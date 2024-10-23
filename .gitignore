@@ -1,0 +1,14 @@
+target/
+
+.idea/
+.vscode
+
+.envrc
+.direnv/
+
+*.pending-snap
+
+flamegraph.svg
+perf.data
+
+Cargo.lock

@@ -1,0 +1,13 @@
+[package]
+name = "lutra-data"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+prqlc-parser = "0.13.2"
+
+[build-dependencies]
+lutra-codegen = { path = "./lutra-codegen" }
+
+[workspace]
+members = ["lutra-codegen"]
