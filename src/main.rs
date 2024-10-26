@@ -14,8 +14,8 @@ fn main() {
         type x = {int, a = text, b = [bool]}
     "#;
 
-    let lr = prqlc_parser::lexer::lex_source(source).unwrap();
-    let (stmts, _errs) = prqlc_parser::parser::parse_lr_to_pr(0, lr.0);
+    let lr = lutra_parser::lexer::lex_source(source).unwrap();
+    let (stmts, _errs) = lutra_parser::parser::parse_lr_to_pr(0, lr.0);
     let mut stmts = stmts.unwrap().into_iter();
 
     let ty_stmt = stmts.next().unwrap();

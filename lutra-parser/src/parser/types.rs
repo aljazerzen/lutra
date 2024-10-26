@@ -1,0 +1,108 @@
+use chumsky::prelude::*;
+
+use super::expr::ident;
+use super::perror::PError;
+use super::pr::*;
+use super::*;
+use crate::lexer::lr::TokenKind;
+
+pub(crate) fn type_expr() -> impl Parser<TokenKind, Ty, Error = PError> + Clone {
+    recursive(|nested_type_expr| {
+        let basic = select! {
+            TokenKind::Ident(i) if i == "int"=> PrimitiveSet::Int,
+            TokenKind::Ident(i) if i == "float"=> PrimitiveSet::Float,
+            TokenKind::Ident(i) if i == "bool"=> PrimitiveSet::Bool,
+            TokenKind::Ident(i) if i == "text"=> PrimitiveSet::Text,
+            TokenKind::Ident(i) if i == "date"=> PrimitiveSet::Date,
+            TokenKind::Ident(i) if i == "time"=> PrimitiveSet::Time,
+            TokenKind::Ident(i) if i == "timestamp"=> PrimitiveSet::Timestamp,
+        }
+        .map(TyKind::Primitive);
+
+        let ident = ident().map(TyKind::Ident);
+
+        let func = keyword("func")
+            .ignore_then(
+                nested_type_expr
+                    .clone()
+                    .map(Some)
+                    .repeated()
+                    .then_ignore(just(TokenKind::ArrowThin))
+                    .then(nested_type_expr.clone().map(Box::new).map(Some))
+                    .map(|(params, return_ty)| TyFunc {
+                        name_hint: None,
+                        params,
+                        return_ty,
+                    })
+                    .or_not(),
+            )
+            .map(TyKind::Function);
+
+        let tuple = sequence(choice((ident_part()
+            .then_ignore(ctrl('='))
+            .or_not()
+            .then(nested_type_expr.clone())
+            .map(|(name, ty)| TyTupleField { name, ty }),)))
+        .delimited_by(ctrl('{'), ctrl('}'))
+        .recover_with(nested_delimiters(
+            TokenKind::Control('{'),
+            TokenKind::Control('}'),
+            [
+                (TokenKind::Control('{'), TokenKind::Control('}')),
+                (TokenKind::Control('('), TokenKind::Control(')')),
+                (TokenKind::Control('['), TokenKind::Control(']')),
+            ],
+            |_| vec![],
+        ))
+        .map(TyKind::Tuple)
+        .labelled("tuple");
+
+        let enum_ = keyword("enum")
+            .ignore_then(
+                sequence(
+                    ident_part()
+                        .then(ctrl('=').ignore_then(nested_type_expr.clone()).or_not())
+                        .map(|(name, ty)| {
+                            (name, ty.unwrap_or_else(|| Ty::new(TyKind::Tuple(vec![]))))
+                        }),
+                )
+                .delimited_by(ctrl('{'), ctrl('}'))
+                .recover_with(nested_delimiters(
+                    TokenKind::Control('{'),
+                    TokenKind::Control('}'),
+                    [
+                        (TokenKind::Control('{'), TokenKind::Control('}')),
+                        (TokenKind::Control('('), TokenKind::Control(')')),
+                        (TokenKind::Control('['), TokenKind::Control(']')),
+                    ],
+                    |_| vec![],
+                )),
+            )
+            .map(TyKind::Enum)
+            .labelled("enum");
+
+        let array = nested_type_expr
+            .map(Box::new)
+            .padded_by(new_line().repeated())
+            .delimited_by(ctrl('['), ctrl(']'))
+            .recover_with(nested_delimiters(
+                TokenKind::Control('['),
+                TokenKind::Control(']'),
+                [
+                    (TokenKind::Control('{'), TokenKind::Control('}')),
+                    (TokenKind::Control('('), TokenKind::Control(')')),
+                    (TokenKind::Control('['), TokenKind::Control(']')),
+                ],
+                |_| Box::new(Ty::new(TyKind::Tuple(vec![]))),
+            ))
+            .map(TyKind::Array)
+            .labelled("array");
+
+        let term = choice((basic, ident, func, tuple, array, enum_))
+            .map_with_span(TyKind::into_ty)
+            .boxed();
+
+        term
+    })
+    .labelled("type expression")
+}

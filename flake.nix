@@ -25,6 +25,9 @@
               "rustfmt"
               "rust-analyzer"
             ])
+
+            pkgs.cargo-nextest
+            pkgs.cargo-insta
           ];
         };
       });

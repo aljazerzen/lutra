@@ -1,10 +1,10 @@
 use std::{borrow::Cow, fmt::Write};
 
-use prqlc_parser::parser::pr;
+use lutra_parser::parser::pr;
 
 pub fn codegen(source: &str) -> Result<String, std::fmt::Error> {
-    let lr = prqlc_parser::lexer::lex_source(source).unwrap();
-    let (stmts, errs) = prqlc_parser::parser::parse_lr_to_pr(0, lr.0);
+    let lr = lutra_parser::lexer::lex_source(source).unwrap();
+    let (stmts, errs) = lutra_parser::parser::parse_lr_to_pr(0, lr.0);
     if !errs.is_empty() {
         panic!("parse errors: {errs:?}");
     }
@@ -59,17 +59,11 @@ fn infer_names_re(ty: &mut pr::Ty, name_prefix: &mut Vec<String>) {
 
         pr::TyKind::Tuple(fields) => {
             for (index, field) in fields.iter_mut().enumerate() {
-                match field {
-                    pr::TyTupleField::Single(name, ty) => {
-                        let name = tuple_field_name(name, index);
-                        name_prefix.push(name.into_owned());
+                let name = tuple_field_name(&field.name, index);
+                name_prefix.push(name.into_owned());
 
-                        let ty = ty.as_mut().unwrap();
-                        infer_names_re(ty, name_prefix);
-                        name_prefix.pop();
-                    }
-                    pr::TyTupleField::Wildcard(_) => todo!(),
-                }
+                infer_names_re(&mut field.ty, name_prefix);
+                name_prefix.pop();
             }
         }
 
@@ -111,19 +105,12 @@ fn write_ty_def<'t>(
             writeln!(w, "pub struct {} {{", name)?;
 
             for (index, field) in fields.iter().enumerate() {
-                match field {
-                    pr::TyTupleField::Single(name, ty) => {
-                        let name = tuple_field_name(name, index);
+                let name = tuple_field_name(&field.name, index);
 
-                        let ty = ty.as_ref().unwrap();
+                write!(w, "    pub {name}: ")?;
+                write_ty_ref(w, &field.ty, false, ctx)?;
 
-                        write!(w, "    pub {name}: ")?;
-                        write_ty_ref(w, ty, false, ctx)?;
-
-                        writeln!(w, ",")?;
-                    }
-                    pr::TyTupleField::Wildcard(_) => todo!(),
-                }
+                writeln!(w, ",")?;
             }
 
             writeln!(w, "}}\n")?;
@@ -202,14 +189,9 @@ fn write_ty_def_impl<'t>(w: &mut impl Write, ty: &'t pr::Ty) -> Result<(), std::
 
         pr::TyKind::Tuple(fields) => {
             for (index, field) in fields.iter().enumerate() {
-                match field {
-                    pr::TyTupleField::Single(field_name, ..) => {
-                        let field_name = tuple_field_name(field_name, index);
+                let field_name = tuple_field_name(&field.name, index);
 
-                        writeln!(w, "        self.{field_name}.encode(w)?;")?;
-                    }
-                    pr::TyTupleField::Wildcard(_) => todo!(),
-                }
+                writeln!(w, "        self.{field_name}.encode(w)?;")?;
             }
 
             writeln!(w, "        Ok(())")?;
@@ -232,31 +214,21 @@ fn write_ty_def_impl<'t>(w: &mut impl Write, ty: &'t pr::Ty) -> Result<(), std::
 
         pr::TyKind::Tuple(fields) => {
             for (index, field) in fields.iter().enumerate() {
-                match field {
-                    pr::TyTupleField::Single(field_name, field_ty) => {
-                        let field_name = tuple_field_name(field_name, index);
-                        let field_ty = field_ty.as_ref().unwrap();
+                let field_name = tuple_field_name(&field.name, index);
+                let field_ty = &field.ty;
 
-                        write!(w, "        let {field_name} = ")?;
+                write!(w, "        let {field_name} = ")?;
 
-                        let mut ctx = Context::default();
-                        write_ty_ref(w, field_ty, true, &mut ctx)?;
+                let mut ctx = Context::default();
+                write_ty_ref(w, field_ty, true, &mut ctx)?;
 
-                        writeln!(w, "::decode(r)?;")?;
-                    }
-                    pr::TyTupleField::Wildcard(_) => todo!(),
-                }
+                writeln!(w, "::decode(r)?;")?;
             }
 
             writeln!(w, "        Ok({name} {{")?;
             for (index, field) in fields.iter().enumerate() {
-                match field {
-                    pr::TyTupleField::Single(field_name, ..) => {
-                        let field_name = tuple_field_name(field_name, index);
-                        writeln!(w, "            {field_name},")?;
-                    }
-                    pr::TyTupleField::Wildcard(_) => todo!(),
-                }
+                let field_name = tuple_field_name(&field.name, index);
+                writeln!(w, "            {field_name},")?;
             }
             writeln!(w, "        }})")?;
         }

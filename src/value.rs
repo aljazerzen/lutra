@@ -1,4 +1,4 @@
-use prqlc_parser::parser::pr;
+use lutra_parser::parser::pr;
 use std::io::{Read, Write};
 
 use crate::{Decode, Encode};
@@ -54,16 +54,11 @@ pub fn decode<'t>(r: &mut impl Read, ty: &'t pr::Ty) -> std::io::Result<Value<'t
 
         pr::TyKind::Tuple(fields) => {
             let mut res = Vec::with_capacity(fields.len());
-            for f in fields {
-                match f {
-                    pr::TyTupleField::Single(name, ty) => {
-                        let name = name.as_deref();
-                        let ty = ty.as_ref().unwrap();
+            for field in fields {
+                let name = field.name.as_deref();
+                let ty = &field.ty;
 
-                        res.push((name, decode(r, ty)?));
-                    }
-                    pr::TyTupleField::Wildcard(_) => todo!(),
-                }
+                res.push((name, decode(r, ty)?));
             }
             Value::Tuple(res)
         }
