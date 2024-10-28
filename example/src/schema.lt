@@ -1,0 +1,5 @@
+type x = {int, a = text, b = [bool]}
+
+type y = [int]
+
+type z = bool

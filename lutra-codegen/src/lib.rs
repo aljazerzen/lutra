@@ -179,16 +179,30 @@ fn write_ty_def_impl<'t>(w: &mut impl Write, ty: &'t pr::Ty) -> Result<(), std::
     let name = ty.name.as_ref().unwrap();
 
     match &ty.kind {
-        pr::TyKind::Primitive(_) | pr::TyKind::Array(_) => {
+        pr::TyKind::Primitive(_) => {
             writeln!(w, "impl ::lutra_bin::Encode for {name} {{")?;
             writeln!(w, "    type BodyMeta = ();")?;
-            writeln!(w, "    fn encode_body(&self, w: &mut Vec<u8>)")?;
+            writeln!(w, "    fn encode_body(&self, _w: &mut Vec<u8>)")?;
             writeln!(w, "        -> std::io::Result<()> {{")?;
             writeln!(w, "        Ok(())")?;
             writeln!(w, "    }}")?;
             writeln!(w, "    fn encode_head(&self, _: (), w: &mut Vec<u8>)")?;
             writeln!(w, "        -> std::io::Result<()> {{")?;
             writeln!(w, "        self.0.encode_head((), w)")?;
+            writeln!(w, "    }}")?;
+            writeln!(w, "}}")?;
+        }
+
+        pr::TyKind::Array(_) => {
+            writeln!(w, "impl ::lutra_bin::Encode for {name} {{")?;
+            writeln!(w, "    type BodyMeta = usize;")?;
+            writeln!(w, "    fn encode_body(&self, w: &mut Vec<u8>)")?;
+            writeln!(w, "        -> std::io::Result<usize> {{")?;
+            writeln!(w, "        self.0.encode_body(w)")?;
+            writeln!(w, "    }}")?;
+            writeln!(w, "    fn encode_head(&self, meta: usize, w: &mut Vec<u8>)")?;
+            writeln!(w, "        -> std::io::Result<()> {{")?;
+            writeln!(w, "        self.0.encode_head(meta, w)")?;
             writeln!(w, "    }}")?;
             writeln!(w, "}}")?;
         }
@@ -232,7 +246,6 @@ fn write_ty_def_impl<'t>(w: &mut impl Write, ty: &'t pr::Ty) -> Result<(), std::
             writeln!(w, "    }}")?;
 
             writeln!(w, "}}")?;
-            
 
             // body meta struct
             writeln!(w, "#[allow(non_camel_case_types)]")?;
@@ -253,34 +266,56 @@ fn write_ty_def_impl<'t>(w: &mut impl Write, ty: &'t pr::Ty) -> Result<(), std::
         _ => unimplemented!(),
     }
 
-    writeln!(w, "impl ::lutra_bin::Layout for {name} {{")?;
-    writeln!(w, "    fn head_size() -> usize {{")?;
     match &ty.kind {
         pr::TyKind::Primitive(_) | pr::TyKind::Array(_) => {
-            writeln!(w, "        self.0.head_size(r)")?;
+            writeln!(w, "impl ::lutra_bin::Layout for {name} {{")?;
+            writeln!(w, "    fn head_size() -> usize {{")?;
+
+            write!(w, "        ")?;
+            let mut ctx = Context::default();
+            write_ty_ref(w, ty, true, &mut ctx)?;
+            writeln!(w, "::head_size()")?;
+
+            writeln!(w, "    }}")?;
+            writeln!(w, "}}\n")?;
         }
 
         pr::TyKind::Tuple(fields) => {
             let head_size: usize = fields.iter().map(|f| lutra_bin::get_head_size(&f.ty)).sum();
+            writeln!(w, "impl ::lutra_bin::Layout for {name} {{")?;
+            writeln!(w, "    fn head_size() -> usize {{")?;
             writeln!(w, "        {head_size}")?;
+            writeln!(w, "    }}")?;
+            writeln!(w, "}}\n")?;
         }
 
         _ => unimplemented!(),
     }
-    writeln!(w, "    }}")?;
-    writeln!(w, "}}\n")?;
 
-    writeln!(w, "impl ::lutra_bin::Decode for {name} {{")?;
-    writeln!(
-        w,
-        "    fn decode(r: &mut ::lutra_bin::Reader<'_>) -> std::io::Result<Self> {{"
-    )?;
     match &ty.kind {
         pr::TyKind::Primitive(_) | pr::TyKind::Array(_) => {
-            writeln!(w, "        self.0.decode(r)")?;
+            writeln!(w, "impl ::lutra_bin::Decode for {name} {{")?;
+            writeln!(
+                w,
+                "    fn decode(r: &mut ::lutra_bin::Reader<'_>) -> std::io::Result<Self> {{"
+            )?;
+
+            write!(w, "        Ok(Self(")?;
+            let mut ctx = Context::default();
+            write_ty_ref(w, ty, true, &mut ctx)?;
+            writeln!(w, "::decode(r)?))")?;
+
+            writeln!(w, "    }}")?;
+            writeln!(w, "}}\n")?;
         }
 
         pr::TyKind::Tuple(fields) => {
+            writeln!(w, "impl ::lutra_bin::Decode for {name} {{")?;
+            writeln!(
+                w,
+                "    fn decode(r: &mut ::lutra_bin::Reader<'_>) -> std::io::Result<Self> {{"
+            )?;
+
             for (index, field) in fields.iter().enumerate() {
                 let field_name = tuple_field_name(&field.name, index);
                 let field_ty = &field.ty;
@@ -299,12 +334,13 @@ fn write_ty_def_impl<'t>(w: &mut impl Write, ty: &'t pr::Ty) -> Result<(), std::
                 writeln!(w, "            {field_name},")?;
             }
             writeln!(w, "        }})")?;
+
+            writeln!(w, "    }}")?;
+            writeln!(w, "}}\n")?;
         }
 
         _ => unimplemented!(),
     }
-    writeln!(w, "    }}")?;
-    writeln!(w, "}}\n")?;
 
     Ok(())
 }

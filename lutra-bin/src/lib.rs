@@ -3,5 +3,5 @@ mod layout;
 mod value;
 
 pub use encode::{Decode, Encode, Reader};
-pub use layout::{Layout, get_head_size};
+pub use layout::{get_head_size, Layout};
 pub use value::Value;

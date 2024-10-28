@@ -1,20 +1,6 @@
-[package]
-name = "lutra-data"
-edition.workspace = true
-license.workspace = true
-repository.workspace = true
-rust-version.workspace = true
-version.workspace = true
-
-[dependencies]
-lutra-parser = { path = "lutra-parser" }
-lutra-bin = { path = "lutra-bin" }
-
-[build-dependencies]
-lutra-codegen = { path = "./lutra-codegen" }
-
 [workspace]
-members = ["lutra-bin", "lutra-codegen", "lutra-parser"]
+members = ["example", "lutra-bin", "lutra-codegen", "lutra-parser"]
+resolver = "2"
 
 [workspace.package]
 edition = "2021"
