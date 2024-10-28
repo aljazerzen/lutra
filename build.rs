@@ -2,7 +2,7 @@ use std::{env, fs::File, io::Write, path::Path};
 
 fn main() {
     let source = r#"
-        type x = {int, a = text, b = [bool]} 
+        type x = {int, a = text, b = [bool]}
     "#;
 
     let out_dir = env::var_os("OUT_DIR").unwrap();

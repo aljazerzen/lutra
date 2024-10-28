@@ -1,13 +1,10 @@
 [package]
-name = "lutra-codegen"
-
+name = "lutra-bin"
 edition.workspace = true
 license.workspace = true
 repository.workspace = true
 rust-version.workspace = true
 version.workspace = true
 
-
 [dependencies]
 lutra-parser = { path = "../lutra-parser" }
-lutra-bin = { path = "../lutra-bin" }

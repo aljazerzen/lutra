@@ -1,13 +1,9 @@
-mod value;
-mod encode;
-
-pub use encode::{Encode, Decode};
-
 mod hello {
     include!(concat!(env!("OUT_DIR"), "/hello.rs"));
 }
 
-use value::Value;
+use lutra_bin::Value;
+use lutra_bin::{Decode, Encode};
 
 fn main() {
     let source = r#"
@@ -31,14 +27,17 @@ fn main() {
     ]);
 
     let mut buf = Vec::new();
-    value::encode(&mut buf, &value).unwrap();
+    value.encode(&mut buf).unwrap();
     dbg!(&buf);
 
-    let mut buf_reader = buf.as_slice();
-    let value = value::decode(&mut buf_reader, &ty).unwrap();
+    let value = Value::decode(&buf, &ty).unwrap();
     dbg!(value);
 
-    let mut buf_reader = buf.as_slice();
-    let x = hello::x::decode(&mut buf_reader).unwrap();
-    dbg!(x);
+    let x = hello::x::decode_bytes(&buf).unwrap();
+    dbg!(&x);
+
+    let mut buf2 = Vec::new();
+    x.encode(&mut buf2).unwrap();
+
+    assert_eq!(buf, buf2);
 }

@@ -177,24 +177,92 @@ fn write_ty_ref<'t>(
 /// Generates the impl encode for a type.
 fn write_ty_def_impl<'t>(w: &mut impl Write, ty: &'t pr::Ty) -> Result<(), std::fmt::Error> {
     let name = ty.name.as_ref().unwrap();
-    writeln!(w, "impl crate::Encode for {name} {{")?;
-    writeln!(
-        w,
-        "    fn encode(&self, w: &mut impl std::io::Write) -> std::io::Result<()> {{"
-    )?;
+
     match &ty.kind {
         pr::TyKind::Primitive(_) | pr::TyKind::Array(_) => {
-            writeln!(w, "        todo!()")?;
+            writeln!(w, "impl ::lutra_bin::Encode for {name} {{")?;
+            writeln!(w, "    type BodyMeta = ();")?;
+            writeln!(w, "    fn encode_body(&self, w: &mut Vec<u8>)")?;
+            writeln!(w, "        -> std::io::Result<()> {{")?;
+            writeln!(w, "        Ok(())")?;
+            writeln!(w, "    }}")?;
+            writeln!(w, "    fn encode_head(&self, _: (), w: &mut Vec<u8>)")?;
+            writeln!(w, "        -> std::io::Result<()> {{")?;
+            writeln!(w, "        self.0.encode_head((), w)")?;
+            writeln!(w, "    }}")?;
+            writeln!(w, "}}")?;
         }
 
         pr::TyKind::Tuple(fields) => {
+            writeln!(w, "impl ::lutra_bin::Encode for {name} {{")?;
+            writeln!(w, "    type BodyMeta = {name}BodyMeta;")?;
+
+            // encode body
+            writeln!(w, "    fn encode_body(&self, w: &mut Vec<u8>)")?;
+            writeln!(w, "        -> std::io::Result<Self::BodyMeta> {{")?;
+
             for (index, field) in fields.iter().enumerate() {
                 let field_name = tuple_field_name(&field.name, index);
 
-                writeln!(w, "        self.{field_name}.encode(w)?;")?;
+                writeln!(w, "        let {0} = self.{0}.encode_body(w)?;", field_name)?;
             }
 
+            writeln!(w, "        Ok({name}BodyMeta {{")?;
+            for (index, field) in fields.iter().enumerate() {
+                let field_name = tuple_field_name(&field.name, index);
+
+                writeln!(w, "            {field_name},")?;
+            }
+            writeln!(w, "        }})")?;
+            writeln!(w, "    }}")?;
+
+            // encode head
+            writeln!(
+                w,
+                "    fn encode_head(&self, meta: Self::BodyMeta, w: &mut Vec<u8>)"
+            )?;
+            writeln!(w, "        -> std::io::Result<()> {{")?;
+
+            for (index, field) in fields.iter().enumerate() {
+                let field_name = tuple_field_name(&field.name, index);
+
+                writeln!(w, "        self.{0}.encode_head(meta.{0}, w)?;", field_name)?;
+            }
             writeln!(w, "        Ok(())")?;
+            writeln!(w, "    }}")?;
+
+            writeln!(w, "}}")?;
+            
+
+            // body meta struct
+            writeln!(w, "#[allow(non_camel_case_types)]")?;
+            writeln!(w, "pub struct {name}BodyMeta {{")?;
+            for (index, field) in fields.iter().enumerate() {
+                let field_name = tuple_field_name(&field.name, index);
+
+                write!(w, "    {field_name}: <")?;
+
+                let mut ctx = Context::default();
+                write_ty_ref(w, &field.ty, true, &mut ctx)?;
+
+                writeln!(w, " as ::lutra_bin::Encode>::BodyMeta,")?;
+            }
+            writeln!(w, "}}")?;
+        }
+
+        _ => unimplemented!(),
+    }
+
+    writeln!(w, "impl ::lutra_bin::Layout for {name} {{")?;
+    writeln!(w, "    fn head_size() -> usize {{")?;
+    match &ty.kind {
+        pr::TyKind::Primitive(_) | pr::TyKind::Array(_) => {
+            writeln!(w, "        self.0.head_size(r)")?;
+        }
+
+        pr::TyKind::Tuple(fields) => {
+            let head_size: usize = fields.iter().map(|f| lutra_bin::get_head_size(&f.ty)).sum();
+            writeln!(w, "        {head_size}")?;
         }
 
         _ => unimplemented!(),
@@ -202,14 +270,14 @@ fn write_ty_def_impl<'t>(w: &mut impl Write, ty: &'t pr::Ty) -> Result<(), std::
     writeln!(w, "    }}")?;
     writeln!(w, "}}\n")?;
 
-    writeln!(w, "impl crate::Decode for {name} {{")?;
+    writeln!(w, "impl ::lutra_bin::Decode for {name} {{")?;
     writeln!(
         w,
-        "    fn decode(r: &mut impl std::io::Read) -> std::io::Result<Self> {{"
+        "    fn decode(r: &mut ::lutra_bin::Reader<'_>) -> std::io::Result<Self> {{"
     )?;
     match &ty.kind {
         pr::TyKind::Primitive(_) | pr::TyKind::Array(_) => {
-            writeln!(w, "        todo!()")?;
+            writeln!(w, "        self.0.decode(r)")?;
         }
 
         pr::TyKind::Tuple(fields) => {
