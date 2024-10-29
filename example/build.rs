@@ -7,7 +7,7 @@ fn main() {
     let out_dir = env::var_os("OUT_DIR").unwrap();
     let out_dir = Path::new(&out_dir);
 
-    let compiled_files = lutra_codegen::compile_dir(&in_dir, &out_dir);
+    let compiled_files = lutra_codegen::compile_dir(in_dir, out_dir);
 
     for f in compiled_files {
         println!("cargo::rerun-if-changed={}", f.to_str().unwrap());

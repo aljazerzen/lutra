@@ -142,13 +142,13 @@ fn write_ty_def<'t>(
             for (index, (variant_name, variant_ty)) in variants.iter().enumerate() {
                 write!(w, "    {variant_name}")?;
                 if !is_unit_variant(variant_ty) {
-                    let needs_box = ctx.cache.does_enum_variant_contain_recursive(&ty, index);
+                    let needs_box = ctx.cache.does_enum_variant_contain_recursive(ty, index);
 
                     write!(w, "(")?;
                     if needs_box {
                         write!(w, "Box<")?;
                     }
-                    write_ty_ref(w, &variant_ty, false, ctx)?;
+                    write_ty_ref(w, variant_ty, false, ctx)?;
                     if needs_box {
                         write!(w, ">")?;
                     }
@@ -258,6 +258,7 @@ fn write_ty_def_impl<'t>(
         }
 
         pr::TyKind::Tuple(fields) => {
+            writeln!(w, "#[allow(clippy::all)]")?;
             writeln!(w, "impl ::lutra_bin::Encode for {name} {{")?;
             writeln!(w, "    type BodyMeta = {name}BodyMeta;")?;
 
@@ -308,7 +309,7 @@ fn write_ty_def_impl<'t>(
         }
 
         pr::TyKind::Enum(variants) => {
-            let head = layout::enum_head_format(&variants, &mut ctx.cache).unwrap();
+            let head = layout::enum_head_format(variants, &mut ctx.cache).unwrap();
 
             let needs_body_meta = variants.iter().any(|(_, t)| !is_unit_variant(t));
             let body_meta_name = if needs_body_meta {
@@ -318,6 +319,7 @@ fn write_ty_def_impl<'t>(
             };
 
             writeln!(w, "#[allow(unused_variables)]")?;
+            writeln!(w, "#[allow(clippy::all)]")?;
             writeln!(w, "impl ::lutra_bin::Encode for {name} {{")?;
             writeln!(w, "    type BodyMeta = {body_meta_name};")?;
             writeln!(w, "    fn encode_body(&self, w: &mut Vec<u8>) -> ::lutra_bin::Result<{body_meta_name}> {{")?;
@@ -419,7 +421,7 @@ fn write_ty_def_impl<'t>(
                     if variant.is_inline {
                         write!(w, "(<")?;
                         let mut ctx = Context::default();
-                        write_ty_ref(w, &variant_ty, false, &mut ctx)?;
+                        write_ty_ref(w, variant_ty, false, &mut ctx)?;
                         write!(w, " as ::lutra_bin::Encode>::BodyMeta)")?;
                     } else {
                         write!(w, "(usize)")?;
@@ -531,7 +533,7 @@ fn write_ty_def_impl<'t>(
                     writeln!(w, "                r.skip({});", variant_format.padding / 8)?;
                 }
 
-                let needs_box = ctx.cache.does_enum_variant_contain_recursive(&ty, index);
+                let needs_box = ctx.cache.does_enum_variant_contain_recursive(ty, index);
 
                 if is_unit_variant(variant_ty) {
                     writeln!(w, "                {name}::{variant_name}")?;

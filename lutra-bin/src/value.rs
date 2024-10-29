@@ -105,12 +105,12 @@ fn encode_body<'t>(
 
             let mut metas = Vec::with_capacity(items.len());
             for i in items {
-                metas.push(encode_body(w, i, &items_ty, ctx)?);
+                metas.push(encode_body(w, i, items_ty, ctx)?);
             }
 
             let items_start = w.len();
             for (i, m) in items.iter().zip(metas.into_iter()) {
-                encode_head(w, i, m, &items_ty, ctx)?;
+                encode_head(w, i, m, items_ty, ctx)?;
             }
 
             Ok(ValueBodyMeta::Offset(items_start))
@@ -120,13 +120,13 @@ fn encode_body<'t>(
 
             let (_, variant_format, _, variant_ty) = encode_enum_params(variant, variants, ctx)?;
 
-            let meta = encode_body(w, &inner, variant_ty, ctx)?;
+            let meta = encode_body(w, inner, variant_ty, ctx)?;
 
             if variant_format.is_inline {
                 Ok(meta)
             } else {
                 let variant_start = w.len();
-                encode_head(w, &inner, meta, variant_ty, ctx)?;
+                encode_head(w, inner, meta, variant_ty, ctx)?;
                 Ok(ValueBodyMeta::Offset(variant_start))
             }
         }
@@ -184,8 +184,8 @@ fn encode_head<'t>(
             };
 
             let offset = w.len() - items_offset;
-            w.write(&(offset as u32).to_le_bytes())?;
-            w.write(&(items.len() as u32).to_le_bytes())?;
+            w.write_all(&(offset as u32).to_le_bytes())?;
+            w.write_all(&(items.len() as u32).to_le_bytes())?;
         }
         Value::Enum(variant, inner) => {
             let variants = expect_ty(ty, |k| k.as_enum(), "enum")?;
@@ -195,22 +195,20 @@ fn encode_head<'t>(
             let tag_bytes = &(tag as u64).to_le_bytes()[0..(head.s / 8)];
 
             if variant.is_inline {
-                w.write(tag_bytes)?;
-                encode_head(w, &inner, body_meta, &variant_ty, ctx)?;
+                w.write_all(tag_bytes)?;
+                encode_head(w, inner, body_meta, variant_ty, ctx)?;
             } else {
                 let ValueBodyMeta::Offset(inner_start) = body_meta else {
                     unreachable!()
                 };
                 let offset = w.len() - inner_start;
 
-                w.write(tag_bytes)?;
-                w.write(&(offset as u32).to_le_bytes())?;
+                w.write_all(tag_bytes)?;
+                w.write_all(&(offset as u32).to_le_bytes())?;
             }
 
             if variant.padding > 0 {
-                let mut padding = Vec::new();
-                padding.resize(variant.padding / 8, 0);
-                w.write(&padding)?;
+                w.write_all(&vec![0; variant.padding / 8])?;
             }
         }
     }
@@ -220,14 +218,14 @@ fn encode_head<'t>(
 
 fn encode_enum_params<'t>(
     variant: &str,
-    ty_variants: &'t Vec<(String, pr::Ty)>,
+    ty_variants: &'t [(String, pr::Ty)],
     cache: &mut Context<'t>,
 ) -> Result<(EnumHeadFormat, EnumVariantFormat, usize, &'t pr::Ty)> {
     let head_format = layout::enum_head_format(ty_variants, &mut cache.cache)?;
 
     let tag = ty_variants
         .iter()
-        .position(|v| &v.0 == variant)
+        .position(|v| v.0 == variant)
         .ok_or(Error::InvalidData)?;
     let (_, variant_ty) = ty_variants.get(tag).ok_or(Error::InvalidData)?;
 
@@ -247,8 +245,8 @@ impl<'t> Value<'t> {
     }
 }
 
-fn decode_inner<'b, 't>(
-    r: &mut Reader<'b>,
+fn decode_inner<'t>(
+    r: &mut Reader<'_>,
     ty: &'t pr::Ty,
     ctx: &mut Context<'t>,
 ) -> Result<Value<'t>> {
@@ -282,7 +280,7 @@ fn decode_inner<'b, 't>(
 
             let mut buf = Vec::with_capacity(len);
             for _ in 0..len {
-                buf.push(decode_inner(&mut body, &item_ty, ctx)?);
+                buf.push(decode_inner(&mut body, item_ty, ctx)?);
             }
 
             Value::Array(buf)
@@ -328,7 +326,7 @@ where
     })
 }
 
-fn expect_ty_primitive<'t>(ty: &'t pr::Ty, expected: pr::PrimitiveSet) -> Result<()> {
+fn expect_ty_primitive(ty: &pr::Ty, expected: pr::PrimitiveSet) -> Result<()> {
     let found = ty.kind.as_primitive().ok_or_else(|| Error::TypeMismatch {
         expected: primitive_set_name(&expected),
         found: ty.kind.as_ref().to_string(),

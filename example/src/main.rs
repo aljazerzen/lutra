@@ -4,8 +4,7 @@ mod schema {
 
 use std::collections::HashMap;
 
-use lutra_bin::Value;
-use lutra_bin::{Decode, Encode};
+use lutra_bin::{Decode, Encode, Value};
 use lutra_parser::parser::pr;
 
 fn main() {
@@ -26,7 +25,7 @@ fn main() {
         let mut buf = Vec::new();
         x_value.encode(&mut buf, x_ty).unwrap();
 
-        let x_value = Value::decode(&buf, &x_ty).unwrap();
+        let x_value = Value::decode(&buf, x_ty).unwrap();
         dbg!(&x_value);
 
         let x = schema::x::decode_buffer(&buf).unwrap();
@@ -49,7 +48,7 @@ fn main() {
         let mut buf = Vec::new();
         y_value.encode(&mut buf, y_ty).unwrap();
 
-        let y_value = Value::decode(&buf, &y_ty).unwrap();
+        let y_value = Value::decode(&buf, y_ty).unwrap();
         dbg!(y_value);
 
         let y = schema::y::decode_buffer(&buf).unwrap();
@@ -68,7 +67,7 @@ fn main() {
         let mut buf = Vec::new();
         z_value.encode(&mut buf, z_ty).unwrap();
 
-        let z_value = Value::decode(&buf, &z_ty).unwrap();
+        let z_value = Value::decode(&buf, z_ty).unwrap();
         dbg!(z_value);
 
         let z = schema::z::decode_buffer(&buf).unwrap();
@@ -87,7 +86,7 @@ fn main() {
         let mut buf = Vec::new();
         u_value.encode(&mut buf, u_ty).unwrap();
 
-        let u_value = Value::decode(&buf, &u_ty).unwrap();
+        let u_value = Value::decode(&buf, u_ty).unwrap();
         dbg!(u_value);
 
         let u = schema::u::decode_buffer(&buf).unwrap();
@@ -106,7 +105,7 @@ fn main() {
         let mut buf = Vec::new();
         u_value.encode(&mut buf, u_ty).unwrap();
 
-        let u_value = Value::decode(&buf, &u_ty).unwrap();
+        let u_value = Value::decode(&buf, u_ty).unwrap();
         dbg!(u_value);
 
         let u = schema::u::decode_buffer(&buf).unwrap();
@@ -124,14 +123,14 @@ fn main() {
             "h".into(),
             Box::new(Value::Tuple(vec![
                 (Some("a".into()), Value::Integer(-12)),
-                (Some("b".into()), Value::Float(3.14)),
+                (Some("b".into()), Value::Float(3.16)),
             ])),
         );
 
         let mut buf = Vec::new();
         u_value.encode(&mut buf, u_ty).unwrap();
 
-        let u_value = Value::decode(&buf, &u_ty).unwrap();
+        let u_value = Value::decode(&buf, u_ty).unwrap();
         dbg!(u_value);
 
         let u = schema::u::decode_buffer(&buf).unwrap();
@@ -150,7 +149,7 @@ fn main() {
         let mut buf = Vec::new();
         v_value.encode(&mut buf, v_ty).unwrap();
 
-        let v_value = Value::decode(&buf, &v_ty).unwrap();
+        let v_value = Value::decode(&buf, v_ty).unwrap();
         dbg!(v_value);
 
         let v = schema::v::decode_buffer(&buf).unwrap();
@@ -193,7 +192,7 @@ fn main() {
         let mut buf = Vec::new();
         tree_value.encode(&mut buf, tree_ty).unwrap();
 
-        let tree_value = Value::decode(&buf, &tree_ty).unwrap();
+        let tree_value = Value::decode(&buf, tree_ty).unwrap();
         dbg!(tree_value);
 
         let tree = schema::Tree::decode_buffer(&buf).unwrap();
@@ -217,9 +216,9 @@ fn main() {
         ]);
 
         let mut ltd_buf = Vec::new();
-        lutra_file::encode_typed_data(&mut ltd_buf, x_value, x_ty).unwrap();
+        lutra_typed_data::encode_typed_data(&mut ltd_buf, x_value, x_ty).unwrap();
 
-        let (x_value, _x_ty) = lutra_file::decode_typed_data(&ltd_buf).unwrap();
+        let (x_value, _x_ty) = lutra_typed_data::decode_typed_data(&ltd_buf).unwrap();
         dbg!(x_value);
     }
 
@@ -228,9 +227,9 @@ fn main() {
         let z_value = Value::Boolean(true);
 
         let mut ltd_buf = Vec::new();
-        lutra_file::encode_typed_data(&mut ltd_buf, z_value, z_ty).unwrap();
+        lutra_typed_data::encode_typed_data(&mut ltd_buf, z_value, z_ty).unwrap();
 
-        let (z_value, _z_ty) = lutra_file::decode_typed_data(&ltd_buf).unwrap();
+        let (z_value, _z_ty) = lutra_typed_data::decode_typed_data(&ltd_buf).unwrap();
         dbg!(z_value);
     }
 }

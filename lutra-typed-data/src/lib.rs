@@ -29,7 +29,7 @@ pub fn encode_typed_data<'t>(
     let mut data_u8 = Vec::new();
     value.encode(&mut data_u8, ty)?;
 
-    let ty = type_from_pr(&ty);
+    let ty = type_from_pr(ty);
 
     let mut data = Vec::with_capacity(data_u8.len());
     for datum in data_u8 {
@@ -58,7 +58,7 @@ fn type_to_pr(ty: &schema::Ty) -> pr::Ty {
         }
         schema::Ty::Tuple(fields) => pr::TyKind::Tuple(
             fields
-                .into_iter()
+                .iter()
                 .map(|f| {
                     let name = match &f.name {
                         schema::OptText::None => None,
@@ -69,10 +69,10 @@ fn type_to_pr(ty: &schema::Ty) -> pr::Ty {
                 })
                 .collect(),
         ),
-        schema::Ty::Array(items_ty) => pr::TyKind::Array(Box::new(type_to_pr(&items_ty))),
+        schema::Ty::Array(items_ty) => pr::TyKind::Array(Box::new(type_to_pr(items_ty))),
         schema::Ty::Enum(variants) => pr::TyKind::Enum(
             variants
-                .into_iter()
+                .iter()
                 .map(|v| (v.name.clone(), type_to_pr(&v.ty)))
                 .collect(),
         ),
@@ -99,7 +99,7 @@ fn type_from_pr(ty: &pr::Ty) -> schema::Ty {
         }
         pr::TyKind::Tuple(fields) => schema::Ty::Tuple(
             fields
-                .into_iter()
+                .iter()
                 .map(|f| {
                     let name = match &f.name {
                         None => schema::OptText::None,
@@ -110,10 +110,10 @@ fn type_from_pr(ty: &pr::Ty) -> schema::Ty {
                 })
                 .collect(),
         ),
-        pr::TyKind::Array(items_ty) => schema::Ty::Array(Box::new(type_from_pr(&items_ty))),
+        pr::TyKind::Array(items_ty) => schema::Ty::Array(Box::new(type_from_pr(items_ty))),
         pr::TyKind::Enum(variants) => schema::Ty::Enum(
             variants
-                .into_iter()
+                .iter()
                 .map(|v| TyEnumItems {
                     name: v.0.clone(),
                     ty: type_from_pr(&v.1),
