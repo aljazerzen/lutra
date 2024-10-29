@@ -1,7 +1,8 @@
 use lutra_parser::parser::pr;
 use std::io::Write;
 
-use crate::{encode::Reader, layout, Decode, Encode};
+use crate::layout::{self, EnumHeadFormat, EnumVariantFormat};
+use crate::{encode::Reader, Decode, Encode};
 
 #[derive(Debug)]
 pub enum Value<'ty> {
@@ -11,13 +12,14 @@ pub enum Value<'ty> {
     String(String),
     Tuple(Vec<(Option<&'ty str>, Value<'ty>)>),
     Array(Vec<Value<'ty>>),
+    Enum(&'ty str, Box<Value<'ty>>),
 }
 
-impl Value<'_> {
+impl<'t> Value<'t> {
     /// Convert a Lutra [Value] to .ld binary encoding.
-    pub fn encode(&self, w: &mut Vec<u8>) -> std::io::Result<()> {
-        let meta = encode_body(w, self)?;
-        encode_head(w, self, meta)?;
+    pub fn encode(&self, w: &mut Vec<u8>, ty: &'t pr::Ty) -> std::io::Result<()> {
+        let meta = encode_body(w, self, ty)?;
+        encode_head(w, self, meta, ty)?;
         Ok(())
     }
 }
@@ -28,7 +30,11 @@ enum ValueBodyMeta {
     Tuple(Vec<ValueBodyMeta>),
 }
 
-fn encode_body(w: &mut Vec<u8>, value: &Value) -> std::io::Result<ValueBodyMeta> {
+fn encode_body<'t>(
+    w: &mut Vec<u8>,
+    value: &Value,
+    ty: &'t pr::Ty,
+) -> std::io::Result<ValueBodyMeta> {
     match value {
         Value::Boolean(_) | Value::Integer(_) | Value::Float(_) => Ok(ValueBodyMeta::None),
         Value::String(v) => {
@@ -36,30 +42,54 @@ fn encode_body(w: &mut Vec<u8>, value: &Value) -> std::io::Result<ValueBodyMeta>
             Ok(ValueBodyMeta::Offset(meta))
         }
         Value::Tuple(fields) => {
+            let ty_fields = ty.kind.as_tuple().unwrap();
+
             let mut metas = Vec::with_capacity(fields.len());
-            for (_, f) in fields {
-                metas.push(encode_body(w, f)?);
+            for ((_, f), f_ty) in fields.iter().zip(ty_fields) {
+                metas.push(encode_body(w, f, &f_ty.ty)?);
             }
 
             Ok(ValueBodyMeta::Tuple(metas))
         }
         Value::Array(items) => {
+            let items_ty = ty.kind.as_array().unwrap();
+
             let mut metas = Vec::with_capacity(items.len());
             for i in items {
-                metas.push(encode_body(w, i)?);
+                metas.push(encode_body(w, i, &items_ty)?);
             }
 
             let items_start = w.len();
             for (i, m) in items.iter().zip(metas.into_iter()) {
-                encode_head(w, i, m)?;
+                encode_head(w, i, m, &items_ty)?;
             }
 
             Ok(ValueBodyMeta::Offset(items_start))
         }
+        Value::Enum(variant, inner) => {
+            let variants = ty.kind.as_enum().unwrap();
+
+            let (_, variant_format, _, variant_ty) = encode_enum_params(variant, variants);
+
+            let meta = encode_body(w, &inner, variant_ty)?;
+
+            if variant_format.is_inline {
+                Ok(meta)
+            } else {
+                let variant_start = w.len();
+                encode_head(w, &inner, meta, variant_ty)?;
+                Ok(ValueBodyMeta::Offset(variant_start))
+            }
+        }
     }
 }
 
-fn encode_head(w: &mut Vec<u8>, value: &Value, body_meta: ValueBodyMeta) -> std::io::Result<()> {
+fn encode_head<'t>(
+    w: &mut Vec<u8>,
+    value: &Value,
+    body_meta: ValueBodyMeta,
+    ty: &'t pr::Ty,
+) -> std::io::Result<()> {
     match value {
         Value::Boolean(v) => {
             v.encode_head((), w)?;
@@ -78,12 +108,14 @@ fn encode_head(w: &mut Vec<u8>, value: &Value, body_meta: ValueBodyMeta) -> std:
             v.encode_head(bytes_offset, w)?;
         }
         Value::Tuple(fields) => {
+            let ty_fields = ty.kind.as_tuple().unwrap();
+
             let ValueBodyMeta::Tuple(metas) = body_meta else {
                 unreachable!()
             };
 
-            for ((_, f), m) in fields.iter().zip(metas.into_iter()) {
-                encode_head(w, f, m)?;
+            for (((_, f), m), f_ty) in fields.iter().zip(metas.into_iter()).zip(ty_fields) {
+                encode_head(w, f, m, &f_ty.ty)?;
             }
         }
         Value::Array(items) => {
@@ -95,9 +127,48 @@ fn encode_head(w: &mut Vec<u8>, value: &Value, body_meta: ValueBodyMeta) -> std:
             w.write(&(offset as u32).to_le_bytes())?;
             w.write(&(items.len() as u32).to_le_bytes())?;
         }
+        Value::Enum(variant, inner) => {
+            let variants = ty.kind.as_enum().unwrap();
+
+            let (head, variant, tag, variant_ty) = encode_enum_params(variant, variants);
+
+            let tag_bytes = &(tag as u64).to_le_bytes()[0..(head.s / 8)];
+
+            if variant.is_inline {
+                w.write(tag_bytes)?;
+                encode_head(w, &inner, body_meta, &variant_ty)?;
+            } else {
+                let ValueBodyMeta::Offset(inner_start) = body_meta else {
+                    unreachable!()
+                };
+                let offset = w.len() - inner_start;
+
+                w.write(tag_bytes)?;
+                w.write(&(offset as u32).to_le_bytes())?;
+            }
+
+            if variant.padding > 0 {
+                let mut padding = Vec::new();
+                padding.resize(variant.padding / 8, 0);
+                w.write(&padding)?;
+            }
+        }
     }
 
     Ok(())
+}
+
+fn encode_enum_params<'a>(
+    variant: &'a str,
+    ty_variants: &'a Vec<(String, pr::Ty)>,
+) -> (EnumHeadFormat, EnumVariantFormat, usize, &'a pr::Ty) {
+    let head_format = layout::enum_head_format(ty_variants);
+
+    let tag = ty_variants.iter().position(|v| &v.0 == variant).unwrap();
+    let (_, variant_ty) = ty_variants.get(tag).unwrap();
+
+    let variant_format = layout::enum_variant_format(&head_format, variant_ty);
+    (head_format, variant_format, tag, variant_ty)
 }
 
 impl<'t> Value<'t> {
@@ -132,7 +203,7 @@ fn decode_inner<'b, 't>(r: &mut Reader<'b>, ty: &'t pr::Ty) -> std::io::Result<V
 
             let offset = r.copy_const::<4>();
             let offset = u32::from_le_bytes(offset) as usize;
-            body.apply_offset(offset);
+            body.rewind(offset);
 
             let len = r.copy_const::<4>();
             let len = u32::from_le_bytes(len) as usize;
@@ -144,6 +215,33 @@ fn decode_inner<'b, 't>(r: &mut Reader<'b>, ty: &'t pr::Ty) -> std::io::Result<V
 
             Value::Array(buf)
         }
+
+        pr::TyKind::Enum(variants) => {
+            let mut body = r.clone();
+
+            let head = layout::enum_head_format(variants);
+
+            let mut tag_bytes = r.copy_n(head.s / 8);
+            tag_bytes.resize(8, 0);
+            let tag = u64::from_le_bytes(tag_bytes.try_into().unwrap()) as usize;
+
+            let (variant_name, variant_ty) = variants.get(tag).unwrap();
+
+            let variant_format = layout::enum_variant_format(&head, variant_ty);
+
+            let inner = if variant_format.is_inline {
+                decode_inner(r, variant_ty)?
+            } else {
+                let offset = r.copy_const::<4>();
+                let offset = u32::from_le_bytes(offset) as usize;
+                body.rewind(offset);
+                decode_inner(&mut body, variant_ty)?
+            };
+
+            r.skip(variant_format.padding);
+            Value::Enum(&variant_name, Box::new(inner))
+        }
+
         _ => todo!(),
     })
 }

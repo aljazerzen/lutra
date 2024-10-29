@@ -1,3 +1,5 @@
+use std::ops::Mul;
+
 use lutra_parser::parser::pr;
 
 pub trait Layout {
@@ -45,18 +47,11 @@ pub fn get_head_size(ty: &pr::Ty) -> usize {
 
         pr::TyKind::Tuple(fields) => fields.iter().map(|f| get_head_size(&f.ty)).sum(),
         pr::TyKind::Enum(variants) => {
-            let s = enum_tag_size(variants.len());
-
-            let h = variants
-                .iter()
-                .map(|(_n, ty)| get_head_size(ty))
-                .max()
-                .unwrap_or_default();
-
-            if s + h <= 64 {
-                s + h
+            let head = enum_head_format(variants);
+            if head.is_always_inline {
+                head.s + head.h
             } else {
-                s + 32
+                head.s + 32
             }
         }
 
@@ -66,33 +61,84 @@ pub fn get_head_size(ty: &pr::Ty) -> usize {
     }
 }
 
+pub struct EnumHeadFormat {
+    pub s: usize,
+    pub h: usize,
+    pub is_always_inline: bool,
+}
+
+pub fn enum_head_format(variants: &[(String, pr::Ty)]) -> EnumHeadFormat {
+    let s = enum_tag_size(variants.len());
+
+    let h = enum_max_variant_head_size(variants);
+
+    EnumHeadFormat {
+        s,
+        h,
+        is_always_inline: s + h <= 64,
+    }
+}
+
+pub struct EnumVariantFormat {
+    pub padding: usize,
+    pub is_inline: bool,
+}
+
+pub fn enum_variant_format(head: &EnumHeadFormat, variant_ty: &pr::Ty) -> EnumVariantFormat {
+    let variant_size = get_head_size(variant_ty);
+
+    if head.is_always_inline {
+        EnumVariantFormat {
+            is_inline: true,
+            padding: head.h - variant_size,
+        }
+    } else {
+        let is_inline = head.s + variant_size <= 32;
+        let padding = 32_usize.saturating_sub(variant_size);
+
+        EnumVariantFormat { is_inline, padding }
+    }
+}
+
+fn enum_max_variant_head_size(variants: &[(String, pr::Ty)]) -> usize {
+    variants
+        .iter()
+        .map(|(_n, ty)| get_head_size(ty))
+        .max()
+        .unwrap_or_default()
+}
+
 fn enum_tag_size(variants_len: usize) -> usize {
+    enum_tag_size_used(variants_len).div_ceil(8).mul(8)
+}
+
+fn enum_tag_size_used(variants_len: usize) -> usize {
     f64::log2(variants_len as f64).ceil() as usize
 }
 
 #[test]
 fn test_enum_tag_size() {
-    assert_eq!(0, enum_tag_size(0));
-    assert_eq!(0, enum_tag_size(1));
-    assert_eq!(1, enum_tag_size(2));
-    assert_eq!(2, enum_tag_size(3));
-    assert_eq!(2, enum_tag_size(4));
-    assert_eq!(3, enum_tag_size(5));
-    assert_eq!(3, enum_tag_size(6));
-    assert_eq!(3, enum_tag_size(7));
-    assert_eq!(3, enum_tag_size(8));
-    assert_eq!(4, enum_tag_size(9));
-    assert_eq!(4, enum_tag_size(10));
-    assert_eq!(4, enum_tag_size(11));
-    assert_eq!(4, enum_tag_size(12));
-    assert_eq!(4, enum_tag_size(13));
-    assert_eq!(4, enum_tag_size(14));
-    assert_eq!(4, enum_tag_size(15));
-    assert_eq!(4, enum_tag_size(16));
-    assert_eq!(5, enum_tag_size(17));
-    assert_eq!(5, enum_tag_size(18));
-    assert_eq!(5, enum_tag_size(19));
-    assert_eq!(5, enum_tag_size(20));
-    assert_eq!(5, enum_tag_size(21));
-    assert_eq!(5, enum_tag_size(22));
+    assert_eq!(0, enum_tag_size_used(0));
+    assert_eq!(0, enum_tag_size_used(1));
+    assert_eq!(1, enum_tag_size_used(2));
+    assert_eq!(2, enum_tag_size_used(3));
+    assert_eq!(2, enum_tag_size_used(4));
+    assert_eq!(3, enum_tag_size_used(5));
+    assert_eq!(3, enum_tag_size_used(6));
+    assert_eq!(3, enum_tag_size_used(7));
+    assert_eq!(3, enum_tag_size_used(8));
+    assert_eq!(4, enum_tag_size_used(9));
+    assert_eq!(4, enum_tag_size_used(10));
+    assert_eq!(4, enum_tag_size_used(11));
+    assert_eq!(4, enum_tag_size_used(12));
+    assert_eq!(4, enum_tag_size_used(13));
+    assert_eq!(4, enum_tag_size_used(14));
+    assert_eq!(4, enum_tag_size_used(15));
+    assert_eq!(4, enum_tag_size_used(16));
+    assert_eq!(5, enum_tag_size_used(17));
+    assert_eq!(5, enum_tag_size_used(18));
+    assert_eq!(5, enum_tag_size_used(19));
+    assert_eq!(5, enum_tag_size_used(20));
+    assert_eq!(5, enum_tag_size_used(21));
+    assert_eq!(5, enum_tag_size_used(22));
 }

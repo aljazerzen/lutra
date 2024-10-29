@@ -24,7 +24,7 @@ fn main() {
         ]);
 
         let mut buf = Vec::new();
-        x_value.encode(&mut buf).unwrap();
+        x_value.encode(&mut buf, x_ty).unwrap();
 
         let x_value = Value::decode(&buf, &x_ty).unwrap();
         dbg!(x_value);
@@ -47,7 +47,7 @@ fn main() {
         ]);
 
         let mut buf = Vec::new();
-        y_value.encode(&mut buf).unwrap();
+        y_value.encode(&mut buf, y_ty).unwrap();
 
         let y_value = Value::decode(&buf, &y_ty).unwrap();
         dbg!(y_value);
@@ -66,7 +66,7 @@ fn main() {
         let z_value = Value::Boolean(true);
 
         let mut buf = Vec::new();
-        z_value.encode(&mut buf).unwrap();
+        z_value.encode(&mut buf, z_ty).unwrap();
 
         let z_value = Value::decode(&buf, &z_ty).unwrap();
         dbg!(z_value);
@@ -76,6 +76,88 @@ fn main() {
 
         let mut buf2 = Vec::new();
         z.encode(&mut buf2).unwrap();
+
+        assert_eq!(buf, buf2);
+    }
+
+    {
+        let u_ty = schema_types.get("u").unwrap();
+        let u_value = Value::Enum("f", Box::new(Value::Boolean(true)));
+
+        let mut buf = Vec::new();
+        u_value.encode(&mut buf, u_ty).unwrap();
+
+        let u_value = Value::decode(&buf, &u_ty).unwrap();
+        dbg!(u_value);
+
+        let u = schema::u::decode_bytes(&buf).unwrap();
+        dbg!(&u);
+
+        let mut buf2 = Vec::new();
+        u.encode(&mut buf2).unwrap();
+
+        assert_eq!(buf, buf2);
+    }
+
+    {
+        let u_ty = schema_types.get("u").unwrap();
+        let u_value = Value::Enum("g", Box::new(Value::Tuple(vec![])));
+
+        let mut buf = Vec::new();
+        u_value.encode(&mut buf, u_ty).unwrap();
+
+        let u_value = Value::decode(&buf, &u_ty).unwrap();
+        dbg!(u_value);
+
+        let u = schema::u::decode_bytes(&buf).unwrap();
+        dbg!(&u);
+
+        let mut buf2 = Vec::new();
+        u.encode(&mut buf2).unwrap();
+
+        assert_eq!(buf, buf2);
+    }
+
+    {
+        let u_ty = schema_types.get("u").unwrap();
+        let u_value = Value::Enum(
+            "h",
+            Box::new(Value::Tuple(vec![
+                (Some("a"), Value::Integer(-12)),
+                (Some("b"), Value::Float(3.14)),
+            ])),
+        );
+
+        let mut buf = Vec::new();
+        u_value.encode(&mut buf, u_ty).unwrap();
+
+        let u_value = Value::decode(&buf, &u_ty).unwrap();
+        dbg!(u_value);
+
+        let u = schema::u::decode_bytes(&buf).unwrap();
+        dbg!(&u);
+
+        let mut buf2 = Vec::new();
+        u.encode(&mut buf2).unwrap();
+
+        assert_eq!(buf, buf2);
+    }
+
+    {
+        let v_ty = schema_types.get("v").unwrap();
+        let v_value = Value::Enum("No", Box::new(Value::Tuple(vec![])));
+
+        let mut buf = Vec::new();
+        v_value.encode(&mut buf, v_ty).unwrap();
+
+        let v_value = Value::decode(&buf, &v_ty).unwrap();
+        dbg!(v_value);
+
+        let v = schema::v::decode_bytes(&buf).unwrap();
+        dbg!(&v);
+
+        let mut buf2 = Vec::new();
+        v.encode(&mut buf2).unwrap();
 
         assert_eq!(buf, buf2);
     }

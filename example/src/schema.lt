@@ -3,3 +3,11 @@ type x = {int, a = text, b = [bool]}
 type y = [int]
 
 type z = bool
+
+type u = enum {
+  f = bool,
+  g,
+  h = {a = int, b = float}
+}
+
+type v = enum { Yes, No, Maybe }

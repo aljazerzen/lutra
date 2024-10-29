@@ -114,8 +114,12 @@ impl<'a> Reader<'a> {
         r
     }
 
-    pub fn apply_offset(&mut self, offset: usize) {
-        self.current_pos -= offset;
+    pub fn rewind(&mut self, byte_count: usize) {
+        self.current_pos -= byte_count;
+    }
+    
+    pub fn skip(&mut self, byte_count: usize) {
+        self.current_pos += byte_count;
     }
 }
 
@@ -155,7 +159,7 @@ impl Decode for String {
 
         let offset = r.copy_const::<4>();
         let offset = u32::from_le_bytes(offset) as usize;
-        body.apply_offset(offset);
+        body.rewind(offset);
 
         let len = r.copy_const::<4>();
         let len = u32::from_le_bytes(len) as usize;
@@ -170,7 +174,7 @@ impl<E: Decode> Decode for Vec<E> {
 
         let offset = r.copy_const::<4>();
         let offset = u32::from_le_bytes(offset) as usize;
-        body.apply_offset(offset);
+        body.rewind(offset);
 
         let len = r.copy_const::<4>();
         let len = u32::from_le_bytes(len) as usize;
