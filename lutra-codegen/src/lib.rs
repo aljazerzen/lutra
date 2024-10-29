@@ -213,10 +213,10 @@ fn write_ty_def_impl<'t>(w: &mut impl Write, ty: &'t pr::Ty) -> Result<(), std::
         pr::TyKind::Primitive(_) => {
             writeln!(w, "impl ::lutra_bin::Encode for {name} {{")?;
             writeln!(w, "    type BodyMeta = ();")?;
-            writeln!(w, "    fn encode_body(&self, _w: &mut Vec<u8>) -> std::io::Result<()> {{")?;
+            writeln!(w, "    fn encode_body(&self, _w: &mut Vec<u8>) -> ::lutra_bin::Result<()> {{")?;
             writeln!(w, "        Ok(())")?;
             writeln!(w, "    }}")?;
-            writeln!(w, "    fn encode_head(&self, _: (), w: &mut Vec<u8>) -> std::io::Result<()> {{")?;
+            writeln!(w, "    fn encode_head(&self, _: (), w: &mut Vec<u8>) -> ::lutra_bin::Result<()> {{")?;
             writeln!(w, "        self.0.encode_head((), w)")?;
             writeln!(w, "    }}")?;
             writeln!(w, "}}")?;
@@ -225,10 +225,10 @@ fn write_ty_def_impl<'t>(w: &mut impl Write, ty: &'t pr::Ty) -> Result<(), std::
         pr::TyKind::Array(_) => {
             writeln!(w, "impl ::lutra_bin::Encode for {name} {{")?;
             writeln!(w, "    type BodyMeta = usize;")?;
-            writeln!(w, "    fn encode_body(&self, w: &mut Vec<u8>) -> std::io::Result<usize> {{")?;
+            writeln!(w, "    fn encode_body(&self, w: &mut Vec<u8>) -> ::lutra_bin::Result<usize> {{")?;
             writeln!(w, "        self.0.encode_body(w)")?;
             writeln!(w, "    }}")?;
-            writeln!(w, "    fn encode_head(&self, meta: usize, w: &mut Vec<u8>) -> std::io::Result<()> {{")?;
+            writeln!(w, "    fn encode_head(&self, meta: usize, w: &mut Vec<u8>) -> ::lutra_bin::Result<()> {{")?;
             writeln!(w, "        self.0.encode_head(meta, w)")?;
             writeln!(w, "    }}")?;
             writeln!(w, "}}")?;
@@ -239,7 +239,7 @@ fn write_ty_def_impl<'t>(w: &mut impl Write, ty: &'t pr::Ty) -> Result<(), std::
             writeln!(w, "    type BodyMeta = {name}BodyMeta;")?;
 
             // encode body
-            writeln!(w, "    fn encode_body(&self, w: &mut Vec<u8>) -> std::io::Result<Self::BodyMeta> {{")?;
+            writeln!(w, "    fn encode_body(&self, w: &mut Vec<u8>) -> ::lutra_bin::Result<Self::BodyMeta> {{")?;
 
             for (index, field) in fields.iter().enumerate() {
                 let field_name = tuple_field_name(&field.name, index);
@@ -257,7 +257,7 @@ fn write_ty_def_impl<'t>(w: &mut impl Write, ty: &'t pr::Ty) -> Result<(), std::
             writeln!(w, "    }}")?;
 
             // encode head
-            writeln!(w, "    fn encode_head(&self, meta: Self::BodyMeta, w: &mut Vec<u8>) -> std::io::Result<()> {{")?;
+            writeln!(w, "    fn encode_head(&self, meta: Self::BodyMeta, w: &mut Vec<u8>) -> ::lutra_bin::Result<()> {{")?;
             for (index, field) in fields.iter().enumerate() {
                 let field_name = tuple_field_name(&field.name, index);
 
@@ -285,7 +285,7 @@ fn write_ty_def_impl<'t>(w: &mut impl Write, ty: &'t pr::Ty) -> Result<(), std::
         }
 
         pr::TyKind::Enum(variants) => {
-            let head = layout::enum_head_format(&variants);
+            let head = layout::enum_head_format(&variants).unwrap();
 
             let needs_body_meta = variants.iter().any(|(_, t)| !is_unit_variant(t));
             let body_meta_name = if needs_body_meta {
@@ -297,7 +297,7 @@ fn write_ty_def_impl<'t>(w: &mut impl Write, ty: &'t pr::Ty) -> Result<(), std::
             writeln!(w, "#[allow(unused_variables)]")?;
             writeln!(w, "impl ::lutra_bin::Encode for {name} {{")?;
             writeln!(w, "    type BodyMeta = {body_meta_name};")?;
-            writeln!(w, "    fn encode_body(&self, w: &mut Vec<u8>) -> std::io::Result<{body_meta_name}> {{")?;
+            writeln!(w, "    fn encode_body(&self, w: &mut Vec<u8>) -> ::lutra_bin::Result<{body_meta_name}> {{")?;
             if needs_body_meta {
                 writeln!(w, "        Ok(match self {{")?;
 
@@ -308,7 +308,7 @@ fn write_ty_def_impl<'t>(w: &mut impl Write, ty: &'t pr::Ty) -> Result<(), std::
                     }
                     writeln!(w, " => {{")?;
 
-                    let variant = layout::enum_variant_format(&head, variant_ty);
+                    let variant = layout::enum_variant_format(&head, variant_ty).unwrap();
 
                     if is_unit_variant(variant_ty) {
                         writeln!(w, "                {body_meta_name}::None")?;
@@ -330,11 +330,11 @@ fn write_ty_def_impl<'t>(w: &mut impl Write, ty: &'t pr::Ty) -> Result<(), std::
                 writeln!(w, "        Ok(())")?;
             }
             writeln!(w, "    }}")?;
-            writeln!(w, "    fn encode_head(&self, meta: {body_meta_name}, w: &mut Vec<u8>) -> std::io::Result<()> {{")?;
+            writeln!(w, "    fn encode_head(&self, meta: {body_meta_name}, w: &mut Vec<u8>) -> ::lutra_bin::Result<()> {{")?;
             writeln!(w, "        Ok(match self {{")?;
 
             for (tag, (variant_name, variant_ty)) in variants.iter().enumerate() {
-                let variant = layout::enum_variant_format(&head, variant_ty);
+                let variant = layout::enum_variant_format(&head, variant_ty).unwrap();
 
                 write!(w, "            Self::{variant_name}")?;
 
@@ -386,7 +386,7 @@ fn write_ty_def_impl<'t>(w: &mut impl Write, ty: &'t pr::Ty) -> Result<(), std::
                         continue;
                     }
 
-                    let variant = layout::enum_variant_format(&head, variant_ty);
+                    let variant = layout::enum_variant_format(&head, variant_ty).unwrap();
 
                     write!(w, "    {variant_name}")?;
 
@@ -408,7 +408,7 @@ fn write_ty_def_impl<'t>(w: &mut impl Write, ty: &'t pr::Ty) -> Result<(), std::
         _ => unimplemented!(),
     }
 
-    let head_size = layout::get_head_size(ty);
+    let head_size = layout::get_head_size(ty).unwrap();
     writeln!(w, "impl ::lutra_bin::Layout for {name} {{")?;
     writeln!(w, "    fn head_size() -> usize {{")?;
     writeln!(w, "        {head_size}")?;
@@ -420,7 +420,7 @@ fn write_ty_def_impl<'t>(w: &mut impl Write, ty: &'t pr::Ty) -> Result<(), std::
             writeln!(w, "impl ::lutra_bin::Decode for {name} {{")?;
             writeln!(
                 w,
-                "    fn decode(r: &mut ::lutra_bin::Reader<'_>) -> std::io::Result<Self> {{"
+                "    fn decode(r: &mut ::lutra_bin::Reader<'_>) -> ::lutra_bin::Result<Self> {{"
             )?;
 
             write!(w, "        Ok(Self(")?;
@@ -434,7 +434,7 @@ fn write_ty_def_impl<'t>(w: &mut impl Write, ty: &'t pr::Ty) -> Result<(), std::
 
         pr::TyKind::Tuple(fields) => {
             writeln!(w, "impl ::lutra_bin::Decode for {name} {{")?;
-            writeln!(w, "    fn decode(r: &mut ::lutra_bin::Reader<'_>) -> std::io::Result<Self> {{")?;
+            writeln!(w, "    fn decode(r: &mut ::lutra_bin::Reader<'_>) -> ::lutra_bin::Result<Self> {{")?;
 
             for (index, field) in fields.iter().enumerate() {
                 let field_name = tuple_field_name(&field.name, index);
@@ -463,10 +463,10 @@ fn write_ty_def_impl<'t>(w: &mut impl Write, ty: &'t pr::Ty) -> Result<(), std::
             writeln!(w, "impl ::lutra_bin::Decode for {name} {{")?;
             writeln!(
                 w,
-                "    fn decode(r: &mut ::lutra_bin::Reader<'_>) -> std::io::Result<Self> {{"
+                "    fn decode(r: &mut ::lutra_bin::Reader<'_>) -> ::lutra_bin::Result<Self> {{"
             )?;
 
-            let head = layout::enum_head_format(variants);
+            let head = layout::enum_head_format(variants).unwrap();
             if !head.is_always_inline {
                 writeln!(w, "        let mut body = r.clone();")?;
             }
@@ -480,7 +480,7 @@ fn write_ty_def_impl<'t>(w: &mut impl Write, ty: &'t pr::Ty) -> Result<(), std::
             for (index, (variant_name, variant_ty)) in variants.iter().enumerate() {
                 writeln!(w, "            {index} => {{")?;
 
-                let variant_format = layout::enum_variant_format(&head, variant_ty);
+                let variant_format = layout::enum_variant_format(&head, variant_ty).unwrap();
 
                 if variant_format.is_inline {
                     if !is_unit_variant(variant_ty) {
@@ -512,7 +512,7 @@ fn write_ty_def_impl<'t>(w: &mut impl Write, ty: &'t pr::Ty) -> Result<(), std::
 
                 writeln!(w, "            }},")?;
             }
-            writeln!(w, "            _ => unreachable!()")?;
+            writeln!(w, "            _ => return Err(::lutra_bin::Error::InvalidData)")?;
             writeln!(w, "        }})")?;
             writeln!(w, "    }}")?;
             writeln!(w, "}}\n")?;

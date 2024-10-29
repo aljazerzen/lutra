@@ -2,6 +2,8 @@ use std::ops::Mul;
 
 use lutra_parser::parser::pr;
 
+use crate::{Error, Result};
+
 pub trait Layout {
     /// Returns the size of the head in bits for a given type.
     fn head_size() -> usize;
@@ -37,17 +39,23 @@ impl<I> Layout for Vec<I> {
     }
 }
 
-pub fn get_head_size(ty: &pr::Ty) -> usize {
-    match &ty.kind {
+pub fn get_head_size(ty: &pr::Ty) -> Result<usize> {
+    Ok(match &ty.kind {
         pr::TyKind::Primitive(pr::PrimitiveSet::Bool) => 8,
         pr::TyKind::Primitive(pr::PrimitiveSet::Int) => 64,
         pr::TyKind::Primitive(pr::PrimitiveSet::Float) => 64,
         pr::TyKind::Primitive(pr::PrimitiveSet::Text) => 64,
         pr::TyKind::Array(_) => 64,
 
-        pr::TyKind::Tuple(fields) => fields.iter().map(|f| get_head_size(&f.ty)).sum(),
+        pr::TyKind::Tuple(fields) => {
+            let mut size = 0;
+            for f in fields {
+                size += get_head_size(&f.ty)?;
+            }
+            size
+        }
         pr::TyKind::Enum(variants) => {
-            let head = enum_head_format(variants);
+            let head = enum_head_format(variants)?;
             if head.is_always_inline {
                 head.s + head.h
             } else {
@@ -55,10 +63,10 @@ pub fn get_head_size(ty: &pr::Ty) -> usize {
             }
         }
 
-        pr::TyKind::Primitive(_) => todo!(),
-        pr::TyKind::Function(_) => todo!(),
-        pr::TyKind::Ident(_) => todo!(),
-    }
+        pr::TyKind::Primitive(_) | pr::TyKind::Function(_) | pr::TyKind::Ident(_) => {
+            return Err(Error::InvalidType)
+        }
+    })
 }
 
 pub struct EnumHeadFormat {
@@ -67,16 +75,16 @@ pub struct EnumHeadFormat {
     pub is_always_inline: bool,
 }
 
-pub fn enum_head_format(variants: &[(String, pr::Ty)]) -> EnumHeadFormat {
+pub fn enum_head_format(variants: &[(String, pr::Ty)]) -> Result<EnumHeadFormat> {
     let s = enum_tag_size(variants.len());
 
-    let h = enum_max_variant_head_size(variants);
+    let h = enum_max_variant_head_size(variants)?;
 
-    EnumHeadFormat {
+    Ok(EnumHeadFormat {
         s,
         h,
         is_always_inline: s + h <= 64,
-    }
+    })
 }
 
 pub struct EnumVariantFormat {
@@ -84,10 +92,13 @@ pub struct EnumVariantFormat {
     pub is_inline: bool,
 }
 
-pub fn enum_variant_format(head: &EnumHeadFormat, variant_ty: &pr::Ty) -> EnumVariantFormat {
-    let variant_size = get_head_size(variant_ty);
+pub fn enum_variant_format(
+    head: &EnumHeadFormat,
+    variant_ty: &pr::Ty,
+) -> Result<EnumVariantFormat> {
+    let variant_size = get_head_size(variant_ty)?;
 
-    if head.is_always_inline {
+    Ok(if head.is_always_inline {
         EnumVariantFormat {
             is_inline: true,
             padding: head.h - variant_size,
@@ -97,15 +108,16 @@ pub fn enum_variant_format(head: &EnumHeadFormat, variant_ty: &pr::Ty) -> EnumVa
         let padding = 32_usize.saturating_sub(variant_size);
 
         EnumVariantFormat { is_inline, padding }
-    }
+    })
 }
 
-fn enum_max_variant_head_size(variants: &[(String, pr::Ty)]) -> usize {
-    variants
-        .iter()
-        .map(|(_n, ty)| get_head_size(ty))
-        .max()
-        .unwrap_or_default()
+fn enum_max_variant_head_size(variants: &[(String, pr::Ty)]) -> Result<usize> {
+    let mut h = 0;
+    for (_n, ty) in variants {
+        let size = get_head_size(ty)?;
+        h = h.max(size);
+    }
+    Ok(h)
 }
 
 fn enum_tag_size(variants_len: usize) -> usize {

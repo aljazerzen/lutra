@@ -8,3 +8,4 @@ version.workspace = true
 
 [dependencies]
 lutra-parser = { path = "../lutra-parser" }
+thiserror = "1.0.65"

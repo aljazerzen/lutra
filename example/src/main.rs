@@ -29,7 +29,7 @@ fn main() {
         let x_value = Value::decode(&buf, &x_ty).unwrap();
         dbg!(x_value);
 
-        let x = schema::x::decode_bytes(&buf).unwrap();
+        let x = schema::x::decode_buffer(&buf).unwrap();
         dbg!(&x);
 
         let mut buf2 = Vec::new();
@@ -52,7 +52,7 @@ fn main() {
         let y_value = Value::decode(&buf, &y_ty).unwrap();
         dbg!(y_value);
 
-        let y = schema::y::decode_bytes(&buf).unwrap();
+        let y = schema::y::decode_buffer(&buf).unwrap();
         dbg!(&y);
 
         let mut buf2 = Vec::new();
@@ -71,7 +71,7 @@ fn main() {
         let z_value = Value::decode(&buf, &z_ty).unwrap();
         dbg!(z_value);
 
-        let z = schema::z::decode_bytes(&buf).unwrap();
+        let z = schema::z::decode_buffer(&buf).unwrap();
         dbg!(&z);
 
         let mut buf2 = Vec::new();
@@ -90,7 +90,7 @@ fn main() {
         let u_value = Value::decode(&buf, &u_ty).unwrap();
         dbg!(u_value);
 
-        let u = schema::u::decode_bytes(&buf).unwrap();
+        let u = schema::u::decode_buffer(&buf).unwrap();
         dbg!(&u);
 
         let mut buf2 = Vec::new();
@@ -109,7 +109,7 @@ fn main() {
         let u_value = Value::decode(&buf, &u_ty).unwrap();
         dbg!(u_value);
 
-        let u = schema::u::decode_bytes(&buf).unwrap();
+        let u = schema::u::decode_buffer(&buf).unwrap();
         dbg!(&u);
 
         let mut buf2 = Vec::new();
@@ -134,7 +134,7 @@ fn main() {
         let u_value = Value::decode(&buf, &u_ty).unwrap();
         dbg!(u_value);
 
-        let u = schema::u::decode_bytes(&buf).unwrap();
+        let u = schema::u::decode_buffer(&buf).unwrap();
         dbg!(&u);
 
         let mut buf2 = Vec::new();
@@ -153,7 +153,7 @@ fn main() {
         let v_value = Value::decode(&buf, &v_ty).unwrap();
         dbg!(v_value);
 
-        let v = schema::v::decode_bytes(&buf).unwrap();
+        let v = schema::v::decode_buffer(&buf).unwrap();
         dbg!(&v);
 
         let mut buf2 = Vec::new();
