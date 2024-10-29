@@ -14,6 +14,12 @@ pub enum Error {
     #[error("invalid type: type has no binary format")]
     InvalidType,
 
+    #[error("invalid type reference: {name}")]
+    InvalidTypeReference { name: String },
+
+    #[error("type has an infinite size")]
+    InvalidTypeRecursive,
+
     #[error("io error")]
     IoError(#[from] std::io::Error),
 }

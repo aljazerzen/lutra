@@ -18,8 +18,12 @@ pub enum Value<'ty> {
 impl<'t> Value<'t> {
     /// Convert a Lutra [Value] to .ld binary encoding.
     pub fn encode(&self, w: &mut Vec<u8>, ty: &'t pr::Ty) -> Result<()> {
-        let meta = encode_body(w, self, ty)?;
-        encode_head(w, self, meta, ty)?;
+        let mut ctx = Context::new(ty);
+        // run layout ahead of type to resolve recursive references
+        layout::get_head_size(ty, &mut ctx.cache)?;
+
+        let meta = encode_body(w, self, ty, &mut ctx)?;
+        encode_head(w, self, meta, ty, &mut ctx)?;
         Ok(())
     }
 }
@@ -30,7 +34,14 @@ enum ValueBodyMeta {
     Tuple(Vec<ValueBodyMeta>),
 }
 
-fn encode_body<'t>(w: &mut Vec<u8>, value: &Value, ty: &'t pr::Ty) -> Result<ValueBodyMeta> {
+fn encode_body<'t>(
+    w: &mut Vec<u8>,
+    value: &Value,
+    ty: &'t pr::Ty,
+    ctx: &mut Context<'t>,
+) -> Result<ValueBodyMeta> {
+    let ty = resolve_ident(ty, ctx);
+
     match value {
         Value::Integer(_) => {
             expect_ty_primitive(ty, pr::PrimitiveSet::Int)?;
@@ -55,7 +66,7 @@ fn encode_body<'t>(w: &mut Vec<u8>, value: &Value, ty: &'t pr::Ty) -> Result<Val
 
             let mut metas = Vec::with_capacity(fields.len());
             for ((_, f), f_ty) in fields.iter().zip(ty_fields) {
-                metas.push(encode_body(w, f, &f_ty.ty)?);
+                metas.push(encode_body(w, f, &f_ty.ty, ctx)?);
             }
 
             Ok(ValueBodyMeta::Tuple(metas))
@@ -65,12 +76,12 @@ fn encode_body<'t>(w: &mut Vec<u8>, value: &Value, ty: &'t pr::Ty) -> Result<Val
 
             let mut metas = Vec::with_capacity(items.len());
             for i in items {
-                metas.push(encode_body(w, i, &items_ty)?);
+                metas.push(encode_body(w, i, &items_ty, ctx)?);
             }
 
             let items_start = w.len();
             for (i, m) in items.iter().zip(metas.into_iter()) {
-                encode_head(w, i, m, &items_ty)?;
+                encode_head(w, i, m, &items_ty, ctx)?;
             }
 
             Ok(ValueBodyMeta::Offset(items_start))
@@ -78,15 +89,15 @@ fn encode_body<'t>(w: &mut Vec<u8>, value: &Value, ty: &'t pr::Ty) -> Result<Val
         Value::Enum(variant, inner) => {
             let variants = expect_ty(ty, |k| k.as_enum(), "enum")?;
 
-            let (_, variant_format, _, variant_ty) = encode_enum_params(variant, variants)?;
+            let (_, variant_format, _, variant_ty) = encode_enum_params(variant, variants, ctx)?;
 
-            let meta = encode_body(w, &inner, variant_ty)?;
+            let meta = encode_body(w, &inner, variant_ty, ctx)?;
 
             if variant_format.is_inline {
                 Ok(meta)
             } else {
                 let variant_start = w.len();
-                encode_head(w, &inner, meta, variant_ty)?;
+                encode_head(w, &inner, meta, variant_ty, ctx)?;
                 Ok(ValueBodyMeta::Offset(variant_start))
             }
         }
@@ -98,7 +109,10 @@ fn encode_head<'t>(
     value: &Value,
     body_meta: ValueBodyMeta,
     ty: &'t pr::Ty,
+    ctx: &mut Context<'t>,
 ) -> Result<()> {
+    let ty = resolve_ident(ty, ctx);
+
     match value {
         Value::Integer(v) => {
             expect_ty_primitive(ty, pr::PrimitiveSet::Int)?;
@@ -130,7 +144,7 @@ fn encode_head<'t>(
             };
 
             for (((_, f), m), f_ty) in fields.iter().zip(metas.into_iter()).zip(ty_fields) {
-                encode_head(w, f, m, &f_ty.ty)?;
+                encode_head(w, f, m, &f_ty.ty, ctx)?;
             }
         }
         Value::Array(items) => {
@@ -147,13 +161,13 @@ fn encode_head<'t>(
         Value::Enum(variant, inner) => {
             let variants = expect_ty(ty, |k| k.as_enum(), "enum")?;
 
-            let (head, variant, tag, variant_ty) = encode_enum_params(variant, variants)?;
+            let (head, variant, tag, variant_ty) = encode_enum_params(variant, variants, ctx)?;
 
             let tag_bytes = &(tag as u64).to_le_bytes()[0..(head.s / 8)];
 
             if variant.is_inline {
                 w.write(tag_bytes)?;
-                encode_head(w, &inner, body_meta, &variant_ty)?;
+                encode_head(w, &inner, body_meta, &variant_ty, ctx)?;
             } else {
                 let ValueBodyMeta::Offset(inner_start) = body_meta else {
                     unreachable!()
@@ -175,12 +189,12 @@ fn encode_head<'t>(
     Ok(())
 }
 
-fn encode_enum_params<'a>(
-    variant: &'a str,
-    ty_variants: &'a Vec<(String, pr::Ty)>,
-) -> Result<(EnumHeadFormat, EnumVariantFormat, usize, &'a pr::Ty)> {
-    let mut cache = LayoutCache::default();
-    let head_format = layout::enum_head_format(ty_variants, &mut cache)?;
+fn encode_enum_params<'t>(
+    variant: &str,
+    ty_variants: &'t Vec<(String, pr::Ty)>,
+    cache: &mut Context<'t>,
+) -> Result<(EnumHeadFormat, EnumVariantFormat, usize, &'t pr::Ty)> {
+    let head_format = layout::enum_head_format(ty_variants, &mut cache.cache)?;
 
     let tag = ty_variants
         .iter()
@@ -188,23 +202,29 @@ fn encode_enum_params<'a>(
         .ok_or(Error::InvalidData)?;
     let (_, variant_ty) = ty_variants.get(tag).ok_or(Error::InvalidData)?;
 
-    let variant_format = layout::enum_variant_format(&head_format, variant_ty, &mut cache)?;
+    let variant_format = layout::enum_variant_format(&head_format, variant_ty, &mut cache.cache)?;
     Ok((head_format, variant_format, tag, variant_ty))
 }
 
 impl<'t> Value<'t> {
     /// Convert .ld binary encoding into Lutra [Value].
     pub fn decode<'b>(buf: &'b [u8], ty: &'t pr::Ty) -> Result<Value<'t>> {
-        let mut cache = LayoutCache::default();
+        let mut ctx = Context::new(ty);
 
-        let head_size = layout::get_head_size(ty, &mut cache)? / 8;
+        let head_size = layout::get_head_size(ty, &mut ctx.cache)? / 8;
 
         let mut reader = Reader::new(buf, buf.len() - head_size);
-        decode_inner(&mut reader, ty, &mut cache)
+        decode_inner(&mut reader, ty, &mut ctx)
     }
 }
 
-fn decode_inner<'b, 't>(r: &mut Reader<'b>, ty: &'t pr::Ty, cache: &mut LayoutCache) -> Result<Value<'t>> {
+fn decode_inner<'b, 't>(
+    r: &mut Reader<'b>,
+    ty: &'t pr::Ty,
+    ctx: &mut Context<'t>,
+) -> Result<Value<'t>> {
+    let ty = resolve_ident(ty, ctx);
+
     Ok(match &ty.kind {
         pr::TyKind::Primitive(pr::PrimitiveSet::Bool) => Value::Boolean(bool::decode(r)?),
         pr::TyKind::Primitive(pr::PrimitiveSet::Int) => Value::Integer(i64::decode(r)?),
@@ -217,7 +237,7 @@ fn decode_inner<'b, 't>(r: &mut Reader<'b>, ty: &'t pr::Ty, cache: &mut LayoutCa
                 let name = field.name.as_deref();
                 let ty = &field.ty;
 
-                res.push((name, decode_inner(r, ty, cache)?));
+                res.push((name, decode_inner(r, ty, ctx)?));
             }
             Value::Tuple(res)
         }
@@ -233,7 +253,7 @@ fn decode_inner<'b, 't>(r: &mut Reader<'b>, ty: &'t pr::Ty, cache: &mut LayoutCa
 
             let mut buf = Vec::with_capacity(len);
             for _ in 0..len {
-                buf.push(decode_inner(&mut body, &item_ty, cache)?);
+                buf.push(decode_inner(&mut body, &item_ty, ctx)?);
             }
 
             Value::Array(buf)
@@ -242,7 +262,7 @@ fn decode_inner<'b, 't>(r: &mut Reader<'b>, ty: &'t pr::Ty, cache: &mut LayoutCa
         pr::TyKind::Enum(variants) => {
             let mut body = r.clone();
 
-            let head = layout::enum_head_format(variants, cache)?;
+            let head = layout::enum_head_format(variants, &mut ctx.cache)?;
 
             let mut tag_bytes = r.copy_n(head.s / 8);
             tag_bytes.resize(8, 0);
@@ -250,15 +270,15 @@ fn decode_inner<'b, 't>(r: &mut Reader<'b>, ty: &'t pr::Ty, cache: &mut LayoutCa
 
             let (variant_name, variant_ty) = variants.get(tag).unwrap();
 
-            let variant_format = layout::enum_variant_format(&head, variant_ty, cache)?;
+            let variant_format = layout::enum_variant_format(&head, variant_ty, &mut ctx.cache)?;
 
             let inner = if variant_format.is_inline {
-                decode_inner(r, variant_ty, cache)?
+                decode_inner(r, variant_ty, ctx)?
             } else {
                 let offset = r.copy_const::<4>();
                 let offset = u32::from_le_bytes(offset) as usize;
                 body.rewind(offset);
-                decode_inner(&mut body, variant_ty, cache)?
+                decode_inner(&mut body, variant_ty, ctx)?
             };
 
             r.skip(variant_format.padding);
@@ -303,5 +323,31 @@ fn primitive_set_name(expected: &pr::PrimitiveSet) -> &'static str {
         pr::PrimitiveSet::Date => "date",
         pr::PrimitiveSet::Time => "time",
         pr::PrimitiveSet::Timestamp => "timestamp",
+    }
+}
+
+struct Context<'t> {
+    cache: LayoutCache,
+    top_level_ty: &'t pr::Ty,
+}
+
+impl<'t> Context<'t> {
+    fn new(top_level_ty: &'t pr::Ty) -> Self {
+        Context {
+            cache: LayoutCache::default(),
+            top_level_ty,
+        }
+    }
+}
+
+fn resolve_ident<'t>(ty: &'t pr::Ty, ctx: &mut Context<'t>) -> &'t pr::Ty {
+    if let pr::TyKind::Ident(ident) = &ty.kind {
+        if ctx.top_level_ty.name.as_ref() == Some(&ident.name) {
+            ctx.top_level_ty
+        } else {
+            ty
+        }
+    } else {
+        ty
     }
 }

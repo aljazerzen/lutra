@@ -30,6 +30,9 @@ pub fn codegen(source: &str) -> Result<String, std::fmt::Error> {
 
                 let ty = ty_def.value.as_ref().unwrap();
 
+                // run layout ahead of time to resolve recursive references
+                layout::get_head_size(ty, &mut ctx.cache).unwrap();
+
                 write_ty_def(&mut w, ty, &mut ctx)?;
             }
         }
@@ -136,11 +139,19 @@ fn write_ty_def<'t>(
         pr::TyKind::Enum(variants) => {
             writeln!(w, "pub enum {} {{", name)?;
 
-            for (variant_name, variant_ty) in variants {
+            for (index, (variant_name, variant_ty)) in variants.iter().enumerate() {
                 write!(w, "    {variant_name}")?;
                 if !is_unit_variant(variant_ty) {
+                    let needs_box = ctx.cache.does_enum_variant_contain_recursive(&ty, index);
+
                     write!(w, "(")?;
+                    if needs_box {
+                        write!(w, "Box<")?;
+                    }
                     write_ty_ref(w, &variant_ty, false, ctx)?;
+                    if needs_box {
+                        write!(w, ">")?;
+                    }
                     write!(w, ")")?;
                 }
 
@@ -392,7 +403,7 @@ fn write_ty_def_impl<'t>(
             writeln!(w, "}}")?;
 
             if needs_body_meta {
-                writeln!(w, "#[allow(non_camel_case_types)]")?;
+                writeln!(w, "#[allow(non_camel_case_types, dead_code)]")?;
                 writeln!(w, "pub enum {name}BodyMeta {{")?;
                 writeln!(w, "    None,")?;
                 for (variant_name, variant_ty) in variants {
@@ -520,8 +531,12 @@ fn write_ty_def_impl<'t>(
                     writeln!(w, "                r.skip({});", variant_format.padding)?;
                 }
 
+                let needs_box = ctx.cache.does_enum_variant_contain_recursive(&ty, index);
+
                 if is_unit_variant(variant_ty) {
                     writeln!(w, "                {name}::{variant_name}")?;
+                } else if needs_box {
+                    writeln!(w, "                {name}::{variant_name}(Box::new(inner))")?;
                 } else {
                     writeln!(w, "                {name}::{variant_name}(inner)")?;
                 }

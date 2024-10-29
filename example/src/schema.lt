@@ -13,3 +13,8 @@ type u = enum {
 type v = enum { Yes, No, Maybe }
 
 type i = {v, z}
+
+type Tree = enum {
+    Leaf = int,
+    Node = {left = Tree, right = Tree},
+}

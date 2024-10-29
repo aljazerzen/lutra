@@ -161,6 +161,40 @@ fn main() {
 
         assert_eq!(buf, buf2);
     }
+
+    {
+        let tree_ty = schema_types.get("Tree").unwrap();
+        let tree_value = Value::Enum(
+            "Node",
+            Box::new(Value::Tuple(vec![
+                (None, Value::Enum("Leaf", Box::new(Value::Integer(4)))),
+                (
+                    None,
+                    Value::Enum(
+                        "Node",
+                        Box::new(Value::Tuple(vec![
+                            (None, Value::Enum("Leaf", Box::new(Value::Integer(7)))),
+                            (None, Value::Enum("Leaf", Box::new(Value::Integer(10)))),
+                        ])),
+                    ),
+                ),
+            ])),
+        );
+
+        let mut buf = Vec::new();
+        tree_value.encode(&mut buf, tree_ty).unwrap();
+
+        let tree_value = Value::decode(&buf, &tree_ty).unwrap();
+        dbg!(tree_value);
+
+        let tree = schema::Tree::decode_buffer(&buf).unwrap();
+        dbg!(&tree);
+
+        let mut buf2 = Vec::new();
+        tree.encode(&mut buf2).unwrap();
+
+        assert_eq!(buf, buf2);
+    }
 }
 
 fn parse_types(source: &str) -> HashMap<String, pr::Ty> {
@@ -171,7 +205,9 @@ fn parse_types(source: &str) -> HashMap<String, pr::Ty> {
     let mut res = HashMap::new();
     for stmt in stmts.unwrap() {
         if let pr::StmtKind::TypeDef(ty_def) = stmt.kind {
-            res.insert(ty_def.name, ty_def.value.unwrap());
+            let mut ty = ty_def.value.unwrap();
+            ty.name = Some(ty_def.name.clone());
+            res.insert(ty_def.name, ty);
         }
     }
     res
