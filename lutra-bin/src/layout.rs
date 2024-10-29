@@ -1,4 +1,4 @@
-use std::ops::Mul;
+use std::{collections::HashMap, ops::Mul};
 
 use lutra_parser::parser::pr;
 
@@ -39,8 +39,25 @@ impl<I> Layout for Vec<I> {
     }
 }
 
-pub fn get_head_size(ty: &pr::Ty) -> Result<usize> {
-    Ok(match &ty.kind {
+#[derive(Default)]
+pub struct LayoutCache {
+    head_size_cache: HashMap<String, usize>,
+}
+
+impl LayoutCache {
+    // fn contains_name(&self, name: &str) -> bool {
+    //     self.head_size_cache.contains_key(name)
+    // }
+}
+
+pub fn get_head_size(ty: &pr::Ty, cache: &mut LayoutCache) -> Result<usize> {
+    if let Some(name) = &ty.name {
+        if let Some(existing) = cache.head_size_cache.get(name) {
+            return Ok(*existing);
+        }
+    }
+
+    let size = match &ty.kind {
         pr::TyKind::Primitive(pr::PrimitiveSet::Bool) => 8,
         pr::TyKind::Primitive(pr::PrimitiveSet::Int) => 64,
         pr::TyKind::Primitive(pr::PrimitiveSet::Float) => 64,
@@ -50,12 +67,12 @@ pub fn get_head_size(ty: &pr::Ty) -> Result<usize> {
         pr::TyKind::Tuple(fields) => {
             let mut size = 0;
             for f in fields {
-                size += get_head_size(&f.ty)?;
+                size += get_head_size(&f.ty, cache)?;
             }
             size
         }
         pr::TyKind::Enum(variants) => {
-            let head = enum_head_format(variants)?;
+            let head = enum_head_format(variants, cache)?;
             if head.is_always_inline {
                 head.s + head.h
             } else {
@@ -63,10 +80,22 @@ pub fn get_head_size(ty: &pr::Ty) -> Result<usize> {
             }
         }
 
-        pr::TyKind::Primitive(_) | pr::TyKind::Function(_) | pr::TyKind::Ident(_) => {
-            return Err(Error::InvalidType)
+        pr::TyKind::Ident(ident) => {
+            if let Some(val) = cache.head_size_cache.get(&ident.name) {
+                *val
+            } else {
+                // if target of the ident has not yet been resolved, the type is invalid
+                return Err(Error::InvalidType);
+            }
         }
-    })
+
+        pr::TyKind::Primitive(_) | pr::TyKind::Function(_) => return Err(Error::InvalidType),
+    };
+
+    if let Some(name) = &ty.name {
+        cache.head_size_cache.insert(name.clone(), size);
+    }
+    Ok(size)
 }
 
 pub struct EnumHeadFormat {
@@ -75,10 +104,13 @@ pub struct EnumHeadFormat {
     pub is_always_inline: bool,
 }
 
-pub fn enum_head_format(variants: &[(String, pr::Ty)]) -> Result<EnumHeadFormat> {
+pub fn enum_head_format(
+    variants: &[(String, pr::Ty)],
+    cache: &mut LayoutCache,
+) -> Result<EnumHeadFormat> {
     let s = enum_tag_size(variants.len());
 
-    let h = enum_max_variant_head_size(variants)?;
+    let h = enum_max_variant_head_size(variants, cache)?;
 
     Ok(EnumHeadFormat {
         s,
@@ -95,8 +127,9 @@ pub struct EnumVariantFormat {
 pub fn enum_variant_format(
     head: &EnumHeadFormat,
     variant_ty: &pr::Ty,
+    cache: &mut LayoutCache,
 ) -> Result<EnumVariantFormat> {
-    let variant_size = get_head_size(variant_ty)?;
+    let variant_size = get_head_size(variant_ty, cache)?;
 
     Ok(if head.is_always_inline {
         EnumVariantFormat {
@@ -111,16 +144,20 @@ pub fn enum_variant_format(
     })
 }
 
-fn enum_max_variant_head_size(variants: &[(String, pr::Ty)]) -> Result<usize> {
+fn enum_max_variant_head_size(
+    variants: &[(String, pr::Ty)],
+    cache: &mut LayoutCache,
+) -> Result<usize> {
     let mut h = 0;
     for (_n, ty) in variants {
-        let size = get_head_size(ty)?;
+        let size = get_head_size(ty, cache)?;
         h = h.max(size);
     }
     Ok(h)
 }
 
 fn enum_tag_size(variants_len: usize) -> usize {
+    // TODO: when bool-sub-byte packing is implemented, remove function in favor of enum_tag_size_used
     enum_tag_size_used(variants_len).div_ceil(8).mul(8)
 }
 

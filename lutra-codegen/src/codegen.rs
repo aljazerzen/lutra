@@ -17,9 +17,9 @@ pub fn codegen(source: &str) -> Result<String, std::fmt::Error> {
     let mut w = String::new();
     writeln!(w, "use std::io::Write;\n")?;
 
-    for stmt in &mut stmts {
-        let mut ctx = Context::default();
+    let mut ctx = Context::default();
 
+    for stmt in &mut stmts {
         match &mut stmt.kind {
             pr::StmtKind::QueryDef(_) => todo!(),
             pr::StmtKind::VarDef(_) => todo!(),
@@ -96,6 +96,8 @@ fn infer_names_re(ty: &mut pr::Ty, name_prefix: &mut Vec<String>) {
 struct Context<'t> {
     /// Buffer for types that need their definitions generated.
     def_buffer: Vec<&'t pr::Ty>,
+
+    cache: layout::LayoutCache,
 }
 
 /// Generates a type definition.
@@ -151,7 +153,7 @@ fn write_ty_def<'t>(
         _ => unimplemented!(),
     }
 
-    write_ty_def_impl(w, ty)?;
+    write_ty_def_impl(w, ty, ctx)?;
 
     Ok(())
 }
@@ -212,7 +214,11 @@ fn write_ty_ref<'t>(
 /// Generates the impl encode for a type.
 #[rustfmt::skip::macros(writeln)]
 #[rustfmt::skip::macros(write)]
-fn write_ty_def_impl<'t>(w: &mut impl Write, ty: &'t pr::Ty) -> Result<(), std::fmt::Error> {
+fn write_ty_def_impl<'t>(
+    w: &mut impl Write,
+    ty: &'t pr::Ty,
+    ctx: &mut Context<'t>,
+) -> Result<(), std::fmt::Error> {
     let name = ty.name.as_ref().unwrap();
 
     match &ty.kind {
@@ -291,7 +297,7 @@ fn write_ty_def_impl<'t>(w: &mut impl Write, ty: &'t pr::Ty) -> Result<(), std::
         }
 
         pr::TyKind::Enum(variants) => {
-            let head = layout::enum_head_format(&variants).unwrap();
+            let head = layout::enum_head_format(&variants, &mut ctx.cache).unwrap();
 
             let needs_body_meta = variants.iter().any(|(_, t)| !is_unit_variant(t));
             let body_meta_name = if needs_body_meta {
@@ -314,7 +320,8 @@ fn write_ty_def_impl<'t>(w: &mut impl Write, ty: &'t pr::Ty) -> Result<(), std::
                     }
                     writeln!(w, " => {{")?;
 
-                    let variant = layout::enum_variant_format(&head, variant_ty).unwrap();
+                    let variant =
+                        layout::enum_variant_format(&head, variant_ty, &mut ctx.cache).unwrap();
 
                     if is_unit_variant(variant_ty) {
                         writeln!(w, "                {body_meta_name}::None")?;
@@ -340,7 +347,8 @@ fn write_ty_def_impl<'t>(w: &mut impl Write, ty: &'t pr::Ty) -> Result<(), std::
             writeln!(w, "        Ok(match self {{")?;
 
             for (tag, (variant_name, variant_ty)) in variants.iter().enumerate() {
-                let variant = layout::enum_variant_format(&head, variant_ty).unwrap();
+                let variant =
+                    layout::enum_variant_format(&head, variant_ty, &mut ctx.cache).unwrap();
 
                 write!(w, "            Self::{variant_name}")?;
 
@@ -392,7 +400,8 @@ fn write_ty_def_impl<'t>(w: &mut impl Write, ty: &'t pr::Ty) -> Result<(), std::
                         continue;
                     }
 
-                    let variant = layout::enum_variant_format(&head, variant_ty).unwrap();
+                    let variant =
+                        layout::enum_variant_format(&head, variant_ty, &mut ctx.cache).unwrap();
 
                     write!(w, "    {variant_name}")?;
 
@@ -414,7 +423,7 @@ fn write_ty_def_impl<'t>(w: &mut impl Write, ty: &'t pr::Ty) -> Result<(), std::
         _ => unimplemented!(),
     }
 
-    let head_size = layout::get_head_size(ty).unwrap();
+    let head_size = layout::get_head_size(ty, &mut ctx.cache).unwrap();
     writeln!(w, "impl ::lutra_bin::Layout for {name} {{")?;
     writeln!(w, "    fn head_size() -> usize {{")?;
     writeln!(w, "        {head_size}")?;
@@ -472,7 +481,7 @@ fn write_ty_def_impl<'t>(w: &mut impl Write, ty: &'t pr::Ty) -> Result<(), std::
                 "    fn decode(r: &mut ::lutra_bin::Reader<'_>) -> ::lutra_bin::Result<Self> {{"
             )?;
 
-            let head = layout::enum_head_format(variants).unwrap();
+            let head = layout::enum_head_format(variants, &mut ctx.cache).unwrap();
             if !head.is_always_inline {
                 writeln!(w, "        let mut body = r.clone();")?;
             }
@@ -486,7 +495,8 @@ fn write_ty_def_impl<'t>(w: &mut impl Write, ty: &'t pr::Ty) -> Result<(), std::
             for (index, (variant_name, variant_ty)) in variants.iter().enumerate() {
                 writeln!(w, "            {index} => {{")?;
 
-                let variant_format = layout::enum_variant_format(&head, variant_ty).unwrap();
+                let variant_format =
+                    layout::enum_variant_format(&head, variant_ty, &mut ctx.cache).unwrap();
 
                 if variant_format.is_inline {
                     if !is_unit_variant(variant_ty) {

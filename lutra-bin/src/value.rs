@@ -1,7 +1,7 @@
 use lutra_parser::parser::pr;
 use std::io::Write;
 
-use crate::layout::{self, EnumHeadFormat, EnumVariantFormat};
+use crate::layout::{self, EnumHeadFormat, EnumVariantFormat, LayoutCache};
 use crate::{Decode, Encode, Error, Reader, Result};
 
 #[derive(Debug)]
@@ -179,26 +179,32 @@ fn encode_enum_params<'a>(
     variant: &'a str,
     ty_variants: &'a Vec<(String, pr::Ty)>,
 ) -> Result<(EnumHeadFormat, EnumVariantFormat, usize, &'a pr::Ty)> {
-    let head_format = layout::enum_head_format(ty_variants)?;
+    let mut cache = LayoutCache::default();
+    let head_format = layout::enum_head_format(ty_variants, &mut cache)?;
 
-    let tag = ty_variants.iter().position(|v| &v.0 == variant).ok_or(Error::InvalidData)?;
+    let tag = ty_variants
+        .iter()
+        .position(|v| &v.0 == variant)
+        .ok_or(Error::InvalidData)?;
     let (_, variant_ty) = ty_variants.get(tag).ok_or(Error::InvalidData)?;
 
-    let variant_format = layout::enum_variant_format(&head_format, variant_ty)?;
+    let variant_format = layout::enum_variant_format(&head_format, variant_ty, &mut cache)?;
     Ok((head_format, variant_format, tag, variant_ty))
 }
 
 impl<'t> Value<'t> {
     /// Convert .ld binary encoding into Lutra [Value].
     pub fn decode<'b>(buf: &'b [u8], ty: &'t pr::Ty) -> Result<Value<'t>> {
-        let head_size = layout::get_head_size(ty)? / 8;
+        let mut cache = LayoutCache::default();
+
+        let head_size = layout::get_head_size(ty, &mut cache)? / 8;
 
         let mut reader = Reader::new(buf, buf.len() - head_size);
-        decode_inner(&mut reader, ty)
+        decode_inner(&mut reader, ty, &mut cache)
     }
 }
 
-fn decode_inner<'b, 't>(r: &mut Reader<'b>, ty: &'t pr::Ty) -> Result<Value<'t>> {
+fn decode_inner<'b, 't>(r: &mut Reader<'b>, ty: &'t pr::Ty, cache: &mut LayoutCache) -> Result<Value<'t>> {
     Ok(match &ty.kind {
         pr::TyKind::Primitive(pr::PrimitiveSet::Bool) => Value::Boolean(bool::decode(r)?),
         pr::TyKind::Primitive(pr::PrimitiveSet::Int) => Value::Integer(i64::decode(r)?),
@@ -211,7 +217,7 @@ fn decode_inner<'b, 't>(r: &mut Reader<'b>, ty: &'t pr::Ty) -> Result<Value<'t>>
                 let name = field.name.as_deref();
                 let ty = &field.ty;
 
-                res.push((name, decode_inner(r, ty)?));
+                res.push((name, decode_inner(r, ty, cache)?));
             }
             Value::Tuple(res)
         }
@@ -227,7 +233,7 @@ fn decode_inner<'b, 't>(r: &mut Reader<'b>, ty: &'t pr::Ty) -> Result<Value<'t>>
 
             let mut buf = Vec::with_capacity(len);
             for _ in 0..len {
-                buf.push(decode_inner(&mut body, &item_ty)?);
+                buf.push(decode_inner(&mut body, &item_ty, cache)?);
             }
 
             Value::Array(buf)
@@ -236,7 +242,7 @@ fn decode_inner<'b, 't>(r: &mut Reader<'b>, ty: &'t pr::Ty) -> Result<Value<'t>>
         pr::TyKind::Enum(variants) => {
             let mut body = r.clone();
 
-            let head = layout::enum_head_format(variants)?;
+            let head = layout::enum_head_format(variants, cache)?;
 
             let mut tag_bytes = r.copy_n(head.s / 8);
             tag_bytes.resize(8, 0);
@@ -244,15 +250,15 @@ fn decode_inner<'b, 't>(r: &mut Reader<'b>, ty: &'t pr::Ty) -> Result<Value<'t>>
 
             let (variant_name, variant_ty) = variants.get(tag).unwrap();
 
-            let variant_format = layout::enum_variant_format(&head, variant_ty)?;
+            let variant_format = layout::enum_variant_format(&head, variant_ty, cache)?;
 
             let inner = if variant_format.is_inline {
-                decode_inner(r, variant_ty)?
+                decode_inner(r, variant_ty, cache)?
             } else {
                 let offset = r.copy_const::<4>();
                 let offset = u32::from_le_bytes(offset) as usize;
                 body.rewind(offset);
-                decode_inner(&mut body, variant_ty)?
+                decode_inner(&mut body, variant_ty, cache)?
             };
 
             r.skip(variant_format.padding);

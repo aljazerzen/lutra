@@ -11,3 +11,5 @@ type u = enum {
 }
 
 type v = enum { Yes, No, Maybe }
+
+type i = {v, z}
