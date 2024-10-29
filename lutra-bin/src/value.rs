@@ -1,4 +1,5 @@
 use lutra_parser::parser::pr;
+use std::borrow::Cow;
 use std::io::Write;
 
 use crate::layout::{self, EnumHeadFormat, EnumVariantFormat, LayoutCache};
@@ -10,9 +11,9 @@ pub enum Value<'ty> {
     Float(f64),
     Boolean(bool),
     String(String),
-    Tuple(Vec<(Option<&'ty str>, Value<'ty>)>),
+    Tuple(Vec<(Option<Cow<'ty, str>>, Value<'ty>)>),
     Array(Vec<Value<'ty>>),
-    Enum(&'ty str, Box<Value<'ty>>),
+    Enum(Cow<'ty, str>, Box<Value<'ty>>),
 }
 
 impl<'t> Value<'t> {
@@ -25,6 +26,34 @@ impl<'t> Value<'t> {
         let meta = encode_body(w, self, ty, &mut ctx)?;
         encode_head(w, self, meta, ty, &mut ctx)?;
         Ok(())
+    }
+
+    pub fn disown_type(self) -> Value<'static> {
+        match self {
+            Value::Integer(v) => Value::Integer(v),
+            Value::Float(v) => Value::Float(v),
+            Value::Boolean(v) => Value::Boolean(v),
+            Value::String(v) => Value::String(v),
+            Value::Tuple(fields) => Value::Tuple(
+                fields
+                    .into_iter()
+                    .map(|(name, ty)| (name.map(cow_to_owned), ty.disown_type()))
+                    .collect(),
+            ),
+            Value::Array(items) => {
+                Value::Array(items.into_iter().map(|x| x.disown_type()).collect())
+            }
+            Value::Enum(variant, inner) => {
+                Value::Enum(cow_to_owned(variant), Box::new(inner.disown_type()))
+            }
+        }
+    }
+}
+
+fn cow_to_owned(c: Cow<'_, str>) -> Cow<'static, str> {
+    match c {
+        Cow::Borrowed(b) => Cow::Owned(b.to_string()),
+        Cow::Owned(o) => Cow::Owned(o),
     }
 }
 
@@ -237,7 +266,7 @@ fn decode_inner<'b, 't>(
                 let name = field.name.as_deref();
                 let ty = &field.ty;
 
-                res.push((name, decode_inner(r, ty, ctx)?));
+                res.push((name.map(Cow::from), decode_inner(r, ty, ctx)?));
             }
             Value::Tuple(res)
         }
@@ -282,7 +311,7 @@ fn decode_inner<'b, 't>(
             };
 
             r.skip(variant_format.padding);
-            Value::Enum(&variant_name, Box::new(inner))
+            Value::Enum(Cow::from(variant_name), Box::new(inner))
         }
 
         _ => return Err(Error::InvalidType),

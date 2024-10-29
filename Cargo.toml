@@ -1,5 +1,11 @@
 [workspace]
-members = ["example", "lutra-bin", "lutra-codegen", "lutra-parser"]
+members = [
+    "example",
+    "lutra-bin",
+    "lutra-codegen",
+    "lutra-parser",
+    "lutra-typed-data",
+]
 resolver = "2"
 
 [workspace.package]

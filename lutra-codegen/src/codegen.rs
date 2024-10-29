@@ -210,7 +210,7 @@ fn write_ty_ref<'t>(
             write!(w, ">")?;
         }
 
-        pr::TyKind::Tuple(_) => {
+        pr::TyKind::Tuple(_) | pr::TyKind::Enum(_) => {
             ctx.def_buffer.push(ty);
 
             let name = ty.name.as_ref().unwrap();
@@ -528,7 +528,7 @@ fn write_ty_def_impl<'t>(
                 }
 
                 if variant_format.padding > 0 {
-                    writeln!(w, "                r.skip({});", variant_format.padding)?;
+                    writeln!(w, "                r.skip({});", variant_format.padding / 8)?;
                 }
 
                 let needs_box = ctx.cache.does_enum_variant_contain_recursive(&ty, index);

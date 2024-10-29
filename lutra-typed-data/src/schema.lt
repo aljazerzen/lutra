@@ -1,0 +1,26 @@
+type PrimitiveSet = enum {
+    int,
+    float,
+    bool,
+    text,
+}
+
+type OptText = enum {
+    None,
+    Some = text
+}
+
+type Ty = enum {
+    Primitive = PrimitiveSet,
+
+    Tuple = [{name = OptText, ty = Ty}],
+
+    Array = Ty,
+
+    Enum = [{name = text, ty = Ty}],
+}
+
+type TypedData = {
+    ty = Ty,
+    data = [int] # TODO: [uint8]
+}

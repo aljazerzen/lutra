@@ -16,9 +16,9 @@ fn main() {
         let x_ty = schema_types.get("x").unwrap();
         let x_value = Value::Tuple(vec![
             (None, Value::Integer(42)),
-            (Some("a"), Value::String("Hello world!".to_string())),
+            (Some("a".into()), Value::String("Hello world!".to_string())),
             (
-                Some("b"),
+                Some("b".into()),
                 Value::Array(vec![Value::Boolean(true), Value::Boolean(false)]),
             ),
         ]);
@@ -27,7 +27,7 @@ fn main() {
         x_value.encode(&mut buf, x_ty).unwrap();
 
         let x_value = Value::decode(&buf, &x_ty).unwrap();
-        dbg!(x_value);
+        dbg!(&x_value);
 
         let x = schema::x::decode_buffer(&buf).unwrap();
         dbg!(&x);
@@ -82,7 +82,7 @@ fn main() {
 
     {
         let u_ty = schema_types.get("u").unwrap();
-        let u_value = Value::Enum("f", Box::new(Value::Boolean(true)));
+        let u_value = Value::Enum("f".into(), Box::new(Value::Boolean(true)));
 
         let mut buf = Vec::new();
         u_value.encode(&mut buf, u_ty).unwrap();
@@ -101,7 +101,7 @@ fn main() {
 
     {
         let u_ty = schema_types.get("u").unwrap();
-        let u_value = Value::Enum("g", Box::new(Value::Tuple(vec![])));
+        let u_value = Value::Enum("g".into(), Box::new(Value::Tuple(vec![])));
 
         let mut buf = Vec::new();
         u_value.encode(&mut buf, u_ty).unwrap();
@@ -121,10 +121,10 @@ fn main() {
     {
         let u_ty = schema_types.get("u").unwrap();
         let u_value = Value::Enum(
-            "h",
+            "h".into(),
             Box::new(Value::Tuple(vec![
-                (Some("a"), Value::Integer(-12)),
-                (Some("b"), Value::Float(3.14)),
+                (Some("a".into()), Value::Integer(-12)),
+                (Some("b".into()), Value::Float(3.14)),
             ])),
         );
 
@@ -145,7 +145,7 @@ fn main() {
 
     {
         let v_ty = schema_types.get("v").unwrap();
-        let v_value = Value::Enum("No", Box::new(Value::Tuple(vec![])));
+        let v_value = Value::Enum("No".into(), Box::new(Value::Tuple(vec![])));
 
         let mut buf = Vec::new();
         v_value.encode(&mut buf, v_ty).unwrap();
@@ -165,16 +165,25 @@ fn main() {
     {
         let tree_ty = schema_types.get("Tree").unwrap();
         let tree_value = Value::Enum(
-            "Node",
+            "Node".into(),
             Box::new(Value::Tuple(vec![
-                (None, Value::Enum("Leaf", Box::new(Value::Integer(4)))),
+                (
+                    None,
+                    Value::Enum("Leaf".into(), Box::new(Value::Integer(4))),
+                ),
                 (
                     None,
                     Value::Enum(
-                        "Node",
+                        "Node".into(),
                         Box::new(Value::Tuple(vec![
-                            (None, Value::Enum("Leaf", Box::new(Value::Integer(7)))),
-                            (None, Value::Enum("Leaf", Box::new(Value::Integer(10)))),
+                            (
+                                None,
+                                Value::Enum("Leaf".into(), Box::new(Value::Integer(7))),
+                            ),
+                            (
+                                None,
+                                Value::Enum("Leaf".into(), Box::new(Value::Integer(10))),
+                            ),
                         ])),
                     ),
                 ),
@@ -194,6 +203,35 @@ fn main() {
         tree.encode(&mut buf2).unwrap();
 
         assert_eq!(buf, buf2);
+    }
+
+    {
+        let x_ty = schema_types.get("x").unwrap();
+        let x_value = Value::Tuple(vec![
+            (None, Value::Integer(42)),
+            (Some("a".into()), Value::String("Hello world!".to_string())),
+            (
+                Some("b".into()),
+                Value::Array(vec![Value::Boolean(true), Value::Boolean(false)]),
+            ),
+        ]);
+
+        let mut ltd_buf = Vec::new();
+        lutra_file::encode_typed_data(&mut ltd_buf, x_value, x_ty).unwrap();
+
+        let (x_value, _x_ty) = lutra_file::decode_typed_data(&ltd_buf).unwrap();
+        dbg!(x_value);
+    }
+
+    {
+        let z_ty = schema_types.get("z").unwrap();
+        let z_value = Value::Boolean(true);
+
+        let mut ltd_buf = Vec::new();
+        lutra_file::encode_typed_data(&mut ltd_buf, z_value, z_ty).unwrap();
+
+        let (z_value, _z_ty) = lutra_file::decode_typed_data(&ltd_buf).unwrap();
+        dbg!(z_value);
     }
 }
 
