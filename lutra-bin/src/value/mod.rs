@@ -1,6 +1,7 @@
 mod encode;
 mod fold;
 mod print_source;
+mod print_pretty;
 
 use crate::{Error, Result};
 use lutra_parser::parser::pr;

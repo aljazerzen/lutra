@@ -36,11 +36,7 @@ fn main() {
 
     {
         let y_ty = schema_types.get("y").unwrap();
-        let y_value = Value::Array(vec![
-            Value::Int(12),
-            Value::Int(55),
-            Value::Int(2),
-        ]);
+        let y_value = Value::Array(vec![Value::Int(12), Value::Int(55), Value::Int(2)]);
 
         let mut buf = Vec::new();
         y_value.encode(&mut buf, y_ty).unwrap();
@@ -210,6 +206,51 @@ fn main() {
 
         let (z_value, _z_ty) = lutra_typed_data::decode_typed_data(&ltd_buf).unwrap();
         dbg!(z_value);
+    }
+
+    {
+        let y_ty = schema_types.get("y").unwrap();
+        let y_value = Value::Array(vec![
+            Value::Bool(false),
+            Value::Bool(true),
+            Value::Bool(true),
+            Value::Bool(false),
+        ]);
+
+        println!("{}", y_value.print_pretty(y_ty).unwrap());
+    }
+
+    {
+        let rel_ty = schema_types.get("Rel").unwrap();
+        let rel_value = Value::Tuple(vec![
+            Value::Int(100),
+            Value::Array(vec![
+                Value::Tuple(vec![
+                    Value::Int(2),                    // id = int,
+                    Value::Text("aljaz".to_string()), // name = text,
+                    Value::Tuple(vec![
+                        // address = {
+                        Value::Text("Ljubljana".into()), //     city = text,
+                        Value::Text("Trubarjeva ulica".into()), //     street = text
+                    ]), // },
+                    Value::Int(27),                   // int,
+                    Value::Bool(true),                // is_admin = bool
+                ]),
+                Value::Tuple(vec![
+                    Value::Int(12),                 // id = int,
+                    Value::Text("tom".to_string()), // name = text,
+                    Value::Tuple(vec![
+                        // address = {
+                        Value::Text("London".into()), //     city = text,
+                        Value::Text("Trafalgar".into()), //     street = text
+                    ]), // },
+                    Value::Int(18),                 // int,
+                    Value::Bool(false),             // is_admin = bool
+                ]),
+            ]),
+        ]);
+
+        println!("{}", rel_value.print_pretty(rel_ty).unwrap());
     }
 }
 
