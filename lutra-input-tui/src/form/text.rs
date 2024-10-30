@@ -58,7 +58,7 @@ impl TextForm {
         vec![]
     }
 
-    pub(crate) fn get_value(&self) -> lutra_bin::Value<'static> {
+    pub(crate) fn get_value(&self) -> lutra_bin::Value {
         lutra_bin::Value::String(self.value.clone())
     }
 }
@@ -79,8 +79,8 @@ pub fn render_name_colon(form: &Form, frame: &mut Frame, area: Rect) -> Rect {
     });
     frame.render_widget(":".white(), area_colon);
 
-    let area_value = area_colon
+    
+    area_colon
         .offset(Offset { x: 2, y: 0 })
-        .intersection(frame.size());
-    area_value
+        .intersection(frame.size())
 }

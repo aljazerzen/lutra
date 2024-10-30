@@ -45,7 +45,7 @@ impl TupleForm {
         next_field_area
     }
 
-    pub(crate) fn get_value(&self) -> lutra_bin::Value<'static> {
-        lutra_bin::Value::Tuple(self.fields.iter().map(|f| (None, f.get_value())).collect())
+    pub(crate) fn get_value(&self) -> lutra_bin::Value {
+        lutra_bin::Value::Tuple(self.fields.iter().map(|f| f.get_value()).collect())
     }
 }

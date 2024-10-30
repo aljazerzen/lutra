@@ -6,7 +6,7 @@ use lutra_bin::{Decode, Encode, Result, Value};
 use lutra_parser::parser::pr;
 use schema::TyEnumItems;
 
-pub fn decode_typed_data(buffer: &[u8]) -> Result<(Value<'static>, pr::Ty)> {
+pub fn decode_typed_data(buffer: &[u8]) -> Result<(Value, pr::Ty)> {
     let typed_data = schema::TypedData::decode_buffer(buffer)?;
 
     let ty = type_to_pr(&typed_data.ty);
@@ -18,14 +18,10 @@ pub fn decode_typed_data(buffer: &[u8]) -> Result<(Value<'static>, pr::Ty)> {
 
     let value = Value::decode(&data, &ty)?;
 
-    Ok((value.disown_type(), ty))
+    Ok((value, ty))
 }
 
-pub fn encode_typed_data<'t>(
-    w: &mut impl std::io::Write,
-    value: Value<'t>,
-    ty: &'t pr::Ty,
-) -> Result<()> {
+pub fn encode_typed_data(w: &mut impl std::io::Write, value: Value, ty: &pr::Ty) -> Result<()> {
     let mut data_u8 = Vec::new();
     value.encode(&mut data_u8, ty)?;
 

@@ -212,7 +212,7 @@ impl Form {
         }
     }
 
-    pub fn get_value(&self) -> lutra_bin::Value<'static> {
+    pub fn get_value(&self) -> lutra_bin::Value {
         match &self.kind {
             FormKind::Text(form) => form.get_value(),
             FormKind::Tuple(form) => form.get_value(),

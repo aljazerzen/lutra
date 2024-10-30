@@ -23,7 +23,7 @@ impl App {
         app
     }
 
-    pub fn get_value(&self) -> lutra_bin::Value<'static> {
+    pub fn get_value(&self) -> lutra_bin::Value {
         self.form.get_value()
     }
 

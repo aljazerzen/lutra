@@ -91,9 +91,8 @@ impl EnumForm {
         vec![]
     }
 
-    pub(crate) fn get_value(&self) -> lutra_bin::Value<'static> {
+    pub(crate) fn get_value(&self) -> lutra_bin::Value {
         let selected_form = self.variants.get(self.selected).unwrap();
-        let variant_name = selected_form.name.name.clone().unwrap();
-        lutra_bin::Value::Enum(variant_name.into(), Box::new(selected_form.get_value()))
+        lutra_bin::Value::Enum(self.selected, Box::new(selected_form.get_value()))
     }
 }

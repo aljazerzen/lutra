@@ -1,24 +1,23 @@
 use lutra_parser::parser::pr;
-use std::borrow::Cow;
 use std::io::Write;
 
 use crate::layout::{self, EnumHeadFormat, EnumVariantFormat, LayoutCache};
 use crate::{Decode, Encode, Error, Reader, Result};
 
 #[derive(Debug)]
-pub enum Value<'ty> {
+pub enum Value {
     Integer(i64),
     Float(f64),
     Boolean(bool),
     String(String),
-    Tuple(Vec<(Option<Cow<'ty, str>>, Value<'ty>)>),
-    Array(Vec<Value<'ty>>),
-    Enum(Cow<'ty, str>, Box<Value<'ty>>),
+    Tuple(Vec<Value>),
+    Array(Vec<Value>),
+    Enum(usize, Box<Value>),
 }
 
-impl<'t> Value<'t> {
+impl Value {
     /// Convert a Lutra [Value] to .ld binary encoding.
-    pub fn encode(&self, w: &mut Vec<u8>, ty: &'t pr::Ty) -> Result<()> {
+    pub fn encode(&self, w: &mut Vec<u8>, ty: &pr::Ty) -> Result<()> {
         let mut ctx = Context::new(ty);
         // run layout ahead of type to resolve recursive references
         layout::get_head_size(ty, &mut ctx.cache)?;
@@ -28,32 +27,14 @@ impl<'t> Value<'t> {
         Ok(())
     }
 
-    pub fn disown_type(self) -> Value<'static> {
-        match self {
-            Value::Integer(v) => Value::Integer(v),
-            Value::Float(v) => Value::Float(v),
-            Value::Boolean(v) => Value::Boolean(v),
-            Value::String(v) => Value::String(v),
-            Value::Tuple(fields) => Value::Tuple(
-                fields
-                    .into_iter()
-                    .map(|(name, ty)| (name.map(cow_to_owned), ty.disown_type()))
-                    .collect(),
-            ),
-            Value::Array(items) => {
-                Value::Array(items.into_iter().map(|x| x.disown_type()).collect())
-            }
-            Value::Enum(variant, inner) => {
-                Value::Enum(cow_to_owned(variant), Box::new(inner.disown_type()))
-            }
-        }
-    }
-}
+    /// Convert .ld binary encoding into Lutra [Value].
+    pub fn decode(buf: &[u8], ty: &pr::Ty) -> Result<Value> {
+        let mut ctx = Context::new(ty);
 
-fn cow_to_owned(c: Cow<'_, str>) -> Cow<'static, str> {
-    match c {
-        Cow::Borrowed(b) => Cow::Owned(b.to_string()),
-        Cow::Owned(o) => Cow::Owned(o),
+        let head_size = layout::get_head_size(ty, &mut ctx.cache)? / 8;
+
+        let mut reader = Reader::new(buf, buf.len() - head_size);
+        decode_inner(&mut reader, ty, &mut ctx)
     }
 }
 
@@ -94,7 +75,7 @@ fn encode_body<'t>(
             let ty_fields = expect_ty(ty, |k| k.as_tuple(), "tuple")?;
 
             let mut metas = Vec::with_capacity(fields.len());
-            for ((_, f), f_ty) in fields.iter().zip(ty_fields) {
+            for (f, f_ty) in fields.iter().zip(ty_fields) {
                 metas.push(encode_body(w, f, &f_ty.ty, ctx)?);
             }
 
@@ -115,10 +96,10 @@ fn encode_body<'t>(
 
             Ok(ValueBodyMeta::Offset(items_start))
         }
-        Value::Enum(variant, inner) => {
+        Value::Enum(tag, inner) => {
             let variants = expect_ty(ty, |k| k.as_enum(), "enum")?;
 
-            let (_, variant_format, _, variant_ty) = encode_enum_params(variant, variants, ctx)?;
+            let (_, variant_format, _, variant_ty) = encode_enum_params(*tag, variants, ctx)?;
 
             let meta = encode_body(w, inner, variant_ty, ctx)?;
 
@@ -172,7 +153,7 @@ fn encode_head<'t>(
                 unreachable!()
             };
 
-            for (((_, f), m), f_ty) in fields.iter().zip(metas.into_iter()).zip(ty_fields) {
+            for ((f, m), f_ty) in fields.iter().zip(metas.into_iter()).zip(ty_fields) {
                 encode_head(w, f, m, &f_ty.ty, ctx)?;
             }
         }
@@ -187,10 +168,10 @@ fn encode_head<'t>(
             w.write_all(&(offset as u32).to_le_bytes())?;
             w.write_all(&(items.len() as u32).to_le_bytes())?;
         }
-        Value::Enum(variant, inner) => {
+        Value::Enum(tag, inner) => {
             let variants = expect_ty(ty, |k| k.as_enum(), "enum")?;
 
-            let (head, variant, tag, variant_ty) = encode_enum_params(variant, variants, ctx)?;
+            let (head, variant, tag, variant_ty) = encode_enum_params(*tag, variants, ctx)?;
 
             let tag_bytes = &(tag as u64).to_le_bytes()[0..(head.s / 8)];
 
@@ -217,39 +198,19 @@ fn encode_head<'t>(
 }
 
 fn encode_enum_params<'t>(
-    variant: &str,
+    tag: usize,
     ty_variants: &'t [(String, pr::Ty)],
     cache: &mut Context<'t>,
 ) -> Result<(EnumHeadFormat, EnumVariantFormat, usize, &'t pr::Ty)> {
     let head_format = layout::enum_head_format(ty_variants, &mut cache.cache)?;
 
-    let tag = ty_variants
-        .iter()
-        .position(|v| v.0 == variant)
-        .ok_or(Error::InvalidData)?;
     let (_, variant_ty) = ty_variants.get(tag).ok_or(Error::InvalidData)?;
 
     let variant_format = layout::enum_variant_format(&head_format, variant_ty, &mut cache.cache)?;
     Ok((head_format, variant_format, tag, variant_ty))
 }
 
-impl<'t> Value<'t> {
-    /// Convert .ld binary encoding into Lutra [Value].
-    pub fn decode<'b>(buf: &'b [u8], ty: &'t pr::Ty) -> Result<Value<'t>> {
-        let mut ctx = Context::new(ty);
-
-        let head_size = layout::get_head_size(ty, &mut ctx.cache)? / 8;
-
-        let mut reader = Reader::new(buf, buf.len() - head_size);
-        decode_inner(&mut reader, ty, &mut ctx)
-    }
-}
-
-fn decode_inner<'t>(
-    r: &mut Reader<'_>,
-    ty: &'t pr::Ty,
-    ctx: &mut Context<'t>,
-) -> Result<Value<'t>> {
+fn decode_inner<'t>(r: &mut Reader<'_>, ty: &'t pr::Ty, ctx: &mut Context<'t>) -> Result<Value> {
     let ty = resolve_ident(ty, ctx);
 
     Ok(match &ty.kind {
@@ -261,10 +222,7 @@ fn decode_inner<'t>(
         pr::TyKind::Tuple(fields) => {
             let mut res = Vec::with_capacity(fields.len());
             for field in fields {
-                let name = field.name.as_deref();
-                let ty = &field.ty;
-
-                res.push((name.map(Cow::from), decode_inner(r, ty, ctx)?));
+                res.push(decode_inner(r, &field.ty, ctx)?);
             }
             Value::Tuple(res)
         }
@@ -295,7 +253,7 @@ fn decode_inner<'t>(
             tag_bytes.resize(8, 0);
             let tag = u64::from_le_bytes(tag_bytes.try_into().unwrap()) as usize;
 
-            let (variant_name, variant_ty) = variants.get(tag).unwrap();
+            let (_, variant_ty) = variants.get(tag).unwrap();
 
             let variant_format = layout::enum_variant_format(&head, variant_ty, &mut ctx.cache)?;
 
@@ -309,7 +267,7 @@ fn decode_inner<'t>(
             };
 
             r.skip(variant_format.padding);
-            Value::Enum(Cow::from(variant_name), Box::new(inner))
+            Value::Enum(tag, Box::new(inner))
         }
 
         _ => return Err(Error::InvalidType),

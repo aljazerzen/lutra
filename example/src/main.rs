@@ -14,12 +14,9 @@ fn main() {
     {
         let x_ty = schema_types.get("x").unwrap();
         let x_value = Value::Tuple(vec![
-            (None, Value::Integer(42)),
-            (Some("a".into()), Value::String("Hello world!".to_string())),
-            (
-                Some("b".into()),
-                Value::Array(vec![Value::Boolean(true), Value::Boolean(false)]),
-            ),
+            Value::Integer(42),
+            Value::String("Hello world!".to_string()),
+            Value::Array(vec![Value::Boolean(true), Value::Boolean(false)]),
         ]);
 
         let mut buf = Vec::new();
@@ -81,7 +78,7 @@ fn main() {
 
     {
         let u_ty = schema_types.get("u").unwrap();
-        let u_value = Value::Enum("f".into(), Box::new(Value::Boolean(true)));
+        let u_value = Value::Enum(0, Box::new(Value::Boolean(true)));
 
         let mut buf = Vec::new();
         u_value.encode(&mut buf, u_ty).unwrap();
@@ -100,7 +97,7 @@ fn main() {
 
     {
         let u_ty = schema_types.get("u").unwrap();
-        let u_value = Value::Enum("g".into(), Box::new(Value::Tuple(vec![])));
+        let u_value = Value::Enum(1, Box::new(Value::Tuple(vec![])));
 
         let mut buf = Vec::new();
         u_value.encode(&mut buf, u_ty).unwrap();
@@ -120,11 +117,8 @@ fn main() {
     {
         let u_ty = schema_types.get("u").unwrap();
         let u_value = Value::Enum(
-            "h".into(),
-            Box::new(Value::Tuple(vec![
-                (Some("a".into()), Value::Integer(-12)),
-                (Some("b".into()), Value::Float(3.16)),
-            ])),
+            1,
+            Box::new(Value::Tuple(vec![Value::Integer(-12), Value::Float(3.16)])),
         );
 
         let mut buf = Vec::new();
@@ -144,7 +138,7 @@ fn main() {
 
     {
         let v_ty = schema_types.get("v").unwrap();
-        let v_value = Value::Enum("No".into(), Box::new(Value::Tuple(vec![])));
+        let v_value = Value::Enum(1, Box::new(Value::Tuple(vec![])));
 
         let mut buf = Vec::new();
         v_value.encode(&mut buf, v_ty).unwrap();
@@ -164,27 +158,15 @@ fn main() {
     {
         let tree_ty = schema_types.get("Tree").unwrap();
         let tree_value = Value::Enum(
-            "Node".into(),
+            1, // Node
             Box::new(Value::Tuple(vec![
-                (
-                    None,
-                    Value::Enum("Leaf".into(), Box::new(Value::Integer(4))),
-                ),
-                (
-                    None,
-                    Value::Enum(
-                        "Node".into(),
-                        Box::new(Value::Tuple(vec![
-                            (
-                                None,
-                                Value::Enum("Leaf".into(), Box::new(Value::Integer(7))),
-                            ),
-                            (
-                                None,
-                                Value::Enum("Leaf".into(), Box::new(Value::Integer(10))),
-                            ),
-                        ])),
-                    ),
+                Value::Enum(0, Box::new(Value::Integer(4))), // Leaf
+                Value::Enum(
+                    1, // Node
+                    Box::new(Value::Tuple(vec![
+                        Value::Enum(0, Box::new(Value::Integer(7))),  // Leaf
+                        Value::Enum(0, Box::new(Value::Integer(10))), // Leaf
+                    ])),
                 ),
             ])),
         );
@@ -207,12 +189,9 @@ fn main() {
     {
         let x_ty = schema_types.get("x").unwrap();
         let x_value = Value::Tuple(vec![
-            (None, Value::Integer(42)),
-            (Some("a".into()), Value::String("Hello world!".to_string())),
-            (
-                Some("b".into()),
-                Value::Array(vec![Value::Boolean(true), Value::Boolean(false)]),
-            ),
+            Value::Integer(42),
+            Value::String("Hello world!".to_string()),
+            Value::Array(vec![Value::Boolean(true), Value::Boolean(false)]),
         ]);
 
         let mut ltd_buf = Vec::new();
