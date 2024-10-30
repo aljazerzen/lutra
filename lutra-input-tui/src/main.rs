@@ -3,9 +3,9 @@ use lutra_parser::parser::pr;
 fn main() {
     let ty = get_ty();
 
-    let value = lutra_input_tui::prompt_for_ty(ty).unwrap();
+    let value = lutra_input_tui::prompt_for_ty(&ty).unwrap();
 
-    println!("{value:?}");
+    println!("{}", value.print_source(&ty).unwrap());
 }
 
 fn get_ty() -> pr::Ty {

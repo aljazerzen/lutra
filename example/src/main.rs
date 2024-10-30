@@ -14,9 +14,9 @@ fn main() {
     {
         let x_ty = schema_types.get("x").unwrap();
         let x_value = Value::Tuple(vec![
-            Value::Integer(42),
-            Value::String("Hello world!".to_string()),
-            Value::Array(vec![Value::Boolean(true), Value::Boolean(false)]),
+            Value::Int(42),
+            Value::Text("Hello world!".to_string()),
+            Value::Array(vec![Value::Bool(true), Value::Bool(false)]),
         ]);
 
         let mut buf = Vec::new();
@@ -37,9 +37,9 @@ fn main() {
     {
         let y_ty = schema_types.get("y").unwrap();
         let y_value = Value::Array(vec![
-            Value::Integer(12),
-            Value::Integer(55),
-            Value::Integer(2),
+            Value::Int(12),
+            Value::Int(55),
+            Value::Int(2),
         ]);
 
         let mut buf = Vec::new();
@@ -59,7 +59,7 @@ fn main() {
 
     {
         let z_ty = schema_types.get("z").unwrap();
-        let z_value = Value::Boolean(true);
+        let z_value = Value::Bool(true);
 
         let mut buf = Vec::new();
         z_value.encode(&mut buf, z_ty).unwrap();
@@ -78,7 +78,7 @@ fn main() {
 
     {
         let u_ty = schema_types.get("u").unwrap();
-        let u_value = Value::Enum(0, Box::new(Value::Boolean(true)));
+        let u_value = Value::Enum(0, Box::new(Value::Bool(true)));
 
         let mut buf = Vec::new();
         u_value.encode(&mut buf, u_ty).unwrap();
@@ -118,7 +118,7 @@ fn main() {
         let u_ty = schema_types.get("u").unwrap();
         let u_value = Value::Enum(
             1,
-            Box::new(Value::Tuple(vec![Value::Integer(-12), Value::Float(3.16)])),
+            Box::new(Value::Tuple(vec![Value::Int(-12), Value::Float(3.16)])),
         );
 
         let mut buf = Vec::new();
@@ -160,12 +160,12 @@ fn main() {
         let tree_value = Value::Enum(
             1, // Node
             Box::new(Value::Tuple(vec![
-                Value::Enum(0, Box::new(Value::Integer(4))), // Leaf
+                Value::Enum(0, Box::new(Value::Int(4))), // Leaf
                 Value::Enum(
                     1, // Node
                     Box::new(Value::Tuple(vec![
-                        Value::Enum(0, Box::new(Value::Integer(7))),  // Leaf
-                        Value::Enum(0, Box::new(Value::Integer(10))), // Leaf
+                        Value::Enum(0, Box::new(Value::Int(7))),  // Leaf
+                        Value::Enum(0, Box::new(Value::Int(10))), // Leaf
                     ])),
                 ),
             ])),
@@ -189,9 +189,9 @@ fn main() {
     {
         let x_ty = schema_types.get("x").unwrap();
         let x_value = Value::Tuple(vec![
-            Value::Integer(42),
-            Value::String("Hello world!".to_string()),
-            Value::Array(vec![Value::Boolean(true), Value::Boolean(false)]),
+            Value::Int(42),
+            Value::Text("Hello world!".to_string()),
+            Value::Array(vec![Value::Bool(true), Value::Bool(false)]),
         ]);
 
         let mut ltd_buf = Vec::new();
@@ -203,7 +203,7 @@ fn main() {
 
     {
         let z_ty = schema_types.get("z").unwrap();
-        let z_value = Value::Boolean(true);
+        let z_value = Value::Bool(true);
 
         let mut ltd_buf = Vec::new();
         lutra_typed_data::encode_typed_data(&mut ltd_buf, z_value, z_ty).unwrap();

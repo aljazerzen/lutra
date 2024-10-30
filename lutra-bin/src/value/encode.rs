@@ -1,19 +1,10 @@
-use lutra_parser::parser::pr;
 use std::io::Write;
 
+use lutra_parser::parser::pr;
+
+use super::{expect_ty, expect_ty_primitive, Value};
 use crate::layout::{self, EnumHeadFormat, EnumVariantFormat, LayoutCache};
 use crate::{Decode, Encode, Error, Reader, Result};
-
-#[derive(Debug)]
-pub enum Value {
-    Integer(i64),
-    Float(f64),
-    Boolean(bool),
-    String(String),
-    Tuple(Vec<Value>),
-    Array(Vec<Value>),
-    Enum(usize, Box<Value>),
-}
 
 impl Value {
     /// Convert a Lutra [Value] to .ld binary encoding.
@@ -53,7 +44,7 @@ fn encode_body<'t>(
     let ty = resolve_ident(ty, ctx);
 
     match value {
-        Value::Integer(_) => {
+        Value::Int(_) => {
             expect_ty_primitive(ty, pr::PrimitiveSet::Int)?;
             Ok(ValueBodyMeta::None)
         }
@@ -61,11 +52,11 @@ fn encode_body<'t>(
             expect_ty_primitive(ty, pr::PrimitiveSet::Float)?;
             Ok(ValueBodyMeta::None)
         }
-        Value::Boolean(_) => {
+        Value::Bool(_) => {
             expect_ty_primitive(ty, pr::PrimitiveSet::Bool)?;
             Ok(ValueBodyMeta::None)
         }
-        Value::String(v) => {
+        Value::Text(v) => {
             expect_ty_primitive(ty, pr::PrimitiveSet::Text)?;
 
             let meta = v.encode_body(w)?;
@@ -124,7 +115,7 @@ fn encode_head<'t>(
     let ty = resolve_ident(ty, ctx);
 
     match value {
-        Value::Integer(v) => {
+        Value::Int(v) => {
             expect_ty_primitive(ty, pr::PrimitiveSet::Int)?;
             v.encode_head((), w)?;
         }
@@ -132,12 +123,12 @@ fn encode_head<'t>(
             expect_ty_primitive(ty, pr::PrimitiveSet::Float)?;
             v.encode_head((), w)?;
         }
-        Value::Boolean(v) => {
+        Value::Bool(v) => {
             expect_ty_primitive(ty, pr::PrimitiveSet::Bool)?;
 
             v.encode_head((), w)?;
         }
-        Value::String(v) => {
+        Value::Text(v) => {
             expect_ty_primitive(ty, pr::PrimitiveSet::Text)?;
 
             let ValueBodyMeta::Offset(bytes_offset) = body_meta else {
@@ -214,10 +205,10 @@ fn decode_inner<'t>(r: &mut Reader<'_>, ty: &'t pr::Ty, ctx: &mut Context<'t>) -
     let ty = resolve_ident(ty, ctx);
 
     Ok(match &ty.kind {
-        pr::TyKind::Primitive(pr::PrimitiveSet::Bool) => Value::Boolean(bool::decode(r)?),
-        pr::TyKind::Primitive(pr::PrimitiveSet::Int) => Value::Integer(i64::decode(r)?),
+        pr::TyKind::Primitive(pr::PrimitiveSet::Bool) => Value::Bool(bool::decode(r)?),
+        pr::TyKind::Primitive(pr::PrimitiveSet::Int) => Value::Int(i64::decode(r)?),
         pr::TyKind::Primitive(pr::PrimitiveSet::Float) => Value::Float(f64::decode(r)?),
-        pr::TyKind::Primitive(pr::PrimitiveSet::Text) => Value::String(String::decode(r)?),
+        pr::TyKind::Primitive(pr::PrimitiveSet::Text) => Value::Text(String::decode(r)?),
 
         pr::TyKind::Tuple(fields) => {
             let mut res = Vec::with_capacity(fields.len());
@@ -274,42 +265,6 @@ fn decode_inner<'t>(r: &mut Reader<'_>, ty: &'t pr::Ty, ctx: &mut Context<'t>) -
     })
 }
 
-fn expect_ty<'t, F, K>(ty: &'t pr::Ty, cast: F, expected: &'static str) -> Result<&'t K>
-where
-    F: Fn(&pr::TyKind) -> Option<&K>,
-{
-    cast(&ty.kind).ok_or_else(|| Error::TypeMismatch {
-        expected,
-        found: ty.kind.as_ref().to_string(),
-    })
-}
-
-fn expect_ty_primitive(ty: &pr::Ty, expected: pr::PrimitiveSet) -> Result<()> {
-    let found = ty.kind.as_primitive().ok_or_else(|| Error::TypeMismatch {
-        expected: primitive_set_name(&expected),
-        found: ty.kind.as_ref().to_string(),
-    })?;
-
-    if *found != expected {
-        return Err(Error::TypeMismatch {
-            expected: primitive_set_name(&expected),
-            found: primitive_set_name(found).to_string(),
-        });
-    }
-    Ok(())
-}
-
-fn primitive_set_name(expected: &pr::PrimitiveSet) -> &'static str {
-    match expected {
-        pr::PrimitiveSet::Int => "int",
-        pr::PrimitiveSet::Float => "float",
-        pr::PrimitiveSet::Bool => "bool",
-        pr::PrimitiveSet::Text => "text",
-        pr::PrimitiveSet::Date => "date",
-        pr::PrimitiveSet::Time => "time",
-        pr::PrimitiveSet::Timestamp => "timestamp",
-    }
-}
 
 struct Context<'t> {
     cache: LayoutCache,

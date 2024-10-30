@@ -12,8 +12,8 @@ pub struct App {
 }
 
 impl App {
-    pub fn new(ty: pr::Ty) -> Self {
-        let form = Form::new(&ty, FormName::default());
+    pub fn new(ty: &pr::Ty) -> Self {
+        let form = Form::new(ty, FormName::default());
 
         let mut app = App {
             form,

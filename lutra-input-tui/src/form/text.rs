@@ -59,7 +59,7 @@ impl TextForm {
     }
 
     pub(crate) fn get_value(&self) -> lutra_bin::Value {
-        lutra_bin::Value::String(self.value.clone())
+        lutra_bin::Value::Text(self.value.clone())
     }
 }
 

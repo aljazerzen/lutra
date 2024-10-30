@@ -14,7 +14,7 @@ use lutra_parser::parser::pr;
 use ratatui::prelude::*;
 
 /// Starts a TUI prompt for type `ty` on stdout terminal.
-pub fn prompt_for_ty(ty: pr::Ty) -> Result<lutra_bin::Value, anyhow::Error> {
+pub fn prompt_for_ty(ty: &pr::Ty) -> Result<lutra_bin::Value, anyhow::Error> {
     let mut app = App::new(ty);
 
     within_alternate_screen(|term| app.run(term))??;
