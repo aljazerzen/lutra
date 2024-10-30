@@ -1,0 +1,15 @@
+[package]
+name = "lutra-input-tui"
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+version.workspace = true
+
+[dependencies]
+anyhow = "1.0.82"
+crossterm = "0.27.0"
+itertools = "0.12.1"
+ratatui = "0.26.2"
+lutra-parser = { path = "../lutra-parser" }
+lutra-bin = { path = "../lutra-bin" }

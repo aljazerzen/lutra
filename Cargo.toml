@@ -3,6 +3,7 @@ members = [
     "example",
     "lutra-bin",
     "lutra-codegen",
+    "lutra-input-tui",
     "lutra-parser",
     "lutra-typed-data",
 ]
