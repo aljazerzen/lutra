@@ -124,8 +124,6 @@ impl<'a> GetHeadSizeCtx<'a> {
                     // - resolution order is wrong (this results in an error for now),
                     // - the type is recursive, we need to check its validity
 
-                    dbg!(&self.path);
-
                     let (is_recursive, enum_ptr) = self.validate_recursive_type(&ident.name)?;
                     if is_recursive {
                         if let Some((enum_name, variant_index)) = enum_ptr {

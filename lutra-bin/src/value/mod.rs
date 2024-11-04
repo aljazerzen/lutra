@@ -6,7 +6,7 @@ mod print_pretty;
 use crate::{Error, Result};
 use lutra_parser::parser::pr;
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub enum Value {
     Int(i64),
     Float(f64),
