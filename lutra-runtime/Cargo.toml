@@ -9,3 +9,6 @@ version.workspace = true
 [dependencies]
 lutra-bin = { path = "../lutra-bin" }
 lutra-frontend = { path = "../lutra-frontend" }
+
+[build-dependencies]
+lutra-codegen = { path = "../lutra-codegen" }

@@ -1,8 +1,11 @@
 use lutra_frontend::pr;
 
 mod interpreter;
-mod ir;
 mod native;
+
+mod ir {
+    include!(concat!(env!("OUT_DIR"), "/ir.rs"));
+}
 
 macro_rules! println_size_of {
     ($type_name: ty) => {
@@ -14,7 +17,7 @@ macro_rules! println_size_of {
 }
 
 fn main() {
-    println_size_of!(interpreter::Symbol);
+    println_size_of!(interpreter::Cell);
     println!("");
 
     println_size_of!(std::rc::Rc<lutra_bin::Value>);
@@ -30,55 +33,59 @@ fn main() {
             id: "std_int_add".into(),
         }],
         main: ir::Expr {
-            kind: ir::ExprKind::Binding(ir::Binding {
-                symbol: 0x40000001,
-                expr: Box::new(ir::Expr {
-                    kind: ir::ExprKind::Function(ir::Function {
-                        symbol_ns: 0x80000200,
-                        body: Box::new(ir::Expr {
+            kind: ir::ExprKind::Binding(Box::new(ir::Binding {
+                symbol: ir::Sid(0x40000001),
+                expr: ir::Expr {
+                    kind: ir::ExprKind::Function(Box::new(ir::Function {
+                        symbol_ns: ir::Sid(0x80000200),
+                        body: ir::Expr {
                             kind: ir::ExprKind::Array(vec![
                                 ir::Expr {
-                                    kind: ir::ExprKind::Pointer(0x80000200),
+                                    kind: ir::ExprKind::Pointer(ir::Sid(0x80000200)),
                                 },
                                 ir::Expr {
-                                    kind: ir::ExprKind::Pointer(0x80000200),
+                                    kind: ir::ExprKind::Pointer(ir::Sid(0x80000200)),
                                 },
                                 ir::Expr {
-                                    kind: ir::ExprKind::Pointer(0x80000200),
+                                    kind: ir::ExprKind::Pointer(ir::Sid(0x80000200)),
                                 },
                             ]),
-                        }),
-                    }),
-                }),
-                main: Box::new(ir::Expr {
+                        },
+                    })),
+                },
+                main: ir::Expr {
                     kind: ir::ExprKind::Tuple(vec![
                         ir::Expr {
-                            kind: ir::ExprKind::Call(ir::Call {
-                                function: Box::new(ir::Expr {
-                                    kind: ir::ExprKind::Pointer(0x40000001),
-                                }),
+                            kind: ir::ExprKind::Call(Box::new(ir::Call {
+                                function: ir::Expr {
+                                    kind: ir::ExprKind::Pointer(ir::Sid(0x40000001)),
+                                },
                                 args: vec![ir::Expr {
                                     kind: ir::ExprKind::Literal(ir::Literal::Float(3.5)),
                                 }],
-                            }),
+                            })),
                         },
                         ir::Expr {
-                            kind: ir::ExprKind::Call(ir::Call {
-                                function: Box::new(ir::Expr {
-                                    kind: ir::ExprKind::Function(ir::Function {
-                                        symbol_ns: 0x80000300,
-                                        body: Box::new(ir::Expr {
+                            kind: ir::ExprKind::Call(Box::new(ir::Call {
+                                function: ir::Expr {
+                                    kind: ir::ExprKind::Function(Box::new(ir::Function {
+                                        symbol_ns: ir::Sid(0x80000300),
+                                        body: ir::Expr {
                                             kind: ir::ExprKind::Array(vec![
                                                 ir::Expr {
-                                                    kind: ir::ExprKind::Pointer(0x80000300),
+                                                    kind: ir::ExprKind::Pointer(ir::Sid(
+                                                        0x80000300,
+                                                    )),
                                                 },
                                                 ir::Expr {
-                                                    kind: ir::ExprKind::Pointer(0x80000301),
+                                                    kind: ir::ExprKind::Pointer(ir::Sid(
+                                                        0x80000301,
+                                                    )),
                                                 },
                                             ]),
-                                        }),
-                                    }),
-                                }),
+                                        },
+                                    })),
+                                },
                                 args: vec![
                                     ir::Expr {
                                         kind: ir::ExprKind::Literal(ir::Literal::Int(6)),
@@ -87,13 +94,13 @@ fn main() {
                                         kind: ir::ExprKind::Literal(ir::Literal::Int(7)),
                                     },
                                 ],
-                            }),
+                            })),
                         },
                         ir::Expr {
-                            kind: ir::ExprKind::Call(ir::Call {
-                                function: Box::new(ir::Expr {
-                                    kind: ir::ExprKind::Pointer(0x00000000),
-                                }),
+                            kind: ir::ExprKind::Call(Box::new(ir::Call {
+                                function: ir::Expr {
+                                    kind: ir::ExprKind::Pointer(ir::Sid(0x00000000)),
+                                },
                                 args: vec![
                                     ir::Expr {
                                         kind: ir::ExprKind::Literal(ir::Literal::Int(6)),
@@ -102,11 +109,11 @@ fn main() {
                                         kind: ir::ExprKind::Literal(ir::Literal::Int(2)),
                                     },
                                 ],
-                            }),
+                            })),
                         },
                     ]),
-                }),
-            }),
+                },
+            })),
         },
     };
 

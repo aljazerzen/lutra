@@ -1,36 +1,36 @@
 use lutra_bin::Value;
 
-use crate::interpreter::{self, Symbol};
+use crate::interpreter::{self, Cell};
 
-pub fn lookup_native_symbol(id: &str) -> Symbol {
+pub fn lookup_native_symbol(id: &str) -> Cell {
     match id {
         "interpreter_version" => interpreter_version(),
-        "std_int_add" => Symbol::FunctionNative(&std_int_add),
+        "std_int_add" => Cell::FunctionNative(&std_int_add),
         _ => panic!(),
     }
 }
 
-fn interpreter_version() -> interpreter::Symbol {
-    interpreter::Symbol::Value(Value::Text("lutra-runtime 0.0.1".into()).into())
+fn interpreter_version() -> interpreter::Cell {
+    interpreter::Cell::Value(Value::Text("lutra-runtime 0.0.1".into()).into())
 }
 
-fn std_int_add(args: Vec<interpreter::Symbol>) -> interpreter::Symbol {
+fn std_int_add(args: Vec<interpreter::Cell>) -> interpreter::Cell {
     let left = assume_int(&args[0]);
     let right = assume_int(&args[1]);
 
-    interpreter::Symbol::Value(Value::Int(left + right).into())
+    interpreter::Cell::Value(Value::Int(left + right).into())
 }
 
-fn assume_value(symbol: &Symbol) -> lutra_bin::Value {
+fn assume_value(symbol: &Cell) -> lutra_bin::Value {
     match symbol {
-        Symbol::Value(val) => val.as_ref().clone(),
-        Symbol::Function(_) => panic!(),
-        Symbol::FunctionNative(_) => panic!(),
-        Symbol::Vacant => panic!(),
+        Cell::Value(val) => val.as_ref().clone(),
+        Cell::Function(_) => panic!(),
+        Cell::FunctionNative(_) => panic!(),
+        Cell::Vacant => panic!(),
     }
 }
 
-fn assume_int(symbol: &Symbol) -> i64 {
+fn assume_int(symbol: &Cell) -> i64 {
     match assume_value(symbol) {
         Value::Int(v) => v,
         _ => panic!(),

@@ -1,0 +1,76 @@
+## Symbol id.
+## - 0b00xxxxxx - external
+## - 0b01xxxxxx - local bindings
+## - 0b10xxxxxx - function scopes
+## - 0b11xxxxxx - unused
+# TODO: make this u32
+type Sid = int
+
+type Program = {
+    externals = [ExternalSymbol],
+    main = Expr,
+}
+
+#TODO: @(derive Clone)
+type ExternalSymbol = {
+    id = text,
+}
+
+#TODO: @(derive Clone)
+type Expr = {
+    kind = ExprKind,
+}
+
+#[derive(Clone)]
+type ExprKind = enum {
+    Pointer = Sid,
+    Literal = Literal,
+    Call = Call,
+    Function = Function,
+    `Tuple` = [Expr],
+    Array = [Expr],
+    TupleLookup = TupleLookup,
+    ArrayLookup = ArrayLookup,
+    Binding = Binding,
+}
+
+#[derive(Clone)]
+type Literal = enum {
+    Int = int,
+    Float = float,
+    Bool = bool,
+    Text = text,
+}
+
+#TODO: @(derive Clone)
+type Call = {
+    function = Expr,
+    args = [Expr],
+}
+
+#TODO: @(derive Clone)
+type Function = {
+    symbol_ns = Sid,
+
+    # can contain function parameters prefixed with symbol_ns
+    body = Expr,
+}
+
+#TODO: @(derive Clone)
+type TupleLookup = {
+    base = Expr,
+    offset = int,
+}
+
+@(derive Clone)
+type ArrayLookup = {
+    base = Expr,
+    offset = int,
+}
+
+@(derive Clone)
+type Binding = {
+    symbol = Sid,
+    expr = Expr,
+    main = Expr,
+}
