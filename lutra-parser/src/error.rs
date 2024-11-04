@@ -1,7 +1,6 @@
 use std::fmt::Debug;
 
 use chumsky::error::Cheap;
-use serde::Serialize;
 
 use super::parser::perror::PError;
 use crate::span::Span;
@@ -35,7 +34,7 @@ pub enum ErrorSource {
 pub struct Errors(pub Vec<Error>);
 
 /// Compile message kind. Currently only Error is implemented.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum MessageKind {
     Error,
     Warning,

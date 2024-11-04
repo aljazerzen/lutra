@@ -14,11 +14,9 @@ doctest = false
 
 [dependencies]
 enum-as-inner = "0.6.1"
-itertools = "0.13.0"
-log = "0.4.22"
+itertools = { workspace = true }
+log = { workspace = true }
 semver = { version = "1.0.23", features = ["serde"] }
-serde = { version = "1.0.213", features = ["derive"] }
-serde_yaml = "0.9.34"
 strum = { version = "0.26.3", features = ["std", "derive"] }
 chumsky = "0.9.2"
 

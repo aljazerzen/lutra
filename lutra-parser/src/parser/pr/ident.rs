@@ -1,7 +1,5 @@
 use std::fmt::Write;
 
-use serde::{ser::SerializeSeq, Deserialize, Deserializer, Serialize, Serializer};
-
 /// A name. Generally columns, tables, functions, variables.
 /// This is glorified way of writing a "vec with at least one element".
 #[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Clone)]
@@ -133,29 +131,6 @@ impl std::ops::Add<Ident> for Ident {
             path: self.into_iter().chain(rhs.path).collect(),
             name: rhs.name,
         }
-    }
-}
-
-impl Serialize for Ident {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        let mut seq = serializer.serialize_seq(Some(self.len()))?;
-        for part in &self.path {
-            seq.serialize_element(part)?;
-        }
-        seq.serialize_element(&self.name)?;
-        seq.end()
-    }
-}
-
-impl<'de> Deserialize<'de> for Ident {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        <Vec<String> as Deserialize>::deserialize(deserializer).map(Ident::from_path)
     }
 }
 

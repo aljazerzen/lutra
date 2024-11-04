@@ -2,8 +2,6 @@ use std::fmt::{self, Debug, Formatter};
 use std::ops::{Add, Range, Sub};
 
 use chumsky::Stream;
-use serde::de::Visitor;
-use serde::{Deserialize, Serialize};
 
 #[derive(Clone, PartialEq, Eq, Copy)]
 pub struct Span {
@@ -12,6 +10,26 @@ pub struct Span {
 
     /// A key representing the path of the source. Value is stored in prqlc's SourceTree::source_ids.
     pub source_id: u16,
+}
+
+impl Span {
+    pub fn merge(a: Span, b: Span) -> Span {
+        assert_eq!(a.source_id, b.source_id);
+        Span {
+            start: usize::min(a.start, b.start),
+            end: usize::max(a.end, b.end),
+
+            source_id: a.source_id,
+        }
+    }
+
+    pub fn merge_opt(a: Option<Span>, b: Option<Span>) -> Option<Span> {
+        match (a, b) {
+            (Some(a), Some(b)) => Some(Self::merge(a, b)),
+            (Some(s), None) | (None, Some(s)) => Some(s),
+            (None, None) => None,
+        }
+    }
 }
 
 impl From<Span> for Range<usize> {
@@ -26,15 +44,6 @@ impl Debug for Span {
     }
 }
 
-impl Serialize for Span {
-    fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
-    where
-        S: serde::Serializer,
-    {
-        let str = format!("{self:?}");
-        serializer.serialize_str(&str)
-    }
-}
 
 impl PartialOrd for Span {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
@@ -46,62 +55,6 @@ impl PartialOrd for Span {
             }
             _ => None,
         }
-    }
-}
-
-impl<'de> Deserialize<'de> for Span {
-    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
-    where
-        D: serde::Deserializer<'de>,
-    {
-        struct SpanVisitor {}
-
-        impl<'de> Visitor<'de> for SpanVisitor {
-            type Value = Span;
-
-            fn expecting(&self, f: &mut fmt::Formatter) -> fmt::Result {
-                write!(f, "A span string of form `file_id:x-y`")
-            }
-
-            fn visit_str<E>(self, v: &str) -> std::result::Result<Self::Value, E>
-            where
-                E: serde::de::Error,
-            {
-                use serde::de;
-
-                if let Some((file_id, char_span)) = v.split_once(':') {
-                    let file_id = file_id
-                        .parse::<u16>()
-                        .map_err(|e| de::Error::custom(e.to_string()))?;
-
-                    if let Some((start, end)) = char_span.split_once('-') {
-                        let start = start
-                            .parse::<usize>()
-                            .map_err(|e| de::Error::custom(e.to_string()))?;
-                        let end = end
-                            .parse::<usize>()
-                            .map_err(|e| de::Error::custom(e.to_string()))?;
-
-                        return Ok(Span {
-                            start,
-                            end,
-                            source_id: file_id,
-                        });
-                    }
-                }
-
-                Err(de::Error::custom("malformed span"))
-            }
-
-            fn visit_string<E>(self, v: String) -> std::result::Result<Self::Value, E>
-            where
-                E: serde::de::Error,
-            {
-                self.visit_str(&v)
-            }
-        }
-
-        deserializer.deserialize_string(SpanVisitor {})
     }
 }
 
@@ -183,19 +136,6 @@ pub(crate) fn string_stream<'a>(
 #[cfg(test)]
 mod test {
     use super::*;
-
-    #[test]
-    fn test_span_serde() {
-        let span = Span {
-            start: 12,
-            end: 15,
-            source_id: 45,
-        };
-        let span_serialized = serde_json::to_string(&span).unwrap();
-        insta::assert_snapshot!(span_serialized, @r#""45:12-15""#);
-        let span_deserialized: Span = serde_json::from_str(&span_serialized).unwrap();
-        assert_eq!(span_deserialized, span);
-    }
 
     #[test]
     fn test_span_partial_cmp() {

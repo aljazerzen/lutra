@@ -2,7 +2,7 @@ use chumsky::Parser;
 use insta::assert_debug_snapshot;
 use insta::assert_snapshot;
 
-use crate::lexer::lr::{Literal, TokenKind, Tokens};
+use crate::lexer::token::{Literal, TokenKind, Tokens};
 use crate::lexer::{lex_source, lexer, literal, quoted_string};
 
 #[test]

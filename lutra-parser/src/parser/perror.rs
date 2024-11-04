@@ -6,8 +6,8 @@ use std::hash::Hash;
 
 use crate::error::WithErrorInfo;
 use crate::error::{Error, ErrorSource, Reason};
-use crate::lexer::lr::TokenKind;
 use crate::span::Span;
+use crate::lexer;
 
 #[derive(Clone, Debug)]
 pub struct ChumError<T: Hash + Eq + Debug> {
@@ -18,7 +18,7 @@ pub struct ChumError<T: Hash + Eq + Debug> {
     label: SimpleLabel,
 }
 
-pub type PError = ChumError<TokenKind>;
+pub type PError = ChumError<lexer::TokenKind>;
 
 impl<T: Hash + Eq + Debug> ChumError<T> {
     ///Create an error with a custom error message.
@@ -203,15 +203,15 @@ impl From<PError> for Error {
                 return Error::new_simple(message).with_source(ErrorSource::Parser(e));
             }
 
-            fn token_to_string(t: Option<TokenKind>) -> String {
+            fn token_to_string(t: Option<lexer::TokenKind>) -> String {
                 t.as_ref()
-                    .map(TokenKind::to_string)
+                    .map(lexer::TokenKind::to_string)
                     .unwrap_or_else(|| "end of input".to_string())
             }
 
             let is_all_whitespace = e
                 .expected()
-                .all(|t| matches!(t, None | Some(TokenKind::NewLine)));
+                .all(|t| matches!(t, None | Some(lexer::TokenKind::NewLine)));
             let expected: Vec<String> = e
                 .expected()
                 // Only include whitespace if we're _only_ expecting whitespace,
@@ -219,7 +219,10 @@ impl From<PError> for Error {
                 // when there's no ending `}`, since a new line is allowed.
                 .filter(|t| {
                     is_all_whitespace
-                        || !matches!(t, None | Some(TokenKind::NewLine) | Some(TokenKind::Start))
+                        || !matches!(
+                            t,
+                            None | Some(lexer::TokenKind::NewLine) | Some(lexer::TokenKind::Start)
+                        )
                 })
                 .cloned()
                 .map(token_to_string)
@@ -317,14 +320,14 @@ mod tests {
     #[test]
     fn display() {
         assert_snapshot!(create_simple_error(),
-            @r#"Error { kind: Error, span: None, reason: Simple("A simple error message"), hints: ["take a hint"], code: Some("E001") }"#
+            @r###"Error { kind: Error, span: None, reason: Simple("A simple error message"), hints: ["take a hint"], code: Some("E001") }"###
         );
 
         let errors = Errors(vec![create_simple_error()]);
         assert_snapshot!(errors,
-            @r#"Errors([Error { kind: Error, span: None, reason: Simple("A simple error message"), hints: ["take a hint"], code: Some("E001") }])"#
+            @r###"Errors([Error { kind: Error, span: None, reason: Simple("A simple error message"), hints: ["take a hint"], code: Some("E001") }])"###
         );
-        assert_debug_snapshot!(errors, @r#"
+        assert_debug_snapshot!(errors, @r###"
         Errors(
             [
                 Error {
@@ -342,13 +345,13 @@ mod tests {
                 },
             ],
         )
-        "#)
+        "###)
     }
 
     #[test]
     fn test_simple_error() {
         let err = create_simple_error();
-        assert_debug_snapshot!(err, @r#"
+        assert_debug_snapshot!(err, @r###"
         Error {
             kind: Error,
             span: None,
@@ -362,7 +365,7 @@ mod tests {
                 "E001",
             ),
         }
-        "#);
+        "###);
     }
 
     #[test]
@@ -373,7 +376,7 @@ mod tests {
             expected: "expected_value".to_string(),
             found: "found_value".to_string(),
         })
-        .with_code("E002"), @r#"
+        .with_code("E002"), @r###"
         Error {
             kind: Error,
             span: None,
@@ -389,7 +392,7 @@ mod tests {
                 "E002",
             ),
         }
-        "#);
+        "###);
     }
 
     #[test]
@@ -398,7 +401,7 @@ mod tests {
             .with_hints(vec!["Take a hint"])
             .push_hint("Take another hint")
             .with_code("E001");
-        assert_debug_snapshot!(result, @r#"
+        assert_debug_snapshot!(result, @r###"
         Err(
             Error {
                 kind: Error,
@@ -415,6 +418,6 @@ mod tests {
                 ),
             },
         )
-        "#);
+        "###);
     }
 }

@@ -3,8 +3,8 @@ use chumsky::{prelude::*, Stream};
 use self::perror::PError;
 use self::pr::{Annotation, Stmt, StmtKind};
 use crate::error::Error;
-use crate::lexer::lr;
-use crate::lexer::lr::TokenKind;
+use crate::lexer;
+use crate::lexer::TokenKind;
 use crate::span::Span;
 
 mod expr;
@@ -12,14 +12,15 @@ mod interpolation;
 pub(crate) mod perror;
 pub mod pr;
 pub(crate) mod stmt;
-#[cfg(test)]
-mod test;
 mod types;
 
 // Note that `parse_source` is in `prqlc` crate, not in `prqlc-parser` crate,
 // because it logs using the logging framework in `prqlc`.
 
-pub fn parse_lr_to_pr(source_id: u16, lr: Vec<lr::Token>) -> (Option<Vec<pr::Stmt>>, Vec<Error>) {
+pub fn parse_lr_to_pr(
+    source_id: u16,
+    lr: Vec<lexer::Token>,
+) -> (Option<Vec<pr::Stmt>>, Vec<Error>) {
     let stream = prepare_stream(lr, source_id);
     let (pr, parse_errors) = stmt::source().parse_recovery(stream);
 
@@ -32,9 +33,10 @@ pub fn parse_lr_to_pr(source_id: u16, lr: Vec<lr::Token>) -> (Option<Vec<pr::Stm
 /// Convert the output of the lexer into the input of the parser. Requires
 /// supplying the original source code.
 pub(crate) fn prepare_stream<'a>(
-    tokens: Vec<lr::Token>,
+    tokens: Vec<lexer::Token>,
     source_id: u16,
-) -> Stream<'a, lr::TokenKind, Span, impl Iterator<Item = (lr::TokenKind, Span)> + Sized + 'a> {
+) -> Stream<'a, TokenKind, Span, impl Iterator<Item = (TokenKind, Span)> + Sized + 'a>
+{
     let final_span = tokens.last().map(|t| t.span.end).unwrap_or(0);
 
     // We don't want comments in the AST (but we do intend to use them as part of
@@ -42,7 +44,7 @@ pub(crate) fn prepare_stream<'a>(
     let semantic_tokens = tokens.into_iter().filter(|token| {
         !matches!(
             token.kind,
-            lr::TokenKind::Comment(_) | lr::TokenKind::LineWrap(_)
+            TokenKind::Comment(_) | TokenKind::LineWrap(_)
         )
     });
 
@@ -180,22 +182,22 @@ mod tests {
         #! doc comment
         #! another line
 
-        "#, doc_comment()), @r#"
+        "#, doc_comment()), @r###"
         Ok(
             " doc comment\n another line",
         )
-        "#);
+        "###);
     }
 
     #[test]
     fn test_doc_comment_or_not() {
         assert_debug_snapshot!(parse_with_parser(r#"hello"#, doc_comment().or_not()).unwrap(), @"None");
-        assert_debug_snapshot!(parse_with_parser(r#"hello"#, doc_comment().or_not().then_ignore(new_line().repeated()).then(ident_part())).unwrap(), @r#"
+        assert_debug_snapshot!(parse_with_parser(r#"hello"#, doc_comment().or_not().then_ignore(new_line().repeated()).then(ident_part())).unwrap(), @r###"
         (
             None,
             "hello",
         )
-        "#);
+        "###);
     }
 
     #[test]
@@ -205,6 +207,6 @@ mod tests {
                 self
             }
         }
-        assert_debug_snapshot!(parse_with_parser(r#"hello"#, with_doc_comment(new_line().ignore_then(ident_part()))).unwrap(), @r#""hello""#);
+        assert_debug_snapshot!(parse_with_parser(r#"hello"#, with_doc_comment(new_line().ignore_then(ident_part()))).unwrap(), @r###""hello""###);
     }
 }

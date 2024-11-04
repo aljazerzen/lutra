@@ -3,7 +3,7 @@ mod text;
 mod tuple;
 mod r#enum;
 
-use lutra_parser::parser::pr::{self, PrimitiveSet, Ty};
+use lutra_parser::pr::{self, PrimitiveSet, Ty};
 use ratatui::prelude::*;
 use std::borrow::Cow;
 

@@ -1,17 +1,15 @@
-use serde::{Deserialize, Serialize};
-
 use enum_as_inner::EnumAsInner;
 
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Tokens(pub Vec<Token>);
 
-#[derive(Clone, PartialEq, Serialize, Deserialize, Eq)]
+#[derive(Clone, PartialEq, Eq)]
 pub struct Token {
     pub kind: TokenKind,
     pub span: std::ops::Range<usize>,
 }
 
-#[derive(Clone, PartialEq, Debug, Serialize, Deserialize)]
+#[derive(Clone, PartialEq, Debug)]
 pub enum TokenKind {
     NewLine,
 
@@ -69,11 +67,8 @@ pub enum TokenKind {
     Start,
 }
 
-#[derive(
-    Debug, EnumAsInner, PartialEq, Clone, Serialize, Deserialize, strum::AsRefStr,
-)]
+#[derive(Debug, EnumAsInner, PartialEq, Clone, strum::AsRefStr)]
 pub enum Literal {
-    Null, 
     Integer(i64),
     Float(f64),
     Boolean(bool),
@@ -82,7 +77,6 @@ pub enum Literal {
     Date(String),
     Time(String),
     Timestamp(String),
-    ValueAndUnit(ValueAndUnit),
 }
 
 impl TokenKind {
@@ -93,17 +87,10 @@ impl TokenKind {
         }
     }
 }
-// Compound units, such as "2 days 3 hours" can be represented as `2days + 3hours`
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-pub struct ValueAndUnit {
-    pub n: i64,       // Do any DBs use floats or decimals for this?
-    pub unit: String, // Could be an enum IntervalType,
-}
 
 impl std::fmt::Display for Literal {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Literal::Null => write!(f, "null")?,
             Literal::Integer(i) => write!(f, "{i}")?,
             Literal::Float(i) => write!(f, "{i}")?,
 
@@ -121,10 +108,6 @@ impl std::fmt::Display for Literal {
 
             Literal::Date(inner) | Literal::Time(inner) | Literal::Timestamp(inner) => {
                 write!(f, "@{inner}")?;
-            }
-
-            Literal::ValueAndUnit(i) => {
-                write!(f, "{}{}", i.n, i.unit)?;
             }
         }
         Ok(())
@@ -279,33 +262,33 @@ mod test {
 
         assert_snapshot!(
             make_str("hello").to_string(),
-            @r#""hello""#
+            @r###""hello""###
         );
 
         assert_snapshot!(
             make_str(r#"he's nice"#).to_string(),
-            @r#""he's nice""#
+            @r###""he's nice""###
         );
 
         assert_snapshot!(
             make_str(r#"he said "what up""#).to_string(),
-            @r#"'he said "what up"'"#
+            @r###"'he said "what up"'"###
         );
 
         assert_snapshot!(
             make_str(r#"he said "what's up""#).to_string(),
-            @r#"'''he said "what's up"'''"#
+            @r###"'''he said "what's up"'''"###
         );
 
         assert_snapshot!(
             make_str(r#" single' three double""" four double"""" "#).to_string(),
-            @r#"""""" single' three double""" four double"""" """"""#
+            @r###"""""" single' three double""" four double"""" """"""###
 
         );
 
         assert_snapshot!(
             make_str(r#""Starts with a double quote and ' contains a single quote"#).to_string(),
-            @r#"'''"Starts with a double quote and ' contains a single quote'''"#
+            @r###"'''"Starts with a double quote and ' contains a single quote'''"###
         );
     }
 
@@ -313,12 +296,12 @@ mod test {
     fn test_string_escapes() {
         assert_snapshot!(
             Literal::String(r#"hello\nworld"#.to_string()).to_string(),
-            @r#""hello\\nworld""#
+            @r###""hello\\nworld""###
         );
 
         assert_snapshot!(
             Literal::String(r#"hello\tworld"#.to_string()).to_string(),
-            @r#""hello\\tworld""#
+            @r###""hello\\tworld""###
         );
 
         // TODO: one problem here is that we don't remember whether the original
@@ -339,7 +322,7 @@ mod test {
         assert_snapshot!(
             Literal::String(r#"hello
             world"#.to_string()).to_string(),
-            @r#""hello\n            world""#
+            @r###""hello\n            world""###
         );
     }
 
@@ -352,7 +335,7 @@ mod test {
 
         assert_snapshot!(
             make_str("hello").to_string(),
-            @r#"r"hello""#
+            @r###"r"hello""###
         );
     }
 }

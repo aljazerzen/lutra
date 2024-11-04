@@ -10,7 +10,7 @@ use crossterm::terminal::{
     disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen,
 };
 use crossterm::ExecutableCommand;
-use lutra_parser::parser::pr;
+use lutra_parser::pr;
 use ratatui::prelude::*;
 
 /// Starts a TUI prompt for type `ty` on stdout terminal.

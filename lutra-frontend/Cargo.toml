@@ -1,0 +1,41 @@
+[package]
+name = "lutra"
+
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+version.workspace = true
+
+[features]
+cli = ["clap", "env_logger", "anyhow"]
+default = ["cli"]
+
+[lib]
+bench = false
+doctest = false
+test = false
+
+[[bin]]
+bench = false
+name = "lutra"
+path = "src/cli.rs"
+required-features = ["cli"]
+test = false
+
+[dependencies]
+lutra-parser = {path = "../lutra-parser"}
+
+thiserror = { workspace = true }
+itertools = { workspace = true }
+log = { workspace = true }
+walkdir = "2.5.0"
+
+clap = { version = "4.4.18", features = ["derive"], optional = true }
+env_logger = { version = "0.10.2", optional = true }
+anyhow = { workspace = true, optional = true }
+
+enum-as-inner = "0.6.1"
+strum = "0.26.3"
+regex = "1.11.1"
+indexmap = "2.6.0"

@@ -1,4 +1,4 @@
-use lutra_parser::parser::pr;
+use lutra_parser::pr;
 
 fn main() {
     let ty = get_ty();
@@ -22,9 +22,7 @@ fn get_ty() -> pr::Ty {
         }
     "#;
 
-    let tokens = lutra_parser::lexer::lex_source(source).unwrap();
-
-    let (stmts, _errs) = lutra_parser::parser::parse_lr_to_pr(0, tokens.0);
+    let (stmts, _errs) = lutra_parser::parse_source(&source, 0);
     let stmt = stmts.unwrap().into_iter().next().unwrap();
 
     let type_def = stmt.kind.into_type_def().unwrap();

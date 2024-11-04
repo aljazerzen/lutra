@@ -1,7 +1,7 @@
 use std::collections::VecDeque;
 
 use crossterm::event::{self, KeyCode, KeyEvent, KeyEventKind};
-use lutra_parser::parser::pr;
+use lutra_parser::pr;
 use ratatui::prelude::*;
 
 use crate::form::{Form, FormName};

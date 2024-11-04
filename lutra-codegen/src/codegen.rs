@@ -1,11 +1,10 @@
 use std::{borrow::Cow, fmt::Write};
 
 use lutra_bin::layout;
-use lutra_parser::parser::pr;
+use lutra_parser::pr;
 
 pub fn codegen(source: &str) -> Result<String, std::fmt::Error> {
-    let lr = lutra_parser::lexer::lex_source(source).unwrap();
-    let (stmts, errs) = lutra_parser::parser::parse_lr_to_pr(0, lr.0);
+    let (stmts, errs) = lutra_parser::parse_source(source, 0);
     if !errs.is_empty() {
         for err in errs {
             eprintln!("{err}");
@@ -21,7 +20,6 @@ pub fn codegen(source: &str) -> Result<String, std::fmt::Error> {
 
     for stmt in &mut stmts {
         match &mut stmt.kind {
-            pr::StmtKind::QueryDef(_) => todo!(),
             pr::StmtKind::VarDef(_) => todo!(),
             pr::StmtKind::ModuleDef(_) => todo!(),
             pr::StmtKind::ImportDef(_) => todo!(),

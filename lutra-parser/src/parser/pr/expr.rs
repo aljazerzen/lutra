@@ -1,9 +1,8 @@
 use std::collections::HashMap;
 
 use enum_as_inner::EnumAsInner;
-use serde::{Deserialize, Serialize};
 
-use crate::lexer::lr::Literal;
+use crate::lexer::Literal;
 use crate::parser::pr::ops::{BinOp, UnOp};
 use crate::parser::pr::Ty;
 use crate::span::Span;
@@ -24,18 +23,14 @@ impl Expr {
 
 /// Expr is anything that has a value and thus a type.
 /// Most of these can contain other [Expr] themselves; literals should be [ExprKind::Literal].
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Expr {
-    #[serde(flatten)]
     pub kind: ExprKind,
 
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub span: Option<Span>,
 
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub alias: Option<String>,
 
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub doc_comment: Option<String>,
 }
 
@@ -48,9 +43,7 @@ impl SupportsDocComment for Expr {
     }
 }
 
-#[derive(
-    Debug, EnumAsInner, PartialEq, Clone, Serialize, Deserialize, strum::AsRefStr,
-)]
+#[derive(Debug, EnumAsInner, PartialEq, Clone, strum::AsRefStr)]
 pub enum ExprKind {
     Ident(String),
 
@@ -93,7 +86,7 @@ impl ExprKind {
     }
 }
 
-#[derive(Debug, EnumAsInner, PartialEq, Clone, Serialize, Deserialize)]
+#[derive(Debug, EnumAsInner, PartialEq, Clone)]
 pub enum IndirectionKind {
     Name(String),
     Position(i64),
@@ -101,7 +94,7 @@ pub enum IndirectionKind {
 }
 
 /// Expression with two operands and an operator, such as `1 + 2`.
-#[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct BinaryExpr {
     pub left: Box<Expr>,
     pub op: BinOp,
@@ -109,24 +102,23 @@ pub struct BinaryExpr {
 }
 
 /// Expression with one operand and an operator, such as `-1`.
-#[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct UnaryExpr {
     pub op: UnOp,
     pub expr: Box<Expr>,
 }
 
 /// Function call.
-#[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct FuncCall {
     pub name: Box<Expr>,
     pub args: Vec<Expr>,
-    #[serde(default, skip_serializing_if = "HashMap::is_empty")]
     pub named_args: HashMap<String, Expr>,
 }
 
 /// Function called with possibly missing positional arguments.
 /// May also contain environment that is needed to evaluate the body.
-#[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct Func {
     /// Type requirement for the function body expression.
     pub return_ty: Option<Ty>,
@@ -144,26 +136,27 @@ pub struct Func {
     pub generic_type_params: Vec<GenericTypeParam>,
 }
 
-#[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct FuncParam {
     pub name: String,
 
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub ty: Option<Ty>,
 
     pub default_value: Option<Box<Expr>>,
 }
 
-#[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone)]
 pub struct GenericTypeParam {
     /// Assigned name of this generic type argument.
     pub name: String,
 
     pub domain: Vec<Ty>,
+
+    pub span: Option<Span>,
 }
 
 /// A value and a series of functions that are to be applied to that value one after another.
-#[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct Pipeline {
     pub exprs: Vec<Expr>,
 }
@@ -181,5 +174,20 @@ impl From<Literal> for ExprKind {
 impl From<Func> for ExprKind {
     fn from(value: Func) -> Self {
         ExprKind::Func(Box::new(value))
+    }
+}
+
+impl PartialEq for GenericTypeParam {
+    fn eq(&self, other: &Self) -> bool {
+        self.name == other.name && self.domain == other.domain
+    }
+}
+
+impl Eq for GenericTypeParam {}
+
+impl std::hash::Hash for GenericTypeParam {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.name.hash(state);
+        self.domain.hash(state);
     }
 }

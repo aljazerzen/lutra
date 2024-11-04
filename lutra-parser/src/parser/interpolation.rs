@@ -1,7 +1,7 @@
 use chumsky::prelude::*;
 use itertools::Itertools;
 
-use crate::lexer::lr::{Literal, TokenKind};
+use crate::lexer::{Literal, TokenKind};
 use crate::parser::perror::{ChumError, PError};
 use crate::parser::pr::*;
 use crate::span::{string_stream, Span};
@@ -84,7 +84,7 @@ fn parse_interpolate() {
 
     assert_debug_snapshot!(
         parse("concat({a})".to_string(), span_base).unwrap(),
-    @r#"
+    @r###"
     [
         String(
             "concat(",
@@ -106,31 +106,31 @@ fn parse_interpolate() {
             ")",
         ),
     ]
-    "#);
+    "###);
 
     assert_debug_snapshot!(
         parse("print('{{hello}}')".to_string(), span_base).unwrap(),
-    @r#"
+    @r###"
     [
         String(
             "print('{hello}')",
         ),
     ]
-    "#);
+    "###);
 
     assert_debug_snapshot!(
         parse("concat('{{', a, '}}')".to_string(), span_base).unwrap(),
-    @r#"
+    @r###"
     [
         String(
             "concat('{', a, '}')",
         ),
     ]
-    "#);
+    "###);
 
     assert_debug_snapshot!(
         parse("concat('{{', {a}, '}}')".to_string(), span_base).unwrap(),
-    @r#"
+    @r###"
     [
         String(
             "concat('{', ",
@@ -152,5 +152,5 @@ fn parse_interpolate() {
             ", '}')",
         ),
     ]
-    "#);
+    "###);
 }

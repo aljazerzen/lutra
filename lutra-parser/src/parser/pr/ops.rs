@@ -1,17 +1,4 @@
-use serde::{Deserialize, Serialize};
-
-#[derive(
-    Debug,
-    PartialEq,
-    Eq,
-    Clone,
-    Copy,
-    Hash,
-    Serialize,
-    Deserialize,
-    strum::Display,
-    strum::EnumString,
-)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy, Hash, strum::Display, strum::EnumString)]
 pub enum UnOp {
     #[strum(to_string = "-")]
     Neg,
@@ -23,18 +10,7 @@ pub enum UnOp {
     EqSelf,
 }
 
-#[derive(
-    Debug,
-    PartialEq,
-    Eq,
-    Clone,
-    Copy,
-    Hash,
-    Serialize,
-    Deserialize,
-    strum::Display,
-    strum::EnumString,
-)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy, Hash, strum::Display, strum::EnumString)]
 pub enum BinOp {
     #[strum(to_string = "*")]
     Mul,

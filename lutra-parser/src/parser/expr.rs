@@ -3,7 +3,7 @@ use std::collections::{hash_map::Entry, HashMap};
 use chumsky::prelude::*;
 use itertools::Itertools;
 
-use crate::lexer::lr::{Literal, TokenKind};
+use crate::lexer::{Literal, TokenKind};
 use crate::parser::interpolation;
 use crate::parser::perror::PError;
 use crate::parser::pr::*;
@@ -278,7 +278,7 @@ where
                 (TokenKind::Control('['), TokenKind::Control(']')),
                 (TokenKind::Control('('), TokenKind::Control(')')),
             ],
-            |_| Expr::new(ExprKind::Literal(Literal::Null)),
+            |_| Expr::new(ExprKind::Tuple(vec![])),
         ))
         .labelled("pipeline")
 }
@@ -480,9 +480,17 @@ where
         .then(ctrl(':').ignore_then(expr.clone().map(Box::new)).or_not());
 
     let generic_args = ident_part()
-        .then_ignore(ctrl(':'))
-        .then(type_expr().separated_by(ctrl('|')))
-        .map(|(name, domain)| GenericTypeParam { name, domain })
+        .then(
+            ctrl(':')
+                .ignore_then(type_expr().separated_by(ctrl('|')).at_least(1))
+                .or_not()
+                .map(|x| x.unwrap_or_default()),
+        )
+        .map_with_span(|(name, domain), span| GenericTypeParam {
+            name,
+            domain,
+            span: Some(span),
+        })
         .separated_by(ctrl(','))
         .at_least(1)
         .delimited_by(ctrl('<'), ctrl('>'))
@@ -499,7 +507,10 @@ where
                 .allow_trailing(),
         ),
         // plain
-        param.repeated().map(|params| (Vec::new(), params)),
+        param
+            .repeated()
+            .at_least(1)
+            .map(|params| (Vec::new(), params)),
     ))
     .then_ignore(just(TokenKind::ArrowThin))
     // return type
@@ -574,420 +585,4 @@ fn operator_or() -> impl Parser<TokenKind, BinOp, Error = PError> + Clone {
 }
 fn operator_coalesce() -> impl Parser<TokenKind, BinOp, Error = PError> + Clone {
     just(TokenKind::Coalesce).to(BinOp::Coalesce)
-}
-
-#[cfg(test)]
-mod tests {
-
-    use insta::{assert_debug_snapshot, assert_yaml_snapshot};
-
-    use super::super::test::trim_start;
-    use crate::test::parse_with_parser;
-
-    use super::*;
-
-    #[test]
-    fn test_expr_call() {
-        assert_yaml_snapshot!(
-            parse_with_parser(r#"derive x = 5"#, trim_start().ignore_then(expr_call())).unwrap(),
-             @r#"
-        FuncCall:
-          name:
-            Ident: derive
-            span: "0:0-6"
-          args:
-            - Literal:
-                Integer: 5
-              span: "0:11-12"
-              alias: x
-        span: "0:0-12"
-        "#);
-
-        assert_yaml_snapshot!(
-            parse_with_parser(r#"aggregate {sum salary}"#, trim_start().ignore_then(expr_call())).unwrap(),
-             @r#"
-        FuncCall:
-          name:
-            Ident: aggregate
-            span: "0:0-9"
-          args:
-            - Tuple:
-                - FuncCall:
-                    name:
-                      Ident: sum
-                      span: "0:11-14"
-                    args:
-                      - Ident: salary
-                        span: "0:15-21"
-                  span: "0:11-21"
-              span: "0:10-22"
-        span: "0:0-22"
-        "#);
-    }
-
-    #[test]
-    fn aliased_in_expr() {
-        assert_yaml_snapshot!(
-            parse_with_parser(r#"x = 5"#, trim_start().ignore_then(expr())).unwrap(), @r#"
-        Ident: x
-        span: "0:0-1"
-        "#);
-    }
-
-    #[test]
-    fn test_tuple() {
-        let tuple = || trim_start().ignore_then(tuple(expr()));
-        assert_yaml_snapshot!(
-            parse_with_parser(r#"{a = 5, b = 6}"#, tuple()).unwrap(),
-            @r#"
-        Tuple:
-          - Literal:
-              Integer: 5
-            span: "0:5-6"
-            alias: a
-          - Literal:
-              Integer: 6
-            span: "0:12-13"
-            alias: b
-        "#);
-
-        assert_debug_snapshot!(
-            parse_with_parser(r#"
-            {a = 5
-             b = 6}"#, tuple()).unwrap_err(),
-            @r#"
-        [
-            Error {
-                kind: Error,
-                span: Some(
-                    0:33-34,
-                ),
-                reason: Expected {
-                    who: Some(
-                        "new line",
-                    ),
-                    expected: "}",
-                    found: "b",
-                },
-                hints: [],
-                code: None,
-            },
-        ]
-        "#);
-
-        assert_yaml_snapshot!(parse_with_parser(r#"{d_str = (d | date.to_text "%Y/%m/%d")}"#, tuple()).unwrap(),
-        @r#"
-        Tuple:
-          - Pipeline:
-              exprs:
-                - Ident: d
-                  span: "0:10-11"
-                - FuncCall:
-                    name:
-                      Indirection:
-                        base:
-                          Ident: date
-                          span: "0:14-18"
-                        field:
-                          Name: to_text
-                      span: "0:18-26"
-                    args:
-                      - Literal:
-                          String: "%Y/%m/%d"
-                        span: "0:27-37"
-                  span: "0:14-37"
-            span: "0:10-37"
-            alias: d_str
-        "#);
-    }
-
-    #[test]
-    fn test_expr() {
-        assert_yaml_snapshot!(
-            parse_with_parser(r#"5+5"#, trim_start().ignore_then(expr())).unwrap(),
-             @r#"
-        Binary:
-          left:
-            Literal:
-              Integer: 5
-            span: "0:0-1"
-          op: Add
-          right:
-            Literal:
-              Integer: 5
-            span: "0:2-3"
-        span: "0:0-3"
-        "#);
-    }
-
-    #[test]
-    fn test_pipeline() {
-        assert_yaml_snapshot!(
-            parse_with_parser(r#"
-            (
-              from artists
-              derive x = 5
-            )
-            "#, trim_start().ignore_then(pipeline(expr_call()))).unwrap(),
-            @r#"
-        Pipeline:
-          exprs:
-            - FuncCall:
-                name:
-                  Ident: from
-                  span: "0:29-33"
-                args:
-                  - Ident: artists
-                    span: "0:34-41"
-              span: "0:29-41"
-            - FuncCall:
-                name:
-                  Ident: derive
-                  span: "0:56-62"
-                args:
-                  - Literal:
-                      Integer: 5
-                    span: "0:67-68"
-                    alias: x
-              span: "0:56-68"
-        span: "0:13-82"
-        "#);
-    }
-
-    #[test]
-    fn test_case() {
-        assert_yaml_snapshot!(
-            parse_with_parser(r#"
-
-        case [
-
-            nickname != null => nickname,
-            true => null
-
-        ]
-            "#, trim_start().then(case(expr()))).unwrap(),
-        @r#"
-        - ~
-        - Case:
-            - condition:
-                Binary:
-                  left:
-                    Ident: nickname
-                    span: "0:30-38"
-                  op: Ne
-                  right:
-                    Literal: "Null"
-                    span: "0:42-46"
-                span: "0:30-46"
-              value:
-                Ident: nickname
-                span: "0:50-58"
-            - condition:
-                Literal:
-                  Boolean: true
-                span: "0:72-76"
-              value:
-                Literal: "Null"
-                span: "0:80-84"
-        "#);
-    }
-
-    // this should return an error but doesn't yet
-    #[should_panic]
-    #[test]
-    fn should_error_01() {
-        assert_debug_snapshot!(
-            parse_with_parser(r#"
-            derive {x = y z = 3}
-            "#.trim(), trim_start().ignore_then(expr_call()).then_ignore(end())).unwrap_err(),
-            @r###"
-        "###);
-    }
-
-    #[test]
-    fn tuple_missing_comma() {
-        assert_debug_snapshot!(
-            parse_with_parser(r#"
-            {
-              x = y
-              z = 3
-            }
-            "#.trim(), trim_start().ignore_then(expr_call()).then_ignore(end())).unwrap_err(),
-            @r#"
-        [
-            Error {
-                kind: Error,
-                span: Some(
-                    0:36-37,
-                ),
-                reason: Expected {
-                    who: Some(
-                        "new line",
-                    ),
-                    expected: "}",
-                    found: "z",
-                },
-                hints: [],
-                code: None,
-            },
-        ]
-        "#);
-    }
-
-    #[test]
-    fn forced_new_lines() {
-        // Not sure whether this is possible to adjust, putting a test here
-        // as a note.
-        //
-        // Check the opening new lines aren't consumed
-        assert!(parse_with_parser(
-            r#"
-            {
-            #! doc comment
-            derive x = 5
-            }
-            "#,
-            trim_start().ignore_then(tuple(expr())),
-        )
-        .is_err());
-    }
-
-    #[test]
-    fn args_in_parens() {
-        // Ensure function arguments allow parentheses
-        assert_yaml_snapshot!(
-            parse_with_parser(r#"f (a) b"#, trim_start().ignore_then(expr_call()).then_ignore(end())).unwrap(), @r#"
-        FuncCall:
-          name:
-            Ident: f
-            span: "0:0-1"
-          args:
-            - Ident: a
-              span: "0:3-4"
-            - Ident: b
-              span: "0:6-7"
-        span: "0:0-7"
-        "#);
-
-        assert_yaml_snapshot!(
-            parse_with_parser(r#"f (a=2) b"#, trim_start().ignore_then(expr_call()).then_ignore(end())).unwrap(), @r#"
-        FuncCall:
-          name:
-            Ident: f
-            span: "0:0-1"
-          args:
-            - Literal:
-                Integer: 2
-              span: "0:5-6"
-              alias: a
-            - Ident: b
-              span: "0:8-9"
-        span: "0:0-9"
-        "#);
-
-        assert_yaml_snapshot!(
-            parse_with_parser(r#"f (a b)"#, trim_start().ignore_then(expr_call()).then_ignore(end())).unwrap(), @r#"
-        FuncCall:
-          name:
-            Ident: f
-            span: "0:0-1"
-          args:
-            - FuncCall:
-                name:
-                  Ident: a
-                  span: "0:3-4"
-                args:
-                  - Ident: b
-                    span: "0:5-6"
-              span: "0:3-6"
-        span: "0:0-7"
-        "#);
-    }
-
-    #[test]
-    fn pipeline_starting_with_alias_expr() {
-        let source = r#"
-    (
-      tbl
-      select t.date
-    )
-    "#;
-
-        assert_yaml_snapshot!(parse_with_parser(source, trim_start().ignore_then(pipeline(expr_call()))).unwrap(), @r#"
-        Pipeline:
-          exprs:
-            - Ident: tbl
-              span: "0:13-16"
-            - FuncCall:
-                name:
-                  Ident: select
-                  span: "0:23-29"
-                args:
-                  - Indirection:
-                      base:
-                        Ident: t
-                        span: "0:30-31"
-                      field:
-                        Name: date
-                    span: "0:31-36"
-              span: "0:23-36"
-        span: "0:5-42"
-        "#);
-
-        let source = r#"
-    (
-      t = tbl
-      select t.date
-    )
-    "#;
-
-        assert_yaml_snapshot!(parse_with_parser(source, trim_start().ignore_then(pipeline(expr_call()))).unwrap(), @r#"
-        Pipeline:
-          exprs:
-            - Ident: tbl
-              span: "0:17-20"
-              alias: t
-            - FuncCall:
-                name:
-                  Ident: select
-                  span: "0:27-33"
-                args:
-                  - Indirection:
-                      base:
-                        Ident: t
-                        span: "0:34-35"
-                      field:
-                        Name: date
-                    span: "0:35-40"
-              span: "0:27-40"
-        span: "0:5-46"
-        "#);
-    }
-
-    // TODO: I think this should pass...
-    #[should_panic]
-    #[test]
-    fn pipeline_starting_with_parenthesized_alias() {
-        let with_parens = parse_with_parser(
-            r#"
-        (
-          (t = tbl)
-          select t.date
-        )"#,
-            trim_start().ignore_then(pipeline(expr_call())),
-        )
-        .unwrap();
-
-        let without_parens = parse_with_parser(
-            r#"
-        (
-          t = tbl
-          select t.date
-        )"#,
-            trim_start().ignore_then(pipeline(expr_call())),
-        )
-        .unwrap();
-
-        assert_eq!(with_parens, without_parens);
-    }
 }

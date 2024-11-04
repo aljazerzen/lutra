@@ -3,7 +3,7 @@ use std::{
     ops::Mul,
 };
 
-use lutra_parser::parser::pr;
+use lutra_parser::pr;
 
 use crate::{Error, Result};
 

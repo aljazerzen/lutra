@@ -4,7 +4,7 @@ use super::expr::ident;
 use super::perror::PError;
 use super::pr::*;
 use super::*;
-use crate::lexer::lr::TokenKind;
+use crate::lexer::TokenKind;
 
 pub(crate) fn type_expr() -> impl Parser<TokenKind, Ty, Error = PError> + Clone {
     recursive(|nested_type_expr| {
@@ -29,11 +29,7 @@ pub(crate) fn type_expr() -> impl Parser<TokenKind, Ty, Error = PError> + Clone 
                     .repeated()
                     .then_ignore(just(TokenKind::ArrowThin))
                     .then(nested_type_expr.clone().map(Box::new).map(Some))
-                    .map(|(params, return_ty)| TyFunc {
-                        name_hint: None,
-                        params,
-                        return_ty,
-                    })
+                    .map(|(params, return_ty)| TyFunc { params, return_ty })
                     .or_not(),
             )
             .map(TyKind::Function);
@@ -102,6 +98,24 @@ pub(crate) fn type_expr() -> impl Parser<TokenKind, Ty, Error = PError> + Clone 
             .map_with_span(TyKind::into_ty)
             .boxed();
 
+        // exclude
+        // term.clone()
+        //     .then(ctrl('-').ignore_then(term).repeated())
+        //     .foldl(|left, right| {
+        //         let left_span = left.span.as_ref().unwrap();
+        //         let right_span = right.span.as_ref().unwrap();
+        //         let span = Span {
+        //             start: left_span.start,
+        //             end: right_span.end,
+        //             source_id: left_span.source_id,
+        //         };
+
+        //         let kind = TyKind::Exclude {
+        //             base: Box::new(left),
+        //             except: Box::new(right),
+        //         };
+        //         TyKind::into_ty(kind, span)
+        //     })
         term
     })
     .labelled("type expression")

@@ -9,7 +9,7 @@ pub use stmt::*;
 pub use types::*;
 
 // re-export Literal from LR, since it's encapsulated in TyKind
-pub use crate::lexer::lr::Literal;
+pub use crate::lexer::Literal;
 pub use crate::span::Span;
 
 mod expr;

@@ -1,14 +1,15 @@
+#[cfg(test)]
+mod test;
+mod token;
+
+pub use token::{Literal, Token, TokenKind};
+
 use chumsky::error::Cheap;
 use chumsky::prelude::*;
 use chumsky::text::{newline, Character};
 
-use self::lr::{Literal, Token, TokenKind, ValueAndUnit};
 use crate::error::{Error, ErrorSource, Reason, WithErrorInfo};
 use crate::span::Span;
-
-pub mod lr;
-#[cfg(test)]
-mod test;
 
 /// Lex PRQL into LR, returning both the LR and any errors encountered
 pub fn lex_source_recovery(source: &str, source_id: u16) -> (Option<Vec<Token>>, Vec<Error>) {
@@ -26,11 +27,12 @@ pub fn lex_source_recovery(source: &str, source_id: u16) -> (Option<Vec<Token>>,
 }
 
 /// Lex PRQL into LR, returning either the LR or the errors encountered
-pub fn lex_source(source: &str) -> Result<lr::Tokens, Vec<Error>> {
+#[cfg(test)]
+pub fn lex_source(source: &str) -> Result<token::Tokens, Vec<Error>> {
     lexer()
         .parse(source)
         .map(insert_start)
-        .map(lr::Tokens)
+        .map(token::Tokens)
         .map_err(|e| {
             e.into_iter()
                 .map(|x| convert_lexer_error(source, x, 0))
@@ -68,7 +70,7 @@ fn convert_lexer_error(source: &str, e: chumsky::error::Cheap<char>, source_id: 
 }
 
 /// Lex chars to tokens until the end of the input
-pub(crate) fn lexer() -> impl Parser<char, Vec<Token>, Error = Cheap<char>> {
+fn lexer() -> impl Parser<char, Vec<Token>, Error = Cheap<char>> {
     lex_token()
         .repeated()
         .then_ignore(ignored())
@@ -291,32 +293,6 @@ fn literal() -> impl Parser<char, Literal, Error = Cheap<char>> {
         .then_ignore(end_expr())
         .map(Literal::Boolean);
 
-    let null = just("null").to(Literal::Null).then_ignore(end_expr());
-
-    let value_and_unit = integer
-        .then(choice((
-            just("microseconds"),
-            just("milliseconds"),
-            just("seconds"),
-            just("minutes"),
-            just("hours"),
-            just("days"),
-            just("weeks"),
-            just("months"),
-            just("years"),
-        )))
-        .then_ignore(end_expr())
-        .try_map(|(number, unit), span| {
-            let str = number.into_iter().filter(|c| *c != '_').collect::<String>();
-            if let Ok(n) = str.parse::<i64>() {
-                let unit = unit.to_string();
-                Ok(ValueAndUnit { n, unit })
-            } else {
-                Err(Cheap::expected_input_found(span, None, None))
-            }
-        })
-        .map(Literal::ValueAndUnit);
-
     let date_inner = digits(4)
         .chain(just('-'))
         .chain::<char, _, _>(digits(2))
@@ -386,10 +362,8 @@ fn literal() -> impl Parser<char, Literal, Error = Cheap<char>> {
         octal_notation,
         string,
         raw_string,
-        value_and_unit,
         number,
         bool,
-        null,
         datetime,
         date,
         time,

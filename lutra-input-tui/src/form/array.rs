@@ -1,5 +1,5 @@
 use crossterm::event::KeyCode;
-use lutra_parser::parser::pr;
+use lutra_parser::pr;
 use ratatui::{layout::Offset, prelude::*};
 
 use crate::app::Action;

@@ -1,4 +1,4 @@
-use lutra_parser::parser::pr::{self, TyTupleField};
+use lutra_parser::pr::{self, TyTupleField};
 
 use crate::Value;
 

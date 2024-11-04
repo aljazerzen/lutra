@@ -1,11 +1,10 @@
 use enum_as_inner::EnumAsInner;
-use serde::{Deserialize, Serialize};
 use strum::AsRefStr;
 
 use crate::parser::pr::ident::Ident;
 use crate::span::Span;
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone)]
 pub struct Ty {
     pub kind: TyKind,
 
@@ -15,7 +14,7 @@ pub struct Ty {
     pub name: Option<String>,
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, EnumAsInner, AsRefStr)]
+#[derive(Debug, Clone, PartialEq, Hash, EnumAsInner, AsRefStr)]
 pub enum TyKind {
     /// Identifier that still needs to be resolved.
     Ident(Ident),
@@ -34,6 +33,10 @@ pub enum TyKind {
 
     /// Type of functions with defined params and return types.
     Function(Option<TyFunc>),
+
+    // /// Tuples that have fields of `base` tuple, but don't have fields of `except` tuple.
+    // /// Implies that `base` has all fields of `except`.
+    // Exclude { base: Box<Ty>, except: Box<Ty> },
 }
 
 impl TyKind {
@@ -46,24 +49,17 @@ impl TyKind {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Hash)]
 pub struct TyTupleField {
     /// Named tuple element.
     pub name: Option<String>,
-    
+
     pub ty: Ty,
 }
 
 /// Built-in sets.
 #[derive(
-    Debug,
-    Clone,
-    Serialize,
-    Deserialize,
-    PartialEq,
-    Eq,
-    strum::EnumString,
-    strum::Display,
+    Debug, Clone, PartialEq, Eq, Hash, strum::EnumString, strum::Display
 )]
 pub enum PrimitiveSet {
     #[strum(to_string = "int")]
@@ -83,9 +79,8 @@ pub enum PrimitiveSet {
 }
 
 // Type of a function
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Hash)]
 pub struct TyFunc {
-    pub name_hint: Option<Ident>,
     pub params: Vec<Option<Ty>>,
     pub return_ty: Option<Box<Ty>>,
 }
@@ -135,5 +130,20 @@ impl From<PrimitiveSet> for TyKind {
 impl From<TyFunc> for TyKind {
     fn from(value: TyFunc) -> Self {
         TyKind::Function(Some(value))
+    }
+}
+
+impl PartialEq for Ty {
+    fn eq(&self, other: &Self) -> bool {
+        self.kind == other.kind && self.name == other.name
+    }
+}
+
+impl Eq for Ty {}
+
+impl std::hash::Hash for Ty {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.kind.hash(state);
+        self.name.hash(state);
     }
 }

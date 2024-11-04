@@ -1,0 +1,61 @@
+//! Pipelined Language AST
+//!
+//! Abstract Syntax Tree for the first part of PRQL compiler.
+//! It can represent basic expressions, lists, pipelines, function calls &
+//! definitions, variable declarations and more.
+//!
+//! The central struct here is [Expr] and its [ExprKind].
+//!
+//! Top-level construct is a list of statements [`Vec<Stmt>`].
+
+pub use crate::pr::Literal;
+pub use crate::pr::QueryDef;
+pub use crate::pr::{BinOp, BinaryExpr, Ident, UnOp, UnaryExpr};
+
+pub use self::expr::*;
+pub use self::extra::*;
+pub use self::fold::*;
+pub use self::stmt::*;
+pub use self::utils::*;
+
+mod expr;
+mod extra;
+mod fold;
+mod stmt;
+mod utils;
+
+#[allow(dead_code)]
+pub fn print_mem_sizes() {
+    use std::mem::size_of;
+
+    use crate::ir::{decl, pl};
+    use crate::pr::{PrimitiveSet, Ty, TyFunc, TyKind, TyTupleField};
+
+    println!("{:16}= {}", "Annotation", size_of::<Annotation>());
+    println!("{:16}= {}", "BinaryExpr", size_of::<BinaryExpr>());
+    println!("{:16}= {}", "BinOp", size_of::<BinOp>());
+    println!("{:16}= {}", "decl::Decl", size_of::<decl::Decl>());
+    println!("{:16}= {}", "decl::DeclKind", size_of::<decl::DeclKind>());
+    println!("{:16}= {}", "decl::Module", size_of::<decl::Module>());
+    println!("{:16}= {}", "ExprKind", size_of::<ExprKind>());
+    println!("{:16}= {}", "Func", size_of::<Func>());
+    println!("{:16}= {}", "FuncCall", size_of::<FuncCall>());
+    println!("{:16}= {}", "FuncParam", size_of::<FuncParam>());
+    println!("{:16}= {}", "InterpolateItem", size_of::<InterpolateItem>());
+    println!("{:16}= {}", "ModuleDef", size_of::<ModuleDef>());
+    println!("{:16}= {}", "pl::Expr", size_of::<pl::Expr>());
+    println!("{:16}= {}", "PrimitiveSet", size_of::<PrimitiveSet>());
+    println!("{:16}= {}", "QueryDef", size_of::<QueryDef>());
+    println!("{:16}= {}", "Range", size_of::<Range>());
+    println!("{:16}= {}", "Stmt", size_of::<Stmt>());
+    println!("{:16}= {}", "StmtKind", size_of::<StmtKind>());
+    println!("{:16}= {}", "SwitchCase", size_of::<SwitchCase>());
+    println!("{:16}= {}", "TupleField", size_of::<TyTupleField>());
+    println!("{:16}= {}", "Ty", size_of::<Ty>());
+    println!("{:16}= {}", "TyFunc", size_of::<TyFunc>());
+    println!("{:16}= {}", "TyKind", size_of::<TyKind>());
+    println!("{:16}= {}", "TypeDef", size_of::<TypeDef>());
+    println!("{:16}= {}", "UnaryExpr", size_of::<UnaryExpr>());
+    println!("{:16}= {}", "UnOp", size_of::<UnOp>());
+    println!("{:16}= {}", "VarDef", size_of::<VarDef>());
+}

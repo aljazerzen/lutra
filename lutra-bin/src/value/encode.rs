@@ -1,6 +1,6 @@
 use std::io::Write;
 
-use lutra_parser::parser::pr;
+use lutra_parser::pr;
 
 use super::{expect_ty, expect_ty_primitive, Value};
 use crate::layout::{self, EnumHeadFormat, EnumVariantFormat, LayoutCache};
