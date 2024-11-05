@@ -1,5 +1,5 @@
 [package]
-name = "lutra-lang"
+name = "lutra-runtime"
 edition.workspace = true
 license.workspace = true
 repository.workspace = true

@@ -11,7 +11,7 @@ pub fn lookup_native_symbol(id: &str) -> Symbol {
 }
 
 fn interpreter_version() -> interpreter::Symbol {
-    interpreter::Symbol::Value(Value::Text("lutra-lang 0.0.1".into()).into())
+    interpreter::Symbol::Value(Value::Text("lutra-runtime 0.0.1".into()).into())
 }
 
 fn std_int_add(args: Vec<interpreter::Symbol>) -> interpreter::Symbol {
