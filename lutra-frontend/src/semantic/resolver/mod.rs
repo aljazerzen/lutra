@@ -13,7 +13,7 @@ mod types;
 pub struct Resolver<'a> {
     root_mod: &'a mut RootModule,
 
-    pub debug_current_decl: crate::pr::Ident,
+    pub debug_current_decl: crate::pr::Path,
 
     /// Sometimes ident closures must be resolved and sometimes not. See [test::test_func_call_resolve].
     in_func_call_name: bool,
@@ -34,7 +34,7 @@ impl Resolver<'_> {
 
         Resolver {
             root_mod,
-            debug_current_decl: crate::pr::Ident::from_name("?"),
+            debug_current_decl: crate::pr::Path::from_name("?"),
             in_func_call_name: false,
             id,
             scopes: Vec::new(),
@@ -55,8 +55,8 @@ pub(in crate::semantic) mod test {
     use crate::{Errors, Result};
     use insta::assert_yaml_snapshot;
 
-    use crate::pr::Ty;
     use crate::ir::pl::{Expr, PlFold};
+    use crate::pr::Ty;
 
     pub fn erase_ids(expr: Expr) -> Expr {
         IdEraser {}.fold_expr(expr).unwrap()

@@ -8,6 +8,8 @@ use crate::parser::pr::Ty;
 use crate::span::Span;
 use crate::{generic, parser::SupportsDocComment};
 
+use super::Path;
+
 impl Expr {
     pub fn new<K: Into<ExprKind>>(kind: K) -> Self {
         Expr {
@@ -45,7 +47,7 @@ impl SupportsDocComment for Expr {
 
 #[derive(Debug, EnumAsInner, PartialEq, Clone, strum::AsRefStr)]
 pub enum ExprKind {
-    Ident(String),
+    Ident(Path),
 
     /// A lookup into an object by name or position.
     /// Currently, this includes only tuple field lookups, primarily by name.

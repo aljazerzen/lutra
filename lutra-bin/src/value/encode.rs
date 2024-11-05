@@ -265,7 +265,6 @@ fn decode_inner<'t>(r: &mut Reader<'_>, ty: &'t pr::Ty, ctx: &mut Context<'t>) -
     })
 }
 
-
 struct Context<'t> {
     cache: LayoutCache,
     top_level_ty: &'t pr::Ty,
@@ -282,7 +281,7 @@ impl<'t> Context<'t> {
 
 fn resolve_ident<'t>(ty: &'t pr::Ty, ctx: &mut Context<'t>) -> &'t pr::Ty {
     if let pr::TyKind::Ident(ident) = &ty.kind {
-        if ctx.top_level_ty.name.as_ref() == Some(&ident.name) {
+        if ctx.top_level_ty.name.as_deref() == Some(ident.name()) {
             ctx.top_level_ty
         } else {
             ty

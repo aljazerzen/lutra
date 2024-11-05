@@ -356,7 +356,7 @@ impl Resolver<'_> {
         &mut self,
         arg: Expr,
         param: &Option<Ty>,
-        func_name: &Option<Ident>,
+        func_name: &Option<Path>,
         coerce_tuple: bool,
     ) -> Result<Result<Expr, Expr>> {
         // fold
@@ -468,7 +468,7 @@ fn extract_partial_application(mut func: FuncApplication, position: usize) -> Re
     };
 
     let param_name = format!("_partial_{}", arg.id.unwrap());
-    let substitute_arg = Expr::new(Ident::from_path(vec![
+    let substitute_arg = Expr::new(Path::from_path(vec![
         NS_LOCAL.to_string(),
         param_name.clone(),
     ]));

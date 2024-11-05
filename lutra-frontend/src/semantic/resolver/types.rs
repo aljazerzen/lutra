@@ -30,7 +30,7 @@ impl Resolver<'_> {
                         // materialize into the referred type
                         self.fold_type_actual(Ty {
                             kind: ref_ty.kind.clone(),
-                            name: ref_ty.name.clone().or(Some(ident.name)),
+                            name: ref_ty.name.clone().or(Some(ident.name().to_string())),
                             span: ty.span,
                         })?
                     }
@@ -524,16 +524,16 @@ where
 }
 
 pub struct TypeReplacer {
-    mapping: HashMap<Ident, Ty>,
+    mapping: HashMap<Path, Ty>,
 }
 
 #[allow(dead_code)]
 impl TypeReplacer {
-    pub fn on_ty(ty: Ty, mapping: HashMap<Ident, Ty>) -> Ty {
+    pub fn on_ty(ty: Ty, mapping: HashMap<Path, Ty>) -> Ty {
         TypeReplacer { mapping }.fold_type(ty).unwrap()
     }
 
-    pub fn on_func(func: Func, mapping: HashMap<Ident, Ty>) -> Func {
+    pub fn on_func(func: Func, mapping: HashMap<Path, Ty>) -> Func {
         TypeReplacer { mapping }.fold_func(func).unwrap()
     }
 }

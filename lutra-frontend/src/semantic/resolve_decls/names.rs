@@ -10,7 +10,7 @@ use crate::{Error, Result, WithErrorInfo};
 ///
 /// Keeps track of all inter-declaration references.
 /// Returns a resolution order.
-pub fn resolve_decl_refs(root: &mut decl::RootModule) -> Result<Vec<pl::Ident>> {
+pub fn resolve_decl_refs(root: &mut decl::RootModule) -> Result<Vec<pl::Path>> {
     // resolve inter-declaration references
     let refs = {
         let mut r = ModuleRefResolver {
@@ -26,14 +26,14 @@ pub fn resolve_decl_refs(root: &mut decl::RootModule) -> Result<Vec<pl::Ident>> 
     // this is needed because during compilation of transforms, we inject refs to "std.lte" and a few others
     // sorting here makes std decls appear first in the final ordering
     let mut refs = refs;
-    refs.sort_by_key(|(a, _)| !a.path.first().map_or(false, |p| p == "std"));
+    refs.sort_by_key(|(a, _)| !a.path().first().map_or(false, |p| p == "std"));
 
     // toposort the declarations
     // TODO: we might not need to compile all declarations if they are not used
     //   to prevent that, this start should be something else than None
     //   a list of all public declarations?
     // let main = pl::Ident::from_name("main");
-    let order = utils::toposort::<pr::Ident>(&refs, None);
+    let order = utils::toposort::<pr::Path>(&refs, None);
 
     if let Some(order) = order {
         Ok(order.into_iter().cloned().collect_vec())
@@ -49,7 +49,7 @@ struct ModuleRefResolver<'a> {
     current_path: Vec<String>,
 
     // TODO: maybe make these ids, instead of Ident?
-    refs: Vec<(pr::Ident, Vec<pr::Ident>)>,
+    refs: Vec<(pr::Path, Vec<pr::Path>)>,
 }
 
 impl ModuleRefResolver<'_> {
@@ -94,7 +94,7 @@ impl ModuleRefResolver<'_> {
             let stmt = r.fold_stmt_kind(stmt).with_span_fallback(span)?;
             decl.kind = decl::DeclKind::Unresolved(stmt);
 
-            let decl_ident = pl::Ident::from_path(path.clone());
+            let decl_ident = pl::Path::from_path(path.clone());
             self.refs.push((decl_ident, r.refs));
 
             let name = path.pop().unwrap();
@@ -119,7 +119,7 @@ impl ModuleRefResolver<'_> {
 struct NameResolver<'a> {
     root: &'a mut decl::RootModule,
     decl_module_path: &'a [String],
-    refs: Vec<pl::Ident>,
+    refs: Vec<pl::Path>,
 }
 
 impl NameResolver<'_> {
@@ -146,7 +146,7 @@ impl NameResolver<'_> {
             return Err(Error::new_simple("invalid type name"));
         }
         Ok(pl::ImportDef {
-            name: pr::Ident::from_path(fq_ident),
+            name: pr::Path::from_path(fq_ident),
             alias: import_def.alias,
         })
     }
@@ -154,18 +154,12 @@ impl NameResolver<'_> {
 
 impl pl::PlFold for NameResolver<'_> {
     fn fold_expr(&mut self, expr: pl::Expr) -> Result<pl::Expr> {
-        // Convert indirections into ident, since the algo below works with
-        // full idents and not indirections.
-        // We could change that to work with indirections, but then we'd
-        // need to change how idents in types and imports are resolved.
-        let expr = push_indirections_into_ident(expr);
-
         Ok(match expr.kind {
             pl::ExprKind::Ident(ident) => {
                 let (ident, indirections) = self.resolve_ident(ident).with_span(expr.span)?;
                 // TODO: can this ident have length 0?
 
-                let mut kind = pl::ExprKind::Ident(pr::Ident::from_path(ident));
+                let mut kind = pl::ExprKind::Ident(pr::Path::from_path(ident));
                 for indirection in indirections {
                     let mut e = pl::Expr::new(kind);
                     e.span = expr.span;
@@ -202,7 +196,7 @@ impl pl::PlFold for NameResolver<'_> {
                 }
 
                 pr::Ty {
-                    kind: pr::TyKind::Ident(pr::Ident::from_path(ident)),
+                    kind: pr::TyKind::Ident(pr::Path::from_path(ident)),
                     ..ty
                 }
             }
@@ -211,43 +205,9 @@ impl pl::PlFold for NameResolver<'_> {
     }
 }
 
-/// Converts `Indirection { base: Ident(x), field: y }` into `Ident(x.y)`.
-fn push_indirections_into_ident(mut expr: pl::Expr) -> pl::Expr {
-    let mut indirections = Vec::new();
-    while let pl::ExprKind::Indirection {
-        base,
-        field: pl::IndirectionKind::Name(name),
-    } = expr.kind
-    {
-        indirections.push((name, expr.span, expr.alias, expr.flatten));
-        expr = *base;
-    }
-
-    if let pl::ExprKind::Ident(ident) = &mut expr.kind {
-        for (part, span, alias, flatten) in indirections.into_iter().rev() {
-            ident.push(part);
-            expr.span = pr::Span::merge_opt(expr.span, span);
-            expr.alias = alias.or(expr.alias);
-            expr.flatten = flatten;
-        }
-    } else {
-        // this is not on an ident - we have to revert it
-        for (name, span, alias, flatten) in indirections {
-            expr = pl::Expr::new(pl::ExprKind::Indirection {
-                base: Box::new(expr),
-                field: pl::IndirectionKind::Name(name),
-            });
-            expr.span = span;
-            expr.alias = alias;
-            expr.flatten = flatten;
-        }
-    }
-    expr
-}
-
 impl NameResolver<'_> {
     /// Returns resolved fully-qualified ident and a list of indirections
-    fn resolve_ident(&mut self, mut ident: pr::Ident) -> Result<(Vec<String>, Vec<String>)> {
+    fn resolve_ident(&mut self, mut ident: pr::Path) -> Result<(Vec<String>, Vec<String>)> {
         // this is the name we are looking for
         let first = ident.iter().next().unwrap();
         let mod_path = match first.as_str() {
@@ -261,7 +221,6 @@ impl NameResolver<'_> {
 
             NS_STD => Some(vec![NS_STD.to_string()]),
             NS_THIS => Some(vec![NS_LOCAL.to_string(), NS_THIS.to_string()]),
-            "prql" => Some(vec![NS_STD.to_string(), "prql".to_string()]),
 
             // transforms
             "from" |
@@ -316,16 +275,14 @@ impl NameResolver<'_> {
 
             // now find the decl within that module
             if let Some(ident_within) = ident.pop_front().1 {
-                let mut module_lookup = ModuleLookup::new();
-
-                let (path, indirections) = module_lookup.run(module, ident_within)?;
+                let (path, indirections) = module_lookup(module, ident_within)?;
 
                 // prepend the ident with the module path
                 // this will make this ident a fully-qualified ident
                 let mut fq_ident = mod_path;
                 fq_ident.extend(path);
 
-                self.refs.push(pr::Ident::from_path(fq_ident.clone()));
+                self.refs.push(pr::Path::from_path(fq_ident.clone()));
 
                 (fq_ident, indirections)
             } else {
@@ -342,46 +299,33 @@ impl NameResolver<'_> {
     }
 }
 
-struct ModuleLookup {}
+fn module_lookup(
+    module: &mut decl::Module,
+    ident_within: pr::Path,
+) -> Result<(Vec<String>, Vec<String>)> {
+    let mut steps = ident_within.into_iter().collect_vec();
 
-impl ModuleLookup {
-    fn new() -> Self {
-        ModuleLookup {}
-    }
-
-    fn run(
-        &mut self,
-        module: &mut decl::Module,
-        ident_within: pr::Ident,
-    ) -> Result<(Vec<String>, Vec<String>)> {
-        let mut steps = ident_within.into_iter().collect_vec();
-
-        let mut module = module;
-        for i in 0..steps.len() {
-            let decl = self.run_step(module, &steps[i])?;
-            if let decl::DeclKind::Module(inner) = &mut decl.kind {
-                module = inner;
-                continue;
-            } else {
-                // we've found a declaration that is not a module:
-                // this and preceding steps are identifier, steps following are indirections
-                let indirections = steps.drain((i + 1)..).collect_vec();
-                return Ok((steps, indirections));
-            }
+    let mut module = module;
+    for i in 0..steps.len() {
+        let decl = module_lookup_step(module, &steps[i])?;
+        if let decl::DeclKind::Module(inner) = &mut decl.kind {
+            module = inner;
+            continue;
+        } else {
+            // we've found a declaration that is not a module:
+            // this and preceding steps are identifier, steps following are indirections
+            let indirections = steps.drain((i + 1)..).collect_vec();
+            return Ok((steps, indirections));
         }
-
-        Err(Error::new_simple("direct references modules not allowed"))
     }
 
-    fn run_step<'m>(
-        &mut self,
-        module: &'m mut decl::Module,
-        step: &str,
-    ) -> Result<&'m mut decl::Decl> {
-        if module.names.contains_key(step) {
-            return Ok(module.names.get_mut(step).unwrap());
-        }
+    Err(Error::new_simple("direct references modules not allowed"))
+}
 
-        Err(Error::new_simple(format!("Name not found: {step}")))
+fn module_lookup_step<'m>(module: &'m mut decl::Module, step: &str) -> Result<&'m mut decl::Decl> {
+    if module.names.contains_key(step) {
+        return Ok(module.names.get_mut(step).unwrap());
     }
+
+    Err(Error::new_simple(format!("Name not found: {step}")))
 }

@@ -25,9 +25,9 @@ impl Module {
         }
     }
 
-    pub fn insert(&mut self, fq_ident: pr::Ident, decl: Decl) -> Result<Option<Decl>, Error> {
-        if fq_ident.path.is_empty() {
-            Ok(self.names.insert(fq_ident.name, decl))
+    pub fn insert(&mut self, fq_ident: pr::Path, decl: Decl) -> Result<Option<Decl>, Error> {
+        if fq_ident.path().is_empty() {
+            Ok(self.names.insert(fq_ident.name().to_string(), decl))
         } else {
             let (top_level, remaining) = fq_ident.pop_front();
             let entry = self.names.entry(top_level).or_default();
@@ -42,10 +42,10 @@ impl Module {
         }
     }
 
-    pub fn get_mut(&mut self, ident: &pr::Ident) -> Option<&mut Decl> {
+    pub fn get_mut(&mut self, ident: &pr::Path) -> Option<&mut Decl> {
         let mut ns = self;
 
-        for part in &ident.path {
+        for part in ident.path() {
             let entry = ns.names.get_mut(part);
 
             match entry {
@@ -59,14 +59,14 @@ impl Module {
             }
         }
 
-        ns.names.get_mut(&ident.name)
+        ns.names.get_mut(ident.name())
     }
 
     /// Get namespace entry using a fully qualified ident.
-    pub fn get(&self, fq_ident: &pr::Ident) -> Option<&Decl> {
+    pub fn get(&self, fq_ident: &pr::Path) -> Option<&Decl> {
         let mut ns = self;
 
-        for part in fq_ident.path.iter() {
+        for part in fq_ident.path().iter() {
             let decl = ns.names.get(part)?;
 
             if let DeclKind::Module(inner) = &decl.kind {
@@ -76,7 +76,7 @@ impl Module {
             }
         }
 
-        ns.names.get(&fq_ident.name)
+        ns.names.get(fq_ident.name())
     }
 
     pub fn get_submodule(&self, path: &[String]) -> Option<&Module> {
@@ -127,7 +127,7 @@ impl Module {
         }
     }
 
-    pub fn as_decls(&self) -> Vec<(pr::Ident, &Decl)> {
+    pub fn as_decls(&self) -> Vec<(pr::Path, &Decl)> {
         let mut r = Vec::new();
         for (name, decl) in &self.names {
             match &decl.kind {
@@ -135,16 +135,16 @@ impl Module {
                     module
                         .as_decls()
                         .into_iter()
-                        .map(|(inner, decl)| (pr::Ident::from_name(name) + inner, decl)),
+                        .map(|(inner, decl)| (pr::Path::from_name(name) + inner, decl)),
                 ),
-                _ => r.push((pr::Ident::from_name(name), decl)),
+                _ => r.push((pr::Path::from_name(name), decl)),
             }
         }
         r
     }
 
     /// Recursively finds all declarations that end in suffix.
-    pub fn find_by_suffix(&self, suffix: &str) -> Vec<pr::Ident> {
+    pub fn find_by_suffix(&self, suffix: &str) -> Vec<pr::Path> {
         let mut res = Vec::new();
 
         for (name, decl) in &self.names {
@@ -155,7 +155,7 @@ impl Module {
             }
 
             if name == suffix {
-                res.push(pr::Ident::from_name(name));
+                res.push(pr::Path::from_name(name));
             }
         }
 
@@ -163,7 +163,7 @@ impl Module {
     }
 
     /// Recursively finds all declarations with an annotation that has a specific name.
-    pub fn find_by_annotation_name(&self, annotation_name: &pr::Ident) -> Vec<pr::Ident> {
+    pub fn find_by_annotation_name(&self, annotation_name: &pr::Path) -> Vec<pr::Path> {
         let mut res = Vec::new();
 
         for (name, decl) in &self.names {
@@ -174,14 +174,14 @@ impl Module {
 
             let has_annotation = decl_has_annotation(decl, annotation_name);
             if has_annotation {
-                res.push(pr::Ident::from_name(name));
+                res.push(pr::Path::from_name(name));
             }
         }
         res
     }
 }
 
-fn decl_has_annotation(decl: &Decl, annotation_name: &pr::Ident) -> bool {
+fn decl_has_annotation(decl: &Decl, annotation_name: &pr::Path) -> bool {
     for ann in &decl.annotations {
         if super::is_ident_or_func_call(&ann.expr, annotation_name) {
             return true;
@@ -195,7 +195,7 @@ type HintAndSpan = (Option<String>, Option<Span>);
 impl RootModule {
     /// Finds that main pipeline given a path to either main itself or its parent module.
     /// Returns main expr and fq ident of the decl.
-    pub fn find_main_rel(&self, path: &[String]) -> Result<(&pl::Expr, pr::Ident), HintAndSpan> {
+    pub fn find_main_rel(&self, path: &[String]) -> Result<(&pl::Expr, pr::Path), HintAndSpan> {
         let (decl, ident) = self.find_main(path).map_err(|x| (x, None))?;
 
         let span = decl
@@ -210,12 +210,12 @@ impl RootModule {
         Ok((decl.as_ref(), ident))
     }
 
-    pub fn find_main(&self, path: &[String]) -> Result<(&Decl, pr::Ident), Option<String>> {
+    pub fn find_main(&self, path: &[String]) -> Result<(&Decl, pr::Path), Option<String>> {
         let mut tried_idents = Vec::new();
 
         // is path referencing the relational var directly?
         if !path.is_empty() {
-            let ident = pr::Ident::from_path(path.to_vec());
+            let ident = pr::Path::from_path(path.to_vec());
             let decl = self.module.get(&ident);
 
             if let Some(decl) = decl {
@@ -230,7 +230,7 @@ impl RootModule {
             let mut path = path.to_vec();
             path.push(NS_MAIN.to_string());
 
-            let ident = pr::Ident::from_path(path);
+            let ident = pr::Path::from_path(path);
             let decl = self.module.get(&ident);
 
             if let Some(decl) = decl {
@@ -247,12 +247,12 @@ impl RootModule {
     }
 
     /// Finds all main pipelines.
-    pub fn find_mains(&self) -> Vec<pr::Ident> {
+    pub fn find_mains(&self) -> Vec<pr::Path> {
         self.module.find_by_suffix(NS_MAIN)
     }
 
     /// Finds declarations that are annotated with a specific name.
-    pub fn find_by_annotation_name(&self, annotation_name: &pr::Ident) -> Vec<pr::Ident> {
+    pub fn find_by_annotation_name(&self, annotation_name: &pr::Path) -> Vec<pr::Path> {
         self.module.find_by_annotation_name(annotation_name)
     }
 }
@@ -267,7 +267,7 @@ mod tests {
     fn test_module_shadow_unshadow() {
         let mut module = Module::default();
 
-        let ident = pr::Ident::from_name("test_name");
+        let ident = pr::Path::from_name("test_name");
         let expr: pl::Expr = pl::Expr::new(pl::ExprKind::Literal(Literal::Integer(42)));
         let decl: Decl = DeclKind::Expr(Box::new(expr)).into();
 

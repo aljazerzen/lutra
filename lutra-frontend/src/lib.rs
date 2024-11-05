@@ -12,7 +12,7 @@ pub use project::Project;
 
 use lutra_parser::pr;
 
-use lutra_parser::error::{Error, WithErrorInfo, Reason};
+use lutra_parser::error::{Error, Reason, WithErrorInfo};
 use lutra_parser::span::Span;
 
 type Result<T, E = Error> = core::result::Result<T, E>;

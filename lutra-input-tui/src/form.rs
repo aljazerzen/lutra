@@ -1,7 +1,7 @@
 mod array;
+mod r#enum;
 mod text;
 mod tuple;
-mod r#enum;
 
 use lutra_parser::pr::{self, PrimitiveSet, Ty};
 use ratatui::prelude::*;
@@ -10,9 +10,9 @@ use std::borrow::Cow;
 use crate::app::Action;
 
 use self::array::ArrayForm;
+use self::r#enum::EnumForm;
 use self::text::TextForm;
 use self::tuple::TupleForm;
-use self::r#enum::EnumForm;
 
 pub struct Form {
     pub name: FormName,

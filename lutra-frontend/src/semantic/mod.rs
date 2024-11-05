@@ -55,7 +55,7 @@ pub fn load_std_lib(module_tree: &mut pr::ModuleDef) {
     }
 }
 
-pub fn is_ident_or_func_call(expr: &pl::Expr, name: &pr::Ident) -> bool {
+pub fn is_ident_or_func_call(expr: &pl::Expr, name: &pr::Path) -> bool {
     match &expr.kind {
         pl::ExprKind::Ident(i) if i == name => true,
         pl::ExprKind::FuncCall(pl::FuncCall { name: n_expr, .. })
@@ -88,7 +88,9 @@ impl Stmt {
             StmtKind::VarDef(VarDef { name, .. }) => name,
             StmtKind::TypeDef(TypeDef { name, .. }) => name,
             StmtKind::ModuleDef(ModuleDef { name, .. }) => name,
-            StmtKind::ImportDef(ImportDef { name, alias }) => alias.as_ref().unwrap_or(&name.name),
+            StmtKind::ImportDef(ImportDef { name, alias }) => {
+                alias.as_deref().unwrap_or(name.name())
+            }
         }
     }
 }

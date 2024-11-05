@@ -27,7 +27,7 @@ pub(crate) fn expr() -> impl Parser<TokenKind, Expr, Error = PError> + Clone {
     recursive(|expr| {
         let literal = select! { TokenKind::Literal(lit) => ExprKind::Literal(lit) };
 
-        let ident_kind = ident_part().map(ExprKind::Ident);
+        let ident_kind = ident().map(ExprKind::Ident);
 
         let internal = keyword("internal")
             .ignore_then(ident())
@@ -541,11 +541,11 @@ where
     .labelled("function definition")
 }
 
-pub(crate) fn ident() -> impl Parser<TokenKind, Ident, Error = PError> + Clone {
+pub(crate) fn ident() -> impl Parser<TokenKind, Path, Error = PError> + Clone {
     ident_part()
-        .separated_by(ctrl('.'))
+        .separated_by(just(TokenKind::PathSep))
         .at_least(1)
-        .map(Ident::from_path::<String>)
+        .map(Path::from_path::<String>)
 }
 
 fn operator_unary() -> impl Parser<TokenKind, UnOp, Error = PError> + Clone {

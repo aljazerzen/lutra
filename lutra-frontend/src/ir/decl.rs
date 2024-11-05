@@ -31,7 +31,7 @@ pub struct Module {
     /// - because of redirect `std`, so we look for `average` in `std`,
     /// - there is `average` is `std`,
     /// - result of the lookup is FQ ident `std.average`.
-    pub redirects: Vec<pl::Ident>,
+    pub redirects: Vec<pl::Path>,
 
     /// A declaration that has been shadowed (overwritten) by this module.
     pub shadowed: Option<Box<Decl>>,
@@ -70,7 +70,7 @@ pub enum DeclKind {
     Ty(Ty),
 
     /// Equivalent to the declaration pointed to by the fully qualified ident
-    Import(pr::Ident),
+    Import(pr::Path),
 
     /// A declaration that has not yet been resolved.
     /// Created during the first pass of the AST, must not be present in

@@ -1,11 +1,9 @@
 use indexmap::IndexMap;
 
-use crate::ir::decl::{Decl, DeclKind};
-use crate::pr::Ident;
+use crate::ir::decl::Decl;
+use crate::pr::Path;
 use crate::semantic::NS_LOCAL;
-use crate::{Error, Result};
 
-use super::tuple::StepOwned;
 use super::Resolver;
 
 #[derive(Debug)]
@@ -44,10 +42,10 @@ impl Resolver<'_> {
     /// Get declaration from within the current scope.
     ///
     /// Does not mutate the current scope or module structure.
-    pub(super) fn get_ident(&self, ident: &Ident) -> Option<&Decl> {
+    pub(super) fn get_ident(&self, ident: &Path) -> Option<&Decl> {
         if ident.starts_with_part(NS_LOCAL) {
             assert!(ident.len() == 2);
-            self.scopes.last()?.get(&ident.name)
+            self.scopes.last()?.get(&ident.name())
         } else {
             self.root_mod.module.get(ident)
         }
@@ -57,77 +55,12 @@ impl Resolver<'_> {
     ///
     /// Does not mutate the current scope or module structure.
     #[allow(dead_code)]
-    pub(super) fn get_ident_mut(&mut self, ident: &Ident) -> Option<&mut Decl> {
+    pub(super) fn get_ident_mut(&mut self, ident: &Path) -> Option<&mut Decl> {
         if ident.starts_with_part(NS_LOCAL) {
             assert!(ident.len() == 2);
-            self.scopes.last_mut()?.get_mut(&ident.name)
+            self.scopes.last_mut()?.get_mut(&ident.name())
         } else {
             self.root_mod.module.get_mut(ident)
         }
     }
-
-    /// Performs an identifer lookup, possibly infering type information or
-    /// even new declarations.
-    pub(super) fn lookup_ident(&mut self, ident: &Ident) -> Result<LookupResult, Error> {
-        if !ident.starts_with_part(NS_LOCAL) {
-            // if ident is not local, it must have been resolved eariler
-            // so we can just do a direct lookup
-            return Ok(LookupResult::Direct);
-        }
-        assert!(ident.len() == 2);
-
-        let res = if let Some(scope) = self.scopes.pop() {
-            let r = self.lookup_in_scope(&scope, &ident.name);
-            self.scopes.push(scope);
-            r
-        } else {
-            Ok(None)
-        };
-        let res = res.and_then(|x| {
-            x.ok_or_else(|| Error::new_simple(format!("Unknown name `{}`", &ident.name)))
-        });
-
-        if let Err(e) = &res {
-            log::debug!(
-                "cannot resolve `{}`: `{e:?}`,\nscope={:#?}",
-                ident.name,
-                self.scopes.last(),
-            );
-        }
-        res
-    }
-
-    fn lookup_in_scope(&mut self, scope: &Scope, name: &str) -> Result<Option<LookupResult>> {
-        if scope.get(name).is_some() {
-            return Ok(Some(LookupResult::Direct));
-        }
-
-        for (param_name, decl) in &scope.values {
-            let DeclKind::Variable(Some(var_ty)) = &decl.kind else {
-                continue;
-            };
-
-            let Some(steps) = self.lookup_name_in_tuple(var_ty, name)? else {
-                continue;
-            };
-
-            return Ok(Some(LookupResult::Indirect {
-                real_name: param_name.clone(),
-                indirections: steps,
-            }));
-        }
-        Ok(None)
-    }
-}
-
-/// When doing a lookup of, for example, `a` it might turn out that what we are
-/// looking for is under fully-qualified path `this.b.a`. In such cases, lookup will
-/// return an "indirect result". In this example, it would be
-/// `Indirect { real_name: "this", indirections: vec!["b", "a"] }`.
-pub enum LookupResult {
-    Direct,
-    Indirect {
-        real_name: String,
-        indirections: Vec<StepOwned>,
-    },
 }

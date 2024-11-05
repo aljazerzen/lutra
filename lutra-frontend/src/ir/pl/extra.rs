@@ -1,4 +1,4 @@
-use crate::ir::pl::{Expr, ExprKind, FuncCall, Ident};
+use crate::ir::pl::{Expr, ExprKind, FuncCall, Path};
 
 impl FuncCall {
     pub fn new_simple(name: Expr, args: Vec<Expr>) -> Self {
@@ -13,7 +13,7 @@ impl FuncCall {
 #[derive(Debug, PartialEq, Clone, Default)]
 pub struct FuncMetadata {
     /// Name of the function. Used for user-facing messages only.
-    pub name_hint: Option<Ident>,
+    pub name_hint: Option<Path>,
 
     pub implicit_closure: Option<Box<ImplicitClosureConfig>>,
     pub coerce_tuple: Option<u8>,
@@ -30,7 +30,7 @@ impl FuncMetadata {
     pub(crate) fn as_debug_name(&self) -> &str {
         let ident = self.name_hint.as_ref();
 
-        ident.map(|n| n.name.as_str()).unwrap_or("<anonymous>")
+        ident.map(|n| n.name()).unwrap_or("<anonymous>")
     }
 }
 

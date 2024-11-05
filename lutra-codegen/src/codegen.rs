@@ -195,7 +195,7 @@ fn write_ty_ref<'t>(
             write!(w, "String")?;
         }
         pr::TyKind::Ident(ident) => {
-            write!(w, "{}", ident.name)?;
+            write!(w, "{}", ident.name())?;
         }
         pr::TyKind::Array(items_ty) => {
             write!(w, "Vec")?;

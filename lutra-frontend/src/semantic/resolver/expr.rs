@@ -3,7 +3,6 @@ use itertools::Itertools;
 use crate::ir::decl::DeclKind;
 use crate::ir::pl::{self, *};
 use crate::pr::Ty;
-use crate::semantic::resolver::scope::LookupResult;
 use crate::semantic::{NS_LOCAL, NS_STD, NS_THIS};
 use crate::{Error, Result, Span, WithErrorInfo};
 
@@ -48,19 +47,7 @@ impl PlFold for super::Resolver<'_> {
             ExprKind::Ident(ident) => {
                 log::debug!("resolving ident {ident:?}...");
 
-                let result = self.lookup_ident(&ident).with_span(node.span)?;
-
-                let (ident, indirections) = match result {
-                    LookupResult::Direct => (ident, vec![]),
-                    LookupResult::Indirect {
-                        real_name,
-                        indirections,
-                    } => {
-                        let mut ident = ident;
-                        ident.name = real_name;
-                        (ident, indirections)
-                    }
-                };
+                let indirections = vec![];
 
                 let mut expr = {
                     let decl = self.get_ident(&ident).unwrap();
@@ -234,13 +221,13 @@ impl super::Resolver<'_> {
                     //     _local.select {alias = _local.this} r
 
                     let expr = Expr::new(ExprKind::FuncCall(FuncCall {
-                        name: Box::new(Expr::new(ExprKind::Ident(Ident::from_path(vec![
+                        name: Box::new(Expr::new(ExprKind::Ident(Path::from_path(vec![
                             NS_STD, "select",
                         ])))),
                         args: vec![
                             Expr::new(ExprKind::Tuple(vec![Expr {
                                 alias: Some(alias),
-                                ..Expr::new(Ident::from_path(vec![NS_LOCAL, NS_THIS]))
+                                ..Expr::new(Path::from_path(vec![NS_LOCAL, NS_THIS]))
                             }])),
                             *r,
                         ],
@@ -259,7 +246,7 @@ impl super::Resolver<'_> {
         let except = self.coerce_into_tuple(expr)?;
 
         self.fold_expr(Expr::new(ExprKind::All {
-            within: Box::new(Expr::new(Ident::from_path(vec![NS_LOCAL, NS_THIS]))),
+            within: Box::new(Expr::new(Path::from_path(vec![NS_LOCAL, NS_THIS]))),
             except: Box::new(except),
         }))
     }

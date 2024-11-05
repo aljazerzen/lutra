@@ -1,6 +1,6 @@
 use enum_as_inner::EnumAsInner;
 
-use crate::pr::{Ident, Ty};
+use crate::pr::{Path, Ty};
 use crate::Span;
 
 use super::{Expr, FuncCall};
@@ -45,7 +45,7 @@ pub struct ModuleDef {
 #[derive(Debug, PartialEq, Clone)]
 pub struct ImportDef {
     pub alias: Option<String>,
-    pub name: Ident,
+    pub name: Path,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -59,7 +59,7 @@ impl Annotation {
         let call = self.expr.kind.as_func_call()?;
 
         let func_name = call.name.kind.as_ident()?;
-        if func_name.len() != 1 || func_name.name != name {
+        if func_name.len() != 1 || func_name.name() != name {
             return None;
         }
         Some(call)

@@ -79,11 +79,14 @@ fn main() {
                                         }),
                                     }),
                                 }),
-                                args: vec![ir::Expr {
-                                    kind: ir::ExprKind::Literal(ir::Literal::Int(6)),
-                                }, ir::Expr {
-                                    kind: ir::ExprKind::Literal(ir::Literal::Int(7)),
-                                }],
+                                args: vec![
+                                    ir::Expr {
+                                        kind: ir::ExprKind::Literal(ir::Literal::Int(6)),
+                                    },
+                                    ir::Expr {
+                                        kind: ir::ExprKind::Literal(ir::Literal::Int(7)),
+                                    },
+                                ],
                             }),
                         },
                         ir::Expr {

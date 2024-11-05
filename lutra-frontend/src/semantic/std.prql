@@ -244,11 +244,3 @@ module date {
 ## File-reading functions, primarily for DuckDB
 let read_parquet = func <R: {}> source<text> -> <[R]> internal std.read_parquet
 # let read_csv = func <R: {}> source<text> -> <[R]> internal std.read_csv
-
-## PRQL compiler functions
-module `prql` {
-  let version <text> = internal prql_version
-}
-
-# Deprecated, will be removed in 0.12.0
-let prql_version <text> = internal prql_version

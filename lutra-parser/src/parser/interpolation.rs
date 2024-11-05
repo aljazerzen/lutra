@@ -36,7 +36,7 @@ fn interpolated_parser() -> impl Parser<char, Vec<InterpolateItem>, Error = Chum
             let mut parts = ident_parts.into_iter();
 
             let (first, first_span) = parts.next().unwrap();
-            let mut base = Box::new(ExprKind::Ident(first).into_expr(first_span));
+            let mut base = Box::new(ExprKind::Ident(Path::from_name(first)).into_expr(first_span));
 
             for (part, span) in parts {
                 let field = IndirectionKind::Name(part);
@@ -84,7 +84,7 @@ fn parse_interpolate() {
 
     assert_debug_snapshot!(
         parse("concat({a})".to_string(), span_base).unwrap(),
-    @r###"
+    @r#"
     [
         String(
             "concat(",
@@ -92,7 +92,9 @@ fn parse_interpolate() {
         Expr {
             expr: Expr {
                 kind: Ident(
-                    "a",
+                    [
+                        "a",
+                    ],
                 ),
                 span: Some(
                     0:8-9,
@@ -106,7 +108,7 @@ fn parse_interpolate() {
             ")",
         ),
     ]
-    "###);
+    "#);
 
     assert_debug_snapshot!(
         parse("print('{{hello}}')".to_string(), span_base).unwrap(),
@@ -130,7 +132,7 @@ fn parse_interpolate() {
 
     assert_debug_snapshot!(
         parse("concat('{{', {a}, '}}')".to_string(), span_base).unwrap(),
-    @r###"
+    @r#"
     [
         String(
             "concat('{', ",
@@ -138,7 +140,9 @@ fn parse_interpolate() {
         Expr {
             expr: Expr {
                 kind: Ident(
-                    "a",
+                    [
+                        "a",
+                    ],
                 ),
                 span: Some(
                     0:14-15,
@@ -152,5 +156,5 @@ fn parse_interpolate() {
             ", '}')",
         ),
     ]
-    "###);
+    "#);
 }

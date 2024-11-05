@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use enum_as_inner::EnumAsInner;
 use semver::VersionReq;
 
-use crate::parser::pr::ident::Ident;
+use crate::parser::pr::path::Path;
 use crate::parser::pr::{Expr, Ty};
 use crate::parser::SupportsDocComment;
 use crate::span::Span;
@@ -72,7 +72,7 @@ pub struct ModuleDef {
 #[derive(Debug, PartialEq, Clone)]
 pub struct ImportDef {
     pub alias: Option<String>,
-    pub name: Ident,
+    pub name: Path,
 }
 
 #[derive(Debug, Clone, PartialEq)]

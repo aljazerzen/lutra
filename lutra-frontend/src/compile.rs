@@ -7,6 +7,7 @@ use lutra_parser::pr;
 
 use crate::error;
 use crate::error::Diagnostic;
+use crate::ir::decl;
 use crate::project;
 
 pub use linearize::is_mod_def_for;
@@ -19,24 +20,21 @@ pub fn compile(
     source: project::SourceTree,
     _: CompileParams,
 ) -> Result<project::Project, crate::error::Error> {
-    let mut project = parse_and_compile(&source)?;
+    let root_module = parse_and_compile(&source)?;
     // .map_err(|e| e.composed(&source_tree))?;
 
-    project.source = source;
-    Ok(project)
-}
-
-fn parse_and_compile(source_tree: &project::SourceTree) -> Result<project::Project, error::Error> {
-    // parse and resolve
-    let ast_tree = parse(source_tree)?;
-    let root_module = crate::semantic::resolve(ast_tree)
-        .map_err(Diagnostic::from_prql)
-        .map_err(Diagnostic::into_error)?;
-
-    Ok(project::Project {
-        source: project::SourceTree::default(), // placeholder
+    Ok(crate::Project {
+        source,
         root_module,
     })
+}
+
+fn parse_and_compile(source_tree: &project::SourceTree) -> Result<decl::RootModule, error::Error> {
+    // parse and resolve
+    let ast_tree = parse(source_tree)?;
+    crate::semantic::resolve(ast_tree)
+        .map_err(Diagnostic::from_prql)
+        .map_err(Diagnostic::into_error)
 }
 
 fn parse(file_tree: &project::SourceTree) -> Result<pr::ModuleDef, error::Error> {

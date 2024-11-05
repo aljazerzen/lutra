@@ -6,8 +6,8 @@ use std::hash::Hash;
 
 use crate::error::WithErrorInfo;
 use crate::error::{Error, ErrorSource, Reason};
-use crate::span::Span;
 use crate::lexer;
+use crate::span::Span;
 
 #[derive(Clone, Debug)]
 pub struct ChumError<T: Hash + Eq + Debug> {

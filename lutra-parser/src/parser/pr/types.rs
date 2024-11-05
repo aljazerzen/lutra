@@ -1,7 +1,7 @@
 use enum_as_inner::EnumAsInner;
 use strum::AsRefStr;
 
-use crate::parser::pr::ident::Ident;
+use crate::parser::pr::path::Path;
 use crate::span::Span;
 
 #[derive(Debug, Clone)]
@@ -17,7 +17,7 @@ pub struct Ty {
 #[derive(Debug, Clone, PartialEq, Hash, EnumAsInner, AsRefStr)]
 pub enum TyKind {
     /// Identifier that still needs to be resolved.
-    Ident(Ident),
+    Ident(Path),
 
     /// Type of a built-in primitive type
     Primitive(PrimitiveSet),
@@ -33,7 +33,6 @@ pub enum TyKind {
 
     /// Type of functions with defined params and return types.
     Function(Option<TyFunc>),
-
     // /// Tuples that have fields of `base` tuple, but don't have fields of `except` tuple.
     // /// Implies that `base` has all fields of `except`.
     // Exclude { base: Box<Ty>, except: Box<Ty> },
@@ -58,9 +57,7 @@ pub struct TyTupleField {
 }
 
 /// Built-in sets.
-#[derive(
-    Debug, Clone, PartialEq, Eq, Hash, strum::EnumString, strum::Display
-)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, strum::EnumString, strum::Display)]
 pub enum PrimitiveSet {
     #[strum(to_string = "int")]
     Int,

@@ -35,18 +35,14 @@ pub fn parse_lr_to_pr(
 pub(crate) fn prepare_stream<'a>(
     tokens: Vec<lexer::Token>,
     source_id: u16,
-) -> Stream<'a, TokenKind, Span, impl Iterator<Item = (TokenKind, Span)> + Sized + 'a>
-{
+) -> Stream<'a, TokenKind, Span, impl Iterator<Item = (TokenKind, Span)> + Sized + 'a> {
     let final_span = tokens.last().map(|t| t.span.end).unwrap_or(0);
 
     // We don't want comments in the AST (but we do intend to use them as part of
     // formatting)
-    let semantic_tokens = tokens.into_iter().filter(|token| {
-        !matches!(
-            token.kind,
-            TokenKind::Comment(_) | TokenKind::LineWrap(_)
-        )
-    });
+    let semantic_tokens = tokens
+        .into_iter()
+        .filter(|token| !matches!(token.kind, TokenKind::Comment(_) | TokenKind::LineWrap(_)));
 
     let tokens = semantic_tokens
         .into_iter()

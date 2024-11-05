@@ -111,8 +111,6 @@ impl ArrayForm {
     }
 
     pub(crate) fn get_value(&self) -> lutra_bin::Value {
-        lutra_bin::Value::Array(
-            self.items.iter().map(|f| f.get_value()).collect(),
-        )
+        lutra_bin::Value::Array(self.items.iter().map(|f| f.get_value()).collect())
     }
 }

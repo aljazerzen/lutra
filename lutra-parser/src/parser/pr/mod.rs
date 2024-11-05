@@ -3,8 +3,8 @@
 //! understands expressions, such as tuples & functions.
 
 pub use expr::*;
-pub use ident::*;
 pub use ops::*;
+pub use path::*;
 pub use stmt::*;
 pub use types::*;
 
@@ -13,7 +13,7 @@ pub use crate::lexer::Literal;
 pub use crate::span::Span;
 
 mod expr;
-mod ident;
 mod ops;
+mod path;
 mod stmt;
 mod types;

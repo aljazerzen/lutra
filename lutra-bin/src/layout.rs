@@ -117,14 +117,14 @@ impl<'a> GetHeadSizeCtx<'a> {
             }
 
             pr::TyKind::Ident(ident) => {
-                if let Some(val) = self.cache.head_size_cache.get(&ident.name) {
+                if let Some(val) = self.cache.head_size_cache.get(ident.name()) {
                     *val
                 } else {
                     // if target of the ident has not yet been resolved, there are two cases:
                     // - resolution order is wrong (this results in an error for now),
                     // - the type is recursive, we need to check its validity
 
-                    let (is_recursive, enum_ptr) = self.validate_recursive_type(&ident.name)?;
+                    let (is_recursive, enum_ptr) = self.validate_recursive_type(ident.name())?;
                     if is_recursive {
                         if let Some((enum_name, variant_index)) = enum_ptr {
                             let entry = self
@@ -138,7 +138,7 @@ impl<'a> GetHeadSizeCtx<'a> {
                         32 // a pointer
                     } else {
                         return Err(Error::InvalidTypeReference {
-                            name: ident.name.clone(),
+                            name: ident.name().to_string(),
                         });
                     }
                 }

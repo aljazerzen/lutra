@@ -2,7 +2,7 @@ use enum_as_inner::EnumAsInner;
 use lutra_parser::generic;
 use std::collections::HashMap;
 
-use crate::pr::{GenericTypeParam, Ident, Literal, Span, Ty};
+use crate::pr::{GenericTypeParam, Literal, Path, Span, Ty};
 
 /// Expr is anything that has a value and thus a type.
 /// Most of these can contain other [Expr] themselves; literals should be [ExprKind::Literal].
@@ -34,7 +34,7 @@ pub struct Expr {
 
 #[derive(Debug, EnumAsInner, PartialEq, Clone, strum::AsRefStr)]
 pub enum ExprKind {
-    Ident(Ident),
+    Ident(Path),
     All {
         within: Box<Expr>,
         except: Box<Expr>,
@@ -127,8 +127,8 @@ impl From<Literal> for ExprKind {
     }
 }
 
-impl From<Ident> for ExprKind {
-    fn from(value: Ident) -> Self {
+impl From<Path> for ExprKind {
+    fn from(value: Path) -> Self {
         ExprKind::Ident(value)
     }
 }

@@ -7,15 +7,15 @@ use crate::Result;
 impl super::Resolver<'_> {
     /// Entry point to the resolver.
     /// fq_ident must point to an unresolved declaration.
-    pub fn resolve_decl(&mut self, fq_ident: Ident) -> Result<()> {
+    pub fn resolve_decl(&mut self, fq_ident: Path) -> Result<()> {
         if !fq_ident.starts_with_part(NS_STD) {
             log::debug!("resolving decl {fq_ident}");
         }
 
         // take decl out of the module
         let mut decl = {
-            let module = self.root_mod.module.get_submodule_mut(&fq_ident.path);
-            module.unwrap().names.remove(&fq_ident.name).unwrap()
+            let module = self.root_mod.module.get_submodule_mut(fq_ident.path());
+            module.unwrap().names.remove(fq_ident.name()).unwrap()
         };
         let stmt = decl.kind.into_unresolved().unwrap();
         self.debug_current_decl = fq_ident.clone();
@@ -36,7 +36,7 @@ impl super::Resolver<'_> {
 
                         // validate type
                         if expected_ty.is_some() {
-                            let who = || Some(fq_ident.name.clone());
+                            let who = || Some(fq_ident.name().to_string());
                             self.validate_expr_type(&mut def_value, expected_ty.as_ref(), &who)?;
                         }
 
@@ -50,7 +50,8 @@ impl super::Resolver<'_> {
                     }
                     None => {
                         // var value is not provided: treat this var as a param
-                        let mut expr = Box::new(Expr::new(ExprKind::Param(fq_ident.name.clone())));
+                        let mut expr =
+                            Box::new(Expr::new(ExprKind::Param(fq_ident.name().to_string())));
                         expr.ty = expected_ty;
                         DeclKind::Expr(expr)
                     }
@@ -64,7 +65,7 @@ impl super::Resolver<'_> {
                 };
 
                 let mut ty = fold_type_opt(self, Some(value))?.unwrap();
-                ty.name = Some(fq_ident.name.clone());
+                ty.name = Some(fq_ident.name().to_string());
 
                 decl.kind = DeclKind::Ty(ty);
             }
@@ -75,8 +76,11 @@ impl super::Resolver<'_> {
 
         // put decl back in
         {
-            let module = self.root_mod.module.get_submodule_mut(&fq_ident.path);
-            module.unwrap().names.insert(fq_ident.name, decl);
+            let module = self.root_mod.module.get_submodule_mut(fq_ident.path());
+            module
+                .unwrap()
+                .names
+                .insert(fq_ident.name().to_string(), decl);
         }
         Ok(())
     }

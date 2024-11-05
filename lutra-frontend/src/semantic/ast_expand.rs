@@ -9,7 +9,7 @@ use lutra_parser::generic;
 /// An AST pass that maps AST to PL.
 pub fn expand_expr(expr: pr::Expr) -> Result<pl::Expr> {
     let kind = match expr.kind {
-        pr::ExprKind::Ident(v) => pl::ExprKind::Ident(pr::Ident::from_name(v)),
+        pr::ExprKind::Ident(v) => pl::ExprKind::Ident(v),
         pr::ExprKind::Indirection {
             base,
             field: pr::IndirectionKind::Name(field),
@@ -181,7 +181,7 @@ fn expand_unary(pr::UnaryExpr { op, expr }: pr::UnaryExpr) -> Result<pl::ExprKin
                     "you can only use column names with self-equality operator",
                 ));
             };
-            if !ident.path.is_empty() {
+            if !ident.path().is_empty() {
                 return Err(Error::new_simple(
                     "you cannot use namespace prefix with self-equality operator",
                 ));
@@ -189,23 +189,23 @@ fn expand_unary(pr::UnaryExpr { op, expr }: pr::UnaryExpr) -> Result<pl::ExprKin
 
             let left = pl::Expr {
                 span: expr.span,
-                ..pl::Expr::new(pr::Ident {
-                    path: vec![NS_THIS.to_string()],
-                    name: ident.name.clone(),
-                })
+                ..pl::Expr::new(pr::Path::from_path(vec![
+                    NS_THIS.to_string(),
+                    ident.name().to_string(),
+                ]))
             };
             let right = pl::Expr {
                 span: expr.span,
-                ..pl::Expr::new(pr::Ident {
-                    path: vec![NS_THAT.to_string()],
-                    name: ident.name,
-                })
+                ..pl::Expr::new(pr::Path::from_path(vec![
+                    NS_THAT.to_string(),
+                    ident.name().to_string(),
+                ]))
             };
             return Ok(new_binop(left, &["std", "eq"], right).kind);
         }
     };
     Ok(pl::ExprKind::FuncCall(pl::FuncCall::new_simple(
-        pl::Expr::new(pr::Ident::from_path(func_name.to_vec())),
+        pl::Expr::new(pr::Path::from_path(func_name.to_vec())),
         vec![expr],
     )))
 }

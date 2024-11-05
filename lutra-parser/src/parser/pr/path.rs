@@ -1,76 +1,82 @@
 use std::fmt::Write;
 
-/// A name. Generally columns, tables, functions, variables.
+/// A name referring to a statement within the module tree.
 /// This is glorified way of writing a "vec with at least one element".
 #[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Clone)]
-pub struct Ident {
-    pub path: Vec<String>,
-    pub name: String,
+pub struct Path {
+    path: Vec<String>,
 }
 
-impl Ident {
+impl Path {
     pub fn from_name<S: ToString>(name: S) -> Self {
-        Ident {
-            path: Vec::new(),
-            name: name.to_string(),
+        Path {
+            path: vec![name.to_string()],
         }
     }
 
     /// Creates a new ident from a non-empty path.
     ///
     /// Panics if path is empty.
-    pub fn from_path<S: ToString>(mut path: Vec<S>) -> Self {
-        let name = path.pop().unwrap().to_string();
-        Ident {
+    pub fn from_path<S: ToString>(path: Vec<S>) -> Self {
+        Path {
             path: path.into_iter().map(|x| x.to_string()).collect(),
-            name,
         }
     }
 
+    pub fn name(&self) -> &str {
+        self.path.last().unwrap()
+    }
+
+    pub fn path(&self) -> &[String] {
+        &self.path[0..(self.len() - 1)]
+    }
+
     pub fn len(&self) -> usize {
-        self.path.len() + 1
+        self.path.len()
     }
 
     pub fn is_empty(&self) -> bool {
-        false
+        self.path.is_empty()
     }
 
     /// Remove last part of the ident.
     /// Result will generally refer to the parent of this ident.
-    pub fn pop(self) -> Option<Self> {
-        let mut path = self.path;
-        path.pop().map(|name| Ident { path, name })
+    pub fn pop(mut self) -> Option<Self> {
+        if self.is_empty() {
+            return None;
+        }
+        self.path.pop();
+        Some(self)
     }
 
-    pub fn pop_front(mut self) -> (String, Option<Ident>) {
+    pub fn pop_front(mut self) -> (String, Option<Path>) {
+        let first = self.path.remove(0);
         if self.path.is_empty() {
-            (self.name, None)
+            (first, None)
         } else {
-            let first = self.path.remove(0);
             (first, Some(self))
         }
     }
 
-    pub fn prepend(self, mut parts: Vec<String>) -> Ident {
+    pub fn prepend(self, mut parts: Vec<String>) -> Path {
         parts.extend(self);
-        Ident::from_path(parts)
+        Path::from_path(parts)
     }
 
     pub fn push(&mut self, name: String) {
-        self.path.push(std::mem::take(&mut self.name));
-        self.name = name;
+        self.path.push(name);
     }
 
     pub fn with_name<S: ToString>(mut self, name: S) -> Self {
-        self.name = name.to_string();
+        *self.path.last_mut().unwrap() = name.to_string();
         self
     }
 
     pub fn iter(&self) -> impl Iterator<Item = &String> {
-        self.path.iter().chain(std::iter::once(&self.name))
+        self.path.iter()
     }
 
-    pub fn starts_with(&self, prefix: &Ident) -> bool {
+    pub fn starts_with(&self, prefix: &Path) -> bool {
         if prefix.len() > self.len() {
             return false;
         }
@@ -96,45 +102,37 @@ impl Ident {
     }
 }
 
-impl std::fmt::Debug for Ident {
+impl std::fmt::Debug for Path {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_list()
-            .entries(&self.path)
-            .entry(&self.name)
-            .finish()
+        f.debug_list().entries(&self.path).finish()
     }
 }
 
-impl std::fmt::Display for Ident {
+impl std::fmt::Display for Path {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         display_ident(f, self)
     }
 }
 
-impl IntoIterator for Ident {
+impl IntoIterator for Path {
     type Item = String;
-    type IntoIter = std::iter::Chain<
-        std::vec::IntoIter<std::string::String>,
-        std::option::IntoIter<std::string::String>,
-    >;
+    type IntoIter = std::vec::IntoIter<std::string::String>;
 
     fn into_iter(self) -> Self::IntoIter {
-        self.path.into_iter().chain(Some(self.name))
+        self.path.into_iter()
     }
 }
 
-impl std::ops::Add<Ident> for Ident {
-    type Output = Ident;
+impl std::ops::Add<Path> for Path {
+    type Output = Path;
 
-    fn add(self, rhs: Ident) -> Self::Output {
-        Ident {
-            path: self.into_iter().chain(rhs.path).collect(),
-            name: rhs.name,
-        }
+    fn add(mut self, rhs: Path) -> Self::Output {
+        self.path.extend(rhs.path);
+        self
     }
 }
 
-pub fn display_ident(f: &mut std::fmt::Formatter, ident: &Ident) -> Result<(), std::fmt::Error> {
+pub fn display_ident(f: &mut std::fmt::Formatter, ident: &Path) -> Result<(), std::fmt::Error> {
     let mut path = &ident.path[..];
 
     // HACK: don't display `_local` prefix
@@ -142,11 +140,13 @@ pub fn display_ident(f: &mut std::fmt::Formatter, ident: &Ident) -> Result<(), s
     if path.first().map_or(false, |f| f == "_local") {
         path = &path[1..];
     }
-    for part in path {
+
+    for (index, part) in path.iter().enumerate() {
+        if index > 0 {
+            f.write_char('.')?;
+        }
         display_ident_part(f, part)?;
-        f.write_char('.')?;
     }
-    display_ident_part(f, &ident.name)?;
     Ok(())
 }
 

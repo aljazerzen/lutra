@@ -10,7 +10,7 @@
 
 pub use crate::pr::Literal;
 pub use crate::pr::QueryDef;
-pub use crate::pr::{BinOp, BinaryExpr, Ident, UnOp, UnaryExpr};
+pub use crate::pr::{BinOp, BinaryExpr, Path, UnOp, UnaryExpr};
 
 pub use self::expr::*;
 pub use self::extra::*;
