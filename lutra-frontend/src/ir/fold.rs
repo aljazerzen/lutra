@@ -5,8 +5,8 @@
 /// type.
 use itertools::Itertools;
 
-use super::*;
-use crate::pr::{Ty, TyFunc, TyKind, TyTupleField};
+use crate::pr;
+use crate::pr::*;
 use crate::Result;
 
 // Fold pattern:
@@ -21,7 +21,7 @@ use crate::Result;
 // we define a function outside the trait, by default call it, and let
 // implementors override the default while calling the function directly for
 // some cases. Ref https://stackoverflow.com/a/66077767/3064736
-pub trait PlFold {
+pub trait PrFold {
     fn fold_stmt(&mut self, mut stmt: Stmt) -> Result<Stmt> {
         stmt.kind = fold_stmt_kind(self, stmt.kind)?;
         Ok(stmt)
@@ -66,14 +66,14 @@ pub trait PlFold {
     }
 }
 
-pub fn fold_expr_kind<T: ?Sized + PlFold>(fold: &mut T, expr_kind: ExprKind) -> Result<ExprKind> {
+pub fn fold_expr_kind<T: ?Sized + PrFold>(fold: &mut T, expr_kind: ExprKind) -> Result<ExprKind> {
     use ExprKind::*;
     Ok(match expr_kind {
         Ident(ident) => Ident(ident),
-        All { within, except } => All {
-            within: Box::new(fold.fold_expr(*within)?),
-            except: Box::new(fold.fold_expr(*except)?),
-        },
+        // All { within, except } => All {
+        //     within: Box::new(fold.fold_expr(*within)?),
+        //     except: Box::new(fold.fold_expr(*except)?),
+        // },
         Indirection { base, field } => Indirection {
             base: Box::new(fold.fold_expr(*base)?),
             field,
@@ -96,22 +96,33 @@ pub fn fold_expr_kind<T: ?Sized + PlFold>(fold: &mut T, expr_kind: ExprKind) -> 
 
         FuncCall(func_call) => FuncCall(fold.fold_func_call(func_call)?),
         Func(func) => Func(Box::new(fold.fold_func(*func)?)),
-        FuncApplication(func_app) => FuncApplication(super::expr::FuncApplication {
-            func: Box::new(fold.fold_expr(*func_app.func)?),
-            args: fold.fold_exprs(func_app.args)?,
+        // FuncApplication(func_app) => FuncApplication(super::expr::FuncApplication {
+        //     func: Box::new(fold.fold_expr(*func_app.func)?),
+        //     args: fold.fold_exprs(func_app.args)?,
+        // }),
+        Pipeline(pipeline) => Pipeline(pr::Pipeline {
+            exprs: fold.fold_exprs(pipeline.exprs)?,
         }),
-
-        RqOperator { name, args } => RqOperator {
-            name,
-            args: fold.fold_exprs(args)?,
-        },
+        Range(range) => Range(pr::Range {
+            start: fold_optional_box(fold, range.start)?,
+            end: fold_optional_box(fold, range.end)?,
+        }),
+        Binary(e) => Binary(BinaryExpr {
+            left: Box::new(fold.fold_expr(*e.left)?),
+            op: e.op,
+            right: Box::new(fold.fold_expr(*e.right)?),
+        }),
+        Unary(e) => Unary(UnaryExpr {
+            op: e.op,
+            expr: Box::new(fold.fold_expr(*e.expr)?),
+        }),
 
         // None of these capture variables, so we don't need to fold them.
         Param(_) | Internal(_) | Literal(_) => expr_kind,
     })
 }
 
-pub fn fold_stmt_kind<T: ?Sized + PlFold>(fold: &mut T, stmt_kind: StmtKind) -> Result<StmtKind> {
+pub fn fold_stmt_kind<T: ?Sized + PrFold>(fold: &mut T, stmt_kind: StmtKind) -> Result<StmtKind> {
     use StmtKind::*;
     Ok(match stmt_kind {
         VarDef(var_def) => VarDef(fold.fold_var_def(var_def)?),
@@ -121,22 +132,23 @@ pub fn fold_stmt_kind<T: ?Sized + PlFold>(fold: &mut T, stmt_kind: StmtKind) -> 
     })
 }
 
-fn fold_module_def<F: ?Sized + PlFold>(fold: &mut F, module_def: ModuleDef) -> Result<ModuleDef> {
+fn fold_module_def<F: ?Sized + PrFold>(fold: &mut F, module_def: ModuleDef) -> Result<ModuleDef> {
     Ok(ModuleDef {
         name: module_def.name,
         stmts: fold.fold_stmts(module_def.stmts)?,
     })
 }
 
-pub fn fold_var_def<F: ?Sized + PlFold>(fold: &mut F, var_def: VarDef) -> Result<VarDef> {
-    Ok(VarDef {
+pub fn fold_var_def<F: ?Sized + PrFold>(fold: &mut F, var_def: VarDef) -> Result<VarDef> {
+    Ok(pr::VarDef {
         name: var_def.name,
+        kind: var_def.kind,
         value: fold_optional_box(fold, var_def.value)?,
         ty: var_def.ty.map(|x| fold.fold_type(x)).transpose()?,
     })
 }
 
-pub fn fold_range<F: ?Sized + PlFold>(fold: &mut F, Range { start, end }: Range) -> Result<Range> {
+pub fn fold_range<F: ?Sized + PrFold>(fold: &mut F, Range { start, end }: Range) -> Result<Range> {
     Ok(Range {
         start: fold_optional_box(fold, start)?,
         end: fold_optional_box(fold, end)?,
@@ -146,14 +158,14 @@ pub fn fold_range<F: ?Sized + PlFold>(fold: &mut F, Range { start, end }: Range)
 // This aren't strictly in the hierarchy, so we don't need to
 // have an assoc. function for `fold_optional_box` — we just
 // call out to the function in this module
-pub fn fold_optional_box<F: ?Sized + PlFold>(
+pub fn fold_optional_box<F: ?Sized + PrFold>(
     fold: &mut F,
     opt: Option<Box<Expr>>,
 ) -> Result<Option<Box<Expr>>> {
     Ok(opt.map(|n| fold.fold_expr(*n)).transpose()?.map(Box::from))
 }
 
-pub fn fold_interpolate_item<F: ?Sized + PlFold>(
+pub fn fold_interpolate_item<F: ?Sized + PrFold>(
     fold: &mut F,
     interpolate_item: InterpolateItem,
 ) -> Result<InterpolateItem> {
@@ -166,21 +178,21 @@ pub fn fold_interpolate_item<F: ?Sized + PlFold>(
     })
 }
 
-fn fold_cases<F: ?Sized + PlFold>(fold: &mut F, cases: Vec<SwitchCase>) -> Result<Vec<SwitchCase>> {
+fn fold_cases<F: ?Sized + PrFold>(fold: &mut F, cases: Vec<SwitchCase>) -> Result<Vec<SwitchCase>> {
     cases
         .into_iter()
         .map(|c| fold_switch_case(fold, c))
         .try_collect()
 }
 
-pub fn fold_switch_case<F: ?Sized + PlFold>(fold: &mut F, case: SwitchCase) -> Result<SwitchCase> {
+pub fn fold_switch_case<F: ?Sized + PrFold>(fold: &mut F, case: SwitchCase) -> Result<SwitchCase> {
     Ok(SwitchCase {
         condition: Box::new(fold.fold_expr(*case.condition)?),
         value: Box::new(fold.fold_expr(*case.value)?),
     })
 }
 
-pub fn fold_func_call<T: ?Sized + PlFold>(fold: &mut T, func_call: FuncCall) -> Result<FuncCall> {
+pub fn fold_func_call<T: ?Sized + PrFold>(fold: &mut T, func_call: FuncCall) -> Result<FuncCall> {
     Ok(FuncCall {
         name: Box::new(fold.fold_expr(*func_call.name)?),
         args: fold.fold_exprs(func_call.args)?,
@@ -192,7 +204,7 @@ pub fn fold_func_call<T: ?Sized + PlFold>(fold: &mut T, func_call: FuncCall) -> 
     })
 }
 
-pub fn fold_func<T: ?Sized + PlFold>(fold: &mut T, func: Func) -> Result<Func> {
+pub fn fold_func<T: ?Sized + PrFold>(fold: &mut T, func: Func) -> Result<Func> {
     Ok(Func {
         body: Box::new(fold.fold_expr(*func.body)?),
         return_ty: fold_type_opt(fold, func.return_ty)?,
@@ -202,7 +214,7 @@ pub fn fold_func<T: ?Sized + PlFold>(fold: &mut T, func: Func) -> Result<Func> {
     })
 }
 
-pub fn fold_func_param<T: ?Sized + PlFold>(
+pub fn fold_func_param<T: ?Sized + PrFold>(
     fold: &mut T,
     nodes: Vec<FuncParam>,
 ) -> Result<Vec<FuncParam>> {
@@ -219,11 +231,11 @@ pub fn fold_func_param<T: ?Sized + PlFold>(
 }
 
 #[inline]
-pub fn fold_type_opt<T: ?Sized + PlFold>(fold: &mut T, ty: Option<Ty>) -> Result<Option<Ty>> {
+pub fn fold_type_opt<T: ?Sized + PrFold>(fold: &mut T, ty: Option<Ty>) -> Result<Option<Ty>> {
     ty.map(|t| fold.fold_type(t)).transpose()
 }
 
-pub fn fold_type<T: ?Sized + PlFold>(fold: &mut T, ty: Ty) -> Result<Ty> {
+pub fn fold_type<T: ?Sized + PrFold>(fold: &mut T, ty: Ty) -> Result<Ty> {
     Ok(Ty {
         kind: match ty.kind {
             TyKind::Tuple(fields) => TyKind::Tuple(fold_ty_tuple_fields(fold, fields)?),
@@ -248,7 +260,7 @@ pub fn fold_type<T: ?Sized + PlFold>(fold: &mut T, ty: Ty) -> Result<Ty> {
     })
 }
 
-pub fn fold_ty_func<F: ?Sized + PlFold>(fold: &mut F, f: TyFunc) -> Result<TyFunc> {
+pub fn fold_ty_func<F: ?Sized + PrFold>(fold: &mut F, f: TyFunc) -> Result<TyFunc> {
     Ok(TyFunc {
         params: f
             .params
@@ -263,7 +275,7 @@ pub fn fold_ty_func<F: ?Sized + PlFold>(fold: &mut F, f: TyFunc) -> Result<TyFun
     })
 }
 
-pub fn fold_ty_tuple_fields<F: ?Sized + PlFold>(
+pub fn fold_ty_tuple_fields<F: ?Sized + PrFold>(
     fold: &mut F,
     fields: Vec<TyTupleField>,
 ) -> Result<Vec<TyTupleField>> {

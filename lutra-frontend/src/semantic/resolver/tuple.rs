@@ -2,15 +2,14 @@ use std::borrow::Cow;
 
 use itertools::Itertools;
 
-use crate::ir::pl::{Expr, ExprKind, IndirectionKind};
-use crate::pr::{Ty, TyKind};
+use crate::pr;
 use crate::{Error, Result, WithErrorInfo};
 
 // TODO: i'm not proud of the naming scheme in this file
 
-pub fn lookup_position_in_tuple(base: &Ty, position: usize) -> Result<Option<StepOwned>> {
+pub fn lookup_position_in_tuple(base: &pr::Ty, position: usize) -> Result<Option<StepOwned>> {
     // get base fields
-    let TyKind::Tuple(fields) = &base.kind else {
+    let pr::TyKind::Tuple(fields) = &base.kind else {
         return Ok(None);
     };
 
@@ -30,7 +29,7 @@ impl super::Resolver<'_> {
     /// Performs tuple indirection by name.
     pub fn lookup_name_in_tuple<'a>(
         &'a mut self,
-        ty: &'a Ty,
+        ty: &'a pr::Ty,
         name: &str,
     ) -> Result<Option<Vec<StepOwned>>> {
         log::debug!("looking up `.{name}` in {:?}", ty);
@@ -57,8 +56,8 @@ impl super::Resolver<'_> {
     }
 
     /// Find in fields of this tuple (including the unpack)
-    fn find_name_in_tuple<'a>(&'a self, ty: &'a Ty, name: &str) -> Vec<Vec<Step>> {
-        let TyKind::Tuple(fields) = &ty.kind else {
+    fn find_name_in_tuple<'a>(&'a self, ty: &'a pr::Ty, name: &str) -> Vec<Vec<Step>> {
+        let pr::TyKind::Tuple(fields) = &ty.kind else {
             return vec![];
         };
 
@@ -84,8 +83,8 @@ impl super::Resolver<'_> {
     }
 
     /// Find in this tuple (including the unpack)
-    fn find_name_in_tuple_direct<'a>(&'a self, ty: &'a Ty, name: &str) -> Option<Step<'a>> {
-        let TyKind::Tuple(fields) = &ty.kind else {
+    fn find_name_in_tuple_direct<'a>(&'a self, ty: &'a pr::Ty, name: &str) -> Option<Step<'a>> {
+        let pr::TyKind::Tuple(fields) = &ty.kind else {
             return None;
         };
 
@@ -104,14 +103,14 @@ impl super::Resolver<'_> {
     /// Utility function for wrapping an expression into additional indirections.
     /// For example, when we have `x.a`, but `x = {b = {a = int}}`, lookup will return steps `[b, a]`.
     /// This function converts `x` and `[b, a]` into `((x).b).a`.
-    pub fn apply_indirections(&mut self, mut base: Expr, steps: Vec<StepOwned>) -> Expr {
+    pub fn apply_indirections(&mut self, mut base: pr::Expr, steps: Vec<StepOwned>) -> pr::Expr {
         for step in steps {
-            base = Expr {
+            base = pr::Expr {
                 id: Some(self.id.gen()),
                 ty: Some(step.target_ty),
-                ..Expr::new(ExprKind::Indirection {
+                ..pr::Expr::new(pr::ExprKind::Indirection {
                     base: Box::new(base),
-                    field: IndirectionKind::Position(step.position as i64),
+                    field: pr::IndirectionKind::Position(step.position as i64),
                 })
             }
         }
@@ -123,16 +122,16 @@ impl super::Resolver<'_> {
 pub struct Step<'a> {
     position: usize,
     name: Option<&'a String>,
-    target_ty: Cow<'a, Ty>,
+    target_ty: Cow<'a, pr::Ty>,
 }
 
 impl<'a> Step<'a> {
     #[allow(dead_code)]
-    fn into_indirection(self) -> IndirectionKind {
+    fn into_indirection(self) -> pr::IndirectionKind {
         if let Some(name) = self.name {
-            IndirectionKind::Name(name.clone())
+            pr::IndirectionKind::Name(name.clone())
         } else {
-            IndirectionKind::Position(self.position as i64)
+            pr::IndirectionKind::Position(self.position as i64)
         }
     }
 
@@ -155,7 +154,7 @@ impl<'a> Step<'a> {
 #[derive(PartialEq)]
 pub struct StepOwned {
     position: usize,
-    target_ty: Ty,
+    target_ty: pr::Ty,
 }
 
 impl std::fmt::Debug for StepOwned {

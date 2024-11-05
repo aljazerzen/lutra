@@ -1,9 +1,9 @@
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 
 use itertools::Itertools;
 
-use crate::ir::pl::*;
-use crate::pr::{PrimitiveSet, Ty, TyFunc, TyKind, TyTupleField};
+use crate::ir::fold::{self, PrFold};
+use crate::pr::{self, *};
 use crate::Result;
 use crate::{Error, Reason, Span, WithErrorInfo};
 
@@ -52,7 +52,7 @@ impl Resolver<'_> {
             //     }
             // }
             TyKind::Tuple(fields) => Ty {
-                kind: TyKind::Tuple(fold_ty_tuple_fields(self, fields)?),
+                kind: TyKind::Tuple(fold::fold_ty_tuple_fields(self, fields)?),
                 ..ty
             },
             // TyKind::Exclude { base, except } => {
@@ -64,7 +64,7 @@ impl Resolver<'_> {
             //         ..ty
             //     }
             // }
-            _ => fold_type(self, ty)?,
+            _ => fold::fold_type(self, ty)?,
         })
     }
 
@@ -96,17 +96,17 @@ impl Resolver<'_> {
                 for field in fields {
                     let ty = self.infer_type(field)?.unwrap();
 
-                    if field.flatten {
-                        let ty = ty.clone();
-                        match ty.kind {
-                            TyKind::Tuple(inner_fields) => {
-                                ty_fields.extend(inner_fields);
-                            }
-                            _ => panic!(),
-                        }
+                    // if field.flatten {
+                    //     let ty = ty.clone();
+                    //     match ty.kind {
+                    //         TyKind::Tuple(inner_fields) => {
+                    //             ty_fields.extend(inner_fields);
+                    //         }
+                    //         _ => panic!(),
+                    //     }
 
-                        continue;
-                    }
+                    //     continue;
+                    // }
 
                     let name = field
                         .alias
@@ -146,16 +146,15 @@ impl Resolver<'_> {
                 TyKind::Array(Box::new(items_ty))
             }
 
-            ExprKind::All { within, except } => {
-                let Some(within_ty) = self.infer_type(within)? else {
-                    return Ok(None);
-                };
-                let Some(except_ty) = self.infer_type(except)? else {
-                    return Ok(None);
-                };
-                self.ty_tuple_exclusion(within_ty, except_ty)?
-            }
-
+            // ExprKind::All { within, except } => {
+            //     let Some(within_ty) = self.infer_type(within)? else {
+            //         return Ok(None);
+            //     };
+            //     let Some(except_ty) = self.infer_type(except)? else {
+            //         return Ok(None);
+            //     };
+            //     self.ty_tuple_exclusion(within_ty, except_ty)?
+            // }
             ExprKind::Case(cases) => {
                 let case_tys: Vec<Option<Ty>> = cases
                     .iter()
@@ -194,7 +193,7 @@ impl Resolver<'_> {
     /// Validates that found node has expected type. Returns assumed type of the node.
     pub fn validate_expr_type<F>(
         &mut self,
-        found: &mut Expr,
+        found: &mut pr::Expr,
         expected: Option<&Ty>,
         who: &F,
     ) -> Result<(), Error>
@@ -347,23 +346,23 @@ impl Resolver<'_> {
         }
     }
 
-    /// Instantiate generic type parameters into generic type arguments.
-    ///
-    /// When resolving a type of reference to a variable, we cannot just use the type
-    /// of the variable as the type of the reference. That's because the variable might contain
-    /// generic type arguments that need to differ between references to the same variable.
-    ///
-    /// For example:
-    /// ```prql
-    /// let plus_one = func <T> x<T> -> <T> x + 1
-    ///
-    /// let a = plus_one 1
-    /// let b = plus_one 1.5
-    /// ```
-    ///
-    /// Here, the first reference to `plus_one` must resolve with T=int and the second with T=float.
-    ///
-    /// This struct makes sure that distinct instanced of T are created from generic type param T.
+    // /// Instantiate generic type parameters into generic type arguments.
+    // ///
+    // /// When resolving a type of reference to a variable, we cannot just use the type
+    // /// of the variable as the type of the reference. That's because the variable might contain
+    // /// generic type arguments that need to differ between references to the same variable.
+    // ///
+    // /// For example:
+    // /// ```prql
+    // /// let plus_one = func <T> x<T> -> <T> x + 1
+    // ///
+    // /// let a = plus_one 1
+    // /// let b = plus_one 1.5
+    // /// ```
+    // ///
+    // /// Here, the first reference to `plus_one` must resolve with T=int and the second with T=float.
+    // ///
+    // /// This struct makes sure that distinct instanced of T are created from generic type param T.
     // pub fn instantiate_type(&mut self, ty: Ty, id: usize) -> Ty {
     //     let TyKind::Function(Some(ty_func)) = &ty.kind else {
     //         return ty;
@@ -399,69 +398,69 @@ impl Resolver<'_> {
     //     TypeReplacer::on_ty(ty, ident_mapping)
     // }
 
-    pub fn ty_tuple_exclusion(&self, base: Ty, except: Ty) -> Result<TyKind> {
-        let mask = self.ty_tuple_exclusion_mask(&base, &except)?;
+    // pub fn ty_tuple_exclusion(&self, base: Ty, except: Ty) -> Result<TyKind> {
+    //     let mask = self.ty_tuple_exclusion_mask(&base, &except)?;
 
-        let new_fields = itertools::zip_eq(base.kind.as_tuple().unwrap(), mask)
-            .filter(|(_, p)| *p)
-            .map(|(x, _)| x.clone())
-            .collect();
+    //     let new_fields = itertools::zip_eq(base.kind.as_tuple().unwrap(), mask)
+    //         .filter(|(_, p)| *p)
+    //         .map(|(x, _)| x.clone())
+    //         .collect();
 
-        Ok(TyKind::Tuple(new_fields))
-    }
+    //     Ok(TyKind::Tuple(new_fields))
+    // }
 
-    /// Computes the "field mask", which is a vector of booleans indicating if a field of
-    /// base tuple type should appear in the resulting type.
-    ///
-    /// Returns `None` if:
-    /// - base or exclude is a generic type argument, or
-    /// - either of the types contains Unpack.
-    pub fn ty_tuple_exclusion_mask(&self, base: &Ty, except: &Ty) -> Result<Vec<bool>> {
-        let within_fields = match &base.kind {
-            TyKind::Tuple(f) => f,
+    // /// Computes the "field mask", which is a vector of booleans indicating if a field of
+    // /// base tuple type should appear in the resulting type.
+    // ///
+    // /// Returns `None` if:
+    // /// - base or exclude is a generic type argument, or
+    // /// - either of the types contains Unpack.
+    // pub fn ty_tuple_exclusion_mask(&self, base: &Ty, except: &Ty) -> Result<Vec<bool>> {
+    //     let within_fields = match &base.kind {
+    //         TyKind::Tuple(f) => f,
 
-            // this is a generic, exclusion cannot be inlined
-            TyKind::Ident(_) => todo!(),
+    //         // this is a generic, exclusion cannot be inlined
+    //         TyKind::Ident(_) => todo!(),
 
-            _ => {
-                return Err(
-                    Error::new_simple("fields can only be excluded from a tuple")
-                        .with_span(base.span),
-                )
-            }
-        };
+    //         _ => {
+    //             return Err(
+    //                 Error::new_simple("fields can only be excluded from a tuple")
+    //                     .with_span(base.span),
+    //             )
+    //         }
+    //     };
 
-        let except_fields = match &except.kind {
-            TyKind::Tuple(f) => f,
+    //     let except_fields = match &except.kind {
+    //         TyKind::Tuple(f) => f,
 
-            // this is a generic, exclusion cannot be inlined
-            TyKind::Ident(_) => todo!(),
+    //         // this is a generic, exclusion cannot be inlined
+    //         TyKind::Ident(_) => todo!(),
 
-            _ => {
-                return Err(Error::new_simple("expected excluded fields to be a tuple")
-                    .with_span(except.span));
-            }
-        };
+    //         _ => {
+    //             return Err(Error::new_simple("expected excluded fields to be a tuple")
+    //                 .with_span(except.span));
+    //         }
+    //     };
 
-        let except_fields: HashSet<&String> = except_fields
-            .iter()
-            .map(|field| match &field.name {
-                Some(name) => Ok(name),
-                None => Err(Error::new_simple("excluded fields must be named")),
-            })
-            .collect::<Result<_>>()
-            .with_span(except.span)?;
+    //     let except_fields: HashSet<&String> = except_fields
+    //         .iter()
+    //         .map(|field| match &field.name {
+    //             Some(name) => Ok(name),
+    //             None => Err(Error::new_simple("excluded fields must be named")),
+    //         })
+    //         .collect::<Result<_>>()
+    //         .with_span(except.span)?;
 
-        let mut mask = Vec::new();
-        for field in within_fields {
-            if let Some(name) = &field.name {
-                mask.push(!except_fields.contains(&name));
-            } else {
-                mask.push(true);
-            }
-        }
-        Ok(mask)
-    }
+    //     let mut mask = Vec::new();
+    //     for field in within_fields {
+    //         if let Some(name) = &field.name {
+    //             mask.push(!except_fields.contains(&name));
+    //         } else {
+    //             mask.push(true);
+    //         }
+    //     }
+    //     Ok(mask)
+    // }
 }
 
 pub fn ty_tuple_kind(fields: Vec<TyTupleField>) -> TyKind {
@@ -532,12 +531,12 @@ impl TypeReplacer {
         TypeReplacer { mapping }.fold_type(ty).unwrap()
     }
 
-    pub fn on_func(func: Func, mapping: HashMap<Path, Ty>) -> Func {
+    pub fn on_func(func: pr::Func, mapping: HashMap<Path, Ty>) -> pr::Func {
         TypeReplacer { mapping }.fold_func(func).unwrap()
     }
 }
 
-impl PlFold for TypeReplacer {
+impl PrFold for TypeReplacer {
     fn fold_type(&mut self, mut ty: Ty) -> Result<Ty> {
         ty.kind = match ty.kind {
             TyKind::Ident(ident) => {
@@ -547,7 +546,7 @@ impl PlFold for TypeReplacer {
                     TyKind::Ident(ident)
                 }
             }
-            _ => return fold_type(self, ty),
+            _ => return fold::fold_type(self, ty),
         };
         Ok(ty)
     }

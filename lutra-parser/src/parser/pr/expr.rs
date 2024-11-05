@@ -17,6 +17,8 @@ impl Expr {
             span: None,
             alias: None,
             doc_comment: None,
+            ty: None,
+            id: None,
         }
     }
 }
@@ -32,6 +34,12 @@ pub struct Expr {
     pub span: Option<Span>,
 
     pub alias: Option<String>,
+
+    /// Type of expression this node represents.
+    /// [None] means that type should be inferred.
+    pub ty: Option<Ty>,
+
+    pub id: Option<usize>,
 
     pub doc_comment: Option<String>,
 }
@@ -84,6 +92,8 @@ impl ExprKind {
             kind: self,
             alias: None,
             doc_comment: None,
+            ty: None,
+            id: None,
         }
     }
 }
@@ -176,6 +186,12 @@ impl From<Literal> for ExprKind {
 impl From<Func> for ExprKind {
     fn from(value: Func) -> Self {
         ExprKind::Func(Box::new(value))
+    }
+}
+
+impl From<Path> for ExprKind {
+    fn from(value: Path) -> Self {
+        ExprKind::Ident(value)
     }
 }
 

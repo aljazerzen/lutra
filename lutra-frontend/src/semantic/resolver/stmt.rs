@@ -1,13 +1,13 @@
 use crate::ir::decl::DeclKind;
-use crate::ir::pl::*;
-use crate::pr::{Ty, TyKind};
+use crate::ir::fold::{self, PrFold};
+use crate::pr;
 use crate::semantic::NS_STD;
 use crate::Result;
 
 impl super::Resolver<'_> {
     /// Entry point to the resolver.
     /// fq_ident must point to an unresolved declaration.
-    pub fn resolve_decl(&mut self, fq_ident: &Path) -> Result<()> {
+    pub fn resolve_decl(&mut self, fq_ident: &pr::Path) -> Result<()> {
         if !fq_ident.starts_with_part(NS_STD) {
             log::debug!("resolving decl {fq_ident}");
         }
@@ -22,11 +22,11 @@ impl super::Resolver<'_> {
 
         // resolve
         match stmt {
-            StmtKind::ModuleDef(_) => {
+            pr::StmtKind::ModuleDef(_) => {
                 unreachable!("module def cannot be unresolved at this point")
                 // it should have been converted into Module in resolve_decls::init_module_tree
             }
-            StmtKind::VarDef(var_def) => {
+            pr::StmtKind::VarDef(var_def) => {
                 let def = self.fold_var_def(var_def)?;
                 let expected_ty = def.ty;
 
@@ -50,26 +50,27 @@ impl super::Resolver<'_> {
                     }
                     None => {
                         // var value is not provided: treat this var as a param
-                        let mut expr =
-                            Box::new(Expr::new(ExprKind::Param(fq_ident.name().to_string())));
+                        let mut expr = Box::new(pr::Expr::new(pr::ExprKind::Param(
+                            fq_ident.name().to_string(),
+                        )));
                         expr.ty = expected_ty;
                         DeclKind::Expr(expr)
                     }
                 };
             }
-            StmtKind::TypeDef(ty_def) => {
+            pr::StmtKind::TypeDef(ty_def) => {
                 let value = if let Some(value) = ty_def.value {
                     value
                 } else {
-                    Ty::new(TyKind::Tuple(vec![]))
+                    pr::Ty::new(pr::TyKind::Tuple(vec![]))
                 };
 
-                let mut ty = fold_type_opt(self, Some(value))?.unwrap();
+                let mut ty = fold::fold_type_opt(self, Some(value))?.unwrap();
                 ty.name = Some(fq_ident.name().to_string());
 
                 decl.kind = DeclKind::Ty(ty);
             }
-            StmtKind::ImportDef(target) => {
+            pr::StmtKind::ImportDef(target) => {
                 decl.kind = DeclKind::Import(target.name);
             }
         };

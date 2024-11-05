@@ -5,8 +5,8 @@ use enum_as_inner::EnumAsInner;
 use indexmap::IndexMap;
 use itertools::Itertools;
 
-use crate::ir::pl;
-use crate::pr::{self, Span, Ty};
+use crate::pr;
+use crate::Span;
 
 /// Context of the pipeline.
 #[derive(Default, Clone)]
@@ -14,7 +14,7 @@ pub struct RootModule {
     /// A tree of all accessible statements
     pub module: Module,
 
-    pub ordering: Vec<pl::Path>,
+    pub ordering: Vec<pr::Path>,
 
     pub span_map: HashMap<usize, Span>,
 }
@@ -34,7 +34,7 @@ pub struct Module {
     /// - because of redirect `std`, so we look for `average` in `std`,
     /// - there is `average` is `std`,
     /// - result of the lookup is FQ ident `std.average`.
-    pub redirects: Vec<pl::Path>,
+    pub redirects: Vec<pr::Path>,
 
     /// A declaration that has been shadowed (overwritten) by this module.
     pub shadowed: Option<Box<Decl>>,
@@ -53,7 +53,7 @@ pub struct Decl {
     /// 0 means that the order is irrelevant.
     pub order: usize,
 
-    pub annotations: Vec<pl::Annotation>,
+    pub annotations: Vec<pr::Annotation>,
 }
 
 /// Declaration kind.
@@ -64,13 +64,13 @@ pub enum DeclKind {
 
     /// A function parameter (usually the implicit `this` param)
     // TODO: make this type non-optional
-    Variable(Option<Ty>),
+    Variable(Option<pr::Ty>),
 
     TupleField,
 
-    Expr(Box<pl::Expr>),
+    Expr(Box<pr::Expr>),
 
-    Ty(Ty),
+    Ty(pr::Ty),
 
     /// Equivalent to the declaration pointed to by the fully qualified ident
     Import(pr::Path),
@@ -78,13 +78,7 @@ pub enum DeclKind {
     /// A declaration that has not yet been resolved.
     /// Created during the first pass of the AST, must not be present in
     /// a fully resolved module structure.
-    Unresolved(Option<pl::StmtKind>),
-}
-
-#[derive(Debug, PartialEq, Clone)]
-pub struct GenericParam {
-    pub domain: Vec<Ty>,
-    pub bounds: Vec<Ty>,
+    Unresolved(Option<pr::StmtKind>),
 }
 
 impl std::fmt::Debug for RootModule {

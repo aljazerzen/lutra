@@ -1,7 +1,7 @@
 use itertools::Itertools;
 
 use crate::ir::decl;
-use crate::ir::pl::{self, PlFold};
+use crate::ir::fold::{self, PrFold};
 use crate::semantic::NS_STD;
 use crate::{pr, utils};
 use crate::{Error, Result, WithErrorInfo};
@@ -10,7 +10,7 @@ use crate::{Error, Result, WithErrorInfo};
 ///
 /// Keeps track of all inter-declaration references.
 /// Returns a resolution order.
-pub fn resolve_decl_refs(root: &mut decl::RootModule) -> Result<Vec<pl::Path>> {
+pub fn resolve_decl_refs(root: &mut decl::RootModule) -> Result<Vec<pr::Path>> {
     // resolve inter-declaration references
     let refs = {
         let mut r = ModuleRefResolver {
@@ -32,7 +32,7 @@ pub fn resolve_decl_refs(root: &mut decl::RootModule) -> Result<Vec<pl::Path>> {
     // TODO: we might not need to compile all declarations if they are not used
     //   to prevent that, this start should be something else than None
     //   a list of all public declarations?
-    // let main = pl::Ident::from_name("main");
+    // let main = pr::Ident::from_name("main");
     let order = utils::toposort::<pr::Path>(&refs, None);
 
     if let Some(order) = order {
@@ -97,7 +97,7 @@ impl ModuleRefResolver<'_> {
             // filter out self-references
             r.refs.retain(|r| r.full_path() != path);
 
-            let decl_ident = pl::Path::from_path(path.clone());
+            let decl_ident = pr::Path::from_path(path.clone());
             self.refs.push((decl_ident, r.refs));
 
             let name = path.pop().unwrap();
@@ -124,22 +124,22 @@ impl ModuleRefResolver<'_> {
 struct NameResolver<'a> {
     root: &'a mut decl::RootModule,
     decl_module_path: &'a [String],
-    refs: Vec<pl::Path>,
+    refs: Vec<pr::Path>,
 }
 
 impl NameResolver<'_> {
-    fn fold_stmt_kind(&mut self, stmt: pl::StmtKind) -> Result<pl::StmtKind> {
+    fn fold_stmt_kind(&mut self, stmt: pr::StmtKind) -> Result<pr::StmtKind> {
         Ok(match stmt {
-            pl::StmtKind::VarDef(var_def) => pl::StmtKind::VarDef(self.fold_var_def(var_def)?),
-            pl::StmtKind::TypeDef(ty_def) => pl::StmtKind::TypeDef(self.fold_type_def(ty_def)?),
-            pl::StmtKind::ImportDef(import_def) => {
-                pl::StmtKind::ImportDef(self.fold_import_def(import_def)?)
+            pr::StmtKind::VarDef(var_def) => pr::StmtKind::VarDef(self.fold_var_def(var_def)?),
+            pr::StmtKind::TypeDef(ty_def) => pr::StmtKind::TypeDef(self.fold_type_def(ty_def)?),
+            pr::StmtKind::ImportDef(import_def) => {
+                pr::StmtKind::ImportDef(self.fold_import_def(import_def)?)
             }
-            pl::StmtKind::ModuleDef(_) => unreachable!(),
+            pr::StmtKind::ModuleDef(_) => unreachable!(),
         })
     }
 
-    fn fold_import_def(&mut self, import_def: pl::ImportDef) -> Result<pl::ImportDef, Error> {
+    fn fold_import_def(&mut self, import_def: pr::ImportDef) -> Result<pr::ImportDef, Error> {
         let (fq_ident, indirections) = self.resolve_ident(import_def.name)?;
         if !indirections.is_empty() {
             return Err(Error::new_simple(
@@ -150,34 +150,34 @@ impl NameResolver<'_> {
             log::debug!("resolved type ident to : {fq_ident:?} + {indirections:?}");
             return Err(Error::new_simple("invalid type name"));
         }
-        Ok(pl::ImportDef {
+        Ok(pr::ImportDef {
             name: pr::Path::from_path(fq_ident),
             alias: import_def.alias,
         })
     }
 }
 
-impl pl::PlFold for NameResolver<'_> {
-    fn fold_expr(&mut self, expr: pl::Expr) -> Result<pl::Expr> {
+impl fold::PrFold for NameResolver<'_> {
+    fn fold_expr(&mut self, expr: pr::Expr) -> Result<pr::Expr> {
         Ok(match expr.kind {
-            pl::ExprKind::Ident(ident) => {
+            pr::ExprKind::Ident(ident) => {
                 let (ident, indirections) = self.resolve_ident(ident).with_span(expr.span)?;
                 // TODO: can this ident have length 0?
 
-                let mut kind = pl::ExprKind::Ident(pr::Path::from_path(ident));
+                let mut kind = pr::ExprKind::Ident(pr::Path::from_path(ident));
                 for indirection in indirections {
-                    let mut e = pl::Expr::new(kind);
+                    let mut e = pr::Expr::new(kind);
                     e.span = expr.span;
-                    kind = pl::ExprKind::Indirection {
+                    kind = pr::ExprKind::Indirection {
                         base: Box::new(e),
-                        field: pl::IndirectionKind::Name(indirection),
+                        field: pr::IndirectionKind::Name(indirection),
                     };
                 }
 
-                pl::Expr { kind, ..expr }
+                pr::Expr { kind, ..expr }
             }
-            _ => pl::Expr {
-                kind: pl::fold_expr_kind(self, expr.kind)?,
+            _ => pr::Expr {
+                kind: fold::fold_expr_kind(self, expr.kind)?,
                 ..expr
             },
         })
@@ -205,7 +205,7 @@ impl pl::PlFold for NameResolver<'_> {
                     ..ty
                 }
             }
-            _ => pl::fold_type(self, ty)?,
+            _ => fold::fold_type(self, ty)?,
         })
     }
 }

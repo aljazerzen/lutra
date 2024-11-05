@@ -1,15 +1,16 @@
 use itertools::Itertools;
+use lutra_parser::pr;
 
 use crate::ir::decl::DeclKind;
-use crate::ir::pl::{self, *};
+use crate::ir::fold::{self, PrFold};
 use crate::pr::Ty;
 use crate::semantic::{NS_STD, NS_THIS};
 use crate::{Error, Result, Span, WithErrorInfo};
 
 use super::tuple::StepOwned;
 
-impl PlFold for super::Resolver<'_> {
-    fn fold_stmts(&mut self, _: Vec<Stmt>) -> Result<Vec<Stmt>> {
+impl fold::PrFold for super::Resolver<'_> {
+    fn fold_stmts(&mut self, _: Vec<pr::Stmt>) -> Result<Vec<pr::Stmt>> {
         unreachable!()
     }
 
@@ -17,9 +18,10 @@ impl PlFold for super::Resolver<'_> {
         self.fold_type_actual(ty)
     }
 
-    fn fold_var_def(&mut self, var_def: VarDef) -> Result<VarDef> {
-        Ok(VarDef {
+    fn fold_var_def(&mut self, var_def: pr::VarDef) -> Result<pr::VarDef> {
+        Ok(pr::VarDef {
             name: var_def.name,
+            kind: pr::VarDefKind::Let,
             value: match var_def.value {
                 Some(value) => Some(Box::new(self.fold_expr(*value)?)),
                 None => None,
@@ -28,8 +30,8 @@ impl PlFold for super::Resolver<'_> {
         })
     }
 
-    fn fold_expr(&mut self, node: pl::Expr) -> Result<pl::Expr> {
-        if node.id.is_some() && !matches!(node.kind, pl::ExprKind::Func(_)) {
+    fn fold_expr(&mut self, node: pr::Expr) -> Result<pr::Expr> {
+        if node.id.is_some() && !matches!(node.kind, pr::ExprKind::Func(_)) {
             return Ok(node);
         }
 
@@ -44,7 +46,7 @@ impl PlFold for super::Resolver<'_> {
         log::trace!("folding expr {node:?}");
 
         let r = match node.kind {
-            ExprKind::Ident(ident) => {
+            pr::ExprKind::Ident(ident) => {
                 log::debug!("resolving ident {ident:?}...");
 
                 let indirections = vec![];
@@ -58,8 +60,8 @@ impl PlFold for super::Resolver<'_> {
                     }
 
                     match &decl.kind {
-                        DeclKind::Variable(ty) => Expr {
-                            kind: ExprKind::Ident(ident),
+                        DeclKind::Variable(ty) => pr::Expr {
+                            kind: pr::ExprKind::Ident(ident),
                             ty: ty.clone(),
                             ..node
                         },
@@ -78,8 +80,8 @@ impl PlFold for super::Resolver<'_> {
                             // generics into current function scope
                             // let ty = self.instantiate_type(ty, id);
 
-                            Expr {
-                                kind: ExprKind::Ident(ident),
+                            pr::Expr {
+                                kind: pr::ExprKind::Ident(ident),
                                 ty: Some(ty),
                                 ..node
                             }
@@ -97,26 +99,26 @@ impl PlFold for super::Resolver<'_> {
                             )));
                         }
 
-                        _ => Expr {
-                            kind: ExprKind::Ident(ident),
+                        _ => pr::Expr {
+                            kind: pr::ExprKind::Ident(ident),
                             ..node
                         },
                     }
                 };
 
                 expr.id = expr.id.or(Some(id));
-                let flatten = expr.flatten;
-                expr.flatten = false;
+                // let flatten = expr.flatten;
+                // expr.flatten = false;
                 let alias = expr.alias.take();
 
                 let mut expr = self.apply_indirections(expr, indirections);
 
-                expr.flatten = flatten;
+                // expr.flatten = flatten;
                 expr.alias = alias;
                 expr
             }
 
-            ExprKind::Indirection { base, field } => {
+            pr::ExprKind::Indirection { base, field } => {
                 let base = self.fold_expr(*base)?;
 
                 let ty = base.ty.as_ref().unwrap();
@@ -124,7 +126,7 @@ impl PlFold for super::Resolver<'_> {
                 let steps = self.resolve_indirection(ty, &field).with_span(*span)?;
 
                 let expr = self.apply_indirections(base, steps);
-                Expr {
+                pr::Expr {
                     id: expr.id,
                     kind: expr.kind,
                     ty: expr.ty,
@@ -132,18 +134,18 @@ impl PlFold for super::Resolver<'_> {
                 }
             }
 
-            pl::ExprKind::FuncCall(pl::FuncCall { name, args, .. })
+            pr::ExprKind::FuncCall(pr::FuncCall { name, args, .. })
                 if (name.kind.as_ident()).map_or(false, |i| i.to_string() == "std.not")
-                    && matches!(args[0].kind, pl::ExprKind::Tuple(_)) =>
+                    && matches!(args[0].kind, pr::ExprKind::Tuple(_)) =>
             {
                 let arg = args.into_iter().exactly_one().unwrap();
                 self.resolve_column_exclusion(arg)?
             }
 
-            pl::ExprKind::FuncCall(pl::FuncCall {
+            pr::ExprKind::FuncCall(pr::FuncCall {
                 name,
                 args,
-                named_args,
+                named_args: _,
             }) => {
                 // fold function name
                 let old = self.in_func_call_name;
@@ -151,39 +153,37 @@ impl PlFold for super::Resolver<'_> {
                 let func = Box::new(self.fold_expr(*name)?);
                 self.in_func_call_name = old;
 
-                // convert to function application
-                let fn_app = self.apply_args_to_function(func, args, named_args)?;
-                self.resolve_func_application(fn_app, *span)?
+                self.resolve_func_application(func, args, *span)?
             }
 
-            ExprKind::Func(func) => {
+            pr::ExprKind::Func(func) => {
                 let func = self.resolve_func(func)?;
-                Expr {
-                    kind: ExprKind::Func(func),
+                pr::Expr {
+                    kind: pr::ExprKind::Func(func),
                     ..node
                 }
             }
 
-            pl::ExprKind::Tuple(exprs) => {
+            pr::ExprKind::Tuple(exprs) => {
                 let exprs = self.fold_exprs(exprs)?;
 
                 // flatten
                 let exprs = exprs
                     .into_iter()
                     .flat_map(|e| match e.kind {
-                        pl::ExprKind::Tuple(items) if e.flatten => items,
+                        // pr::ExprKind::Tuple(items) if e.flatten => items,
                         _ => vec![e],
                     })
                     .collect_vec();
 
-                pl::Expr {
-                    kind: pl::ExprKind::Tuple(exprs),
+                pr::Expr {
+                    kind: pr::ExprKind::Tuple(exprs),
                     ..node
                 }
             }
 
-            item => pl::Expr {
-                kind: pl::fold_expr_kind(self, item)?,
+            item => pr::Expr {
+                kind: fold::fold_expr_kind(self, item)?,
                 ..node
             },
         };
@@ -194,12 +194,12 @@ impl PlFold for super::Resolver<'_> {
 impl super::Resolver<'_> {
     fn finish_expr_resolve(
         &mut self,
-        expr: pl::Expr,
+        expr: pr::Expr,
         id: usize,
         alias: Option<String>,
         span: Option<Span>,
-    ) -> Result<pl::Expr> {
-        let mut r = Box::new(self.maybe_static_eval(expr)?);
+    ) -> Result<pr::Expr> {
+        let mut r = Box::new(expr);
 
         r.id = r.id.or(Some(id));
         r.alias = r.alias.or(alias);
@@ -220,14 +220,14 @@ impl super::Resolver<'_> {
                     // into:
                     //     _local.select {alias = _local.this} r
 
-                    let expr = Expr::new(ExprKind::FuncCall(FuncCall {
-                        name: Box::new(Expr::new(ExprKind::Ident(Path::from_path(vec![
-                            NS_STD, "select",
-                        ])))),
+                    let expr = pr::Expr::new(pr::ExprKind::FuncCall(pr::FuncCall {
+                        name: Box::new(pr::Expr::new(pr::ExprKind::Ident(pr::Path::from_path(
+                            vec![NS_STD, "select"],
+                        )))),
                         args: vec![
-                            Expr::new(ExprKind::Tuple(vec![Expr {
+                            pr::Expr::new(pr::ExprKind::Tuple(vec![pr::Expr {
                                 alias: Some(alias),
-                                ..Expr::new(Path::from_path(vec![NS_THIS]))
+                                ..pr::Expr::new(pr::Path::from_path(vec![NS_THIS]))
                             }])),
                             *r,
                         ],
@@ -241,14 +241,15 @@ impl super::Resolver<'_> {
         Ok(*r)
     }
 
-    pub fn resolve_column_exclusion(&mut self, expr: pl::Expr) -> Result<pl::Expr> {
+    pub fn resolve_column_exclusion(&mut self, expr: pr::Expr) -> Result<pr::Expr> {
         let expr = self.fold_expr(expr)?;
-        let except = self.coerce_into_tuple(expr)?;
+        let _except = self.coerce_into_tuple(expr)?;
 
-        self.fold_expr(Expr::new(ExprKind::All {
-            within: Box::new(Expr::new(Path::from_path(vec![NS_THIS]))),
-            except: Box::new(except),
-        }))
+        todo!()
+        // self.fold_expr(pr::Expr::new(pr::ExprKind::All {
+        //     within: Box::new(pr::Expr::new(pr::Path::from_path(vec![NS_THIS]))),
+        //     except: Box::new(except),
+        // }))
     }
 
     /// Resolve tuple indirections.
@@ -258,18 +259,21 @@ impl super::Resolver<'_> {
     pub fn resolve_indirection(
         &mut self,
         base: &Ty,
-        indirection: &IndirectionKind,
+        indirection: &pr::IndirectionKind,
     ) -> Result<Vec<StepOwned>> {
         match indirection {
-            IndirectionKind::Name(name) => self.lookup_name_in_tuple(base, name).and_then(|res| {
-                res.ok_or_else(|| Error::new_simple(format!("Unknown name {name}")))
-            }),
-            IndirectionKind::Position(pos) => {
+            pr::IndirectionKind::Name(name) => {
+                self.lookup_name_in_tuple(base, name).and_then(|res| {
+                    res.ok_or_else(|| Error::new_simple(format!("Unknown name {name}")))
+                })
+            }
+            pr::IndirectionKind::Position(pos) => {
                 let step = super::tuple::lookup_position_in_tuple(base, *pos as usize)?
                     .ok_or_else(|| Error::new_simple("Out of bounds"))?;
 
                 Ok(vec![step])
             }
+            pr::IndirectionKind::Star => todo!(),
         }
     }
 }

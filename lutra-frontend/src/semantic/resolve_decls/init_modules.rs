@@ -1,11 +1,11 @@
 use std::collections::HashMap;
 
 use crate::ir::decl;
-use crate::ir::pl;
+use crate::pr;
 use crate::utils::IdGenerator;
 use crate::Span;
 
-pub fn init_module_tree(root_module_def: pl::ModuleDef) -> decl::RootModule {
+pub fn init_module_tree(root_module_def: pr::ModuleDef) -> decl::RootModule {
     let mut root = decl::Module::new_root();
 
     let mut ctx = Context {
@@ -28,17 +28,17 @@ struct Context {
 }
 
 impl Context {
-    fn populate_module(&mut self, module: &mut decl::Module, stmts: Vec<pl::Stmt>) {
+    fn populate_module(&mut self, module: &mut decl::Module, stmts: Vec<pr::Stmt>) {
         for (index, stmt) in stmts.into_iter().enumerate() {
             let id = self.id.gen();
             if let Some(span) = stmt.span {
                 self.span_map.insert(id, span);
             }
 
-            let name = stmt.name().to_string();
+            let name = get_stmt_name(&stmt).to_string();
 
             let kind = match stmt.kind {
-                pl::StmtKind::ModuleDef(module_def) => {
+                pr::StmtKind::ModuleDef(module_def) => {
                     // init new module and recurse
                     let mut new_mod = decl::Module::default();
                     self.populate_module(&mut new_mod, module_def.stmts);
@@ -57,6 +57,17 @@ impl Context {
                 annotations: stmt.annotations,
             };
             module.names.insert(name, decl);
+        }
+    }
+}
+
+fn get_stmt_name(stmt: &pr::Stmt) -> &str {
+    match &stmt.kind {
+        pr::StmtKind::VarDef(pr::VarDef { name, .. }) => name,
+        pr::StmtKind::TypeDef(pr::TypeDef { name, .. }) => name,
+        pr::StmtKind::ModuleDef(pr::ModuleDef { name, .. }) => name,
+        pr::StmtKind::ImportDef(pr::ImportDef { name, alias }) => {
+            alias.as_deref().unwrap_or(name.name())
         }
     }
 }

@@ -1,6 +1,6 @@
 //! Semantic resolver (name resolution, type checking and lowering to RQ)
 
-pub mod ast_expand;
+pub mod desugar;
 mod module;
 mod resolve_decls;
 mod resolver;
@@ -9,7 +9,6 @@ use self::resolver::Resolver;
 
 use crate::compile::is_mod_def_for;
 use crate::ir::decl::RootModule;
-use crate::ir::pl::{self, ImportDef, ModuleDef, Stmt, StmtKind, TypeDef, VarDef};
 use crate::pr;
 use crate::Result;
 
@@ -18,7 +17,7 @@ pub fn resolve(module_tree: pr::ModuleDef) -> Result<RootModule> {
     // load_std_lib(&mut module_tree);
 
     // expand AST into PL
-    let root_module_def = ast_expand::expand_module_def(module_tree)?;
+    let root_module_def = desugar::run(module_tree);
 
     // init the module structure
     let mut root_module = resolve_decls::init_module_tree(root_module_def);
@@ -57,10 +56,10 @@ pub fn load_std_lib(module_tree: &mut pr::ModuleDef) {
     }
 }
 
-pub fn is_ident_or_func_call(expr: &pl::Expr, name: &pr::Path) -> bool {
+pub fn is_ident_or_func_call(expr: &pr::Expr, name: &pr::Path) -> bool {
     match &expr.kind {
-        pl::ExprKind::Ident(i) if i == name => true,
-        pl::ExprKind::FuncCall(pl::FuncCall { name: n_expr, .. })
+        pr::ExprKind::Ident(i) if i == name => true,
+        pr::ExprKind::FuncCall(pr::FuncCall { name: n_expr, .. })
             if n_expr.kind.as_ident().map_or(false, |i| i == name) =>
         {
             true
@@ -73,28 +72,6 @@ pub const NS_STD: &str = "std";
 pub const NS_THIS: &str = "this";
 pub const NS_MAIN: &str = "main";
 pub const NS_LOCAL: &str = "_local";
-
-impl Stmt {
-    pub fn new(kind: StmtKind) -> Stmt {
-        Stmt {
-            id: None,
-            kind,
-            span: None,
-            annotations: Vec::new(),
-        }
-    }
-
-    pub(crate) fn name(&self) -> &str {
-        match &self.kind {
-            StmtKind::VarDef(VarDef { name, .. }) => name,
-            StmtKind::TypeDef(TypeDef { name, .. }) => name,
-            StmtKind::ModuleDef(ModuleDef { name, .. }) => name,
-            StmtKind::ImportDef(ImportDef { name, alias }) => {
-                alias.as_deref().unwrap_or(name.name())
-            }
-        }
-    }
-}
 
 #[cfg(test)]
 pub mod test {

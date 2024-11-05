@@ -4,7 +4,6 @@ use crate::utils::IdGenerator;
 mod expr;
 mod functions;
 mod scope;
-mod static_eval;
 mod stmt;
 mod tuple;
 mod types;
@@ -55,7 +54,7 @@ pub(in crate::semantic) mod test {
     use crate::{Errors, Result};
     use insta::assert_yaml_snapshot;
 
-    use crate::ir::pl::{Expr, PlFold};
+    use crate::ir::fold::{Expr, PrFold};
     use crate::pr::Ty;
 
     pub fn erase_ids(expr: Expr) -> Expr {
@@ -64,7 +63,7 @@ pub(in crate::semantic) mod test {
 
     struct IdEraser {}
 
-    impl PlFold for IdEraser {
+    impl PrFold for IdEraser {
         fn fold_expr(&mut self, mut expr: Expr) -> Result<Expr> {
             expr.kind = self.fold_expr_kind(expr.kind)?;
             expr.id = None;

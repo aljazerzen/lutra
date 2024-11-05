@@ -1,7 +1,6 @@
 use indexmap::IndexMap;
 
 use crate::ir::decl::{Decl, DeclKind, Module, RootModule};
-use crate::ir::pl;
 use crate::pr;
 use crate::{Error, Result, Span};
 
@@ -193,7 +192,7 @@ type HintAndSpan = (Option<String>, Option<Span>);
 impl RootModule {
     /// Finds that main pipeline given a path to either main itself or its parent module.
     /// Returns main expr and fq ident of the decl.
-    pub fn find_main_rel(&self, path: &[String]) -> Result<(&pl::Expr, pr::Path), HintAndSpan> {
+    pub fn find_main_rel(&self, path: &[String]) -> Result<(&pr::Expr, pr::Path), HintAndSpan> {
         let (decl, ident) = self.find_main(path).map_err(|x| (x, None))?;
 
         let span = decl
@@ -258,7 +257,7 @@ impl RootModule {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::ir::pl;
+    use crate::ir::fold;
     use crate::pr::Literal;
 
     #[test]
@@ -266,7 +265,7 @@ mod tests {
         let mut module = Module::default();
 
         let ident = pr::Path::from_name("test_name");
-        let expr: pl::Expr = pl::Expr::new(pl::ExprKind::Literal(Literal::Integer(42)));
+        let expr: pr::Expr = pr::Expr::new(pr::ExprKind::Literal(Literal::Integer(42)));
         let decl: Decl = DeclKind::Expr(Box::new(expr)).into();
 
         module.insert(ident.clone(), decl.clone()).unwrap();
