@@ -1,7 +1,7 @@
 use enum_as_inner::EnumAsInner;
 use strum::AsRefStr;
 
-use crate::parser::pr::path::Path;
+use crate::pr::path::Path;
 use crate::span::Span;
 
 #[derive(Debug, Clone)]

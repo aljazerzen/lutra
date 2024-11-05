@@ -1,11 +1,11 @@
 use chumsky::prelude::*;
 
 use super::expr::{expr, expr_call, ident, pipeline};
-use super::{ctrl, ident_part, into_stmt, keyword, new_line, pipe, with_doc_comment};
+use super::{ctrl, ident_part, keyword, new_line, pipe};
 use crate::lexer::TokenKind;
 use crate::parser::perror::PError;
-use crate::parser::pr::*;
 use crate::parser::types::type_expr;
+use crate::pr::*;
 
 /// The top-level parser for a PRQL file
 pub fn source() -> impl Parser<TokenKind, Vec<Stmt>, Error = PError> {
@@ -56,14 +56,41 @@ fn module_contents() -> impl Parser<TokenKind, Vec<Stmt>, Error = PError> {
 
         // Currently doc comments need to be before the annotation; probably
         // should relax this?
-        with_doc_comment(
-            annotation
-                .repeated()
-                .then(stmt_kind)
-                .map_with_span(into_stmt),
-        )
-        .repeated()
+        (doc_comment().or_not())
+            .then(annotation.repeated())
+            .then(stmt_kind.map_with_span(into_stmt))
+            .map(|((doc_comment, annotations), mut inner)| {
+                inner.doc_comment = doc_comment;
+                inner.annotations = annotations;
+                inner
+            })
+            .repeated()
     })
+}
+
+fn into_stmt(kind: StmtKind, span: Span) -> Stmt {
+    Stmt {
+        kind,
+        span: Some(span),
+        annotations: vec![],
+        doc_comment: None,
+    }
+}
+
+fn doc_comment() -> impl Parser<TokenKind, String, Error = PError> + Clone {
+    // doc comments must start on a new line, so we enforce a new line (which
+    // can also be a file start) before the doc comment
+    //
+    // TODO: we currently lose any empty newlines between doc comments;
+    // eventually we want to retain or restrict them
+    (new_line().repeated().at_least(1).ignore_then(select! {
+        TokenKind::DocComment(dc) => dc,
+    }))
+    .repeated()
+    .at_least(1)
+    .collect()
+    .map(|lines: Vec<String>| lines.join("\n"))
+    .labelled("doc comment")
 }
 
 /// A variable definition could be any of:
@@ -129,4 +156,36 @@ fn import_def() -> impl Parser<TokenKind, StmtKind, Error = PError> + Clone {
         .then(ident())
         .map(|(alias, name)| StmtKind::ImportDef(ImportDef { name, alias }))
         .labelled("import statement")
+}
+
+#[cfg(test)]
+mod tests {
+    use insta::assert_debug_snapshot;
+
+    use super::*;
+    use crate::test::parse_with_parser;
+
+    #[test]
+    fn test_doc_comment() {
+        assert_debug_snapshot!(parse_with_parser(r#"
+        #! doc comment
+        #! another line
+
+        "#, doc_comment()), @r###"
+        Ok(
+            " doc comment\n another line",
+        )
+        "###);
+    }
+
+    #[test]
+    fn test_doc_comment_or_not() {
+        assert_debug_snapshot!(parse_with_parser(r#"hello"#, doc_comment().or_not()).unwrap(), @"None");
+        assert_debug_snapshot!(parse_with_parser(r#"hello"#, doc_comment().or_not().then_ignore(new_line().repeated()).then(ident_part())).unwrap(), @r###"
+        (
+            None,
+            "hello",
+        )
+        "###);
+    }
 }

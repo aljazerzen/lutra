@@ -58,8 +58,8 @@ pub trait PrFold {
     fn fold_func(&mut self, func: Func) -> Result<Func> {
         fold_func(self, func)
     }
-    fn fold_interpolate_item(&mut self, sstring_item: InterpolateItem) -> Result<InterpolateItem> {
-        fold_interpolate_item(self, sstring_item)
+    fn fold_interpolate_item(&mut self, inter: InterpolateItem) -> Result<InterpolateItem> {
+        fold_interpolate_item(self, inter)
     }
     fn fold_type(&mut self, t: Ty) -> Result<Ty> {
         fold_type(self, t)
@@ -80,12 +80,6 @@ pub fn fold_expr_kind<T: ?Sized + PrFold>(fold: &mut T, expr_kind: ExprKind) -> 
         },
         Tuple(items) => Tuple(fold.fold_exprs(items)?),
         Array(items) => Array(fold.fold_exprs(items)?),
-        SString(items) => SString(
-            items
-                .into_iter()
-                .map(|x| fold.fold_interpolate_item(x))
-                .try_collect()?,
-        ),
         FString(items) => FString(
             items
                 .into_iter()

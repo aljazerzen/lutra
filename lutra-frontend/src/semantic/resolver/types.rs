@@ -68,9 +68,9 @@ impl Resolver<'_> {
         })
     }
 
-    pub fn infer_type(&mut self, expr: &Expr) -> Result<Option<Ty>> {
+    pub fn infer_type(&mut self, expr: &Expr) -> Result<Ty> {
         if let Some(ty) = &expr.ty {
-            return Ok(Some(ty.clone()));
+            return Ok(ty.clone());
         }
 
         let kind = match &expr.kind {
@@ -85,16 +85,13 @@ impl Resolver<'_> {
                 Literal::Timestamp(_) => TyKind::Primitive(PrimitiveSet::Timestamp),
             },
 
-            ExprKind::Ident(_) | ExprKind::FuncCall(_) => return Ok(None),
-
-            ExprKind::SString(_) => return Ok(None),
             ExprKind::FString(_) => TyKind::Primitive(PrimitiveSet::Text),
 
             ExprKind::Tuple(fields) => {
                 let mut ty_fields: Vec<TyTupleField> = Vec::with_capacity(fields.len());
 
                 for field in fields {
-                    let ty = self.infer_type(field)?.unwrap();
+                    let ty = self.infer_type(field)?;
 
                     // if field.flatten {
                     //     let ty = ty.clone();
@@ -121,9 +118,7 @@ impl Resolver<'_> {
                 let mut variants = Vec::with_capacity(items.len());
                 for item in items {
                     let item_ty = self.infer_type(item)?;
-                    if let Some(item_ty) = item_ty {
-                        variants.push(item_ty);
-                    }
+                    variants.push(item_ty);
                 }
                 let items_ty = match variants.len() {
                     0 => {
@@ -156,19 +151,19 @@ impl Resolver<'_> {
             //     self.ty_tuple_exclusion(within_ty, except_ty)?
             // }
             ExprKind::Case(cases) => {
-                let case_tys: Vec<Option<Ty>> = cases
+                let case_tys: Vec<Ty> = cases
                     .iter()
                     .map(|c| self.infer_type(&c.value))
                     .try_collect()?;
 
-                let Some(inferred_ty) = case_tys.iter().find_map(|x| x.as_ref()) else {
+                let Some(inferred_ty) = case_tys.iter().next() else {
                     return Err(Error::new_simple(
                         "cannot infer type of any of the branches of this case statement",
                     )
                     .with_span(expr.span));
                 };
 
-                return Ok(Some(inferred_ty.clone()));
+                return Ok(inferred_ty.clone());
             }
 
             ExprKind::Func(func) => TyKind::Function(Some(TyFunc {
@@ -181,13 +176,21 @@ impl Resolver<'_> {
                 // generic_type_params: func.generic_type_params.clone(),
             })),
 
-            _ => return Ok(None),
+            ExprKind::Ident(_)
+            | ExprKind::FuncCall(_)
+            | ExprKind::Indirection { .. }
+            | ExprKind::Param(_)
+            | ExprKind::Pipeline(_) // desugar-ed
+            | ExprKind::Range(_) // desugar-ed
+            | ExprKind::Binary(_) // desugar-ed
+            | ExprKind::Unary(_) // desugar-ed
+            | ExprKind::Internal(_) => unreachable!(),
         };
-        Ok(Some(Ty {
+        Ok(Ty {
             kind,
             name: None,
             span: expr.span,
-        }))
+        })
     }
 
     /// Validates that found node has expected type. Returns assumed type of the node.

@@ -2,7 +2,7 @@ use chumsky::Parser;
 use insta::assert_debug_snapshot;
 use std::fmt::Debug;
 
-use crate::parser::pr::Stmt;
+use crate::pr::Stmt;
 use crate::parser::prepare_stream;
 use crate::parser::stmt;
 use crate::{error::Error, lexer::TokenKind, parser::perror::PError};

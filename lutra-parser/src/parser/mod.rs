@@ -1,16 +1,16 @@
 use chumsky::{prelude::*, Stream};
 
 use self::perror::PError;
-use self::pr::{Annotation, Stmt, StmtKind};
+
 use crate::error::Error;
 use crate::lexer;
 use crate::lexer::TokenKind;
+use crate::pr;
 use crate::span::Span;
 
 mod expr;
 mod interpolation;
 pub(crate) mod perror;
-pub mod pr;
 pub(crate) mod stmt;
 mod types;
 
@@ -90,51 +90,6 @@ fn ctrl(char: char) -> impl Parser<TokenKind, (), Error = PError> + Clone {
     just(TokenKind::Control(char)).ignored()
 }
 
-fn into_stmt((annotations, kind): (Vec<Annotation>, StmtKind), span: Span) -> Stmt {
-    Stmt {
-        kind,
-        span: Some(span),
-        annotations,
-        doc_comment: None,
-    }
-}
-
-fn doc_comment() -> impl Parser<TokenKind, String, Error = PError> + Clone {
-    // doc comments must start on a new line, so we enforce a new line (which
-    // can also be a file start) before the doc comment
-    //
-    // TODO: we currently lose any empty newlines between doc comments;
-    // eventually we want to retain or restrict them
-    (new_line().repeated().at_least(1).ignore_then(select! {
-        TokenKind::DocComment(dc) => dc,
-    }))
-    .repeated()
-    .at_least(1)
-    .collect()
-    .map(|lines: Vec<String>| lines.join("\n"))
-    .labelled("doc comment")
-}
-
-fn with_doc_comment<'a, P, O>(parser: P) -> impl Parser<TokenKind, O, Error = PError> + Clone + 'a
-where
-    P: Parser<TokenKind, O, Error = PError> + Clone + 'a,
-    O: SupportsDocComment + 'a,
-{
-    doc_comment()
-        .or_not()
-        .then(parser)
-        .map(|(doc_comment, inner)| inner.with_doc_comment(doc_comment))
-}
-
-/// Allows us to surround a parser by `with_doc_comment` and for a doc comment
-/// to be added to the result, as long as the result implements `SupportsDocComment`.
-///
-/// (In retrospect, we could manage without it, though probably not worth the
-/// effort to remove it. We could also use it to also support Span items.)
-trait SupportsDocComment {
-    fn with_doc_comment(self, doc_comment: Option<String>) -> Self;
-}
-
 /// Parse a sequence, allowing commas and new lines between items. Doesn't
 /// include the surrounding delimiters.
 fn sequence<'a, P, O>(parser: P) -> impl Parser<TokenKind, Vec<O>, Error = PError> + Clone + 'a
@@ -163,46 +118,4 @@ fn pipe() -> impl Parser<TokenKind, (), Error = PError> + Clone {
     ctrl('|')
         .ignored()
         .or(new_line().repeated().at_least(1).ignored())
-}
-
-#[cfg(test)]
-mod tests {
-    use insta::assert_debug_snapshot;
-
-    use super::*;
-    use crate::test::parse_with_parser;
-
-    #[test]
-    fn test_doc_comment() {
-        assert_debug_snapshot!(parse_with_parser(r#"
-        #! doc comment
-        #! another line
-
-        "#, doc_comment()), @r###"
-        Ok(
-            " doc comment\n another line",
-        )
-        "###);
-    }
-
-    #[test]
-    fn test_doc_comment_or_not() {
-        assert_debug_snapshot!(parse_with_parser(r#"hello"#, doc_comment().or_not()).unwrap(), @"None");
-        assert_debug_snapshot!(parse_with_parser(r#"hello"#, doc_comment().or_not().then_ignore(new_line().repeated()).then(ident_part())).unwrap(), @r###"
-        (
-            None,
-            "hello",
-        )
-        "###);
-    }
-
-    #[test]
-    fn test_no_doc_comment_in_with_doc_comment() {
-        impl SupportsDocComment for String {
-            fn with_doc_comment(self, _doc_comment: Option<String>) -> Self {
-                self
-            }
-        }
-        assert_debug_snapshot!(parse_with_parser(r#"hello"#, with_doc_comment(new_line().ignore_then(ident_part()))).unwrap(), @r###""hello""###);
-    }
 }

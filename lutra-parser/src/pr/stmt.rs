@@ -3,9 +3,8 @@ use std::collections::HashMap;
 use enum_as_inner::EnumAsInner;
 use semver::VersionReq;
 
-use crate::parser::pr::path::Path;
-use crate::parser::pr::{Expr, Ty};
-use crate::parser::SupportsDocComment;
+use crate::pr::path::Path;
+use crate::pr::{Expr, Ty};
 use crate::span::Span;
 
 #[derive(Debug, PartialEq, Eq, Clone, Default)]
@@ -29,15 +28,6 @@ pub struct Stmt {
     pub annotations: Vec<Annotation>,
 
     pub doc_comment: Option<String>,
-}
-
-impl SupportsDocComment for Stmt {
-    fn with_doc_comment(self, doc_comment: Option<String>) -> Self {
-        Stmt {
-            doc_comment,
-            ..self
-        }
-    }
 }
 
 #[derive(Debug, EnumAsInner, PartialEq, Clone)]

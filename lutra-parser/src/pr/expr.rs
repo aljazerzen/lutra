@@ -2,11 +2,11 @@ use std::collections::HashMap;
 
 use enum_as_inner::EnumAsInner;
 
+use crate::generic;
 use crate::lexer::Literal;
-use crate::parser::pr::ops::{BinOp, UnOp};
-use crate::parser::pr::Ty;
+use crate::pr::ops::{BinOp, UnOp};
+use crate::pr::Ty;
 use crate::span::Span;
-use crate::{generic, parser::SupportsDocComment};
 
 use super::Path;
 
@@ -16,7 +16,6 @@ impl Expr {
             kind: kind.into(),
             span: None,
             alias: None,
-            doc_comment: None,
             ty: None,
             id: None,
         }
@@ -40,17 +39,6 @@ pub struct Expr {
     pub ty: Option<Ty>,
 
     pub id: Option<usize>,
-
-    pub doc_comment: Option<String>,
-}
-
-impl SupportsDocComment for Expr {
-    fn with_doc_comment(self, doc_comment: Option<String>) -> Self {
-        Self {
-            doc_comment,
-            ..self
-        }
-    }
 }
 
 #[derive(Debug, EnumAsInner, PartialEq, Clone, strum::AsRefStr)]
@@ -73,7 +61,6 @@ pub enum ExprKind {
     Unary(UnaryExpr),
     FuncCall(FuncCall),
     Func(Box<Func>),
-    SString(Vec<InterpolateItem>),
     FString(Vec<InterpolateItem>),
     Case(Vec<SwitchCase>),
 
@@ -91,7 +78,6 @@ impl ExprKind {
             span: Some(span),
             kind: self,
             alias: None,
-            doc_comment: None,
             ty: None,
             id: None,
         }

@@ -206,10 +206,7 @@ impl super::Resolver<'_> {
         r.span = r.span.or(span);
 
         if r.ty.is_none() {
-            r.ty = self.infer_type(&r)?;
-        }
-        if r.ty.is_none() {
-            panic!("cannot infer type: {r:?}");
+            r.ty = Some(self.infer_type(&r)?);
         }
         if let Some(ty) = &mut r.ty {
             if ty.is_relation() {

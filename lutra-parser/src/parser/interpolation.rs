@@ -3,7 +3,7 @@ use itertools::Itertools;
 
 use crate::lexer::{Literal, TokenKind};
 use crate::parser::perror::{ChumError, PError};
-use crate::parser::pr::*;
+use crate::pr::*;
 use crate::span::{string_stream, Span};
 
 /// Parses interpolated strings

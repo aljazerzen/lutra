@@ -6,9 +6,9 @@ use itertools::Itertools;
 use crate::lexer::{Literal, TokenKind};
 use crate::parser::interpolation;
 use crate::parser::perror::PError;
-use crate::parser::pr::*;
 use crate::parser::types::type_expr;
-use crate::parser::{ctrl, ident_part, keyword, new_line, sequence, with_doc_comment};
+use crate::parser::{ctrl, ident_part, keyword, new_line, sequence};
+use crate::pr::*;
 use crate::span::Span;
 
 use super::pipe;
@@ -34,11 +34,9 @@ pub(crate) fn expr() -> impl Parser<TokenKind, Expr, Error = PError> + Clone {
             .map(|x| x.to_string())
             .map(ExprKind::Internal);
 
-        let nested_expr = with_doc_comment(
-            lambda_func(expr.clone())
-                .or(func_call(expr.clone()))
-                .boxed(),
-        );
+        let nested_expr = lambda_func(expr.clone())
+            .or(func_call(expr.clone()))
+            .boxed();
 
         let tuple = tuple(nested_expr.clone());
         let array = array(nested_expr.clone());
@@ -50,23 +48,21 @@ pub(crate) fn expr() -> impl Parser<TokenKind, Expr, Error = PError> + Clone {
 
         let param = select! { TokenKind::Param(id) => ExprKind::Param(id) };
 
-        let term = with_doc_comment(
-            choice((
-                literal,
-                internal,
-                tuple,
-                array,
-                interpolation,
-                ident_kind,
-                case,
-                param,
-            ))
-            .map_with_span(ExprKind::into_expr)
-            // No longer used given the TODO in `pipeline`; can remove if we
-            // don't resolve.
-            // .or(aliased(expr.clone()))
-            .or(pipeline_expr),
-        )
+        let term = choice((
+            literal,
+            internal,
+            tuple,
+            array,
+            interpolation,
+            ident_kind,
+            case,
+            param,
+        ))
+        .map_with_span(ExprKind::into_expr)
+        // No longer used given the TODO in `pipeline`; can remove if we
+        // don't resolve.
+        // .or(aliased(expr.clone()))
+        .or(pipeline_expr)
         .boxed();
 
         let term = field_lookup(term);
@@ -126,7 +122,6 @@ fn array<'a>(
 
 fn interpolation() -> impl Parser<TokenKind, ExprKind, Error = PError> + Clone {
     select! {
-        TokenKind::Interpolation('s', string) => (ExprKind::SString as fn(_) -> _, string),
         TokenKind::Interpolation('f', string) => (ExprKind::FString as fn(_) -> _, string),
     }
     .validate(
@@ -257,7 +252,7 @@ where
     // TODO: do we need the `maybe_aliased` here rather than in `expr`? We had
     // tried `with_doc_comment(expr)` in #4775 (and push an aliased expr into
     // `expr`) but couldn't get it work.
-    with_doc_comment(maybe_aliased(expr))
+    maybe_aliased(expr)
         .separated_by(pipe())
         .at_least(1)
         .map_with_span(|exprs, span| {
