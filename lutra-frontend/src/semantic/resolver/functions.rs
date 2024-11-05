@@ -4,7 +4,6 @@ use std::collections::HashMap;
 use crate::ir::decl::{Decl, DeclKind};
 use crate::ir::pl::*;
 use crate::pr::{Ty, TyFunc};
-use crate::semantic::{write_pl, NS_LOCAL};
 use crate::{Error, Result, Span, WithErrorInfo};
 
 use super::scope::Scope;
@@ -420,8 +419,6 @@ impl Resolver<'_> {
 }
 
 fn extract_partial_application(mut func: FuncApplication, position: usize) -> Result<Box<Func>> {
-    dbg!(&func);
-
     // Input:
     // Func {
     //     params: [x, y, z],
@@ -463,15 +460,13 @@ fn extract_partial_application(mut func: FuncApplication, position: usize) -> Re
 
     let arg = func.args.get_mut(position).unwrap();
     let ExprKind::FuncApplication(arg_func) = &mut arg.kind else {
-        return Err(Error::new_assert("expected func application")
-            .push_hint(format!("got: {}", write_pl(arg.clone()))));
+        return Err(
+            Error::new_assert("expected func application").push_hint(format!("got: {:?}", arg))
+        );
     };
 
     let param_name = format!("_partial_{}", arg.id.unwrap());
-    let substitute_arg = Expr::new(Path::from_path(vec![
-        NS_LOCAL.to_string(),
-        param_name.clone(),
-    ]));
+    let substitute_arg = Expr::new(Path::from_path(vec![param_name.clone()]));
     arg_func.args.push(substitute_arg);
 
     // set the arg func body to the parent func

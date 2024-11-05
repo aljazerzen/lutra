@@ -4,7 +4,7 @@ mod print_pretty;
 mod print_source;
 
 use crate::{Error, Result};
-use lutra_parser::pr;
+use lutra_frontend::pr;
 
 #[derive(Clone, Debug)]
 pub enum Value {

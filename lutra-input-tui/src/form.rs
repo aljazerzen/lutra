@@ -3,7 +3,7 @@ mod r#enum;
 mod text;
 mod tuple;
 
-use lutra_parser::pr::{self, PrimitiveSet, Ty};
+use lutra_frontend::pr;
 use ratatui::prelude::*;
 use std::borrow::Cow;
 
@@ -16,7 +16,7 @@ use self::tuple::TupleForm;
 
 pub struct Form {
     pub name: FormName,
-    pub ty: Ty,
+    pub ty: pr::Ty,
     pub kind: FormKind,
     pub focus: bool,
 }
@@ -29,9 +29,9 @@ pub enum FormKind {
 }
 
 impl Form {
-    pub fn new(ty: &Ty, name: FormName) -> Self {
+    pub fn new(ty: &pr::Ty, name: FormName) -> Self {
         let kind: FormKind = match &ty.kind {
-            pr::TyKind::Primitive(PrimitiveSet::Text) => {
+            pr::TyKind::Primitive(pr::PrimitiveSet::Text) => {
                 FormKind::Text(TextForm::new(String::new()))
             }
             pr::TyKind::Primitive(_) => todo!(),

@@ -7,7 +7,7 @@ use crate::Result;
 impl super::Resolver<'_> {
     /// Entry point to the resolver.
     /// fq_ident must point to an unresolved declaration.
-    pub fn resolve_decl(&mut self, fq_ident: Path) -> Result<()> {
+    pub fn resolve_decl(&mut self, fq_ident: &Path) -> Result<()> {
         if !fq_ident.starts_with_part(NS_STD) {
             log::debug!("resolving decl {fq_ident}");
         }
@@ -15,9 +15,9 @@ impl super::Resolver<'_> {
         // take decl out of the module
         let mut decl = {
             let module = self.root_mod.module.get_submodule_mut(fq_ident.path());
-            module.unwrap().names.remove(fq_ident.name()).unwrap()
+            module.unwrap().names.shift_remove(fq_ident.name()).unwrap()
         };
-        let stmt = decl.kind.into_unresolved().unwrap();
+        let stmt = decl.kind.into_unresolved().unwrap().unwrap();
         self.debug_current_decl = fq_ident.clone();
 
         // resolve

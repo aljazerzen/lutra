@@ -7,9 +7,9 @@ rust-version.workspace = true
 version.workspace = true
 
 [dependencies]
-lutra-parser = { path = "../lutra-parser" }
 lutra-bin = { path = "../lutra-bin" }
 lutra-typed-data = { path = "../lutra-typed-data" }
+lutra-frontend = { path = "../lutra-frontend" }
 
 [build-dependencies]
 lutra-codegen = { path = "../lutra-codegen" }

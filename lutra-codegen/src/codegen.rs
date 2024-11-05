@@ -1,43 +1,36 @@
 use std::{borrow::Cow, fmt::Write};
 
 use lutra_bin::layout;
-use lutra_parser::pr;
+use lutra_frontend::decl;
+use lutra_frontend::pr;
 
 pub fn codegen(source: &str) -> Result<String, std::fmt::Error> {
-    let (stmts, errs) = lutra_parser::parse_source(source, 0);
-    if !errs.is_empty() {
-        for err in errs {
-            eprintln!("{err}");
-        }
-        panic!();
-    }
-    let mut stmts = stmts.unwrap();
+    let source = lutra_frontend::SourceTree::single("".into(), source.into());
+    let project = lutra_frontend::compile(source, lutra_frontend::CompileParams {}).unwrap();
 
     let mut w = String::new();
     writeln!(w, "use std::io::Write;\n")?;
 
     let mut ctx = Context::default();
 
-    for stmt in &mut stmts {
-        match &mut stmt.kind {
-            pr::StmtKind::VarDef(_) => todo!(),
-            pr::StmtKind::ModuleDef(_) => todo!(),
-            pr::StmtKind::ImportDef(_) => todo!(),
-            pr::StmtKind::TypeDef(ty_def) => {
-                infer_names(ty_def);
+    for path in &project.root_module.ordering {
+        let mut decl = project.root_module.module.get(path).unwrap().clone();
 
-                let ty = ty_def.value.as_ref().unwrap();
+        match &mut decl.kind {
+            decl::DeclKind::Ty(ty) => {
+                infer_names(path.name(), ty);
 
                 // run layout ahead of time to resolve recursive references
                 layout::get_head_size(ty, &mut ctx.cache).unwrap();
 
                 write_ty_def(&mut w, ty, &mut ctx)?;
             }
+            _ => {}
         }
 
         while !ctx.def_buffer.is_empty() {
             let ty = ctx.def_buffer.remove(0);
-            write_ty_def(&mut w, ty, &mut ctx)?;
+            write_ty_def(&mut w, &ty, &mut ctx)?;
         }
     }
     Ok(w)
@@ -45,10 +38,9 @@ pub fn codegen(source: &str) -> Result<String, std::fmt::Error> {
 
 /// Types might not have names, because they are defined inline.
 /// This function traverses a type definition and generates names for all of the types.
-fn infer_names(ty_def: &mut pr::TypeDef) {
-    let ty = ty_def.value.as_mut().unwrap();
+fn infer_names(stmt_name: &str, ty: &mut pr::Ty) {
     if ty.name.is_none() {
-        ty.name = Some(ty_def.name.clone());
+        ty.name = Some(stmt_name.to_string());
     }
 
     let mut name_prefix = Vec::new();
@@ -94,9 +86,9 @@ fn infer_names_re(ty: &mut pr::Ty, name_prefix: &mut Vec<String>) {
 }
 
 #[derive(Default)]
-struct Context<'t> {
+struct Context {
     /// Buffer for types that need their definitions generated.
-    def_buffer: Vec<&'t pr::Ty>,
+    def_buffer: Vec<pr::Ty>,
 
     cache: layout::LayoutCache,
 }
@@ -105,7 +97,7 @@ struct Context<'t> {
 fn write_ty_def<'t>(
     w: &mut impl Write,
     ty: &'t pr::Ty,
-    ctx: &mut Context<'t>,
+    ctx: &mut Context,
 ) -> Result<(), std::fmt::Error> {
     let name = ty.name.as_ref().unwrap();
 
@@ -179,7 +171,7 @@ fn write_ty_ref<'t>(
     w: &mut impl Write,
     ty: &'t pr::Ty,
     as_expr: bool,
-    ctx: &mut Context<'t>,
+    ctx: &mut Context,
 ) -> Result<(), std::fmt::Error> {
     match &ty.kind {
         pr::TyKind::Primitive(pr::PrimitiveSet::Int) => {
@@ -209,7 +201,7 @@ fn write_ty_ref<'t>(
         }
 
         pr::TyKind::Tuple(_) | pr::TyKind::Enum(_) => {
-            ctx.def_buffer.push(ty);
+            ctx.def_buffer.push(ty.clone());
 
             let name = ty.name.as_ref().unwrap();
             write!(w, "{name}")?;
@@ -226,7 +218,7 @@ fn write_ty_ref<'t>(
 fn write_ty_def_impl<'t>(
     w: &mut impl Write,
     ty: &'t pr::Ty,
-    ctx: &mut Context<'t>,
+    ctx: &mut Context,
 ) -> Result<(), std::fmt::Error> {
     let name = ty.name.as_ref().unwrap();
 

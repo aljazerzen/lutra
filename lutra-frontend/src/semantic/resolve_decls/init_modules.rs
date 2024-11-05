@@ -17,6 +17,7 @@ pub fn init_module_tree(root_module_def: pl::ModuleDef) -> decl::RootModule {
 
     decl::RootModule {
         module: root,
+        ordering: Vec::new(), // computed later
         span_map: ctx.span_map,
     }
 }
@@ -46,7 +47,7 @@ impl Context {
                 }
                 kind => {
                     // insert "DeclKind::Unresolved"
-                    decl::DeclKind::Unresolved(kind)
+                    decl::DeclKind::Unresolved(Some(kind))
                 }
             };
             let decl = decl::Decl {

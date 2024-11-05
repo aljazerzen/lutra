@@ -2,6 +2,7 @@ use std::collections::HashMap;
 use std::fmt::Debug;
 
 use enum_as_inner::EnumAsInner;
+use indexmap::IndexMap;
 use itertools::Itertools;
 
 use crate::ir::pl;
@@ -10,8 +11,10 @@ use crate::pr::{self, Span, Ty};
 /// Context of the pipeline.
 #[derive(Default, Clone)]
 pub struct RootModule {
-    /// Map of all accessible names (for each namespace)
+    /// A tree of all accessible statements
     pub module: Module,
+
+    pub ordering: Vec<pl::Path>,
 
     pub span_map: HashMap<usize, Span>,
 }
@@ -19,7 +22,7 @@ pub struct RootModule {
 #[derive(Default, PartialEq, Clone)]
 pub struct Module {
     /// Names declared in this module. This is the important thing.
-    pub names: HashMap<String, Decl>,
+    pub names: IndexMap<String, Decl>,
 
     /// List of relative paths to include in search path when doing lookup in
     /// this module.
@@ -75,7 +78,7 @@ pub enum DeclKind {
     /// A declaration that has not yet been resolved.
     /// Created during the first pass of the AST, must not be present in
     /// a fully resolved module structure.
-    Unresolved(pl::StmtKind),
+    Unresolved(Option<pl::StmtKind>),
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -111,7 +114,7 @@ impl std::fmt::Debug for Module {
     }
 }
 
-struct DebugNames<'a>(&'a HashMap<String, Decl>);
+struct DebugNames<'a>(&'a IndexMap<String, Decl>);
 
 impl<'a> std::fmt::Debug for DebugNames<'a> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {

@@ -9,5 +9,5 @@ version.workspace = true
 
 
 [dependencies]
-lutra-parser = { path = "../lutra-parser" }
+lutra-frontend = { path = "../lutra-frontend" }
 lutra-bin = { path = "../lutra-bin" }

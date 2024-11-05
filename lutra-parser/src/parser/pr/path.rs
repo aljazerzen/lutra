@@ -17,7 +17,7 @@ impl Path {
     /// Creates a new ident from a non-empty path.
     ///
     /// Panics if path is empty.
-    pub fn from_path<S: ToString>(path: Vec<S>) -> Self {
+    pub fn from_path<S: ToString, I: IntoIterator<Item = S>>(path: I) -> Self {
         Path {
             path: path.into_iter().map(|x| x.to_string()).collect(),
         }
@@ -29,6 +29,10 @@ impl Path {
 
     pub fn path(&self) -> &[String] {
         &self.path[0..(self.len() - 1)]
+    }
+
+    pub fn full_path(&self) -> &[String] {
+        &self.path
     }
 
     pub fn len(&self) -> usize {
@@ -49,12 +53,11 @@ impl Path {
         Some(self)
     }
 
-    pub fn pop_front(mut self) -> (String, Option<Path>) {
-        let first = self.path.remove(0);
+    pub fn pop_front(&mut self) -> Option<String> {
         if self.path.is_empty() {
-            (first, None)
+            None
         } else {
-            (first, Some(self))
+            Some(self.path.remove(0))
         }
     }
 

@@ -7,6 +7,6 @@ rust-version.workspace = true
 version.workspace = true
 
 [dependencies]
-lutra-parser = { path = "../lutra-parser" }
+lutra-frontend = { path = "../lutra-frontend" }
 tabular = "0.2.0"
 thiserror = {workspace = true}

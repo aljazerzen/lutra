@@ -2,7 +2,7 @@ use itertools::Itertools;
 
 use crate::ir::decl;
 use crate::ir::pl::{self, PlFold};
-use crate::semantic::{NS_LOCAL, NS_STD, NS_THIS};
+use crate::semantic::NS_STD;
 use crate::{pr, utils};
 use crate::{Error, Result, WithErrorInfo};
 
@@ -73,12 +73,14 @@ impl ModuleRefResolver<'_> {
 
         for name in unresolved_decls {
             // take the decl out of the module tree
-            let mut decl = {
+            let (stmt, declared_at) = {
                 let submodule = self.root.module.get_submodule_mut(path).unwrap();
-                submodule.names.remove(&name).unwrap()
+                let decl = submodule.names.get_mut(&name).unwrap();
+                let unresolved = decl.kind.as_unresolved_mut().unwrap();
+
+                (unresolved.take().unwrap(), decl.declared_at)
             };
-            let span = decl
-                .declared_at
+            let span = declared_at
                 .and_then(|x| self.root.span_map.get(&x))
                 .cloned();
 
@@ -90,9 +92,10 @@ impl ModuleRefResolver<'_> {
                 refs: Vec::new(),
             };
 
-            let stmt = decl.kind.into_unresolved().unwrap();
             let stmt = r.fold_stmt_kind(stmt).with_span_fallback(span)?;
-            decl.kind = decl::DeclKind::Unresolved(stmt);
+
+            // filter out self-references
+            r.refs.retain(|r| r.full_path() != path);
 
             let decl_ident = pl::Path::from_path(path.clone());
             self.refs.push((decl_ident, r.refs));
@@ -102,7 +105,9 @@ impl ModuleRefResolver<'_> {
             // put the decl back in
             {
                 let submodule = self.root.module.get_submodule_mut(path).unwrap();
-                submodule.names.insert(name, decl);
+                let decl = submodule.names.get_mut(&name).unwrap();
+                let unresolved = decl.kind.as_unresolved_mut().unwrap();
+                *unresolved = Some(stmt);
             };
         }
 
@@ -211,90 +216,51 @@ impl NameResolver<'_> {
         // this is the name we are looking for
         let first = ident.iter().next().unwrap();
         let mod_path = match first.as_str() {
-            "project" => Some(vec![]),
-            "module" => Some(self.decl_module_path.to_vec()),
+            "project" => {
+                ident.pop_front();
+                vec![]
+            }
+            "module" => {
+                ident.pop_front();
+                self.decl_module_path.to_vec()
+            }
             "super" => {
+                ident.pop_front();
+
                 let mut path = self.decl_module_path.to_vec();
                 path.pop();
-                Some(path)
+                path
             }
 
-            NS_STD => Some(vec![NS_STD.to_string()]),
-            NS_THIS => Some(vec![NS_LOCAL.to_string(), NS_THIS.to_string()]),
-
-            // transforms
-            "from" |
-            "select" |
-            "filter" |
-            "derive" |
-            "aggregate" |
-            "sort" |
-            "take" |
-            "join" |
-            "group" |
-            "window" |
-            "append" |
-            "intersect" |
-            "remove" |
-            "loop" |
-            // agg
-            "min" |
-            "max" |
-            "sum" |
-            "average" |
-            "stddev" |
-            "all" |
-            "any" |
-            "concat_array" |
-            "count" |
-            "count_distinct" |
-            "lag" |
-            "lead" |
-            "first" |
-            "last" |
-            "rank" |
-            "rank_dense" |
-            "row_number" |
-            // utils
-            "in" |
-            "as" => {
-                ident = ident.prepend(vec![NS_STD.to_string()]);
-                Some(vec![NS_STD.to_string()])
+            NS_STD => {
+                ident.pop_front();
+                vec![NS_STD.to_string()]
             }
 
-            _ => None,
+            _ => self.decl_module_path.to_vec(),
         };
-        let mod_decl = mod_path
-            .as_ref()
-            .and_then(|p| self.root.module.get_submodule_mut(p));
+        let mod_decl = self.root.module.get_submodule_mut(&mod_path);
 
-        // let decl = find_lookup_base(&self.root.module, self.decl_module_path, name);
         Ok(if let Some(module) = mod_decl {
-            let mod_path = mod_path.unwrap();
             // module found
 
             // now find the decl within that module
-            if let Some(ident_within) = ident.pop_front().1 {
-                let (path, indirections) = module_lookup(module, ident_within)?;
+            let (path, indirections) = module_lookup(module, ident)?;
 
-                // prepend the ident with the module path
-                // this will make this ident a fully-qualified ident
-                let mut fq_ident = mod_path;
-                fq_ident.extend(path);
+            // prepend the ident with the module path
+            // this will make this ident a fully-qualified ident
+            let mut fq_ident = mod_path;
+            fq_ident.extend(path);
 
-                self.refs.push(pr::Path::from_path(fq_ident.clone()));
+            self.refs.push(pr::Path::from_path(fq_ident.clone()));
 
-                (fq_ident, indirections)
-            } else {
-                // there is no inner ident - we return the fq path to the module
-                (mod_path, vec![])
-            }
+            (fq_ident, indirections)
         } else {
             // cannot find module, so this must be a ref to a local var + indirections
             let mut steps = ident.into_iter();
             let first = steps.next().unwrap();
             let indirections = steps.collect_vec();
-            (vec![NS_LOCAL.to_string(), first], indirections)
+            (vec![first], indirections)
         })
     }
 }

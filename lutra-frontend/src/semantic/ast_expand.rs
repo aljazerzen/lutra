@@ -2,8 +2,7 @@ use itertools::Itertools;
 
 use crate::ir::pl::{self, new_binop};
 use crate::pr;
-use crate::semantic::{NS_THAT, NS_THIS};
-use crate::{Error, Result};
+use crate::Result;
 use lutra_parser::generic;
 
 /// An AST pass that maps AST to PL.
@@ -174,35 +173,7 @@ fn expand_unary(pr::UnaryExpr { op, expr }: pr::UnaryExpr) -> Result<pl::ExprKin
     let func_name = match op {
         Neg => ["std", "neg"],
         Not => ["std", "not"],
-        Add => return Ok(expr.kind),
-        EqSelf => {
-            let pl::ExprKind::Ident(ident) = expr.kind else {
-                return Err(Error::new_simple(
-                    "you can only use column names with self-equality operator",
-                ));
-            };
-            if !ident.path().is_empty() {
-                return Err(Error::new_simple(
-                    "you cannot use namespace prefix with self-equality operator",
-                ));
-            }
-
-            let left = pl::Expr {
-                span: expr.span,
-                ..pl::Expr::new(pr::Path::from_path(vec![
-                    NS_THIS.to_string(),
-                    ident.name().to_string(),
-                ]))
-            };
-            let right = pl::Expr {
-                span: expr.span,
-                ..pl::Expr::new(pr::Path::from_path(vec![
-                    NS_THAT.to_string(),
-                    ident.name().to_string(),
-                ]))
-            };
-            return Ok(new_binop(left, &["std", "eq"], right).kind);
-        }
+        Pos => return Ok(expr.kind),
     };
     Ok(pl::ExprKind::FuncCall(pl::FuncCall::new_simple(
         pl::Expr::new(pr::Path::from_path(func_name.to_vec())),

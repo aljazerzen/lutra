@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use indexmap::IndexMap;
 
 use crate::ir::decl::{Decl, DeclKind, Module, RootModule};
 use crate::ir::pl;
@@ -8,18 +8,11 @@ use crate::{Error, Result, Span};
 use super::{NS_MAIN, NS_STD};
 
 impl Module {
-    pub fn singleton<S: ToString>(name: S, entry: Decl) -> Module {
-        Module {
-            names: HashMap::from([(name.to_string(), entry)]),
-            ..Default::default()
-        }
-    }
-
-    pub fn new_root() -> Module {
+    pub(crate) fn new_root() -> Module {
         // Each module starts with a default namespace that contains a wildcard
         // and the standard library.
         Module {
-            names: HashMap::from([(NS_STD.to_string(), Decl::from(DeclKind::default()))]),
+            names: IndexMap::from([(NS_STD.to_string(), Decl::from(DeclKind::default()))]),
             shadowed: None,
             redirects: vec![],
         }
@@ -29,11 +22,12 @@ impl Module {
         if fq_ident.path().is_empty() {
             Ok(self.names.insert(fq_ident.name().to_string(), decl))
         } else {
-            let (top_level, remaining) = fq_ident.pop_front();
+            let mut fq_ident = fq_ident.into_iter();
+            let top_level = fq_ident.next().unwrap();
             let entry = self.names.entry(top_level).or_default();
 
             if let DeclKind::Module(inner) = &mut entry.kind {
-                inner.insert(remaining.unwrap(), decl)
+                inner.insert(pr::Path::from_path(fq_ident), decl)
             } else {
                 Err(Error::new_simple(
                     "path does not resolve to a module or a table",
@@ -109,7 +103,7 @@ impl Module {
     }
 
     pub fn shadow(&mut self, ident: &str) {
-        let shadowed = self.names.remove(ident).map(Box::new);
+        let shadowed = self.names.shift_remove(ident).map(Box::new);
         let entry = DeclKind::Module(Module {
             shadowed,
             ..Default::default()
@@ -118,7 +112,7 @@ impl Module {
     }
 
     pub fn unshadow(&mut self, ident: &str) {
-        if let Some(entry) = self.names.remove(ident) {
+        if let Some(entry) = self.names.shift_remove(ident) {
             let ns = entry.kind.into_module().unwrap();
 
             if let Some(shadowed) = ns.shadowed {
@@ -127,13 +121,17 @@ impl Module {
         }
     }
 
-    pub fn as_decls(&self) -> Vec<(pr::Path, &Decl)> {
+    pub fn get_decls(&self) -> Vec<(&String, &Decl)> {
+        self.names.iter().collect()
+    }
+
+    pub fn as_flat_decls(&self) -> Vec<(pr::Path, &Decl)> {
         let mut r = Vec::new();
         for (name, decl) in &self.names {
             match &decl.kind {
                 DeclKind::Module(module) => r.extend(
                     module
-                        .as_decls()
+                        .as_flat_decls()
                         .into_iter()
                         .map(|(inner, decl)| (pr::Path::from_name(name) + inner, decl)),
                 ),

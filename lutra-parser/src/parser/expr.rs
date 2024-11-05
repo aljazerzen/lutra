@@ -545,14 +545,13 @@ pub(crate) fn ident() -> impl Parser<TokenKind, Path, Error = PError> + Clone {
     ident_part()
         .separated_by(just(TokenKind::PathSep))
         .at_least(1)
-        .map(Path::from_path::<String>)
+        .map(Path::from_path::<String, Vec<String>>)
 }
 
 fn operator_unary() -> impl Parser<TokenKind, UnOp, Error = PError> + Clone {
-    (ctrl('+').to(UnOp::Add))
+    (ctrl('+').to(UnOp::Pos))
         .or(ctrl('-').to(UnOp::Neg))
         .or(ctrl('!').to(UnOp::Not))
-        .or(just(TokenKind::Eq).to(UnOp::EqSelf))
 }
 fn operator_pow() -> impl Parser<TokenKind, BinOp, Error = PError> + Clone {
     just(TokenKind::Pow).to(BinOp::Pow)

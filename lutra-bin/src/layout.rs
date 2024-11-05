@@ -3,7 +3,7 @@ use std::{
     ops::Mul,
 };
 
-use lutra_parser::pr;
+use lutra_frontend::pr;
 
 use crate::{Error, Result};
 
@@ -67,7 +67,7 @@ impl LayoutCache {
     }
 }
 
-pub fn get_head_size(ty: &pr::Ty, cache: &mut LayoutCache) -> Result<usize> {
+pub fn get_head_size<'t>(ty: &pr::Ty, cache: &mut LayoutCache) -> Result<usize> {
     let mut ctx = GetHeadSizeCtx::new(cache);
     ctx.get(ty)
 }

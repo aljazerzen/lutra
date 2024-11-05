@@ -1,4 +1,4 @@
-use lutra_parser::pr::{self, TyTupleField};
+use lutra_frontend::pr;
 
 use crate::Value;
 
@@ -46,7 +46,7 @@ pub trait ValueVisitor {
     fn visit_tuple(
         &mut self,
         fields: &[Value],
-        ty_fields: &[TyTupleField],
+        ty_fields: &[pr::TyTupleField],
     ) -> Result<Self::Res, crate::Error>;
 
     fn visit_array(

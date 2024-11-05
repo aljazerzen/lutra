@@ -3,7 +3,7 @@ mod schema {
 }
 
 use lutra_bin::{Decode, Encode, Result, Value};
-use lutra_parser::pr;
+use lutra_frontend::pr;
 use schema::TyEnumItems;
 
 pub fn decode_typed_data(buffer: &[u8]) -> Result<(Value, pr::Ty)> {

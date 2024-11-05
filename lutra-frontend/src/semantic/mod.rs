@@ -14,8 +14,8 @@ use crate::pr;
 use crate::Result;
 
 /// Runs semantic analysis on the query.
-pub fn resolve(mut module_tree: pr::ModuleDef) -> Result<RootModule> {
-    load_std_lib(&mut module_tree);
+pub fn resolve(module_tree: pr::ModuleDef) -> Result<RootModule> {
+    // load_std_lib(&mut module_tree);
 
     // expand AST into PL
     let root_module_def = ast_expand::expand_module_def(module_tree)?;
@@ -29,14 +29,16 @@ pub fn resolve(mut module_tree: pr::ModuleDef) -> Result<RootModule> {
     // resolve
     let mut resolver = Resolver::new(&mut root_module);
 
-    for decl_fq in resolution_order {
+    for decl_fq in &resolution_order {
         resolver.resolve_decl(decl_fq)?;
     }
 
+    root_module.ordering = resolution_order;
     Ok(root_module)
 }
 
 /// Preferred way of injecting std module.
+#[allow(dead_code)]
 pub fn load_std_lib(module_tree: &mut pr::ModuleDef) {
     if !module_tree.stmts.iter().any(|s| is_mod_def_for(s, NS_STD)) {
         log::debug!("loading std.prql");
@@ -69,7 +71,6 @@ pub fn is_ident_or_func_call(expr: &pl::Expr, name: &pr::Path) -> bool {
 
 pub const NS_STD: &str = "std";
 pub const NS_THIS: &str = "this";
-pub const NS_THAT: &str = "that";
 pub const NS_MAIN: &str = "main";
 pub const NS_LOCAL: &str = "_local";
 
@@ -95,12 +96,6 @@ impl Stmt {
     }
 }
 
-/// Write a PL IR to string.
-///
-/// Because PL needs to be restricted back to AST, ownerships of expr is required.
-pub fn write_pl(expr: pl::Expr) -> String {
-    format!("{expr:?}")
-}
 #[cfg(test)]
 pub mod test {
     use insta::assert_yaml_snapshot;

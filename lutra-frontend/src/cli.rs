@@ -21,7 +21,7 @@ fn main() {
 
 mod inner {
     use clap::{Parser, Subcommand};
-    use lutra::DiscoverParams;
+    use lutra_frontend::DiscoverParams;
 
     #[derive(Parser)]
     pub struct Command {
@@ -42,7 +42,7 @@ mod inner {
     }
 
     pub fn discover_and_print(cmd: DiscoverCommand) -> anyhow::Result<()> {
-        let project = lutra::discover(cmd.discover)?;
+        let project = lutra_frontend::discover(cmd.discover)?;
 
         println!("{project}");
         Ok(())

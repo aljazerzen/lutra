@@ -1,4 +1,4 @@
-use lutra_parser::pr;
+use lutra_frontend::pr;
 use ratatui::{
     layout::{Offset, Rect},
     style::Stylize,

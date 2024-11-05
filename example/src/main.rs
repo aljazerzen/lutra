@@ -5,7 +5,7 @@ mod schema {
 use std::collections::HashMap;
 
 use lutra_bin::{Decode, Encode, Value};
-use lutra_parser::pr;
+use lutra_frontend::pr;
 
 fn main() {
     let schema_source = include_str!("schema.lt");
@@ -259,14 +259,16 @@ fn main() {
 }
 
 fn parse_types(source: &str) -> HashMap<String, pr::Ty> {
-    let (stmts, _errs) = lutra_parser::parse_source(source, 0);
+    let source = lutra_frontend::SourceTree::single("".into(), source.into());
+
+    let project = lutra_frontend::compile(source, lutra_frontend::CompileParams {}).unwrap();
 
     let mut res = HashMap::new();
-    for stmt in stmts.unwrap() {
-        if let pr::StmtKind::TypeDef(ty_def) = stmt.kind {
-            let mut ty = ty_def.value.unwrap();
-            ty.name = Some(ty_def.name.clone());
-            res.insert(ty_def.name, ty);
+    for (name, decl) in project.root_module.module.get_decls() {
+        if let lutra_frontend::decl::DeclKind::Ty(ty) = &decl.kind {
+            let mut ty = ty.clone();
+            ty.name = Some(name.clone());
+            res.insert(name.clone(), ty);
         }
     }
     res

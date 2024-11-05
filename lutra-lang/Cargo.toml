@@ -8,4 +8,4 @@ version.workspace = true
 
 [dependencies]
 lutra-bin = { path = "../lutra-bin" }
-lutra-parser = { path = "../lutra-parser" }
+lutra-frontend = { path = "../lutra-frontend" }

@@ -1,5 +1,5 @@
 [package]
-name = "lutra"
+name = "lutra-frontend"
 
 edition.workspace = true
 license.workspace = true

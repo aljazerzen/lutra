@@ -1,4 +1,4 @@
-use lutra_parser::pr;
+use lutra_frontend::pr;
 
 mod interpreter;
 mod ir;
@@ -121,13 +121,11 @@ fn get_ty() -> pr::Ty {
         type t = {[float], [int], int}
     "#;
 
-    let (stmts, _errs) = lutra_parser::parse_source(source, 0);
-    let stmt = stmts.unwrap().into_iter().next().unwrap();
+    let source = lutra_frontend::SourceTree::single("".into(), source.into());
+    let project = lutra_frontend::compile(source, lutra_frontend::CompileParams {}).unwrap();
 
-    let type_def = stmt.kind.into_type_def().unwrap();
+    let name = pr::Path::from_name("t");
+    let type_def = project.root_module.module.get(&name);
 
-    let mut ty = type_def.value.unwrap();
-
-    ty.name = Some(type_def.name);
-    ty
+    type_def.unwrap().kind.as_ty().unwrap().clone()
 }

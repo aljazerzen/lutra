@@ -3,11 +3,9 @@ pub enum UnOp {
     #[strum(to_string = "-")]
     Neg,
     #[strum(to_string = "+")]
-    Add, // TODO: rename to Pos
+    Pos,
     #[strum(to_string = "!")]
     Not,
-    #[strum(to_string = "==")]
-    EqSelf,
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy, Hash, strum::Display, strum::EnumString)]

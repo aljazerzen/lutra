@@ -2,7 +2,6 @@ use std::collections::{HashMap, HashSet};
 
 use itertools::Itertools;
 
-use crate::ir::decl::DeclKind;
 use crate::ir::pl::*;
 use crate::pr::{PrimitiveSet, Ty, TyFunc, TyKind, TyTupleField};
 use crate::Result;
@@ -12,46 +11,46 @@ use super::Resolver;
 
 impl Resolver<'_> {
     /// Visit a type in the main resolver pass. It will:
-    /// - resolve [TyKind::Ident] to material types (expect for the ones that point to generic type arguments),
+    /// - resolve [TyKind::Ident] to material types (except for the ones that point to generic type arguments),
     /// - inline [TyTupleField::Unpack],
     /// - inline [TyKind::Exclude].
     // This function is named fold_type_actual, because fold_type must be in
     // expr.rs, where we implement PlFold.
     pub fn fold_type_actual(&mut self, ty: Ty) -> Result<Ty> {
         Ok(match ty.kind {
-            TyKind::Ident(ident) => {
-                let decl = self.get_ident(&ident).ok_or_else(|| {
-                    Error::new_assert("cannot find type ident")
-                        .push_hint(format!("ident={ident:?}"))
-                })?;
+            // TyKind::Ident(ident) => {
+            //     let decl = self.get_ident(&ident).ok_or_else(|| {
+            //         Error::new_assert("cannot find type ident")
+            //             .push_hint(format!("ident={ident:?}"))
+            //     })?;
 
-                match &decl.kind {
-                    DeclKind::Ty(ref_ty) => {
-                        // materialize into the referred type
-                        self.fold_type_actual(Ty {
-                            kind: ref_ty.kind.clone(),
-                            name: ref_ty.name.clone().or(Some(ident.name().to_string())),
-                            span: ty.span,
-                        })?
-                    }
+            //     match &decl.kind {
+            //         DeclKind::Ty(ref_ty) => {
+            //             // materialize into the referred type
+            //             self.fold_type_actual(Ty {
+            //                 kind: ref_ty.kind.clone(),
+            //                 name: ref_ty.name.clone().or(Some(ident.name().to_string())),
+            //                 span: ty.span,
+            //             })?
+            //         }
 
-                    DeclKind::Unresolved(_) => {
-                        return Err(Error::new_assert(format!(
-                            "bad resolution order: unresolved {ident} while resolving {}",
-                            self.debug_current_decl
-                        ))
-                        .with_span(ty.span))
-                    }
-                    _ => {
-                        return Err(Error::new(Reason::Expected {
-                            who: None,
-                            expected: "a type".to_string(),
-                            found: format!("{decl:?}"),
-                        })
-                        .with_span(ty.span))
-                    }
-                }
-            }
+            //         DeclKind::Unresolved(_) => {
+            //             return Err(Error::new_assert(format!(
+            //                 "bad resolution order: unresolved {ident} while resolving {}",
+            //                 self.debug_current_decl
+            //             ))
+            //             .with_span(ty.span))
+            //         }
+            //         _ => {
+            //             return Err(Error::new(Reason::Expected {
+            //                 who: None,
+            //                 expected: "a type".to_string(),
+            //                 found: format!("{decl:?}"),
+            //             })
+            //             .with_span(ty.span))
+            //         }
+            //     }
+            // }
             TyKind::Tuple(fields) => Ty {
                 kind: TyKind::Tuple(fold_ty_tuple_fields(self, fields)?),
                 ..ty

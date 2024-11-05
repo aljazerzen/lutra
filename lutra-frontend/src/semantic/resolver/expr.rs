@@ -3,7 +3,7 @@ use itertools::Itertools;
 use crate::ir::decl::DeclKind;
 use crate::ir::pl::{self, *};
 use crate::pr::Ty;
-use crate::semantic::{NS_LOCAL, NS_STD, NS_THIS};
+use crate::semantic::{NS_STD, NS_THIS};
 use crate::{Error, Result, Span, WithErrorInfo};
 
 use super::tuple::StepOwned;
@@ -209,7 +209,7 @@ impl super::Resolver<'_> {
             r.ty = self.infer_type(&r)?;
         }
         if r.ty.is_none() {
-            panic!();
+            panic!("cannot infer type: {r:?}");
         }
         if let Some(ty) = &mut r.ty {
             if ty.is_relation() {
@@ -227,7 +227,7 @@ impl super::Resolver<'_> {
                         args: vec![
                             Expr::new(ExprKind::Tuple(vec![Expr {
                                 alias: Some(alias),
-                                ..Expr::new(Path::from_path(vec![NS_LOCAL, NS_THIS]))
+                                ..Expr::new(Path::from_path(vec![NS_THIS]))
                             }])),
                             *r,
                         ],
@@ -246,7 +246,7 @@ impl super::Resolver<'_> {
         let except = self.coerce_into_tuple(expr)?;
 
         self.fold_expr(Expr::new(ExprKind::All {
-            within: Box::new(Expr::new(Path::from_path(vec![NS_LOCAL, NS_THIS]))),
+            within: Box::new(Expr::new(Path::from_path(vec![NS_THIS]))),
             except: Box::new(except),
         }))
     }
