@@ -50,7 +50,7 @@ pub struct VarDef {
 #[derive(Debug, PartialEq, Clone)]
 pub struct TypeDef {
     pub name: String,
-    pub value: Option<Ty>,
+    pub ty: Ty,
 }
 
 #[derive(Debug, PartialEq, Clone)]

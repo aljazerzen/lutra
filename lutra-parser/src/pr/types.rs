@@ -10,8 +10,23 @@ pub struct Ty {
 
     pub span: Option<Span>,
 
-    /// Name inferred from the type declaration.
+    /// Name inferred from the type's declaration.
     pub name: Option<String>,
+
+    pub layout: Option<TyLayout>,
+}
+
+/// Memory layout of a type.
+#[derive(Debug, Clone)]
+pub struct TyLayout {
+    /// Number of bits required to store the type's the head
+    /// (the part whose size is known at compile time).
+    pub head_size: usize,
+
+    /// For enums, indexes of variants that contain recursive
+    /// (transitive) references to self. This is used to determine
+    /// if a variant needs a Box in Rust.
+    pub variants_recursive: Vec<usize>,
 }
 
 #[derive(Debug, Clone, PartialEq, Hash, EnumAsInner, AsRefStr)]
@@ -44,6 +59,7 @@ impl TyKind {
             kind: self,
             span: Some(span),
             name: None,
+            layout: None,
         }
     }
 }
@@ -88,6 +104,7 @@ impl Ty {
             kind: kind.into(),
             span: None,
             name: None,
+            layout: None,
         }
     }
 
@@ -132,7 +149,7 @@ impl From<TyFunc> for TyKind {
 
 impl PartialEq for Ty {
     fn eq(&self, other: &Self) -> bool {
-        self.kind == other.kind && self.name == other.name
+        self.kind == other.kind
     }
 }
 
@@ -141,6 +158,5 @@ impl Eq for Ty {}
 impl std::hash::Hash for Ty {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
         self.kind.hash(state);
-        self.name.hash(state);
     }
 }

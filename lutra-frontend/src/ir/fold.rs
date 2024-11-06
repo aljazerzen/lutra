@@ -46,7 +46,7 @@ pub trait PrFold {
     fn fold_type_def(&mut self, ty_def: TypeDef) -> Result<TypeDef> {
         Ok(TypeDef {
             name: ty_def.name,
-            value: ty_def.value.map(|x| self.fold_type(x)).transpose()?,
+            ty: self.fold_type(ty_def.ty)?,
         })
     }
     fn fold_module_def(&mut self, module_def: ModuleDef) -> Result<ModuleDef> {
@@ -251,6 +251,7 @@ pub fn fold_type<T: ?Sized + PrFold>(fold: &mut T, ty: Ty) -> Result<Ty> {
         },
         span: ty.span,
         name: ty.name,
+        layout: ty.layout,
     })
 }
 

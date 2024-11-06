@@ -75,7 +75,7 @@ impl Desugarator {
             Pos => return Ok(expr.kind),
         };
         Ok(pr::ExprKind::FuncCall(pr::FuncCall {
-            name: Box::new(pr::Expr::new(pr::Path::from_path(func_name.to_vec()))),
+            name: Box::new(pr::Expr::new(pr::Path::new(func_name.to_vec()))),
             args: vec![expr],
             named_args: Default::default(),
         }))
@@ -126,7 +126,7 @@ impl Desugarator {
 
 fn new_binop(left: pr::Expr, op_name: &[&str], right: pr::Expr) -> pr::Expr {
     pr::Expr::new(pr::ExprKind::FuncCall(pr::FuncCall {
-        name: Box::new(pr::Expr::new(pr::Path::from_path(op_name.to_vec()))),
+        name: Box::new(pr::Expr::new(pr::Path::new(op_name.to_vec()))),
         args: vec![left, right],
         named_args: Default::default(),
     }))

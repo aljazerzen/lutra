@@ -10,62 +10,27 @@ use crate::{Error, Reason, Span, WithErrorInfo};
 use super::Resolver;
 
 impl Resolver<'_> {
-    /// Visit a type in the main resolver pass. It will:
-    /// - resolve [TyKind::Ident] to material types (except for the ones that point to generic type arguments),
-    /// - inline [TyTupleField::Unpack],
-    /// - inline [TyKind::Exclude].
+    /// Visit a type in the main resolver pass.
     // This function is named fold_type_actual, because fold_type must be in
     // expr.rs, where we implement PlFold.
     pub fn fold_type_actual(&mut self, ty: Ty) -> Result<Ty> {
-        Ok(match ty.kind {
-            // TyKind::Ident(ident) => {
-            //     let decl = self.get_ident(&ident).ok_or_else(|| {
-            //         Error::new_assert("cannot find type ident")
-            //             .push_hint(format!("ident={ident:?}"))
-            //     })?;
+        let mut ty = fold::fold_type(self, ty)?;
 
-            //     match &decl.kind {
-            //         DeclKind::Ty(ref_ty) => {
-            //             // materialize into the referred type
-            //             self.fold_type_actual(Ty {
-            //                 kind: ref_ty.kind.clone(),
-            //                 name: ref_ty.name.clone().or(Some(ident.name().to_string())),
-            //                 span: ty.span,
-            //             })?
-            //         }
+        // compute memory layout
+        ty.layout = self.compute_ty_layout(&ty)?;
+        if ty.layout.is_none() {
+            if self.strict_mode {
+                return Err(Error::new_simple(format!(
+                    "type has an infinite size due to recursive type references"
+                ))
+                .push_hint("add an array or an enum onto the path of recursion")
+                .with_span(ty.span));
+            } else {
+                self.strict_mode_needed = true;
+            }
+        }
 
-            //         DeclKind::Unresolved(_) => {
-            //             return Err(Error::new_assert(format!(
-            //                 "bad resolution order: unresolved {ident} while resolving {}",
-            //                 self.debug_current_decl
-            //             ))
-            //             .with_span(ty.span))
-            //         }
-            //         _ => {
-            //             return Err(Error::new(Reason::Expected {
-            //                 who: None,
-            //                 expected: "a type".to_string(),
-            //                 found: format!("{decl:?}"),
-            //             })
-            //             .with_span(ty.span))
-            //         }
-            //     }
-            // }
-            TyKind::Tuple(fields) => Ty {
-                kind: TyKind::Tuple(fold::fold_ty_tuple_fields(self, fields)?),
-                ..ty
-            },
-            // TyKind::Exclude { base, except } => {
-            //     let base = self.fold_type(*base)?;
-            //     let except = self.fold_type(*except)?;
-
-            //     Ty {
-            //         kind: self.ty_tuple_exclusion(base, except)?,
-            //         ..ty
-            //     }
-            // }
-            _ => fold::fold_type(self, ty)?,
-        })
+        Ok(ty)
     }
 
     pub fn infer_type(&mut self, expr: &Expr) -> Result<Ty> {
@@ -190,6 +155,7 @@ impl Resolver<'_> {
             kind,
             name: None,
             span: expr.span,
+            layout: None,
         })
     }
 

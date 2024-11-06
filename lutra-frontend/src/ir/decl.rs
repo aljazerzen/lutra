@@ -13,7 +13,8 @@ pub struct RootModule {
     /// A tree of all accessible statements
     pub module: Module,
 
-    pub ordering: Vec<pr::Path>,
+    // TODO: make a more efficient "a ordered vec of unordered groups" data structure
+    pub ordering: Vec<Vec<pr::Path>>,
 }
 
 #[derive(Default, PartialEq, Clone)]

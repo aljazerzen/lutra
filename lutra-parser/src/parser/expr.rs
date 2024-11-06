@@ -540,7 +540,7 @@ pub(crate) fn ident() -> impl Parser<TokenKind, Path, Error = PError> + Clone {
     ident_part()
         .separated_by(just(TokenKind::PathSep))
         .at_least(1)
-        .map(Path::from_path::<String, Vec<String>>)
+        .map(Path::new::<String, Vec<String>>)
 }
 
 fn operator_unary() -> impl Parser<TokenKind, UnOp, Error = PError> + Clone {

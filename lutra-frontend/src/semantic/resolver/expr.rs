@@ -202,13 +202,13 @@ impl super::Resolver<'_> {
                     //     _local.select {alias = _local.this} r
 
                     let expr = pr::Expr::new(pr::ExprKind::FuncCall(pr::FuncCall {
-                        name: Box::new(pr::Expr::new(pr::ExprKind::Ident(pr::Path::from_path(
-                            vec![NS_STD, "select"],
-                        )))),
+                        name: Box::new(pr::Expr::new(pr::ExprKind::Ident(pr::Path::new(vec![
+                            NS_STD, "select",
+                        ])))),
                         args: vec![
                             pr::Expr::new(pr::ExprKind::Tuple(vec![pr::Expr {
                                 alias: Some(alias),
-                                ..pr::Expr::new(pr::Path::from_path(vec![NS_THIS]))
+                                ..pr::Expr::new(pr::Path::new(vec![NS_THIS]))
                             }])),
                             *r,
                         ],

@@ -10,7 +10,7 @@ use crate::{Error, Result, WithErrorInfo};
 ///
 /// Keeps track of all inter-declaration references.
 /// Returns a resolution order.
-pub fn resolve_decl_refs(root: &mut decl::RootModule) -> Result<Vec<pr::Path>> {
+pub fn resolve_decl_refs(root: &mut decl::RootModule) -> Result<Vec<Vec<pr::Path>>> {
     // resolve inter-declaration references
     let (refs_tys, refs_vars) = {
         let mut r = ModuleRefResolver {
@@ -28,18 +28,19 @@ pub fn resolve_decl_refs(root: &mut decl::RootModule) -> Result<Vec<pr::Path>> {
 
     // toposort vars
     let order_vars = utils::toposort::<pr::Path>(&refs_vars);
-    let has_cycles = order_vars.iter().any(|scc| scc.len() != 1);
+    let has_var_cycles = order_vars.iter().any(|scc| scc.len() != 1);
 
-    if !has_cycles {
-        Ok(order_tys
-            .iter()
-            .chain(order_vars.iter())
-            .flat_map(|tree| tree.iter())
-            .map(|p| (*p).clone())
-            .collect_vec())
-    } else {
-        todo!("error for a cyclic references between expressions")
+    if has_var_cycles {
+        return Err(Error::new_simple(
+            "unimplemented cyclic references between expressions",
+        ));
     }
+
+    Ok(order_tys
+        .iter()
+        .chain(order_vars.iter())
+        .map(|tree| tree.iter().map(|p| (*p).clone()).collect_vec())
+        .collect_vec())
 }
 
 /// Traverses module tree and runs name resolution on each of the declarations.
@@ -58,32 +59,28 @@ impl ModuleRefResolver<'_> {
         let module = self.root.module.get_submodule_mut(path).unwrap();
 
         let mut submodules = Vec::new();
-        let mut unresolved_imports = Vec::new();
+        let mut unresolved_decls = Vec::new();
         for (name, decl) in &module.names {
             match &decl.kind {
                 decl::DeclKind::Module(_) => {
                     submodules.push(name.clone());
                 }
                 decl::DeclKind::Unresolved(Some(_)) => {
-                    unresolved_imports.push(name.clone());
+                    unresolved_decls.push(name.clone());
                 }
                 decl::DeclKind::Unresolved(None) => panic!(),
                 _ => {}
             }
         }
 
-        for name in unresolved_imports {
-            // take the decl out of the module tree
-            let (stmt, span) = {
-                let submodule = self.root.module.get_submodule_mut(path).unwrap();
-                let decl = submodule.names.get_mut(&name).unwrap();
-                let unresolved = decl.kind.as_unresolved_mut().unwrap();
+        for name in unresolved_decls {
+            path.push(name);
+            let fq_ident = pr::Path::new(path.clone());
 
-                (unresolved.take().unwrap(), decl.span)
-            };
+            // take the decl out of the module tree
+            let (stmt, span) = self.root.module.take_unresolved(&fq_ident);
 
             // resolve the decl
-            path.push(name);
             let mut r = NameResolver {
                 root: self.root,
                 decl_module_path: &path[0..(path.len() - 1)],
@@ -93,27 +90,24 @@ impl ModuleRefResolver<'_> {
             let stmt = r.fold_stmt_kind(stmt).with_span_fallback(span)?;
 
             // filter out self-references
-            r.refs.retain(|r| r.full_path() != path);
+            r.refs.retain(|r| r != &fq_ident);
 
-            let decl_ident = pr::Path::from_path(path.clone());
             match &stmt {
                 pr::StmtKind::VarDef(_) => {
-                    self.refs_vars.push((decl_ident, r.refs));
+                    self.refs_vars.push((fq_ident.clone(), r.refs));
                 }
                 pr::StmtKind::TypeDef(_) => {
-                    self.refs_tys.push((decl_ident, r.refs));
+                    self.refs_tys.push((fq_ident.clone(), r.refs));
                 }
                 pr::StmtKind::ModuleDef(_) | pr::StmtKind::ImportDef(_) => {}
             }
 
-            let name = path.pop().unwrap();
+            path.pop();
 
             // put the decl back in
             {
-                let submodule = self.root.module.get_submodule_mut(path).unwrap();
-                let decl = submodule.names.get_mut(&name).unwrap();
-                let unresolved = decl.kind.as_unresolved_mut().unwrap();
-                *unresolved = Some(stmt);
+                let decl = self.root.module.get_mut(&fq_ident).unwrap();
+                *decl.kind.as_unresolved_mut().unwrap() = Some(stmt);
             };
         }
 
@@ -157,20 +151,27 @@ impl NameResolver<'_> {
             return Err(Error::new_simple("invalid type name"));
         }
         Ok(pr::ImportDef {
-            name: pr::Path::from_path(fq_ident),
+            name: pr::Path::new(fq_ident),
             alias: import_def.alias,
         })
     }
 }
 
 impl fold::PrFold for NameResolver<'_> {
+    fn fold_stmt(&mut self, _stmt: pr::Stmt) -> Result<pr::Stmt> {
+        unreachable!()
+    }
+    fn fold_stmts(&mut self, _stmts: Vec<pr::Stmt>) -> Result<Vec<pr::Stmt>> {
+        unreachable!()
+    }
+
     fn fold_expr(&mut self, expr: pr::Expr) -> Result<pr::Expr> {
         Ok(match expr.kind {
             pr::ExprKind::Ident(ident) => {
                 let (ident, indirections) = self.resolve_ident(ident).with_span(expr.span)?;
                 // TODO: can this ident have length 0?
 
-                let mut kind = pr::ExprKind::Ident(pr::Path::from_path(ident));
+                let mut kind = pr::ExprKind::Ident(pr::Path::new(ident));
                 for indirection in indirections {
                     let mut e = pr::Expr::new(kind);
                     e.span = expr.span;
@@ -207,7 +208,7 @@ impl fold::PrFold for NameResolver<'_> {
                 }
 
                 pr::Ty {
-                    kind: pr::TyKind::Ident(pr::Path::from_path(ident)),
+                    kind: pr::TyKind::Ident(pr::Path::new(ident)),
                     ..ty
                 }
             }
@@ -258,7 +259,7 @@ impl NameResolver<'_> {
             let mut fq_ident = mod_path;
             fq_ident.extend(path);
 
-            self.refs.push(pr::Path::from_path(fq_ident.clone()));
+            self.refs.push(pr::Path::new(fq_ident.clone()));
 
             (fq_ident, indirections)
         } else {

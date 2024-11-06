@@ -3,15 +3,13 @@ use std::io::Write;
 use lutra_frontend::pr;
 
 use super::{expect_ty, expect_ty_primitive, Value};
-use crate::layout::{self, EnumHeadFormat, EnumVariantFormat, LayoutCache};
+use crate::layout::{self, EnumHeadFormat, EnumVariantFormat};
 use crate::{Decode, Encode, Error, Reader, Result};
 
 impl Value {
     /// Convert a Lutra [Value] to .ld binary encoding.
     pub fn encode(&self, w: &mut Vec<u8>, ty: &pr::Ty) -> Result<()> {
         let mut ctx = Context::new(ty);
-        // run layout ahead of type to resolve recursive references
-        layout::get_head_size(ty, &mut ctx.cache)?;
 
         let meta = encode_body(w, self, ty, &mut ctx)?;
         encode_head(w, self, meta, ty, &mut ctx)?;
@@ -22,7 +20,7 @@ impl Value {
     pub fn decode(buf: &[u8], ty: &pr::Ty) -> Result<Value> {
         let mut ctx = Context::new(ty);
 
-        let head_size = layout::get_head_size(ty, &mut ctx.cache)? / 8;
+        let head_size = ty.layout.as_ref().unwrap().head_size / 8;
 
         let mut reader = Reader::new(buf, buf.len() - head_size);
         decode_inner(&mut reader, ty, &mut ctx)
@@ -90,7 +88,7 @@ fn encode_body<'t>(
         Value::Enum(tag, inner) => {
             let variants = expect_ty(ty, |k| k.as_enum(), "enum")?;
 
-            let (_, variant_format, _, variant_ty) = encode_enum_params(*tag, variants, ctx)?;
+            let (_, variant_format, _, variant_ty) = encode_enum_params(*tag, variants)?;
 
             let meta = encode_body(w, inner, variant_ty, ctx)?;
 
@@ -162,7 +160,7 @@ fn encode_head<'t>(
         Value::Enum(tag, inner) => {
             let variants = expect_ty(ty, |k| k.as_enum(), "enum")?;
 
-            let (head, variant, tag, variant_ty) = encode_enum_params(*tag, variants, ctx)?;
+            let (head, variant, tag, variant_ty) = encode_enum_params(*tag, variants)?;
 
             let tag_bytes = &(tag as u64).to_le_bytes()[0..(head.s / 8)];
 
@@ -191,13 +189,12 @@ fn encode_head<'t>(
 fn encode_enum_params<'t>(
     tag: usize,
     ty_variants: &'t [(String, pr::Ty)],
-    cache: &mut Context<'t>,
 ) -> Result<(EnumHeadFormat, EnumVariantFormat, usize, &'t pr::Ty)> {
-    let head_format = layout::enum_head_format(ty_variants, &mut cache.cache)?;
+    let head_format = layout::enum_head_format(ty_variants);
 
     let (_, variant_ty) = ty_variants.get(tag).ok_or(Error::InvalidData)?;
 
-    let variant_format = layout::enum_variant_format(&head_format, variant_ty, &mut cache.cache)?;
+    let variant_format = layout::enum_variant_format(variant_ty);
     Ok((head_format, variant_format, tag, variant_ty))
 }
 
@@ -238,7 +235,7 @@ fn decode_inner<'t>(r: &mut Reader<'_>, ty: &'t pr::Ty, ctx: &mut Context<'t>) -
         pr::TyKind::Enum(variants) => {
             let mut body = r.clone();
 
-            let head = layout::enum_head_format(variants, &mut ctx.cache)?;
+            let head = layout::enum_head_format(variants);
 
             let mut tag_bytes = r.copy_n(head.s / 8);
             tag_bytes.resize(8, 0);
@@ -246,7 +243,7 @@ fn decode_inner<'t>(r: &mut Reader<'_>, ty: &'t pr::Ty, ctx: &mut Context<'t>) -
 
             let (_, variant_ty) = variants.get(tag).unwrap();
 
-            let variant_format = layout::enum_variant_format(&head, variant_ty, &mut ctx.cache)?;
+            let variant_format = layout::enum_variant_format(variant_ty);
 
             let inner = if variant_format.is_inline {
                 decode_inner(r, variant_ty, ctx)?
@@ -266,16 +263,12 @@ fn decode_inner<'t>(r: &mut Reader<'_>, ty: &'t pr::Ty, ctx: &mut Context<'t>) -
 }
 
 struct Context<'t> {
-    cache: LayoutCache,
     top_level_ty: &'t pr::Ty,
 }
 
 impl<'t> Context<'t> {
     fn new(top_level_ty: &'t pr::Ty) -> Self {
-        Context {
-            cache: LayoutCache::default(),
-            top_level_ty,
-        }
+        Context { top_level_ty }
     }
 }
 

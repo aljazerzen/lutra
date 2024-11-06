@@ -8,18 +8,16 @@ pub struct Path {
 }
 
 impl Path {
-    pub fn from_name<S: ToString>(name: S) -> Self {
+    /// Creates a new ident from a non-empty path.
+    pub fn new<S: ToString, I: IntoIterator<Item = S>>(path: I) -> Self {
         Path {
-            path: vec![name.to_string()],
+            path: path.into_iter().map(|x| x.to_string()).collect(),
         }
     }
 
-    /// Creates a new ident from a non-empty path.
-    ///
-    /// Panics if path is empty.
-    pub fn from_path<S: ToString, I: IntoIterator<Item = S>>(path: I) -> Self {
+    pub fn from_name<S: ToString>(name: S) -> Self {
         Path {
-            path: path.into_iter().map(|x| x.to_string()).collect(),
+            path: vec![name.to_string()],
         }
     }
 
@@ -63,7 +61,7 @@ impl Path {
 
     pub fn prepend(self, mut parts: Vec<String>) -> Path {
         parts.extend(self);
-        Path::from_path(parts)
+        Path::new(parts)
     }
 
     pub fn push(&mut self, name: String) {

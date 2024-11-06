@@ -28,8 +28,23 @@ pub fn resolve(module_tree: pr::ModuleDef) -> Result<RootModule> {
     // resolve
     let mut resolver = Resolver::new(&mut root_module);
 
-    for decl_fq in &resolution_order {
-        resolver.resolve_decl(decl_fq)?;
+    for group in &resolution_order {
+        resolver.strict_mode = false;
+        for _ in 0..5 {
+            resolver.strict_mode_needed = false;
+            for fq_ident in group {
+                resolver.resolve_decl(fq_ident)?;
+            }
+            if !resolver.strict_mode_needed {
+                break;
+            }
+        }
+        if resolver.strict_mode_needed {
+            resolver.strict_mode = true;
+            for fq_ident in group {
+                resolver.resolve_decl(fq_ident)?;
+            }
+        }
     }
 
     root_module.ordering = resolution_order;

@@ -2,7 +2,7 @@ use indexmap::IndexMap;
 
 use crate::ir::decl::{Decl, DeclKind, Module, RootModule};
 use crate::pr;
-use crate::{Error, Result, Span};
+use crate::{Result, Span};
 
 use super::{NS_MAIN, NS_STD};
 
@@ -15,62 +15,20 @@ impl Module {
         }
     }
 
-    pub fn insert(&mut self, fq_ident: pr::Path, decl: Decl) -> Result<Option<Decl>, Error> {
-        if fq_ident.path().is_empty() {
-            Ok(self.names.insert(fq_ident.name().to_string(), decl))
-        } else {
-            let mut fq_ident = fq_ident.into_iter();
-            let top_level = fq_ident.next().unwrap();
-            let entry = self
-                .names
-                .entry(top_level)
-                .or_insert_with(|| Decl::new(Module::default()));
-
-            if let DeclKind::Module(inner) = &mut entry.kind {
-                inner.insert(pr::Path::from_path(fq_ident), decl)
-            } else {
-                Err(Error::new_simple(
-                    "path does not resolve to a module or a table",
-                ))
-            }
-        }
+    pub fn insert(&mut self, fq_ident: pr::Path, decl: Decl) -> Option<Decl> {
+        let module = self.get_submodule_mut(fq_ident.path())?;
+        module.names.insert(fq_ident.name().to_string(), decl)
     }
 
     pub fn get_mut(&mut self, ident: &pr::Path) -> Option<&mut Decl> {
-        let mut ns = self;
-
-        for part in ident.path() {
-            let entry = ns.names.get_mut(part);
-
-            match entry {
-                Some(Decl {
-                    kind: DeclKind::Module(inner),
-                    ..
-                }) => {
-                    ns = inner;
-                }
-                _ => return None,
-            }
-        }
-
-        ns.names.get_mut(ident.name())
+        let module = self.get_submodule_mut(ident.path())?;
+        module.names.get_mut(ident.name())
     }
 
     /// Get namespace entry using a fully qualified ident.
-    pub fn get(&self, fq_ident: &pr::Path) -> Option<&Decl> {
-        let mut ns = self;
-
-        for part in fq_ident.path().iter() {
-            let decl = ns.names.get(part)?;
-
-            if let DeclKind::Module(inner) = &decl.kind {
-                ns = inner;
-            } else {
-                return None;
-            }
-        }
-
-        ns.names.get(fq_ident.name())
+    pub fn get(&self, ident: &pr::Path) -> Option<&Decl> {
+        let module = self.get_submodule(ident.path())?;
+        module.names.get(ident.name())
     }
 
     pub fn get_submodule(&self, path: &[String]) -> Option<&Module> {
@@ -158,6 +116,12 @@ impl Module {
         }
         res
     }
+
+    pub fn take_unresolved(&mut self, ident: &pr::Path) -> (pr::StmtKind, Option<Span>) {
+        let decl = self.get_mut(ident).unwrap();
+        let unresolved = decl.kind.as_unresolved_mut().unwrap();
+        (unresolved.take().unwrap(), decl.span)
+    }
 }
 
 fn decl_has_annotation(decl: &Decl, annotation_name: &pr::Path) -> bool {
@@ -191,7 +155,7 @@ impl RootModule {
 
         // is path referencing the relational var directly?
         if !path.is_empty() {
-            let ident = pr::Path::from_path(path.to_vec());
+            let ident = pr::Path::new(path.to_vec());
             let decl = self.module.get(&ident);
 
             if let Some(decl) = decl {
@@ -206,7 +170,7 @@ impl RootModule {
             let mut path = path.to_vec();
             path.push(NS_MAIN.to_string());
 
-            let ident = pr::Path::from_path(path);
+            let ident = pr::Path::new(path);
             let decl = self.module.get(&ident);
 
             if let Some(decl) = decl {

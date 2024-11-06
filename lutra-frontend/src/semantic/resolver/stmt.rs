@@ -1,5 +1,5 @@
 use crate::ir::decl::DeclKind;
-use crate::ir::fold::{self, PrFold};
+use crate::ir::fold::PrFold;
 use crate::pr;
 use crate::semantic::NS_STD;
 use crate::Result;
@@ -12,16 +12,43 @@ impl super::Resolver<'_> {
             log::debug!("resolving decl {fq_ident}");
         }
 
-        // take decl out of the module
-        let mut decl = {
-            let module = self.root_mod.module.get_submodule_mut(fq_ident.path());
-            module.unwrap().names.shift_remove(fq_ident.name()).unwrap()
-        };
-        let stmt = decl.kind.into_unresolved().unwrap().unwrap();
         self.debug_current_decl = fq_ident.clone();
 
+        // take decl out of the module
+        let decl = self.root_mod.module.get_mut(fq_ident).unwrap();
+
+        let decl_kind = match &mut decl.kind {
+            // happens in first pass
+            DeclKind::Unresolved(stmt) => {
+                let stmt = stmt.take().unwrap();
+                self.resolve_unresolved(fq_ident, stmt)?
+            }
+
+            // happens in strict (second) pass
+            DeclKind::Ty(ty) => {
+                let ty_orig = ty.clone();
+
+                DeclKind::Ty(self.fold_type(ty_orig)?)
+            }
+
+            DeclKind::Module(_) => unreachable!(),
+            DeclKind::Expr(_) => unreachable!(),
+            DeclKind::Import(_) => unreachable!(),
+        };
+
+        // put decl back in
+        let decl = self.root_mod.module.get_mut(fq_ident).unwrap();
+        decl.kind = decl_kind;
+        Ok(())
+    }
+
+    pub fn resolve_unresolved(
+        &mut self,
+        fq_ident: &pr::Path,
+        stmt: pr::StmtKind,
+    ) -> Result<DeclKind> {
         // resolve
-        match stmt {
+        Ok(match stmt {
             pr::StmtKind::ModuleDef(_) => {
                 unreachable!("module def cannot be unresolved at this point")
                 // it should have been converted into Module in resolve_decls::init_module_tree
@@ -30,7 +57,7 @@ impl super::Resolver<'_> {
                 let def = self.fold_var_def(var_def)?;
                 let expected_ty = def.ty;
 
-                decl.kind = match def.value {
+                match def.value {
                     Some(mut def_value) => {
                         // var value is provided
 
@@ -56,33 +83,14 @@ impl super::Resolver<'_> {
                         expr.ty = expected_ty;
                         DeclKind::Expr(expr)
                     }
-                };
+                }
             }
             pr::StmtKind::TypeDef(ty_def) => {
-                let value = if let Some(value) = ty_def.value {
-                    value
-                } else {
-                    pr::Ty::new(pr::TyKind::Tuple(vec![]))
-                };
-
-                let mut ty = fold::fold_type_opt(self, Some(value))?.unwrap();
+                let mut ty = self.fold_type(ty_def.ty)?;
                 ty.name = Some(fq_ident.name().to_string());
-
-                decl.kind = DeclKind::Ty(ty);
+                DeclKind::Ty(ty)
             }
-            pr::StmtKind::ImportDef(target) => {
-                decl.kind = DeclKind::Import(target.name);
-            }
-        };
-
-        // put decl back in
-        {
-            let module = self.root_mod.module.get_submodule_mut(fq_ident.path());
-            module
-                .unwrap()
-                .names
-                .insert(fq_ident.name().to_string(), decl);
-        }
-        Ok(())
+            pr::StmtKind::ImportDef(target) => DeclKind::Import(target.name),
+        })
     }
 }

@@ -3,6 +3,7 @@ use crate::utils::IdGenerator;
 
 mod expr;
 mod functions;
+mod layout;
 mod scope;
 mod stmt;
 mod tuple;
@@ -11,6 +12,15 @@ mod types;
 /// Can fold (walk) over AST and for each function call or variable find what they are referencing.
 pub struct Resolver<'a> {
     root_mod: &'a mut RootModule,
+
+    /// For recursive stmt references (recursive types and functions),
+    /// we do two passes:
+    /// - non-strict mode, where we try to resolve as much types as possible and don't fail on
+    ///   unresolved references.
+    ///   After this pass, all top-level types should be resolved.
+    /// - strict mode, where we require all types to be resolved.
+    pub strict_mode: bool,
+    pub strict_mode_needed: bool,
 
     pub debug_current_decl: crate::pr::Path,
 
@@ -33,6 +43,8 @@ impl Resolver<'_> {
             in_func_call_name: false,
             id: IdGenerator::new(),
             scopes: Vec::new(),
+            strict_mode: false,
+            strict_mode_needed: false,
         }
     }
 

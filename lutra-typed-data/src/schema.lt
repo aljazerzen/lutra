@@ -1,3 +1,28 @@
+type TypedData = {
+    ty = Ty,
+    data = [int] # TODO: [uint8]
+}
+
+type Ty = {
+    kind = TyKind,
+    layout = enum {None, Some = TyLayout},
+}
+
+type TyKind = enum {
+    Primitive = PrimitiveSet,
+
+    Tuple = [{name = OptText, ty = Ty}],
+
+    Array = Ty,
+
+    Enum = [{name = text, ty = Ty}],
+}
+
+type TyLayout = {
+    head_size = int,
+    variants_recursive = [int]
+}
+
 type PrimitiveSet = enum {
     int,
     float,
@@ -8,19 +33,4 @@ type PrimitiveSet = enum {
 type OptText = enum {
     None,
     Some = text
-}
-
-type Ty = enum {
-    Primitive = PrimitiveSet,
-
-    Tuple = [{name = OptText, ty = Ty}],
-
-    Array = Ty,
-
-    Enum = [{name = text, ty = Ty}],
-}
-
-type TypedData = {
-    ty = Ty,
-    data = [int] # TODO: [uint8]
 }
