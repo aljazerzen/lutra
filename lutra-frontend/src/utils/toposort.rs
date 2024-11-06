@@ -1,22 +1,25 @@
 use std::collections::HashMap;
 
+use itertools::Itertools;
+
 type Dag = Vec<Vec<usize>>;
 
-struct Toposort {
-    nodes: Vec<Node>,
-    order: Vec<usize>,
+struct DepthFirstSearch {
+    nodes: Vec<NodeStatus>,
+    finish_order: Vec<usize>,
 }
 
 #[derive(Clone, Copy)]
-struct Node {
+struct NodeStatus {
     visiting: bool,
-    done: bool,
+    finished: bool,
 }
 
+/// Performs a topological sort + computes strongly connected components
+/// of the DAG specified by the `dependencies`.
 pub fn toposort<'a, Key: Eq + std::hash::Hash + Clone>(
     dependencies: &'a [(Key, Vec<Key>)],
-    start: Option<&'_ Key>,
-) -> Option<Vec<&'a Key>> {
+) -> Vec<Vec<&'a Key>> {
     // create mapping from Key to usize
     let index: HashMap<&Key, usize> = dependencies
         .iter()
@@ -30,60 +33,117 @@ pub fn toposort<'a, Key: Eq + std::hash::Hash + Clone>(
         .map(|(_, deps)| deps.iter().flat_map(|d| index.get(d).cloned()).collect())
         .collect();
 
-    // init toposort
-    let empty = Node {
-        visiting: false,
-        done: false,
-    };
-    let mut toposort = Toposort {
-        nodes: vec![empty; index.len()],
-        order: Vec::with_capacity(index.len()),
-    };
+    // first dfs
+    let mut dfs = DepthFirstSearch::new(dag.len());
+    dfs.visit_all(&dag);
 
-    if let Some(start) = start.map(|s| index.get(s).unwrap()) {
-        // use only the provided visit start
-        toposort.visit(&dag, *start).ok()?;
-    } else {
-        // start visits from all nodes
-        while toposort.order.len() < dependencies.len() {
-            for start_at in 0..index.len() {
-                toposort.visit(&dag, start_at).ok()?;
-            }
+    // transpose and sort edges by finished_at
+    let dag_t = transpose_dag(&dag);
+
+    // second dfs
+    let mut dfs_2 = DepthFirstSearch::new(dag.len());
+    let trees = dfs_2.visit_in_order(&dag_t, dfs.finish_order.iter().cloned().rev());
+
+    // unmap
+    trees
+        .iter()
+        .rev()
+        .map(|tree| tree.iter().map(|i| &dependencies[*i].0).collect_vec())
+        .collect()
+}
+
+impl DepthFirstSearch {
+    fn new(number_of_nodes: usize) -> Self {
+        const EMPTY: NodeStatus = NodeStatus {
+            visiting: false,
+            finished: false,
+        };
+
+        DepthFirstSearch {
+            nodes: vec![EMPTY; number_of_nodes],
+            finish_order: Vec::with_capacity(number_of_nodes),
         }
     }
 
-    // unmap
-    Some(toposort.order.iter().map(|i| &dependencies[*i].0).collect())
-}
-
-impl Toposort {
-    fn visit(&mut self, dag: &Dag, n: usize) -> Result<(), ()> {
-        let node = self.nodes.get_mut(n).unwrap();
-        if node.done {
-            return Ok(());
+    fn visit(&mut self, dag: &Dag, n: usize) {
+        let node = &mut self.nodes[n];
+        if node.finished {
+            return;
         }
         if node.visiting {
-            return Err(());
+            return;
         }
         node.visiting = true;
 
         for m in &dag[n] {
-            self.visit(dag, *m)?;
+            self.visit(dag, *m);
         }
 
-        let node = self.nodes.get_mut(n).unwrap();
+        let node = &mut self.nodes[n];
         node.visiting = false;
-        node.done = true;
-        self.order.push(n);
-
-        Ok(())
+        node.finished = true;
+        self.finish_order.push(n);
     }
+
+    /// Start visits from each node, until all nodes have been visited
+    fn visit_all(&mut self, dag: &Dag) {
+        for start_at in 0..dag.len() {
+            self.visit(&dag, start_at);
+            if self.finish_order.len() == dag.len() {
+                break;
+            }
+        }
+    }
+
+    /// Start visits from nodes provided by the iterator.
+    /// Returns trees produced by each visit, each tree in finish_order.
+    fn visit_in_order(&mut self, dag: &Dag, order: impl Iterator<Item = usize>) -> Vec<Vec<usize>> {
+        let mut last = 0_usize;
+        let mut trees = Vec::new();
+
+        for start_at in order {
+            self.visit(&dag, start_at);
+
+            if self.finish_order.len() > last {
+                trees.push(self.finish_order[last..].to_vec());
+                last = self.finish_order.len();
+            }
+
+            if self.finish_order.len() == dag.len() {
+                break;
+            }
+        }
+        trees
+    }
+}
+
+fn transpose_dag(dag: &Dag) -> Dag {
+    // count incoming edges for each edge
+    let mut incoming_edges = vec![0; dag.len()];
+    for edges in dag {
+        for v in edges {
+            incoming_edges[*v] += 1;
+        }
+    }
+
+    // init edges for each node
+    let mut dag_t: Dag = Vec::with_capacity(dag.len());
+    for ie in incoming_edges {
+        dag_t.push(Vec::with_capacity(ie));
+    }
+
+    // transpose
+    for (u, edges) in dag.iter().enumerate() {
+        for v in edges {
+            dag_t[*v].push(u);
+        }
+    }
+
+    dag_t
 }
 
 #[cfg(test)]
 mod tests {
-    use itertools::Itertools;
-
     use super::toposort;
 
     #[test]
@@ -94,10 +154,9 @@ mod tests {
             ("c", vec![]),
             ("d", vec![]),
         ];
-        let order = toposort(&dependencies, None).unwrap();
+        let order = toposort(&dependencies);
 
-        let order = order.into_iter().copied().collect_vec();
-        assert_eq!(order, vec!["c", "b", "a", "d"]);
+        assert_eq!(order, vec![vec![&"c"], vec![&"b"], vec![&"a"], vec![&"d"]]);
     }
 
     #[test]
@@ -108,10 +167,9 @@ mod tests {
             ("c", vec!["b"]),
             ("d", vec!["c"]),
         ];
-        let order = toposort(&dependencies, None).unwrap();
+        let order = toposort(&dependencies);
 
-        let order = order.into_iter().copied().collect_vec();
-        assert_eq!(order, vec!["a", "b", "c", "d"]);
+        assert_eq!(order, vec![vec![&"a"], vec![&"b"], vec![&"c"], vec![&"d"]]);
     }
 
     #[test]
@@ -122,9 +180,9 @@ mod tests {
             ("c", vec![]),
             ("d", vec!["a"]),
         ];
-        let order = toposort(&dependencies, None);
+        let order = toposort(&dependencies);
 
-        assert!(order.is_none());
+        assert_eq!(order, vec![vec![&"c"], vec![&"b", &"d", &"a"]]);
     }
 
     #[test]
@@ -136,25 +194,8 @@ mod tests {
             ("d", vec!["b"]),
         ];
 
-        let order = toposort(&dependencies, None).unwrap();
+        let order = toposort(&dependencies);
 
-        let order = order.into_iter().copied().collect_vec();
-        assert_eq!(order, vec!["b", "a", "c", "d"]);
-    }
-
-    #[test]
-    fn with_root() {
-        let dependencies = vec![
-            ("a", vec!["b"]),
-            ("b", vec![]),
-            ("c", vec!["b"]),
-            ("d", vec!["b"]),
-        ];
-        let root = "c";
-
-        let order = toposort(&dependencies, Some(&root)).unwrap();
-
-        let order = order.into_iter().copied().collect_vec();
-        assert_eq!(order, vec!["b", "c"]);
+        assert_eq!(order, vec![vec![&"b"], vec![&"a"], vec![&"c"], vec![&"d"]]);
     }
 }

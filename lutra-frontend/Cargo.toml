@@ -14,7 +14,6 @@ default = ["cli"]
 [lib]
 bench = false
 doctest = false
-test = false
 
 [[bin]]
 bench = false

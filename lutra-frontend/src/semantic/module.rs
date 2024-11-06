@@ -11,9 +11,7 @@ impl Module {
         // Each module starts with a default namespace that contains a wildcard
         // and the standard library.
         Module {
-            names: IndexMap::from([(NS_STD.to_string(), Decl::from(DeclKind::default()))]),
-            shadowed: None,
-            redirects: vec![],
+            names: IndexMap::from([(NS_STD.to_string(), Decl::new(Module::default()))]),
         }
     }
 
@@ -23,7 +21,10 @@ impl Module {
         } else {
             let mut fq_ident = fq_ident.into_iter();
             let top_level = fq_ident.next().unwrap();
-            let entry = self.names.entry(top_level).or_default();
+            let entry = self
+                .names
+                .entry(top_level)
+                .or_insert_with(|| Decl::new(Module::default()));
 
             if let DeclKind::Module(inner) = &mut entry.kind {
                 inner.insert(pr::Path::from_path(fq_ident), decl)
@@ -101,25 +102,6 @@ impl Module {
         Some(res)
     }
 
-    pub fn shadow(&mut self, ident: &str) {
-        let shadowed = self.names.shift_remove(ident).map(Box::new);
-        let entry = DeclKind::Module(Module {
-            shadowed,
-            ..Default::default()
-        });
-        self.names.insert(ident.to_string(), entry.into());
-    }
-
-    pub fn unshadow(&mut self, ident: &str) {
-        if let Some(entry) = self.names.shift_remove(ident) {
-            let ns = entry.kind.into_module().unwrap();
-
-            if let Some(shadowed) = ns.shadowed {
-                self.names.insert(ident.to_string(), *shadowed);
-            }
-        }
-    }
-
     pub fn get_decls(&self) -> Vec<(&String, &Decl)> {
         self.names.iter().collect()
     }
@@ -195,10 +177,7 @@ impl RootModule {
     pub fn find_main_rel(&self, path: &[String]) -> Result<(&pr::Expr, pr::Path), HintAndSpan> {
         let (decl, ident) = self.find_main(path).map_err(|x| (x, None))?;
 
-        let span = decl
-            .declared_at
-            .and_then(|id| self.span_map.get(&id))
-            .cloned();
+        let span = decl.span.clone();
 
         let decl = (decl.kind.as_expr())
             .filter(|e| e.ty.as_ref().unwrap().is_relation())
@@ -251,29 +230,5 @@ impl RootModule {
     /// Finds declarations that are annotated with a specific name.
     pub fn find_by_annotation_name(&self, annotation_name: &pr::Path) -> Vec<pr::Path> {
         self.module.find_by_annotation_name(annotation_name)
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::ir::fold;
-    use crate::pr::Literal;
-
-    #[test]
-    fn test_module_shadow_unshadow() {
-        let mut module = Module::default();
-
-        let ident = pr::Path::from_name("test_name");
-        let expr: pr::Expr = pr::Expr::new(pr::ExprKind::Literal(Literal::Integer(42)));
-        let decl: Decl = DeclKind::Expr(Box::new(expr)).into();
-
-        module.insert(ident.clone(), decl.clone()).unwrap();
-
-        module.shadow("test_name");
-        assert!(module.get(&ident) != Some(&decl));
-
-        module.unshadow("test_name");
-        assert_eq!(module.get(&ident).unwrap(), &decl);
     }
 }

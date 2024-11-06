@@ -12,31 +12,31 @@ use crate::{Error, Result, WithErrorInfo};
 /// Returns a resolution order.
 pub fn resolve_decl_refs(root: &mut decl::RootModule) -> Result<Vec<pr::Path>> {
     // resolve inter-declaration references
-    let refs = {
+    let (refs_tys, refs_vars) = {
         let mut r = ModuleRefResolver {
             root,
-            refs: Default::default(),
+            refs_tys: Default::default(),
+            refs_vars: Default::default(),
             current_path: Vec::new(),
         };
         r.resolve_refs()?;
-        r.refs
+        (r.refs_tys, r.refs_vars)
     };
 
-    // HACK: put std.* declarations first
-    // this is needed because during compilation of transforms, we inject refs to "std.lte" and a few others
-    // sorting here makes std decls appear first in the final ordering
-    let mut refs = refs;
-    refs.sort_by_key(|(a, _)| !a.path().first().map_or(false, |p| p == "std"));
+    // toposort tys
+    let order_tys = utils::toposort::<pr::Path>(&refs_tys);
 
-    // toposort the declarations
-    // TODO: we might not need to compile all declarations if they are not used
-    //   to prevent that, this start should be something else than None
-    //   a list of all public declarations?
-    // let main = pr::Ident::from_name("main");
-    let order = utils::toposort::<pr::Path>(&refs, None);
+    // toposort vars
+    let order_vars = utils::toposort::<pr::Path>(&refs_vars);
+    let has_cycles = order_vars.iter().any(|scc| scc.len() != 1);
 
-    if let Some(order) = order {
-        Ok(order.into_iter().cloned().collect_vec())
+    if !has_cycles {
+        Ok(order_tys
+            .iter()
+            .chain(order_vars.iter())
+            .flat_map(|tree| tree.iter())
+            .map(|p| (*p).clone())
+            .collect_vec())
     } else {
         todo!("error for a cyclic references between expressions")
     }
@@ -48,8 +48,8 @@ struct ModuleRefResolver<'a> {
     root: &'a mut decl::RootModule,
     current_path: Vec<String>,
 
-    // TODO: maybe make these ids, instead of Ident?
-    refs: Vec<(pr::Path, Vec<pr::Path>)>,
+    refs_tys: Vec<(pr::Path, Vec<pr::Path>)>,
+    refs_vars: Vec<(pr::Path, Vec<pr::Path>)>,
 }
 
 impl ModuleRefResolver<'_> {
@@ -58,31 +58,29 @@ impl ModuleRefResolver<'_> {
         let module = self.root.module.get_submodule_mut(path).unwrap();
 
         let mut submodules = Vec::new();
-        let mut unresolved_decls = Vec::new();
+        let mut unresolved_imports = Vec::new();
         for (name, decl) in &module.names {
             match &decl.kind {
                 decl::DeclKind::Module(_) => {
                     submodules.push(name.clone());
                 }
-                decl::DeclKind::Unresolved(_) => {
-                    unresolved_decls.push(name.clone());
+                decl::DeclKind::Unresolved(Some(_)) => {
+                    unresolved_imports.push(name.clone());
                 }
+                decl::DeclKind::Unresolved(None) => panic!(),
                 _ => {}
             }
         }
 
-        for name in unresolved_decls {
+        for name in unresolved_imports {
             // take the decl out of the module tree
-            let (stmt, declared_at) = {
+            let (stmt, span) = {
                 let submodule = self.root.module.get_submodule_mut(path).unwrap();
                 let decl = submodule.names.get_mut(&name).unwrap();
                 let unresolved = decl.kind.as_unresolved_mut().unwrap();
 
-                (unresolved.take().unwrap(), decl.declared_at)
+                (unresolved.take().unwrap(), decl.span)
             };
-            let span = declared_at
-                .and_then(|x| self.root.span_map.get(&x))
-                .cloned();
 
             // resolve the decl
             path.push(name);
@@ -98,7 +96,15 @@ impl ModuleRefResolver<'_> {
             r.refs.retain(|r| r.full_path() != path);
 
             let decl_ident = pr::Path::from_path(path.clone());
-            self.refs.push((decl_ident, r.refs));
+            match &stmt {
+                pr::StmtKind::VarDef(_) => {
+                    self.refs_vars.push((decl_ident, r.refs));
+                }
+                pr::StmtKind::TypeDef(_) => {
+                    self.refs_tys.push((decl_ident, r.refs));
+                }
+                pr::StmtKind::ModuleDef(_) | pr::StmtKind::ImportDef(_) => {}
+            }
 
             let name = path.pop().unwrap();
 

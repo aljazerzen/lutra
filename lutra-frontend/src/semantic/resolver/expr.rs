@@ -39,10 +39,6 @@ impl fold::PrFold for super::Resolver<'_> {
         let alias = Box::new(node.alias.clone());
         let span = Box::new(node.span);
 
-        if let Some(span) = *span {
-            self.root_mod.span_map.insert(id, span);
-        }
-
         log::trace!("folding expr {node:?}");
 
         let r = match node.kind {
@@ -60,18 +56,6 @@ impl fold::PrFold for super::Resolver<'_> {
                     }
 
                     match &decl.kind {
-                        DeclKind::Variable(ty) => pr::Expr {
-                            kind: pr::ExprKind::Ident(ident),
-                            ty: ty.clone(),
-                            ..node
-                        },
-
-                        DeclKind::TupleField => {
-                            unimplemented!();
-                            // indirections.push(IndirectionKind::Name(ident.name));
-                            // Expr::new(ExprKind::Ident(Ident::from_path(ident.path)))
-                        }
-
                         DeclKind::Expr(expr) => {
                             // keep as ident, but pull in the type
                             let ty = expr.ty.clone().unwrap();

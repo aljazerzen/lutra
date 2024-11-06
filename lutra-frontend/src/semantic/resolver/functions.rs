@@ -332,12 +332,8 @@ impl Resolver<'_> {
 
 fn prepare_scope_of_func(scope: &mut Scope, func: &Func) {
     for param in &func.params {
-        let v = Decl {
-            kind: DeclKind::Variable(param.ty.clone()),
-            ..Default::default()
-        };
-        let param_name = param.name.split('.').last().unwrap();
-        scope.values.insert(param_name.to_string(), v);
+        let v = Decl::new(DeclKind::Ty(param.ty.clone().unwrap()));
+        scope.values.insert(param.name.clone(), v);
     }
 }
 

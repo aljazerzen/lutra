@@ -11,6 +11,7 @@ impl<T: From<usize>> IdGenerator<T> {
         Self::default()
     }
 
+    #[allow(dead_code)]
     pub fn skip(&mut self, id: usize) {
         self.next_id = self.next_id.max(id + 1);
     }
