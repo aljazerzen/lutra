@@ -11,11 +11,11 @@ use chumsky::{prelude::*, Stream};
 use self::lexer::TokenKind;
 use self::perror::PError;
 
-use crate::error::Error;
+use crate::error::Diagnostic;
 use crate::pr;
 use crate::span::Span;
 
-pub fn parse_source(source: &str, source_id: u16) -> (Option<Vec<pr::Stmt>>, Vec<Error>) {
+pub fn parse_source(source: &str, source_id: u16) -> (Option<Vec<pr::Stmt>>, Vec<Diagnostic>) {
     let (tokens, mut errors) = lexer::lex_source_recovery(source, source_id);
 
     let ast = if let Some(tokens) = tokens {
@@ -29,7 +29,10 @@ pub fn parse_source(source: &str, source_id: u16) -> (Option<Vec<pr::Stmt>>, Vec
     (ast, errors)
 }
 
-fn parse_lr_to_pr(source_id: u16, lr: Vec<lexer::Token>) -> (Option<Vec<pr::Stmt>>, Vec<Error>) {
+fn parse_lr_to_pr(
+    source_id: u16,
+    lr: Vec<lexer::Token>,
+) -> (Option<Vec<pr::Stmt>>, Vec<Diagnostic>) {
     let stream = prepare_stream(lr, source_id);
     let (pr, parse_errors) = stmt::source().parse_recovery(stream);
 

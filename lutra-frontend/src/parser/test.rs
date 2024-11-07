@@ -4,11 +4,12 @@ use chumsky::Parser;
 use insta::assert_debug_snapshot;
 use std::fmt::Debug;
 
+use crate::error::Diagnostic;
 use crate::parser::lexer::TokenKind;
+use crate::parser::perror::PError;
 use crate::parser::prepare_stream;
 use crate::parser::stmt;
 use crate::pr::Stmt;
-use crate::{error::Error, parser::perror::PError};
 
 /// Parse source code based on the supplied parser.
 ///
@@ -16,7 +17,7 @@ use crate::{error::Error, parser::perror::PError};
 pub(crate) fn parse_with_parser<O: Debug>(
     source: &str,
     parser: impl Parser<TokenKind, O, Error = PError>,
-) -> Result<O, Vec<Error>> {
+) -> Result<O, Vec<Diagnostic>> {
     let tokens = crate::parser::lexer::lex_source(source)?;
     let stream = prepare_stream(tokens.0, 0);
 
@@ -33,7 +34,7 @@ pub(crate) fn parse_with_parser<O: Debug>(
 }
 
 /// Parse into statements
-pub(crate) fn parse_source(source: &str) -> Result<Vec<Stmt>, Vec<Error>> {
+pub(crate) fn parse_source(source: &str) -> Result<Vec<Stmt>, Vec<Diagnostic>> {
     parse_with_parser(source, stmt::source())
 }
 

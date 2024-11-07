@@ -1,12 +1,12 @@
+use crate::error::{Diagnostic, WithErrorInfo};
 use crate::ir::decl;
 use crate::pr;
 use crate::Result;
-use crate::{Error, WithErrorInfo};
 
 use super::Resolver;
 
 impl Resolver<'_> {
-    pub fn compute_ty_layout(&mut self, ty: &pr::Ty) -> Result<Option<pr::TyLayout>, Error> {
+    pub fn compute_ty_layout(&mut self, ty: &pr::Ty) -> Result<Option<pr::TyLayout>, Diagnostic> {
         if ty.layout.is_some() {
             return Ok(ty.layout.clone());
         }
@@ -54,7 +54,7 @@ impl Resolver<'_> {
 
             pr::TyKind::Ident(ident) => {
                 let decl = self.get_ident(ident).ok_or_else(|| {
-                    Error::new_assert("cannot find type ident")
+                    Diagnostic::new_assert("cannot find type ident")
                         .push_hint(format!("ident={ident:?}"))
                 })?;
 
@@ -82,7 +82,7 @@ impl Resolver<'_> {
                     }
 
                     _ => {
-                        return Err(Error::new_simple(format!(
+                        return Err(Diagnostic::new_simple(format!(
                             "expected a type, but found {decl:?}"
                         ))
                         .with_span(ty.span))

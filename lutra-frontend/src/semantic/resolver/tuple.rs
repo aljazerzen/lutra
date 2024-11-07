@@ -2,8 +2,9 @@ use std::borrow::Cow;
 
 use itertools::Itertools;
 
+use crate::error::Diagnostic;
 use crate::pr;
-use crate::{Error, Result, WithErrorInfo};
+use crate::{Result, WithErrorInfo};
 
 // TODO: i'm not proud of the naming scheme in this file
 
@@ -166,7 +167,7 @@ impl std::fmt::Debug for StepOwned {
     }
 }
 
-fn ambiguous_error(candidates: Vec<Vec<Step>>) -> Error {
+fn ambiguous_error(candidates: Vec<Vec<Step>>) -> Diagnostic {
     let mut candidates_str = Vec::new();
     for steps in candidates {
         let mut steps = steps.into_iter();
@@ -180,5 +181,5 @@ fn ambiguous_error(candidates: Vec<Vec<Step>>) -> Error {
         candidates_str.push(r);
     }
     let hint = format!("could be any of: {}", candidates_str.join(", "));
-    Error::new_simple("Ambiguous name").push_hint(hint)
+    Diagnostic::new_simple("Ambiguous name").push_hint(hint)
 }

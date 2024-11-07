@@ -5,7 +5,6 @@ members = [
     "lutra-codegen",
     "lutra-input-tui",
     "lutra-runtime",
-    "lutra-parser",
     "lutra-typed-data",
     "lutra-frontend",
 ]

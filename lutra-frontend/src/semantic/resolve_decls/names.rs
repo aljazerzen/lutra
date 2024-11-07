@@ -1,10 +1,11 @@
 use itertools::Itertools;
 
+use crate::error::{Diagnostic, WithErrorInfo};
 use crate::ir::decl;
 use crate::ir::fold::{self, PrFold};
 use crate::semantic::NS_STD;
+use crate::Result;
 use crate::{pr, utils};
-use crate::{Error, Result, WithErrorInfo};
 
 /// Runs name resolution for global names - names that refer to declarations.
 ///
@@ -31,7 +32,7 @@ pub fn resolve_decl_refs(root: &mut decl::RootModule) -> Result<Vec<Vec<pr::Path
     let has_var_cycles = order_vars.iter().any(|scc| scc.len() != 1);
 
     if has_var_cycles {
-        return Err(Error::new_simple(
+        return Err(Diagnostic::new_simple(
             "unimplemented cyclic references between expressions",
         ));
     }
@@ -139,16 +140,16 @@ impl NameResolver<'_> {
         })
     }
 
-    fn fold_import_def(&mut self, import_def: pr::ImportDef) -> Result<pr::ImportDef, Error> {
+    fn fold_import_def(&mut self, import_def: pr::ImportDef) -> Result<pr::ImportDef, Diagnostic> {
         let (fq_ident, indirections) = self.resolve_ident(import_def.name)?;
         if !indirections.is_empty() {
-            return Err(Error::new_simple(
+            return Err(Diagnostic::new_simple(
                 "Import can only reference modules and declarations",
             ));
         }
         if fq_ident.is_empty() {
             log::debug!("resolved type ident to : {fq_ident:?} + {indirections:?}");
-            return Err(Error::new_simple("invalid type name"));
+            return Err(Diagnostic::new_simple("invalid type name"));
         }
         Ok(pr::ImportDef {
             name: pr::Path::new(fq_ident),
@@ -197,14 +198,13 @@ impl fold::PrFold for NameResolver<'_> {
 
                 if !indirections.is_empty() {
                     log::debug!("resolved type ident to : {ident:?} + {indirections:?}");
-                    return Err(
-                        Error::new_simple("types are not allowed indirections").with_span(ty.span)
-                    );
+                    return Err(Diagnostic::new_simple("types are not allowed indirections")
+                        .with_span(ty.span));
                 }
 
                 if ident.is_empty() {
                     log::debug!("resolved type ident to : {ident:?} + {indirections:?}");
-                    return Err(Error::new_simple("invalid type name").with_span(ty.span));
+                    return Err(Diagnostic::new_simple("invalid type name").with_span(ty.span));
                 }
 
                 pr::Ty {
@@ -292,7 +292,9 @@ fn module_lookup(
         }
     }
 
-    Err(Error::new_simple("direct references modules not allowed"))
+    Err(Diagnostic::new_simple(
+        "direct references modules not allowed",
+    ))
 }
 
 fn module_lookup_step<'m>(module: &'m mut decl::Module, step: &str) -> Result<&'m mut decl::Decl> {
@@ -300,5 +302,5 @@ fn module_lookup_step<'m>(module: &'m mut decl::Module, step: &str) -> Result<&'
         return Ok(module.names.get_mut(step).unwrap());
     }
 
-    Err(Error::new_simple(format!("Name not found: {step}")))
+    Err(Diagnostic::new_simple(format!("Name not found: {step}")))
 }

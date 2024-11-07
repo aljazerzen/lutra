@@ -1,9 +1,10 @@
 use itertools::Itertools;
 
+use crate::error::Diagnostic;
 use crate::ir::decl::{Decl, DeclKind};
 use crate::ir::fold::{self, PrFold};
 use crate::pr::*;
-use crate::{Error, Result, Span, WithErrorInfo};
+use crate::{Result, Span, WithErrorInfo};
 
 use super::scope::Scope;
 use super::Resolver;
@@ -79,7 +80,7 @@ impl Resolver<'_> {
         );
 
         if args.len() > fn_ty.params.len() {
-            return Err(Error::new_simple(format!(
+            return Err(Diagnostic::new_simple(format!(
                 "Too many arguments to function `{}`",
                 metadata.as_debug_name()
             ))
@@ -226,7 +227,7 @@ impl Resolver<'_> {
             };
 
             if res.len() != 1 {
-                return Err(Error::new_simple(format!(
+                return Err(Diagnostic::new_simple(format!(
                     "cannot determine the type {}",
                     generic_param.name
                 )));
@@ -314,9 +315,11 @@ impl Resolver<'_> {
         Ok(if is_tuple_ty {
             // a helpful check for a common anti-pattern
             if let Some(alias) = expr.alias {
-                return Err(Error::new_simple(format!("unexpected assign to `{alias}`"))
-                    .push_hint(format!("move assign into the tuple: `{{{alias} = ...}}`"))
-                    .with_span(expr.span));
+                return Err(
+                    Diagnostic::new_simple(format!("unexpected assign to `{alias}`"))
+                        .push_hint(format!("move assign into the tuple: `{{{alias} = ...}}`"))
+                        .with_span(expr.span),
+                );
             }
 
             expr

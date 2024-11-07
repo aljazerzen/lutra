@@ -1,13 +1,9 @@
 use std::collections::HashMap;
 
-use lutra_parser::pr;
-// use prqlc::ir::decl::RootModule;
-// use prqlc::ir::pl::{Ident, Literal};
-// use prqlc::{semantic, Error, ErrorMessages, Errors, Options, SourceTree, Target, WithErrorInfo};
-
 use crate::error;
 use crate::error::Diagnostic;
 use crate::ir::decl;
+use crate::pr;
 use crate::project;
 
 pub use linearize::is_mod_def_for;
@@ -32,9 +28,7 @@ pub fn compile(
 fn parse_and_compile(source_tree: &project::SourceTree) -> Result<decl::RootModule, error::Error> {
     // parse and resolve
     let ast_tree = parse(source_tree)?;
-    crate::semantic::resolve(ast_tree)
-        .map_err(Diagnostic::from_prql)
-        .map_err(Diagnostic::into_error)
+    crate::semantic::resolve(ast_tree).map_err(Diagnostic::into_error)
 }
 
 fn parse(file_tree: &project::SourceTree) -> Result<pr::ModuleDef, error::Error> {
@@ -54,25 +48,24 @@ fn parse(file_tree: &project::SourceTree) -> Result<pr::ModuleDef, error::Error>
     };
 
     // parse and insert into the root
-    let mut errors = Vec::new();
+    let mut diagnostics = Vec::new();
     for source_file in source_files {
         let id = ids
             .get(&source_file.file_path)
             .map(|x| **x)
             .expect("source tree has malformed ids");
 
-        let (ast, errs) = lutra_parser::parse_source(source_file.content, id);
+        let (ast, errs) = crate::parser::parse_source(source_file.content, id);
 
         if let Some(stmts) = ast {
             linearize::insert_stmts_at_path(&mut root, source_file.module_path, stmts);
         } else {
-            errors.extend(errs);
+            diagnostics.extend(errs);
         }
     }
-    if errors.is_empty() {
+    if diagnostics.is_empty() {
         Ok(root)
     } else {
-        let diagnostics = errors.into_iter().map(Diagnostic::from_prql).collect();
         Err(error::Error::InvalidSource { diagnostics })
     }
 }
@@ -81,9 +74,9 @@ mod linearize {
     use std::path::{Path, PathBuf};
 
     use itertools::Itertools;
-    use lutra_parser::pr;
 
     use crate::error;
+    use crate::pr;
     use crate::project::SourceTree;
 
     pub(super) struct SourceFile<'a> {
@@ -209,7 +202,8 @@ mod linearize {
         path.components()
             .map(|x| {
                 x.as_os_str().to_str().map(str::to_string).ok_or_else(|| {
-                    error::Diagnostic::custom(format!("Invalid file path: {path:?}")).into_error()
+                    error::Diagnostic::new_custom(format!("Invalid file path: {path:?}"))
+                        .into_error()
                 })
             })
             .try_collect()

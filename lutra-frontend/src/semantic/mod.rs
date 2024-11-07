@@ -58,7 +58,7 @@ pub fn load_std_lib(module_tree: &mut pr::ModuleDef) {
         log::debug!("loading std.prql");
 
         let std_source = include_str!("std.prql");
-        let (ast, errs) = lutra_parser::parse_source(std_source, 0);
+        let (ast, errs) = crate::parser::parse_source(std_source, 0);
         if let Some(stmts) = ast {
             let stmt = pr::Stmt::new(pr::StmtKind::ModuleDef(pr::ModuleDef {
                 name: "std".to_string(),

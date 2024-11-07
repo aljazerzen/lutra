@@ -23,18 +23,21 @@ required-features = ["cli"]
 test = false
 
 [dependencies]
-lutra-parser = {path = "../lutra-parser"}
-
 thiserror = { workspace = true }
 itertools = { workspace = true }
 log = { workspace = true }
 walkdir = "2.5.0"
 
+semver = { version = "1.0.23", features = ["serde"] }
+chumsky = "0.9.2"
+enum-as-inner = "0.6.1"
+strum = { version = "0.26.3", features = ["std", "derive"] }
+regex = "1.11.1"
+indexmap = "2.6.0"
+
 clap = { version = "4.4.18", features = ["derive"], optional = true }
 env_logger = { version = "0.10.2", optional = true }
 anyhow = { workspace = true, optional = true }
 
-enum-as-inner = "0.6.1"
-strum = "0.26.3"
-regex = "1.11.1"
-indexmap = "2.6.0"
+[dev-dependencies]
+insta = { version = "1.40.0", features = ["yaml"] }

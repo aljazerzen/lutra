@@ -3,9 +3,9 @@ use std::fmt::Debug;
 use enum_as_inner::EnumAsInner;
 use indexmap::IndexMap;
 use itertools::Itertools;
-use lutra_parser::pr::Span;
 
 use crate::pr;
+use crate::span::Span;
 
 /// Context of the pipeline.
 #[derive(Default, Clone)]

@@ -8,12 +8,13 @@ use chumsky::error::Cheap;
 use chumsky::prelude::*;
 use chumsky::text::{newline, Character};
 
-use crate::error::{Error, ErrorSource, Reason, WithErrorInfo};
+use crate::error::{Diagnostic, DiagnosticCode};
+
 use crate::pr::Literal;
 use crate::span::Span;
 
 /// Lex PRQL into LR, returning both the LR and any errors encountered
-pub fn lex_source_recovery(source: &str, source_id: u16) -> (Option<Vec<Token>>, Vec<Error>) {
+pub fn lex_source_recovery(source: &str, source_id: u16) -> (Option<Vec<Token>>, Vec<Diagnostic>) {
     let (tokens, lex_errors) = lexer().parse_recovery(source);
 
     let tokens = tokens.map(insert_start);
@@ -29,7 +30,7 @@ pub fn lex_source_recovery(source: &str, source_id: u16) -> (Option<Vec<Token>>,
 
 /// Lex PRQL into LR, returning either the LR or the errors encountered
 #[cfg(test)]
-pub fn lex_source(source: &str) -> Result<token::Tokens, Vec<Error>> {
+pub fn lex_source(source: &str) -> Result<token::Tokens, Vec<Diagnostic>> {
     lexer()
         .parse(source)
         .map(insert_start)
@@ -51,10 +52,10 @@ fn insert_start(tokens: Vec<Token>) -> Vec<Token> {
     .collect()
 }
 
-fn convert_lexer_error(source: &str, e: chumsky::error::Cheap<char>, source_id: u16) -> Error {
+fn convert_lexer_error(source: &str, e: chumsky::error::Cheap<char>, source_id: u16) -> Diagnostic {
     // We want to slice based on the chars, not the bytes, so can't just index
     // into the str.
-    let found = source
+    let found: String = source
         .chars()
         .skip(e.span().start)
         .take(e.span().end() - e.span().start)
@@ -65,9 +66,7 @@ fn convert_lexer_error(source: &str, e: chumsky::error::Cheap<char>, source_id: 
         source_id,
     });
 
-    Error::new(Reason::Unexpected { found })
-        .with_span(span)
-        .with_source(ErrorSource::Lexer(e))
+    Diagnostic::new(format!("unexpected {found}"), DiagnosticCode::PARSER).with_span(span)
 }
 
 /// Lex chars to tokens until the end of the input

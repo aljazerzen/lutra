@@ -2,10 +2,11 @@ use std::collections::HashMap;
 
 use itertools::Itertools;
 
+use crate::error::Diagnostic;
 use crate::ir::fold::{self, PrFold};
 use crate::pr::{self, *};
 use crate::Result;
-use crate::{Error, Reason, Span, WithErrorInfo};
+use crate::{Span, WithErrorInfo};
 
 use super::Resolver;
 
@@ -20,7 +21,7 @@ impl Resolver<'_> {
         ty.layout = self.compute_ty_layout(&ty)?;
         if ty.layout.is_none() {
             if self.strict_mode {
-                return Err(Error::new_simple(
+                return Err(Diagnostic::new_simple(
                     "type has an infinite size due to recursive type references".to_string(),
                 )
                 .push_hint("add an array or an enum onto the path of recursion")
@@ -122,7 +123,7 @@ impl Resolver<'_> {
                     .try_collect()?;
 
                 let Some(inferred_ty) = case_tys.first() else {
-                    return Err(Error::new_simple(
+                    return Err(Diagnostic::new_simple(
                         "cannot infer type of any of the branches of this case statement",
                     )
                     .with_span(expr.span));
@@ -165,7 +166,7 @@ impl Resolver<'_> {
         found: &mut pr::Expr,
         expected: Option<&Ty>,
         who: &F,
-    ) -> Result<(), Error>
+    ) -> Result<(), Diagnostic>
     where
         F: Fn() -> Option<String>,
     {
@@ -191,7 +192,7 @@ impl Resolver<'_> {
         expected: &Ty,
         span: Option<Span>,
         who: &F,
-    ) -> Result<(), Error>
+    ) -> Result<(), Diagnostic>
     where
         F: Fn() -> Option<String>,
     {
@@ -388,7 +389,7 @@ impl Resolver<'_> {
 
     //         _ => {
     //             return Err(
-    //                 Error::new_simple("fields can only be excluded from a tuple")
+    //                 Diagnostic::new_simple("fields can only be excluded from a tuple")
     //                     .with_span(base.span),
     //             )
     //         }
@@ -401,7 +402,7 @@ impl Resolver<'_> {
     //         TyKind::Ident(_) => todo!(),
 
     //         _ => {
-    //             return Err(Error::new_simple("expected excluded fields to be a tuple")
+    //             return Err(Diagnostic::new_simple("expected excluded fields to be a tuple")
     //                 .with_span(except.span));
     //         }
     //     };
@@ -410,7 +411,7 @@ impl Resolver<'_> {
     //         .iter()
     //         .map(|field| match &field.name {
     //             Some(name) => Ok(name),
-    //             None => Err(Error::new_simple("excluded fields must be named")),
+    //             None => Err(Diagnostic::new_simple("excluded fields must be named")),
     //         })
     //         .collect::<Result<_>>()
     //         .with_span(except.span)?;
@@ -446,7 +447,7 @@ pub fn ty_tuple_kind(fields: Vec<TyTupleField>) -> TyKind {
     TyKind::Tuple(res)
 }
 
-fn compose_type_error<F>(found_ty: &Ty, expected: &Ty, who: &F) -> Error
+fn compose_type_error<F>(found_ty: &Ty, expected: &Ty, who: &F) -> Diagnostic
 where
     F: Fn() -> Option<String>,
 {
@@ -459,12 +460,13 @@ where
         .as_ref()
         .map(|x| x.contains("std.join"))
         .unwrap_or_default();
+    let who = who.map(|x| format!("{x} ")).unwrap_or_default();
 
-    let mut e = Error::new(Reason::Expected {
-        who,
-        expected: display_ty(expected),
-        found: display_ty(found_ty),
-    });
+    let mut e = Diagnostic::new_simple(format!(
+        "{who}expected {}, but found {}",
+        display_ty(expected),
+        display_ty(found_ty)
+    ));
 
     if found_ty.kind.is_function() && !expected.kind.is_function() {
         let to_what = "in this function call?";

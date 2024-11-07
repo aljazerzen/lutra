@@ -4,15 +4,16 @@ use std::fmt::Debug;
 use std::fmt::Display;
 use std::hash::Hash;
 
-use crate::error::WithErrorInfo;
-use crate::error::{Error, ErrorSource, Reason};
+use crate::error::Diagnostic;
+use crate::error::DiagnosticCode;
 use crate::parser::lexer;
+
 use crate::span::Span;
 
 #[derive(Clone, Debug)]
 pub struct ChumError<T: Hash + Eq + Debug> {
     span: Span,
-    reason: Option<String>,
+    message: Option<String>,
     expected: HashSet<Option<T>>,
     found: Option<T>,
     label: SimpleLabel,
@@ -25,7 +26,7 @@ impl<T: Hash + Eq + Debug> ChumError<T> {
     pub fn custom<M: ToString>(span: Span, msg: M) -> Self {
         Self {
             span,
-            reason: Some(msg.to_string()),
+            message: Some(msg.to_string()),
             expected: HashSet::default(),
             found: None,
             label: SimpleLabel::None,
@@ -49,7 +50,7 @@ impl<T: Hash + Eq + Debug> ChumError<T> {
 
     /// Returns the reason for the error.
     pub fn reason(&self) -> &Option<String> {
-        &self.reason
+        &self.message
     }
 
     /// Returns the error's label, if any.
@@ -64,7 +65,7 @@ impl<T: Hash + Eq + Debug> ChumError<T> {
     pub fn map<U: Hash + Eq + Debug, F: FnMut(T) -> U>(self, mut f: F) -> ChumError<U> {
         ChumError {
             span: self.span,
-            reason: self.reason,
+            message: self.message,
             expected: self.expected.into_iter().map(|e| e.map(&mut f)).collect(),
             found: self.found.map(f),
             label: self.label,
@@ -86,7 +87,7 @@ impl<T: Hash + Eq + Display + Debug> chumsky::Error<T> for ChumError<T> {
         Self {
             span,
             // reason: Some(String::from("unexpected")),
-            reason: None,
+            message: None,
             expected: exp,
             found,
             label: SimpleLabel::None,
@@ -102,7 +103,7 @@ impl<T: Hash + Eq + Display + Debug> chumsky::Error<T> for ChumError<T> {
     ) -> Self {
         Self {
             span,
-            reason: Some(format!(
+            message: Some(format!(
                 "unclosed delimiter: {delimiter} within span {}..{}",
                 unclosed_span.start, unclosed_span.end
             )),
@@ -131,7 +132,7 @@ impl<T: Hash + Eq + Display + Debug> chumsky::Error<T> for ChumError<T> {
         //     (Some(mut r1), Some(r2)) => {r1.push('s');Some(r1)},
         // };
 
-        self.reason = self.reason.zip(other.reason).map(|(mut r1, r2)| {
+        self.message = self.message.zip(other.message).map(|(mut r1, r2)| {
             r1.push_str(" | ");
             r1.push_str(r2.as_str());
             r1
@@ -147,7 +148,7 @@ impl<T: Hash + Eq + Debug> PartialEq for ChumError<T> {
     fn eq(&self, other: &Self) -> bool {
         self.span == other.span
             && self.found == other.found
-            && self.reason == other.reason
+            && self.message == other.message
             && self.expected == other.expected
             && self.label == other.label
     }
@@ -194,13 +195,13 @@ impl<T: fmt::Display + Hash + Eq + Debug> fmt::Display for ChumError<T> {
     }
 }
 
-impl From<PError> for Error {
-    fn from(p: PError) -> Error {
+impl From<PError> for Diagnostic {
+    fn from(p: PError) -> Diagnostic {
         let span = p.span();
 
-        fn construct_parser_error(e: PError) -> Error {
+        fn construct_diagnostic(e: PError) -> Diagnostic {
             if let Some(message) = e.reason() {
-                return Error::new_simple(message).with_source(ErrorSource::Parser(e));
+                return Diagnostic::new(message, DiagnosticCode::PARSER);
             }
 
             fn token_to_string(t: Option<lexer::TokenKind>) -> String {
@@ -235,8 +236,10 @@ impl From<PError> for Error {
 
             if expected.is_empty() || expected.len() > 10 {
                 let label = token_to_string(e.found().cloned());
-                return Error::new_simple(format!("unexpected {label}{while_parsing}"))
-                    .with_source(ErrorSource::Parser(e));
+                return Diagnostic::new(
+                    format!("unexpected {label}{while_parsing}"),
+                    DiagnosticCode::PARSER,
+                );
             }
 
             let mut expected = expected;
@@ -251,22 +254,16 @@ impl From<PError> for Error {
                 }
             };
 
-            match e.found() {
-                Some(found) => Error::new(Reason::Expected {
-                    who: e.label().map(|x| x.to_string()),
-                    expected,
-                    found: found.to_string(),
-                })
-                .with_source(ErrorSource::Parser(e)),
-                // We want a friendlier message than "found end of input"...
-                None => Error::new(Reason::Simple(format!(
-                    "Expected {expected}, but didn't find anything before the end."
-                )))
-                .with_source(ErrorSource::Parser(e)),
-            }
+            let who = e.label().map(|x| format!("{x} ")).unwrap_or_default();
+
+            let message = match e.found() {
+                Some(found) => format!("{who}expected {expected}, but found {found}"),
+                None => format!("{who}expected {expected}, but encountered the end of the file."),
+            };
+            Diagnostic::new(message, DiagnosticCode::PARSER)
         }
 
-        construct_parser_error(p).with_span(Some(span))
+        construct_diagnostic(p).with_span(Some(span))
     }
 }
 

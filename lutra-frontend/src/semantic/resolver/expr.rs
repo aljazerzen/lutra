@@ -1,11 +1,12 @@
 use itertools::Itertools;
-use lutra_parser::pr;
 
+use crate::error::{Diagnostic, WithErrorInfo};
 use crate::ir::decl::DeclKind;
 use crate::ir::fold::{self, PrFold};
+use crate::pr;
 use crate::pr::Ty;
 use crate::semantic::{NS_STD, NS_THIS};
-use crate::{Error, Result, Span, WithErrorInfo};
+use crate::{Result, Span};
 
 use super::tuple::StepOwned;
 
@@ -72,12 +73,14 @@ impl fold::PrFold for super::Resolver<'_> {
                         }
 
                         DeclKind::Ty(_) => {
-                            return Err(Error::new_simple("expected a value, but found a type")
-                                .with_span(*span));
+                            return Err(Diagnostic::new_simple(
+                                "expected a value, but found a type",
+                            )
+                            .with_span(*span));
                         }
 
                         DeclKind::Unresolved(_) => {
-                            return Err(Error::new_assert(format!(
+                            return Err(Diagnostic::new_assert(format!(
                                 "bad resolution order: unresolved {ident} while resolving {}",
                                 self.debug_current_decl
                             )));
@@ -239,12 +242,12 @@ impl super::Resolver<'_> {
         match indirection {
             pr::IndirectionKind::Name(name) => {
                 self.lookup_name_in_tuple(base, name).and_then(|res| {
-                    res.ok_or_else(|| Error::new_simple(format!("Unknown name {name}")))
+                    res.ok_or_else(|| Diagnostic::new_simple(format!("Unknown name {name}")))
                 })
             }
             pr::IndirectionKind::Position(pos) => {
                 let step = super::tuple::lookup_position_in_tuple(base, *pos as usize)?
-                    .ok_or_else(|| Error::new_simple("Out of bounds"))?;
+                    .ok_or_else(|| Diagnostic::new_simple("Out of bounds"))?;
 
                 Ok(vec![step])
             }
