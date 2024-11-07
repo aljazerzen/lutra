@@ -45,7 +45,7 @@ impl Resolver<'_> {
     pub(super) fn get_ident(&self, ident: &Path) -> Option<&Decl> {
         if ident.starts_with_part(NS_LOCAL) {
             assert!(ident.len() == 2);
-            self.scopes.last()?.get(&ident.name())
+            self.scopes.last()?.get(ident.name())
         } else {
             self.root_mod.module.get(ident)
         }
@@ -58,7 +58,7 @@ impl Resolver<'_> {
     pub(super) fn get_ident_mut(&mut self, ident: &Path) -> Option<&mut Decl> {
         if ident.starts_with_part(NS_LOCAL) {
             assert!(ident.len() == 2);
-            self.scopes.last_mut()?.get_mut(&ident.name())
+            self.scopes.last_mut()?.get_mut(ident.name())
         } else {
             self.root_mod.module.get_mut(ident)
         }

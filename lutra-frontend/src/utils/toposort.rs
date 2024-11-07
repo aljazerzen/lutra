@@ -17,9 +17,9 @@ struct NodeStatus {
 
 /// Performs a topological sort + computes strongly connected components
 /// of the DAG specified by the `dependencies`.
-pub fn toposort<'a, Key: Eq + std::hash::Hash + Clone>(
-    dependencies: &'a [(Key, Vec<Key>)],
-) -> Vec<Vec<&'a Key>> {
+pub fn toposort<Key: Eq + std::hash::Hash + Clone>(
+    dependencies: &[(Key, Vec<Key>)],
+) -> Vec<Vec<&Key>> {
     // create mapping from Key to usize
     let index: HashMap<&Key, usize> = dependencies
         .iter()
@@ -88,7 +88,7 @@ impl DepthFirstSearch {
     /// Start visits from each node, until all nodes have been visited
     fn visit_all(&mut self, dag: &Dag) {
         for start_at in 0..dag.len() {
-            self.visit(&dag, start_at);
+            self.visit(dag, start_at);
             if self.finish_order.len() == dag.len() {
                 break;
             }
@@ -102,7 +102,7 @@ impl DepthFirstSearch {
         let mut trees = Vec::new();
 
         for start_at in order {
-            self.visit(&dag, start_at);
+            self.visit(dag, start_at);
 
             if self.finish_order.len() > last {
                 trees.push(self.finish_order[last..].to_vec());

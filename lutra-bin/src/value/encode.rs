@@ -186,10 +186,10 @@ fn encode_head<'t>(
     Ok(())
 }
 
-fn encode_enum_params<'t>(
+fn encode_enum_params(
     tag: usize,
-    ty_variants: &'t [(String, pr::Ty)],
-) -> Result<(EnumHeadFormat, EnumVariantFormat, usize, &'t pr::Ty)> {
+    ty_variants: &[(String, pr::Ty)],
+) -> Result<(EnumHeadFormat, EnumVariantFormat, usize, &pr::Ty)> {
     let head_format = layout::enum_head_format(ty_variants);
 
     let (_, variant_ty) = ty_variants.get(tag).ok_or(Error::InvalidData)?;

@@ -100,7 +100,7 @@ impl ValueVisitor for Printer {
             let mut r = String::new();
             for row in table.split('\n') {
                 r += &self.new_line();
-                r += &row;
+                r += row;
             }
             return Ok(r);
         }
@@ -152,7 +152,7 @@ impl ValueVisitor for Printer {
 fn try_tabular(items_ty: &pr::Ty) -> Option<tabular::Table> {
     match &items_ty.kind {
         pr::TyKind::Primitive(primitive) => {
-            let t = tabular::Table::new(column_spec_primitive(&primitive));
+            let t = tabular::Table::new(column_spec_primitive(primitive));
 
             Some(t)
         }

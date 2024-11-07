@@ -141,7 +141,7 @@ impl RootModule {
     pub fn find_main_rel(&self, path: &[String]) -> Result<(&pr::Expr, pr::Path), HintAndSpan> {
         let (decl, ident) = self.find_main(path).map_err(|x| (x, None))?;
 
-        let span = decl.span.clone();
+        let span = decl.span;
 
         let decl = (decl.kind.as_expr())
             .filter(|e| e.ty.as_ref().unwrap().is_relation())

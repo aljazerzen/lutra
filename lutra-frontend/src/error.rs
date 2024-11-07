@@ -3,7 +3,7 @@ use lutra_parser::span::Span;
 #[derive(thiserror::Error, Debug)]
 pub enum Error {
     #[error("io error")]
-    IoError(#[from] std::io::Error),
+    Io(#[from] std::io::Error),
 
     #[error("invalid source structure: {problem}")]
     InvalidSourceStructure { problem: String },
@@ -91,7 +91,7 @@ impl DiagnosticCode {
     pub const PARSER_ERROR: DiagnosticCode = DiagnosticCode("E0002");
 
     pub fn get(&self) -> &'static str {
-        &self.0
+        self.0
     }
 
     pub const fn get_severity(&self) -> Severity {

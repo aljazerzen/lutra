@@ -53,7 +53,7 @@ impl Resolver<'_> {
             }
 
             pr::TyKind::Ident(ident) => {
-                let decl = self.get_ident(&ident).ok_or_else(|| {
+                let decl = self.get_ident(ident).ok_or_else(|| {
                     Error::new_assert("cannot find type ident")
                         .push_hint(format!("ident={ident:?}"))
                 })?;
@@ -63,12 +63,10 @@ impl Resolver<'_> {
                     decl::DeclKind::Ty(ty) => {
                         if let Some(layout) = &ty.layout {
                             layout.head_size
+                        } else if self.strict_mode {
+                            panic!("Unresolved layout of reference {ident} at {:?}: {ty:?} (during eval of {})", ty.span, self.debug_current_decl)
                         } else {
-                            if self.strict_mode {
-                                panic!("Unresolved layout of reference {ident} at {:?}: {ty:?} (during eval of {})", ty.span, self.debug_current_decl)
-                            } else {
-                                return Ok(None);
-                            }
+                            return Ok(None);
                         }
                     }
 

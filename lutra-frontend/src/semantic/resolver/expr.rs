@@ -154,10 +154,7 @@ impl fold::PrFold for super::Resolver<'_> {
                 // flatten
                 let exprs = exprs
                     .into_iter()
-                    .flat_map(|e| match e.kind {
-                        // pr::ExprKind::Tuple(items) if e.flatten => items,
-                        _ => vec![e],
-                    })
+                    .flat_map(|e| vec![e])
                     .collect_vec();
 
                 pr::Expr {

@@ -19,14 +19,11 @@ pub fn codegen(source: &str) -> Result<String, std::fmt::Error> {
     for (name, decl) in project.root_module.module.get_decls() {
         let mut decl = decl.clone();
 
-        match &mut decl.kind {
-            decl::DeclKind::Ty(ty) => {
-                infer_names(name, ty);
+        if let decl::DeclKind::Ty(ty) = &mut decl.kind {
+            infer_names(name, ty);
 
-                write_ty_def(&mut w, ty, &mut ctx)?;
-                tys.push(ty.clone());
-            }
-            _ => {}
+            write_ty_def(&mut w, ty, &mut ctx)?;
+            tys.push(ty.clone());
         }
 
         while !ctx.def_buffer.is_empty() {
@@ -38,7 +35,7 @@ pub fn codegen(source: &str) -> Result<String, std::fmt::Error> {
 
     writeln!(w, "// -- impl Layout, Encode & Decode --\n")?;
     for ty in &tys {
-        write_ty_def_impl(&mut w, &ty, &mut ctx)?;
+        write_ty_def_impl(&mut w, ty, &mut ctx)?;
     }
     Ok(w)
 }
@@ -101,9 +98,9 @@ struct Context {
 }
 
 /// Generates a type definition.
-fn write_ty_def<'t>(
+fn write_ty_def(
     w: &mut impl Write,
-    ty: &'t pr::Ty,
+    ty: &pr::Ty,
     ctx: &mut Context,
 ) -> Result<(), std::fmt::Error> {
     let name = ty.name.as_ref().unwrap();
@@ -183,9 +180,9 @@ fn tuple_field_name(name: &Option<String>, index: usize) -> Cow<'_, str> {
 
 /// Generates a reference to a type.
 /// Syntactically, this could be used in `let x: type_ref`.
-fn write_ty_ref<'t>(
+fn write_ty_ref(
     w: &mut impl Write,
-    ty: &'t pr::Ty,
+    ty: &pr::Ty,
     as_expr: bool,
     ctx: &mut Context,
 ) -> Result<(), std::fmt::Error> {
@@ -231,9 +228,9 @@ fn write_ty_ref<'t>(
 /// Generates the impl encode for a type.
 #[rustfmt::skip::macros(writeln)]
 #[rustfmt::skip::macros(write)]
-fn write_ty_def_impl<'t>(
+fn write_ty_def_impl(
     w: &mut impl Write,
-    ty: &'t pr::Ty,
+    ty: &pr::Ty,
     ctx: &mut Context,
 ) -> Result<(), std::fmt::Error> {
     let name = ty.name.as_ref().unwrap();

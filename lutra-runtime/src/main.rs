@@ -18,13 +18,13 @@ macro_rules! println_size_of {
 
 fn main() {
     println_size_of!(interpreter::Cell);
-    println!("");
+    println!();
 
     println_size_of!(std::rc::Rc<lutra_bin::Value>);
     println_size_of!(Box<ir::Function>);
     println_size_of!(interpreter::NativeFunction);
 
-    println!("");
+    println!();
 
     // std::mem::size_of
 

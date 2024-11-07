@@ -105,7 +105,7 @@ impl Interpreter {
     fn drop_binding(&mut self, binding_id: ir::Sid) {
         assert_eq!((binding_id.0 as u32).shr(30), 0x1_u32);
 
-        let addr = self.bindings.remove(&binding_id).unwrap() as usize;
+        let addr = self.bindings.remove(&binding_id).unwrap();
         self.drop(addr, addr + 1);
     }
 
@@ -124,7 +124,7 @@ impl Interpreter {
     fn drop_scope(&mut self, scope_id: ir::Sid, scope_size: usize) {
         assert_eq!((scope_id.0 as u32).shr(30), 0x2_u32);
 
-        let sid_start = self.scopes.get_mut(&scope_id).unwrap().pop().unwrap() as usize;
+        let sid_start = self.scopes.get_mut(&scope_id).unwrap().pop().unwrap();
         let sid_end = sid_start + scope_size;
 
         self.drop(sid_start, sid_end);
@@ -220,7 +220,9 @@ impl Interpreter {
                     arg_symbols.push(self.evaluate_expr(arg));
                 }
 
-                let res = match function {
+                
+
+                match function {
                     Cell::Function(func) => {
                         let scope_size = arg_symbols.len();
                         self.allocate_scope(func.symbol_ns, arg_symbols);
@@ -233,9 +235,7 @@ impl Interpreter {
                     Cell::FunctionNative(native) => native(arg_symbols),
                     Cell::Value(_) => panic!(),
                     Cell::Vacant => panic!(),
-                };
-
-                res
+                }
             }
             ir::ExprKind::Function(func) => Cell::Function(func.clone()),
             ir::ExprKind::Binding(binding) => {

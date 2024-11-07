@@ -20,9 +20,7 @@ impl Resolver<'_> {
         ty.layout = self.compute_ty_layout(&ty)?;
         if ty.layout.is_none() {
             if self.strict_mode {
-                return Err(Error::new_simple(format!(
-                    "type has an infinite size due to recursive type references"
-                ))
+                return Err(Error::new_simple("type has an infinite size due to recursive type references".to_string())
                 .push_hint("add an array or an enum onto the path of recursion")
                 .with_span(ty.span));
             } else {
@@ -121,7 +119,7 @@ impl Resolver<'_> {
                     .map(|c| self.infer_type(&c.value))
                     .try_collect()?;
 
-                let Some(inferred_ty) = case_tys.iter().next() else {
+                let Some(inferred_ty) = case_tys.first() else {
                     return Err(Error::new_simple(
                         "cannot infer type of any of the branches of this case statement",
                     )
@@ -184,6 +182,7 @@ impl Resolver<'_> {
     }
 
     /// Validates that found node has expected type. Returns assumed type of the node.
+    #[allow(clippy::only_used_in_recursion)]
     pub fn validate_type<F>(
         &mut self,
         found: &Ty,
@@ -220,11 +219,7 @@ impl Resolver<'_> {
                 let found_types: HashMap<_, _> = found_fields
                     .iter()
                     .filter_map(|e| {
-                        if let Some(n) = &e.name {
-                            Some((n, &e.ty))
-                        } else {
-                            None
-                        }
+                        e.name.as_ref().map(|n| (n, &e.ty))
                     })
                     .collect();
 
