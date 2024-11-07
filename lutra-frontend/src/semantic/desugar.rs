@@ -2,7 +2,6 @@ use crate::ir::fold;
 use crate::ir::fold::PrFold;
 use crate::pr;
 use crate::Result;
-use lutra_parser::generic;
 
 pub fn run(module_def: pr::ModuleDef) -> pr::ModuleDef {
     Desugarator.fold_module_def(module_def).unwrap()
@@ -31,7 +30,7 @@ impl Desugarator {
     /// De-sugars range `a..b` into `{start=a, end=b}`.
     ///
     /// TODO: Open bounds are mapped into `null`.
-    fn desugar_range(&mut self, v: generic::Range<Box<pr::Expr>>) -> Result<pr::ExprKind> {
+    fn desugar_range(&mut self, v: pr::Range) -> Result<pr::ExprKind> {
         let mut start = fold::fold_optional_box(self, v.start)?
             .map(|b| *b)
             .unwrap_or_else(|| pr::Expr::new(pr::Literal::Integer(0))); // TODO

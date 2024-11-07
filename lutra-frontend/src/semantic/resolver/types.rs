@@ -20,7 +20,9 @@ impl Resolver<'_> {
         ty.layout = self.compute_ty_layout(&ty)?;
         if ty.layout.is_none() {
             if self.strict_mode {
-                return Err(Error::new_simple("type has an infinite size due to recursive type references".to_string())
+                return Err(Error::new_simple(
+                    "type has an infinite size due to recursive type references".to_string(),
+                )
                 .push_hint("add an array or an enum onto the path of recursion")
                 .with_span(ty.span));
             } else {
@@ -218,9 +220,7 @@ impl Resolver<'_> {
                 // build index of found fields
                 let found_types: HashMap<_, _> = found_fields
                     .iter()
-                    .filter_map(|e| {
-                        e.name.as_ref().map(|n| (n, &e.ty))
-                    })
+                    .filter_map(|e| e.name.as_ref().map(|n| (n, &e.ty)))
                     .collect();
 
                 let mut expected_but_not_found = Vec::new();

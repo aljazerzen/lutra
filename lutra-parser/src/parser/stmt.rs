@@ -2,7 +2,7 @@ use chumsky::prelude::*;
 
 use super::expr::{expr, expr_call, ident, pipeline};
 use super::{ctrl, ident_part, keyword, new_line, pipe};
-use crate::lexer::TokenKind;
+use crate::parser::lexer::TokenKind;
 use crate::parser::perror::PError;
 use crate::parser::types::type_expr;
 use crate::pr::*;
@@ -163,7 +163,7 @@ mod tests {
     use insta::assert_debug_snapshot;
 
     use super::*;
-    use crate::test::parse_with_parser;
+    use crate::parser::test::parse_with_parser;
 
     #[test]
     fn test_doc_comment() {

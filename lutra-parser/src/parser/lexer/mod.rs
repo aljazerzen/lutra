@@ -2,13 +2,14 @@
 mod test;
 mod token;
 
-pub use token::{Literal, Token, TokenKind};
+pub use token::{Token, TokenKind};
 
 use chumsky::error::Cheap;
 use chumsky::prelude::*;
 use chumsky::text::{newline, Character};
 
 use crate::error::{Error, ErrorSource, Reason, WithErrorInfo};
+use crate::pr::Literal;
 use crate::span::Span;
 
 /// Lex PRQL into LR, returning both the LR and any errors encountered

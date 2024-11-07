@@ -1,26 +1,35 @@
+mod expr;
+mod interpolation;
+pub(crate) mod lexer;
+pub(crate) mod perror;
+pub(crate) mod stmt;
+mod test;
+mod types;
+
 use chumsky::{prelude::*, Stream};
 
+use self::lexer::TokenKind;
 use self::perror::PError;
 
 use crate::error::Error;
-use crate::lexer;
-use crate::lexer::TokenKind;
 use crate::pr;
 use crate::span::Span;
 
-mod expr;
-mod interpolation;
-pub(crate) mod perror;
-pub(crate) mod stmt;
-mod types;
+pub fn parse_source(source: &str, source_id: u16) -> (Option<Vec<pr::Stmt>>, Vec<Error>) {
+    let (tokens, mut errors) = lexer::lex_source_recovery(source, source_id);
 
-// Note that `parse_source` is in `prqlc` crate, not in `prqlc-parser` crate,
-// because it logs using the logging framework in `prqlc`.
+    let ast = if let Some(tokens) = tokens {
+        let (ast, parse_errors) = parse_lr_to_pr(source_id, tokens);
+        errors.extend(parse_errors);
+        ast
+    } else {
+        None
+    };
 
-pub fn parse_lr_to_pr(
-    source_id: u16,
-    lr: Vec<lexer::Token>,
-) -> (Option<Vec<pr::Stmt>>, Vec<Error>) {
+    (ast, errors)
+}
+
+fn parse_lr_to_pr(source_id: u16, lr: Vec<lexer::Token>) -> (Option<Vec<pr::Stmt>>, Vec<Error>) {
     let stream = prepare_stream(lr, source_id);
     let (pr, parse_errors) = stmt::source().parse_recovery(stream);
 

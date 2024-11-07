@@ -3,8 +3,8 @@ use std::collections::{hash_map::Entry, HashMap};
 use chumsky::prelude::*;
 use itertools::Itertools;
 
-use crate::lexer::{Literal, TokenKind};
 use crate::parser::interpolation;
+use crate::parser::lexer::TokenKind;
 use crate::parser::perror::PError;
 use crate::parser::types::type_expr;
 use crate::parser::{ctrl, ident_part, keyword, new_line, sequence};

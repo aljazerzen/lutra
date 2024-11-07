@@ -2,10 +2,7 @@ use std::collections::HashMap;
 
 use enum_as_inner::EnumAsInner;
 
-use crate::generic;
-use crate::lexer::Literal;
-use crate::pr::ops::{BinOp, UnOp};
-use crate::pr::Ty;
+use crate::pr::{BinOp, Literal, Ty, UnOp};
 use crate::span::Span;
 
 use super::Path;
@@ -159,9 +156,37 @@ pub struct Pipeline {
     pub exprs: Vec<Expr>,
 }
 
-pub type Range = generic::Range<Box<Expr>>;
-pub type InterpolateItem = generic::InterpolateItem<Expr>;
-pub type SwitchCase = generic::SwitchCase<Box<Expr>>;
+/// Inclusive-inclusive range.
+/// Missing bound means unbounded range.
+#[derive(Debug, Clone, Default, PartialEq)]
+pub struct Range {
+    pub start: Option<Box<Expr>>,
+    pub end: Option<Box<Expr>>,
+}
+
+impl Range {
+    pub const fn unbounded() -> Self {
+        Range {
+            start: None,
+            end: None,
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum InterpolateItem {
+    String(String),
+    Expr {
+        expr: Box<Expr>,
+        format: Option<String>,
+    },
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct SwitchCase {
+    pub condition: Box<Expr>,
+    pub value: Box<Expr>,
+}
 
 impl From<Literal> for ExprKind {
     fn from(value: Literal) -> Self {

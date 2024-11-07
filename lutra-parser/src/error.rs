@@ -160,8 +160,6 @@ impl std::fmt::Display for Errors {
 pub trait WithErrorInfo: Sized {
     fn push_hint<S: Into<String>>(self, hint: S) -> Self;
 
-    fn with_hints<S: Into<String>, I: IntoIterator<Item = S>>(self, hints: I) -> Self;
-
     fn with_span(self, span: Option<Span>) -> Self;
 
     fn with_span_fallback(self, span: Option<Span>) -> Self;
@@ -174,11 +172,6 @@ pub trait WithErrorInfo: Sized {
 impl WithErrorInfo for Error {
     fn push_hint<S: Into<String>>(mut self, hint: S) -> Self {
         self.hints.push(hint.into());
-        self
-    }
-
-    fn with_hints<S: Into<String>, I: IntoIterator<Item = S>>(mut self, hints: I) -> Self {
-        self.hints = hints.into_iter().map(|x| x.into()).collect();
         self
     }
 
@@ -206,10 +199,6 @@ impl WithErrorInfo for Error {
 impl<T, E: WithErrorInfo> WithErrorInfo for Result<T, E> {
     fn push_hint<S: Into<String>>(self, hint: S) -> Self {
         self.map_err(|e| e.push_hint(hint))
-    }
-
-    fn with_hints<S: Into<String>, I: IntoIterator<Item = S>>(self, hints: I) -> Self {
-        self.map_err(|e| e.with_hints(hints))
     }
 
     fn with_span(self, span: Option<Span>) -> Self {

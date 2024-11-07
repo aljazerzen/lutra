@@ -98,11 +98,7 @@ struct Context {
 }
 
 /// Generates a type definition.
-fn write_ty_def(
-    w: &mut impl Write,
-    ty: &pr::Ty,
-    ctx: &mut Context,
-) -> Result<(), std::fmt::Error> {
+fn write_ty_def(w: &mut impl Write, ty: &pr::Ty, ctx: &mut Context) -> Result<(), std::fmt::Error> {
     let name = ty.name.as_ref().unwrap();
 
     // derive traits

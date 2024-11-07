@@ -3,16 +3,16 @@
 //! understands expressions, such as tuples & functions.
 
 pub use expr::*;
+pub use literal::*;
 pub use ops::*;
 pub use path::*;
 pub use stmt::*;
 pub use types::*;
 
-// re-export Literal from LR, since it's encapsulated in TyKind
-pub use crate::lexer::Literal;
 pub use crate::span::Span;
 
 mod expr;
+mod literal;
 mod ops;
 mod path;
 mod stmt;

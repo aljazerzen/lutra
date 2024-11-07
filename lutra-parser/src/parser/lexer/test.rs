@@ -2,8 +2,10 @@ use chumsky::Parser;
 use insta::assert_debug_snapshot;
 use insta::assert_snapshot;
 
-use crate::lexer::token::{Literal, TokenKind, Tokens};
-use crate::lexer::{lex_source, lexer, literal, quoted_string};
+use crate::pr::Literal;
+
+use super::token::{TokenKind, Tokens};
+use super::{lex_source, lexer, literal, quoted_string};
 
 #[test]
 fn line_wrap() {

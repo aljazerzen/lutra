@@ -220,8 +220,6 @@ impl Interpreter {
                     arg_symbols.push(self.evaluate_expr(arg));
                 }
 
-                
-
                 match function {
                     Cell::Function(func) => {
                         let scope_size = arg_symbols.len();
