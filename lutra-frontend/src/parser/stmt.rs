@@ -6,6 +6,7 @@ use crate::parser::lexer::TokenKind;
 use crate::parser::perror::PError;
 use crate::parser::types::type_expr;
 use crate::pr::*;
+use crate::Span;
 
 /// The top-level parser for a PRQL file
 pub fn source() -> impl Parser<TokenKind, Vec<Stmt>, Error = PError> {

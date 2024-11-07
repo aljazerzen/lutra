@@ -19,27 +19,16 @@ pub fn parse_source(source: &str, source_id: u16) -> (Option<Vec<pr::Stmt>>, Vec
     let (tokens, mut errors) = lexer::lex_source_recovery(source, source_id);
 
     let ast = if let Some(tokens) = tokens {
-        let (ast, parse_errors) = parse_lr_to_pr(source_id, tokens);
-        errors.extend(parse_errors);
+        let stream = prepare_stream(tokens, source_id);
+        let (ast, chum_errs) = stmt::source().parse_recovery(stream);
+
+        errors.extend(chum_errs.into_iter().map(Diagnostic::from));
         ast
     } else {
         None
     };
 
     (ast, errors)
-}
-
-fn parse_lr_to_pr(
-    source_id: u16,
-    lr: Vec<lexer::Token>,
-) -> (Option<Vec<pr::Stmt>>, Vec<Diagnostic>) {
-    let stream = prepare_stream(lr, source_id);
-    let (pr, parse_errors) = stmt::source().parse_recovery(stream);
-
-    let errors = parse_errors.into_iter().map(|e| e.into()).collect();
-    log::debug!("parse errors: {errors:?}");
-
-    (pr, errors)
 }
 
 /// Convert the output of the lexer into the input of the parser. Requires

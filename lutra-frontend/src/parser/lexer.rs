@@ -97,7 +97,7 @@ fn lex_token() -> impl Parser<char, Token, Error = Cheap<char>> {
             .to(TokenKind::Annotate),
     ));
 
-    let control = one_of("></%=+-*[]().,:|!{}").map(TokenKind::Control);
+    let control = one_of("></%=+-*[]().,:|!{};").map(TokenKind::Control);
 
     let ident = ident_part().map(TokenKind::Ident);
 

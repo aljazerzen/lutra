@@ -10,5 +10,13 @@ version.workspace = true
 lutra-bin = { path = "../lutra-bin" }
 lutra-frontend = { path = "../lutra-frontend" }
 
+# for the IR parser
+chumsky = { workspace = true }
+itertools = { workspace = true }
+log = { workspace = true }
+
+[dev-dependencies]
+insta = { workspace = true }
+
 [build-dependencies]
 lutra-codegen = { path = "../lutra-codegen" }

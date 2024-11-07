@@ -15,7 +15,15 @@ pub use project::{Project, SourceTree};
 
 pub use ir::decl;
 
-use error::{Diagnostic, WithErrorInfo};
-use span::Span;
+pub use span::Span;
 
-type Result<T, E = Diagnostic> = core::result::Result<T, E>;
+type Result<T, E = error::Diagnostic> = core::result::Result<T, E>;
+
+pub mod _lexer {
+    pub use crate::parser::lexer::{Token, TokenKind};
+    pub use crate::error::Diagnostic;
+    
+    pub use crate::parser::lexer::lex_source_recovery as lex;
+}
+
+

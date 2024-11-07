@@ -2,9 +2,9 @@ use std::borrow::Cow;
 
 use itertools::Itertools;
 
-use crate::error::Diagnostic;
+use crate::error::{Diagnostic, WithErrorInfo};
 use crate::pr;
-use crate::{Result, WithErrorInfo};
+use crate::Result;
 
 // TODO: i'm not proud of the naming scheme in this file
 

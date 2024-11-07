@@ -9,8 +9,6 @@ pub use path::*;
 pub use stmt::*;
 pub use types::*;
 
-pub use crate::span::Span;
-
 mod expr;
 mod literal;
 mod ops;

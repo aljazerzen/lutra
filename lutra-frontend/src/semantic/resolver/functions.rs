@@ -1,10 +1,10 @@
 use itertools::Itertools;
 
-use crate::error::Diagnostic;
+use crate::error::{Diagnostic, WithErrorInfo};
 use crate::ir::decl::{Decl, DeclKind};
 use crate::ir::fold::{self, PrFold};
 use crate::pr::*;
-use crate::{Result, Span, WithErrorInfo};
+use crate::{Result, Span};
 
 use super::scope::Scope;
 use super::Resolver;

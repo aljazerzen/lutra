@@ -210,16 +210,15 @@ fn test_lex_source() {
     assert_debug_snapshot!(lex_source("^"), @r#"
     Err(
         [
-            Error {
-                kind: Error,
+            Diagnostic {
+                code: DiagnosticCode(
+                    "E0003",
+                ),
+                message: "unexpected ^",
                 span: Some(
                     0:0-1,
                 ),
-                reason: Unexpected {
-                    found: "^",
-                },
-                hints: [],
-                code: None,
+                additional: [],
             },
         ],
     )

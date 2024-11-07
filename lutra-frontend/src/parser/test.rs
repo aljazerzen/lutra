@@ -50,49 +50,46 @@ fn test_error_unicode_string() {
     parse_source("👍 s’").unwrap_err();
 
     let source = "Mississippi has four S’s and four I’s.";
-    assert_debug_snapshot!(parse_source(source).unwrap_err(), @r###"
+    assert_debug_snapshot!(parse_source(source).unwrap_err(), @r#"
     [
-        Error {
-            kind: Error,
+        Diagnostic {
+            code: DiagnosticCode(
+                "E0003",
+            ),
+            message: "unexpected ’",
             span: Some(
                 0:22-23,
             ),
-            reason: Unexpected {
-                found: "’",
-            },
-            hints: [],
-            code: None,
+            additional: [],
         },
-        Error {
-            kind: Error,
+        Diagnostic {
+            code: DiagnosticCode(
+                "E0003",
+            ),
+            message: "unexpected ’",
             span: Some(
                 0:35-36,
             ),
-            reason: Unexpected {
-                found: "’",
-            },
-            hints: [],
-            code: None,
+            additional: [],
         },
     ]
-    "###);
+    "#);
 }
 
 #[test]
 fn test_error_unexpected() {
-    assert_debug_snapshot!(parse_source("Answer: T-H-A-T!").unwrap_err(), @r###"
+    assert_debug_snapshot!(parse_source("Answer: T-H-A-T!").unwrap_err(), @r#"
     [
-        Error {
-            kind: Error,
+        Diagnostic {
+            code: DiagnosticCode(
+                "E0003",
+            ),
+            message: "unexpected :",
             span: Some(
                 0:6-7,
             ),
-            reason: Simple(
-                "unexpected :",
-            ),
-            hints: [],
-            code: None,
+            additional: [],
         },
     ]
-    "###);
+    "#);
 }
