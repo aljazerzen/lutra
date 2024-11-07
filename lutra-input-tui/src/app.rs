@@ -28,7 +28,7 @@ impl App {
     }
 
     pub fn render(&self, frame: &mut Frame) {
-        self.form.render(frame, frame.size());
+        self.form.render(frame, frame.area());
     }
 
     pub fn handle_event(&mut self, event: event::Event) -> EventResult {

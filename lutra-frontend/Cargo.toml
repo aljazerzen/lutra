@@ -26,17 +26,21 @@ test = false
 thiserror = { workspace = true }
 itertools = { workspace = true }
 log = { workspace = true }
+
+# discover
 walkdir = "2.5.0"
 
+# parser
 semver = { version = "1.0.23", features = ["serde"] }
-chumsky = "0.9.2"
+chumsky = { workspace = true }
+
 enum-as-inner = "0.6.1"
 strum = { version = "0.26.3", features = ["std", "derive"] }
-regex = "1.11.1"
 indexmap = "2.6.0"
 
+# cli
 clap = { version = "4.4.18", features = ["derive"], optional = true }
-env_logger = { version = "0.10.2", optional = true }
+env_logger = { workspace = true, optional = true }
 anyhow = { workspace = true, optional = true }
 
 [dev-dependencies]

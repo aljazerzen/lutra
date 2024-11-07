@@ -38,7 +38,7 @@ pub struct Expr {
     pub id: Option<usize>,
 }
 
-#[derive(Debug, EnumAsInner, PartialEq, Clone, strum::AsRefStr)]
+#[derive(Debug, EnumAsInner, PartialEq, Clone)]
 pub enum ExprKind {
     Ident(Path),
 

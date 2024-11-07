@@ -81,5 +81,5 @@ pub fn render_name_colon(form: &Form, frame: &mut Frame, area: Rect) -> Rect {
 
     area_colon
         .offset(Offset { x: 2, y: 0 })
-        .intersection(frame.size())
+        .intersection(frame.area())
 }

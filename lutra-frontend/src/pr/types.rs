@@ -73,7 +73,7 @@ pub struct TyTupleField {
 }
 
 /// Built-in sets.
-#[derive(Debug, Clone, PartialEq, Eq, Hash, strum::EnumString, strum::Display)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, strum::Display)]
 pub enum PrimitiveSet {
     #[strum(to_string = "int")]
     Int,

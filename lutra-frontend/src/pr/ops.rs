@@ -1,4 +1,4 @@
-#[derive(Debug, PartialEq, Eq, Clone, Copy, Hash, strum::Display, strum::EnumString)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy, Hash, strum::Display)]
 pub enum UnOp {
     #[strum(to_string = "-")]
     Neg,
@@ -8,7 +8,7 @@ pub enum UnOp {
     Not,
 }
 
-#[derive(Debug, PartialEq, Eq, Clone, Copy, Hash, strum::Display, strum::EnumString)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy, Hash, strum::Display)]
 pub enum BinOp {
     #[strum(to_string = "*")]
     Mul,

@@ -1,6 +1,6 @@
 use enum_as_inner::EnumAsInner;
 
-#[derive(Debug, EnumAsInner, PartialEq, Clone, strum::AsRefStr)]
+#[derive(Debug, EnumAsInner, PartialEq, Clone)]
 pub enum Literal {
     Integer(i64),
     Float(f64),
