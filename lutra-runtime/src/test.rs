@@ -1,34 +1,20 @@
 #![cfg(test)]
 
 use insta::assert_snapshot;
-use lutra_frontend::pr;
 
 #[track_caller]
-fn test_interpret(program: &str, res_ty: &str) -> String {
+fn _test_interpret(program: &str, res_ty: &str) -> String {
     let program = lutra_ir::_test_parse(program);
-    let ty = parse_ty(res_ty);
+    let ty = lutra_frontend::_test_compile_ty(res_ty);
 
     let value = crate::interpreter::evaluate(&program, ());
 
     value.print_source(&ty).unwrap()
 }
 
-#[track_caller]
-fn parse_ty(ty_source: &str) -> pr::Ty {
-    let source = format!("type t = {ty_source}");
-
-    let source = lutra_frontend::SourceTree::single("".into(), source.into());
-    let project = lutra_frontend::compile(source, lutra_frontend::CompileParams {}).unwrap();
-
-    let name = pr::Path::from_name("t");
-    let type_def = project.root_module.module.get(&name);
-
-    type_def.unwrap().kind.as_ty().unwrap().clone()
-}
-
 #[test]
 fn interpret_01() {
-    assert_snapshot!(test_interpret(r#"
+    assert_snapshot!(_test_interpret(r#"
     let externals = [core_int_add];
 
     let main =
@@ -60,7 +46,7 @@ fn interpret_01() {
 
 #[test]
 fn interpret_02() {
-    assert_snapshot!(test_interpret(r#"
+    assert_snapshot!(_test_interpret(r#"
     let externals = [core_array_map];
 
     let main =
@@ -89,7 +75,7 @@ fn interpret_02() {
 
 #[test]
 fn interpret_03() {
-    assert_snapshot!(test_interpret(r#"
+    assert_snapshot!(_test_interpret(r#"
     let externals = [core_array_map, core_int_mul];
 
     let main =

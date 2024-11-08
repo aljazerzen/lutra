@@ -25,3 +25,16 @@ pub mod _lexer {
 
     pub use crate::parser::lexer::lex_source_recovery as lex;
 }
+
+#[track_caller]
+pub fn _test_compile_ty(ty_source: &str) -> pr::Ty {
+    let source = format!("type t = {ty_source}");
+
+    let source = SourceTree::single("".into(), source);
+    let project = compile(source, CompileParams {}).unwrap();
+
+    let name = pr::Path::from_name("t");
+    let type_def = project.root_module.module.get(&name);
+
+    type_def.unwrap().kind.as_ty().unwrap().clone()
+}

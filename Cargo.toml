@@ -1,6 +1,6 @@
 [workspace]
 members = [
-    "example",
+    "tests",
     "lutra-bin",
     "lutra-codegen",
     "lutra-input-tui",

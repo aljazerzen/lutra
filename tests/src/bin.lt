@@ -18,17 +18,3 @@ type Tree = enum {
     Leaf = int,
     Node = {left = Tree, right = Tree},
 }
-
-type Rel = {
-  n_rows = int,
-  page = [{
-    id = int,
-    name = text,
-    address = {
-      city = text,
-      street = text
-    },
-    int,
-    is_admin = bool
-  }]
-}

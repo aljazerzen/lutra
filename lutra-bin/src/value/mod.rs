@@ -2,11 +2,12 @@ mod encode;
 mod fold;
 mod print_pretty;
 mod print_source;
+mod test;
 
 use crate::{Error, Result};
 use lutra_frontend::pr;
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum Value {
     Int(i64),
     Float(f64),
