@@ -6,7 +6,7 @@ use lutra_ir::ir;
 
 type Addr = usize;
 
-struct Interpreter {
+pub(crate) struct Interpreter {
     memory: Vec<Cell>,
 
     bindings: HashMap<ir::Sid, Addr>,
@@ -21,7 +21,7 @@ pub(crate) enum Cell {
     Vacant,
 }
 
-pub type NativeFunction = &'static dyn Fn(Vec<Cell>) -> Cell;
+pub type NativeFunction = &'static dyn Fn(&mut Interpreter, Vec<Cell>) -> Cell;
 
 pub fn evaluate(program: &ir::Program, _input: ()) -> lutra_bin::Value {
     let mut interpreter = Interpreter {
@@ -45,7 +45,7 @@ pub fn evaluate(program: &ir::Program, _input: ()) -> lutra_bin::Value {
 }
 
 impl Interpreter {
-    fn get_symbol(&self, sid: ir::Sid) -> &Cell {
+    fn get_cell(&self, sid: ir::Sid) -> &Cell {
         self.memory.get(self.resolve_sid_addr(sid)).unwrap()
     }
 
@@ -130,7 +130,7 @@ impl Interpreter {
     fn evaluate_expr(&mut self, expr: &ir::Expr) -> Cell {
         match &expr.kind {
             ir::ExprKind::Pointer(sid) => {
-                let mem_cell = self.get_symbol(*sid);
+                let mem_cell = self.get_cell(*sid);
                 match mem_cell {
                     Cell::Value(_) | Cell::Function(_) | Cell::FunctionNative(_) => {
                         mem_cell.clone()
@@ -209,25 +209,11 @@ impl Interpreter {
 
                 let function = self.evaluate_expr(function);
 
-                let mut arg_symbols = Vec::new();
+                let mut arg_cells = Vec::new();
                 for arg in args {
-                    arg_symbols.push(self.evaluate_expr(arg));
+                    arg_cells.push(self.evaluate_expr(arg));
                 }
-
-                match function {
-                    Cell::Function(func) => {
-                        let scope_size = arg_symbols.len();
-                        self.allocate_scope(func.symbol_ns, arg_symbols);
-
-                        let res = self.evaluate_expr(&func.body);
-
-                        self.drop_scope(func.symbol_ns, scope_size);
-                        res
-                    }
-                    Cell::FunctionNative(native) => native(arg_symbols),
-                    Cell::Value(_) => panic!(),
-                    Cell::Vacant => panic!(),
-                }
+                self.evaluate_func_call(&function, arg_cells)
             }
             ir::ExprKind::Function(func) => Cell::Function(func.clone()),
             ir::ExprKind::Binding(binding) => {
@@ -240,6 +226,23 @@ impl Interpreter {
                 self.drop_binding(*symbol);
                 main
             }
+        }
+    }
+
+    pub fn evaluate_func_call(&mut self, function: &Cell, args: Vec<Cell>) -> Cell {
+        match function {
+            Cell::Function(func) => {
+                let scope_size = args.len();
+                self.allocate_scope(func.symbol_ns, args);
+
+                let res = self.evaluate_expr(&func.body);
+
+                self.drop_scope(func.symbol_ns, scope_size);
+                res
+            }
+            Cell::FunctionNative(native) => native(self, args),
+            Cell::Value(_) => panic!(),
+            Cell::Vacant => panic!(),
         }
     }
 }

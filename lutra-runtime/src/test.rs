@@ -29,7 +29,7 @@ fn parse_ty(ty_source: &str) -> pr::Ty {
 #[test]
 fn interpret_01() {
     assert_snapshot!(test_interpret(r#"
-    let externals = [std_int_add];
+    let externals = [core_int_add];
 
     let main =
         let 1 = func 2 -> [fn.2+0, fn.2+0, fn.2+0];
@@ -54,6 +54,56 @@ fn interpret_01() {
       ],
       8,
     }
+    "#
+    );
+}
+
+#[test]
+fn interpret_02() {
+    assert_snapshot!(test_interpret(r#"
+    let externals = [core_array_map];
+
+    let main =
+        let 1 = func 1 -> {fn.1+0, fn.1+0};
+        (var.1, [2, 3, 1]) | external.0
+    "#,
+    "[{int, int}]"
+    ), @r#"
+    [
+      {
+        2,
+        2,
+      },
+      {
+        3,
+        3,
+      },
+      {
+        1,
+        1,
+      },
+    ]
+    "#
+    );
+}
+
+#[test]
+fn interpret_03() {
+    assert_snapshot!(test_interpret(r#"
+    let externals = [core_array_map, core_int_mul];
+
+    let main =
+        let 1 = [{1, 3}, {5, 4}, {2, 3}];
+        let 2 = func 1 -> (fn.1+0 .0, fn.1+0 .1) | external.1;
+        (var.2, var.1) | external.0
+    "#,
+    "[int]"
+    ), @r#"
+    [
+      3,
+      20,
+      6,
+    ]
     "#
     );
 }
