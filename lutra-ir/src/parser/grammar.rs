@@ -9,7 +9,7 @@ use lutra_frontend::_lexer::TokenKind;
 
 pub fn program() -> impl Parser<TokenKind, Program, Error = PError> {
     let externals = keyword("let")
-        .then(ident_keyword("external"))
+        .then(ident_keyword("externals"))
         .then(ctrl('='))
         .ignore_then(
             ident_part()
@@ -170,7 +170,7 @@ where
         .labelled("function call")
 }
 
-fn function<'a, E>(expr: E) -> impl Parser<TokenKind, ExprKind, Error = PError>
+fn function<E>(expr: E) -> impl Parser<TokenKind, ExprKind, Error = PError>
 where
     E: Parser<TokenKind, Expr, Error = PError> + Clone,
 {
@@ -189,7 +189,7 @@ where
         .labelled("function")
 }
 
-fn binding<'a, E>(expr: E) -> impl Parser<TokenKind, ExprKind, Error = PError>
+fn binding<E>(expr: E) -> impl Parser<TokenKind, ExprKind, Error = PError>
 where
     E: Parser<TokenKind, Expr, Error = PError> + Clone,
 {

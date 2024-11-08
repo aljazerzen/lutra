@@ -1,32 +1,20 @@
 #![cfg(test)]
-
 use insta::assert_debug_snapshot;
-
-#[track_caller]
-pub fn parse(source: &str) -> crate::ir::Program {
-    let (program, errors) = super::parse_source(source);
-    for error in &errors {
-        eprintln!("{}-{}: {}", error.span.start, error.span.end, error.message);
-    }
-    if !errors.is_empty() {
-        panic!();
-    }
-    program.unwrap()
-}
 
 #[test]
 fn parse_01() {
-    assert_debug_snapshot!(parse(r#"
-    let external = [std_int_add];
+    assert_debug_snapshot!(super::_test_parse(r#"let externals = [
+  std_int_add,
+];
 
-    let main =
-        let 1 = func 2 -> [fn.2+0, fn.2+0, fn.2+0];
-        let 2 = var.1;
-        {
-            (3.5) | var.2,
-            (6, 7) | func 3 -> [ fn.3+0, fn.3+1 ],
-            (6, 2) | external.0
-        }.1[0]
+let main =
+  let 1 = func 2 -> [fn.2+0, fn.2+0, fn.2+0];
+  let 2 = var.1;
+  {
+    (3.5) | var.2,
+    (6, 7) | func 3 -> [ fn.3+0, fn.3+1 ],
+    (6, 2) | external.0
+  }.1[0]
     "#), @r#"
     Program {
         externals: [

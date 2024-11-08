@@ -1,6 +1,6 @@
 mod grammar;
 mod perror;
-pub mod test;
+mod test;
 
 pub use perror::{Error, Span};
 
@@ -8,7 +8,7 @@ use crate::ir;
 use chumsky::{prelude::*, Stream};
 use lutra_frontend::_lexer::{lex, Token, TokenKind};
 
-pub fn parse_source(source: &str) -> (Option<ir::Program>, Vec<Error>) {
+pub fn parse(source: &str) -> (Option<ir::Program>, Vec<Error>) {
     let (tokens, errors) = lex(source, 0);
 
     let mut errors: Vec<_> = errors.into_iter().map(Error::from).collect();
@@ -54,4 +54,16 @@ fn prepare_stream<'a>(
         end: final_span,
     };
     Stream::from_iter(eoi, tokens)
+}
+
+#[track_caller]
+pub fn _test_parse(source: &str) -> crate::ir::Program {
+    let (program, errors) = super::parse(source);
+    for error in &errors {
+        eprintln!("{}-{}: {}", error.span.start, error.span.end, error.message);
+    }
+    if !errors.is_empty() {
+        panic!();
+    }
+    program.unwrap()
 }

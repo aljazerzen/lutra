@@ -4,8 +4,8 @@ use insta::assert_snapshot;
 use lutra_frontend::pr;
 
 #[track_caller]
-fn interpret(program: &str, res_ty: &str) -> String {
-    let program = crate::parser::test::parse(program);
+fn test_interpret(program: &str, res_ty: &str) -> String {
+    let program = lutra_ir::_test_parse(program);
     let ty = parse_ty(res_ty);
 
     let value = crate::interpreter::evaluate(&program, ());
@@ -28,8 +28,8 @@ fn parse_ty(ty_source: &str) -> pr::Ty {
 
 #[test]
 fn interpret_01() {
-    assert_snapshot!(interpret(r#"
-    let external = [std_int_add];
+    assert_snapshot!(test_interpret(r#"
+    let externals = [std_int_add];
 
     let main =
         let 1 = func 2 -> [fn.2+0, fn.2+0, fn.2+0];

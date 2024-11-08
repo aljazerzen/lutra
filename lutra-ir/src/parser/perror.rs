@@ -68,9 +68,7 @@ impl chumsky::Span for Span {
         }
     }
 
-    fn context(&self) -> Self::Context {
-        ()
-    }
+    fn context(&self) -> Self::Context {}
 
     fn start(&self) -> Self::Offset {
         self.start

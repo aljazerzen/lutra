@@ -1,5 +1,5 @@
 [package]
-name = "lutra-runtime"
+name = "lutra-ir"
 edition.workspace = true
 license.workspace = true
 repository.workspace = true
@@ -8,9 +8,15 @@ version.workspace = true
 
 [dependencies]
 lutra-bin = { path = "../lutra-bin" }
+
+# parser
+chumsky = { workspace = true }
+itertools = { workspace = true }
+log = { workspace = true }
 lutra-frontend = { path = "../lutra-frontend" }
-lutra-ir = { path = "../lutra-ir" }
+
+[build-dependencies]
+lutra-codegen = { path = "../lutra-codegen" }
 
 [dev-dependencies]
 insta = { workspace = true }
-

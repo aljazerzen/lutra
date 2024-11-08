@@ -26,7 +26,7 @@ impl std::cmp::PartialEq for Literal {
     }
 }
 
-fn quote_string(s: &str) -> String {
+pub(crate) fn quote_string(s: &str) -> String {
     if !s.contains('"') {
         return format!(r#""{}""#, s);
     }
@@ -67,7 +67,7 @@ fn quote_string(s: &str) -> String {
     format!("{}{}{}", delim, s, delim)
 }
 
-fn escape_all_except_quotes(s: &str) -> String {
+pub(crate) fn escape_all_except_quotes(s: &str) -> String {
     let mut result = String::new();
     for ch in s.chars() {
         if ch == '"' || ch == '\'' {

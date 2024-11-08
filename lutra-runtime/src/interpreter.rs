@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::ops::{BitAnd, Shr};
 use std::rc::Rc;
 
-use crate::ir;
+use lutra_ir::ir;
 
 type Addr = usize;
 
@@ -68,27 +68,21 @@ impl Interpreter {
     }
 
     fn resolve_sid_addr(&self, sid: ir::Sid) -> Addr {
-        let sid_kind: u32 = (sid.0 as u32).shr(30);
-        match sid_kind {
-            0 => {
+        match sid.kind() {
+            ir::SidKind::External => {
                 // externals: layed out at the start of memory
                 sid.0 as Addr
             }
-            1 => {
+            ir::SidKind::Var => {
                 // bindings
                 *self.bindings.get(&sid).unwrap()
             }
-            2 => {
+            ir::SidKind::FunctionScope => {
                 // function scopes
                 let scope_id = ir::Sid((sid.0 as u32).bitand(0xffffff00_u32) as i64);
-                if let Some(start) = self.scopes.get(&scope_id).and_then(|s| s.last()) {
-                    *start + ((sid.0 as u32).bitand(0x000000ff_u32) as usize)
-                } else {
-                    panic!()
-                }
-            }
-            _ => {
-                panic!()
+                let start = self.scopes.get(&scope_id).and_then(|s| s.last()).unwrap();
+
+                *start + ((sid.0 as u32).bitand(0x000000ff_u32) as usize)
             }
         }
     }
