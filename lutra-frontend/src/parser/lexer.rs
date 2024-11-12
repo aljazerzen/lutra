@@ -13,7 +13,7 @@ use crate::error::{Diagnostic, DiagnosticCode};
 use crate::pr::Literal;
 use crate::span::Span;
 
-/// Lex PRQL into LR, returning both the LR and any errors encountered
+/// Split source into tokens.
 pub fn lex_source_recovery(source: &str, source_id: u16) -> (Option<Vec<Token>>, Vec<Diagnostic>) {
     let (tokens, lex_errors) = lexer().parse_recovery(source);
 
@@ -28,7 +28,6 @@ pub fn lex_source_recovery(source: &str, source_id: u16) -> (Option<Vec<Token>>,
     (tokens, errors)
 }
 
-/// Lex PRQL into LR, returning either the LR or the errors encountered
 #[cfg(test)]
 pub fn lex_source(source: &str) -> Result<token::Tokens, Vec<Diagnostic>> {
     lexer()

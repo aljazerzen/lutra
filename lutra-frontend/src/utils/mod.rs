@@ -1,3 +1,4 @@
+pub mod fold;
 mod id_gen;
 mod toposort;
 

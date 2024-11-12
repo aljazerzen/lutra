@@ -1,6 +1,6 @@
-use crate::ir::fold;
-use crate::ir::fold::PrFold;
 use crate::pr;
+use crate::utils::fold;
+use crate::utils::fold::PrFold;
 use crate::Result;
 
 pub fn run(module_def: pr::ModuleDef) -> pr::ModuleDef {

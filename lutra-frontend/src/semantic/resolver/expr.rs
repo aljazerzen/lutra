@@ -1,11 +1,11 @@
 use itertools::Itertools;
 
+use crate::decl::DeclKind;
 use crate::error::{Diagnostic, WithErrorInfo};
-use crate::ir::decl::DeclKind;
-use crate::ir::fold::{self, PrFold};
 use crate::pr;
 use crate::pr::Ty;
 use crate::semantic::{NS_STD, NS_THIS};
+use crate::utils::fold::{self, PrFold};
 use crate::{Result, Span};
 
 use super::tuple::StepOwned;

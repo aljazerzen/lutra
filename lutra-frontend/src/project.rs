@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::path::PathBuf;
 
-use crate::ir::decl::RootModule;
+use crate::decl::RootModule;
 
 /// Project, resolved.
 #[derive(Debug)]

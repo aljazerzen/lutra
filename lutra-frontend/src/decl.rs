@@ -24,7 +24,7 @@ pub struct Module {
 }
 
 /// A struct containing information about a single declaration
-/// within a PRQL module.
+/// within a module.
 #[derive(Debug, PartialEq, Clone)]
 pub struct Decl {
     pub span: Option<Span>,

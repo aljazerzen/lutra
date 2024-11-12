@@ -1,4 +1,4 @@
-use crate::ir::decl::RootModule;
+use crate::decl::RootModule;
 use crate::utils::IdGenerator;
 
 mod expr;

@@ -1,5 +1,5 @@
-//! PR, or "Parser Representation" is an AST representation of parsed PRQL. It
-//! takes LR tokens and converts them into a more structured form which
+//! PR, or "Parser Representation" is an AST representation of parsed source code.
+//! It takes LR tokens and converts them into a more structured form which
 //! understands expressions, such as tuples & functions.
 
 pub use expr::*;

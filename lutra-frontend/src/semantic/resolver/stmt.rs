@@ -1,7 +1,7 @@
-use crate::ir::decl::DeclKind;
-use crate::ir::fold::PrFold;
+use crate::decl::DeclKind;
 use crate::pr;
 use crate::semantic::NS_STD;
+use crate::utils::fold::PrFold;
 use crate::Result;
 
 impl super::Resolver<'_> {

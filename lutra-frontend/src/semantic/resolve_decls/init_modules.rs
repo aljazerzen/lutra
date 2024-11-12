@@ -1,4 +1,4 @@
-use crate::ir::decl;
+use crate::decl;
 use crate::pr;
 
 pub fn init_module_tree(root_module_def: pr::ModuleDef) -> decl::RootModule {

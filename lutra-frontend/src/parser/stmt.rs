@@ -8,7 +8,7 @@ use crate::parser::types::type_expr;
 use crate::pr::*;
 use crate::Span;
 
-/// The top-level parser for a PRQL file
+/// The top-level parser
 pub fn source() -> impl Parser<TokenKind, Vec<Stmt>, Error = PError> {
     module_contents()
         // This is the only instance we can consume newlines at the end of something, since

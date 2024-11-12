@@ -3,8 +3,8 @@ use std::collections::HashMap;
 use itertools::Itertools;
 
 use crate::error::{Diagnostic, WithErrorInfo};
-use crate::ir::fold::{self, PrFold};
 use crate::pr::{self, *};
+use crate::utils::fold::{self, PrFold};
 use crate::{Result, Span};
 
 use super::Resolver;

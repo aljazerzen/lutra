@@ -1,6 +1,6 @@
 use indexmap::IndexMap;
 
-use crate::ir::decl::{Decl, DeclKind, Module, RootModule};
+use crate::decl::{Decl, DeclKind, Module, RootModule};
 use crate::pr;
 use crate::{Result, Span};
 

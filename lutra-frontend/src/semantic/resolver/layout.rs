@@ -1,5 +1,5 @@
+use crate::decl;
 use crate::error::{Diagnostic, WithErrorInfo};
-use crate::ir::decl;
 use crate::pr;
 use crate::Result;
 

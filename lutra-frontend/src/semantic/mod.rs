@@ -8,7 +8,7 @@ mod resolver;
 use self::resolver::Resolver;
 
 use crate::compile::is_mod_def_for;
-use crate::ir::decl::RootModule;
+use crate::decl::RootModule;
 use crate::pr;
 use crate::Result;
 

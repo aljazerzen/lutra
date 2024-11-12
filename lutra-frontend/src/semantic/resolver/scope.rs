@@ -1,6 +1,6 @@
 use indexmap::IndexMap;
 
-use crate::ir::decl::Decl;
+use crate::decl::Decl;
 use crate::pr::Path;
 use crate::semantic::NS_LOCAL;
 

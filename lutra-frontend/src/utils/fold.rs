@@ -1,8 +1,7 @@
 #![allow(dead_code)]
 
-/// A trait to "fold" a PRQL AST (similar to a visitor), so we can transitively
-/// apply some logic to a whole tree by just defining how we want to handle each
-/// type.
+/// A trait to "fold" the PR AST, so we can transitively apply some logic to
+/// a whole tree by just defining how we want to handle each type.
 use itertools::Itertools;
 
 use crate::pr;

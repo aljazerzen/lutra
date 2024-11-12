@@ -1,8 +1,8 @@
 use std::collections::HashMap;
 
+use crate::decl;
 use crate::error;
 use crate::error::Diagnostic;
-use crate::ir::decl;
 use crate::pr;
 use crate::project;
 

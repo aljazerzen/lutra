@@ -1,9 +1,9 @@
 use itertools::Itertools;
 
+use crate::decl;
 use crate::error::{Diagnostic, WithErrorInfo};
-use crate::ir::decl;
-use crate::ir::fold::{self, PrFold};
 use crate::semantic::NS_STD;
+use crate::utils::fold::{self, PrFold};
 use crate::Result;
 use crate::{pr, utils};
 
