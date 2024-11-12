@@ -4,9 +4,11 @@ use std::rc::Rc;
 
 use lutra_ir::ir;
 
+use crate::NativeModule;
+
 type Addr = usize;
 
-pub(crate) struct Interpreter {
+pub struct Interpreter {
     memory: Vec<Cell>,
 
     bindings: HashMap<ir::Sid, Addr>,
@@ -14,16 +16,20 @@ pub(crate) struct Interpreter {
 }
 
 #[derive(Clone)]
-pub(crate) enum Cell {
+pub enum Cell {
     Value(Rc<lutra_bin::Value>),
     Function(Box<ir::Function>),
     FunctionNative(NativeFunction),
     Vacant,
 }
 
-pub type NativeFunction = &'static dyn Fn(&mut Interpreter, Vec<Cell>) -> Cell;
+pub type NativeFunction = &'static dyn Fn(&mut Interpreter, Vec<Cell>) -> lutra_bin::Value;
 
-pub fn evaluate(program: &ir::Program, _input: ()) -> lutra_bin::Value {
+pub fn evaluate(
+    program: &ir::Program,
+    _input: (),
+    native_modules: &[(&str, &dyn NativeModule)],
+) -> lutra_bin::Value {
     let mut interpreter = Interpreter {
         memory: Vec::<Cell>::new(),
         bindings: HashMap::new(),
@@ -31,8 +37,12 @@ pub fn evaluate(program: &ir::Program, _input: ()) -> lutra_bin::Value {
     };
 
     // load external symbols
+    let native_modules: HashMap<&str, _> = native_modules.iter().map(|a| (a.0, a.1)).collect();
     for external in &program.externals {
-        interpreter.allocate(crate::native::lookup_native_symbol(&external.id));
+        let (mod_id, decl_name) = external.id.rsplit_once('_').unwrap();
+
+        let module = native_modules.get(mod_id).unwrap();
+        interpreter.allocate(module.lookup_native_symbol(decl_name));
     }
 
     // evaluate the expression
@@ -240,7 +250,10 @@ impl Interpreter {
                 self.drop_scope(func.symbol_ns, scope_size);
                 res
             }
-            Cell::FunctionNative(native) => native(self, args),
+            Cell::FunctionNative(native) => {
+                let res: lutra_bin::Value = native(self, args);
+                Cell::Value(Rc::new(res))
+            }
             Cell::Value(_) => panic!(),
             Cell::Vacant => panic!(),
         }

@@ -37,18 +37,9 @@ impl<I> Layout for Vec<I> {
     }
 }
 
-#[derive(Default)]
-pub struct LayoutCache {}
-
-impl LayoutCache {
-    pub fn does_enum_variant_contain_recursive(
-        &self,
-        enum_ty: &pr::Ty,
-        variant_index: usize,
-    ) -> bool {
-        let layout = enum_ty.layout.as_ref().unwrap();
-        layout.variants_recursive.contains(&variant_index)
-    }
+pub fn does_enum_variant_contain_recursive(enum_ty: &pr::Ty, variant_index: usize) -> bool {
+    let layout = enum_ty.layout.as_ref().unwrap();
+    layout.variants_recursive.contains(&variant_index)
 }
 
 pub struct EnumHeadFormat {

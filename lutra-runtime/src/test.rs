@@ -7,7 +7,7 @@ fn _test_interpret(program: &str, res_ty: &str) -> String {
     let program = lutra_ir::_test_parse(program);
     let ty = lutra_frontend::_test_compile_ty(res_ty);
 
-    let value = crate::interpreter::evaluate(&program, ());
+    let value = crate::interpreter::evaluate(&program, (), crate::BUILTIN_MODULES);
 
     value.print_source(&ty).unwrap()
 }

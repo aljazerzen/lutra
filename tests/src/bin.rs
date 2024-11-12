@@ -1,8 +1,4 @@
-#![cfg(test)]
-
-mod types {
-    include!(concat!(env!("OUT_DIR"), "/project.rs"));
-}
+use crate::lutra::bin as types;
 
 use std::sync::OnceLock;
 
@@ -36,7 +32,7 @@ static SCHEMA: OnceLock<Project> = OnceLock::new();
 #[track_caller]
 fn _test_get_type(name: &'static str) -> &'static pr::Ty {
     let project = SCHEMA.get_or_init(|| {
-        let source = include_str!("bin.lt");
+        let source = include_str!("../lutra/bin.lt");
         let source = lutra_frontend::SourceTree::single("".into(), source.into());
 
         lutra_frontend::compile(source, lutra_frontend::CompileParams {}).unwrap()

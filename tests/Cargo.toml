@@ -1,5 +1,5 @@
 [package]
-name = "example"
+name = "tests"
 edition.workspace = true
 license.workspace = true
 repository.workspace = true
@@ -10,6 +10,8 @@ version.workspace = true
 lutra-bin = { path = "../lutra-bin" }
 lutra-typed-data = { path = "../lutra-typed-data" }
 lutra-frontend = { path = "../lutra-frontend" }
+lutra-runtime = { path = "../lutra-runtime" }
+lutra-ir = { path = "../lutra-ir" }
 
 [build-dependencies]
 lutra-codegen = { path = "../lutra-codegen" }

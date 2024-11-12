@@ -1,5 +1,3 @@
-#![cfg(test)]
-
 use lutra_bin::Value;
 
 #[track_caller]
