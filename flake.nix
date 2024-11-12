@@ -25,10 +25,14 @@
               "rustfmt"
               "rust-analyzer"
             ])
+            pkgs.clang
+            pkgs.mold
 
             pkgs.cargo-nextest
             pkgs.cargo-insta
           ];
+
+          RUSTFLAGS = "-Clink-arg=-fuse-ld=${pkgs.mold}/bin/mold";
         };
       });
 }
