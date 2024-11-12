@@ -9,11 +9,12 @@ use self::resolver::Resolver;
 
 use crate::compile::is_mod_def_for;
 use crate::decl::RootModule;
+use crate::diagnostic::Diagnostic;
 use crate::pr;
 use crate::Result;
 
 /// Runs semantic analysis on the query.
-pub fn resolve(module_tree: pr::ModuleDef) -> Result<RootModule> {
+pub fn resolve(module_tree: pr::ModuleDef) -> Result<RootModule, Vec<Diagnostic>> {
     // load_std_lib(&mut module_tree);
 
     // expand AST into PL
@@ -23,29 +24,14 @@ pub fn resolve(module_tree: pr::ModuleDef) -> Result<RootModule> {
     let mut root_module = resolve_decls::init_module_tree(root_module_def);
 
     // resolve name references between declarations
-    let resolution_order = resolve_decls::resolve_decl_refs(&mut root_module)?;
+    let resolution_order =
+        resolve_decls::resolve_decl_refs(&mut root_module).map_err(|d| vec![d])?;
 
     // resolve
     let mut resolver = Resolver::new(&mut root_module);
-
-    for group in &resolution_order {
-        resolver.strict_mode = false;
-        for _ in 0..5 {
-            resolver.strict_mode_needed = false;
-            for fq_ident in group {
-                resolver.resolve_decl(fq_ident)?;
-            }
-            if !resolver.strict_mode_needed {
-                break;
-            }
-        }
-        if resolver.strict_mode_needed {
-            resolver.strict_mode = true;
-            for fq_ident in group {
-                resolver.resolve_decl(fq_ident)?;
-            }
-        }
-    }
+    resolver
+        .resolve_decls(resolution_order.as_slice())
+        .map_err(|d| vec![d])?;
 
     root_module.ordering = resolution_order;
     Ok(root_module)

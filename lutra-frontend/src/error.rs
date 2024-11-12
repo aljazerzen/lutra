@@ -1,154 +1,209 @@
-use crate::Span;
+use std::collections::HashMap;
+use std::fmt::{self, Write};
+use std::path::{Path, PathBuf};
+
+use crate::diagnostic::{Diagnostic, DiagnosticCode};
 
 #[derive(thiserror::Error, Debug)]
 pub enum Error {
     #[error("io error")]
     Io(#[from] std::io::Error),
 
+    #[error("invalid path: {path}")]
+    InvalidPath { path: PathBuf },
+
     #[error("invalid source structure: {problem}")]
     InvalidSourceStructure { problem: String },
 
-    #[error("invalid source code")]
-    InvalidSource { diagnostics: Vec<Diagnostic> },
+    #[error("{}", DisplayMessages(.diagnostics))]
+    InvalidSource { diagnostics: Vec<DiagnosticMessage> },
 }
 
+impl Error {
+    pub(crate) fn from_diagnostics(
+        diagnostics: Vec<Diagnostic>,
+        source: &crate::SourceTree,
+    ) -> Self {
+        let diagnostics = compose_diagnostic_messages(diagnostics, source);
+        Error::InvalidSource { diagnostics }
+    }
+}
+
+#[derive(Debug)]
+pub struct DiagnosticMessage {
+    diagnostic: Diagnostic,
+
+    display: String,
+
+    location: SourceLocation,
+}
+
+impl DiagnosticMessage {
+    pub fn code(&self) -> &'static str {
+        self.diagnostic.code.get()
+    }
+
+    pub fn message(&self) -> &str {
+        &self.diagnostic.message
+    }
+
+    pub fn span(&self) -> &Option<crate::Span> {
+        &self.diagnostic.span
+    }
+
+    pub fn display(&self) -> &str {
+        &self.display
+    }
+
+    pub fn location(&self) -> &SourceLocation {
+        &self.location
+    }
+}
+
+/// Location within the source file.
+/// Tuples contain:
+/// - line number (0-based),
+/// - column number within that line (0-based),
 #[derive(Debug, Clone)]
-pub struct Diagnostic {
-    pub code: DiagnosticCode,
+pub struct SourceLocation {
+    pub start: (usize, usize),
 
-    pub message: String,
-
-    pub span: Option<Span>,
-
-    pub additional: Vec<Additional>,
+    pub end: (usize, usize),
 }
 
-#[allow(dead_code)]
-impl Diagnostic {
-    pub(crate) fn new<S: ToString>(message: S, code: DiagnosticCode) -> Self {
-        Diagnostic {
-            code,
-            message: message.to_string(),
-            span: None,
-            additional: vec![],
+fn compose_diagnostic_messages(
+    diagnostics: Vec<Diagnostic>,
+    sources: &crate::SourceTree,
+) -> Vec<DiagnosticMessage> {
+    use ariadne::Cache;
+
+    let mut cache = FileTreeCache::new(sources);
+
+    let mut messages = Vec::with_capacity(diagnostics.len());
+    for diagnostic in diagnostics {
+        if let Some(span) = diagnostic.span {
+            let source_path = sources.source_ids.get(&span.source_id).unwrap().as_path();
+
+            let source = cache.fetch(&source_path).unwrap();
+            let Some(location) = compose_location(&diagnostic, source) else {
+                panic!(
+                    "span {:?} is out of bounds of the source (len = {})",
+                    diagnostic.span,
+                    source.len()
+                );
+            };
+
+            let display = compose_display(&diagnostic, source_path, &mut cache);
+            messages.push(DiagnosticMessage {
+                diagnostic,
+                display,
+                location,
+            });
+        } else {
+            panic!("missing diagnostic span: {}", diagnostic.message)
         }
     }
+    messages
+}
 
-    pub(crate) fn new_custom<S: ToString>(message: S) -> Self {
-        Diagnostic::new(message, DiagnosticCode::CUSTOM)
+fn compose_display(
+    diagnostic: &Diagnostic,
+    source_path: &Path,
+    cache: &mut FileTreeCache,
+) -> String {
+    use ariadne::{Config, Label, Report, ReportKind};
+
+    // We always pass color to ariadne as true, and then (currently) strip later.
+    let config = Config::default().with_color(true);
+
+    let span = std::ops::Range::from(diagnostic.span.unwrap());
+
+    let kind = match diagnostic.code.get_severity() {
+        crate::diagnostic::Severity::Warning => ReportKind::Warning,
+        crate::diagnostic::Severity::Error => ReportKind::Error,
+    };
+
+    let mut report = Report::build(kind, source_path, span.start)
+        .with_config(config)
+        .with_label(Label::new((source_path, span)).with_message(&diagnostic.message));
+
+    if diagnostic.code != DiagnosticCode::CUSTOM {
+        report = report.with_code(diagnostic.code.get());
     }
 
-    pub(crate) fn new_simple<S: ToString>(message: S) -> Self {
-        Diagnostic::new(message, DiagnosticCode::CUSTOM)
+    let mut notes = String::new();
+    for additional in &diagnostic.additional {
+        if let Some(span) = additional.span {
+            let span = std::ops::Range::from(span);
+            report.add_label(Label::new((source_path, span)).with_message(&diagnostic.message))
+        } else {
+            notes += &additional.message;
+            notes += "\n";
+        }
+    }
+    if !notes.is_empty() {
+        report.set_note(notes);
     }
 
-    /// Things that we know are not working correctly, but will eventually get fixed.
-    pub(crate) fn new_bug(issue_no: u32) -> Self {
-        Diagnostic::new("Internal bug", DiagnosticCode::BUG)
-            .push_hint(format!("Tracked under number {issue_no}"))
-    }
+    let mut out = Vec::new();
+    report.finish().write(cache, &mut out).unwrap();
+    String::from_utf8(out).unwrap()
+}
 
-    /// Things that you *think* should never happen, but are not sure.
-    pub(crate) fn new_assert<S: Into<String>>(message: S) -> Self {
-        Diagnostic::new("Internal bug. Please file an issue.", DiagnosticCode::BUG)
-            .push_hint(message)
-    }
+fn compose_location(diagnostic: &Diagnostic, source: &ariadne::Source) -> Option<SourceLocation> {
+    let span = diagnostic.span?;
 
-    pub(crate) fn with_span(mut self, span: Option<Span>) -> Self {
-        self.span = span.or(self.span);
-        self
-    }
+    let start = source.get_offset_line(span.start)?;
+    let end = source.get_offset_line(span.end)?;
+    Some(SourceLocation {
+        start: (start.1, start.2),
+        end: (end.1, end.2),
+    })
+}
 
-    pub(crate) fn with_span_fallback(mut self, span: Option<Span>) -> Self {
-        self.span = self.span.or(span);
-        self
-    }
-
-    pub(crate) fn with_additional(mut self, additional: Additional) -> Self {
-        self.additional.push(additional);
-        self
-    }
-
-    pub(crate) fn into_error(self) -> Error {
-        Error::InvalidSource {
-            diagnostics: vec![self],
+struct FileTreeCache<'a> {
+    file_tree: &'a crate::SourceTree,
+    cache: HashMap<PathBuf, ariadne::Source>,
+}
+impl<'a> FileTreeCache<'a> {
+    fn new(file_tree: &'a crate::SourceTree) -> Self {
+        FileTreeCache {
+            file_tree,
+            cache: HashMap::new(),
         }
     }
 }
 
-#[derive(Debug, Clone)]
-pub enum Severity {
-    Warning,
-    Error,
-}
+impl<'a> ariadne::Cache<&Path> for FileTreeCache<'a> {
+    type Storage = String;
+    fn fetch(&mut self, id: &&Path) -> Result<&ariadne::Source, Box<dyn fmt::Debug + '_>> {
+        let file_contents = match self.file_tree.sources.get(*id) {
+            Some(v) => v,
+            None => return Err(Box::new(format!("Unknown file `{id:?}`"))),
+        };
 
-#[derive(Debug, Clone)]
-pub struct DiagnosticCode(&'static str); // Maybe [std::ascii::Char; 5]?
-
-impl DiagnosticCode {
-    pub const CUSTOM: DiagnosticCode = DiagnosticCode("E0000");
-    pub const BUG: DiagnosticCode = DiagnosticCode("E0001");
-    pub const ASSERT: DiagnosticCode = DiagnosticCode("E0002");
-    pub const PARSER: DiagnosticCode = DiagnosticCode("E0003");
-
-    pub fn get(&self) -> &'static str {
-        self.0
+        Ok(self
+            .cache
+            .entry((*id).to_owned())
+            .or_insert_with(|| ariadne::Source::from(file_contents.to_string())))
     }
 
-    pub const fn get_severity(&self) -> Severity {
-        match self.0.as_bytes()[0] {
-            b'E' => Severity::Error,
-            b'W' => Severity::Warning,
-            _ => panic!(),
+    fn display<'b>(&self, id: &&'b Path) -> Option<Box<dyn fmt::Display + 'b>> {
+        match id.as_os_str().to_str() {
+            Some(s) => Some(Box::new(s)),
+            None => None,
         }
     }
 }
 
-#[derive(Debug, Clone)]
-pub struct Additional {
-    pub message: String,
+struct DisplayMessages<'a>(&'a Vec<DiagnosticMessage>);
 
-    pub span: Option<Span>,
-}
-
-pub trait WithErrorInfo: Sized {
-    fn push_hint<S: Into<String>>(self, hint: S) -> Self;
-
-    fn with_span(self, span: Option<Span>) -> Self;
-
-    fn with_span_fallback(self, span: Option<Span>) -> Self;
-}
-
-impl WithErrorInfo for Diagnostic {
-    fn push_hint<S: Into<String>>(mut self, hint: S) -> Self {
-        self.additional.push(Additional {
-            message: hint.into(),
-            span: None,
-        });
-        self
-    }
-
-    fn with_span(mut self, span: Option<Span>) -> Self {
-        self.span = span;
-        self
-    }
-
-    fn with_span_fallback(mut self, span: Option<Span>) -> Self {
-        self.span = self.span.or(span);
-        self
-    }
-}
-
-impl<T, E: WithErrorInfo> WithErrorInfo for Result<T, E> {
-    fn push_hint<S: Into<String>>(self, hint: S) -> Self {
-        self.map_err(|e| e.push_hint(hint))
-    }
-
-    fn with_span(self, span: Option<Span>) -> Self {
-        self.map_err(|e| e.with_span(span))
-    }
-
-    fn with_span_fallback(self, span: Option<Span>) -> Self {
-        self.map_err(|e| e.with_span_fallback(span))
+impl<'a> std::fmt::Display for DisplayMessages<'a> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        for d in self.0 {
+            f.write_str(&d.display)?;
+            f.write_char('\n')?;
+        }
+        Ok(())
     }
 }

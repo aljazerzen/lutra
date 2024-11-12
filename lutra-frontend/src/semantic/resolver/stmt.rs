@@ -5,6 +5,28 @@ use crate::utils::fold::PrFold;
 use crate::Result;
 
 impl super::Resolver<'_> {
+    pub fn resolve_decls(&mut self, order: &[Vec<pr::Path>]) -> Result<()> {
+        for group in order {
+            self.strict_mode = false;
+            for _ in 0..5 {
+                self.strict_mode_needed = false;
+                for fq_ident in group {
+                    self.resolve_decl(fq_ident)?;
+                }
+                if !self.strict_mode_needed {
+                    break;
+                }
+            }
+            if self.strict_mode_needed {
+                self.strict_mode = true;
+                for fq_ident in group {
+                    self.resolve_decl(fq_ident)?;
+                }
+            }
+        }
+        Ok(())
+    }
+
     /// Entry point to the resolver.
     /// fq_ident must point to an unresolved declaration.
     pub fn resolve_decl(&mut self, fq_ident: &pr::Path) -> Result<()> {

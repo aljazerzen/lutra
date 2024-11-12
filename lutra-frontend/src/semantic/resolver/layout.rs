@@ -1,5 +1,5 @@
 use crate::decl;
-use crate::error::{Diagnostic, WithErrorInfo};
+use crate::diagnostic::{Diagnostic, WithErrorInfo};
 use crate::pr;
 use crate::Result;
 
@@ -82,7 +82,7 @@ impl Resolver<'_> {
                     }
 
                     _ => {
-                        return Err(Diagnostic::new_simple(format!(
+                        return Err(Diagnostic::new_custom(format!(
                             "expected a type, but found {decl:?}"
                         ))
                         .with_span(ty.span))

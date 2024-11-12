@@ -1,7 +1,7 @@
 use itertools::Itertools;
 
 use crate::decl;
-use crate::error::{Diagnostic, WithErrorInfo};
+use crate::diagnostic::{Diagnostic, WithErrorInfo};
 use crate::semantic::NS_STD;
 use crate::utils::fold::{self, PrFold};
 use crate::Result;
@@ -32,7 +32,7 @@ pub fn resolve_decl_refs(root: &mut decl::RootModule) -> Result<Vec<Vec<pr::Path
     let has_var_cycles = order_vars.iter().any(|scc| scc.len() != 1);
 
     if has_var_cycles {
-        return Err(Diagnostic::new_simple(
+        return Err(Diagnostic::new_custom(
             "unimplemented cyclic references between expressions",
         ));
     }
@@ -143,13 +143,13 @@ impl NameResolver<'_> {
     fn fold_import_def(&mut self, import_def: pr::ImportDef) -> Result<pr::ImportDef, Diagnostic> {
         let (fq_ident, indirections) = self.resolve_ident(import_def.name)?;
         if !indirections.is_empty() {
-            return Err(Diagnostic::new_simple(
+            return Err(Diagnostic::new_custom(
                 "Import can only reference modules and declarations",
             ));
         }
         if fq_ident.is_empty() {
             log::debug!("resolved type ident to : {fq_ident:?} + {indirections:?}");
-            return Err(Diagnostic::new_simple("invalid type name"));
+            return Err(Diagnostic::new_custom("invalid type name"));
         }
         Ok(pr::ImportDef {
             name: pr::Path::new(fq_ident),
@@ -198,13 +198,13 @@ impl fold::PrFold for NameResolver<'_> {
 
                 if !indirections.is_empty() {
                     log::debug!("resolved type ident to : {ident:?} + {indirections:?}");
-                    return Err(Diagnostic::new_simple("types are not allowed indirections")
+                    return Err(Diagnostic::new_custom("types are not allowed indirections")
                         .with_span(ty.span));
                 }
 
                 if ident.is_empty() {
                     log::debug!("resolved type ident to : {ident:?} + {indirections:?}");
-                    return Err(Diagnostic::new_simple("invalid type name").with_span(ty.span));
+                    return Err(Diagnostic::new_custom("invalid type name").with_span(ty.span));
                 }
 
                 pr::Ty {
@@ -292,7 +292,7 @@ fn module_lookup(
         }
     }
 
-    Err(Diagnostic::new_simple(
+    Err(Diagnostic::new_custom(
         "direct references modules not allowed",
     ))
 }
@@ -302,5 +302,5 @@ fn module_lookup_step<'m>(module: &'m mut decl::Module, step: &str) -> Result<&'
         return Ok(module.names.get_mut(step).unwrap());
     }
 
-    Err(Diagnostic::new_simple(format!("Name not found: {step}")))
+    Err(Diagnostic::new_custom(format!("Name not found: {step}")))
 }

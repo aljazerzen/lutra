@@ -8,7 +8,7 @@ use chumsky::error::Cheap;
 use chumsky::prelude::*;
 use chumsky::text::{newline, Character};
 
-use crate::error::{Diagnostic, DiagnosticCode};
+use crate::diagnostic::{Diagnostic, DiagnosticCode};
 
 use crate::pr::Literal;
 use crate::span::Span;

@@ -12,7 +12,8 @@ pub fn generate_types(project_dir: &std::path::Path, out_file: &std::path::Path)
     })
     .unwrap();
 
-    let project = lutra_frontend::compile(source, CompileParams {}).unwrap();
+    let project =
+        lutra_frontend::compile(source, CompileParams {}).unwrap_or_else(|e| panic!("{e}"));
 
     // write types
     let mut file = fs::File::create(out_file).unwrap();

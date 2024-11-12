@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use itertools::Itertools;
 
-use crate::error::{Diagnostic, WithErrorInfo};
+use crate::diagnostic::{Diagnostic, WithErrorInfo};
 use crate::pr::{self, *};
 use crate::utils::fold::{self, PrFold};
 use crate::{Result, Span};
@@ -20,7 +20,7 @@ impl Resolver<'_> {
         ty.layout = self.compute_ty_layout(&ty)?;
         if ty.layout.is_none() {
             if self.strict_mode {
-                return Err(Diagnostic::new_simple(
+                return Err(Diagnostic::new_custom(
                     "type has an infinite size due to recursive type references".to_string(),
                 )
                 .push_hint("add an array or an enum onto the path of recursion")
@@ -122,7 +122,7 @@ impl Resolver<'_> {
                     .try_collect()?;
 
                 let Some(inferred_ty) = case_tys.first() else {
-                    return Err(Diagnostic::new_simple(
+                    return Err(Diagnostic::new_custom(
                         "cannot infer type of any of the branches of this case statement",
                     )
                     .with_span(expr.span));
@@ -461,7 +461,7 @@ where
         .unwrap_or_default();
     let who = who.map(|x| format!("{x} ")).unwrap_or_default();
 
-    let mut e = Diagnostic::new_simple(format!(
+    let mut e = Diagnostic::new_custom(format!(
         "{who}expected {}, but found {}",
         display_ty(expected),
         display_ty(found_ty)

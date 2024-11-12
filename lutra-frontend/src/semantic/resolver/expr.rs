@@ -1,7 +1,7 @@
 use itertools::Itertools;
 
 use crate::decl::DeclKind;
-use crate::error::{Diagnostic, WithErrorInfo};
+use crate::diagnostic::{Diagnostic, WithErrorInfo};
 use crate::pr;
 use crate::pr::Ty;
 use crate::semantic::{NS_STD, NS_THIS};
@@ -73,7 +73,7 @@ impl fold::PrFold for super::Resolver<'_> {
                         }
 
                         DeclKind::Ty(_) => {
-                            return Err(Diagnostic::new_simple(
+                            return Err(Diagnostic::new_custom(
                                 "expected a value, but found a type",
                             )
                             .with_span(*span));
@@ -242,12 +242,12 @@ impl super::Resolver<'_> {
         match indirection {
             pr::IndirectionKind::Name(name) => {
                 self.lookup_name_in_tuple(base, name).and_then(|res| {
-                    res.ok_or_else(|| Diagnostic::new_simple(format!("Unknown name {name}")))
+                    res.ok_or_else(|| Diagnostic::new_custom(format!("Unknown name {name}")))
                 })
             }
             pr::IndirectionKind::Position(pos) => {
                 let step = super::tuple::lookup_position_in_tuple(base, *pos as usize)?
-                    .ok_or_else(|| Diagnostic::new_simple("Out of bounds"))?;
+                    .ok_or_else(|| Diagnostic::new_custom("Out of bounds"))?;
 
                 Ok(vec![step])
             }

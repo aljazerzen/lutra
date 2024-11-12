@@ -4,8 +4,7 @@ use std::fmt::Debug;
 use std::fmt::Display;
 use std::hash::Hash;
 
-use crate::error::Diagnostic;
-use crate::error::DiagnosticCode;
+use crate::diagnostic::{Diagnostic, DiagnosticCode};
 use crate::parser::lexer;
 
 use crate::span::Span;

@@ -4,7 +4,7 @@ use chumsky::Parser;
 use insta::assert_debug_snapshot;
 use std::fmt::Debug;
 
-use crate::error::Diagnostic;
+use crate::diagnostic::Diagnostic;
 use crate::parser::lexer::TokenKind;
 use crate::parser::perror::PError;
 use crate::parser::prepare_stream;

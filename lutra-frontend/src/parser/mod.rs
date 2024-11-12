@@ -11,7 +11,7 @@ use chumsky::{prelude::*, Stream};
 use self::lexer::TokenKind;
 use self::perror::PError;
 
-use crate::error::Diagnostic;
+use crate::diagnostic::Diagnostic;
 use crate::pr;
 use crate::span::Span;
 

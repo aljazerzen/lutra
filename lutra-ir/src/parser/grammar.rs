@@ -1,4 +1,4 @@
-use std::ops::{Shl, ShlAssign};
+use ::std::ops::{Shl, ShlAssign};
 
 use chumsky::prelude::*;
 use lutra_frontend::pr;

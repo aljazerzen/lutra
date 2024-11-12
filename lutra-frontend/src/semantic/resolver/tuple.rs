@@ -2,7 +2,7 @@ use std::borrow::Cow;
 
 use itertools::Itertools;
 
-use crate::error::{Diagnostic, WithErrorInfo};
+use crate::diagnostic::{Diagnostic, WithErrorInfo};
 use crate::pr;
 use crate::Result;
 
@@ -181,5 +181,5 @@ fn ambiguous_error(candidates: Vec<Vec<Step>>) -> Diagnostic {
         candidates_str.push(r);
     }
     let hint = format!("could be any of: {}", candidates_str.join(", "));
-    Diagnostic::new_simple("Ambiguous name").push_hint(hint)
+    Diagnostic::new_custom("Ambiguous name").push_hint(hint)
 }

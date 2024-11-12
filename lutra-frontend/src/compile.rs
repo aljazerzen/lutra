@@ -1,10 +1,11 @@
 use std::collections::HashMap;
 
-use crate::decl;
+use crate::diagnostic::Diagnostic;
 use crate::error;
-use crate::error::Diagnostic;
+use crate::error::Error;
 use crate::pr;
 use crate::project;
+use crate::SourceTree;
 
 pub use linearize::is_mod_def_for;
 
@@ -15,9 +16,12 @@ pub struct CompileParams {}
 pub fn compile(
     source: project::SourceTree,
     _: CompileParams,
-) -> Result<project::Project, crate::error::Error> {
-    let root_module = parse_and_compile(&source)?;
-    // .map_err(|e| e.composed(&source_tree))?;
+) -> Result<project::Project, error::Error> {
+    let source_files = linearize::linearize_tree(&source)?;
+
+    let root_module = parse(&source, source_files)
+        .and_then(crate::semantic::resolve)
+        .map_err(|e| Error::from_diagnostics(e, &source))?;
 
     Ok(crate::Project {
         source,
@@ -25,17 +29,12 @@ pub fn compile(
     })
 }
 
-fn parse_and_compile(source_tree: &project::SourceTree) -> Result<decl::RootModule, error::Error> {
-    // parse and resolve
-    let ast_tree = parse(source_tree)?;
-    crate::semantic::resolve(ast_tree).map_err(Diagnostic::into_error)
-}
-
-fn parse(file_tree: &project::SourceTree) -> Result<pr::ModuleDef, error::Error> {
-    let source_files = linearize::linearize_tree(file_tree)?;
-
+fn parse(
+    tree: &SourceTree,
+    files: Vec<linearize::SourceFile>,
+) -> Result<pr::ModuleDef, Vec<Diagnostic>> {
     // reverse the id->file_path map
-    let ids: HashMap<_, _> = file_tree
+    let ids: HashMap<_, _> = tree
         .source_ids
         .iter()
         .map(|(a, b)| (b.as_path(), a))
@@ -49,7 +48,7 @@ fn parse(file_tree: &project::SourceTree) -> Result<pr::ModuleDef, error::Error>
 
     // parse and insert into the root
     let mut diagnostics = Vec::new();
-    for source_file in source_files {
+    for source_file in files {
         let id = ids
             .get(&source_file.file_path)
             .map(|x| **x)
@@ -66,7 +65,7 @@ fn parse(file_tree: &project::SourceTree) -> Result<pr::ModuleDef, error::Error>
     if diagnostics.is_empty() {
         Ok(root)
     } else {
-        Err(error::Error::InvalidSource { diagnostics })
+        Err(diagnostics)
     }
 }
 
@@ -99,9 +98,6 @@ mod linearize {
             root_path = root;
         } else {
             if tree.sources.is_empty() {
-                // TODO: should we allow non `.prql` files? We could require `.prql`
-                // for modules but then allow any file if a single file is passed
-                // (python allows this, for example)
                 return Err(error::Error::InvalidSourceStructure {
                     problem: "No `.lt` files found".to_string(),
                 });
@@ -201,10 +197,10 @@ mod linearize {
         // split by /
         path.components()
             .map(|x| {
-                x.as_os_str().to_str().map(str::to_string).ok_or_else(|| {
-                    error::Diagnostic::new_custom(format!("Invalid file path: {path:?}"))
-                        .into_error()
-                })
+                x.as_os_str()
+                    .to_str()
+                    .map(str::to_string)
+                    .ok_or_else(|| error::Error::InvalidPath { path: path.clone() })
             })
             .try_collect()
     }

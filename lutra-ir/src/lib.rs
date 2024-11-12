@@ -6,7 +6,7 @@ mod sid;
 pub mod ir {
     pub use crate::sid::SidKind;
 
-    include!(concat!(env!("OUT_DIR"), "/ir.rs"));
+    include!(concat!(env!("OUT_DIR"), "/project.rs"));
 }
 
 pub use parser::{_test_parse, parse};

@@ -1,7 +1,7 @@
 use itertools::Itertools;
 
 use crate::decl::{Decl, DeclKind};
-use crate::error::{Diagnostic, WithErrorInfo};
+use crate::diagnostic::{Diagnostic, WithErrorInfo};
 use crate::pr::*;
 use crate::utils::fold::{self, PrFold};
 use crate::{Result, Span};
@@ -80,7 +80,7 @@ impl Resolver<'_> {
         );
 
         if args.len() > fn_ty.params.len() {
-            return Err(Diagnostic::new_simple(format!(
+            return Err(Diagnostic::new_custom(format!(
                 "Too many arguments to function `{}`",
                 metadata.as_debug_name()
             ))
@@ -316,7 +316,7 @@ impl Resolver<'_> {
             // a helpful check for a common anti-pattern
             if let Some(alias) = expr.alias {
                 return Err(
-                    Diagnostic::new_simple(format!("unexpected assign to `{alias}`"))
+                    Diagnostic::new_custom(format!("unexpected assign to `{alias}`"))
                         .push_hint(format!("move assign into the tuple: `{{{alias} = ...}}`"))
                         .with_span(expr.span),
                 );
