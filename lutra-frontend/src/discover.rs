@@ -14,7 +14,7 @@ pub struct DiscoverParams {
 }
 
 pub fn discover(params: DiscoverParams) -> Result<project::SourceTree, std::io::Error> {
-    let source_extension = Some(OsStr::new("prql"));
+    let source_extension = Some(OsStr::new("lt"));
 
     let mut project = project::SourceTree {
         root: params.project_path,
@@ -31,7 +31,7 @@ pub fn discover(params: DiscoverParams) -> Result<project::SourceTree, std::io::
                 e if e == source_extension => {
                     let file_contents = fs::read_to_string(path)?;
 
-                    project.sources.insert(relative_path, file_contents);
+                    project.insert(relative_path, file_contents);
                 }
 
                 // ignore

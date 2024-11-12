@@ -1,7 +1,7 @@
 #![cfg(test)]
 
 mod types {
-    include!(concat!(env!("OUT_DIR"), "/bin.rs"));
+    include!(concat!(env!("OUT_DIR"), "/project.rs"));
 }
 
 use std::sync::OnceLock;

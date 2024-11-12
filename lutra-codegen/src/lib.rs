@@ -1,32 +1,24 @@
 mod codegen;
 
+use std::fs;
+use std::io::Write;
 use std::path::PathBuf;
 
-pub use codegen::codegen;
+use lutra_frontend::{CompileParams, DiscoverParams};
 
-pub fn compile_dir(source_dir: &std::path::Path, out_dir: &std::path::Path) -> Vec<PathBuf> {
-    let mut compiled_files = Vec::new();
-    for entry in std::fs::read_dir(source_dir).unwrap() {
-        let entry = entry.unwrap();
-        let path = entry.path();
+pub fn generate_types(project_dir: &std::path::Path, out_file: &std::path::Path) -> Vec<PathBuf> {
+    let source = lutra_frontend::discover(DiscoverParams {
+        project_path: project_dir.into(),
+    })
+    .unwrap();
 
-        if path.extension().map_or(false, |x| x == "lt") && path.is_file() {
-            compile_file(&path, out_dir);
-            compiled_files.push(path);
-        }
-    }
-    compiled_files
-}
+    let project = lutra_frontend::compile(source, CompileParams {}).unwrap();
 
-pub fn compile_file(source_path: &std::path::Path, out_dir: &std::path::Path) {
-    use std::fs;
-    use std::io::Write;
+    // write types
+    let mut file = fs::File::create(out_file).unwrap();
+    let generated = codegen::codegen_types(&project.root_module.module).unwrap();
+    write!(file, "{generated}").unwrap();
 
-    let source_stem = source_path.file_stem().unwrap();
-    let source = fs::read_to_string(source_path).unwrap();
-
-    let dest_path = out_dir.join(source_stem).with_extension("rs");
-
-    let mut file = fs::File::create(dest_path).unwrap();
-    write!(file, "{}", codegen(&source).unwrap()).unwrap();
+    // return vec of input files
+    project.source.get_sources().map(|s| s.0.clone()).collect()
 }

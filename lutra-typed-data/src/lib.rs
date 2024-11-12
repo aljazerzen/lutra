@@ -1,5 +1,5 @@
 mod schema {
-    include!(concat!(env!("OUT_DIR"), "/schema.rs"));
+    include!(concat!(env!("OUT_DIR"), "/project.rs"));
 }
 
 use lutra_bin::{Decode, Encode, Result, Value};

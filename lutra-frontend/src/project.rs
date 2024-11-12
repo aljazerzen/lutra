@@ -26,7 +26,7 @@ pub struct SourceTree {
 
     /// Mapping from file paths into into their contents.
     /// Paths are relative to the root.
-    pub sources: HashMap<PathBuf, String>,
+    pub(crate) sources: HashMap<PathBuf, String>,
 
     /// Index of source ids to paths. Used to keep [error::Span] lean.
     pub(crate) source_ids: HashMap<u16, PathBuf>,
@@ -66,6 +66,10 @@ impl SourceTree {
 
     pub fn get_path(&self, source_id: u16) -> Option<&PathBuf> {
         self.source_ids.get(&source_id)
+    }
+
+    pub fn get_sources(&self) -> impl Iterator<Item = (&PathBuf, &String)> {
+        self.sources.iter()
     }
 }
 
