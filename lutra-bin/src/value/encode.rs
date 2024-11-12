@@ -3,6 +3,7 @@ use std::io::Write;
 use lutra_frontend::pr;
 
 use super::{expect_ty, expect_ty_primitive, Value};
+use crate::encode::OffsetPointer;
 use crate::layout::{self, EnumHeadFormat, EnumVariantFormat};
 use crate::{Decode, Encode, Error, Reader, Result};
 
@@ -11,8 +12,9 @@ impl Value {
     pub fn encode(&self, w: &mut Vec<u8>, ty: &pr::Ty) -> Result<()> {
         let mut ctx = Context::new(ty);
 
-        let meta = encode_body(w, self, ty, &mut ctx)?;
-        encode_head(w, self, meta, ty, &mut ctx)?;
+        let head_ptr = encode_head(w, self, ty, &mut ctx)?;
+
+        encode_body(w, self, head_ptr, ty, &mut ctx)?;
         Ok(())
     }
 
@@ -20,165 +22,160 @@ impl Value {
     pub fn decode(buf: &[u8], ty: &pr::Ty) -> Result<Value> {
         let mut ctx = Context::new(ty);
 
-        let head_size = ty.layout.as_ref().unwrap().head_size / 8;
-
-        let mut reader = Reader::new(buf, buf.len() - head_size);
+        let mut reader = Reader::new(buf, 0);
         decode_inner(&mut reader, ty, &mut ctx)
-    }
-}
-
-enum ValueBodyMeta {
-    None,
-    Offset(usize),
-    Tuple(Vec<ValueBodyMeta>),
-}
-
-fn encode_body<'t>(
-    w: &mut Vec<u8>,
-    value: &Value,
-    ty: &'t pr::Ty,
-    ctx: &mut Context<'t>,
-) -> Result<ValueBodyMeta> {
-    let ty = resolve_ident(ty, ctx);
-
-    match value {
-        Value::Int(_) => {
-            expect_ty_primitive(ty, pr::PrimitiveSet::Int)?;
-            Ok(ValueBodyMeta::None)
-        }
-        Value::Float(_) => {
-            expect_ty_primitive(ty, pr::PrimitiveSet::Float)?;
-            Ok(ValueBodyMeta::None)
-        }
-        Value::Bool(_) => {
-            expect_ty_primitive(ty, pr::PrimitiveSet::Bool)?;
-            Ok(ValueBodyMeta::None)
-        }
-        Value::Text(v) => {
-            expect_ty_primitive(ty, pr::PrimitiveSet::Text)?;
-
-            let meta = v.encode_body(w)?;
-            Ok(ValueBodyMeta::Offset(meta))
-        }
-        Value::Tuple(fields) => {
-            let ty_fields = expect_ty(ty, |k| k.as_tuple(), "tuple")?;
-
-            let mut metas = Vec::with_capacity(fields.len());
-            for (f, f_ty) in fields.iter().zip(ty_fields) {
-                metas.push(encode_body(w, f, &f_ty.ty, ctx)?);
-            }
-
-            Ok(ValueBodyMeta::Tuple(metas))
-        }
-        Value::Array(items) => {
-            let items_ty = expect_ty(ty, |k| k.as_array(), "array")?;
-
-            let mut metas = Vec::with_capacity(items.len());
-            for i in items {
-                metas.push(encode_body(w, i, items_ty, ctx)?);
-            }
-
-            let items_start = w.len();
-            for (i, m) in items.iter().zip(metas.into_iter()) {
-                encode_head(w, i, m, items_ty, ctx)?;
-            }
-
-            Ok(ValueBodyMeta::Offset(items_start))
-        }
-        Value::Enum(tag, inner) => {
-            let variants = expect_ty(ty, |k| k.as_enum(), "enum")?;
-
-            let (_, variant_format, _, variant_ty) = encode_enum_params(*tag, variants)?;
-
-            let meta = encode_body(w, inner, variant_ty, ctx)?;
-
-            if variant_format.is_inline {
-                Ok(meta)
-            } else {
-                let variant_start = w.len();
-                encode_head(w, inner, meta, variant_ty, ctx)?;
-                Ok(ValueBodyMeta::Offset(variant_start))
-            }
-        }
     }
 }
 
 fn encode_head<'t>(
     w: &mut Vec<u8>,
     value: &Value,
-    body_meta: ValueBodyMeta,
+    ty: &'t pr::Ty,
+    ctx: &mut Context<'t>,
+) -> Result<ValueHeadPtr> {
+    let ty = resolve_ident(ty, ctx);
+
+    match value {
+        Value::Int(v) => {
+            expect_ty_primitive(ty, pr::PrimitiveSet::Int)?;
+            v.encode_head(w)?;
+            Ok(ValueHeadPtr::None)
+        }
+        Value::Float(v) => {
+            expect_ty_primitive(ty, pr::PrimitiveSet::Float)?;
+            v.encode_head(w)?;
+            Ok(ValueHeadPtr::None)
+        }
+        Value::Bool(v) => {
+            expect_ty_primitive(ty, pr::PrimitiveSet::Bool)?;
+
+            v.encode_head(w)?;
+            Ok(ValueHeadPtr::None)
+        }
+        Value::Text(v) => {
+            expect_ty_primitive(ty, pr::PrimitiveSet::Text)?;
+
+            v.encode_head(w).map(ValueHeadPtr::Offset)
+        }
+        Value::Tuple(fields) => {
+            let ty_fields = expect_ty(ty, |k| k.as_tuple(), "tuple")?;
+
+            let mut head_ptrs = Vec::with_capacity(fields.len());
+            for (f, f_ty) in fields.iter().zip(ty_fields) {
+                head_ptrs.push(encode_head(w, f, &f_ty.ty, ctx)?);
+            }
+
+            Ok(ValueHeadPtr::Tuple(head_ptrs))
+        }
+        Value::Array(items) => {
+            expect_ty(ty, |k| k.as_array(), "array")?;
+
+            let offset_ptr = OffsetPointer::new(w);
+            w.write_all(&(items.len() as u32).to_le_bytes())?;
+            Ok(ValueHeadPtr::Offset(offset_ptr))
+        }
+        Value::Enum(tag, inner) => {
+            let variants = expect_ty(ty, |k| k.as_enum(), "enum")?;
+
+            let (head, variant, tag, variant_ty) = enum_params_encode(*tag, variants)?;
+
+            let tag_bytes = &(tag as u64).to_le_bytes()[0..(head.s / 8)];
+
+            let r = if variant.is_inline {
+                w.write_all(tag_bytes)?;
+                encode_head(w, inner, variant_ty, ctx)?
+            } else {
+                w.write_all(tag_bytes)?;
+                let offset = OffsetPointer::new(w);
+
+                ValueHeadPtr::Offset(offset)
+            };
+
+            if variant.padding > 0 {
+                w.write_all(&vec![0; variant.padding / 8])?;
+            }
+            Ok(r)
+        }
+    }
+}
+
+enum ValueHeadPtr {
+    None,
+    Offset(OffsetPointer),
+    Tuple(Vec<ValueHeadPtr>),
+}
+
+fn encode_body<'t>(
+    w: &mut Vec<u8>,
+    value: &Value,
+    head_ptr: ValueHeadPtr,
     ty: &'t pr::Ty,
     ctx: &mut Context<'t>,
 ) -> Result<()> {
     let ty = resolve_ident(ty, ctx);
 
     match value {
-        Value::Int(v) => {
+        Value::Int(_) => {
             expect_ty_primitive(ty, pr::PrimitiveSet::Int)?;
-            v.encode_head((), w)?;
         }
-        Value::Float(v) => {
+        Value::Float(_) => {
             expect_ty_primitive(ty, pr::PrimitiveSet::Float)?;
-            v.encode_head((), w)?;
         }
-        Value::Bool(v) => {
+        Value::Bool(_) => {
             expect_ty_primitive(ty, pr::PrimitiveSet::Bool)?;
-
-            v.encode_head((), w)?;
         }
         Value::Text(v) => {
             expect_ty_primitive(ty, pr::PrimitiveSet::Text)?;
 
-            let ValueBodyMeta::Offset(bytes_offset) = body_meta else {
+            let ValueHeadPtr::Offset(offset_ptr) = head_ptr else {
                 unreachable!()
             };
 
-            v.encode_head(bytes_offset, w)?;
+            v.encode_body(offset_ptr, w)?;
         }
         Value::Tuple(fields) => {
             let ty_fields = expect_ty(ty, |k| k.as_tuple(), "tuple")?;
 
-            let ValueBodyMeta::Tuple(metas) = body_meta else {
+            let ValueHeadPtr::Tuple(tuple_ptrs) = head_ptr else {
                 unreachable!()
             };
 
-            for ((f, m), f_ty) in fields.iter().zip(metas.into_iter()).zip(ty_fields) {
-                encode_head(w, f, m, &f_ty.ty, ctx)?;
+            for ((f, h), f_ty) in fields.iter().zip(tuple_ptrs.into_iter()).zip(ty_fields) {
+                encode_body(w, f, h, &f_ty.ty, ctx)?
             }
         }
         Value::Array(items) => {
-            expect_ty(ty, |k| k.as_array(), "array")?;
+            let items_ty = expect_ty(ty, |k| k.as_array(), "array")?;
 
-            let ValueBodyMeta::Offset(items_offset) = body_meta else {
+            let ValueHeadPtr::Offset(offset_ptr) = head_ptr else {
                 unreachable!()
             };
+            offset_ptr.write(w);
 
-            let offset = w.len() - items_offset;
-            w.write_all(&(offset as u32).to_le_bytes())?;
-            w.write_all(&(items.len() as u32).to_le_bytes())?;
+            let mut head_ptrs = Vec::with_capacity(items.len());
+            for i in items {
+                head_ptrs.push(encode_head(w, i, items_ty, ctx)?);
+            }
+
+            for (i, h) in items.iter().zip(head_ptrs.into_iter()) {
+                encode_body(w, i, h, items_ty, ctx)?;
+            }
         }
         Value::Enum(tag, inner) => {
             let variants = expect_ty(ty, |k| k.as_enum(), "enum")?;
 
-            let (head, variant, tag, variant_ty) = encode_enum_params(*tag, variants)?;
+            let (_, variant_format, _, variant_ty) = enum_params_encode(*tag, variants)?;
 
-            let tag_bytes = &(tag as u64).to_le_bytes()[0..(head.s / 8)];
-
-            if variant.is_inline {
-                w.write_all(tag_bytes)?;
-                encode_head(w, inner, body_meta, variant_ty, ctx)?;
+            if variant_format.is_inline {
+                encode_body(w, inner, head_ptr, variant_ty, ctx)?;
             } else {
-                let ValueBodyMeta::Offset(inner_start) = body_meta else {
+                let ValueHeadPtr::Offset(offset_ptr) = head_ptr else {
                     unreachable!()
                 };
-                let offset = w.len() - inner_start;
+                offset_ptr.write(w);
 
-                w.write_all(tag_bytes)?;
-                w.write_all(&(offset as u32).to_le_bytes())?;
-            }
-
-            if variant.padding > 0 {
-                w.write_all(&vec![0; variant.padding / 8])?;
+                let head_ptr = encode_head(w, inner, variant_ty, ctx)?;
+                encode_body(w, inner, head_ptr, variant_ty, ctx)?;
             }
         }
     }
@@ -186,7 +183,7 @@ fn encode_head<'t>(
     Ok(())
 }
 
-fn encode_enum_params(
+fn enum_params_encode(
     tag: usize,
     ty_variants: &[(String, pr::Ty)],
 ) -> Result<(EnumHeadFormat, EnumVariantFormat, usize, &pr::Ty)> {
@@ -219,7 +216,7 @@ fn decode_inner<'t>(r: &mut Reader<'_>, ty: &'t pr::Ty, ctx: &mut Context<'t>) -
 
             let offset = r.copy_const::<4>();
             let offset = u32::from_le_bytes(offset) as usize;
-            body.rewind(offset);
+            body.skip(offset);
 
             let len = r.copy_const::<4>();
             let len = u32::from_le_bytes(len) as usize;
@@ -233,8 +230,6 @@ fn decode_inner<'t>(r: &mut Reader<'_>, ty: &'t pr::Ty, ctx: &mut Context<'t>) -
         }
 
         pr::TyKind::Enum(variants) => {
-            let mut body = r.clone();
-
             let head = layout::enum_head_format(variants);
 
             let mut tag_bytes = r.copy_n(head.s / 8);
@@ -248,9 +243,10 @@ fn decode_inner<'t>(r: &mut Reader<'_>, ty: &'t pr::Ty, ctx: &mut Context<'t>) -
             let inner = if variant_format.is_inline {
                 decode_inner(r, variant_ty, ctx)?
             } else {
+                let mut body = r.clone();
                 let offset = r.copy_const::<4>();
                 let offset = u32::from_le_bytes(offset) as usize;
-                body.rewind(offset);
+                body.skip(offset);
                 decode_inner(&mut body, variant_ty, ctx)?
             };
 

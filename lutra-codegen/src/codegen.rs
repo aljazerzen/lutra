@@ -234,24 +234,24 @@ fn write_ty_def_impl(
     match &ty.kind {
         pr::TyKind::Primitive(_) => {
             writeln!(w, "impl ::lutra_bin::Encode for {name} {{")?;
-            writeln!(w, "    type BodyMeta = ();")?;
-            writeln!(w, "    fn encode_body(&self, _w: &mut Vec<u8>) -> ::lutra_bin::Result<()> {{")?;
-            writeln!(w, "        Ok(())")?;
+            writeln!(w, "    type HeadPtr = ();")?;
+            writeln!(w, "    fn encode_head(&self, w: &mut Vec<u8>) -> ::lutra_bin::Result<()> {{")?;
+            writeln!(w, "        self.0.encode_head(w)")?;
             writeln!(w, "    }}")?;
-            writeln!(w, "    fn encode_head(&self, _: (), w: &mut Vec<u8>) -> ::lutra_bin::Result<()> {{")?;
-            writeln!(w, "        self.0.encode_head((), w)")?;
+            writeln!(w, "    fn encode_body(&self, _: (), _w: &mut Vec<u8>) -> ::lutra_bin::Result<()> {{")?;
+            writeln!(w, "        Ok(())")?;
             writeln!(w, "    }}")?;
             writeln!(w, "}}")?;
         }
 
         pr::TyKind::Array(_) => {
             writeln!(w, "impl ::lutra_bin::Encode for {name} {{")?;
-            writeln!(w, "    type BodyMeta = usize;")?;
-            writeln!(w, "    fn encode_body(&self, w: &mut Vec<u8>) -> ::lutra_bin::Result<usize> {{")?;
-            writeln!(w, "        self.0.encode_body(w)")?;
+            writeln!(w, "    type HeadPtr = ::lutra_bin::OffsetPointer;")?;
+            writeln!(w, "    fn encode_head(&self, w: &mut Vec<u8>) -> ::lutra_bin::Result<Self::HeadPtr> {{")?;
+            writeln!(w, "        self.0.encode_head(w)")?;
             writeln!(w, "    }}")?;
-            writeln!(w, "    fn encode_head(&self, meta: usize, w: &mut Vec<u8>) -> ::lutra_bin::Result<()> {{")?;
-            writeln!(w, "        self.0.encode_head(meta, w)")?;
+            writeln!(w, "    fn encode_body(&self, head: Self::HeadPtr, w: &mut Vec<u8>) -> ::lutra_bin::Result<()> {{")?;
+            writeln!(w, "        self.0.encode_body(head, w)")?;
             writeln!(w, "    }}")?;
             writeln!(w, "}}")?;
         }
@@ -259,18 +259,16 @@ fn write_ty_def_impl(
         pr::TyKind::Tuple(fields) => {
             writeln!(w, "#[allow(clippy::all)]")?;
             writeln!(w, "impl ::lutra_bin::Encode for {name} {{")?;
-            writeln!(w, "    type BodyMeta = {name}BodyMeta;")?;
+            writeln!(w, "    type HeadPtr = {name}HeadPtr;")?;
 
-            // encode body
-            writeln!(w, "    fn encode_body(&self, w: &mut Vec<u8>) -> ::lutra_bin::Result<Self::BodyMeta> {{")?;
-
+            // encode head
+            writeln!(w, "    fn encode_head(&self, w: &mut Vec<u8>) -> ::lutra_bin::Result<Self::HeadPtr> {{")?;
             for (index, field) in fields.iter().enumerate() {
                 let field_name = tuple_field_name(&field.name, index);
 
-                writeln!(w, "        let {0} = self.{0}.encode_body(w)?;", field_name)?;
+                writeln!(w, "        let {0} = self.{0}.encode_head(w)?;", field_name)?;
             }
-
-            writeln!(w, "        Ok({name}BodyMeta {{")?;
+            writeln!(w, "        Ok({name}HeadPtr {{")?;
             for (index, field) in fields.iter().enumerate() {
                 let field_name = tuple_field_name(&field.name, index);
 
@@ -279,21 +277,23 @@ fn write_ty_def_impl(
             writeln!(w, "        }})")?;
             writeln!(w, "    }}")?;
 
-            // encode head
-            writeln!(w, "    fn encode_head(&self, meta: Self::BodyMeta, w: &mut Vec<u8>) -> ::lutra_bin::Result<()> {{")?;
+            // encode body
+            writeln!(w, "    fn encode_body(&self, head: Self::HeadPtr, w: &mut Vec<u8>) -> ::lutra_bin::Result<()> {{")?;
+
             for (index, field) in fields.iter().enumerate() {
                 let field_name = tuple_field_name(&field.name, index);
 
-                writeln!(w, "        self.{0}.encode_head(meta.{0}, w)?;", field_name)?;
+                writeln!(w, "        self.{0}.encode_body(head.{0}, w)?;", field_name)?;
             }
             writeln!(w, "        Ok(())")?;
+
             writeln!(w, "    }}")?;
 
             writeln!(w, "}}")?;
 
-            // body meta struct
+            // head ptr struct
             writeln!(w, "#[allow(non_camel_case_types)]")?;
-            writeln!(w, "pub struct {name}BodyMeta {{")?;
+            writeln!(w, "pub struct {name}HeadPtr {{")?;
             for (index, field) in fields.iter().enumerate() {
                 let field_name = tuple_field_name(&field.name, index);
 
@@ -302,7 +302,7 @@ fn write_ty_def_impl(
                 let mut ctx = Context::default();
                 write_ty_ref(w, &field.ty, true, &mut ctx)?;
 
-                writeln!(w, " as ::lutra_bin::Encode>::BodyMeta,")?;
+                writeln!(w, " as ::lutra_bin::Encode>::HeadPtr,")?;
             }
             writeln!(w, "}}")?;
         }
@@ -310,9 +310,9 @@ fn write_ty_def_impl(
         pr::TyKind::Enum(variants) => {
             let head = layout::enum_head_format(variants);
 
-            let needs_body_meta = variants.iter().any(|(_, t)| !is_unit_variant(t));
-            let body_meta_name = if needs_body_meta {
-                format!("{name}BodyMeta")
+            let needs_head_ptr = variants.iter().any(|(_, t)| !is_unit_variant(t));
+            let head_ptr_name = if needs_head_ptr {
+                format!("{name}HeadPtr")
             } else {
                 "()".to_string()
             };
@@ -320,41 +320,8 @@ fn write_ty_def_impl(
             writeln!(w, "#[allow(unused_variables)]")?;
             writeln!(w, "#[allow(clippy::all)]")?;
             writeln!(w, "impl ::lutra_bin::Encode for {name} {{")?;
-            writeln!(w, "    type BodyMeta = {body_meta_name};")?;
-            writeln!(w, "    fn encode_body(&self, w: &mut Vec<u8>) -> ::lutra_bin::Result<{body_meta_name}> {{")?;
-            if needs_body_meta {
-                writeln!(w, "        Ok(match self {{")?;
-
-                for (variant_name, variant_ty) in variants {
-                    write!(w, "            Self::{variant_name}")?;
-                    if !is_unit_variant(variant_ty) {
-                        write!(w, "(inner)")?;
-                    }
-                    writeln!(w, " => {{")?;
-
-                    let variant = layout::enum_variant_format(variant_ty);
-
-                    if is_unit_variant(variant_ty) {
-                        writeln!(w, "                {body_meta_name}::None")?;
-                    } else if variant.is_inline {
-                        writeln!(w, "                let meta = inner.encode_body(w)?;")?;
-                        writeln!(w, "                {body_meta_name}::{variant_name}(meta)")?;
-                    } else {
-                        writeln!(w, "                let meta = inner.encode_body(w)?;")?;
-                        writeln!(w, "                let start = w.len();")?;
-                        writeln!(w, "                inner.encode_head(meta, w)?;")?;
-                        writeln!(w, "                {body_meta_name}::{variant_name}(start)")?;
-                    }
-
-                    writeln!(w, "            }},")?;
-                }
-
-                writeln!(w, "        }})")?;
-            } else {
-                writeln!(w, "        Ok(())")?;
-            }
-            writeln!(w, "    }}")?;
-            writeln!(w, "    fn encode_head(&self, meta: {body_meta_name}, w: &mut Vec<u8>) -> ::lutra_bin::Result<()> {{")?;
+            writeln!(w, "    type HeadPtr = {head_ptr_name};")?;
+            writeln!(w, "    fn encode_head(&self, w: &mut Vec<u8>) -> ::lutra_bin::Result<{head_ptr_name}> {{")?;
             writeln!(w, "        Ok(match self {{")?;
 
             for (tag, (variant_name, variant_ty)) in variants.iter().enumerate() {
@@ -369,21 +336,17 @@ fn write_ty_def_impl(
                 }
                 writeln!(w, " => {{")?;
 
-                if !variant.is_inline {
-                    writeln!(w, "                let {body_meta_name}::{variant_name}(meta) = meta else {{ unreachable!() }};")?;
-                    writeln!(w, "                let offset = (w.len() - meta) as u32;")?;
-                }
-
                 let tag_bytes = &tag.to_le_bytes()[0..head.s / 8];
                 writeln!(w, "                w.write_all(&{tag_bytes:?})?;")?;
 
-                if variant.is_inline {
-                    if !is_unit_variant(variant_ty) {
-                        writeln!(w, "                let {body_meta_name}::{variant_name}(meta) = meta else {{ unreachable!() }};")?;
-                        writeln!(w, "                inner.encode_head(meta, w)?;")?;
-                    }
-                } else {
-                    writeln!(w, "                w.write_all(&offset.to_le_bytes())?;")?;
+                if !variant.is_inline {
+                    writeln!(w, "                let head_ptr = ::lutra_bin::OffsetPointer::new(w);")?;
+                    writeln!(w, "                let r = {head_ptr_name}::{variant_name}(head_ptr);")?;
+                } else if !is_unit_variant(variant_ty) {
+                    writeln!(w, "                let inner_head_ptr = inner.encode_head(w)?;")?;
+                    writeln!(w, "                let r = {head_ptr_name}::{variant_name}(inner_head_ptr);")?;
+                } else if needs_head_ptr {
+                    writeln!(w, "                let r = {head_ptr_name}::None;")?;
                 }
 
                 if variant.padding > 0 {
@@ -393,17 +356,49 @@ fn write_ty_def_impl(
                     }
                     writeln!(w, "])?;")?;
                 }
+                if needs_head_ptr {
+                    writeln!(w, "                r")?;
+                }
 
                 writeln!(w, "            }},")?;
             }
-
             writeln!(w, "        }})")?;
+            writeln!(w, "    }}")?;
+            writeln!(w, "    fn encode_body(&self, head: {head_ptr_name}, w: &mut Vec<u8>) -> ::lutra_bin::Result<()> {{")?;
+            if needs_head_ptr {
+                writeln!(w, "        match self {{")?;
+
+                for (variant_name, variant_ty) in variants {
+                    write!(w, "            Self::{variant_name}")?;
+                    if !is_unit_variant(variant_ty) {
+                        write!(w, "(inner)")?;
+                    }
+                    writeln!(w, " => {{")?;
+
+                    let variant = layout::enum_variant_format(variant_ty);
+
+                    if !variant.is_inline {
+                        writeln!(w, "                let {head_ptr_name}::{variant_name}(offset_ptr) = head else {{ unreachable!() }};")?;
+                        writeln!(w, "                offset_ptr.write(w);")?;
+                        writeln!(w, "                let inner_head_ptr = inner.encode_head(w)?;")?;
+                        writeln!(w, "                inner.encode_body(inner_head_ptr, w)?;")?;
+                    } else if !is_unit_variant(variant_ty) {
+                        writeln!(w, "                let {head_ptr_name}::{variant_name}(inner_head_ptr) = head else {{ unreachable!() }};")?;
+                        writeln!(w, "                inner.encode_body(inner_head_ptr, w)?;")?;
+                    }
+
+                    writeln!(w, "            }},")?;
+                }
+
+                writeln!(w, "        }}")?;
+            }
+            writeln!(w, "        Ok(())")?;
             writeln!(w, "    }}")?;
             writeln!(w, "}}")?;
 
-            if needs_body_meta {
+            if needs_head_ptr {
                 writeln!(w, "#[allow(non_camel_case_types, dead_code)]")?;
-                writeln!(w, "pub enum {name}BodyMeta {{")?;
+                writeln!(w, "pub enum {head_ptr_name} {{")?;
                 writeln!(w, "    None,")?;
                 for (variant_name, variant_ty) in variants {
                     if is_unit_variant(variant_ty) {
@@ -414,13 +409,13 @@ fn write_ty_def_impl(
 
                     write!(w, "    {variant_name}")?;
 
-                    if variant.is_inline {
+                    if !variant.is_inline {
+                        write!(w, "(::lutra_bin::OffsetPointer)")?;
+                    } else {
                         write!(w, "(<")?;
                         let mut ctx = Context::default();
                         write_ty_ref(w, variant_ty, false, &mut ctx)?;
-                        write!(w, " as ::lutra_bin::Encode>::BodyMeta)")?;
-                    } else {
-                        write!(w, "(usize)")?;
+                        write!(w, " as ::lutra_bin::Encode>::HeadPtr)")?;
                     }
 
                     writeln!(w, ",")?;
@@ -432,12 +427,12 @@ fn write_ty_def_impl(
         _ => unimplemented!(),
     }
 
-    let head_size = ty.layout.as_ref().unwrap().head_size;
-    writeln!(w, "impl ::lutra_bin::Layout for {name} {{")?;
-    writeln!(w, "    fn head_size() -> usize {{")?;
-    writeln!(w, "        {head_size}")?;
-    writeln!(w, "    }}")?;
-    writeln!(w, "}}\n")?;
+    // let head_size = ty.layout.as_ref().unwrap().head_size;
+    // writeln!(w, "impl ::lutra_bin::Layout for {name} {{")?;
+    // writeln!(w, "    fn head_size() -> usize {{")?;
+    // writeln!(w, "        {head_size}")?;
+    // writeln!(w, "    }}")?;
+    // writeln!(w, "}}\n")?;
 
     match &ty.kind {
         pr::TyKind::Primitive(_) | pr::TyKind::Array(_) => {
@@ -491,9 +486,6 @@ fn write_ty_def_impl(
             )?;
 
             let head = layout::enum_head_format(variants);
-            if !head.no_pointer {
-                writeln!(w, "        let mut body = r.clone();")?;
-            }
 
             // tag
             writeln!(w, "        let mut tag_bytes = r.copy_n({});", head.s / 8)?;
@@ -514,9 +506,10 @@ fn write_ty_def_impl(
                         writeln!(w, "::decode(r)?;")?;
                     }
                 } else {
+                    writeln!(w, "                let mut body = r.clone();")?;
                     writeln!(w, "                let offset = r.copy_const::<4>();")?;
                     writeln!(w, "                let offset = u32::from_le_bytes(offset);")?;
-                    writeln!(w, "                body.rewind(offset as usize);")?;
+                    writeln!(w, "                body.skip(offset as usize);")?;
 
                     write!(w, "                let inner = ")?;
                     let mut ctx = Context::default();

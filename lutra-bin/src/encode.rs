@@ -1,94 +1,109 @@
 use std::io::Write;
 
-use crate::layout::Layout;
 use crate::Result;
 
 pub trait Encode {
-    type BodyMeta;
+    type HeadPtr;
 
     fn encode(&self, w: &mut Vec<u8>) -> Result<()> {
-        let meta = self.encode_body(w)?;
-        self.encode_head(meta, w)?;
+        let ptr = self.encode_head(w)?;
+        self.encode_body(ptr, w)?;
         Ok(())
     }
 
-    fn encode_head(&self, body_meta: Self::BodyMeta, w: &mut Vec<u8>) -> Result<()>;
+    fn encode_head(&self, w: &mut Vec<u8>) -> Result<Self::HeadPtr>;
 
-    fn encode_body(&self, w: &mut Vec<u8>) -> Result<Self::BodyMeta>;
+    fn encode_body(&self, head: Self::HeadPtr, w: &mut Vec<u8>) -> Result<()>;
 }
 
 impl Encode for i64 {
-    type BodyMeta = ();
+    type HeadPtr = ();
 
-    fn encode_body(&self, _w: &mut Vec<u8>) -> Result<Self::BodyMeta> {
-        Ok(())
+    fn encode_head(&self, w: &mut Vec<u8>) -> Result<Self::HeadPtr> {
+        Ok(w.write_all(&self.to_le_bytes())?)
     }
 
-    fn encode_head(&self, _: (), w: &mut Vec<u8>) -> Result<()> {
-        Ok(w.write_all(&self.to_le_bytes())?)
+    fn encode_body(&self, _head: Self::HeadPtr, _w: &mut Vec<u8>) -> Result<()> {
+        Ok(())
     }
 }
 impl Encode for f64 {
-    type BodyMeta = ();
+    type HeadPtr = ();
 
-    fn encode_body(&self, _w: &mut Vec<u8>) -> Result<Self::BodyMeta> {
-        Ok(())
+    fn encode_head(&self, w: &mut Vec<u8>) -> Result<Self::HeadPtr> {
+        Ok(w.write_all(&self.to_le_bytes())?)
     }
 
-    fn encode_head(&self, _: (), w: &mut Vec<u8>) -> Result<()> {
-        Ok(w.write_all(&self.to_le_bytes())?)
+    fn encode_body(&self, _head: Self::HeadPtr, _w: &mut Vec<u8>) -> Result<()> {
+        Ok(())
     }
 }
 impl Encode for bool {
-    type BodyMeta = ();
+    type HeadPtr = ();
 
-    fn encode_body(&self, _w: &mut Vec<u8>) -> Result<Self::BodyMeta> {
-        Ok(())
+    fn encode_head(&self, w: &mut Vec<u8>) -> Result<Self::HeadPtr> {
+        Ok(w.write_all(&[(*self as u8)])?)
     }
 
-    fn encode_head(&self, _: (), w: &mut Vec<u8>) -> Result<()> {
-        Ok(w.write_all(&[(*self as u8)])?)
+    fn encode_body(&self, _head: Self::HeadPtr, _w: &mut Vec<u8>) -> Result<()> {
+        Ok(())
     }
 }
 impl Encode for String {
-    type BodyMeta = usize;
+    type HeadPtr = OffsetPointer;
 
-    fn encode_body(&self, w: &mut Vec<u8>) -> Result<Self::BodyMeta> {
-        let bytes_start = w.len();
-        w.write_all(self.as_bytes())?;
-        Ok(bytes_start)
+    fn encode_head(&self, w: &mut Vec<u8>) -> Result<OffsetPointer> {
+        let offset = OffsetPointer::new(w);
+        w.write_all(&(self.len() as u32).to_le_bytes())?;
+        Ok(offset)
     }
 
-    fn encode_head(&self, bytes_start: usize, w: &mut Vec<u8>) -> Result<()> {
-        let offset = w.len() - bytes_start;
-
-        w.write_all(&(offset as u32).to_le_bytes())?;
-        w.write_all(&(self.len() as u32).to_le_bytes())?;
+    fn encode_body(&self, head: Self::HeadPtr, w: &mut Vec<u8>) -> Result<()> {
+        head.write(w);
+        w.write_all(self.as_bytes())?;
         Ok(())
     }
 }
 impl<E: Encode> Encode for Vec<E> {
-    type BodyMeta = usize;
+    type HeadPtr = OffsetPointer;
 
-    fn encode_body(&self, w: &mut Vec<u8>) -> Result<Self::BodyMeta> {
-        let mut body_metas: Vec<_> = Vec::with_capacity(self.len());
-        for i in self {
-            body_metas.push(i.encode_body(w)?);
-        }
-
-        let bytes_start = w.len();
-        for (i, b) in self.iter().zip(body_metas.into_iter()) {
-            i.encode_head(b, w)?;
-        }
-        Ok(bytes_start)
+    fn encode_head(&self, w: &mut Vec<u8>) -> Result<OffsetPointer> {
+        let offset = OffsetPointer::new(w);
+        w.write_all(&(self.len() as u32).to_le_bytes())?;
+        Ok(offset)
     }
 
-    fn encode_head(&self, bytes_start: usize, w: &mut Vec<u8>) -> Result<()> {
-        let offset = w.len() - bytes_start;
+    fn encode_body(&self, offset_ptr: Self::HeadPtr, w: &mut Vec<u8>) -> Result<()> {
+        offset_ptr.write(w);
 
-        w.write_all(&(offset as u32).to_le_bytes())?;
-        w.write_all(&(self.len() as u32).to_le_bytes())?;
+        let mut heads: Vec<_> = Vec::with_capacity(self.len());
+        for i in self {
+            heads.push(i.encode_head(w)?);
+        }
+
+        for (i, h) in self.iter().zip(heads.into_iter()) {
+            i.encode_body(h, w)?;
+        }
         Ok(())
+    }
+}
+
+/// Pointer to a location where an offset should be written to.
+pub struct OffsetPointer {
+    /// Location offset within the buffer.
+    ptr: usize,
+}
+
+impl OffsetPointer {
+    pub fn new(w: &mut Vec<u8>) -> OffsetPointer {
+        let r = OffsetPointer { ptr: w.len() };
+        w.extend([0_u8; 4]);
+        r
+    }
+
+    pub fn write(self, w: &mut [u8]) {
+        let offset = w.len() - self.ptr;
+        w[self.ptr..(self.ptr + 4)].copy_from_slice(&(offset as u32).to_le_bytes());
     }
 }
 
@@ -124,12 +139,9 @@ impl<'a> Reader<'a> {
     }
 }
 
-pub trait Decode: Layout + Sized {
+pub trait Decode: Sized {
     fn decode_buffer(bytes: &[u8]) -> Result<Self> {
-        let s = Self::head_size() / 8;
-        let head_offset = bytes.len() - s;
-        let mut reader = Reader::new(bytes, head_offset);
-
+        let mut reader = Reader::new(bytes, 0);
         Self::decode(&mut reader)
     }
 
@@ -160,7 +172,7 @@ impl Decode for String {
 
         let offset = r.copy_const::<4>();
         let offset = u32::from_le_bytes(offset) as usize;
-        body.rewind(offset);
+        body.skip(offset);
 
         let len = r.copy_const::<4>();
         let len = u32::from_le_bytes(len) as usize;
@@ -175,7 +187,7 @@ impl<E: Decode> Decode for Vec<E> {
 
         let offset = r.copy_const::<4>();
         let offset = u32::from_le_bytes(offset) as usize;
-        body.rewind(offset);
+        body.skip(offset);
 
         let len = r.copy_const::<4>();
         let len = u32::from_le_bytes(len) as usize;
