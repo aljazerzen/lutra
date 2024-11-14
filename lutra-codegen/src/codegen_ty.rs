@@ -279,7 +279,7 @@ fn write_ty_def_impl(w: &mut impl Write, ty: &pr::Ty) -> Result<(), std::fmt::Er
 
             let mut inner_head_ptr = String::new();
             let mut ctx = Context::default();
-            write_ty_ref(&mut inner_head_ptr, &inner_ty, true, &mut ctx)?;
+            write_ty_ref(&mut inner_head_ptr, inner_ty, true, &mut ctx)?;
 
             writeln!(w, "impl ::lutra_bin::Encode for {name} {{")?;
             writeln!(w, "    type HeadPtr = Option<Result<")?;
@@ -605,7 +605,7 @@ fn is_unit_variant(variant_ty: &pr::Ty) -> bool {
 }
 
 fn is_option_enum(variants: &[(String, pr::Ty)]) -> bool {
-    return variants.len() == 2
+    variants.len() == 2
         && is_unit_variant(&variants[0].1)
-        && !is_unit_variant(&variants[1].1);
+        && !is_unit_variant(&variants[1].1)
 }

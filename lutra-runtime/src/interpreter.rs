@@ -192,7 +192,7 @@ impl Interpreter {
                     let symbol = self.evaluate_expr(item);
 
                     let value = assume_value(&symbol);
-                    let value = lutra_bin::Value::decode(value, &ty_items).unwrap();
+                    let value = lutra_bin::Value::decode(value, ty_items).unwrap();
                     res.push(value);
                 }
                 let res = lutra_bin::Value::Array(res).encode(&ty).unwrap();
@@ -219,7 +219,8 @@ impl Interpreter {
                 match base {
                     Cell::Value(base) => {
                         let mut base_reader = lutra_bin::Reader::new(&base);
-                        let mut items = lutra_bin::ArrayReader::new_for_ty(&mut base_reader, &base_ty);
+                        let mut items =
+                            lutra_bin::ArrayReader::new_for_ty(&mut base_reader, &base_ty);
 
                         let item = items.nth(*offset as usize).unwrap();
 
@@ -232,7 +233,11 @@ impl Interpreter {
             }
 
             ir::ExprKind::Call(call) => {
-                let ir::Call { function, layout, args } = call.as_ref();
+                let ir::Call {
+                    function,
+                    layout,
+                    args,
+                } = call.as_ref();
 
                 let function = self.evaluate_expr(function);
 
@@ -258,7 +263,12 @@ impl Interpreter {
         }
     }
 
-    pub fn evaluate_func_call(&mut self, function: &Cell, layout: Vec<u32>, args: Vec<Cell>) -> Cell {
+    pub fn evaluate_func_call(
+        &mut self,
+        function: &Cell,
+        layout: Vec<u32>,
+        args: Vec<Cell>,
+    ) -> Cell {
         match function {
             Cell::Function(func) => {
                 let scope_size = args.len();

@@ -139,7 +139,7 @@ mod assume {
         i64::decode_buffer(bytes).unwrap()
     }
 
-    pub fn array<'b>(cell: &'b Cell, item_head_bytes: usize) -> ArrayReader<'b> {
+    pub fn array(cell: &Cell, item_head_bytes: usize) -> ArrayReader<'_> {
         let mut reader = Reader::new(as_value(cell));
         ArrayReader::new(&mut reader, item_head_bytes)
     }

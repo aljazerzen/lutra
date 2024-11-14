@@ -46,7 +46,7 @@ impl<'b> ArrayReader<'b> {
         let pr::TyKind::Array(items_ty) = &ty.kind else {
             panic!()
         };
-        let item_head_size = items_ty.layout.as_ref().unwrap().head_size as usize;
+        let item_head_size = items_ty.layout.as_ref().unwrap().head_size;
 
         Self::new(head, item_head_size / 8)
     }

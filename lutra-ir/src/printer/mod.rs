@@ -176,12 +176,13 @@ impl Printer {
         r
     }
 
+    #[allow(clippy::only_used_in_recursion)]
     fn print_ty(&self, ty: &ir::Ty) -> String {
         match &ty.kind {
-            ir::TyKind::Primitive(ir::PrimitiveSet::bool) => format!("bool"),
-            ir::TyKind::Primitive(ir::PrimitiveSet::int) => format!("int"),
-            ir::TyKind::Primitive(ir::PrimitiveSet::float) => format!("float"),
-            ir::TyKind::Primitive(ir::PrimitiveSet::text) => format!("text"),
+            ir::TyKind::Primitive(ir::PrimitiveSet::bool) => "bool".to_string(),
+            ir::TyKind::Primitive(ir::PrimitiveSet::int) => "int".to_string(),
+            ir::TyKind::Primitive(ir::PrimitiveSet::float) => "float".to_string(),
+            ir::TyKind::Primitive(ir::PrimitiveSet::text) => "text".to_string(),
             ir::TyKind::Tuple(fields) => {
                 let mut r = "{".to_string();
                 for (index, field) in fields.iter().enumerate() {
@@ -198,7 +199,7 @@ impl Printer {
                 r
             }
             ir::TyKind::Array(items) => {
-                format!("[{}]", self.print_ty(&items))
+                format!("[{}]", self.print_ty(items))
             }
             ir::TyKind::Enum(variants) => {
                 let mut r = "enum {".to_string();
@@ -219,7 +220,7 @@ impl Printer {
                     if index > 0 {
                         r += ", ";
                     }
-                    r += &self.print_ty(&param);
+                    r += &self.print_ty(param);
                 }
                 r += ") -> ";
                 r += &self.print_ty(&func.body);
