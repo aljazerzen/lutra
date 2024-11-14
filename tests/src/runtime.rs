@@ -26,7 +26,11 @@ fn test_01() {
         world_hello
     ];
 
-    let main = (1, 2) | external.0
+    let main = (
+        call external.0: func (int, int) -> int,
+        1: int,
+        2: int
+    ): int
     ",
     );
 

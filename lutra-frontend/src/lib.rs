@@ -1,10 +1,10 @@
 mod compile;
+mod diagnostic;
 mod discover;
 mod error;
 mod parser;
 mod project;
 mod semantic;
-mod diagnostic;
 mod span;
 mod utils;
 

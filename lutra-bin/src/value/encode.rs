@@ -22,7 +22,7 @@ impl Value {
     pub fn decode(buf: &[u8], ty: &pr::Ty) -> Result<Value> {
         let mut ctx = Context::new(ty);
 
-        let mut reader = Reader::new(buf, 0);
+        let mut reader = Reader::new(buf);
         decode_inner(&mut reader, ty, &mut ctx)
     }
 }
@@ -232,7 +232,7 @@ fn decode_inner<'t>(r: &mut Reader<'_>, ty: &'t pr::Ty, ctx: &mut Context<'t>) -
         pr::TyKind::Enum(variants) => {
             let head = layout::enum_head_format(variants);
 
-            let mut tag_bytes = r.copy_n(head.s / 8);
+            let mut tag_bytes = r.copy_n(head.s / 8).to_vec();
             tag_bytes.resize(8, 0);
             let tag = u64::from_le_bytes(tag_bytes.try_into().unwrap()) as usize;
 
@@ -250,7 +250,7 @@ fn decode_inner<'t>(r: &mut Reader<'_>, ty: &'t pr::Ty, ctx: &mut Context<'t>) -
                 decode_inner(&mut body, variant_ty, ctx)?
             };
 
-            r.skip(variant_format.padding);
+            r.skip(variant_format.padding / 8);
             Value::Enum(tag, Box::new(inner))
         }
 

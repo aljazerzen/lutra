@@ -8,13 +8,38 @@ fn parse_01() {
 ];
 
 let main =
-  let 1 = func 2 -> [fn.2+0, fn.2+0, fn.2+0];
-  let 2 = var.1;
+  let 1 = (
+    func 2 -> [
+        fn.2+0: float,
+        fn.2+0: float,
+        fn.2+0: float
+    ]: [float]
+  ): func (float) -> [float];
+
+  let 2 = var.1: func (float) -> [float];
   {
-    (3.5) | var.2,
-    (6, 7) | func 3 -> [ fn.3+0, fn.3+1 ],
-    (6, 2) | external.0
-  }.1[0]
+    (
+        call var.2: func (float) -> [float],
+        3.5: float
+    ): [float],
+    (call
+        (
+            func 3 -> [
+                fn.3+0: int,
+                fn.3+1: int,
+            ]: [int]
+        ): func (int, int) -> [int],
+        6: int,
+        7: int,
+    ): [int],
+    (call
+        external.0: func (int, int) -> int,
+        6: int,
+        2: int
+    ): int
+  }: {[float], [int], int}
+  .1:[int]
+  .[0]:int
     "#), @r#"
     Program {
         externals: [
@@ -43,6 +68,15 @@ let main =
                                                         2147484160,
                                                     ),
                                                 ),
+                                                ty: Ty {
+                                                    kind: Primitive(
+                                                        float,
+                                                    ),
+                                                    layout: TyLayout {
+                                                        head_size: 0,
+                                                        variants_recursive: [],
+                                                    },
+                                                },
                                             },
                                             Expr {
                                                 kind: Pointer(
@@ -50,6 +84,15 @@ let main =
                                                         2147484160,
                                                     ),
                                                 ),
+                                                ty: Ty {
+                                                    kind: Primitive(
+                                                        float,
+                                                    ),
+                                                    layout: TyLayout {
+                                                        head_size: 0,
+                                                        variants_recursive: [],
+                                                    },
+                                                },
                                             },
                                             Expr {
                                                 kind: Pointer(
@@ -57,12 +100,76 @@ let main =
                                                         2147484160,
                                                     ),
                                                 ),
+                                                ty: Ty {
+                                                    kind: Primitive(
+                                                        float,
+                                                    ),
+                                                    layout: TyLayout {
+                                                        head_size: 0,
+                                                        variants_recursive: [],
+                                                    },
+                                                },
                                             },
                                         ],
                                     ),
+                                    ty: Ty {
+                                        kind: Array(
+                                            Ty {
+                                                kind: Primitive(
+                                                    float,
+                                                ),
+                                                layout: TyLayout {
+                                                    head_size: 0,
+                                                    variants_recursive: [],
+                                                },
+                                            },
+                                        ),
+                                        layout: TyLayout {
+                                            head_size: 0,
+                                            variants_recursive: [],
+                                        },
+                                    },
                                 },
                             },
                         ),
+                        ty: Ty {
+                            kind: Function(
+                                TyFunction {
+                                    params: [
+                                        Ty {
+                                            kind: Primitive(
+                                                float,
+                                            ),
+                                            layout: TyLayout {
+                                                head_size: 0,
+                                                variants_recursive: [],
+                                            },
+                                        },
+                                    ],
+                                    body: Ty {
+                                        kind: Array(
+                                            Ty {
+                                                kind: Primitive(
+                                                    float,
+                                                ),
+                                                layout: TyLayout {
+                                                    head_size: 0,
+                                                    variants_recursive: [],
+                                                },
+                                            },
+                                        ),
+                                        layout: TyLayout {
+                                            head_size: 0,
+                                            variants_recursive: [],
+                                        },
+                                    },
+                                },
+                            ),
+                            layout: TyLayout {
+                                head_size: 0,
+                                variants_recursive: [],
+                            },
+                        },
                     },
                     main: Expr {
                         kind: Binding(
@@ -76,6 +183,44 @@ let main =
                                             1073741825,
                                         ),
                                     ),
+                                    ty: Ty {
+                                        kind: Function(
+                                            TyFunction {
+                                                params: [
+                                                    Ty {
+                                                        kind: Primitive(
+                                                            float,
+                                                        ),
+                                                        layout: TyLayout {
+                                                            head_size: 0,
+                                                            variants_recursive: [],
+                                                        },
+                                                    },
+                                                ],
+                                                body: Ty {
+                                                    kind: Array(
+                                                        Ty {
+                                                            kind: Primitive(
+                                                                float,
+                                                            ),
+                                                            layout: TyLayout {
+                                                                head_size: 0,
+                                                                variants_recursive: [],
+                                                            },
+                                                        },
+                                                    ),
+                                                    layout: TyLayout {
+                                                        head_size: 0,
+                                                        variants_recursive: [],
+                                                    },
+                                                },
+                                            },
+                                        ),
+                                        layout: TyLayout {
+                                            head_size: 0,
+                                            variants_recursive: [],
+                                        },
+                                    },
                                 },
                                 main: Expr {
                                     kind: ArrayLookup(
@@ -95,6 +240,44 @@ let main =
                                                                                             1073741826,
                                                                                         ),
                                                                                     ),
+                                                                                    ty: Ty {
+                                                                                        kind: Function(
+                                                                                            TyFunction {
+                                                                                                params: [
+                                                                                                    Ty {
+                                                                                                        kind: Primitive(
+                                                                                                            float,
+                                                                                                        ),
+                                                                                                        layout: TyLayout {
+                                                                                                            head_size: 0,
+                                                                                                            variants_recursive: [],
+                                                                                                        },
+                                                                                                    },
+                                                                                                ],
+                                                                                                body: Ty {
+                                                                                                    kind: Array(
+                                                                                                        Ty {
+                                                                                                            kind: Primitive(
+                                                                                                                float,
+                                                                                                            ),
+                                                                                                            layout: TyLayout {
+                                                                                                                head_size: 0,
+                                                                                                                variants_recursive: [],
+                                                                                                            },
+                                                                                                        },
+                                                                                                    ),
+                                                                                                    layout: TyLayout {
+                                                                                                        head_size: 0,
+                                                                                                        variants_recursive: [],
+                                                                                                    },
+                                                                                                },
+                                                                                            },
+                                                                                        ),
+                                                                                        layout: TyLayout {
+                                                                                            head_size: 0,
+                                                                                            variants_recursive: [],
+                                                                                        },
+                                                                                    },
                                                                                 },
                                                                                 args: [
                                                                                     Expr {
@@ -103,10 +286,36 @@ let main =
                                                                                                 3.5,
                                                                                             ),
                                                                                         ),
+                                                                                        ty: Ty {
+                                                                                            kind: Primitive(
+                                                                                                float,
+                                                                                            ),
+                                                                                            layout: TyLayout {
+                                                                                                head_size: 0,
+                                                                                                variants_recursive: [],
+                                                                                            },
+                                                                                        },
                                                                                     },
                                                                                 ],
                                                                             },
                                                                         ),
+                                                                        ty: Ty {
+                                                                            kind: Array(
+                                                                                Ty {
+                                                                                    kind: Primitive(
+                                                                                        float,
+                                                                                    ),
+                                                                                    layout: TyLayout {
+                                                                                        head_size: 0,
+                                                                                        variants_recursive: [],
+                                                                                    },
+                                                                                },
+                                                                            ),
+                                                                            layout: TyLayout {
+                                                                                head_size: 0,
+                                                                                variants_recursive: [],
+                                                                            },
+                                                                        },
                                                                     },
                                                                     Expr {
                                                                         kind: Call(
@@ -126,6 +335,15 @@ let main =
                                                                                                                     2147484416,
                                                                                                                 ),
                                                                                                             ),
+                                                                                                            ty: Ty {
+                                                                                                                kind: Primitive(
+                                                                                                                    int,
+                                                                                                                ),
+                                                                                                                layout: TyLayout {
+                                                                                                                    head_size: 0,
+                                                                                                                    variants_recursive: [],
+                                                                                                                },
+                                                                                                            },
                                                                                                         },
                                                                                                         Expr {
                                                                                                             kind: Pointer(
@@ -133,12 +351,85 @@ let main =
                                                                                                                     2147484417,
                                                                                                                 ),
                                                                                                             ),
+                                                                                                            ty: Ty {
+                                                                                                                kind: Primitive(
+                                                                                                                    int,
+                                                                                                                ),
+                                                                                                                layout: TyLayout {
+                                                                                                                    head_size: 0,
+                                                                                                                    variants_recursive: [],
+                                                                                                                },
+                                                                                                            },
                                                                                                         },
                                                                                                     ],
                                                                                                 ),
+                                                                                                ty: Ty {
+                                                                                                    kind: Array(
+                                                                                                        Ty {
+                                                                                                            kind: Primitive(
+                                                                                                                int,
+                                                                                                            ),
+                                                                                                            layout: TyLayout {
+                                                                                                                head_size: 0,
+                                                                                                                variants_recursive: [],
+                                                                                                            },
+                                                                                                        },
+                                                                                                    ),
+                                                                                                    layout: TyLayout {
+                                                                                                        head_size: 0,
+                                                                                                        variants_recursive: [],
+                                                                                                    },
+                                                                                                },
                                                                                             },
                                                                                         },
                                                                                     ),
+                                                                                    ty: Ty {
+                                                                                        kind: Function(
+                                                                                            TyFunction {
+                                                                                                params: [
+                                                                                                    Ty {
+                                                                                                        kind: Primitive(
+                                                                                                            int,
+                                                                                                        ),
+                                                                                                        layout: TyLayout {
+                                                                                                            head_size: 0,
+                                                                                                            variants_recursive: [],
+                                                                                                        },
+                                                                                                    },
+                                                                                                    Ty {
+                                                                                                        kind: Primitive(
+                                                                                                            int,
+                                                                                                        ),
+                                                                                                        layout: TyLayout {
+                                                                                                            head_size: 0,
+                                                                                                            variants_recursive: [],
+                                                                                                        },
+                                                                                                    },
+                                                                                                ],
+                                                                                                body: Ty {
+                                                                                                    kind: Array(
+                                                                                                        Ty {
+                                                                                                            kind: Primitive(
+                                                                                                                int,
+                                                                                                            ),
+                                                                                                            layout: TyLayout {
+                                                                                                                head_size: 0,
+                                                                                                                variants_recursive: [],
+                                                                                                            },
+                                                                                                        },
+                                                                                                    ),
+                                                                                                    layout: TyLayout {
+                                                                                                        head_size: 0,
+                                                                                                        variants_recursive: [],
+                                                                                                    },
+                                                                                                },
+                                                                                            },
+                                                                                        ),
+                                                                                        layout: TyLayout {
+                                                                                            head_size: 0,
+                                                                                            variants_recursive: [],
+                                                                                        },
+                                                                                    },
                                                                                 },
                                                                                 args: [
                                                                                     Expr {
@@ -147,6 +438,15 @@ let main =
                                                                                                 6,
                                                                                             ),
                                                                                         ),
+                                                                                        ty: Ty {
+                                                                                            kind: Primitive(
+                                                                                                int,
+                                                                                            ),
+                                                                                            layout: TyLayout {
+                                                                                                head_size: 0,
+                                                                                                variants_recursive: [],
+                                                                                            },
+                                                                                        },
                                                                                     },
                                                                                     Expr {
                                                                                         kind: Literal(
@@ -154,10 +454,36 @@ let main =
                                                                                                 7,
                                                                                             ),
                                                                                         ),
+                                                                                        ty: Ty {
+                                                                                            kind: Primitive(
+                                                                                                int,
+                                                                                            ),
+                                                                                            layout: TyLayout {
+                                                                                                head_size: 0,
+                                                                                                variants_recursive: [],
+                                                                                            },
+                                                                                        },
                                                                                     },
                                                                                 ],
                                                                             },
                                                                         ),
+                                                                        ty: Ty {
+                                                                            kind: Array(
+                                                                                Ty {
+                                                                                    kind: Primitive(
+                                                                                        int,
+                                                                                    ),
+                                                                                    layout: TyLayout {
+                                                                                        head_size: 0,
+                                                                                        variants_recursive: [],
+                                                                                    },
+                                                                                },
+                                                                            ),
+                                                                            layout: TyLayout {
+                                                                                head_size: 0,
+                                                                                variants_recursive: [],
+                                                                            },
+                                                                        },
                                                                     },
                                                                     Expr {
                                                                         kind: Call(
@@ -168,6 +494,45 @@ let main =
                                                                                             0,
                                                                                         ),
                                                                                     ),
+                                                                                    ty: Ty {
+                                                                                        kind: Function(
+                                                                                            TyFunction {
+                                                                                                params: [
+                                                                                                    Ty {
+                                                                                                        kind: Primitive(
+                                                                                                            int,
+                                                                                                        ),
+                                                                                                        layout: TyLayout {
+                                                                                                            head_size: 0,
+                                                                                                            variants_recursive: [],
+                                                                                                        },
+                                                                                                    },
+                                                                                                    Ty {
+                                                                                                        kind: Primitive(
+                                                                                                            int,
+                                                                                                        ),
+                                                                                                        layout: TyLayout {
+                                                                                                            head_size: 0,
+                                                                                                            variants_recursive: [],
+                                                                                                        },
+                                                                                                    },
+                                                                                                ],
+                                                                                                body: Ty {
+                                                                                                    kind: Primitive(
+                                                                                                        int,
+                                                                                                    ),
+                                                                                                    layout: TyLayout {
+                                                                                                        head_size: 0,
+                                                                                                        variants_recursive: [],
+                                                                                                    },
+                                                                                                },
+                                                                                            },
+                                                                                        ),
+                                                                                        layout: TyLayout {
+                                                                                            head_size: 0,
+                                                                                            variants_recursive: [],
+                                                                                        },
+                                                                                    },
                                                                                 },
                                                                                 args: [
                                                                                     Expr {
@@ -176,6 +541,15 @@ let main =
                                                                                                 6,
                                                                                             ),
                                                                                         ),
+                                                                                        ty: Ty {
+                                                                                            kind: Primitive(
+                                                                                                int,
+                                                                                            ),
+                                                                                            layout: TyLayout {
+                                                                                                head_size: 0,
+                                                                                                variants_recursive: [],
+                                                                                            },
+                                                                                        },
                                                                                     },
                                                                                     Expr {
                                                                                         kind: Literal(
@@ -183,27 +557,151 @@ let main =
                                                                                                 2,
                                                                                             ),
                                                                                         ),
+                                                                                        ty: Ty {
+                                                                                            kind: Primitive(
+                                                                                                int,
+                                                                                            ),
+                                                                                            layout: TyLayout {
+                                                                                                head_size: 0,
+                                                                                                variants_recursive: [],
+                                                                                            },
+                                                                                        },
                                                                                     },
                                                                                 ],
                                                                             },
                                                                         ),
+                                                                        ty: Ty {
+                                                                            kind: Primitive(
+                                                                                int,
+                                                                            ),
+                                                                            layout: TyLayout {
+                                                                                head_size: 0,
+                                                                                variants_recursive: [],
+                                                                            },
+                                                                        },
                                                                     },
                                                                 ],
                                                             ),
+                                                            ty: Ty {
+                                                                kind: Tuple(
+                                                                    [
+                                                                        TyTupleField {
+                                                                            name: None,
+                                                                            ty: Ty {
+                                                                                kind: Array(
+                                                                                    Ty {
+                                                                                        kind: Primitive(
+                                                                                            float,
+                                                                                        ),
+                                                                                        layout: TyLayout {
+                                                                                            head_size: 0,
+                                                                                            variants_recursive: [],
+                                                                                        },
+                                                                                    },
+                                                                                ),
+                                                                                layout: TyLayout {
+                                                                                    head_size: 0,
+                                                                                    variants_recursive: [],
+                                                                                },
+                                                                            },
+                                                                        },
+                                                                        TyTupleField {
+                                                                            name: None,
+                                                                            ty: Ty {
+                                                                                kind: Array(
+                                                                                    Ty {
+                                                                                        kind: Primitive(
+                                                                                            int,
+                                                                                        ),
+                                                                                        layout: TyLayout {
+                                                                                            head_size: 0,
+                                                                                            variants_recursive: [],
+                                                                                        },
+                                                                                    },
+                                                                                ),
+                                                                                layout: TyLayout {
+                                                                                    head_size: 0,
+                                                                                    variants_recursive: [],
+                                                                                },
+                                                                            },
+                                                                        },
+                                                                        TyTupleField {
+                                                                            name: None,
+                                                                            ty: Ty {
+                                                                                kind: Primitive(
+                                                                                    int,
+                                                                                ),
+                                                                                layout: TyLayout {
+                                                                                    head_size: 0,
+                                                                                    variants_recursive: [],
+                                                                                },
+                                                                            },
+                                                                        },
+                                                                    ],
+                                                                ),
+                                                                layout: TyLayout {
+                                                                    head_size: 0,
+                                                                    variants_recursive: [],
+                                                                },
+                                                            },
                                                         },
                                                         offset: 1,
                                                     },
                                                 ),
+                                                ty: Ty {
+                                                    kind: Array(
+                                                        Ty {
+                                                            kind: Primitive(
+                                                                int,
+                                                            ),
+                                                            layout: TyLayout {
+                                                                head_size: 0,
+                                                                variants_recursive: [],
+                                                            },
+                                                        },
+                                                    ),
+                                                    layout: TyLayout {
+                                                        head_size: 0,
+                                                        variants_recursive: [],
+                                                    },
+                                                },
                                             },
                                             offset: 0,
                                         },
                                     ),
+                                    ty: Ty {
+                                        kind: Primitive(
+                                            int,
+                                        ),
+                                        layout: TyLayout {
+                                            head_size: 0,
+                                            variants_recursive: [],
+                                        },
+                                    },
                                 },
                             },
                         ),
+                        ty: Ty {
+                            kind: Primitive(
+                                int,
+                            ),
+                            layout: TyLayout {
+                                head_size: 0,
+                                variants_recursive: [],
+                            },
+                        },
                     },
                 },
             ),
+            ty: Ty {
+                kind: Primitive(
+                    int,
+                ),
+                layout: TyLayout {
+                    head_size: 0,
+                    variants_recursive: [],
+                },
+            },
         },
     }
     "#);

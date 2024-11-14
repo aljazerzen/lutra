@@ -1,6 +1,7 @@
 use std::io::Write;
 
-use crate::Result;
+use crate::reader::{self};
+use crate::{Layout, Reader, Result};
 
 pub trait Encode {
     type HeadPtr;
@@ -107,42 +108,19 @@ impl OffsetPointer {
     }
 }
 
-#[derive(Clone)]
-pub struct Reader<'a> {
-    buf: &'a [u8],
-    current_pos: usize,
-}
-
-impl<'a> Reader<'a> {
-    pub fn new(buf: &'a [u8], current_pos: usize) -> Self {
-        Reader { buf, current_pos }
-    }
-
-    pub fn copy_n(&mut self, n: usize) -> Vec<u8> {
-        let r = self.buf[self.current_pos..][..n].to_vec();
-        self.current_pos += n;
-        r
-    }
-
-    pub fn copy_const<const N: usize>(&mut self) -> [u8; N] {
-        let r = self.buf[self.current_pos..][..N].try_into().unwrap();
-        self.current_pos += N;
-        r
-    }
-
-    pub fn rewind(&mut self, byte_count: usize) {
-        self.current_pos -= byte_count;
-    }
-
-    pub fn skip(&mut self, byte_count: usize) {
-        self.current_pos += byte_count;
-    }
-}
-
-pub trait Decode: Sized {
+pub trait Decode: Sized + Layout {
     fn decode_buffer(bytes: &[u8]) -> Result<Self> {
-        let mut reader = Reader::new(bytes, 0);
-        Self::decode(&mut reader)
+        let mut reader = Reader::new(bytes);
+        let res = Self::decode(&mut reader);
+
+        // sanity check that correct number of bytes have been read
+        #[cfg(debug_assertions)]
+        {
+            let bytes_read = bytes.len() - reader.remaining();
+            assert_eq!(bytes_read, Self::head_size().div_ceil(8));
+        }
+
+        res
     }
 
     fn decode(r: &mut Reader<'_>) -> Result<Self>;
@@ -178,25 +156,12 @@ impl Decode for String {
         let len = u32::from_le_bytes(len) as usize;
 
         let buf = body.copy_n(len);
-        Ok(String::from_utf8(buf).unwrap())
+        Ok(String::from_utf8(buf.to_vec()).unwrap())
     }
 }
 impl<E: Decode> Decode for Vec<E> {
     fn decode(r: &mut Reader<'_>) -> Result<Self> {
-        let mut body = r.clone();
-
-        let offset = r.copy_const::<4>();
-        let offset = u32::from_le_bytes(offset) as usize;
-        body.skip(offset);
-
-        let len = r.copy_const::<4>();
-        let len = u32::from_le_bytes(len) as usize;
-
-        let mut buf = Vec::with_capacity(len);
-        for _ in 0..len {
-            buf.push(E::decode(&mut body)?);
-        }
-
-        Ok(buf)
+        let reader = reader::ArrayReader::new(r, E::head_size());
+        reader.into_iter().map(|mut r| E::decode(&mut r)).collect()
     }
 }

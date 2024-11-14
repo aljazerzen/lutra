@@ -58,18 +58,88 @@ fn expr() -> impl Parser<TokenKind, Expr, Error = PError> + Clone {
             .map(|(f, p)| Sid(0x80000000_i64 + f.0.shl(8) + p.0));
         let pointer = choice((pointer_external, pointer_var, pointer_param)).map(ExprKind::Pointer);
 
-        let binding = binding(expr.clone());
+        // let binding = binding(expr.clone());
         let tuple = tuple(expr.clone());
         let array = array(expr.clone());
         let function = function(expr.clone());
         let call = func_call(expr);
 
-        let term = choice((pointer, literal, binding, tuple, array, function, call))
-            .map(|kind| Expr { kind })
+        let term = choice((pointer, literal, tuple, array, function, call))
+            .then(ty())
+            .map(|(kind, ty)| Expr { kind, ty })
             .boxed();
 
-        lookups(term)
+        binding(lookups(term).boxed())
     })
+}
+
+fn ty() -> impl Parser<TokenKind, Ty, Error = PError> {
+    let ty_expr = recursive(|ty_inner| {
+        let primitive = choice((
+            ident_keyword("int").to(PrimitiveSet::int),
+            ident_keyword("float").to(PrimitiveSet::float),
+            ident_keyword("bool").to(PrimitiveSet::bool),
+            ident_keyword("text").to(PrimitiveSet::text),
+        ))
+        .map(TyKind::Primitive);
+
+        let array = ty_inner
+            .clone()
+            .delimited_by(ctrl('['), ctrl(']'))
+            .map(Box::new)
+            .map(TyKind::Array);
+
+        let tuple = ident_part()
+            .then_ignore(ctrl('='))
+            .or_not()
+            .map(|n| match n {
+                Some(n) => TyTupleFieldname::Some(n),
+                None => TyTupleFieldname::None,
+            })
+            .then(ty_inner.clone())
+            .map(|(name, ty)| TyTupleField { name, ty })
+            .separated_by(ctrl(','))
+            .allow_trailing()
+            .delimited_by(ctrl('{'), ctrl('}'))
+            .map(TyKind::Tuple);
+
+        let enum_ = ident_keyword("enum")
+            .ignore_then(
+                ident_part()
+                    .then_ignore(ctrl('='))
+                    .then(ty_inner.clone())
+                    .map(|(name, ty)| TyEnumVariant { name, ty })
+                    .separated_by(ctrl(','))
+                    .allow_trailing()
+                    .delimited_by(ctrl('{'), ctrl('}')),
+            )
+            .map(TyKind::Enum);
+
+        let func = keyword("func")
+            .ignore_then(
+                ty_inner
+                    .clone()
+                    .separated_by(ctrl(','))
+                    .allow_trailing()
+                    .delimited_by(ctrl('('), ctrl(')')),
+            )
+            .then_ignore(just(TokenKind::ArrowThin))
+            .then(ty_inner)
+            .map(|(params, body)| TyFunction { params, body })
+            .map(Box::new)
+            .map(TyKind::Function);
+
+        choice((primitive, array, tuple, enum_, func)).map(|kind| Ty {
+            kind,
+            layout: TyLayout {
+                head_size: 0,
+                variants_recursive: vec![],
+            },
+        })
+    })
+    .labelled("a type");
+
+    ctrl(':').ignore_then(ty_expr)
 }
 
 fn sid() -> impl Parser<TokenKind, Sid, Error = PError> {
@@ -122,27 +192,30 @@ enum LookupKind {
     Array,
 }
 
-fn lookups<'a, E>(expr: E) -> impl Parser<TokenKind, Expr, Error = PError> + Clone + 'a
+fn lookups<'a, E>(expr: E) -> impl Parser<TokenKind, Expr, Error = PError> + 'a
 where
-    E: Parser<TokenKind, Expr, Error = PError> + Clone + 'a,
+    E: Parser<TokenKind, Expr, Error = PError> + 'a,
 {
     expr.then(
-        choice((
-            ctrl('.').ignore_then(select! {
-                TokenKind::Literal(pr::Literal::Integer(i)) => (LookupKind::Tuple, i)
-            }),
-            select! {
-                TokenKind::Literal(pr::Literal::Integer(i)) => (LookupKind::Array, i)
-            }
-            .delimited_by(ctrl('['), ctrl(']')),
-        ))
-        .repeated(),
+        ctrl('.')
+            .ignore_then(choice((
+                select! {
+                    TokenKind::Literal(pr::Literal::Integer(i)) => (LookupKind::Tuple, i)
+                },
+                select! {
+                    TokenKind::Literal(pr::Literal::Integer(i)) => (LookupKind::Array, i)
+                }
+                .delimited_by(ctrl('['), ctrl(']')),
+            )))
+            .then(ty())
+            .repeated(),
     )
-    .foldl(|base, (kind, offset)| Expr {
+    .foldl(|base, ((kind, offset), ty)| Expr {
         kind: match kind {
             LookupKind::Tuple => ExprKind::TupleLookup(Box::new(TupleLookup { base, offset })),
             LookupKind::Array => ExprKind::ArrayLookup(Box::new(ArrayLookup { base, offset })),
         },
+        ty,
     })
 }
 
@@ -150,9 +223,13 @@ fn func_call<'a, E>(expr: E) -> impl Parser<TokenKind, ExprKind, Error = PError>
 where
     E: Parser<TokenKind, Expr, Error = PError> + Clone + 'a,
 {
-    expr.clone()
-        .separated_by(ctrl(','))
-        .allow_trailing()
+    ident_keyword("call")
+        .ignore_then(expr.separated_by(ctrl(',')).at_least(1).allow_trailing())
+        .map(|mut exprs| {
+            let function = exprs.remove(0);
+            let args = exprs;
+            ExprKind::Call(Box::new(Call { args, function }))
+        })
         .delimited_by(ctrl('('), ctrl(')'))
         .recover_with(nested_delimiters(
             TokenKind::Control('('),
@@ -162,11 +239,8 @@ where
                 (TokenKind::Control('('), TokenKind::Control(')')),
                 (TokenKind::Control('['), TokenKind::Control(']')),
             ],
-            |_| vec![],
+            |_| ExprKind::Tuple(vec![]),
         ))
-        .then_ignore(ctrl('|'))
-        .then(expr)
-        .map(|(args, function)| ExprKind::Call(Box::new(Call { args, function })))
         .labelled("function call")
 }
 
@@ -185,11 +259,12 @@ where
         .then_ignore(just(TokenKind::ArrowThin))
         // body
         .then(expr)
+        .delimited_by(ctrl('('), ctrl(')'))
         .map(|(symbol_ns, body)| ExprKind::Function(Box::new(Function { symbol_ns, body })))
         .labelled("function")
 }
 
-fn binding<E>(expr: E) -> impl Parser<TokenKind, ExprKind, Error = PError>
+fn binding<E>(expr: E) -> impl Parser<TokenKind, Expr, Error = PError>
 where
     E: Parser<TokenKind, Expr, Error = PError> + Clone,
 {
@@ -205,13 +280,12 @@ where
         .then(expr.clone())
         .then_ignore(ctrl(';'))
         .repeated()
-        .at_least(1)
         // main
         .then(expr)
         .foldr(|(symbol, expr), main| Expr {
+            ty: main.ty.clone(),
             kind: ExprKind::Binding(Box::new(Binding { symbol, expr, main })),
         })
-        .map(|e| e.kind)
         .labelled("binding")
 }
 

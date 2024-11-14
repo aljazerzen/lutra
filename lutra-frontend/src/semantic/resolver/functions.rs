@@ -102,7 +102,7 @@ impl Resolver<'_> {
 
         // run fold again, so idents that used to point to generics get inlined
         let return_ty = fn_ty
-            .return_ty
+            .body
             .clone()
             .map(|ty| self.fold_type(*ty))
             .transpose()?;
@@ -391,7 +391,7 @@ pub fn expr_of_func_application(
     } else {
         Some(Ty::new(TyFunc {
             params: ty_func_params,
-            return_ty: body_ty.map(Box::new),
+            body: body_ty.map(Box::new),
         }))
     };
 

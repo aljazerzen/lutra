@@ -261,8 +261,8 @@ pub fn fold_ty_func<F: ?Sized + PrFold>(fold: &mut F, f: TyFunc) -> Result<TyFun
             .into_iter()
             .map(|a| fold_type_opt(fold, a))
             .try_collect()?,
-        return_ty: f
-            .return_ty
+        body: f
+            .body
             .map(|t| fold.fold_type(*t).map(Box::new))
             .transpose()?,
         // generic_type_params: f.generic_type_params,

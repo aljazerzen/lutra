@@ -133,7 +133,7 @@ impl Resolver<'_> {
 
             ExprKind::Func(func) => TyKind::Function(Some(TyFunc {
                 params: func.params.iter().map(|p| p.ty.clone()).collect_vec(),
-                return_ty: func
+                body: func
                     .return_ty
                     .clone()
                     .or_else(|| func.body.ty.clone())
@@ -260,10 +260,9 @@ impl Resolver<'_> {
                 }
 
                 // return types
-                if let Some((f_ret, e_ret)) = Option::zip(
-                    Option::as_ref(&f_func.return_ty),
-                    Option::as_ref(&e_func.return_ty),
-                ) {
+                if let Some((f_ret, e_ret)) =
+                    Option::zip(Option::as_ref(&f_func.body), Option::as_ref(&e_func.body))
+                {
                     // co-variant contained type
                     self.validate_type(f_ret, e_ret, span, who)?;
                 }

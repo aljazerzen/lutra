@@ -19,6 +19,7 @@ type ExternalSymbol = {
 #TODO: @(derive Clone)
 type Expr = {
     kind = ExprKind,
+    ty = Ty,
 }
 
 #[derive(Clone)]
@@ -73,4 +74,48 @@ type Binding = {
     symbol = Sid,
     expr = Expr,
     main = Expr,
+}
+
+type Ty = {
+    kind = TyKind,
+    layout = TyLayout,
+}
+
+type TyKind = enum {
+    Primitive = PrimitiveSet,
+
+    Tuple = [TyTupleField],
+
+    Array = Ty,
+
+    Enum = [TyEnumVariant],
+
+    Function = TyFunction,
+}
+
+type PrimitiveSet = enum {
+    int,
+    float,
+    bool,
+    text,
+}
+
+type TyTupleField = {
+    name = enum { None, Some = text},
+    ty = Ty,
+}
+
+type TyEnumVariant = {
+    name = text,
+    ty = Ty,
+}
+
+type TyLayout = {
+    head_size = int,
+    variants_recursive = [int]
+}
+
+type TyFunction = {
+    params = [Ty],
+    body = Ty
 }

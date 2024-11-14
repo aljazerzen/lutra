@@ -95,7 +95,7 @@ pub enum PrimitiveSet {
 #[derive(Debug, Clone, PartialEq, Hash)]
 pub struct TyFunc {
     pub params: Vec<Option<Ty>>,
-    pub return_ty: Option<Box<Ty>>,
+    pub body: Option<Box<Ty>>,
 }
 
 impl Ty {

@@ -30,7 +30,10 @@ pub(crate) fn type_expr() -> impl Parser<TokenKind, Ty, Error = PError> + Clone 
                     .repeated()
                     .then_ignore(just(TokenKind::ArrowThin))
                     .then(nested_type_expr.clone().map(Box::new).map(Some))
-                    .map(|(params, return_ty)| TyFunc { params, return_ty })
+                    .map(|(params, return_ty)| TyFunc {
+                        params,
+                        body: return_ty,
+                    })
                     .or_not(),
             )
             .map(TyKind::Function);

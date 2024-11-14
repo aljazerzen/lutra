@@ -23,7 +23,8 @@ fn get_ty() -> pr::Ty {
     "#;
 
     let source = lutra_frontend::SourceTree::single("".into(), source.into());
-    let project = lutra_frontend::compile(source, lutra_frontend::CompileParams {}).unwrap_or_else(|e| panic!("{e}"));
+    let project = lutra_frontend::compile(source, lutra_frontend::CompileParams {})
+        .unwrap_or_else(|e| panic!("{e}"));
 
     let name = pr::Path::from_name("Pupek");
     let type_def = project.root_module.module.get(&name);

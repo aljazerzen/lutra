@@ -50,8 +50,8 @@ impl Printer {
         r
     }
 
-    fn print_expr(&mut self, v: &ir::Expr) -> String {
-        match &v.kind {
+    fn print_expr(&mut self, expr: &ir::Expr) -> String {
+        let mut r = match &expr.kind {
             ir::ExprKind::Pointer(sid) => {
                 let id = (sid.0 as u32) & 0x3fffffff;
                 match sid.kind() {
@@ -69,23 +69,35 @@ impl Printer {
             }
             ir::ExprKind::Call(call) => {
                 let mut r = "(".to_string();
-                for (index, arg) in call.args.iter().enumerate() {
-                    if index > 0 {
-                        r += ", ";
-                    }
-                    r += &self.print_expr(arg);
-                }
-                r += ") | ";
+                self.indent();
+                r += &self.new_line();
+                r += "call ";
                 r += &self.print_expr(&call.function);
+                r += ", ";
+                for arg in &call.args {
+                    r += &self.new_line();
+                    r += &self.print_expr(arg);
+                    r += ", ";
+                }
+                self.dedent();
+                r += &self.new_line();
+                r += ")";
                 r
             }
             ir::ExprKind::Function(func) => {
-                let mut r = "func ".to_string();
+                let mut r = "(".to_string();
+                self.indent();
+                r += &self.new_line();
 
+                r += "func ";
                 let func_id = (func.symbol_ns.0 as u32 & 0x3fffffff) >> 8;
                 r += &func_id.to_string();
                 r += " -> ";
                 r += &self.print_expr(&func.body);
+
+                self.dedent();
+                r += &self.new_line();
+                r += ")";
 
                 r
             }
@@ -117,13 +129,15 @@ impl Printer {
             }
             ir::ExprKind::TupleLookup(lookup) => {
                 let mut r = self.print_expr(&lookup.base);
+                r += &self.new_line();
                 r += ".";
                 r += &lookup.offset.to_string();
                 r
             }
             ir::ExprKind::ArrayLookup(lookup) => {
                 let mut r = self.print_expr(&lookup.base);
-                r += "[";
+                r += &self.new_line();
+                r += ".[";
                 r += &lookup.offset.to_string();
                 r += "]";
                 r
@@ -154,6 +168,61 @@ impl Printer {
 
                 r += &self.print_expr(&binding.main);
                 self.dedent();
+                r
+            }
+        };
+        r += ": ";
+        r += &self.print_ty(&expr.ty);
+        r
+    }
+
+    fn print_ty(&self, ty: &ir::Ty) -> String {
+        match &ty.kind {
+            ir::TyKind::Primitive(ir::PrimitiveSet::bool) => format!("bool"),
+            ir::TyKind::Primitive(ir::PrimitiveSet::int) => format!("int"),
+            ir::TyKind::Primitive(ir::PrimitiveSet::float) => format!("float"),
+            ir::TyKind::Primitive(ir::PrimitiveSet::text) => format!("text"),
+            ir::TyKind::Tuple(fields) => {
+                let mut r = "{".to_string();
+                for (index, field) in fields.iter().enumerate() {
+                    if index > 0 {
+                        r += ", ";
+                    }
+                    if let ir::TyTupleFieldname::Some(name) = &field.name {
+                        r += name;
+                        r += " = ";
+                    }
+                    r += &self.print_ty(&field.ty);
+                }
+                r += "}";
+                r
+            }
+            ir::TyKind::Array(items) => {
+                format!("[{}]", self.print_ty(&items))
+            }
+            ir::TyKind::Enum(variants) => {
+                let mut r = "enum {".to_string();
+                for (index, variant) in variants.iter().enumerate() {
+                    if index > 0 {
+                        r += ", ";
+                    }
+                    r += &variant.name;
+                    r += " = ";
+                    r += &self.print_ty(&variant.ty);
+                }
+                r += "}";
+                r
+            }
+            ir::TyKind::Function(func) => {
+                let mut r = "func (".to_string();
+                for (index, param) in func.params.iter().enumerate() {
+                    if index > 0 {
+                        r += ", ";
+                    }
+                    r += &self.print_ty(&param);
+                }
+                r += ") -> ";
+                r += &self.print_ty(&func.body);
                 r
             }
         }

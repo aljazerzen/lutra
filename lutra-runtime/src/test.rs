@@ -3,12 +3,12 @@
 use insta::assert_snapshot;
 
 #[track_caller]
-fn _test_interpret(program: &str, res_ty: &str) -> String {
+fn _test_interpret(program: &str) -> String {
     let program = lutra_ir::_test_parse(program);
-    let ty = lutra_frontend::_test_compile_ty(res_ty);
 
     let value = crate::interpreter::evaluate(&program, (), crate::BUILTIN_MODULES);
 
+    let ty = lutra_ir::ty_into_pr(program.main.ty);
     value.print_source(&ty).unwrap()
 }
 
@@ -18,15 +18,27 @@ fn interpret_01() {
     let externals = [core_int_add];
 
     let main =
-        let 1 = func 2 -> [fn.2+0, fn.2+0, fn.2+0];
-        let 2 = var.1;
+        let 1 = (func 2 -> [fn.2+0: float, fn.2+0: float, fn.2+0: float]: [float]): func (float) -> [float];
+        let 2 = var.1: func (float) -> [float];
         {
-            (3.5) | var.2,
-            (6, 7) | func 3 -> [ fn.3+0, fn.3+1 ],
-            (6, 2) | external.0
-        }
+            (
+                call var.2: func (float) -> [float],
+                3.5: float
+            ): [float],
+            (
+                call (
+                    func 3 -> [fn.3+0: int, fn.3+1: int]: [int]
+                ): func (int) -> [int],
+                6: int,
+                7: int,
+            ): [int],
+            (
+                call external.0: func (int) -> int,
+                6: int,
+                2: int,
+            ): int,
+        }: {[float], [int], int}
     "#,
-    "{[float], [int], int}"
     ), @r#"
     {
       [
@@ -50,10 +62,13 @@ fn interpret_02() {
     let externals = [core_array_map];
 
     let main =
-        let 1 = func 1 -> {fn.1+0, fn.1+0};
-        (var.1, [2, 3, 1]) | external.0
+        let 1 = (func 1 -> {fn.1+0: int, fn.1+0: int}: {int, int}): func (int) -> {int, int};
+        (
+            call external.0: func (func (int) -> {int, int}, [int]) -> [{int, int}],
+            var.1: func (int) -> {int, int},
+            [2: int, 3: int, 1: int]: [int]
+        ): [{int, int}]
     "#,
-    "[{int, int}]"
     ), @r#"
     [
       {
@@ -79,11 +94,24 @@ fn interpret_03() {
     let externals = [core_array_map, core_int_mul];
 
     let main =
-        let 1 = [{1, 3}, {5, 4}, {2, 3}];
-        let 2 = func 1 -> (fn.1+0 .0, fn.1+0 .1) | external.1;
-        (var.2, var.1) | external.0
+        let 1 = [
+            {1:int, 3:int}: {int, int}, 
+            {5:int, 4:int}: {int, int}, 
+            {2:int, 3:int}: {int, int},
+        ]: [{int, int}];
+        let 2 = (
+            func 1 -> (
+                call external.1: func (int, int) -> int,
+                fn.1+0: {int, int} .0: int,
+                fn.1+0: {int, int} .1: int,
+            ): int
+        ): func ({int, int}) -> int;
+        (
+            call external.0: func (func ({int, int}) -> int, [{int, int}]) -> [int],
+            var.2: func ({int, int}) -> int,
+            var.1: [{int, int}],
+        ): [int]
     "#,
-    "[int]"
     ), @r#"
     [
       3,

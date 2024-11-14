@@ -35,7 +35,8 @@ fn _test_get_type(name: &'static str) -> &'static pr::Ty {
         let source = include_str!("../lutra/bin.lt");
         let source = lutra_frontend::SourceTree::single("".into(), source.into());
 
-        lutra_frontend::compile(source, lutra_frontend::CompileParams {}).unwrap_or_else(|e| panic!("{e}"))
+        lutra_frontend::compile(source, lutra_frontend::CompileParams {})
+            .unwrap_or_else(|e| panic!("{e}"))
     });
 
     let name = pr::Path::from_name(name);

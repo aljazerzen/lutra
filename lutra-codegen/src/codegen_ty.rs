@@ -426,12 +426,12 @@ fn write_ty_def_impl(w: &mut impl Write, ty: &pr::Ty) -> Result<(), std::fmt::Er
         _ => unimplemented!(),
     }
 
-    // let head_size = ty.layout.as_ref().unwrap().head_size;
-    // writeln!(w, "impl ::lutra_bin::Layout for {name} {{")?;
-    // writeln!(w, "    fn head_size() -> usize {{")?;
-    // writeln!(w, "        {head_size}")?;
-    // writeln!(w, "    }}")?;
-    // writeln!(w, "}}\n")?;
+    let head_size = ty.layout.as_ref().unwrap().head_size;
+    writeln!(w, "impl ::lutra_bin::Layout for {name} {{")?;
+    writeln!(w, "    fn head_size() -> usize {{")?;
+    writeln!(w, "        {head_size}")?;
+    writeln!(w, "    }}")?;
+    writeln!(w, "}}\n")?;
 
     match &ty.kind {
         pr::TyKind::Primitive(_) | pr::TyKind::Array(_) => {
@@ -487,7 +487,7 @@ fn write_ty_def_impl(w: &mut impl Write, ty: &pr::Ty) -> Result<(), std::fmt::Er
             let head = layout::enum_head_format(variants);
 
             // tag
-            writeln!(w, "        let mut tag_bytes = r.copy_n({});", head.s / 8)?;
+            writeln!(w, "        let mut tag_bytes = r.copy_n({}).to_vec();", head.s / 8)?;
             writeln!(w, "        tag_bytes.resize(8, 0);")?;
             writeln!(w, "        let tag = u64::from_le_bytes(tag_bytes.try_into().unwrap()) as usize;")?;
 

@@ -59,11 +59,16 @@ fn prepare_stream<'a>(
 #[track_caller]
 pub fn _test_parse(source: &str) -> crate::ir::Program {
     let (program, errors) = super::parse(source);
-    for error in &errors {
-        eprintln!("{}-{}: {}", error.span.start, error.span.end, error.message);
-    }
+
     if !errors.is_empty() {
-        panic!();
+        let mut message = "[PARSER ERRORS]:\n".to_string();
+        for error in &errors {
+            message += &format!(
+                "{}-{}: {}\n",
+                error.span.start, error.span.end, error.message
+            );
+        }
+        panic!("{message}");
     }
     program.unwrap()
 }
