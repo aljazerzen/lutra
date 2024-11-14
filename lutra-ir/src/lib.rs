@@ -29,10 +29,7 @@ pub fn ty_into_pr(ty: ir::Ty) -> pr::Ty {
             fields
                 .into_iter()
                 .map(|f| {
-                    let name = match &f.name {
-                        ir::TyTupleFieldname::None => None,
-                        ir::TyTupleFieldname::Some(n) => Some(n.clone()),
-                    };
+                    let name = f.name.clone();
                     let ty = ty_into_pr(f.ty);
                     pr::TyTupleField { name, ty }
                 })

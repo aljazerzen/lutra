@@ -54,10 +54,7 @@ fn type_to_pr(ty: &schema::Ty) -> pr::Ty {
             fields
                 .iter()
                 .map(|f| {
-                    let name = match &f.name {
-                        schema::OptText::None => None,
-                        schema::OptText::Some(n) => Some(n.clone()),
-                    };
+                    let name = f.name.0.clone();
                     let ty = type_to_pr(&f.ty);
                     pr::TyTupleField { name, ty }
                 })
@@ -74,17 +71,14 @@ fn type_to_pr(ty: &schema::Ty) -> pr::Ty {
         ),
     };
 
-    let layout = match &ty.layout {
-        schema::Tylayout::None => None,
-        schema::Tylayout::Some(layout) => Some(pr::TyLayout {
-            head_size: layout.head_size as usize,
-            variants_recursive: layout
-                .variants_recursive
-                .iter()
-                .map(|x| *x as usize)
-                .collect(),
-        }),
-    };
+    let layout = ty.layout.as_ref().map(|layout| pr::TyLayout {
+        head_size: layout.head_size as usize,
+        variants_recursive: layout
+            .variants_recursive
+            .iter()
+            .map(|x| *x as usize)
+            .collect(),
+    });
 
     pr::Ty {
         kind,
@@ -110,10 +104,7 @@ fn type_from_pr(ty: &pr::Ty) -> schema::Ty {
             fields
                 .iter()
                 .map(|f| {
-                    let name = match &f.name {
-                        None => schema::OptText::None,
-                        Some(n) => schema::OptText::Some(n.clone()),
-                    };
+                    let name = schema::OptText(f.name.clone());
                     let ty = type_from_pr(&f.ty);
                     schema::TyKindTupleItems { name, ty }
                 })
@@ -131,17 +122,14 @@ fn type_from_pr(ty: &pr::Ty) -> schema::Ty {
         ),
         _ => todo!(),
     };
-    let layout = match &ty.layout {
-        Some(layout) => schema::Tylayout::Some(schema::TyLayout {
-            head_size: layout.head_size as i64,
-            variants_recursive: layout
-                .variants_recursive
-                .iter()
-                .map(|x| *x as i64)
-                .collect(),
-        }),
-        None => schema::Tylayout::None,
-    };
+    let layout = ty.layout.as_ref().map(|layout| schema::TyLayout {
+        head_size: layout.head_size as i64,
+        variants_recursive: layout
+            .variants_recursive
+            .iter()
+            .map(|x| *x as i64)
+            .collect(),
+    });
 
     schema::Ty { kind, layout }
 }

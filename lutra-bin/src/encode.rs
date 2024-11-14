@@ -88,6 +88,56 @@ impl<E: Encode> Encode for Vec<E> {
         Ok(())
     }
 }
+impl<E: Encode + Layout> Encode for Option<E> {
+    type HeadPtr = Option<Result<E::HeadPtr, OffsetPointer>>;
+
+    fn encode_head(&self, w: &mut Vec<u8>) -> Result<Self::HeadPtr> {
+        let tag: u8 = if self.is_none() { 0 } else { 1 };
+        w.write_all(&[tag])?;
+
+        let inner_head_size = E::head_size();
+        let is_inline = inner_head_size <= 4;
+
+        Ok(if let Some(inner) = self {
+            if is_inline {
+                let ptr = inner.encode_head(w)?;
+                if inner_head_size < 4 {
+                    w.write_all(&vec![0; 4 - inner_head_size])?;
+                }
+                Some(Ok(ptr))
+            } else {
+                let offset = OffsetPointer::new(w);
+
+                Some(Err(offset))
+            }
+        } else {
+            w.write_all(&[0, 0, 0, 0])?;
+            None
+        })
+    }
+
+    fn encode_body(&self, head: Self::HeadPtr, w: &mut Vec<u8>) -> Result<()> {
+        let Some(inner) = self else { return Ok(()) };
+
+        let inner_head_size = E::head_size();
+        let is_inline = inner_head_size <= 4;
+
+        let head = head.unwrap();
+
+        if is_inline {
+            let Ok(head) = head else { unreachable!() };
+            inner.encode_body(head, w)
+        } else {
+            let Err(offset_ptr) = head else {
+                unreachable!()
+            };
+            offset_ptr.write(w);
+
+            let head_ptr = inner.encode_head(w)?;
+            inner.encode_body(head_ptr, w)
+        }
+    }
+}
 
 /// Pointer to a location where an offset should be written to.
 pub struct OffsetPointer {
@@ -170,5 +220,31 @@ impl<E: Decode> Decode for Vec<E> {
             buf.push(E::decode(&mut body)?);
         }
         Ok(buf)
+    }
+}
+impl<E: Decode> Decode for Option<E> {
+    fn decode(r: &mut Reader<'_>) -> Result<Self> {
+        let [tag] = r.copy_const::<1>();
+        if tag == 0 {
+            r.skip(4);
+            Ok(None)
+        } else {
+            let inner_head_size = E::head_size();
+            let is_inline = inner_head_size <= 4;
+
+            Ok(Some(if is_inline {
+                let res = E::decode(r)?;
+                if inner_head_size < 4 {
+                    r.skip(4 - inner_head_size);
+                }
+                res
+            } else {
+                let mut body = r.clone();
+                let offset = r.copy_const::<4>();
+                let offset = u32::from_le_bytes(offset) as usize;
+                body.skip(offset);
+                E::decode(&mut body)?
+            }))
+        }
     }
 }

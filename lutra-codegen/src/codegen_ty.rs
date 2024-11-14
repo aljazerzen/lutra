@@ -125,6 +125,13 @@ pub fn write_ty_def(
             writeln!(w, ");\n")?;
         }
 
+        pr::TyKind::Enum(variants) if is_option_enum(variants) => {
+            // generate a wrapper new-type struct
+            write!(w, "pub struct {}(pub ", name)?;
+            write_ty_ref(w, ty, false, ctx)?;
+            writeln!(w, ");\n")?;
+        }
+
         pr::TyKind::Tuple(fields) => {
             writeln!(w, "pub struct {} {{", name)?;
 
@@ -211,6 +218,18 @@ fn write_ty_ref(
             write_ty_ref(w, items_ty, as_expr, ctx)?;
             write!(w, ">")?;
         }
+        pr::TyKind::Enum(variants) if is_option_enum(variants) => {
+            let inner_ty = &variants[1].1;
+
+            write!(w, "Option")?;
+            if as_expr {
+                write!(w, "::<")?;
+            } else {
+                write!(w, "<")?;
+            }
+            write_ty_ref(w, inner_ty, as_expr, ctx)?;
+            write!(w, ">")?;
+        }
 
         pr::TyKind::Tuple(_) | pr::TyKind::Enum(_) => {
             ctx.def_buffer.push_back(ty.clone());
@@ -246,6 +265,27 @@ fn write_ty_def_impl(w: &mut impl Write, ty: &pr::Ty) -> Result<(), std::fmt::Er
         pr::TyKind::Array(_) => {
             writeln!(w, "impl ::lutra_bin::Encode for {name} {{")?;
             writeln!(w, "    type HeadPtr = ::lutra_bin::OffsetPointer;")?;
+            writeln!(w, "    fn encode_head(&self, w: &mut Vec<u8>) -> ::lutra_bin::Result<Self::HeadPtr> {{")?;
+            writeln!(w, "        self.0.encode_head(w)")?;
+            writeln!(w, "    }}")?;
+            writeln!(w, "    fn encode_body(&self, head: Self::HeadPtr, w: &mut Vec<u8>) -> ::lutra_bin::Result<()> {{")?;
+            writeln!(w, "        self.0.encode_body(head, w)")?;
+            writeln!(w, "    }}")?;
+            writeln!(w, "}}")?;
+        }
+
+        pr::TyKind::Enum(variants) if is_option_enum(variants) => {
+            let inner_ty = &variants[1].1;
+
+            let mut inner_head_ptr = String::new();
+            let mut ctx = Context::default();
+            write_ty_ref(&mut inner_head_ptr, &inner_ty, true, &mut ctx)?;
+
+            writeln!(w, "impl ::lutra_bin::Encode for {name} {{")?;
+            writeln!(w, "    type HeadPtr = Option<Result<")?;
+            writeln!(w, "         <{inner_head_ptr} as ::lutra_bin::Encode>::HeadPtr,")?;
+            writeln!(w, "         ::lutra_bin::OffsetPointer,")?;
+            writeln!(w, "    >>;")?;
             writeln!(w, "    fn encode_head(&self, w: &mut Vec<u8>) -> ::lutra_bin::Result<Self::HeadPtr> {{")?;
             writeln!(w, "        self.0.encode_head(w)")?;
             writeln!(w, "    }}")?;
@@ -450,6 +490,22 @@ fn write_ty_def_impl(w: &mut impl Write, ty: &pr::Ty) -> Result<(), std::fmt::Er
             writeln!(w, "}}\n")?;
         }
 
+        pr::TyKind::Enum(variants) if is_option_enum(variants) => {
+            writeln!(w, "impl ::lutra_bin::Decode for {name} {{")?;
+            writeln!(
+                w,
+                "    fn decode(r: &mut ::lutra_bin::Reader<'_>) -> ::lutra_bin::Result<Self> {{"
+            )?;
+
+            write!(w, "        Ok(Self(")?;
+            let mut ctx = Context::default();
+            write_ty_ref(w, ty, true, &mut ctx)?;
+            writeln!(w, "::decode(r)?))")?;
+
+            writeln!(w, "    }}")?;
+            writeln!(w, "}}\n")?;
+        }
+
         pr::TyKind::Tuple(fields) => {
             writeln!(w, "impl ::lutra_bin::Decode for {name} {{")?;
             writeln!(w, "    fn decode(r: &mut ::lutra_bin::Reader<'_>) -> ::lutra_bin::Result<Self> {{")?;
@@ -546,4 +602,10 @@ fn write_ty_def_impl(w: &mut impl Write, ty: &pr::Ty) -> Result<(), std::fmt::Er
 
 fn is_unit_variant(variant_ty: &pr::Ty) -> bool {
     variant_ty.kind.as_tuple().map_or(false, |f| f.is_empty())
+}
+
+fn is_option_enum(variants: &[(String, pr::Ty)]) -> bool {
+    return variants.len() == 2
+        && is_unit_variant(&variants[0].1)
+        && !is_unit_variant(&variants[1].1);
 }

@@ -18,3 +18,5 @@ type Tree = enum {
     Leaf = int,
     Node = {left = Tree, right = Tree},
 }
+
+type opt = enum { None, Some = text }

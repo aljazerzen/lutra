@@ -188,7 +188,7 @@ impl Printer {
                     if index > 0 {
                         r += ", ";
                     }
-                    if let ir::TyTupleFieldname::Some(name) = &field.name {
+                    if let Some(name) = &field.name {
                         r += name;
                         r += " = ";
                     }

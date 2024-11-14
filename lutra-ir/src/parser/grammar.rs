@@ -92,10 +92,6 @@ fn ty() -> impl Parser<TokenKind, Ty, Error = PError> {
         let tuple = ident_part()
             .then_ignore(ctrl('='))
             .or_not()
-            .map(|n| match n {
-                Some(n) => TyTupleFieldname::Some(n),
-                None => TyTupleFieldname::None,
-            })
             .then(ty_inner.clone())
             .map(|(name, ty)| TyTupleField { name, ty })
             .separated_by(ctrl(','))

@@ -163,3 +163,32 @@ fn test_tree() {
     "#
     );
 }
+
+#[test]
+fn test_opt_01() {
+    let ty = _test_get_type("opt");
+    let value = Value::Enum(
+        0, // Node
+        Box::new(Value::Tuple(vec![])),
+    );
+    assert_snapshot!(_test_encode_decode::<types::opt>(value, ty), @r#"
+    Length: 5 (0x5) bytes
+    0000:   00 00 00 00  00                                      .....
+    "#
+    );
+}
+
+#[test]
+fn test_opt_02() {
+    let ty = _test_get_type("opt");
+    let value = Value::Enum(
+        1, // Node
+        Box::new(Value::Text("text".into())),
+    );
+    assert_snapshot!(_test_encode_decode::<types::opt>(value, ty), @r#"
+    Length: 17 (0x11) bytes
+    0000:   01 04 00 00  00 08 00 00  00 04 00 00  00 74 65 78   .............tex
+    0010:   74                                                   t
+    "#
+    );
+}
