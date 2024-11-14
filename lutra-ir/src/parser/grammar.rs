@@ -224,11 +224,23 @@ where
     E: Parser<TokenKind, Expr, Error = PError> + Clone + 'a,
 {
     ident_keyword("call")
-        .ignore_then(expr.separated_by(ctrl(',')).at_least(1).allow_trailing())
-        .map(|mut exprs| {
-            let function = exprs.remove(0);
-            let args = exprs;
-            ExprKind::Call(Box::new(Call { args, function }))
+        .ignore_then(expr.clone())
+        .then(
+            ctrl(',')
+                .ignore_then(ident_keyword("layout"))
+                .ignore_then(select! {
+                    TokenKind::Literal(pr::Literal::Integer(i)) => i
+                })
+                .repeated(),
+        )
+        .then(ctrl(',').ignore_then(expr).repeated())
+        .then_ignore(ctrl(',').or_not())
+        .map(|((function, layout), args)| {
+            ExprKind::Call(Box::new(Call {
+                function,
+                layout,
+                args,
+            }))
         })
         .delimited_by(ctrl('('), ctrl(')'))
         .recover_with(nested_delimiters(

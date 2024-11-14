@@ -5,17 +5,18 @@ use lutra_frontend::pr;
 use super::{expect_ty, expect_ty_primitive, Value};
 use crate::encode::OffsetPointer;
 use crate::layout::{self, EnumHeadFormat, EnumVariantFormat};
-use crate::{Decode, Encode, Error, Reader, Result};
+use crate::{ArrayReader, Decode, Encode, Error, Reader, Result};
 
 impl Value {
     /// Convert a Lutra [Value] to .ld binary encoding.
-    pub fn encode(&self, w: &mut Vec<u8>, ty: &pr::Ty) -> Result<()> {
+    pub fn encode(&self, ty: &pr::Ty) -> Result<Vec<u8>> {
+        let mut res = Vec::new();
+
         let mut ctx = Context::new(ty);
 
-        let head_ptr = encode_head(w, self, ty, &mut ctx)?;
-
-        encode_body(w, self, head_ptr, ty, &mut ctx)?;
-        Ok(())
+        let head_ptr = encode_head(&mut res, self, ty, &mut ctx)?;
+        encode_body(&mut res, self, head_ptr, ty, &mut ctx)?;
+        Ok(res)
     }
 
     /// Convert .ld binary encoding into Lutra [Value].
@@ -214,12 +215,8 @@ fn decode_inner<'t>(r: &mut Reader<'_>, ty: &'t pr::Ty, ctx: &mut Context<'t>) -
         pr::TyKind::Array(item_ty) => {
             let mut body = r.clone();
 
-            let offset = r.copy_const::<4>();
-            let offset = u32::from_le_bytes(offset) as usize;
+            let (offset, len) = ArrayReader::read_head(r);
             body.skip(offset);
-
-            let len = r.copy_const::<4>();
-            let len = u32::from_le_bytes(len) as usize;
 
             let mut buf = Vec::with_capacity(len);
             for _ in 0..len {

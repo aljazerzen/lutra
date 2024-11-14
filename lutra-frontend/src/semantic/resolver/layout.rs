@@ -12,30 +12,16 @@ impl Resolver<'_> {
         }
 
         let head_size = match &ty.kind {
-            pr::TyKind::Primitive(prim) => match prim {
-                pr::PrimitiveSet::Bool => 8,
-                pr::PrimitiveSet::Int => 64,
-                pr::PrimitiveSet::Float => 64,
-                pr::PrimitiveSet::Text => 64,
-                _ => unimplemented!(),
-            },
-            pr::TyKind::Array(_) => 64,
-
-            pr::TyKind::Tuple(fields) => {
-                let mut size = 0;
-                for f in fields {
-                    if let Some(layout) = &f.ty.layout {
-                        size += layout.head_size;
-                    } else {
-                        return Ok(None);
-                    }
+            pr::TyKind::Primitive(_) | pr::TyKind::Array(_) | pr::TyKind::Tuple(_) => {
+                if let Some(size) = ty.kind.get_head_size() {
+                    size
+                } else {
+                    return Ok(None);
                 }
-                size
             }
-            pr::TyKind::Enum(variants) => {
-                let tag_size = enum_tag_size(variants.len());
 
-                let head_size = tag_size + 32;
+            pr::TyKind::Enum(variants) => {
+                let head_size = ty.kind.get_head_size().unwrap();
 
                 let mut variants_recursive = Vec::new();
                 for (index, (_, variant_ty)) in variants.iter().enumerate() {
@@ -97,40 +83,4 @@ impl Resolver<'_> {
             variants_recursive: vec![],
         }))
     }
-}
-
-fn enum_tag_size(variants_len: usize) -> usize {
-    // TODO: when bool-sub-byte packing is implemented, remove function in favor of enum_tag_size_used
-    enum_tag_size_used(variants_len).div_ceil(8) * 8
-}
-
-fn enum_tag_size_used(variants_len: usize) -> usize {
-    f64::log2(variants_len as f64).ceil() as usize
-}
-
-#[test]
-fn test_enum_tag_size() {
-    assert_eq!(0, enum_tag_size_used(0));
-    assert_eq!(0, enum_tag_size_used(1));
-    assert_eq!(1, enum_tag_size_used(2));
-    assert_eq!(2, enum_tag_size_used(3));
-    assert_eq!(2, enum_tag_size_used(4));
-    assert_eq!(3, enum_tag_size_used(5));
-    assert_eq!(3, enum_tag_size_used(6));
-    assert_eq!(3, enum_tag_size_used(7));
-    assert_eq!(3, enum_tag_size_used(8));
-    assert_eq!(4, enum_tag_size_used(9));
-    assert_eq!(4, enum_tag_size_used(10));
-    assert_eq!(4, enum_tag_size_used(11));
-    assert_eq!(4, enum_tag_size_used(12));
-    assert_eq!(4, enum_tag_size_used(13));
-    assert_eq!(4, enum_tag_size_used(14));
-    assert_eq!(4, enum_tag_size_used(15));
-    assert_eq!(4, enum_tag_size_used(16));
-    assert_eq!(5, enum_tag_size_used(17));
-    assert_eq!(5, enum_tag_size_used(18));
-    assert_eq!(5, enum_tag_size_used(19));
-    assert_eq!(5, enum_tag_size_used(20));
-    assert_eq!(5, enum_tag_size_used(21));
-    assert_eq!(5, enum_tag_size_used(22));
 }

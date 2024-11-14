@@ -14,7 +14,7 @@ pub fn write_functions(
 
     writeln!(w, "pub trait NativeFunctions {{")?;
     for (name, _func) in functions {
-        writeln!(w, "    fn {name}(interpreter: &mut ::lutra_runtime::Interpreter, args: Vec<::lutra_runtime::Cell>) -> ::lutra_bin::Value;")?;
+        writeln!(w, "    fn {name}(interpreter: &mut ::lutra_runtime::Interpreter, layout: Vec<u32>, args: Vec<::lutra_runtime::Cell>) -> ::lutra_runtime::Cell;")?;
     }
     writeln!(w, "}}\n")?;
 

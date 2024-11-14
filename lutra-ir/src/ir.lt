@@ -46,6 +46,7 @@ type Literal = enum {
 #TODO: @(derive Clone)
 type Call = {
     function = Expr,
+    layout = [int],
     args = [Expr],
 }
 

@@ -161,7 +161,14 @@ impl Decode for String {
 }
 impl<E: Decode> Decode for Vec<E> {
     fn decode(r: &mut Reader<'_>) -> Result<Self> {
-        let reader = reader::ArrayReader::new(r, E::head_size());
-        reader.into_iter().map(|mut r| E::decode(&mut r)).collect()
+        let mut body = r.clone();
+        let (offset, len) = reader::ArrayReader::read_head(r);
+        body.skip(offset);
+
+        let mut buf = Vec::with_capacity(len);
+        for _ in 0..len {
+            buf.push(E::decode(&mut body)?);
+        }
+        Ok(buf)
     }
 }

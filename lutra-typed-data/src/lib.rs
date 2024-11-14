@@ -21,8 +21,7 @@ pub fn decode_typed_data(buffer: &[u8]) -> Result<(Value, pr::Ty)> {
 }
 
 pub fn encode_typed_data(w: &mut impl std::io::Write, value: Value, ty: &pr::Ty) -> Result<()> {
-    let mut data_u8 = Vec::new();
-    value.encode(&mut data_u8, ty)?;
+    let data_u8 = value.encode(ty)?;
 
     let ty = type_from_pr(ty);
 

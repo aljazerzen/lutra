@@ -51,8 +51,15 @@ pub fn ty_into_pr(ty: ir::Ty) -> pr::Ty {
         })),
     };
 
+    let mut head_size = ty.layout.head_size as usize;
+    if head_size == 0 {
+        if let Some(h) = kind.get_head_size() {
+            head_size = h
+        }
+    }
+
     let layout = Some(pr::TyLayout {
-        head_size: ty.layout.head_size as usize,
+        head_size,
         variants_recursive: ty
             .layout
             .variants_recursive

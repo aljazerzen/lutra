@@ -2,6 +2,7 @@ use std::collections::HashMap;
 use std::ops::{BitAnd, Shr};
 use std::rc::Rc;
 
+use lutra_frontend::pr;
 use lutra_ir::ir;
 
 use crate::NativeModule;
@@ -17,19 +18,19 @@ pub struct Interpreter {
 
 #[derive(Clone)]
 pub enum Cell {
-    Value(Rc<lutra_bin::Value>),
+    Value(Rc<Vec<u8>>),
     Function(Box<ir::Function>),
     FunctionNative(NativeFunction),
     Vacant,
 }
 
-pub type NativeFunction = &'static dyn Fn(&mut Interpreter, Vec<Cell>) -> lutra_bin::Value;
+pub type NativeFunction = &'static dyn Fn(&mut Interpreter, Vec<u32>, Vec<Cell>) -> Cell;
 
 pub fn evaluate(
     program: &ir::Program,
     _input: (),
     native_modules: &[(&str, &dyn NativeModule)],
-) -> lutra_bin::Value {
+) -> Vec<u8> {
     let mut interpreter = Interpreter {
         memory: Vec::<Cell>::new(),
         bindings: HashMap::new(),
@@ -150,63 +151,79 @@ impl Interpreter {
                 }
             }
 
-            ir::ExprKind::Literal(l) => Cell::Value(Rc::new(match l {
-                ir::Literal::Int(i) => lutra_bin::Value::Int(*i),
-                ir::Literal::Float(i) => lutra_bin::Value::Float(*i),
-                ir::Literal::Bool(i) => lutra_bin::Value::Bool(*i),
-                ir::Literal::Text(i) => lutra_bin::Value::Text(i.clone()),
-            })),
+            ir::ExprKind::Literal(l) => {
+                let ty = lutra_ir::ty_into_pr(expr.ty.clone());
+                let value = match l {
+                    ir::Literal::Int(i) => lutra_bin::Value::Int(*i),
+                    ir::Literal::Float(i) => lutra_bin::Value::Float(*i),
+                    ir::Literal::Bool(i) => lutra_bin::Value::Bool(*i),
+                    ir::Literal::Text(i) => lutra_bin::Value::Text(i.clone()),
+                };
+                Cell::Value(Rc::new(value.encode(&ty).unwrap()))
+            }
 
             ir::ExprKind::Tuple(fields) => {
-                let mut res = Vec::new();
-                for field in fields {
+                let ty = lutra_ir::ty_into_pr(expr.ty.clone());
+                let pr::TyKind::Tuple(ty_fields) = &ty.kind else {
+                    panic!()
+                };
+
+                let mut res = Vec::with_capacity(fields.len());
+                for (i, field) in fields.iter().enumerate() {
                     let symbol = self.evaluate_expr(field);
+
+                    let field_ty = &ty_fields[i];
                     let value = assume_value(&symbol);
+                    let value = lutra_bin::Value::decode(value, &field_ty.ty).unwrap();
                     res.push(value);
                 }
-                Cell::Value(Rc::new(lutra_bin::Value::Tuple(res)))
+                let res = lutra_bin::Value::Tuple(res).encode(&ty).unwrap();
+
+                Cell::Value(Rc::new(res))
             }
             ir::ExprKind::Array(items) => {
+                let ty = lutra_ir::ty_into_pr(expr.ty.clone());
+                let pr::TyKind::Array(ty_items) = &ty.kind else {
+                    panic!()
+                };
+
                 let mut res = Vec::new();
                 for item in items {
                     let symbol = self.evaluate_expr(item);
+
                     let value = assume_value(&symbol);
+                    let value = lutra_bin::Value::decode(value, &ty_items).unwrap();
                     res.push(value);
                 }
-                Cell::Value(Rc::new(lutra_bin::Value::Array(res)))
+                let res = lutra_bin::Value::Array(res).encode(&ty).unwrap();
+
+                Cell::Value(Rc::new(res))
             }
             ir::ExprKind::TupleLookup(lookup) => {
                 let ir::TupleLookup { base, offset } = lookup.as_ref();
+                let base_ty = lutra_ir::ty_into_pr(base.ty.clone());
+
                 let base = self.evaluate_expr(base);
+                let base = lutra_bin::Reader::new(assume_value(&base));
+                let base = lutra_bin::TupleReader::new(base, &base_ty);
 
-                match base {
-                    Cell::Value(value) => {
-                        let lutra_bin::Value::Tuple(fields) = value.as_ref() else {
-                            panic!()
-                        };
-
-                        let index = *offset as usize;
-                        let value = fields.get(index).unwrap_or_else(|| panic!());
-                        Cell::Value(Rc::new(value.clone()))
-                    }
-                    Cell::Function(_) => panic!(),
-                    Cell::FunctionNative(_) => panic!(),
-                    Cell::Vacant => panic!(),
-                }
+                let field = base.get_field(*offset as usize);
+                Cell::Value(Rc::new(field.to_owned()))
             }
             ir::ExprKind::ArrayLookup(lookup) => {
                 let ir::ArrayLookup { base, offset } = lookup.as_ref();
+                let base_ty = lutra_ir::ty_into_pr(base.ty.clone());
+
                 let base = self.evaluate_expr(base);
 
                 match base {
-                    Cell::Value(value) => {
-                        let lutra_bin::Value::Array(items) = value.as_ref() else {
-                            panic!()
-                        };
+                    Cell::Value(base) => {
+                        let mut base_reader = lutra_bin::Reader::new(&base);
+                        let mut items = lutra_bin::ArrayReader::new_for_ty(&mut base_reader, &base_ty);
 
-                        let index = *offset as usize;
-                        let value = items.get(index).unwrap_or_else(|| panic!());
-                        Cell::Value(Rc::new(value.clone()))
+                        let item = items.nth(*offset as usize).unwrap();
+
+                        Cell::Value(Rc::new(item.to_owned()))
                     }
                     Cell::Function(_) => panic!(),
                     Cell::FunctionNative(_) => panic!(),
@@ -215,15 +232,17 @@ impl Interpreter {
             }
 
             ir::ExprKind::Call(call) => {
-                let ir::Call { function, args } = call.as_ref();
+                let ir::Call { function, layout, args } = call.as_ref();
 
                 let function = self.evaluate_expr(function);
+
+                let layout = layout.iter().map(|l| *l as u32).collect();
 
                 let mut arg_cells = Vec::new();
                 for arg in args {
                     arg_cells.push(self.evaluate_expr(arg));
                 }
-                self.evaluate_func_call(&function, arg_cells)
+                self.evaluate_func_call(&function, layout, arg_cells)
             }
             ir::ExprKind::Function(func) => Cell::Function(func.clone()),
             ir::ExprKind::Binding(binding) => {
@@ -239,7 +258,7 @@ impl Interpreter {
         }
     }
 
-    pub fn evaluate_func_call(&mut self, function: &Cell, args: Vec<Cell>) -> Cell {
+    pub fn evaluate_func_call(&mut self, function: &Cell, layout: Vec<u32>, args: Vec<Cell>) -> Cell {
         match function {
             Cell::Function(func) => {
                 let scope_size = args.len();
@@ -250,19 +269,16 @@ impl Interpreter {
                 self.drop_scope(func.symbol_ns, scope_size);
                 res
             }
-            Cell::FunctionNative(native) => {
-                let res: lutra_bin::Value = native(self, args);
-                Cell::Value(Rc::new(res))
-            }
+            Cell::FunctionNative(native) => native(self, layout, args),
             Cell::Value(_) => panic!(),
             Cell::Vacant => panic!(),
         }
     }
 }
 
-fn assume_value(symbol: &Cell) -> lutra_bin::Value {
+fn assume_value(symbol: &Cell) -> &[u8] {
     match symbol {
-        Cell::Value(val) => val.as_ref().clone(),
+        Cell::Value(val) => val.as_ref(),
         Cell::Function(_) => panic!(),
         Cell::FunctionNative(_) => panic!(),
         Cell::Vacant => panic!(),

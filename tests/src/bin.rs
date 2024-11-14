@@ -9,8 +9,7 @@ use lutra_frontend::{pr, Project};
 #[track_caller]
 fn _test_encode_decode<T: Encode + Decode>(value: Value, ty: &pr::Ty) -> String {
     // Value::encode
-    let mut buf = Vec::new();
-    value.encode(&mut buf, ty).unwrap();
+    let buf = value.encode(ty).unwrap();
 
     // Value::decode
     let value_decoded = Value::decode(&buf, ty).unwrap();

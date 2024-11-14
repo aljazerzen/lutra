@@ -62,6 +62,37 @@ impl TyKind {
             layout: None,
         }
     }
+
+    pub fn get_head_size(&self) -> Option<usize> {
+        Some(match self {
+            TyKind::Primitive(prim) => match prim {
+                PrimitiveSet::Bool => 8,
+                PrimitiveSet::Int => 64,
+                PrimitiveSet::Float => 64,
+                PrimitiveSet::Text => 64,
+                _ => unimplemented!(),
+            },
+            TyKind::Array(_) => 64,
+
+            TyKind::Tuple(fields) => {
+                let mut size = 0;
+                for f in fields {
+                    if let Some(layout) = &f.ty.layout {
+                        size += layout.head_size;
+                    } else {
+                        return None;
+                    }
+                }
+                size
+            }
+            TyKind::Enum(variants) => {
+                let tag_size = enum_tag_size(variants.len());
+
+                tag_size + 32
+            }
+            _ => return None,
+        })
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Hash)]
@@ -159,4 +190,40 @@ impl std::hash::Hash for Ty {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
         self.kind.hash(state);
     }
+}
+
+fn enum_tag_size(variants_len: usize) -> usize {
+    // TODO: when bool-sub-byte packing is implemented, remove function in favor of enum_tag_size_used
+    enum_tag_size_used(variants_len).div_ceil(8) * 8
+}
+
+fn enum_tag_size_used(variants_len: usize) -> usize {
+    f64::log2(variants_len as f64).ceil() as usize
+}
+
+#[test]
+fn test_enum_tag_size() {
+    assert_eq!(0, enum_tag_size_used(0));
+    assert_eq!(0, enum_tag_size_used(1));
+    assert_eq!(1, enum_tag_size_used(2));
+    assert_eq!(2, enum_tag_size_used(3));
+    assert_eq!(2, enum_tag_size_used(4));
+    assert_eq!(3, enum_tag_size_used(5));
+    assert_eq!(3, enum_tag_size_used(6));
+    assert_eq!(3, enum_tag_size_used(7));
+    assert_eq!(3, enum_tag_size_used(8));
+    assert_eq!(4, enum_tag_size_used(9));
+    assert_eq!(4, enum_tag_size_used(10));
+    assert_eq!(4, enum_tag_size_used(11));
+    assert_eq!(4, enum_tag_size_used(12));
+    assert_eq!(4, enum_tag_size_used(13));
+    assert_eq!(4, enum_tag_size_used(14));
+    assert_eq!(4, enum_tag_size_used(15));
+    assert_eq!(4, enum_tag_size_used(16));
+    assert_eq!(5, enum_tag_size_used(17));
+    assert_eq!(5, enum_tag_size_used(18));
+    assert_eq!(5, enum_tag_size_used(19));
+    assert_eq!(5, enum_tag_size_used(20));
+    assert_eq!(5, enum_tag_size_used(21));
+    assert_eq!(5, enum_tag_size_used(22));
 }

@@ -1,4 +1,7 @@
-use lutra_bin::Value;
+use std::rc::Rc;
+
+use lutra_bin::{Encode, Value};
+use lutra_runtime::{Cell, Interpreter};
 
 use crate::lutra::runtime;
 
@@ -7,17 +10,16 @@ const MODULE: RuntimeModule = RuntimeModule;
 struct RuntimeModule;
 
 impl runtime::NativeFunctions for RuntimeModule {
-    fn hello(
-        _interpreter: &mut ::lutra_runtime::Interpreter,
-        _args: Vec<::lutra_runtime::Cell>,
-    ) -> ::lutra_bin::Value {
-        ::lutra_bin::Value::Int(2)
+    fn hello(_interpreter: &mut Interpreter, _layout: Vec<u32>, _args: Vec<Cell>) -> Cell {
+        let mut buf = Vec::with_capacity(8);
+        2_i64.encode(&mut buf).unwrap();
+        Cell::Value(Rc::new(buf))
     }
 }
 
 #[test]
 fn test_01() {
-    let mut modules = ::lutra_runtime::BUILTIN_MODULES.to_vec();
+    let mut modules = lutra_runtime::BUILTIN_MODULES.to_vec();
     modules.push(("world", &runtime::Wrapper(MODULE)));
 
     let program = ::lutra_ir::_test_parse(
@@ -34,7 +36,10 @@ fn test_01() {
     ",
     );
 
-    let value = ::lutra_runtime::evaluate(&program, (), &modules);
+    let value = lutra_runtime::evaluate(&program, (), &modules);
+
+    let ty = lutra_ir::ty_into_pr(program.main.ty);
+    let value = Value::decode(&value, &ty).unwrap();
 
     assert_eq!(value, Value::Int(2));
 }
