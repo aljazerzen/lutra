@@ -264,7 +264,7 @@ fn write_ty_def_impl(w: &mut impl Write, ty: &pr::Ty) -> Result<(), std::fmt::Er
 
         pr::TyKind::Array(_) => {
             writeln!(w, "impl ::lutra_bin::Encode for {name} {{")?;
-            writeln!(w, "    type HeadPtr = ::lutra_bin::OffsetPointer;")?;
+            writeln!(w, "    type HeadPtr = ::lutra_bin::ReversePointer;")?;
             writeln!(w, "    fn encode_head(&self, w: &mut Vec<u8>) -> ::lutra_bin::Result<Self::HeadPtr> {{")?;
             writeln!(w, "        self.0.encode_head(w)")?;
             writeln!(w, "    }}")?;
@@ -284,7 +284,7 @@ fn write_ty_def_impl(w: &mut impl Write, ty: &pr::Ty) -> Result<(), std::fmt::Er
             writeln!(w, "impl ::lutra_bin::Encode for {name} {{")?;
             writeln!(w, "    type HeadPtr = Option<Result<")?;
             writeln!(w, "         <{inner_head_ptr} as ::lutra_bin::Encode>::HeadPtr,")?;
-            writeln!(w, "         ::lutra_bin::OffsetPointer,")?;
+            writeln!(w, "         ::lutra_bin::ReversePointer,")?;
             writeln!(w, "    >>;")?;
             writeln!(w, "    fn encode_head(&self, w: &mut Vec<u8>) -> ::lutra_bin::Result<Self::HeadPtr> {{")?;
             writeln!(w, "        self.0.encode_head(w)")?;
@@ -379,7 +379,7 @@ fn write_ty_def_impl(w: &mut impl Write, ty: &pr::Ty) -> Result<(), std::fmt::Er
                 writeln!(w, "                w.write_all(&{tag_bytes:?})?;")?;
 
                 if !variant.is_inline {
-                    writeln!(w, "                let head_ptr = ::lutra_bin::OffsetPointer::new(w);")?;
+                    writeln!(w, "                let head_ptr = ::lutra_bin::ReversePointer::new(w);")?;
                     writeln!(w, "                let r = {head_ptr_name}::{variant_name}(head_ptr);")?;
                 } else if !is_unit_variant(variant_ty) {
                     writeln!(w, "                let inner_head_ptr = inner.encode_head(w)?;")?;
@@ -449,7 +449,7 @@ fn write_ty_def_impl(w: &mut impl Write, ty: &pr::Ty) -> Result<(), std::fmt::Er
                     write!(w, "    {variant_name}")?;
 
                     if !variant.is_inline {
-                        write!(w, "(::lutra_bin::OffsetPointer)")?;
+                        write!(w, "(::lutra_bin::ReversePointer)")?;
                     } else {
                         write!(w, "(<")?;
                         let mut ctx = Context::default();
@@ -605,7 +605,5 @@ fn is_unit_variant(variant_ty: &pr::Ty) -> bool {
 }
 
 fn is_option_enum(variants: &[(String, pr::Ty)]) -> bool {
-    variants.len() == 2
-        && is_unit_variant(&variants[0].1)
-        && !is_unit_variant(&variants[1].1)
+    variants.len() == 2 && is_unit_variant(&variants[0].1) && !is_unit_variant(&variants[1].1)
 }

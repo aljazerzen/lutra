@@ -50,8 +50,8 @@ pub fn ty_into_pr(ty: ir::Ty) -> pr::Ty {
 
     let mut head_size = ty.layout.head_size as usize;
     if head_size == 0 {
-        if let Some(h) = kind.get_head_size() {
-            head_size = h
+        if let Some(h) = kind.get_layout_simple() {
+            head_size = h.head_size;
         }
     }
 
@@ -63,6 +63,7 @@ pub fn ty_into_pr(ty: ir::Ty) -> pr::Ty {
             .iter()
             .map(|x| *x as usize)
             .collect(),
+        body_ptr_offset: None, // TODO
     });
 
     pr::Ty {

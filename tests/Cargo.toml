@@ -18,4 +18,4 @@ lutra-codegen = { path = "../lutra-codegen" }
 
 [dev-dependencies]
 insta = {workspace = true}
-pretty-hex = "0.4.1"
+pretty-hex = {workspace = true}

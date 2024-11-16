@@ -11,31 +11,28 @@ impl Resolver<'_> {
             return Ok(ty.layout.clone());
         }
 
-        let head_size = match &ty.kind {
+        let layout = match &ty.kind {
             pr::TyKind::Primitive(_) | pr::TyKind::Array(_) | pr::TyKind::Tuple(_) => {
-                if let Some(size) = ty.kind.get_head_size() {
-                    size
+                if let Some(layout) = ty.kind.get_layout_simple() {
+                    layout
                 } else {
                     return Ok(None);
                 }
             }
 
             pr::TyKind::Enum(variants) => {
-                let head_size = ty.kind.get_head_size().unwrap();
+                let mut layout = ty.kind.get_layout_simple().unwrap();
 
-                let mut variants_recursive = Vec::new();
+                assert!(layout.variants_recursive.is_empty());
                 for (index, (_, variant_ty)) in variants.iter().enumerate() {
                     if variant_ty.layout.is_none() {
                         // unresolved - this type is (probably) recursive, save this info
                         // (I don't think this logic is 100% sound)
-                        variants_recursive.push(index);
+                        layout.variants_recursive.push(index);
                     }
                 }
 
-                return Ok(Some(pr::TyLayout {
-                    head_size,
-                    variants_recursive,
-                }));
+                return Ok(Some(layout));
             }
 
             pr::TyKind::Ident(ident) => {
@@ -48,7 +45,7 @@ impl Resolver<'_> {
                     // reference to a type: use it's layout
                     decl::DeclKind::Ty(ty) => {
                         if let Some(layout) = &ty.layout {
-                            layout.head_size
+                            layout.clone()
                         } else if self.strict_mode {
                             panic!("Unresolved layout of reference {ident} at {:?}: {ty:?} (during eval of {})", ty.span, self.debug_current_decl)
                         } else {
@@ -78,9 +75,6 @@ impl Resolver<'_> {
 
             pr::TyKind::Function(_) => unimplemented!(),
         };
-        Ok(Some(pr::TyLayout {
-            head_size,
-            variants_recursive: vec![],
-        }))
+        Ok(Some(layout))
     }
 }

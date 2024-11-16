@@ -80,7 +80,7 @@ pub mod core {
                     let value = it.evaluate_func_call(func, vec![], vec![cell]);
 
                     // TODO: this does not work for types with body
-                    res.extend(dbg!(assume::as_value(&value)));
+                    res.extend(assume::as_value(&value));
                 }
 
                 Cell::Value(Rc::new(res))

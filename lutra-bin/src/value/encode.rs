@@ -3,7 +3,7 @@ use std::io::Write;
 use lutra_frontend::pr;
 
 use super::{expect_ty, expect_ty_primitive, Value};
-use crate::encode::OffsetPointer;
+use crate::encode::ReversePointer;
 use crate::layout::{self, EnumHeadFormat, EnumVariantFormat};
 use crate::{ArrayReader, Decode, Encode, Error, Reader, Result};
 
@@ -71,7 +71,7 @@ fn encode_head<'t>(
         Value::Array(items) => {
             expect_ty(ty, |k| k.as_array(), "array")?;
 
-            let offset_ptr = OffsetPointer::new(w);
+            let offset_ptr = ReversePointer::new(w);
             w.write_all(&(items.len() as u32).to_le_bytes())?;
             Ok(ValueHeadPtr::Offset(offset_ptr))
         }
@@ -87,7 +87,7 @@ fn encode_head<'t>(
                 encode_head(w, inner, variant_ty, ctx)?
             } else {
                 w.write_all(tag_bytes)?;
-                let offset = OffsetPointer::new(w);
+                let offset = ReversePointer::new(w);
 
                 ValueHeadPtr::Offset(offset)
             };
@@ -102,7 +102,7 @@ fn encode_head<'t>(
 
 enum ValueHeadPtr {
     None,
-    Offset(OffsetPointer),
+    Offset(ReversePointer),
     Tuple(Vec<ValueHeadPtr>),
 }
 

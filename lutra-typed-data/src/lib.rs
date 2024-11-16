@@ -78,6 +78,7 @@ fn type_to_pr(ty: &schema::Ty) -> pr::Ty {
             .iter()
             .map(|x| *x as usize)
             .collect(),
+        body_ptr_offset: None, // TODO
     });
 
     pr::Ty {

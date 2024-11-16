@@ -23,6 +23,11 @@ pub struct TyLayout {
     /// (the part whose size is known at compile time).
     pub head_size: usize,
 
+    /// Position of the body pointer within the head.
+    /// It is measured bytes from the start of the head.
+    /// Pointer itself is relative to own position (and the start of the head).
+    pub body_ptr_offset: Option<usize>,
+
     /// For enums, indexes of variants that contain recursive
     /// (transitive) references to self. This is used to determine
     /// if a variant needs a Box in Rust.
@@ -63,8 +68,8 @@ impl TyKind {
         }
     }
 
-    pub fn get_head_size(&self) -> Option<usize> {
-        Some(match self {
+    pub fn get_layout_simple(&self) -> Option<TyLayout> {
+        let head_size = match self {
             TyKind::Primitive(prim) => match prim {
                 PrimitiveSet::Bool => 8,
                 PrimitiveSet::Int => 64,
@@ -91,6 +96,20 @@ impl TyKind {
                 tag_size + 32
             }
             _ => return None,
+        };
+        let body_ptr_offset = match self {
+            TyKind::Primitive(PrimitiveSet::Text) => Some(0_usize),
+            TyKind::Array(_) => Some(0_usize),
+            TyKind::Enum(_) => Some(8), // TODO: this is wrong
+
+            TyKind::Primitive(_) | TyKind::Tuple(_) => None,
+
+            _ => return None,
+        };
+        Some(TyLayout {
+            head_size,
+            body_ptr_offset,
+            variants_recursive: vec![],
         })
     }
 }

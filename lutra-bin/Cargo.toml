@@ -13,3 +13,4 @@ thiserror = {workspace = true}
 
 [dev-dependencies]
 insta = {workspace = true}
+pretty-hex = {workspace = true}

@@ -51,10 +51,10 @@ impl Encode for bool {
     }
 }
 impl Encode for String {
-    type HeadPtr = OffsetPointer;
+    type HeadPtr = ReversePointer;
 
-    fn encode_head(&self, w: &mut Vec<u8>) -> Result<OffsetPointer> {
-        let offset = OffsetPointer::new(w);
+    fn encode_head(&self, w: &mut Vec<u8>) -> Result<ReversePointer> {
+        let offset = ReversePointer::new(w);
         w.write_all(&(self.len() as u32).to_le_bytes())?;
         Ok(offset)
     }
@@ -66,10 +66,10 @@ impl Encode for String {
     }
 }
 impl<E: Encode> Encode for Vec<E> {
-    type HeadPtr = OffsetPointer;
+    type HeadPtr = ReversePointer;
 
-    fn encode_head(&self, w: &mut Vec<u8>) -> Result<OffsetPointer> {
-        let offset = OffsetPointer::new(w);
+    fn encode_head(&self, w: &mut Vec<u8>) -> Result<ReversePointer> {
+        let offset = ReversePointer::new(w);
         w.write_all(&(self.len() as u32).to_le_bytes())?;
         Ok(offset)
     }
@@ -89,7 +89,7 @@ impl<E: Encode> Encode for Vec<E> {
     }
 }
 impl<E: Encode + Layout> Encode for Option<E> {
-    type HeadPtr = Option<Result<E::HeadPtr, OffsetPointer>>;
+    type HeadPtr = Option<Result<E::HeadPtr, ReversePointer>>;
 
     fn encode_head(&self, w: &mut Vec<u8>) -> Result<Self::HeadPtr> {
         let tag: u8 = if self.is_none() { 0 } else { 1 };
@@ -106,7 +106,7 @@ impl<E: Encode + Layout> Encode for Option<E> {
                 }
                 Some(Ok(ptr))
             } else {
-                let offset = OffsetPointer::new(w);
+                let offset = ReversePointer::new(w);
 
                 Some(Err(offset))
             }
@@ -140,21 +140,25 @@ impl<E: Encode + Layout> Encode for Option<E> {
 }
 
 /// Pointer to a location where an offset should be written to.
-pub struct OffsetPointer {
+pub struct ReversePointer {
     /// Location offset within the buffer.
-    ptr: usize,
+    location: usize,
 }
 
-impl OffsetPointer {
-    pub fn new(w: &mut Vec<u8>) -> OffsetPointer {
-        let r = OffsetPointer { ptr: w.len() };
+impl ReversePointer {
+    pub fn new(w: &mut Vec<u8>) -> ReversePointer {
+        let r = ReversePointer { location: w.len() };
         w.extend([0_u8; 4]);
         r
     }
 
+    pub fn new_at(location: usize) -> ReversePointer {
+        ReversePointer { location }
+    }
+
     pub fn write(self, w: &mut [u8]) {
-        let offset = w.len() - self.ptr;
-        w[self.ptr..(self.ptr + 4)].copy_from_slice(&(offset as u32).to_le_bytes());
+        let offset = w.len() - self.location;
+        w[self.location..(self.location + 4)].copy_from_slice(&(offset as u32).to_le_bytes());
     }
 }
 

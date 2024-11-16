@@ -3,9 +3,11 @@ mod error;
 pub mod layout;
 pub mod reader;
 mod value;
+mod writer;
 
-pub use encode::{Decode, Encode, OffsetPointer};
+pub use encode::{Decode, Encode, ReversePointer};
 pub use error::{Error, Result};
 pub use layout::Layout;
 pub use reader::{ArrayReader, Reader, TupleReader};
 pub use value::Value;
+pub use writer::{ArrayWriter, TupleWriter};
