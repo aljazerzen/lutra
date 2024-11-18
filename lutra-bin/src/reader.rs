@@ -1,5 +1,7 @@
 use lutra_frontend::pr;
 
+use crate::Data;
+
 #[derive(Clone)]
 pub struct Reader<'a> {
     buf: &'a [u8],
@@ -35,26 +37,27 @@ impl<'a> Reader<'a> {
     }
 }
 
-pub struct ArrayReader<'b> {
+pub struct ArrayReader {
     item_head_bytes: usize,
-    next: Reader<'b>,
+    next: Data,
     remaining: usize,
 }
 
-impl<'b> ArrayReader<'b> {
-    pub fn new_for_ty(head: &mut Reader<'b>, ty: &pr::Ty) -> Self {
+impl ArrayReader {
+    pub fn new_for_ty(data: Data, ty: &pr::Ty) -> Self {
         let pr::TyKind::Array(items_ty) = &ty.kind else {
             panic!()
         };
         let item_head_size = items_ty.layout.as_ref().unwrap().head_size;
 
-        Self::new(head, item_head_size / 8)
+        Self::new(data, item_head_size / 8)
     }
 
-    pub fn new(head: &mut Reader<'b>, item_head_bytes: usize) -> Self {
-        let mut body = head.clone();
+    fn new(data: Data, item_head_bytes: usize) -> Self {
+        let mut head = Reader::new(data.slice(item_head_bytes));
+        let (offset, len) = Self::read_head(&mut head);
 
-        let (offset, len) = Self::read_head(head);
+        let mut body = data.clone();
         body.skip(offset);
 
         ArrayReader {
@@ -64,7 +67,7 @@ impl<'b> ArrayReader<'b> {
         }
     }
 
-    pub fn read_head(reader: &mut Reader<'b>) -> (usize, usize) {
+    pub fn read_head(reader: &mut Reader) -> (usize, usize) {
         let offset = reader.read_const::<4>();
         let offset = u32::from_le_bytes(offset);
 
@@ -78,8 +81,8 @@ impl<'b> ArrayReader<'b> {
     }
 }
 
-impl<'b> Iterator for ArrayReader<'b> {
-    type Item = Reader<'b>;
+impl Iterator for ArrayReader {
+    type Item = Data;
 
     fn next(&mut self) -> Option<Self::Item> {
         if self.remaining > 0 {
@@ -115,26 +118,26 @@ impl<'b> Iterator for ArrayReader<'b> {
     }
 }
 
-pub struct TupleReader<'b, 't> {
-    tuple: Reader<'b>,
+pub struct TupleReader<'d, 't> {
+    data: &'d Data,
     ty_fields: &'t [pr::TyTupleField],
 }
 
-impl<'b, 't> TupleReader<'b, 't> {
-    pub fn new(tuple: Reader<'b>, ty: &'t pr::Ty) -> Self {
+impl<'d, 't> TupleReader<'d, 't> {
+    pub fn new(data: &'d Data, ty: &'t pr::Ty) -> Self {
         let pr::TyKind::Tuple(ty_fields) = &ty.kind else {
             panic!()
         };
-        TupleReader { tuple, ty_fields }
+        TupleReader { data, ty_fields }
     }
 
-    pub fn get_field(&self, index: usize) -> Reader<'b> {
+    pub fn get_field(&self, index: usize) -> Data {
         let mut bytes_offset = 0;
         for i in 0..index {
             let layout = self.ty_fields[i].ty.layout.as_ref().unwrap();
             bytes_offset += layout.head_size / 8;
         }
-        let mut r = self.tuple.clone();
+        let mut r = self.data.clone();
         r.skip(bytes_offset);
         r
     }

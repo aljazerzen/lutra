@@ -1,6 +1,5 @@
-use std::rc::Rc;
-
 use lutra_bin::{Encode, Layout};
+use lutra_ir::ir;
 
 use crate::interpreter::{Cell, Interpreter};
 use crate::NativeModule;
@@ -25,23 +24,23 @@ pub mod core {
         }
 
         impl Module {
-            pub fn add(_: &mut Interpreter, _: Vec<u32>, args: Vec<Cell>) -> Cell {
-                let left = assume::int(&args[0]);
-                let right = assume::int(&args[1]);
+            pub fn add(_: &mut Interpreter, args: Vec<(&ir::Ty, Cell)>) -> Cell {
+                let left = assume::int(&args[0].1);
+                let right = assume::int(&args[1].1);
 
                 Cell::Value(encode(&(left + right)))
             }
 
-            pub fn sub(_: &mut Interpreter, _: Vec<u32>, args: Vec<Cell>) -> Cell {
-                let left = assume::int(&args[0]);
-                let right = assume::int(&args[1]);
+            pub fn sub(_: &mut Interpreter, args: Vec<(&ir::Ty, Cell)>) -> Cell {
+                let left = assume::int(&args[0].1);
+                let right = assume::int(&args[1].1);
 
                 Cell::Value(encode(&(left - right)))
             }
 
-            pub fn mul(_: &mut Interpreter, _: Vec<u32>, args: Vec<Cell>) -> Cell {
-                let left = assume::int(&args[0]);
-                let right = assume::int(&args[1]);
+            pub fn mul(_: &mut Interpreter, args: Vec<(&ir::Ty, Cell)>) -> Cell {
+                let left = assume::int(&args[0].1);
+                let right = assume::int(&args[1].1);
 
                 Cell::Value(encode(&(left * right)))
             }
@@ -64,26 +63,32 @@ pub mod core {
         }
 
         impl Module {
-            pub fn map(it: &mut Interpreter, layout: Vec<u32>, args: Vec<Cell>) -> Cell {
-                let input_item_head_bytes = layout[0];
-
+            pub fn map(it: &mut Interpreter, args: Vec<(&ir::Ty, Cell)>) -> Cell {
                 let func = &args[0];
-                let array = assume::array(&args[1], input_item_head_bytes as usize);
+                let array = assume::array(&args[1].0, &args[1].1);
 
-                let mut res = vec![8, 0, 0, 0];
-                res.extend((array.remaining() as u32).to_le_bytes());
+                let ir::TyKind::Function(ty_func) = &func.0.kind else {
+                    panic!()
+                };
+                let output_ty = ir::Ty {
+                    kind: ir::TyKind::Array(Box::new(ty_func.body.clone())),
+                    layout: ir::TyLayout {
+                        head_size: 0,
+                        variants_recursive: vec![],
+                    },
+                };
+                let output_ty = lutra_ir::ty_into_pr(output_ty);
+                let mut res = lutra_bin::ArrayWriter::new(&output_ty);
 
                 for item in array {
-                    // TODO: this is super inefficient
-                    let cell = Cell::Value(item.to_owned().into());
+                    let cell = Cell::Value(item);
 
-                    let value = it.evaluate_func_call(func, vec![], vec![cell]);
+                    let value = it.evaluate_func_call(&func.1, vec![(&args[1].0, cell)]);
 
-                    // TODO: this does not work for types with body
-                    res.extend(assume::as_value(&value));
+                    res.write_item(assume::into_value(value));
                 }
 
-                Cell::Value(Rc::new(res))
+                Cell::Value(res.finish())
             }
         }
     }
@@ -113,21 +118,21 @@ pub mod interpreter {
 
 mod assume {
     use crate::interpreter::Cell;
-    use lutra_bin::{ArrayReader, Decode, Reader};
+    use lutra_bin::{ArrayReader, Decode};
+    use lutra_ir::ir;
 
-    #[allow(dead_code)]
-    pub fn into_value(cell: &Cell) -> std::rc::Rc<Vec<u8>> {
+    pub fn into_value(cell: Cell) -> lutra_bin::Data {
         match cell {
-            Cell::Value(val) => val.clone(),
+            Cell::Value(val) => val,
             Cell::Function(_) => panic!(),
             Cell::FunctionNative(_) => panic!(),
             Cell::Vacant => panic!(),
         }
     }
 
-    pub fn as_value(cell: &Cell) -> &[u8] {
+    pub fn as_value(cell: &Cell) -> &lutra_bin::Data {
         match cell {
-            Cell::Value(val) => val.as_ref(),
+            Cell::Value(val) => val,
             Cell::Function(_) => panic!(),
             Cell::FunctionNative(_) => panic!(),
             Cell::Vacant => panic!(),
@@ -136,17 +141,19 @@ mod assume {
 
     pub fn int(cell: &Cell) -> i64 {
         let bytes = as_value(cell);
-        i64::decode_buffer(bytes).unwrap()
+        i64::decode_buffer(bytes.slice(8)).unwrap()
     }
 
-    pub fn array(cell: &Cell, item_head_bytes: usize) -> ArrayReader<'_> {
-        let mut reader = Reader::new(as_value(cell));
-        ArrayReader::new(&mut reader, item_head_bytes)
+    pub fn array<'d>(ty: &ir::Ty, cell: &'d Cell) -> ArrayReader {
+        let ty = lutra_ir::ty_into_pr(ty.clone());
+
+        let data = as_value(cell).clone();
+        ArrayReader::new_for_ty(data, &ty)
     }
 }
 
-pub fn encode<T: Encode + Layout>(value: &T) -> Rc<Vec<u8>> {
+pub fn encode<T: Encode + Layout>(value: &T) -> lutra_bin::Data {
     let mut buf = Vec::with_capacity(T::head_size() / 8);
     value.encode(&mut buf).unwrap();
-    Rc::new(buf)
+    lutra_bin::Data::new(buf)
 }

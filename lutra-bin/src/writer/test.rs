@@ -13,7 +13,7 @@ pub(crate) fn _test_array_writer(items: Vec<Data>, output_ty: &pr::Ty) -> String
         output.write_item(item);
     }
 
-    let output_buf = output.finish().into_owned();
+    let output_buf = output.finish().flatten();
     let output_val = crate::Value::decode(&output_buf, output_ty).unwrap();
 
     String::new()
@@ -29,7 +29,7 @@ pub(crate) fn _test_tuple_writer(fields: Vec<Data>, output_ty: &pr::Ty) -> Strin
         output.write_field(field);
     }
 
-    let output_buf = output.finish().into_owned();
+    let output_buf = output.finish().flatten();
     let output_val = crate::Value::decode(&output_buf, output_ty).unwrap();
 
     String::new()
@@ -51,6 +51,13 @@ pub(crate) fn test_01() {
     let output_ty = lutra_frontend::_test_compile_ty("[int]");
 
     insta::assert_snapshot!(_test_array_writer(items, &output_ty), @r#"
+    [
+      0,
+      1,
+      2,
+      3,
+      4,
+    ]
     Length: 48 (0x30) bytes
     0000:   08 00 00 00  05 00 00 00  00 00 00 00  00 00 00 00   ................
     0010:   01 00 00 00  00 00 00 00  02 00 00 00  00 00 00 00   ................
@@ -77,6 +84,12 @@ pub(crate) fn test_02() {
     let output_ty = lutra_frontend::_test_compile_ty("[text]");
 
     insta::assert_snapshot!(_test_array_writer(items, &output_ty), @r#"
+    [
+      "0",
+      "1",
+      "7",
+      "8",
+    ]
     Length: 47 (0x2f) bytes
     0000:   08 00 00 00  04 00 00 00  20 00 00 00  01 00 00 00   ........ .......
     0010:   19 00 00 00  01 00 00 00  12 00 00 00  01 00 00 00   ................

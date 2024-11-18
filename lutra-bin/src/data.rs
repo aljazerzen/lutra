@@ -57,7 +57,7 @@ impl Data {
         }
     }
 
-    pub fn into_owned(self) -> Vec<u8> {
+    pub fn flatten(&self) -> Vec<u8> {
         let mut out = Vec::with_capacity(self.len());
         self.write_all(&mut out);
         out

@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::ops::{BitAnd, Shr};
-use std::rc::Rc;
 
+use lutra_bin::Data;
 use lutra_frontend::pr;
 use lutra_ir::ir;
 
@@ -18,13 +18,13 @@ pub struct Interpreter {
 
 #[derive(Clone)]
 pub enum Cell {
-    Value(Rc<Vec<u8>>),
+    Value(Data),
     Function(Box<ir::Function>),
     FunctionNative(NativeFunction),
     Vacant,
 }
 
-pub type NativeFunction = &'static dyn Fn(&mut Interpreter, Vec<u32>, Vec<Cell>) -> Cell;
+pub type NativeFunction = &'static dyn Fn(&mut Interpreter, Vec<(&ir::Ty, Cell)>) -> Cell;
 
 pub fn evaluate(
     program: &ir::Program,
@@ -52,7 +52,7 @@ pub fn evaluate(
     // extract result
     drop(interpreter);
     let Cell::Value(value) = main else { panic!() };
-    Rc::into_inner(value).unwrap()
+    value.flatten()
 }
 
 impl Interpreter {
@@ -114,14 +114,14 @@ impl Interpreter {
         self.drop(addr, addr + 1);
     }
 
-    fn allocate_scope(&mut self, scope_id: ir::Sid, symbols: Vec<Cell>) -> Addr {
+    fn allocate_scope(&mut self, scope_id: ir::Sid, cells: Vec<(&ir::Ty, Cell)>) -> Addr {
         assert_eq!((scope_id.0 as u32).shr(30), 0x2_u32);
 
         let mem_start = self.memory.len() as Addr;
         self.scopes.entry(scope_id).or_default().push(mem_start);
 
-        for symbol in symbols {
-            self.allocate(symbol);
+        for (_, cell) in cells {
+            self.allocate(cell);
         }
         mem_start
     }
@@ -159,7 +159,7 @@ impl Interpreter {
                     ir::Literal::Bool(i) => lutra_bin::Value::Bool(*i),
                     ir::Literal::Text(i) => lutra_bin::Value::Text(i.clone()),
                 };
-                Cell::Value(Rc::new(value.encode(&ty).unwrap()))
+                Cell::Value(Data::new(value.encode(&ty).unwrap()))
             }
 
             ir::ExprKind::Tuple(fields) => {
@@ -173,13 +173,13 @@ impl Interpreter {
                     let symbol = self.evaluate_expr(field);
 
                     let field_ty = &ty_fields[i];
-                    let value = assume_value(&symbol);
-                    let value = lutra_bin::Value::decode(value, &field_ty.ty).unwrap();
+                    let value = assume_value(&symbol).flatten();
+                    let value = lutra_bin::Value::decode(&value, &field_ty.ty).unwrap();
                     res.push(value);
                 }
                 let res = lutra_bin::Value::Tuple(res).encode(&ty).unwrap();
 
-                Cell::Value(Rc::new(res))
+                Cell::Value(Data::new(res))
             }
             ir::ExprKind::Array(items) => {
                 let ty = lutra_ir::ty_into_pr(expr.ty.clone());
@@ -191,24 +191,23 @@ impl Interpreter {
                 for item in items {
                     let symbol = self.evaluate_expr(item);
 
-                    let value = assume_value(&symbol);
-                    let value = lutra_bin::Value::decode(value, ty_items).unwrap();
+                    let value = assume_value(&symbol).flatten();
+                    let value = lutra_bin::Value::decode(&value, ty_items).unwrap();
                     res.push(value);
                 }
                 let res = lutra_bin::Value::Array(res).encode(&ty).unwrap();
 
-                Cell::Value(Rc::new(res))
+                Cell::Value(Data::new(res))
             }
             ir::ExprKind::TupleLookup(lookup) => {
                 let ir::TupleLookup { base, offset } = lookup.as_ref();
                 let base_ty = lutra_ir::ty_into_pr(base.ty.clone());
 
                 let base = self.evaluate_expr(base);
-                let base = lutra_bin::Reader::new(assume_value(&base));
-                let base = lutra_bin::TupleReader::new(base, &base_ty);
 
-                let field = base.get_field(*offset as usize);
-                Cell::Value(Rc::new(field.to_owned()))
+                let base = lutra_bin::TupleReader::new(assume_value(&base), &base_ty);
+
+                Cell::Value(base.get_field(*offset as usize))
             }
             ir::ExprKind::ArrayLookup(lookup) => {
                 let ir::ArrayLookup { base, offset } = lookup.as_ref();
@@ -218,13 +217,11 @@ impl Interpreter {
 
                 match base {
                     Cell::Value(base) => {
-                        let mut base_reader = lutra_bin::Reader::new(&base);
-                        let mut items =
-                            lutra_bin::ArrayReader::new_for_ty(&mut base_reader, &base_ty);
+                        let mut items = lutra_bin::ArrayReader::new_for_ty(base, &base_ty);
 
                         let item = items.nth(*offset as usize).unwrap();
 
-                        Cell::Value(Rc::new(item.to_owned()))
+                        Cell::Value(item.to_owned())
                     }
                     Cell::Function(_) => panic!(),
                     Cell::FunctionNative(_) => panic!(),
@@ -233,21 +230,16 @@ impl Interpreter {
             }
 
             ir::ExprKind::Call(call) => {
-                let ir::Call {
-                    function,
-                    layout,
-                    args,
-                } = call.as_ref();
+                let ir::Call { function, args, .. } = call.as_ref();
 
                 let function = self.evaluate_expr(function);
 
-                let layout = layout.iter().map(|l| *l as u32).collect();
-
                 let mut arg_cells = Vec::new();
                 for arg in args {
-                    arg_cells.push(self.evaluate_expr(arg));
+                    let value = self.evaluate_expr(arg);
+                    arg_cells.push((&arg.ty, value));
                 }
-                self.evaluate_func_call(&function, layout, arg_cells)
+                self.evaluate_func_call(&function, arg_cells)
             }
             ir::ExprKind::Function(func) => Cell::Function(func.clone()),
             ir::ExprKind::Binding(binding) => {
@@ -263,12 +255,7 @@ impl Interpreter {
         }
     }
 
-    pub fn evaluate_func_call(
-        &mut self,
-        function: &Cell,
-        layout: Vec<u32>,
-        args: Vec<Cell>,
-    ) -> Cell {
+    pub fn evaluate_func_call(&mut self, function: &Cell, args: Vec<(&ir::Ty, Cell)>) -> Cell {
         match function {
             Cell::Function(func) => {
                 let scope_size = args.len();
@@ -279,16 +266,16 @@ impl Interpreter {
                 self.drop_scope(func.symbol_ns, scope_size);
                 res
             }
-            Cell::FunctionNative(native) => native(self, layout, args),
+            Cell::FunctionNative(native) => native(self, args),
             Cell::Value(_) => panic!(),
             Cell::Vacant => panic!(),
         }
     }
 }
 
-fn assume_value(symbol: &Cell) -> &[u8] {
+fn assume_value(symbol: &Cell) -> &Data {
     match symbol {
-        Cell::Value(val) => val.as_ref(),
+        Cell::Value(val) => val,
         Cell::Function(_) => panic!(),
         Cell::FunctionNative(_) => panic!(),
         Cell::Vacant => panic!(),

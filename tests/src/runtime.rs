@@ -1,6 +1,5 @@
-use std::rc::Rc;
-
-use lutra_bin::{Encode, Value};
+use lutra_bin::{Data, Encode, Value};
+use lutra_ir::ir;
 use lutra_runtime::{Cell, Interpreter};
 
 use crate::lutra::runtime;
@@ -10,10 +9,10 @@ const MODULE: RuntimeModule = RuntimeModule;
 struct RuntimeModule;
 
 impl runtime::NativeFunctions for RuntimeModule {
-    fn hello(_interpreter: &mut Interpreter, _layout: Vec<u32>, _args: Vec<Cell>) -> Cell {
+    fn hello(_interpreter: &mut Interpreter, _args: Vec<(&ir::Ty, Cell)>) -> Cell {
         let mut buf = Vec::with_capacity(8);
         2_i64.encode(&mut buf).unwrap();
-        Cell::Value(Rc::new(buf))
+        Cell::Value(Data::new(buf))
     }
 }
 
