@@ -10,13 +10,13 @@ impl<'a> Reader<'a> {
         Reader { buf }
     }
 
-    pub fn copy_n(&mut self, n: usize) -> &[u8] {
+    pub fn read_n(&mut self, n: usize) -> &[u8] {
         let r = &self.buf[..n];
         self.buf = &self.buf[n..];
         r
     }
 
-    pub fn copy_const<const N: usize>(&mut self) -> [u8; N] {
+    pub fn read_const<const N: usize>(&mut self) -> [u8; N] {
         let r = self.buf[..N].try_into().unwrap();
         self.buf = &self.buf[N..];
         r
@@ -65,10 +65,10 @@ impl<'b> ArrayReader<'b> {
     }
 
     pub fn read_head(reader: &mut Reader<'b>) -> (usize, usize) {
-        let offset = reader.copy_const::<4>();
+        let offset = reader.read_const::<4>();
         let offset = u32::from_le_bytes(offset);
 
-        let len = reader.copy_const::<4>();
+        let len = reader.read_const::<4>();
         let len = u32::from_le_bytes(len);
         (offset as usize, len as usize)
     }

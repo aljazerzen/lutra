@@ -418,7 +418,7 @@ fn write_ty_def_impl(w: &mut impl Write, ty: &pr::Ty) -> Result<(), std::fmt::Er
 
                     if !variant.is_inline {
                         writeln!(w, "                let {head_ptr_name}::{variant_name}(offset_ptr) = head else {{ unreachable!() }};")?;
-                        writeln!(w, "                offset_ptr.write(w);")?;
+                        writeln!(w, "                offset_ptr.write_cur_len(w);")?;
                         writeln!(w, "                let inner_head_ptr = inner.encode_head(w)?;")?;
                         writeln!(w, "                inner.encode_body(inner_head_ptr, w)?;")?;
                     } else if !is_unit_variant(variant_ty) {
@@ -543,7 +543,7 @@ fn write_ty_def_impl(w: &mut impl Write, ty: &pr::Ty) -> Result<(), std::fmt::Er
             let head = layout::enum_head_format(variants);
 
             // tag
-            writeln!(w, "        let mut tag_bytes = r.copy_n({}).to_vec();", head.s / 8)?;
+            writeln!(w, "        let mut tag_bytes = r.read_n({}).to_vec();", head.s / 8)?;
             writeln!(w, "        tag_bytes.resize(8, 0);")?;
             writeln!(w, "        let tag = u64::from_le_bytes(tag_bytes.try_into().unwrap()) as usize;")?;
 
@@ -562,7 +562,7 @@ fn write_ty_def_impl(w: &mut impl Write, ty: &pr::Ty) -> Result<(), std::fmt::Er
                     }
                 } else {
                     writeln!(w, "                let mut body = r.clone();")?;
-                    writeln!(w, "                let offset = r.copy_const::<4>();")?;
+                    writeln!(w, "                let offset = r.read_const::<4>();")?;
                     writeln!(w, "                let offset = u32::from_le_bytes(offset);")?;
                     writeln!(w, "                body.skip(offset as usize);")?;
 

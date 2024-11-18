@@ -7,29 +7,34 @@ pub use tuple::TupleWriter;
 
 use lutra_frontend::pr;
 
-fn extract_head_and_body<'b>(buf: &'b [u8], layout: &pr::TyLayout) -> (&'b [u8], Option<&'b [u8]>) {
+use crate::Data;
+
+fn extract_head_and_body<'b>(buf: &'b Data, layout: &pr::TyLayout) -> (&'b [u8], Option<Data>) {
     let head_bytes = layout.head_size / 8;
 
-    let (head, remaining) = buf.split_at(head_bytes);
+    let head = buf.slice(head_bytes);
 
     let body = if let Some(body_ptr_offset) = layout.body_ptr_offset {
-        let mut head = crate::Reader::new(head);
-        head.skip(body_ptr_offset);
-        let body_offset = u32::from_le_bytes(head.copy_const()) as usize - head_bytes;
+        let mut buf = buf.clone();
 
-        Some(&remaining[body_offset..])
+        let mut head = crate::Reader::new(buf.slice(body_ptr_offset + 4));
+        head.skip(body_ptr_offset);
+        let body_offset = u32::from_le_bytes(head.read_const()) as usize;
+
+        buf.skip(body_ptr_offset + body_offset);
+        Some(buf)
     } else {
         None
     };
     (head, body)
 }
 
-fn write_head<'b>(
+fn write_head(
     out: &mut Vec<u8>,
-    data: &'b [u8],
+    data: Data,
     layout: &pr::TyLayout,
-) -> Option<(crate::ReversePointer, &'b [u8])> {
-    let (head, body) = extract_head_and_body(data, layout);
+) -> Option<(crate::ReversePointer, Data)> {
+    let (head, body) = extract_head_and_body(&data, layout);
 
     let res = if let Some(body) = body {
         let o = layout.body_ptr_offset.unwrap();

@@ -151,7 +151,7 @@ fn encode_body<'t>(
             let ValueHeadPtr::Offset(offset_ptr) = head_ptr else {
                 unreachable!()
             };
-            offset_ptr.write(w);
+            offset_ptr.write_cur_len(w);
 
             let mut head_ptrs = Vec::with_capacity(items.len());
             for i in items {
@@ -173,7 +173,7 @@ fn encode_body<'t>(
                 let ValueHeadPtr::Offset(offset_ptr) = head_ptr else {
                     unreachable!()
                 };
-                offset_ptr.write(w);
+                offset_ptr.write_cur_len(w);
 
                 let head_ptr = encode_head(w, inner, variant_ty, ctx)?;
                 encode_body(w, inner, head_ptr, variant_ty, ctx)?;
@@ -229,7 +229,7 @@ fn decode_inner<'t>(r: &mut Reader<'_>, ty: &'t pr::Ty, ctx: &mut Context<'t>) -
         pr::TyKind::Enum(variants) => {
             let head = layout::enum_head_format(variants);
 
-            let mut tag_bytes = r.copy_n(head.s / 8).to_vec();
+            let mut tag_bytes = r.read_n(head.s / 8).to_vec();
             tag_bytes.resize(8, 0);
             let tag = u64::from_le_bytes(tag_bytes.try_into().unwrap()) as usize;
 
@@ -241,7 +241,7 @@ fn decode_inner<'t>(r: &mut Reader<'_>, ty: &'t pr::Ty, ctx: &mut Context<'t>) -
                 decode_inner(r, variant_ty, ctx)?
             } else {
                 let mut body = r.clone();
-                let offset = r.copy_const::<4>();
+                let offset = r.read_const::<4>();
                 let offset = u32::from_le_bytes(offset) as usize;
                 body.skip(offset);
                 decode_inner(&mut body, variant_ty, ctx)?

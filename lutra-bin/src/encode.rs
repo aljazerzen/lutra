@@ -60,7 +60,7 @@ impl Encode for String {
     }
 
     fn encode_body(&self, head: Self::HeadPtr, w: &mut Vec<u8>) -> Result<()> {
-        head.write(w);
+        head.write_cur_len(w);
         w.write_all(self.as_bytes())?;
         Ok(())
     }
@@ -75,7 +75,7 @@ impl<E: Encode> Encode for Vec<E> {
     }
 
     fn encode_body(&self, offset_ptr: Self::HeadPtr, w: &mut Vec<u8>) -> Result<()> {
-        offset_ptr.write(w);
+        offset_ptr.write_cur_len(w);
 
         let mut heads: Vec<_> = Vec::with_capacity(self.len());
         for i in self {
@@ -131,7 +131,7 @@ impl<E: Encode + Layout> Encode for Option<E> {
             let Err(offset_ptr) = head else {
                 unreachable!()
             };
-            offset_ptr.write(w);
+            offset_ptr.write_cur_len(w);
 
             let head_ptr = inner.encode_head(w)?;
             inner.encode_body(head_ptr, w)
@@ -140,6 +140,7 @@ impl<E: Encode + Layout> Encode for Option<E> {
 }
 
 /// Pointer to a location where an offset should be written to.
+#[derive(Debug, Clone, Copy)]
 pub struct ReversePointer {
     /// Location offset within the buffer.
     location: usize,
@@ -156,9 +157,17 @@ impl ReversePointer {
         ReversePointer { location }
     }
 
-    pub fn write(self, w: &mut [u8]) {
-        let offset = w.len() - self.location;
-        w[self.location..(self.location + 4)].copy_from_slice(&(offset as u32).to_le_bytes());
+    pub fn unwrap(&self) -> usize {
+        self.location
+    }
+
+    pub fn write_cur_len(self, w: &mut [u8]) {
+        self.write(w, w.len())
+    }
+
+    pub fn write(self, w: &mut [u8], absolute_ptr: usize) {
+        let relative = absolute_ptr - self.location;
+        w[self.location..(self.location + 4)].copy_from_slice(&(relative as u32).to_le_bytes());
     }
 }
 
@@ -182,19 +191,19 @@ pub trait Decode: Sized + Layout {
 
 impl Decode for i64 {
     fn decode(r: &mut Reader<'_>) -> Result<Self> {
-        let bytes = r.copy_const::<8>();
+        let bytes = r.read_const::<8>();
         Ok(i64::from_le_bytes(bytes))
     }
 }
 impl Decode for f64 {
     fn decode(r: &mut Reader<'_>) -> Result<Self> {
-        let bytes = r.copy_const::<8>();
+        let bytes = r.read_const::<8>();
         Ok(f64::from_le_bytes(bytes))
     }
 }
 impl Decode for bool {
     fn decode(r: &mut Reader<'_>) -> Result<Self> {
-        let [v] = r.copy_const::<1>();
+        let [v] = r.read_const::<1>();
         Ok(v != 0)
     }
 }
@@ -202,14 +211,14 @@ impl Decode for String {
     fn decode(r: &mut Reader<'_>) -> Result<Self> {
         let mut body = r.clone();
 
-        let offset = r.copy_const::<4>();
+        let offset = r.read_const::<4>();
         let offset = u32::from_le_bytes(offset) as usize;
         body.skip(offset);
 
-        let len = r.copy_const::<4>();
+        let len = r.read_const::<4>();
         let len = u32::from_le_bytes(len) as usize;
 
-        let buf = body.copy_n(len);
+        let buf = body.read_n(len);
         Ok(String::from_utf8(buf.to_vec()).unwrap())
     }
 }
@@ -228,7 +237,7 @@ impl<E: Decode> Decode for Vec<E> {
 }
 impl<E: Decode> Decode for Option<E> {
     fn decode(r: &mut Reader<'_>) -> Result<Self> {
-        let [tag] = r.copy_const::<1>();
+        let [tag] = r.read_const::<1>();
         if tag == 0 {
             r.skip(4);
             Ok(None)
@@ -244,7 +253,7 @@ impl<E: Decode> Decode for Option<E> {
                 res
             } else {
                 let mut body = r.clone();
-                let offset = r.copy_const::<4>();
+                let offset = r.read_const::<4>();
                 let offset = u32::from_le_bytes(offset) as usize;
                 body.skip(offset);
                 E::decode(&mut body)?
