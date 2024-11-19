@@ -1,0 +1,15 @@
+
+source: "."
+site:
+  title: "Lutra"
+  description: "An interface lanugage"
+  base_url: "/"
+
+syntax_highlight:
+  theme: "base16-ocean.dark"
+  enabled: false
+
+pages:
+  default:
+    layout: default.liquid
+    permalink: /{{name}}/

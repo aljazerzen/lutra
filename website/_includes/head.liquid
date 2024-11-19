@@ -1,0 +1,27 @@
+
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta charset="utf-8">
+    <title>{{ page.title }}</title>
+    <link rel="stylesheet" href="{{ site.base_url }}/public/water.min.css">
+    <style>
+        @font-face {
+            font-family: "Archivo Black";
+            src: url('static/ArchivoBlack-Regular.ttf');
+        }
+        h1, h2, h3, h4 {
+            font-family: "Archivo Black", sans-serif;
+        }
+        .underline::after {
+            display: block;
+            content: '';
+
+            position: relative;
+            top: -6px;
+            left: -0.25em;
+            height: 10px;
+            width: calc(100% + 0.5em);
+            
+            border-radius: 1px;
+            background-color: var(--selection);
+        }
+    </style>

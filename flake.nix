@@ -30,6 +30,8 @@
 
             pkgs.cargo-nextest
             pkgs.cargo-insta
+
+            pkgs.cobalt
           ];
 
           RUSTFLAGS = "-Clink-arg=-fuse-ld=${pkgs.mold}/bin/mold";
