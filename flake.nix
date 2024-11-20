@@ -28,8 +28,11 @@
             pkgs.clang
             pkgs.mold
 
+            pkgs.just
             pkgs.cargo-nextest
             pkgs.cargo-insta
+            pkgs.cargo-depgraph
+            pkgs.graphviz
 
             pkgs.cobalt
           ];
