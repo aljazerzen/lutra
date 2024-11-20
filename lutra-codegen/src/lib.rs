@@ -92,7 +92,7 @@ fn codegen_in(
                 sub_modules.push((name, module));
             }
             lutra_frontend::decl::DeclKind::Ty(ty) => {
-                tys.push((name, ty));
+                tys.push((name, ty, &decl.annotations));
             }
             lutra_frontend::decl::DeclKind::Expr(expr) => {
                 let ty = expr.ty.as_ref().unwrap();

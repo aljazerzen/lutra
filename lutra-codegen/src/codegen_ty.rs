@@ -5,21 +5,22 @@ use lutra_frontend::pr;
 
 pub fn write_tys(
     w: &mut impl Write,
-    tys: &[(&String, &pr::Ty)],
+    tys: &[(&String, &pr::Ty, &Vec<pr::Annotation>)],
 ) -> Result<Vec<pr::Ty>, std::fmt::Error> {
     let mut all_tys = Vec::new();
 
     let mut ctx = Context::default();
-    for (name, ty) in tys {
+    for (name, ty, annotations) in tys {
         let mut ty = (*ty).clone();
 
         infer_names(name, &mut ty);
 
-        write_ty_def(w, &ty, &mut ctx)?;
+        write_ty_def(w, &ty, annotations, &mut ctx)?;
         all_tys.push(ty);
 
         while let Some(ty) = ctx.def_buffer.pop_front() {
-            write_ty_def(w, &ty, &mut ctx)?;
+            let annotations = vec![];
+            write_ty_def(w, &ty, &annotations, &mut ctx)?;
             all_tys.push(ty);
         }
     }
@@ -100,21 +101,33 @@ pub struct Context {
 pub fn write_ty_def(
     w: &mut impl Write,
     ty: &pr::Ty,
+    annotations: &[pr::Annotation],
     ctx: &mut Context,
 ) -> Result<(), std::fmt::Error> {
     let name = ty.name.as_ref().unwrap();
 
     // derive traits
-    let mut traits = vec!["Debug", "Clone"];
-    match &ty.kind {
-        pr::TyKind::Primitive(pr::PrimitiveSet::bool)
-        | pr::TyKind::Primitive(pr::PrimitiveSet::int)
-        | pr::TyKind::Primitive(pr::PrimitiveSet::float) => {
-            traits.extend(["Copy", "PartialEq", "Eq", "Hash"])
-        }
-        _ => {}
+    let mut derive_traits = vec![];
+
+    let derive_annotation = annotations.iter().find(|x| {
+        x.expr
+            .kind
+            .as_func_call()
+            .and_then(|c| c.name.kind.as_ident())
+            .map_or(false, |i| i.name() == "derive")
+    });
+    if let Some(derive_annotation) = derive_annotation {
+        let c = derive_annotation.expr.kind.as_func_call().unwrap();
+        let values = c.args[0].kind.as_array().unwrap();
+        derive_traits.extend(
+            values
+                .iter()
+                .map(|e| e.kind.as_literal().unwrap().as_string().unwrap().clone()),
+        );
+    } else {
+        derive_traits.extend(["Debug".into(), "Clone".into()]);
     }
-    writeln!(w, "#[derive({})]", traits.join(", "))?;
+    writeln!(w, "#[derive({})]", derive_traits.join(", "))?;
 
     writeln!(w, "#[allow(non_camel_case_types)]")?;
     match &ty.kind {

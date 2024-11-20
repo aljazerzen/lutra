@@ -13,19 +13,6 @@ impl std::fmt::Display for Literal {
     }
 }
 
-// #[derive(PartialEq)]
-impl std::cmp::PartialEq for Literal {
-    fn eq(&self, other: &Self) -> bool {
-        match (self, other) {
-            (Self::Int(l0), Self::Int(r0)) => l0 == r0,
-            (Self::Float(l0), Self::Float(r0)) => l0 == r0,
-            (Self::Bool(l0), Self::Bool(r0)) => l0 == r0,
-            (Self::Text(l0), Self::Text(r0)) => l0 == r0,
-            _ => false,
-        }
-    }
-}
-
 pub(crate) fn quote_string(s: &str) -> String {
     if !s.contains('"') {
         return format!(r#""{}""#, s);

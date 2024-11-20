@@ -1,122 +1,116 @@
+type Program = {
+  externals = [ExternalSymbol],
+  main = Expr,
+}
+
+type ExternalSymbol = {
+  id = text,
+}
+
+type Expr = {
+  kind = ExprKind,
+  ty = Ty,
+}
+
+type ExprKind = enum {
+  Pointer = Sid,
+  Literal = Literal,
+  Call = Call,
+  Function = Function,
+  `Tuple` = [Expr],
+  Array = [Expr],
+  TupleLookup = TupleLookup,
+  ArrayLookup = ArrayLookup,
+  Binding = Binding,
+}
+
 ## Symbol id.
 ## - 0b00xxxxxx - external
 ## - 0b01xxxxxx - local bindings
 ## - 0b10xxxxxx - function scopes
 ## - 0b11xxxxxx - unused
 # TODO: make this u32
+@(derive ["Debug", "Clone", "Copy", "PartialEq", "Eq", "Hash"])
 type Sid = int
 
-type Program = {
-    externals = [ExternalSymbol],
-    main = Expr,
-}
-
-#TODO: @(derive Clone)
-type ExternalSymbol = {
-    id = text,
-}
-
-#TODO: @(derive Clone)
-type Expr = {
-    kind = ExprKind,
-    ty = Ty,
-}
-
-#[derive(Clone)]
-type ExprKind = enum {
-    Pointer = Sid,
-    Literal = Literal,
-    Call = Call,
-    Function = Function,
-    `Tuple` = [Expr],
-    Array = [Expr],
-    TupleLookup = TupleLookup,
-    ArrayLookup = ArrayLookup,
-    Binding = Binding,
-}
-
-#[derive(Clone)]
+@(derive ["Debug", "Clone", "PartialEq"])
 type Literal = enum {
-    Int = int,
-    Float = float,
-    Bool = bool,
-    Text = text,
+  Int = int,
+  Float = float,
+  Bool = bool,
+  Text = text,
 }
 
-#TODO: @(derive Clone)
 type Call = {
-    function = Expr,
-    layout = [int],
-    args = [Expr],
+  function = Expr,
+  layout = [int],
+  args = [Expr],
 }
 
-#TODO: @(derive Clone)
 type Function = {
-    symbol_ns = Sid,
+  symbol_ns = Sid,
 
-    # can contain function parameters prefixed with symbol_ns
-    body = Expr,
+  # can contain function parameters prefixed with symbol_ns
+  body = Expr,
 }
 
-#TODO: @(derive Clone)
 type TupleLookup = {
-    base = Expr,
-    offset = int,
+  base = Expr,
+  offset = int,
 }
 
-@(derive Clone)
 type ArrayLookup = {
-    base = Expr,
-    offset = int,
+  base = Expr,
+  offset = int,
 }
 
-@(derive Clone)
 type Binding = {
-    symbol = Sid,
-    expr = Expr,
-    main = Expr,
+  symbol = Sid,
+  expr = Expr,
+  main = Expr,
 }
 
 type Ty = {
-    kind = TyKind,
-    layout = TyLayout,
+  kind = TyKind,
+  layout = TyLayout,
 }
 
 type TyKind = enum {
-    Primitive = PrimitiveSet,
+  Primitive = PrimitiveSet,
 
-    Tuple = [TyTupleField],
+  Tuple = [TyTupleField],
 
-    Array = Ty,
+  Array = Ty,
 
-    Enum = [TyEnumVariant],
+  Enum = [TyEnumVariant],
 
-    Function = TyFunction,
+  Function = TyFunction,
 }
 
+@(derive ["Debug", "Clone", "Copy", "PartialEq", "Eq", "Hash"])
 type PrimitiveSet = enum {
-    int,
-    float,
-    bool,
-    text,
+  int,
+  float,
+  bool,
+  text,
 }
 
 type TyTupleField = {
-    name = enum { None, Some = text},
-    ty = Ty,
+  name = enum { None, Some = text},
+  ty = Ty,
 }
 
 type TyEnumVariant = {
-    name = text,
-    ty = Ty,
+  name = text,
+  ty = Ty,
 }
 
 type TyLayout = {
-    head_size = int,
-    variants_recursive = [int]
+  head_size = int,
+  variants_recursive = [int]
 }
 
 type TyFunction = {
-    params = [Ty],
-    body = Ty
+  params = [Ty],
+  body = Ty
 }
