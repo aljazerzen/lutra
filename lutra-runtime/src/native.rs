@@ -28,21 +28,21 @@ pub mod core {
                 let left = assume::int(&args[0].1);
                 let right = assume::int(&args[1].1);
 
-                Cell::Value(encode(&(left + right)))
+                Cell::Data(encode(&(left + right)))
             }
 
             pub fn sub(_: &mut Interpreter, args: Vec<(&ir::Ty, Cell)>) -> Cell {
                 let left = assume::int(&args[0].1);
                 let right = assume::int(&args[1].1);
 
-                Cell::Value(encode(&(left - right)))
+                Cell::Data(encode(&(left - right)))
             }
 
             pub fn mul(_: &mut Interpreter, args: Vec<(&ir::Ty, Cell)>) -> Cell {
                 let left = assume::int(&args[0].1);
                 let right = assume::int(&args[1].1);
 
-                Cell::Value(encode(&(left * right)))
+                Cell::Data(encode(&(left * right)))
             }
         }
     }
@@ -79,14 +79,14 @@ pub mod core {
                 let mut res = lutra_bin::ArrayWriter::new(&output_ty);
 
                 for item in array {
-                    let cell = Cell::Value(item);
+                    let cell = Cell::Data(item);
 
                     let value = it.evaluate_func_call(&func.1, vec![(args[1].0, cell)]);
 
                     res.write_item(assume::into_value(value));
                 }
 
-                Cell::Value(res.finish())
+                Cell::Data(res.finish())
             }
         }
     }
@@ -109,7 +109,7 @@ pub mod interpreter {
 
     impl Module {
         fn version() -> Cell {
-            Cell::Value(encode(&"lutra-runtime 0.0.1".to_string()))
+            Cell::Data(encode(&"lutra-runtime 0.0.1".to_string()))
         }
     }
 }
@@ -121,7 +121,7 @@ mod assume {
 
     pub fn into_value(cell: Cell) -> lutra_bin::Data {
         match cell {
-            Cell::Value(val) => val,
+            Cell::Data(val) => val,
             Cell::Function(_) => panic!(),
             Cell::FunctionNative(_) => panic!(),
             Cell::Vacant => panic!(),
@@ -130,7 +130,7 @@ mod assume {
 
     pub fn as_value(cell: &Cell) -> &lutra_bin::Data {
         match cell {
-            Cell::Value(val) => val,
+            Cell::Data(val) => val,
             Cell::Function(_) => panic!(),
             Cell::FunctionNative(_) => panic!(),
             Cell::Vacant => panic!(),

@@ -12,7 +12,7 @@ impl runtime::NativeFunctions for RuntimeModule {
     fn hello(_interpreter: &mut Interpreter, _args: Vec<(&ir::Ty, Cell)>) -> Cell {
         let mut buf = Vec::with_capacity(8);
         2_i64.encode(&mut buf).unwrap();
-        Cell::Value(Data::new(buf))
+        Cell::Data(Data::new(buf))
     }
 }
 

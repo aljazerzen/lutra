@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::ops::{BitAnd, Shr};
 
 use lutra_bin::ir;
-use lutra_bin::Data;
+use lutra_bin::{Data, Encode};
 
 use crate::NativeModule;
 
@@ -17,7 +17,7 @@ pub struct Interpreter {
 
 #[derive(Clone)]
 pub enum Cell {
-    Value(Data),
+    Data(Data),
     Function(Box<ir::Function>),
     FunctionNative(NativeFunction),
     Vacant,
@@ -50,7 +50,7 @@ pub fn evaluate(
 
     // extract result
     drop(interpreter);
-    let Cell::Value(value) = main else { panic!() };
+    let Cell::Data(value) = main else { panic!() };
     value.flatten()
 }
 
@@ -142,58 +142,42 @@ impl Interpreter {
             ir::ExprKind::Pointer(sid) => {
                 let mem_cell = self.get_cell(*sid);
                 match mem_cell {
-                    Cell::Value(_) | Cell::Function(_) | Cell::FunctionNative(_) => {
-                        mem_cell.clone()
-                    }
+                    Cell::Data(_) | Cell::Function(_) | Cell::FunctionNative(_) => mem_cell.clone(),
 
                     Cell::Vacant => panic!(),
                 }
             }
 
             ir::ExprKind::Literal(l) => {
-                let value = match l {
-                    ir::Literal::Int(i) => lutra_bin::Value::Int(*i),
-                    ir::Literal::Float(i) => lutra_bin::Value::Float(*i),
-                    ir::Literal::Bool(i) => lutra_bin::Value::Bool(*i),
-                    ir::Literal::Text(i) => lutra_bin::Value::Text(i.clone()),
+                let mut buf = Vec::new();
+                match l {
+                    ir::Literal::Int(i) => i.encode(&mut buf).unwrap(),
+                    ir::Literal::Float(i) => i.encode(&mut buf).unwrap(),
+                    ir::Literal::Bool(i) => i.encode(&mut buf).unwrap(),
+                    ir::Literal::Text(i) => i.encode(&mut buf).unwrap(),
                 };
-                Cell::Value(Data::new(value.encode(&expr.ty).unwrap()))
+                Cell::Data(Data::new(buf))
             }
 
             ir::ExprKind::Tuple(fields) => {
-                let ir::TyKind::Tuple(ty_fields) = &expr.ty.kind else {
-                    panic!()
-                };
+                let mut writer = lutra_bin::TupleWriter::new(&expr.ty);
+                for field in fields {
+                    let cell = self.evaluate_expr(field);
 
-                let mut res = Vec::with_capacity(fields.len());
-                for (i, field) in fields.iter().enumerate() {
-                    let symbol = self.evaluate_expr(field);
-
-                    let field_ty = &ty_fields[i];
-                    let value = assume_value(&symbol).flatten();
-                    let value = lutra_bin::Value::decode(&value, &field_ty.ty).unwrap();
-                    res.push(value);
+                    writer.write_field(assume_data(&cell).clone());
                 }
-                let res = lutra_bin::Value::Tuple(res).encode(&expr.ty).unwrap();
 
-                Cell::Value(Data::new(res))
+                Cell::Data(writer.finish())
             }
             ir::ExprKind::Array(items) => {
-                let ir::TyKind::Array(ty_items) = &expr.ty.kind else {
-                    panic!()
-                };
-
-                let mut res = Vec::new();
+                let mut writer = lutra_bin::ArrayWriter::new(&expr.ty);
                 for item in items {
-                    let symbol = self.evaluate_expr(item);
+                    let cell = self.evaluate_expr(item);
 
-                    let value = assume_value(&symbol).flatten();
-                    let value = lutra_bin::Value::decode(&value, ty_items).unwrap();
-                    res.push(value);
+                    writer.write_item(assume_data(&cell).clone());
                 }
-                let res = lutra_bin::Value::Array(res).encode(&expr.ty).unwrap();
 
-                Cell::Value(Data::new(res))
+                Cell::Data(writer.finish())
             }
             ir::ExprKind::TupleLookup(lookup) => {
                 let ir::TupleLookup { base, offset } = lookup.as_ref();
@@ -201,9 +185,9 @@ impl Interpreter {
 
                 let base = self.evaluate_expr(base);
 
-                let base = lutra_bin::TupleReader::new(assume_value(&base), base_ty);
+                let base = lutra_bin::TupleReader::new(assume_data(&base), base_ty);
 
-                Cell::Value(base.get_field(*offset as usize))
+                Cell::Data(base.get_field(*offset as usize))
             }
             ir::ExprKind::ArrayLookup(lookup) => {
                 let ir::ArrayLookup { base, offset } = lookup.as_ref();
@@ -212,12 +196,12 @@ impl Interpreter {
                 let base = self.evaluate_expr(base);
 
                 match base {
-                    Cell::Value(base) => {
+                    Cell::Data(base) => {
                         let mut items = lutra_bin::ArrayReader::new_for_ty(base, base_ty);
 
                         let item = items.nth(*offset as usize).unwrap();
 
-                        Cell::Value(item.to_owned())
+                        Cell::Data(item.to_owned())
                     }
                     Cell::Function(_) => panic!(),
                     Cell::FunctionNative(_) => panic!(),
@@ -263,15 +247,15 @@ impl Interpreter {
                 res
             }
             Cell::FunctionNative(native) => native(self, args),
-            Cell::Value(_) => panic!(),
+            Cell::Data(_) => panic!(),
             Cell::Vacant => panic!(),
         }
     }
 }
 
-fn assume_value(symbol: &Cell) -> &Data {
+fn assume_data(symbol: &Cell) -> &Data {
     match symbol {
-        Cell::Value(val) => val,
+        Cell::Data(val) => val,
         Cell::Function(_) => panic!(),
         Cell::FunctionNative(_) => panic!(),
         Cell::Vacant => panic!(),
