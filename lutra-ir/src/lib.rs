@@ -39,7 +39,10 @@ pub fn ty_into_pr(ty: ir::Ty) -> pr::Ty {
         ir::TyKind::Enum(variants) => pr::TyKind::Enum(
             variants
                 .into_iter()
-                .map(|v| (v.name, ty_into_pr(v.ty)))
+                .map(|v| pr::TyEnumVariant {
+                    name: v.name,
+                    ty: ty_into_pr(v.ty),
+                })
                 .collect(),
         ),
         ir::TyKind::Function(func) => pr::TyKind::Function(Some(pr::TyFunc {

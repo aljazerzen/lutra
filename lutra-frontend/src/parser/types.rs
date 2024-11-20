@@ -61,10 +61,13 @@ pub(crate) fn type_expr() -> impl Parser<TokenKind, Ty, Error = PError> + Clone 
             .ignore_then(
                 sequence(
                     ident_part()
-                        .then(ctrl('=').ignore_then(nested_type_expr.clone()).or_not())
-                        .map(|(name, ty)| {
-                            (name, ty.unwrap_or_else(|| Ty::new(TyKind::Tuple(vec![]))))
-                        }),
+                        .then(
+                            ctrl('=')
+                                .ignore_then(nested_type_expr.clone())
+                                .or_not()
+                                .map(|ty| ty.unwrap_or_else(|| Ty::new(TyKind::Tuple(vec![])))),
+                        )
+                        .map(|(name, ty)| TyEnumVariant { name, ty }),
                 )
                 .delimited_by(ctrl('{'), ctrl('}'))
                 .recover_with(nested_delimiters(

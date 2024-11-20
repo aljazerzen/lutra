@@ -58,7 +58,7 @@ pub struct EnumHeadFormat {
     pub no_pointer: bool,
 }
 
-pub fn enum_head_format(variants: &[(String, pr::Ty)]) -> EnumHeadFormat {
+pub fn enum_head_format(variants: &[pr::TyEnumVariant]) -> EnumHeadFormat {
     let s = enum_tag_size(variants.len());
 
     let h = enum_max_variant_head_size(variants);
@@ -83,10 +83,10 @@ pub fn enum_variant_format(variant_ty: &pr::Ty) -> EnumVariantFormat {
     EnumVariantFormat { is_inline, padding }
 }
 
-fn enum_max_variant_head_size(variants: &[(String, pr::Ty)]) -> usize {
+fn enum_max_variant_head_size(variants: &[pr::TyEnumVariant]) -> usize {
     let mut h = 0;
-    for (_n, ty) in variants {
-        let size = ty.layout.as_ref().unwrap().head_size;
+    for variant in variants {
+        let size = variant.ty.layout.as_ref().unwrap().head_size;
         h = h.max(size);
     }
     h

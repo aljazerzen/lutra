@@ -49,7 +49,7 @@ pub enum TyKind {
     Array(Box<Ty>),
 
     /// Type of functions with defined params and return types.
-    Enum(Vec<(String, Ty)>),
+    Enum(Vec<TyEnumVariant>),
 
     /// Type of functions with defined params and return types.
     Function(Option<TyFunc>),
@@ -119,6 +119,12 @@ pub struct TyTupleField {
     /// Named tuple element.
     pub name: Option<String>,
 
+    pub ty: Ty,
+}
+
+#[derive(Debug, Clone, PartialEq, Hash)]
+pub struct TyEnumVariant {
+    pub name: String,
     pub ty: Ty,
 }
 

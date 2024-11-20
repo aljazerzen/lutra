@@ -126,19 +126,19 @@ impl ValueVisitor for Printer {
         &mut self,
         tag: usize,
         inner: &Value,
-        ty_variants: &[(String, pr::Ty)],
+        ty_variants: &[pr::TyEnumVariant],
     ) -> Result<Self::Res, crate::Error> {
-        let (variant_name, variant_ty) = ty_variants.get(tag).ok_or(crate::Error::InvalidData)?;
+        let variant = ty_variants.get(tag).ok_or(crate::Error::InvalidData)?;
 
-        let mut r = variant_name.to_string();
+        let mut r = variant.name.to_string();
 
-        let is_unit = variant_ty.kind.as_tuple().map_or(false, |x| x.is_empty());
+        let is_unit = variant.ty.kind.as_tuple().map_or(false, |x| x.is_empty());
         if !is_unit {
             r += "(";
             self.indent();
 
             r += &self.new_line();
-            r += &self.visit_value(inner, variant_ty)?;
+            r += &self.visit_value(inner, &variant.ty)?;
 
             self.deindent();
             r += &self.new_line();

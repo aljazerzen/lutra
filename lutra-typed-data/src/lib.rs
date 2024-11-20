@@ -66,7 +66,10 @@ fn type_to_pr(ty: &schema::Ty) -> pr::Ty {
         schema::TyKind::Enum(variants) => pr::TyKind::Enum(
             variants
                 .iter()
-                .map(|v| (v.name.clone(), type_to_pr(&v.ty)))
+                .map(|v| pr::TyEnumVariant {
+                    name: v.name.clone(),
+                    ty: type_to_pr(&v.ty),
+                })
                 .collect(),
         ),
     };
@@ -116,8 +119,8 @@ fn type_from_pr(ty: &pr::Ty) -> schema::Ty {
             variants
                 .iter()
                 .map(|v| schema::TyKindEnumItems {
-                    name: v.0.clone(),
-                    ty: type_from_pr(&v.1),
+                    name: v.name.clone(),
+                    ty: type_from_pr(&v.ty),
                 })
                 .collect(),
         ),

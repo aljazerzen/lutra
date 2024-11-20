@@ -59,6 +59,6 @@ pub trait ValueVisitor {
         &mut self,
         tag: usize,
         inner: &Value,
-        ty_variants: &[(String, pr::Ty)],
+        ty_variants: &[pr::TyEnumVariant],
     ) -> Result<Self::Res, crate::Error>;
 }

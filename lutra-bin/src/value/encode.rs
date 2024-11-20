@@ -186,14 +186,14 @@ fn encode_body<'t>(
 
 fn enum_params_encode(
     tag: usize,
-    ty_variants: &[(String, pr::Ty)],
+    ty_variants: &[pr::TyEnumVariant],
 ) -> Result<(EnumHeadFormat, EnumVariantFormat, usize, &pr::Ty)> {
     let head_format = layout::enum_head_format(ty_variants);
 
-    let (_, variant_ty) = ty_variants.get(tag).ok_or(Error::InvalidData)?;
+    let variant = ty_variants.get(tag).ok_or(Error::InvalidData)?;
 
-    let variant_format = layout::enum_variant_format(variant_ty);
-    Ok((head_format, variant_format, tag, variant_ty))
+    let variant_format = layout::enum_variant_format(&variant.ty);
+    Ok((head_format, variant_format, tag, &variant.ty))
 }
 
 fn decode_inner<'t>(r: &mut Reader<'_>, ty: &'t pr::Ty, ctx: &mut Context<'t>) -> Result<Value> {
@@ -233,18 +233,18 @@ fn decode_inner<'t>(r: &mut Reader<'_>, ty: &'t pr::Ty, ctx: &mut Context<'t>) -
             tag_bytes.resize(8, 0);
             let tag = u64::from_le_bytes(tag_bytes.try_into().unwrap()) as usize;
 
-            let (_, variant_ty) = variants.get(tag).unwrap();
+            let variant = variants.get(tag).unwrap();
 
-            let variant_format = layout::enum_variant_format(variant_ty);
+            let variant_format = layout::enum_variant_format(&variant.ty);
 
             let inner = if variant_format.is_inline {
-                decode_inner(r, variant_ty, ctx)?
+                decode_inner(r, &variant.ty, ctx)?
             } else {
                 let mut body = r.clone();
                 let offset = r.read_const::<4>();
                 let offset = u32::from_le_bytes(offset) as usize;
                 body.skip(offset);
-                decode_inner(&mut body, variant_ty, ctx)?
+                decode_inner(&mut body, &variant.ty, ctx)?
             };
 
             r.skip(variant_format.padding / 8);

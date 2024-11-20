@@ -239,7 +239,12 @@ pub fn fold_type<T: ?Sized + PrFold>(fold: &mut T, ty: Ty) -> Result<Ty> {
             TyKind::Enum(variants) => TyKind::Enum(
                 variants
                     .into_iter()
-                    .map(|(name, ty)| -> Result<_> { Ok((name, fold.fold_type(ty)?)) })
+                    .map(|variant| -> Result<_> {
+                        Ok(TyEnumVariant {
+                            name: variant.name,
+                            ty: fold.fold_type(variant.ty)?,
+                        })
+                    })
                     .try_collect()?,
             ),
             // TyKind::Exclude { base, except } => TyKind::Exclude {

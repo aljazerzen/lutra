@@ -11,17 +11,17 @@ pub struct EnumForm {
     pub variants: Vec<Form>,
 }
 impl EnumForm {
-    pub fn new(variants: &[(String, pr::Ty)]) -> EnumForm {
+    pub fn new(variants: &[pr::TyEnumVariant]) -> EnumForm {
         let variants = variants
             .iter()
             .enumerate()
-            .map(|(pos, (name, ty))| {
+            .map(|(pos, variant)| {
                 let name = FormName {
-                    name: Some(name.clone()),
+                    name: Some(variant.name.clone()),
                     position: Some(pos),
                 };
 
-                Form::new(ty, name)
+                Form::new(&variant.ty, name)
             })
             .collect();
 

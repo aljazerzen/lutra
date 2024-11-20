@@ -24,8 +24,8 @@ impl Resolver<'_> {
                 let mut layout = ty.kind.get_layout_simple().unwrap();
 
                 assert!(layout.variants_recursive.is_empty());
-                for (index, (_, variant_ty)) in variants.iter().enumerate() {
-                    if variant_ty.layout.is_none() {
+                for (index, variant) in variants.iter().enumerate() {
+                    if variant.ty.layout.is_none() {
                         // unresolved - this type is (probably) recursive, save this info
                         // (I don't think this logic is 100% sound)
                         layout.variants_recursive.push(index);

@@ -79,9 +79,9 @@ fn infer_names_re(ty: &mut pr::Ty, name_prefix: &mut Vec<String>) {
         }
 
         pr::TyKind::Enum(variants) => {
-            for (v_name, v_ty) in variants {
-                name_prefix.push(v_name.clone());
-                infer_names_re(v_ty, name_prefix);
+            for v in variants {
+                name_prefix.push(v.name.clone());
+                infer_names_re(&mut v.ty, name_prefix);
                 name_prefix.pop();
             }
         }
@@ -150,16 +150,16 @@ pub fn write_ty_def(
         pr::TyKind::Enum(variants) => {
             writeln!(w, "pub enum {} {{", name)?;
 
-            for (index, (variant_name, variant_ty)) in variants.iter().enumerate() {
-                write!(w, "    {variant_name}")?;
-                if !is_unit_variant(variant_ty) {
+            for (index, variant) in variants.iter().enumerate() {
+                write!(w, "    {}", variant.name)?;
+                if !is_unit_variant(&variant.ty) {
                     let needs_box = layout::does_enum_variant_contain_recursive(ty, index);
 
                     write!(w, "(")?;
                     if needs_box {
                         write!(w, "Box<")?;
                     }
-                    write_ty_ref(w, variant_ty, false, ctx)?;
+                    write_ty_ref(w, &variant.ty, false, ctx)?;
                     if needs_box {
                         write!(w, ">")?;
                     }
@@ -219,7 +219,7 @@ fn write_ty_ref(
             write!(w, ">")?;
         }
         pr::TyKind::Enum(variants) if is_option_enum(variants) => {
-            let inner_ty = &variants[1].1;
+            let inner_ty = &variants[1].ty;
 
             write!(w, "Option")?;
             if as_expr {
@@ -275,7 +275,7 @@ fn write_ty_def_impl(w: &mut impl Write, ty: &pr::Ty) -> Result<(), std::fmt::Er
         }
 
         pr::TyKind::Enum(variants) if is_option_enum(variants) => {
-            let inner_ty = &variants[1].1;
+            let inner_ty = &variants[1].ty;
 
             let mut inner_head_ptr = String::new();
             let mut ctx = Context::default();
@@ -349,7 +349,7 @@ fn write_ty_def_impl(w: &mut impl Write, ty: &pr::Ty) -> Result<(), std::fmt::Er
         pr::TyKind::Enum(variants) => {
             let head = layout::enum_head_format(variants);
 
-            let needs_head_ptr = variants.iter().any(|(_, t)| !is_unit_variant(t));
+            let needs_head_ptr = variants.iter().any(|variant| !is_unit_variant(&variant.ty));
             let head_ptr_name = if needs_head_ptr {
                 format!("{name}HeadPtr")
             } else {
@@ -363,14 +363,14 @@ fn write_ty_def_impl(w: &mut impl Write, ty: &pr::Ty) -> Result<(), std::fmt::Er
             writeln!(w, "    fn encode_head(&self, w: &mut Vec<u8>) -> ::lutra_bin::Result<{head_ptr_name}> {{")?;
             writeln!(w, "        Ok(match self {{")?;
 
-            for (tag, (variant_name, variant_ty)) in variants.iter().enumerate() {
-                let variant = layout::enum_variant_format(variant_ty);
+            for (tag, variant) in variants.iter().enumerate() {
+                let va_format = layout::enum_variant_format(&variant.ty);
 
-                write!(w, "            Self::{variant_name}")?;
+                write!(w, "            Self::{}", variant.name)?;
 
-                if !variant.is_inline {
+                if !va_format.is_inline {
                     write!(w, "(_)")?;
-                } else if !is_unit_variant(variant_ty) {
+                } else if !is_unit_variant(&variant.ty) {
                     write!(w, "(inner)")?;
                 }
                 writeln!(w, " => {{")?;
@@ -378,19 +378,19 @@ fn write_ty_def_impl(w: &mut impl Write, ty: &pr::Ty) -> Result<(), std::fmt::Er
                 let tag_bytes = &tag.to_le_bytes()[0..head.s / 8];
                 writeln!(w, "                w.write_all(&{tag_bytes:?})?;")?;
 
-                if !variant.is_inline {
+                if !va_format.is_inline {
                     writeln!(w, "                let head_ptr = ::lutra_bin::ReversePointer::new(w);")?;
-                    writeln!(w, "                let r = {head_ptr_name}::{variant_name}(head_ptr);")?;
-                } else if !is_unit_variant(variant_ty) {
+                    writeln!(w, "                let r = {head_ptr_name}::{}(head_ptr);", variant.name)?;
+                } else if !is_unit_variant(&variant.ty) {
                     writeln!(w, "                let inner_head_ptr = inner.encode_head(w)?;")?;
-                    writeln!(w, "                let r = {head_ptr_name}::{variant_name}(inner_head_ptr);")?;
+                    writeln!(w, "                let r = {head_ptr_name}::{}(inner_head_ptr);", variant.name)?;
                 } else if needs_head_ptr {
                     writeln!(w, "                let r = {head_ptr_name}::None;")?;
                 }
 
-                if variant.padding > 0 {
+                if va_format.padding > 0 {
                     write!(w, "                w.write_all(&[")?;
-                    for _ in 0..(variant.padding / 8) {
+                    for _ in 0..(va_format.padding / 8) {
                         write!(w, "0u8,")?;
                     }
                     writeln!(w, "])?;")?;
@@ -407,22 +407,22 @@ fn write_ty_def_impl(w: &mut impl Write, ty: &pr::Ty) -> Result<(), std::fmt::Er
             if needs_head_ptr {
                 writeln!(w, "        match self {{")?;
 
-                for (variant_name, variant_ty) in variants {
-                    write!(w, "            Self::{variant_name}")?;
-                    if !is_unit_variant(variant_ty) {
+                for variant in variants {
+                    write!(w, "            Self::{}", variant.name)?;
+                    if !is_unit_variant(&variant.ty) {
                         write!(w, "(inner)")?;
                     }
                     writeln!(w, " => {{")?;
 
-                    let variant = layout::enum_variant_format(variant_ty);
+                    let variant_format = layout::enum_variant_format(&variant.ty);
 
-                    if !variant.is_inline {
-                        writeln!(w, "                let {head_ptr_name}::{variant_name}(offset_ptr) = head else {{ unreachable!() }};")?;
+                    if !variant_format.is_inline {
+                        writeln!(w, "                let {head_ptr_name}::{}(offset_ptr) = head else {{ unreachable!() }};", variant.name)?;
                         writeln!(w, "                offset_ptr.write_cur_len(w);")?;
                         writeln!(w, "                let inner_head_ptr = inner.encode_head(w)?;")?;
                         writeln!(w, "                inner.encode_body(inner_head_ptr, w)?;")?;
-                    } else if !is_unit_variant(variant_ty) {
-                        writeln!(w, "                let {head_ptr_name}::{variant_name}(inner_head_ptr) = head else {{ unreachable!() }};")?;
+                    } else if !is_unit_variant(&variant.ty) {
+                        writeln!(w, "                let {head_ptr_name}::{}(inner_head_ptr) = head else {{ unreachable!() }};", variant.name)?;
                         writeln!(w, "                inner.encode_body(inner_head_ptr, w)?;")?;
                     }
 
@@ -439,21 +439,21 @@ fn write_ty_def_impl(w: &mut impl Write, ty: &pr::Ty) -> Result<(), std::fmt::Er
                 writeln!(w, "#[allow(non_camel_case_types, dead_code)]")?;
                 writeln!(w, "pub enum {head_ptr_name} {{")?;
                 writeln!(w, "    None,")?;
-                for (variant_name, variant_ty) in variants {
-                    if is_unit_variant(variant_ty) {
+                for variant in variants {
+                    if is_unit_variant(&variant.ty) {
                         continue;
                     }
 
-                    let variant = layout::enum_variant_format(variant_ty);
+                    let variant_format = layout::enum_variant_format(&variant.ty);
 
-                    write!(w, "    {variant_name}")?;
+                    write!(w, "    {}", variant.name)?;
 
-                    if !variant.is_inline {
+                    if !variant_format.is_inline {
                         write!(w, "(::lutra_bin::ReversePointer)")?;
                     } else {
                         write!(w, "(<")?;
                         let mut ctx = Context::default();
-                        write_ty_ref(w, variant_ty, false, &mut ctx)?;
+                        write_ty_ref(w, &variant.ty, false, &mut ctx)?;
                         write!(w, " as ::lutra_bin::Encode>::HeadPtr)")?;
                     }
 
@@ -548,16 +548,16 @@ fn write_ty_def_impl(w: &mut impl Write, ty: &pr::Ty) -> Result<(), std::fmt::Er
             writeln!(w, "        let tag = u64::from_le_bytes(tag_bytes.try_into().unwrap()) as usize;")?;
 
             writeln!(w, "        Ok(match tag {{")?;
-            for (index, (variant_name, variant_ty)) in variants.iter().enumerate() {
+            for (index, variant) in variants.iter().enumerate() {
                 writeln!(w, "            {index} => {{")?;
 
-                let variant_format = layout::enum_variant_format(variant_ty);
+                let variant_format = layout::enum_variant_format(&variant.ty);
 
                 if variant_format.is_inline {
-                    if !is_unit_variant(variant_ty) {
+                    if !is_unit_variant(&variant.ty) {
                         write!(w, "                let inner = ")?;
                         let mut ctx = Context::default();
-                        write_ty_ref(w, variant_ty, true, &mut ctx)?;
+                        write_ty_ref(w, &variant.ty, true, &mut ctx)?;
                         writeln!(w, "::decode(r)?;")?;
                     }
                 } else {
@@ -568,7 +568,7 @@ fn write_ty_def_impl(w: &mut impl Write, ty: &pr::Ty) -> Result<(), std::fmt::Er
 
                     write!(w, "                let inner = ")?;
                     let mut ctx = Context::default();
-                    write_ty_ref(w, variant_ty, true, &mut ctx)?;
+                    write_ty_ref(w, &variant.ty, true, &mut ctx)?;
                     writeln!(w, "::decode(&mut body)?;")?;
                 }
 
@@ -578,12 +578,12 @@ fn write_ty_def_impl(w: &mut impl Write, ty: &pr::Ty) -> Result<(), std::fmt::Er
 
                 let needs_box = layout::does_enum_variant_contain_recursive(ty, index);
 
-                if is_unit_variant(variant_ty) {
-                    writeln!(w, "                {name}::{variant_name}")?;
+                if is_unit_variant(&variant.ty) {
+                    writeln!(w, "                {name}::{}", variant.name)?;
                 } else if needs_box {
-                    writeln!(w, "                {name}::{variant_name}(Box::new(inner))")?;
+                    writeln!(w, "                {name}::{}(Box::new(inner))", variant.name)?;
                 } else {
-                    writeln!(w, "                {name}::{variant_name}(inner)")?;
+                    writeln!(w, "                {name}::{}(inner)", variant.name)?;
                 }
 
                 writeln!(w, "            }},")?;
@@ -604,6 +604,6 @@ fn is_unit_variant(variant_ty: &pr::Ty) -> bool {
     variant_ty.kind.as_tuple().map_or(false, |f| f.is_empty())
 }
 
-fn is_option_enum(variants: &[(String, pr::Ty)]) -> bool {
-    variants.len() == 2 && is_unit_variant(&variants[0].1) && !is_unit_variant(&variants[1].1)
+fn is_option_enum(variants: &[pr::TyEnumVariant]) -> bool {
+    variants.len() == 2 && is_unit_variant(&variants[0].ty) && !is_unit_variant(&variants[1].ty)
 }
