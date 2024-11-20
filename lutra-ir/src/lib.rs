@@ -18,10 +18,10 @@ pub fn ty_into_pr(ty: ir::Ty) -> pr::Ty {
     let kind = match ty.kind {
         ir::TyKind::Primitive(primitive) => {
             let primitive = match primitive {
-                ir::PrimitiveSet::int => pr::PrimitiveSet::Int,
-                ir::PrimitiveSet::float => pr::PrimitiveSet::Float,
-                ir::PrimitiveSet::bool => pr::PrimitiveSet::Bool,
-                ir::PrimitiveSet::text => pr::PrimitiveSet::Text,
+                ir::PrimitiveSet::int => pr::PrimitiveSet::int,
+                ir::PrimitiveSet::float => pr::PrimitiveSet::float,
+                ir::PrimitiveSet::bool => pr::PrimitiveSet::bool,
+                ir::PrimitiveSet::text => pr::PrimitiveSet::text,
             };
             pr::TyKind::Primitive(primitive)
         }

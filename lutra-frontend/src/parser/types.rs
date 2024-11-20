@@ -10,13 +10,10 @@ use crate::pr::*;
 pub(crate) fn type_expr() -> impl Parser<TokenKind, Ty, Error = PError> + Clone {
     recursive(|nested_type_expr| {
         let basic = select! {
-            TokenKind::Ident(i) if i == "int"=> PrimitiveSet::Int,
-            TokenKind::Ident(i) if i == "float"=> PrimitiveSet::Float,
-            TokenKind::Ident(i) if i == "bool"=> PrimitiveSet::Bool,
-            TokenKind::Ident(i) if i == "text"=> PrimitiveSet::Text,
-            TokenKind::Ident(i) if i == "date"=> PrimitiveSet::Date,
-            TokenKind::Ident(i) if i == "time"=> PrimitiveSet::Time,
-            TokenKind::Ident(i) if i == "timestamp"=> PrimitiveSet::Timestamp,
+            TokenKind::Ident(i) if i == "int"=> PrimitiveSet::int,
+            TokenKind::Ident(i) if i == "float"=> PrimitiveSet::float,
+            TokenKind::Ident(i) if i == "bool"=> PrimitiveSet::bool,
+            TokenKind::Ident(i) if i == "text"=> PrimitiveSet::text,
         }
         .map(TyKind::Primitive);
 

@@ -107,9 +107,9 @@ pub fn write_ty_def(
     // derive traits
     let mut traits = vec!["Debug", "Clone"];
     match &ty.kind {
-        pr::TyKind::Primitive(pr::PrimitiveSet::Bool)
-        | pr::TyKind::Primitive(pr::PrimitiveSet::Int)
-        | pr::TyKind::Primitive(pr::PrimitiveSet::Float) => {
+        pr::TyKind::Primitive(pr::PrimitiveSet::bool)
+        | pr::TyKind::Primitive(pr::PrimitiveSet::int)
+        | pr::TyKind::Primitive(pr::PrimitiveSet::float) => {
             traits.extend(["Copy", "PartialEq", "Eq", "Hash"])
         }
         _ => {}
@@ -193,16 +193,16 @@ fn write_ty_ref(
     ctx: &mut Context,
 ) -> Result<(), std::fmt::Error> {
     match &ty.kind {
-        pr::TyKind::Primitive(pr::PrimitiveSet::Int) => {
+        pr::TyKind::Primitive(pr::PrimitiveSet::int) => {
             write!(w, "i64")?;
         }
-        pr::TyKind::Primitive(pr::PrimitiveSet::Float) => {
+        pr::TyKind::Primitive(pr::PrimitiveSet::float) => {
             write!(w, "f64")?;
         }
-        pr::TyKind::Primitive(pr::PrimitiveSet::Bool) => {
+        pr::TyKind::Primitive(pr::PrimitiveSet::bool) => {
             write!(w, "bool")?;
         }
-        pr::TyKind::Primitive(pr::PrimitiveSet::Text) => {
+        pr::TyKind::Primitive(pr::PrimitiveSet::text) => {
             write!(w, "String")?;
         }
         pr::TyKind::Ident(ident) => {

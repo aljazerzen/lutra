@@ -65,7 +65,7 @@ pub mod core {
         impl Module {
             pub fn map(it: &mut Interpreter, args: Vec<(&ir::Ty, Cell)>) -> Cell {
                 let func = &args[0];
-                let array = assume::array(&args[1].0, &args[1].1);
+                let array = assume::array(args[1].0, &args[1].1);
 
                 let ir::TyKind::Function(ty_func) = &func.0.kind else {
                     panic!()
@@ -83,7 +83,7 @@ pub mod core {
                 for item in array {
                     let cell = Cell::Value(item);
 
-                    let value = it.evaluate_func_call(&func.1, vec![(&args[1].0, cell)]);
+                    let value = it.evaluate_func_call(&func.1, vec![(args[1].0, cell)]);
 
                     res.write_item(assume::into_value(value));
                 }
@@ -144,7 +144,7 @@ mod assume {
         i64::decode_buffer(bytes.slice(8)).unwrap()
     }
 
-    pub fn array<'d>(ty: &ir::Ty, cell: &'d Cell) -> ArrayReader {
+    pub fn array(ty: &ir::Ty, cell: &Cell) -> ArrayReader {
         let ty = lutra_ir::ty_into_pr(ty.clone());
 
         let data = as_value(cell).clone();

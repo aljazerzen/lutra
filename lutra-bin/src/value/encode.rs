@@ -38,23 +38,23 @@ fn encode_head<'t>(
 
     match value {
         Value::Int(v) => {
-            expect_ty_primitive(ty, pr::PrimitiveSet::Int)?;
+            expect_ty_primitive(ty, pr::PrimitiveSet::int)?;
             v.encode_head(w)?;
             Ok(ValueHeadPtr::None)
         }
         Value::Float(v) => {
-            expect_ty_primitive(ty, pr::PrimitiveSet::Float)?;
+            expect_ty_primitive(ty, pr::PrimitiveSet::float)?;
             v.encode_head(w)?;
             Ok(ValueHeadPtr::None)
         }
         Value::Bool(v) => {
-            expect_ty_primitive(ty, pr::PrimitiveSet::Bool)?;
+            expect_ty_primitive(ty, pr::PrimitiveSet::bool)?;
 
             v.encode_head(w)?;
             Ok(ValueHeadPtr::None)
         }
         Value::Text(v) => {
-            expect_ty_primitive(ty, pr::PrimitiveSet::Text)?;
+            expect_ty_primitive(ty, pr::PrimitiveSet::text)?;
 
             v.encode_head(w).map(ValueHeadPtr::Offset)
         }
@@ -117,16 +117,16 @@ fn encode_body<'t>(
 
     match value {
         Value::Int(_) => {
-            expect_ty_primitive(ty, pr::PrimitiveSet::Int)?;
+            expect_ty_primitive(ty, pr::PrimitiveSet::int)?;
         }
         Value::Float(_) => {
-            expect_ty_primitive(ty, pr::PrimitiveSet::Float)?;
+            expect_ty_primitive(ty, pr::PrimitiveSet::float)?;
         }
         Value::Bool(_) => {
-            expect_ty_primitive(ty, pr::PrimitiveSet::Bool)?;
+            expect_ty_primitive(ty, pr::PrimitiveSet::bool)?;
         }
         Value::Text(v) => {
-            expect_ty_primitive(ty, pr::PrimitiveSet::Text)?;
+            expect_ty_primitive(ty, pr::PrimitiveSet::text)?;
 
             let ValueHeadPtr::Offset(offset_ptr) = head_ptr else {
                 unreachable!()
@@ -200,10 +200,10 @@ fn decode_inner<'t>(r: &mut Reader<'_>, ty: &'t pr::Ty, ctx: &mut Context<'t>) -
     let ty = resolve_ident(ty, ctx);
 
     Ok(match &ty.kind {
-        pr::TyKind::Primitive(pr::PrimitiveSet::Bool) => Value::Bool(bool::decode(r)?),
-        pr::TyKind::Primitive(pr::PrimitiveSet::Int) => Value::Int(i64::decode(r)?),
-        pr::TyKind::Primitive(pr::PrimitiveSet::Float) => Value::Float(f64::decode(r)?),
-        pr::TyKind::Primitive(pr::PrimitiveSet::Text) => Value::Text(String::decode(r)?),
+        pr::TyKind::Primitive(pr::PrimitiveSet::bool) => Value::Bool(bool::decode(r)?),
+        pr::TyKind::Primitive(pr::PrimitiveSet::int) => Value::Int(i64::decode(r)?),
+        pr::TyKind::Primitive(pr::PrimitiveSet::float) => Value::Float(f64::decode(r)?),
+        pr::TyKind::Primitive(pr::PrimitiveSet::text) => Value::Text(String::decode(r)?),
 
         pr::TyKind::Tuple(fields) => {
             let mut res = Vec::with_capacity(fields.len());

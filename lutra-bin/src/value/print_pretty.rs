@@ -182,10 +182,9 @@ fn try_tabular(items_ty: &pr::Ty) -> Option<tabular::Table> {
 
 fn column_spec_primitive(primitive: &pr::PrimitiveSet) -> &'static str {
     match primitive {
-        pr::PrimitiveSet::Int | pr::PrimitiveSet::Float => "{:>}",
-        pr::PrimitiveSet::Bool => "{:^}",
-        pr::PrimitiveSet::Text => "{:<}",
-        _ => todo!(),
+        pr::PrimitiveSet::int | pr::PrimitiveSet::float => "{:>}",
+        pr::PrimitiveSet::bool => "{:^}",
+        pr::PrimitiveSet::text => "{:<}",
     }
 }
 

@@ -43,10 +43,10 @@ fn type_to_pr(ty: &schema::Ty) -> pr::Ty {
     let kind = match &ty.kind {
         schema::TyKind::Primitive(primitive) => {
             let primitive = match primitive {
-                schema::PrimitiveSet::int => pr::PrimitiveSet::Int,
-                schema::PrimitiveSet::float => pr::PrimitiveSet::Float,
-                schema::PrimitiveSet::bool => pr::PrimitiveSet::Bool,
-                schema::PrimitiveSet::text => pr::PrimitiveSet::Text,
+                schema::PrimitiveSet::int => pr::PrimitiveSet::int,
+                schema::PrimitiveSet::float => pr::PrimitiveSet::float,
+                schema::PrimitiveSet::bool => pr::PrimitiveSet::bool,
+                schema::PrimitiveSet::text => pr::PrimitiveSet::text,
             };
             pr::TyKind::Primitive(primitive)
         }
@@ -96,11 +96,10 @@ fn type_from_pr(ty: &pr::Ty) -> schema::Ty {
     let kind = match &ty.kind {
         pr::TyKind::Primitive(primitive) => {
             let primitive = match primitive {
-                pr::PrimitiveSet::Int => schema::PrimitiveSet::int,
-                pr::PrimitiveSet::Float => schema::PrimitiveSet::float,
-                pr::PrimitiveSet::Bool => schema::PrimitiveSet::bool,
-                pr::PrimitiveSet::Text => schema::PrimitiveSet::text,
-                _ => todo!(),
+                pr::PrimitiveSet::int => schema::PrimitiveSet::int,
+                pr::PrimitiveSet::float => schema::PrimitiveSet::float,
+                pr::PrimitiveSet::bool => schema::PrimitiveSet::bool,
+                pr::PrimitiveSet::text => schema::PrimitiveSet::text,
             };
             schema::TyKind::Primitive(primitive)
         }

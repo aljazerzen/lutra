@@ -45,12 +45,9 @@ fn expect_ty_primitive(ty: &pr::Ty, expected: pr::PrimitiveSet) -> Result<()> {
 
 fn primitive_set_name(expected: &pr::PrimitiveSet) -> &'static str {
     match expected {
-        pr::PrimitiveSet::Int => "int",
-        pr::PrimitiveSet::Float => "float",
-        pr::PrimitiveSet::Bool => "bool",
-        pr::PrimitiveSet::Text => "text",
-        pr::PrimitiveSet::Date => "date",
-        pr::PrimitiveSet::Time => "time",
-        pr::PrimitiveSet::Timestamp => "timestamp",
+        pr::PrimitiveSet::int => "int",
+        pr::PrimitiveSet::float => "float",
+        pr::PrimitiveSet::bool => "bool",
+        pr::PrimitiveSet::text => "text",
     }
 }

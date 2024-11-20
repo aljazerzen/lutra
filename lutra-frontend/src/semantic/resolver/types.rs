@@ -40,17 +40,15 @@ impl Resolver<'_> {
 
         let kind = match &expr.kind {
             ExprKind::Literal(ref literal) => match literal {
-                Literal::Integer(_) => TyKind::Primitive(PrimitiveSet::Int),
-                Literal::Float(_) => TyKind::Primitive(PrimitiveSet::Float),
-                Literal::Boolean(_) => TyKind::Primitive(PrimitiveSet::Bool),
-                Literal::String(_) => TyKind::Primitive(PrimitiveSet::Text),
-                Literal::RawString(_) => TyKind::Primitive(PrimitiveSet::Text),
-                Literal::Date(_) => TyKind::Primitive(PrimitiveSet::Date),
-                Literal::Time(_) => TyKind::Primitive(PrimitiveSet::Time),
-                Literal::Timestamp(_) => TyKind::Primitive(PrimitiveSet::Timestamp),
+                Literal::Integer(_) => TyKind::Primitive(PrimitiveSet::int),
+                Literal::Float(_) => TyKind::Primitive(PrimitiveSet::float),
+                Literal::Boolean(_) => TyKind::Primitive(PrimitiveSet::bool),
+                Literal::String(_) => TyKind::Primitive(PrimitiveSet::text),
+                Literal::RawString(_) => TyKind::Primitive(PrimitiveSet::text),
+                _ => panic!(),
             },
 
-            ExprKind::FString(_) => TyKind::Primitive(PrimitiveSet::Text),
+            ExprKind::FString(_) => TyKind::Primitive(PrimitiveSet::text),
 
             ExprKind::Tuple(fields) => {
                 let mut ty_fields: Vec<TyTupleField> = Vec::with_capacity(fields.len());

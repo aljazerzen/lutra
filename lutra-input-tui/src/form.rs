@@ -31,7 +31,7 @@ pub enum FormKind {
 impl Form {
     pub fn new(ty: &pr::Ty, name: FormName) -> Self {
         let kind: FormKind = match &ty.kind {
-            pr::TyKind::Primitive(pr::PrimitiveSet::Text) => {
+            pr::TyKind::Primitive(pr::PrimitiveSet::text) => {
                 FormKind::Text(TextForm::new(String::new()))
             }
             pr::TyKind::Primitive(_) => todo!(),

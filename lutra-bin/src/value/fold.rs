@@ -8,19 +8,19 @@ pub trait ValueVisitor {
     fn visit_value(&mut self, value: &Value, ty: &pr::Ty) -> Result<Self::Res, crate::Error> {
         match value {
             Value::Int(v) => {
-                super::expect_ty_primitive(ty, pr::PrimitiveSet::Int)?;
+                super::expect_ty_primitive(ty, pr::PrimitiveSet::int)?;
                 self.visit_int(*v)
             }
             Value::Float(v) => {
-                super::expect_ty_primitive(ty, pr::PrimitiveSet::Float)?;
+                super::expect_ty_primitive(ty, pr::PrimitiveSet::float)?;
                 self.visit_float(*v)
             }
             Value::Bool(v) => {
-                super::expect_ty_primitive(ty, pr::PrimitiveSet::Bool)?;
+                super::expect_ty_primitive(ty, pr::PrimitiveSet::bool)?;
                 self.visit_bool(*v)
             }
             Value::Text(v) => {
-                super::expect_ty_primitive(ty, pr::PrimitiveSet::Text)?;
+                super::expect_ty_primitive(ty, pr::PrimitiveSet::text)?;
                 self.visit_text(v)
             }
             Value::Tuple(fields) => {

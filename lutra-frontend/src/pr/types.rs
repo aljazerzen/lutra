@@ -71,11 +71,10 @@ impl TyKind {
     pub fn get_layout_simple(&self) -> Option<TyLayout> {
         let head_size = match self {
             TyKind::Primitive(prim) => match prim {
-                PrimitiveSet::Bool => 8,
-                PrimitiveSet::Int => 64,
-                PrimitiveSet::Float => 64,
-                PrimitiveSet::Text => 64,
-                _ => unimplemented!(),
+                PrimitiveSet::bool => 8,
+                PrimitiveSet::int => 64,
+                PrimitiveSet::float => 64,
+                PrimitiveSet::text => 64,
             },
             TyKind::Array(_) => 64,
 
@@ -98,7 +97,7 @@ impl TyKind {
             _ => return None,
         };
         let body_ptr_offset = match self {
-            TyKind::Primitive(PrimitiveSet::Text) => Some(0_usize),
+            TyKind::Primitive(PrimitiveSet::text) => Some(0_usize),
             TyKind::Array(_) => Some(0_usize),
             TyKind::Enum(_) => Some(8), // TODO: this is wrong
 
@@ -130,21 +129,12 @@ pub struct TyEnumVariant {
 
 /// Built-in sets.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, strum::Display)]
+#[allow(non_camel_case_types)]
 pub enum PrimitiveSet {
-    #[strum(to_string = "int")]
-    Int,
-    #[strum(to_string = "float")]
-    Float,
-    #[strum(to_string = "bool")]
-    Bool,
-    #[strum(to_string = "text")]
-    Text,
-    #[strum(to_string = "date")]
-    Date,
-    #[strum(to_string = "time")]
-    Time,
-    #[strum(to_string = "timestamp")]
-    Timestamp,
+    int,
+    float,
+    bool,
+    text,
 }
 
 // Type of a function
