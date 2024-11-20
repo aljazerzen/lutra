@@ -41,7 +41,7 @@ fn _test_get_type(name: &'static str) -> ir::Ty {
     let name = pr::Path::from_name(name);
     let decl = project.root_module.module.get(&name).unwrap();
     let ty = decl.kind.as_ty().unwrap();
-    lutra_bin::ir::ty_from_pr(ty.clone())
+    lutra_bin::ir::Ty::from(ty.clone())
 }
 
 #[test]

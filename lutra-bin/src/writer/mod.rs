@@ -1,5 +1,4 @@
 mod array;
-mod test;
 mod tuple;
 
 pub use array::ArrayWriter;

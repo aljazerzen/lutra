@@ -7,13 +7,12 @@ rust-version.workspace = true
 version.workspace = true
 
 [dependencies]
-lutra-bin = { path = "../lutra-bin" }
-
 # parser
 chumsky = { workspace = true }
 itertools = { workspace = true }
 log = { workspace = true }
 lutra-frontend = { path = "../lutra-frontend" }
+lutra-bin = { path = "../lutra-bin" }
 
 [dev-dependencies]
 insta = { workspace = true }

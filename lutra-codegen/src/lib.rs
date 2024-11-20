@@ -92,7 +92,7 @@ fn codegen_in(
                 sub_modules.push((name, module));
             }
             lutra_frontend::decl::DeclKind::Ty(ty) => {
-                let ty = lutra_bin::ir::ty_from_pr(ty.clone());
+                let ty = lutra_bin::ir::Ty::from(ty.clone());
                 tys.push((name, ty, &decl.annotations));
             }
             lutra_frontend::decl::DeclKind::Expr(expr) => {

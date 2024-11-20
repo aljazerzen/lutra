@@ -1,7 +1,6 @@
-#![cfg(test)]
-
-use super::Value;
 use insta::assert_snapshot;
+use lutra_bin::ir;
+use lutra_bin::Value;
 
 #[test]
 fn test_print_01() {
@@ -50,7 +49,7 @@ fn test_print_01() {
         ]),
     ]);
 
-    let ty = crate::ir::ty_from_pr(ty);
+    let ty = ir::Ty::from(ty);
     assert_snapshot!(value.print_source(&ty).unwrap(), @r#"
     {
       n_rows = 100,
@@ -91,7 +90,7 @@ fn test_print_02() {
         Value::Int(4),
     ]);
 
-    let ty = crate::ir::ty_from_pr(ty);
+    let ty = ir::Ty::from(ty);
     assert_snapshot!(value.print_source(&ty).unwrap(), @r#"
     [
       1,

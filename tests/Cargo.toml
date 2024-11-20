@@ -17,5 +17,5 @@ lutra-ir = { path = "../lutra-ir" }
 lutra-codegen = { path = "../lutra-codegen" }
 
 [dev-dependencies]
-insta = {workspace = true}
-pretty-hex = {workspace = true}
+insta = { workspace = true }
+pretty-hex = { workspace = true }

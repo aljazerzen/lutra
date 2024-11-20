@@ -31,5 +31,5 @@ fn get_ty() -> ir::Ty {
     let type_def = project.root_module.module.get(&name);
 
     let ty = type_def.unwrap().kind.as_ty().unwrap().clone();
-    ir::ty_from_pr(ty)
+    ir::Ty::from(ty)
 }

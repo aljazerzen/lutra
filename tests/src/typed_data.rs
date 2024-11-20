@@ -3,7 +3,7 @@ use lutra_bin::Value;
 #[track_caller]
 fn _test_typed_data_roundtrip(value: Value, ty: &str) -> String {
     let ty = lutra_frontend::_test_compile_ty(ty);
-    let ty = lutra_bin::ir::ty_from_pr(ty);
+    let ty = lutra_bin::ir::Ty::from(ty);
 
     let mut ltd_buf = Vec::new();
     lutra_typed_data::encode_typed_data(&mut ltd_buf, value.clone(), &ty).unwrap();

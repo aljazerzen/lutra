@@ -2,7 +2,6 @@ mod encode;
 mod fold;
 mod print_pretty;
 mod print_source;
-mod test;
 
 use crate::ir;
 use crate::{Error, Result};
