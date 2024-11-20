@@ -1,11 +1,10 @@
-use lutra_frontend::pr;
-
+use crate::ir;
 use crate::{Result, Value};
 
 use super::fold::ValueVisitor;
 
 impl Value {
-    pub fn print_source(&self, ty: &pr::Ty) -> Result<String> {
+    pub fn print_source(&self, ty: &ir::Ty) -> Result<String> {
         let mut printer = Printer::default();
 
         printer.visit_value(self, ty)
@@ -62,7 +61,7 @@ impl ValueVisitor for Printer {
     fn visit_tuple(
         &mut self,
         fields: &[Value],
-        ty_fields: &[pr::TyTupleField],
+        ty_fields: &[ir::TyTupleField],
     ) -> Result<Self::Res, crate::Error> {
         let mut r = "{".to_string();
         self.indent();
@@ -86,7 +85,7 @@ impl ValueVisitor for Printer {
     fn visit_array(
         &mut self,
         items: &[Value],
-        ty_items: &pr::Ty,
+        ty_items: &ir::Ty,
     ) -> Result<Self::Res, crate::Error> {
         let mut r = "[".to_string();
 
@@ -109,7 +108,7 @@ impl ValueVisitor for Printer {
         &mut self,
         tag: usize,
         inner: &Value,
-        ty_variants: &[pr::TyEnumVariant],
+        ty_variants: &[ir::TyEnumVariant],
     ) -> Result<Self::Res, crate::Error> {
         let variant = ty_variants.get(tag).ok_or(crate::Error::InvalidData)?;
 

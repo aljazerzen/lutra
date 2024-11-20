@@ -1,3 +1,4 @@
+use lutra_bin::ir;
 use lutra_frontend::pr;
 
 fn main() {
@@ -8,7 +9,7 @@ fn main() {
     println!("{}", value.print_source(&ty).unwrap());
 }
 
-fn get_ty() -> pr::Ty {
+fn get_ty() -> ir::Ty {
     let source = r#"
         type Pupek = {
             ime = text,
@@ -29,5 +30,6 @@ fn get_ty() -> pr::Ty {
     let name = pr::Path::from_name("Pupek");
     let type_def = project.root_module.module.get(&name);
 
-    type_def.unwrap().kind.as_ty().unwrap().clone()
+    let ty = type_def.unwrap().kind.as_ty().unwrap().clone();
+    ir::ty_from_pr(ty)
 }

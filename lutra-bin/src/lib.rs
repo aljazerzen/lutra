@@ -1,6 +1,7 @@
 mod data;
 mod encode;
 mod error;
+pub mod ir;
 pub mod layout;
 pub mod reader;
 mod value;

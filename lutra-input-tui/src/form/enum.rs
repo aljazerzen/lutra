@@ -1,5 +1,5 @@
 use crossterm::event::KeyCode;
-use lutra_frontend::pr;
+use lutra_bin::ir;
 use ratatui::{layout::Offset, prelude::*};
 
 use crate::app::Action;
@@ -11,7 +11,7 @@ pub struct EnumForm {
     pub variants: Vec<Form>,
 }
 impl EnumForm {
-    pub fn new(variants: &[pr::TyEnumVariant]) -> EnumForm {
+    pub fn new(variants: &[ir::TyEnumVariant]) -> EnumForm {
         let variants = variants
             .iter()
             .enumerate()

@@ -1,11 +1,10 @@
-use lutra_frontend::pr;
-
+use crate::ir;
 use crate::{Result, Value};
 
 use super::fold::ValueVisitor;
 
 impl Value {
-    pub fn print_pretty(&self, ty: &pr::Ty) -> Result<String> {
+    pub fn print_pretty(&self, ty: &ir::Ty) -> Result<String> {
         let mut printer = Printer::default();
 
         printer.visit_value(self, ty)
@@ -62,7 +61,7 @@ impl ValueVisitor for Printer {
     fn visit_tuple(
         &mut self,
         fields: &[Value],
-        ty_fields: &[pr::TyTupleField],
+        ty_fields: &[ir::TyTupleField],
     ) -> Result<Self::Res, crate::Error> {
         let mut r = "{".to_string();
         self.indent();
@@ -86,7 +85,7 @@ impl ValueVisitor for Printer {
     fn visit_array(
         &mut self,
         items: &[Value],
-        ty_items: &pr::Ty,
+        ty_items: &ir::Ty,
     ) -> Result<Self::Res, crate::Error> {
         if let Some(mut table) = try_tabular(ty_items) {
             for item in items {
@@ -126,7 +125,7 @@ impl ValueVisitor for Printer {
         &mut self,
         tag: usize,
         inner: &Value,
-        ty_variants: &[pr::TyEnumVariant],
+        ty_variants: &[ir::TyEnumVariant],
     ) -> Result<Self::Res, crate::Error> {
         let variant = ty_variants.get(tag).ok_or(crate::Error::InvalidData)?;
 
@@ -149,14 +148,14 @@ impl ValueVisitor for Printer {
     }
 }
 
-fn try_tabular(items_ty: &pr::Ty) -> Option<tabular::Table> {
+fn try_tabular(items_ty: &ir::Ty) -> Option<tabular::Table> {
     match &items_ty.kind {
-        pr::TyKind::Primitive(primitive) => {
+        ir::TyKind::Primitive(primitive) => {
             let t = tabular::Table::new(column_spec_primitive(primitive));
 
             Some(t)
         }
-        pr::TyKind::Tuple(_) => {
+        ir::TyKind::Tuple(_) => {
             let column_spec = column_spec_ty(items_ty)?;
 
             let mut table = tabular::Table::new(&column_spec);
@@ -174,24 +173,24 @@ fn try_tabular(items_ty: &pr::Ty) -> Option<tabular::Table> {
 
             Some(table)
         }
-        pr::TyKind::Array(_) => None,
-        pr::TyKind::Enum(_) => None,
+        ir::TyKind::Array(_) => None,
+        ir::TyKind::Enum(_) => None,
         _ => todo!(),
     }
 }
 
-fn column_spec_primitive(primitive: &pr::PrimitiveSet) -> &'static str {
+fn column_spec_primitive(primitive: &ir::PrimitiveSet) -> &'static str {
     match primitive {
-        pr::PrimitiveSet::int | pr::PrimitiveSet::float => "{:>}",
-        pr::PrimitiveSet::bool => "{:^}",
-        pr::PrimitiveSet::text => "{:<}",
+        ir::PrimitiveSet::int | ir::PrimitiveSet::float => "{:>}",
+        ir::PrimitiveSet::bool => "{:^}",
+        ir::PrimitiveSet::text => "{:<}",
     }
 }
 
-fn column_spec_ty(ty: &pr::Ty) -> Option<String> {
+fn column_spec_ty(ty: &ir::Ty) -> Option<String> {
     match &ty.kind {
-        pr::TyKind::Primitive(p) => Some(column_spec_primitive(p).to_string()),
-        pr::TyKind::Tuple(fields) => {
+        ir::TyKind::Primitive(p) => Some(column_spec_primitive(p).to_string()),
+        ir::TyKind::Tuple(fields) => {
             let specs = fields
                 .iter()
                 .map(|f| column_spec_ty(&f.ty))
@@ -199,18 +198,18 @@ fn column_spec_ty(ty: &pr::Ty) -> Option<String> {
 
             Some(specs.join(" "))
         }
-        pr::TyKind::Array(_) => None,
-        pr::TyKind::Enum(_) => None,
+        ir::TyKind::Array(_) => None,
+        ir::TyKind::Enum(_) => None,
         _ => todo!(),
     }
 }
 
-fn apply_header(row: &mut tabular::Row, prefix: &mut Vec<String>, ty: &pr::Ty) {
+fn apply_header(row: &mut tabular::Row, prefix: &mut Vec<String>, ty: &ir::Ty) {
     match &ty.kind {
-        pr::TyKind::Primitive(_) => {
+        ir::TyKind::Primitive(_) => {
             row.add_cell(prefix.join("."));
         }
-        pr::TyKind::Tuple(fields) => {
+        ir::TyKind::Tuple(fields) => {
             for (index, field) in fields.iter().enumerate() {
                 let name = field
                     .name
@@ -224,8 +223,8 @@ fn apply_header(row: &mut tabular::Row, prefix: &mut Vec<String>, ty: &pr::Ty) {
             }
         }
 
-        pr::TyKind::Array(_) => unreachable!(),
-        pr::TyKind::Enum(_) => unreachable!(),
+        ir::TyKind::Array(_) => unreachable!(),
+        ir::TyKind::Enum(_) => unreachable!(),
         _ => todo!(),
     }
 }

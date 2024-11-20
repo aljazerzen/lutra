@@ -1,6 +1,6 @@
 use std::io::Write;
 
-use lutra_frontend::pr;
+use crate::ir;
 
 use super::{expect_ty, expect_ty_primitive, Value};
 use crate::encode::ReversePointer;
@@ -9,7 +9,7 @@ use crate::{ArrayReader, Decode, Encode, Error, Reader, Result};
 
 impl Value {
     /// Convert a Lutra [Value] to .ld binary encoding.
-    pub fn encode(&self, ty: &pr::Ty) -> Result<Vec<u8>> {
+    pub fn encode(&self, ty: &ir::Ty) -> Result<Vec<u8>> {
         let mut res = Vec::new();
 
         let mut ctx = Context::new(ty);
@@ -20,7 +20,7 @@ impl Value {
     }
 
     /// Convert .ld binary encoding into Lutra [Value].
-    pub fn decode(buf: &[u8], ty: &pr::Ty) -> Result<Value> {
+    pub fn decode(buf: &[u8], ty: &ir::Ty) -> Result<Value> {
         let mut ctx = Context::new(ty);
 
         let mut reader = Reader::new(buf);
@@ -31,30 +31,30 @@ impl Value {
 fn encode_head<'t>(
     w: &mut Vec<u8>,
     value: &Value,
-    ty: &'t pr::Ty,
+    ty: &'t ir::Ty,
     ctx: &mut Context<'t>,
 ) -> Result<ValueHeadPtr> {
     let ty = resolve_ident(ty, ctx);
 
     match value {
         Value::Int(v) => {
-            expect_ty_primitive(ty, pr::PrimitiveSet::int)?;
+            expect_ty_primitive(ty, ir::PrimitiveSet::int)?;
             v.encode_head(w)?;
             Ok(ValueHeadPtr::None)
         }
         Value::Float(v) => {
-            expect_ty_primitive(ty, pr::PrimitiveSet::float)?;
+            expect_ty_primitive(ty, ir::PrimitiveSet::float)?;
             v.encode_head(w)?;
             Ok(ValueHeadPtr::None)
         }
         Value::Bool(v) => {
-            expect_ty_primitive(ty, pr::PrimitiveSet::bool)?;
+            expect_ty_primitive(ty, ir::PrimitiveSet::bool)?;
 
             v.encode_head(w)?;
             Ok(ValueHeadPtr::None)
         }
         Value::Text(v) => {
-            expect_ty_primitive(ty, pr::PrimitiveSet::text)?;
+            expect_ty_primitive(ty, ir::PrimitiveSet::text)?;
 
             v.encode_head(w).map(ValueHeadPtr::Offset)
         }
@@ -110,23 +110,23 @@ fn encode_body<'t>(
     w: &mut Vec<u8>,
     value: &Value,
     head_ptr: ValueHeadPtr,
-    ty: &'t pr::Ty,
+    ty: &'t ir::Ty,
     ctx: &mut Context<'t>,
 ) -> Result<()> {
     let ty = resolve_ident(ty, ctx);
 
     match value {
         Value::Int(_) => {
-            expect_ty_primitive(ty, pr::PrimitiveSet::int)?;
+            expect_ty_primitive(ty, ir::PrimitiveSet::int)?;
         }
         Value::Float(_) => {
-            expect_ty_primitive(ty, pr::PrimitiveSet::float)?;
+            expect_ty_primitive(ty, ir::PrimitiveSet::float)?;
         }
         Value::Bool(_) => {
-            expect_ty_primitive(ty, pr::PrimitiveSet::bool)?;
+            expect_ty_primitive(ty, ir::PrimitiveSet::bool)?;
         }
         Value::Text(v) => {
-            expect_ty_primitive(ty, pr::PrimitiveSet::text)?;
+            expect_ty_primitive(ty, ir::PrimitiveSet::text)?;
 
             let ValueHeadPtr::Offset(offset_ptr) = head_ptr else {
                 unreachable!()
@@ -186,8 +186,8 @@ fn encode_body<'t>(
 
 fn enum_params_encode(
     tag: usize,
-    ty_variants: &[pr::TyEnumVariant],
-) -> Result<(EnumHeadFormat, EnumVariantFormat, usize, &pr::Ty)> {
+    ty_variants: &[ir::TyEnumVariant],
+) -> Result<(EnumHeadFormat, EnumVariantFormat, usize, &ir::Ty)> {
     let head_format = layout::enum_head_format(ty_variants);
 
     let variant = ty_variants.get(tag).ok_or(Error::InvalidData)?;
@@ -196,23 +196,23 @@ fn enum_params_encode(
     Ok((head_format, variant_format, tag, &variant.ty))
 }
 
-fn decode_inner<'t>(r: &mut Reader<'_>, ty: &'t pr::Ty, ctx: &mut Context<'t>) -> Result<Value> {
+fn decode_inner<'t>(r: &mut Reader<'_>, ty: &'t ir::Ty, ctx: &mut Context<'t>) -> Result<Value> {
     let ty = resolve_ident(ty, ctx);
 
     Ok(match &ty.kind {
-        pr::TyKind::Primitive(pr::PrimitiveSet::bool) => Value::Bool(bool::decode(r)?),
-        pr::TyKind::Primitive(pr::PrimitiveSet::int) => Value::Int(i64::decode(r)?),
-        pr::TyKind::Primitive(pr::PrimitiveSet::float) => Value::Float(f64::decode(r)?),
-        pr::TyKind::Primitive(pr::PrimitiveSet::text) => Value::Text(String::decode(r)?),
+        ir::TyKind::Primitive(ir::PrimitiveSet::bool) => Value::Bool(bool::decode(r)?),
+        ir::TyKind::Primitive(ir::PrimitiveSet::int) => Value::Int(i64::decode(r)?),
+        ir::TyKind::Primitive(ir::PrimitiveSet::float) => Value::Float(f64::decode(r)?),
+        ir::TyKind::Primitive(ir::PrimitiveSet::text) => Value::Text(String::decode(r)?),
 
-        pr::TyKind::Tuple(fields) => {
+        ir::TyKind::Tuple(fields) => {
             let mut res = Vec::with_capacity(fields.len());
             for field in fields {
                 res.push(decode_inner(r, &field.ty, ctx)?);
             }
             Value::Tuple(res)
         }
-        pr::TyKind::Array(item_ty) => {
+        ir::TyKind::Array(item_ty) => {
             let mut body = r.clone();
 
             let (offset, len) = ArrayReader::read_head(r);
@@ -226,7 +226,7 @@ fn decode_inner<'t>(r: &mut Reader<'_>, ty: &'t pr::Ty, ctx: &mut Context<'t>) -
             Value::Array(buf)
         }
 
-        pr::TyKind::Enum(variants) => {
+        ir::TyKind::Enum(variants) => {
             let head = layout::enum_head_format(variants);
 
             let mut tag_bytes = r.read_n(head.s / 8).to_vec();
@@ -256,18 +256,18 @@ fn decode_inner<'t>(r: &mut Reader<'_>, ty: &'t pr::Ty, ctx: &mut Context<'t>) -
 }
 
 struct Context<'t> {
-    top_level_ty: &'t pr::Ty,
+    top_level_ty: &'t ir::Ty,
 }
 
 impl<'t> Context<'t> {
-    fn new(top_level_ty: &'t pr::Ty) -> Self {
+    fn new(top_level_ty: &'t ir::Ty) -> Self {
         Context { top_level_ty }
     }
 }
 
-fn resolve_ident<'t>(ty: &'t pr::Ty, ctx: &mut Context<'t>) -> &'t pr::Ty {
-    if let pr::TyKind::Ident(ident) = &ty.kind {
-        if ctx.top_level_ty.name.as_deref() == Some(ident.name()) {
+fn resolve_ident<'t>(ty: &'t ir::Ty, ctx: &mut Context<'t>) -> &'t ir::Ty {
+    if let ir::TyKind::Ident(ident) = &ty.kind {
+        if ctx.top_level_ty.name.as_ref() == ident.0.last() {
             ctx.top_level_ty
         } else {
             ty

@@ -10,11 +10,11 @@ use crossterm::terminal::{
     disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen,
 };
 use crossterm::ExecutableCommand;
-use lutra_frontend::pr;
+use lutra_bin::ir;
 use ratatui::prelude::*;
 
 /// Starts a TUI prompt for type `ty` on stdout terminal.
-pub fn prompt_for_ty(ty: &pr::Ty) -> Result<lutra_bin::Value, anyhow::Error> {
+pub fn prompt_for_ty(ty: &ir::Ty) -> Result<lutra_bin::Value, anyhow::Error> {
     let mut app = App::new(ty);
 
     within_alternate_screen(|term| app.run(term))??;

@@ -1,6 +1,4 @@
-use std::ops::Mul;
-
-use lutra_frontend::pr;
+use crate::ir;
 
 pub trait Layout {
     /// Returns the size of the head in bits for a given type.
@@ -47,9 +45,53 @@ impl<I: Layout> Layout for Option<I> {
     }
 }
 
-pub fn does_enum_variant_contain_recursive(enum_ty: &pr::Ty, variant_index: usize) -> bool {
+pub fn get_layout_simple(ty: &ir::Ty) -> Option<ir::TyLayout> {
+    let head_size: i64 = match &ty.kind {
+        ir::TyKind::Primitive(prim) => match prim {
+            ir::PrimitiveSet::bool => 8,
+            ir::PrimitiveSet::int => 64,
+            ir::PrimitiveSet::float => 64,
+            ir::PrimitiveSet::text => 64,
+        },
+        ir::TyKind::Array(_) => 64,
+
+        ir::TyKind::Tuple(fields) => {
+            let mut size = 0;
+            for f in fields {
+                if let Some(layout) = &f.ty.layout {
+                    size += layout.head_size;
+                } else {
+                    return None;
+                }
+            }
+            size
+        }
+        ir::TyKind::Enum(variants) => {
+            let tag_size = enum_tag_size(variants.len()) as i64;
+
+            tag_size + 32
+        }
+        _ => return None,
+    };
+    let body_ptr_offset: Option<i64> = match &ty.kind {
+        ir::TyKind::Primitive(ir::PrimitiveSet::text) => Some(0),
+        ir::TyKind::Array(_) => Some(0),
+        ir::TyKind::Enum(_) => Some(8), // TODO: this is wrong
+
+        ir::TyKind::Primitive(_) | ir::TyKind::Tuple(_) => None,
+
+        _ => return None,
+    };
+    Some(ir::TyLayout {
+        head_size,
+        body_ptr_offset,
+        variants_recursive: vec![],
+    })
+}
+
+pub fn does_enum_variant_contain_recursive(enum_ty: &ir::Ty, variant_index: usize) -> bool {
     let layout = enum_ty.layout.as_ref().unwrap();
-    layout.variants_recursive.contains(&variant_index)
+    layout.variants_recursive.contains(&(variant_index as i64))
 }
 
 pub struct EnumHeadFormat {
@@ -58,7 +100,7 @@ pub struct EnumHeadFormat {
     pub no_pointer: bool,
 }
 
-pub fn enum_head_format(variants: &[pr::TyEnumVariant]) -> EnumHeadFormat {
+pub fn enum_head_format(variants: &[ir::TyEnumVariant]) -> EnumHeadFormat {
     let s = enum_tag_size(variants.len());
 
     let h = enum_max_variant_head_size(variants);
@@ -74,8 +116,8 @@ pub struct EnumVariantFormat {
     pub is_inline: bool,
 }
 
-pub fn enum_variant_format(variant_ty: &pr::Ty) -> EnumVariantFormat {
-    let variant_size = variant_ty.layout.as_ref().unwrap().head_size;
+pub fn enum_variant_format(variant_ty: &ir::Ty) -> EnumVariantFormat {
+    let variant_size = variant_ty.layout.as_ref().unwrap().head_size as usize;
 
     let is_inline = variant_size <= 32;
     let padding = 32_usize.saturating_sub(variant_size);
@@ -83,10 +125,10 @@ pub fn enum_variant_format(variant_ty: &pr::Ty) -> EnumVariantFormat {
     EnumVariantFormat { is_inline, padding }
 }
 
-fn enum_max_variant_head_size(variants: &[pr::TyEnumVariant]) -> usize {
+fn enum_max_variant_head_size(variants: &[ir::TyEnumVariant]) -> usize {
     let mut h = 0;
     for variant in variants {
-        let size = variant.ty.layout.as_ref().unwrap().head_size;
+        let size = variant.ty.layout.as_ref().unwrap().head_size as usize;
         h = h.max(size);
     }
     h
@@ -94,7 +136,7 @@ fn enum_max_variant_head_size(variants: &[pr::TyEnumVariant]) -> usize {
 
 fn enum_tag_size(variants_len: usize) -> usize {
     // TODO: when bool-sub-byte packing is implemented, remove function in favor of enum_tag_size_used
-    enum_tag_size_used(variants_len).div_ceil(8).mul(8)
+    enum_tag_size_used(variants_len).div_ceil(8) * 8
 }
 
 fn enum_tag_size_used(variants_len: usize) -> usize {

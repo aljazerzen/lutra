@@ -1,7 +1,7 @@
 use std::collections::VecDeque;
 
 use crossterm::event::{self, KeyCode, KeyEvent, KeyEventKind};
-use lutra_frontend::pr;
+use lutra_bin::ir;
 use ratatui::prelude::*;
 
 use crate::form::{Form, FormName};
@@ -12,7 +12,7 @@ pub struct App {
 }
 
 impl App {
-    pub fn new(ty: &pr::Ty) -> Self {
+    pub fn new(ty: &ir::Ty) -> Self {
         let form = Form::new(ty, FormName::default());
 
         let mut app = App {

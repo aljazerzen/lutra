@@ -1,5 +1,5 @@
 use crossterm::event::KeyCode;
-use lutra_frontend::pr;
+use lutra_bin::ir;
 use ratatui::{layout::Offset, prelude::*};
 
 use crate::app::Action;
@@ -75,7 +75,7 @@ impl ArrayForm {
         area
     }
 
-    pub fn update(&mut self, action: &Action, self_ty: &pr::Ty) -> Vec<Action> {
+    pub fn update(&mut self, action: &Action, self_ty: &ir::Ty) -> Vec<Action> {
         match action {
             Action::KeyEvent(event) if event.code == KeyCode::Left => {
                 self.focused_action = self.focused_action.saturating_sub(1);

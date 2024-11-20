@@ -1,9 +1,8 @@
 use std::collections::HashMap;
 use std::ops::{BitAnd, Shr};
 
+use lutra_bin::ir;
 use lutra_bin::Data;
-use lutra_frontend::pr;
-use lutra_ir::ir;
 
 use crate::NativeModule;
 
@@ -152,19 +151,17 @@ impl Interpreter {
             }
 
             ir::ExprKind::Literal(l) => {
-                let ty = lutra_ir::ty_into_pr(expr.ty.clone());
                 let value = match l {
                     ir::Literal::Int(i) => lutra_bin::Value::Int(*i),
                     ir::Literal::Float(i) => lutra_bin::Value::Float(*i),
                     ir::Literal::Bool(i) => lutra_bin::Value::Bool(*i),
                     ir::Literal::Text(i) => lutra_bin::Value::Text(i.clone()),
                 };
-                Cell::Value(Data::new(value.encode(&ty).unwrap()))
+                Cell::Value(Data::new(value.encode(&expr.ty).unwrap()))
             }
 
             ir::ExprKind::Tuple(fields) => {
-                let ty = lutra_ir::ty_into_pr(expr.ty.clone());
-                let pr::TyKind::Tuple(ty_fields) = &ty.kind else {
+                let ir::TyKind::Tuple(ty_fields) = &expr.ty.kind else {
                     panic!()
                 };
 
@@ -177,13 +174,12 @@ impl Interpreter {
                     let value = lutra_bin::Value::decode(&value, &field_ty.ty).unwrap();
                     res.push(value);
                 }
-                let res = lutra_bin::Value::Tuple(res).encode(&ty).unwrap();
+                let res = lutra_bin::Value::Tuple(res).encode(&expr.ty).unwrap();
 
                 Cell::Value(Data::new(res))
             }
             ir::ExprKind::Array(items) => {
-                let ty = lutra_ir::ty_into_pr(expr.ty.clone());
-                let pr::TyKind::Array(ty_items) = &ty.kind else {
+                let ir::TyKind::Array(ty_items) = &expr.ty.kind else {
                     panic!()
                 };
 
@@ -195,29 +191,29 @@ impl Interpreter {
                     let value = lutra_bin::Value::decode(&value, ty_items).unwrap();
                     res.push(value);
                 }
-                let res = lutra_bin::Value::Array(res).encode(&ty).unwrap();
+                let res = lutra_bin::Value::Array(res).encode(&expr.ty).unwrap();
 
                 Cell::Value(Data::new(res))
             }
             ir::ExprKind::TupleLookup(lookup) => {
                 let ir::TupleLookup { base, offset } = lookup.as_ref();
-                let base_ty = lutra_ir::ty_into_pr(base.ty.clone());
+                let base_ty = &base.ty;
 
                 let base = self.evaluate_expr(base);
 
-                let base = lutra_bin::TupleReader::new(assume_value(&base), &base_ty);
+                let base = lutra_bin::TupleReader::new(assume_value(&base), base_ty);
 
                 Cell::Value(base.get_field(*offset as usize))
             }
             ir::ExprKind::ArrayLookup(lookup) => {
                 let ir::ArrayLookup { base, offset } = lookup.as_ref();
-                let base_ty = lutra_ir::ty_into_pr(base.ty.clone());
+                let base_ty = &base.ty;
 
                 let base = self.evaluate_expr(base);
 
                 match base {
                     Cell::Value(base) => {
-                        let mut items = lutra_bin::ArrayReader::new_for_ty(base, &base_ty);
+                        let mut items = lutra_bin::ArrayReader::new_for_ty(base, base_ty);
 
                         let item = items.nth(*offset as usize).unwrap();
 

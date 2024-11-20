@@ -1,5 +1,5 @@
+use lutra_bin::ir;
 use lutra_bin::{Data, Encode, Value};
-use lutra_ir::ir;
 use lutra_runtime::{Cell, Interpreter};
 
 use crate::lutra::runtime;
@@ -37,8 +37,7 @@ fn test_01() {
 
     let value = lutra_runtime::evaluate(&program, (), &modules);
 
-    let ty = lutra_ir::ty_into_pr(program.main.ty);
-    let value = Value::decode(&value, &ty).unwrap();
+    let value = Value::decode(&value, &program.main.ty).unwrap();
 
     assert_eq!(value, Value::Int(2));
 }

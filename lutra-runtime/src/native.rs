@@ -1,5 +1,5 @@
+use lutra_bin::ir;
 use lutra_bin::{Encode, Layout};
-use lutra_ir::ir;
 
 use crate::interpreter::{Cell, Interpreter};
 use crate::NativeModule;
@@ -70,14 +70,12 @@ pub mod core {
                 let ir::TyKind::Function(ty_func) = &func.0.kind else {
                     panic!()
                 };
-                let output_ty = ir::Ty {
+                let mut output_ty = ir::Ty {
                     kind: ir::TyKind::Array(Box::new(ty_func.body.clone())),
-                    layout: ir::TyLayout {
-                        head_size: 0,
-                        variants_recursive: vec![],
-                    },
+                    layout: Some(ir::TyLayout::default()),
+                    name: None,
                 };
-                let output_ty = lutra_ir::ty_into_pr(output_ty);
+                output_ty.layout = lutra_bin::layout::get_layout_simple(&output_ty);
                 let mut res = lutra_bin::ArrayWriter::new(&output_ty);
 
                 for item in array {
@@ -118,8 +116,8 @@ pub mod interpreter {
 
 mod assume {
     use crate::interpreter::Cell;
+    use lutra_bin::ir;
     use lutra_bin::{ArrayReader, Decode};
-    use lutra_ir::ir;
 
     pub fn into_value(cell: Cell) -> lutra_bin::Data {
         match cell {
@@ -145,10 +143,8 @@ mod assume {
     }
 
     pub fn array(ty: &ir::Ty, cell: &Cell) -> ArrayReader {
-        let ty = lutra_ir::ty_into_pr(ty.clone());
-
         let data = as_value(cell).clone();
-        ArrayReader::new_for_ty(data, &ty)
+        ArrayReader::new_for_ty(data, ty)
     }
 }
 

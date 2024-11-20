@@ -1,5 +1,4 @@
-use lutra_frontend::pr;
-
+use crate::ir;
 use crate::Data;
 
 #[derive(Clone)]
@@ -44,11 +43,11 @@ pub struct ArrayReader {
 }
 
 impl ArrayReader {
-    pub fn new_for_ty(data: Data, ty: &pr::Ty) -> Self {
-        let pr::TyKind::Array(items_ty) = &ty.kind else {
+    pub fn new_for_ty(data: Data, ty: &ir::Ty) -> Self {
+        let ir::TyKind::Array(items_ty) = &ty.kind else {
             panic!()
         };
-        let item_head_size = items_ty.layout.as_ref().unwrap().head_size;
+        let item_head_size = items_ty.layout.as_ref().unwrap().head_size as usize;
 
         Self::new(data, item_head_size / 8)
     }
@@ -120,12 +119,12 @@ impl Iterator for ArrayReader {
 
 pub struct TupleReader<'d, 't> {
     data: &'d Data,
-    ty_fields: &'t [pr::TyTupleField],
+    ty_fields: &'t [ir::TyTupleField],
 }
 
 impl<'d, 't> TupleReader<'d, 't> {
-    pub fn new(data: &'d Data, ty: &'t pr::Ty) -> Self {
-        let pr::TyKind::Tuple(ty_fields) = &ty.kind else {
+    pub fn new(data: &'d Data, ty: &'t ir::Ty) -> Self {
+        let ir::TyKind::Tuple(ty_fields) = &ty.kind else {
             panic!()
         };
         TupleReader { data, ty_fields }
@@ -134,8 +133,8 @@ impl<'d, 't> TupleReader<'d, 't> {
     pub fn get_field(&self, index: usize) -> Data {
         let mut bytes_offset = 0;
         for i in 0..index {
-            let layout = self.ty_fields[i].ty.layout.as_ref().unwrap();
-            bytes_offset += layout.head_size / 8;
+            let layout = &self.ty_fields[i].ty.layout;
+            bytes_offset += (layout.as_ref().unwrap().head_size as usize) / 8;
         }
         let mut r = self.data.clone();
         r.skip(bytes_offset);

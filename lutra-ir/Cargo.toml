@@ -15,8 +15,5 @@ itertools = { workspace = true }
 log = { workspace = true }
 lutra-frontend = { path = "../lutra-frontend" }
 
-[build-dependencies]
-lutra-codegen = { path = "../lutra-codegen" }
-
 [dev-dependencies]
 insta = { workspace = true }

@@ -34,5 +34,7 @@ pub fn _test_compile_ty(ty_source: &str) -> pr::Ty {
     let name = pr::Path::from_name("t");
     let type_def = project.root_module.module.get(&name);
 
-    type_def.unwrap().kind.as_ty().unwrap().clone()
+    let mut ty = type_def.unwrap().kind.as_ty().unwrap().clone();
+    ty.name = None;
+    ty
 }

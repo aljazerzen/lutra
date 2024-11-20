@@ -1,18 +1,16 @@
 use std::{borrow::Cow, collections::VecDeque, fmt::Write};
 
-use lutra_bin::layout;
+use lutra_bin::{ir, layout};
 use lutra_frontend::pr;
 
 pub fn write_tys(
     w: &mut impl Write,
-    tys: &[(&String, &pr::Ty, &Vec<pr::Annotation>)],
-) -> Result<Vec<pr::Ty>, std::fmt::Error> {
+    tys: Vec<(&String, ir::Ty, &Vec<pr::Annotation>)>,
+) -> Result<Vec<ir::Ty>, std::fmt::Error> {
     let mut all_tys = Vec::new();
 
     let mut ctx = Context::default();
-    for (name, ty, annotations) in tys {
-        let mut ty = (*ty).clone();
-
+    for (name, mut ty, annotations) in tys {
         infer_names(name, &mut ty);
 
         write_ty_def(w, &ty, annotations, &mut ctx)?;
@@ -27,7 +25,7 @@ pub fn write_tys(
     Ok(all_tys)
 }
 
-pub fn write_tys_impls(w: &mut impl Write, tys: &[pr::Ty]) -> Result<(), std::fmt::Error> {
+pub fn write_tys_impls(w: &mut impl Write, tys: &[ir::Ty]) -> Result<(), std::fmt::Error> {
     if tys.is_empty() {
         return Ok(());
     }
@@ -44,7 +42,7 @@ pub fn write_tys_impls(w: &mut impl Write, tys: &[pr::Ty]) -> Result<(), std::fm
 
 /// Types might not have names, because they are defined inline.
 /// This function traverses a type definition and generates names for all of the types.
-pub fn infer_names(stmt_name: &str, ty: &mut pr::Ty) {
+pub fn infer_names(stmt_name: &str, ty: &mut ir::Ty) {
     if ty.name.is_none() {
         ty.name = Some(stmt_name.to_string());
     }
@@ -53,7 +51,7 @@ pub fn infer_names(stmt_name: &str, ty: &mut pr::Ty) {
     infer_names_re(ty, &mut name_prefix);
 }
 
-fn infer_names_re(ty: &mut pr::Ty, name_prefix: &mut Vec<String>) {
+fn infer_names_re(ty: &mut ir::Ty, name_prefix: &mut Vec<String>) {
     if ty.name.is_none() {
         ty.name = Some(name_prefix.concat());
     } else {
@@ -61,9 +59,9 @@ fn infer_names_re(ty: &mut pr::Ty, name_prefix: &mut Vec<String>) {
     }
 
     match &mut ty.kind {
-        pr::TyKind::Primitive(_) | pr::TyKind::Ident(_) => {}
+        ir::TyKind::Primitive(_) | ir::TyKind::Ident(_) => {}
 
-        pr::TyKind::Tuple(fields) => {
+        ir::TyKind::Tuple(fields) => {
             for (index, field) in fields.iter_mut().enumerate() {
                 let name = tuple_field_name(&field.name, index);
                 name_prefix.push(name.into_owned());
@@ -73,13 +71,13 @@ fn infer_names_re(ty: &mut pr::Ty, name_prefix: &mut Vec<String>) {
             }
         }
 
-        pr::TyKind::Array(items_ty) => {
+        ir::TyKind::Array(items_ty) => {
             name_prefix.push("Items".to_string());
             infer_names_re(items_ty, name_prefix);
             name_prefix.pop();
         }
 
-        pr::TyKind::Enum(variants) => {
+        ir::TyKind::Enum(variants) => {
             for v in variants {
                 name_prefix.push(v.name.clone());
                 infer_names_re(&mut v.ty, name_prefix);
@@ -94,13 +92,13 @@ fn infer_names_re(ty: &mut pr::Ty, name_prefix: &mut Vec<String>) {
 #[derive(Default)]
 pub struct Context {
     /// Buffer for types that need their definitions generated.
-    def_buffer: VecDeque<pr::Ty>,
+    def_buffer: VecDeque<ir::Ty>,
 }
 
 /// Generates a type definition.
 pub fn write_ty_def(
     w: &mut impl Write,
-    ty: &pr::Ty,
+    ty: &ir::Ty,
     annotations: &[pr::Annotation],
     ctx: &mut Context,
 ) -> Result<(), std::fmt::Error> {
@@ -131,21 +129,21 @@ pub fn write_ty_def(
 
     writeln!(w, "#[allow(non_camel_case_types)]")?;
     match &ty.kind {
-        pr::TyKind::Primitive(_) | pr::TyKind::Array(_) => {
+        ir::TyKind::Primitive(_) | ir::TyKind::Array(_) => {
             // generate a wrapper new-type struct
             write!(w, "pub struct {}(pub ", name)?;
             write_ty_ref(w, ty, false, ctx)?;
             writeln!(w, ");\n")?;
         }
 
-        pr::TyKind::Enum(variants) if is_option_enum(variants) => {
+        ir::TyKind::Enum(variants) if is_option_enum(variants) => {
             // generate a wrapper new-type struct
             write!(w, "pub struct {}(pub ", name)?;
             write_ty_ref(w, ty, false, ctx)?;
             writeln!(w, ");\n")?;
         }
 
-        pr::TyKind::Tuple(fields) => {
+        ir::TyKind::Tuple(fields) => {
             writeln!(w, "pub struct {} {{", name)?;
 
             for (index, field) in fields.iter().enumerate() {
@@ -160,7 +158,7 @@ pub fn write_ty_def(
             writeln!(w, "}}\n")?;
         }
 
-        pr::TyKind::Enum(variants) => {
+        ir::TyKind::Enum(variants) => {
             writeln!(w, "pub enum {} {{", name)?;
 
             for (index, variant) in variants.iter().enumerate() {
@@ -201,27 +199,27 @@ fn tuple_field_name(name: &Option<String>, index: usize) -> Cow<'_, str> {
 /// Syntactically, this could be used in `let x: type_ref`.
 fn write_ty_ref(
     w: &mut impl Write,
-    ty: &pr::Ty,
+    ty: &ir::Ty,
     as_expr: bool,
     ctx: &mut Context,
 ) -> Result<(), std::fmt::Error> {
     match &ty.kind {
-        pr::TyKind::Primitive(pr::PrimitiveSet::int) => {
+        ir::TyKind::Primitive(ir::PrimitiveSet::int) => {
             write!(w, "i64")?;
         }
-        pr::TyKind::Primitive(pr::PrimitiveSet::float) => {
+        ir::TyKind::Primitive(ir::PrimitiveSet::float) => {
             write!(w, "f64")?;
         }
-        pr::TyKind::Primitive(pr::PrimitiveSet::bool) => {
+        ir::TyKind::Primitive(ir::PrimitiveSet::bool) => {
             write!(w, "bool")?;
         }
-        pr::TyKind::Primitive(pr::PrimitiveSet::text) => {
+        ir::TyKind::Primitive(ir::PrimitiveSet::text) => {
             write!(w, "String")?;
         }
-        pr::TyKind::Ident(ident) => {
-            write!(w, "{}", ident.name())?;
+        ir::TyKind::Ident(ident) => {
+            write!(w, "{}", ident.0.last().unwrap())?;
         }
-        pr::TyKind::Array(items_ty) => {
+        ir::TyKind::Array(items_ty) => {
             write!(w, "Vec")?;
             if as_expr {
                 write!(w, "::<")?;
@@ -231,7 +229,7 @@ fn write_ty_ref(
             write_ty_ref(w, items_ty, as_expr, ctx)?;
             write!(w, ">")?;
         }
-        pr::TyKind::Enum(variants) if is_option_enum(variants) => {
+        ir::TyKind::Enum(variants) if is_option_enum(variants) => {
             let inner_ty = &variants[1].ty;
 
             write!(w, "Option")?;
@@ -244,7 +242,7 @@ fn write_ty_ref(
             write!(w, ">")?;
         }
 
-        pr::TyKind::Tuple(_) | pr::TyKind::Enum(_) => {
+        ir::TyKind::Tuple(_) | ir::TyKind::Enum(_) => {
             ctx.def_buffer.push_back(ty.clone());
 
             let name = ty.name.as_ref().unwrap();
@@ -259,11 +257,11 @@ fn write_ty_ref(
 /// Generates the impl encode for a type.
 #[rustfmt::skip::macros(writeln)]
 #[rustfmt::skip::macros(write)]
-fn write_ty_def_impl(w: &mut impl Write, ty: &pr::Ty) -> Result<(), std::fmt::Error> {
+fn write_ty_def_impl(w: &mut impl Write, ty: &ir::Ty) -> Result<(), std::fmt::Error> {
     let name = ty.name.as_ref().unwrap();
 
     match &ty.kind {
-        pr::TyKind::Primitive(_) => {
+        ir::TyKind::Primitive(_) => {
             writeln!(w, "impl ::lutra_bin::Encode for {name} {{")?;
             writeln!(w, "    type HeadPtr = ();")?;
             writeln!(w, "    fn encode_head(&self, w: &mut Vec<u8>) -> ::lutra_bin::Result<()> {{")?;
@@ -275,7 +273,7 @@ fn write_ty_def_impl(w: &mut impl Write, ty: &pr::Ty) -> Result<(), std::fmt::Er
             writeln!(w, "}}")?;
         }
 
-        pr::TyKind::Array(_) => {
+        ir::TyKind::Array(_) => {
             writeln!(w, "impl ::lutra_bin::Encode for {name} {{")?;
             writeln!(w, "    type HeadPtr = ::lutra_bin::ReversePointer;")?;
             writeln!(w, "    fn encode_head(&self, w: &mut Vec<u8>) -> ::lutra_bin::Result<Self::HeadPtr> {{")?;
@@ -287,7 +285,7 @@ fn write_ty_def_impl(w: &mut impl Write, ty: &pr::Ty) -> Result<(), std::fmt::Er
             writeln!(w, "}}")?;
         }
 
-        pr::TyKind::Enum(variants) if is_option_enum(variants) => {
+        ir::TyKind::Enum(variants) if is_option_enum(variants) => {
             let inner_ty = &variants[1].ty;
 
             let mut inner_head_ptr = String::new();
@@ -308,7 +306,7 @@ fn write_ty_def_impl(w: &mut impl Write, ty: &pr::Ty) -> Result<(), std::fmt::Er
             writeln!(w, "}}")?;
         }
 
-        pr::TyKind::Tuple(fields) => {
+        ir::TyKind::Tuple(fields) => {
             writeln!(w, "#[allow(clippy::all)]")?;
             writeln!(w, "impl ::lutra_bin::Encode for {name} {{")?;
             writeln!(w, "    type HeadPtr = {name}HeadPtr;")?;
@@ -359,7 +357,7 @@ fn write_ty_def_impl(w: &mut impl Write, ty: &pr::Ty) -> Result<(), std::fmt::Er
             writeln!(w, "}}")?;
         }
 
-        pr::TyKind::Enum(variants) => {
+        ir::TyKind::Enum(variants) => {
             let head = layout::enum_head_format(variants);
 
             let needs_head_ptr = variants.iter().any(|variant| !is_unit_variant(&variant.ty));
@@ -479,7 +477,7 @@ fn write_ty_def_impl(w: &mut impl Write, ty: &pr::Ty) -> Result<(), std::fmt::Er
         _ => unimplemented!(),
     }
 
-    let head_size = ty.layout.as_ref().unwrap().head_size;
+    let head_size = &ty.layout.as_ref().unwrap().head_size;
     writeln!(w, "impl ::lutra_bin::Layout for {name} {{")?;
     writeln!(w, "    fn head_size() -> usize {{")?;
     writeln!(w, "        {head_size}")?;
@@ -487,7 +485,7 @@ fn write_ty_def_impl(w: &mut impl Write, ty: &pr::Ty) -> Result<(), std::fmt::Er
     writeln!(w, "}}\n")?;
 
     match &ty.kind {
-        pr::TyKind::Primitive(_) | pr::TyKind::Array(_) => {
+        ir::TyKind::Primitive(_) | ir::TyKind::Array(_) => {
             writeln!(w, "impl ::lutra_bin::Decode for {name} {{")?;
             writeln!(
                 w,
@@ -503,7 +501,7 @@ fn write_ty_def_impl(w: &mut impl Write, ty: &pr::Ty) -> Result<(), std::fmt::Er
             writeln!(w, "}}\n")?;
         }
 
-        pr::TyKind::Enum(variants) if is_option_enum(variants) => {
+        ir::TyKind::Enum(variants) if is_option_enum(variants) => {
             writeln!(w, "impl ::lutra_bin::Decode for {name} {{")?;
             writeln!(
                 w,
@@ -519,7 +517,7 @@ fn write_ty_def_impl(w: &mut impl Write, ty: &pr::Ty) -> Result<(), std::fmt::Er
             writeln!(w, "}}\n")?;
         }
 
-        pr::TyKind::Tuple(fields) => {
+        ir::TyKind::Tuple(fields) => {
             writeln!(w, "impl ::lutra_bin::Decode for {name} {{")?;
             writeln!(w, "    fn decode(r: &mut ::lutra_bin::Reader<'_>) -> ::lutra_bin::Result<Self> {{")?;
 
@@ -546,7 +544,7 @@ fn write_ty_def_impl(w: &mut impl Write, ty: &pr::Ty) -> Result<(), std::fmt::Er
             writeln!(w, "}}\n")?;
         }
 
-        pr::TyKind::Enum(variants) => {
+        ir::TyKind::Enum(variants) => {
             writeln!(w, "impl ::lutra_bin::Decode for {name} {{")?;
             writeln!(
                 w,
@@ -613,10 +611,10 @@ fn write_ty_def_impl(w: &mut impl Write, ty: &pr::Ty) -> Result<(), std::fmt::Er
     Ok(())
 }
 
-fn is_unit_variant(variant_ty: &pr::Ty) -> bool {
+fn is_unit_variant(variant_ty: &ir::Ty) -> bool {
     variant_ty.kind.as_tuple().map_or(false, |f| f.is_empty())
 }
 
-fn is_option_enum(variants: &[pr::TyEnumVariant]) -> bool {
+fn is_option_enum(variants: &[ir::TyEnumVariant]) -> bool {
     variants.len() == 2 && is_unit_variant(&variants[0].ty) && !is_unit_variant(&variants[1].ty)
 }

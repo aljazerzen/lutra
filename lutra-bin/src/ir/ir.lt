@@ -12,6 +12,7 @@ type Expr = {
   ty = Ty,
 }
 
+@(derive ["Debug", "Clone", "enum_as_inner::EnumAsInner"])
 type ExprKind = enum {
   Pointer = Sid,
   Literal = Literal,
@@ -33,7 +34,7 @@ type ExprKind = enum {
 @(derive ["Debug", "Clone", "Copy", "PartialEq", "Eq", "Hash"])
 type Sid = int
 
-@(derive ["Debug", "Clone", "PartialEq"])
+@(derive ["Debug", "Clone", "PartialEq", "enum_as_inner::EnumAsInner"])
 type Literal = enum {
   Int = int,
   Float = float,
@@ -43,7 +44,6 @@ type Literal = enum {
 
 type Call = {
   function = Expr,
-  layout = [int],
   args = [Expr],
 }
 
@@ -70,11 +70,14 @@ type Binding = {
   main = Expr,
 }
 
+@(derive ["Debug", "Clone"])
 type Ty = {
   kind = TyKind,
-  layout = TyLayout,
+  layout = enum { None, Some = TyLayout },
+  name = enum { None, Some = text },
 }
 
+@(derive ["Debug", "Clone", "PartialEq", "enum_as_inner::EnumAsInner"])
 type TyKind = enum {
   Primitive = PrimitiveSet,
 
@@ -85,6 +88,8 @@ type TyKind = enum {
   Enum = [TyEnumVariant],
 
   Function = TyFunction,
+
+  Ident = Path,
 }
 
 @(derive ["Debug", "Clone", "Copy", "PartialEq", "Eq", "Hash"])
@@ -95,22 +100,30 @@ type PrimitiveSet = enum {
   text,
 }
 
+@(derive ["Debug", "Clone", "PartialEq"])
 type TyTupleField = {
   name = enum { None, Some = text},
   ty = Ty,
 }
 
+@(derive ["Debug", "Clone", "PartialEq"])
 type TyEnumVariant = {
   name = text,
   ty = Ty,
 }
 
+@(derive ["Debug", "Clone", "PartialEq", "Default"])
 type TyLayout = {
   head_size = int,
+  body_ptr_offset = enum { None, Some = int },
   variants_recursive = [int]
 }
 
+@(derive ["Debug", "Clone", "PartialEq"])
 type TyFunction = {
   params = [Ty],
   body = Ty
 }
+
+@(derive ["Debug", "Clone", "PartialEq"])
+type Path = [text]

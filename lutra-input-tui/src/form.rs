@@ -3,7 +3,7 @@ mod r#enum;
 mod text;
 mod tuple;
 
-use lutra_frontend::pr;
+use lutra_bin::ir;
 use ratatui::prelude::*;
 use std::borrow::Cow;
 
@@ -16,7 +16,7 @@ use self::tuple::TupleForm;
 
 pub struct Form {
     pub name: FormName,
-    pub ty: pr::Ty,
+    pub ty: ir::Ty,
     pub kind: FormKind,
     pub focus: bool,
 }
@@ -29,19 +29,19 @@ pub enum FormKind {
 }
 
 impl Form {
-    pub fn new(ty: &pr::Ty, name: FormName) -> Self {
+    pub fn new(ty: &ir::Ty, name: FormName) -> Self {
         let kind: FormKind = match &ty.kind {
-            pr::TyKind::Primitive(pr::PrimitiveSet::text) => {
+            ir::TyKind::Primitive(ir::PrimitiveSet::text) => {
                 FormKind::Text(TextForm::new(String::new()))
             }
-            pr::TyKind::Primitive(_) => todo!(),
+            ir::TyKind::Primitive(_) => todo!(),
 
-            pr::TyKind::Enum(variants) => FormKind::Enum(EnumForm::new(variants)),
-            pr::TyKind::Tuple(fields) => FormKind::Tuple(TupleForm::new(fields)),
+            ir::TyKind::Enum(variants) => FormKind::Enum(EnumForm::new(variants)),
+            ir::TyKind::Tuple(fields) => FormKind::Tuple(TupleForm::new(fields)),
 
-            pr::TyKind::Array(_) => FormKind::Array(ArrayForm::new()),
+            ir::TyKind::Array(_) => FormKind::Array(ArrayForm::new()),
 
-            pr::TyKind::Ident(_) | pr::TyKind::Function(_) => unimplemented!(),
+            ir::TyKind::Ident(_) | ir::TyKind::Function(_) => unimplemented!(),
         };
 
         let name = ty

@@ -10,6 +10,7 @@ version.workspace = true
 lutra-frontend = { path = "../lutra-frontend" }
 tabular = "0.2.0"
 thiserror = {workspace = true}
+enum-as-inner = {workspace = true}
 
 [dev-dependencies]
 insta = {workspace = true}

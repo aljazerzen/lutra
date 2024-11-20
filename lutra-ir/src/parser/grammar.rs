@@ -4,7 +4,7 @@ use chumsky::prelude::*;
 use lutra_frontend::pr;
 
 use super::perror::PError;
-use crate::ir::*;
+use lutra_bin::ir::*;
 use lutra_frontend::_lexer::TokenKind;
 
 pub fn program() -> impl Parser<TokenKind, Program, Error = PError> {
@@ -125,12 +125,14 @@ fn ty() -> impl Parser<TokenKind, Ty, Error = PError> {
             .map(Box::new)
             .map(TyKind::Function);
 
-        choice((primitive, array, tuple, enum_, func)).map(|kind| Ty {
-            kind,
-            layout: TyLayout {
-                head_size: 0,
-                variants_recursive: vec![],
-            },
+        choice((primitive, array, tuple, enum_, func)).map(|kind| {
+            let mut ty = Ty {
+                kind,
+                layout: None,
+                name: None,
+            };
+            ty.layout = lutra_bin::layout::get_layout_simple(&ty);
+            ty
         })
     })
     .labelled("a type");
@@ -221,23 +223,9 @@ where
 {
     ident_keyword("call")
         .ignore_then(expr.clone())
-        .then(
-            ctrl(',')
-                .ignore_then(ident_keyword("layout"))
-                .ignore_then(select! {
-                    TokenKind::Literal(pr::Literal::Integer(i)) => i
-                })
-                .repeated(),
-        )
         .then(ctrl(',').ignore_then(expr).repeated())
         .then_ignore(ctrl(',').or_not())
-        .map(|((function, layout), args)| {
-            ExprKind::Call(Box::new(Call {
-                function,
-                layout,
-                args,
-            }))
-        })
+        .map(|(function, args)| ExprKind::Call(Box::new(Call { function, args })))
         .delimited_by(ctrl('('), ctrl(')'))
         .recover_with(nested_delimiters(
             TokenKind::Control('('),

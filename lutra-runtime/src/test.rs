@@ -8,9 +8,9 @@ fn _test_interpret(program: &str) -> String {
 
     let value = crate::interpreter::evaluate(&program, (), crate::BUILTIN_MODULES);
 
-    let ty = lutra_ir::ty_into_pr(program.main.ty);
-    let value = lutra_bin::Value::decode(&value, &ty).unwrap();
-    value.print_source(&ty).unwrap()
+    let ty = &program.main.ty;
+    let value = lutra_bin::Value::decode(&value, ty).unwrap();
+    value.print_source(ty).unwrap()
 }
 
 #[test]
@@ -66,7 +66,6 @@ fn interpret_02() {
         let 1 = (func 1 -> {fn.1+0: int, fn.1+0: int}: {int, int}): func (int) -> {int, int};
         (
             call external.0: func (func (int) -> {int, int}, [int]) -> [{int, int}],
-            layout 8,
             var.1: func (int) -> {int, int},
             [2: int, 3: int, 1: int]: [int]
         ): [{int, int}]
@@ -110,7 +109,6 @@ fn interpret_03() {
         ): func ({int, int}) -> int;
         (
             call external.0: func (func ({int, int}) -> int, [{int, int}]) -> [int],
-            layout 16,
             var.2: func ({int, int}) -> int,
             var.1: [{int, int}],
         ): [int]

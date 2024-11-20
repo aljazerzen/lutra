@@ -4,8 +4,8 @@ mod test;
 
 pub use perror::{Error, Span};
 
-use crate::ir;
 use chumsky::{prelude::*, Stream};
+use lutra_bin::ir;
 use lutra_frontend::_lexer::{lex, Token, TokenKind};
 
 pub fn parse(source: &str) -> (Option<ir::Program>, Vec<Error>) {
@@ -57,7 +57,7 @@ fn prepare_stream<'a>(
 }
 
 #[track_caller]
-pub fn _test_parse(source: &str) -> crate::ir::Program {
+pub fn _test_parse(source: &str) -> lutra_bin::ir::Program {
     let (program, errors) = super::parse(source);
 
     if !errors.is_empty() {

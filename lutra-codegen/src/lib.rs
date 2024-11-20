@@ -92,6 +92,7 @@ fn codegen_in(
                 sub_modules.push((name, module));
             }
             lutra_frontend::decl::DeclKind::Ty(ty) => {
+                let ty = lutra_bin::ir::ty_from_pr(ty.clone());
                 tys.push((name, ty, &decl.annotations));
             }
             lutra_frontend::decl::DeclKind::Expr(expr) => {
@@ -106,7 +107,7 @@ fn codegen_in(
 
     // write types
     let all_tys = if options.generate_types {
-        codegen_ty::write_tys(w, &tys)?
+        codegen_ty::write_tys(w, tys)?
     } else {
         vec![]
     };

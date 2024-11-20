@@ -1,9 +1,9 @@
-use lutra_frontend::pr;
+use crate::ir;
 
 use crate::{Data, ReversePointer};
 
 pub struct ArrayWriter<'t> {
-    item_ty: &'t pr::Ty,
+    item_ty: &'t ir::Ty,
 
     buf: Vec<u8>,
 
@@ -12,8 +12,8 @@ pub struct ArrayWriter<'t> {
 }
 
 impl<'t> ArrayWriter<'t> {
-    pub fn new(ty: &'t pr::Ty) -> Self {
-        let pr::TyKind::Array(item_ty) = &ty.kind else {
+    pub fn new(ty: &'t ir::Ty) -> Self {
+        let ir::TyKind::Array(item_ty) = &ty.kind else {
             panic!()
         };
 

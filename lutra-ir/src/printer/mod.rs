@@ -1,6 +1,6 @@
 mod test;
 
-use crate::ir;
+use lutra_bin::ir;
 
 pub fn print(program: &ir::Program) -> String {
     let mut printer = Printer::default();
@@ -225,6 +225,10 @@ impl Printer {
                 r += ") -> ";
                 r += &self.print_ty(&func.body);
                 r
+            }
+            ir::TyKind::Ident(path) => {
+                // TODO: quote
+                path.0.join(".")
             }
         }
     }

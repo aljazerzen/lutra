@@ -1,4 +1,4 @@
-use lutra_frontend::pr;
+use lutra_bin::ir;
 use ratatui::{
     layout::{Offset, Rect},
     style::Stylize,
@@ -12,7 +12,7 @@ pub struct TupleForm {
 }
 
 impl TupleForm {
-    pub fn new(fields: &[pr::TyTupleField]) -> Self {
+    pub fn new(fields: &[ir::TyTupleField]) -> Self {
         let fields = fields
             .iter()
             .enumerate()

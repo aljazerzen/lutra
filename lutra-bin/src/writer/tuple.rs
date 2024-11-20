@@ -1,9 +1,8 @@
-use lutra_frontend::pr;
-
+use crate::ir;
 use crate::{Data, ReversePointer};
 
 pub struct TupleWriter<'t> {
-    fields_ty: &'t [pr::TyTupleField],
+    fields_ty: &'t [ir::TyTupleField],
 
     buf: Vec<u8>,
 
@@ -12,8 +11,8 @@ pub struct TupleWriter<'t> {
 }
 
 impl<'t> TupleWriter<'t> {
-    pub fn new(ty: &'t pr::Ty) -> Self {
-        let pr::TyKind::Tuple(fields_ty) = &ty.kind else {
+    pub fn new(ty: &'t ir::Ty) -> Self {
+        let ir::TyKind::Tuple(fields_ty) = &ty.kind else {
             panic!()
         };
 

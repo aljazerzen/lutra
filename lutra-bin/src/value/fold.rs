@@ -1,26 +1,26 @@
-use lutra_frontend::pr;
+use crate::ir;
 
 use crate::Value;
 
 pub trait ValueVisitor {
     type Res;
 
-    fn visit_value(&mut self, value: &Value, ty: &pr::Ty) -> Result<Self::Res, crate::Error> {
+    fn visit_value(&mut self, value: &Value, ty: &ir::Ty) -> Result<Self::Res, crate::Error> {
         match value {
             Value::Int(v) => {
-                super::expect_ty_primitive(ty, pr::PrimitiveSet::int)?;
+                super::expect_ty_primitive(ty, ir::PrimitiveSet::int)?;
                 self.visit_int(*v)
             }
             Value::Float(v) => {
-                super::expect_ty_primitive(ty, pr::PrimitiveSet::float)?;
+                super::expect_ty_primitive(ty, ir::PrimitiveSet::float)?;
                 self.visit_float(*v)
             }
             Value::Bool(v) => {
-                super::expect_ty_primitive(ty, pr::PrimitiveSet::bool)?;
+                super::expect_ty_primitive(ty, ir::PrimitiveSet::bool)?;
                 self.visit_bool(*v)
             }
             Value::Text(v) => {
-                super::expect_ty_primitive(ty, pr::PrimitiveSet::text)?;
+                super::expect_ty_primitive(ty, ir::PrimitiveSet::text)?;
                 self.visit_text(v)
             }
             Value::Tuple(fields) => {
@@ -46,19 +46,19 @@ pub trait ValueVisitor {
     fn visit_tuple(
         &mut self,
         fields: &[Value],
-        ty_fields: &[pr::TyTupleField],
+        ty_fields: &[ir::TyTupleField],
     ) -> Result<Self::Res, crate::Error>;
 
     fn visit_array(
         &mut self,
         items: &[Value],
-        ty_items: &pr::Ty,
+        ty_items: &ir::Ty,
     ) -> Result<Self::Res, crate::Error>;
 
     fn visit_enum(
         &mut self,
         tag: usize,
         inner: &Value,
-        ty_variants: &[pr::TyEnumVariant],
+        ty_variants: &[ir::TyEnumVariant],
     ) -> Result<Self::Res, crate::Error>;
 }

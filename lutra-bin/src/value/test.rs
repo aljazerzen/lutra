@@ -50,6 +50,7 @@ fn test_print_01() {
         ]),
     ]);
 
+    let ty = crate::ir::ty_from_pr(ty);
     assert_snapshot!(value.print_source(&ty).unwrap(), @r#"
     {
       n_rows = 100,
@@ -90,6 +91,7 @@ fn test_print_02() {
         Value::Int(4),
     ]);
 
+    let ty = crate::ir::ty_from_pr(ty);
     assert_snapshot!(value.print_source(&ty).unwrap(), @r#"
     [
       1,

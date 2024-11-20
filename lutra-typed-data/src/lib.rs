@@ -2,13 +2,12 @@ mod schema {
     include!(concat!(env!("OUT_DIR"), "/project.rs"));
 }
 
-use lutra_bin::{Decode, Encode, Result, Value};
-use lutra_frontend::pr;
+use lutra_bin::{ir, Decode, Encode, Result, Value};
 
-pub fn decode_typed_data(buffer: &[u8]) -> Result<(Value, pr::Ty)> {
+pub fn decode_typed_data(buffer: &[u8]) -> Result<(Value, ir::Ty)> {
     let typed_data = schema::TypedData::decode_buffer(buffer)?;
 
-    let ty = type_to_pr(&typed_data.ty);
+    let ty = type_to_ir(&typed_data.ty);
 
     let mut data = Vec::with_capacity(typed_data.data.len());
     for datum in typed_data.data {
@@ -20,7 +19,7 @@ pub fn decode_typed_data(buffer: &[u8]) -> Result<(Value, pr::Ty)> {
     Ok((value, ty))
 }
 
-pub fn encode_typed_data(w: &mut impl std::io::Write, value: Value, ty: &pr::Ty) -> Result<()> {
+pub fn encode_typed_data(w: &mut impl std::io::Write, value: Value, ty: &ir::Ty) -> Result<()> {
     let data_u8 = value.encode(ty)?;
 
     let ty = type_from_pr(ty);
@@ -39,71 +38,66 @@ pub fn encode_typed_data(w: &mut impl std::io::Write, value: Value, ty: &pr::Ty)
     Ok(())
 }
 
-fn type_to_pr(ty: &schema::Ty) -> pr::Ty {
+fn type_to_ir(ty: &schema::Ty) -> ir::Ty {
     let kind = match &ty.kind {
         schema::TyKind::Primitive(primitive) => {
             let primitive = match primitive {
-                schema::PrimitiveSet::int => pr::PrimitiveSet::int,
-                schema::PrimitiveSet::float => pr::PrimitiveSet::float,
-                schema::PrimitiveSet::bool => pr::PrimitiveSet::bool,
-                schema::PrimitiveSet::text => pr::PrimitiveSet::text,
+                schema::PrimitiveSet::int => ir::PrimitiveSet::int,
+                schema::PrimitiveSet::float => ir::PrimitiveSet::float,
+                schema::PrimitiveSet::bool => ir::PrimitiveSet::bool,
+                schema::PrimitiveSet::text => ir::PrimitiveSet::text,
             };
-            pr::TyKind::Primitive(primitive)
+            ir::TyKind::Primitive(primitive)
         }
-        schema::TyKind::Tuple(fields) => pr::TyKind::Tuple(
+        schema::TyKind::Tuple(fields) => ir::TyKind::Tuple(
             fields
                 .iter()
                 .map(|f| {
                     let name = f.name.0.clone();
-                    let ty = type_to_pr(&f.ty);
-                    pr::TyTupleField { name, ty }
+                    let ty = type_to_ir(&f.ty);
+                    ir::TyTupleField { name, ty }
                 })
                 .collect(),
         ),
         schema::TyKind::Array(items_ty) => {
-            pr::TyKind::Array(Box::new(type_to_pr(items_ty.as_ref())))
+            ir::TyKind::Array(Box::new(type_to_ir(items_ty.as_ref())))
         }
-        schema::TyKind::Enum(variants) => pr::TyKind::Enum(
+        schema::TyKind::Enum(variants) => ir::TyKind::Enum(
             variants
                 .iter()
-                .map(|v| pr::TyEnumVariant {
+                .map(|v| ir::TyEnumVariant {
                     name: v.name.clone(),
-                    ty: type_to_pr(&v.ty),
+                    ty: type_to_ir(&v.ty),
                 })
                 .collect(),
         ),
     };
 
-    let layout = ty.layout.as_ref().map(|layout| pr::TyLayout {
-        head_size: layout.head_size as usize,
-        variants_recursive: layout
-            .variants_recursive
-            .iter()
-            .map(|x| *x as usize)
-            .collect(),
+    let layout = ty.layout.as_ref().map(|layout| ir::TyLayout {
+        head_size: layout.head_size,
+        variants_recursive: layout.variants_recursive.clone(),
         body_ptr_offset: None, // TODO
     });
 
-    pr::Ty {
+    ir::Ty {
         kind,
-        span: None,
         name: None,
         layout,
     }
 }
 
-fn type_from_pr(ty: &pr::Ty) -> schema::Ty {
+fn type_from_pr(ty: &ir::Ty) -> schema::Ty {
     let kind = match &ty.kind {
-        pr::TyKind::Primitive(primitive) => {
+        ir::TyKind::Primitive(primitive) => {
             let primitive = match primitive {
-                pr::PrimitiveSet::int => schema::PrimitiveSet::int,
-                pr::PrimitiveSet::float => schema::PrimitiveSet::float,
-                pr::PrimitiveSet::bool => schema::PrimitiveSet::bool,
-                pr::PrimitiveSet::text => schema::PrimitiveSet::text,
+                ir::PrimitiveSet::int => schema::PrimitiveSet::int,
+                ir::PrimitiveSet::float => schema::PrimitiveSet::float,
+                ir::PrimitiveSet::bool => schema::PrimitiveSet::bool,
+                ir::PrimitiveSet::text => schema::PrimitiveSet::text,
             };
             schema::TyKind::Primitive(primitive)
         }
-        pr::TyKind::Tuple(fields) => schema::TyKind::Tuple(
+        ir::TyKind::Tuple(fields) => schema::TyKind::Tuple(
             fields
                 .iter()
                 .map(|f| {
@@ -113,8 +107,8 @@ fn type_from_pr(ty: &pr::Ty) -> schema::Ty {
                 })
                 .collect(),
         ),
-        pr::TyKind::Array(items_ty) => schema::TyKind::Array(Box::new(type_from_pr(items_ty))),
-        pr::TyKind::Enum(variants) => schema::TyKind::Enum(
+        ir::TyKind::Array(items_ty) => schema::TyKind::Array(Box::new(type_from_pr(items_ty))),
+        ir::TyKind::Enum(variants) => schema::TyKind::Enum(
             variants
                 .iter()
                 .map(|v| schema::TyKindEnumItems {
@@ -126,12 +120,8 @@ fn type_from_pr(ty: &pr::Ty) -> schema::Ty {
         _ => todo!(),
     };
     let layout = ty.layout.as_ref().map(|layout| schema::TyLayout {
-        head_size: layout.head_size as i64,
-        variants_recursive: layout
-            .variants_recursive
-            .iter()
-            .map(|x| *x as i64)
-            .collect(),
+        head_size: layout.head_size,
+        variants_recursive: layout.variants_recursive.clone(),
     });
 
     schema::Ty { kind, layout }

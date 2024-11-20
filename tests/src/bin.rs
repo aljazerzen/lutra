@@ -3,11 +3,11 @@ use crate::lutra::bin as types;
 use std::sync::OnceLock;
 
 use insta::assert_snapshot;
-use lutra_bin::{Decode, Encode, Value};
+use lutra_bin::{ir, Decode, Encode, Value};
 use lutra_frontend::{pr, Project};
 
 #[track_caller]
-fn _test_encode_decode<T: Encode + Decode>(value: Value, ty: &pr::Ty) -> String {
+fn _test_encode_decode<T: Encode + Decode>(value: Value, ty: &ir::Ty) -> String {
     // Value::encode
     let buf = value.encode(ty).unwrap();
 
@@ -29,7 +29,7 @@ fn _test_encode_decode<T: Encode + Decode>(value: Value, ty: &pr::Ty) -> String 
 static SCHEMA: OnceLock<Project> = OnceLock::new();
 
 #[track_caller]
-fn _test_get_type(name: &'static str) -> &'static pr::Ty {
+fn _test_get_type(name: &'static str) -> ir::Ty {
     let project = SCHEMA.get_or_init(|| {
         let source = include_str!("../lutra/bin.lt");
         let source = lutra_frontend::SourceTree::single("".into(), source.into());
@@ -40,7 +40,8 @@ fn _test_get_type(name: &'static str) -> &'static pr::Ty {
 
     let name = pr::Path::from_name(name);
     let decl = project.root_module.module.get(&name).unwrap();
-    decl.kind.as_ty().unwrap()
+    let ty = decl.kind.as_ty().unwrap();
+    lutra_bin::ir::ty_from_pr(ty.clone())
 }
 
 #[test]
@@ -53,7 +54,7 @@ fn test_x() {
         Value::Array(vec![Value::Bool(true), Value::Bool(false)]),
     ]);
 
-    assert_snapshot!(_test_encode_decode::<types::x>(value, ty), @r#"
+    assert_snapshot!(_test_encode_decode::<types::x>(value, &ty), @r#"
     Length: 38 (0x26) bytes
     0000:   2a 00 00 00  00 00 00 00  10 00 00 00  0c 00 00 00   *...............
     0010:   14 00 00 00  02 00 00 00  48 65 6c 6c  6f 20 77 6f   ........Hello wo
@@ -66,7 +67,7 @@ fn test_x() {
 fn test_y() {
     let ty = _test_get_type("y");
     let value = Value::Array(vec![Value::Int(12), Value::Int(55), Value::Int(2)]);
-    assert_snapshot!(_test_encode_decode::<types::y>(value, ty), @r#"
+    assert_snapshot!(_test_encode_decode::<types::y>(value, &ty), @r#"
     Length: 32 (0x20) bytes
     0000:   08 00 00 00  03 00 00 00  0c 00 00 00  00 00 00 00   ................
     0010:   37 00 00 00  00 00 00 00  02 00 00 00  00 00 00 00   7...............
@@ -79,7 +80,7 @@ fn test_z() {
     let ty = _test_get_type("z");
     let value = Value::Bool(true);
 
-    assert_snapshot!(_test_encode_decode::<types::z>(value, ty), @r#"
+    assert_snapshot!(_test_encode_decode::<types::z>(value, &ty), @r#"
     Length: 1 (0x1) bytes
     0000:   01                                                   .
     "#
@@ -91,7 +92,7 @@ fn test_u_01() {
     let ty = _test_get_type("u");
     let value = Value::Enum(0, Box::new(Value::Bool(true)));
 
-    assert_snapshot!(_test_encode_decode::<types::u>(value, ty), @r#"
+    assert_snapshot!(_test_encode_decode::<types::u>(value, &ty), @r#"
     Length: 5 (0x5) bytes
     0000:   00 01 00 00  00                                      .....
     "#
@@ -103,7 +104,7 @@ fn test_u_02() {
     let ty = _test_get_type("u");
     let value = Value::Enum(1, Box::new(Value::Tuple(vec![])));
 
-    assert_snapshot!(_test_encode_decode::<types::u>(value, ty), @r#"
+    assert_snapshot!(_test_encode_decode::<types::u>(value, &ty), @r#"
     Length: 5 (0x5) bytes
     0000:   01 00 00 00  00                                      .....
     "#
@@ -118,7 +119,7 @@ fn test_u_03() {
         Box::new(Value::Tuple(vec![Value::Int(-12), Value::Float(3.16)])),
     );
 
-    assert_snapshot!(_test_encode_decode::<types::u>(value, ty), @r#"
+    assert_snapshot!(_test_encode_decode::<types::u>(value, &ty), @r#"
     Length: 21 (0x15) bytes
     0000:   02 04 00 00  00 f4 ff ff  ff ff ff ff  ff 48 e1 7a   .............H.z
     0010:   14 ae 47 09  40                                      ..G.@
@@ -131,7 +132,7 @@ fn test_v() {
     let ty = _test_get_type("v");
     let value = Value::Enum(1, Box::new(Value::Tuple(vec![])));
 
-    assert_snapshot!(_test_encode_decode::<types::v>(value, ty), @r#"
+    assert_snapshot!(_test_encode_decode::<types::v>(value, &ty), @r#"
     Length: 5 (0x5) bytes
     0000:   01 00 00 00  00                                      .....
     "#
@@ -154,7 +155,7 @@ fn test_tree() {
             ),
         ])),
     );
-    assert_snapshot!(_test_encode_decode::<types::Tree>(value, ty), @r#"
+    assert_snapshot!(_test_encode_decode::<types::Tree>(value, &ty), @r#"
     Length: 49 (0x31) bytes
     0000:   01 04 00 00  00 00 09 00  00 00 01 0c  00 00 00 04   ................
     0010:   00 00 00 00  00 00 00 00  09 00 00 00  00 0c 00 00   ................
@@ -171,7 +172,7 @@ fn test_opt_01() {
         0, // Node
         Box::new(Value::Tuple(vec![])),
     );
-    assert_snapshot!(_test_encode_decode::<types::opt>(value, ty), @r#"
+    assert_snapshot!(_test_encode_decode::<types::opt>(value, &ty), @r#"
     Length: 5 (0x5) bytes
     0000:   00 00 00 00  00                                      .....
     "#
@@ -185,7 +186,7 @@ fn test_opt_02() {
         1, // Node
         Box::new(Value::Text("text".into())),
     );
-    assert_snapshot!(_test_encode_decode::<types::opt>(value, ty), @r#"
+    assert_snapshot!(_test_encode_decode::<types::opt>(value, &ty), @r#"
     Length: 17 (0x11) bytes
     0000:   01 04 00 00  00 08 00 00  00 04 00 00  00 74 65 78   .............tex
     0010:   74                                                   t

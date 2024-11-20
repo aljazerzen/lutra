@@ -4,8 +4,8 @@ mod print_pretty;
 mod print_source;
 mod test;
 
+use crate::ir;
 use crate::{Error, Result};
-use lutra_frontend::pr;
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum Value {
@@ -18,21 +18,23 @@ pub enum Value {
     Enum(usize, Box<Value>),
 }
 
-fn expect_ty<'t, F, K>(ty: &'t pr::Ty, cast: F, expected: &'static str) -> Result<&'t K>
+fn expect_ty<'t, F, K>(ty: &'t ir::Ty, cast: F, expected: &'static str) -> Result<&'t K>
 where
-    F: Fn(&pr::TyKind) -> Option<&K>,
+    F: Fn(&ir::TyKind) -> Option<&K>,
 {
     cast(&ty.kind).ok_or_else(|| Error::TypeMismatch {
         expected,
-        found: ty.kind.as_ref().to_string(),
+        found: ty_kind_name(&ty.kind).to_string(),
     })
 }
 
-fn expect_ty_primitive(ty: &pr::Ty, expected: pr::PrimitiveSet) -> Result<()> {
-    let found = ty.kind.as_primitive().ok_or_else(|| Error::TypeMismatch {
-        expected: primitive_set_name(&expected),
-        found: ty.kind.as_ref().to_string(),
-    })?;
+fn expect_ty_primitive(ty: &ir::Ty, expected: ir::PrimitiveSet) -> Result<()> {
+    let ir::TyKind::Primitive(found) = &ty.kind else {
+        return Err(Error::TypeMismatch {
+            expected: primitive_set_name(&expected),
+            found: ty_kind_name(&ty.kind).to_string(),
+        });
+    };
 
     if *found != expected {
         return Err(Error::TypeMismatch {
@@ -43,11 +45,22 @@ fn expect_ty_primitive(ty: &pr::Ty, expected: pr::PrimitiveSet) -> Result<()> {
     Ok(())
 }
 
-fn primitive_set_name(expected: &pr::PrimitiveSet) -> &'static str {
+fn primitive_set_name(expected: &ir::PrimitiveSet) -> &'static str {
     match expected {
-        pr::PrimitiveSet::int => "int",
-        pr::PrimitiveSet::float => "float",
-        pr::PrimitiveSet::bool => "bool",
-        pr::PrimitiveSet::text => "text",
+        ir::PrimitiveSet::int => "int",
+        ir::PrimitiveSet::float => "float",
+        ir::PrimitiveSet::bool => "bool",
+        ir::PrimitiveSet::text => "text",
+    }
+}
+
+fn ty_kind_name(expected: &ir::TyKind) -> &'static str {
+    match expected {
+        ir::TyKind::Primitive(_) => "primitive",
+        ir::TyKind::Tuple(_) => "tuple",
+        ir::TyKind::Array(_) => "array",
+        ir::TyKind::Enum(_) => "enum",
+        ir::TyKind::Function(_) => "function",
+        ir::TyKind::Ident(_) => "ident",
     }
 }

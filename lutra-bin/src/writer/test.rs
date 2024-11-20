@@ -4,10 +4,10 @@ use crate::Data;
 
 use super::{ArrayWriter, TupleWriter};
 
-use lutra_frontend::pr;
+use crate::ir;
 
 #[track_caller]
-pub(crate) fn _test_array_writer(items: Vec<Data>, output_ty: &pr::Ty) -> String {
+pub(crate) fn _test_array_writer(items: Vec<Data>, output_ty: &ir::Ty) -> String {
     let mut output = ArrayWriter::new(output_ty);
     for item in items {
         output.write_item(item);
@@ -23,7 +23,7 @@ pub(crate) fn _test_array_writer(items: Vec<Data>, output_ty: &pr::Ty) -> String
 }
 
 #[track_caller]
-pub(crate) fn _test_tuple_writer(fields: Vec<Data>, output_ty: &pr::Ty) -> String {
+pub(crate) fn _test_tuple_writer(fields: Vec<Data>, output_ty: &ir::Ty) -> String {
     let mut output = TupleWriter::new(output_ty);
     for field in fields {
         output.write_field(field);
@@ -49,6 +49,7 @@ pub(crate) fn test_01() {
     ];
 
     let output_ty = lutra_frontend::_test_compile_ty("[int]");
+    let output_ty = crate::ir::ty_from_pr(output_ty);
 
     insta::assert_snapshot!(_test_array_writer(items, &output_ty), @r#"
     [
@@ -82,6 +83,7 @@ pub(crate) fn test_02() {
     ];
 
     let output_ty = lutra_frontend::_test_compile_ty("[text]");
+    let output_ty = crate::ir::ty_from_pr(output_ty);
 
     insta::assert_snapshot!(_test_array_writer(items, &output_ty), @r#"
     [
@@ -108,6 +110,7 @@ pub(crate) fn test_04() {
     ];
 
     let output_ty = lutra_frontend::_test_compile_ty("{int, text, int}");
+    let output_ty = crate::ir::ty_from_pr(output_ty);
 
     insta::assert_snapshot!(_test_tuple_writer(fields, &output_ty), @r#"
     {

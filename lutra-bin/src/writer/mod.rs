@@ -5,16 +5,17 @@ mod tuple;
 pub use array::ArrayWriter;
 pub use tuple::TupleWriter;
 
-use lutra_frontend::pr;
+use crate::ir;
 
 use crate::Data;
 
-fn extract_head_and_body<'b>(buf: &'b Data, layout: &pr::TyLayout) -> (&'b [u8], Option<Data>) {
+fn extract_head_and_body<'b>(buf: &'b Data, layout: &ir::TyLayout) -> (&'b [u8], Option<Data>) {
     let head_bytes = layout.head_size / 8;
 
-    let head = buf.slice(head_bytes);
+    let head = buf.slice(head_bytes as usize);
 
     let body = if let Some(body_ptr_offset) = layout.body_ptr_offset {
+        let body_ptr_offset = body_ptr_offset as usize;
         let mut buf = buf.clone();
 
         let mut head = crate::Reader::new(buf.slice(body_ptr_offset + 4));
@@ -32,12 +33,12 @@ fn extract_head_and_body<'b>(buf: &'b Data, layout: &pr::TyLayout) -> (&'b [u8],
 fn write_head(
     out: &mut Vec<u8>,
     data: Data,
-    layout: &pr::TyLayout,
+    layout: &ir::TyLayout,
 ) -> Option<(crate::ReversePointer, Data)> {
     let (head, body) = extract_head_and_body(&data, layout);
 
     let res = if let Some(body) = body {
-        let o = layout.body_ptr_offset.unwrap();
+        let o = layout.body_ptr_offset.unwrap() as usize;
         let ptr_loc = crate::ReversePointer::new_at(out.len() + o);
 
         Some((ptr_loc, body))
