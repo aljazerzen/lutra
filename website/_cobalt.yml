@@ -2,7 +2,7 @@
 source: "."
 site:
   title: "Lutra"
-  description: "An interface lanugage"
+  description: "An interface language"
   base_url: "/"
 
 syntax_highlight:
