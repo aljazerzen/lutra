@@ -164,7 +164,7 @@ impl Interpreter {
                 for field in fields {
                     let cell = self.evaluate_expr(field);
 
-                    writer.write_field(assume_data(&cell).clone());
+                    writer.write_field(cell.into_data().unwrap_or_else(|_| panic!()));
                 }
 
                 Cell::Data(writer.finish())
@@ -174,7 +174,7 @@ impl Interpreter {
                 for item in items {
                     let cell = self.evaluate_expr(item);
 
-                    writer.write_item(assume_data(&cell).clone());
+                    writer.write_item(cell.into_data().unwrap_or_else(|_| panic!()));
                 }
 
                 Cell::Data(writer.finish())
@@ -184,8 +184,9 @@ impl Interpreter {
                 let base_ty = &base.ty;
 
                 let base = self.evaluate_expr(base);
+                let base = base.into_data().unwrap_or_else(|_| panic!());
 
-                let base = lutra_bin::TupleReader::new(assume_data(&base), base_ty);
+                let base = lutra_bin::TupleReader::new(&base, base_ty);
 
                 Cell::Data(base.get_field(*offset as usize))
             }
@@ -253,11 +254,22 @@ impl Interpreter {
     }
 }
 
-fn assume_data(symbol: &Cell) -> &Data {
-    match symbol {
-        Cell::Data(val) => val,
-        Cell::Function(_) => panic!(),
-        Cell::FunctionNative(_) => panic!(),
-        Cell::Vacant => panic!(),
+impl Cell {
+    pub fn as_data(&self) -> Option<&Data> {
+        match self {
+            Cell::Data(val) => Some(val),
+            Cell::Function(_) => None,
+            Cell::FunctionNative(_) => None,
+            Cell::Vacant => None,
+        }
+    }
+
+    pub fn into_data(self) -> Result<Data, Cell> {
+        match self {
+            Cell::Data(val) => Ok(val),
+            Cell::Function(_) => Err(self),
+            Cell::FunctionNative(_) => Err(self),
+            Cell::Vacant => Err(self),
+        }
     }
 }

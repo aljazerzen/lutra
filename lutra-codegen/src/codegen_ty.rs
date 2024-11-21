@@ -196,8 +196,9 @@ fn tuple_field_name(name: &Option<String>, index: usize) -> Cow<'_, str> {
 }
 
 /// Generates a reference to a type.
-/// Syntactically, this could be used in `let x: type_ref`.
-fn write_ty_ref(
+/// Syntactically, this could be used in `let x: type_ref` or `let x = Vec::<type_ref>::new();`.
+/// The first example is not as-expr and the second one is.
+pub fn write_ty_ref(
     w: &mut impl Write,
     ty: &ir::Ty,
     as_expr: bool,

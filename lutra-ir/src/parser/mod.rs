@@ -57,7 +57,7 @@ fn prepare_stream<'a>(
 }
 
 #[track_caller]
-pub fn _test_parse(source: &str) -> lutra_bin::ir::Program {
+pub fn _test_parse(source: &str) -> ir::Program {
     let (program, errors) = super::parse(source);
 
     if !errors.is_empty() {

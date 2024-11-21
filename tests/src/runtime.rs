@@ -1,6 +1,4 @@
-use lutra_bin::ir;
-use lutra_bin::{Data, Encode, Value};
-use lutra_runtime::{Cell, Interpreter};
+use lutra_bin::Value;
 
 use crate::lutra::runtime;
 
@@ -8,11 +6,9 @@ const MODULE: RuntimeModule = RuntimeModule;
 
 struct RuntimeModule;
 
-impl runtime::NativeFunctions for RuntimeModule {
-    fn hello(_interpreter: &mut Interpreter, _args: Vec<(&ir::Ty, Cell)>) -> Cell {
-        let mut buf = Vec::with_capacity(8);
-        2_i64.encode(&mut buf).unwrap();
-        Cell::Data(Data::new(buf))
+impl runtime::Functions for RuntimeModule {
+    fn hello(a: f64, b: u64) -> i64 {
+        (a * 4.0) as i64 + b as i64
     }
 }
 
@@ -28,8 +24,8 @@ fn test_01() {
     ];
 
     let main = (
-        call external.0: func (int64, int64) -> int64,
-        1: int64,
+        call external.0: func (float64, uint32) -> int64,
+        1.0: float64,
         2: int64,
     ): int64
     ",
@@ -39,5 +35,5 @@ fn test_01() {
 
     let value = Value::decode(&value, &program.main.ty).unwrap();
 
-    assert_eq!(value, Value::Int64(2));
+    assert_eq!(value, Value::Int64(6));
 }

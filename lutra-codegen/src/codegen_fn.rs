@@ -2,6 +2,8 @@ use std::fmt::Write;
 
 use lutra_frontend::pr;
 
+use super::codegen_ty;
+
 #[rustfmt::skip::macros(writeln)]
 #[rustfmt::skip::macros(write)]
 pub fn write_functions(
@@ -12,9 +14,72 @@ pub fn write_functions(
         return Ok(());
     }
 
+    let mut ctx = codegen_ty::Context::default();
+
+    writeln!(w, "pub trait Functions {{")?;
+    for (name, func) in functions {
+        writeln!(w, "    fn {name}(")?;
+        for (param_i, param) in func.params.iter().enumerate() {
+            let param = param.as_ref().unwrap();
+            let param = lutra_bin::ir::Ty::from(param.clone());
+
+            write!(w, "        arg{param_i}: ")?;
+            codegen_ty::write_ty_ref(w, &param, false, &mut ctx)?;
+            writeln!(w, ",")?;
+        }
+
+        let body = func.body.as_ref().unwrap().as_ref();
+        let body = lutra_bin::ir::Ty::from(body.clone());
+        writeln!(w, "    ) -> ")?;
+        codegen_ty::write_ty_ref(w, &body, false, &mut ctx)?;
+        writeln!(w, ";")?;
+    }
+    writeln!(w, "}}\n")?;
+
     writeln!(w, "pub trait NativeFunctions {{")?;
     for (name, _func) in functions {
-        writeln!(w, "    fn {name}(interpreter: &mut ::lutra_runtime::Interpreter, args: Vec<(&::lutra_bin::ir::Ty, ::lutra_runtime::Cell)>) -> ::lutra_runtime::Cell;")?;
+        writeln!(w, "    fn {name}(")?;
+        writeln!(w, "        interpreter: &mut ::lutra_runtime::Interpreter,")?;
+        writeln!(w, "        args: Vec<(&::lutra_bin::ir::Ty, ::lutra_runtime::Cell)>,")?;
+        writeln!(w, "    ) -> ::lutra_runtime::Cell;")?;
+    }
+    writeln!(w, "}}\n")?;
+
+    writeln!(w, "impl <T: Functions> NativeFunctions for T {{")?;
+    for (name, func) in functions {
+        writeln!(w, "    fn {name}(")?;
+        writeln!(w, "        _interpreter: &mut ::lutra_runtime::Interpreter,")?;
+        writeln!(w, "        args: Vec<(&::lutra_bin::ir::Ty, ::lutra_runtime::Cell)>,")?;
+        writeln!(w, "    ) -> ::lutra_runtime::Cell {{")?;
+        writeln!(w, "        use lutra_bin::{{Encode, Decode}};")?;
+
+        // decode args
+        writeln!(w, "        let mut args = args.into_iter();")?;
+        writeln!(w)?;
+        for (param_i, param) in func.params.iter().enumerate() {
+            let param = param.as_ref().unwrap();
+            let param = lutra_bin::ir::Ty::from(param.clone());
+
+            writeln!(w, "        let (_, arg{param_i}) = args.next().unwrap();")?;
+            writeln!(w, "        let arg{param_i} = arg{param_i}.into_data().unwrap_or_else(|_| panic!());")?;
+            write!(w, "        let arg{param_i} = ")?;
+            codegen_ty::write_ty_ref(w, &param, true, &mut ctx)?;
+            writeln!(w, "::decode_buffer(&arg{param_i}.flatten()).unwrap();")?;
+            writeln!(w)?;
+        }
+
+        // call
+        writeln!(w, "        let res = <T as Functions>::{name}(")?;
+        for (param_i, _param) in func.params.iter().enumerate() {
+            writeln!(w, "            arg{param_i},")?;
+        }
+        writeln!(w, "        );")?;
+
+        // encode result
+        writeln!(w, "        let mut buf = Vec::new();")?;
+        writeln!(w, "        res.encode(&mut buf).unwrap();")?;
+        writeln!(w, "        ::lutra_runtime::Cell::Data(::lutra_bin::Data::new(buf))")?;
+        writeln!(w, "    }}")?;
     }
     writeln!(w, "}}\n")?;
 

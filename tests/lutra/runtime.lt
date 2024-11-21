@@ -1,2 +1,2 @@
 
-let hello = func<int64> a<int64> b<int64> -> 1
+let hello = func a<float64> b<uint64> -> 1
