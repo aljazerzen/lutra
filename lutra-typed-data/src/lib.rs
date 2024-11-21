@@ -9,25 +9,15 @@ pub fn decode_typed_data(buffer: &[u8]) -> Result<(Value, ir::Ty)> {
 
     let ty = type_to_ir(&typed_data.ty);
 
-    let mut data = Vec::with_capacity(typed_data.data.len());
-    for datum in typed_data.data {
-        data.push(datum as u8);
-    }
-
-    let value = Value::decode(&data, &ty)?;
+    let value = Value::decode(&typed_data.data, &ty)?;
 
     Ok((value, ty))
 }
 
 pub fn encode_typed_data(w: &mut impl std::io::Write, value: Value, ty: &ir::Ty) -> Result<()> {
-    let data_u8 = value.encode(ty)?;
+    let data = value.encode(ty)?;
 
     let ty = type_from_pr(ty);
-
-    let mut data = Vec::with_capacity(data_u8.len());
-    for datum in data_u8 {
-        data.push(datum as i64);
-    }
 
     let typed_data = schema::TypedData { ty, data };
 
@@ -42,8 +32,16 @@ fn type_to_ir(ty: &schema::Ty) -> ir::Ty {
     let kind = match &ty.kind {
         schema::TyKind::Primitive(primitive) => {
             let primitive = match primitive {
-                schema::PrimitiveSet::int => ir::PrimitiveSet::int,
-                schema::PrimitiveSet::float => ir::PrimitiveSet::float,
+                schema::PrimitiveSet::int8 => ir::PrimitiveSet::int8,
+                schema::PrimitiveSet::int16 => ir::PrimitiveSet::int16,
+                schema::PrimitiveSet::int32 => ir::PrimitiveSet::int32,
+                schema::PrimitiveSet::int64 => ir::PrimitiveSet::int64,
+                schema::PrimitiveSet::uint8 => ir::PrimitiveSet::uint8,
+                schema::PrimitiveSet::uint16 => ir::PrimitiveSet::uint16,
+                schema::PrimitiveSet::uint32 => ir::PrimitiveSet::uint32,
+                schema::PrimitiveSet::uint64 => ir::PrimitiveSet::uint64,
+                schema::PrimitiveSet::float32 => ir::PrimitiveSet::float32,
+                schema::PrimitiveSet::float64 => ir::PrimitiveSet::float64,
                 schema::PrimitiveSet::bool => ir::PrimitiveSet::bool,
                 schema::PrimitiveSet::text => ir::PrimitiveSet::text,
             };
@@ -90,8 +88,16 @@ fn type_from_pr(ty: &ir::Ty) -> schema::Ty {
     let kind = match &ty.kind {
         ir::TyKind::Primitive(primitive) => {
             let primitive = match primitive {
-                ir::PrimitiveSet::int => schema::PrimitiveSet::int,
-                ir::PrimitiveSet::float => schema::PrimitiveSet::float,
+                ir::PrimitiveSet::int8 => schema::PrimitiveSet::int8,
+                ir::PrimitiveSet::int16 => schema::PrimitiveSet::int16,
+                ir::PrimitiveSet::int32 => schema::PrimitiveSet::int32,
+                ir::PrimitiveSet::int64 => schema::PrimitiveSet::int64,
+                ir::PrimitiveSet::uint8 => schema::PrimitiveSet::uint8,
+                ir::PrimitiveSet::uint16 => schema::PrimitiveSet::uint16,
+                ir::PrimitiveSet::uint32 => schema::PrimitiveSet::uint32,
+                ir::PrimitiveSet::uint64 => schema::PrimitiveSet::uint64,
+                ir::PrimitiveSet::float32 => schema::PrimitiveSet::float32,
+                ir::PrimitiveSet::float64 => schema::PrimitiveSet::float64,
                 ir::PrimitiveSet::bool => schema::PrimitiveSet::bool,
                 ir::PrimitiveSet::text => schema::PrimitiveSet::text,
             };

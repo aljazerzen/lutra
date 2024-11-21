@@ -53,7 +53,7 @@ impl Printer {
     fn print_expr(&mut self, expr: &ir::Expr) -> String {
         let mut r = match &expr.kind {
             ir::ExprKind::Pointer(sid) => {
-                let id = (sid.0 as u32) & 0x3fffffff;
+                let id = sid.0 & 0x3fffffff;
                 match sid.kind() {
                     ir::SidKind::External => format!("external.{id}"),
                     ir::SidKind::Var => format!("var.{id}"),
@@ -90,7 +90,7 @@ impl Printer {
                 r += &self.new_line();
 
                 r += "func ";
-                let func_id = (func.symbol_ns.0 as u32 & 0x3fffffff) >> 8;
+                let func_id = (func.symbol_ns.0 & 0x3fffffff) >> 8;
                 r += &func_id.to_string();
                 r += " -> ";
                 r += &self.print_expr(&func.body);
@@ -151,7 +151,7 @@ impl Printer {
                 loop {
                     r += "let ";
 
-                    let id = (binding.symbol.0 as u32) & 0x3fffffff;
+                    let id = binding.symbol.0 & 0x3fffffff;
                     r += &id.to_string();
 
                     r += " = ";
@@ -180,8 +180,16 @@ impl Printer {
     fn print_ty(&self, ty: &ir::Ty) -> String {
         match &ty.kind {
             ir::TyKind::Primitive(ir::PrimitiveSet::bool) => "bool".to_string(),
-            ir::TyKind::Primitive(ir::PrimitiveSet::int) => "int".to_string(),
-            ir::TyKind::Primitive(ir::PrimitiveSet::float) => "float".to_string(),
+            ir::TyKind::Primitive(ir::PrimitiveSet::int8) => "int8".to_string(),
+            ir::TyKind::Primitive(ir::PrimitiveSet::int16) => "int16".to_string(),
+            ir::TyKind::Primitive(ir::PrimitiveSet::int32) => "int32".to_string(),
+            ir::TyKind::Primitive(ir::PrimitiveSet::int64) => "int64".to_string(),
+            ir::TyKind::Primitive(ir::PrimitiveSet::uint8) => "uint8".to_string(),
+            ir::TyKind::Primitive(ir::PrimitiveSet::uint16) => "uint16".to_string(),
+            ir::TyKind::Primitive(ir::PrimitiveSet::uint32) => "uint32".to_string(),
+            ir::TyKind::Primitive(ir::PrimitiveSet::uint64) => "uint64".to_string(),
+            ir::TyKind::Primitive(ir::PrimitiveSet::float32) => "float32".to_string(),
+            ir::TyKind::Primitive(ir::PrimitiveSet::float64) => "float64".to_string(),
             ir::TyKind::Primitive(ir::PrimitiveSet::text) => "text".to_string(),
             ir::TyKind::Tuple(fields) => {
                 let mut r = "{".to_string();

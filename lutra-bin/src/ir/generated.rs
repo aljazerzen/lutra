@@ -36,7 +36,7 @@ pub enum ExprKind {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[allow(non_camel_case_types)]
-pub struct Sid(pub i64);
+pub struct Sid(pub u32);
 
 #[derive(Debug, Clone, PartialEq, enum_as_inner::EnumAsInner)]
 #[allow(non_camel_case_types)]
@@ -65,14 +65,14 @@ pub struct Function {
 #[allow(non_camel_case_types)]
 pub struct TupleLookup {
     pub base: Expr,
-    pub offset: i64,
+    pub offset: u16,
 }
 
 #[derive(Debug, Clone)]
 #[allow(non_camel_case_types)]
 pub struct ArrayLookup {
     pub base: Expr,
-    pub offset: i64,
+    pub offset: u32,
 }
 
 #[derive(Debug, Clone)]
@@ -105,9 +105,17 @@ pub enum TyKind {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[allow(non_camel_case_types)]
 pub enum PrimitiveSet {
-    int,
-    float,
     bool,
+    int8,
+    int16,
+    int32,
+    int64,
+    uint8,
+    uint16,
+    uint32,
+    uint64,
+    float32,
+    float64,
     text,
 }
 
@@ -128,9 +136,9 @@ pub struct TyEnumVariant {
 #[derive(Debug, Clone, PartialEq, Default)]
 #[allow(non_camel_case_types)]
 pub struct TyLayout {
-    pub head_size: i64,
-    pub body_ptr_offset: Option<i64>,
-    pub variants_recursive: Vec<i64>,
+    pub head_size: u32,
+    pub body_ptr_offset: Option<u32>,
+    pub variants_recursive: Vec<u16>,
 }
 
 #[derive(Debug, Clone, PartialEq)]

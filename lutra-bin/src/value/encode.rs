@@ -37,19 +37,60 @@ fn encode_head<'t>(
     let ty = resolve_ident(ty, ctx);
 
     match value {
-        Value::Int(v) => {
-            expect_ty_primitive(ty, ir::PrimitiveSet::int)?;
-            v.encode_head(w)?;
-            Ok(ValueHeadPtr::None)
-        }
-        Value::Float(v) => {
-            expect_ty_primitive(ty, ir::PrimitiveSet::float)?;
-            v.encode_head(w)?;
-            Ok(ValueHeadPtr::None)
-        }
         Value::Bool(v) => {
             expect_ty_primitive(ty, ir::PrimitiveSet::bool)?;
 
+            v.encode_head(w)?;
+            Ok(ValueHeadPtr::None)
+        }
+
+        Value::Int8(v) => {
+            expect_ty_primitive(ty, ir::PrimitiveSet::int8)?;
+            v.encode_head(w)?;
+            Ok(ValueHeadPtr::None)
+        }
+        Value::Int16(v) => {
+            expect_ty_primitive(ty, ir::PrimitiveSet::int16)?;
+            v.encode_head(w)?;
+            Ok(ValueHeadPtr::None)
+        }
+        Value::Int32(v) => {
+            expect_ty_primitive(ty, ir::PrimitiveSet::int32)?;
+            v.encode_head(w)?;
+            Ok(ValueHeadPtr::None)
+        }
+        Value::Int64(v) => {
+            expect_ty_primitive(ty, ir::PrimitiveSet::int64)?;
+            v.encode_head(w)?;
+            Ok(ValueHeadPtr::None)
+        }
+        Value::Uint8(v) => {
+            expect_ty_primitive(ty, ir::PrimitiveSet::uint8)?;
+            v.encode_head(w)?;
+            Ok(ValueHeadPtr::None)
+        }
+        Value::Uint16(v) => {
+            expect_ty_primitive(ty, ir::PrimitiveSet::uint16)?;
+            v.encode_head(w)?;
+            Ok(ValueHeadPtr::None)
+        }
+        Value::Uint32(v) => {
+            expect_ty_primitive(ty, ir::PrimitiveSet::uint32)?;
+            v.encode_head(w)?;
+            Ok(ValueHeadPtr::None)
+        }
+        Value::Uint64(v) => {
+            expect_ty_primitive(ty, ir::PrimitiveSet::uint64)?;
+            v.encode_head(w)?;
+            Ok(ValueHeadPtr::None)
+        }
+        Value::Float32(v) => {
+            expect_ty_primitive(ty, ir::PrimitiveSet::float32)?;
+            v.encode_head(w)?;
+            Ok(ValueHeadPtr::None)
+        }
+        Value::Float64(v) => {
+            expect_ty_primitive(ty, ir::PrimitiveSet::float64)?;
             v.encode_head(w)?;
             Ok(ValueHeadPtr::None)
         }
@@ -116,15 +157,17 @@ fn encode_body<'t>(
     let ty = resolve_ident(ty, ctx);
 
     match value {
-        Value::Int(_) => {
-            expect_ty_primitive(ty, ir::PrimitiveSet::int)?;
-        }
-        Value::Float(_) => {
-            expect_ty_primitive(ty, ir::PrimitiveSet::float)?;
-        }
-        Value::Bool(_) => {
-            expect_ty_primitive(ty, ir::PrimitiveSet::bool)?;
-        }
+        Value::Int8(_)
+        | Value::Int16(_)
+        | Value::Int32(_)
+        | Value::Int64(_)
+        | Value::Uint8(_)
+        | Value::Uint16(_)
+        | Value::Uint32(_)
+        | Value::Uint64(_)
+        | Value::Float32(_)
+        | Value::Float64(_)
+        | Value::Bool(_) => {}
         Value::Text(v) => {
             expect_ty_primitive(ty, ir::PrimitiveSet::text)?;
 
@@ -201,8 +244,16 @@ fn decode_inner<'t>(r: &mut Reader<'_>, ty: &'t ir::Ty, ctx: &mut Context<'t>) -
 
     Ok(match &ty.kind {
         ir::TyKind::Primitive(ir::PrimitiveSet::bool) => Value::Bool(bool::decode(r)?),
-        ir::TyKind::Primitive(ir::PrimitiveSet::int) => Value::Int(i64::decode(r)?),
-        ir::TyKind::Primitive(ir::PrimitiveSet::float) => Value::Float(f64::decode(r)?),
+        ir::TyKind::Primitive(ir::PrimitiveSet::int8) => Value::Int8(i8::decode(r)?),
+        ir::TyKind::Primitive(ir::PrimitiveSet::int16) => Value::Int16(i16::decode(r)?),
+        ir::TyKind::Primitive(ir::PrimitiveSet::int32) => Value::Int32(i32::decode(r)?),
+        ir::TyKind::Primitive(ir::PrimitiveSet::int64) => Value::Int64(i64::decode(r)?),
+        ir::TyKind::Primitive(ir::PrimitiveSet::uint8) => Value::Uint8(u8::decode(r)?),
+        ir::TyKind::Primitive(ir::PrimitiveSet::uint16) => Value::Uint16(u16::decode(r)?),
+        ir::TyKind::Primitive(ir::PrimitiveSet::uint32) => Value::Uint32(u32::decode(r)?),
+        ir::TyKind::Primitive(ir::PrimitiveSet::uint64) => Value::Uint64(u64::decode(r)?),
+        ir::TyKind::Primitive(ir::PrimitiveSet::float32) => Value::Float32(f32::decode(r)?),
+        ir::TyKind::Primitive(ir::PrimitiveSet::float64) => Value::Float64(f64::decode(r)?),
         ir::TyKind::Primitive(ir::PrimitiveSet::text) => Value::Text(String::decode(r)?),
 
         ir::TyKind::Tuple(fields) => {

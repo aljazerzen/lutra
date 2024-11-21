@@ -37,20 +37,43 @@ impl Printer {
 impl ValueVisitor for Printer {
     type Res = String;
 
-    fn visit_int(&mut self, v: i64) -> Result<Self::Res, crate::Error> {
-        Ok(format!("{v}"))
-    }
-
-    fn visit_float(&mut self, v: f64) -> Result<Self::Res, crate::Error> {
-        Ok(format!("{v:1.1}"))
-    }
-
     fn visit_bool(&mut self, v: bool) -> Result<Self::Res, crate::Error> {
         Ok(if v {
             "true".to_string()
         } else {
             "false".to_string()
         })
+    }
+
+    fn visit_int8(&mut self, v: i8) -> Result<Self::Res, crate::Error> {
+        Ok(format!("{v}"))
+    }
+    fn visit_int16(&mut self, v: i16) -> Result<Self::Res, crate::Error> {
+        Ok(format!("{v}"))
+    }
+    fn visit_int32(&mut self, v: i32) -> Result<Self::Res, crate::Error> {
+        Ok(format!("{v}"))
+    }
+    fn visit_int64(&mut self, v: i64) -> Result<Self::Res, crate::Error> {
+        Ok(format!("{v}"))
+    }
+    fn visit_uint8(&mut self, v: u8) -> Result<Self::Res, crate::Error> {
+        Ok(format!("{v}"))
+    }
+    fn visit_uint16(&mut self, v: u16) -> Result<Self::Res, crate::Error> {
+        Ok(format!("{v}"))
+    }
+    fn visit_uint32(&mut self, v: u32) -> Result<Self::Res, crate::Error> {
+        Ok(format!("{v}"))
+    }
+    fn visit_uint64(&mut self, v: u64) -> Result<Self::Res, crate::Error> {
+        Ok(format!("{v}"))
+    }
+    fn visit_float32(&mut self, v: f32) -> Result<Self::Res, crate::Error> {
+        Ok(format!("{v}"))
+    }
+    fn visit_float64(&mut self, v: f64) -> Result<Self::Res, crate::Error> {
+        Ok(format!("{v}"))
     }
 
     fn visit_text(&mut self, v: &str) -> Result<Self::Res, crate::Error> {
@@ -181,8 +204,17 @@ fn try_tabular(items_ty: &ir::Ty) -> Option<tabular::Table> {
 
 fn column_spec_primitive(primitive: &ir::PrimitiveSet) -> &'static str {
     match primitive {
-        ir::PrimitiveSet::int | ir::PrimitiveSet::float => "{:>}",
         ir::PrimitiveSet::bool => "{:^}",
+        ir::PrimitiveSet::int8
+        | ir::PrimitiveSet::int16
+        | ir::PrimitiveSet::int32
+        | ir::PrimitiveSet::int64
+        | ir::PrimitiveSet::uint8
+        | ir::PrimitiveSet::uint16
+        | ir::PrimitiveSet::uint32
+        | ir::PrimitiveSet::uint64
+        | ir::PrimitiveSet::float32
+        | ir::PrimitiveSet::float64 => "{:>}",
         ir::PrimitiveSet::text => "{:<}",
     }
 }
@@ -231,14 +263,38 @@ fn apply_header(row: &mut tabular::Row, prefix: &mut Vec<String>, ty: &ir::Ty) {
 
 fn apply_tabular_value(row: &mut tabular::Row, value: &Value) {
     match value {
-        Value::Int(v) => {
-            row.add_cell(v.to_string());
-        }
-        Value::Float(v) => {
-            row.add_cell(v.to_string());
-        }
         Value::Bool(v) => {
             row.add_cell(if *v { "x" } else { " " });
+        }
+        Value::Int8(v) => {
+            row.add_cell(v.to_string());
+        }
+        Value::Int16(v) => {
+            row.add_cell(v.to_string());
+        }
+        Value::Int32(v) => {
+            row.add_cell(v.to_string());
+        }
+        Value::Int64(v) => {
+            row.add_cell(v.to_string());
+        }
+        Value::Uint8(v) => {
+            row.add_cell(v.to_string());
+        }
+        Value::Uint16(v) => {
+            row.add_cell(v.to_string());
+        }
+        Value::Uint32(v) => {
+            row.add_cell(v.to_string());
+        }
+        Value::Uint64(v) => {
+            row.add_cell(v.to_string());
+        }
+        Value::Float32(v) => {
+            row.add_cell(v.to_string());
+        }
+        Value::Float64(v) => {
+            row.add_cell(v.to_string());
         }
         Value::Text(v) => {
             row.add_cell(v.to_string());

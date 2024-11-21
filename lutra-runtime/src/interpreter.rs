@@ -89,16 +89,16 @@ impl Interpreter {
             }
             ir::SidKind::FunctionScope => {
                 // function scopes
-                let scope_id = ir::Sid((sid.0 as u32).bitand(0xffffff00_u32) as i64);
+                let scope_id = ir::Sid(sid.0.bitand(0xffffff00_u32));
                 let start = self.scopes.get(&scope_id).and_then(|s| s.last()).unwrap();
 
-                *start + ((sid.0 as u32).bitand(0x000000ff_u32) as usize)
+                *start + (sid.0.bitand(0x000000ff_u32) as usize)
             }
         }
     }
 
     fn allocate_binding(&mut self, binding_id: ir::Sid, symbol: Cell) -> Addr {
-        assert_eq!((binding_id.0 as u32).shr(30), 0x1_u32);
+        assert_eq!(binding_id.0.shr(30), 0x1_u32);
 
         let addr = self.allocate(symbol);
         self.bindings.insert(binding_id, addr);
@@ -107,14 +107,14 @@ impl Interpreter {
     }
 
     fn drop_binding(&mut self, binding_id: ir::Sid) {
-        assert_eq!((binding_id.0 as u32).shr(30), 0x1_u32);
+        assert_eq!(binding_id.0.shr(30), 0x1_u32);
 
         let addr = self.bindings.remove(&binding_id).unwrap();
         self.drop(addr, addr + 1);
     }
 
     fn allocate_scope(&mut self, scope_id: ir::Sid, cells: Vec<(&ir::Ty, Cell)>) -> Addr {
-        assert_eq!((scope_id.0 as u32).shr(30), 0x2_u32);
+        assert_eq!(scope_id.0.shr(30), 0x2_u32);
 
         let mem_start = self.memory.len() as Addr;
         self.scopes.entry(scope_id).or_default().push(mem_start);
@@ -126,7 +126,7 @@ impl Interpreter {
     }
 
     fn drop_scope(&mut self, scope_id: ir::Sid, scope_size: usize) {
-        assert_eq!((scope_id.0 as u32).shr(30), 0x2_u32);
+        assert_eq!(scope_id.0.shr(30), 0x2_u32);
 
         let sid_start = self.scopes.get_mut(&scope_id).unwrap().pop().unwrap();
         let sid_end = sid_start + scope_size;

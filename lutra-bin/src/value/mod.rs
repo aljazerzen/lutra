@@ -8,9 +8,17 @@ use crate::{Error, Result};
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum Value {
-    Int(i64),
-    Float(f64),
     Bool(bool),
+    Int8(i8),
+    Int16(i16),
+    Int32(i32),
+    Int64(i64),
+    Uint8(u8),
+    Uint16(u16),
+    Uint32(u32),
+    Uint64(u64),
+    Float32(f32),
+    Float64(f64),
     Text(String),
     Tuple(Vec<Value>),
     Array(Vec<Value>),
@@ -46,9 +54,17 @@ fn expect_ty_primitive(ty: &ir::Ty, expected: ir::PrimitiveSet) -> Result<()> {
 
 fn primitive_set_name(expected: &ir::PrimitiveSet) -> &'static str {
     match expected {
-        ir::PrimitiveSet::int => "int",
-        ir::PrimitiveSet::float => "float",
         ir::PrimitiveSet::bool => "bool",
+        ir::PrimitiveSet::int8 => "int8",
+        ir::PrimitiveSet::int16 => "int16",
+        ir::PrimitiveSet::int32 => "int32",
+        ir::PrimitiveSet::int64 => "int64",
+        ir::PrimitiveSet::uint8 => "uint8",
+        ir::PrimitiveSet::uint16 => "uint16",
+        ir::PrimitiveSet::uint32 => "uint32",
+        ir::PrimitiveSet::uint64 => "uint64",
+        ir::PrimitiveSet::float32 => "float32",
+        ir::PrimitiveSet::float64 => "float64",
         ir::PrimitiveSet::text => "text",
     }
 }

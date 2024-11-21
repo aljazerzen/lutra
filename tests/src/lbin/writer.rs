@@ -44,7 +44,7 @@ fn test_01() {
         Data::new(vec![4, 0, 0, 0, 0, 0, 0, 0]),
     ];
 
-    let output_ty = lutra_frontend::_test_compile_ty("[int]");
+    let output_ty = lutra_frontend::_test_compile_ty("[int64]");
     let output_ty = ir::Ty::from(output_ty);
 
     insta::assert_snapshot!(_test_array_writer(items, &output_ty), @r#"
@@ -105,7 +105,7 @@ fn test_04() {
         Data::new(vec![1, 1, 0, 0, 0, 0, 0, 0, 65, 66, 65, 66]), // int (followed by the body of text)
     ];
 
-    let output_ty = lutra_frontend::_test_compile_ty("{int, text, int}");
+    let output_ty = lutra_frontend::_test_compile_ty("{int64, text, int64}");
     let output_ty = ir::Ty::from(output_ty);
 
     insta::assert_snapshot!(_test_tuple_writer(fields, &output_ty), @r#"

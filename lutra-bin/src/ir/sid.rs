@@ -8,7 +8,7 @@ pub enum SidKind {
 
 impl ir::Sid {
     pub fn kind(&self) -> SidKind {
-        let sid_kind: u32 = (self.0 as u32) >> 30;
+        let sid_kind: u32 = self.0 >> 30;
         match sid_kind {
             0 => SidKind::External,
             1 => SidKind::Var,

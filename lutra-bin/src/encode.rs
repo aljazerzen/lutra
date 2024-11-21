@@ -16,8 +16,107 @@ pub trait Encode {
 
     fn encode_body(&self, head: Self::HeadPtr, w: &mut Vec<u8>) -> Result<()>;
 }
+impl Encode for bool {
+    type HeadPtr = ();
 
+    fn encode_head(&self, w: &mut Vec<u8>) -> Result<Self::HeadPtr> {
+        Ok(w.write_all(&[(*self as u8)])?)
+    }
+
+    fn encode_body(&self, _head: Self::HeadPtr, _w: &mut Vec<u8>) -> Result<()> {
+        Ok(())
+    }
+}
+
+impl Encode for i8 {
+    type HeadPtr = ();
+
+    fn encode_head(&self, w: &mut Vec<u8>) -> Result<Self::HeadPtr> {
+        Ok(w.write_all(&self.to_le_bytes())?)
+    }
+
+    fn encode_body(&self, _head: Self::HeadPtr, _w: &mut Vec<u8>) -> Result<()> {
+        Ok(())
+    }
+}
+impl Encode for i16 {
+    type HeadPtr = ();
+
+    fn encode_head(&self, w: &mut Vec<u8>) -> Result<Self::HeadPtr> {
+        Ok(w.write_all(&self.to_le_bytes())?)
+    }
+
+    fn encode_body(&self, _head: Self::HeadPtr, _w: &mut Vec<u8>) -> Result<()> {
+        Ok(())
+    }
+}
+impl Encode for i32 {
+    type HeadPtr = ();
+
+    fn encode_head(&self, w: &mut Vec<u8>) -> Result<Self::HeadPtr> {
+        Ok(w.write_all(&self.to_le_bytes())?)
+    }
+
+    fn encode_body(&self, _head: Self::HeadPtr, _w: &mut Vec<u8>) -> Result<()> {
+        Ok(())
+    }
+}
 impl Encode for i64 {
+    type HeadPtr = ();
+
+    fn encode_head(&self, w: &mut Vec<u8>) -> Result<Self::HeadPtr> {
+        Ok(w.write_all(&self.to_le_bytes())?)
+    }
+
+    fn encode_body(&self, _head: Self::HeadPtr, _w: &mut Vec<u8>) -> Result<()> {
+        Ok(())
+    }
+}
+impl Encode for u8 {
+    type HeadPtr = ();
+
+    fn encode_head(&self, w: &mut Vec<u8>) -> Result<Self::HeadPtr> {
+        Ok(w.write_all(&self.to_le_bytes())?)
+    }
+
+    fn encode_body(&self, _head: Self::HeadPtr, _w: &mut Vec<u8>) -> Result<()> {
+        Ok(())
+    }
+}
+impl Encode for u16 {
+    type HeadPtr = ();
+
+    fn encode_head(&self, w: &mut Vec<u8>) -> Result<Self::HeadPtr> {
+        Ok(w.write_all(&self.to_le_bytes())?)
+    }
+
+    fn encode_body(&self, _head: Self::HeadPtr, _w: &mut Vec<u8>) -> Result<()> {
+        Ok(())
+    }
+}
+impl Encode for u32 {
+    type HeadPtr = ();
+
+    fn encode_head(&self, w: &mut Vec<u8>) -> Result<Self::HeadPtr> {
+        Ok(w.write_all(&self.to_le_bytes())?)
+    }
+
+    fn encode_body(&self, _head: Self::HeadPtr, _w: &mut Vec<u8>) -> Result<()> {
+        Ok(())
+    }
+}
+impl Encode for u64 {
+    type HeadPtr = ();
+
+    fn encode_head(&self, w: &mut Vec<u8>) -> Result<Self::HeadPtr> {
+        Ok(w.write_all(&self.to_le_bytes())?)
+    }
+
+    fn encode_body(&self, _head: Self::HeadPtr, _w: &mut Vec<u8>) -> Result<()> {
+        Ok(())
+    }
+}
+impl Encode for f32 {
     type HeadPtr = ();
 
     fn encode_head(&self, w: &mut Vec<u8>) -> Result<Self::HeadPtr> {
@@ -39,17 +138,7 @@ impl Encode for f64 {
         Ok(())
     }
 }
-impl Encode for bool {
-    type HeadPtr = ();
 
-    fn encode_head(&self, w: &mut Vec<u8>) -> Result<Self::HeadPtr> {
-        Ok(w.write_all(&[(*self as u8)])?)
-    }
-
-    fn encode_body(&self, _head: Self::HeadPtr, _w: &mut Vec<u8>) -> Result<()> {
-        Ok(())
-    }
-}
 impl Encode for String {
     type HeadPtr = ReversePointer;
 
@@ -188,25 +277,74 @@ pub trait Decode: Sized + Layout {
 
     fn decode(r: &mut Reader<'_>) -> Result<Self>;
 }
-
-impl Decode for i64 {
-    fn decode(r: &mut Reader<'_>) -> Result<Self> {
-        let bytes = r.read_const::<8>();
-        Ok(i64::from_le_bytes(bytes))
-    }
-}
-impl Decode for f64 {
-    fn decode(r: &mut Reader<'_>) -> Result<Self> {
-        let bytes = r.read_const::<8>();
-        Ok(f64::from_le_bytes(bytes))
-    }
-}
 impl Decode for bool {
     fn decode(r: &mut Reader<'_>) -> Result<Self> {
         let [v] = r.read_const::<1>();
         Ok(v != 0)
     }
 }
+
+impl Decode for i8 {
+    fn decode(r: &mut Reader<'_>) -> Result<Self> {
+        let bytes = r.read_const();
+        Ok(i8::from_le_bytes(bytes))
+    }
+}
+impl Decode for i16 {
+    fn decode(r: &mut Reader<'_>) -> Result<Self> {
+        let bytes = r.read_const();
+        Ok(i16::from_le_bytes(bytes))
+    }
+}
+impl Decode for i32 {
+    fn decode(r: &mut Reader<'_>) -> Result<Self> {
+        let bytes = r.read_const();
+        Ok(i32::from_le_bytes(bytes))
+    }
+}
+impl Decode for i64 {
+    fn decode(r: &mut Reader<'_>) -> Result<Self> {
+        let bytes = r.read_const();
+        Ok(i64::from_le_bytes(bytes))
+    }
+}
+impl Decode for u8 {
+    fn decode(r: &mut Reader<'_>) -> Result<Self> {
+        let bytes = r.read_const();
+        Ok(u8::from_le_bytes(bytes))
+    }
+}
+impl Decode for u16 {
+    fn decode(r: &mut Reader<'_>) -> Result<Self> {
+        let bytes = r.read_const();
+        Ok(u16::from_le_bytes(bytes))
+    }
+}
+impl Decode for u32 {
+    fn decode(r: &mut Reader<'_>) -> Result<Self> {
+        let bytes = r.read_const();
+        Ok(u32::from_le_bytes(bytes))
+    }
+}
+impl Decode for u64 {
+    fn decode(r: &mut Reader<'_>) -> Result<Self> {
+        let bytes = r.read_const();
+        Ok(u64::from_le_bytes(bytes))
+    }
+}
+impl Decode for f32 {
+    fn decode(r: &mut Reader<'_>) -> Result<Self> {
+        let bytes = r.read_const();
+        Ok(f32::from_le_bytes(bytes))
+    }
+}
+impl Decode for f64 {
+    fn decode(r: &mut Reader<'_>) -> Result<Self> {
+        let bytes = r.read_const();
+        Ok(f64::from_le_bytes(bytes))
+    }
+}
+
 impl Decode for String {
     fn decode(r: &mut Reader<'_>) -> Result<Self> {
         let mut body = r.clone();

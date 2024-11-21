@@ -12,4 +12,5 @@ test-fast tests='':
     cargo clippy --all-targets
 
 generate-ir:
+    cargo run -p lutra-codegen -- lutra-bin/src/ir lutra-bin/src/ir/generated.rs
     ./target/debug/lutra-codegen lutra-bin/src/ir lutra-bin/src/ir/generated.rs

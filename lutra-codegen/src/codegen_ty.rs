@@ -164,7 +164,7 @@ pub fn write_ty_def(
             for (index, variant) in variants.iter().enumerate() {
                 write!(w, "    {}", variant.name)?;
                 if !is_unit_variant(&variant.ty) {
-                    let needs_box = layout::does_enum_variant_contain_recursive(ty, index);
+                    let needs_box = layout::does_enum_variant_contain_recursive(ty, index as u16);
 
                     write!(w, "(")?;
                     if needs_box {
@@ -204,14 +204,38 @@ fn write_ty_ref(
     ctx: &mut Context,
 ) -> Result<(), std::fmt::Error> {
     match &ty.kind {
-        ir::TyKind::Primitive(ir::PrimitiveSet::int) => {
-            write!(w, "i64")?;
-        }
-        ir::TyKind::Primitive(ir::PrimitiveSet::float) => {
-            write!(w, "f64")?;
-        }
         ir::TyKind::Primitive(ir::PrimitiveSet::bool) => {
             write!(w, "bool")?;
+        }
+        ir::TyKind::Primitive(ir::PrimitiveSet::int8) => {
+            write!(w, "i8")?;
+        }
+        ir::TyKind::Primitive(ir::PrimitiveSet::int16) => {
+            write!(w, "i16")?;
+        }
+        ir::TyKind::Primitive(ir::PrimitiveSet::int32) => {
+            write!(w, "i32")?;
+        }
+        ir::TyKind::Primitive(ir::PrimitiveSet::int64) => {
+            write!(w, "i64")?;
+        }
+        ir::TyKind::Primitive(ir::PrimitiveSet::uint8) => {
+            write!(w, "u8")?;
+        }
+        ir::TyKind::Primitive(ir::PrimitiveSet::uint16) => {
+            write!(w, "u16")?;
+        }
+        ir::TyKind::Primitive(ir::PrimitiveSet::uint32) => {
+            write!(w, "u32")?;
+        }
+        ir::TyKind::Primitive(ir::PrimitiveSet::uint64) => {
+            write!(w, "u64")?;
+        }
+        ir::TyKind::Primitive(ir::PrimitiveSet::float32) => {
+            write!(w, "f32")?;
+        }
+        ir::TyKind::Primitive(ir::PrimitiveSet::float64) => {
+            write!(w, "f64")?;
         }
         ir::TyKind::Primitive(ir::PrimitiveSet::text) => {
             write!(w, "String")?;
@@ -587,7 +611,7 @@ fn write_ty_def_impl(w: &mut impl Write, ty: &ir::Ty) -> Result<(), std::fmt::Er
                     writeln!(w, "                r.skip({});", variant_format.padding / 8)?;
                 }
 
-                let needs_box = layout::does_enum_variant_contain_recursive(ty, index);
+                let needs_box = layout::does_enum_variant_contain_recursive(ty, index as u16);
 
                 if is_unit_variant(&variant.ty) {
                     writeln!(w, "                {name}::{}", variant.name)?;

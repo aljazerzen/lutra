@@ -10,36 +10,36 @@ fn parse_01() {
 let main =
   let 1 = (
     func 2 -> [
-        fn.2+0: float,
-        fn.2+0: float,
-        fn.2+0: float
-    ]: [float]
-  ): func (float) -> [float];
+        fn.2+0: float64,
+        fn.2+0: float64,
+        fn.2+0: float64
+    ]: [float64]
+  ): func (float64) -> [float64];
 
-  let 2 = var.1: func (float) -> [float];
+  let 2 = var.1: func (float64) -> [float64];
   {
     (
-        call var.2: func (float) -> [float],
-        3.5: float
-    ): [float],
+        call var.2: func (float64) -> [float64],
+        3.5: float64
+    ): [float64],
     (call
         (
             func 3 -> [
-                fn.3+0: int,
-                fn.3+1: int,
-            ]: [int]
-        ): func (int, int) -> [int],
-        6: int,
-        7: int,
-    ): [int],
+                fn.3+0: int64,
+                fn.3+1: int64,
+            ]: [int64]
+        ): func (int64, int64) -> [int64],
+        6: int64,
+        7: int64,
+    ): [int64],
     (call
-        external.0: func (int, int) -> int,
-        6: int,
-        2: int
-    ): int
-  }: {[float], [int], int}
-  .1:[int]
-  .[0]:int
+        external.0: func (int64, int64) -> int64,
+        6: int64,
+        2: int64
+    ): int64
+  }: {[float64], [int64], int64}
+  .1:[int64]
+  .[0]:int64
     "#), @r#"
     Program {
         externals: [
@@ -70,7 +70,7 @@ let main =
                                                 ),
                                                 ty: Ty {
                                                     kind: Primitive(
-                                                        float,
+                                                        float64,
                                                     ),
                                                     layout: Some(
                                                         TyLayout {
@@ -90,7 +90,7 @@ let main =
                                                 ),
                                                 ty: Ty {
                                                     kind: Primitive(
-                                                        float,
+                                                        float64,
                                                     ),
                                                     layout: Some(
                                                         TyLayout {
@@ -110,7 +110,7 @@ let main =
                                                 ),
                                                 ty: Ty {
                                                     kind: Primitive(
-                                                        float,
+                                                        float64,
                                                     ),
                                                     layout: Some(
                                                         TyLayout {
@@ -128,7 +128,7 @@ let main =
                                         kind: Array(
                                             Ty {
                                                 kind: Primitive(
-                                                    float,
+                                                    float64,
                                                 ),
                                                 layout: Some(
                                                     TyLayout {
@@ -160,7 +160,7 @@ let main =
                                     params: [
                                         Ty {
                                             kind: Primitive(
-                                                float,
+                                                float64,
                                             ),
                                             layout: Some(
                                                 TyLayout {
@@ -176,7 +176,7 @@ let main =
                                         kind: Array(
                                             Ty {
                                                 kind: Primitive(
-                                                    float,
+                                                    float64,
                                                 ),
                                                 layout: Some(
                                                     TyLayout {
@@ -223,7 +223,7 @@ let main =
                                                 params: [
                                                     Ty {
                                                         kind: Primitive(
-                                                            float,
+                                                            float64,
                                                         ),
                                                         layout: Some(
                                                             TyLayout {
@@ -239,7 +239,7 @@ let main =
                                                     kind: Array(
                                                         Ty {
                                                             kind: Primitive(
-                                                                float,
+                                                                float64,
                                                             ),
                                                             layout: Some(
                                                                 TyLayout {
@@ -292,7 +292,7 @@ let main =
                                                                                                 params: [
                                                                                                     Ty {
                                                                                                         kind: Primitive(
-                                                                                                            float,
+                                                                                                            float64,
                                                                                                         ),
                                                                                                         layout: Some(
                                                                                                             TyLayout {
@@ -308,7 +308,7 @@ let main =
                                                                                                     kind: Array(
                                                                                                         Ty {
                                                                                                             kind: Primitive(
-                                                                                                                float,
+                                                                                                                float64,
                                                                                                             ),
                                                                                                             layout: Some(
                                                                                                                 TyLayout {
@@ -346,7 +346,7 @@ let main =
                                                                                         ),
                                                                                         ty: Ty {
                                                                                             kind: Primitive(
-                                                                                                float,
+                                                                                                float64,
                                                                                             ),
                                                                                             layout: Some(
                                                                                                 TyLayout {
@@ -365,7 +365,7 @@ let main =
                                                                             kind: Array(
                                                                                 Ty {
                                                                                     kind: Primitive(
-                                                                                        float,
+                                                                                        float64,
                                                                                     ),
                                                                                     layout: Some(
                                                                                         TyLayout {
@@ -409,7 +409,7 @@ let main =
                                                                                                             ),
                                                                                                             ty: Ty {
                                                                                                                 kind: Primitive(
-                                                                                                                    int,
+                                                                                                                    int64,
                                                                                                                 ),
                                                                                                                 layout: Some(
                                                                                                                     TyLayout {
@@ -429,7 +429,7 @@ let main =
                                                                                                             ),
                                                                                                             ty: Ty {
                                                                                                                 kind: Primitive(
-                                                                                                                    int,
+                                                                                                                    int64,
                                                                                                                 ),
                                                                                                                 layout: Some(
                                                                                                                     TyLayout {
@@ -447,7 +447,7 @@ let main =
                                                                                                     kind: Array(
                                                                                                         Ty {
                                                                                                             kind: Primitive(
-                                                                                                                int,
+                                                                                                                int64,
                                                                                                             ),
                                                                                                             layout: Some(
                                                                                                                 TyLayout {
@@ -479,7 +479,7 @@ let main =
                                                                                                 params: [
                                                                                                     Ty {
                                                                                                         kind: Primitive(
-                                                                                                            int,
+                                                                                                            int64,
                                                                                                         ),
                                                                                                         layout: Some(
                                                                                                             TyLayout {
@@ -492,7 +492,7 @@ let main =
                                                                                                     },
                                                                                                     Ty {
                                                                                                         kind: Primitive(
-                                                                                                            int,
+                                                                                                            int64,
                                                                                                         ),
                                                                                                         layout: Some(
                                                                                                             TyLayout {
@@ -508,7 +508,7 @@ let main =
                                                                                                     kind: Array(
                                                                                                         Ty {
                                                                                                             kind: Primitive(
-                                                                                                                int,
+                                                                                                                int64,
                                                                                                             ),
                                                                                                             layout: Some(
                                                                                                                 TyLayout {
@@ -546,7 +546,7 @@ let main =
                                                                                         ),
                                                                                         ty: Ty {
                                                                                             kind: Primitive(
-                                                                                                int,
+                                                                                                int64,
                                                                                             ),
                                                                                             layout: Some(
                                                                                                 TyLayout {
@@ -566,7 +566,7 @@ let main =
                                                                                         ),
                                                                                         ty: Ty {
                                                                                             kind: Primitive(
-                                                                                                int,
+                                                                                                int64,
                                                                                             ),
                                                                                             layout: Some(
                                                                                                 TyLayout {
@@ -585,7 +585,7 @@ let main =
                                                                             kind: Array(
                                                                                 Ty {
                                                                                     kind: Primitive(
-                                                                                        int,
+                                                                                        int64,
                                                                                     ),
                                                                                     layout: Some(
                                                                                         TyLayout {
@@ -624,7 +624,7 @@ let main =
                                                                                                 params: [
                                                                                                     Ty {
                                                                                                         kind: Primitive(
-                                                                                                            int,
+                                                                                                            int64,
                                                                                                         ),
                                                                                                         layout: Some(
                                                                                                             TyLayout {
@@ -637,7 +637,7 @@ let main =
                                                                                                     },
                                                                                                     Ty {
                                                                                                         kind: Primitive(
-                                                                                                            int,
+                                                                                                            int64,
                                                                                                         ),
                                                                                                         layout: Some(
                                                                                                             TyLayout {
@@ -651,7 +651,7 @@ let main =
                                                                                                 ],
                                                                                                 body: Ty {
                                                                                                     kind: Primitive(
-                                                                                                        int,
+                                                                                                        int64,
                                                                                                     ),
                                                                                                     layout: Some(
                                                                                                         TyLayout {
@@ -677,7 +677,7 @@ let main =
                                                                                         ),
                                                                                         ty: Ty {
                                                                                             kind: Primitive(
-                                                                                                int,
+                                                                                                int64,
                                                                                             ),
                                                                                             layout: Some(
                                                                                                 TyLayout {
@@ -697,7 +697,7 @@ let main =
                                                                                         ),
                                                                                         ty: Ty {
                                                                                             kind: Primitive(
-                                                                                                int,
+                                                                                                int64,
                                                                                             ),
                                                                                             layout: Some(
                                                                                                 TyLayout {
@@ -714,7 +714,7 @@ let main =
                                                                         ),
                                                                         ty: Ty {
                                                                             kind: Primitive(
-                                                                                int,
+                                                                                int64,
                                                                             ),
                                                                             layout: Some(
                                                                                 TyLayout {
@@ -737,7 +737,7 @@ let main =
                                                                                 kind: Array(
                                                                                     Ty {
                                                                                         kind: Primitive(
-                                                                                            float,
+                                                                                            float64,
                                                                                         ),
                                                                                         layout: Some(
                                                                                             TyLayout {
@@ -767,7 +767,7 @@ let main =
                                                                                 kind: Array(
                                                                                     Ty {
                                                                                         kind: Primitive(
-                                                                                            int,
+                                                                                            int64,
                                                                                         ),
                                                                                         layout: Some(
                                                                                             TyLayout {
@@ -795,7 +795,7 @@ let main =
                                                                             name: None,
                                                                             ty: Ty {
                                                                                 kind: Primitive(
-                                                                                    int,
+                                                                                    int64,
                                                                                 ),
                                                                                 layout: Some(
                                                                                     TyLayout {
@@ -826,7 +826,7 @@ let main =
                                                     kind: Array(
                                                         Ty {
                                                             kind: Primitive(
-                                                                int,
+                                                                int64,
                                                             ),
                                                             layout: Some(
                                                                 TyLayout {
@@ -855,7 +855,7 @@ let main =
                                     ),
                                     ty: Ty {
                                         kind: Primitive(
-                                            int,
+                                            int64,
                                         ),
                                         layout: Some(
                                             TyLayout {
@@ -871,7 +871,7 @@ let main =
                         ),
                         ty: Ty {
                             kind: Primitive(
-                                int,
+                                int64,
                             ),
                             layout: Some(
                                 TyLayout {
@@ -887,7 +887,7 @@ let main =
             ),
             ty: Ty {
                 kind: Primitive(
-                    int,
+                    int64,
                 ),
                 layout: Some(
                     TyLayout {

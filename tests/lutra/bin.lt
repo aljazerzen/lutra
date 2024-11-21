@@ -1,13 +1,13 @@
-type x = {int, a = text, b = [bool]}
+type x = {int64, a = text, b = [bool]}
 
-type y = [int]
+type y = [int64]
 
 type z = bool
 
 type u = enum {
   f = bool,
   g,
-  h = {a = int, b = float}
+  h = {a = int64, b = float64}
 }
 
 type v = enum { Yes, No, Maybe }
@@ -15,7 +15,7 @@ type v = enum { Yes, No, Maybe }
 type i = {v, z}
 
 type Tree = enum {
-    Leaf = int,
+    Leaf = int64,
     Node = {left = Tree, right = Tree},
 }
 

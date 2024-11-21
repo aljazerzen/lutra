@@ -1,3 +1,6 @@
+mod value;
+mod writer;
+
 use crate::lutra::bin as types;
 
 use std::sync::OnceLock;
@@ -49,7 +52,7 @@ fn test_x() {
     let ty = _test_get_type("x");
 
     let value = Value::Tuple(vec![
-        Value::Int(42),
+        Value::Int64(42),
         Value::Text("Hello world!".to_string()),
         Value::Array(vec![Value::Bool(true), Value::Bool(false)]),
     ]);
@@ -66,7 +69,7 @@ fn test_x() {
 #[test]
 fn test_y() {
     let ty = _test_get_type("y");
-    let value = Value::Array(vec![Value::Int(12), Value::Int(55), Value::Int(2)]);
+    let value = Value::Array(vec![Value::Int64(12), Value::Int64(55), Value::Int64(2)]);
     assert_snapshot!(_test_encode_decode::<types::y>(value, &ty), @r#"
     Length: 32 (0x20) bytes
     0000:   08 00 00 00  03 00 00 00  0c 00 00 00  00 00 00 00   ................
@@ -116,7 +119,7 @@ fn test_u_03() {
     let ty = _test_get_type("u");
     let value = Value::Enum(
         2,
-        Box::new(Value::Tuple(vec![Value::Int(-12), Value::Float(3.16)])),
+        Box::new(Value::Tuple(vec![Value::Int64(-12), Value::Float64(3.16)])),
     );
 
     assert_snapshot!(_test_encode_decode::<types::u>(value, &ty), @r#"
@@ -145,12 +148,12 @@ fn test_tree() {
     let value = Value::Enum(
         1, // Node
         Box::new(Value::Tuple(vec![
-            Value::Enum(0, Box::new(Value::Int(4))), // Leaf
+            Value::Enum(0, Box::new(Value::Int64(4))), // Leaf
             Value::Enum(
                 1, // Node
                 Box::new(Value::Tuple(vec![
-                    Value::Enum(0, Box::new(Value::Int(7))),  // Leaf
-                    Value::Enum(0, Box::new(Value::Int(10))), // Leaf
+                    Value::Enum(0, Box::new(Value::Int64(7))),  // Leaf
+                    Value::Enum(0, Box::new(Value::Int64(10))), // Leaf
                 ])),
             ),
         ])),

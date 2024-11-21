@@ -28,10 +28,10 @@ fn test_01() {
     ];
 
     let main = (
-        call external.0: func (int, int) -> int,
-        1: int,
-        2: int
-    ): int
+        call external.0: func (int64, int64) -> int64,
+        1: int64,
+        2: int64,
+    ): int64
     ",
     );
 
@@ -39,5 +39,5 @@ fn test_01() {
 
     let value = Value::decode(&value, &program.main.ty).unwrap();
 
-    assert_eq!(value, Value::Int(2));
+    assert_eq!(value, Value::Int64(2));
 }

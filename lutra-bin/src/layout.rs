@@ -11,12 +11,51 @@ impl Layout for bool {
     }
 }
 
+impl Layout for i8 {
+    fn head_size() -> usize {
+        8
+    }
+}
+impl Layout for i16 {
+    fn head_size() -> usize {
+        16
+    }
+}
+impl Layout for i32 {
+    fn head_size() -> usize {
+        32
+    }
+}
 impl Layout for i64 {
     fn head_size() -> usize {
         64
     }
 }
-
+impl Layout for u8 {
+    fn head_size() -> usize {
+        8
+    }
+}
+impl Layout for u16 {
+    fn head_size() -> usize {
+        16
+    }
+}
+impl Layout for u32 {
+    fn head_size() -> usize {
+        32
+    }
+}
+impl Layout for u64 {
+    fn head_size() -> usize {
+        64
+    }
+}
+impl Layout for f32 {
+    fn head_size() -> usize {
+        32
+    }
+}
 impl Layout for f64 {
     fn head_size() -> usize {
         64
@@ -46,11 +85,19 @@ impl<I: Layout> Layout for Option<I> {
 }
 
 pub fn get_layout_simple(ty: &ir::Ty) -> Option<ir::TyLayout> {
-    let head_size: i64 = match &ty.kind {
+    let head_size = match &ty.kind {
         ir::TyKind::Primitive(prim) => match prim {
+            ir::PrimitiveSet::int8 => 8,
+            ir::PrimitiveSet::int16 => 16,
+            ir::PrimitiveSet::int32 => 32,
+            ir::PrimitiveSet::int64 => 64,
+            ir::PrimitiveSet::uint8 => 8,
+            ir::PrimitiveSet::uint16 => 16,
+            ir::PrimitiveSet::uint32 => 32,
+            ir::PrimitiveSet::uint64 => 64,
+            ir::PrimitiveSet::float32 => 32,
+            ir::PrimitiveSet::float64 => 64,
             ir::PrimitiveSet::bool => 8,
-            ir::PrimitiveSet::int => 64,
-            ir::PrimitiveSet::float => 64,
             ir::PrimitiveSet::text => 64,
         },
         ir::TyKind::Array(_) => 64,
@@ -67,13 +114,13 @@ pub fn get_layout_simple(ty: &ir::Ty) -> Option<ir::TyLayout> {
             size
         }
         ir::TyKind::Enum(variants) => {
-            let tag_size = enum_tag_size(variants.len()) as i64;
+            let tag_size = enum_tag_size(variants.len());
 
             tag_size + 32
         }
         _ => return None,
     };
-    let body_ptr_offset: Option<i64> = match &ty.kind {
+    let body_ptr_offset: Option<u32> = match &ty.kind {
         ir::TyKind::Primitive(ir::PrimitiveSet::text) => Some(0),
         ir::TyKind::Array(_) => Some(0),
         ir::TyKind::Enum(_) => Some(8), // TODO: this is wrong
@@ -89,9 +136,9 @@ pub fn get_layout_simple(ty: &ir::Ty) -> Option<ir::TyLayout> {
     })
 }
 
-pub fn does_enum_variant_contain_recursive(enum_ty: &ir::Ty, variant_index: usize) -> bool {
+pub fn does_enum_variant_contain_recursive(enum_ty: &ir::Ty, variant_index: u16) -> bool {
     let layout = enum_ty.layout.as_ref().unwrap();
-    layout.variants_recursive.contains(&(variant_index as i64))
+    layout.variants_recursive.contains(&variant_index)
 }
 
 pub struct EnumHeadFormat {
@@ -101,7 +148,7 @@ pub struct EnumHeadFormat {
 }
 
 pub fn enum_head_format(variants: &[ir::TyEnumVariant]) -> EnumHeadFormat {
-    let s = enum_tag_size(variants.len());
+    let s = enum_tag_size(variants.len()) as usize;
 
     let h = enum_max_variant_head_size(variants);
 
@@ -134,13 +181,13 @@ fn enum_max_variant_head_size(variants: &[ir::TyEnumVariant]) -> usize {
     h
 }
 
-fn enum_tag_size(variants_len: usize) -> usize {
+fn enum_tag_size(variants_len: usize) -> u32 {
     // TODO: when bool-sub-byte packing is implemented, remove function in favor of enum_tag_size_used
     enum_tag_size_used(variants_len).div_ceil(8) * 8
 }
 
-fn enum_tag_size_used(variants_len: usize) -> usize {
-    f64::log2(variants_len as f64).ceil() as usize
+fn enum_tag_size_used(variants_len: usize) -> u32 {
+    f64::log2(variants_len as f64).ceil() as u32
 }
 
 #[test]

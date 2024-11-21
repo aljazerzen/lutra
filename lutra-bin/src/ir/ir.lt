@@ -30,14 +30,13 @@ type ExprKind = enum {
 ## - 0b01xxxxxx - local bindings
 ## - 0b10xxxxxx - function scopes
 ## - 0b11xxxxxx - unused
-# TODO: make this u32
 @(derive ["Debug", "Clone", "Copy", "PartialEq", "Eq", "Hash"])
-type Sid = int
+type Sid = uint32
 
 @(derive ["Debug", "Clone", "PartialEq", "enum_as_inner::EnumAsInner"])
 type Literal = enum {
-  Int = int,
-  Float = float,
+  Int = int64,
+  Float = float64,
   Bool = bool,
   Text = text,
 }
@@ -56,12 +55,12 @@ type Function = {
 
 type TupleLookup = {
   base = Expr,
-  offset = int,
+  offset = uint16,
 }
 
 type ArrayLookup = {
   base = Expr,
-  offset = int,
+  offset = uint32,
 }
 
 type Binding = {
@@ -94,9 +93,17 @@ type TyKind = enum {
 
 @(derive ["Debug", "Clone", "Copy", "PartialEq", "Eq", "Hash"])
 type PrimitiveSet = enum {
-  int,
-  float,
   bool,
+  int8,
+  int16,
+  int32,
+  int64,
+  uint8,
+  uint16,
+  uint32,
+  uint64,
+  float32,
+  float64,
   text,
 }
 
@@ -114,9 +121,9 @@ type TyEnumVariant = {
 
 @(derive ["Debug", "Clone", "PartialEq", "Default"])
 type TyLayout = {
-  head_size = int,
-  body_ptr_offset = enum { None, Some = int },
-  variants_recursive = [int]
+  head_size = uint32,
+  body_ptr_offset = enum { None, Some = uint32 },
+  variants_recursive = [uint16]
 }
 
 @(derive ["Debug", "Clone", "PartialEq"])

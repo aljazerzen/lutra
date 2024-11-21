@@ -40,8 +40,8 @@ impl Resolver<'_> {
 
         let kind = match &expr.kind {
             ExprKind::Literal(ref literal) => match literal {
-                Literal::Integer(_) => TyKind::Primitive(PrimitiveSet::int),
-                Literal::Float(_) => TyKind::Primitive(PrimitiveSet::float),
+                Literal::Integer(_) => TyKind::Primitive(PrimitiveSet::int64),
+                Literal::Float(_) => TyKind::Primitive(PrimitiveSet::float64),
                 Literal::Boolean(_) => TyKind::Primitive(PrimitiveSet::bool),
                 Literal::String(_) => TyKind::Primitive(PrimitiveSet::text),
                 Literal::RawString(_) => TyKind::Primitive(PrimitiveSet::text),

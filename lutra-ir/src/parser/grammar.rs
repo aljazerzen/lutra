@@ -55,7 +55,7 @@ fn expr() -> impl Parser<TokenKind, Expr, Error = PError> + Clone {
             .ignore_then(sid())
             .then_ignore(ctrl('+'))
             .then(sid())
-            .map(|(f, p)| Sid(0x80000000_i64 + f.0.shl(8) + p.0));
+            .map(|(f, p)| Sid(0x80000000_u32 + f.0.shl(8) + p.0));
         let pointer = choice((pointer_external, pointer_var, pointer_param)).map(ExprKind::Pointer);
 
         // let binding = binding(expr.clone());
@@ -76,9 +76,17 @@ fn expr() -> impl Parser<TokenKind, Expr, Error = PError> + Clone {
 fn ty() -> impl Parser<TokenKind, Ty, Error = PError> {
     let ty_expr = recursive(|ty_inner| {
         let primitive = choice((
-            ident_keyword("int").to(PrimitiveSet::int),
-            ident_keyword("float").to(PrimitiveSet::float),
             ident_keyword("bool").to(PrimitiveSet::bool),
+            ident_keyword("int8").to(PrimitiveSet::int8),
+            ident_keyword("int16").to(PrimitiveSet::int16),
+            ident_keyword("int32").to(PrimitiveSet::int32),
+            ident_keyword("int64").to(PrimitiveSet::int64),
+            ident_keyword("uint8").to(PrimitiveSet::uint8),
+            ident_keyword("uint16").to(PrimitiveSet::uint16),
+            ident_keyword("uint32").to(PrimitiveSet::uint32),
+            ident_keyword("uint64").to(PrimitiveSet::uint64),
+            ident_keyword("float32").to(PrimitiveSet::float32),
+            ident_keyword("float64").to(PrimitiveSet::float64),
             ident_keyword("text").to(PrimitiveSet::text),
         ))
         .map(TyKind::Primitive);
@@ -141,7 +149,7 @@ fn ty() -> impl Parser<TokenKind, Ty, Error = PError> {
 }
 
 fn sid() -> impl Parser<TokenKind, Sid, Error = PError> {
-    select! { TokenKind::Literal(pr::Literal::Integer(sid)) => Sid(sid) }
+    select! { TokenKind::Literal(pr::Literal::Integer(sid)) => Sid(sid as u32) }
 }
 
 fn tuple<'a>(
@@ -186,8 +194,8 @@ fn array<'a>(
 }
 
 enum LookupKind {
-    Tuple,
-    Array,
+    Tuple(u16),
+    Array(u32),
 }
 
 fn lookups<'a, E>(expr: E) -> impl Parser<TokenKind, Expr, Error = PError> + 'a
@@ -198,20 +206,24 @@ where
         ctrl('.')
             .ignore_then(choice((
                 select! {
-                    TokenKind::Literal(pr::Literal::Integer(i)) => (LookupKind::Tuple, i)
+                    TokenKind::Literal(pr::Literal::Integer(i)) => LookupKind::Tuple(i as u16)
                 },
                 select! {
-                    TokenKind::Literal(pr::Literal::Integer(i)) => (LookupKind::Array, i)
+                    TokenKind::Literal(pr::Literal::Integer(i)) => LookupKind::Array(i as u32)
                 }
                 .delimited_by(ctrl('['), ctrl(']')),
             )))
             .then(ty())
             .repeated(),
     )
-    .foldl(|base, ((kind, offset), ty)| Expr {
+    .foldl(|base, (kind, ty)| Expr {
         kind: match kind {
-            LookupKind::Tuple => ExprKind::TupleLookup(Box::new(TupleLookup { base, offset })),
-            LookupKind::Array => ExprKind::ArrayLookup(Box::new(ArrayLookup { base, offset })),
+            LookupKind::Tuple(offset) => {
+                ExprKind::TupleLookup(Box::new(TupleLookup { base, offset }))
+            }
+            LookupKind::Array(offset) => {
+                ExprKind::ArrayLookup(Box::new(ArrayLookup { base, offset }))
+            }
         },
         ty,
     })

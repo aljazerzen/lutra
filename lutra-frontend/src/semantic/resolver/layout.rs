@@ -28,7 +28,7 @@ impl Resolver<'_> {
                     if variant.ty.layout.is_none() {
                         // unresolved - this type is (probably) recursive, save this info
                         // (I don't think this logic is 100% sound)
-                        layout.variants_recursive.push(index);
+                        layout.variants_recursive.push(index as u16);
                     }
                 }
 

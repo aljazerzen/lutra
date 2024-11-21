@@ -37,20 +37,43 @@ impl Printer {
 impl ValueVisitor for Printer {
     type Res = String;
 
-    fn visit_int(&mut self, v: i64) -> Result<Self::Res, crate::Error> {
-        Ok(format!("{v}"))
-    }
-
-    fn visit_float(&mut self, v: f64) -> Result<Self::Res, crate::Error> {
-        Ok(format!("{v:1.1}"))
-    }
-
     fn visit_bool(&mut self, v: bool) -> Result<Self::Res, crate::Error> {
         Ok(if v {
             "true".to_string()
         } else {
             "false".to_string()
         })
+    }
+
+    fn visit_int8(&mut self, v: i8) -> Result<Self::Res, crate::Error> {
+        Ok(format!("{v}"))
+    }
+    fn visit_int16(&mut self, v: i16) -> Result<Self::Res, crate::Error> {
+        Ok(format!("{v}"))
+    }
+    fn visit_int32(&mut self, v: i32) -> Result<Self::Res, crate::Error> {
+        Ok(format!("{v}"))
+    }
+    fn visit_int64(&mut self, v: i64) -> Result<Self::Res, crate::Error> {
+        Ok(format!("{v}"))
+    }
+    fn visit_uint8(&mut self, v: u8) -> Result<Self::Res, crate::Error> {
+        Ok(format!("{v}"))
+    }
+    fn visit_uint16(&mut self, v: u16) -> Result<Self::Res, crate::Error> {
+        Ok(format!("{v}"))
+    }
+    fn visit_uint32(&mut self, v: u32) -> Result<Self::Res, crate::Error> {
+        Ok(format!("{v}"))
+    }
+    fn visit_uint64(&mut self, v: u64) -> Result<Self::Res, crate::Error> {
+        Ok(format!("{v}"))
+    }
+    fn visit_float32(&mut self, v: f32) -> Result<Self::Res, crate::Error> {
+        Ok(format!("{v}"))
+    }
+    fn visit_float64(&mut self, v: f64) -> Result<Self::Res, crate::Error> {
+        Ok(format!("{v}"))
     }
 
     fn visit_text(&mut self, v: &str) -> Result<Self::Res, crate::Error> {

@@ -21,17 +21,17 @@ pub struct Ty {
 pub struct TyLayout {
     /// Number of bits required to store the type's the head
     /// (the part whose size is known at compile time).
-    pub head_size: usize,
+    pub head_size: u32,
 
     /// Position of the body pointer within the head.
     /// It is measured bytes from the start of the head.
     /// Pointer itself is relative to own position (and the start of the head).
-    pub body_ptr_offset: Option<usize>,
+    pub body_ptr_offset: Option<u32>,
 
     /// For enums, indexes of variants that contain recursive
     /// (transitive) references to self. This is used to determine
     /// if a variant needs a Box in Rust.
-    pub variants_recursive: Vec<usize>,
+    pub variants_recursive: Vec<u16>,
 }
 
 #[derive(Debug, Clone, PartialEq, Hash, EnumAsInner, AsRefStr)]
@@ -72,8 +72,16 @@ impl TyKind {
         let head_size = match self {
             TyKind::Primitive(prim) => match prim {
                 PrimitiveSet::bool => 8,
-                PrimitiveSet::int => 64,
-                PrimitiveSet::float => 64,
+                PrimitiveSet::int8 => 8,
+                PrimitiveSet::int16 => 16,
+                PrimitiveSet::int32 => 32,
+                PrimitiveSet::int64 => 64,
+                PrimitiveSet::uint8 => 8,
+                PrimitiveSet::uint16 => 16,
+                PrimitiveSet::uint32 => 32,
+                PrimitiveSet::uint64 => 64,
+                PrimitiveSet::float32 => 32,
+                PrimitiveSet::float64 => 64,
                 PrimitiveSet::text => 64,
             },
             TyKind::Array(_) => 64,
@@ -96,9 +104,9 @@ impl TyKind {
             }
             _ => return None,
         };
-        let body_ptr_offset = match self {
-            TyKind::Primitive(PrimitiveSet::text) => Some(0_usize),
-            TyKind::Array(_) => Some(0_usize),
+        let body_ptr_offset: Option<u32> = match self {
+            TyKind::Primitive(PrimitiveSet::text) => Some(0),
+            TyKind::Array(_) => Some(0),
             TyKind::Enum(_) => Some(8), // TODO: this is wrong
 
             TyKind::Primitive(_) | TyKind::Tuple(_) => None,
@@ -131,8 +139,16 @@ pub struct TyEnumVariant {
 #[derive(Debug, Clone, PartialEq, Eq, Hash, strum::Display)]
 #[allow(non_camel_case_types)]
 pub enum PrimitiveSet {
-    int,
-    float,
+    int8,
+    int16,
+    int32,
+    int64,
+    uint8,
+    uint16,
+    uint32,
+    uint64,
+    float32,
+    float64,
     bool,
     text,
 }
@@ -207,13 +223,13 @@ impl std::hash::Hash for Ty {
     }
 }
 
-fn enum_tag_size(variants_len: usize) -> usize {
+fn enum_tag_size(variants_len: usize) -> u32 {
     // TODO: when bool-sub-byte packing is implemented, remove function in favor of enum_tag_size_used
     enum_tag_size_used(variants_len).div_ceil(8) * 8
 }
 
-fn enum_tag_size_used(variants_len: usize) -> usize {
-    f64::log2(variants_len as f64).ceil() as usize
+fn enum_tag_size_used(variants_len: usize) -> u32 {
+    f64::log2(variants_len as f64).ceil() as u32
 }
 
 #[test]

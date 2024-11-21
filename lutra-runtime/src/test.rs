@@ -19,26 +19,32 @@ fn interpret_01() {
     let externals = [core_int_add];
 
     let main =
-        let 1 = (func 2 -> [fn.2+0: float, fn.2+0: float, fn.2+0: float]: [float]): func (float) -> [float];
-        let 2 = var.1: func (float) -> [float];
+        let 1 = (
+            func 2 -> [
+                fn.2+0: float64,
+                fn.2+0: float64,
+                fn.2+0: float64
+            ]: [float64]
+        ): func (float64) -> [float64];
+        let 2 = var.1: func (float64) -> [float64];
         {
             (
-                call var.2: func (float) -> [float],
-                3.5: float
-            ): [float],
+                call var.2: func (float64) -> [float64],
+                3.5: float64
+            ): [float64],
             (
                 call (
-                    func 3 -> [fn.3+0: int, fn.3+1: int]: [int]
-                ): func (int) -> [int],
-                6: int,
-                7: int,
-            ): [int],
+                    func 3 -> [fn.3+0: int64, fn.3+1: int64]: [int64]
+                ): func (int64) -> [int64],
+                6: int64,
+                7: int64,
+            ): [int64],
             (
-                call external.0: func (int) -> int,
-                6: int,
-                2: int,
-            ): int,
-        }: {[float], [int], int}
+                call external.0: func (int64) -> int64,
+                6: int64,
+                2: int64,
+            ): int64,
+        }: {[float64], [int64], int64}
     "#,
     ), @r#"
     {
@@ -63,12 +69,19 @@ fn interpret_02() {
     let externals = [core_array_map];
 
     let main =
-        let 1 = (func 1 -> {fn.1+0: int, fn.1+0: int}: {int, int}): func (int) -> {int, int};
+        let 1 = (
+            func 1 -> {
+                fn.1+0: int64,
+                fn.1+0: int64,
+            }: {int64, int64}
+        ): func (int64) -> {int64, int64};
         (
-            call external.0: func (func (int) -> {int, int}, [int]) -> [{int, int}],
-            var.1: func (int) -> {int, int},
-            [2: int, 3: int, 1: int]: [int]
-        ): [{int, int}]
+            call external.0: func (
+                func (int64) -> {int64, int64}, [int64]
+            ) -> [{int64, int64}],
+            var.1: func (int64) -> {int64, int64},
+            [2: int64, 3: int64, 1: int64]: [int64]
+        ): [{int64, int64}]
     "#,
     ), @r#"
     [
@@ -96,22 +109,22 @@ fn interpret_03() {
 
     let main =
         let 1 = [
-            {1:int, 3:int}: {int, int}, 
-            {5:int, 4:int}: {int, int}, 
-            {2:int, 3:int}: {int, int},
-        ]: [{int, int}];
+            {1:int64, 3:int64}: {int64, int64}, 
+            {5:int64, 4:int64}: {int64, int64}, 
+            {2:int64, 3:int64}: {int64, int64},
+        ]: [{int64, int64}];
         let 2 = (
             func 1 -> (
-                call external.1: func (int, int) -> int,
-                fn.1+0: {int, int} .0: int,
-                fn.1+0: {int, int} .1: int,
-            ): int
-        ): func ({int, int}) -> int;
+                call external.1: func (int64, int64) -> int64,
+                fn.1+0: {int64, int64} .0: int64,
+                fn.1+0: {int64, int64} .1: int64,
+            ): int64
+        ): func ({int64, int64}) -> int64;
         (
-            call external.0: func (func ({int, int}) -> int, [{int, int}]) -> [int],
-            var.2: func ({int, int}) -> int,
-            var.1: [{int, int}],
-        ): [int]
+            call external.0: func (func ({int64, int64}) -> int64, [{int64, int64}]) -> [int64],
+            var.2: func ({int64, int64}) -> int64,
+            var.1: [{int64, int64}],
+        ): [int64]
     "#,
     ), @r#"
     [
