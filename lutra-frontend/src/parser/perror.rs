@@ -209,24 +209,18 @@ impl From<PError> for Diagnostic {
                     .unwrap_or_else(|| "end of input".to_string())
             }
 
-            let is_all_whitespace = e
-                .expected()
-                .all(|t| matches!(t, None | Some(lexer::TokenKind::NewLine)));
-            let expected: Vec<String> = e
-                .expected()
-                // Only include whitespace if we're _only_ expecting whitespace,
-                // otherwise we get "expected start of line or new line or }"
-                // when there's no ending `}`, since a new line is allowed.
-                .filter(|t| {
-                    is_all_whitespace
-                        || !matches!(
-                            t,
-                            None | Some(lexer::TokenKind::NewLine) | Some(lexer::TokenKind::Start)
-                        )
-                })
-                .cloned()
-                .map(token_to_string)
-                .collect();
+            let is_expecting_eof = e.expected().all(|t| t.is_none());
+            let expected: Vec<String> = if is_expecting_eof {
+                vec![token_to_string(None)]
+            } else {
+                e.expected()
+                    // Exclude eof otherwise we get "expected end of file or }"
+                    // when there's no ending `}`.
+                    .filter(|t| t.is_some())
+                    .cloned()
+                    .map(token_to_string)
+                    .collect()
+            };
 
             let while_parsing = e
                 .label()

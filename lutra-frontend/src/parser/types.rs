@@ -91,7 +91,6 @@ pub(crate) fn type_expr() -> impl Parser<TokenKind, Ty, Error = PError> + Clone 
 
         let array = nested_type_expr
             .map(Box::new)
-            .padded_by(new_line().repeated())
             .delimited_by(ctrl('['), ctrl(']'))
             .recover_with(nested_delimiters(
                 TokenKind::Control('['),

@@ -7,16 +7,17 @@ use crate::pr;
 use crate::project;
 use crate::SourceTree;
 
-pub use linearize::is_mod_def_for;
-
 #[cfg_attr(feature = "clap", derive(clap::Parser))]
 #[derive(Default)]
 pub struct CompileParams {}
 
 pub fn compile(
-    source: project::SourceTree,
+    mut source: project::SourceTree,
     _: CompileParams,
 ) -> Result<project::Project, error::Error> {
+    crate::semantic::load_std_lib(&mut source);
+    let source = source;
+
     let source_files = linearize::linearize_tree(&source)?;
 
     let root_module = parse(&source, source_files)
@@ -88,13 +89,16 @@ mod linearize {
         // find root
         let root_path;
 
-        if tree.sources.len() == 1 {
+        let std = Path::new("std.lt");
+        let sources: Vec<_> = tree.sources.keys().filter(|p| p != &std).collect();
+
+        if sources.len() == 1 {
             // if there is only one file, use that as the root
-            root_path = tree.sources.keys().next().unwrap();
+            root_path = sources.into_iter().next().unwrap();
         } else if let Some(root) = tree.sources.get_key_value(&PathBuf::from("")) {
             // if there is an empty path, that's the root
             root_path = root.0;
-        } else if let Some(root) = tree.sources.keys().find(path_starts_with_uppercase) {
+        } else if let Some(root) = sources.iter().cloned().find(path_starts_with_uppercase) {
             root_path = root;
         } else {
             if tree.sources.is_empty() {
@@ -103,9 +107,8 @@ mod linearize {
                 });
             }
 
-            let file_names = tree
-                .sources
-                .keys()
+            let file_names = sources
+                .iter()
                 .map(|p| format!(" - {}", p.to_str().unwrap_or_default()))
                 .sorted()
                 .join("\n");

@@ -39,13 +39,7 @@ pub(crate) fn prepare_stream<'a>(
 ) -> Stream<'a, TokenKind, Span, impl Iterator<Item = (TokenKind, Span)> + Sized + 'a> {
     let final_span = tokens.last().map(|t| t.span.end).unwrap_or(0);
 
-    // We don't want comments in the AST (but we do intend to use them as part of
-    // formatting)
-    let semantic_tokens = tokens
-        .into_iter()
-        .filter(|token| !matches!(token.kind, TokenKind::Comment(_) | TokenKind::LineWrap(_)));
-
-    let tokens = semantic_tokens
+    let tokens = tokens
         .into_iter()
         .map(move |token| (token.kind, Span::new(source_id, token.span)));
     let eoi = Span {
@@ -74,19 +68,6 @@ fn keyword(kw: &'static str) -> impl Parser<TokenKind, (), Error = PError> + Clo
     just(TokenKind::Keyword(kw.to_string())).ignored()
 }
 
-/// Our approach to new lines is each item consumes new lines _before_ itself,
-/// but not newlines after itself. This allows us to enforce new lines between
-/// some items. The only place we handle new lines after an item is in the root
-/// parser.
-pub(crate) fn new_line() -> impl Parser<TokenKind, (), Error = PError> + Clone {
-    just(TokenKind::NewLine)
-        // Start is considered a new line, so we can enforce things start on a new
-        // line while allowing them to be at the beginning of a file
-        .or(just(TokenKind::Start))
-        .ignored()
-        .labelled("new line")
-}
-
 fn ctrl(char: char) -> impl Parser<TokenKind, (), Error = PError> + Clone {
     just(TokenKind::Control(char)).ignored()
 }
@@ -98,25 +79,9 @@ where
     P: Parser<TokenKind, O, Error = PError> + Clone + 'a,
     O: 'a,
 {
-    parser
-        .separated_by(ctrl(',').then_ignore(new_line().repeated()))
-        .allow_trailing()
-        // Note because we pad rather than only take the ending new line, we
-        // can't put items that require a new line in a tuple, like:
-        //
-        // ```
-        // {
-        //   !# doc comment
-        //   a,
-        // }
-        // ```
-        // ...but I'm not sure there's a way around it, since we do need to
-        // consume newlines in tuples...
-        .padded_by(new_line().repeated())
+    parser.separated_by(ctrl(',')).allow_trailing()
 }
 
 fn pipe() -> impl Parser<TokenKind, (), Error = PError> + Clone {
-    ctrl('|')
-        .ignored()
-        .or(new_line().repeated().at_least(1).ignored())
+    ctrl('|').ignored()
 }

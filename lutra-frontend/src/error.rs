@@ -100,7 +100,10 @@ fn compose_diagnostic_messages(
                 location,
             });
         } else {
-            panic!("missing diagnostic span: {}", diagnostic.message)
+            panic!(
+                "missing diagnostic span: [{:?}] {}, {:#?}",
+                diagnostic.code, diagnostic.message, diagnostic.additional
+            )
         }
     }
     messages

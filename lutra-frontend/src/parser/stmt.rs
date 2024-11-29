@@ -1,7 +1,7 @@
 use chumsky::prelude::*;
 
-use super::expr::{expr, expr_call, ident, pipeline};
-use super::{ctrl, ident_part, keyword, new_line, pipe};
+use super::expr::{expr, expr_call, ident};
+use super::{ctrl, ident_part, keyword};
 use crate::parser::lexer::TokenKind;
 use crate::parser::perror::PError;
 use crate::parser::types::type_expr;
@@ -10,50 +10,25 @@ use crate::Span;
 
 /// The top-level parser
 pub fn source() -> impl Parser<TokenKind, Vec<Stmt>, Error = PError> {
-    module_contents()
-        // This is the only instance we can consume newlines at the end of something, since
-        // this is the end of the file
-        .then_ignore(new_line().repeated())
-        .then_ignore(end())
+    module_contents().then_ignore(end())
 }
 
 fn module_contents() -> impl Parser<TokenKind, Vec<Stmt>, Error = PError> {
     recursive(|module_contents| {
         let module_def = keyword("module")
             .ignore_then(ident_part())
-            .then(
-                module_contents
-                    .then_ignore(new_line().repeated())
-                    .delimited_by(ctrl('{'), ctrl('}')),
-            )
+            .then(module_contents.delimited_by(ctrl('{'), ctrl('}')))
             .map(|(name, stmts)| StmtKind::ModuleDef(ModuleDef { name, stmts }))
             .labelled("module definition");
 
-        let annotation = new_line()
-            .repeated()
-            .at_least(1)
-            .ignore_then(
-                just(TokenKind::Annotate)
-                    .ignore_then(expr())
-                    .map(|expr| Annotation {
-                        expr: Box::new(expr),
-                    }),
-            )
+        let annotation = just(TokenKind::Annotate)
+            .ignore_then(expr())
+            .map(|expr| Annotation {
+                expr: Box::new(expr),
+            })
             .labelled("annotation");
 
-        // TODO: we want to confirm that we're not allowing things on the same
-        // line that should't be; e.g. `let foo = 5 let bar = 6`. We can't
-        // enforce a new line here because then `module two {let houses =
-        // both.alike}` fails (though we could force a new line after the
-        // `module` if we wanted to?)
-        //
-        // let stmt_kind = new_line().repeated().at_least(1).ignore_then(choice((
-        let stmt_kind = new_line().repeated().ignore_then(choice((
-            module_def,
-            type_def(),
-            import_def(),
-            var_def(),
-        )));
+        let stmt_kind = choice((module_def, type_def(), import_def(), var_def()));
 
         // Currently doc comments need to be before the annotation; probably
         // should relax this?
@@ -79,14 +54,9 @@ fn into_stmt(kind: StmtKind, span: Span) -> Stmt {
 }
 
 fn doc_comment() -> impl Parser<TokenKind, String, Error = PError> + Clone {
-    // doc comments must start on a new line, so we enforce a new line (which
-    // can also be a file start) before the doc comment
-    //
-    // TODO: we currently lose any empty newlines between doc comments;
-    // eventually we want to retain or restrict them
-    (new_line().repeated().at_least(1).ignore_then(select! {
-        TokenKind::DocComment(dc) => dc,
-    }))
+    select! {
+        TokenKind::DocComment(text) => text,
+    }
     .repeated()
     .at_least(1)
     .collect()
@@ -99,48 +69,28 @@ fn doc_comment() -> impl Parser<TokenKind, String, Error = PError> + Clone {
 /// - `from artists` — captured as a "main"
 /// - `from artists | into x` — captured as an "into"`
 fn var_def() -> impl Parser<TokenKind, StmtKind, Error = PError> + Clone {
-    let let_ = new_line()
-        .repeated()
-        .ignore_then(keyword("let"))
-        .ignore_then(ident_part())
-        .then(type_expr().delimited_by(ctrl('<'), ctrl('>')).or_not())
-        .then(ctrl('=').ignore_then(expr_call()).map(Box::new).or_not())
-        .map(|((name, ty), value)| {
-            StmtKind::VarDef(VarDef {
-                name,
-                value,
-                ty,
-                kind: VarDefKind::Let,
-            })
-        })
-        .labelled("variable definition");
+    let expr = expr_call();
 
-    let main_or_into = new_line()
-        .repeated()
-        .ignore_then(pipeline(expr_call()))
+    let let_ = keyword("let")
+        .ignore_then(ident_part())
+        .then(ctrl(':').ignore_then(type_expr()).or_not())
+        .then(ctrl('=').ignore_then(expr.clone()).map(Box::new).or_not())
+        .map(|((name, ty), value)| StmtKind::VarDef(VarDef { name, value, ty }));
+
+    let main_or_into = expr
         .map(Box::new)
-        .then(
-            pipe()
-                .ignore_then(keyword("into").ignore_then(ident_part()))
-                .or_not(),
-        )
+        .then(keyword("into").ignore_then(ident_part()).or_not())
         .map(|(value, name)| {
-            let kind = if name.is_none() {
-                VarDefKind::Main
-            } else {
-                VarDefKind::Into
-            };
             let name = name.unwrap_or_else(|| "main".to_string());
 
             StmtKind::VarDef(VarDef {
                 name,
-                kind,
                 value: Some(value),
                 ty: None,
             })
         });
 
-    let_.or(main_or_into)
+    let_.or(main_or_into).labelled("variable definition")
 }
 
 fn type_def() -> impl Parser<TokenKind, StmtKind, Error = PError> + Clone {
@@ -169,8 +119,8 @@ mod tests {
     #[test]
     fn test_doc_comment() {
         assert_debug_snapshot!(parse_with_parser(r#"
-        #! doc comment
-        #! another line
+        ## doc comment
+        ## another line
 
         "#, doc_comment()), @r###"
         Ok(
@@ -182,7 +132,7 @@ mod tests {
     #[test]
     fn test_doc_comment_or_not() {
         assert_debug_snapshot!(parse_with_parser(r#"hello"#, doc_comment().or_not()).unwrap(), @"None");
-        assert_debug_snapshot!(parse_with_parser(r#"hello"#, doc_comment().or_not().then_ignore(new_line().repeated()).then(ident_part())).unwrap(), @r###"
+        assert_debug_snapshot!(parse_with_parser(r#"hello"#, doc_comment().or_not().then(ident_part())).unwrap(), @r###"
         (
             None,
             "hello",

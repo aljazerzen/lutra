@@ -22,7 +22,6 @@ impl fold::PrFold for super::Resolver<'_> {
     fn fold_var_def(&mut self, var_def: pr::VarDef) -> Result<pr::VarDef> {
         Ok(pr::VarDef {
             name: var_def.name,
-            kind: pr::VarDefKind::Let,
             value: match var_def.value {
                 Some(value) => Some(Box::new(self.fold_expr(*value)?)),
                 None => None,
@@ -46,61 +45,51 @@ impl fold::PrFold for super::Resolver<'_> {
             pr::ExprKind::Ident(ident) => {
                 log::debug!("resolving ident {ident:?}...");
 
-                let indirections = vec![];
+                let decl = self.get_ident(&ident).unwrap();
 
-                let mut expr = {
-                    let decl = self.get_ident(&ident).unwrap();
+                let log_debug = !ident.starts_with_part(NS_STD);
+                if log_debug {
+                    log::debug!("... resolved to {decl:?}");
+                }
 
-                    let log_debug = !ident.starts_with_part(NS_STD);
-                    if log_debug {
-                        log::debug!("... resolved to {decl:?}");
-                    }
+                let mut expr = match &decl.kind {
+                    DeclKind::Expr(expr) => {
+                        // keep as ident, but pull in the type
+                        let ty = expr.ty.clone().unwrap();
 
-                    match &decl.kind {
-                        DeclKind::Expr(expr) => {
-                            // keep as ident, but pull in the type
-                            let ty = expr.ty.clone().unwrap();
+                        // if the type contains generics, we need to instantiate those
+                        // generics into current function scope
+                        // let ty = self.instantiate_type(ty, id);
 
-                            // if the type contains generics, we need to instantiate those
-                            // generics into current function scope
-                            // let ty = self.instantiate_type(ty, id);
-
-                            pr::Expr {
-                                kind: pr::ExprKind::Ident(ident),
-                                ty: Some(ty),
-                                ..node
-                            }
-                        }
-
-                        DeclKind::Ty(_) => {
-                            return Err(Diagnostic::new_custom(
-                                "expected a value, but found a type",
-                            )
-                            .with_span(*span));
-                        }
-
-                        DeclKind::Unresolved(_) => {
-                            return Err(Diagnostic::new_assert(format!(
-                                "bad resolution order: unresolved {ident} while resolving {}",
-                                self.debug_current_decl
-                            )));
-                        }
-
-                        _ => pr::Expr {
+                        pr::Expr {
                             kind: pr::ExprKind::Ident(ident),
+                            ty: Some(ty),
                             ..node
-                        },
+                        }
                     }
+
+                    DeclKind::Ty(_) => {
+                        return Err(Diagnostic::new_custom("expected a value, but found a type")
+                            .with_span(*span));
+                    }
+
+                    DeclKind::Unresolved(_) => {
+                        return Err(Diagnostic::new_assert(format!(
+                            "bad resolution order: unresolved {ident} while resolving {}",
+                            self.debug_current_decl
+                        )));
+                    }
+
+                    _ => pr::Expr {
+                        kind: pr::ExprKind::Ident(ident),
+                        ..node
+                    },
                 };
 
                 expr.id = expr.id.or(Some(id));
-                // let flatten = expr.flatten;
-                // expr.flatten = false;
                 let alias = expr.alias.take();
 
-                let mut expr = self.apply_indirections(expr, indirections);
-
-                // expr.flatten = flatten;
+                let mut expr = expr;
                 expr.alias = alias;
                 expr
             }
@@ -129,11 +118,7 @@ impl fold::PrFold for super::Resolver<'_> {
                 self.resolve_column_exclusion(arg)?
             }
 
-            pr::ExprKind::FuncCall(pr::FuncCall {
-                name,
-                args,
-                named_args: _,
-            }) => {
+            pr::ExprKind::FuncCall(pr::FuncCall { name, args }) => {
                 // fold function name
                 let old = self.in_func_call_name;
                 self.in_func_call_name = true;
@@ -209,7 +194,6 @@ impl super::Resolver<'_> {
                             }])),
                             *r,
                         ],
-                        named_args: Default::default(),
                     }));
                     return self.fold_expr(expr);
                 }

@@ -1,5 +1,3 @@
-use std::collections::HashMap;
-
 use enum_as_inner::EnumAsInner;
 
 use crate::pr::{BinOp, Literal, Ty, UnOp};
@@ -61,9 +59,6 @@ pub enum ExprKind {
     FString(Vec<InterpolateItem>),
     Case(Vec<SwitchCase>),
 
-    /// placeholder for values provided after query is compiled
-    Param(String),
-
     /// When used instead of function body, the function will be translated to a RQ operator.
     /// Contains ident of the RQ operator.
     Internal(String),
@@ -108,7 +103,6 @@ pub struct UnaryExpr {
 pub struct FuncCall {
     pub name: Box<Expr>,
     pub args: Vec<Expr>,
-    pub named_args: HashMap<String, Expr>,
 }
 
 /// Function called with possibly missing positional arguments.
@@ -121,11 +115,8 @@ pub struct Func {
     /// Expression containing parameter (and environment) references.
     pub body: Box<Expr>,
 
-    /// Positional function parameters.
+    /// Function parameters.
     pub params: Vec<FuncParam>,
-
-    /// Named function parameters.
-    pub named_params: Vec<FuncParam>,
 
     /// Generic type arguments within this function.
     pub generic_type_params: Vec<GenericTypeParam>,
@@ -203,6 +194,12 @@ impl From<Func> for ExprKind {
 impl From<Path> for ExprKind {
     fn from(value: Path) -> Self {
         ExprKind::Ident(value)
+    }
+}
+
+impl From<Range> for ExprKind {
+    fn from(value: Range) -> Self {
+        ExprKind::Range(value)
     }
 }
 

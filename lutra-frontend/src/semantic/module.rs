@@ -8,10 +8,26 @@ use super::{NS_MAIN, NS_STD};
 
 impl Module {
     pub(crate) fn new_root() -> Module {
-        // Each module starts with a default namespace that contains a wildcard
-        // and the standard library.
         Module {
-            names: IndexMap::from([(NS_STD.to_string(), Decl::new(Module::default()))]),
+            names: IndexMap::from([
+                (NS_STD.to_string(), Decl::new(Module::default())),
+                (
+                    "bool".into(),
+                    Decl::new(pr::Ty::new(pr::PrimitiveSet::bool)),
+                ),
+                (
+                    "int".into(),
+                    Decl::new(pr::Ty::new(pr::PrimitiveSet::int64)),
+                ),
+                (
+                    "float".into(),
+                    Decl::new(pr::Ty::new(pr::PrimitiveSet::float64)),
+                ),
+                (
+                    "text".into(),
+                    Decl::new(pr::Ty::new(pr::PrimitiveSet::text)),
+                ),
+            ]),
         }
     }
 

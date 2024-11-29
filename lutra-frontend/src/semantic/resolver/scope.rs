@@ -1,16 +1,17 @@
 use indexmap::IndexMap;
 
-use crate::decl::Decl;
-use crate::pr::Path;
-use crate::semantic::NS_LOCAL;
+use crate::decl;
+use crate::pr::{self, Path};
 
 use super::Resolver;
 
 #[derive(Debug)]
-pub(super) struct Scope {
-    pub types: IndexMap<String, Decl>,
+pub struct Scope {
+    // todo: use something else then Decl here
+    pub types: IndexMap<String, decl::Decl>,
 
-    pub values: IndexMap<String, Decl>,
+    // todo: use something else then Decl here
+    pub values: IndexMap<String, decl::Decl>,
 }
 
 impl Scope {
@@ -21,7 +22,46 @@ impl Scope {
         }
     }
 
-    pub fn get(&self, name: &str) -> Option<&Decl> {
+    pub fn new_of_func(func: &pr::Func) -> Self {
+        let values = func
+            .params
+            .iter()
+            .map(|p| {
+                let dummy = pr::Expr::new(pr::Path::new::<String, _>(vec![]));
+                let dummy = decl::Decl::new(decl::DeclKind::Expr(Box::new(dummy)));
+
+                (p.name.clone(), dummy)
+            })
+            .collect();
+
+        let types = func
+            .generic_type_params
+            .iter()
+            .map(|gtp| {
+                let dummy = pr::Ty::new(pr::TyKind::Tuple(vec![]));
+                let dummy = decl::Decl::new(decl::DeclKind::Ty(dummy));
+
+                (gtp.name.clone(), dummy)
+            })
+            .collect();
+
+        Self { types, values }
+    }
+
+    pub fn populate_from_func(&mut self, func: &pr::Func) {
+        for param in &func.params {
+            let decl = decl::Decl::new(pr::Expr {
+                kind: pr::Path::from_name(param.name.clone()).into(),
+                ty: Some(param.ty.clone().unwrap()),
+                span: None,
+                alias: None,
+                id: None,
+            });
+            self.values.insert(param.name.clone(), decl);
+        }
+    }
+
+    pub fn get(&self, name: &str) -> Option<&decl::Decl> {
         if let Some(decl) = self.types.get(name) {
             return Some(decl);
         }
@@ -29,7 +69,7 @@ impl Scope {
         self.values.get(name)
     }
 
-    pub fn get_mut(&mut self, name: &str) -> Option<&mut Decl> {
+    pub fn get_mut(&mut self, name: &str) -> Option<&mut decl::Decl> {
         if let Some(decl) = self.types.get_mut(name) {
             return Some(decl);
         }
@@ -42,25 +82,27 @@ impl Resolver<'_> {
     /// Get declaration from within the current scope.
     ///
     /// Does not mutate the current scope or module structure.
-    pub(super) fn get_ident(&self, ident: &Path) -> Option<&Decl> {
-        if ident.starts_with_part(NS_LOCAL) {
-            assert!(ident.len() == 2);
-            self.scopes.last()?.get(ident.name())
-        } else {
-            self.root_mod.module.get(ident)
+    pub(super) fn get_ident(&self, ident: &Path) -> Option<&decl::Decl> {
+        for scope in self.scopes.iter().rev() {
+            if let Some(decl) = scope.get(ident.first()) {
+                return Some(decl);
+            }
         }
+
+        self.root_mod.module.get(ident)
     }
 
     /// Get mutable reference to a declaration from within the current scope.
     ///
     /// Does not mutate the current scope or module structure.
     #[allow(dead_code)]
-    pub(super) fn get_ident_mut(&mut self, ident: &Path) -> Option<&mut Decl> {
-        if ident.starts_with_part(NS_LOCAL) {
-            assert!(ident.len() == 2);
-            self.scopes.last_mut()?.get_mut(ident.name())
-        } else {
-            self.root_mod.module.get_mut(ident)
+    pub(super) fn get_ident_mut(&mut self, ident: &Path) -> Option<&mut decl::Decl> {
+        for scope in self.scopes.iter_mut().rev() {
+            if let Some(decl) = scope.get_mut(ident.first()) {
+                return Some(decl);
+            }
         }
+
+        self.root_mod.module.get_mut(ident)
     }
 }

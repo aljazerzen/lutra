@@ -1,0 +1,29 @@
+
+
+module db {
+  let invoices: [{transaction_fee = float64, total = float64}]
+}
+
+let my_func = func (x: int): int -> x
+
+func () -> (
+  std::from(db::invoices)
+  | std::map(func this -> {
+    this,
+    transaction_fee = 0.8,
+    income = this.total - this.transaction_fee,
+  })
+  | func (y) -> my_func(y)
+  | std::filter(func this -> this.income > 5)
+  | std::filter(func this -> this.invoice_date >= @2010-01-16)
+  | group(
+    func this -> this.customer_id,
+    func partition -> (
+      partition
+      | std::aggregate(func columns -> {
+        sum_income = sum columns.income,
+        ct = count columns.customer_id,
+      })
+    )
+  )
+)

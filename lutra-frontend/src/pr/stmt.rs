@@ -40,7 +40,6 @@ pub enum StmtKind {
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct VarDef {
-    pub kind: VarDefKind,
     pub name: String,
     pub value: Option<Box<Expr>>,
 

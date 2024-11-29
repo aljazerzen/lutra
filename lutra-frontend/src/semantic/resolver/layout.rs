@@ -39,6 +39,7 @@ impl Resolver<'_> {
                 let decl = self.get_ident(ident).ok_or_else(|| {
                     Diagnostic::new_assert("cannot find type ident")
                         .push_hint(format!("ident={ident:?}"))
+                        .with_span(ty.span)
                 })?;
 
                 match &decl.kind {

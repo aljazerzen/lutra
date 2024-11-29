@@ -5,9 +5,10 @@ mod module;
 mod resolve_decls;
 mod resolver;
 
+use std::str::FromStr;
+
 use self::resolver::Resolver;
 
-use crate::compile::is_mod_def_for;
 use crate::decl::RootModule;
 use crate::diagnostic::Diagnostic;
 use crate::pr;
@@ -15,10 +16,8 @@ use crate::Result;
 
 /// Runs semantic analysis on the query.
 pub fn resolve(module_tree: pr::ModuleDef) -> Result<RootModule, Vec<Diagnostic>> {
-    // load_std_lib(&mut module_tree);
-
     // expand AST into PL
-    let root_module_def = desugar::run(module_tree);
+    let root_module_def = desugar::run(module_tree).map_err(|d| vec![d])?;
 
     // init the module structure
     let mut root_module = resolve_decls::init_module_tree(root_module_def);
@@ -39,21 +38,10 @@ pub fn resolve(module_tree: pr::ModuleDef) -> Result<RootModule, Vec<Diagnostic>
 
 /// Preferred way of injecting std module.
 #[allow(dead_code)]
-pub fn load_std_lib(module_tree: &mut pr::ModuleDef) {
-    if !module_tree.stmts.iter().any(|s| is_mod_def_for(s, NS_STD)) {
-        log::debug!("loading std.prql");
-
-        let std_source = include_str!("std.prql");
-        let (ast, errs) = crate::parser::parse_source(std_source, 0);
-        if let Some(stmts) = ast {
-            let stmt = pr::Stmt::new(pr::StmtKind::ModuleDef(pr::ModuleDef {
-                name: "std".to_string(),
-                stmts,
-            }));
-            module_tree.stmts.insert(0, stmt);
-        } else {
-            panic!("std.prql failed to compile:\n{errs:?}");
-        }
+pub fn load_std_lib(source: &mut crate::SourceTree) {
+    let path = std::path::PathBuf::from_str("std.lt").unwrap();
+    if source.get_source(&path).is_none() {
+        source.insert(path, include_str!("std.lt").to_string());
     }
 }
 
@@ -72,4 +60,3 @@ pub fn is_ident_or_func_call(expr: &pr::Expr, name: &pr::Path) -> bool {
 pub const NS_STD: &str = "std";
 pub const NS_THIS: &str = "this";
 pub const NS_MAIN: &str = "main";
-pub const NS_LOCAL: &str = "_local";

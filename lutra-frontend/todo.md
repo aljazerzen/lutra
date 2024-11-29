@@ -1,0 +1,22 @@
+
+Language changes:
+- remove significant whitespace (make pipes explicit)
+- remove params (replaced by functions)
+- require parenthesis for the main pipeline
+- change function call syntax:
+  - require parenthesis,
+  - function name outside of parenthesis,
+  - commas inside
+- change function def syntax:
+  - require `func` keyword,
+  - parenthesis around params,
+  - type annotations via `:`,
+  - return type after parenthesis,
+- remove implicit closures
+- remove tuple coercion
+- remove named function params (might re-add later)
+- make functions calls non-pure (functions without arguments)
+- recursive functions (or cycles of recursive functions) must have type annotations for parameters and body,
+- remove table and column inference. Working without knowledge of the types is hard and cannot be fully relied upon.
+- tables are functions that return the relations,
+- variable declarations must be pure. Maybe we can achieve that with requiring them to be static/const?

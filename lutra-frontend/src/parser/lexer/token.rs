@@ -11,20 +11,10 @@ pub struct Token {
 
 #[derive(Clone, PartialEq, Debug)]
 pub enum TokenKind {
-    NewLine,
-
     Ident(String),
     Keyword(String),
     Literal(pr::Literal),
-    /// A parameter such as `$1`
-    Param(String),
 
-    Range {
-        /// Whether the left side of the range is bound by the previous token
-        /// (but it's not contained in this token)
-        bind_left: bool,
-        bind_right: bool,
-    },
     Interpolation(char, String),
 
     /// single-char control tokens
@@ -44,37 +34,10 @@ pub enum TokenKind {
     Pow,         // **
     Annotate,    // @
     PathSep,     // ::
+    Range,       // ..
 
-    // Aesthetics only
-    Comment(String),
     DocComment(String),
-    /// Vec containing comments between the newline and the line wrap
-    // Currently we include the comments with the LineWrap token. This isn't
-    // ideal, but I'm not sure of an easy way of having them be separate.
-    // - The line wrap span technically includes the comments — on a newline,
-    //   we need to look ahead to _after_ the comments to see if there's a
-    //   line wrap, and exclude the newline if there is.
-    // - We can only pass one token back
-    //
-    // Alternatives:
-    // - Post-process the stream, removing the newline prior to a line wrap.
-    //   But requires a whole extra pass.
-    // - Change the functionality. But it's very nice to be able to comment
-    //   something out and have line-wraps still work.
-    LineWrap(Vec<TokenKind>),
-
-    /// A token we manually insert at the start of the input, which later stages
-    /// can treat as a newline.
-    Start,
-}
-
-impl TokenKind {
-    pub fn range(bind_left: bool, bind_right: bool) -> Self {
-        TokenKind::Range {
-            bind_left,
-            bind_right,
-        }
-    }
+    DocCommentSelf(String),
 }
 
 // This is here because Literal::Float(f64) does not implement Hash, so we cannot simply derive it.
@@ -93,7 +56,6 @@ impl std::cmp::Eq for TokenKind {}
 impl std::fmt::Display for TokenKind {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            TokenKind::NewLine => write!(f, "new line"),
             TokenKind::Ident(s) => {
                 if s.is_empty() {
                     // FYI this shows up in errors
@@ -120,35 +82,13 @@ impl std::fmt::Display for TokenKind {
             TokenKind::Pow => f.write_str("**"),
             TokenKind::Annotate => f.write_str("@"),
             TokenKind::PathSep => f.write_str("::"),
+            TokenKind::Range => f.write_str(".."),
 
-            TokenKind::Param(id) => write!(f, "${id}"),
-
-            TokenKind::Range {
-                bind_left,
-                bind_right,
-            } => write!(
-                f,
-                "'{}..{}'",
-                if *bind_left { "" } else { " " },
-                if *bind_right { "" } else { " " }
-            ),
             TokenKind::Interpolation(c, s) => {
                 write!(f, "{c}\"{}\"", s)
             }
-            TokenKind::Comment(s) => {
-                writeln!(f, "#{}", s)
-            }
-            TokenKind::DocComment(s) => {
-                writeln!(f, "#!{}", s)
-            }
-            TokenKind::LineWrap(comments) => {
-                write!(f, "\n\\ ")?;
-                for comment in comments {
-                    write!(f, "{}", comment)?;
-                }
-                Ok(())
-            }
-            TokenKind::Start => write!(f, "start of input"),
+            TokenKind::DocComment(text) => writeln!(f, "##{text}"),
+            TokenKind::DocCommentSelf(text) => writeln!(f, "#!{text}"),
         }
     }
 }

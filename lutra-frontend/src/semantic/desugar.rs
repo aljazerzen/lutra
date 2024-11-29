@@ -1,10 +1,11 @@
+use crate::diagnostic::Diagnostic;
 use crate::pr;
 use crate::utils::fold;
 use crate::utils::fold::PrFold;
 use crate::Result;
 
-pub fn run(module_def: pr::ModuleDef) -> pr::ModuleDef {
-    Desugarator.fold_module_def(module_def).unwrap()
+pub fn run(module_def: pr::ModuleDef) -> Result<pr::ModuleDef> {
+    Desugarator.fold_module_def(module_def)
 }
 
 struct Desugarator;
@@ -48,15 +49,32 @@ impl Desugarator {
         let mut value = self.fold_expr(value)?;
 
         for expr in pipeline.exprs {
-            let expr = self.fold_expr(expr)?;
+            let mut expr = self.fold_expr(expr)?;
             let span = expr.span;
 
-            value = pr::Expr::new(pr::ExprKind::FuncCall(pr::FuncCall {
-                name: Box::new(expr),
-                args: vec![value],
-                named_args: Default::default(),
-            }));
-            value.span = span;
+            match expr.kind {
+                pr::ExprKind::FuncCall(mut func_call) => {
+                    func_call.args.insert(0, value);
+                    expr.kind = pr::ExprKind::FuncCall(func_call);
+
+                    value = expr;
+                }
+                pr::ExprKind::Func(_) => {
+                    let func = expr;
+
+                    value = pr::Expr::new(pr::ExprKind::FuncCall(pr::FuncCall {
+                        name: Box::new(func),
+                        args: vec![value],
+                    }));
+                    value.span = span;
+                }
+                _ => {
+                    return Err(Diagnostic::new_custom(
+                        "pipeline can only contain function calls or functions",
+                    )
+                    .with_span(span))
+                }
+            };
         }
 
         Ok(value)
@@ -76,7 +94,6 @@ impl Desugarator {
         Ok(pr::ExprKind::FuncCall(pr::FuncCall {
             name: Box::new(pr::Expr::new(pr::Path::new(func_name.to_vec()))),
             args: vec![expr],
-            named_args: Default::default(),
         }))
     }
 
@@ -127,6 +144,5 @@ fn new_binop(left: pr::Expr, op_name: &[&str], right: pr::Expr) -> pr::Expr {
     pr::Expr::new(pr::ExprKind::FuncCall(pr::FuncCall {
         name: Box::new(pr::Expr::new(pr::Path::new(op_name.to_vec()))),
         args: vec![left, right],
-        named_args: Default::default(),
     }))
 }

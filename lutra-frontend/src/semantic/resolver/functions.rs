@@ -1,6 +1,5 @@
 use itertools::Itertools;
 
-use crate::decl::{Decl, DeclKind};
 use crate::diagnostic::{Diagnostic, WithErrorInfo};
 use crate::pr::*;
 use crate::utils::fold::{self, PrFold};
@@ -13,6 +12,10 @@ impl Resolver<'_> {
     /// Folds function types, so they are resolved to material types, ready for type checking.
     /// Requires id of the function call node, so it can be used to generic type arguments.
     pub fn resolve_func(&mut self, mut func: Box<Func>) -> Result<Box<Func>> {
+        log::debug!(
+            "resolving func with params: {}",
+            func.params.iter().map(|p| &p.name).join(", ")
+        );
         let scope = Scope::new();
 
         // prepare generic arguments
@@ -29,20 +32,11 @@ impl Resolver<'_> {
         self.scopes.push(scope);
 
         // fold types
-        func.params = func
-            .params
-            .into_iter()
-            .map(|p| -> Result<_> {
-                Ok(FuncParam {
-                    ty: fold::fold_type_opt(self, p.ty)?,
-                    ..p
-                })
-            })
-            .try_collect()?;
+        func.params = fold::fold_func_param(self, func.params)?;
         func.return_ty = fold::fold_type_opt(self, func.return_ty)?;
 
         // put params into scope
-        prepare_scope_of_func(self.scopes.last_mut().unwrap(), &func);
+        self.scopes.last_mut().unwrap().populate_from_func(&func);
 
         func.body = Box::new(self.fold_expr(*func.body)?);
 
@@ -133,34 +127,6 @@ impl Resolver<'_> {
         // populate name hint
         res.name_hint = Some(fq_ident.clone());
 
-        let decl = self.root_mod.module.get(fq_ident).unwrap();
-
-        fn literal_as_u8(expr: Option<&Expr>) -> Option<u8> {
-            Some(*expr?.kind.as_literal()?.as_integer()? as u8)
-        }
-
-        // populate implicit_closure config
-        if let Some(im_clos) = decl
-            .annotations
-            .iter()
-            .find_map(|a| annotation_as_func_call(a, "implicit_closure"))
-        {
-            res.implicit_closure = Some(Box::new(ImplicitClosureConfig {
-                param: literal_as_u8(im_clos.args.first()).unwrap(),
-                this: literal_as_u8(im_clos.named_args.get("this")),
-                that: literal_as_u8(im_clos.named_args.get("that")),
-            }));
-        }
-
-        // populate coerce_tuple config
-        if let Some(coerce_tuple) = decl
-            .annotations
-            .iter()
-            .find_map(|a| annotation_as_func_call(a, "coerce_tuple"))
-        {
-            res.coerce_tuple = Some(literal_as_u8(coerce_tuple.args.first()).unwrap());
-        }
-
         res
     }
 
@@ -247,38 +213,18 @@ impl Resolver<'_> {
         args_to_resolve: Vec<Expr>,
         metadata: &FuncMetadata,
     ) -> Result<Vec<Expr>> {
-        let mut args = vec![Expr::new(Literal::Boolean(false)); args_to_resolve.len()];
+        let mut args = Vec::with_capacity(args_to_resolve.len());
 
         let func_name = &metadata.name_hint;
 
         let func_ty = func.ty.as_ref().unwrap();
         let func_ty = func_ty.kind.as_function().unwrap();
         let func_ty = func_ty.as_ref().unwrap();
-        let mut param_args = itertools::zip_eq(&func_ty.params, args_to_resolve)
-            .map(Box::new)
-            .map(Some)
-            .collect_vec();
 
-        // pull out this and that
-        let this_pos = metadata.implicit_closure.as_ref().and_then(|i| i.this);
-        let that_pos = metadata.implicit_closure.as_ref().and_then(|i| i.that);
+        for (param, mut arg) in itertools::zip_eq(&func_ty.params, args_to_resolve) {
+            arg = self.resolve_func_app_arg(arg, param, func_name)?;
 
-        // prepare order
-        let order = this_pos
-            .into_iter()
-            .chain(that_pos)
-            .map(|x| x as usize)
-            .chain(0..param_args.len())
-            .unique()
-            .collect_vec();
-
-        for index in order {
-            let (param, mut arg) = *param_args[index].take().unwrap();
-            let should_coerce_tuple = metadata.coerce_tuple.map_or(false, |i| i as usize == index);
-
-            arg = self.resolve_func_app_arg(arg, param, func_name, should_coerce_tuple)?;
-
-            args[index] = arg;
+            args.push(arg);
         }
 
         Ok(args)
@@ -289,14 +235,9 @@ impl Resolver<'_> {
         arg: Expr,
         param: &Option<Ty>,
         func_name: &Option<Path>,
-        coerce_tuple: bool,
     ) -> Result<Expr> {
         // fold
         let mut arg = self.fold_expr(arg)?;
-
-        if coerce_tuple {
-            arg = self.coerce_into_tuple(arg)?;
-        }
 
         // validate type
         let who = || {
@@ -333,30 +274,10 @@ impl Resolver<'_> {
     }
 }
 
-fn prepare_scope_of_func(scope: &mut Scope, func: &Func) {
-    for param in &func.params {
-        let v = Decl::new(DeclKind::Ty(param.ty.clone().unwrap()));
-        scope.values.insert(param.name.clone(), v);
-    }
-}
-
-/// Utility to match function calls by name and unpack its arguments.
-pub fn annotation_as_func_call<'a>(a: &'a Annotation, name: &str) -> Option<&'a FuncCall> {
-    let call = a.expr.kind.as_func_call()?;
-
-    let func_name = call.name.kind.as_ident()?;
-    if func_name.len() != 1 || func_name.name() != name {
-        return None;
-    }
-    Some(call)
-}
 #[derive(Debug, PartialEq, Clone, Default)]
 pub struct FuncMetadata {
     /// Name of the function. Used for user-facing messages only.
     pub name_hint: Option<Path>,
-
-    pub implicit_closure: Option<Box<ImplicitClosureConfig>>,
-    pub coerce_tuple: Option<u8>,
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -401,7 +322,6 @@ pub fn expr_of_func_application(
         ..Expr::new(ExprKind::FuncCall(FuncCall {
             name: Box::new(func),
             args,
-            named_args: Default::default(),
         }))
     }
 }

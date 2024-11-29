@@ -9,6 +9,8 @@ mod stmt;
 mod tuple;
 mod types;
 
+pub(super) use scope::Scope;
+
 /// Can fold (walk) over AST and for each function call or variable find what they are referencing.
 pub struct Resolver<'a> {
     root_mod: &'a mut RootModule,

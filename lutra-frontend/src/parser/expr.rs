@@ -1,5 +1,3 @@
-use std::collections::{hash_map::Entry, HashMap};
-
 use chumsky::prelude::*;
 use itertools::Itertools;
 
@@ -7,20 +5,14 @@ use crate::parser::interpolation;
 use crate::parser::lexer::TokenKind;
 use crate::parser::perror::PError;
 use crate::parser::types::type_expr;
-use crate::parser::{ctrl, ident_part, keyword, new_line, sequence};
+use crate::parser::{ctrl, ident_part, keyword, sequence};
 use crate::pr::*;
 use crate::span::Span;
 
 use super::pipe;
 
 pub(crate) fn expr_call() -> impl Parser<TokenKind, Expr, Error = PError> + Clone {
-    let expr = expr();
-
-    choice((
-        lambda_func(expr.clone()),
-        func_call(expr.clone()),
-        pipeline(expr),
-    ))
+    expr()
 }
 
 pub(crate) fn expr() -> impl Parser<TokenKind, Expr, Error = PError> + Clone {
@@ -34,29 +26,25 @@ pub(crate) fn expr() -> impl Parser<TokenKind, Expr, Error = PError> + Clone {
             .map(|x| x.to_string())
             .map(ExprKind::Internal);
 
-        let nested_expr = lambda_func(expr.clone())
-            .or(func_call(expr.clone()))
-            .boxed();
+        let func = lambda_func(expr.clone());
+        let call = func_call(expr.clone());
 
-        let tuple = tuple(nested_expr.clone());
-        let array = array(nested_expr.clone());
-        let pipeline_expr = pipeline(nested_expr.clone())
-            .padded_by(new_line().repeated())
-            .delimited_by(ctrl('('), ctrl(')'));
+        let tuple = tuple(expr.clone());
+        let array = array(expr.clone());
+        let pipeline_expr = pipeline(expr.clone()).delimited_by(ctrl('('), ctrl(')'));
         let interpolation = interpolation();
         let case = case(expr.clone());
-
-        let param = select! { TokenKind::Param(id) => ExprKind::Param(id) };
 
         let term = choice((
             literal,
             internal,
+            func,
             tuple,
             array,
             interpolation,
+            call,
             ident_kind,
             case,
-            param,
         ))
         .map_with_span(ExprKind::into_expr)
         // No longer used given the TODO in `pipeline`; can remove if we
@@ -78,27 +66,36 @@ pub(crate) fn expr() -> impl Parser<TokenKind, Expr, Error = PError> + Clone {
         let expr = binary_op_parser(expr, operator_coalesce());
         let expr = binary_op_parser(expr, operator_and());
 
-        binary_op_parser(expr, operator_or())
+        binary_op_parser(expr, operator_or()).labelled("expression")
     })
 }
 
 fn tuple<'a>(
     nested_expr: impl Parser<TokenKind, Expr, Error = PError> + Clone + 'a,
 ) -> impl Parser<TokenKind, ExprKind, Error = PError> + Clone + 'a {
-    sequence(maybe_aliased(nested_expr))
-        .delimited_by(ctrl('{'), ctrl('}'))
-        .recover_with(nested_delimiters(
-            TokenKind::Control('{'),
-            TokenKind::Control('}'),
-            [
-                (TokenKind::Control('{'), TokenKind::Control('}')),
-                (TokenKind::Control('('), TokenKind::Control(')')),
-                (TokenKind::Control('['), TokenKind::Control(']')),
-            ],
-            |_| vec![],
-        ))
-        .map(ExprKind::Tuple)
-        .labelled("tuple")
+    sequence(
+        ident_part()
+            .then_ignore(ctrl('='))
+            .or_not()
+            .then(nested_expr)
+            .map(|(alias, mut expr)| {
+                expr.alias = alias.or(expr.alias);
+                expr
+            }),
+    )
+    .delimited_by(ctrl('{'), ctrl('}'))
+    .recover_with(nested_delimiters(
+        TokenKind::Control('{'),
+        TokenKind::Control('}'),
+        [
+            (TokenKind::Control('{'), TokenKind::Control('}')),
+            (TokenKind::Control('('), TokenKind::Control(')')),
+            (TokenKind::Control('['), TokenKind::Control(']')),
+        ],
+        |_| vec![],
+    ))
+    .map(ExprKind::Tuple)
+    .labelled("tuple")
 }
 
 fn array<'a>(
@@ -142,10 +139,9 @@ fn case<'a>(
     expr: impl Parser<TokenKind, Expr, Error = PError> + Clone + 'a,
 ) -> impl Parser<TokenKind, ExprKind, Error = PError> + Clone + 'a {
     // The `nickname != null => nickname,` part
-    let mapping = func_call(expr.clone())
-        .map(Box::new)
+    let mapping = (expr.clone().map(Box::new))
         .then_ignore(just(TokenKind::ArrowFat))
-        .then(func_call(expr).map(Box::new))
+        .then(expr.map(Box::new))
         .map(|(condition, value)| SwitchCase { condition, value });
 
     keyword("case")
@@ -191,54 +187,8 @@ fn range<'a, E>(expr: E) -> impl Parser<TokenKind, Expr, Error = PError> + Clone
 where
     E: Parser<TokenKind, Expr, Error = PError> + Clone + 'a,
 {
-    // Ranges have five cases we need to parse:
-    // x..y (bounded)
-    // x..  (only start bound)
-    // x    (no-op)
-    //  ..y (only end bound)
-    //  ..  (unbounded)
-    #[derive(Clone)]
-    enum RangeCase {
-        NoOp(Expr),
-        Range(Option<Expr>, Option<Expr>),
-    }
-    choice((
-        // with start bound (first 3 cases)
-        expr.clone()
-            .then(choice((
-                // range and end bound
-                just(TokenKind::range(true, true))
-                    .ignore_then(expr.clone())
-                    .map(|x| Some(Some(x))),
-                // range and no end bound
-                select! { TokenKind::Range { bind_left: true, .. } => Some(None) },
-                // no range
-                empty().to(None),
-            )))
-            .map(|(start, range)| {
-                if let Some(end) = range {
-                    RangeCase::Range(Some(start), end)
-                } else {
-                    RangeCase::NoOp(start)
-                }
-            }),
-        // only end bound
-        select! { TokenKind::Range { bind_right: true, .. } => () }
-            .ignore_then(expr)
-            .map(|range| RangeCase::Range(None, Some(range))),
-        // unbounded
-        select! { TokenKind::Range { .. } => RangeCase::Range(None, None) },
-    ))
-    .map_with_span(|case, span| match case {
-        RangeCase::NoOp(x) => x,
-        RangeCase::Range(start, end) => {
-            let kind = ExprKind::Range(Range {
-                start: start.map(Box::new),
-                end: end.map(Box::new),
-            });
-            kind.into_expr(span)
-        }
-    })
+    // TODO
+    expr.or(just(TokenKind::Range).to(Expr::new(Range::unbounded())))
 }
 
 /// A pipeline of `expr`, separated by pipes. Doesn't require parentheses.
@@ -252,8 +202,7 @@ where
     // TODO: do we need the `maybe_aliased` here rather than in `expr`? We had
     // tried `with_doc_comment(expr)` in #4775 (and push an aliased expr into
     // `expr`) but couldn't get it work.
-    maybe_aliased(expr)
-        .separated_by(pipe())
+    expr.separated_by(pipe())
         .at_least(1)
         .map_with_span(|exprs, span| {
             // If there's only one expr, then we don't need to wrap it
@@ -381,98 +330,46 @@ where
         .or(aliased.delimited_by(ctrl('('), ctrl(')')))
 }
 
-fn maybe_aliased<'a, E>(expr: E) -> impl Parser<TokenKind, Expr, Error = PError> + Clone + 'a
+fn func_call<'a, E>(expr: E) -> impl Parser<TokenKind, ExprKind, Error = PError> + Clone + 'a
 where
     E: Parser<TokenKind, Expr, Error = PError> + Clone + 'a,
 {
-    let aliased = ident_part()
-        .then_ignore(ctrl('='))
-        // This is added for `maybe_aliased`; possibly we should integrate
-        // the funcs
-        .or_not()
-        .then(expr)
-        .map(|(alias, mut expr)| {
-            expr.alias = alias.or(expr.alias);
-            expr
-        });
-    // Because `expr` accounts for parentheses, and aliased is `x=$expr`, we
-    // need to allow another layer of parentheses here.
-    aliased
-        .clone()
-        .or(aliased.delimited_by(ctrl('('), ctrl(')')))
-}
-
-fn func_call<'a, E>(expr: E) -> impl Parser<TokenKind, Expr, Error = PError> + Clone + 'a
-where
-    E: Parser<TokenKind, Expr, Error = PError> + Clone + 'a,
-{
-    let func_name = expr.clone();
-
-    let named_arg = ident_part()
-        .map(Some)
-        .then_ignore(ctrl(':'))
-        .then(expr.clone());
-
-    // TODO: I think this possibly should be restructured. Currently in the case
-    // of `derive x = 5`, the `x` is an alias of a single positional argument.
-    // That then means we incorrectly allow something like `derive x = 5 y = 6`,
-    // since there are two positional arguments each with an alias. This then
-    // leads to quite confusing error messages.
-    //
-    // Instead, we could only allow a single alias per function call as the
-    // first positional argument? (I worry that not simple though...).
-    // Alternatively we could change the language to enforce tuples, so `derive
-    // {x = 5}` were required. But we still need to account for the `join`
-    // example below, which doesn't work so well in a tuple; so I'm not sure
-    // this helps much.
-    //
-    // As a reminder, we need to account for `derive x = 5` and `join a=artists
-    // (id==album_id)`.
-    let positional_arg = maybe_aliased(expr.clone()).map(|e| (None, e));
+    let func_name = ident()
+        .map(ExprKind::from)
+        .map_with_span(ExprKind::into_expr)
+        .map(Box::new);
 
     func_name
-        .then(named_arg.or(positional_arg).repeated())
-        .validate(|(name, args), span, emit| {
-            if args.is_empty() {
-                return name.kind;
-            }
-
-            let mut named_args = HashMap::new();
-            let mut positional = Vec::new();
-
-            for (name, arg) in args {
-                if let Some(name) = name {
-                    match named_args.entry(name) {
-                        Entry::Occupied(entry) => emit(PError::custom(
-                            span,
-                            format!("argument '{}' is used multiple times", entry.key()),
-                        )),
-                        Entry::Vacant(entry) => {
-                            entry.insert(arg);
-                        }
-                    }
-                } else {
-                    positional.push(arg);
-                }
-            }
-
-            ExprKind::FuncCall(FuncCall {
-                name: Box::new(name),
-                args: positional,
-                named_args,
-            })
-        })
-        .map_with_span(ExprKind::into_expr)
+        .then(
+            expr.separated_by(ctrl(','))
+                .allow_trailing()
+                .delimited_by(ctrl('('), ctrl(')'))
+                .recover_with(nested_delimiters(
+                    TokenKind::Control('('),
+                    TokenKind::Control(')'),
+                    [
+                        (TokenKind::Control('{'), TokenKind::Control('}')),
+                        (TokenKind::Control('('), TokenKind::Control(')')),
+                        (TokenKind::Control('['), TokenKind::Control(']')),
+                    ],
+                    |_| vec![],
+                )),
+        )
+        .map(|(name, args)| ExprKind::FuncCall(FuncCall { name, args }))
         .labelled("function call")
 }
 
-fn lambda_func<'a, E>(expr: E) -> impl Parser<TokenKind, Expr, Error = PError> + Clone + 'a
+fn lambda_func<'a, E>(expr: E) -> impl Parser<TokenKind, ExprKind, Error = PError> + Clone + 'a
 where
     E: Parser<TokenKind, Expr, Error = PError> + Clone + 'a,
 {
     let param = ident_part()
-        .then(type_expr().delimited_by(ctrl('<'), ctrl('>')).or_not())
-        .then(ctrl(':').ignore_then(expr.clone().map(Box::new)).or_not());
+        .then(ctrl(':').ignore_then(type_expr()).or_not())
+        .map(|(name, ty)| FuncParam {
+            name,
+            ty,
+            default_value: None,
+        });
 
     let generic_args = ident_part()
         .then(
@@ -492,48 +389,32 @@ where
         .or_not()
         .map(|x| x.unwrap_or_default());
 
-    choice((
-        // func
-        keyword("func").ignore_then(generic_args).then(
+    // func
+    keyword("func")
+        .ignore_then(generic_args)
+        .then(
             param
                 .clone()
-                .separated_by(new_line().repeated())
-                .allow_leading()
-                .allow_trailing(),
-        ),
-        // plain
-        param
-            .repeated()
-            .at_least(1)
-            .map(|params| (Vec::new(), params)),
-    ))
-    .then_ignore(just(TokenKind::ArrowThin))
-    // return type
-    .then(type_expr().delimited_by(ctrl('<'), ctrl('>')).or_not())
-    // body
-    .then(func_call(expr))
-    .map(|(((generic_type_params, params), return_ty), body)| {
-        let (pos, name) = params
-            .into_iter()
-            .map(|((name, ty), default_value)| FuncParam {
-                name,
-                ty,
-                default_value,
+                .separated_by(ctrl(','))
+                .allow_trailing()
+                .delimited_by(ctrl('('), ctrl(')')),
+        )
+        // return type
+        .then(ctrl(':').ignore_then(type_expr()).or_not())
+        // arrow
+        .then_ignore(just(TokenKind::ArrowThin))
+        // body
+        .then(expr.map(Box::new))
+        .map(|(((generic_type_params, params), return_ty), body)| {
+            Box::new(Func {
+                generic_type_params,
+                params,
+                return_ty,
+                body,
             })
-            .partition(|p| p.default_value.is_none());
-
-        Box::new(Func {
-            params: pos,
-            named_params: name,
-
-            body: Box::new(body),
-            return_ty,
-            generic_type_params,
         })
-    })
-    .map(ExprKind::Func)
-    .map_with_span(ExprKind::into_expr)
-    .labelled("function definition")
+        .map(ExprKind::Func)
+        .labelled("function definition")
 }
 
 pub(crate) fn ident() -> impl Parser<TokenKind, Path, Error = PError> + Clone {

@@ -111,7 +111,7 @@ pub fn fold_expr_kind<T: ?Sized + PrFold>(fold: &mut T, expr_kind: ExprKind) -> 
         }),
 
         // None of these capture variables, so we don't need to fold them.
-        Param(_) | Internal(_) | Literal(_) => expr_kind,
+        Internal(_) | Literal(_) => expr_kind,
     })
 }
 
@@ -135,7 +135,6 @@ fn fold_module_def<F: ?Sized + PrFold>(fold: &mut F, module_def: ModuleDef) -> R
 pub fn fold_var_def<F: ?Sized + PrFold>(fold: &mut F, var_def: VarDef) -> Result<VarDef> {
     Ok(pr::VarDef {
         name: var_def.name,
-        kind: var_def.kind,
         value: fold_optional_box(fold, var_def.value)?,
         ty: var_def.ty.map(|x| fold.fold_type(x)).transpose()?,
     })
@@ -189,11 +188,6 @@ pub fn fold_func_call<T: ?Sized + PrFold>(fold: &mut T, func_call: FuncCall) -> 
     Ok(FuncCall {
         name: Box::new(fold.fold_expr(*func_call.name)?),
         args: fold.fold_exprs(func_call.args)?,
-        named_args: func_call
-            .named_args
-            .into_iter()
-            .map(|(name, expr)| fold.fold_expr(expr).map(|e| (name, e)))
-            .try_collect()?,
     })
 }
 
@@ -202,16 +196,15 @@ pub fn fold_func<T: ?Sized + PrFold>(fold: &mut T, func: Func) -> Result<Func> {
         body: Box::new(fold.fold_expr(*func.body)?),
         return_ty: fold_type_opt(fold, func.return_ty)?,
         params: fold_func_param(fold, func.params)?,
-        named_params: fold_func_param(fold, func.named_params)?,
         generic_type_params: func.generic_type_params, // recurse into this too?
     })
 }
 
 pub fn fold_func_param<T: ?Sized + PrFold>(
     fold: &mut T,
-    nodes: Vec<FuncParam>,
+    params: Vec<FuncParam>,
 ) -> Result<Vec<FuncParam>> {
-    nodes
+    params
         .into_iter()
         .map(|param| {
             Ok(FuncParam {
@@ -261,17 +254,23 @@ pub fn fold_type<T: ?Sized + PrFold>(fold: &mut T, ty: Ty) -> Result<Ty> {
 
 pub fn fold_ty_func<F: ?Sized + PrFold>(fold: &mut F, f: TyFunc) -> Result<TyFunc> {
     Ok(TyFunc {
-        params: f
-            .params
-            .into_iter()
-            .map(|a| fold_type_opt(fold, a))
-            .try_collect()?,
+        params: fold_ty_func_params(fold, f.params)?,
         body: f
             .body
             .map(|t| fold.fold_type(*t).map(Box::new))
             .transpose()?,
         // generic_type_params: f.generic_type_params,
     })
+}
+
+pub fn fold_ty_func_params<F: ?Sized + PrFold>(
+    fold: &mut F,
+    params: Vec<Option<pr::Ty>>,
+) -> Result<Vec<Option<Ty>>> {
+    params
+        .into_iter()
+        .map(|a| fold_type_opt(fold, a))
+        .try_collect()
 }
 
 pub fn fold_ty_tuple_fields<F: ?Sized + PrFold>(

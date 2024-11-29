@@ -6,7 +6,7 @@ pub use token::{Token, TokenKind};
 
 use chumsky::error::Cheap;
 use chumsky::prelude::*;
-use chumsky::text::{newline, Character};
+use chumsky::text::newline;
 
 use crate::diagnostic::{Diagnostic, DiagnosticCode};
 
@@ -16,8 +16,6 @@ use crate::span::Span;
 /// Split source into tokens.
 pub fn lex_source_recovery(source: &str, source_id: u16) -> (Option<Vec<Token>>, Vec<Diagnostic>) {
     let (tokens, lex_errors) = lexer().parse_recovery(source);
-
-    let tokens = tokens.map(insert_start);
 
     let errors = lex_errors
         .into_iter()
@@ -30,25 +28,11 @@ pub fn lex_source_recovery(source: &str, source_id: u16) -> (Option<Vec<Token>>,
 
 #[cfg(test)]
 pub fn lex_source(source: &str) -> Result<token::Tokens, Vec<Diagnostic>> {
-    lexer()
-        .parse(source)
-        .map(insert_start)
-        .map(token::Tokens)
-        .map_err(|e| {
-            e.into_iter()
-                .map(|x| convert_lexer_error(source, x, 0))
-                .collect()
-        })
-}
-
-/// Insert a start token so later stages can treat the start of a file like a newline
-fn insert_start(tokens: Vec<Token>) -> Vec<Token> {
-    std::iter::once(Token {
-        kind: TokenKind::Start,
-        span: 0..0,
+    lexer().parse(source).map(token::Tokens).map_err(|e| {
+        e.into_iter()
+            .map(|x| convert_lexer_error(source, x, 0))
+            .collect()
     })
-    .chain(tokens)
-    .collect()
 }
 
 fn convert_lexer_error(source: &str, e: chumsky::error::Cheap<char>, source_id: u16) -> Diagnostic {
@@ -70,14 +54,6 @@ fn convert_lexer_error(source: &str, e: chumsky::error::Cheap<char>, source_id: 
 
 /// Lex chars to tokens until the end of the input
 fn lexer() -> impl Parser<char, Vec<Token>, Error = Cheap<char>> {
-    lex_token()
-        .repeated()
-        .then_ignore(ignored())
-        .then_ignore(end())
-}
-
-/// Lex chars to a single token
-fn lex_token() -> impl Parser<char, Token, Error = Cheap<char>> {
     let control_multi = choice((
         just("->").to(TokenKind::ArrowThin),
         just("=>").to(TokenKind::ArrowFat),
@@ -94,6 +70,8 @@ fn lex_token() -> impl Parser<char, Token, Error = Cheap<char>> {
         just("@")
             .then(digits(1).not().rewind())
             .to(TokenKind::Annotate),
+        just("::").to(TokenKind::PathSep),
+        just("..").to(TokenKind::Range),
     ));
 
     let control = one_of("></%=+-*[]().,:|!{};").map(TokenKind::Control);
@@ -118,89 +96,51 @@ fn lex_token() -> impl Parser<char, Token, Error = Cheap<char>> {
 
     let literal = literal().map(TokenKind::Literal);
 
-    let param = just('$')
-        .ignore_then(filter(|c: &char| c.is_alphanumeric() || *c == '_' || *c == '.').repeated())
-        .collect::<String>()
-        .map(TokenKind::Param);
-
     let interpolation = one_of("sf")
         .then(quoted_string(true))
         .map(|(c, s)| TokenKind::Interpolation(c, s));
 
     let token = choice((
-        line_wrap(),
-        newline().to(TokenKind::NewLine),
         control_multi,
         interpolation,
-        param,
         control,
         literal,
         keyword,
         ident,
-        comment(),
+        doc_comment(),
     ))
-    .recover_with(skip_then_retry_until([]).skip_start());
+    .recover_with(skip_then_retry_until([]).skip_start())
+    .map_with_span(|kind, span| Token { kind, span });
 
-    let range = (whitespace().or_not())
-        .then_ignore(just(".."))
-        .then(whitespace().or_not())
-        .map(|(left, right)| TokenKind::Range {
-            // If there was no whitespace before (after), then we mark the range
-            // as bound on the left (right).
-            bind_left: left.is_none(),
-            bind_right: right.is_none(),
+    token
+        .separated_by(ignored())
+        .allow_leading()
+        .allow_trailing()
+        .then_ignore(end())
+}
+
+fn doc_comment() -> impl Parser<char, TokenKind, Error = Cheap<char>> {
+    just('#')
+        .ignore_then(choice((just('#').to(false), just('!').to(true))))
+        .then(newline().not().repeated().collect::<String>())
+        .map(|(is_self, text)| {
+            if is_self {
+                TokenKind::DocCommentSelf(text)
+            } else {
+                TokenKind::DocComment(text)
+            }
         })
-        .map_with_span(|kind, span| Token { kind, span });
-
-    choice((
-        range,
-        ignored().ignore_then(token.map_with_span(|kind, span| Token { kind, span })),
-    ))
 }
 
 fn ignored() -> impl Parser<char, (), Error = Cheap<char>> {
-    whitespace().repeated().ignored()
-}
+    let comment = just('#')
+        .ignore_then(just('#').or(just('!')).not().rewind())
+        .ignore_then(newline().not().repeated())
+        .ignored();
 
-fn whitespace() -> impl Parser<char, (), Error = Cheap<char>> {
-    filter(|x: &char| x.is_inline_whitespace())
-        .repeated()
-        .at_least(1)
-        .ignored()
-}
+    let whitespace = filter::<char, _, Cheap<char>>(|c: &char| c.is_whitespace()).ignored();
 
-fn line_wrap() -> impl Parser<char, TokenKind, Error = Cheap<char>> {
-    newline()
-        .ignore_then(
-            whitespace()
-                .repeated()
-                .ignore_then(comment())
-                .then_ignore(newline())
-                .repeated(),
-        )
-        .then_ignore(whitespace().repeated())
-        .then_ignore(just('\\'))
-        .map(TokenKind::LineWrap)
-}
-
-fn comment() -> impl Parser<char, TokenKind, Error = Cheap<char>> {
-    just('#').ignore_then(choice((
-        // One option would be to check that doc comments have new lines in the
-        // lexer (we currently do in the parser); which would give better error
-        // messages?
-        just('!').ignore_then(
-            newline()
-                .not()
-                .repeated()
-                .collect::<String>()
-                .map(TokenKind::DocComment),
-        ),
-        newline()
-            .not()
-            .repeated()
-            .collect::<String>()
-            .map(TokenKind::Comment),
-    )))
+    comment.or(whitespace).repeated().ignored()
 }
 
 pub(crate) fn ident_part() -> impl Parser<char, String, Error = Cheap<char>> + Clone {

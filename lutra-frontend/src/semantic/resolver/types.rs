@@ -14,7 +14,33 @@ impl Resolver<'_> {
     // This function is named fold_type_actual, because fold_type must be in
     // expr.rs, where we implement PlFold.
     pub fn fold_type_actual(&mut self, ty: Ty) -> Result<Ty> {
-        let mut ty = fold::fold_type(self, ty)?;
+        // inline idents / fold inner
+        let mut ty = match ty.kind {
+            TyKind::Ident(ident) => {
+                // this will not panic, because names should be resolved at this point
+                let decl = self.get_ident(&ident).unwrap();
+
+                match &decl.kind {
+                    crate::decl::DeclKind::Ty(ty) => ty.clone(),
+                    crate::decl::DeclKind::Unresolved(_) => {
+                        // recursive type, skip inlining
+                        // TODO: maybe determine that some decls should not be inlined because we already know that they are recursive
+                        Ty {
+                            kind: TyKind::Ident(ident),
+                            ..ty
+                        }
+                    }
+                    _ => {
+                        return Err(Diagnostic::new_custom(format!(
+                            "expected a type, found {}",
+                            decl.kind.as_ref()
+                        ))
+                        .with_span(ty.span));
+                    }
+                }
+            }
+            _ => fold::fold_type(self, ty)?,
+        };
 
         // compute memory layout
         ty.layout = self.compute_ty_layout(&ty)?;
@@ -142,7 +168,6 @@ impl Resolver<'_> {
             ExprKind::Ident(_)
             | ExprKind::FuncCall(_)
             | ExprKind::Indirection { .. }
-            | ExprKind::Param(_)
             | ExprKind::Pipeline(_) // desugar-ed
             | ExprKind::Range(_) // desugar-ed
             | ExprKind::Binary(_) // desugar-ed
@@ -182,7 +207,6 @@ impl Resolver<'_> {
     }
 
     /// Validates that found node has expected type. Returns assumed type of the node.
-    #[allow(clippy::only_used_in_recursion)]
     pub fn validate_type<F>(
         &mut self,
         found: &Ty,

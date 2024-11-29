@@ -71,6 +71,10 @@ impl SourceTree {
     pub fn get_sources(&self) -> impl Iterator<Item = (&PathBuf, &String)> {
         self.sources.iter()
     }
+
+    pub fn get_source(&self, path: &std::path::Path) -> Option<&String> {
+        self.sources.get(path)
+    }
 }
 
 impl std::fmt::Display for SourceTree {

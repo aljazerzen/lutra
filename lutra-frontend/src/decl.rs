@@ -3,6 +3,7 @@ use std::fmt::Debug;
 use enum_as_inner::EnumAsInner;
 use indexmap::IndexMap;
 use itertools::Itertools;
+use strum::AsRefStr;
 
 use crate::pr;
 use crate::span::Span;
@@ -35,7 +36,7 @@ pub struct Decl {
 }
 
 /// Declaration kind.
-#[derive(Debug, PartialEq, Clone, EnumAsInner)]
+#[derive(Debug, PartialEq, Clone, EnumAsInner, AsRefStr)]
 pub enum DeclKind {
     /// A nested namespace
     Module(Module),
@@ -97,5 +98,16 @@ impl Decl {
 impl From<Module> for DeclKind {
     fn from(value: Module) -> Self {
         DeclKind::Module(value)
+    }
+}
+
+impl From<pr::Ty> for DeclKind {
+    fn from(ty: pr::Ty) -> Self {
+        DeclKind::Ty(ty)
+    }
+}
+impl From<pr::Expr> for DeclKind {
+    fn from(expr: pr::Expr) -> Self {
+        DeclKind::Expr(Box::new(expr))
     }
 }

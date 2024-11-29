@@ -2,6 +2,7 @@ use itertools::Itertools;
 
 use crate::decl;
 use crate::diagnostic::{Diagnostic, WithErrorInfo};
+use crate::semantic::resolver::Scope;
 use crate::semantic::NS_STD;
 use crate::utils::fold::{self, PrFold};
 use crate::Result;
@@ -85,6 +86,7 @@ impl ModuleRefResolver<'_> {
             let mut r = NameResolver {
                 root: self.root,
                 decl_module_path: &path[0..(path.len() - 1)],
+                scopes: Vec::new(),
                 refs: Vec::new(),
             };
 
@@ -125,6 +127,7 @@ impl ModuleRefResolver<'_> {
 struct NameResolver<'a> {
     root: &'a mut decl::RootModule,
     decl_module_path: &'a [String],
+    scopes: Vec<crate::semantic::resolver::Scope>,
     refs: Vec<pr::Path>,
 }
 
@@ -141,18 +144,9 @@ impl NameResolver<'_> {
     }
 
     fn fold_import_def(&mut self, import_def: pr::ImportDef) -> Result<pr::ImportDef, Diagnostic> {
-        let (fq_ident, indirections) = self.resolve_ident(import_def.name)?;
-        if !indirections.is_empty() {
-            return Err(Diagnostic::new_custom(
-                "Import can only reference modules and declarations",
-            ));
-        }
-        if fq_ident.is_empty() {
-            log::debug!("resolved type ident to : {fq_ident:?} + {indirections:?}");
-            return Err(Diagnostic::new_custom("invalid type name"));
-        }
+        let fq_ident = self.resolve_ident(import_def.name)?;
         Ok(pr::ImportDef {
-            name: pr::Path::new(fq_ident),
+            name: fq_ident,
             alias: import_def.alias,
         })
     }
@@ -169,19 +163,11 @@ impl fold::PrFold for NameResolver<'_> {
     fn fold_expr(&mut self, expr: pr::Expr) -> Result<pr::Expr> {
         Ok(match expr.kind {
             pr::ExprKind::Ident(ident) => {
-                let (ident, indirections) = self.resolve_ident(ident).with_span(expr.span)?;
                 // TODO: can this ident have length 0?
 
-                let mut kind = pr::ExprKind::Ident(pr::Path::new(ident));
-                for indirection in indirections {
-                    let mut e = pr::Expr::new(kind);
-                    e.span = expr.span;
-                    kind = pr::ExprKind::Indirection {
-                        base: Box::new(e),
-                        field: pr::IndirectionKind::Name(indirection),
-                    };
-                }
+                let ident = self.resolve_ident(ident).with_span(expr.span)?;
 
+                let kind = pr::ExprKind::Ident(ident);
                 pr::Expr { kind, ..expr }
             }
             _ => pr::Expr {
@@ -194,35 +180,46 @@ impl fold::PrFold for NameResolver<'_> {
     fn fold_type(&mut self, ty: pr::Ty) -> Result<pr::Ty> {
         Ok(match ty.kind {
             pr::TyKind::Ident(ident) => {
-                let (ident, indirections) = self.resolve_ident(ident).with_span(ty.span)?;
-
-                if !indirections.is_empty() {
-                    log::debug!("resolved type ident to : {ident:?} + {indirections:?}");
-                    return Err(Diagnostic::new_custom("types are not allowed indirections")
-                        .with_span(ty.span));
-                }
-
-                if ident.is_empty() {
-                    log::debug!("resolved type ident to : {ident:?} + {indirections:?}");
-                    return Err(Diagnostic::new_custom("invalid type name").with_span(ty.span));
-                }
+                let ident = self.resolve_ident(ident).with_span(ty.span)?;
 
                 pr::Ty {
-                    kind: pr::TyKind::Ident(pr::Path::new(ident)),
+                    kind: pr::TyKind::Ident(ident),
                     ..ty
                 }
             }
             _ => fold::fold_type(self, ty)?,
         })
     }
+
+    fn fold_func(&mut self, func: pr::Func) -> Result<pr::Func> {
+        let scope = Scope::new_of_func(&func);
+        self.scopes.push(scope);
+        let r = fold::fold_func(self, func);
+        self.scopes.pop();
+        r
+    }
 }
 
 impl NameResolver<'_> {
-    /// Returns resolved fully-qualified ident and a list of indirections
-    fn resolve_ident(&mut self, mut ident: pr::Path) -> Result<(Vec<String>, Vec<String>)> {
-        // this is the name we are looking for
-        let first = ident.iter().next().unwrap();
-        let mod_path = match first.as_str() {
+    /// Returns resolved fully-qualified ident
+    fn resolve_ident(&mut self, mut ident: pr::Path) -> Result<pr::Path> {
+        for scope in self.scopes.iter().rev() {
+            if scope.get(ident.first()).is_some() {
+                // match, this ident is a param ref
+
+                return if ident.len() == 1 {
+                    Ok(ident)
+                } else {
+                    Err(Diagnostic::new_custom(format!(
+                        "{} is a param, not a module",
+                        ident.first()
+                    )))
+                };
+            }
+        }
+
+        // find module
+        let mod_fq_path = match ident.first() {
             "project" => {
                 ident.pop_front();
                 vec![]
@@ -239,6 +236,8 @@ impl NameResolver<'_> {
                 path
             }
 
+            "int" | "float" | "text" | "bool" => vec![],
+
             NS_STD => {
                 ident.pop_front();
                 vec![NS_STD.to_string()]
@@ -246,61 +245,21 @@ impl NameResolver<'_> {
 
             _ => self.decl_module_path.to_vec(),
         };
-        let mod_decl = self.root.module.get_submodule_mut(&mod_path);
+        let mod_decl = self.root.module.get_submodule_mut(&mod_fq_path);
 
-        Ok(if let Some(module) = mod_decl {
-            // module found
-
-            // now find the decl within that module
-            let (path, indirections) = module_lookup(module, ident)?;
-
-            // prepend the ident with the module path
-            // this will make this ident a fully-qualified ident
-            let mut fq_ident = mod_path;
-            fq_ident.extend(path);
-
-            self.refs.push(pr::Path::new(fq_ident.clone()));
-
-            (fq_ident, indirections)
-        } else {
-            // cannot find module, so this must be a ref to a local var + indirections
-            let mut steps = ident.into_iter();
-            let first = steps.next().unwrap();
-            let indirections = steps.collect_vec();
-            (vec![first], indirections)
-        })
-    }
-}
-
-fn module_lookup(
-    module: &mut decl::Module,
-    ident_within: pr::Path,
-) -> Result<(Vec<String>, Vec<String>)> {
-    let mut steps = ident_within.into_iter().collect_vec();
-
-    let mut module = module;
-    for i in 0..steps.len() {
-        let decl = module_lookup_step(module, &steps[i])?;
-        if let decl::DeclKind::Module(inner) = &mut decl.kind {
-            module = inner;
-            continue;
-        } else {
-            // we've found a declaration that is not a module:
-            // this and preceding steps are identifier, steps following are indirections
-            let indirections = steps.drain((i + 1)..).collect_vec();
-            return Ok((steps, indirections));
+        let decl = mod_decl.filter(|module| module.get(&ident).is_some());
+        if decl.is_none() {
+            return Err(Diagnostic::new_custom(format!("unknown name")));
         }
+
+        // prepend the ident with the module path
+        // this will make this ident a fully-qualified ident
+        let mut fq_ident = mod_fq_path;
+        fq_ident.extend(ident);
+        let fq_ident = pr::Path::new(fq_ident);
+
+        self.refs.push(fq_ident.clone());
+
+        Ok(fq_ident)
     }
-
-    Err(Diagnostic::new_custom(
-        "direct references modules not allowed",
-    ))
-}
-
-fn module_lookup_step<'m>(module: &'m mut decl::Module, step: &str) -> Result<&'m mut decl::Decl> {
-    if module.names.contains_key(step) {
-        return Ok(module.names.get_mut(step).unwrap());
-    }
-
-    Err(Diagnostic::new_custom(format!("Name not found: {step}")))
 }

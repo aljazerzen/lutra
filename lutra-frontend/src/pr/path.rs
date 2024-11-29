@@ -29,6 +29,10 @@ impl Path {
         &self.path[0..(self.len() - 1)]
     }
 
+    pub fn first(&self) -> &str {
+        self.path.first().unwrap()
+    }
+
     pub fn full_path(&self) -> &[String] {
         &self.path
     }

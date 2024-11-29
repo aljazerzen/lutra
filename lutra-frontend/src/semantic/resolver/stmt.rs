@@ -98,8 +98,8 @@ impl super::Resolver<'_> {
                         DeclKind::Expr(def_value)
                     }
                     None => {
-                        // var value is not provided: treat this var as a param
-                        let mut expr = Box::new(pr::Expr::new(pr::ExprKind::Param(
+                        // var value is not provided: treat this var as value provided by the runtime
+                        let mut expr = Box::new(pr::Expr::new(pr::ExprKind::Internal(
                             fq_ident.name().to_string(),
                         )));
                         expr.ty = expected_ty;
