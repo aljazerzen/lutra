@@ -42,7 +42,8 @@ pub fn evaluate(
         let (mod_id, decl_name) = external.id.rsplit_once('_').unwrap();
 
         let module = native_modules.get(mod_id).unwrap();
-        interpreter.allocate(module.lookup_native_symbol(decl_name));
+        let function = module.lookup_native_symbol(decl_name);
+        interpreter.allocate(Cell::FunctionNative(function));
     }
 
     // evaluate the expression

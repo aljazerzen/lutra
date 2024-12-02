@@ -86,10 +86,10 @@ pub fn write_functions(
     writeln!(w, "pub struct Wrapper<T>(pub T);\n")?;
 
     writeln!(w, "impl <T: NativeFunctions + 'static + Sync> ::lutra_runtime::NativeModule for Wrapper<T> {{")?;
-    writeln!(w, "    fn lookup_native_symbol(&self, id: &str) -> ::lutra_runtime::Cell {{")?;
+    writeln!(w, "    fn lookup_native_symbol(&self, id: &str) -> ::lutra_runtime::NativeFunction {{")?;
     writeln!(w, "        match id {{")?;
     for (name, _func) in functions {
-        writeln!(w, "          \"{name}\" => ::lutra_runtime::Cell::FunctionNative(&T::{name}),")?;
+        writeln!(w, "          \"{name}\" => &T::{name},")?;
     }
     writeln!(w, "          _ => panic!(),")?;
     writeln!(w, "        }}")?;

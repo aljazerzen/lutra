@@ -13,11 +13,11 @@ pub mod core {
         pub struct Module;
 
         impl NativeModule for Module {
-            fn lookup_native_symbol(&self, id: &str) -> crate::interpreter::Cell {
+            fn lookup_native_symbol(&self, id: &str) -> crate::interpreter::NativeFunction {
                 match id {
-                    "add" => Cell::FunctionNative(&Self::add),
-                    "sub" => Cell::FunctionNative(&Self::sub),
-                    "mul" => Cell::FunctionNative(&Self::mul),
+                    "add" => &Self::add,
+                    "sub" => &Self::sub,
+                    "mul" => &Self::mul,
                     _ => panic!(),
                 }
             }
@@ -54,9 +54,9 @@ pub mod core {
         pub struct Module;
 
         impl NativeModule for Module {
-            fn lookup_native_symbol(&self, id: &str) -> crate::interpreter::Cell {
+            fn lookup_native_symbol(&self, id: &str) -> crate::interpreter::NativeFunction {
                 match id {
-                    "map" => Cell::FunctionNative(&Self::map),
+                    "map" => &Self::map,
                     _ => panic!(),
                 }
             }
@@ -99,16 +99,16 @@ pub mod interpreter {
     pub struct Module;
 
     impl NativeModule for Module {
-        fn lookup_native_symbol(&self, id: &str) -> crate::interpreter::Cell {
+        fn lookup_native_symbol(&self, id: &str) -> crate::interpreter::NativeFunction {
             match id {
-                "version" => Self::version(),
+                "version" => &Self::version,
                 _ => panic!(),
             }
         }
     }
 
     impl Module {
-        fn version() -> Cell {
+        fn version(_it: &mut Interpreter, _args: Vec<(&ir::Ty, Cell)>) -> Cell {
             Cell::Data(encode(&"lutra-runtime 0.0.1".to_string()))
         }
     }
