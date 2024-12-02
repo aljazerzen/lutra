@@ -59,9 +59,7 @@ pub enum ExprKind {
     FString(Vec<InterpolateItem>),
     Case(Vec<SwitchCase>),
 
-    /// When used instead of function body, the function will be translated to a RQ operator.
-    /// Contains ident of the RQ operator.
-    Internal(String),
+    Internal,
 }
 
 impl ExprKind {

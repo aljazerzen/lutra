@@ -1,200 +1,149 @@
 # Operators
 
-let mul = func (left, right): int -> internal std.mul
-let div_i = func (left, right): int -> internal std.div_i
-let div_f = func (left, right): int -> internal std.div_f
-let mod = func (left, right): int -> internal std.mod
-let add = func (left, right): int -> internal std.add
-let sub = func (left, right): int -> internal std.sub
-let eq = func (left, right): bool -> internal std.eq
-let ne = func (left, right): bool -> internal std.ne
-let gt = func (left, right): bool -> internal std.gt
-let lt = func (left, right): bool -> internal std.lt
-let gte = func (left, right): bool -> internal std.gte
-let lte = func (left, right): bool -> internal std.lte
-let and = func (left: bool, right: bool): bool -> internal std.and
-let or = func (left: bool, right: bool): bool -> internal std.or
-let coalesce = func (left, right) -> internal std.coalesce
-let regex_search = func (text: text, pattern: text): bool -> internal std.regex_search
+let mul: func (left: int, right: int): int
+let div_i: func (left: int, right: int): int
+let div_f: func (left: int, right: int): int
+let mod: func (left: int, right: int): int
+let add: func (left: int, right: int): int
+let sub: func (left: int, right: int): int
+let eq: func (left: int, right: int): bool
+let ne: func (left: int, right: int): bool
+let gt: func (left: int, right: int): bool
+let lt: func (left: int, right: int): bool
+let gte: func (left: int, right: int): bool
+let lte: func (left: int, right: int): bool
+let and: func (left: bool, right: bool): bool
+let or: func (left: bool, right: bool): bool
+let coalesce: func (left: int, right: int): int
+let regex_search: func (text: text, pattern: text): bool
 
-let neg = func (expr: int):int -> internal std.neg
-let not = func (expr: bool):bool -> internal std.not
+let neg: func (expr: int): int
+let not: func (expr: bool): bool
 
 # Types
 
 # Functions
-
-let from = func <R> (tbl: R): R -> tbl
-
-let map = func (
-  mapper,
-  array,
-) -> internal map
-
-let select = func (
-  assigns,
-  tbl,
-) -> internal select
-
-let filter = func (
-  condition: bool,
-  tbl,
-) -> internal filter
-
-let derive = func (
-  assigns,
-  tbl,
-) -> internal derive
-
-let aggregate = func (
-  assigns,
-  tbl,
-) -> internal aggregate
-
-let sort = func (
-  by,
-  tbl,
-) -> internal sort
-
-let take = func (
-  expr,
-  tbl,
-) -> internal take
-
-let join = func (
-  with,
-  condition: bool,
-  side: text,
-  tbl,
-) -> internal join
-
-let group = func (
-  by,
-  pipeline,
-  tbl,
-) -> internal group
 
 # let from = func <R> (tbl: R): R -> tbl
 # 
 # let map = func <I, O> (
 #   mapper: func I -> O,
 #   array: [I],
-# ): [O] -> internal map
+# ): [O] -> internal
 # 
 # let select = func <I, A> (
 #   assigns: A,
 #   tbl: [I],
-# ): [A] -> internal select
+# ): [A] -> internal
 # 
 # let filter = func <T> (
 #   condition: bool,
 #   tbl: [T],
-# ): [T] -> internal filter
+# ): [T] -> internal
 # 
 # let derive = func <I, A> (
 #   assigns: A,
 #   tbl: [I],
-# ): [{I, A}] -> internal derive
+# ): [{I, A}] -> internal
 # 
 # let aggregate = func <I, A> (
 #   assigns: A,
 #   tbl: [I],
-# ): [A] -> internal aggregate
+# ): [A] -> internal
 # 
 # let sort = func <I> (
 #   by: {},
 #   tbl: [I],
-# ): [I] -> internal sort
+# ): [I] -> internal
 # 
 # let take = func <I> (
 #   expr,
 #   tbl: [I],
-# ): [I] -> internal take
+# ): [I] -> internal
 # 
 # let join = func <A, B> (
 #   with: [B],
 #   condition: bool,
 #   side: text,
 #   tbl: [A],
-# ): [{A, B}] -> internal join
+# ): [{A, B}] -> internal
 # 
 # let group = func <I, B, PO> (
 #   by: B,
 #   pipeline: func [I - B] -> [PO],
 #   tbl: [I],
-# ): [{B, ..PO}] -> internal group
+# ): [{B, ..PO}] -> internal
 # 
-# let append = func (bottom, top) -> internal append
+# let append = func (bottom, top) -> internal
 
 # Aggregation functions
 
-let min = func (column): int -> internal std.min
+let min: func (column: [int]): int
 
-let max = func (column): int -> internal std.max
+let max: func (column: [int]): int
 
-let sum = func (column): int -> internal std.sum
+let sum: func (column: [int]): int
 
-let average = func (column): float -> internal std.average
+let average: func (column: [int]): float
 
-let stddev = func (column): float -> internal std.stddev
+let stddev: func (column: [int]): float
 
-let all = func (column): bool -> internal std.all
+let all: func (column: [bool]): bool
 
-let any = func (column): bool -> internal std.any
+let any: func (column: [bool]): bool
 
-let concat_array = func (column): text -> internal std.concat_array
+let contains: func (value: [int], pattern: int): bool
 
-let count = func (column):int -> internal count
+let concat_array: func (column: [text]): text
+
+let count: func (column: [int]):int
 
 # Window functions
 
-let lag = func (offset: int, column) -> internal std.lag
-let lead = func (offset: int, column) -> internal std.lead
-let first = func (column) -> internal std.first
-let last = func (column) -> internal std.last
-let rank = func (column) -> internal std.rank
-let rank_dense = func (column) -> internal std.rank_dense
-let row_number = func (column) -> internal row_number
+let lag: func (offset: int, column: [int]): [int]
+let lead: func (offset: int, column: [int]): [int]
+let rank: func (column: [int]): [int]
+let rank_dense: func (column: [int]): [int]
+let row_number: func (column: [int]): [int]
 
-# Mathematical functions
+## Mathematical functions
 module math {
-  let abs = func (column): int -> internal std.math.abs
-  let floor = func (column): int -> internal std.math.floor
-  let ceil = func (column): int -> internal std.math.ceil
-  let pi: float = internal std.math.pi
-  let exp = func (column): int -> internal std.math.exp
-  let ln = func (column): int -> internal std.math.ln
-  let log10 = func (column): int -> internal std.math.log10
-  let log = func (base: int, column): int -> internal std.math.log
-  let sqrt = func (column): int -> internal std.math.sqrt
-  let degrees = func (column): int -> internal std.math.degrees
-  let radians = func (column): int -> internal std.math.radians
-  let cos = func (column): int -> internal std.math.cos
-  let acos = func (column): int -> internal std.math.acos
-  let sin = func (column): int -> internal std.math.sin
-  let asin = func (column): int -> internal std.math.asin
-  let tan = func (column): int -> internal std.math.tan
-  let atan = func (column): int -> internal std.math.atan
-  let pow = func (exponent: int, column): int -> internal std.math.pow
-  let round = func (n_digits, column): int -> internal std.math.round
+  let abs: func (val: int): int
+  let floor: func (val: int): int
+  let ceil: func (val: int): int
+  let pi: float
+  let exp: func (val: int): int
+  let ln: func (val: int): int
+  let log10: func (val: int): int
+  let log: func (base: int, val: int): int
+  let sqrt: func (val: int): int
+  let degrees: func (val: int): int
+  let radians: func (val: int): int
+  let cos: func (val: int): int
+  let acos: func (val: int): int
+  let sin: func (val: int): int
+  let asin: func (val: int): int
+  let tan: func (val: int): int
+  let atan: func (val: int): int
+  let pow: func (val: int, exponent: int): int
+  let round: func (val: int, n_digits: int): int
 }
 
-# Misc functions
-
-let in = func (pattern, value): bool -> internal in
-
-# Text functions
-
+## Text functions
 module text_ops {
-  let lower = func (column): text -> internal std.text.lower
-  let upper = func (column): text -> internal std.text.upper
-  let ltrim = func (column): text -> internal std.text.ltrim
-  let rtrim = func (column): text -> internal std.text.rtrim
-  let trim = func (column): text -> internal std.text.trim
-  let length = func (column): int -> internal std.text.length
-  let extract = func (offset: int, length: int, column): text -> internal std.text.extract
-  let replace = func (pattern: text, replacement: text, column): text -> internal std.text.replace
-  let starts_with = func (prefix: text, column): bool -> internal std.text.starts_with
-  let contains = func (substr: text, column): bool -> internal std.text.contains
-  let ends_with = func (suffix: text, column): bool -> internal std.text.ends_with
+  let lower: func (value: text): text
+  let upper: func (value: text): text
+
+  let ltrim: func (value: text): text
+  let rtrim: func (value: text): text
+  let trim: func (value: text): text
+
+  let length: func (value: text): int
+
+  let substring: func (value: text, offset: int, length: int): text
+  let replace: func (value: text, pattern: text, replacement: text): text
+
+  let starts_with: func (value: text, prefix: text): bool
+  let contains: func (value: text, substr: text): bool
+  let ends_with: func (value: text, suffix: text): bool
 }

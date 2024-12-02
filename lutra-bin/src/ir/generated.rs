@@ -151,5 +151,3 @@ pub struct TyFunction {
 #[derive(Debug, Clone, PartialEq)]
 #[allow(non_camel_case_types)]
 pub struct Path(pub Vec<String>);
-
-pub mod std {}

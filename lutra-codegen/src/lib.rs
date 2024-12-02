@@ -87,6 +87,9 @@ fn codegen_in(
     let mut functions = Vec::new();
     let mut sub_modules = Vec::new();
     for (name, decl) in &module.names {
+        if decl.built_in {
+            continue;
+        }
         match &decl.kind {
             lutra_frontend::decl::DeclKind::Module(module) => {
                 sub_modules.push((name, module));

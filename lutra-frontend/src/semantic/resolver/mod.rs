@@ -26,9 +26,6 @@ pub struct Resolver<'a> {
 
     pub debug_current_decl: crate::pr::Path,
 
-    /// Sometimes ident closures must be resolved and sometimes not. See [test::test_func_call_resolve].
-    in_func_call_name: bool,
-
     pub id: IdGenerator<usize>,
 
     scopes: Vec<scope::Scope>,
@@ -42,7 +39,6 @@ impl Resolver<'_> {
         Resolver {
             root_mod,
             debug_current_decl: crate::pr::Path::from_name("?"),
-            in_func_call_name: false,
             id: IdGenerator::new(),
             scopes: Vec::new(),
             strict_mode: false,

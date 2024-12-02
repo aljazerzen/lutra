@@ -12,7 +12,7 @@ type Expr = {
   ty = Ty,
 }
 
-@(derive ["Debug", "Clone", "enum_as_inner::EnumAsInner"])
+@derive(["Debug", "Clone", "enum_as_inner::EnumAsInner"])
 type ExprKind = enum {
   Pointer = Sid,
   Literal = Literal,
@@ -30,10 +30,10 @@ type ExprKind = enum {
 ## - 0b01xxxxxx - local bindings
 ## - 0b10xxxxxx - function scopes
 ## - 0b11xxxxxx - unused
-@(derive ["Debug", "Clone", "Copy", "PartialEq", "Eq", "Hash"])
+@derive(["Debug", "Clone", "Copy", "PartialEq", "Eq", "Hash"])
 type Sid = uint32
 
-@(derive ["Debug", "Clone", "PartialEq", "enum_as_inner::EnumAsInner"])
+@derive(["Debug", "Clone", "PartialEq", "enum_as_inner::EnumAsInner"])
 type Literal = enum {
   Int = int64,
   Float = float64,
@@ -69,14 +69,14 @@ type Binding = {
   main = Expr,
 }
 
-@(derive ["Debug", "Clone"])
+@derive(["Debug", "Clone"])
 type Ty = {
   kind = TyKind,
   layout = enum { None, Some = TyLayout },
   name = enum { None, Some = text },
 }
 
-@(derive ["Debug", "Clone", "PartialEq", "enum_as_inner::EnumAsInner"])
+@derive(["Debug", "Clone", "PartialEq", "enum_as_inner::EnumAsInner"])
 type TyKind = enum {
   Primitive = PrimitiveSet,
 
@@ -91,7 +91,7 @@ type TyKind = enum {
   Ident = Path,
 }
 
-@(derive ["Debug", "Clone", "Copy", "PartialEq", "Eq", "Hash"])
+@derive(["Debug", "Clone", "Copy", "PartialEq", "Eq", "Hash"])
 type PrimitiveSet = enum {
   bool,
   int8,
@@ -107,30 +107,30 @@ type PrimitiveSet = enum {
   text,
 }
 
-@(derive ["Debug", "Clone", "PartialEq"])
+@derive(["Debug", "Clone", "PartialEq"])
 type TyTupleField = {
   name = enum { None, Some = text},
   ty = Ty,
 }
 
-@(derive ["Debug", "Clone", "PartialEq"])
+@derive(["Debug", "Clone", "PartialEq"])
 type TyEnumVariant = {
   name = text,
   ty = Ty,
 }
 
-@(derive ["Debug", "Clone", "PartialEq", "Default"])
+@derive(["Debug", "Clone", "PartialEq", "Default"])
 type TyLayout = {
   head_size = uint32,
   body_ptr_offset = enum { None, Some = uint32 },
   variants_recursive = [uint16]
 }
 
-@(derive ["Debug", "Clone", "PartialEq"])
+@derive(["Debug", "Clone", "PartialEq"])
 type TyFunction = {
   params = [Ty],
   body = Ty
 }
 
-@(derive ["Debug", "Clone", "PartialEq"])
+@derive(["Debug", "Clone", "PartialEq"])
 type Path = [text]

@@ -247,9 +247,9 @@ impl NameResolver<'_> {
         };
         let mod_decl = self.root.module.get_submodule_mut(&mod_fq_path);
 
-        let decl = mod_decl.filter(|module| module.get(&ident).is_some());
+        let decl = mod_decl.and_then(|module| module.get(&ident));
         if decl.is_none() {
-            return Err(Diagnostic::new_custom(format!("unknown name")));
+            return Err(Diagnostic::new_custom("unknown name"));
         }
 
         // prepend the ident with the module path

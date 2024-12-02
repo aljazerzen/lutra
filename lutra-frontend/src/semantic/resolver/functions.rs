@@ -36,7 +36,7 @@ impl Resolver<'_> {
         func.return_ty = fold::fold_type_opt(self, func.return_ty)?;
 
         // put params into scope
-        self.scopes.last_mut().unwrap().populate_from_func(&func);
+        self.scopes.last_mut().unwrap().populate_from_func(&func)?;
 
         func.body = Box::new(self.fold_expr(*func.body)?);
 
@@ -73,17 +73,18 @@ impl Resolver<'_> {
             fn_ty.params.len()
         );
 
-        if args.len() > fn_ty.params.len() {
+        let args_match_params = args.len() == fn_ty.params.len();
+        if !args_match_params {
             return Err(Diagnostic::new_custom(format!(
-                "Too many arguments to function `{}`",
-                metadata.as_debug_name()
+                "{}expected {} arguments, but got {}",
+                metadata
+                    .name_hint
+                    .map(|x| format!("{x} "))
+                    .unwrap_or_default(),
+                fn_ty.params.len(),
+                args.len(),
             ))
             .with_span(span));
-        }
-
-        let enough_args = args.len() == fn_ty.params.len();
-        if !enough_args {
-            todo!()
         }
 
         self.init_func_app_generic_args(&fn_ty, func.id.unwrap());

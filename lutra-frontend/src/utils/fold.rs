@@ -111,7 +111,7 @@ pub fn fold_expr_kind<T: ?Sized + PrFold>(fold: &mut T, expr_kind: ExprKind) -> 
         }),
 
         // None of these capture variables, so we don't need to fold them.
-        Internal(_) | Literal(_) => expr_kind,
+        Internal | Literal(_) => expr_kind,
     })
 }
 

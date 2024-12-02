@@ -21,11 +21,6 @@ pub(crate) fn expr() -> impl Parser<TokenKind, Expr, Error = PError> + Clone {
 
         let ident_kind = ident().map(ExprKind::Ident);
 
-        let internal = keyword("internal")
-            .ignore_then(ident())
-            .map(|x| x.to_string())
-            .map(ExprKind::Internal);
-
         let func = lambda_func(expr.clone());
         let call = func_call(expr.clone());
 
@@ -37,7 +32,6 @@ pub(crate) fn expr() -> impl Parser<TokenKind, Expr, Error = PError> + Clone {
 
         let term = choice((
             literal,
-            internal,
             func,
             tuple,
             array,
@@ -169,7 +163,6 @@ where
         ctrl('.')
             .ignore_then(choice((
                 ident_part().map(IndirectionKind::Name),
-                ctrl('*').to(IndirectionKind::Star),
                 select! {
                     TokenKind::Literal(Literal::Integer(i)) => IndirectionKind::Position(i)
                 },

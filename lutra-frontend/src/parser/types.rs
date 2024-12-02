@@ -14,12 +14,14 @@ pub(crate) fn type_expr() -> impl Parser<TokenKind, Ty, Error = PError> + Clone 
             TokenKind::Ident(i) if i == "int16" => PrimitiveSet::int16,
             TokenKind::Ident(i) if i == "int32" => PrimitiveSet::int32,
             TokenKind::Ident(i) if i == "int64" => PrimitiveSet::int64,
+            TokenKind::Ident(i) if i == "int" => PrimitiveSet::int64,
             TokenKind::Ident(i) if i == "uint8" => PrimitiveSet::uint8,
             TokenKind::Ident(i) if i == "uint16" => PrimitiveSet::uint16,
             TokenKind::Ident(i) if i == "uint32" => PrimitiveSet::uint32,
             TokenKind::Ident(i) if i == "uint64" => PrimitiveSet::uint64,
             TokenKind::Ident(i) if i == "float32" => PrimitiveSet::float32,
             TokenKind::Ident(i) if i == "float64" => PrimitiveSet::float64,
+            TokenKind::Ident(i) if i == "float" => PrimitiveSet::float64,
             TokenKind::Ident(i) if i == "bool"=> PrimitiveSet::bool,
             TokenKind::Ident(i) if i == "text"=> PrimitiveSet::text,
         }
@@ -29,11 +31,12 @@ pub(crate) fn type_expr() -> impl Parser<TokenKind, Ty, Error = PError> + Clone 
 
         let func = keyword("func")
             .ignore_then(
-                nested_type_expr
-                    .clone()
-                    .map(Some)
-                    .repeated()
-                    .then_ignore(just(TokenKind::ArrowThin))
+                (ident_part().then_ignore(ctrl(':')).or_not())
+                    .ignore_then(nested_type_expr.clone().map(Some))
+                    .separated_by(ctrl(','))
+                    .allow_trailing()
+                    .delimited_by(ctrl('('), ctrl(')'))
+                    .then_ignore(ctrl(':'))
                     .then(nested_type_expr.clone().map(Box::new).map(Some))
                     .map(|(params, return_ty)| TyFunc {
                         params,

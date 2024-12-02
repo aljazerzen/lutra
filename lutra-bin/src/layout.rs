@@ -175,7 +175,12 @@ pub fn enum_variant_format(variant_ty: &ir::Ty) -> EnumVariantFormat {
 fn enum_max_variant_head_size(variants: &[ir::TyEnumVariant]) -> usize {
     let mut h = 0;
     for variant in variants {
-        let size = variant.ty.layout.as_ref().unwrap().head_size as usize;
+        let ty_layout = variant
+            .ty
+            .layout
+            .as_ref()
+            .unwrap_or_else(|| panic!("missing layout: {:?}", variant.ty));
+        let size = ty_layout.head_size as usize;
         h = h.max(size);
     }
     h

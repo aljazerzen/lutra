@@ -33,6 +33,8 @@ pub struct Decl {
     pub kind: DeclKind,
 
     pub annotations: Vec<pr::Annotation>,
+
+    pub built_in: bool,
 }
 
 /// Declaration kind.
@@ -91,6 +93,7 @@ impl Decl {
             kind: kind.into(),
             span: None,
             annotations: Vec::new(),
+            built_in: false,
         }
     }
 }

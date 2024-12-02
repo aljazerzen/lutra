@@ -502,7 +502,11 @@ fn write_ty_def_impl(w: &mut impl Write, ty: &ir::Ty) -> Result<(), std::fmt::Er
         _ => unimplemented!(),
     }
 
-    let head_size = &ty.layout.as_ref().unwrap().head_size;
+    let head_size = &ty
+        .layout
+        .as_ref()
+        .unwrap_or_else(|| panic!("ty is missing layout: {ty:?}"))
+        .head_size;
     writeln!(w, "impl ::lutra_bin::Layout for {name} {{")?;
     writeln!(w, "    fn head_size() -> usize {{")?;
     writeln!(w, "        {head_size}")?;

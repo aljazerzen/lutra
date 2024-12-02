@@ -99,9 +99,7 @@ impl super::Resolver<'_> {
                     }
                     None => {
                         // var value is not provided: treat this var as value provided by the runtime
-                        let mut expr = Box::new(pr::Expr::new(pr::ExprKind::Internal(
-                            fq_ident.name().to_string(),
-                        )));
+                        let mut expr = Box::new(pr::Expr::new(pr::ExprKind::Internal));
                         expr.ty = expected_ty;
                         DeclKind::Expr(expr)
                     }

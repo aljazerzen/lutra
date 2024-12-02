@@ -19,17 +19,6 @@ impl fold::PrFold for super::Resolver<'_> {
         self.fold_type_actual(ty)
     }
 
-    fn fold_var_def(&mut self, var_def: pr::VarDef) -> Result<pr::VarDef> {
-        Ok(pr::VarDef {
-            name: var_def.name,
-            value: match var_def.value {
-                Some(value) => Some(Box::new(self.fold_expr(*value)?)),
-                None => None,
-            },
-            ty: var_def.ty.map(|x| self.fold_type(x)).transpose()?,
-        })
-    }
-
     fn fold_expr(&mut self, node: pr::Expr) -> Result<pr::Expr> {
         if node.id.is_some() && !matches!(node.kind, pr::ExprKind::Func(_)) {
             return Ok(node);
@@ -120,16 +109,13 @@ impl fold::PrFold for super::Resolver<'_> {
 
             pr::ExprKind::FuncCall(pr::FuncCall { name, args }) => {
                 // fold function name
-                let old = self.in_func_call_name;
-                self.in_func_call_name = true;
                 let func = Box::new(self.fold_expr(*name)?);
-                self.in_func_call_name = old;
 
                 self.resolve_func_application(func, args, *span)?
             }
 
             pr::ExprKind::Func(func) => {
-                let func = self.resolve_func(func)?;
+                let func = self.resolve_func(func).with_span_fallback(*span)?;
                 pr::Expr {
                     kind: pr::ExprKind::Func(func),
                     ..node
@@ -223,19 +209,47 @@ impl super::Resolver<'_> {
         base: &Ty,
         indirection: &pr::IndirectionKind,
     ) -> Result<Vec<StepOwned>> {
-        match indirection {
-            pr::IndirectionKind::Name(name) => {
-                self.lookup_name_in_tuple(base, name).and_then(|res| {
-                    res.ok_or_else(|| Diagnostic::new_custom(format!("Unknown name {name}")))
-                })
+        match &base.kind {
+            pr::TyKind::Ident(fq_ident) => {
+                let decl_ty = self.get_ident(fq_ident).unwrap();
+                let base = decl_ty.kind.as_ty().unwrap().clone();
+                self.resolve_indirection(&base, indirection)
             }
-            pr::IndirectionKind::Position(pos) => {
-                let step = super::tuple::lookup_position_in_tuple(base, *pos as usize)?
-                    .ok_or_else(|| Diagnostic::new_custom("Out of bounds"))?;
 
-                Ok(vec![step])
+            pr::TyKind::Tuple(fields) => match indirection {
+                pr::IndirectionKind::Name(name) => {
+                    self.lookup_name_in_tuple(fields, name).and_then(|res| {
+                        res.ok_or_else(|| Diagnostic::new_custom(format!("Unknown name {name}")))
+                    })
+                }
+                pr::IndirectionKind::Position(pos) => {
+                    let step = super::tuple::lookup_position_in_tuple(base, *pos as usize)?
+                        .ok_or_else(|| Diagnostic::new_custom("Out of bounds"))?;
+
+                    Ok(vec![step])
+                }
+                pr::IndirectionKind::Star => todo!(),
+            },
+
+            pr::TyKind::Array(items_ty) => match indirection {
+                pr::IndirectionKind::Name(_) => {
+                    Err(Diagnostic::new_custom("cannot lookup array items by name")
+                        .with_span(base.span))
+                }
+                pr::IndirectionKind::Position(pos) => Ok(vec![StepOwned {
+                    position: *pos as usize,
+                    target_ty: *items_ty.clone(),
+                }]),
+                pr::IndirectionKind::Star => todo!(),
+            },
+
+            pr::TyKind::Primitive(_) | pr::TyKind::Enum(_) | pr::TyKind::Function(_) => {
+                Err(Diagnostic::new_custom(format!(
+                    "expected a struct or array, found {}",
+                    base.kind.as_ref()
+                ))
+                .with_span(base.span))
             }
-            pr::IndirectionKind::Star => todo!(),
         }
     }
 }

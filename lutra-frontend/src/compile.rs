@@ -57,10 +57,9 @@ fn parse(
 
         let (ast, errs) = crate::parser::parse_source(source_file.content, id);
 
+        diagnostics.extend(errs);
         if let Some(stmts) = ast {
             linearize::insert_stmts_at_path(&mut root, source_file.module_path, stmts);
-        } else {
-            diagnostics.extend(errs);
         }
     }
     if diagnostics.is_empty() {

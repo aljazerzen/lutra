@@ -11,22 +11,10 @@ impl Module {
         Module {
             names: IndexMap::from([
                 (NS_STD.to_string(), Decl::new(Module::default())),
-                (
-                    "bool".into(),
-                    Decl::new(pr::Ty::new(pr::PrimitiveSet::bool)),
-                ),
-                (
-                    "int".into(),
-                    Decl::new(pr::Ty::new(pr::PrimitiveSet::int64)),
-                ),
-                (
-                    "float".into(),
-                    Decl::new(pr::Ty::new(pr::PrimitiveSet::float64)),
-                ),
-                (
-                    "text".into(),
-                    Decl::new(pr::Ty::new(pr::PrimitiveSet::text)),
-                ),
+                // ("bool".into(), init_primitive_ty(pr::PrimitiveSet::bool)),
+                // ("int".into(), init_primitive_ty(pr::PrimitiveSet::int64)),
+                // ("float".into(), init_primitive_ty(pr::PrimitiveSet::float64)),
+                // ("text".into(), init_primitive_ty(pr::PrimitiveSet::text)),
             ]),
         }
     }
@@ -139,6 +127,15 @@ impl Module {
         (unresolved.take().unwrap(), decl.span)
     }
 }
+
+// fn init_primitive_ty(primitive: pr::PrimitiveSet) -> Decl {
+//     let mut ty = pr::Ty::new(primitive);
+//     ty.layout = Some(ty.kind.get_layout_simple().unwrap());
+
+//     let mut decl = Decl::new(ty);
+//     decl.built_in = true;
+//     decl
+// }
 
 fn decl_has_annotation(decl: &Decl, annotation_name: &pr::Path) -> bool {
     for ann in &decl.annotations {

@@ -29,10 +29,12 @@ fn populate_module(module: &mut decl::Module, stmts: Vec<pr::Stmt>) {
                 decl::DeclKind::Unresolved(Some(kind))
             }
         };
+        let built_in = name == "std";
         let decl = decl::Decl {
             span: stmt.span,
             kind,
             annotations: stmt.annotations,
+            built_in,
         };
         module.names.insert(name, decl);
     }

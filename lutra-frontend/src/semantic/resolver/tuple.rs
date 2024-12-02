@@ -30,13 +30,13 @@ impl super::Resolver<'_> {
     /// Performs tuple indirection by name.
     pub fn lookup_name_in_tuple<'a>(
         &'a mut self,
-        ty: &'a pr::Ty,
+        fields: &'a [pr::TyTupleField],
         name: &str,
     ) -> Result<Option<Vec<StepOwned>>> {
-        log::debug!("looking up `.{name}` in {:?}", ty);
+        log::debug!("looking up `.{name}` in {:?}", fields);
 
         // find existing field
-        let found = self.find_name_in_tuple(ty, name);
+        let found = self.find_name_in_tuple(fields, name);
         match found.len() {
             // no match: pass though
             0 => {}
@@ -57,18 +57,22 @@ impl super::Resolver<'_> {
     }
 
     /// Find in fields of this tuple (including the unpack)
-    fn find_name_in_tuple<'a>(&'a self, ty: &'a pr::Ty, name: &str) -> Vec<Vec<Step>> {
-        let pr::TyKind::Tuple(fields) = &ty.kind else {
-            return vec![];
-        };
-
-        if let Some(step) = self.find_name_in_tuple_direct(ty, name) {
+    fn find_name_in_tuple<'a>(
+        &'a self,
+        fields: &'a [pr::TyTupleField],
+        name: &str,
+    ) -> Vec<Vec<Step>> {
+        if let Some(step) = self.find_name_in_tuple_direct(fields, name) {
             return vec![vec![step]];
         };
 
         let mut res = vec![];
         for (position, field) in fields.iter().enumerate() {
-            for mut x in self.find_name_in_tuple(&field.ty, name) {
+            let pr::TyKind::Tuple(inner_fields) = &field.ty.kind else {
+                return vec![];
+            };
+
+            for mut x in self.find_name_in_tuple(inner_fields, name) {
                 x.insert(
                     0,
                     Step {
@@ -84,11 +88,11 @@ impl super::Resolver<'_> {
     }
 
     /// Find in this tuple (including the unpack)
-    fn find_name_in_tuple_direct<'a>(&'a self, ty: &'a pr::Ty, name: &str) -> Option<Step<'a>> {
-        let pr::TyKind::Tuple(fields) = &ty.kind else {
-            return None;
-        };
-
+    fn find_name_in_tuple_direct<'a>(
+        &'a self,
+        fields: &'a [pr::TyTupleField],
+        name: &str,
+    ) -> Option<Step<'a>> {
         for (position, field) in fields.iter().enumerate() {
             if field.name.as_ref().map_or(false, |n| n == name) {
                 return Some(Step {
@@ -154,8 +158,8 @@ impl<'a> Step<'a> {
 
 #[derive(PartialEq)]
 pub struct StepOwned {
-    position: usize,
-    target_ty: pr::Ty,
+    pub position: usize,
+    pub target_ty: pr::Ty,
 }
 
 impl std::fmt::Debug for StepOwned {

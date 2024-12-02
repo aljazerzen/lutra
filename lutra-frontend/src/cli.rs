@@ -66,7 +66,7 @@ mod inner {
 
         let project = lutra_frontend::compile(project, cmd.compile)?;
 
-        println!("{project:?}");
+        println!("{project:#?}");
         Ok(())
     }
 }

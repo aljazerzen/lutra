@@ -1,5 +1,6 @@
 use indexmap::IndexMap;
 
+use crate::_lexer::Diagnostic;
 use crate::decl;
 use crate::pr::{self, Path};
 
@@ -48,17 +49,22 @@ impl Scope {
         Self { types, values }
     }
 
-    pub fn populate_from_func(&mut self, func: &pr::Func) {
+    pub fn populate_from_func(&mut self, func: &pr::Func) -> crate::Result<()> {
         for param in &func.params {
+            let ty = param
+                .ty
+                .clone()
+                .ok_or_else(|| Diagnostic::new_custom("missing type annotations"))?;
             let decl = decl::Decl::new(pr::Expr {
                 kind: pr::Path::from_name(param.name.clone()).into(),
-                ty: Some(param.ty.clone().unwrap()),
+                ty: Some(ty),
                 span: None,
                 alias: None,
                 id: None,
             });
             self.values.insert(param.name.clone(), decl);
         }
+        Ok(())
     }
 
     pub fn get(&self, name: &str) -> Option<&decl::Decl> {

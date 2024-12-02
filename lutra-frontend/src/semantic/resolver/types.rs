@@ -21,7 +21,11 @@ impl Resolver<'_> {
                 let decl = self.get_ident(&ident).unwrap();
 
                 match &decl.kind {
-                    crate::decl::DeclKind::Ty(ty) => ty.clone(),
+                    crate::decl::DeclKind::Ty(decl_ty) => pr::Ty {
+                        kind: pr::TyKind::Ident(ident),
+                        layout: decl_ty.layout.clone(),
+                        ..ty
+                    },
                     crate::decl::DeclKind::Unresolved(_) => {
                         // recursive type, skip inlining
                         // TODO: maybe determine that some decls should not be inlined because we already know that they are recursive
@@ -172,7 +176,7 @@ impl Resolver<'_> {
             | ExprKind::Range(_) // desugar-ed
             | ExprKind::Binary(_) // desugar-ed
             | ExprKind::Unary(_) // desugar-ed
-            | ExprKind::Internal(_) => unreachable!(),
+            | ExprKind::Internal => unreachable!(),
         };
         Ok(Ty {
             kind,
@@ -207,6 +211,7 @@ impl Resolver<'_> {
     }
 
     /// Validates that found node has expected type. Returns assumed type of the node.
+    #[allow(clippy::only_used_in_recursion)]
     pub fn validate_type<F>(
         &mut self,
         found: &Ty,
@@ -221,14 +226,16 @@ impl Resolver<'_> {
             // base case
             (TyKind::Primitive(f), TyKind::Primitive(e)) if e == f => Ok(()),
 
-            // generics: infer
-            (_, TyKind::Ident(_expected_fq)) => {
-                // if expected type is a generic, infer that it must be the found type
-                todo!();
+            // lookup idents
+            (_, TyKind::Ident(expected_fq)) => {
+                let expected_decl = self.get_ident(expected_fq).unwrap();
+                let expected = expected_decl.kind.as_ty().unwrap().clone();
+                self.validate_type(found, &expected, span, who)
             }
-            (TyKind::Ident(_found_fq), _) => {
-                // if found type is a generic, infer that it must be the expected type
-                todo!();
+            (TyKind::Ident(found_fq), _) => {
+                let found_decl = self.get_ident(found_fq).unwrap();
+                let found = found_decl.kind.as_ty().unwrap().clone();
+                self.validate_type(&found, expected, span, who)
             }
 
             // containers: recurse
