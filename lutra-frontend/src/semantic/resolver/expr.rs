@@ -69,9 +69,9 @@ impl fold::PrFold for super::Resolver<'_> {
                         )));
                     }
 
-                    _ => pr::Expr {
-                        kind: pr::ExprKind::Ident(ident),
-                        ..node
+                    DeclKind::Module(_) | DeclKind::Import(_) => {
+                        // handled during name resolution
+                        unreachable!()
                     },
                 };
 
@@ -118,18 +118,6 @@ impl fold::PrFold for super::Resolver<'_> {
                 let func = self.resolve_func(func).with_span_fallback(*span)?;
                 pr::Expr {
                     kind: pr::ExprKind::Func(func),
-                    ..node
-                }
-            }
-
-            pr::ExprKind::Tuple(exprs) => {
-                let exprs = self.fold_exprs(exprs)?;
-
-                // flatten
-                let exprs = exprs.into_iter().flat_map(|e| vec![e]).collect_vec();
-
-                pr::Expr {
-                    kind: pr::ExprKind::Tuple(exprs),
                     ..node
                 }
             }

@@ -8,49 +8,39 @@ use super::Resolver;
 
 #[derive(Debug)]
 pub struct Scope {
-    // todo: use something else then Decl here
-    pub types: IndexMap<String, decl::Decl>,
-
-    // todo: use something else then Decl here
-    pub values: IndexMap<String, decl::Decl>,
+    // TODO: use something other than Decl here
+    names: IndexMap<String, decl::Decl>,
 }
 
 impl Scope {
     pub fn new() -> Self {
         Self {
-            types: IndexMap::new(),
-            values: IndexMap::new(),
+            names: IndexMap::new(),
         }
     }
 
     pub fn new_of_func(func: &pr::Func) -> Self {
-        let values = func
-            .params
-            .iter()
-            .map(|p| {
+        let names = itertools::chain(
+            func.params.iter().map(|p| {
                 let dummy = pr::Expr::new(pr::Path::new::<String, _>(vec![]));
                 let dummy = decl::Decl::new(decl::DeclKind::Expr(Box::new(dummy)));
 
                 (p.name.clone(), dummy)
-            })
-            .collect();
-
-        let types = func
-            .generic_type_params
-            .iter()
-            .map(|gtp| {
+            }),
+            func.generic_type_params.iter().map(|gtp| {
                 let dummy = pr::Ty::new(pr::TyKind::Tuple(vec![]));
                 let dummy = decl::Decl::new(decl::DeclKind::Ty(dummy));
 
                 (gtp.name.clone(), dummy)
-            })
-            .collect();
+            }),
+        )
+        .collect();
 
-        Self { types, values }
+        Self { names }
     }
 
     pub fn populate_from_func(&mut self, func: &pr::Func) -> crate::Result<()> {
-        for param in &func.params {
+        for (index, param) in func.params.iter().enumerate() {
             let ty = param
                 .ty
                 .clone()
@@ -62,25 +52,22 @@ impl Scope {
                 alias: None,
                 id: None,
             });
-            self.values.insert(param.name.clone(), decl);
+            self.names.insert(index.to_string(), decl);
         }
         Ok(())
     }
 
     pub fn get(&self, name: &str) -> Option<&decl::Decl> {
-        if let Some(decl) = self.types.get(name) {
-            return Some(decl);
-        }
-
-        self.values.get(name)
+        self.names.get(name)
     }
 
-    pub fn get_mut(&mut self, name: &str) -> Option<&mut decl::Decl> {
-        if let Some(decl) = self.types.get_mut(name) {
-            return Some(decl);
-        }
+    pub fn get_index(&self, name: &str) -> Option<usize> {
+        self.names.get_index_of(name)
+    }
 
-        self.values.get_mut(name)
+    #[allow(dead_code)]
+    pub fn get_mut(&mut self, name: &str) -> Option<&mut decl::Decl> {
+        self.names.get_mut(name)
     }
 }
 
@@ -89,26 +76,19 @@ impl Resolver<'_> {
     ///
     /// Does not mutate the current scope or module structure.
     pub(super) fn get_ident(&self, ident: &Path) -> Option<&decl::Decl> {
-        for scope in self.scopes.iter().rev() {
-            if let Some(decl) = scope.get(ident.first()) {
-                return Some(decl);
+        if ident.starts_with_part("func") {
+            let mut parts = ident.iter().peekable();
+            parts.next();
+
+            let mut scope = self.scopes.iter().rev();
+            while parts.peek().map_or(false, |x| *x == "up") {
+                parts.next();
+                scope.next();
             }
+            let scope = scope.next().unwrap();
+            scope.get(parts.next().unwrap())
+        } else {
+            self.root_mod.module.get(ident)
         }
-
-        self.root_mod.module.get(ident)
-    }
-
-    /// Get mutable reference to a declaration from within the current scope.
-    ///
-    /// Does not mutate the current scope or module structure.
-    #[allow(dead_code)]
-    pub(super) fn get_ident_mut(&mut self, ident: &Path) -> Option<&mut decl::Decl> {
-        for scope in self.scopes.iter_mut().rev() {
-            if let Some(decl) = scope.get_mut(ident.first()) {
-                return Some(decl);
-            }
-        }
-
-        self.root_mod.module.get_mut(ident)
     }
 }

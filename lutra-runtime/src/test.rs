@@ -16,7 +16,7 @@ fn _test_interpret(program: &str) -> String {
 #[test]
 fn interpret_01() {
     assert_snapshot!(_test_interpret(r#"
-    let externals = [core_int_add];
+    let externals = [std::int::add];
 
     let main =
         let 1 = (
@@ -66,7 +66,7 @@ fn interpret_01() {
 #[test]
 fn interpret_02() {
     assert_snapshot!(_test_interpret(r#"
-    let externals = [core_array_map];
+    let externals = [std::array::map];
 
     let main =
         let 1 = (
@@ -105,7 +105,7 @@ fn interpret_02() {
 #[test]
 fn interpret_03() {
     assert_snapshot!(_test_interpret(r#"
-    let externals = [core_array_map, core_int_mul];
+    let externals = [std::array::map, std::int::mul];
 
     let main =
         let 1 = [

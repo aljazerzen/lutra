@@ -6,7 +6,7 @@ use insta::assert_snapshot;
 fn print_01() {
     assert_snapshot!(super::_test_print(r#"
     let externals = [
-      std_int_add,
+      std::int::add,
     ];
     
     let main =
@@ -44,7 +44,7 @@ fn print_01() {
       .[0]:int64
     "#), @r#"
     let externals = [
-      std_int_add,
+      std::int::add,
     ];
 
     let main =

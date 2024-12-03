@@ -2,6 +2,7 @@ mod compile;
 mod diagnostic;
 mod discover;
 mod error;
+mod lowering;
 mod parser;
 mod project;
 mod semantic;
@@ -14,6 +15,7 @@ pub mod decl;
 pub mod pr;
 pub use compile::{compile, CompileParams};
 pub use discover::{discover, DiscoverParams};
+pub use lowering::lower;
 pub use project::{Project, SourceTree};
 pub use span::Span;
 

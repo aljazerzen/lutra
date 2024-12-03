@@ -4,90 +4,72 @@ use lutra_bin::{Encode, Layout};
 use crate::interpreter::{Cell, Interpreter};
 use crate::NativeModule;
 
-pub mod core {
-    pub mod int {
-        use crate::native::*;
+pub mod std {
 
-        pub const MODULE: Module = Module;
+    use crate::native::*;
 
-        pub struct Module;
+    pub const MODULE: Module = Module;
 
-        impl NativeModule for Module {
-            fn lookup_native_symbol(&self, id: &str) -> crate::interpreter::NativeFunction {
-                match id {
-                    "add" => &Self::add,
-                    "sub" => &Self::sub,
-                    "mul" => &Self::mul,
-                    _ => panic!(),
-                }
-            }
-        }
+    pub struct Module;
 
-        impl Module {
-            pub fn add(_: &mut Interpreter, args: Vec<(&ir::Ty, Cell)>) -> Cell {
-                let left = assume::int(&args[0].1);
-                let right = assume::int(&args[1].1);
-
-                Cell::Data(encode(&(left + right)))
-            }
-
-            pub fn sub(_: &mut Interpreter, args: Vec<(&ir::Ty, Cell)>) -> Cell {
-                let left = assume::int(&args[0].1);
-                let right = assume::int(&args[1].1);
-
-                Cell::Data(encode(&(left - right)))
-            }
-
-            pub fn mul(_: &mut Interpreter, args: Vec<(&ir::Ty, Cell)>) -> Cell {
-                let left = assume::int(&args[0].1);
-                let right = assume::int(&args[1].1);
-
-                Cell::Data(encode(&(left * right)))
+    impl NativeModule for Module {
+        fn lookup_native_symbol(&self, id: &str) -> crate::interpreter::NativeFunction {
+            match id {
+                "add" => &Self::add,
+                "sub" => &Self::sub,
+                "mul" => &Self::mul,
+                "map" => &Self::map,
+                _ => panic!(),
             }
         }
     }
 
-    pub mod array {
-        use crate::native::*;
+    impl Module {
+        pub fn add(_: &mut Interpreter, args: Vec<(&ir::Ty, Cell)>) -> Cell {
+            let left = assume::int(&args[0].1);
+            let right = assume::int(&args[1].1);
 
-        pub const MODULE: Module = Module;
-        pub struct Module;
-
-        impl NativeModule for Module {
-            fn lookup_native_symbol(&self, id: &str) -> crate::interpreter::NativeFunction {
-                match id {
-                    "map" => &Self::map,
-                    _ => panic!(),
-                }
-            }
+            Cell::Data(encode(&(left + right)))
         }
 
-        impl Module {
-            pub fn map(it: &mut Interpreter, args: Vec<(&ir::Ty, Cell)>) -> Cell {
-                let func = &args[0];
-                let array = assume::array(args[1].0, &args[1].1);
+        pub fn sub(_: &mut Interpreter, args: Vec<(&ir::Ty, Cell)>) -> Cell {
+            let left = assume::int(&args[0].1);
+            let right = assume::int(&args[1].1);
 
-                let ir::TyKind::Function(ty_func) = &func.0.kind else {
-                    panic!()
-                };
-                let mut output_ty = ir::Ty {
-                    kind: ir::TyKind::Array(Box::new(ty_func.body.clone())),
-                    layout: Some(ir::TyLayout::default()),
-                    name: None,
-                };
-                output_ty.layout = lutra_bin::layout::get_layout_simple(&output_ty);
-                let mut res = lutra_bin::ArrayWriter::new(&output_ty);
+            Cell::Data(encode(&(left - right)))
+        }
 
-                for item in array {
-                    let cell = Cell::Data(item);
+        pub fn mul(_: &mut Interpreter, args: Vec<(&ir::Ty, Cell)>) -> Cell {
+            let left = assume::int(&args[0].1);
+            let right = assume::int(&args[1].1);
 
-                    let value = it.evaluate_func_call(&func.1, vec![(args[1].0, cell)]);
+            Cell::Data(encode(&(left * right)))
+        }
 
-                    res.write_item(assume::into_value(value));
-                }
+        pub fn map(it: &mut Interpreter, args: Vec<(&ir::Ty, Cell)>) -> Cell {
+            let func = &args[0];
+            let array = assume::array(args[1].0, &args[1].1);
 
-                Cell::Data(res.finish())
+            let ir::TyKind::Function(ty_func) = &func.0.kind else {
+                panic!()
+            };
+            let mut output_ty = ir::Ty {
+                kind: ir::TyKind::Array(Box::new(ty_func.body.clone())),
+                layout: Some(ir::TyLayout::default()),
+                name: None,
+            };
+            output_ty.layout = lutra_bin::layout::get_layout_simple(&output_ty);
+            let mut res = lutra_bin::ArrayWriter::new(&output_ty);
+
+            for item in array {
+                let cell = Cell::Data(item);
+
+                let value = it.evaluate_func_call(&func.1, vec![(args[1].0, cell)]);
+
+                res.write_item(assume::into_value(value));
             }
+
+            Cell::Data(res.finish())
         }
     }
 }

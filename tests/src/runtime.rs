@@ -20,7 +20,7 @@ fn test_01() {
     let program = ::lutra_ir::_test_parse(
         "
     let externals = [
-        world_hello
+        world::hello
     ];
 
     let main = (

@@ -21,7 +21,7 @@ pub(crate) fn parse(string: String, span_base: Span) -> Result<Vec<InterpolateIt
             .into_iter()
             .map(|err| {
                 log::debug!("interpolated string error (lex inside parse): {:?}", err);
-                err.map(|c| TokenKind::Literal(Literal::String(c.to_string())))
+                err.map(|c| TokenKind::Literal(Literal::Text(c.to_string())))
             })
             .collect_vec()),
     }

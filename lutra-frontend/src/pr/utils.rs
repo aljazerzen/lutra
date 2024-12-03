@@ -110,7 +110,15 @@ impl From<super::Ty> for ir::Ty {
                     .collect(),
             ),
             super::TyKind::Ident(path) => ir::TyKind::Ident(ir::Path(path.into_iter().collect())),
-            super::TyKind::Function(_) => todo!(),
+            super::TyKind::Function(Some(func)) => ir::TyKind::Function(Box::new(ir::TyFunction {
+                params: func
+                    .params
+                    .into_iter()
+                    .map(|p| ir::Ty::from(p.unwrap()))
+                    .collect(),
+                body: ir::Ty::from(*func.body.clone().unwrap()),
+            })),
+            super::TyKind::Function(None) => todo!(),
         };
 
         let layout = ty.layout.map(|layout| ir::TyLayout {

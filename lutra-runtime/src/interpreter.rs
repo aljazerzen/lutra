@@ -39,9 +39,14 @@ pub fn evaluate(
     // load external symbols
     let native_modules: HashMap<&str, _> = native_modules.iter().map(|a| (a.0, a.1)).collect();
     for external in &program.externals {
-        let (mod_id, decl_name) = external.id.rsplit_once('_').unwrap();
+        let (mod_id, decl_name) = external
+            .id
+            .rsplit_once("::")
+            .unwrap_or_else(|| panic!("bad external id: {}", external.id));
 
-        let module = native_modules.get(mod_id).unwrap();
+        let module = native_modules
+            .get(mod_id)
+            .unwrap_or_else(|| panic!("cannot find native module {mod_id}"));
         let function = module.lookup_native_symbol(decl_name);
         interpreter.allocate(Cell::FunctionNative(function));
     }

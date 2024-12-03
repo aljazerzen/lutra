@@ -38,9 +38,7 @@ pub fn resolve_decl_refs(root: &mut decl::RootModule) -> Result<Vec<Vec<pr::Path
         ));
     }
 
-    Ok(order_tys
-        .iter()
-        .chain(order_vars.iter())
+    Ok(itertools::chain(order_tys, order_vars)
         .map(|tree| tree.iter().map(|p| (*p).clone()).collect_vec())
         .collect_vec())
 }
@@ -203,18 +201,23 @@ impl fold::PrFold for NameResolver<'_> {
 impl NameResolver<'_> {
     /// Returns resolved fully-qualified ident
     fn resolve_ident(&mut self, mut ident: pr::Path) -> Result<pr::Path> {
-        for scope in self.scopes.iter().rev() {
-            if scope.get(ident.first()).is_some() {
-                // match, this ident is a param ref
+        for (up, scope) in self.scopes.iter().rev().enumerate() {
+            if let Some(param_index) = scope.get_index(ident.first()) {
+                // match: this ident is a param ref
 
-                return if ident.len() == 1 {
-                    Ok(ident)
-                } else {
-                    Err(Diagnostic::new_custom(format!(
+                if ident.len() != 1 {
+                    return Err(Diagnostic::new_custom(format!(
                         "{} is a param, not a module",
                         ident.first()
-                    )))
-                };
+                    )));
+                }
+
+                let mut fq_ident = pr::Path::new(vec!["func"]);
+                for _ in 0..up {
+                    fq_ident.push("up".to_string())
+                }
+                fq_ident.push(param_index.to_string());
+                return Ok(fq_ident);
             }
         }
 

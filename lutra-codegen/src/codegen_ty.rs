@@ -120,7 +120,7 @@ pub fn write_ty_def(
         derive_traits.extend(
             values
                 .iter()
-                .map(|e| e.kind.as_literal().unwrap().as_string().unwrap().clone()),
+                .map(|e| e.kind.as_literal().unwrap().as_text().unwrap().clone()),
         );
     } else {
         derive_traits.extend(["Debug".into(), "Clone".into()]);

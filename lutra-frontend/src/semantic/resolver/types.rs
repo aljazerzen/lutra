@@ -47,7 +47,7 @@ impl Resolver<'_> {
         };
 
         // compute memory layout
-        ty.layout = self.compute_ty_layout(&ty)?;
+        self.compute_ty_layout(&mut ty)?;
         if ty.layout.is_none() {
             if self.strict_mode {
                 return Err(Diagnostic::new_custom(
@@ -73,8 +73,7 @@ impl Resolver<'_> {
                 Literal::Integer(_) => TyKind::Primitive(PrimitiveSet::int64),
                 Literal::Float(_) => TyKind::Primitive(PrimitiveSet::float64),
                 Literal::Boolean(_) => TyKind::Primitive(PrimitiveSet::bool),
-                Literal::String(_) => TyKind::Primitive(PrimitiveSet::text),
-                Literal::RawString(_) => TyKind::Primitive(PrimitiveSet::text),
+                Literal::Text(_) => TyKind::Primitive(PrimitiveSet::text),
                 _ => panic!(),
             },
 
@@ -85,18 +84,6 @@ impl Resolver<'_> {
 
                 for field in fields {
                     let ty = self.infer_type(field)?;
-
-                    // if field.flatten {
-                    //     let ty = ty.clone();
-                    //     match ty.kind {
-                    //         TyKind::Tuple(inner_fields) => {
-                    //             ty_fields.extend(inner_fields);
-                    //         }
-                    //         _ => panic!(),
-                    //     }
-
-                    //     continue;
-                    // }
 
                     let name = field
                         .alias
@@ -178,12 +165,17 @@ impl Resolver<'_> {
             | ExprKind::Unary(_) // desugar-ed
             | ExprKind::Internal => unreachable!(),
         };
-        Ok(Ty {
+        let mut ty = Ty {
             kind,
             name: None,
             span: expr.span,
             layout: None,
-        })
+        };
+        self.compute_ty_layout(&mut ty)?;
+        if ty.layout.is_none() {
+            panic!();
+        }
+        Ok(ty)
     }
 
     /// Validates that found node has expected type. Returns assumed type of the node.

@@ -6,9 +6,9 @@ use crate::Result;
 use super::Resolver;
 
 impl Resolver<'_> {
-    pub fn compute_ty_layout(&mut self, ty: &pr::Ty) -> Result<Option<pr::TyLayout>, Diagnostic> {
+    pub fn compute_ty_layout(&mut self, ty: &mut pr::Ty) -> Result<(), Diagnostic> {
         if ty.layout.is_some() {
-            return Ok(ty.layout.clone());
+            return Ok(());
         }
 
         let layout = match &ty.kind {
@@ -16,7 +16,7 @@ impl Resolver<'_> {
                 if let Some(layout) = ty.kind.get_layout_simple() {
                     layout
                 } else {
-                    return Ok(None);
+                    return Ok(());
                 }
             }
 
@@ -32,7 +32,8 @@ impl Resolver<'_> {
                     }
                 }
 
-                return Ok(Some(layout));
+                ty.layout = Some(layout);
+                return Ok(());
             }
 
             pr::TyKind::Ident(ident) => {
@@ -50,7 +51,7 @@ impl Resolver<'_> {
                         } else if self.strict_mode {
                             panic!("Unresolved layout of reference {ident} at {:?}: {ty:?} (during eval of {})", ty.span, self.debug_current_decl)
                         } else {
-                            return Ok(None);
+                            return Ok(());
                         }
                     }
 
@@ -62,7 +63,7 @@ impl Resolver<'_> {
                                 ty.span, self.debug_current_decl
                             )
                         }
-                        return Ok(None);
+                        return Ok(());
                     }
 
                     _ => {
@@ -81,6 +82,7 @@ impl Resolver<'_> {
                 variants_recursive: vec![],
             },
         };
-        Ok(Some(layout))
+        ty.layout = Some(layout);
+        Ok(())
     }
 }

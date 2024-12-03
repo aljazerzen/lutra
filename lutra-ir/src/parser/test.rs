@@ -4,7 +4,7 @@ use insta::assert_debug_snapshot;
 #[test]
 fn parse_01() {
     assert_debug_snapshot!(super::_test_parse(r#"let externals = [
-  std_int_add,
+  std::int::add,
 ];
 
 let main =
@@ -44,7 +44,7 @@ let main =
     Program {
         externals: [
             ExternalSymbol {
-                id: "std_int_add",
+                id: "std::int::add",
             },
         ],
         main: Expr {

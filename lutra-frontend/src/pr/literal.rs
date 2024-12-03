@@ -5,8 +5,7 @@ pub enum Literal {
     Integer(i64),
     Float(f64),
     Boolean(bool),
-    String(String),
-    RawString(String),
+    Text(String),
     Date(String),
     Time(String),
     Timestamp(String),
@@ -18,12 +17,8 @@ impl std::fmt::Display for Literal {
             Literal::Integer(i) => write!(f, "{i}")?,
             Literal::Float(i) => write!(f, "{i}")?,
 
-            Literal::String(s) => {
+            Literal::Text(s) => {
                 write!(f, "{}", quote_string(escape_all_except_quotes(s).as_str()))?;
-            }
-
-            Literal::RawString(s) => {
-                write!(f, "r{}", quote_string(s))?;
             }
 
             Literal::Boolean(b) => {

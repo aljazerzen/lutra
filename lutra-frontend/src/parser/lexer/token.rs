@@ -109,7 +109,7 @@ mod test {
     #[test]
     fn test_string_quoting() {
         fn make_str(s: &str) -> Literal {
-            Literal::String(s.to_string())
+            Literal::Text(s.to_string())
         }
 
         assert_snapshot!(
@@ -147,12 +147,12 @@ mod test {
     #[test]
     fn test_string_escapes() {
         assert_snapshot!(
-            Literal::String(r#"hello\nworld"#.to_string()).to_string(),
+            Literal::Text(r#"hello\nworld"#.to_string()).to_string(),
             @r###""hello\\nworld""###
         );
 
         assert_snapshot!(
-            Literal::String(r#"hello\tworld"#.to_string()).to_string(),
+            Literal::Text(r#"hello\tworld"#.to_string()).to_string(),
             @r###""hello\\tworld""###
         );
 
@@ -172,7 +172,7 @@ mod test {
         //   elegant; the parser is designed to normalize this sort of thing.
 
         assert_snapshot!(
-            Literal::String(r#"hello
+            Literal::Text(r#"hello
             world"#.to_string()).to_string(),
             @r###""hello\n            world""###
         );
@@ -182,12 +182,12 @@ mod test {
     fn test_raw_string_quoting() {
         // TODO: add some test for escapes
         fn make_str(s: &str) -> Literal {
-            Literal::RawString(s.to_string())
+            Literal::Text(s.to_string())
         }
 
         assert_snapshot!(
             make_str("hello").to_string(),
-            @r###"r"hello""###
+            @r#""hello""#
         );
     }
 }

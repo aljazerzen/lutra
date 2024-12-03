@@ -13,7 +13,9 @@ pub fn program() -> impl Parser<TokenKind, Program, Error = PError> {
         .then(ctrl('='))
         .ignore_then(
             ident_part()
-                .map(|id| ExternalSymbol { id })
+                .separated_by(just(TokenKind::PathSep))
+                .at_least(1)
+                .map(|id| ExternalSymbol { id: id.join("::") })
                 .separated_by(ctrl(','))
                 .allow_trailing()
                 .delimited_by(ctrl('['), ctrl(']')),
@@ -38,7 +40,7 @@ fn expr() -> impl Parser<TokenKind, Expr, Error = PError> + Clone {
             TokenKind::Literal(pr::Literal::Integer(i)) => ExprKind::Literal(Literal::Int(i)),
             TokenKind::Literal(pr::Literal::Float(i)) => ExprKind::Literal(Literal::Float(i)),
             TokenKind::Literal(pr::Literal::Boolean(i)) => ExprKind::Literal(Literal::Bool(i)),
-            TokenKind::Literal(pr::Literal::String(i)) => ExprKind::Literal(Literal::Text(i)),
+            TokenKind::Literal(pr::Literal::Text(i)) => ExprKind::Literal(Literal::Text(i)),
         };
 
         let pointer_external = ident_keyword("external")

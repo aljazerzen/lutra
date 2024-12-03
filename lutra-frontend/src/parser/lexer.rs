@@ -221,11 +221,11 @@ fn literal() -> impl Parser<char, Literal, Error = Cheap<char>> {
         })
         .labelled("number");
 
-    let string = quoted_string(true).map(Literal::String);
+    let string = quoted_string(true).map(Literal::Text);
 
     let raw_string = just("r")
         .ignore_then(quoted_string(false))
-        .map(Literal::RawString);
+        .map(Literal::Text);
 
     let bool = (just("true").to(true))
         .or(just("false").to(false))

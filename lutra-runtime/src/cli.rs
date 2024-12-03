@@ -9,6 +9,7 @@ fn main() {
     let res = match action.command {
         Action::Discover(cmd) => discover_and_print(cmd),
         Action::Compile(cmd) => compile_and_print(cmd),
+        Action::Run(cmd) => run_and_print(cmd),
     };
 
     match res {
@@ -22,7 +23,7 @@ fn main() {
 
 mod inner {
     use clap::{Parser, Subcommand};
-    use lutra_frontend::{CompileParams, DiscoverParams};
+    use lutra_frontend::{pr, CompileParams, DiscoverParams};
 
     #[derive(Parser)]
     pub struct Command {
@@ -37,12 +38,22 @@ mod inner {
 
         /// Compile the project
         Compile(CompileCommand),
+
+        /// Compile the project and run a program
+        Run(RunCommand),
     }
 
     #[derive(clap::Parser)]
     pub struct DiscoverCommand {
         #[clap(flatten)]
         discover: DiscoverParams,
+    }
+
+    pub fn discover_and_print(cmd: DiscoverCommand) -> anyhow::Result<()> {
+        let project = lutra_frontend::discover(cmd.discover)?;
+
+        println!("{project}");
+        Ok(())
     }
 
     #[derive(clap::Parser)]
@@ -54,19 +65,40 @@ mod inner {
         compile: CompileParams,
     }
 
-    pub fn discover_and_print(cmd: DiscoverCommand) -> anyhow::Result<()> {
-        let project = lutra_frontend::discover(cmd.discover)?;
-
-        println!("{project}");
-        Ok(())
-    }
-
     pub fn compile_and_print(cmd: CompileCommand) -> anyhow::Result<()> {
         let project = lutra_frontend::discover(cmd.discover)?;
 
         let project = lutra_frontend::compile(project, cmd.compile)?;
 
         println!("{project:#?}");
+        Ok(())
+    }
+
+    #[derive(clap::Parser)]
+    pub struct RunCommand {
+        #[clap(flatten)]
+        discover: DiscoverParams,
+
+        #[clap(flatten)]
+        compile: CompileParams,
+
+        #[clap(default_value = "main")]
+        path: String,
+    }
+
+    pub fn run_and_print(cmd: RunCommand) -> anyhow::Result<()> {
+        let project = lutra_frontend::discover(cmd.discover)?;
+
+        let project = lutra_frontend::compile(project, cmd.compile)?;
+
+        let path = pr::Path::new(cmd.path.split("::"));
+        let program = lutra_frontend::lower(&project.root_module, &path);
+        log::debug!("ir: {}", lutra_ir::print(&program));
+
+        let res = lutra_runtime::evaluate(&program, (), lutra_runtime::BUILTIN_MODULES);
+        let value = lutra_bin::Value::decode(&res, &program.main.ty)?;
+
+        println!("{}", value.print_pretty(&program.main.ty).unwrap());
         Ok(())
     }
 }

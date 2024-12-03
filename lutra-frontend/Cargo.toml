@@ -8,19 +8,11 @@ rust-version.workspace = true
 version.workspace = true
 
 [features]
-cli = ["clap", "env_logger", "anyhow"]
-default = ["cli"]
+default = []
 
 [lib]
 bench = false
 doctest = false
-
-[[bin]]
-bench = false
-name = "lutra"
-path = "src/cli.rs"
-required-features = ["cli"]
-test = false
 
 [dependencies]
 thiserror = { workspace = true }
@@ -43,8 +35,6 @@ lutra-bin = { path = "../lutra-bin" }
 
 # cli
 clap = { version = "4.4.18", features = ["derive"], optional = true }
-env_logger = { workspace = true, optional = true }
-anyhow = { workspace = true, optional = true }
 
 [dev-dependencies]
 insta = { workspace = true, features = ["yaml"] }
