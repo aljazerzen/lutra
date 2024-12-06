@@ -1,6 +1,7 @@
 use crate::ir;
 use crate::{Data, ReversePointer};
 
+#[derive(Debug)]
 pub struct TupleWriter<'t> {
     fields_ty: &'t [ir::TyTupleField],
 

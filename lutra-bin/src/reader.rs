@@ -1,7 +1,7 @@
 use crate::ir;
 use crate::Data;
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Reader<'a> {
     buf: &'a [u8],
 }
@@ -36,6 +36,7 @@ impl<'a> Reader<'a> {
     }
 }
 
+#[derive(Clone)]
 pub struct ArrayReader {
     item_head_bytes: usize,
     next: Data,
@@ -53,7 +54,7 @@ impl ArrayReader {
     }
 
     fn new(data: Data, item_head_bytes: usize) -> Self {
-        let mut head = Reader::new(data.slice(item_head_bytes));
+        let mut head = Reader::new(data.slice(8));
         let (offset, len) = Self::read_head(&mut head);
 
         let mut body = data.clone();
@@ -77,6 +78,16 @@ impl ArrayReader {
 
     pub fn remaining(&self) -> usize {
         self.remaining
+    }
+
+    pub fn get(&self, index: usize) -> Option<Data> {
+        if index >= self.remaining {
+            return None;
+        }
+
+        let mut data = self.next.clone();
+        data.skip(self.item_head_bytes * index);
+        Some(data)
     }
 }
 

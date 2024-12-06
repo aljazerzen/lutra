@@ -5,5 +5,6 @@ mod lutra {
 }
 
 mod lbin;
+mod native_functions;
 mod runtime;
 mod typed_data;

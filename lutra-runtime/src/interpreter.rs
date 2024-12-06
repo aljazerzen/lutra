@@ -169,8 +169,9 @@ impl Interpreter {
                 let mut writer = lutra_bin::TupleWriter::new(&expr.ty);
                 for field in fields {
                     let cell = self.evaluate_expr(field);
+                    let data = cell.into_data().unwrap_or_else(|_| panic!());
 
-                    writer.write_field(cell.into_data().unwrap_or_else(|_| panic!()));
+                    writer.write_field(data);
                 }
 
                 Cell::Data(writer.finish())

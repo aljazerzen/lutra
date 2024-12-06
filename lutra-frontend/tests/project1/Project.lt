@@ -5,8 +5,38 @@ module db {
   let invoices: func (): [invoice_ty]
 }
 
-let my_func2 = func (x: int64): int64 -> x + 1
+let x = [
+  1, 4, 2, 3, 2, 3, 4, 5, 1, 2
+]
 
-let my_func = func (x: int64): {int64, int64} -> {x, my_func2(x)}
+let y = [
+  {1, 20},
+  {4, 15},
+  {2, 14},
+  {6, 17},
+  {4, 22},
+  {7, 12},
+  {8, 23},
+  {3, 16},
+]
 
-{a = 1 + 2, my_func(3), my_func(2)}
+let my_func2 = func (x: int64) -> x + 1
+
+let my_func = func (x: int64) -> {x, my_func2(x)}
+
+{
+  a = 1 + 2,
+  my_func(3),
+  my_func(2),
+  hello = (
+    x
+    | std::map(func (y: int) -> y + 1)
+    | std::filter(func (y: int) -> !(y > 3))
+    | std::sort(func (x: int) -> x)
+    | std::map(func (y: int) -> y % 3)
+  ),
+  world = (
+    y
+    | std::to_columnar
+  )
+}

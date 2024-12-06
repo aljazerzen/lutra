@@ -98,7 +98,7 @@ mod inner {
         let res = lutra_runtime::evaluate(&program, (), lutra_runtime::BUILTIN_MODULES);
         let value = lutra_bin::Value::decode(&res, &program.main.ty)?;
 
-        println!("{}", value.print_pretty(&program.main.ty).unwrap());
+        println!("{}", value.print_source(&program.main.ty).unwrap());
         Ok(())
     }
 }

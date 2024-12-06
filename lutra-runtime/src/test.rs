@@ -16,7 +16,7 @@ fn _test_interpret(program: &str) -> String {
 #[test]
 fn interpret_01() {
     assert_snapshot!(_test_interpret(r#"
-    let externals = [std::int::add];
+    let externals = [std::add];
 
     let main =
         let 1 = (
@@ -66,7 +66,7 @@ fn interpret_01() {
 #[test]
 fn interpret_02() {
     assert_snapshot!(_test_interpret(r#"
-    let externals = [std::array::map];
+    let externals = [std::map];
 
     let main =
         let 1 = (
@@ -79,8 +79,8 @@ fn interpret_02() {
             call external.0: func (
                 func (int64) -> {int64, int64}, [int64]
             ) -> [{int64, int64}],
+            [2: int64, 3: int64, 1: int64]: [int64],
             var.1: func (int64) -> {int64, int64},
-            [2: int64, 3: int64, 1: int64]: [int64]
         ): [{int64, int64}]
     "#,
     ), @r#"
@@ -105,7 +105,7 @@ fn interpret_02() {
 #[test]
 fn interpret_03() {
     assert_snapshot!(_test_interpret(r#"
-    let externals = [std::array::map, std::int::mul];
+    let externals = [std::map, std::mul];
 
     let main =
         let 1 = [
@@ -122,8 +122,8 @@ fn interpret_03() {
         ): func ({int64, int64}) -> int64;
         (
             call external.0: func (func ({int64, int64}) -> int64, [{int64, int64}]) -> [int64],
-            var.2: func ({int64, int64}) -> int64,
             var.1: [{int64, int64}],
+            var.2: func ({int64, int64}) -> int64,
         ): [int64]
     "#,
     ), @r#"

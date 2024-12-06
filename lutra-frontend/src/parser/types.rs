@@ -31,6 +31,15 @@ pub(crate) fn type_expr() -> impl Parser<TokenKind, Ty, Error = PError> + Clone 
 
         let func = keyword("func")
             .ignore_then(
+                ident_part()
+                    .then(ctrl(':').ignore_then(nested_type_expr.clone()).or_not())
+                    .separated_by(ctrl(','))
+                    .allow_trailing()
+                    .at_least(1)
+                    .delimited_by(ctrl('<'), ctrl('>'))
+                    .or_not(),
+            )
+            .ignore_then(
                 (ident_part().then_ignore(ctrl(':')).or_not())
                     .ignore_then(nested_type_expr.clone().map(Some))
                     .separated_by(ctrl(','))

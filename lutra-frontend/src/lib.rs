@@ -16,6 +16,7 @@ pub mod pr;
 pub use compile::{compile, CompileParams};
 pub use discover::{discover, DiscoverParams};
 pub use lowering::lower;
+use lutra_bin::ir;
 pub use project::{Project, SourceTree};
 pub use span::Span;
 
@@ -39,4 +40,13 @@ pub fn _test_compile_ty(ty_source: &str) -> pr::Ty {
     let mut ty = type_def.unwrap().kind.as_ty().unwrap().clone();
     ty.name = None;
     ty
+}
+
+#[track_caller]
+pub fn _test_compile(source: &str) -> ir::Program {
+    let source = SourceTree::single("".into(), source.to_string());
+    let project = compile(source, CompileParams {}).unwrap_or_else(|e| panic!("{e}"));
+
+    let path = pr::Path::from_name("main");
+    lowering::lower(&project.root_module, &path)
 }

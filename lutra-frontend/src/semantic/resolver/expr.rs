@@ -72,7 +72,7 @@ impl fold::PrFold for super::Resolver<'_> {
                     DeclKind::Module(_) | DeclKind::Import(_) => {
                         // handled during name resolution
                         unreachable!()
-                    },
+                    }
                 };
 
                 expr.id = expr.id.or(Some(id));

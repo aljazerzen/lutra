@@ -103,7 +103,10 @@ impl Resolver<'_> {
                 let items_ty = match variants.len() {
                     0 => {
                         // no items, so we must infer the type
-                        todo!()
+                        // TODO
+                        let mut ty = Ty::new(PrimitiveSet::int64);
+                        ty.layout = ty.kind.get_layout_simple();
+                        ty
                     }
                     1 => {
                         // single item, use its type

@@ -59,7 +59,7 @@ impl Desugarator {
 
                     value = expr;
                 }
-                pr::ExprKind::Func(_) => {
+                pr::ExprKind::Func(_) | pr::ExprKind::Ident(_) => {
                     let func = expr;
 
                     value = pr::Expr::new(pr::ExprKind::FuncCall(pr::FuncCall {
@@ -107,8 +107,8 @@ impl Desugarator {
 
         let func_name: Vec<&str> = match op {
             pr::BinOp::Mul => vec!["std", "mul"],
-            pr::BinOp::DivInt => vec!["std", "div_i"],
-            pr::BinOp::DivFloat => vec!["std", "div_f"],
+            pr::BinOp::DivInt => vec!["std", "div"],
+            pr::BinOp::DivFloat => vec!["std", "div"], // TODO
             pr::BinOp::Mod => vec!["std", "mod"],
             pr::BinOp::Pow => vec!["std", "math", "pow"],
             pr::BinOp::Add => vec!["std", "add"],
