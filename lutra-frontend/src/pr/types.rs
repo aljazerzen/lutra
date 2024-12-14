@@ -26,7 +26,7 @@ pub struct TyLayout {
     /// Position of the body pointer within the head.
     /// It is measured bytes from the start of the head.
     /// Pointer itself is relative to own position (and the start of the head).
-    pub body_ptr_offset: Option<u32>,
+    pub body_ptrs: Vec<u32>,
 
     /// For enums, indexes of variants that contain recursive
     /// (transitive) references to self. This is used to determine
@@ -104,18 +104,26 @@ impl TyKind {
             }
             _ => return None,
         };
-        let body_ptr_offset: Option<u32> = match self {
-            TyKind::Primitive(PrimitiveSet::text) => Some(0),
-            TyKind::Array(_) => Some(0),
-            TyKind::Enum(_) => Some(8), // TODO: this is wrong
+        let body_ptrs: Vec<u32> = match self {
+            TyKind::Primitive(PrimitiveSet::text) => vec![0],
+            TyKind::Array(_) => vec![0],
+            TyKind::Enum(_) => vec![1], // TODO: this is wrong (in some cases)
 
-            TyKind::Primitive(_) | TyKind::Tuple(_) => None,
+            TyKind::Tuple(fields) => {
+                let mut r = Vec::new();
+                for f in fields {
+                    let ty = f.ty.layout.as_ref().unwrap();
+                    r.extend(&ty.body_ptrs);
+                }
+                r
+            }
+            TyKind::Primitive(_) => vec![],
 
             _ => return None,
         };
         Some(TyLayout {
             head_size,
-            body_ptr_offset,
+            body_ptrs,
             variants_recursive: vec![],
         })
     }

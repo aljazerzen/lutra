@@ -1,5 +1,7 @@
 use crate::ir;
-use crate::{Data, ReversePointer};
+use crate::Data;
+
+use super::SeveredBodies;
 
 #[derive(Debug)]
 pub struct TupleWriter<'t> {
@@ -8,7 +10,7 @@ pub struct TupleWriter<'t> {
     buf: Vec<u8>,
 
     next: usize,
-    fields_bodies: Vec<(ReversePointer, Data)>,
+    fields_bodies: Vec<SeveredBodies>,
 }
 
 impl<'t> TupleWriter<'t> {
@@ -33,8 +35,8 @@ impl<'t> TupleWriter<'t> {
         let layout = self.fields_ty[self.next].ty.layout.as_ref().unwrap();
 
         let body = super::write_head(&mut self.buf, field, layout);
-        if let Some((ptr, body)) = body {
-            self.fields_bodies.push((ptr, body.to_owned()));
+        if let Some(body) = body {
+            self.fields_bodies.push(body);
         }
 
         self.next += 1;
@@ -43,15 +45,15 @@ impl<'t> TupleWriter<'t> {
     pub fn finish(mut self) -> Data {
         // write body offsets for each field
         let mut total_len = self.buf.len();
-        for (ptr, d) in &self.fields_bodies {
-            ptr.write(&mut self.buf, total_len);
-            total_len += d.len();
+        for body in &self.fields_bodies {
+            body.write_pointers(&mut self.buf, total_len);
+            total_len += body.buf.len();
         }
 
         // construct data
         let mut data = Data::new(self.buf);
-        for (_, d) in self.fields_bodies {
-            data = data.combine(d);
+        for body in self.fields_bodies {
+            data = data.combine(body.buf);
         }
         data
     }

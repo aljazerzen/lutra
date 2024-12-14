@@ -120,18 +120,26 @@ pub fn get_layout_simple(ty: &ir::Ty) -> Option<ir::TyLayout> {
         }
         _ => return None,
     };
-    let body_ptr_offset: Option<u32> = match &ty.kind {
-        ir::TyKind::Primitive(ir::PrimitiveSet::text) => Some(0),
-        ir::TyKind::Array(_) => Some(0),
-        ir::TyKind::Enum(_) => Some(8), // TODO: this is wrong
+    let body_ptr_offset: Vec<u32> = match &ty.kind {
+        ir::TyKind::Primitive(ir::PrimitiveSet::text) => vec![0],
+        ir::TyKind::Array(_) => vec![0],
+        ir::TyKind::Enum(_) => vec![1], // TODO: this is wrong (in some cases)
 
-        ir::TyKind::Primitive(_) | ir::TyKind::Tuple(_) => None,
+        ir::TyKind::Tuple(fields) => {
+            let mut r = Vec::new();
+            for f in fields {
+                let ty = f.ty.layout.as_ref().unwrap();
+                r.extend(&ty.body_ptrs);
+            }
+            r
+        }
+        ir::TyKind::Primitive(_) => vec![],
 
         _ => return None,
     };
     Some(ir::TyLayout {
         head_size,
-        body_ptr_offset,
+        body_ptrs: body_ptr_offset,
         variants_recursive: vec![],
     })
 }

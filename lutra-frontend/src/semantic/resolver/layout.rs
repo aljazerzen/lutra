@@ -78,7 +78,7 @@ impl Resolver<'_> {
             // functions cannot be serialized, so we can dream up a layout
             pr::TyKind::Function(_) => pr::TyLayout {
                 head_size: 0,
-                body_ptr_offset: None,
+                body_ptrs: vec![],
                 variants_recursive: vec![],
             },
         };

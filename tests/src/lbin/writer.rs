@@ -64,6 +64,9 @@ fn test_01() {
 
 #[test]
 fn test_02() {
+    let data1 = Data::new(vec![8, 0, 0, 0, 1, 0, 0, 0, 0x30]);
+    let data2 = Data::new(vec![8, 0, 0, 0, 1, 0, 0, 0, 0x31]);
+
     let data3 = Data::new(vec![
         0x10, 0, 0, 0, 1, 0, 0, 0, 9, 0, 0, 0, 1, 0, 0, 0, 0x37, 0x38, 0x39,
     ]);
@@ -71,12 +74,7 @@ fn test_02() {
     let mut data4 = data3.clone();
     data4.skip(8);
 
-    let items = vec![
-        Data::new(vec![8, 0, 0, 0, 1, 0, 0, 0, 0x30]),
-        Data::new(vec![8, 0, 0, 0, 1, 0, 0, 0, 0x31]),
-        data3,
-        data4,
-    ];
+    let items = vec![data1, data2, data3, data4];
 
     let output_ty = lutra_frontend::_test_compile_ty("[text]");
     let output_ty = ir::Ty::from(output_ty);

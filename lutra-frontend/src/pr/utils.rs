@@ -57,7 +57,7 @@ impl From<ir::Ty> for super::Ty {
         let layout = ty.layout.map(|layout| super::TyLayout {
             head_size: layout.head_size,
             variants_recursive: layout.variants_recursive,
-            body_ptr_offset: layout.body_ptr_offset,
+            body_ptrs: layout.body_ptrs,
         });
 
         super::Ty {
@@ -124,7 +124,7 @@ impl From<super::Ty> for ir::Ty {
         let layout = ty.layout.map(|layout| ir::TyLayout {
             head_size: layout.head_size,
             variants_recursive: layout.variants_recursive,
-            body_ptr_offset: layout.body_ptr_offset,
+            body_ptrs: layout.body_ptrs,
         });
 
         ir::Ty {

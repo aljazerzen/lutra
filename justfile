@@ -7,7 +7,7 @@ show-deps-workspace:
 test-fast tests='':
     cargo fmt
     cargo check --all-targets --profile=test
-    INSTA_FORCE_PASS=1 cargo nextest run -- {{tests}}
+    RUST_BACKTRACE=1 INSTA_FORCE_PASS=1 cargo nextest run -- {{tests}}
     cargo insta review
     cargo clippy --all-targets
 

@@ -4,17 +4,23 @@
 
 Each type has head and an optional body.
 Head has static size.
-Body has dynamic size, which is somehow encoded in the head.
+Body has dynamic size.
+Buffer that contains a type, has the type's head at the beginning of the buffer.
+If there is a body, head contains a pointer to the body.
+Head and body might not be adjacent in the buffer - they might be separated by data belonging to other types.
+
 For example:
-- int, float and bool only have a head,
-- text has offset and lenght in head and bytes in the body.
+
+- `int`, `float` and `bool` only have a head,
+- `text` has pointer and length in head and UTF-8 encoded bytes in the body.
 
 ## Primitives
 
-int   - 64 bit integer, little-endian signed
+bool - 1 bit
+int - 64 bit integer, little-endian signed
+uint - 64 bit integer, little-endian unsigned
 float - 64 bit float, little-endian IEEE 754
-bool  - 1 bit
-text  - text encoded as UTF8, head has offset & len, body has bytes
+text - text encoded as UTF8, head has offset & len, body has bytes
 
 ## Tuple
 
@@ -36,7 +42,7 @@ Then, the size of inner head I is determined:
 
 If `H + S <= 64 bits`, head of the enum contains
 the tag followed by the head of the inner value
-of the selected variant. 
+of the selected variant.
 
 If `H + S > 64bits`, head of the enum contains
 the tag followed by the offset of the inner value

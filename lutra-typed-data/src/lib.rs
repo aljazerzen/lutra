@@ -74,7 +74,7 @@ fn type_to_ir(ty: &schema::Ty) -> ir::Ty {
     let layout = ty.layout.as_ref().map(|layout| ir::TyLayout {
         head_size: layout.head_size,
         variants_recursive: layout.variants_recursive.clone(),
-        body_ptr_offset: None, // TODO
+        body_ptrs: vec![], // TODO
     });
 
     ir::Ty {

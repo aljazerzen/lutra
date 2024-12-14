@@ -122,7 +122,7 @@ type TyEnumVariant = {
 @derive(["Debug", "Clone", "PartialEq", "Default"])
 type TyLayout = {
   head_size = uint32,
-  body_ptr_offset = enum { None, Some = uint32 },
+  body_ptrs = [uint32],
   variants_recursive = [uint16]
 }
 

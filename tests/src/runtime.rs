@@ -14,14 +14,17 @@ fn _test_run(lutra_source: &str) -> String {
 fn std_mul() {
     insta::assert_snapshot!(_test_run("2 * 3"), @"6");
 }
+
 #[test]
 fn std_div() {
     insta::assert_snapshot!(_test_run("10 / 6"), @"1");
 }
+
 #[test]
 fn std_mod() {
     insta::assert_snapshot!(_test_run("10 / 6"), @"1");
 }
+
 #[test]
 fn std_add() {
     insta::assert_snapshot!(_test_run("{30 + 2, 2 + 30}"), @r#"
@@ -31,6 +34,7 @@ fn std_add() {
     }
     "#);
 }
+
 #[test]
 fn std_sub() {
     insta::assert_snapshot!(_test_run("{30 - 2, 2 - 30}"), @r#"
@@ -40,6 +44,7 @@ fn std_sub() {
     }
     "#);
 }
+
 #[test]
 fn std_eq() {
     insta::assert_snapshot!(_test_run("{30 == 2, 30 == 30}"), @r#"
@@ -49,6 +54,7 @@ fn std_eq() {
     }
     "#);
 }
+
 #[test]
 fn std_ne() {
     insta::assert_snapshot!(_test_run("{30 != 2, 30 != 30}"), @r#"
@@ -58,6 +64,7 @@ fn std_ne() {
     }
     "#);
 }
+
 #[test]
 fn std_gt() {
     insta::assert_snapshot!(_test_run("{3 > 2, 2 > 3, 2 > 2}"), @r#"
@@ -68,6 +75,7 @@ fn std_gt() {
     }
     "#);
 }
+
 #[test]
 fn std_lt() {
     insta::assert_snapshot!(_test_run("{3 < 2, 2 < 3, 2 < 2}"), @r#"
@@ -78,6 +86,7 @@ fn std_lt() {
     }
     "#);
 }
+
 #[test]
 fn std_gte() {
     insta::assert_snapshot!(_test_run("{3 >= 2, 2 >= 3, 2 >= 2}"), @r#"
@@ -88,6 +97,7 @@ fn std_gte() {
     }
     "#);
 }
+
 #[test]
 fn std_lte() {
     insta::assert_snapshot!(_test_run("{3 <= 2, 2 <= 3, 2 <= 2}"), @r#"
@@ -98,6 +108,7 @@ fn std_lte() {
     }
     "#);
 }
+
 #[test]
 fn std_and() {
     insta::assert_snapshot!(_test_run("{false && false, false && true, true && false, true && true}"), @r#"
@@ -109,6 +120,7 @@ fn std_and() {
     }
     "#);
 }
+
 #[test]
 fn std_or() {
     insta::assert_snapshot!(_test_run("{false || false, false || true, true || false, true || true}"), @r#"
@@ -120,6 +132,7 @@ fn std_or() {
     }
     "#);
 }
+
 #[test]
 fn std_neg() {
     insta::assert_snapshot!(_test_run("{!false, !true}"), @r#"
@@ -129,6 +142,7 @@ fn std_neg() {
     }
     "#);
 }
+
 #[test]
 fn std_not() {
     insta::assert_snapshot!(_test_run("{-2, - (-3)}"), @r#"
@@ -138,6 +152,7 @@ fn std_not() {
     }
     "#);
 }
+
 #[test]
 fn std_map() {
     insta::assert_snapshot!(_test_run(r#"
@@ -155,6 +170,7 @@ fn std_map() {
     std::map([], func (x: int) -> x + 1)
     "#), @"[]");
 }
+
 #[test]
 fn std_filter() {
     insta::assert_snapshot!(_test_run(r#"
@@ -172,6 +188,7 @@ fn std_filter() {
     std::filter([], func (x: int) -> x > 3)
     "#), @"[]");
 }
+
 #[test]
 fn std_slice() {
     insta::assert_snapshot!(_test_run(r#"
@@ -205,6 +222,7 @@ fn std_slice() {
     std::slice([5,3,65,3,2], -7, 0)
     "#), @"[]");
 }
+
 #[test]
 fn std_sort() {
     insta::assert_snapshot!(_test_run(r#"
@@ -219,6 +237,7 @@ fn std_sort() {
     ]
     "#);
 }
+
 #[test]
 fn std_to_columnar() {
     insta::assert_snapshot!(_test_run(r#"
@@ -238,19 +257,34 @@ fn std_to_columnar() {
     }
     "#);
 }
+
 #[test]
-#[ignore]
 fn std_from_columnar() {
     insta::assert_snapshot!(_test_run(r#"
     std::from_columnar({[4, 3, 2], [5, 4, 1]})
-    "#), @"1");
+    "#), @r#"
+    [
+      {
+        4,
+        5,
+      },
+      {
+        3,
+        4,
+      },
+      {
+        2,
+        1,
+      },
+    ]
+    "#);
 
     insta::assert_snapshot!(_test_run(r#"
     std::from_columnar({[], []})
-    "#), @"1");
+    "#), @"[]");
 }
+
 #[test]
-#[ignore]
 fn std_map_columnar() {
     insta::assert_snapshot!(_test_run(r#"
     std::map_columnar(
@@ -261,70 +295,86 @@ fn std_map_columnar() {
         }
     )
     "#), @r#"
-    {
-      [
-        5,
-        65,
-        3,
-      ],
-      [
-        3,
+    [
+      {
+        0,
         1,
+      },
+      {
+        5,
         2,
-      ],
-    }
+      },
+      {
+        65,
+        0,
+      },
+    ]
     "#);
 }
+
 #[test]
-#[ignore]
 fn std_aggregate() {
     insta::assert_snapshot!(_test_run(r#"
     std::aggregate([{5,3},{65,1},{3, 2}], func (x: {[int], [int]}) -> {std::min(x.0), std::min(x.1)})
-    "#), @"1");
+    "#), @r#"
+    {
+      3,
+      1,
+    }
+    "#);
 }
+
 #[test]
 fn std_min() {
     insta::assert_snapshot!(_test_run(r#"std::min([5,3,65,3,2,56,67])"#), @"2");
     insta::assert_snapshot!(_test_run(r#"std::min([])"#), @"0");
 }
+
 #[test]
 fn std_max() {
     insta::assert_snapshot!(_test_run(r#"std::max([5,3,65,3,2,56,67])"#), @"67");
     insta::assert_snapshot!(_test_run(r#"std::max([])"#), @"0");
 }
+
 #[test]
 fn std_sum() {
     insta::assert_snapshot!(_test_run(r#"std::sum([5,3,65,3,2,56,67])"#), @"201");
     insta::assert_snapshot!(_test_run(r#"std::sum([])"#), @"0");
 }
+
 #[test]
 fn std_count() {
     insta::assert_snapshot!(_test_run(r#"std::count([5,3,65,3,2,56,67])"#), @"7");
     insta::assert_snapshot!(_test_run(r#"std::count([])"#), @"0");
 }
+
 #[test]
 fn std_average() {
     insta::assert_snapshot!(_test_run(r#"std::average([5,3,65,3,2,56,67])"#), @"28.714285714285715");
     insta::assert_snapshot!(_test_run(r#"std::average([])"#), @"0");
 }
+
 #[test]
 fn std_all() {
     insta::assert_snapshot!(_test_run(r#"std::all([true, false, false, true])"#), @"false");
     insta::assert_snapshot!(_test_run(r#"std::all([false, false])"#), @"false");
     insta::assert_snapshot!(_test_run(r#"std::all([true, true, true])"#), @"true");
 }
+
 #[test]
 fn std_any() {
     insta::assert_snapshot!(_test_run(r#"std::any([true, false, false, true])"#), @"true");
     insta::assert_snapshot!(_test_run(r#"std::any([false, false])"#), @"false");
     insta::assert_snapshot!(_test_run(r#"std::any([true, true, true])"#), @"true");
 }
+
 #[test]
 fn std_contains() {
     insta::assert_snapshot!(_test_run(r#"std::contains([5,3,65,3,2,56,67], 3)"#), @"true");
     insta::assert_snapshot!(_test_run(r#"std::contains([5,3,65,3,2,56,67], 7)"#), @"false");
     insta::assert_snapshot!(_test_run(r#"std::contains([], 2)"#), @"false");
 }
+
 #[test]
 fn std_lag() {
     insta::assert_snapshot!(_test_run(r#"std::lag([5,3,65,3,2,56,67], 2)"#), @r#"
@@ -359,6 +409,7 @@ fn std_lag() {
     ]
     "#);
 }
+
 #[test]
 fn std_lead() {
     insta::assert_snapshot!(_test_run(r#"std::lead([5,3,65,3,2,56,67], 2)"#), @r#"
@@ -393,6 +444,7 @@ fn std_lead() {
     ]
     "#);
 }
+
 #[test]
 fn std_row_number() {
     insta::assert_snapshot!(_test_run(r#"std::row_number([5,3,65,3,2,56,67])"#), @r#"

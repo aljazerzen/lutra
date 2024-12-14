@@ -121,14 +121,17 @@ impl CombinedSlices {
         CombinedSlices { parts }
     }
 
+    /// Translates the location relative to this buffer
+    /// into the part index and location within that part.
+    /// If offset falls outside of this buffer, None is returned.
     fn locate_offset(&self, mut offset: usize) -> Option<(usize, usize)> {
         // TODO: use binary search instead (log n)
-        for (b_i, b) in self.parts.iter().enumerate() {
-            let len = b.len();
+        for (p_i, p) in self.parts.iter().enumerate() {
+            let len = p.len();
             if offset < len {
-                return Some((b_i, offset));
+                return Some((p_i, offset));
             }
-            offset -= b.len();
+            offset -= p.len();
         }
         None
     }
@@ -143,16 +146,20 @@ impl CombinedSlices {
     }
 
     fn skip(&mut self, bytes: usize) {
-        let (b_i, offset) = self.locate_offset(bytes).unwrap();
-        self.parts.drain(0..b_i);
-        if offset > 0 {
-            self.parts.last_mut().unwrap().skip(offset);
+        if let Some((b_i, offset)) = self.locate_offset(bytes) {
+            self.parts.drain(0..b_i);
+            if offset > 0 {
+                self.parts.first_mut().unwrap().skip(offset);
+            }
+        } else {
+            self.parts.clear();
         }
     }
 
     fn len(&self) -> usize {
         self.parts.iter().map(|d| d.len()).sum()
     }
+
     fn is_empty(&self) -> bool {
         self.parts.iter().all(|d| d.is_empty())
     }

@@ -75,7 +75,7 @@ let main =
                                                     layout: Some(
                                                         TyLayout {
                                                             head_size: 64,
-                                                            body_ptr_offset: None,
+                                                            body_ptrs: [],
                                                             variants_recursive: [],
                                                         },
                                                     ),
@@ -95,7 +95,7 @@ let main =
                                                     layout: Some(
                                                         TyLayout {
                                                             head_size: 64,
-                                                            body_ptr_offset: None,
+                                                            body_ptrs: [],
                                                             variants_recursive: [],
                                                         },
                                                     ),
@@ -115,7 +115,7 @@ let main =
                                                     layout: Some(
                                                         TyLayout {
                                                             head_size: 64,
-                                                            body_ptr_offset: None,
+                                                            body_ptrs: [],
                                                             variants_recursive: [],
                                                         },
                                                     ),
@@ -133,7 +133,7 @@ let main =
                                                 layout: Some(
                                                     TyLayout {
                                                         head_size: 64,
-                                                        body_ptr_offset: None,
+                                                        body_ptrs: [],
                                                         variants_recursive: [],
                                                     },
                                                 ),
@@ -143,9 +143,9 @@ let main =
                                         layout: Some(
                                             TyLayout {
                                                 head_size: 64,
-                                                body_ptr_offset: Some(
+                                                body_ptrs: [
                                                     0,
-                                                ),
+                                                ],
                                                 variants_recursive: [],
                                             },
                                         ),
@@ -165,7 +165,7 @@ let main =
                                             layout: Some(
                                                 TyLayout {
                                                     head_size: 64,
-                                                    body_ptr_offset: None,
+                                                    body_ptrs: [],
                                                     variants_recursive: [],
                                                 },
                                             ),
@@ -181,7 +181,7 @@ let main =
                                                 layout: Some(
                                                     TyLayout {
                                                         head_size: 64,
-                                                        body_ptr_offset: None,
+                                                        body_ptrs: [],
                                                         variants_recursive: [],
                                                     },
                                                 ),
@@ -191,9 +191,9 @@ let main =
                                         layout: Some(
                                             TyLayout {
                                                 head_size: 64,
-                                                body_ptr_offset: Some(
+                                                body_ptrs: [
                                                     0,
-                                                ),
+                                                ],
                                                 variants_recursive: [],
                                             },
                                         ),
@@ -228,7 +228,7 @@ let main =
                                                         layout: Some(
                                                             TyLayout {
                                                                 head_size: 64,
-                                                                body_ptr_offset: None,
+                                                                body_ptrs: [],
                                                                 variants_recursive: [],
                                                             },
                                                         ),
@@ -244,7 +244,7 @@ let main =
                                                             layout: Some(
                                                                 TyLayout {
                                                                     head_size: 64,
-                                                                    body_ptr_offset: None,
+                                                                    body_ptrs: [],
                                                                     variants_recursive: [],
                                                                 },
                                                             ),
@@ -254,9 +254,9 @@ let main =
                                                     layout: Some(
                                                         TyLayout {
                                                             head_size: 64,
-                                                            body_ptr_offset: Some(
+                                                            body_ptrs: [
                                                                 0,
-                                                            ),
+                                                            ],
                                                             variants_recursive: [],
                                                         },
                                                     ),
@@ -297,7 +297,7 @@ let main =
                                                                                                         layout: Some(
                                                                                                             TyLayout {
                                                                                                                 head_size: 64,
-                                                                                                                body_ptr_offset: None,
+                                                                                                                body_ptrs: [],
                                                                                                                 variants_recursive: [],
                                                                                                             },
                                                                                                         ),
@@ -313,7 +313,7 @@ let main =
                                                                                                             layout: Some(
                                                                                                                 TyLayout {
                                                                                                                     head_size: 64,
-                                                                                                                    body_ptr_offset: None,
+                                                                                                                    body_ptrs: [],
                                                                                                                     variants_recursive: [],
                                                                                                                 },
                                                                                                             ),
@@ -323,9 +323,9 @@ let main =
                                                                                                     layout: Some(
                                                                                                         TyLayout {
                                                                                                             head_size: 64,
-                                                                                                            body_ptr_offset: Some(
+                                                                                                            body_ptrs: [
                                                                                                                 0,
-                                                                                                            ),
+                                                                                                            ],
                                                                                                             variants_recursive: [],
                                                                                                         },
                                                                                                     ),
@@ -351,7 +351,7 @@ let main =
                                                                                             layout: Some(
                                                                                                 TyLayout {
                                                                                                     head_size: 64,
-                                                                                                    body_ptr_offset: None,
+                                                                                                    body_ptrs: [],
                                                                                                     variants_recursive: [],
                                                                                                 },
                                                                                             ),
@@ -370,7 +370,7 @@ let main =
                                                                                     layout: Some(
                                                                                         TyLayout {
                                                                                             head_size: 64,
-                                                                                            body_ptr_offset: None,
+                                                                                            body_ptrs: [],
                                                                                             variants_recursive: [],
                                                                                         },
                                                                                     ),
@@ -380,9 +380,9 @@ let main =
                                                                             layout: Some(
                                                                                 TyLayout {
                                                                                     head_size: 64,
-                                                                                    body_ptr_offset: Some(
+                                                                                    body_ptrs: [
                                                                                         0,
-                                                                                    ),
+                                                                                    ],
                                                                                     variants_recursive: [],
                                                                                 },
                                                                             ),
@@ -414,7 +414,7 @@ let main =
                                                                                                                 layout: Some(
                                                                                                                     TyLayout {
                                                                                                                         head_size: 64,
-                                                                                                                        body_ptr_offset: None,
+                                                                                                                        body_ptrs: [],
                                                                                                                         variants_recursive: [],
                                                                                                                     },
                                                                                                                 ),
@@ -434,7 +434,7 @@ let main =
                                                                                                                 layout: Some(
                                                                                                                     TyLayout {
                                                                                                                         head_size: 64,
-                                                                                                                        body_ptr_offset: None,
+                                                                                                                        body_ptrs: [],
                                                                                                                         variants_recursive: [],
                                                                                                                     },
                                                                                                                 ),
@@ -452,7 +452,7 @@ let main =
                                                                                                             layout: Some(
                                                                                                                 TyLayout {
                                                                                                                     head_size: 64,
-                                                                                                                    body_ptr_offset: None,
+                                                                                                                    body_ptrs: [],
                                                                                                                     variants_recursive: [],
                                                                                                                 },
                                                                                                             ),
@@ -462,9 +462,9 @@ let main =
                                                                                                     layout: Some(
                                                                                                         TyLayout {
                                                                                                             head_size: 64,
-                                                                                                            body_ptr_offset: Some(
+                                                                                                            body_ptrs: [
                                                                                                                 0,
-                                                                                                            ),
+                                                                                                            ],
                                                                                                             variants_recursive: [],
                                                                                                         },
                                                                                                     ),
@@ -484,7 +484,7 @@ let main =
                                                                                                         layout: Some(
                                                                                                             TyLayout {
                                                                                                                 head_size: 64,
-                                                                                                                body_ptr_offset: None,
+                                                                                                                body_ptrs: [],
                                                                                                                 variants_recursive: [],
                                                                                                             },
                                                                                                         ),
@@ -497,7 +497,7 @@ let main =
                                                                                                         layout: Some(
                                                                                                             TyLayout {
                                                                                                                 head_size: 64,
-                                                                                                                body_ptr_offset: None,
+                                                                                                                body_ptrs: [],
                                                                                                                 variants_recursive: [],
                                                                                                             },
                                                                                                         ),
@@ -513,7 +513,7 @@ let main =
                                                                                                             layout: Some(
                                                                                                                 TyLayout {
                                                                                                                     head_size: 64,
-                                                                                                                    body_ptr_offset: None,
+                                                                                                                    body_ptrs: [],
                                                                                                                     variants_recursive: [],
                                                                                                                 },
                                                                                                             ),
@@ -523,9 +523,9 @@ let main =
                                                                                                     layout: Some(
                                                                                                         TyLayout {
                                                                                                             head_size: 64,
-                                                                                                            body_ptr_offset: Some(
+                                                                                                            body_ptrs: [
                                                                                                                 0,
-                                                                                                            ),
+                                                                                                            ],
                                                                                                             variants_recursive: [],
                                                                                                         },
                                                                                                     ),
@@ -551,7 +551,7 @@ let main =
                                                                                             layout: Some(
                                                                                                 TyLayout {
                                                                                                     head_size: 64,
-                                                                                                    body_ptr_offset: None,
+                                                                                                    body_ptrs: [],
                                                                                                     variants_recursive: [],
                                                                                                 },
                                                                                             ),
@@ -571,7 +571,7 @@ let main =
                                                                                             layout: Some(
                                                                                                 TyLayout {
                                                                                                     head_size: 64,
-                                                                                                    body_ptr_offset: None,
+                                                                                                    body_ptrs: [],
                                                                                                     variants_recursive: [],
                                                                                                 },
                                                                                             ),
@@ -590,7 +590,7 @@ let main =
                                                                                     layout: Some(
                                                                                         TyLayout {
                                                                                             head_size: 64,
-                                                                                            body_ptr_offset: None,
+                                                                                            body_ptrs: [],
                                                                                             variants_recursive: [],
                                                                                         },
                                                                                     ),
@@ -600,9 +600,9 @@ let main =
                                                                             layout: Some(
                                                                                 TyLayout {
                                                                                     head_size: 64,
-                                                                                    body_ptr_offset: Some(
+                                                                                    body_ptrs: [
                                                                                         0,
-                                                                                    ),
+                                                                                    ],
                                                                                     variants_recursive: [],
                                                                                 },
                                                                             ),
@@ -629,7 +629,7 @@ let main =
                                                                                                         layout: Some(
                                                                                                             TyLayout {
                                                                                                                 head_size: 64,
-                                                                                                                body_ptr_offset: None,
+                                                                                                                body_ptrs: [],
                                                                                                                 variants_recursive: [],
                                                                                                             },
                                                                                                         ),
@@ -642,7 +642,7 @@ let main =
                                                                                                         layout: Some(
                                                                                                             TyLayout {
                                                                                                                 head_size: 64,
-                                                                                                                body_ptr_offset: None,
+                                                                                                                body_ptrs: [],
                                                                                                                 variants_recursive: [],
                                                                                                             },
                                                                                                         ),
@@ -656,7 +656,7 @@ let main =
                                                                                                     layout: Some(
                                                                                                         TyLayout {
                                                                                                             head_size: 64,
-                                                                                                            body_ptr_offset: None,
+                                                                                                            body_ptrs: [],
                                                                                                             variants_recursive: [],
                                                                                                         },
                                                                                                     ),
@@ -682,7 +682,7 @@ let main =
                                                                                             layout: Some(
                                                                                                 TyLayout {
                                                                                                     head_size: 64,
-                                                                                                    body_ptr_offset: None,
+                                                                                                    body_ptrs: [],
                                                                                                     variants_recursive: [],
                                                                                                 },
                                                                                             ),
@@ -702,7 +702,7 @@ let main =
                                                                                             layout: Some(
                                                                                                 TyLayout {
                                                                                                     head_size: 64,
-                                                                                                    body_ptr_offset: None,
+                                                                                                    body_ptrs: [],
                                                                                                     variants_recursive: [],
                                                                                                 },
                                                                                             ),
@@ -719,7 +719,7 @@ let main =
                                                                             layout: Some(
                                                                                 TyLayout {
                                                                                     head_size: 64,
-                                                                                    body_ptr_offset: None,
+                                                                                    body_ptrs: [],
                                                                                     variants_recursive: [],
                                                                                 },
                                                                             ),
@@ -742,7 +742,7 @@ let main =
                                                                                         layout: Some(
                                                                                             TyLayout {
                                                                                                 head_size: 64,
-                                                                                                body_ptr_offset: None,
+                                                                                                body_ptrs: [],
                                                                                                 variants_recursive: [],
                                                                                             },
                                                                                         ),
@@ -752,9 +752,9 @@ let main =
                                                                                 layout: Some(
                                                                                     TyLayout {
                                                                                         head_size: 64,
-                                                                                        body_ptr_offset: Some(
+                                                                                        body_ptrs: [
                                                                                             0,
-                                                                                        ),
+                                                                                        ],
                                                                                         variants_recursive: [],
                                                                                     },
                                                                                 ),
@@ -772,7 +772,7 @@ let main =
                                                                                         layout: Some(
                                                                                             TyLayout {
                                                                                                 head_size: 64,
-                                                                                                body_ptr_offset: None,
+                                                                                                body_ptrs: [],
                                                                                                 variants_recursive: [],
                                                                                             },
                                                                                         ),
@@ -782,9 +782,9 @@ let main =
                                                                                 layout: Some(
                                                                                     TyLayout {
                                                                                         head_size: 64,
-                                                                                        body_ptr_offset: Some(
+                                                                                        body_ptrs: [
                                                                                             0,
-                                                                                        ),
+                                                                                        ],
                                                                                         variants_recursive: [],
                                                                                     },
                                                                                 ),
@@ -800,7 +800,7 @@ let main =
                                                                                 layout: Some(
                                                                                     TyLayout {
                                                                                         head_size: 64,
-                                                                                        body_ptr_offset: None,
+                                                                                        body_ptrs: [],
                                                                                         variants_recursive: [],
                                                                                     },
                                                                                 ),
@@ -812,7 +812,10 @@ let main =
                                                                 layout: Some(
                                                                     TyLayout {
                                                                         head_size: 192,
-                                                                        body_ptr_offset: None,
+                                                                        body_ptrs: [
+                                                                            0,
+                                                                            0,
+                                                                        ],
                                                                         variants_recursive: [],
                                                                     },
                                                                 ),
@@ -831,7 +834,7 @@ let main =
                                                             layout: Some(
                                                                 TyLayout {
                                                                     head_size: 64,
-                                                                    body_ptr_offset: None,
+                                                                    body_ptrs: [],
                                                                     variants_recursive: [],
                                                                 },
                                                             ),
@@ -841,9 +844,9 @@ let main =
                                                     layout: Some(
                                                         TyLayout {
                                                             head_size: 64,
-                                                            body_ptr_offset: Some(
+                                                            body_ptrs: [
                                                                 0,
-                                                            ),
+                                                            ],
                                                             variants_recursive: [],
                                                         },
                                                     ),
@@ -860,7 +863,7 @@ let main =
                                         layout: Some(
                                             TyLayout {
                                                 head_size: 64,
-                                                body_ptr_offset: None,
+                                                body_ptrs: [],
                                                 variants_recursive: [],
                                             },
                                         ),
@@ -876,7 +879,7 @@ let main =
                             layout: Some(
                                 TyLayout {
                                     head_size: 64,
-                                    body_ptr_offset: None,
+                                    body_ptrs: [],
                                     variants_recursive: [],
                                 },
                             ),
@@ -892,7 +895,7 @@ let main =
                 layout: Some(
                     TyLayout {
                         head_size: 64,
-                        body_ptr_offset: None,
+                        body_ptrs: [],
                         variants_recursive: [],
                     },
                 ),

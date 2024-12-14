@@ -1,6 +1,8 @@
 use crate::ir;
 
-use crate::{Data, ReversePointer};
+use crate::Data;
+
+use super::SeveredBodies;
 
 pub struct ArrayWriter<'t> {
     item_ty: &'t ir::Ty,
@@ -8,7 +10,7 @@ pub struct ArrayWriter<'t> {
     buf: Vec<u8>,
 
     count: usize,
-    item_bodies: Vec<(ReversePointer, Data)>,
+    item_bodies: Vec<SeveredBodies>,
 }
 
 impl<'t> ArrayWriter<'t> {
@@ -45,15 +47,15 @@ impl<'t> ArrayWriter<'t> {
 
         // write body offsets of each item
         let mut total_len = self.buf.len();
-        for (ptr, d) in &self.item_bodies {
-            ptr.write(&mut self.buf, total_len);
-            total_len += d.len();
+        for body in &self.item_bodies {
+            body.write_pointers(&mut self.buf, total_len);
+            total_len += body.buf.len();
         }
 
         // construct data
         let mut data = Data::new(self.buf);
-        for (_, d) in self.item_bodies {
-            data = data.combine(d);
+        for body in self.item_bodies {
+            data = data.combine(body.buf);
         }
         data
     }

@@ -137,7 +137,7 @@ pub struct TyEnumVariant {
 #[allow(non_camel_case_types)]
 pub struct TyLayout {
     pub head_size: u32,
-    pub body_ptr_offset: Option<u32>,
+    pub body_ptrs: Vec<u32>,
     pub variants_recursive: Vec<u16>,
 }
 
