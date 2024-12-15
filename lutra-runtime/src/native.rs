@@ -144,7 +144,7 @@ pub mod std {
 
             let output_ty = construct_adhoc_ty(ir::TyKind::Array(Box::new(func_ty.body.clone())));
 
-            let mut res = ArrayWriter::new(&output_ty);
+            let mut res = ArrayWriter::new_for_ty(&output_ty);
 
             for item in input {
                 let cell = Cell::Data(item);
@@ -163,7 +163,7 @@ pub mod std {
 
             let func = &args[1];
 
-            let mut output = ArrayWriter::new(args[0].0);
+            let mut output = ArrayWriter::new_for_ty(args[0].0);
             for item in input {
                 let item_c = Cell::Data(item.clone());
 
@@ -193,7 +193,7 @@ pub mod std {
             let skip = start;
             let take = end.saturating_sub(skip);
 
-            let mut output = ArrayWriter::new(args[0].0);
+            let mut output = ArrayWriter::new_for_ty(args[0].0);
             for item in input.skip(start).take(take) {
                 output.write_item(item);
             }
@@ -217,7 +217,7 @@ pub mod std {
             }
             keys.sort();
 
-            let mut output = ArrayWriter::new(args[0].0);
+            let mut output = ArrayWriter::new_for_ty(args[0].0);
             for (_key, index) in keys {
                 let item = input.get(index).unwrap();
                 output.write_item(item);
@@ -242,12 +242,12 @@ pub mod std {
             // init output arrays
             let mut output_arrays: Vec<ArrayWriter> = output_fields_ty
                 .iter()
-                .map(|f| ArrayWriter::new(&f.ty))
+                .map(|f| ArrayWriter::new_for_ty(&f.ty))
                 .collect();
 
             // partition input into output arrays
             for item in input {
-                let tuple = TupleReader::new(&item, input_items_ty);
+                let tuple = TupleReader::new_for_ty(&item, input_items_ty);
 
                 for (index, output_array) in output_arrays.iter_mut().enumerate() {
                     let field = tuple.get_field(index);
@@ -256,7 +256,7 @@ pub mod std {
             }
 
             // construct the final tuple
-            let mut output = TupleWriter::new(&output_ty);
+            let mut output = TupleWriter::new_for_ty(&output_ty);
             for output_array in output_arrays {
                 let array = output_array.finish();
                 output.write_field(array);
@@ -266,7 +266,7 @@ pub mod std {
 
         pub fn from_columnar(_it: &mut Interpreter, args: Vec<(&ir::Ty, Cell)>) -> Cell {
             let input = assume::as_value(&args[0].1);
-            let input = TupleReader::new(input, args[0].0);
+            let input = TupleReader::new_for_ty(input, args[0].0);
 
             let input_fields_ty = args[0].0.kind.as_tuple().unwrap();
 
@@ -293,9 +293,9 @@ pub mod std {
                 .collect();
 
             // init output array
-            let mut output = ArrayWriter::new(&output_ty);
+            let mut output = ArrayWriter::new_for_ty(&output_ty);
             'output: loop {
-                let mut tuple = TupleWriter::new(&output_tuple_ty);
+                let mut tuple = TupleWriter::new_for_ty(&output_tuple_ty);
                 for (index, _) in input_fields_ty.iter().enumerate() {
                     if let Some(item) = input_arrays.get_mut(index).unwrap().next() {
                         tuple.write_field(item)
@@ -370,7 +370,7 @@ pub mod std {
             let array = assume::array(args[0].0, &args[0].1);
             let offset = assume::int(&args[1].1).max(0) as usize;
 
-            let mut out = ArrayWriter::new(args[0].0);
+            let mut out = ArrayWriter::new_for_ty(args[0].0);
 
             let n_blanks = offset.min(array.remaining());
             for _ in 0..n_blanks {
@@ -389,7 +389,7 @@ pub mod std {
             let array = assume::array(args[0].0, &args[0].1);
             let offset = assume::int(&args[1].1).max(0) as usize;
 
-            let mut out = ArrayWriter::new(args[0].0);
+            let mut out = ArrayWriter::new_for_ty(args[0].0);
             let array_len = array.remaining();
 
             for item in array.skip(offset) {
@@ -407,7 +407,7 @@ pub mod std {
         pub fn row_number(_it: &mut Interpreter, args: Vec<(&ir::Ty, Cell)>) -> Cell {
             let array = assume::array(args[0].0, &args[0].1);
 
-            let mut out = ArrayWriter::new(args[0].0); // TODO: make this int always
+            let mut out = ArrayWriter::new_for_ty(args[0].0); // TODO: make this int always
             for (index, _) in array.enumerate() {
                 out.write_item(encode(&(index as i64)));
             }

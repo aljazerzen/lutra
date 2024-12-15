@@ -5,7 +5,8 @@ use crate::Data;
 use super::SeveredBodies;
 
 pub struct ArrayWriter<'t> {
-    item_ty: &'t ir::Ty,
+    item_head_bytes: usize,
+    item_body_ptrs: &'t [u32],
 
     buf: Vec<u8>,
 
@@ -14,13 +15,22 @@ pub struct ArrayWriter<'t> {
 }
 
 impl<'t> ArrayWriter<'t> {
-    pub fn new(ty: &'t ir::Ty) -> Self {
+    pub fn new_for_ty(ty: &'t ir::Ty) -> Self {
         let ir::TyKind::Array(item_ty) = &ty.kind else {
             panic!()
         };
+        let layout = item_ty.layout.as_ref().unwrap();
 
+        let head_bytes = layout.head_size.div_ceil(8) as usize;
+        let body_ptrs = layout.body_ptrs.as_slice();
+
+        Self::new(head_bytes, body_ptrs)
+    }
+
+    pub fn new(item_head_bytes: usize, item_body_ptrs: &'t [u32]) -> Self {
         ArrayWriter {
-            item_ty: item_ty.as_ref(),
+            item_head_bytes,
+            item_body_ptrs,
             count: 0,
             buf: vec![
                 8, 0, 0, 0, // offset
@@ -33,9 +43,12 @@ impl<'t> ArrayWriter<'t> {
     pub fn write_item(&mut self, item: Data) {
         self.count += 1;
 
-        let layout = self.item_ty.layout.as_ref().unwrap();
-
-        let body = super::write_head(&mut self.buf, item, layout);
+        let body = super::write_head(
+            &mut self.buf,
+            item,
+            self.item_head_bytes,
+            self.item_body_ptrs,
+        );
         if let Some(body) = body {
             self.item_bodies.push(body);
         }

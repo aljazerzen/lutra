@@ -4,7 +4,7 @@ use lutra_bin::{Data, Value};
 
 #[track_caller]
 pub(crate) fn _test_array_writer(items: Vec<Data>, output_ty: &ir::Ty) -> String {
-    let mut output = ArrayWriter::new(output_ty);
+    let mut output = ArrayWriter::new_for_ty(output_ty);
     for item in items {
         output.write_item(item);
     }
@@ -20,7 +20,7 @@ pub(crate) fn _test_array_writer(items: Vec<Data>, output_ty: &ir::Ty) -> String
 
 #[track_caller]
 pub(crate) fn _test_tuple_writer(fields: Vec<Data>, output_ty: &ir::Ty) -> String {
-    let mut output = TupleWriter::new(output_ty);
+    let mut output = TupleWriter::new_for_ty(output_ty);
     for field in fields {
         output.write_field(field);
     }

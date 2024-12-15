@@ -6,8 +6,6 @@ use std::iter::zip;
 pub use array::ArrayWriter;
 pub use tuple::TupleWriter;
 
-use crate::ir;
-
 use crate::Data;
 use crate::ReversePointer;
 
@@ -45,31 +43,30 @@ impl SeveredBodies {
 
 fn extract_head_and_body<'b>(
     buf: &'b Data,
-    layout: &ir::TyLayout,
+    head_bytes: usize,
+    body_ptrs: &[u32],
 ) -> (&'b [u8], Option<SeveredBodies>) {
-    let head_bytes = layout.head_size / 8;
+    let head = buf.slice(head_bytes);
 
-    let head = buf.slice(head_bytes as usize);
+    let body = if !body_ptrs.is_empty() {
+        let mut ptrs = body_ptrs.iter();
 
-    let body = if !layout.body_ptrs.is_empty() {
-        let mut body_ptrs = layout.body_ptrs.iter();
-
-        let first_body_ptr = body_ptrs.next().unwrap();
+        let first_body_ptr = ptrs.next().unwrap();
         let mut buf = buf.clone();
 
         let first_body_offset = read_ptr(head, *first_body_ptr);
 
         // read body offsets
         let mut body_offsets = Vec::new();
-        for body_ptr in body_ptrs {
-            let body_offset = read_ptr(head, *body_ptr);
+        for ptr in ptrs {
+            let body_offset = read_ptr(head, *ptr);
             body_offsets.push(body_offset - first_body_offset);
         }
 
         buf.skip(first_body_offset as usize);
         Some(SeveredBodies {
             buf,
-            body_ptr_offsets: layout.body_ptrs.clone(),
+            body_ptr_offsets: body_ptrs.to_vec(),
             body_offsets,
         })
     } else {
@@ -86,8 +83,13 @@ fn read_ptr(buf: &[u8], offset: u32) -> u32 {
     u32::from_le_bytes(r.read_const()) + offset
 }
 
-fn write_head(out: &mut Vec<u8>, data: Data, layout: &ir::TyLayout) -> Option<SeveredBodies> {
-    let (head, mut body) = extract_head_and_body(&data, layout);
+fn write_head(
+    out: &mut Vec<u8>,
+    data: Data,
+    head_bytes: usize,
+    body_ptrs: &[u32],
+) -> Option<SeveredBodies> {
+    let (head, mut body) = extract_head_and_body(&data, head_bytes, body_ptrs);
 
     // offset body pointers to the out buffer
     if let Some(body) = body.as_mut() {

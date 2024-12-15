@@ -166,7 +166,7 @@ impl Interpreter {
             }
 
             ir::ExprKind::Tuple(fields) => {
-                let mut writer = lutra_bin::TupleWriter::new(&expr.ty);
+                let mut writer = lutra_bin::TupleWriter::new_for_ty(&expr.ty);
                 for field in fields {
                     let cell = self.evaluate_expr(field);
                     let data = cell.into_data().unwrap_or_else(|_| panic!());
@@ -177,7 +177,7 @@ impl Interpreter {
                 Cell::Data(writer.finish())
             }
             ir::ExprKind::Array(items) => {
-                let mut writer = lutra_bin::ArrayWriter::new(&expr.ty);
+                let mut writer = lutra_bin::ArrayWriter::new_for_ty(&expr.ty);
                 for item in items {
                     let cell = self.evaluate_expr(item);
 
@@ -193,7 +193,7 @@ impl Interpreter {
                 let base = self.evaluate_expr(base);
                 let base = base.into_data().unwrap_or_else(|_| panic!());
 
-                let base = lutra_bin::TupleReader::new(&base, base_ty);
+                let base = lutra_bin::TupleReader::new_for_ty(&base, base_ty);
 
                 Cell::Data(base.get_field(*offset as usize))
             }

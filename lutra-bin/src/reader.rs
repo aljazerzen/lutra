@@ -128,27 +128,40 @@ impl Iterator for ArrayReader {
     }
 }
 
-pub struct TupleReader<'d, 't> {
+pub struct TupleReader<'d> {
     data: &'d Data,
-    ty_fields: &'t [ir::TyTupleField],
+    field_offsets: Vec<usize>,
 }
 
-impl<'d, 't> TupleReader<'d, 't> {
-    pub fn new(data: &'d Data, ty: &'t ir::Ty) -> Self {
+impl<'d> TupleReader<'d> {
+    pub fn new(data: &'d Data, field_offsets: Vec<usize>) -> Self {
+        TupleReader {
+            data,
+            field_offsets,
+        }
+    }
+
+    pub fn new_for_ty(data: &'d Data, ty: &ir::Ty) -> Self {
         let ir::TyKind::Tuple(ty_fields) = &ty.kind else {
             panic!()
         };
-        TupleReader { data, ty_fields }
+
+        // compute field offsets
+        let mut field_offsets = Vec::with_capacity(ty_fields.len());
+        let mut offset = 0;
+        for field in ty_fields {
+            field_offsets.push(offset);
+
+            let layout = field.ty.layout.as_ref().unwrap();
+            offset += (layout.head_size as usize).div_ceil(8);
+        }
+
+        Self::new(data, field_offsets)
     }
 
     pub fn get_field(&self, index: usize) -> Data {
-        let mut bytes_offset = 0;
-        for i in 0..index {
-            let layout = &self.ty_fields[i].ty.layout;
-            bytes_offset += (layout.as_ref().unwrap().head_size as usize) / 8;
-        }
         let mut r = self.data.clone();
-        r.skip(bytes_offset);
+        r.skip(self.field_offsets[index]);
         r
     }
 }

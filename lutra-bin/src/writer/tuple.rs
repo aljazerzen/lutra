@@ -5,7 +5,7 @@ use super::SeveredBodies;
 
 #[derive(Debug)]
 pub struct TupleWriter<'t> {
-    fields_ty: &'t [ir::TyTupleField],
+    fields_layouts: Vec<(usize, &'t [u32])>,
 
     buf: Vec<u8>,
 
@@ -14,13 +14,27 @@ pub struct TupleWriter<'t> {
 }
 
 impl<'t> TupleWriter<'t> {
-    pub fn new(ty: &'t ir::Ty) -> Self {
+    pub fn new_for_ty(ty: &'t ir::Ty) -> Self {
         let ir::TyKind::Tuple(fields_ty) = &ty.kind else {
             panic!()
         };
+        let fields_layouts = fields_ty
+            .iter()
+            .map(|f| {
+                let layout = f.ty.layout.as_ref().unwrap();
 
+                let head_bytes = layout.head_size.div_ceil(8) as usize;
+                let body_ptrs = layout.body_ptrs.as_slice();
+                (head_bytes, body_ptrs)
+            })
+            .collect();
+
+        Self::new(fields_layouts)
+    }
+
+    pub fn new(fields_layouts: Vec<(usize, &'t [u32])>) -> Self {
         TupleWriter {
-            fields_ty: fields_ty.as_slice(),
+            fields_layouts,
             next: 0,
             buf: Vec::new(),
             fields_bodies: vec![],
@@ -28,13 +42,12 @@ impl<'t> TupleWriter<'t> {
     }
 
     pub fn write_field(&mut self, field: Data) {
-        if self.next >= self.fields_ty.len() {
+        if self.next >= self.fields_layouts.len() {
             panic!()
         }
+        let (head_bytes, body_ptrs) = self.fields_layouts[self.next];
 
-        let layout = self.fields_ty[self.next].ty.layout.as_ref().unwrap();
-
-        let body = super::write_head(&mut self.buf, field, layout);
+        let body = super::write_head(&mut self.buf, field, head_bytes, body_ptrs);
         if let Some(body) = body {
             self.fields_bodies.push(body);
         }
