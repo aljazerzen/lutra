@@ -95,10 +95,10 @@ mod inner {
         let program = lutra_frontend::lower(&project.root_module, &path);
         log::debug!("ir: {}", lutra_ir::print(&program));
 
-        let res = lutra_runtime::evaluate(&program, (), lutra_runtime::BUILTIN_MODULES);
-        let value = lutra_bin::Value::decode(&res, &program.main.ty)?;
+        let res = lutra_runtime::evaluate(&program, vec![], lutra_runtime::BUILTIN_MODULES);
+        let value = lutra_bin::Value::decode(&res, program.get_output_ty())?;
 
-        println!("{}", value.print_source(&program.main.ty).unwrap());
+        println!("{}", value.print_source(program.get_output_ty()).unwrap());
         Ok(())
     }
 }

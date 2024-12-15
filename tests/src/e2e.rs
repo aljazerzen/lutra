@@ -1,13 +1,14 @@
 #[track_caller]
 fn _test_run(lutra_source: &str) -> String {
-    let program = lutra_frontend::_test_compile(lutra_source);
+    let source = format!("let main = func () -> {lutra_source}");
+
+    let program = lutra_frontend::_test_compile(&source);
     eprintln!("--- ir:\n{}\n---", lutra_ir::print(&program));
 
-    let result = lutra_runtime::evaluate(&program, (), lutra_runtime::BUILTIN_MODULES);
-    let result_ty = &program.main.ty;
+    let output = lutra_runtime::evaluate(&program, vec![], lutra_runtime::BUILTIN_MODULES);
 
-    let value = lutra_bin::Value::decode(&result, result_ty).unwrap();
-    value.print_source(result_ty).unwrap()
+    let output = lutra_bin::Value::decode(&output, program.get_output_ty()).unwrap();
+    output.print_source(program.get_output_ty()).unwrap()
 }
 
 #[test]
@@ -22,7 +23,7 @@ fn std_div() {
 
 #[test]
 fn std_mod() {
-    insta::assert_snapshot!(_test_run("10 / 6"), @"1");
+    insta::assert_snapshot!(_test_run("10 % 6"), @"4");
 }
 
 #[test]

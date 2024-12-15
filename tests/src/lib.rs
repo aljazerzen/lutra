@@ -4,7 +4,7 @@ mod lutra {
     include!(concat!(env!("OUT_DIR"), "/lutra.rs"));
 }
 
+mod e2e;
 mod lbin;
 mod native_functions;
-mod runtime;
 mod typed_data;

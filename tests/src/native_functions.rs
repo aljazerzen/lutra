@@ -23,17 +23,19 @@ fn test_01() {
         world::hello
     ];
 
-    let main = (
-        call external.0: func (float64, uint32) -> int64,
-        1.0: float64,
-        2: int64,
-    ): int64
+    let main = (func 0 -> 
+        (
+            call external.0: func (float64, uint32) -> int64,
+            1.0: float64,
+            2: int64,
+        ): int64
+    ): func () -> int64
     ",
     );
 
-    let value = lutra_runtime::evaluate(&program, (), &modules);
+    let value = lutra_runtime::evaluate(&program, vec![], &modules);
 
-    let value = Value::decode(&value, &program.main.ty).unwrap();
+    let value = Value::decode(&value, program.get_output_ty()).unwrap();
 
     assert_eq!(value, Value::Int64(6));
 }

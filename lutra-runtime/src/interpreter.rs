@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::iter::zip;
 use std::ops::{BitAnd, Shr};
 
 use lutra_bin::ir;
@@ -27,7 +28,7 @@ pub type NativeFunction = &'static dyn Fn(&mut Interpreter, Vec<(&ir::Ty, Cell)>
 
 pub fn evaluate(
     program: &ir::Program,
-    _input: (),
+    inputs: Vec<Vec<u8>>,
     native_modules: &[(&str, &dyn NativeModule)],
 ) -> Vec<u8> {
     let mut interpreter = Interpreter {
@@ -51,12 +52,18 @@ pub fn evaluate(
         interpreter.allocate(Cell::FunctionNative(function));
     }
 
-    // evaluate the expression
+    // the main function call
+    let main_ty = program.main.ty.kind.as_function().unwrap();
     let main = interpreter.evaluate_expr(&program.main);
+    let args = zip(main_ty.params.iter(), inputs)
+        .map(|(p, a)| (p, Cell::Data(Data::new(a))))
+        .collect();
+
+    let res = interpreter.evaluate_func_call(&main, args);
 
     // extract result
     drop(interpreter);
-    let Cell::Data(value) = main else { panic!() };
+    let Cell::Data(value) = res else { panic!() };
     value.flatten()
 }
 
@@ -86,7 +93,7 @@ impl Interpreter {
     fn resolve_sid_addr(&self, sid: ir::Sid) -> Addr {
         match sid.kind() {
             ir::SidKind::External => {
-                // externals: layed out at the start of memory
+                // externals: laid out at the start of memory
                 sid.0 as Addr
             }
             ir::SidKind::Var => {
@@ -115,8 +122,9 @@ impl Interpreter {
     fn drop_binding(&mut self, binding_id: ir::Sid) {
         assert_eq!(binding_id.0.shr(30), 0x1_u32);
 
-        let addr = self.bindings.remove(&binding_id).unwrap();
-        self.drop(addr, addr + 1);
+        // TODO
+        // let addr = self.bindings.remove(&binding_id).unwrap();
+        // self.drop(addr, addr + 1);
     }
 
     fn allocate_scope(&mut self, scope_id: ir::Sid, cells: Vec<(&ir::Ty, Cell)>) -> Addr {

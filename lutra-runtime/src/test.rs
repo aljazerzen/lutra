@@ -6,11 +6,10 @@ use insta::assert_snapshot;
 fn _test_interpret(program: &str) -> String {
     let program = lutra_ir::_test_parse(program);
 
-    let value = crate::interpreter::evaluate(&program, (), crate::BUILTIN_MODULES);
+    let output = crate::interpreter::evaluate(&program, vec![], crate::BUILTIN_MODULES);
 
-    let ty = &program.main.ty;
-    let value = lutra_bin::Value::decode(&value, ty).unwrap();
-    value.print_source(ty).unwrap()
+    let output = lutra_bin::Value::decode(&output, program.get_output_ty()).unwrap();
+    output.print_source(program.get_output_ty()).unwrap()
 }
 
 #[test]
@@ -18,7 +17,7 @@ fn interpret_01() {
     assert_snapshot!(_test_interpret(r#"
     let externals = [std::add];
 
-    let main =
+    let main = (func 3 ->
         let 1 = (
             func 2 -> [
                 fn.2+0: float64,
@@ -45,6 +44,7 @@ fn interpret_01() {
                 2: int64,
             ): int64,
         }: {[float64], [int64], int64}
+    ): func () -> {[float64], [int64], int64}
     "#,
     ), @r#"
     {
@@ -68,7 +68,7 @@ fn interpret_02() {
     assert_snapshot!(_test_interpret(r#"
     let externals = [std::map];
 
-    let main =
+    let main = (func 0 ->
         let 1 = (
             func 1 -> {
                 fn.1+0: int64,
@@ -82,6 +82,7 @@ fn interpret_02() {
             [2: int64, 3: int64, 1: int64]: [int64],
             var.1: func (int64) -> {int64, int64},
         ): [{int64, int64}]
+    ): func () -> [{int64, int64}]
     "#,
     ), @r#"
     [
@@ -107,7 +108,7 @@ fn interpret_03() {
     assert_snapshot!(_test_interpret(r#"
     let externals = [std::map, std::mul];
 
-    let main =
+    let main = (func 0 ->
         let 1 = [
             {1:int64, 3:int64}: {int64, int64}, 
             {5:int64, 4:int64}: {int64, int64}, 
@@ -125,6 +126,7 @@ fn interpret_03() {
             var.1: [{int64, int64}],
             var.2: func ({int64, int64}) -> int64,
         ): [int64]
+    ): func () -> [int64]
     "#,
     ), @r#"
     [
