@@ -86,9 +86,9 @@ impl<'a> Lowerer<'a> {
             pr::ExprKind::Indirection { base, field } => {
                 ir::ExprKind::TupleLookup(Box::new(ir::TupleLookup {
                     base: self.lower_expr(base)?,
-                    offset: match field {
+                    position: match field {
                         pr::IndirectionKind::Name(_) => todo!(),
-                        pr::IndirectionKind::Position(offset) => *offset as u16,
+                        pr::IndirectionKind::Position(position) => *position as u16,
                         pr::IndirectionKind::Star => todo!(),
                     },
                 }))

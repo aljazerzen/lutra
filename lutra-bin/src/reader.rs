@@ -142,11 +142,16 @@ impl<'d> TupleReader<'d> {
     }
 
     pub fn new_for_ty(data: &'d Data, ty: &ir::Ty) -> Self {
+        let field_offsets = Self::compute_field_offsets(ty);
+
+        Self::new(data, field_offsets)
+    }
+
+    pub fn compute_field_offsets(ty: &ir::Ty) -> Vec<usize> {
         let ir::TyKind::Tuple(ty_fields) = &ty.kind else {
             panic!()
         };
 
-        // compute field offsets
         let mut field_offsets = Vec::with_capacity(ty_fields.len());
         let mut offset = 0;
         for field in ty_fields {
@@ -155,8 +160,13 @@ impl<'d> TupleReader<'d> {
             let layout = field.ty.layout.as_ref().unwrap();
             offset += (layout.head_size as usize).div_ceil(8);
         }
+        field_offsets
+    }
 
-        Self::new(data, field_offsets)
+    pub fn compute_field_offset(ty: &ir::Ty, position: u16) -> usize {
+        *Self::compute_field_offsets(ty)
+            .get(position as usize)
+            .unwrap()
     }
 
     pub fn get_field(&self, index: usize) -> Data {

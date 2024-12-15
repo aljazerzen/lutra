@@ -131,7 +131,7 @@ impl Printer {
                 let mut r = self.print_expr(&lookup.base);
                 r += &self.new_line();
                 r += ".";
-                r += &lookup.offset.to_string();
+                r += &lookup.position.to_string();
                 r
             }
             ir::ExprKind::Binding(binding) => {

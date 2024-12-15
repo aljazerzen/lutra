@@ -54,7 +54,7 @@ type Function = {
 
 type TupleLookup = {
   base = Expr,
-  offset = uint16,
+  position = uint16,
 }
 
 type Binding = {

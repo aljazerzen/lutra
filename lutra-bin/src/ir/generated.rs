@@ -64,7 +64,7 @@ pub struct Function {
 #[allow(non_camel_case_types)]
 pub struct TupleLookup {
     pub base: Expr,
-    pub offset: u16,
+    pub position: u16,
 }
 
 #[derive(Debug, Clone)]

@@ -818,7 +818,7 @@ let main =
                                                     name: None,
                                                 },
                                             },
-                                            offset: 1,
+                                            position: 1,
                                         },
                                     ),
                                     ty: Ty {

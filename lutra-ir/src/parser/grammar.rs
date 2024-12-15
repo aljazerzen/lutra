@@ -207,8 +207,8 @@ where
             .then(ty())
             .repeated(),
     )
-    .foldl(|base, (offset, ty)| Expr {
-        kind: ExprKind::TupleLookup(Box::new(TupleLookup { base, offset })),
+    .foldl(|base, (position, ty)| Expr {
+        kind: ExprKind::TupleLookup(Box::new(TupleLookup { base, position })),
         ty,
     })
 }

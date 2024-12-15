@@ -195,15 +195,16 @@ impl Interpreter {
                 Cell::Data(writer.finish())
             }
             ir::ExprKind::TupleLookup(lookup) => {
-                let ir::TupleLookup { base, offset } = lookup.as_ref();
+                let ir::TupleLookup { base, position } = lookup.as_ref();
                 let base_ty = &base.ty;
 
                 let base = self.evaluate_expr(base);
-                let base = base.into_data().unwrap_or_else(|_| panic!());
 
-                let base = lutra_bin::TupleReader::new_for_ty(&base, base_ty);
+                let field_offset = lutra_bin::TupleReader::compute_field_offset(base_ty, *position);
 
-                Cell::Data(base.get_field(*offset as usize))
+                let mut data = base.into_data().unwrap_or_else(|_| panic!());
+                data.skip(field_offset);
+                Cell::Data(data)
             }
             ir::ExprKind::Call(call) => {
                 let ir::Call { function, args, .. } = call.as_ref();
