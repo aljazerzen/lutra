@@ -71,7 +71,7 @@ fn expr() -> impl Parser<TokenKind, Expr, Error = PError> + Clone {
             .map(|(kind, ty)| Expr { kind, ty })
             .boxed();
 
-        binding(lookups(term).boxed())
+        binding(tuple_lookup(term).boxed())
     })
 }
 
@@ -195,38 +195,20 @@ fn array<'a>(
         .labelled("array")
 }
 
-enum LookupKind {
-    Tuple(u16),
-    Array(u32),
-}
-
-fn lookups<'a, E>(expr: E) -> impl Parser<TokenKind, Expr, Error = PError> + 'a
+fn tuple_lookup<'a, E>(expr: E) -> impl Parser<TokenKind, Expr, Error = PError> + 'a
 where
     E: Parser<TokenKind, Expr, Error = PError> + 'a,
 {
     expr.then(
         ctrl('.')
-            .ignore_then(choice((
-                select! {
-                    TokenKind::Literal(pr::Literal::Integer(i)) => LookupKind::Tuple(i as u16)
-                },
-                select! {
-                    TokenKind::Literal(pr::Literal::Integer(i)) => LookupKind::Array(i as u32)
-                }
-                .delimited_by(ctrl('['), ctrl(']')),
-            )))
+            .ignore_then(select! {
+                TokenKind::Literal(pr::Literal::Integer(i)) => i as u16
+            })
             .then(ty())
             .repeated(),
     )
-    .foldl(|base, (kind, ty)| Expr {
-        kind: match kind {
-            LookupKind::Tuple(offset) => {
-                ExprKind::TupleLookup(Box::new(TupleLookup { base, offset }))
-            }
-            LookupKind::Array(offset) => {
-                ExprKind::ArrayLookup(Box::new(ArrayLookup { base, offset }))
-            }
-        },
+    .foldl(|base, (offset, ty)| Expr {
+        kind: ExprKind::TupleLookup(Box::new(TupleLookup { base, offset })),
         ty,
     })
 }

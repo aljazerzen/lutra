@@ -84,25 +84,14 @@ impl<'a> Lowerer<'a> {
             pr::ExprKind::Tuple(fields) => ir::ExprKind::Tuple(self.lower_exprs(fields)?),
             pr::ExprKind::Array(items) => ir::ExprKind::Array(self.lower_exprs(items)?),
             pr::ExprKind::Indirection { base, field } => {
-                if base.ty.as_ref().unwrap().kind.is_tuple() {
-                    ir::ExprKind::TupleLookup(Box::new(ir::TupleLookup {
-                        base: self.lower_expr(base)?,
-                        offset: match field {
-                            pr::IndirectionKind::Name(_) => todo!(),
-                            pr::IndirectionKind::Position(offset) => *offset as u16,
-                            pr::IndirectionKind::Star => todo!(),
-                        },
-                    }))
-                } else {
-                    ir::ExprKind::ArrayLookup(Box::new(ir::ArrayLookup {
-                        base: self.lower_expr(base)?,
-                        offset: match field {
-                            pr::IndirectionKind::Name(_) => todo!(),
-                            pr::IndirectionKind::Position(offset) => *offset as u32,
-                            pr::IndirectionKind::Star => todo!(),
-                        },
-                    }))
-                }
+                ir::ExprKind::TupleLookup(Box::new(ir::TupleLookup {
+                    base: self.lower_expr(base)?,
+                    offset: match field {
+                        pr::IndirectionKind::Name(_) => todo!(),
+                        pr::IndirectionKind::Position(offset) => *offset as u16,
+                        pr::IndirectionKind::Star => todo!(),
+                    },
+                }))
             }
 
             pr::ExprKind::FuncCall(call) => ir::ExprKind::Call(Box::new(ir::Call {

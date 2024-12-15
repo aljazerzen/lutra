@@ -134,14 +134,6 @@ impl Printer {
                 r += &lookup.offset.to_string();
                 r
             }
-            ir::ExprKind::ArrayLookup(lookup) => {
-                let mut r = self.print_expr(&lookup.base);
-                r += &self.new_line();
-                r += ".[";
-                r += &lookup.offset.to_string();
-                r += "]";
-                r
-            }
             ir::ExprKind::Binding(binding) => {
                 self.indent();
                 let mut r = self.new_line();
@@ -171,8 +163,12 @@ impl Printer {
                 r
             }
         };
-        r += ": ";
-        r += &self.print_ty(&expr.ty);
+
+        let print_ty = !matches!(expr.kind, ir::ExprKind::Binding(_));
+        if print_ty {
+            r += ": ";
+            r += &self.print_ty(&expr.ty);
+        }
         r
     }
 

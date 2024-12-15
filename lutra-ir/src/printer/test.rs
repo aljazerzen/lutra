@@ -41,7 +41,6 @@ fn print_01() {
         ): int64
       }: {[float64], [int64], int64}
       .1:[int64]
-      .[0]:int64
     "#), @r#"
     let externals = [
       std::int::add,
@@ -78,6 +77,5 @@ fn print_01() {
         ): int64,
       }: {[float64], [int64], int64}
       .1: [int64]
-      .[0]: int64: int64
     "#);
 }

@@ -39,7 +39,6 @@ let main =
     ): int64
   }: {[float64], [int64], int64}
   .1:[int64]
-  .[0]:int64
     "#), @r#"
     Program {
         externals: [
@@ -269,82 +268,25 @@ let main =
                                     },
                                 },
                                 main: Expr {
-                                    kind: ArrayLookup(
-                                        ArrayLookup {
+                                    kind: TupleLookup(
+                                        TupleLookup {
                                             base: Expr {
-                                                kind: TupleLookup(
-                                                    TupleLookup {
-                                                        base: Expr {
-                                                            kind: Tuple(
-                                                                [
-                                                                    Expr {
-                                                                        kind: Call(
-                                                                            Call {
-                                                                                function: Expr {
-                                                                                    kind: Pointer(
-                                                                                        Sid(
-                                                                                            1073741826,
-                                                                                        ),
-                                                                                    ),
-                                                                                    ty: Ty {
-                                                                                        kind: Function(
-                                                                                            TyFunction {
-                                                                                                params: [
-                                                                                                    Ty {
-                                                                                                        kind: Primitive(
-                                                                                                            float64,
-                                                                                                        ),
-                                                                                                        layout: Some(
-                                                                                                            TyLayout {
-                                                                                                                head_size: 64,
-                                                                                                                body_ptrs: [],
-                                                                                                                variants_recursive: [],
-                                                                                                            },
-                                                                                                        ),
-                                                                                                        name: None,
-                                                                                                    },
-                                                                                                ],
-                                                                                                body: Ty {
-                                                                                                    kind: Array(
-                                                                                                        Ty {
-                                                                                                            kind: Primitive(
-                                                                                                                float64,
-                                                                                                            ),
-                                                                                                            layout: Some(
-                                                                                                                TyLayout {
-                                                                                                                    head_size: 64,
-                                                                                                                    body_ptrs: [],
-                                                                                                                    variants_recursive: [],
-                                                                                                                },
-                                                                                                            ),
-                                                                                                            name: None,
-                                                                                                        },
-                                                                                                    ),
-                                                                                                    layout: Some(
-                                                                                                        TyLayout {
-                                                                                                            head_size: 64,
-                                                                                                            body_ptrs: [
-                                                                                                                0,
-                                                                                                            ],
-                                                                                                            variants_recursive: [],
-                                                                                                        },
-                                                                                                    ),
-                                                                                                    name: None,
-                                                                                                },
-                                                                                            },
-                                                                                        ),
-                                                                                        layout: None,
-                                                                                        name: None,
-                                                                                    },
-                                                                                },
-                                                                                args: [
-                                                                                    Expr {
-                                                                                        kind: Literal(
-                                                                                            Float(
-                                                                                                3.5,
-                                                                                            ),
-                                                                                        ),
-                                                                                        ty: Ty {
+                                                kind: Tuple(
+                                                    [
+                                                        Expr {
+                                                            kind: Call(
+                                                                Call {
+                                                                    function: Expr {
+                                                                        kind: Pointer(
+                                                                            Sid(
+                                                                                1073741826,
+                                                                            ),
+                                                                        ),
+                                                                        ty: Ty {
+                                                                            kind: Function(
+                                                                                TyFunction {
+                                                                                    params: [
+                                                                                        Ty {
                                                                                             kind: Primitive(
                                                                                                 float64,
                                                                                             ),
@@ -357,299 +299,111 @@ let main =
                                                                                             ),
                                                                                             name: None,
                                                                                         },
-                                                                                    },
-                                                                                ],
-                                                                            },
-                                                                        ),
-                                                                        ty: Ty {
-                                                                            kind: Array(
-                                                                                Ty {
-                                                                                    kind: Primitive(
-                                                                                        float64,
-                                                                                    ),
-                                                                                    layout: Some(
-                                                                                        TyLayout {
-                                                                                            head_size: 64,
-                                                                                            body_ptrs: [],
-                                                                                            variants_recursive: [],
-                                                                                        },
-                                                                                    ),
-                                                                                    name: None,
-                                                                                },
-                                                                            ),
-                                                                            layout: Some(
-                                                                                TyLayout {
-                                                                                    head_size: 64,
-                                                                                    body_ptrs: [
-                                                                                        0,
                                                                                     ],
-                                                                                    variants_recursive: [],
-                                                                                },
-                                                                            ),
-                                                                            name: None,
-                                                                        },
-                                                                    },
-                                                                    Expr {
-                                                                        kind: Call(
-                                                                            Call {
-                                                                                function: Expr {
-                                                                                    kind: Function(
-                                                                                        Function {
-                                                                                            symbol_ns: Sid(
-                                                                                                2147484416,
-                                                                                            ),
-                                                                                            body: Expr {
-                                                                                                kind: Array(
-                                                                                                    [
-                                                                                                        Expr {
-                                                                                                            kind: Pointer(
-                                                                                                                Sid(
-                                                                                                                    2147484416,
-                                                                                                                ),
-                                                                                                            ),
-                                                                                                            ty: Ty {
-                                                                                                                kind: Primitive(
-                                                                                                                    int64,
-                                                                                                                ),
-                                                                                                                layout: Some(
-                                                                                                                    TyLayout {
-                                                                                                                        head_size: 64,
-                                                                                                                        body_ptrs: [],
-                                                                                                                        variants_recursive: [],
-                                                                                                                    },
-                                                                                                                ),
-                                                                                                                name: None,
-                                                                                                            },
-                                                                                                        },
-                                                                                                        Expr {
-                                                                                                            kind: Pointer(
-                                                                                                                Sid(
-                                                                                                                    2147484417,
-                                                                                                                ),
-                                                                                                            ),
-                                                                                                            ty: Ty {
-                                                                                                                kind: Primitive(
-                                                                                                                    int64,
-                                                                                                                ),
-                                                                                                                layout: Some(
-                                                                                                                    TyLayout {
-                                                                                                                        head_size: 64,
-                                                                                                                        body_ptrs: [],
-                                                                                                                        variants_recursive: [],
-                                                                                                                    },
-                                                                                                                ),
-                                                                                                                name: None,
-                                                                                                            },
-                                                                                                        },
-                                                                                                    ],
+                                                                                    body: Ty {
+                                                                                        kind: Array(
+                                                                                            Ty {
+                                                                                                kind: Primitive(
+                                                                                                    float64,
                                                                                                 ),
-                                                                                                ty: Ty {
-                                                                                                    kind: Array(
-                                                                                                        Ty {
-                                                                                                            kind: Primitive(
-                                                                                                                int64,
-                                                                                                            ),
-                                                                                                            layout: Some(
-                                                                                                                TyLayout {
-                                                                                                                    head_size: 64,
-                                                                                                                    body_ptrs: [],
-                                                                                                                    variants_recursive: [],
-                                                                                                                },
-                                                                                                            ),
-                                                                                                            name: None,
-                                                                                                        },
-                                                                                                    ),
-                                                                                                    layout: Some(
-                                                                                                        TyLayout {
-                                                                                                            head_size: 64,
-                                                                                                            body_ptrs: [
-                                                                                                                0,
-                                                                                                            ],
-                                                                                                            variants_recursive: [],
-                                                                                                        },
-                                                                                                    ),
-                                                                                                    name: None,
-                                                                                                },
-                                                                                            },
-                                                                                        },
-                                                                                    ),
-                                                                                    ty: Ty {
-                                                                                        kind: Function(
-                                                                                            TyFunction {
-                                                                                                params: [
-                                                                                                    Ty {
-                                                                                                        kind: Primitive(
-                                                                                                            int64,
-                                                                                                        ),
-                                                                                                        layout: Some(
-                                                                                                            TyLayout {
-                                                                                                                head_size: 64,
-                                                                                                                body_ptrs: [],
-                                                                                                                variants_recursive: [],
-                                                                                                            },
-                                                                                                        ),
-                                                                                                        name: None,
+                                                                                                layout: Some(
+                                                                                                    TyLayout {
+                                                                                                        head_size: 64,
+                                                                                                        body_ptrs: [],
+                                                                                                        variants_recursive: [],
                                                                                                     },
-                                                                                                    Ty {
-                                                                                                        kind: Primitive(
-                                                                                                            int64,
-                                                                                                        ),
-                                                                                                        layout: Some(
-                                                                                                            TyLayout {
-                                                                                                                head_size: 64,
-                                                                                                                body_ptrs: [],
-                                                                                                                variants_recursive: [],
-                                                                                                            },
-                                                                                                        ),
-                                                                                                        name: None,
-                                                                                                    },
-                                                                                                ],
-                                                                                                body: Ty {
-                                                                                                    kind: Array(
-                                                                                                        Ty {
-                                                                                                            kind: Primitive(
-                                                                                                                int64,
-                                                                                                            ),
-                                                                                                            layout: Some(
-                                                                                                                TyLayout {
-                                                                                                                    head_size: 64,
-                                                                                                                    body_ptrs: [],
-                                                                                                                    variants_recursive: [],
-                                                                                                                },
-                                                                                                            ),
-                                                                                                            name: None,
-                                                                                                        },
-                                                                                                    ),
-                                                                                                    layout: Some(
-                                                                                                        TyLayout {
-                                                                                                            head_size: 64,
-                                                                                                            body_ptrs: [
-                                                                                                                0,
-                                                                                                            ],
-                                                                                                            variants_recursive: [],
-                                                                                                        },
-                                                                                                    ),
-                                                                                                    name: None,
-                                                                                                },
+                                                                                                ),
+                                                                                                name: None,
                                                                                             },
                                                                                         ),
-                                                                                        layout: None,
+                                                                                        layout: Some(
+                                                                                            TyLayout {
+                                                                                                head_size: 64,
+                                                                                                body_ptrs: [
+                                                                                                    0,
+                                                                                                ],
+                                                                                                variants_recursive: [],
+                                                                                            },
+                                                                                        ),
                                                                                         name: None,
                                                                                     },
                                                                                 },
-                                                                                args: [
-                                                                                    Expr {
-                                                                                        kind: Literal(
-                                                                                            Int(
-                                                                                                6,
-                                                                                            ),
-                                                                                        ),
-                                                                                        ty: Ty {
-                                                                                            kind: Primitive(
-                                                                                                int64,
-                                                                                            ),
-                                                                                            layout: Some(
-                                                                                                TyLayout {
-                                                                                                    head_size: 64,
-                                                                                                    body_ptrs: [],
-                                                                                                    variants_recursive: [],
-                                                                                                },
-                                                                                            ),
-                                                                                            name: None,
-                                                                                        },
-                                                                                    },
-                                                                                    Expr {
-                                                                                        kind: Literal(
-                                                                                            Int(
-                                                                                                7,
-                                                                                            ),
-                                                                                        ),
-                                                                                        ty: Ty {
-                                                                                            kind: Primitive(
-                                                                                                int64,
-                                                                                            ),
-                                                                                            layout: Some(
-                                                                                                TyLayout {
-                                                                                                    head_size: 64,
-                                                                                                    body_ptrs: [],
-                                                                                                    variants_recursive: [],
-                                                                                                },
-                                                                                            ),
-                                                                                            name: None,
-                                                                                        },
-                                                                                    },
-                                                                                ],
-                                                                            },
-                                                                        ),
-                                                                        ty: Ty {
-                                                                            kind: Array(
-                                                                                Ty {
-                                                                                    kind: Primitive(
-                                                                                        int64,
-                                                                                    ),
-                                                                                    layout: Some(
-                                                                                        TyLayout {
-                                                                                            head_size: 64,
-                                                                                            body_ptrs: [],
-                                                                                            variants_recursive: [],
-                                                                                        },
-                                                                                    ),
-                                                                                    name: None,
-                                                                                },
                                                                             ),
-                                                                            layout: Some(
-                                                                                TyLayout {
-                                                                                    head_size: 64,
-                                                                                    body_ptrs: [
-                                                                                        0,
-                                                                                    ],
-                                                                                    variants_recursive: [],
-                                                                                },
-                                                                            ),
+                                                                            layout: None,
                                                                             name: None,
                                                                         },
                                                                     },
-                                                                    Expr {
-                                                                        kind: Call(
-                                                                            Call {
-                                                                                function: Expr {
-                                                                                    kind: Pointer(
-                                                                                        Sid(
-                                                                                            0,
-                                                                                        ),
-                                                                                    ),
-                                                                                    ty: Ty {
-                                                                                        kind: Function(
-                                                                                            TyFunction {
-                                                                                                params: [
-                                                                                                    Ty {
-                                                                                                        kind: Primitive(
-                                                                                                            int64,
-                                                                                                        ),
-                                                                                                        layout: Some(
-                                                                                                            TyLayout {
-                                                                                                                head_size: 64,
-                                                                                                                body_ptrs: [],
-                                                                                                                variants_recursive: [],
-                                                                                                            },
-                                                                                                        ),
-                                                                                                        name: None,
-                                                                                                    },
-                                                                                                    Ty {
-                                                                                                        kind: Primitive(
-                                                                                                            int64,
-                                                                                                        ),
-                                                                                                        layout: Some(
-                                                                                                            TyLayout {
-                                                                                                                head_size: 64,
-                                                                                                                body_ptrs: [],
-                                                                                                                variants_recursive: [],
-                                                                                                            },
-                                                                                                        ),
-                                                                                                        name: None,
-                                                                                                    },
-                                                                                                ],
-                                                                                                body: Ty {
+                                                                    args: [
+                                                                        Expr {
+                                                                            kind: Literal(
+                                                                                Float(
+                                                                                    3.5,
+                                                                                ),
+                                                                            ),
+                                                                            ty: Ty {
+                                                                                kind: Primitive(
+                                                                                    float64,
+                                                                                ),
+                                                                                layout: Some(
+                                                                                    TyLayout {
+                                                                                        head_size: 64,
+                                                                                        body_ptrs: [],
+                                                                                        variants_recursive: [],
+                                                                                    },
+                                                                                ),
+                                                                                name: None,
+                                                                            },
+                                                                        },
+                                                                    ],
+                                                                },
+                                                            ),
+                                                            ty: Ty {
+                                                                kind: Array(
+                                                                    Ty {
+                                                                        kind: Primitive(
+                                                                            float64,
+                                                                        ),
+                                                                        layout: Some(
+                                                                            TyLayout {
+                                                                                head_size: 64,
+                                                                                body_ptrs: [],
+                                                                                variants_recursive: [],
+                                                                            },
+                                                                        ),
+                                                                        name: None,
+                                                                    },
+                                                                ),
+                                                                layout: Some(
+                                                                    TyLayout {
+                                                                        head_size: 64,
+                                                                        body_ptrs: [
+                                                                            0,
+                                                                        ],
+                                                                        variants_recursive: [],
+                                                                    },
+                                                                ),
+                                                                name: None,
+                                                            },
+                                                        },
+                                                        Expr {
+                                                            kind: Call(
+                                                                Call {
+                                                                    function: Expr {
+                                                                        kind: Function(
+                                                                            Function {
+                                                                                symbol_ns: Sid(
+                                                                                    2147484416,
+                                                                                ),
+                                                                                body: Expr {
+                                                                                    kind: Array(
+                                                                                        [
+                                                                                            Expr {
+                                                                                                kind: Pointer(
+                                                                                                    Sid(
+                                                                                                        2147484416,
+                                                                                                    ),
+                                                                                                ),
+                                                                                                ty: Ty {
                                                                                                     kind: Primitive(
                                                                                                         int64,
                                                                                                     ),
@@ -663,136 +417,149 @@ let main =
                                                                                                     name: None,
                                                                                                 },
                                                                                             },
+                                                                                            Expr {
+                                                                                                kind: Pointer(
+                                                                                                    Sid(
+                                                                                                        2147484417,
+                                                                                                    ),
+                                                                                                ),
+                                                                                                ty: Ty {
+                                                                                                    kind: Primitive(
+                                                                                                        int64,
+                                                                                                    ),
+                                                                                                    layout: Some(
+                                                                                                        TyLayout {
+                                                                                                            head_size: 64,
+                                                                                                            body_ptrs: [],
+                                                                                                            variants_recursive: [],
+                                                                                                        },
+                                                                                                    ),
+                                                                                                    name: None,
+                                                                                                },
+                                                                                            },
+                                                                                        ],
+                                                                                    ),
+                                                                                    ty: Ty {
+                                                                                        kind: Array(
+                                                                                            Ty {
+                                                                                                kind: Primitive(
+                                                                                                    int64,
+                                                                                                ),
+                                                                                                layout: Some(
+                                                                                                    TyLayout {
+                                                                                                        head_size: 64,
+                                                                                                        body_ptrs: [],
+                                                                                                        variants_recursive: [],
+                                                                                                    },
+                                                                                                ),
+                                                                                                name: None,
+                                                                                            },
                                                                                         ),
-                                                                                        layout: None,
+                                                                                        layout: Some(
+                                                                                            TyLayout {
+                                                                                                head_size: 64,
+                                                                                                body_ptrs: [
+                                                                                                    0,
+                                                                                                ],
+                                                                                                variants_recursive: [],
+                                                                                            },
+                                                                                        ),
                                                                                         name: None,
                                                                                     },
                                                                                 },
-                                                                                args: [
-                                                                                    Expr {
-                                                                                        kind: Literal(
-                                                                                            Int(
-                                                                                                6,
-                                                                                            ),
-                                                                                        ),
-                                                                                        ty: Ty {
-                                                                                            kind: Primitive(
-                                                                                                int64,
-                                                                                            ),
-                                                                                            layout: Some(
-                                                                                                TyLayout {
-                                                                                                    head_size: 64,
-                                                                                                    body_ptrs: [],
-                                                                                                    variants_recursive: [],
-                                                                                                },
-                                                                                            ),
-                                                                                            name: None,
-                                                                                        },
-                                                                                    },
-                                                                                    Expr {
-                                                                                        kind: Literal(
-                                                                                            Int(
-                                                                                                2,
-                                                                                            ),
-                                                                                        ),
-                                                                                        ty: Ty {
-                                                                                            kind: Primitive(
-                                                                                                int64,
-                                                                                            ),
-                                                                                            layout: Some(
-                                                                                                TyLayout {
-                                                                                                    head_size: 64,
-                                                                                                    body_ptrs: [],
-                                                                                                    variants_recursive: [],
-                                                                                                },
-                                                                                            ),
-                                                                                            name: None,
-                                                                                        },
-                                                                                    },
-                                                                                ],
                                                                             },
                                                                         ),
                                                                         ty: Ty {
-                                                                            kind: Primitive(
-                                                                                int64,
-                                                                            ),
-                                                                            layout: Some(
-                                                                                TyLayout {
-                                                                                    head_size: 64,
-                                                                                    body_ptrs: [],
-                                                                                    variants_recursive: [],
+                                                                            kind: Function(
+                                                                                TyFunction {
+                                                                                    params: [
+                                                                                        Ty {
+                                                                                            kind: Primitive(
+                                                                                                int64,
+                                                                                            ),
+                                                                                            layout: Some(
+                                                                                                TyLayout {
+                                                                                                    head_size: 64,
+                                                                                                    body_ptrs: [],
+                                                                                                    variants_recursive: [],
+                                                                                                },
+                                                                                            ),
+                                                                                            name: None,
+                                                                                        },
+                                                                                        Ty {
+                                                                                            kind: Primitive(
+                                                                                                int64,
+                                                                                            ),
+                                                                                            layout: Some(
+                                                                                                TyLayout {
+                                                                                                    head_size: 64,
+                                                                                                    body_ptrs: [],
+                                                                                                    variants_recursive: [],
+                                                                                                },
+                                                                                            ),
+                                                                                            name: None,
+                                                                                        },
+                                                                                    ],
+                                                                                    body: Ty {
+                                                                                        kind: Array(
+                                                                                            Ty {
+                                                                                                kind: Primitive(
+                                                                                                    int64,
+                                                                                                ),
+                                                                                                layout: Some(
+                                                                                                    TyLayout {
+                                                                                                        head_size: 64,
+                                                                                                        body_ptrs: [],
+                                                                                                        variants_recursive: [],
+                                                                                                    },
+                                                                                                ),
+                                                                                                name: None,
+                                                                                            },
+                                                                                        ),
+                                                                                        layout: Some(
+                                                                                            TyLayout {
+                                                                                                head_size: 64,
+                                                                                                body_ptrs: [
+                                                                                                    0,
+                                                                                                ],
+                                                                                                variants_recursive: [],
+                                                                                            },
+                                                                                        ),
+                                                                                        name: None,
+                                                                                    },
                                                                                 },
                                                                             ),
+                                                                            layout: None,
                                                                             name: None,
                                                                         },
                                                                     },
-                                                                ],
-                                                            ),
-                                                            ty: Ty {
-                                                                kind: Tuple(
-                                                                    [
-                                                                        TyTupleField {
-                                                                            name: None,
+                                                                    args: [
+                                                                        Expr {
+                                                                            kind: Literal(
+                                                                                Int(
+                                                                                    6,
+                                                                                ),
+                                                                            ),
                                                                             ty: Ty {
-                                                                                kind: Array(
-                                                                                    Ty {
-                                                                                        kind: Primitive(
-                                                                                            float64,
-                                                                                        ),
-                                                                                        layout: Some(
-                                                                                            TyLayout {
-                                                                                                head_size: 64,
-                                                                                                body_ptrs: [],
-                                                                                                variants_recursive: [],
-                                                                                            },
-                                                                                        ),
-                                                                                        name: None,
-                                                                                    },
+                                                                                kind: Primitive(
+                                                                                    int64,
                                                                                 ),
                                                                                 layout: Some(
                                                                                     TyLayout {
                                                                                         head_size: 64,
-                                                                                        body_ptrs: [
-                                                                                            0,
-                                                                                        ],
+                                                                                        body_ptrs: [],
                                                                                         variants_recursive: [],
                                                                                     },
                                                                                 ),
                                                                                 name: None,
                                                                             },
                                                                         },
-                                                                        TyTupleField {
-                                                                            name: None,
-                                                                            ty: Ty {
-                                                                                kind: Array(
-                                                                                    Ty {
-                                                                                        kind: Primitive(
-                                                                                            int64,
-                                                                                        ),
-                                                                                        layout: Some(
-                                                                                            TyLayout {
-                                                                                                head_size: 64,
-                                                                                                body_ptrs: [],
-                                                                                                variants_recursive: [],
-                                                                                            },
-                                                                                        ),
-                                                                                        name: None,
-                                                                                    },
+                                                                        Expr {
+                                                                            kind: Literal(
+                                                                                Int(
+                                                                                    7,
                                                                                 ),
-                                                                                layout: Some(
-                                                                                    TyLayout {
-                                                                                        head_size: 64,
-                                                                                        body_ptrs: [
-                                                                                            0,
-                                                                                        ],
-                                                                                        variants_recursive: [],
-                                                                                    },
-                                                                                ),
-                                                                                name: None,
-                                                                            },
-                                                                        },
-                                                                        TyTupleField {
-                                                                            name: None,
+                                                                            ),
                                                                             ty: Ty {
                                                                                 kind: Primitive(
                                                                                     int64,
@@ -808,12 +575,28 @@ let main =
                                                                             },
                                                                         },
                                                                     ],
+                                                                },
+                                                            ),
+                                                            ty: Ty {
+                                                                kind: Array(
+                                                                    Ty {
+                                                                        kind: Primitive(
+                                                                            int64,
+                                                                        ),
+                                                                        layout: Some(
+                                                                            TyLayout {
+                                                                                head_size: 64,
+                                                                                body_ptrs: [],
+                                                                                variants_recursive: [],
+                                                                            },
+                                                                        ),
+                                                                        name: None,
+                                                                    },
                                                                 ),
                                                                 layout: Some(
                                                                     TyLayout {
-                                                                        head_size: 192,
+                                                                        head_size: 64,
                                                                         body_ptrs: [
-                                                                            0,
                                                                             0,
                                                                         ],
                                                                         variants_recursive: [],
@@ -822,29 +605,211 @@ let main =
                                                                 name: None,
                                                             },
                                                         },
-                                                        offset: 1,
-                                                    },
-                                                ),
-                                                ty: Ty {
-                                                    kind: Array(
-                                                        Ty {
-                                                            kind: Primitive(
-                                                                int64,
-                                                            ),
-                                                            layout: Some(
-                                                                TyLayout {
-                                                                    head_size: 64,
-                                                                    body_ptrs: [],
-                                                                    variants_recursive: [],
+                                                        Expr {
+                                                            kind: Call(
+                                                                Call {
+                                                                    function: Expr {
+                                                                        kind: Pointer(
+                                                                            Sid(
+                                                                                0,
+                                                                            ),
+                                                                        ),
+                                                                        ty: Ty {
+                                                                            kind: Function(
+                                                                                TyFunction {
+                                                                                    params: [
+                                                                                        Ty {
+                                                                                            kind: Primitive(
+                                                                                                int64,
+                                                                                            ),
+                                                                                            layout: Some(
+                                                                                                TyLayout {
+                                                                                                    head_size: 64,
+                                                                                                    body_ptrs: [],
+                                                                                                    variants_recursive: [],
+                                                                                                },
+                                                                                            ),
+                                                                                            name: None,
+                                                                                        },
+                                                                                        Ty {
+                                                                                            kind: Primitive(
+                                                                                                int64,
+                                                                                            ),
+                                                                                            layout: Some(
+                                                                                                TyLayout {
+                                                                                                    head_size: 64,
+                                                                                                    body_ptrs: [],
+                                                                                                    variants_recursive: [],
+                                                                                                },
+                                                                                            ),
+                                                                                            name: None,
+                                                                                        },
+                                                                                    ],
+                                                                                    body: Ty {
+                                                                                        kind: Primitive(
+                                                                                            int64,
+                                                                                        ),
+                                                                                        layout: Some(
+                                                                                            TyLayout {
+                                                                                                head_size: 64,
+                                                                                                body_ptrs: [],
+                                                                                                variants_recursive: [],
+                                                                                            },
+                                                                                        ),
+                                                                                        name: None,
+                                                                                    },
+                                                                                },
+                                                                            ),
+                                                                            layout: None,
+                                                                            name: None,
+                                                                        },
+                                                                    },
+                                                                    args: [
+                                                                        Expr {
+                                                                            kind: Literal(
+                                                                                Int(
+                                                                                    6,
+                                                                                ),
+                                                                            ),
+                                                                            ty: Ty {
+                                                                                kind: Primitive(
+                                                                                    int64,
+                                                                                ),
+                                                                                layout: Some(
+                                                                                    TyLayout {
+                                                                                        head_size: 64,
+                                                                                        body_ptrs: [],
+                                                                                        variants_recursive: [],
+                                                                                    },
+                                                                                ),
+                                                                                name: None,
+                                                                            },
+                                                                        },
+                                                                        Expr {
+                                                                            kind: Literal(
+                                                                                Int(
+                                                                                    2,
+                                                                                ),
+                                                                            ),
+                                                                            ty: Ty {
+                                                                                kind: Primitive(
+                                                                                    int64,
+                                                                                ),
+                                                                                layout: Some(
+                                                                                    TyLayout {
+                                                                                        head_size: 64,
+                                                                                        body_ptrs: [],
+                                                                                        variants_recursive: [],
+                                                                                    },
+                                                                                ),
+                                                                                name: None,
+                                                                            },
+                                                                        },
+                                                                    ],
                                                                 },
                                                             ),
-                                                            name: None,
+                                                            ty: Ty {
+                                                                kind: Primitive(
+                                                                    int64,
+                                                                ),
+                                                                layout: Some(
+                                                                    TyLayout {
+                                                                        head_size: 64,
+                                                                        body_ptrs: [],
+                                                                        variants_recursive: [],
+                                                                    },
+                                                                ),
+                                                                name: None,
+                                                            },
                                                         },
+                                                    ],
+                                                ),
+                                                ty: Ty {
+                                                    kind: Tuple(
+                                                        [
+                                                            TyTupleField {
+                                                                name: None,
+                                                                ty: Ty {
+                                                                    kind: Array(
+                                                                        Ty {
+                                                                            kind: Primitive(
+                                                                                float64,
+                                                                            ),
+                                                                            layout: Some(
+                                                                                TyLayout {
+                                                                                    head_size: 64,
+                                                                                    body_ptrs: [],
+                                                                                    variants_recursive: [],
+                                                                                },
+                                                                            ),
+                                                                            name: None,
+                                                                        },
+                                                                    ),
+                                                                    layout: Some(
+                                                                        TyLayout {
+                                                                            head_size: 64,
+                                                                            body_ptrs: [
+                                                                                0,
+                                                                            ],
+                                                                            variants_recursive: [],
+                                                                        },
+                                                                    ),
+                                                                    name: None,
+                                                                },
+                                                            },
+                                                            TyTupleField {
+                                                                name: None,
+                                                                ty: Ty {
+                                                                    kind: Array(
+                                                                        Ty {
+                                                                            kind: Primitive(
+                                                                                int64,
+                                                                            ),
+                                                                            layout: Some(
+                                                                                TyLayout {
+                                                                                    head_size: 64,
+                                                                                    body_ptrs: [],
+                                                                                    variants_recursive: [],
+                                                                                },
+                                                                            ),
+                                                                            name: None,
+                                                                        },
+                                                                    ),
+                                                                    layout: Some(
+                                                                        TyLayout {
+                                                                            head_size: 64,
+                                                                            body_ptrs: [
+                                                                                0,
+                                                                            ],
+                                                                            variants_recursive: [],
+                                                                        },
+                                                                    ),
+                                                                    name: None,
+                                                                },
+                                                            },
+                                                            TyTupleField {
+                                                                name: None,
+                                                                ty: Ty {
+                                                                    kind: Primitive(
+                                                                        int64,
+                                                                    ),
+                                                                    layout: Some(
+                                                                        TyLayout {
+                                                                            head_size: 64,
+                                                                            body_ptrs: [],
+                                                                            variants_recursive: [],
+                                                                        },
+                                                                    ),
+                                                                    name: None,
+                                                                },
+                                                            },
+                                                        ],
                                                     ),
                                                     layout: Some(
                                                         TyLayout {
-                                                            head_size: 64,
+                                                            head_size: 192,
                                                             body_ptrs: [
+                                                                0,
                                                                 0,
                                                             ],
                                                             variants_recursive: [],
@@ -853,17 +818,31 @@ let main =
                                                     name: None,
                                                 },
                                             },
-                                            offset: 0,
+                                            offset: 1,
                                         },
                                     ),
                                     ty: Ty {
-                                        kind: Primitive(
-                                            int64,
+                                        kind: Array(
+                                            Ty {
+                                                kind: Primitive(
+                                                    int64,
+                                                ),
+                                                layout: Some(
+                                                    TyLayout {
+                                                        head_size: 64,
+                                                        body_ptrs: [],
+                                                        variants_recursive: [],
+                                                    },
+                                                ),
+                                                name: None,
+                                            },
                                         ),
                                         layout: Some(
                                             TyLayout {
                                                 head_size: 64,
-                                                body_ptrs: [],
+                                                body_ptrs: [
+                                                    0,
+                                                ],
                                                 variants_recursive: [],
                                             },
                                         ),
@@ -873,13 +852,27 @@ let main =
                             },
                         ),
                         ty: Ty {
-                            kind: Primitive(
-                                int64,
+                            kind: Array(
+                                Ty {
+                                    kind: Primitive(
+                                        int64,
+                                    ),
+                                    layout: Some(
+                                        TyLayout {
+                                            head_size: 64,
+                                            body_ptrs: [],
+                                            variants_recursive: [],
+                                        },
+                                    ),
+                                    name: None,
+                                },
                             ),
                             layout: Some(
                                 TyLayout {
                                     head_size: 64,
-                                    body_ptrs: [],
+                                    body_ptrs: [
+                                        0,
+                                    ],
                                     variants_recursive: [],
                                 },
                             ),
@@ -889,13 +882,27 @@ let main =
                 },
             ),
             ty: Ty {
-                kind: Primitive(
-                    int64,
+                kind: Array(
+                    Ty {
+                        kind: Primitive(
+                            int64,
+                        ),
+                        layout: Some(
+                            TyLayout {
+                                head_size: 64,
+                                body_ptrs: [],
+                                variants_recursive: [],
+                            },
+                        ),
+                        name: None,
+                    },
                 ),
                 layout: Some(
                     TyLayout {
                         head_size: 64,
-                        body_ptrs: [],
+                        body_ptrs: [
+                            0,
+                        ],
                         variants_recursive: [],
                     },
                 ),

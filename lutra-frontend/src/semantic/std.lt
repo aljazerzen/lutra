@@ -18,9 +18,9 @@ let regex_search: func (text: text, pattern: text): bool
 let neg: func (expr: int): int
 let not: func (expr: bool): bool
 
-# Types
+# Array functions
 
-# Functions
+let index: func (array: [int], position: int): int
 
 let map: func <I, O> (
   array: [int],

@@ -197,26 +197,6 @@ impl Interpreter {
 
                 Cell::Data(base.get_field(*offset as usize))
             }
-            ir::ExprKind::ArrayLookup(lookup) => {
-                let ir::ArrayLookup { base, offset } = lookup.as_ref();
-                let base_ty = &base.ty;
-
-                let base = self.evaluate_expr(base);
-
-                match base {
-                    Cell::Data(base) => {
-                        let mut items = lutra_bin::ArrayReader::new_for_ty(base, base_ty);
-
-                        let item = items.nth(*offset as usize).unwrap();
-
-                        Cell::Data(item.to_owned())
-                    }
-                    Cell::Function(_) => panic!(),
-                    Cell::FunctionNative(_) => panic!(),
-                    Cell::Vacant => panic!(),
-                }
-            }
-
             ir::ExprKind::Call(call) => {
                 let ir::Call { function, args, .. } = call.as_ref();
 

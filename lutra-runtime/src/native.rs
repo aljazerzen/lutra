@@ -31,6 +31,7 @@ pub mod std {
                 "neg" => &Self::neg,
                 "not" => &Self::not,
 
+                "index" => &Self::index,
                 "map" => &Self::map,
                 "filter" => &Self::filter,
                 "slice" => &Self::slice,
@@ -124,6 +125,15 @@ pub mod std {
         un_func!(not, assume::bool, !);
 
         un_func!(neg, assume::int, -);
+
+        pub fn index(_it: &mut Interpreter, args: Vec<(&ir::Ty, Cell)>) -> Cell {
+            let mut input = assume::array(args[0].0, &args[0].1);
+
+            let offset = assume::int(&args[1].1);
+
+            let item = input.nth(offset as usize).unwrap();
+            Cell::Data(item)
+        }
 
         pub fn map(it: &mut Interpreter, args: Vec<(&ir::Ty, Cell)>) -> Cell {
             let input = assume::array(args[0].0, &args[0].1);

@@ -30,7 +30,6 @@ pub enum ExprKind {
     Tuple(Vec<Expr>),
     Array(Vec<Expr>),
     TupleLookup(Box<TupleLookup>),
-    ArrayLookup(Box<ArrayLookup>),
     Binding(Box<Binding>),
 }
 
@@ -66,13 +65,6 @@ pub struct Function {
 pub struct TupleLookup {
     pub base: Expr,
     pub offset: u16,
-}
-
-#[derive(Debug, Clone)]
-#[allow(non_camel_case_types)]
-pub struct ArrayLookup {
-    pub base: Expr,
-    pub offset: u32,
 }
 
 #[derive(Debug, Clone)]

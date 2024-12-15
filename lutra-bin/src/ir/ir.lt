@@ -21,7 +21,6 @@ type ExprKind = enum {
   `Tuple` = [Expr],
   Array = [Expr],
   TupleLookup = TupleLookup,
-  ArrayLookup = ArrayLookup,
   Binding = Binding,
 }
 
@@ -56,11 +55,6 @@ type Function = {
 type TupleLookup = {
   base = Expr,
   offset = uint16,
-}
-
-type ArrayLookup = {
-  base = Expr,
-  offset = uint32,
 }
 
 type Binding = {

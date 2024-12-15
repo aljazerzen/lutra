@@ -1,3 +1,5 @@
+use std::borrow::Cow;
+
 use itertools::Itertools;
 
 use crate::decl::DeclKind;
@@ -8,7 +10,7 @@ use crate::semantic::{NS_STD, NS_THIS};
 use crate::utils::fold::{self, PrFold};
 use crate::{Result, Span};
 
-use super::tuple::StepOwned;
+use super::tuple::Step;
 
 impl fold::PrFold for super::Resolver<'_> {
     fn fold_stmts(&mut self, _: Vec<pr::Stmt>) -> Result<Vec<pr::Stmt>> {
@@ -85,16 +87,30 @@ impl fold::PrFold for super::Resolver<'_> {
 
             pr::ExprKind::Indirection { base, field } => {
                 let base = self.fold_expr(*base)?;
+                let base_ty = base.ty.as_ref().unwrap();
 
-                let ty = base.ty.as_ref().unwrap();
+                let step = self.resolve_indirection(base_ty, &field).with_span(*span)?;
+                let position = step.position;
+                let target_ty = Some(step.target_ty.into_owned());
 
-                let steps = self.resolve_indirection(ty, &field).with_span(*span)?;
+                let kind = if base_ty.kind.is_tuple() {
+                    // tuples
+                    pr::ExprKind::Indirection {
+                        base: Box::new(base),
+                        field: pr::IndirectionKind::Position(position as i64),
+                    }
+                } else {
+                    // arrays
+                    pr::ExprKind::FuncCall(pr::FuncCall {
+                        name: Box::new(pr::Expr::new(pr::Path::new(vec!["std", "index"]))),
+                        args: vec![pr::Expr::new(pr::Literal::Integer(position as i64))],
+                    })
+                };
 
-                let expr = self.apply_indirections(base, steps);
                 pr::Expr {
-                    id: expr.id,
-                    kind: expr.kind,
-                    ty: expr.ty,
+                    id: Some(id),
+                    ty: target_ty,
+                    kind,
                     ..node
                 }
             }
@@ -192,16 +208,16 @@ impl super::Resolver<'_> {
     /// For example, `base.indirection` where `base` has a tuple type.
     ///
     /// Returns the position of the tuple field within the base tuple.
-    pub fn resolve_indirection(
-        &mut self,
-        base: &Ty,
+    pub fn resolve_indirection<'a>(
+        &'a self,
+        base: &'a Ty,
         indirection: &pr::IndirectionKind,
-    ) -> Result<Vec<StepOwned>> {
+    ) -> Result<Step<'a>> {
         match &base.kind {
             pr::TyKind::Ident(fq_ident) => {
                 let decl_ty = self.get_ident(fq_ident).unwrap();
-                let base = decl_ty.kind.as_ty().unwrap().clone();
-                self.resolve_indirection(&base, indirection)
+                let base = decl_ty.kind.as_ty().unwrap();
+                self.resolve_indirection(base, indirection)
             }
 
             pr::TyKind::Tuple(fields) => match indirection {
@@ -214,7 +230,7 @@ impl super::Resolver<'_> {
                     let step = super::tuple::lookup_position_in_tuple(base, *pos as usize)?
                         .ok_or_else(|| Diagnostic::new_custom("Out of bounds"))?;
 
-                    Ok(vec![step])
+                    Ok(step)
                 }
                 pr::IndirectionKind::Star => todo!(),
             },
@@ -224,10 +240,10 @@ impl super::Resolver<'_> {
                     Err(Diagnostic::new_custom("cannot lookup array items by name")
                         .with_span(base.span))
                 }
-                pr::IndirectionKind::Position(pos) => Ok(vec![StepOwned {
+                pr::IndirectionKind::Position(pos) => Ok(Step {
                     position: *pos as usize,
-                    target_ty: *items_ty.clone(),
-                }]),
+                    target_ty: Cow::Borrowed(items_ty.as_ref()),
+                }),
                 pr::IndirectionKind::Star => todo!(),
             },
 
