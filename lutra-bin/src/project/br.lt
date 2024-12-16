@@ -1,0 +1,67 @@
+type Program = {
+  externals = [ExternalSymbol],
+  main = Expr,
+
+  input_tys = [project::ir::Ty],
+  output_ty = project::ir::Ty,
+}
+
+type ExternalSymbol = {
+  id = text,
+  layout_args = [uint32],
+}
+
+type Expr = {
+  kind = ExprKind,
+}
+
+@derive(["Debug", "Clone", "enum_as_inner::EnumAsInner"])
+type ExprKind = enum {
+  Pointer = project::ir::Sid,
+  Literal = project::ir::Literal,
+  Call = Call,
+  Function = Function,
+  `Tuple` = `Tuple`,
+  Array = Array,
+  TupleLookup = TupleLookup,
+  Binding = Binding,
+}
+
+type Call = {
+  function = Expr,
+  args = [Expr],
+}
+
+type Function = {
+  symbol_ns = project::ir::Sid,
+
+  # can contain function parameters prefixed with symbol_ns
+  body = Expr,
+}
+
+type `Tuple` = {
+    fields = [Expr],
+    field_layouts = [TyLayout]
+}
+
+type Array = {
+    item_layout = TyLayout,
+    items = [Expr],
+}
+
+type TupleLookup = {
+  base = Expr,
+  offset = uint32,
+}
+
+type Binding = {
+  symbol = project::ir::Sid,
+  expr = Expr,
+  main = Expr,
+}
+
+@derive(["Debug", "Clone", "PartialEq", "Default"])
+type TyLayout = {
+  head_size = uint32,
+  body_ptrs = [uint32],
+}

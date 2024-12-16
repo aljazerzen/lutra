@@ -1,3 +1,4 @@
+pub mod br;
 mod data;
 mod encode;
 mod error;
@@ -6,6 +7,9 @@ pub mod layout;
 pub mod reader;
 mod value;
 mod writer;
+
+#[path = "project/generated.rs"]
+mod generated;
 
 pub use data::Data;
 pub use encode::{Decode, Encode, ReversePointer};

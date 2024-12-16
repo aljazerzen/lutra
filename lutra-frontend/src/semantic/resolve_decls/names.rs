@@ -168,6 +168,16 @@ impl fold::PrFold for NameResolver<'_> {
                 let kind = pr::ExprKind::Ident(ident);
                 pr::Expr { kind, ..expr }
             }
+            pr::ExprKind::Indirection { .. } => {
+                // special case: indirection might be compiled to a call to std::index,
+                // so we add a ref here. This could be conditional.
+                self.refs.push(pr::Path::new(vec!["std", "index"]));
+
+                pr::Expr {
+                    kind: fold::fold_expr_kind(self, expr.kind)?,
+                    ..expr
+                }
+            }
             _ => pr::Expr {
                 kind: fold::fold_expr_kind(self, expr.kind)?,
                 ..expr

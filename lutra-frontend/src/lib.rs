@@ -1,3 +1,4 @@
+mod bytecoding;
 mod compile;
 mod diagnostic;
 mod discover;
@@ -13,6 +14,7 @@ type Result<T, E = diagnostic::Diagnostic> = core::result::Result<T, E>;
 
 pub mod decl;
 pub mod pr;
+pub use bytecoding::compile_program as bytecode_program;
 pub use compile::{compile, CompileParams};
 pub use discover::{discover, DiscoverParams};
 pub use lowering::lower;

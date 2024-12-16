@@ -43,10 +43,10 @@ impl SeveredBodies {
 
 fn extract_head_and_body<'b>(
     buf: &'b Data,
-    head_bytes: usize,
+    head_bytes: u32,
     body_ptrs: &[u32],
 ) -> (&'b [u8], Option<SeveredBodies>) {
-    let head = buf.slice(head_bytes);
+    let head = buf.slice(head_bytes as usize);
 
     let body = if !body_ptrs.is_empty() {
         let mut ptrs = body_ptrs.iter();
@@ -86,7 +86,7 @@ fn read_ptr(buf: &[u8], offset: u32) -> u32 {
 fn write_head(
     out: &mut Vec<u8>,
     data: Data,
-    head_bytes: usize,
+    head_bytes: u32,
     body_ptrs: &[u32],
 ) -> Option<SeveredBodies> {
     let (head, mut body) = extract_head_and_body(&data, head_bytes, body_ptrs);

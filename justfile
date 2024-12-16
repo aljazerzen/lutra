@@ -1,3 +1,5 @@
+_default:
+    just --list
 
 show-deps-workspace:
     cargo depgraph --workspace-only > ./target/deps-workspace.dot
@@ -11,6 +13,6 @@ test-fast tests='':
     cargo insta review
     cargo clippy --all-targets
 
-generate-ir:
-    cargo run -p lutra-codegen -- lutra-bin/src/ir lutra-bin/src/ir/generated.rs
-    ./target/debug/lutra-codegen lutra-bin/src/ir lutra-bin/src/ir/generated.rs
+generate:
+    cargo run -p lutra-codegen -- lutra-bin/src/project lutra-bin/src/project/generated.rs
+    ./target/debug/lutra-codegen lutra-bin/src/project lutra-bin/src/project/generated.rs

@@ -122,6 +122,8 @@ pub fn get_layout_simple(ty: &ir::Ty) -> Option<ir::TyLayout> {
     };
     let body_ptr_offset: Vec<u32> = match &ty.kind {
         ir::TyKind::Primitive(ir::PrimitiveSet::text) => vec![0],
+        ir::TyKind::Primitive(_) => vec![],
+
         ir::TyKind::Array(_) => vec![0],
         ir::TyKind::Enum(_) => vec![1], // TODO: this is wrong (in some cases)
 
@@ -133,7 +135,6 @@ pub fn get_layout_simple(ty: &ir::Ty) -> Option<ir::TyLayout> {
             }
             r
         }
-        ir::TyKind::Primitive(_) => vec![],
 
         _ => return None,
     };

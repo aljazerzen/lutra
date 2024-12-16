@@ -1,4 +1,36 @@
-use super::Literal;
+pub use crate::generated::ir::*;
+
+impl Program {
+    pub fn get_output_ty(&self) -> &Ty {
+        let main_ty = self.main.ty.kind.as_function().unwrap();
+        &main_ty.body
+    }
+
+    pub fn get_input_tys(&self) -> &[Ty] {
+        let main_ty = self.main.ty.kind.as_function().unwrap();
+        main_ty.params.as_slice()
+    }
+}
+
+pub enum SidKind {
+    External,
+    Var,
+    FunctionScope,
+}
+
+impl Sid {
+    pub fn kind(&self) -> SidKind {
+        let sid_kind: u32 = self.0 >> 30;
+        match sid_kind {
+            0 => SidKind::External,
+            1 => SidKind::Var,
+            2 => SidKind::FunctionScope,
+            _ => {
+                panic!()
+            }
+        }
+    }
+}
 
 impl std::fmt::Display for Literal {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -13,7 +45,7 @@ impl std::fmt::Display for Literal {
     }
 }
 
-impl PartialEq for super::Ty {
+impl PartialEq for Ty {
     fn eq(&self, other: &Self) -> bool {
         self.kind == other.kind && self.name == other.name
     }

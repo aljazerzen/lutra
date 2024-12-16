@@ -87,8 +87,9 @@ impl Slice {
         self.buf.get(index + self.offset).copied()
     }
 
-    fn slice(&self, index: usize) -> &[u8] {
-        &self.buf[self.offset..][..index]
+    fn slice(&self, start: usize) -> &[u8] {
+        assert!(self.len() >= start);
+        &self.buf[self.offset..][..start]
     }
 
     fn skip(&mut self, bytes: usize) {

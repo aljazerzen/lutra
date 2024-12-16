@@ -5,7 +5,7 @@ use crate::Data;
 use super::SeveredBodies;
 
 pub struct ArrayWriter<'t> {
-    item_head_bytes: usize,
+    item_head_bytes: u32,
     item_body_ptrs: &'t [u32],
 
     buf: Vec<u8>,
@@ -21,13 +21,13 @@ impl<'t> ArrayWriter<'t> {
         };
         let layout = item_ty.layout.as_ref().unwrap();
 
-        let head_bytes = layout.head_size.div_ceil(8) as usize;
+        let head_bytes = layout.head_size.div_ceil(8);
         let body_ptrs = layout.body_ptrs.as_slice();
 
         Self::new(head_bytes, body_ptrs)
     }
 
-    pub fn new(item_head_bytes: usize, item_body_ptrs: &'t [u32]) -> Self {
+    pub fn new(item_head_bytes: u32, item_body_ptrs: &'t [u32]) -> Self {
         ArrayWriter {
             item_head_bytes,
             item_body_ptrs,
@@ -49,6 +49,7 @@ impl<'t> ArrayWriter<'t> {
             self.item_head_bytes,
             self.item_body_ptrs,
         );
+        // dbg!(&self.buf);
         if let Some(body) = body {
             self.item_bodies.push(body);
         }
@@ -64,6 +65,8 @@ impl<'t> ArrayWriter<'t> {
             body.write_pointers(&mut self.buf, total_len);
             total_len += body.buf.len();
         }
+        // dbg!(&self.buf);
+        // dbg!(total_len);
 
         // construct data
         let mut data = Data::new(self.buf);

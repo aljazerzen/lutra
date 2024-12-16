@@ -32,10 +32,11 @@ fn test_01() {
     ): func () -> int64
     ",
     );
+    let program = lutra_frontend::bytecode_program(program);
 
     let value = lutra_runtime::evaluate(&program, vec![], &modules);
 
-    let value = Value::decode(&value, program.get_output_ty()).unwrap();
+    let value = Value::decode(&value, &program.output_ty).unwrap();
 
     assert_eq!(value, Value::Int64(6));
 }

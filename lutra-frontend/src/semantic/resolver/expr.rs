@@ -101,9 +101,13 @@ impl fold::PrFold for super::Resolver<'_> {
                     }
                 } else {
                     // arrays
+                    let std_index =
+                        self.fold_expr(pr::Expr::new(pr::Path::new(vec!["std", "index"])))?;
+                    let position =
+                        self.fold_expr(pr::Expr::new(pr::Literal::Integer(position as i64)))?;
                     pr::ExprKind::FuncCall(pr::FuncCall {
-                        name: Box::new(pr::Expr::new(pr::Path::new(vec!["std", "index"]))),
-                        args: vec![pr::Expr::new(pr::Literal::Integer(position as i64))],
+                        name: Box::new(std_index),
+                        args: vec![base, position],
                     })
                 };
 

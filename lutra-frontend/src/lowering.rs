@@ -18,8 +18,8 @@ pub fn lower(root_module: &decl::RootModule, path: &pr::Path) -> ir::Program {
 
 struct Lowerer<'a> {
     root_module: &'a decl::RootModule,
-    externals: Vec<ir::ExternalSymbol>,
 
+    externals: Vec<ir::ExternalSymbol>,
     function_scopes: Vec<u32>,
     var_bindings: IndexMap<pr::Path, u32>,
 
@@ -33,13 +33,34 @@ impl<'a> Lowerer<'a> {
         Self {
             root_module,
 
-            externals: vec![],
+            externals: Default::default(),
             function_scopes: vec![],
             var_bindings: Default::default(),
 
             generator_function_scope: Default::default(),
             generator_var_binding: Default::default(),
         }
+    }
+
+    fn lower_external_expr_decl(&mut self, path: &pr::Path) -> Result<Option<ir::ExprKind>> {
+        let decl = self
+            .root_module
+            .module
+            .get(path)
+            .unwrap_or_else(|| panic!("{path} does not exist"));
+        let decl::DeclKind::Expr(expr) = &decl.kind else {
+            panic!();
+        };
+
+        if !matches!(expr.kind, pr::ExprKind::Internal) {
+            return Ok(None);
+        }
+
+        let sid = ir::Sid(self.externals.len() as u32);
+        self.externals.push(ir::ExternalSymbol {
+            id: path.iter().join("::"),
+        });
+        Ok(Some(ir::ExprKind::Pointer(sid)))
     }
 
     fn lower_expr_decl(&mut self, path: &pr::Path) -> Result<ir::Expr> {
@@ -52,16 +73,8 @@ impl<'a> Lowerer<'a> {
             panic!();
         };
 
-        if expr.kind.is_internal() {
-            let sid = ir::Sid(self.externals.len() as u32);
-            self.externals.push(ir::ExternalSymbol {
-                id: path.iter().join("::"),
-            });
-            return Ok(ir::Expr {
-                kind: ir::ExprKind::Pointer(sid),
-                ty: ir::Ty::from(expr.ty.clone().unwrap()),
-            });
-        }
+        // should have been lowered earlier
+        assert!(!matches!(expr.kind, pr::ExprKind::Internal));
 
         self.lower_expr(expr.as_ref())
     }
@@ -113,6 +126,7 @@ impl<'a> Lowerer<'a> {
             }
 
             pr::ExprKind::Ident(path) => {
+                dbg!(path);
                 if path.starts_with_part("func") {
                     let mut path = path.iter().peekable();
                     path.next();
@@ -124,6 +138,8 @@ impl<'a> Lowerer<'a> {
                     let param_index = path.next().unwrap().parse::<u32>().unwrap();
                     let scope = scope.next().unwrap();
                     ir::ExprKind::Pointer(ir::Sid(scope + param_index))
+                } else if let Some(ptr) = self.lower_external_expr_decl(path)? {
+                    ptr
                 } else {
                     let entry = self.var_bindings.entry(path.clone());
                     let entry = entry.or_insert_with(|| {

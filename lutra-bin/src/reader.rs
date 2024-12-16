@@ -1,3 +1,5 @@
+use std::borrow::Cow;
+
 use crate::ir;
 use crate::Data;
 
@@ -53,7 +55,7 @@ impl ArrayReader {
         Self::new(data, item_head_size / 8)
     }
 
-    fn new(data: Data, item_head_bytes: usize) -> Self {
+    pub fn new(data: Data, item_head_bytes: usize) -> Self {
         let mut head = Reader::new(data.slice(8));
         let (offset, len) = Self::read_head(&mut head);
 
@@ -128,13 +130,13 @@ impl Iterator for ArrayReader {
     }
 }
 
-pub struct TupleReader<'d> {
+pub struct TupleReader<'d, 't> {
     data: &'d Data,
-    field_offsets: Vec<usize>,
+    field_offsets: Cow<'t, [u32]>,
 }
 
-impl<'d> TupleReader<'d> {
-    pub fn new(data: &'d Data, field_offsets: Vec<usize>) -> Self {
+impl<'d, 't> TupleReader<'d, 't> {
+    pub fn new(data: &'d Data, field_offsets: Cow<'t, [u32]>) -> Self {
         TupleReader {
             data,
             field_offsets,
@@ -144,26 +146,26 @@ impl<'d> TupleReader<'d> {
     pub fn new_for_ty(data: &'d Data, ty: &ir::Ty) -> Self {
         let field_offsets = Self::compute_field_offsets(ty);
 
-        Self::new(data, field_offsets)
+        Self::new(data, field_offsets.into())
     }
 
-    pub fn compute_field_offsets(ty: &ir::Ty) -> Vec<usize> {
+    pub fn compute_field_offsets(ty: &ir::Ty) -> Vec<u32> {
         let ir::TyKind::Tuple(ty_fields) = &ty.kind else {
             panic!()
         };
 
         let mut field_offsets = Vec::with_capacity(ty_fields.len());
-        let mut offset = 0;
+        let mut offset = 0_u32;
         for field in ty_fields {
             field_offsets.push(offset);
 
             let layout = field.ty.layout.as_ref().unwrap();
-            offset += (layout.head_size as usize).div_ceil(8);
+            offset += (layout.head_size).div_ceil(8);
         }
         field_offsets
     }
 
-    pub fn compute_field_offset(ty: &ir::Ty, position: u16) -> usize {
+    pub fn compute_field_offset(ty: &ir::Ty, position: u16) -> u32 {
         *Self::compute_field_offsets(ty)
             .get(position as usize)
             .unwrap()
@@ -171,7 +173,7 @@ impl<'d> TupleReader<'d> {
 
     pub fn get_field(&self, index: usize) -> Data {
         let mut r = self.data.clone();
-        r.skip(self.field_offsets[index]);
+        r.skip(self.field_offsets[index] as usize);
         r
     }
 }

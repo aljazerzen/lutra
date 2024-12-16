@@ -1,4 +1,4 @@
-use std::{borrow::Cow, collections::VecDeque, fmt::Write};
+use std::{borrow::Cow, collections::VecDeque, fmt::Write, iter::zip};
 
 use lutra_bin::{ir, layout};
 use lutra_frontend::pr;
@@ -6,26 +6,30 @@ use lutra_frontend::pr;
 pub fn write_tys(
     w: &mut impl Write,
     tys: Vec<(&String, ir::Ty, &Vec<pr::Annotation>)>,
+    ctx: &mut Context,
 ) -> Result<Vec<ir::Ty>, std::fmt::Error> {
     let mut all_tys = Vec::new();
 
-    let mut ctx = Context::default();
     for (name, mut ty, annotations) in tys {
         infer_names(name, &mut ty);
 
-        write_ty_def(w, &ty, annotations, &mut ctx)?;
+        write_ty_def(w, &ty, annotations, ctx)?;
         all_tys.push(ty);
 
         while let Some(ty) = ctx.def_buffer.pop_front() {
             let annotations = vec![];
-            write_ty_def(w, &ty, &annotations, &mut ctx)?;
+            write_ty_def(w, &ty, &annotations, ctx)?;
             all_tys.push(ty);
         }
     }
     Ok(all_tys)
 }
 
-pub fn write_tys_impls(w: &mut impl Write, tys: &[ir::Ty]) -> Result<(), std::fmt::Error> {
+pub fn write_tys_impls(
+    w: &mut impl Write,
+    tys: &[ir::Ty],
+    ctx: &mut Context,
+) -> Result<(), std::fmt::Error> {
     if tys.is_empty() {
         return Ok(());
     }
@@ -35,8 +39,11 @@ pub fn write_tys_impls(w: &mut impl Write, tys: &[ir::Ty]) -> Result<(), std::fm
     writeln!(w, "use ::std::io::Write;\n")?;
     writeln!(w, "use super::*;")?;
     for ty in tys {
-        write_ty_def_impl(w, ty)?;
+        write_ty_def_impl(w, ty, ctx)?;
     }
+
+    ctx.def_buffer.clear(); // all defs must have been already generated
+
     writeln!(w, "}}")
 }
 
@@ -89,10 +96,26 @@ fn infer_names_re(ty: &mut ir::Ty, name_prefix: &mut Vec<String>) {
     }
 }
 
-#[derive(Default)]
+#[derive(Debug)]
 pub struct Context {
-    /// Buffer for types that need their definitions generated.
+    current_module: pr::Path,
+
+    /// Buffer for types that don't have their own Lutra decl, but need their own Rust decl.
+    /// When such type ref is encountered, it is pushed into here and generated later.
     def_buffer: VecDeque<ir::Ty>,
+}
+
+impl Context {
+    pub fn new(module_path: pr::Path) -> Self {
+        Self {
+            def_buffer: Default::default(),
+            current_module: module_path,
+        }
+    }
+
+    pub fn is_done(&self) -> bool {
+        self.def_buffer.is_empty()
+    }
 }
 
 /// Generates a type definition.
@@ -242,7 +265,19 @@ pub fn write_ty_ref(
             write!(w, "String")?;
         }
         ir::TyKind::Ident(ident) => {
-            write!(w, "{}", ident.0.last().unwrap())?;
+            let matching = zip(ident.0.iter(), ctx.current_module.iter())
+                .filter(|(a, b)| a == b)
+                .count();
+            let supers = ctx.current_module.len() - matching;
+            for _ in 0..supers {
+                w.write_str("super::")?;
+            }
+            for (i, part) in ident.0.iter().skip(matching).enumerate() {
+                if i > 0 {
+                    w.write_str("::")?;
+                }
+                write!(w, "{part}")?;
+            }
         }
         ir::TyKind::Array(items_ty) => {
             write!(w, "Vec")?;
@@ -282,7 +317,11 @@ pub fn write_ty_ref(
 /// Generates the impl encode for a type.
 #[rustfmt::skip::macros(writeln)]
 #[rustfmt::skip::macros(write)]
-fn write_ty_def_impl(w: &mut impl Write, ty: &ir::Ty) -> Result<(), std::fmt::Error> {
+fn write_ty_def_impl(
+    w: &mut impl Write,
+    ty: &ir::Ty,
+    ctx: &mut Context,
+) -> Result<(), std::fmt::Error> {
     let name = ty.name.as_ref().unwrap();
 
     match &ty.kind {
@@ -314,8 +353,7 @@ fn write_ty_def_impl(w: &mut impl Write, ty: &ir::Ty) -> Result<(), std::fmt::Er
             let inner_ty = &variants[1].ty;
 
             let mut inner_head_ptr = String::new();
-            let mut ctx = Context::default();
-            write_ty_ref(&mut inner_head_ptr, inner_ty, true, &mut ctx)?;
+            write_ty_ref(&mut inner_head_ptr, inner_ty, true, ctx)?;
 
             writeln!(w, "impl ::lutra_bin::Encode for {name} {{")?;
             writeln!(w, "    type HeadPtr = Option<Result<")?;
@@ -374,8 +412,7 @@ fn write_ty_def_impl(w: &mut impl Write, ty: &ir::Ty) -> Result<(), std::fmt::Er
 
                 write!(w, "    {field_name}: <")?;
 
-                let mut ctx = Context::default();
-                write_ty_ref(w, &field.ty, true, &mut ctx)?;
+                write_ty_ref(w, &field.ty, true, ctx)?;
 
                 writeln!(w, " as ::lutra_bin::Encode>::HeadPtr,")?;
             }
@@ -488,8 +525,8 @@ fn write_ty_def_impl(w: &mut impl Write, ty: &ir::Ty) -> Result<(), std::fmt::Er
                         write!(w, "(::lutra_bin::ReversePointer)")?;
                     } else {
                         write!(w, "(<")?;
-                        let mut ctx = Context::default();
-                        write_ty_ref(w, &variant.ty, false, &mut ctx)?;
+
+                        write_ty_ref(w, &variant.ty, false, ctx)?;
                         write!(w, " as ::lutra_bin::Encode>::HeadPtr)")?;
                     }
 
@@ -522,8 +559,7 @@ fn write_ty_def_impl(w: &mut impl Write, ty: &ir::Ty) -> Result<(), std::fmt::Er
             )?;
 
             write!(w, "        Ok(Self(")?;
-            let mut ctx = Context::default();
-            write_ty_ref(w, ty, true, &mut ctx)?;
+            write_ty_ref(w, ty, true, ctx)?;
             writeln!(w, "::decode(r)?))")?;
 
             writeln!(w, "    }}")?;
@@ -538,8 +574,7 @@ fn write_ty_def_impl(w: &mut impl Write, ty: &ir::Ty) -> Result<(), std::fmt::Er
             )?;
 
             write!(w, "        Ok(Self(")?;
-            let mut ctx = Context::default();
-            write_ty_ref(w, ty, true, &mut ctx)?;
+            write_ty_ref(w, ty, true, ctx)?;
             writeln!(w, "::decode(r)?))")?;
 
             writeln!(w, "    }}")?;
@@ -556,8 +591,7 @@ fn write_ty_def_impl(w: &mut impl Write, ty: &ir::Ty) -> Result<(), std::fmt::Er
 
                 write!(w, "        let {field_name} = ")?;
 
-                let mut ctx = Context::default();
-                write_ty_ref(w, field_ty, true, &mut ctx)?;
+                write_ty_ref(w, field_ty, true, ctx)?;
 
                 writeln!(w, "::decode(r)?;")?;
             }
@@ -596,8 +630,7 @@ fn write_ty_def_impl(w: &mut impl Write, ty: &ir::Ty) -> Result<(), std::fmt::Er
                 if variant_format.is_inline {
                     if !is_unit_variant(&variant.ty) {
                         write!(w, "                let inner = ")?;
-                        let mut ctx = Context::default();
-                        write_ty_ref(w, &variant.ty, true, &mut ctx)?;
+                        write_ty_ref(w, &variant.ty, true, ctx)?;
                         writeln!(w, "::decode(r)?;")?;
                     }
                 } else {
@@ -607,8 +640,7 @@ fn write_ty_def_impl(w: &mut impl Write, ty: &ir::Ty) -> Result<(), std::fmt::Er
                     writeln!(w, "                body.skip(offset as usize);")?;
 
                     write!(w, "                let inner = ")?;
-                    let mut ctx = Context::default();
-                    write_ty_ref(w, &variant.ty, true, &mut ctx)?;
+                    write_ty_ref(w, &variant.ty, true, ctx)?;
                     writeln!(w, "::decode(&mut body)?;")?;
                 }
 

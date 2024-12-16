@@ -5,7 +5,10 @@ use crate::interpreter::{Cell, Interpreter};
 use crate::NativeModule;
 
 pub mod std {
-    use crate::native::*;
+    use ::std::borrow::Cow;
+
+    use crate::{interpreter::DUMMY_TY, native::*};
+    use assume::LayoutArgsReader;
     use lutra_bin::{ArrayReader, ArrayWriter, TupleReader, TupleWriter};
 
     pub const MODULE: Module = Module;
@@ -60,7 +63,7 @@ pub mod std {
 
     macro_rules! bin_func {
         ($name: ident, $left_assume: path, $right_assume: path, $op: tt) => {
-            pub fn $name(_: &mut Interpreter, args: Vec<(&ir::Ty, Cell)>) -> Cell {
+            pub fn $name(_: &mut Interpreter, _layout_args: &[u32], args: Vec<(&ir::Ty, Cell)>) -> Cell {
                 let left = $left_assume(&args[0].1);
                 let right = $right_assume(&args[1].1);
 
@@ -72,7 +75,7 @@ pub mod std {
 
     macro_rules! un_func {
         ($name: ident, $assume: path, $op: tt) => {
-            pub fn $name(_: &mut Interpreter, args: Vec<(&ir::Ty, Cell)>) -> Cell {
+            pub fn $name(_: &mut Interpreter, _layout_args: &[u32], args: Vec<(&ir::Ty, Cell)>) -> Cell {
                 let operand = $assume(&args[0].1);
                 let res = $op operand;
                 Cell::Data(encode(&res))
@@ -82,8 +85,12 @@ pub mod std {
 
     macro_rules! reduce_func {
         ($name: ident, $item_decode: path, $reduce: expr, $default: literal) => {
-            pub fn $name(_: &mut Interpreter, args: Vec<(&ir::Ty, Cell)>) -> Cell {
-                let array = assume::array(args[0].0, &args[0].1);
+            pub fn $name(
+                _: &mut Interpreter,
+                _layout_args: &[u32],
+                args: Vec<(&ir::Ty, Cell)>,
+            ) -> Cell {
+                let array = assume::array_for_ty(args[0].0, &args[0].1);
 
                 let res = array
                     .map(|x| $item_decode(&x))
@@ -126,39 +133,48 @@ pub mod std {
 
         un_func!(neg, assume::int, -);
 
-        pub fn index(_it: &mut Interpreter, args: Vec<(&ir::Ty, Cell)>) -> Cell {
-            let mut input = assume::array(args[0].0, &args[0].1);
+        pub fn index(
+            _it: &mut Interpreter,
+            layout_args: &[u32],
+            args: Vec<(&ir::Ty, Cell)>,
+        ) -> Cell {
+            let input_item_head_bytes = layout_args[0];
 
-            let offset = assume::int(&args[1].1);
+            let [array, position] = assume::args(args);
 
-            let item = input.nth(offset as usize).unwrap();
+            let array = assume::array(array, input_item_head_bytes);
+            let position = assume::int(&position);
+
+            let item = array.get(position as usize).unwrap();
             Cell::Data(item)
         }
 
-        pub fn map(it: &mut Interpreter, args: Vec<(&ir::Ty, Cell)>) -> Cell {
-            let input = assume::array(args[0].0, &args[0].1);
-            let input_item_ty = args[0].0.kind.as_array().unwrap().as_ref();
+        pub fn map(it: &mut Interpreter, layout_args: &[u32], args: Vec<(&ir::Ty, Cell)>) -> Cell {
+            let mut layout_args = LayoutArgsReader::new(layout_args);
+            let input_item_head_bytes = layout_args.next_u32();
+            let output_item_head_bytes = layout_args.next_u32();
+            let output_item_body_ptrs = layout_args.next_slice();
 
-            let func = &args[1];
-            let func_ty = &func.0.kind.as_function().unwrap();
+            let [array, func] = assume::args(args);
 
-            let output_ty = construct_adhoc_ty(ir::TyKind::Array(Box::new(func_ty.body.clone())));
-
-            let mut res = ArrayWriter::new_for_ty(&output_ty);
-
-            for item in input {
+            let mut output = ArrayWriter::new(output_item_head_bytes, output_item_body_ptrs);
+            for item in assume::array(array, input_item_head_bytes) {
                 let cell = Cell::Data(item);
 
-                let value = it.evaluate_func_call(&func.1, vec![(input_item_ty, cell)]);
+                let value = it.evaluate_func_call(&func, vec![(DUMMY_TY, cell)]);
 
-                res.write_item(assume::into_value(value));
+                output.write_item(assume::into_value(value));
             }
 
-            Cell::Data(res.finish())
+            Cell::Data(output.finish())
         }
 
-        pub fn filter(it: &mut Interpreter, args: Vec<(&ir::Ty, Cell)>) -> Cell {
-            let input = assume::array(args[0].0, &args[0].1);
+        pub fn filter(
+            it: &mut Interpreter,
+            _layout_args: &[u32],
+            args: Vec<(&ir::Ty, Cell)>,
+        ) -> Cell {
+            let input = assume::array_for_ty(args[0].0, &args[0].1);
             let input_item_ty = args[0].0.kind.as_array().unwrap().as_ref();
 
             let func = &args[1];
@@ -178,8 +194,12 @@ pub mod std {
             Cell::Data(output.finish())
         }
 
-        pub fn slice(_it: &mut Interpreter, args: Vec<(&ir::Ty, Cell)>) -> Cell {
-            let input = assume::array(args[0].0, &args[0].1);
+        pub fn slice(
+            _it: &mut Interpreter,
+            _layout_args: &[u32],
+            args: Vec<(&ir::Ty, Cell)>,
+        ) -> Cell {
+            let input = assume::array_for_ty(args[0].0, &args[0].1);
 
             // unpack
             let start = assume::int(&args[1].1);
@@ -200,8 +220,12 @@ pub mod std {
             Cell::Data(output.finish())
         }
 
-        pub fn sort(it: &mut Interpreter, args: Vec<(&ir::Ty, Cell)>) -> Cell {
-            let input = assume::array(args[0].0, &args[0].1);
+        pub fn sort(
+            it: &mut Interpreter,
+            _layout_args: &[u32],
+            args: Vec<(&ir::Ty, Cell)>,
+        ) -> Cell {
+            let input = assume::array_for_ty(args[0].0, &args[0].1);
             let input_item_ty = args[0].0.kind.as_array().unwrap().as_ref();
 
             let func = &args[1];
@@ -225,29 +249,31 @@ pub mod std {
             Cell::Data(output.finish())
         }
 
-        pub fn to_columnar(_it: &mut Interpreter, args: Vec<(&ir::Ty, Cell)>) -> Cell {
-            let input = assume::array(args[0].0, &args[0].1);
-            let input_items_ty = args[0].0.kind.as_array().unwrap().as_ref();
-            let input_fields_ty = input_items_ty.kind.as_tuple().unwrap();
+        pub fn to_columnar(
+            _it: &mut Interpreter,
+            layout_args: &[u32],
+            args: Vec<(&ir::Ty, Cell)>,
+        ) -> Cell {
+            let mut layout_args = LayoutArgsReader::new(layout_args);
+            let input_item_head_bytes = layout_args.next_u32();
+            let fields_offsets = layout_args.next_slice();
+            let fields_head_bytes = layout_args.next_slice();
 
-            let output_fields_ty: Vec<_> = input_fields_ty
-                .iter()
-                .map(|f| ir::TyTupleField {
-                    name: f.name.clone(),
-                    ty: construct_adhoc_ty(ir::TyKind::Array(Box::new(f.ty.clone()))),
-                })
-                .collect();
-            let output_ty = construct_adhoc_ty(ir::TyKind::Tuple(output_fields_ty.clone()));
+            let [array] = assume::args(args);
+            let input = assume::array(array, input_item_head_bytes);
 
             // init output arrays
-            let mut output_arrays: Vec<ArrayWriter> = output_fields_ty
+            let mut output_arrays: Vec<ArrayWriter> = fields_head_bytes
                 .iter()
-                .map(|f| ArrayWriter::new_for_ty(&f.ty))
+                .map(|head_bytes| {
+                    let body_ptrs = layout_args.next_slice();
+                    ArrayWriter::new(*head_bytes, body_ptrs)
+                })
                 .collect();
 
             // partition input into output arrays
             for item in input {
-                let tuple = TupleReader::new_for_ty(&item, input_items_ty);
+                let tuple = TupleReader::new(&item, fields_offsets.into());
 
                 for (index, output_array) in output_arrays.iter_mut().enumerate() {
                     let field = tuple.get_field(index);
@@ -255,8 +281,16 @@ pub mod std {
                 }
             }
 
+            // hard-coded tuple of arrays layout
+            let body_ptr = [0_u32]; // arrays has body ptr at 0
+            let mut output_fields_layouts = Vec::with_capacity(fields_offsets.len());
+            for _ in 0..fields_offsets.len() {
+                let head_bytes = 8_u32;
+                output_fields_layouts.push((head_bytes, body_ptr.as_slice()))
+            }
+
             // construct the final tuple
-            let mut output = TupleWriter::new_for_ty(&output_ty);
+            let mut output = TupleWriter::new(output_fields_layouts.into());
             for output_array in output_arrays {
                 let array = output_array.finish();
                 output.write_field(array);
@@ -264,46 +298,60 @@ pub mod std {
             Cell::Data(output.finish())
         }
 
-        pub fn from_columnar(_it: &mut Interpreter, args: Vec<(&ir::Ty, Cell)>) -> Cell {
-            let input = assume::as_value(&args[0].1);
-            let input = TupleReader::new_for_ty(input, args[0].0);
+        pub fn from_columnar(
+            _it: &mut Interpreter,
+            layout_args: &[u32],
+            args: Vec<(&ir::Ty, Cell)>,
+        ) -> Cell {
+            let mut layout_args = LayoutArgsReader::new(layout_args);
+            let output_head_bytes = layout_args.next_u32();
+            let output_body_ptrs = layout_args.next_slice();
+            let fields_item_head_bytes = layout_args.next_slice();
 
-            let input_fields_ty = args[0].0.kind.as_tuple().unwrap();
+            let mut output_fields_layouts = Vec::new();
+            for field_head_bytes in fields_item_head_bytes {
+                output_fields_layouts.push((*field_head_bytes, layout_args.next_slice()));
+            }
 
-            let output_tuple_ty = construct_adhoc_ty(ir::TyKind::Tuple(
-                input_fields_ty
-                    .iter()
-                    .map(|f| {
-                        let items_ty = f.ty.kind.as_array().unwrap().clone();
-                        ir::TyTupleField {
-                            name: f.name.clone(),
-                            ty: *items_ty,
-                        }
-                    })
-                    .collect(),
-            ));
-            let output_ty =
-                construct_adhoc_ty(ir::TyKind::Array(Box::new(output_tuple_ty.clone())));
+            let [columnar] = assume::args(args);
+
+            // hard-coded tuple of arrays layout
+            let mut field_offsets = Vec::with_capacity(fields_item_head_bytes.len());
+            for i in 0..fields_item_head_bytes.len() {
+                field_offsets.push(8_u32 * i as u32); // array head has 8 bytes
+            }
+
+            let input = TupleReader::new(dbg!(assume::as_value(&columnar)), field_offsets.into());
 
             // init input array readers
-            let mut input_arrays: Vec<ArrayReader> = input_fields_ty
+            let mut input_arrays: Vec<ArrayReader> = fields_item_head_bytes
                 .iter()
                 .enumerate()
-                .map(|(index, f)| ArrayReader::new_for_ty(input.get_field(index), &f.ty))
+                .map(|(i, head_bytes)| ArrayReader::new(input.get_field(i), *head_bytes as usize))
                 .collect();
 
             // init output array
-            let mut output = ArrayWriter::new_for_ty(&output_ty);
+            dbg!(output_head_bytes);
+            dbg!(output_body_ptrs);
+            let mut output = ArrayWriter::new(output_head_bytes, output_body_ptrs);
+
+            // short-circuit empty tuples
+            if output_head_bytes == 0 {
+                return Cell::Data(output.finish());
+            }
+            dbg!(&output_fields_layouts);
             'output: loop {
-                let mut tuple = TupleWriter::new_for_ty(&output_tuple_ty);
-                for (index, _) in input_fields_ty.iter().enumerate() {
+                dbg!("row");
+                let mut tuple = TupleWriter::new(Cow::from(&output_fields_layouts));
+                for (index, _) in output_fields_layouts.iter().enumerate() {
+                    dbg!(index);
                     if let Some(item) = input_arrays.get_mut(index).unwrap().next() {
                         tuple.write_field(item)
                     } else {
                         break 'output;
                     }
                 }
-                output.write_item(tuple.finish());
+                output.write_item(dbg!(tuple.finish()));
             }
             Cell::Data(output.finish())
         }
@@ -314,14 +362,22 @@ pub mod std {
 
         reduce_func!(sum, decode::int, |a, b| a + b, 0);
 
-        pub fn count(_it: &mut Interpreter, args: Vec<(&ir::Ty, Cell)>) -> Cell {
-            let array = assume::array(args[0].0, &args[0].1);
+        pub fn count(
+            _it: &mut Interpreter,
+            _layout_args: &[u32],
+            args: Vec<(&ir::Ty, Cell)>,
+        ) -> Cell {
+            let array = assume::array_for_ty(args[0].0, &args[0].1);
             let res = array.count() as i64;
             Cell::Data(encode(&res))
         }
 
-        pub fn average(_it: &mut Interpreter, args: Vec<(&ir::Ty, Cell)>) -> Cell {
-            let array = assume::array(args[0].0, &args[0].1);
+        pub fn average(
+            _it: &mut Interpreter,
+            _layout_args: &[u32],
+            args: Vec<(&ir::Ty, Cell)>,
+        ) -> Cell {
+            let array = assume::array_for_ty(args[0].0, &args[0].1);
 
             let (sum, count) = array
                 .map(|x| decode::int(&x))
@@ -335,30 +391,46 @@ pub mod std {
             Cell::Data(encode(&res))
         }
 
-        pub fn all(_it: &mut Interpreter, args: Vec<(&ir::Ty, Cell)>) -> Cell {
-            let mut array = assume::array(args[0].0, &args[0].1);
+        pub fn all(
+            _it: &mut Interpreter,
+            _layout_args: &[u32],
+            args: Vec<(&ir::Ty, Cell)>,
+        ) -> Cell {
+            let mut array = assume::array_for_ty(args[0].0, &args[0].1);
 
             let res = array.all(|x| decode::bool(&x));
             Cell::Data(encode(&res))
         }
 
-        pub fn any(_it: &mut Interpreter, args: Vec<(&ir::Ty, Cell)>) -> Cell {
-            let mut array = assume::array(args[0].0, &args[0].1);
+        pub fn any(
+            _it: &mut Interpreter,
+            _layout_args: &[u32],
+            args: Vec<(&ir::Ty, Cell)>,
+        ) -> Cell {
+            let mut array = assume::array_for_ty(args[0].0, &args[0].1);
 
             let res = array.any(|x| decode::bool(&x));
             Cell::Data(encode(&res))
         }
 
-        pub fn contains(_it: &mut Interpreter, args: Vec<(&ir::Ty, Cell)>) -> Cell {
-            let array = assume::array(args[0].0, &args[0].1);
+        pub fn contains(
+            _it: &mut Interpreter,
+            _layout_args: &[u32],
+            args: Vec<(&ir::Ty, Cell)>,
+        ) -> Cell {
+            let array = assume::array_for_ty(args[0].0, &args[0].1);
             let item = assume::int(&args[1].1);
 
             let res = array.into_iter().any(|x| decode::int(&x) == item);
             Cell::Data(encode(&res))
         }
 
-        pub fn concat_array(_it: &mut Interpreter, args: Vec<(&ir::Ty, Cell)>) -> Cell {
-            let array = assume::array(args[0].0, &args[0].1);
+        pub fn concat_array(
+            _it: &mut Interpreter,
+            _layout_args: &[u32],
+            args: Vec<(&ir::Ty, Cell)>,
+        ) -> Cell {
+            let array = assume::array_for_ty(args[0].0, &args[0].1);
             let separator = assume::text(&args[1].1);
 
             let array: Vec<_> = array.map(|x| decode::text(&x)).collect();
@@ -366,31 +438,48 @@ pub mod std {
             Cell::Data(encode(&res))
         }
 
-        pub fn lag(_it: &mut Interpreter, args: Vec<(&ir::Ty, Cell)>) -> Cell {
-            let array = assume::array(args[0].0, &args[0].1);
-            let offset = assume::int(&args[1].1).max(0) as usize;
+        pub fn lag(_it: &mut Interpreter, layout_args: &[u32], args: Vec<(&ir::Ty, Cell)>) -> Cell {
+            let mut layout_args = LayoutArgsReader::new(layout_args);
+            let head_bytes = dbg!(layout_args.next_u32());
+            let body_ptrs = dbg!(layout_args.next_slice());
 
-            let mut out = ArrayWriter::new_for_ty(args[0].0);
+            let [array, offset] = assume::args(args);
+
+            let array = assume::array(array, head_bytes);
+            let offset = assume::int(&offset).max(0) as usize;
+
+            let mut out = ArrayWriter::new(head_bytes, body_ptrs);
 
             let n_blanks = offset.min(array.remaining());
             for _ in 0..n_blanks {
-                out.write_item(encode(&0_i64));
+                out.write_item(dbg!(encode(&0_i64)));
             }
 
             let n_copies = array.remaining().saturating_sub(offset);
             for item in array.take(n_copies) {
-                out.write_item(item);
+                out.write_item(dbg!(item));
             }
 
-            Cell::Data(out.finish())
+            Cell::Data(dbg!(out.finish()))
         }
 
-        pub fn lead(_it: &mut Interpreter, args: Vec<(&ir::Ty, Cell)>) -> Cell {
-            let array = assume::array(args[0].0, &args[0].1);
-            let offset = assume::int(&args[1].1).max(0) as usize;
+        pub fn lead(
+            _it: &mut Interpreter,
+            layout_args: &[u32],
+            args: Vec<(&ir::Ty, Cell)>,
+        ) -> Cell {
+            let mut layout_args = LayoutArgsReader::new(layout_args);
+            let head_bytes = layout_args.next_u32();
+            let body_ptrs = layout_args.next_slice();
 
-            let mut out = ArrayWriter::new_for_ty(args[0].0);
+            let [array, offset] = assume::args(args);
+
+            let array = assume::array(array, head_bytes);
+            let offset = assume::int(&offset).max(0) as usize;
+
             let array_len = array.remaining();
+
+            let mut out = ArrayWriter::new(head_bytes, body_ptrs);
 
             for item in array.skip(offset) {
                 out.write_item(item);
@@ -404,8 +493,12 @@ pub mod std {
             Cell::Data(out.finish())
         }
 
-        pub fn row_number(_it: &mut Interpreter, args: Vec<(&ir::Ty, Cell)>) -> Cell {
-            let array = assume::array(args[0].0, &args[0].1);
+        pub fn row_number(
+            _it: &mut Interpreter,
+            _layout_args: &[u32],
+            args: Vec<(&ir::Ty, Cell)>,
+        ) -> Cell {
+            let array = assume::array_for_ty(args[0].0, &args[0].1);
 
             let mut out = ArrayWriter::new_for_ty(args[0].0); // TODO: make this int always
             for (index, _) in array.enumerate() {
@@ -440,7 +533,11 @@ pub mod interpreter {
     }
 
     impl Module {
-        fn version(_it: &mut Interpreter, _args: Vec<(&ir::Ty, Cell)>) -> Cell {
+        fn version(
+            _it: &mut Interpreter,
+            _layout_args: &[u32],
+            _args: Vec<(&ir::Ty, Cell)>,
+        ) -> Cell {
             Cell::Data(encode(&"lutra-runtime 0.0.1".to_string()))
         }
     }
@@ -449,14 +546,15 @@ pub mod interpreter {
 mod assume {
     use super::decode;
     use crate::interpreter::Cell;
+    use lutra_bin::br;
     use lutra_bin::ir;
     use lutra_bin::ArrayReader;
 
     pub fn into_value(cell: Cell) -> lutra_bin::Data {
         match cell {
             Cell::Data(val) => val,
-            Cell::Function(_) => panic!(),
-            Cell::FunctionNative(_) => panic!(),
+            Cell::Function(..) => panic!(),
+            Cell::FunctionNative(..) => panic!(),
             Cell::Vacant => panic!(),
         }
     }
@@ -464,10 +562,19 @@ mod assume {
     pub fn as_value(cell: &Cell) -> &lutra_bin::Data {
         match cell {
             Cell::Data(val) => val,
-            Cell::Function(_) => panic!(),
-            Cell::FunctionNative(_) => panic!(),
+            Cell::Function(..) => panic!(),
+            Cell::FunctionNative(..) => panic!(),
             Cell::Vacant => panic!(),
         }
+    }
+
+    pub fn args<const N: usize>(args: Vec<(&br::Ty, Cell)>) -> [Cell; N] {
+        let mut res = [const { Cell::Vacant }; N];
+        assert_eq!(args.len(), N);
+        for (i, (_, cell)) in args.into_iter().enumerate() {
+            res[i] = cell;
+        }
+        res
     }
 
     pub fn int(cell: &Cell) -> i64 {
@@ -482,9 +589,46 @@ mod assume {
         decode::text(as_value(cell))
     }
 
-    pub fn array(ty: &ir::Ty, cell: &Cell) -> ArrayReader {
+    pub fn array_for_ty(ty: &ir::Ty, cell: &Cell) -> ArrayReader {
         let data = as_value(cell).clone();
         ArrayReader::new_for_ty(data, ty)
+    }
+
+    pub fn array(cell: Cell, item_head_bytes: u32) -> ArrayReader {
+        ArrayReader::new(into_value(cell), item_head_bytes as usize)
+    }
+
+    #[allow(dead_code)]
+    pub fn uint32(cell: Cell) -> u32 {
+        decode::uint32(&into_value(cell))
+    }
+
+    #[allow(dead_code)]
+    pub fn array_uint32(cell: Cell) -> Vec<u32> {
+        array(cell, 4).map(|x| decode::uint32(&x)).collect()
+    }
+
+    pub struct LayoutArgsReader<'t> {
+        layout_args: &'t [u32],
+    }
+
+    impl<'t> LayoutArgsReader<'t> {
+        pub fn new(layout_args: &'t [u32]) -> Self {
+            Self { layout_args }
+        }
+
+        pub fn next_u32(&mut self) -> u32 {
+            let r = self.layout_args[0];
+            self.layout_args = &self.layout_args[1..];
+            r
+        }
+
+        pub fn next_slice(&mut self) -> &'t [u32] {
+            let len = self.layout_args[0] as usize;
+            let r = &self.layout_args[1..len + 1];
+            self.layout_args = &self.layout_args[len + 1..];
+            r
+        }
     }
 }
 
@@ -493,6 +637,11 @@ mod decode {
 
     pub fn int(data: &Data) -> i64 {
         i64::decode_buffer(data.slice(8)).unwrap()
+    }
+
+    #[allow(dead_code)]
+    pub fn uint32(data: &Data) -> u32 {
+        u32::decode_buffer(data.slice(4)).unwrap()
     }
 
     pub fn bool(data: &Data) -> bool {
@@ -509,14 +658,4 @@ pub fn encode<T: Encode + Layout>(value: &T) -> lutra_bin::Data {
     let mut buf = Vec::with_capacity(T::head_size() / 8);
     value.encode(&mut buf).unwrap();
     lutra_bin::Data::new(buf)
-}
-
-fn construct_adhoc_ty(kind: ir::TyKind) -> ir::Ty {
-    let mut ty = ir::Ty {
-        kind,
-        layout: None,
-        name: None,
-    };
-    ty.layout = Some(lutra_bin::layout::get_layout_simple(&ty).unwrap());
-    ty
 }

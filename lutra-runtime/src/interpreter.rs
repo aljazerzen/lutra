@@ -1,8 +1,10 @@
+use std::borrow::Cow;
 use std::collections::HashMap;
 use std::iter::zip;
 use std::ops::{BitAnd, Shr};
+use std::rc::Rc;
 
-use lutra_bin::ir;
+use lutra_bin::br;
 use lutra_bin::{Data, Encode};
 
 use crate::NativeModule;
@@ -12,22 +14,28 @@ type Addr = usize;
 pub struct Interpreter {
     memory: Vec<Cell>,
 
-    bindings: HashMap<ir::Sid, Addr>,
-    scopes: HashMap<ir::Sid, Vec<Addr>>,
+    bindings: HashMap<br::Sid, Addr>,
+    scopes: HashMap<br::Sid, Vec<Addr>>,
 }
 
 #[derive(Clone)]
 pub enum Cell {
     Data(Data),
-    Function(Box<ir::Function>),
-    FunctionNative(NativeFunction),
+    Function(Box<br::Function>),
+    FunctionNative(Box<(NativeFunction, Rc<[u32]>)>),
     Vacant,
 }
 
-pub type NativeFunction = &'static dyn Fn(&mut Interpreter, Vec<(&ir::Ty, Cell)>) -> Cell;
+pub type NativeFunction = &'static dyn Fn(&mut Interpreter, &[u32], Vec<(&br::Ty, Cell)>) -> Cell;
+
+pub const DUMMY_TY: &br::Ty = &br::Ty {
+    kind: br::TyKind::Tuple(vec![]),
+    layout: None,
+    name: None,
+};
 
 pub fn evaluate(
-    program: &ir::Program,
+    program: &br::Program,
     inputs: Vec<Vec<u8>>,
     native_modules: &[(&str, &dyn NativeModule)],
 ) -> Vec<u8> {
@@ -49,13 +57,15 @@ pub fn evaluate(
             .get(mod_id)
             .unwrap_or_else(|| panic!("cannot find native module {mod_id}"));
         let function = module.lookup_native_symbol(decl_name);
-        interpreter.allocate(Cell::FunctionNative(function));
+        interpreter.allocate(Cell::FunctionNative(Box::new((
+            function,
+            Rc::from(external.layout_args.clone()),
+        ))));
     }
 
     // the main function call
-    let main_ty = program.main.ty.kind.as_function().unwrap();
     let main = interpreter.evaluate_expr(&program.main);
-    let args = zip(main_ty.params.iter(), inputs)
+    let args = zip(&program.input_tys, inputs)
         .map(|(p, a)| (p, Cell::Data(Data::new(a))))
         .collect();
 
@@ -68,7 +78,7 @@ pub fn evaluate(
 }
 
 impl Interpreter {
-    fn get_cell(&self, sid: ir::Sid) -> &Cell {
+    fn get_cell(&self, sid: br::Sid) -> &Cell {
         self.memory.get(self.resolve_sid_addr(sid)).unwrap()
     }
 
@@ -90,19 +100,19 @@ impl Interpreter {
         }
     }
 
-    fn resolve_sid_addr(&self, sid: ir::Sid) -> Addr {
+    fn resolve_sid_addr(&self, sid: br::Sid) -> Addr {
         match sid.kind() {
-            ir::SidKind::External => {
+            br::SidKind::External => {
                 // externals: laid out at the start of memory
                 sid.0 as Addr
             }
-            ir::SidKind::Var => {
+            br::SidKind::Var => {
                 // bindings
                 *self.bindings.get(&sid).unwrap()
             }
-            ir::SidKind::FunctionScope => {
+            br::SidKind::FunctionScope => {
                 // function scopes
-                let scope_id = ir::Sid(sid.0.bitand(0xffffff00_u32));
+                let scope_id = br::Sid(sid.0.bitand(0xffffff00_u32));
                 let start = self.scopes.get(&scope_id).and_then(|s| s.last()).unwrap();
 
                 *start + (sid.0.bitand(0x000000ff_u32) as usize)
@@ -110,7 +120,7 @@ impl Interpreter {
         }
     }
 
-    fn allocate_binding(&mut self, binding_id: ir::Sid, symbol: Cell) -> Addr {
+    fn allocate_binding(&mut self, binding_id: br::Sid, symbol: Cell) -> Addr {
         assert_eq!(binding_id.0.shr(30), 0x1_u32);
 
         let addr = self.allocate(symbol);
@@ -119,7 +129,7 @@ impl Interpreter {
         addr
     }
 
-    fn drop_binding(&mut self, binding_id: ir::Sid) {
+    fn drop_binding(&mut self, binding_id: br::Sid) {
         assert_eq!(binding_id.0.shr(30), 0x1_u32);
 
         // TODO
@@ -127,7 +137,7 @@ impl Interpreter {
         // self.drop(addr, addr + 1);
     }
 
-    fn allocate_scope(&mut self, scope_id: ir::Sid, cells: Vec<(&ir::Ty, Cell)>) -> Addr {
+    fn allocate_scope(&mut self, scope_id: br::Sid, cells: Vec<(&br::Ty, Cell)>) -> Addr {
         assert_eq!(scope_id.0.shr(30), 0x2_u32);
 
         let mem_start = self.memory.len() as Addr;
@@ -139,7 +149,7 @@ impl Interpreter {
         mem_start
     }
 
-    fn drop_scope(&mut self, scope_id: ir::Sid, scope_size: usize) {
+    fn drop_scope(&mut self, scope_id: br::Sid, scope_size: usize) {
         assert_eq!(scope_id.0.shr(30), 0x2_u32);
 
         let sid_start = self.scopes.get_mut(&scope_id).unwrap().pop().unwrap();
@@ -151,31 +161,38 @@ impl Interpreter {
     /// Contract:
     /// - expressions of types int, float, bool, text, tuple & array are evaluated to Symbol::Value,
     /// - expressions of func type are evaluated to Symbol::Function or Symbol::External(Function)
-    fn evaluate_expr(&mut self, expr: &ir::Expr) -> Cell {
+    fn evaluate_expr(&mut self, expr: &br::Expr) -> Cell {
         match &expr.kind {
-            ir::ExprKind::Pointer(sid) => {
+            br::ExprKind::Pointer(sid) => {
                 let mem_cell = self.get_cell(*sid);
                 match mem_cell {
-                    Cell::Data(_) | Cell::Function(_) | Cell::FunctionNative(_) => mem_cell.clone(),
+                    Cell::Data(..) | Cell::Function(..) | Cell::FunctionNative(..) => {
+                        mem_cell.clone()
+                    }
 
                     Cell::Vacant => panic!(),
                 }
             }
 
-            ir::ExprKind::Literal(l) => {
+            br::ExprKind::Literal(l) => {
                 let mut buf = Vec::new();
                 match l {
-                    ir::Literal::Int(i) => i.encode(&mut buf).unwrap(),
-                    ir::Literal::Float(i) => i.encode(&mut buf).unwrap(),
-                    ir::Literal::Bool(i) => i.encode(&mut buf).unwrap(),
-                    ir::Literal::Text(i) => i.encode(&mut buf).unwrap(),
+                    br::Literal::Int(i) => i.encode(&mut buf).unwrap(),
+                    br::Literal::Float(i) => i.encode(&mut buf).unwrap(),
+                    br::Literal::Bool(i) => i.encode(&mut buf).unwrap(),
+                    br::Literal::Text(i) => i.encode(&mut buf).unwrap(),
                 };
                 Cell::Data(Data::new(buf))
             }
 
-            ir::ExprKind::Tuple(fields) => {
-                let mut writer = lutra_bin::TupleWriter::new_for_ty(&expr.ty);
-                for field in fields {
+            br::ExprKind::Tuple(tuple) => {
+                let field_layouts: Cow<_> = tuple
+                    .field_layouts
+                    .iter()
+                    .map(|x| (x.head_size.div_ceil(8), x.body_ptrs.as_slice()))
+                    .collect();
+                let mut writer = lutra_bin::TupleWriter::new(field_layouts);
+                for field in &tuple.fields {
                     let cell = self.evaluate_expr(field);
                     let data = cell.into_data().unwrap_or_else(|_| panic!());
 
@@ -184,9 +201,12 @@ impl Interpreter {
 
                 Cell::Data(writer.finish())
             }
-            ir::ExprKind::Array(items) => {
-                let mut writer = lutra_bin::ArrayWriter::new_for_ty(&expr.ty);
-                for item in items {
+            br::ExprKind::Array(array) => {
+                let mut writer = lutra_bin::ArrayWriter::new(
+                    array.item_layout.head_size.div_ceil(8),
+                    &array.item_layout.body_ptrs,
+                );
+                for item in &array.items {
                     let cell = self.evaluate_expr(item);
 
                     writer.write_item(cell.into_data().unwrap_or_else(|_| panic!()));
@@ -194,33 +214,30 @@ impl Interpreter {
 
                 Cell::Data(writer.finish())
             }
-            ir::ExprKind::TupleLookup(lookup) => {
-                let ir::TupleLookup { base, position } = lookup.as_ref();
-                let base_ty = &base.ty;
+            br::ExprKind::TupleLookup(lookup) => {
+                let br::TupleLookup { base, offset } = lookup.as_ref();
 
                 let base = self.evaluate_expr(base);
 
-                let field_offset = lutra_bin::TupleReader::compute_field_offset(base_ty, *position);
-
                 let mut data = base.into_data().unwrap_or_else(|_| panic!());
-                data.skip(field_offset);
+                data.skip(*offset as usize);
                 Cell::Data(data)
             }
-            ir::ExprKind::Call(call) => {
-                let ir::Call { function, args, .. } = call.as_ref();
+            br::ExprKind::Call(call) => {
+                let br::Call { function, args, .. } = call.as_ref();
 
                 let function = self.evaluate_expr(function);
 
                 let mut arg_cells = Vec::new();
                 for arg in args {
                     let value = self.evaluate_expr(arg);
-                    arg_cells.push((&arg.ty, value));
+                    arg_cells.push((DUMMY_TY, value));
                 }
                 self.evaluate_func_call(&function, arg_cells)
             }
-            ir::ExprKind::Function(func) => Cell::Function(func.clone()),
-            ir::ExprKind::Binding(binding) => {
-                let ir::Binding { symbol, expr, main } = binding.as_ref();
+            br::ExprKind::Function(func) => Cell::Function(func.clone()),
+            br::ExprKind::Binding(binding) => {
+                let br::Binding { symbol, expr, main } = binding.as_ref();
 
                 let expr = self.evaluate_expr(expr);
                 self.allocate_binding(*symbol, expr);
@@ -232,7 +249,7 @@ impl Interpreter {
         }
     }
 
-    pub fn evaluate_func_call(&mut self, function: &Cell, args: Vec<(&ir::Ty, Cell)>) -> Cell {
+    pub fn evaluate_func_call(&mut self, function: &Cell, args: Vec<(&br::Ty, Cell)>) -> Cell {
         match function {
             Cell::Function(func) => {
                 let scope_size = args.len();
@@ -243,7 +260,7 @@ impl Interpreter {
                 self.drop_scope(func.symbol_ns, scope_size);
                 res
             }
-            Cell::FunctionNative(native) => native(self, args),
+            Cell::FunctionNative(func) => func.0(self, &func.1, args),
             Cell::Data(_) => panic!(),
             Cell::Vacant => panic!(),
         }
@@ -254,8 +271,8 @@ impl Cell {
     pub fn as_data(&self) -> Option<&Data> {
         match self {
             Cell::Data(val) => Some(val),
-            Cell::Function(_) => None,
-            Cell::FunctionNative(_) => None,
+            Cell::Function(..) => None,
+            Cell::FunctionNative(..) => None,
             Cell::Vacant => None,
         }
     }
@@ -263,8 +280,8 @@ impl Cell {
     pub fn into_data(self) -> Result<Data, Cell> {
         match self {
             Cell::Data(val) => Ok(val),
-            Cell::Function(_) => Err(self),
-            Cell::FunctionNative(_) => Err(self),
+            Cell::Function(..) => Err(self),
+            Cell::FunctionNative(..) => Err(self),
             Cell::Vacant => Err(self),
         }
     }
