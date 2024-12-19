@@ -2,9 +2,7 @@ use std::fmt::Write;
 
 use lutra_frontend::pr;
 
-use crate::codegen_ty::Context;
-
-use super::codegen_ty;
+use crate::{codegen_ty, Context};
 
 #[rustfmt::skip::macros(writeln)]
 #[rustfmt::skip::macros(write)]

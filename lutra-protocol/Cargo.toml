@@ -1,0 +1,16 @@
+[package]
+name = "lutra-protocol"
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+version.workspace = true
+
+[dependencies]
+lutra-bin = { path = "../lutra-bin" }
+lutra-runtime = { path = "../lutra-runtime" }
+lutra-frontend = { path = "../lutra-frontend" }
+tokio = { version = "1.42.0", features = ["rt", "io-util", "macros"] }
+
+[build-dependencies]
+lutra-codegen = { path = "../lutra-codegen" }

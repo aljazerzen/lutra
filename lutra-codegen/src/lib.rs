@@ -1,9 +1,11 @@
+mod codegen_encode;
 mod codegen_fn;
 mod codegen_ty;
 
-use std::fs;
 use std::path::PathBuf;
+use std::{collections::VecDeque, fs};
 
+use lutra_bin::ir;
 use lutra_frontend::{decl, pr, CompileParams, DiscoverParams};
 
 #[track_caller]
@@ -31,10 +33,13 @@ pub fn generate(
     project.source.get_sources().map(|s| s.0.clone()).collect()
 }
 
+#[derive(Debug, Clone)]
 pub struct GenerateOptions {
     generate_types: bool,
     generate_encode_decode: bool,
     generate_function_traits: bool,
+
+    lutra_bin_path: String,
 }
 
 impl Default for GenerateOptions {
@@ -43,6 +48,7 @@ impl Default for GenerateOptions {
             generate_types: true,
             generate_encode_decode: true,
             generate_function_traits: true,
+            lutra_bin_path: "::lutra_bin".into(),
         }
     }
 }
@@ -61,6 +67,36 @@ impl GenerateOptions {
     pub fn no_generate_function_traits(mut self) -> Self {
         self.generate_function_traits = false;
         self
+    }
+
+    pub fn with_lutra_bin_path(mut self, path: String) -> Self {
+        self.lutra_bin_path = path;
+        self
+    }
+}
+
+#[derive(Debug)]
+pub struct Context<'a> {
+    current_module: pr::Path,
+
+    /// Buffer for types that don't have their own Lutra decl, but need their own Rust decl.
+    /// When such type ref is encountered, it is pushed into here and generated later.
+    def_buffer: VecDeque<ir::Ty>,
+
+    options: &'a GenerateOptions,
+}
+
+impl<'a> Context<'a> {
+    pub fn new(module_path: pr::Path, options: &'a GenerateOptions) -> Self {
+        Self {
+            def_buffer: Default::default(),
+            current_module: module_path,
+            options,
+        }
+    }
+
+    pub fn is_done(&self) -> bool {
+        self.def_buffer.is_empty()
     }
 }
 
@@ -110,7 +146,7 @@ fn codegen_in(
         }
     }
 
-    let mut ctx = codegen_ty::Context::new(module_path.clone());
+    let mut ctx = Context::new(module_path.clone(), options);
 
     // write types
     let all_tys = if options.generate_types {
@@ -135,7 +171,7 @@ fn codegen_in(
 
     // write type impls
     if options.generate_encode_decode {
-        codegen_ty::write_tys_impls(w, &all_tys, &mut ctx)?;
+        codegen_encode::write_encode_impls(w, &all_tys, &mut ctx)?;
     }
 
     assert!(ctx.is_done(), "{ctx:?}");

@@ -47,12 +47,8 @@ impl Path {
 
     /// Remove last part of the ident.
     /// Result will generally refer to the parent of this ident.
-    pub fn pop(mut self) -> Option<Self> {
-        if self.is_empty() {
-            return None;
-        }
-        self.path.pop();
-        Some(self)
+    pub fn pop(&mut self) -> Option<String> {
+        self.path.pop()
     }
 
     pub fn pop_front(&mut self) -> Option<String> {

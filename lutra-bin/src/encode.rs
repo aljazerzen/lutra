@@ -356,8 +356,8 @@ impl Decode for String {
         let len = r.read_const::<4>();
         let len = u32::from_le_bytes(len) as usize;
 
-        let buf = body.read_n(len);
-        Ok(String::from_utf8(buf.to_vec()).unwrap())
+        let buf = body.read_n(len).to_vec();
+        Ok(String::from_utf8(buf).unwrap())
     }
 }
 impl<E: Decode> Decode for Vec<E> {

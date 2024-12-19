@@ -126,7 +126,6 @@ impl<'a> Lowerer<'a> {
             }
 
             pr::ExprKind::Ident(path) => {
-                dbg!(path);
                 if path.starts_with_part("func") {
                     let mut path = path.iter().peekable();
                     path.next();

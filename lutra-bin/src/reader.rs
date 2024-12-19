@@ -1,4 +1,6 @@
 use std::borrow::Cow;
+use std::rc::Rc;
+use std::sync::Mutex;
 
 use crate::ir;
 use crate::Data;
@@ -6,11 +8,15 @@ use crate::Data;
 #[derive(Clone, Debug)]
 pub struct Reader<'a> {
     buf: &'a [u8],
+    most_read: Rc<Mutex<&'a [u8]>>,
 }
 
 impl<'a> Reader<'a> {
     pub fn new(buf: &'a [u8]) -> Self {
-        Reader { buf }
+        Reader {
+            buf,
+            most_read: Rc::new(Mutex::new(buf)),
+        }
     }
 
     pub fn read_n(&mut self, n: usize) -> &[u8] {
@@ -29,12 +35,35 @@ impl<'a> Reader<'a> {
         self.buf = &self.buf[byte_count..];
     }
 
+    pub fn skip_read<'b: 'a>(&mut self) {
+        let mut most_read = self.most_read.lock().unwrap();
+        if most_read.len() > self.buf.len() {
+            *most_read = self.buf;
+        }
+        if most_read.len() < self.buf.len() {
+            self.buf = *most_read;
+        }
+    }
+
+    fn update_most_read(&self) {
+        let mut most_read = self.most_read.lock().unwrap();
+        if most_read.len() > self.buf.len() {
+            *most_read = self.buf;
+        }
+    }
+
     pub fn remaining(&self) -> usize {
         self.buf.len()
     }
 
     pub fn to_owned(&self) -> Vec<u8> {
         self.buf.to_owned()
+    }
+}
+
+impl<'a> Drop for Reader<'a> {
+    fn drop(&mut self) {
+        self.update_most_read();
     }
 }
 

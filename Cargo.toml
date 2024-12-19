@@ -7,7 +7,7 @@ members = [
     "lutra-runtime",
     "lutra-typed-data",
     "lutra-frontend",
-    "lutra-ir",
+    "lutra-ir", "lutra-protocol",
 ]
 resolver = "2"
 
