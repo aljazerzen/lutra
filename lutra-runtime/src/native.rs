@@ -1,4 +1,3 @@
-use lutra_bin::ir;
 use lutra_bin::{Encode, Layout};
 
 use crate::interpreter::{Cell, Interpreter};
@@ -7,7 +6,7 @@ use crate::NativeModule;
 pub mod std {
     use ::std::borrow::Cow;
 
-    use crate::{interpreter::DUMMY_TY, native::*};
+    use crate::native::*;
     use assume::LayoutArgsReader;
     use lutra_bin::{ArrayReader, ArrayWriter, TupleReader, TupleWriter};
 
@@ -63,9 +62,9 @@ pub mod std {
 
     macro_rules! bin_func {
         ($name: ident, $left_assume: path, $right_assume: path, $op: tt) => {
-            pub fn $name(_: &mut Interpreter, _layout_args: &[u32], args: Vec<(&ir::Ty, Cell)>) -> Cell {
-                let left = $left_assume(&args[0].1);
-                let right = $right_assume(&args[1].1);
+            pub fn $name(_: &mut Interpreter, _layout_args: &[u32], args: Vec<Cell>) -> Cell {
+                let left = $left_assume(&args[0]);
+                let right = $right_assume(&args[1]);
 
                 let res = left $op right;
                 Cell::Data(encode(&res))
@@ -75,8 +74,8 @@ pub mod std {
 
     macro_rules! un_func {
         ($name: ident, $assume: path, $op: tt) => {
-            pub fn $name(_: &mut Interpreter, _layout_args: &[u32], args: Vec<(&ir::Ty, Cell)>) -> Cell {
-                let operand = $assume(&args[0].1);
+            pub fn $name(_: &mut Interpreter, _layout_args: &[u32], args: Vec<Cell>) -> Cell {
+                let operand = $assume(&args[0]);
                 let res = $op operand;
                 Cell::Data(encode(&res))
             }
@@ -85,12 +84,9 @@ pub mod std {
 
     macro_rules! reduce_func {
         ($name: ident, $item_decode: path, $reduce: expr, $default: literal) => {
-            pub fn $name(
-                _: &mut Interpreter,
-                _layout_args: &[u32],
-                args: Vec<(&ir::Ty, Cell)>,
-            ) -> Cell {
-                let array = assume::array_for_ty(args[0].0, &args[0].1);
+            pub fn $name(_: &mut Interpreter, layout_args: &[u32], args: Vec<Cell>) -> Cell {
+                let [array] = assume::args(args);
+                let array = assume::array(array, layout_args[0]);
 
                 let res = array
                     .map(|x| $item_decode(&x))
@@ -133,11 +129,7 @@ pub mod std {
 
         un_func!(neg, assume::int, -);
 
-        pub fn index(
-            _it: &mut Interpreter,
-            layout_args: &[u32],
-            args: Vec<(&ir::Ty, Cell)>,
-        ) -> Cell {
+        pub fn index(_it: &mut Interpreter, layout_args: &[u32], args: Vec<Cell>) -> Cell {
             let input_item_head_bytes = layout_args[0];
 
             let [array, position] = assume::args(args);
@@ -149,7 +141,7 @@ pub mod std {
             Cell::Data(item)
         }
 
-        pub fn map(it: &mut Interpreter, layout_args: &[u32], args: Vec<(&ir::Ty, Cell)>) -> Cell {
+        pub fn map(it: &mut Interpreter, layout_args: &[u32], args: Vec<Cell>) -> Cell {
             let mut layout_args = LayoutArgsReader::new(layout_args);
             let input_item_head_bytes = layout_args.next_u32();
             let output_item_head_bytes = layout_args.next_u32();
@@ -161,7 +153,7 @@ pub mod std {
             for item in assume::array(array, input_item_head_bytes) {
                 let cell = Cell::Data(item);
 
-                let value = it.evaluate_func_call(&func, vec![(DUMMY_TY, cell)]);
+                let value = it.evaluate_func_call(&func, vec![cell]);
 
                 output.write_item(assume::into_value(value));
             }
@@ -169,21 +161,19 @@ pub mod std {
             Cell::Data(output.finish())
         }
 
-        pub fn filter(
-            it: &mut Interpreter,
-            _layout_args: &[u32],
-            args: Vec<(&ir::Ty, Cell)>,
-        ) -> Cell {
-            let input = assume::array_for_ty(args[0].0, &args[0].1);
-            let input_item_ty = args[0].0.kind.as_array().unwrap().as_ref();
+        pub fn filter(it: &mut Interpreter, layout_args: &[u32], args: Vec<Cell>) -> Cell {
+            let mut layout_args = LayoutArgsReader::new(layout_args);
+            let item_head_bytes = layout_args.next_u32();
+            let item_body_ptrs = layout_args.next_slice();
 
-            let func = &args[1];
+            let [array, func] = assume::args(args);
+            let input = assume::array(array, item_head_bytes);
 
-            let mut output = ArrayWriter::new_for_ty(args[0].0);
+            let mut output = ArrayWriter::new(item_head_bytes, item_body_ptrs);
             for item in input {
                 let item_c = Cell::Data(item.clone());
 
-                let condition = it.evaluate_func_call(&func.1, vec![(input_item_ty, item_c)]);
+                let condition = it.evaluate_func_call(&func, vec![item_c]);
                 let condition = assume::bool(&condition);
 
                 if condition {
@@ -194,16 +184,18 @@ pub mod std {
             Cell::Data(output.finish())
         }
 
-        pub fn slice(
-            _it: &mut Interpreter,
-            _layout_args: &[u32],
-            args: Vec<(&ir::Ty, Cell)>,
-        ) -> Cell {
-            let input = assume::array_for_ty(args[0].0, &args[0].1);
+        pub fn slice(_it: &mut Interpreter, layout_args: &[u32], args: Vec<Cell>) -> Cell {
+            let mut layout_args = LayoutArgsReader::new(layout_args);
+            let item_head_bytes = layout_args.next_u32();
+            let item_body_ptrs = layout_args.next_slice();
+
+            let [array, start, end] = assume::args(args);
+
+            let input = assume::array(array, item_head_bytes);
 
             // unpack
-            let start = assume::int(&args[1].1);
-            let end = assume::int(&args[2].1);
+            let start = assume::int(&start);
+            let end = assume::int(&end);
 
             // convert to absolute
             let start = index_rel_to_abs(start, input.remaining());
@@ -213,35 +205,34 @@ pub mod std {
             let skip = start;
             let take = end.saturating_sub(skip);
 
-            let mut output = ArrayWriter::new_for_ty(args[0].0);
+            let mut output = ArrayWriter::new(item_head_bytes, item_body_ptrs);
             for item in input.skip(start).take(take) {
                 output.write_item(item);
             }
             Cell::Data(output.finish())
         }
 
-        pub fn sort(
-            it: &mut Interpreter,
-            _layout_args: &[u32],
-            args: Vec<(&ir::Ty, Cell)>,
-        ) -> Cell {
-            let input = assume::array_for_ty(args[0].0, &args[0].1);
-            let input_item_ty = args[0].0.kind.as_array().unwrap().as_ref();
+        pub fn sort(it: &mut Interpreter, layout_args: &[u32], args: Vec<Cell>) -> Cell {
+            let mut layout_args = LayoutArgsReader::new(layout_args);
+            let item_head_bytes = layout_args.next_u32();
+            let item_body_ptrs = layout_args.next_slice();
 
-            let func = &args[1];
+            let [array, func] = assume::args(args);
+
+            let input = assume::array(array, item_head_bytes);
 
             let mut keys = Vec::with_capacity(input.remaining());
             for (index, item) in input.clone().enumerate() {
                 let cell = Cell::Data(item);
 
-                let key = it.evaluate_func_call(&func.1, vec![(input_item_ty, cell)]);
+                let key = it.evaluate_func_call(&func, vec![cell]);
                 let key = assume::int(&key);
 
                 keys.push((key, index));
             }
             keys.sort();
 
-            let mut output = ArrayWriter::new_for_ty(args[0].0);
+            let mut output = ArrayWriter::new(item_head_bytes, item_body_ptrs);
             for (_key, index) in keys {
                 let item = input.get(index).unwrap();
                 output.write_item(item);
@@ -249,11 +240,7 @@ pub mod std {
             Cell::Data(output.finish())
         }
 
-        pub fn to_columnar(
-            _it: &mut Interpreter,
-            layout_args: &[u32],
-            args: Vec<(&ir::Ty, Cell)>,
-        ) -> Cell {
+        pub fn to_columnar(_it: &mut Interpreter, layout_args: &[u32], args: Vec<Cell>) -> Cell {
             let mut layout_args = LayoutArgsReader::new(layout_args);
             let input_item_head_bytes = layout_args.next_u32();
             let fields_offsets = layout_args.next_slice();
@@ -298,11 +285,7 @@ pub mod std {
             Cell::Data(output.finish())
         }
 
-        pub fn from_columnar(
-            _it: &mut Interpreter,
-            layout_args: &[u32],
-            args: Vec<(&ir::Ty, Cell)>,
-        ) -> Cell {
+        pub fn from_columnar(_it: &mut Interpreter, layout_args: &[u32], args: Vec<Cell>) -> Cell {
             let mut layout_args = LayoutArgsReader::new(layout_args);
             let output_head_bytes = layout_args.next_u32();
             let output_body_ptrs = layout_args.next_slice();
@@ -362,86 +345,73 @@ pub mod std {
 
         reduce_func!(sum, decode::int, |a, b| a + b, 0);
 
-        pub fn count(
-            _it: &mut Interpreter,
-            _layout_args: &[u32],
-            args: Vec<(&ir::Ty, Cell)>,
-        ) -> Cell {
-            let array = assume::array_for_ty(args[0].0, &args[0].1);
-            let res = array.count() as i64;
+        pub fn count(_it: &mut Interpreter, _layout_args: &[u32], args: Vec<Cell>) -> Cell {
+            let [array] = assume::args(args);
+            let array = assume::into_value(array);
+
+            let mut reader = lutra_bin::Reader::new(array.slice(8));
+            let (_offset, len) = lutra_bin::ArrayReader::read_head(&mut reader);
+
+            let res = len as i64;
             Cell::Data(encode(&res))
         }
 
-        pub fn average(
-            _it: &mut Interpreter,
-            _layout_args: &[u32],
-            args: Vec<(&ir::Ty, Cell)>,
-        ) -> Cell {
-            let array = assume::array_for_ty(args[0].0, &args[0].1);
+        pub fn average(_it: &mut Interpreter, layout_args: &[u32], args: Vec<Cell>) -> Cell {
+            let [array] = assume::args(args);
+            let array = assume::array(array, layout_args[0]);
 
             let (sum, count) = array
                 .map(|x| decode::int(&x))
                 .fold((0, 0), |(sum, count), item| (sum + item, count + 1));
+
             let res = if count == 0 {
                 0.0
             } else {
                 sum as f64 / count as f64
             };
-
             Cell::Data(encode(&res))
         }
 
-        pub fn all(
-            _it: &mut Interpreter,
-            _layout_args: &[u32],
-            args: Vec<(&ir::Ty, Cell)>,
-        ) -> Cell {
-            let mut array = assume::array_for_ty(args[0].0, &args[0].1);
+        pub fn all(_it: &mut Interpreter, _layout_args: &[u32], args: Vec<Cell>) -> Cell {
+            let [array] = assume::args(args);
+            let mut array = assume::array(array, 1);
 
             let res = array.all(|x| decode::bool(&x));
             Cell::Data(encode(&res))
         }
 
-        pub fn any(
-            _it: &mut Interpreter,
-            _layout_args: &[u32],
-            args: Vec<(&ir::Ty, Cell)>,
-        ) -> Cell {
-            let mut array = assume::array_for_ty(args[0].0, &args[0].1);
+        pub fn any(_it: &mut Interpreter, _layout_args: &[u32], args: Vec<Cell>) -> Cell {
+            let [array] = assume::args(args);
+            let mut array = assume::array(array, 1);
 
             let res = array.any(|x| decode::bool(&x));
             Cell::Data(encode(&res))
         }
 
-        pub fn contains(
-            _it: &mut Interpreter,
-            _layout_args: &[u32],
-            args: Vec<(&ir::Ty, Cell)>,
-        ) -> Cell {
-            let array = assume::array_for_ty(args[0].0, &args[0].1);
-            let item = assume::int(&args[1].1);
+        pub fn contains(_it: &mut Interpreter, layout_args: &[u32], args: Vec<Cell>) -> Cell {
+            let [array, item] = assume::args(args);
+            let array = assume::array(array, layout_args[0]);
+            let item = assume::int(&item);
 
             let res = array.into_iter().any(|x| decode::int(&x) == item);
             Cell::Data(encode(&res))
         }
 
-        pub fn concat_array(
-            _it: &mut Interpreter,
-            _layout_args: &[u32],
-            args: Vec<(&ir::Ty, Cell)>,
-        ) -> Cell {
-            let array = assume::array_for_ty(args[0].0, &args[0].1);
-            let separator = assume::text(&args[1].1);
+        pub fn concat_array(_it: &mut Interpreter, _layout_args: &[u32], args: Vec<Cell>) -> Cell {
+            let [array, separator] = assume::args(args);
+
+            let array = assume::array(array, 8); // text head = 8
+            let separator = assume::text(&separator);
 
             let array: Vec<_> = array.map(|x| decode::text(&x)).collect();
             let res = array.join(&separator);
             Cell::Data(encode(&res))
         }
 
-        pub fn lag(_it: &mut Interpreter, layout_args: &[u32], args: Vec<(&ir::Ty, Cell)>) -> Cell {
+        pub fn lag(_it: &mut Interpreter, layout_args: &[u32], args: Vec<Cell>) -> Cell {
             let mut layout_args = LayoutArgsReader::new(layout_args);
-            let head_bytes = dbg!(layout_args.next_u32());
-            let body_ptrs = dbg!(layout_args.next_slice());
+            let head_bytes = layout_args.next_u32();
+            let body_ptrs = layout_args.next_slice();
 
             let [array, offset] = assume::args(args);
 
@@ -452,22 +422,18 @@ pub mod std {
 
             let n_blanks = offset.min(array.remaining());
             for _ in 0..n_blanks {
-                out.write_item(dbg!(encode(&0_i64)));
+                out.write_item(encode(&0_i64));
             }
 
             let n_copies = array.remaining().saturating_sub(offset);
             for item in array.take(n_copies) {
-                out.write_item(dbg!(item));
+                out.write_item(item);
             }
 
-            Cell::Data(dbg!(out.finish()))
+            Cell::Data(out.finish())
         }
 
-        pub fn lead(
-            _it: &mut Interpreter,
-            layout_args: &[u32],
-            args: Vec<(&ir::Ty, Cell)>,
-        ) -> Cell {
+        pub fn lead(_it: &mut Interpreter, layout_args: &[u32], args: Vec<Cell>) -> Cell {
             let mut layout_args = LayoutArgsReader::new(layout_args);
             let head_bytes = layout_args.next_u32();
             let body_ptrs = layout_args.next_slice();
@@ -493,16 +459,18 @@ pub mod std {
             Cell::Data(out.finish())
         }
 
-        pub fn row_number(
-            _it: &mut Interpreter,
-            _layout_args: &[u32],
-            args: Vec<(&ir::Ty, Cell)>,
-        ) -> Cell {
-            let array = assume::array_for_ty(args[0].0, &args[0].1);
+        pub fn row_number(_it: &mut Interpreter, _layout_args: &[u32], args: Vec<Cell>) -> Cell {
+            let [array] = assume::args(args);
+            let array = assume::into_value(array);
 
-            let mut out = ArrayWriter::new_for_ty(args[0].0); // TODO: make this int always
-            for (index, _) in array.enumerate() {
-                out.write_item(encode(&(index as i64)));
+            dbg!(&array);
+            let mut reader = lutra_bin::Reader::new(array.slice(8));
+            dbg!(&reader);
+            let (_offset, len) = lutra_bin::ArrayReader::read_head(&mut reader);
+
+            let mut out = ArrayWriter::new(8, &[]); // uint64 head = 8
+            for index in 0..len {
+                out.write_item(encode(&(index as u64)));
             }
             Cell::Data(out.finish())
         }
@@ -533,11 +501,7 @@ pub mod interpreter {
     }
 
     impl Module {
-        fn version(
-            _it: &mut Interpreter,
-            _layout_args: &[u32],
-            _args: Vec<(&ir::Ty, Cell)>,
-        ) -> Cell {
+        fn version(_it: &mut Interpreter, _layout_args: &[u32], _args: Vec<Cell>) -> Cell {
             Cell::Data(encode(&"lutra-runtime 0.0.1".to_string()))
         }
     }
@@ -546,8 +510,6 @@ pub mod interpreter {
 mod assume {
     use super::decode;
     use crate::interpreter::Cell;
-    use lutra_bin::br;
-    use lutra_bin::ir;
     use lutra_bin::ArrayReader;
 
     pub fn into_value(cell: Cell) -> lutra_bin::Data {
@@ -568,10 +530,10 @@ mod assume {
         }
     }
 
-    pub fn args<const N: usize>(args: Vec<(&br::Ty, Cell)>) -> [Cell; N] {
+    pub fn args<const N: usize>(args: Vec<Cell>) -> [Cell; N] {
         let mut res = [const { Cell::Vacant }; N];
         assert_eq!(args.len(), N);
-        for (i, (_, cell)) in args.into_iter().enumerate() {
+        for (i, cell) in args.into_iter().enumerate() {
             res[i] = cell;
         }
         res
@@ -587,11 +549,6 @@ mod assume {
 
     pub fn text(cell: &Cell) -> String {
         decode::text(as_value(cell))
-    }
-
-    pub fn array_for_ty(ty: &ir::Ty, cell: &Cell) -> ArrayReader {
-        let data = as_value(cell).clone();
-        ArrayReader::new_for_ty(data, ty)
     }
 
     pub fn array(cell: Cell, item_head_bytes: u32) -> ArrayReader {

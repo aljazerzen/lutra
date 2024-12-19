@@ -24,6 +24,18 @@ fn compile_external_symbol(value: ir::ExternalSymbol) -> ExternalSymbol {
     let layout_args: Vec<u32> = match value.id.as_str() {
         "std::index" => vec![8],
         "std::map" => vec![8, 8, 0],
+        "std::filter" => vec![
+            8, // item_head_size
+            0, // item_body_ptrs
+        ],
+        "std::slice" => vec![
+            8, // item_head_size
+            0, // item_body_ptrs
+        ],
+        "std::sort" => vec![
+            8, // item_head_size
+            0, // item_body_ptrs
+        ],
         "std::to_columnar" => vec![
             16, // item_head_size
             2, 0, 8, // fields_offsets
@@ -37,6 +49,23 @@ fn compile_external_symbol(value: ir::ExternalSymbol) -> ExternalSymbol {
             2, 8, 8, // fields_item_head_bytes
             0, // fields_body_ptrs[0]
             0, // fields_body_ptrs[1]
+        ],
+
+        "std::min" => vec![
+            8, // item_head_size
+        ],
+        "std::max" => vec![
+            8, // item_head_size
+        ],
+        "std::sum" => vec![
+            8, // item_head_size
+        ],
+        "std::count" => vec![],
+        "std::average" => vec![
+            8, // item_head_size
+        ],
+        "std::contains" => vec![
+            8, // item_head_size
         ],
         "std::lag" => vec![
             8, // item_head_size

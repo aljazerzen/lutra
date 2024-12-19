@@ -29,10 +29,10 @@ impl Data {
         }
     }
 
-    pub fn slice(&self, index: usize) -> &[u8] {
+    pub fn slice(&self, len: usize) -> &[u8] {
         match self {
-            Data::Single(slice) => slice.slice(index),
-            Data::Combined(combined) => combined.slice(index),
+            Data::Single(slice) => slice.slice(len),
+            Data::Combined(combined) => combined.slice(len),
         }
     }
 
@@ -87,9 +87,9 @@ impl Slice {
         self.buf.get(index + self.offset).copied()
     }
 
-    fn slice(&self, start: usize) -> &[u8] {
-        assert!(self.len() >= start);
-        &self.buf[self.offset..][..start]
+    fn slice(&self, len: usize) -> &[u8] {
+        assert!(self.len() >= len);
+        &self.buf[self.offset..][..len]
     }
 
     fn skip(&mut self, bytes: usize) {
@@ -142,8 +142,8 @@ impl CombinedSlices {
         self.parts[b_i].get(offset)
     }
 
-    fn slice(&self, index: usize) -> &[u8] {
-        self.parts.first().unwrap().slice(index)
+    fn slice(&self, len: usize) -> &[u8] {
+        self.parts.first().unwrap().slice(len)
     }
 
     fn skip(&mut self, bytes: usize) {

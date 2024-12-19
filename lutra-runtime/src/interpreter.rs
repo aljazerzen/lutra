@@ -1,6 +1,5 @@
 use std::borrow::Cow;
 use std::collections::HashMap;
-use std::iter::zip;
 use std::ops::{BitAnd, Shr};
 use std::rc::Rc;
 
@@ -26,13 +25,7 @@ pub enum Cell {
     Vacant,
 }
 
-pub type NativeFunction = &'static dyn Fn(&mut Interpreter, &[u32], Vec<(&br::Ty, Cell)>) -> Cell;
-
-pub const DUMMY_TY: &br::Ty = &br::Ty {
-    kind: br::TyKind::Tuple(vec![]),
-    layout: None,
-    name: None,
-};
+pub type NativeFunction = &'static dyn Fn(&mut Interpreter, &[u32], Vec<Cell>) -> Cell;
 
 pub fn evaluate(
     program: &br::Program,
@@ -65,8 +58,9 @@ pub fn evaluate(
 
     // the main function call
     let main = interpreter.evaluate_expr(&program.main);
-    let args = zip(&program.input_tys, inputs)
-        .map(|(p, a)| (p, Cell::Data(Data::new(a))))
+    let args = inputs
+        .into_iter()
+        .map(|a| Cell::Data(Data::new(a)))
         .collect();
 
     let res = interpreter.evaluate_func_call(&main, args);
@@ -137,13 +131,13 @@ impl Interpreter {
         // self.drop(addr, addr + 1);
     }
 
-    fn allocate_scope(&mut self, scope_id: br::Sid, cells: Vec<(&br::Ty, Cell)>) -> Addr {
+    fn allocate_scope(&mut self, scope_id: br::Sid, cells: Vec<Cell>) -> Addr {
         assert_eq!(scope_id.0.shr(30), 0x2_u32);
 
         let mem_start = self.memory.len() as Addr;
         self.scopes.entry(scope_id).or_default().push(mem_start);
 
-        for (_, cell) in cells {
+        for cell in cells {
             self.allocate(cell);
         }
         mem_start
@@ -228,10 +222,10 @@ impl Interpreter {
 
                 let function = self.evaluate_expr(function);
 
-                let mut arg_cells = Vec::new();
+                let mut arg_cells = Vec::with_capacity(args.len());
                 for arg in args {
                     let value = self.evaluate_expr(arg);
-                    arg_cells.push((DUMMY_TY, value));
+                    arg_cells.push(value);
                 }
                 self.evaluate_func_call(&function, arg_cells)
             }
@@ -249,7 +243,7 @@ impl Interpreter {
         }
     }
 
-    pub fn evaluate_func_call(&mut self, function: &Cell, args: Vec<(&br::Ty, Cell)>) -> Cell {
+    pub fn evaluate_func_call(&mut self, function: &Cell, args: Vec<Cell>) -> Cell {
         match function {
             Cell::Function(func) => {
                 let scope_size = args.len();

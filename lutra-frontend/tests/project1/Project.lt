@@ -24,7 +24,7 @@ let my_func2 = func (x: int64) -> x + 1
 
 let my_func = func (x: int64) -> {x, my_func2(x)}
 
-{
+func () -> {
   a = 1 + 2,
   my_func(3),
   my_func(2),
