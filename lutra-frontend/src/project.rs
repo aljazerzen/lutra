@@ -1,6 +1,8 @@
 use std::collections::HashMap;
 use std::path::PathBuf;
 
+use itertools::Itertools;
+
 use crate::decl::RootModule;
 
 /// Project, resolved.
@@ -81,7 +83,7 @@ impl std::fmt::Display for SourceTree {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let mut r = format!("path: {}\nsources:\n", self.root.to_string_lossy());
 
-        for source in self.sources.keys() {
+        for source in self.sources.keys().sorted() {
             r += "- ";
             r += &source.to_string_lossy();
             r += "\n";

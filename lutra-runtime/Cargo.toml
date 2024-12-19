@@ -6,27 +6,10 @@ repository.workspace = true
 rust-version.workspace = true
 version.workspace = true
 
-[[bin]]
-bench = false
-name = "lutra"
-path = "src/cli.rs"
-required-features = ["cli"]
-test = false
-
-[features]
-cli = ["clap", "log", "env_logger", "anyhow", "lutra-frontend/clap"]
-default = ["cli"]
-
 [dependencies]
 lutra-bin = { path = "../lutra-bin" }
 lutra-frontend = { path = "../lutra-frontend" }
 lutra-ir = { path = "../lutra-ir" }
-
-# cli
-log = { workspace = true, optional = true }
-clap = { version = "4.4.18", features = ["derive"], optional = true }
-env_logger = { workspace = true, optional = true }
-anyhow = { workspace = true, optional = true }
 
 [dev-dependencies]
 insta = { workspace = true }
