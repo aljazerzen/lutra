@@ -1,9 +1,10 @@
 mod client;
 mod server;
+pub mod http;
 
 pub mod messages {
     include!(concat!(env!("OUT_DIR"), "/messages.rs"));
 }
 
-pub use client::Client;
-pub use server::Server;
+pub use client::ClientConnection;
+pub use server::ServerConnection;

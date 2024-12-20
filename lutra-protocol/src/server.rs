@@ -1,11 +1,11 @@
 use std::{collections::HashMap, marker::Unpin};
 
-use lutra_bin::{br, Decode, Encode};
+use lutra_bin::{br, Decode};
 use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
 
 use crate::messages;
 
-pub struct Server<R, W>
+pub struct ServerConnection<R, W>
 where
     R: AsyncRead + Unpin,
     W: AsyncWrite + Unpin,
@@ -15,7 +15,7 @@ where
     prepared_programs: HashMap<u32, br::Program>,
 }
 
-impl<R, W> Server<R, W>
+impl<R, W> ServerConnection<R, W>
 where
     R: AsyncRead + Unpin,
     W: AsyncWrite + Unpin,
@@ -29,20 +29,8 @@ where
     }
 
     pub async fn run(&mut self) {
-        let mut up_buffer = [0; 1024];
-        loop {
-            let bytes_read = self.rx.read(&mut up_buffer).await.unwrap();
-            if bytes_read == 0 {
-                break;
-            }
-
-            let mut reader = lutra_bin::Reader::new(&up_buffer[0..bytes_read]);
-            while reader.remaining() > 0 {
-                let message = messages::ClientMessage::decode(&mut reader).unwrap();
-                reader.skip_read();
-
-                self.handle_message(message).await;
-            }
+        while let Ok(message) = read_message(&mut self.rx).await {
+            self.handle_message(message).await;
         }
     }
 
@@ -53,6 +41,8 @@ where
 
                 self.prepared_programs.insert(prepare.program_id, program);
                 // maybe send some kind of successful prepare response?
+
+                self.tx.flush().await.unwrap();
             }
             messages::ClientMessage::Execute(execute) => {
                 let program = self.prepared_programs.get(&execute.program_id).unwrap();
@@ -68,15 +58,38 @@ where
                     result: messages::Result::Ok(result),
                 });
 
-                let mut response_buf = Vec::new();
-                response.encode(&mut response_buf).unwrap();
-
-                self.tx.write_all(&response_buf).await.unwrap();
+                write_message(&mut self.tx, response).await.unwrap();
             }
             messages::ClientMessage::Release(release) => {
                 self.prepared_programs.remove(&release.program_id);
                 // maybe send some kind of successful release response?
+
+                self.tx.flush().await.unwrap();
             }
         }
     }
+}
+
+pub async fn write_message(
+    mut tx: impl AsyncWrite + Unpin,
+    e: impl lutra_bin::Encode,
+) -> std::io::Result<()> {
+    let mut buf = Vec::new();
+    e.encode(&mut buf).unwrap();
+
+    tx.write_all(&(buf.len() as u32).to_le_bytes()).await?;
+    tx.write_all(&buf).await?;
+    Ok(())
+}
+
+pub async fn read_message<D: Decode + Sized>(mut rx: impl AsyncRead + Unpin) -> std::io::Result<D> {
+    let mut buf = [0; 4];
+    rx.read_exact(&mut buf).await?;
+    let len = u32::from_le_bytes(buf) as usize;
+
+    let mut buf = Vec::with_capacity(len);
+    buf.resize(len, 0);
+    rx.read_exact(&mut buf).await?;
+
+    Ok(D::decode_buffer(&buf).unwrap())
 }

@@ -1,11 +1,12 @@
 use std::marker::Unpin;
 
-use lutra_bin::{br, Decode, Encode};
-use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
+use lutra_bin::{br, Encode};
+use tokio::io::{AsyncRead, AsyncWrite, AsyncWriteExt};
 
 use crate::messages;
+use crate::server::{read_message, write_message};
 
-pub struct Client<R, W>
+pub struct ClientConnection<R, W>
 where
     R: AsyncRead + Unpin,
     W: AsyncWrite + Unpin,
@@ -16,13 +17,13 @@ where
     next_request_id: u32,
 }
 
-impl<R, W> Client<R, W>
+impl<R, W> ClientConnection<R, W>
 where
     R: AsyncRead + Unpin,
     W: AsyncWrite + Unpin,
 {
     pub fn new(rx: R, tx: W) -> Self {
-        Client {
+        ClientConnection {
             rx,
             tx,
             next_program_id: 0,
@@ -59,10 +60,7 @@ where
             program: program_buf,
         });
 
-        let mut request = Vec::new();
-        prepare.encode(&mut request).unwrap();
-
-        self.tx.write_all(&request).await.unwrap();
+        write_message(&mut self.tx, prepare).await.unwrap();
         program_id
     }
 
@@ -76,43 +74,29 @@ where
             request_id,
         });
 
-        let mut request = Vec::new();
-        execute.encode(&mut request).unwrap();
-
-        self.tx.write_all(&request).await.unwrap();
-
+        write_message(&mut self.tx, execute).await.unwrap();
         request_id
     }
 
     pub async fn release(&mut self, program_id: u32) {
-        let deallocate = messages::ClientMessage::Release(messages::Release { program_id });
-
-        let mut request = Vec::new();
-        deallocate.encode(&mut request).unwrap();
-
-        self.tx.write_all(&request).await.unwrap();
+        let release = messages::ClientMessage::Release(messages::Release { program_id });
+        write_message(&mut self.tx, release).await.unwrap();
     }
 
     pub async fn recv_response(&mut self, request_id: u32) -> messages::Result {
-        loop {
-            let mut buf = [0; 1024];
-            let bytes_read = self.rx.read(&mut buf).await.unwrap();
+        while let Ok(message) = read_message(&mut self.rx).await {
+            // TODO: error handling
 
-            let mut reader = lutra_bin::Reader::new(&buf[0..bytes_read]);
-            while reader.remaining() > 0 {
-                let message = messages::ServerMessage::decode(&mut reader).unwrap();
-                reader.skip_read();
-
-                match message {
-                    messages::ServerMessage::Response(response) => {
-                        if response.request_id == request_id {
-                            return response.result;
-                        }
+            match message {
+                messages::ServerMessage::Response(response) => {
+                    if response.request_id == request_id {
+                        return response.result;
                     }
                 }
-
-                // TODO: don't discard non-matching messages or message left in buffer
             }
+
+            // TODO: don't discard non-matching messages or message left in buffer
         }
+        panic!();
     }
 }

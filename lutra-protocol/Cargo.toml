@@ -10,7 +10,13 @@ version.workspace = true
 lutra-bin = { path = "../lutra-bin" }
 lutra-runtime = { path = "../lutra-runtime" }
 lutra-frontend = { path = "../lutra-frontend" }
-tokio = { version = "1.42.0", features = ["rt", "io-util", "macros"] }
+
+tokio = { version = "1.42.0", features = ["rt", "io-util", "macros", "sync"] }
+log.workspace = true
+
+hyper = { version = "1.5.2", features = ["http1", "server", "client"]}
+hyper-util = { version = "0.1", features = ["tokio"]}
+http-body-util = "0.1.2"
 
 [build-dependencies]
 lutra-codegen = { path = "../lutra-codegen" }
