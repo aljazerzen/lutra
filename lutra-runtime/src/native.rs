@@ -304,7 +304,7 @@ pub mod std {
                 field_offsets.push(8_u32 * i as u32); // array head has 8 bytes
             }
 
-            let input = TupleReader::new(dbg!(assume::as_value(&columnar)), field_offsets.into());
+            let input = TupleReader::new(assume::as_value(&columnar), field_offsets.into());
 
             // init input array readers
             let mut input_arrays: Vec<ArrayReader> = fields_item_head_bytes
@@ -314,27 +314,22 @@ pub mod std {
                 .collect();
 
             // init output array
-            dbg!(output_head_bytes);
-            dbg!(output_body_ptrs);
             let mut output = ArrayWriter::new(output_head_bytes, output_body_ptrs);
 
             // short-circuit empty tuples
             if output_head_bytes == 0 {
                 return Cell::Data(output.finish());
             }
-            dbg!(&output_fields_layouts);
             'output: loop {
-                dbg!("row");
                 let mut tuple = TupleWriter::new(Cow::from(&output_fields_layouts));
                 for (index, _) in output_fields_layouts.iter().enumerate() {
-                    dbg!(index);
                     if let Some(item) = input_arrays.get_mut(index).unwrap().next() {
                         tuple.write_field(item)
                     } else {
                         break 'output;
                     }
                 }
-                output.write_item(dbg!(tuple.finish()));
+                output.write_item(tuple.finish());
             }
             Cell::Data(output.finish())
         }
@@ -349,8 +344,7 @@ pub mod std {
             let [array] = assume::args(args);
             let array = assume::into_value(array);
 
-            let mut reader = lutra_bin::Reader::new(array.slice(8));
-            let (_offset, len) = lutra_bin::ArrayReader::read_head(&mut reader);
+            let (_offset, len) = lutra_bin::ArrayReader::read_head(array.slice(8));
 
             let res = len as i64;
             Cell::Data(encode(&res))
@@ -463,10 +457,7 @@ pub mod std {
             let [array] = assume::args(args);
             let array = assume::into_value(array);
 
-            dbg!(&array);
-            let mut reader = lutra_bin::Reader::new(array.slice(8));
-            dbg!(&reader);
-            let (_offset, len) = lutra_bin::ArrayReader::read_head(&mut reader);
+            let (_offset, len) = lutra_bin::ArrayReader::read_head(array.slice(8));
 
             let mut out = ArrayWriter::new(8, &[]); // uint64 head = 8
             for index in 0..len {
@@ -593,21 +584,21 @@ mod decode {
     use lutra_bin::{Data, Decode};
 
     pub fn int(data: &Data) -> i64 {
-        i64::decode_buffer(data.slice(8)).unwrap()
+        i64::decode(data.slice(8)).unwrap()
     }
 
     #[allow(dead_code)]
     pub fn uint32(data: &Data) -> u32 {
-        u32::decode_buffer(data.slice(4)).unwrap()
+        u32::decode(data.slice(4)).unwrap()
     }
 
     pub fn bool(data: &Data) -> bool {
-        bool::decode_buffer(data.slice(1)).unwrap()
+        bool::decode(data.slice(1)).unwrap()
     }
 
     pub fn text(data: &Data) -> String {
         // TODO: string reader
-        String::decode_buffer(&data.flatten()).unwrap()
+        String::decode(&data.flatten()).unwrap()
     }
 }
 

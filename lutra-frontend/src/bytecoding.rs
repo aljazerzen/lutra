@@ -1,6 +1,5 @@
 use lutra_bin::br::*;
 use lutra_bin::ir;
-use lutra_bin::TupleReader;
 
 pub fn compile_program(value: ir::Program) -> Program {
     Program {
@@ -140,7 +139,7 @@ fn compile_array(ty: ir::Ty, items: Vec<ir::Expr>) -> Array {
 }
 
 fn compile_tuple_lookup(value: ir::TupleLookup) -> TupleLookup {
-    let offset = TupleReader::compute_field_offset(&value.base.ty, value.position);
+    let offset = lutra_bin::layout::tuple_field_offset(&value.base.ty, value.position);
 
     TupleLookup {
         base: compile_expr(value.base),

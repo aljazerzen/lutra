@@ -12,6 +12,8 @@ type u = enum {
 
 type v = enum { Yes, No, Maybe }
 
+type p = {[int64], [int64]}
+
 type i = {v, z}
 
 type Tree = enum {

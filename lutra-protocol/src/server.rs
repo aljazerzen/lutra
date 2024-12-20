@@ -37,7 +37,7 @@ where
     async fn handle_message(&mut self, message: messages::ClientMessage) {
         match message {
             messages::ClientMessage::Prepare(prepare) => {
-                let program = lutra_bin::br::Program::decode_buffer(&prepare.program).unwrap();
+                let program = lutra_bin::br::Program::decode(&prepare.program).unwrap();
 
                 self.prepared_programs.insert(prepare.program_id, program);
                 // maybe send some kind of successful prepare response?
@@ -87,9 +87,8 @@ pub async fn read_message<D: Decode + Sized>(mut rx: impl AsyncRead + Unpin) -> 
     rx.read_exact(&mut buf).await?;
     let len = u32::from_le_bytes(buf) as usize;
 
-    let mut buf = Vec::with_capacity(len);
-    buf.resize(len, 0);
+    let mut buf = vec![0; len];
     rx.read_exact(&mut buf).await?;
 
-    Ok(D::decode_buffer(&buf).unwrap())
+    Ok(D::decode(&buf).unwrap())
 }

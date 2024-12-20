@@ -1,22 +1,16 @@
 use std::borrow::Cow;
-use std::rc::Rc;
-use std::sync::Mutex;
 
 use crate::ir;
+use crate::layout;
 use crate::Data;
 
 #[derive(Clone, Debug)]
 pub struct Reader<'a> {
     buf: &'a [u8],
-    most_read: Rc<Mutex<&'a [u8]>>,
 }
-
 impl<'a> Reader<'a> {
     pub fn new(buf: &'a [u8]) -> Self {
-        Reader {
-            buf,
-            most_read: Rc::new(Mutex::new(buf)),
-        }
+        Reader { buf }
     }
 
     pub fn read_n(&mut self, n: usize) -> &[u8] {
@@ -35,23 +29,6 @@ impl<'a> Reader<'a> {
         self.buf = &self.buf[byte_count..];
     }
 
-    pub fn skip_read<'b: 'a>(&mut self) {
-        let mut most_read = self.most_read.lock().unwrap();
-        if most_read.len() > self.buf.len() {
-            *most_read = self.buf;
-        }
-        if most_read.len() < self.buf.len() {
-            self.buf = *most_read;
-        }
-    }
-
-    fn update_most_read(&self) {
-        let mut most_read = self.most_read.lock().unwrap();
-        if most_read.len() > self.buf.len() {
-            *most_read = self.buf;
-        }
-    }
-
     pub fn remaining(&self) -> usize {
         self.buf.len()
     }
@@ -61,9 +38,31 @@ impl<'a> Reader<'a> {
     }
 }
 
-impl<'a> Drop for Reader<'a> {
-    fn drop(&mut self) {
-        self.update_most_read();
+impl<'a> AsRef<[u8]> for Reader<'a> {
+    fn as_ref(&self) -> &[u8] {
+        self.buf
+    }
+}
+
+pub trait ReaderExt {
+    fn read_n(&self, n: usize) -> &[u8];
+
+    fn read_const<const N: usize>(&self) -> [u8; N];
+
+    fn skip(self, bytes: usize) -> Self;
+}
+
+impl<'a> ReaderExt for &'a [u8] {
+    fn read_n(&self, n: usize) -> &[u8] {
+        &self[..n]
+    }
+
+    fn read_const<const N: usize>(&self) -> [u8; N] {
+        self[0..N].try_into().unwrap()
+    }
+
+    fn skip(self, bytes: usize) -> Self {
+        &self[bytes..]
     }
 }
 
@@ -85,8 +84,7 @@ impl ArrayReader {
     }
 
     pub fn new(data: Data, item_head_bytes: usize) -> Self {
-        let mut head = Reader::new(data.slice(8));
-        let (offset, len) = Self::read_head(&mut head);
+        let (offset, len) = Self::read_head(data.slice(8));
 
         let mut body = data.clone();
         body.skip(offset);
@@ -98,12 +96,10 @@ impl ArrayReader {
         }
     }
 
-    pub fn read_head(reader: &mut Reader) -> (usize, usize) {
-        let offset = reader.read_const::<4>();
-        let offset = u32::from_le_bytes(offset);
+    pub fn read_head(buffer: &[u8]) -> (usize, usize) {
+        let offset = u32::from_le_bytes(buffer.read_const::<4>());
 
-        let len = reader.read_const::<4>();
-        let len = u32::from_le_bytes(len);
+        let len = u32::from_le_bytes(buffer.skip(4).read_const::<4>());
         (offset as usize, len as usize)
     }
 
@@ -173,31 +169,8 @@ impl<'d, 't> TupleReader<'d, 't> {
     }
 
     pub fn new_for_ty(data: &'d Data, ty: &ir::Ty) -> Self {
-        let field_offsets = Self::compute_field_offsets(ty);
-
+        let field_offsets = layout::tuple_field_offsets(ty);
         Self::new(data, field_offsets.into())
-    }
-
-    pub fn compute_field_offsets(ty: &ir::Ty) -> Vec<u32> {
-        let ir::TyKind::Tuple(ty_fields) = &ty.kind else {
-            panic!()
-        };
-
-        let mut field_offsets = Vec::with_capacity(ty_fields.len());
-        let mut offset = 0_u32;
-        for field in ty_fields {
-            field_offsets.push(offset);
-
-            let layout = field.ty.layout.as_ref().unwrap();
-            offset += (layout.head_size).div_ceil(8);
-        }
-        field_offsets
-    }
-
-    pub fn compute_field_offset(ty: &ir::Ty, position: u16) -> u32 {
-        *Self::compute_field_offsets(ty)
-            .get(position as usize)
-            .unwrap()
     }
 
     pub fn get_field(&self, index: usize) -> Data {

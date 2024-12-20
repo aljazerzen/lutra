@@ -1,7 +1,7 @@
 use std::io::Write;
 
-use crate::reader::{self};
-use crate::{Layout, Reader, Result};
+use crate::reader::{self, ReaderExt};
+use crate::{Layout, Result};
 
 pub trait Encode {
     type HeadPtr;
@@ -261,140 +261,104 @@ impl ReversePointer {
 }
 
 pub trait Decode: Sized + Layout {
-    fn decode_buffer(bytes: &[u8]) -> Result<Self> {
-        let mut reader = Reader::new(bytes);
-        let res = Self::decode(&mut reader);
-
-        // sanity check that correct number of bytes have been read
-        #[cfg(debug_assertions)]
-        {
-            let bytes_read = bytes.len() - reader.remaining();
-            assert_eq!(bytes_read, Self::head_size().div_ceil(8));
-        }
-
-        res
-    }
-
-    fn decode(r: &mut Reader<'_>) -> Result<Self>;
+    fn decode(buffer: &[u8]) -> Result<Self>;
 }
 impl Decode for bool {
-    fn decode(r: &mut Reader<'_>) -> Result<Self> {
+    fn decode(r: &[u8]) -> Result<Self> {
         let [v] = r.read_const::<1>();
         Ok(v != 0)
     }
 }
 
 impl Decode for i8 {
-    fn decode(r: &mut Reader<'_>) -> Result<Self> {
-        let bytes = r.read_const();
-        Ok(i8::from_le_bytes(bytes))
+    fn decode(r: &[u8]) -> Result<Self> {
+        Ok(i8::from_le_bytes(r.read_const()))
     }
 }
 impl Decode for i16 {
-    fn decode(r: &mut Reader<'_>) -> Result<Self> {
-        let bytes = r.read_const();
-        Ok(i16::from_le_bytes(bytes))
+    fn decode(r: &[u8]) -> Result<Self> {
+        Ok(i16::from_le_bytes(r.read_const()))
     }
 }
 impl Decode for i32 {
-    fn decode(r: &mut Reader<'_>) -> Result<Self> {
-        let bytes = r.read_const();
-        Ok(i32::from_le_bytes(bytes))
+    fn decode(r: &[u8]) -> Result<Self> {
+        Ok(i32::from_le_bytes(r.read_const()))
     }
 }
 impl Decode for i64 {
-    fn decode(r: &mut Reader<'_>) -> Result<Self> {
-        let bytes = r.read_const();
-        Ok(i64::from_le_bytes(bytes))
+    fn decode(r: &[u8]) -> Result<Self> {
+        Ok(i64::from_le_bytes(r.read_const()))
     }
 }
 impl Decode for u8 {
-    fn decode(r: &mut Reader<'_>) -> Result<Self> {
-        let bytes = r.read_const();
-        Ok(u8::from_le_bytes(bytes))
+    fn decode(r: &[u8]) -> Result<Self> {
+        Ok(u8::from_le_bytes(r.read_const()))
     }
 }
 impl Decode for u16 {
-    fn decode(r: &mut Reader<'_>) -> Result<Self> {
-        let bytes = r.read_const();
-        Ok(u16::from_le_bytes(bytes))
+    fn decode(r: &[u8]) -> Result<Self> {
+        Ok(u16::from_le_bytes(r.read_const()))
     }
 }
 impl Decode for u32 {
-    fn decode(r: &mut Reader<'_>) -> Result<Self> {
-        let bytes = r.read_const();
-        Ok(u32::from_le_bytes(bytes))
+    fn decode(r: &[u8]) -> Result<Self> {
+        Ok(u32::from_le_bytes(r.read_const()))
     }
 }
 impl Decode for u64 {
-    fn decode(r: &mut Reader<'_>) -> Result<Self> {
-        let bytes = r.read_const();
-        Ok(u64::from_le_bytes(bytes))
+    fn decode(r: &[u8]) -> Result<Self> {
+        Ok(u64::from_le_bytes(r.read_const()))
     }
 }
 impl Decode for f32 {
-    fn decode(r: &mut Reader<'_>) -> Result<Self> {
-        let bytes = r.read_const();
-        Ok(f32::from_le_bytes(bytes))
+    fn decode(r: &[u8]) -> Result<Self> {
+        Ok(f32::from_le_bytes(r.read_const()))
     }
 }
 impl Decode for f64 {
-    fn decode(r: &mut Reader<'_>) -> Result<Self> {
-        let bytes = r.read_const();
-        Ok(f64::from_le_bytes(bytes))
+    fn decode(r: &[u8]) -> Result<Self> {
+        Ok(f64::from_le_bytes(r.read_const()))
     }
 }
 
 impl Decode for String {
-    fn decode(r: &mut Reader<'_>) -> Result<Self> {
-        let mut body = r.clone();
+    fn decode(r: &[u8]) -> Result<Self> {
+        let offset = u32::from_le_bytes(r.read_const()) as usize;
+        let len = u32::from_le_bytes(r.skip(4).read_const()) as usize;
 
-        let offset = r.read_const::<4>();
-        let offset = u32::from_le_bytes(offset) as usize;
-        body.skip(offset);
-
-        let len = r.read_const::<4>();
-        let len = u32::from_le_bytes(len) as usize;
-
-        let buf = body.read_n(len).to_vec();
+        let buf = r.skip(offset).read_n(len).to_vec();
         Ok(String::from_utf8(buf).unwrap())
     }
 }
 impl<E: Decode> Decode for Vec<E> {
-    fn decode(r: &mut Reader<'_>) -> Result<Self> {
-        let mut body = r.clone();
+    fn decode(r: &[u8]) -> Result<Self> {
         let (offset, len) = reader::ArrayReader::read_head(r);
-        body.skip(offset);
+        let mut buf = r.skip(offset);
 
-        let mut buf = Vec::with_capacity(len);
+        let mut out = Vec::with_capacity(len);
+        let item_head_bytes = E::head_size().div_ceil(8);
         for _ in 0..len {
-            buf.push(E::decode(&mut body)?);
+            out.push(E::decode(buf)?);
+            buf = buf.skip(item_head_bytes);
         }
-        Ok(buf)
+        Ok(out)
     }
 }
 impl<E: Decode> Decode for Option<E> {
-    fn decode(r: &mut Reader<'_>) -> Result<Self> {
-        let [tag] = r.read_const::<1>();
+    fn decode(buf: &[u8]) -> Result<Self> {
+        let [tag] = buf.read_const::<1>();
         if tag == 0 {
-            r.skip(4);
             Ok(None)
         } else {
+            let buf = buf.skip(1);
             let inner_head_size = E::head_size();
             let is_inline = inner_head_size <= 4;
 
             Ok(Some(if is_inline {
-                let res = E::decode(r)?;
-                if inner_head_size < 4 {
-                    r.skip(4 - inner_head_size);
-                }
-                res
+                E::decode(buf)?
             } else {
-                let mut body = r.clone();
-                let offset = r.read_const::<4>();
-                let offset = u32::from_le_bytes(offset) as usize;
-                body.skip(offset);
-                E::decode(&mut body)?
+                let offset = u32::from_le_bytes(buf.read_const::<4>()) as usize;
+                E::decode(buf.skip(offset))?
             }))
         }
     }

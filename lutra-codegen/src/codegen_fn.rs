@@ -66,7 +66,7 @@ pub fn write_functions(
             writeln!(w, "        let arg{param_i} = arg{param_i}.into_data().unwrap_or_else(|_| panic!());")?;
             write!(w, "        let arg{param_i} = ")?;
             codegen_ty::write_ty_ref(w, &param, true, ctx)?;
-            writeln!(w, "::decode_buffer(&arg{param_i}.flatten()).unwrap();")?;
+            writeln!(w, "::decode(&arg{param_i}.flatten()).unwrap();")?;
             writeln!(w)?;
         }
 

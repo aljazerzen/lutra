@@ -10,7 +10,7 @@ use lutra_bin::{ir, Decode, Encode, Value};
 use lutra_frontend::{pr, Project};
 
 #[track_caller]
-fn _test_encode_decode<T: Encode + Decode>(value: Value, ty: &ir::Ty) -> String {
+fn _test_encode_decode<T: Encode + Decode + std::fmt::Debug>(value: Value, ty: &ir::Ty) -> String {
     // Value::encode
     let buf = value.encode(ty).unwrap();
 
@@ -19,11 +19,11 @@ fn _test_encode_decode<T: Encode + Decode>(value: Value, ty: &ir::Ty) -> String 
     assert_eq!(value, value_decoded);
 
     // native decode
-    let x = T::decode_buffer(&buf).unwrap();
+    let native = T::decode(&buf).unwrap();
 
     // native encode
     let mut buf2 = Vec::new();
-    x.encode(&mut buf2).unwrap();
+    native.encode(&mut buf2).unwrap();
     assert_eq!(buf, buf2);
 
     pretty_hex::pretty_hex(&buf)
@@ -138,6 +138,24 @@ fn test_v() {
     assert_snapshot!(_test_encode_decode::<types::v>(value, &ty), @r#"
     Length: 5 (0x5) bytes
     0000:   01 00 00 00  00                                      .....
+    "#
+    );
+}
+
+#[test]
+fn test_p() {
+    let ty = _test_get_type("p");
+    let value = Value::Tuple(vec![
+        Value::Array(vec![Value::Int64(2), Value::Int64(4)]),
+        Value::Array(vec![Value::Int64(5), Value::Int64(6), Value::Int64(7)]),
+    ]);
+
+    assert_snapshot!(_test_encode_decode::<types::p>(value, &ty), @r#"
+    Length: 56 (0x38) bytes
+    0000:   10 00 00 00  02 00 00 00  18 00 00 00  03 00 00 00   ................
+    0010:   02 00 00 00  00 00 00 00  04 00 00 00  00 00 00 00   ................
+    0020:   05 00 00 00  00 00 00 00  06 00 00 00  00 00 00 00   ................
+    0030:   07 00 00 00  00 00 00 00                             ........
     "#
     );
 }

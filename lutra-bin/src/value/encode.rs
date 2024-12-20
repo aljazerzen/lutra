@@ -1,10 +1,10 @@
 use std::io::Write;
 
-use crate::ir;
+use crate::{ir, reader};
 
 use super::{expect_ty, expect_ty_primitive, Value};
 use crate::encode::ReversePointer;
-use crate::layout::{self, EnumHeadFormat, EnumVariantFormat};
+use crate::layout::{self, EnumHeadFormat, EnumVariantFormat, Layout};
 use crate::{ArrayReader, Decode, Encode, Error, Reader, Result};
 
 impl Value {
@@ -243,18 +243,22 @@ fn decode_inner<'t>(r: &mut Reader<'_>, ty: &'t ir::Ty, ctx: &mut Context<'t>) -
     let ty = resolve_ident(ty, ctx);
 
     Ok(match &ty.kind {
-        ir::TyKind::Primitive(ir::PrimitiveSet::bool) => Value::Bool(bool::decode(r)?),
-        ir::TyKind::Primitive(ir::PrimitiveSet::int8) => Value::Int8(i8::decode(r)?),
-        ir::TyKind::Primitive(ir::PrimitiveSet::int16) => Value::Int16(i16::decode(r)?),
-        ir::TyKind::Primitive(ir::PrimitiveSet::int32) => Value::Int32(i32::decode(r)?),
-        ir::TyKind::Primitive(ir::PrimitiveSet::int64) => Value::Int64(i64::decode(r)?),
-        ir::TyKind::Primitive(ir::PrimitiveSet::uint8) => Value::Uint8(u8::decode(r)?),
-        ir::TyKind::Primitive(ir::PrimitiveSet::uint16) => Value::Uint16(u16::decode(r)?),
-        ir::TyKind::Primitive(ir::PrimitiveSet::uint32) => Value::Uint32(u32::decode(r)?),
-        ir::TyKind::Primitive(ir::PrimitiveSet::uint64) => Value::Uint64(u64::decode(r)?),
-        ir::TyKind::Primitive(ir::PrimitiveSet::float32) => Value::Float32(f32::decode(r)?),
-        ir::TyKind::Primitive(ir::PrimitiveSet::float64) => Value::Float64(f64::decode(r)?),
-        ir::TyKind::Primitive(ir::PrimitiveSet::text) => Value::Text(String::decode(r)?),
+        ir::TyKind::Primitive(ir::PrimitiveSet::bool) => Value::Bool(decode::<bool>(r)?),
+        ir::TyKind::Primitive(ir::PrimitiveSet::int8) => Value::Int8(decode::<i8>(r)?),
+        ir::TyKind::Primitive(ir::PrimitiveSet::int16) => Value::Int16(decode::<i16>(r)?),
+        ir::TyKind::Primitive(ir::PrimitiveSet::int32) => Value::Int32(decode::<i32>(r)?),
+        ir::TyKind::Primitive(ir::PrimitiveSet::int64) => Value::Int64(decode::<i64>(r)?),
+        ir::TyKind::Primitive(ir::PrimitiveSet::uint8) => Value::Uint8(decode::<u8>(r)?),
+        ir::TyKind::Primitive(ir::PrimitiveSet::uint16) => Value::Uint16(decode::<u16>(r)?),
+        ir::TyKind::Primitive(ir::PrimitiveSet::uint32) => Value::Uint32(decode::<u32>(r)?),
+        ir::TyKind::Primitive(ir::PrimitiveSet::uint64) => Value::Uint64(decode::<u64>(r)?),
+        ir::TyKind::Primitive(ir::PrimitiveSet::float32) => Value::Float32(decode::<f32>(r)?),
+        ir::TyKind::Primitive(ir::PrimitiveSet::float64) => Value::Float64(decode::<f64>(r)?),
+        ir::TyKind::Primitive(ir::PrimitiveSet::text) => {
+            let res = String::decode(r.as_ref())?;
+            r.skip(String::head_size().div_ceil(8));
+            Value::Text(res)
+        }
 
         ir::TyKind::Tuple(fields) => {
             let mut res = Vec::with_capacity(fields.len());
@@ -266,7 +270,9 @@ fn decode_inner<'t>(r: &mut Reader<'_>, ty: &'t ir::Ty, ctx: &mut Context<'t>) -
         ir::TyKind::Array(item_ty) => {
             let mut body = r.clone();
 
-            let (offset, len) = ArrayReader::read_head(r);
+            let (offset, len) = ArrayReader::read_head(r.as_ref());
+            r.skip(8);
+
             body.skip(offset);
 
             let mut buf = Vec::with_capacity(len);
@@ -304,6 +310,12 @@ fn decode_inner<'t>(r: &mut Reader<'_>, ty: &'t ir::Ty, ctx: &mut Context<'t>) -
 
         _ => return Err(Error::InvalidType),
     })
+}
+
+fn decode<D: Decode + Sized>(reader: &mut reader::Reader) -> Result<D> {
+    let res = D::decode(reader.as_ref());
+    reader.skip(D::head_size().div_ceil(8));
+    res
 }
 
 struct Context<'t> {

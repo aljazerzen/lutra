@@ -5,7 +5,7 @@ mod schema {
 use lutra_bin::{ir, Decode, Encode, Result, Value};
 
 pub fn decode_typed_data(buffer: &[u8]) -> Result<(Value, ir::Ty)> {
-    let typed_data = schema::TypedData::decode_buffer(buffer)?;
+    let typed_data = schema::TypedData::decode(buffer)?;
 
     let ty = type_to_ir(&typed_data.ty);
 

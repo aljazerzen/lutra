@@ -49,7 +49,6 @@ impl<'t> ArrayWriter<'t> {
             self.item_head_bytes,
             self.item_body_ptrs,
         );
-        // dbg!(&self.buf);
         if let Some(body) = body {
             self.item_bodies.push(body);
         }
@@ -65,8 +64,6 @@ impl<'t> ArrayWriter<'t> {
             body.write_pointers(&mut self.buf, total_len);
             total_len += body.buf.len();
         }
-        // dbg!(&self.buf);
-        // dbg!(total_len);
 
         // construct data
         let mut data = Data::new(self.buf);

@@ -89,9 +89,10 @@ pub mod br {
     mod impls {
         #![allow(unused_imports)]
         use super::*;
+        use crate::ReaderExt;
         use ::std::io::Write;
 
-        #[allow(clippy::all)]
+        #[allow(clippy::all, unused_variables)]
         impl crate::Encode for Program {
             type HeadPtr = ProgramHeadPtr;
             fn encode_head(&self, w: &mut Vec<u8>) -> crate::Result<Self::HeadPtr> {
@@ -128,11 +129,11 @@ pub mod br {
         }
 
         impl crate::Decode for Program {
-            fn decode(r: &mut crate::Reader<'_>) -> crate::Result<Self> {
-                let externals = Vec::<super::ExternalSymbol>::decode(r)?;
-                let main = super::Expr::decode(r)?;
-                let input_tys = Vec::<super::super::ir::Ty>::decode(r)?;
-                let output_ty = super::super::ir::Ty::decode(r)?;
+            fn decode(buf: &[u8]) -> crate::Result<Self> {
+                let externals = Vec::<super::ExternalSymbol>::decode(buf.skip(0))?;
+                let main = super::Expr::decode(buf.skip(8))?;
+                let input_tys = Vec::<super::super::ir::Ty>::decode(buf.skip(13))?;
+                let output_ty = super::super::ir::Ty::decode(buf.skip(21))?;
                 Ok(Program {
                     externals,
                     main,
@@ -142,7 +143,7 @@ pub mod br {
             }
         }
 
-        #[allow(clippy::all)]
+        #[allow(clippy::all, unused_variables)]
         impl crate::Encode for ExternalSymbol {
             type HeadPtr = ExternalSymbolHeadPtr;
             fn encode_head(&self, w: &mut Vec<u8>) -> crate::Result<Self::HeadPtr> {
@@ -168,14 +169,14 @@ pub mod br {
         }
 
         impl crate::Decode for ExternalSymbol {
-            fn decode(r: &mut crate::Reader<'_>) -> crate::Result<Self> {
-                let id = String::decode(r)?;
-                let layout_args = Vec::<u32>::decode(r)?;
+            fn decode(buf: &[u8]) -> crate::Result<Self> {
+                let id = String::decode(buf.skip(0))?;
+                let layout_args = Vec::<u32>::decode(buf.skip(8))?;
                 Ok(ExternalSymbol { id, layout_args })
             }
         }
 
-        #[allow(clippy::all)]
+        #[allow(clippy::all, unused_variables)]
         impl crate::Encode for Expr {
             type HeadPtr = ExprHeadPtr;
             fn encode_head(&self, w: &mut Vec<u8>) -> crate::Result<Self::HeadPtr> {
@@ -198,8 +199,8 @@ pub mod br {
         }
 
         impl crate::Decode for Expr {
-            fn decode(r: &mut crate::Reader<'_>) -> crate::Result<Self> {
-                let kind = super::ExprKind::decode(r)?;
+            fn decode(buf: &[u8]) -> crate::Result<Self> {
+                let kind = super::ExprKind::decode(buf.skip(0))?;
                 Ok(Expr { kind })
             }
         }
@@ -347,69 +348,49 @@ pub mod br {
         }
 
         impl crate::Decode for ExprKind {
-            fn decode(r: &mut crate::Reader<'_>) -> crate::Result<Self> {
-                let mut tag_bytes = r.read_n(1).to_vec();
+            fn decode(buf: &[u8]) -> crate::Result<Self> {
+                let mut tag_bytes = buf.read_n(1).to_vec();
                 tag_bytes.resize(8, 0);
                 let tag = u64::from_le_bytes(tag_bytes.try_into().unwrap()) as usize;
+                let buf = buf.skip(1);
                 Ok(match tag {
                     0 => {
-                        let inner = super::super::ir::Sid::decode(r)?;
+                        let inner = super::super::ir::Sid::decode(buf)?;
                         ExprKind::Pointer(inner)
                     }
                     1 => {
-                        let mut body = r.clone();
-                        let offset = r.read_const::<4>();
-                        let offset = u32::from_le_bytes(offset);
-                        body.skip(offset as usize);
-                        let inner = super::super::ir::Literal::decode(&mut body)?;
+                        let offset = u32::from_le_bytes(buf.read_const::<4>());
+                        let inner = super::super::ir::Literal::decode(buf.skip(offset as usize))?;
                         ExprKind::Literal(inner)
                     }
                     2 => {
-                        let mut body = r.clone();
-                        let offset = r.read_const::<4>();
-                        let offset = u32::from_le_bytes(offset);
-                        body.skip(offset as usize);
-                        let inner = super::Call::decode(&mut body)?;
+                        let offset = u32::from_le_bytes(buf.read_const::<4>());
+                        let inner = super::Call::decode(buf.skip(offset as usize))?;
                         ExprKind::Call(Box::new(inner))
                     }
                     3 => {
-                        let mut body = r.clone();
-                        let offset = r.read_const::<4>();
-                        let offset = u32::from_le_bytes(offset);
-                        body.skip(offset as usize);
-                        let inner = super::Function::decode(&mut body)?;
+                        let offset = u32::from_le_bytes(buf.read_const::<4>());
+                        let inner = super::Function::decode(buf.skip(offset as usize))?;
                         ExprKind::Function(Box::new(inner))
                     }
                     4 => {
-                        let mut body = r.clone();
-                        let offset = r.read_const::<4>();
-                        let offset = u32::from_le_bytes(offset);
-                        body.skip(offset as usize);
-                        let inner = super::Tuple::decode(&mut body)?;
+                        let offset = u32::from_le_bytes(buf.read_const::<4>());
+                        let inner = super::Tuple::decode(buf.skip(offset as usize))?;
                         ExprKind::Tuple(Box::new(inner))
                     }
                     5 => {
-                        let mut body = r.clone();
-                        let offset = r.read_const::<4>();
-                        let offset = u32::from_le_bytes(offset);
-                        body.skip(offset as usize);
-                        let inner = super::Array::decode(&mut body)?;
+                        let offset = u32::from_le_bytes(buf.read_const::<4>());
+                        let inner = super::Array::decode(buf.skip(offset as usize))?;
                         ExprKind::Array(Box::new(inner))
                     }
                     6 => {
-                        let mut body = r.clone();
-                        let offset = r.read_const::<4>();
-                        let offset = u32::from_le_bytes(offset);
-                        body.skip(offset as usize);
-                        let inner = super::TupleLookup::decode(&mut body)?;
+                        let offset = u32::from_le_bytes(buf.read_const::<4>());
+                        let inner = super::TupleLookup::decode(buf.skip(offset as usize))?;
                         ExprKind::TupleLookup(Box::new(inner))
                     }
                     7 => {
-                        let mut body = r.clone();
-                        let offset = r.read_const::<4>();
-                        let offset = u32::from_le_bytes(offset);
-                        body.skip(offset as usize);
-                        let inner = super::Binding::decode(&mut body)?;
+                        let offset = u32::from_le_bytes(buf.read_const::<4>());
+                        let inner = super::Binding::decode(buf.skip(offset as usize))?;
                         ExprKind::Binding(Box::new(inner))
                     }
                     _ => return Err(crate::Error::InvalidData),
@@ -417,7 +398,7 @@ pub mod br {
             }
         }
 
-        #[allow(clippy::all)]
+        #[allow(clippy::all, unused_variables)]
         impl crate::Encode for Call {
             type HeadPtr = CallHeadPtr;
             fn encode_head(&self, w: &mut Vec<u8>) -> crate::Result<Self::HeadPtr> {
@@ -443,14 +424,14 @@ pub mod br {
         }
 
         impl crate::Decode for Call {
-            fn decode(r: &mut crate::Reader<'_>) -> crate::Result<Self> {
-                let function = super::Expr::decode(r)?;
-                let args = Vec::<super::Expr>::decode(r)?;
+            fn decode(buf: &[u8]) -> crate::Result<Self> {
+                let function = super::Expr::decode(buf.skip(0))?;
+                let args = Vec::<super::Expr>::decode(buf.skip(5))?;
                 Ok(Call { function, args })
             }
         }
 
-        #[allow(clippy::all)]
+        #[allow(clippy::all, unused_variables)]
         impl crate::Encode for Function {
             type HeadPtr = FunctionHeadPtr;
             fn encode_head(&self, w: &mut Vec<u8>) -> crate::Result<Self::HeadPtr> {
@@ -476,14 +457,14 @@ pub mod br {
         }
 
         impl crate::Decode for Function {
-            fn decode(r: &mut crate::Reader<'_>) -> crate::Result<Self> {
-                let symbol_ns = super::super::ir::Sid::decode(r)?;
-                let body = super::Expr::decode(r)?;
+            fn decode(buf: &[u8]) -> crate::Result<Self> {
+                let symbol_ns = super::super::ir::Sid::decode(buf.skip(0))?;
+                let body = super::Expr::decode(buf.skip(4))?;
                 Ok(Function { symbol_ns, body })
             }
         }
 
-        #[allow(clippy::all)]
+        #[allow(clippy::all, unused_variables)]
         impl crate::Encode for Tuple {
             type HeadPtr = TupleHeadPtr;
             fn encode_head(&self, w: &mut Vec<u8>) -> crate::Result<Self::HeadPtr> {
@@ -512,9 +493,9 @@ pub mod br {
         }
 
         impl crate::Decode for Tuple {
-            fn decode(r: &mut crate::Reader<'_>) -> crate::Result<Self> {
-                let fields = Vec::<super::Expr>::decode(r)?;
-                let field_layouts = Vec::<super::TyLayout>::decode(r)?;
+            fn decode(buf: &[u8]) -> crate::Result<Self> {
+                let fields = Vec::<super::Expr>::decode(buf.skip(0))?;
+                let field_layouts = Vec::<super::TyLayout>::decode(buf.skip(8))?;
                 Ok(Tuple {
                     fields,
                     field_layouts,
@@ -522,7 +503,7 @@ pub mod br {
             }
         }
 
-        #[allow(clippy::all)]
+        #[allow(clippy::all, unused_variables)]
         impl crate::Encode for Array {
             type HeadPtr = ArrayHeadPtr;
             fn encode_head(&self, w: &mut Vec<u8>) -> crate::Result<Self::HeadPtr> {
@@ -548,14 +529,14 @@ pub mod br {
         }
 
         impl crate::Decode for Array {
-            fn decode(r: &mut crate::Reader<'_>) -> crate::Result<Self> {
-                let item_layout = super::TyLayout::decode(r)?;
-                let items = Vec::<super::Expr>::decode(r)?;
+            fn decode(buf: &[u8]) -> crate::Result<Self> {
+                let item_layout = super::TyLayout::decode(buf.skip(0))?;
+                let items = Vec::<super::Expr>::decode(buf.skip(12))?;
                 Ok(Array { item_layout, items })
             }
         }
 
-        #[allow(clippy::all)]
+        #[allow(clippy::all, unused_variables)]
         impl crate::Encode for TupleLookup {
             type HeadPtr = TupleLookupHeadPtr;
             fn encode_head(&self, w: &mut Vec<u8>) -> crate::Result<Self::HeadPtr> {
@@ -581,14 +562,14 @@ pub mod br {
         }
 
         impl crate::Decode for TupleLookup {
-            fn decode(r: &mut crate::Reader<'_>) -> crate::Result<Self> {
-                let base = super::Expr::decode(r)?;
-                let offset = u32::decode(r)?;
+            fn decode(buf: &[u8]) -> crate::Result<Self> {
+                let base = super::Expr::decode(buf.skip(0))?;
+                let offset = u32::decode(buf.skip(5))?;
                 Ok(TupleLookup { base, offset })
             }
         }
 
-        #[allow(clippy::all)]
+        #[allow(clippy::all, unused_variables)]
         impl crate::Encode for Binding {
             type HeadPtr = BindingHeadPtr;
             fn encode_head(&self, w: &mut Vec<u8>) -> crate::Result<Self::HeadPtr> {
@@ -617,15 +598,15 @@ pub mod br {
         }
 
         impl crate::Decode for Binding {
-            fn decode(r: &mut crate::Reader<'_>) -> crate::Result<Self> {
-                let symbol = super::super::ir::Sid::decode(r)?;
-                let expr = super::Expr::decode(r)?;
-                let main = super::Expr::decode(r)?;
+            fn decode(buf: &[u8]) -> crate::Result<Self> {
+                let symbol = super::super::ir::Sid::decode(buf.skip(0))?;
+                let expr = super::Expr::decode(buf.skip(4))?;
+                let main = super::Expr::decode(buf.skip(9))?;
                 Ok(Binding { symbol, expr, main })
             }
         }
 
-        #[allow(clippy::all)]
+        #[allow(clippy::all, unused_variables)]
         impl crate::Encode for TyLayout {
             type HeadPtr = TyLayoutHeadPtr;
             fn encode_head(&self, w: &mut Vec<u8>) -> crate::Result<Self::HeadPtr> {
@@ -654,9 +635,9 @@ pub mod br {
         }
 
         impl crate::Decode for TyLayout {
-            fn decode(r: &mut crate::Reader<'_>) -> crate::Result<Self> {
-                let head_size = u32::decode(r)?;
-                let body_ptrs = Vec::<u32>::decode(r)?;
+            fn decode(buf: &[u8]) -> crate::Result<Self> {
+                let head_size = u32::decode(buf.skip(0))?;
+                let body_ptrs = Vec::<u32>::decode(buf.skip(4))?;
                 Ok(TyLayout {
                     head_size,
                     body_ptrs,
@@ -814,9 +795,10 @@ pub mod ir {
     mod impls {
         #![allow(unused_imports)]
         use super::*;
+        use crate::ReaderExt;
         use ::std::io::Write;
 
-        #[allow(clippy::all)]
+        #[allow(clippy::all, unused_variables)]
         impl crate::Encode for Program {
             type HeadPtr = ProgramHeadPtr;
             fn encode_head(&self, w: &mut Vec<u8>) -> crate::Result<Self::HeadPtr> {
@@ -842,14 +824,14 @@ pub mod ir {
         }
 
         impl crate::Decode for Program {
-            fn decode(r: &mut crate::Reader<'_>) -> crate::Result<Self> {
-                let externals = Vec::<super::ExternalSymbol>::decode(r)?;
-                let main = super::Expr::decode(r)?;
+            fn decode(buf: &[u8]) -> crate::Result<Self> {
+                let externals = Vec::<super::ExternalSymbol>::decode(buf.skip(0))?;
+                let main = super::Expr::decode(buf.skip(8))?;
                 Ok(Program { externals, main })
             }
         }
 
-        #[allow(clippy::all)]
+        #[allow(clippy::all, unused_variables)]
         impl crate::Encode for ExternalSymbol {
             type HeadPtr = ExternalSymbolHeadPtr;
             fn encode_head(&self, w: &mut Vec<u8>) -> crate::Result<Self::HeadPtr> {
@@ -872,13 +854,13 @@ pub mod ir {
         }
 
         impl crate::Decode for ExternalSymbol {
-            fn decode(r: &mut crate::Reader<'_>) -> crate::Result<Self> {
-                let id = String::decode(r)?;
+            fn decode(buf: &[u8]) -> crate::Result<Self> {
+                let id = String::decode(buf.skip(0))?;
                 Ok(ExternalSymbol { id })
             }
         }
 
-        #[allow(clippy::all)]
+        #[allow(clippy::all, unused_variables)]
         impl crate::Encode for Expr {
             type HeadPtr = ExprHeadPtr;
             fn encode_head(&self, w: &mut Vec<u8>) -> crate::Result<Self::HeadPtr> {
@@ -904,9 +886,9 @@ pub mod ir {
         }
 
         impl crate::Decode for Expr {
-            fn decode(r: &mut crate::Reader<'_>) -> crate::Result<Self> {
-                let kind = super::ExprKind::decode(r)?;
-                let ty = super::Ty::decode(r)?;
+            fn decode(buf: &[u8]) -> crate::Result<Self> {
+                let kind = super::ExprKind::decode(buf.skip(0))?;
+                let ty = super::Ty::decode(buf.skip(5))?;
                 Ok(Expr { kind, ty })
             }
         }
@@ -1054,69 +1036,49 @@ pub mod ir {
         }
 
         impl crate::Decode for ExprKind {
-            fn decode(r: &mut crate::Reader<'_>) -> crate::Result<Self> {
-                let mut tag_bytes = r.read_n(1).to_vec();
+            fn decode(buf: &[u8]) -> crate::Result<Self> {
+                let mut tag_bytes = buf.read_n(1).to_vec();
                 tag_bytes.resize(8, 0);
                 let tag = u64::from_le_bytes(tag_bytes.try_into().unwrap()) as usize;
+                let buf = buf.skip(1);
                 Ok(match tag {
                     0 => {
-                        let inner = super::Sid::decode(r)?;
+                        let inner = super::Sid::decode(buf)?;
                         ExprKind::Pointer(inner)
                     }
                     1 => {
-                        let mut body = r.clone();
-                        let offset = r.read_const::<4>();
-                        let offset = u32::from_le_bytes(offset);
-                        body.skip(offset as usize);
-                        let inner = super::Literal::decode(&mut body)?;
+                        let offset = u32::from_le_bytes(buf.read_const::<4>());
+                        let inner = super::Literal::decode(buf.skip(offset as usize))?;
                         ExprKind::Literal(inner)
                     }
                     2 => {
-                        let mut body = r.clone();
-                        let offset = r.read_const::<4>();
-                        let offset = u32::from_le_bytes(offset);
-                        body.skip(offset as usize);
-                        let inner = super::Call::decode(&mut body)?;
+                        let offset = u32::from_le_bytes(buf.read_const::<4>());
+                        let inner = super::Call::decode(buf.skip(offset as usize))?;
                         ExprKind::Call(Box::new(inner))
                     }
                     3 => {
-                        let mut body = r.clone();
-                        let offset = r.read_const::<4>();
-                        let offset = u32::from_le_bytes(offset);
-                        body.skip(offset as usize);
-                        let inner = super::Function::decode(&mut body)?;
+                        let offset = u32::from_le_bytes(buf.read_const::<4>());
+                        let inner = super::Function::decode(buf.skip(offset as usize))?;
                         ExprKind::Function(Box::new(inner))
                     }
                     4 => {
-                        let mut body = r.clone();
-                        let offset = r.read_const::<4>();
-                        let offset = u32::from_le_bytes(offset);
-                        body.skip(offset as usize);
-                        let inner = Vec::<super::Expr>::decode(&mut body)?;
+                        let offset = u32::from_le_bytes(buf.read_const::<4>());
+                        let inner = Vec::<super::Expr>::decode(buf.skip(offset as usize))?;
                         ExprKind::Tuple(inner)
                     }
                     5 => {
-                        let mut body = r.clone();
-                        let offset = r.read_const::<4>();
-                        let offset = u32::from_le_bytes(offset);
-                        body.skip(offset as usize);
-                        let inner = Vec::<super::Expr>::decode(&mut body)?;
+                        let offset = u32::from_le_bytes(buf.read_const::<4>());
+                        let inner = Vec::<super::Expr>::decode(buf.skip(offset as usize))?;
                         ExprKind::Array(inner)
                     }
                     6 => {
-                        let mut body = r.clone();
-                        let offset = r.read_const::<4>();
-                        let offset = u32::from_le_bytes(offset);
-                        body.skip(offset as usize);
-                        let inner = super::TupleLookup::decode(&mut body)?;
+                        let offset = u32::from_le_bytes(buf.read_const::<4>());
+                        let inner = super::TupleLookup::decode(buf.skip(offset as usize))?;
                         ExprKind::TupleLookup(Box::new(inner))
                     }
                     7 => {
-                        let mut body = r.clone();
-                        let offset = r.read_const::<4>();
-                        let offset = u32::from_le_bytes(offset);
-                        body.skip(offset as usize);
-                        let inner = super::Binding::decode(&mut body)?;
+                        let offset = u32::from_le_bytes(buf.read_const::<4>());
+                        let inner = super::Binding::decode(buf.skip(offset as usize))?;
                         ExprKind::Binding(Box::new(inner))
                     }
                     _ => return Err(crate::Error::InvalidData),
@@ -1140,8 +1102,8 @@ pub mod ir {
         }
 
         impl crate::Decode for Sid {
-            fn decode(r: &mut crate::Reader<'_>) -> crate::Result<Self> {
-                Ok(Self(u32::decode(r)?))
+            fn decode(buf: &[u8]) -> crate::Result<Self> {
+                Ok(Self(u32::decode(buf)?))
             }
         }
 
@@ -1229,38 +1191,29 @@ pub mod ir {
         }
 
         impl crate::Decode for Literal {
-            fn decode(r: &mut crate::Reader<'_>) -> crate::Result<Self> {
-                let mut tag_bytes = r.read_n(1).to_vec();
+            fn decode(buf: &[u8]) -> crate::Result<Self> {
+                let mut tag_bytes = buf.read_n(1).to_vec();
                 tag_bytes.resize(8, 0);
                 let tag = u64::from_le_bytes(tag_bytes.try_into().unwrap()) as usize;
+                let buf = buf.skip(1);
                 Ok(match tag {
                     0 => {
-                        let mut body = r.clone();
-                        let offset = r.read_const::<4>();
-                        let offset = u32::from_le_bytes(offset);
-                        body.skip(offset as usize);
-                        let inner = i64::decode(&mut body)?;
+                        let offset = u32::from_le_bytes(buf.read_const::<4>());
+                        let inner = i64::decode(buf.skip(offset as usize))?;
                         Literal::Int(inner)
                     }
                     1 => {
-                        let mut body = r.clone();
-                        let offset = r.read_const::<4>();
-                        let offset = u32::from_le_bytes(offset);
-                        body.skip(offset as usize);
-                        let inner = f64::decode(&mut body)?;
+                        let offset = u32::from_le_bytes(buf.read_const::<4>());
+                        let inner = f64::decode(buf.skip(offset as usize))?;
                         Literal::Float(inner)
                     }
                     2 => {
-                        let inner = bool::decode(r)?;
-                        r.skip(3);
+                        let inner = bool::decode(buf)?;
                         Literal::Bool(inner)
                     }
                     3 => {
-                        let mut body = r.clone();
-                        let offset = r.read_const::<4>();
-                        let offset = u32::from_le_bytes(offset);
-                        body.skip(offset as usize);
-                        let inner = String::decode(&mut body)?;
+                        let offset = u32::from_le_bytes(buf.read_const::<4>());
+                        let inner = String::decode(buf.skip(offset as usize))?;
                         Literal::Text(inner)
                     }
                     _ => return Err(crate::Error::InvalidData),
@@ -1268,7 +1221,7 @@ pub mod ir {
             }
         }
 
-        #[allow(clippy::all)]
+        #[allow(clippy::all, unused_variables)]
         impl crate::Encode for Call {
             type HeadPtr = CallHeadPtr;
             fn encode_head(&self, w: &mut Vec<u8>) -> crate::Result<Self::HeadPtr> {
@@ -1294,14 +1247,14 @@ pub mod ir {
         }
 
         impl crate::Decode for Call {
-            fn decode(r: &mut crate::Reader<'_>) -> crate::Result<Self> {
-                let function = super::Expr::decode(r)?;
-                let args = Vec::<super::Expr>::decode(r)?;
+            fn decode(buf: &[u8]) -> crate::Result<Self> {
+                let function = super::Expr::decode(buf.skip(0))?;
+                let args = Vec::<super::Expr>::decode(buf.skip(20))?;
                 Ok(Call { function, args })
             }
         }
 
-        #[allow(clippy::all)]
+        #[allow(clippy::all, unused_variables)]
         impl crate::Encode for Function {
             type HeadPtr = FunctionHeadPtr;
             fn encode_head(&self, w: &mut Vec<u8>) -> crate::Result<Self::HeadPtr> {
@@ -1327,14 +1280,14 @@ pub mod ir {
         }
 
         impl crate::Decode for Function {
-            fn decode(r: &mut crate::Reader<'_>) -> crate::Result<Self> {
-                let symbol_ns = super::Sid::decode(r)?;
-                let body = super::Expr::decode(r)?;
+            fn decode(buf: &[u8]) -> crate::Result<Self> {
+                let symbol_ns = super::Sid::decode(buf.skip(0))?;
+                let body = super::Expr::decode(buf.skip(4))?;
                 Ok(Function { symbol_ns, body })
             }
         }
 
-        #[allow(clippy::all)]
+        #[allow(clippy::all, unused_variables)]
         impl crate::Encode for TupleLookup {
             type HeadPtr = TupleLookupHeadPtr;
             fn encode_head(&self, w: &mut Vec<u8>) -> crate::Result<Self::HeadPtr> {
@@ -1360,14 +1313,14 @@ pub mod ir {
         }
 
         impl crate::Decode for TupleLookup {
-            fn decode(r: &mut crate::Reader<'_>) -> crate::Result<Self> {
-                let base = super::Expr::decode(r)?;
-                let position = u16::decode(r)?;
+            fn decode(buf: &[u8]) -> crate::Result<Self> {
+                let base = super::Expr::decode(buf.skip(0))?;
+                let position = u16::decode(buf.skip(20))?;
                 Ok(TupleLookup { base, position })
             }
         }
 
-        #[allow(clippy::all)]
+        #[allow(clippy::all, unused_variables)]
         impl crate::Encode for Binding {
             type HeadPtr = BindingHeadPtr;
             fn encode_head(&self, w: &mut Vec<u8>) -> crate::Result<Self::HeadPtr> {
@@ -1396,15 +1349,15 @@ pub mod ir {
         }
 
         impl crate::Decode for Binding {
-            fn decode(r: &mut crate::Reader<'_>) -> crate::Result<Self> {
-                let symbol = super::Sid::decode(r)?;
-                let expr = super::Expr::decode(r)?;
-                let main = super::Expr::decode(r)?;
+            fn decode(buf: &[u8]) -> crate::Result<Self> {
+                let symbol = super::Sid::decode(buf.skip(0))?;
+                let expr = super::Expr::decode(buf.skip(4))?;
+                let main = super::Expr::decode(buf.skip(24))?;
                 Ok(Binding { symbol, expr, main })
             }
         }
 
-        #[allow(clippy::all)]
+        #[allow(clippy::all, unused_variables)]
         impl crate::Encode for Ty {
             type HeadPtr = TyHeadPtr;
             fn encode_head(&self, w: &mut Vec<u8>) -> crate::Result<Self::HeadPtr> {
@@ -1433,10 +1386,10 @@ pub mod ir {
         }
 
         impl crate::Decode for Ty {
-            fn decode(r: &mut crate::Reader<'_>) -> crate::Result<Self> {
-                let kind = super::TyKind::decode(r)?;
-                let layout = Option::<super::TyLayout>::decode(r)?;
-                let name = Option::<String>::decode(r)?;
+            fn decode(buf: &[u8]) -> crate::Result<Self> {
+                let kind = super::TyKind::decode(buf.skip(0))?;
+                let layout = Option::<super::TyLayout>::decode(buf.skip(5))?;
+                let name = Option::<String>::decode(buf.skip(10))?;
                 Ok(Ty { kind, layout, name })
             }
         }
@@ -1556,57 +1509,40 @@ pub mod ir {
         }
 
         impl crate::Decode for TyKind {
-            fn decode(r: &mut crate::Reader<'_>) -> crate::Result<Self> {
-                let mut tag_bytes = r.read_n(1).to_vec();
+            fn decode(buf: &[u8]) -> crate::Result<Self> {
+                let mut tag_bytes = buf.read_n(1).to_vec();
                 tag_bytes.resize(8, 0);
                 let tag = u64::from_le_bytes(tag_bytes.try_into().unwrap()) as usize;
+                let buf = buf.skip(1);
                 Ok(match tag {
                     0 => {
-                        let mut body = r.clone();
-                        let offset = r.read_const::<4>();
-                        let offset = u32::from_le_bytes(offset);
-                        body.skip(offset as usize);
-                        let inner = super::PrimitiveSet::decode(&mut body)?;
+                        let offset = u32::from_le_bytes(buf.read_const::<4>());
+                        let inner = super::PrimitiveSet::decode(buf.skip(offset as usize))?;
                         TyKind::Primitive(inner)
                     }
                     1 => {
-                        let mut body = r.clone();
-                        let offset = r.read_const::<4>();
-                        let offset = u32::from_le_bytes(offset);
-                        body.skip(offset as usize);
-                        let inner = Vec::<super::TyTupleField>::decode(&mut body)?;
+                        let offset = u32::from_le_bytes(buf.read_const::<4>());
+                        let inner = Vec::<super::TyTupleField>::decode(buf.skip(offset as usize))?;
                         TyKind::Tuple(inner)
                     }
                     2 => {
-                        let mut body = r.clone();
-                        let offset = r.read_const::<4>();
-                        let offset = u32::from_le_bytes(offset);
-                        body.skip(offset as usize);
-                        let inner = super::Ty::decode(&mut body)?;
+                        let offset = u32::from_le_bytes(buf.read_const::<4>());
+                        let inner = super::Ty::decode(buf.skip(offset as usize))?;
                         TyKind::Array(Box::new(inner))
                     }
                     3 => {
-                        let mut body = r.clone();
-                        let offset = r.read_const::<4>();
-                        let offset = u32::from_le_bytes(offset);
-                        body.skip(offset as usize);
-                        let inner = Vec::<super::TyEnumVariant>::decode(&mut body)?;
+                        let offset = u32::from_le_bytes(buf.read_const::<4>());
+                        let inner = Vec::<super::TyEnumVariant>::decode(buf.skip(offset as usize))?;
                         TyKind::Enum(inner)
                     }
                     4 => {
-                        let mut body = r.clone();
-                        let offset = r.read_const::<4>();
-                        let offset = u32::from_le_bytes(offset);
-                        body.skip(offset as usize);
-                        let inner = super::TyFunction::decode(&mut body)?;
+                        let offset = u32::from_le_bytes(buf.read_const::<4>());
+                        let inner = super::TyFunction::decode(buf.skip(offset as usize))?;
                         TyKind::Function(Box::new(inner))
                     }
                     5 => {
-                        let mut body = r.clone();
-                        let offset = r.read_const::<4>();
-                        let offset = u32::from_le_bytes(offset);
-                        body.skip(offset as usize);
-                        let inner = super::Path::decode(&mut body)?;
+                        let offset = u32::from_le_bytes(buf.read_const::<4>());
+                        let inner = super::Path::decode(buf.skip(offset as usize))?;
                         TyKind::Ident(inner)
                     }
                     _ => return Err(crate::Error::InvalidData),
@@ -1681,65 +1617,29 @@ pub mod ir {
         }
 
         impl crate::Decode for PrimitiveSet {
-            fn decode(r: &mut crate::Reader<'_>) -> crate::Result<Self> {
-                let mut tag_bytes = r.read_n(1).to_vec();
+            fn decode(buf: &[u8]) -> crate::Result<Self> {
+                let mut tag_bytes = buf.read_n(1).to_vec();
                 tag_bytes.resize(8, 0);
                 let tag = u64::from_le_bytes(tag_bytes.try_into().unwrap()) as usize;
                 Ok(match tag {
-                    0 => {
-                        r.skip(4);
-                        PrimitiveSet::bool
-                    }
-                    1 => {
-                        r.skip(4);
-                        PrimitiveSet::int8
-                    }
-                    2 => {
-                        r.skip(4);
-                        PrimitiveSet::int16
-                    }
-                    3 => {
-                        r.skip(4);
-                        PrimitiveSet::int32
-                    }
-                    4 => {
-                        r.skip(4);
-                        PrimitiveSet::int64
-                    }
-                    5 => {
-                        r.skip(4);
-                        PrimitiveSet::uint8
-                    }
-                    6 => {
-                        r.skip(4);
-                        PrimitiveSet::uint16
-                    }
-                    7 => {
-                        r.skip(4);
-                        PrimitiveSet::uint32
-                    }
-                    8 => {
-                        r.skip(4);
-                        PrimitiveSet::uint64
-                    }
-                    9 => {
-                        r.skip(4);
-                        PrimitiveSet::float32
-                    }
-                    10 => {
-                        r.skip(4);
-                        PrimitiveSet::float64
-                    }
-                    11 => {
-                        r.skip(4);
-                        PrimitiveSet::text
-                    }
+                    0 => PrimitiveSet::bool,
+                    1 => PrimitiveSet::int8,
+                    2 => PrimitiveSet::int16,
+                    3 => PrimitiveSet::int32,
+                    4 => PrimitiveSet::int64,
+                    5 => PrimitiveSet::uint8,
+                    6 => PrimitiveSet::uint16,
+                    7 => PrimitiveSet::uint32,
+                    8 => PrimitiveSet::uint64,
+                    9 => PrimitiveSet::float32,
+                    10 => PrimitiveSet::float64,
+                    11 => PrimitiveSet::text,
                     _ => return Err(crate::Error::InvalidData),
                 })
             }
         }
 
-        #[allow(clippy::all)]
+        #[allow(clippy::all, unused_variables)]
         impl crate::Encode for TyTupleField {
             type HeadPtr = TyTupleFieldHeadPtr;
             fn encode_head(&self, w: &mut Vec<u8>) -> crate::Result<Self::HeadPtr> {
@@ -1765,14 +1665,14 @@ pub mod ir {
         }
 
         impl crate::Decode for TyTupleField {
-            fn decode(r: &mut crate::Reader<'_>) -> crate::Result<Self> {
-                let name = Option::<String>::decode(r)?;
-                let ty = super::Ty::decode(r)?;
+            fn decode(buf: &[u8]) -> crate::Result<Self> {
+                let name = Option::<String>::decode(buf.skip(0))?;
+                let ty = super::Ty::decode(buf.skip(5))?;
                 Ok(TyTupleField { name, ty })
             }
         }
 
-        #[allow(clippy::all)]
+        #[allow(clippy::all, unused_variables)]
         impl crate::Encode for TyEnumVariant {
             type HeadPtr = TyEnumVariantHeadPtr;
             fn encode_head(&self, w: &mut Vec<u8>) -> crate::Result<Self::HeadPtr> {
@@ -1798,14 +1698,14 @@ pub mod ir {
         }
 
         impl crate::Decode for TyEnumVariant {
-            fn decode(r: &mut crate::Reader<'_>) -> crate::Result<Self> {
-                let name = String::decode(r)?;
-                let ty = super::Ty::decode(r)?;
+            fn decode(buf: &[u8]) -> crate::Result<Self> {
+                let name = String::decode(buf.skip(0))?;
+                let ty = super::Ty::decode(buf.skip(8))?;
                 Ok(TyEnumVariant { name, ty })
             }
         }
 
-        #[allow(clippy::all)]
+        #[allow(clippy::all, unused_variables)]
         impl crate::Encode for TyLayout {
             type HeadPtr = TyLayoutHeadPtr;
             fn encode_head(&self, w: &mut Vec<u8>) -> crate::Result<Self::HeadPtr> {
@@ -1839,10 +1739,10 @@ pub mod ir {
         }
 
         impl crate::Decode for TyLayout {
-            fn decode(r: &mut crate::Reader<'_>) -> crate::Result<Self> {
-                let head_size = u32::decode(r)?;
-                let body_ptrs = Vec::<u32>::decode(r)?;
-                let variants_recursive = Vec::<u16>::decode(r)?;
+            fn decode(buf: &[u8]) -> crate::Result<Self> {
+                let head_size = u32::decode(buf.skip(0))?;
+                let body_ptrs = Vec::<u32>::decode(buf.skip(4))?;
+                let variants_recursive = Vec::<u16>::decode(buf.skip(12))?;
                 Ok(TyLayout {
                     head_size,
                     body_ptrs,
@@ -1851,7 +1751,7 @@ pub mod ir {
             }
         }
 
-        #[allow(clippy::all)]
+        #[allow(clippy::all, unused_variables)]
         impl crate::Encode for TyFunction {
             type HeadPtr = TyFunctionHeadPtr;
             fn encode_head(&self, w: &mut Vec<u8>) -> crate::Result<Self::HeadPtr> {
@@ -1877,9 +1777,9 @@ pub mod ir {
         }
 
         impl crate::Decode for TyFunction {
-            fn decode(r: &mut crate::Reader<'_>) -> crate::Result<Self> {
-                let params = Vec::<super::Ty>::decode(r)?;
-                let body = super::Ty::decode(r)?;
+            fn decode(buf: &[u8]) -> crate::Result<Self> {
+                let params = Vec::<super::Ty>::decode(buf.skip(0))?;
+                let body = super::Ty::decode(buf.skip(8))?;
                 Ok(TyFunction { params, body })
             }
         }
@@ -1900,8 +1800,8 @@ pub mod ir {
         }
 
         impl crate::Decode for Path {
-            fn decode(r: &mut crate::Reader<'_>) -> crate::Result<Self> {
-                Ok(Self(Vec::<String>::decode(r)?))
+            fn decode(buf: &[u8]) -> crate::Result<Self> {
+                Ok(Self(Vec::<String>::decode(buf)?))
             }
         }
     }

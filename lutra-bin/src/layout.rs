@@ -145,6 +145,26 @@ pub fn get_layout_simple(ty: &ir::Ty) -> Option<ir::TyLayout> {
     })
 }
 
+pub fn tuple_field_offsets(ty: &ir::Ty) -> Vec<u32> {
+    let ir::TyKind::Tuple(ty_fields) = &ty.kind else {
+        panic!()
+    };
+
+    let mut field_offsets = Vec::with_capacity(ty_fields.len());
+    let mut offset = 0_u32;
+    for field in ty_fields {
+        field_offsets.push(offset);
+
+        let layout = field.ty.layout.as_ref().unwrap();
+        offset += (layout.head_size).div_ceil(8);
+    }
+    field_offsets
+}
+
+pub fn tuple_field_offset(ty: &ir::Ty, position: u16) -> u32 {
+    *tuple_field_offsets(ty).get(position as usize).unwrap()
+}
+
 pub fn does_enum_variant_contain_recursive(enum_ty: &ir::Ty, variant_index: u16) -> bool {
     let layout = enum_ty.layout.as_ref().unwrap();
     layout.variants_recursive.contains(&variant_index)

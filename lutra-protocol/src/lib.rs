@@ -1,6 +1,6 @@
 mod client;
-mod server;
 pub mod http;
+mod server;
 
 pub mod messages {
     include!(concat!(env!("OUT_DIR"), "/messages.rs"));

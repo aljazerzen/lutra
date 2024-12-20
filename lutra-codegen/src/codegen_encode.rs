@@ -17,6 +17,7 @@ pub fn write_encode_impls(
     writeln!(w, "mod impls {{")?;
     writeln!(w, "#![allow(unused_imports)]")?;
     writeln!(w, "use ::std::io::Write;")?;
+    writeln!(w, "use {}::ReaderExt;", ctx.options.lutra_bin_path)?;
     writeln!(w, "use super::*;\n")?;
 
     ctx.current_module.push("impls".into());
@@ -272,12 +273,12 @@ fn write_ty_def_impl(
             writeln!(w, "impl {lutra_bin}::Decode for {name} {{")?;
             writeln!(
                 w,
-                "    fn decode(r: &mut {lutra_bin}::Reader<'_>) -> {lutra_bin}::Result<Self> {{"
+                "    fn decode(buf: &[u8]) -> {lutra_bin}::Result<Self> {{"
             )?;
 
             write!(w, "        Ok(Self(")?;
             write_ty_ref(w, ty, true, ctx)?;
-            writeln!(w, "::decode(r)?))")?;
+            writeln!(w, "::decode(buf)?))")?;
 
             writeln!(w, "    }}")?;
             writeln!(w, "}}\n")?;
@@ -287,12 +288,12 @@ fn write_ty_def_impl(
             writeln!(w, "impl {lutra_bin}::Decode for {name} {{")?;
             writeln!(
                 w,
-                "    fn decode(r: &mut {lutra_bin}::Reader<'_>) -> {lutra_bin}::Result<Self> {{"
+                "    fn decode(buf: &[u8]) -> {lutra_bin}::Result<Self> {{"
             )?;
 
             write!(w, "        Ok(Self(")?;
             write_ty_ref(w, ty, true, ctx)?;
-            writeln!(w, "::decode(r)?))")?;
+            writeln!(w, "::decode(buf)?))")?;
 
             writeln!(w, "    }}")?;
             writeln!(w, "}}\n")?;
@@ -304,9 +305,10 @@ fn write_ty_def_impl(
             }
 
             writeln!(w, "impl {lutra_bin}::Decode for {name} {{")?;
-            writeln!(w, "    fn decode(r: &mut {lutra_bin}::Reader<'_>) -> {lutra_bin}::Result<Self> {{")?;
+            writeln!(w, "    fn decode(buf: &[u8]) -> {lutra_bin}::Result<Self> {{")?;
 
-            for (index, field) in fields.iter().enumerate() {
+            let field_offsets = layout::tuple_field_offsets(ty);
+            for (index, (field, offset)) in fields.iter().zip(field_offsets).enumerate() {
                 let field_name = tuple_field_name(&field.name, index);
                 let field_ty = &field.ty;
 
@@ -314,7 +316,7 @@ fn write_ty_def_impl(
 
                 write_ty_ref(w, field_ty, true, ctx)?;
 
-                writeln!(w, "::decode(r)?;")?;
+                writeln!(w, "::decode(buf.skip({}))?;", offset)?;
             }
 
             writeln!(w, "        Ok({name} {{")?;
@@ -332,15 +334,19 @@ fn write_ty_def_impl(
             writeln!(w, "impl {lutra_bin}::Decode for {name} {{")?;
             writeln!(
                 w,
-                "    fn decode(r: &mut {lutra_bin}::Reader<'_>) -> {lutra_bin}::Result<Self> {{"
+                "    fn decode(buf: &[u8]) -> {lutra_bin}::Result<Self> {{"
             )?;
 
             let head = layout::enum_head_format(variants);
 
             // tag
-            writeln!(w, "        let mut tag_bytes = r.read_n({}).to_vec();", head.s / 8)?;
+            writeln!(w, "        let mut tag_bytes = buf.read_n({}).to_vec();", head.s / 8)?;
             writeln!(w, "        tag_bytes.resize(8, 0);")?;
             writeln!(w, "        let tag = u64::from_le_bytes(tag_bytes.try_into().unwrap()) as usize;")?;
+
+            if variants.iter().any(|v| !is_unit_variant(&v.ty)) {
+                writeln!(w, "        let buf = buf.skip({});", head.s / 8)?;
+            }
 
             writeln!(w, "        Ok(match tag {{")?;
             for (index, variant) in variants.iter().enumerate() {
@@ -352,21 +358,14 @@ fn write_ty_def_impl(
                     if !is_unit_variant(&variant.ty) {
                         write!(w, "                let inner = ")?;
                         write_ty_ref(w, &variant.ty, true, ctx)?;
-                        writeln!(w, "::decode(r)?;")?;
+                        writeln!(w, "::decode(buf)?;")?;
                     }
                 } else {
-                    writeln!(w, "                let mut body = r.clone();")?;
-                    writeln!(w, "                let offset = r.read_const::<4>();")?;
-                    writeln!(w, "                let offset = u32::from_le_bytes(offset);")?;
-                    writeln!(w, "                body.skip(offset as usize);")?;
+                    writeln!(w, "                let offset = u32::from_le_bytes(buf.read_const::<4>());")?;
 
                     write!(w, "                let inner = ")?;
                     write_ty_ref(w, &variant.ty, true, ctx)?;
-                    writeln!(w, "::decode(&mut body)?;")?;
-                }
-
-                if variant_format.padding > 0 {
-                    writeln!(w, "                r.skip({});", variant_format.padding / 8)?;
+                    writeln!(w, "::decode(buf.skip(offset as usize))?;")?;
                 }
 
                 let needs_box = layout::does_enum_variant_contain_recursive(ty, index as u16);

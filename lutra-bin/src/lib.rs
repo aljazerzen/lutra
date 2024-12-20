@@ -15,6 +15,6 @@ pub use data::Data;
 pub use encode::{Decode, Encode, ReversePointer};
 pub use error::{Error, Result};
 pub use layout::Layout;
-pub use reader::{ArrayReader, Reader, TupleReader};
+pub use reader::{ArrayReader, Reader, ReaderExt, TupleReader};
 pub use value::Value;
 pub use writer::{ArrayWriter, TupleWriter};
