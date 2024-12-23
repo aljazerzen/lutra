@@ -12,26 +12,6 @@ impl Program {
     }
 }
 
-pub enum SidKind {
-    External,
-    Var,
-    FunctionScope,
-}
-
-impl Sid {
-    pub fn kind(&self) -> SidKind {
-        let sid_kind: u32 = self.0 >> 30;
-        match sid_kind {
-            0 => SidKind::External,
-            1 => SidKind::Var,
-            2 => SidKind::FunctionScope,
-            _ => {
-                panic!()
-            }
-        }
-    }
-}
-
 impl std::fmt::Display for Literal {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {

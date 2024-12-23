@@ -3,11 +3,7 @@ use insta::assert_debug_snapshot;
 
 #[test]
 fn parse_01() {
-    assert_debug_snapshot!(super::_test_parse(r#"let externals = [
-  std::int::add,
-];
-
-let main =
+    assert_debug_snapshot!(super::_test_parse(r#"let main =
   let 1 = (
     func 2 -> [
         fn.2+0: float64,
@@ -33,7 +29,7 @@ let main =
         7: int64,
     ): [int64],
     (call
-        external.0: func (int64, int64) -> int64,
+        external.std::int::add: func (int64, int64) -> int64,
         6: int64,
         2: int64
     ): int64
@@ -41,30 +37,24 @@ let main =
   .1:[int64]
     "#), @r#"
     Program {
-        externals: [
-            ExternalSymbol {
-                id: "std::int::add",
-            },
-        ],
         main: Expr {
             kind: Binding(
                 Binding {
-                    symbol: Sid(
-                        1073741825,
-                    ),
+                    id: 1,
                     expr: Expr {
                         kind: Function(
                             Function {
-                                symbol_ns: Sid(
-                                    2147484160,
-                                ),
+                                id: 2,
                                 body: Expr {
                                     kind: Array(
                                         [
                                             Expr {
                                                 kind: Pointer(
-                                                    Sid(
-                                                        2147484160,
+                                                    Parameter(
+                                                        ParameterPtr {
+                                                            function_id: 2,
+                                                            param_position: 0,
+                                                        },
                                                     ),
                                                 ),
                                                 ty: Ty {
@@ -83,8 +73,11 @@ let main =
                                             },
                                             Expr {
                                                 kind: Pointer(
-                                                    Sid(
-                                                        2147484160,
+                                                    Parameter(
+                                                        ParameterPtr {
+                                                            function_id: 2,
+                                                            param_position: 0,
+                                                        },
                                                     ),
                                                 ),
                                                 ty: Ty {
@@ -103,8 +96,11 @@ let main =
                                             },
                                             Expr {
                                                 kind: Pointer(
-                                                    Sid(
-                                                        2147484160,
+                                                    Parameter(
+                                                        ParameterPtr {
+                                                            function_id: 2,
+                                                            param_position: 0,
+                                                        },
                                                     ),
                                                 ),
                                                 ty: Ty {
@@ -207,13 +203,11 @@ let main =
                     main: Expr {
                         kind: Binding(
                             Binding {
-                                symbol: Sid(
-                                    1073741826,
-                                ),
+                                id: 2,
                                 expr: Expr {
                                     kind: Pointer(
-                                        Sid(
-                                            1073741825,
+                                        Binding(
+                                            1,
                                         ),
                                     ),
                                     ty: Ty {
@@ -278,8 +272,8 @@ let main =
                                                                 Call {
                                                                     function: Expr {
                                                                         kind: Pointer(
-                                                                            Sid(
-                                                                                1073741826,
+                                                                            Binding(
+                                                                                2,
                                                                             ),
                                                                         ),
                                                                         ty: Ty {
@@ -391,16 +385,17 @@ let main =
                                                                     function: Expr {
                                                                         kind: Function(
                                                                             Function {
-                                                                                symbol_ns: Sid(
-                                                                                    2147484416,
-                                                                                ),
+                                                                                id: 3,
                                                                                 body: Expr {
                                                                                     kind: Array(
                                                                                         [
                                                                                             Expr {
                                                                                                 kind: Pointer(
-                                                                                                    Sid(
-                                                                                                        2147484416,
+                                                                                                    Parameter(
+                                                                                                        ParameterPtr {
+                                                                                                            function_id: 3,
+                                                                                                            param_position: 0,
+                                                                                                        },
                                                                                                     ),
                                                                                                 ),
                                                                                                 ty: Ty {
@@ -419,8 +414,11 @@ let main =
                                                                                             },
                                                                                             Expr {
                                                                                                 kind: Pointer(
-                                                                                                    Sid(
-                                                                                                        2147484417,
+                                                                                                    Parameter(
+                                                                                                        ParameterPtr {
+                                                                                                            function_id: 3,
+                                                                                                            param_position: 1,
+                                                                                                        },
                                                                                                     ),
                                                                                                 ),
                                                                                                 ty: Ty {
@@ -610,8 +608,8 @@ let main =
                                                                 Call {
                                                                     function: Expr {
                                                                         kind: Pointer(
-                                                                            Sid(
-                                                                                0,
+                                                                            External(
+                                                                                "std::int::add",
                                                                             ),
                                                                         ),
                                                                         ty: Ty {

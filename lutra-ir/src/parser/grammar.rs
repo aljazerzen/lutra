@@ -1,5 +1,3 @@
-use ::std::ops::{Shl, ShlAssign};
-
 use chumsky::prelude::*;
 use lutra_frontend::pr;
 
@@ -8,30 +6,12 @@ use lutra_bin::ir::*;
 use lutra_frontend::_lexer::TokenKind;
 
 pub fn program() -> impl Parser<TokenKind, Program, Error = PError> {
-    let externals = keyword("let")
-        .then(ident_keyword("externals"))
-        .then(ctrl('='))
-        .ignore_then(
-            ident_part()
-                .separated_by(just(TokenKind::PathSep))
-                .at_least(1)
-                .map(|id| ExternalSymbol { id: id.join("::") })
-                .separated_by(ctrl(','))
-                .allow_trailing()
-                .delimited_by(ctrl('['), ctrl(']')),
-        )
-        .then_ignore(ctrl(';'))
-        .or_not()
-        .map(Option::unwrap_or_default);
-
     let main = keyword("let")
         .then(ident_keyword("main"))
         .then(ctrl('='))
         .ignore_then(expr());
 
-    externals
-        .then(main)
-        .map(|(externals, main)| Program { externals, main })
+    main.map(|main| Program { main })
 }
 
 fn expr() -> impl Parser<TokenKind, Expr, Error = PError> + Clone {
@@ -45,19 +25,22 @@ fn expr() -> impl Parser<TokenKind, Expr, Error = PError> + Clone {
 
         let pointer_external = ident_keyword("external")
             .ignore_then(ctrl('.'))
-            .ignore_then(sid());
+            .ignore_then(external_symbol_id())
+            .map(Pointer::External);
         let pointer_var = ident_keyword("var")
             .ignore_then(ctrl('.'))
-            .ignore_then(sid().map(|mut sid| {
-                sid.0 += 0x40000000;
-                sid
-            }));
+            .ignore_then(uint32())
+            .map(Pointer::Binding);
         let pointer_param = ident_keyword("fn")
             .ignore_then(ctrl('.'))
-            .ignore_then(sid())
+            .ignore_then(uint32())
             .then_ignore(ctrl('+'))
-            .then(sid())
-            .map(|(f, p)| Sid(0x80000000_u32 + f.0.shl(8) + p.0));
+            .then(uint32())
+            .map(|(function_id, p)| ParameterPtr {
+                function_id,
+                param_position: p as u8,
+            })
+            .map(Pointer::Parameter);
         let pointer = choice((pointer_external, pointer_var, pointer_param)).map(ExprKind::Pointer);
 
         // let binding = binding(expr.clone());
@@ -73,6 +56,13 @@ fn expr() -> impl Parser<TokenKind, Expr, Error = PError> + Clone {
 
         binding(tuple_lookup(term).boxed())
     })
+}
+
+fn external_symbol_id() -> impl Parser<TokenKind, String, Error = PError> {
+    ident_part()
+        .separated_by(just(TokenKind::PathSep))
+        .at_least(1)
+        .map(|id| id.join("::"))
 }
 
 fn ty() -> impl Parser<TokenKind, Ty, Error = PError> {
@@ -150,8 +140,8 @@ fn ty() -> impl Parser<TokenKind, Ty, Error = PError> {
     ctrl(':').ignore_then(ty_expr)
 }
 
-fn sid() -> impl Parser<TokenKind, Sid, Error = PError> {
-    select! { TokenKind::Literal(pr::Literal::Integer(sid)) => Sid(sid as u32) }
+fn uint32() -> impl Parser<TokenKind, u32, Error = PError> {
+    select! { TokenKind::Literal(pr::Literal::Integer(i)) => i as u32 }
 }
 
 fn tuple<'a>(
@@ -243,16 +233,12 @@ where
     // func
     keyword("func")
         // scope id
-        .ignore_then(sid().map(|mut sid| {
-            sid.0.shl_assign(8);
-            sid.0 += 0x80000000;
-            sid
-        }))
+        .ignore_then(uint32())
         .then_ignore(just(TokenKind::ArrowThin))
         // body
         .then(expr)
         .delimited_by(ctrl('('), ctrl(')'))
-        .map(|(symbol_ns, body)| ExprKind::Function(Box::new(Function { symbol_ns, body })))
+        .map(|(id, body)| ExprKind::Function(Box::new(Function { id, body })))
         .labelled("function")
 }
 
@@ -263,10 +249,7 @@ where
     // func
     keyword("let")
         // symbol id
-        .ignore_then(sid().map(|mut sid| {
-            sid.0 += 0x40000000;
-            sid
-        }))
+        .ignore_then(uint32())
         .then_ignore(ctrl('='))
         // expr
         .then(expr.clone())
@@ -274,9 +257,9 @@ where
         .repeated()
         // main
         .then(expr)
-        .foldr(|(symbol, expr), main| Expr {
+        .foldr(|(id, expr), main| Expr {
             ty: main.ty.clone(),
-            kind: ExprKind::Binding(Box::new(Binding { symbol, expr, main })),
+            kind: ExprKind::Binding(Box::new(Binding { id, expr, main })),
         })
         .labelled("binding")
 }

@@ -17,8 +17,6 @@ fn _test_interpret(program: &str) -> String {
 #[test]
 fn interpret_01() {
     assert_snapshot!(_test_interpret(r#"
-    let externals = [std::add];
-
     let main = (func 3 ->
         let 1 = (
             func 2 -> [
@@ -29,19 +27,19 @@ fn interpret_01() {
         ): func (float64) -> [float64];
         let 2 = var.1: func (float64) -> [float64];
         {
-            (
-                call var.2: func (float64) -> [float64],
+            (call
+                var.2: func (float64) -> [float64],
                 3.5: float64
             ): [float64],
-            (
-                call (
+            (call
+                (
                     func 3 -> [fn.3+0: int64, fn.3+1: int64]: [int64]
                 ): func (int64) -> [int64],
                 6: int64,
                 7: int64,
             ): [int64],
-            (
-                call external.0: func (int64) -> int64,
+            (call
+                external.std::add: func (int64) -> int64,
                 6: int64,
                 2: int64,
             ): int64,

@@ -5,10 +5,7 @@ use insta::assert_snapshot;
 #[test]
 fn print_01() {
     assert_snapshot!(super::_test_print(r#"
-    let externals = [
-      std::int::add,
-    ];
-    
+
     let main =
       let 1 = (
         func 2 -> [
@@ -35,17 +32,13 @@ fn print_01() {
             7: int64,
         ): [int64],
         (call
-            external.0: func (int64, int64) -> int64,
+            external.std::int::add: func (int64, int64) -> int64,
             6: int64,
             2: int64
         ): int64
       }: {[float64], [int64], int64}
       .1:[int64]
     "#), @r#"
-    let externals = [
-      std::int::add,
-    ];
-
     let main =
       let 1 = (
         func 2 -> [
@@ -71,7 +64,7 @@ fn print_01() {
           7: int64, 
         ): [int64],
         (
-          call external.0: func (int64, int64) -> int64, 
+          call external.std::int::add: func (int64, int64) -> int64, 
           6: int64, 
           2: int64, 
         ): int64,

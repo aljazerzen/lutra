@@ -17,7 +17,7 @@ type Expr = {
 
 @derive(["Debug", "Clone", "enum_as_inner::EnumAsInner"])
 type ExprKind = enum {
-  Pointer = project::ir::Sid,
+  Pointer = Sid,
   Literal = project::ir::Literal,
   Call = Call,
   Function = Function,
@@ -27,13 +27,21 @@ type ExprKind = enum {
   Binding = Binding,
 }
 
+## Symbol id.
+## - 0b00xxxxxx - external
+## - 0b01xxxxxx - local bindings
+## - 0b10xxxxxx - function scopes
+## - 0b11xxxxxx - unused
+@derive(["Debug", "Clone", "Copy", "PartialEq", "Eq", "Hash"])
+type Sid = uint32
+
 type Call = {
   function = Expr,
   args = [Expr],
 }
 
 type Function = {
-  symbol_ns = project::ir::Sid,
+  symbol_ns = Sid,
 
   # can contain function parameters prefixed with symbol_ns
   body = Expr,
@@ -55,7 +63,7 @@ type TupleLookup = {
 }
 
 type Binding = {
-  symbol = project::ir::Sid,
+  symbol = Sid,
   expr = Expr,
   main = Expr,
 }

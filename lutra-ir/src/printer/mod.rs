@@ -34,16 +34,6 @@ impl Printer {
 impl Printer {
     fn print_program(&mut self, program: &ir::Program) -> String {
         let mut r = String::new();
-        if !program.externals.is_empty() {
-            r += "let externals = [";
-            self.indent();
-            for external in &program.externals {
-                r += &self.new_line();
-                r += &format!("{},", external.id);
-            }
-            self.dedent();
-            r += "\n];\n\n";
-        }
 
         r += "let main =";
         r += &self.print_expr(&program.main);
@@ -52,18 +42,14 @@ impl Printer {
 
     fn print_expr(&mut self, expr: &ir::Expr) -> String {
         let mut r = match &expr.kind {
-            ir::ExprKind::Pointer(sid) => {
-                let id = sid.0 & 0x3fffffff;
-                match sid.kind() {
-                    ir::SidKind::External => format!("external.{id}"),
-                    ir::SidKind::Var => format!("var.{id}"),
-                    ir::SidKind::FunctionScope => {
-                        let func = id >> 8;
-                        let param = id & 0xff;
-                        format!("fn.{func}+{param}")
-                    }
-                }
-            }
+            ir::ExprKind::Pointer(ptr) => match ptr {
+                ir::Pointer::External(name) => format!("external.{name}"),
+                ir::Pointer::Binding(id) => format!("var.{id}"),
+                ir::Pointer::Parameter(ir::ParameterPtr {
+                    function_id,
+                    param_position,
+                }) => format!("fn.{function_id}+{param_position}"),
+            },
             ir::ExprKind::Literal(literal) => {
                 format!("{literal}")
             }
@@ -90,8 +76,7 @@ impl Printer {
                 r += &self.new_line();
 
                 r += "func ";
-                let func_id = (func.symbol_ns.0 & 0x3fffffff) >> 8;
-                r += &func_id.to_string();
+                r += &func.id.to_string();
                 r += " -> ";
                 r += &self.print_expr(&func.body);
 
@@ -143,8 +128,7 @@ impl Printer {
                 loop {
                     r += "let ";
 
-                    let id = binding.symbol.0 & 0x3fffffff;
-                    r += &id.to_string();
+                    r += &binding.id.to_string();
 
                     r += " = ";
                     r += &self.print_expr(&binding.expr);

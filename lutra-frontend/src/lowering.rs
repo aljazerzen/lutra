@@ -10,16 +10,12 @@ pub fn lower(root_module: &decl::RootModule, path: &pr::Path) -> ir::Program {
     let main = lowerer.lower_expr_decl(path).unwrap();
     let main = lowerer.lower_var_bindings(main);
 
-    ir::Program {
-        externals: lowerer.externals,
-        main,
-    }
+    ir::Program { main }
 }
 
 struct Lowerer<'a> {
     root_module: &'a decl::RootModule,
 
-    externals: Vec<ir::ExternalSymbol>,
     function_scopes: Vec<u32>,
     var_bindings: IndexMap<pr::Path, u32>,
 
@@ -33,7 +29,6 @@ impl<'a> Lowerer<'a> {
         Self {
             root_module,
 
-            externals: Default::default(),
             function_scopes: vec![],
             var_bindings: Default::default(),
 
@@ -56,11 +51,10 @@ impl<'a> Lowerer<'a> {
             return Ok(None);
         }
 
-        let sid = ir::Sid(self.externals.len() as u32);
-        self.externals.push(ir::ExternalSymbol {
-            id: path.iter().join("::"),
-        });
-        Ok(Some(ir::ExprKind::Pointer(sid)))
+        let external_symbol_id = path.iter().join("::");
+        Ok(Some(ir::ExprKind::Pointer(ir::Pointer::External(
+            external_symbol_id,
+        ))))
     }
 
     fn lower_expr_decl(&mut self, path: &pr::Path) -> Result<ir::Expr> {
@@ -112,15 +106,14 @@ impl<'a> Lowerer<'a> {
                 args: self.lower_exprs(&call.args)?,
             })),
             pr::ExprKind::Func(func) => {
-                let symbol_ns = self.generator_function_scope.gen() as u32;
-                let symbol_ns = (symbol_ns << 8) | 0x80000000u32;
+                let function_id = self.generator_function_scope.gen() as u32;
 
-                self.function_scopes.push(symbol_ns);
+                self.function_scopes.push(function_id);
                 let body = self.lower_expr(&func.body)?;
                 self.function_scopes.pop();
 
                 ir::ExprKind::Function(Box::new(ir::Function {
-                    symbol_ns: ir::Sid(symbol_ns),
+                    id: function_id,
                     body,
                 }))
             }
@@ -134,18 +127,19 @@ impl<'a> Lowerer<'a> {
                         path.next();
                         scope.next();
                     }
-                    let param_index = path.next().unwrap().parse::<u32>().unwrap();
-                    let scope = scope.next().unwrap();
-                    ir::ExprKind::Pointer(ir::Sid(scope + param_index))
+                    let param_position = path.next().unwrap().parse::<u8>().unwrap();
+                    let function_id = *scope.next().unwrap();
+                    ir::ExprKind::Pointer(ir::Pointer::Parameter(ir::ParameterPtr {
+                        function_id,
+                        param_position,
+                    }))
                 } else if let Some(ptr) = self.lower_external_expr_decl(path)? {
                     ptr
                 } else {
                     let entry = self.var_bindings.entry(path.clone());
-                    let entry = entry.or_insert_with(|| {
-                        let binding_id = self.generator_var_binding.gen() as u32;
-                        binding_id | 0x40000000u32
-                    });
-                    ir::ExprKind::Pointer(ir::Sid(*entry))
+                    let binding_id =
+                        entry.or_insert_with(|| self.generator_var_binding.gen() as u32);
+                    ir::ExprKind::Pointer(ir::Pointer::Binding(*binding_id))
                 }
             }
 
@@ -175,21 +169,17 @@ impl<'a> Lowerer<'a> {
         let mut main = main;
         let mut i = 0;
         loop {
-            let Some((path, symbol)) = self.var_bindings.get_index(i) else {
+            let Some((path, id)) = self.var_bindings.get_index(i) else {
                 break;
             };
             i += 1;
             let path = path.clone();
-            let symbol = *symbol;
+            let id = *id;
 
             let expr = self.lower_expr_decl(&path).unwrap();
             main = ir::Expr {
                 ty: main.ty.clone(),
-                kind: ir::ExprKind::Binding(Box::new(ir::Binding {
-                    symbol: ir::Sid(symbol),
-                    expr,
-                    main,
-                })),
+                kind: ir::ExprKind::Binding(Box::new(ir::Binding { id, expr, main })),
             }
         }
         main

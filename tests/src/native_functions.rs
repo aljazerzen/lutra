@@ -19,13 +19,9 @@ fn test_01() {
 
     let program = ::lutra_ir::_test_parse(
         "
-    let externals = [
-        world::hello
-    ];
-
     let main = (func 0 -> 
-        (
-            call external.0: func (float64, uint32) -> int64,
+        (call
+            external.world::hello: func (float64, uint32) -> int64,
             1.0: float64,
             2: int64,
         ): int64

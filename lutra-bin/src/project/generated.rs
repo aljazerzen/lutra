@@ -26,7 +26,7 @@ pub mod br {
     #[derive(Debug, Clone, enum_as_inner::EnumAsInner)]
     #[allow(non_camel_case_types)]
     pub enum ExprKind {
-        Pointer(super::ir::Sid),
+        Pointer(Sid),
         Literal(super::ir::Literal),
         Call(Box<Call>),
         Function(Box<Function>),
@@ -35,6 +35,10 @@ pub mod br {
         TupleLookup(Box<TupleLookup>),
         Binding(Box<Binding>),
     }
+
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+    #[allow(non_camel_case_types)]
+    pub struct Sid(pub u32);
 
     #[derive(Debug, Clone)]
     #[allow(non_camel_case_types)]
@@ -46,7 +50,7 @@ pub mod br {
     #[derive(Debug, Clone)]
     #[allow(non_camel_case_types)]
     pub struct Function {
-        pub symbol_ns: super::ir::Sid,
+        pub symbol_ns: Sid,
         pub body: Expr,
     }
 
@@ -74,7 +78,7 @@ pub mod br {
     #[derive(Debug, Clone)]
     #[allow(non_camel_case_types)]
     pub struct Binding {
-        pub symbol: super::ir::Sid,
+        pub symbol: Sid,
         pub expr: Expr,
         pub main: Expr,
     }
@@ -332,7 +336,7 @@ pub mod br {
         #[allow(non_camel_case_types, dead_code)]
         pub enum ExprKindHeadPtr {
             None,
-            Pointer(<super::super::ir::Sid as crate::Encode>::HeadPtr),
+            Pointer(<super::Sid as crate::Encode>::HeadPtr),
             Literal(crate::ReversePointer),
             Call(crate::ReversePointer),
             Function(crate::ReversePointer),
@@ -355,7 +359,7 @@ pub mod br {
                 let buf = buf.skip(1);
                 Ok(match tag {
                     0 => {
-                        let inner = super::super::ir::Sid::decode(buf)?;
+                        let inner = super::Sid::decode(buf)?;
                         ExprKind::Pointer(inner)
                     }
                     1 => {
@@ -395,6 +399,27 @@ pub mod br {
                     }
                     _ => return Err(crate::Error::InvalidData),
                 })
+            }
+        }
+
+        impl crate::Encode for Sid {
+            type HeadPtr = ();
+            fn encode_head(&self, w: &mut Vec<u8>) -> crate::Result<()> {
+                self.0.encode_head(w)
+            }
+            fn encode_body(&self, _: (), _w: &mut Vec<u8>) -> crate::Result<()> {
+                Ok(())
+            }
+        }
+        impl crate::Layout for Sid {
+            fn head_size() -> usize {
+                32
+            }
+        }
+
+        impl crate::Decode for Sid {
+            fn decode(buf: &[u8]) -> crate::Result<Self> {
+                Ok(Self(u32::decode(buf)?))
             }
         }
 
@@ -447,7 +472,7 @@ pub mod br {
         }
         #[allow(non_camel_case_types)]
         pub struct FunctionHeadPtr {
-            symbol_ns: <super::super::ir::Sid as crate::Encode>::HeadPtr,
+            symbol_ns: <super::Sid as crate::Encode>::HeadPtr,
             body: <super::Expr as crate::Encode>::HeadPtr,
         }
         impl crate::Layout for Function {
@@ -458,7 +483,7 @@ pub mod br {
 
         impl crate::Decode for Function {
             fn decode(buf: &[u8]) -> crate::Result<Self> {
-                let symbol_ns = super::super::ir::Sid::decode(buf.skip(0))?;
+                let symbol_ns = super::Sid::decode(buf.skip(0))?;
                 let body = super::Expr::decode(buf.skip(4))?;
                 Ok(Function { symbol_ns, body })
             }
@@ -587,7 +612,7 @@ pub mod br {
         }
         #[allow(non_camel_case_types)]
         pub struct BindingHeadPtr {
-            symbol: <super::super::ir::Sid as crate::Encode>::HeadPtr,
+            symbol: <super::Sid as crate::Encode>::HeadPtr,
             expr: <super::Expr as crate::Encode>::HeadPtr,
             main: <super::Expr as crate::Encode>::HeadPtr,
         }
@@ -599,7 +624,7 @@ pub mod br {
 
         impl crate::Decode for Binding {
             fn decode(buf: &[u8]) -> crate::Result<Self> {
-                let symbol = super::super::ir::Sid::decode(buf.skip(0))?;
+                let symbol = super::Sid::decode(buf.skip(0))?;
                 let expr = super::Expr::decode(buf.skip(4))?;
                 let main = super::Expr::decode(buf.skip(9))?;
                 Ok(Binding { symbol, expr, main })
@@ -651,14 +676,7 @@ pub mod ir {
     #[derive(Debug, Clone)]
     #[allow(non_camel_case_types)]
     pub struct Program {
-        pub externals: Vec<ExternalSymbol>,
         pub main: Expr,
-    }
-
-    #[derive(Debug, Clone)]
-    #[allow(non_camel_case_types)]
-    pub struct ExternalSymbol {
-        pub id: String,
     }
 
     #[derive(Debug, Clone)]
@@ -671,7 +689,7 @@ pub mod ir {
     #[derive(Debug, Clone, enum_as_inner::EnumAsInner)]
     #[allow(non_camel_case_types)]
     pub enum ExprKind {
-        Pointer(Sid),
+        Pointer(Pointer),
         Literal(Literal),
         Call(Box<Call>),
         Function(Box<Function>),
@@ -681,9 +699,20 @@ pub mod ir {
         Binding(Box<Binding>),
     }
 
-    #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+    #[derive(Debug, Clone, enum_as_inner::EnumAsInner)]
     #[allow(non_camel_case_types)]
-    pub struct Sid(pub u32);
+    pub enum Pointer {
+        External(String),
+        Binding(u32),
+        Parameter(ParameterPtr),
+    }
+
+    #[derive(Debug, Clone)]
+    #[allow(non_camel_case_types)]
+    pub struct ParameterPtr {
+        pub function_id: u32,
+        pub param_position: u8,
+    }
 
     #[derive(Debug, Clone, PartialEq, enum_as_inner::EnumAsInner)]
     #[allow(non_camel_case_types)]
@@ -704,7 +733,7 @@ pub mod ir {
     #[derive(Debug, Clone)]
     #[allow(non_camel_case_types)]
     pub struct Function {
-        pub symbol_ns: Sid,
+        pub id: u32,
         pub body: Expr,
     }
 
@@ -718,7 +747,7 @@ pub mod ir {
     #[derive(Debug, Clone)]
     #[allow(non_camel_case_types)]
     pub struct Binding {
-        pub symbol: Sid,
+        pub id: u32,
         pub expr: Expr,
         pub main: Expr,
     }
@@ -802,61 +831,28 @@ pub mod ir {
         impl crate::Encode for Program {
             type HeadPtr = ProgramHeadPtr;
             fn encode_head(&self, w: &mut Vec<u8>) -> crate::Result<Self::HeadPtr> {
-                let externals = self.externals.encode_head(w)?;
                 let main = self.main.encode_head(w)?;
-                Ok(ProgramHeadPtr { externals, main })
+                Ok(ProgramHeadPtr { main })
             }
             fn encode_body(&self, head: Self::HeadPtr, w: &mut Vec<u8>) -> crate::Result<()> {
-                self.externals.encode_body(head.externals, w)?;
                 self.main.encode_body(head.main, w)?;
                 Ok(())
             }
         }
         #[allow(non_camel_case_types)]
         pub struct ProgramHeadPtr {
-            externals: <Vec<super::ExternalSymbol> as crate::Encode>::HeadPtr,
             main: <super::Expr as crate::Encode>::HeadPtr,
         }
         impl crate::Layout for Program {
             fn head_size() -> usize {
-                224
+                160
             }
         }
 
         impl crate::Decode for Program {
             fn decode(buf: &[u8]) -> crate::Result<Self> {
-                let externals = Vec::<super::ExternalSymbol>::decode(buf.skip(0))?;
-                let main = super::Expr::decode(buf.skip(8))?;
-                Ok(Program { externals, main })
-            }
-        }
-
-        #[allow(clippy::all, unused_variables)]
-        impl crate::Encode for ExternalSymbol {
-            type HeadPtr = ExternalSymbolHeadPtr;
-            fn encode_head(&self, w: &mut Vec<u8>) -> crate::Result<Self::HeadPtr> {
-                let id = self.id.encode_head(w)?;
-                Ok(ExternalSymbolHeadPtr { id })
-            }
-            fn encode_body(&self, head: Self::HeadPtr, w: &mut Vec<u8>) -> crate::Result<()> {
-                self.id.encode_body(head.id, w)?;
-                Ok(())
-            }
-        }
-        #[allow(non_camel_case_types)]
-        pub struct ExternalSymbolHeadPtr {
-            id: <String as crate::Encode>::HeadPtr,
-        }
-        impl crate::Layout for ExternalSymbol {
-            fn head_size() -> usize {
-                64
-            }
-        }
-
-        impl crate::Decode for ExternalSymbol {
-            fn decode(buf: &[u8]) -> crate::Result<Self> {
-                let id = String::decode(buf.skip(0))?;
-                Ok(ExternalSymbol { id })
+                let main = super::Expr::decode(buf.skip(0))?;
+                Ok(Program { main })
             }
         }
 
@@ -899,10 +895,10 @@ pub mod ir {
             type HeadPtr = ExprKindHeadPtr;
             fn encode_head(&self, w: &mut Vec<u8>) -> crate::Result<ExprKindHeadPtr> {
                 Ok(match self {
-                    Self::Pointer(inner) => {
+                    Self::Pointer(_) => {
                         w.write_all(&[0])?;
-                        let inner_head_ptr = inner.encode_head(w)?;
-                        let r = ExprKindHeadPtr::Pointer(inner_head_ptr);
+                        let head_ptr = crate::ReversePointer::new(w);
+                        let r = ExprKindHeadPtr::Pointer(head_ptr);
                         r
                     }
                     Self::Literal(_) => {
@@ -952,9 +948,11 @@ pub mod ir {
             fn encode_body(&self, head: ExprKindHeadPtr, w: &mut Vec<u8>) -> crate::Result<()> {
                 match self {
                     Self::Pointer(inner) => {
-                        let ExprKindHeadPtr::Pointer(inner_head_ptr) = head else {
+                        let ExprKindHeadPtr::Pointer(offset_ptr) = head else {
                             unreachable!()
                         };
+                        offset_ptr.write_cur_len(w);
+                        let inner_head_ptr = inner.encode_head(w)?;
                         inner.encode_body(inner_head_ptr, w)?;
                     }
                     Self::Literal(inner) => {
@@ -1020,7 +1018,7 @@ pub mod ir {
         #[allow(non_camel_case_types, dead_code)]
         pub enum ExprKindHeadPtr {
             None,
-            Pointer(<super::Sid as crate::Encode>::HeadPtr),
+            Pointer(crate::ReversePointer),
             Literal(crate::ReversePointer),
             Call(crate::ReversePointer),
             Function(crate::ReversePointer),
@@ -1043,7 +1041,8 @@ pub mod ir {
                 let buf = buf.skip(1);
                 Ok(match tag {
                     0 => {
-                        let inner = super::Sid::decode(buf)?;
+                        let offset = u32::from_le_bytes(buf.read_const::<4>());
+                        let inner = super::Pointer::decode(buf.skip(offset as usize))?;
                         ExprKind::Pointer(inner)
                     }
                     1 => {
@@ -1086,24 +1085,135 @@ pub mod ir {
             }
         }
 
-        impl crate::Encode for Sid {
-            type HeadPtr = ();
-            fn encode_head(&self, w: &mut Vec<u8>) -> crate::Result<()> {
-                self.0.encode_head(w)
+        #[allow(unused_variables)]
+        #[allow(clippy::all)]
+        impl crate::Encode for Pointer {
+            type HeadPtr = PointerHeadPtr;
+            fn encode_head(&self, w: &mut Vec<u8>) -> crate::Result<PointerHeadPtr> {
+                Ok(match self {
+                    Self::External(_) => {
+                        w.write_all(&[0])?;
+                        let head_ptr = crate::ReversePointer::new(w);
+                        let r = PointerHeadPtr::External(head_ptr);
+                        r
+                    }
+                    Self::Binding(inner) => {
+                        w.write_all(&[1])?;
+                        let inner_head_ptr = inner.encode_head(w)?;
+                        let r = PointerHeadPtr::Binding(inner_head_ptr);
+                        r
+                    }
+                    Self::Parameter(_) => {
+                        w.write_all(&[2])?;
+                        let head_ptr = crate::ReversePointer::new(w);
+                        let r = PointerHeadPtr::Parameter(head_ptr);
+                        r
+                    }
+                })
             }
-            fn encode_body(&self, _: (), _w: &mut Vec<u8>) -> crate::Result<()> {
+            fn encode_body(&self, head: PointerHeadPtr, w: &mut Vec<u8>) -> crate::Result<()> {
+                match self {
+                    Self::External(inner) => {
+                        let PointerHeadPtr::External(offset_ptr) = head else {
+                            unreachable!()
+                        };
+                        offset_ptr.write_cur_len(w);
+                        let inner_head_ptr = inner.encode_head(w)?;
+                        inner.encode_body(inner_head_ptr, w)?;
+                    }
+                    Self::Binding(inner) => {
+                        let PointerHeadPtr::Binding(inner_head_ptr) = head else {
+                            unreachable!()
+                        };
+                        inner.encode_body(inner_head_ptr, w)?;
+                    }
+                    Self::Parameter(inner) => {
+                        let PointerHeadPtr::Parameter(offset_ptr) = head else {
+                            unreachable!()
+                        };
+                        offset_ptr.write_cur_len(w);
+                        let inner_head_ptr = inner.encode_head(w)?;
+                        inner.encode_body(inner_head_ptr, w)?;
+                    }
+                }
                 Ok(())
             }
         }
-        impl crate::Layout for Sid {
+        #[allow(non_camel_case_types, dead_code)]
+        pub enum PointerHeadPtr {
+            None,
+            External(crate::ReversePointer),
+            Binding(<u32 as crate::Encode>::HeadPtr),
+            Parameter(crate::ReversePointer),
+        }
+        impl crate::Layout for Pointer {
             fn head_size() -> usize {
-                32
+                40
             }
         }
 
-        impl crate::Decode for Sid {
+        impl crate::Decode for Pointer {
             fn decode(buf: &[u8]) -> crate::Result<Self> {
-                Ok(Self(u32::decode(buf)?))
+                let mut tag_bytes = buf.read_n(1).to_vec();
+                tag_bytes.resize(8, 0);
+                let tag = u64::from_le_bytes(tag_bytes.try_into().unwrap()) as usize;
+                let buf = buf.skip(1);
+                Ok(match tag {
+                    0 => {
+                        let offset = u32::from_le_bytes(buf.read_const::<4>());
+                        let inner = String::decode(buf.skip(offset as usize))?;
+                        Pointer::External(inner)
+                    }
+                    1 => {
+                        let inner = u32::decode(buf)?;
+                        Pointer::Binding(inner)
+                    }
+                    2 => {
+                        let offset = u32::from_le_bytes(buf.read_const::<4>());
+                        let inner = super::ParameterPtr::decode(buf.skip(offset as usize))?;
+                        Pointer::Parameter(inner)
+                    }
+                    _ => return Err(crate::Error::InvalidData),
+                })
+            }
+        }
+
+        #[allow(clippy::all, unused_variables)]
+        impl crate::Encode for ParameterPtr {
+            type HeadPtr = ParameterPtrHeadPtr;
+            fn encode_head(&self, w: &mut Vec<u8>) -> crate::Result<Self::HeadPtr> {
+                let function_id = self.function_id.encode_head(w)?;
+                let param_position = self.param_position.encode_head(w)?;
+                Ok(ParameterPtrHeadPtr {
+                    function_id,
+                    param_position,
+                })
+            }
+            fn encode_body(&self, head: Self::HeadPtr, w: &mut Vec<u8>) -> crate::Result<()> {
+                self.function_id.encode_body(head.function_id, w)?;
+                self.param_position.encode_body(head.param_position, w)?;
+                Ok(())
+            }
+        }
+        #[allow(non_camel_case_types)]
+        pub struct ParameterPtrHeadPtr {
+            function_id: <u32 as crate::Encode>::HeadPtr,
+            param_position: <u8 as crate::Encode>::HeadPtr,
+        }
+        impl crate::Layout for ParameterPtr {
+            fn head_size() -> usize {
+                40
+            }
+        }
+
+        impl crate::Decode for ParameterPtr {
+            fn decode(buf: &[u8]) -> crate::Result<Self> {
+                let function_id = u32::decode(buf.skip(0))?;
+                let param_position = u8::decode(buf.skip(4))?;
+                Ok(ParameterPtr {
+                    function_id,
+                    param_position,
+                })
             }
         }
 
@@ -1258,19 +1368,19 @@ pub mod ir {
         impl crate::Encode for Function {
             type HeadPtr = FunctionHeadPtr;
             fn encode_head(&self, w: &mut Vec<u8>) -> crate::Result<Self::HeadPtr> {
-                let symbol_ns = self.symbol_ns.encode_head(w)?;
+                let id = self.id.encode_head(w)?;
                 let body = self.body.encode_head(w)?;
-                Ok(FunctionHeadPtr { symbol_ns, body })
+                Ok(FunctionHeadPtr { id, body })
             }
             fn encode_body(&self, head: Self::HeadPtr, w: &mut Vec<u8>) -> crate::Result<()> {
-                self.symbol_ns.encode_body(head.symbol_ns, w)?;
+                self.id.encode_body(head.id, w)?;
                 self.body.encode_body(head.body, w)?;
                 Ok(())
             }
         }
         #[allow(non_camel_case_types)]
         pub struct FunctionHeadPtr {
-            symbol_ns: <super::Sid as crate::Encode>::HeadPtr,
+            id: <u32 as crate::Encode>::HeadPtr,
             body: <super::Expr as crate::Encode>::HeadPtr,
         }
         impl crate::Layout for Function {
@@ -1281,9 +1391,9 @@ pub mod ir {
 
         impl crate::Decode for Function {
             fn decode(buf: &[u8]) -> crate::Result<Self> {
-                let symbol_ns = super::Sid::decode(buf.skip(0))?;
+                let id = u32::decode(buf.skip(0))?;
                 let body = super::Expr::decode(buf.skip(4))?;
-                Ok(Function { symbol_ns, body })
+                Ok(Function { id, body })
             }
         }
 
@@ -1324,13 +1434,13 @@ pub mod ir {
         impl crate::Encode for Binding {
             type HeadPtr = BindingHeadPtr;
             fn encode_head(&self, w: &mut Vec<u8>) -> crate::Result<Self::HeadPtr> {
-                let symbol = self.symbol.encode_head(w)?;
+                let id = self.id.encode_head(w)?;
                 let expr = self.expr.encode_head(w)?;
                 let main = self.main.encode_head(w)?;
-                Ok(BindingHeadPtr { symbol, expr, main })
+                Ok(BindingHeadPtr { id, expr, main })
             }
             fn encode_body(&self, head: Self::HeadPtr, w: &mut Vec<u8>) -> crate::Result<()> {
-                self.symbol.encode_body(head.symbol, w)?;
+                self.id.encode_body(head.id, w)?;
                 self.expr.encode_body(head.expr, w)?;
                 self.main.encode_body(head.main, w)?;
                 Ok(())
@@ -1338,7 +1448,7 @@ pub mod ir {
         }
         #[allow(non_camel_case_types)]
         pub struct BindingHeadPtr {
-            symbol: <super::Sid as crate::Encode>::HeadPtr,
+            id: <u32 as crate::Encode>::HeadPtr,
             expr: <super::Expr as crate::Encode>::HeadPtr,
             main: <super::Expr as crate::Encode>::HeadPtr,
         }
@@ -1350,10 +1460,10 @@ pub mod ir {
 
         impl crate::Decode for Binding {
             fn decode(buf: &[u8]) -> crate::Result<Self> {
-                let symbol = super::Sid::decode(buf.skip(0))?;
+                let id = u32::decode(buf.skip(0))?;
                 let expr = super::Expr::decode(buf.skip(4))?;
                 let main = super::Expr::decode(buf.skip(24))?;
-                Ok(Binding { symbol, expr, main })
+                Ok(Binding { id, expr, main })
             }
         }
 
