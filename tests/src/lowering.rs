@@ -77,7 +77,7 @@ fn lower_01() {
         ): int64
       ): func (int64) -> chinook.album;
       (
-        func 0 -> {
+        func 0 @local -> {
           (
             call external.chinook::get_albums @"sqlite_chinook": func () -> [chinook.album], 
           ): [chinook.album],
