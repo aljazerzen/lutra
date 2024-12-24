@@ -25,7 +25,7 @@ fn expr() -> impl Parser<TokenKind, Expr, Error = PError> + Clone {
 
         let pointer_external = ident_keyword("external")
             .ignore_then(ctrl('.'))
-            .ignore_then(external_symbol_id())
+            .ignore_then(external_ptr())
             .map(Pointer::External);
         let pointer_var = ident_keyword("var")
             .ignore_then(ctrl('.'))
@@ -47,9 +47,10 @@ fn expr() -> impl Parser<TokenKind, Expr, Error = PError> + Clone {
         let tuple = tuple(expr.clone());
         let array = array(expr.clone());
         let function = function(expr.clone());
-        let call = func_call(expr);
+        let call = func_call(expr.clone());
+        let remote_call = remote_call(expr);
 
-        let term = choice((pointer, literal, tuple, array, function, call))
+        let term = choice((pointer, literal, tuple, array, function, call, remote_call))
             .then(ty())
             .map(|(kind, ty)| Expr { kind, ty })
             .boxed();
@@ -58,11 +59,24 @@ fn expr() -> impl Parser<TokenKind, Expr, Error = PError> + Clone {
     })
 }
 
-fn external_symbol_id() -> impl Parser<TokenKind, String, Error = PError> {
-    ident_part()
+fn external_ptr() -> impl Parser<TokenKind, ExternalPtr, Error = PError> {
+    let id = ident_part()
         .separated_by(just(TokenKind::PathSep))
         .at_least(1)
-        .map(|id| id.join("::"))
+        .map(|id| id.join("::"));
+
+    id.then(execution_host())
+        .map(|(id, host)| ExternalPtr { host, id })
+}
+
+fn execution_host() -> impl Parser<TokenKind, ExecutionHost, Error = PError> {
+    ctrl('@')
+        .ignore_then(choice((
+            ident_keyword("local").to(ExecutionHost::Local),
+            select! { TokenKind::Literal(pr::Literal::Text(i)) => ExecutionHost::Remote(i) },
+        )))
+        .or_not()
+        .map(|host| host.unwrap_or(ExecutionHost::Any))
 }
 
 fn ty() -> impl Parser<TokenKind, Ty, Error = PError> {
@@ -226,6 +240,30 @@ where
         .labelled("function call")
 }
 
+fn remote_call<'a, E>(expr: E) -> impl Parser<TokenKind, ExprKind, Error = PError> + Clone + 'a
+where
+    E: Parser<TokenKind, Expr, Error = PError> + Clone + 'a,
+{
+    ident_keyword("remote_call")
+        .ignore_then(select! { TokenKind::Literal(pr::Literal::Text(i)) => i })
+        .then_ignore(ctrl(','))
+        .then(expr.clone())
+        .then_ignore(ctrl(',').or_not())
+        .map(|(remote_id, main)| ExprKind::RemoteCall(Box::new(RemoteCall { remote_id, main })))
+        .delimited_by(ctrl('('), ctrl(')'))
+        .recover_with(nested_delimiters(
+            TokenKind::Control('('),
+            TokenKind::Control(')'),
+            [
+                (TokenKind::Control('{'), TokenKind::Control('}')),
+                (TokenKind::Control('('), TokenKind::Control(')')),
+                (TokenKind::Control('['), TokenKind::Control(']')),
+            ],
+            |_| ExprKind::Tuple(vec![]),
+        ))
+        .labelled("remote call")
+}
+
 fn function<E>(expr: E) -> impl Parser<TokenKind, ExprKind, Error = PError>
 where
     E: Parser<TokenKind, Expr, Error = PError> + Clone,
@@ -234,11 +272,12 @@ where
     keyword("func")
         // scope id
         .ignore_then(uint32())
+        .then(execution_host())
         .then_ignore(just(TokenKind::ArrowThin))
         // body
         .then(expr)
         .delimited_by(ctrl('('), ctrl(')'))
-        .map(|(id, body)| ExprKind::Function(Box::new(Function { id, body })))
+        .map(|((id, host), body)| ExprKind::Function(Box::new(Function { id, host, body })))
         .labelled("function")
 }
 

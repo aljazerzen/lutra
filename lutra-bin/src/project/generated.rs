@@ -697,14 +697,22 @@ pub mod ir {
         Array(Vec<Expr>),
         TupleLookup(Box<TupleLookup>),
         Binding(Box<Binding>),
+        RemoteCall(Box<RemoteCall>),
     }
 
     #[derive(Debug, Clone, enum_as_inner::EnumAsInner)]
     #[allow(non_camel_case_types)]
     pub enum Pointer {
-        External(String),
+        External(ExternalPtr),
         Binding(u32),
         Parameter(ParameterPtr),
+    }
+
+    #[derive(Debug, Clone)]
+    #[allow(non_camel_case_types)]
+    pub struct ExternalPtr {
+        pub host: ExecutionHost,
+        pub id: String,
     }
 
     #[derive(Debug, Clone)]
@@ -734,7 +742,16 @@ pub mod ir {
     #[allow(non_camel_case_types)]
     pub struct Function {
         pub id: u32,
+        pub host: ExecutionHost,
         pub body: Expr,
+    }
+
+    #[derive(Debug, Clone, PartialEq, Eq)]
+    #[allow(non_camel_case_types)]
+    pub enum ExecutionHost {
+        Any,
+        Local,
+        Remote(String),
     }
 
     #[derive(Debug, Clone)]
@@ -749,6 +766,13 @@ pub mod ir {
     pub struct Binding {
         pub id: u32,
         pub expr: Expr,
+        pub main: Expr,
+    }
+
+    #[derive(Debug, Clone)]
+    #[allow(non_camel_case_types)]
+    pub struct RemoteCall {
+        pub remote_id: String,
         pub main: Expr,
     }
 
@@ -943,6 +967,12 @@ pub mod ir {
                         let r = ExprKindHeadPtr::Binding(head_ptr);
                         r
                     }
+                    Self::RemoteCall(_) => {
+                        w.write_all(&[8])?;
+                        let head_ptr = crate::ReversePointer::new(w);
+                        let r = ExprKindHeadPtr::RemoteCall(head_ptr);
+                        r
+                    }
                 })
             }
             fn encode_body(&self, head: ExprKindHeadPtr, w: &mut Vec<u8>) -> crate::Result<()> {
@@ -1011,6 +1041,14 @@ pub mod ir {
                         let inner_head_ptr = inner.encode_head(w)?;
                         inner.encode_body(inner_head_ptr, w)?;
                     }
+                    Self::RemoteCall(inner) => {
+                        let ExprKindHeadPtr::RemoteCall(offset_ptr) = head else {
+                            unreachable!()
+                        };
+                        offset_ptr.write_cur_len(w);
+                        let inner_head_ptr = inner.encode_head(w)?;
+                        inner.encode_body(inner_head_ptr, w)?;
+                    }
                 }
                 Ok(())
             }
@@ -1026,6 +1064,7 @@ pub mod ir {
             Array(crate::ReversePointer),
             TupleLookup(crate::ReversePointer),
             Binding(crate::ReversePointer),
+            RemoteCall(crate::ReversePointer),
         }
         impl crate::Layout for ExprKind {
             fn head_size() -> usize {
@@ -1079,6 +1118,11 @@ pub mod ir {
                         let offset = u32::from_le_bytes(buf.read_const::<4>());
                         let inner = super::Binding::decode(buf.skip(offset as usize))?;
                         ExprKind::Binding(Box::new(inner))
+                    }
+                    8 => {
+                        let offset = u32::from_le_bytes(buf.read_const::<4>());
+                        let inner = super::RemoteCall::decode(buf.skip(offset as usize))?;
+                        ExprKind::RemoteCall(Box::new(inner))
                     }
                     _ => return Err(crate::Error::InvalidData),
                 })
@@ -1161,7 +1205,7 @@ pub mod ir {
                 Ok(match tag {
                     0 => {
                         let offset = u32::from_le_bytes(buf.read_const::<4>());
-                        let inner = String::decode(buf.skip(offset as usize))?;
+                        let inner = super::ExternalPtr::decode(buf.skip(offset as usize))?;
                         Pointer::External(inner)
                     }
                     1 => {
@@ -1175,6 +1219,39 @@ pub mod ir {
                     }
                     _ => return Err(crate::Error::InvalidData),
                 })
+            }
+        }
+
+        #[allow(clippy::all, unused_variables)]
+        impl crate::Encode for ExternalPtr {
+            type HeadPtr = ExternalPtrHeadPtr;
+            fn encode_head(&self, w: &mut Vec<u8>) -> crate::Result<Self::HeadPtr> {
+                let host = self.host.encode_head(w)?;
+                let id = self.id.encode_head(w)?;
+                Ok(ExternalPtrHeadPtr { host, id })
+            }
+            fn encode_body(&self, head: Self::HeadPtr, w: &mut Vec<u8>) -> crate::Result<()> {
+                self.host.encode_body(head.host, w)?;
+                self.id.encode_body(head.id, w)?;
+                Ok(())
+            }
+        }
+        #[allow(non_camel_case_types)]
+        pub struct ExternalPtrHeadPtr {
+            host: <super::ExecutionHost as crate::Encode>::HeadPtr,
+            id: <String as crate::Encode>::HeadPtr,
+        }
+        impl crate::Layout for ExternalPtr {
+            fn head_size() -> usize {
+                104
+            }
+        }
+
+        impl crate::Decode for ExternalPtr {
+            fn decode(buf: &[u8]) -> crate::Result<Self> {
+                let host = super::ExecutionHost::decode(buf.skip(0))?;
+                let id = String::decode(buf.skip(5))?;
+                Ok(ExternalPtr { host, id })
             }
         }
 
@@ -1369,11 +1446,13 @@ pub mod ir {
             type HeadPtr = FunctionHeadPtr;
             fn encode_head(&self, w: &mut Vec<u8>) -> crate::Result<Self::HeadPtr> {
                 let id = self.id.encode_head(w)?;
+                let host = self.host.encode_head(w)?;
                 let body = self.body.encode_head(w)?;
-                Ok(FunctionHeadPtr { id, body })
+                Ok(FunctionHeadPtr { id, host, body })
             }
             fn encode_body(&self, head: Self::HeadPtr, w: &mut Vec<u8>) -> crate::Result<()> {
                 self.id.encode_body(head.id, w)?;
+                self.host.encode_body(head.host, w)?;
                 self.body.encode_body(head.body, w)?;
                 Ok(())
             }
@@ -1381,19 +1460,97 @@ pub mod ir {
         #[allow(non_camel_case_types)]
         pub struct FunctionHeadPtr {
             id: <u32 as crate::Encode>::HeadPtr,
+            host: <super::ExecutionHost as crate::Encode>::HeadPtr,
             body: <super::Expr as crate::Encode>::HeadPtr,
         }
         impl crate::Layout for Function {
             fn head_size() -> usize {
-                192
+                232
             }
         }
 
         impl crate::Decode for Function {
             fn decode(buf: &[u8]) -> crate::Result<Self> {
                 let id = u32::decode(buf.skip(0))?;
-                let body = super::Expr::decode(buf.skip(4))?;
-                Ok(Function { id, body })
+                let host = super::ExecutionHost::decode(buf.skip(4))?;
+                let body = super::Expr::decode(buf.skip(9))?;
+                Ok(Function { id, host, body })
+            }
+        }
+
+        #[allow(unused_variables)]
+        #[allow(clippy::all)]
+        impl crate::Encode for ExecutionHost {
+            type HeadPtr = ExecutionHostHeadPtr;
+            fn encode_head(&self, w: &mut Vec<u8>) -> crate::Result<ExecutionHostHeadPtr> {
+                Ok(match self {
+                    Self::Any => {
+                        w.write_all(&[0])?;
+                        let r = ExecutionHostHeadPtr::None;
+                        w.write_all(&[0u8, 0u8, 0u8, 0u8])?;
+                        r
+                    }
+                    Self::Local => {
+                        w.write_all(&[1])?;
+                        let r = ExecutionHostHeadPtr::None;
+                        w.write_all(&[0u8, 0u8, 0u8, 0u8])?;
+                        r
+                    }
+                    Self::Remote(_) => {
+                        w.write_all(&[2])?;
+                        let head_ptr = crate::ReversePointer::new(w);
+                        let r = ExecutionHostHeadPtr::Remote(head_ptr);
+                        r
+                    }
+                })
+            }
+            fn encode_body(
+                &self,
+                head: ExecutionHostHeadPtr,
+                w: &mut Vec<u8>,
+            ) -> crate::Result<()> {
+                match self {
+                    Self::Any => {}
+                    Self::Local => {}
+                    Self::Remote(inner) => {
+                        let ExecutionHostHeadPtr::Remote(offset_ptr) = head else {
+                            unreachable!()
+                        };
+                        offset_ptr.write_cur_len(w);
+                        let inner_head_ptr = inner.encode_head(w)?;
+                        inner.encode_body(inner_head_ptr, w)?;
+                    }
+                }
+                Ok(())
+            }
+        }
+        #[allow(non_camel_case_types, dead_code)]
+        pub enum ExecutionHostHeadPtr {
+            None,
+            Remote(crate::ReversePointer),
+        }
+        impl crate::Layout for ExecutionHost {
+            fn head_size() -> usize {
+                40
+            }
+        }
+
+        impl crate::Decode for ExecutionHost {
+            fn decode(buf: &[u8]) -> crate::Result<Self> {
+                let mut tag_bytes = buf.read_n(1).to_vec();
+                tag_bytes.resize(8, 0);
+                let tag = u64::from_le_bytes(tag_bytes.try_into().unwrap()) as usize;
+                let buf = buf.skip(1);
+                Ok(match tag {
+                    0 => ExecutionHost::Any,
+                    1 => ExecutionHost::Local,
+                    2 => {
+                        let offset = u32::from_le_bytes(buf.read_const::<4>());
+                        let inner = String::decode(buf.skip(offset as usize))?;
+                        ExecutionHost::Remote(inner)
+                    }
+                    _ => return Err(crate::Error::InvalidData),
+                })
             }
         }
 
@@ -1464,6 +1621,39 @@ pub mod ir {
                 let expr = super::Expr::decode(buf.skip(4))?;
                 let main = super::Expr::decode(buf.skip(24))?;
                 Ok(Binding { id, expr, main })
+            }
+        }
+
+        #[allow(clippy::all, unused_variables)]
+        impl crate::Encode for RemoteCall {
+            type HeadPtr = RemoteCallHeadPtr;
+            fn encode_head(&self, w: &mut Vec<u8>) -> crate::Result<Self::HeadPtr> {
+                let remote_id = self.remote_id.encode_head(w)?;
+                let main = self.main.encode_head(w)?;
+                Ok(RemoteCallHeadPtr { remote_id, main })
+            }
+            fn encode_body(&self, head: Self::HeadPtr, w: &mut Vec<u8>) -> crate::Result<()> {
+                self.remote_id.encode_body(head.remote_id, w)?;
+                self.main.encode_body(head.main, w)?;
+                Ok(())
+            }
+        }
+        #[allow(non_camel_case_types)]
+        pub struct RemoteCallHeadPtr {
+            remote_id: <String as crate::Encode>::HeadPtr,
+            main: <super::Expr as crate::Encode>::HeadPtr,
+        }
+        impl crate::Layout for RemoteCall {
+            fn head_size() -> usize {
+                224
+            }
+        }
+
+        impl crate::Decode for RemoteCall {
+            fn decode(buf: &[u8]) -> crate::Result<Self> {
+                let remote_id = String::decode(buf.skip(0))?;
+                let main = super::Expr::decode(buf.skip(8))?;
+                Ok(RemoteCall { remote_id, main })
             }
         }
 

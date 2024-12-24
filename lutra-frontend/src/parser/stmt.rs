@@ -21,7 +21,7 @@ fn module_contents() -> impl Parser<TokenKind, Vec<Stmt>, Error = PError> {
             .map(|(name, stmts)| StmtKind::ModuleDef(ModuleDef { name, stmts }))
             .labelled("module definition");
 
-        let annotation = just(TokenKind::Annotate)
+        let annotation = ctrl('@')
             .ignore_then(expr())
             .map(|expr| Annotation {
                 expr: Box::new(expr),

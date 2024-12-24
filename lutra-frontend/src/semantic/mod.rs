@@ -9,13 +9,13 @@ use std::str::FromStr;
 
 use self::resolver::Resolver;
 
-use crate::decl::RootModule;
+use crate::decl;
 use crate::diagnostic::Diagnostic;
 use crate::pr;
 use crate::Result;
 
 /// Runs semantic analysis on the query.
-pub fn resolve(module_tree: pr::ModuleDef) -> Result<RootModule, Vec<Diagnostic>> {
+pub fn resolve(module_tree: pr::ModuleDef) -> Result<decl::RootModule, Vec<Diagnostic>> {
     // expand AST into PL
     let root_module_def = desugar::run(module_tree).map_err(|d| vec![d])?;
 
@@ -37,7 +37,6 @@ pub fn resolve(module_tree: pr::ModuleDef) -> Result<RootModule, Vec<Diagnostic>
 }
 
 /// Preferred way of injecting std module.
-#[allow(dead_code)]
 pub fn load_std_lib(source: &mut crate::SourceTree) {
     let path = std::path::PathBuf::from_str("std.lt").unwrap();
     if source.get_source(&path).is_none() {
@@ -45,15 +44,27 @@ pub fn load_std_lib(source: &mut crate::SourceTree) {
     }
 }
 
-pub fn is_ident_or_func_call(expr: &pr::Expr, name: &pr::Path) -> bool {
+pub fn decl_get_annotation<'e>(
+    decl: &'e decl::Decl,
+    annotation_name: &pr::Path,
+) -> Option<&'e [pr::Expr]> {
+    for ann in &decl.annotations {
+        if let Some(args) = as_ident_or_func_call(&ann.expr, annotation_name) {
+            return Some(args);
+        }
+    }
+    None
+}
+
+pub fn as_ident_or_func_call<'e>(expr: &'e pr::Expr, name: &pr::Path) -> Option<&'e [pr::Expr]> {
     match &expr.kind {
-        pr::ExprKind::Ident(i) if i == name => true,
-        pr::ExprKind::FuncCall(pr::FuncCall { name: n_expr, .. })
+        pr::ExprKind::Ident(i) if i == name => Some(&[]),
+        pr::ExprKind::FuncCall(pr::FuncCall { name: n_expr, args })
             if n_expr.kind.as_ident().map_or(false, |i| i == name) =>
         {
-            true
+            Some(args.as_slice())
         }
-        _ => false,
+        _ => None,
     }
 }
 

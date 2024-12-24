@@ -73,7 +73,7 @@ impl Path {
         self
     }
 
-    pub fn iter(&self) -> impl Iterator<Item = &String> {
+    pub fn iter(&self) -> impl DoubleEndedIterator<Item = &String> {
         self.path.iter()
     }
 

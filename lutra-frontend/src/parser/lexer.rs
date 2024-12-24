@@ -67,14 +67,11 @@ fn lexer() -> impl Parser<char, Vec<Token>, Error = Cheap<char>> {
         just("??").to(TokenKind::Coalesce),
         just("//").to(TokenKind::DivInt),
         just("**").to(TokenKind::Pow),
-        just("@")
-            .then(digits(1).not().rewind())
-            .to(TokenKind::Annotate),
         just("::").to(TokenKind::PathSep),
         just("..").to(TokenKind::Range),
     ));
 
-    let control = one_of("></%=+-*[]().,:|!{};").map(TokenKind::Control);
+    let control = one_of("></%=+-*[]().,:|!{};@").map(TokenKind::Control);
 
     let ident = ident_part().map(TokenKind::Ident);
 

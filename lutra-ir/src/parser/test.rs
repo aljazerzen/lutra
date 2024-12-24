@@ -5,7 +5,7 @@ use insta::assert_debug_snapshot;
 fn parse_01() {
     assert_debug_snapshot!(super::_test_parse(r#"let main =
   let 1 = (
-    func 2 -> [
+    func 2 @"my_remote" -> [
         fn.2+0: float64,
         fn.2+0: float64,
         fn.2+0: float64
@@ -20,7 +20,7 @@ fn parse_01() {
     ): [float64],
     (call
         (
-            func 3 -> [
+            func 3 @local -> [
                 fn.3+0: int64,
                 fn.3+1: int64,
             ]: [int64]
@@ -45,6 +45,9 @@ fn parse_01() {
                         kind: Function(
                             Function {
                                 id: 2,
+                                host: Remote(
+                                    "my_remote",
+                                ),
                                 body: Expr {
                                     kind: Array(
                                         [
@@ -386,6 +389,7 @@ fn parse_01() {
                                                                         kind: Function(
                                                                             Function {
                                                                                 id: 3,
+                                                                                host: Local,
                                                                                 body: Expr {
                                                                                     kind: Array(
                                                                                         [
@@ -609,7 +613,10 @@ fn parse_01() {
                                                                     function: Expr {
                                                                         kind: Pointer(
                                                                             External(
-                                                                                "std::int::add",
+                                                                                ExternalPtr {
+                                                                                    host: Any,
+                                                                                    id: "std::int::add",
+                                                                                },
                                                                             ),
                                                                         ),
                                                                         ty: Ty {

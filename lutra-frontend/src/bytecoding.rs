@@ -41,6 +41,7 @@ impl ByteCoder {
                 ExprKind::TupleLookup(Box::new(self.compile_tuple_lookup(*v)))
             }
             ir::ExprKind::Binding(v) => ExprKind::Binding(Box::new(self.compile_binding(*v))),
+            ir::ExprKind::RemoteCall(_) => todo!(),
         };
 
         Expr { kind }
@@ -48,8 +49,8 @@ impl ByteCoder {
 
     fn compile_pointer(&mut self, ptr: ir::Pointer) -> Sid {
         match ptr {
-            ir::Pointer::External(id) => {
-                let (index, _) = self.externals.insert_full(id);
+            ir::Pointer::External(ptr) => {
+                let (index, _) = self.externals.insert_full(ptr.id);
 
                 Sid(index as u32).with_tag(SidKind::External)
             }

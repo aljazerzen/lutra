@@ -1,8 +1,13 @@
+use std::iter::zip;
+
 use indexmap::IndexMap;
 use itertools::Itertools;
 use lutra_bin::ir;
 
-use crate::{decl, pr, utils::IdGenerator, Result};
+use crate::diagnostic::Diagnostic;
+use crate::utils::IdGenerator;
+use crate::Result;
+use crate::{decl, pr, semantic};
 
 pub fn lower(root_module: &decl::RootModule, path: &pr::Path) -> ir::Program {
     let mut lowerer = Lowerer::new(root_module);
@@ -15,12 +20,12 @@ pub fn lower(root_module: &decl::RootModule, path: &pr::Path) -> ir::Program {
 
 struct Lowerer<'a> {
     root_module: &'a decl::RootModule,
+    current_host: ir::ExecutionHost,
 
     function_scopes: Vec<u32>,
     var_bindings: IndexMap<pr::Path, u32>,
 
     generator_function_scope: IdGenerator<usize>,
-    #[allow(dead_code)]
     generator_var_binding: IdGenerator<usize>,
 }
 
@@ -28,6 +33,7 @@ impl<'a> Lowerer<'a> {
     fn new(root_module: &'a decl::RootModule) -> Self {
         Self {
             root_module,
+            current_host: ir::ExecutionHost::Any,
 
             function_scopes: vec![],
             var_bindings: Default::default(),
@@ -51,9 +57,14 @@ impl<'a> Lowerer<'a> {
             return Ok(None);
         }
 
+        let host = determine_execution_host(self.root_module, path)?;
+
         let external_symbol_id = path.iter().join("::");
         Ok(Some(ir::ExprKind::Pointer(ir::Pointer::External(
-            external_symbol_id,
+            ir::ExternalPtr {
+                id: external_symbol_id,
+                host,
+            },
         ))))
     }
 
@@ -70,7 +81,15 @@ impl<'a> Lowerer<'a> {
         // should have been lowered earlier
         assert!(!matches!(expr.kind, pr::ExprKind::Internal));
 
-        self.lower_expr(expr.as_ref())
+        // determine the execution host requirements of this decl
+        let host = determine_execution_host(self.root_module, path)?;
+
+        let prev_host = self.current_host.clone();
+        self.current_host = host;
+        let res = self.lower_expr(expr.as_ref())?;
+        self.current_host = prev_host;
+
+        Ok(res)
     }
 
     fn lower_expr(&mut self, expr: &pr::Expr) -> Result<ir::Expr> {
@@ -114,6 +133,7 @@ impl<'a> Lowerer<'a> {
 
                 ir::ExprKind::Function(Box::new(ir::Function {
                     id: function_id,
+                    host: self.current_host.clone(),
                     body,
                 }))
             }
@@ -184,4 +204,32 @@ impl<'a> Lowerer<'a> {
         }
         main
     }
+}
+
+fn determine_execution_host(
+    root_module: &decl::RootModule,
+    path: &pr::Path,
+) -> Result<ir::ExecutionHost, Diagnostic> {
+    let module_path = root_module.module.get_module_path(path.path()).unwrap();
+    let remote = pr::Path::from_name("remote");
+
+    for (module, step) in zip(module_path.into_iter().rev(), path.iter().rev()) {
+        let decl = module.names.get(step).unwrap();
+        if let Some(args) = semantic::decl_get_annotation(decl, &remote) {
+            let arg = args.iter().exactly_one().map_err(|_| {
+                Diagnostic::new_custom("@remote requires exactly one argument").with_span(decl.span)
+            })?;
+
+            let arg = arg
+                .kind
+                .as_literal()
+                .and_then(|l| l.as_text())
+                .ok_or_else(|| {
+                    Diagnostic::new_custom("@remote requires a text literal").with_span(arg.span)
+                })?;
+
+            return Ok(ir::ExecutionHost::Remote(arg.clone()));
+        }
+    }
+    Ok(ir::ExecutionHost::Any)
 }

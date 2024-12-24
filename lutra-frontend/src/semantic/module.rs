@@ -113,8 +113,8 @@ impl Module {
                 res.extend(nested.into_iter().map(|x| x.prepend(vec![name.clone()])));
             }
 
-            let has_annotation = decl_has_annotation(decl, annotation_name);
-            if has_annotation {
+            let annotation = super::decl_get_annotation(decl, annotation_name);
+            if annotation.is_some() {
                 res.push(pr::Path::from_name(name));
             }
         }
@@ -136,15 +136,6 @@ impl Module {
 //     decl.built_in = true;
 //     decl
 // }
-
-fn decl_has_annotation(decl: &Decl, annotation_name: &pr::Path) -> bool {
-    for ann in &decl.annotations {
-        if super::is_ident_or_func_call(&ann.expr, annotation_name) {
-            return true;
-        }
-    }
-    false
-}
 
 type HintAndSpan = (Option<String>, Option<Span>);
 

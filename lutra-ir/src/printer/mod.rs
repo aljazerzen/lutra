@@ -1,6 +1,6 @@
 mod test;
 
-use lutra_bin::ir;
+use lutra_bin::ir::{self, ExecutionHost};
 
 pub fn print(program: &ir::Program) -> String {
     let mut printer = Printer::default();
@@ -43,7 +43,11 @@ impl Printer {
     fn print_expr(&mut self, expr: &ir::Expr) -> String {
         let mut r = match &expr.kind {
             ir::ExprKind::Pointer(ptr) => match ptr {
-                ir::Pointer::External(name) => format!("external.{name}"),
+                ir::Pointer::External(ptr) => {
+                    let mut r = format!("external.{}", ptr.id);
+                    r += &self.print_execution_host(&ptr.host);
+                    r
+                }
                 ir::Pointer::Binding(id) => format!("var.{id}"),
                 ir::Pointer::Parameter(ir::ParameterPtr {
                     function_id,
@@ -77,6 +81,7 @@ impl Printer {
 
                 r += "func ";
                 r += &func.id.to_string();
+                r += &self.print_execution_host(&func.host);
                 r += " -> ";
                 r += &self.print_expr(&func.body);
 
@@ -144,6 +149,21 @@ impl Printer {
 
                 r += &self.print_expr(&binding.main);
                 self.dedent();
+                r
+            }
+            ir::ExprKind::RemoteCall(call) => {
+                let mut r = "(".to_string();
+                self.indent();
+                r += &self.new_line();
+                r += "remote_call \"";
+                r += &call.remote_id;
+                r += "\", ";
+                r += &self.new_line();
+                r += &self.print_expr(&call.main);
+                r += ", ";
+                self.dedent();
+                r += &self.new_line();
+                r += ")";
                 r
             }
         };
@@ -219,6 +239,20 @@ impl Printer {
                 path.0.join(".")
             }
         }
+    }
+
+    fn print_execution_host(&self, host: &ir::ExecutionHost) -> String {
+        let mut r = String::new();
+        match host {
+            ExecutionHost::Any => {}
+            ExecutionHost::Local => {
+                r += " @local";
+            }
+            ExecutionHost::Remote(id) => {
+                r += &format!(" @\"{id}\"");
+            }
+        }
+        r
     }
 }
 

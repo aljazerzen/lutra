@@ -32,7 +32,6 @@ pub enum TokenKind {
     Coalesce,    // ??
     DivInt,      // //
     Pow,         // **
-    Annotate,    // @
     PathSep,     // ::
     Range,       // ..
 
@@ -80,7 +79,6 @@ impl std::fmt::Display for TokenKind {
             TokenKind::Coalesce => f.write_str("??"),
             TokenKind::DivInt => f.write_str("//"),
             TokenKind::Pow => f.write_str("**"),
-            TokenKind::Annotate => f.write_str("@"),
             TokenKind::PathSep => f.write_str("::"),
             TokenKind::Range => f.write_str(".."),
 

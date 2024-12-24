@@ -17,13 +17,19 @@ type ExprKind = enum {
   Array = [Expr],
   TupleLookup = TupleLookup,
   Binding = Binding,
+  RemoteCall = RemoteCall,
 }
 
 @derive(["Debug", "Clone", "enum_as_inner::EnumAsInner"])
 type Pointer = enum {
-  External = text,
+  External = ExternalPtr,
   Binding = uint32,
   Parameter = ParameterPtr,
+}
+
+type ExternalPtr = {
+  host = ExecutionHost,
+  id = text,
 }
 
 @derive(["Debug", "Clone"])
@@ -47,8 +53,15 @@ type Call = {
 
 type Function = {
   id = uint32,
-
+  host = ExecutionHost,
   body = Expr,
+}
+
+@derive(["Debug", "Clone", "PartialEq", "Eq"])
+type ExecutionHost = enum {
+    Any,
+    Local,
+    Remote = text
 }
 
 type TupleLookup = {
@@ -59,6 +72,11 @@ type TupleLookup = {
 type Binding = {
   id = uint32,
   expr = Expr,
+  main = Expr,
+}
+
+type RemoteCall = {
+  remote_id = text,
   main = Expr,
 }
 

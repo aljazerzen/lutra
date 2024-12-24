@@ -8,7 +8,7 @@ fn print_01() {
 
     let main =
       let 1 = (
-        func 2 -> [
+        func 2 @"my_remote" -> [
             fn.2+0: float64,
             fn.2+0: float64,
             fn.2+0: float64
@@ -23,7 +23,7 @@ fn print_01() {
         ): [float64],
         (call
             (
-                func 3 -> [
+                func 3 @local -> [
                     fn.3+0: int64,
                     fn.3+1: int64,
                 ]: [int64]
@@ -32,7 +32,7 @@ fn print_01() {
             7: int64,
         ): [int64],
         (call
-            external.std::int::add: func (int64, int64) -> int64,
+            external.std::int::add @local: func (int64, int64) -> int64,
             6: int64,
             2: int64
         ): int64
@@ -41,7 +41,7 @@ fn print_01() {
     "#), @r#"
     let main =
       let 1 = (
-        func 2 -> [
+        func 2 @"my_remote" -> [
           fn.2+0: float64,
           fn.2+0: float64,
           fn.2+0: float64,
@@ -55,7 +55,7 @@ fn print_01() {
         ): [float64],
         (
           call (
-            func 3 -> [
+            func 3 @local -> [
               fn.3+0: int64,
               fn.3+1: int64,
             ]: [int64]
@@ -64,7 +64,7 @@ fn print_01() {
           7: int64, 
         ): [int64],
         (
-          call external.std::int::add: func (int64, int64) -> int64, 
+          call external.std::int::add @local: func (int64, int64) -> int64, 
           6: int64, 
           2: int64, 
         ): int64,

@@ -15,4 +15,6 @@ test-fast tests='':
 
 generate:
     ./target/debug/lutra-codegen lutra-bin/src/project lutra-bin/src/project/generated.rs
+    cargo fmt -p lutra-bin
     cargo run -p lutra-codegen -- lutra-bin/src/project lutra-bin/src/project/generated.rs
+    cargo fmt -p lutra-bin
