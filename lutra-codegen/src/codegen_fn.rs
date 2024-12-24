@@ -1,6 +1,6 @@
 use std::fmt::Write;
 
-use lutra_frontend::pr;
+use lutra_bin::ir;
 
 use crate::{codegen_ty, Context};
 
@@ -8,7 +8,7 @@ use crate::{codegen_ty, Context};
 #[rustfmt::skip::macros(write)]
 pub fn write_functions(
     w: &mut impl Write,
-    functions: &[(&String, &pr::TyFunc)],
+    functions: &[(&String, ir::TyFunction)],
     ctx: &mut Context,
 ) -> Result<(), std::fmt::Error> {
     if functions.is_empty() {
@@ -20,18 +20,14 @@ pub fn write_functions(
     for (name, func) in functions {
         writeln!(w, "    fn {name}(")?;
         for (param_i, param) in func.params.iter().enumerate() {
-            let param = param.as_ref().unwrap();
-            let param = lutra_bin::ir::Ty::from(param.clone());
-
             write!(w, "        arg{param_i}: ")?;
-            codegen_ty::write_ty_ref(w, &param, false, ctx)?;
+            codegen_ty::write_ty_ref(w, param, false, ctx)?;
             writeln!(w, ",")?;
         }
 
-        let body = func.body.as_ref().unwrap().as_ref();
-        let body = lutra_bin::ir::Ty::from(body.clone());
+        let body = &func.body;
         write!(w, "    ) -> ")?;
-        codegen_ty::write_ty_ref(w, &body, false, ctx)?;
+        codegen_ty::write_ty_ref(w, body, false, ctx)?;
         writeln!(w, ";")?;
     }
     writeln!(w, "}}\n")?;
@@ -48,26 +44,34 @@ pub fn write_functions(
 
     writeln!(w, "impl <T: Functions> NativeFunctions for T {{")?;
     for (name, func) in functions {
+        let args = if func.params.is_empty() {
+            "_args"
+        } else {
+            "args"
+        };
+
         writeln!(w, "    fn {name}(")?;
         writeln!(w, "        _interpreter: &mut ::lutra_runtime::Interpreter,")?;
         writeln!(w, "        _layout_args: &[u32],")?;
-        writeln!(w, "        args: Vec<::lutra_runtime::Cell>,")?;
+        writeln!(w, "        {args}: Vec<::lutra_runtime::Cell>,")?;
         writeln!(w, "    ) -> ::lutra_runtime::Cell {{")?;
-        writeln!(w, "        use {lutra_bin}::{{Encode, Decode}};", )?;
 
-        // decode args
-        writeln!(w, "        let mut args = args.into_iter();")?;
-        writeln!(w)?;
-        for (param_i, param) in func.params.iter().enumerate() {
-            let param = param.as_ref().unwrap();
-            let param = lutra_bin::ir::Ty::from(param.clone());
+        if !func.params.is_empty() {
+            writeln!(w, "        use {lutra_bin}::{{Encode, Decode}};", )?;
 
-            writeln!(w, "        let arg{param_i} = args.next().unwrap();")?;
-            writeln!(w, "        let arg{param_i} = arg{param_i}.into_data().unwrap_or_else(|_| panic!());")?;
-            write!(w, "        let arg{param_i} = ")?;
-            codegen_ty::write_ty_ref(w, &param, true, ctx)?;
-            writeln!(w, "::decode(&arg{param_i}.flatten()).unwrap();")?;
+            // decode args
+            writeln!(w, "        let mut args = args.into_iter();")?;
             writeln!(w)?;
+            for (param_i, param) in func.params.iter().enumerate() {
+                writeln!(w, "        let arg{param_i} = args.next().unwrap();")?;
+                writeln!(w, "        let arg{param_i} = arg{param_i}.into_data().unwrap_or_else(|_| panic!());")?;
+                write!(w, "        let arg{param_i} = ")?;
+                codegen_ty::write_ty_ref(w, param, true, ctx)?;
+                writeln!(w, "::decode(&arg{param_i}.flatten()).unwrap();")?;
+                writeln!(w)?;
+            }
+        } else {
+            writeln!(w, "        use {lutra_bin}::Encode;", )?;
         }
 
         // call

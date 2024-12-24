@@ -133,13 +133,18 @@ fn codegen_in(
                 sub_modules.push((name, module));
             }
             lutra_frontend::decl::DeclKind::Ty(ty) => {
-                let ty = lutra_bin::ir::Ty::from(ty.clone());
-                tys.push((name, ty, &decl.annotations));
+                let mut ty = lutra_bin::ir::Ty::from(ty.clone());
+                infer_names(name, &mut ty);
+
+                tys.push((ty, decl.annotations.as_slice()));
             }
             lutra_frontend::decl::DeclKind::Expr(expr) => {
                 let ty = expr.ty.as_ref().unwrap();
-                if let pr::TyKind::Function(Some(func)) = &ty.kind {
-                    functions.push((name, func));
+                let mut ty = lutra_bin::ir::Ty::from(ty.clone());
+                infer_names(name, &mut ty);
+
+                if let ir::TyKind::Function(func) = ty.kind {
+                    functions.push((name, *func));
                 }
             }
             _ => {}
@@ -149,7 +154,7 @@ fn codegen_in(
     let mut ctx = Context::new(module_path.clone(), options);
 
     // write types
-    let all_tys = if options.generate_types {
+    let mut all_tys = if options.generate_types {
         codegen_ty::write_tys(w, tys, &mut ctx)?
     } else {
         vec![]
@@ -158,6 +163,8 @@ fn codegen_in(
     // write trait for functions
     if options.generate_function_traits {
         codegen_fn::write_functions(w, &functions, &mut ctx)?;
+
+        all_tys.extend(codegen_ty::write_tys_in_buffer(w, &mut ctx)?);
     }
 
     // recurse into sub modules
@@ -177,4 +184,58 @@ fn codegen_in(
     assert!(ctx.is_done(), "{ctx:?}");
 
     Ok(())
+}
+
+/// Types might not have names, because they are defined inline.
+/// This function traverses a type definition and generates names for all of the types.
+fn infer_names(stmt_name: &str, ty: &mut ir::Ty) {
+    if ty.name.is_none() {
+        ty.name = Some(stmt_name.to_string());
+    }
+
+    let mut name_prefix = Vec::new();
+    infer_names_re(ty, &mut name_prefix);
+}
+
+fn infer_names_re(ty: &mut ir::Ty, name_prefix: &mut Vec<String>) {
+    if ty.name.is_none() {
+        ty.name = Some(name_prefix.concat());
+    } else {
+        name_prefix.push(ty.name.clone().unwrap());
+    }
+
+    match &mut ty.kind {
+        ir::TyKind::Primitive(_) | ir::TyKind::Ident(_) => {}
+
+        ir::TyKind::Tuple(fields) => {
+            for (index, field) in fields.iter_mut().enumerate() {
+                let name = codegen_ty::tuple_field_name(&field.name, index);
+                name_prefix.push(name.into_owned());
+
+                infer_names_re(&mut field.ty, name_prefix);
+                name_prefix.pop();
+            }
+        }
+
+        ir::TyKind::Array(items_ty) => {
+            name_prefix.push("Items".to_string());
+            infer_names_re(items_ty, name_prefix);
+            name_prefix.pop();
+        }
+
+        ir::TyKind::Enum(variants) => {
+            for v in variants {
+                name_prefix.push(v.name.clone());
+                infer_names_re(&mut v.ty, name_prefix);
+                name_prefix.pop();
+            }
+        }
+
+        ir::TyKind::Function(func) => {
+            for param in &mut func.params {
+                infer_names_re(param, name_prefix);
+            }
+            infer_names_re(&mut func.body, name_prefix);
+        }
+    }
 }

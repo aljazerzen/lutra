@@ -7,73 +7,32 @@ use crate::Context;
 
 pub fn write_tys(
     w: &mut impl Write,
-    tys: Vec<(&String, ir::Ty, &Vec<pr::Annotation>)>,
+    tys: Vec<(ir::Ty, &[pr::Annotation])>,
     ctx: &mut Context,
 ) -> Result<Vec<ir::Ty>, std::fmt::Error> {
     let mut all_tys = Vec::new();
 
-    for (name, mut ty, annotations) in tys {
-        infer_names(name, &mut ty);
-
+    for (ty, annotations) in tys {
         write_ty_def(w, &ty, annotations, ctx)?;
         all_tys.push(ty);
 
-        while let Some(ty) = ctx.def_buffer.pop_front() {
-            let annotations = vec![];
-            write_ty_def(w, &ty, &annotations, ctx)?;
-            all_tys.push(ty);
-        }
+        all_tys.extend(write_tys_in_buffer(w, ctx)?);
     }
     Ok(all_tys)
 }
 
-/// Types might not have names, because they are defined inline.
-/// This function traverses a type definition and generates names for all of the types.
-pub fn infer_names(stmt_name: &str, ty: &mut ir::Ty) {
-    if ty.name.is_none() {
-        ty.name = Some(stmt_name.to_string());
+pub fn write_tys_in_buffer(
+    w: &mut impl Write,
+    ctx: &mut Context<'_>,
+) -> Result<Vec<ir::Ty>, std::fmt::Error> {
+    let mut all_tys = Vec::new();
+    while let Some(ty) = ctx.def_buffer.pop_front() {
+        let annotations = vec![];
+        write_ty_def(w, &ty, &annotations, ctx)?;
+
+        all_tys.push(ty);
     }
-
-    let mut name_prefix = Vec::new();
-    infer_names_re(ty, &mut name_prefix);
-}
-
-fn infer_names_re(ty: &mut ir::Ty, name_prefix: &mut Vec<String>) {
-    if ty.name.is_none() {
-        ty.name = Some(name_prefix.concat());
-    } else {
-        name_prefix.push(ty.name.clone().unwrap());
-    }
-
-    match &mut ty.kind {
-        ir::TyKind::Primitive(_) | ir::TyKind::Ident(_) => {}
-
-        ir::TyKind::Tuple(fields) => {
-            for (index, field) in fields.iter_mut().enumerate() {
-                let name = tuple_field_name(&field.name, index);
-                name_prefix.push(name.into_owned());
-
-                infer_names_re(&mut field.ty, name_prefix);
-                name_prefix.pop();
-            }
-        }
-
-        ir::TyKind::Array(items_ty) => {
-            name_prefix.push("Items".to_string());
-            infer_names_re(items_ty, name_prefix);
-            name_prefix.pop();
-        }
-
-        ir::TyKind::Enum(variants) => {
-            for v in variants {
-                name_prefix.push(v.name.clone());
-                infer_names_re(&mut v.ty, name_prefix);
-                name_prefix.pop();
-            }
-        }
-
-        _ => unimplemented!(),
-    }
+    Ok(all_tys)
 }
 
 /// Generates a type definition.
@@ -263,7 +222,10 @@ pub fn write_ty_ref(
         ir::TyKind::Tuple(_) | ir::TyKind::Enum(_) => {
             ctx.def_buffer.push_back(ty.clone());
 
-            let name = ty.name.as_ref().unwrap();
+            let name = ty
+                .name
+                .as_ref()
+                .unwrap_or_else(|| panic!("no name for {ty:?}"));
             write!(w, "{name}")?;
         }
 
