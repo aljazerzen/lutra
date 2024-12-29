@@ -29,7 +29,7 @@ chumsky = { workspace = true }
 
 enum-as-inner = { workspace = true }
 strum = { version = "0.26.3", features = ["std", "derive"] }
-indexmap = "2.6.0"
+indexmap = { workspace = true }
 
 lutra-bin = { path = "../lutra-bin" }
 

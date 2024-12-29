@@ -83,9 +83,7 @@ impl App for InputApp {
                     KeyCode::Up => Action::MoveUp,
                     KeyCode::Enter => Action::Select,
                     KeyCode::Backspace => Action::Erase,
-                    KeyCode::Char(char) => {
-                        Action::Write(char.to_string())
-                    }
+                    KeyCode::Char(char) => Action::Write(char.to_string()),
                     _ => return res,
                 };
                 self.update(action);

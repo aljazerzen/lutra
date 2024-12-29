@@ -8,6 +8,12 @@ pub fn print(program: &ir::Program) -> String {
     printer.print_program(program)
 }
 
+pub fn print_ty(ty: &ir::Ty) -> String {
+    let mut printer = Printer::default();
+
+    printer.print_ty(ty)
+}
+
 #[derive(Clone, Default)]
 struct Printer {
     indent: usize,
