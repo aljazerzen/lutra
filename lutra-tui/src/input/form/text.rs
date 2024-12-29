@@ -1,4 +1,3 @@
-use crossterm::event::KeyCode;
 use ratatui::{layout::Offset, prelude::*};
 
 use super::{Action, Form};
@@ -41,23 +40,29 @@ impl TextForm {
         area.offset(Offset { x: 0, y: 1 })
     }
 
-    pub fn update(&mut self, action: &Action) -> Vec<Action> {
-        let Action::KeyEvent(event) = action;
-
-        match event.code {
-            KeyCode::Char(ch) => {
-                self.value.push(ch);
+    pub fn update(&mut self, action: &Action) -> bool {
+        match action {
+            Action::Write(text) => {
+                self.value.extend(text.chars());
+                true
             }
-            KeyCode::Backspace => {
+            Action::Erase => {
                 self.value.pop();
+                true
             }
-            _ => {}
+            _ => false,
         }
-        vec![]
     }
 
     pub(crate) fn get_value(&self) -> lutra_bin::Value {
         lutra_bin::Value::Text(self.value.clone())
+    }
+
+    pub(crate) fn set_value(&mut self, value: lutra_bin::Value) {
+        let lutra_bin::Value::Text(value) = value else {
+            panic!()
+        };
+        self.value = value;
     }
 }
 

@@ -1,13 +1,14 @@
 use lutra_bin::ir;
 
 fn main() {
-    let ty = get_ty();
+    let mut ty = get_ty();
+    ty.name = Some("Pupek".into());
 
-    let value = lutra_tui::prompt_for_ty(&ty).unwrap();
+    let initial = get_value();
 
-    println!("{}", value.print_source(&ty).unwrap());
+    let result = lutra_tui::prompt_for_ty(&ty, Some(initial)).unwrap();
 
-    println!("{}", get_value().print_source(&ty).unwrap());
+    println!("{}", result.print_source(&ty).unwrap());
 }
 
 fn get_ty() -> ir::Ty {

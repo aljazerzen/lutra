@@ -1,4 +1,3 @@
-use crossterm::event::KeyCode;
 use lutra_bin::ir;
 use ratatui::{layout::Offset, prelude::*};
 
@@ -74,42 +73,71 @@ impl ArrayForm {
         area
     }
 
-    pub fn update(&mut self, action: &Action, self_ty: &ir::Ty) -> Vec<Action> {
+    pub fn update(&mut self, action: &Action, self_ty: &ir::Ty) -> bool {
         match action {
-            Action::KeyEvent(event) if event.code == KeyCode::Left => {
+            Action::MoveLeft => {
                 self.focused_action = self.focused_action.saturating_sub(1);
+                true
             }
-            Action::KeyEvent(event) if event.code == KeyCode::Right => {
+            Action::MoveRight => {
                 self.focused_action = self.focused_action.saturating_add(1);
 
                 if self.focused_action >= ACTIONS.len() {
                     self.focused_action = ACTIONS.len() - 1;
                 }
+                true
             }
-            Action::KeyEvent(event) if event.code == KeyCode::Enter => {
+            Action::Select => {
                 if let Some(action) = ACTIONS.get(self.focused_action) {
                     match action {
                         ArrayAction::Push => {
-                            let items_ty = self_ty.kind.as_array().unwrap().clone();
-
-                            let name = FormName {
-                                name: None,
-                                position: Some(self.items.len()),
-                            };
-                            self.items.push(Form::new(&items_ty, name));
+                            self.push(self_ty);
                         }
                         ArrayAction::Pop => {
                             self.items.pop();
                         }
                     }
                 }
+                true
             }
-            _ => {}
+            _ => {
+                false
+            }
         }
-        vec![]
+    }
+
+    fn push(&mut self, self_ty: &ir::Ty) {
+        let items_ty = self_ty.kind.as_array().unwrap().clone();
+
+        let name = FormName {
+            name: None,
+            position: Some(self.items.len()),
+        };
+        self.items.push(Form::new(&items_ty, name));
+    }
+
+    fn set_length(&mut self, len: usize, self_ty: &ir::Ty) {
+        let curr_len = self.items.len();
+        if curr_len < len {
+            for _ in curr_len..len {
+                self.push(self_ty);
+            }
+        } else {
+            self.items.drain(len..);
+        }
     }
 
     pub(crate) fn get_value(&self) -> lutra_bin::Value {
         lutra_bin::Value::Array(self.items.iter().map(|f| f.get_value()).collect())
+    }
+
+    pub(crate) fn set_value(&mut self, value: lutra_bin::Value, self_ty: &ir::Ty) {
+        let lutra_bin::Value::Array(values) = value else {
+            panic!()
+        };
+        self.set_length(values.len(), self_ty);
+        for (item, value) in std::iter::zip(&mut self.items, values) {
+            item.set_value(value);
+        }
     }
 }

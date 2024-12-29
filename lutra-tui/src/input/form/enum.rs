@@ -1,9 +1,8 @@
-use crossterm::event::KeyCode;
 use lutra_bin::ir;
 use ratatui::{layout::Offset, prelude::*};
 
-use super::{Action, Form, FormKind, FormName};
 use super::text::render_name_colon;
+use super::{Action, Form, FormKind, FormName};
 
 pub struct EnumForm {
     pub selected: usize,
@@ -52,8 +51,13 @@ impl EnumForm {
                     } else {
                         frame.render_widget(name.white(), area);
                     }
-                    area.x += name.len() as u16 + 1;
-                    area.width -= name.len() as u16 + 1;
+                    const SPACING: u16 = 1;
+                    let width = name.len() as u16 + SPACING;
+                    if area.width <= width {
+                        break;
+                    }
+                    area.x += width;
+                    area.width -= width;
                 }
             }
 
@@ -74,24 +78,34 @@ impl EnumForm {
         area.offset(Offset { x: 0, y: 1 })
     }
 
-    pub fn update(&mut self, action: &Action) -> Vec<Action> {
+    pub fn update(&mut self, action: &Action) -> bool {
         match action {
-            Action::KeyEvent(event) if event.code == KeyCode::Left => {
+            Action::MoveLeft => {
                 self.selected = self.selected.saturating_sub(1);
+                true
             }
-            Action::KeyEvent(event) if event.code == KeyCode::Right => {
+            Action::MoveRight => {
                 self.selected = self.selected.saturating_add(1);
                 if self.selected >= self.variants.len() {
                     self.selected = self.variants.len() - 1;
                 }
+                true
             }
-            _ => {}
+            _ => {
+                false
+            }
         }
-        vec![]
     }
 
     pub(crate) fn get_value(&self) -> lutra_bin::Value {
         let selected_form = self.variants.get(self.selected).unwrap();
         lutra_bin::Value::Enum(self.selected, Box::new(selected_form.get_value()))
+    }
+
+    pub(crate) fn set_value(&mut self, value: lutra_bin::Value) {
+        let lutra_bin::Value::Enum(tag, value) = value else {
+            panic!()
+        };
+        self.variants.get_mut(tag).unwrap().set_value(*value);
     }
 }

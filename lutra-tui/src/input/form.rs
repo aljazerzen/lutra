@@ -62,10 +62,16 @@ impl Form {
     }
 
     fn get_name(&self) -> Cow<'_, str> {
-        self.name.as_str().unwrap_or_else(|| Cow::from("(unnamed)"))
+        self.name
+            .as_str()
+            .unwrap_or_else(|| Cow::Borrowed("(unnamed)"))
     }
 
     pub fn render(&self, frame: &mut Frame, area: Rect) -> Rect {
+        if area.is_empty() {
+            return area;
+        }
+
         // render inner
         match &self.kind {
             FormKind::Text(form) => form.render(self, frame, area),
@@ -75,10 +81,10 @@ impl Form {
         }
     }
 
-    pub fn update(&mut self, action: &Action) -> Vec<Action> {
+    pub fn update(&mut self, action: &Action) -> bool {
         match &mut self.kind {
             FormKind::Text(form) => form.update(action),
-            FormKind::Tuple(_) => vec![],
+            FormKind::Tuple(form) => form.update(action),
             FormKind::Enum(form) => form.update(action),
             FormKind::Array(form) => form.update(action, &self.ty),
         }
@@ -113,17 +119,21 @@ impl Form {
             self.focus = false;
             return (0, true);
         }
-        match &mut self.kind {
+        let passed_forms = match &mut self.kind {
             FormKind::Tuple(form) => {
-                let mut position = 0;
-                for field in &mut form.fields {
-                    let (p, f) = field.take_focus();
-                    position += p;
-                    if f {
-                        return (position, true);
+                if !form.is_folded {
+                    let mut position = 0;
+                    for field in &mut form.fields {
+                        let (p, f) = field.take_focus();
+                        position += p;
+                        if f {
+                            return (position, true);
+                        }
                     }
+                    position
+                } else {
+                    1
                 }
-                (position, false)
             }
             FormKind::Enum(form) => {
                 let mut position = 1;
@@ -134,7 +144,7 @@ impl Form {
                         return (position, true);
                     }
                 }
-                (position, false)
+                position
             }
             FormKind::Array(form) => {
                 let mut position = 1;
@@ -145,10 +155,11 @@ impl Form {
                         return (position, true);
                     }
                 }
-                (position, false)
+                position
             }
-            FormKind::Text(_) => (1, false),
-        }
+            FormKind::Text(_) => 1,
+        };
+        (passed_forms, false)
     }
 
     /// Walks over focusable forms and sets focus at the specified position. If that
@@ -156,16 +167,25 @@ impl Form {
     pub fn insert_focus(&mut self, mut position: usize) -> Result<Vec<usize>, usize> {
         match &mut self.kind {
             FormKind::Tuple(form) => {
-                for (pos, field) in form.fields.iter_mut().enumerate() {
-                    match field.insert_focus(position) {
-                        Ok(mut path) => {
-                            path.insert(0, pos);
-                            return Ok(path);
+                if !form.is_folded {
+                    for (pos, field) in form.fields.iter_mut().enumerate() {
+                        match field.insert_focus(position) {
+                            Ok(mut path) => {
+                                path.insert(0, pos);
+                                return Ok(path);
+                            }
+                            Err(p) => position = p,
                         }
-                        Err(p) => position = p,
+                    }
+                    Err(position)
+                } else {
+                    if position == 0 {
+                        self.focus = true;
+                        Ok(vec![])
+                    } else {
+                        Err(position - 1)
                     }
                 }
-                Err(position)
             }
             FormKind::Enum(form) => {
                 if position == 0 {
@@ -218,6 +238,15 @@ impl Form {
             FormKind::Tuple(form) => form.get_value(),
             FormKind::Enum(form) => form.get_value(),
             FormKind::Array(form) => form.get_value(),
+        }
+    }
+
+    pub fn set_value(&mut self, value: lutra_bin::Value) {
+        match &mut self.kind {
+            FormKind::Text(form) => form.set_value(value),
+            FormKind::Tuple(form) => form.set_value(value),
+            FormKind::Enum(form) => form.set_value(value),
+            FormKind::Array(form) => form.set_value(value, &self.ty),
         }
     }
 }

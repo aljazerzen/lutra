@@ -2,7 +2,7 @@ mod form;
 
 use std::collections::VecDeque;
 
-use crossterm::event::{self, KeyCode, KeyEvent, KeyEventKind};
+use crossterm::event::{self, KeyCode, KeyEventKind};
 use lutra_bin::ir;
 use ratatui::prelude::*;
 
@@ -10,12 +10,19 @@ use crate::terminal::{App, EventResult};
 use form::{Form, FormName};
 
 /// Starts a TUI prompt for type `ty` on stdout terminal.
-pub fn prompt_for_ty(ty: &ir::Ty) -> Result<lutra_bin::Value, anyhow::Error> {
+pub fn prompt_for_ty(
+    ty: &ir::Ty,
+    initial: Option<lutra_bin::Value>,
+) -> Result<lutra_bin::Value, anyhow::Error> {
     let mut app = InputApp::new(ty);
+
+    if let Some(val) = initial {
+        app.form.set_value(val);
+    }
 
     crate::terminal::within_alternate_screen(|term| crate::terminal::run_app(&mut app, term))??;
 
-    Ok(app.get_value())
+    Ok(app.form.get_value())
 }
 
 pub struct InputApp {
@@ -24,12 +31,19 @@ pub struct InputApp {
 }
 
 #[derive(Default)]
-pub struct Cursor {
+struct Cursor {
     pub form_path: Vec<usize>,
 }
 
-pub enum Action {
-    KeyEvent(KeyEvent),
+#[derive(Debug)]
+enum Action {
+    Write(String),
+    Erase,
+    MoveUp,
+    MoveDown,
+    MoveRight,
+    MoveLeft,
+    Select,
 }
 
 impl InputApp {
@@ -42,10 +56,6 @@ impl InputApp {
         };
         app.update_cursor_path_position(|p| p);
         app
-    }
-
-    pub fn get_value(&self) -> lutra_bin::Value {
-        self.form.get_value()
     }
 }
 
@@ -66,13 +76,28 @@ impl App for InputApp {
                 res.redraw = true;
             }
             event::Event::Key(event) => {
-                self.update(Action::KeyEvent(event));
+                let action = match event.code {
+                    KeyCode::Left => Action::MoveLeft,
+                    KeyCode::Right => Action::MoveRight,
+                    KeyCode::Down => Action::MoveDown,
+                    KeyCode::Up => Action::MoveUp,
+                    KeyCode::Enter => Action::Select,
+                    KeyCode::Backspace => Action::Erase,
+                    KeyCode::Char(char) => {
+                        Action::Write(char.to_string())
+                    }
+                    _ => return res,
+                };
+                self.update(action);
                 res.redraw = true;
             }
             event::Event::FocusGained => {}
             event::Event::FocusLost => {}
             event::Event::Mouse(_) => {}
-            event::Event::Paste(_) => {}
+            event::Event::Paste(text) => {
+                self.update(Action::Write(text));
+                res.redraw = true;
+            }
         }
         res
     }
@@ -84,19 +109,31 @@ impl InputApp {
         queue.push_back(action);
 
         while let Some(action) = queue.pop_front() {
+            // primary handler
             match action {
-                Action::KeyEvent(event) if event.code == KeyCode::Up => {
+                Action::MoveUp => {
                     self.update_cursor_path_position(|p| p.saturating_sub(1));
                 }
-                Action::KeyEvent(event) if event.code == KeyCode::Down => {
+                Action::MoveDown => {
                     self.update_cursor_path_position(|p| p.saturating_add(1));
                 }
-                Action::KeyEvent(_) => {
+                _ => {
                     let focused = self.form.get_mut(&self.cursor.form_path);
                     if let Some(focused) = focused {
-                        queue.extend(focused.update(&action));
+                        let consumed = focused.update(&action);
+                        if consumed {
+                            continue;
+                        }
                     }
                 }
+            }
+
+            // fallback handler
+            match action {
+                Action::MoveLeft => {
+                    self.move_cursor_to_parent();
+                }
+                _ => {}
             }
         }
     }
@@ -116,5 +153,12 @@ impl InputApp {
             return;
         };
         self.cursor.form_path = path;
+    }
+
+    fn move_cursor_to_parent(&mut self) {
+        self.form.take_focus();
+        self.cursor.form_path.pop();
+        let form = self.form.get_mut(&self.cursor.form_path).unwrap();
+        form.focus = true;
     }
 }
