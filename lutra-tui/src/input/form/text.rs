@@ -1,9 +1,7 @@
 use crossterm::event::KeyCode;
 use ratatui::{layout::Offset, prelude::*};
 
-use crate::app::Action;
-
-use super::Form;
+use super::{Action, Form};
 
 pub struct TextForm {
     value: String,

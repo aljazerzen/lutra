@@ -1,5 +1,5 @@
 [package]
-name = "lutra-input-tui"
+name = "lutra-tui"
 edition.workspace = true
 license.workspace = true
 repository.workspace = true

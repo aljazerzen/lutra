@@ -7,7 +7,7 @@ use lutra_bin::ir;
 use ratatui::prelude::*;
 use std::borrow::Cow;
 
-use crate::app::Action;
+use super::Action;
 
 use self::array::ArrayForm;
 use self::r#enum::EnumForm;

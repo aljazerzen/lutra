@@ -2,9 +2,8 @@ use crossterm::event::KeyCode;
 use lutra_bin::ir;
 use ratatui::{layout::Offset, prelude::*};
 
-use crate::app::Action;
-
-use super::{text::render_name_colon, Form, FormKind, FormName};
+use super::{Action, Form, FormKind, FormName};
+use super::text::render_name_colon;
 
 pub struct EnumForm {
     pub selected: usize,

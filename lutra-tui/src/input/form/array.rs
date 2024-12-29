@@ -2,9 +2,8 @@ use crossterm::event::KeyCode;
 use lutra_bin::ir;
 use ratatui::{layout::Offset, prelude::*};
 
-use crate::app::Action;
-
-use super::{text::render_name_colon, Form, FormName};
+use super::text::render_name_colon;
+use super::{Action, Form, FormName};
 
 const ACTIONS: [ArrayAction; 2] = [ArrayAction::Push, ArrayAction::Pop];
 

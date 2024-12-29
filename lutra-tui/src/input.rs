@@ -1,21 +1,42 @@
+mod form;
+
 use std::collections::VecDeque;
 
 use crossterm::event::{self, KeyCode, KeyEvent, KeyEventKind};
 use lutra_bin::ir;
 use ratatui::prelude::*;
 
-use crate::form::{Form, FormName};
+use crate::terminal::{App, EventResult};
+use form::{Form, FormName};
 
-pub struct App {
+/// Starts a TUI prompt for type `ty` on stdout terminal.
+pub fn prompt_for_ty(ty: &ir::Ty) -> Result<lutra_bin::Value, anyhow::Error> {
+    let mut app = InputApp::new(ty);
+
+    crate::terminal::within_alternate_screen(|term| crate::terminal::run_app(&mut app, term))??;
+
+    Ok(app.get_value())
+}
+
+pub struct InputApp {
     cursor: Cursor,
     form: Form,
 }
 
-impl App {
+#[derive(Default)]
+pub struct Cursor {
+    pub form_path: Vec<usize>,
+}
+
+pub enum Action {
+    KeyEvent(KeyEvent),
+}
+
+impl InputApp {
     pub fn new(ty: &ir::Ty) -> Self {
         let form = Form::new(ty, FormName::default());
 
-        let mut app = App {
+        let mut app = InputApp {
             form,
             cursor: Cursor::default(),
         };
@@ -26,12 +47,14 @@ impl App {
     pub fn get_value(&self) -> lutra_bin::Value {
         self.form.get_value()
     }
+}
 
-    pub fn render(&self, frame: &mut Frame) {
+impl App for InputApp {
+    fn render(&self, frame: &mut Frame) {
         self.form.render(frame, frame.area());
     }
 
-    pub fn handle_event(&mut self, event: event::Event) -> EventResult {
+    fn handle_event(&mut self, event: event::Event) -> EventResult {
         let mut res = EventResult::default();
         match event {
             event::Event::Key(key)
@@ -53,7 +76,9 @@ impl App {
         }
         res
     }
+}
 
+impl InputApp {
     fn update(&mut self, action: Action) {
         let mut queue = VecDeque::new();
         queue.push_back(action);
@@ -92,19 +117,4 @@ impl App {
         };
         self.cursor.form_path = path;
     }
-}
-
-#[derive(Default)]
-pub struct EventResult {
-    pub redraw: bool,
-    pub shutdown: bool,
-}
-
-pub enum Action {
-    KeyEvent(KeyEvent),
-}
-
-#[derive(Default)]
-pub struct Cursor {
-    pub form_path: Vec<usize>,
 }
