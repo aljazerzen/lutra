@@ -21,7 +21,7 @@ fn get_ty() -> ir::Ty {
                 param1 = text,
                 text,
             },
-            hello = text,
+            hello = bool,
         }
     "#;
 
@@ -46,6 +46,6 @@ fn get_value() -> lutra_bin::Value {
             Value::Text("top-side".into()),
             Value::Text("file.txt".into()),
         ]),
-        Value::Text("world".into()),
+        Value::Bool(true),
     ])
 }

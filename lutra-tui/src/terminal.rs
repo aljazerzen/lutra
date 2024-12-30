@@ -1,6 +1,6 @@
 use std::io::stdout;
 
-use crossterm::event::{self, KeyCode, KeyEventKind};
+use crossterm::event::{self, KeyCode, KeyModifiers};
 use crossterm::terminal::{
     disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen,
 };
@@ -10,7 +10,7 @@ use ratatui::prelude::*;
 pub trait Component {
     fn render(&self, frame: &mut Frame);
 
-    fn update(&mut self, action: Action);
+    fn update(&mut self, action: Action) -> EventResult;
 }
 
 #[derive(Debug)]
@@ -25,9 +25,16 @@ pub enum Action {
 }
 
 #[derive(Default)]
-struct EventResult {
+pub struct EventResult {
     pub redraw: bool,
     pub shutdown: bool,
+}
+
+impl EventResult {
+    pub fn merge(&mut self, other: EventResult) {
+        self.redraw = self.redraw || other.redraw;
+        self.shutdown = self.shutdown || other.shutdown;
+    }
 }
 
 pub(super) fn run_app(
@@ -55,11 +62,6 @@ pub(super) fn run_app(
 fn handle_event(app: &mut impl Component, event: event::Event) -> EventResult {
     let mut res = EventResult::default();
     match event {
-        event::Event::Key(key)
-            if key.kind == KeyEventKind::Press && key.code == KeyCode::Char('q') =>
-        {
-            res.shutdown = true;
-        }
         event::Event::Resize(_, _) => {
             res.redraw = true;
         }
@@ -69,19 +71,29 @@ fn handle_event(app: &mut impl Component, event: event::Event) -> EventResult {
                 KeyCode::Right => Action::MoveRight,
                 KeyCode::Down => Action::MoveDown,
                 KeyCode::Up => Action::MoveUp,
+
+                KeyCode::Esc => {
+                    res.shutdown = true;
+                    return res;
+                }
+
+                KeyCode::Char('c') if event.modifiers.contains(KeyModifiers::CONTROL) => {
+                    res.shutdown = true;
+                    return res;
+                }
                 KeyCode::Enter => Action::Select,
                 KeyCode::Backspace => Action::Erase,
                 KeyCode::Char(char) => Action::Write(char.to_string()),
                 _ => return res,
             };
-            app.update(action);
+            res.merge(app.update(action));
             res.redraw = true;
         }
         event::Event::FocusGained => {}
         event::Event::FocusLost => {}
         event::Event::Mouse(_) => {}
         event::Event::Paste(text) => {
-            app.update(Action::Write(text));
+            res.merge(app.update(Action::Write(text)));
             res.redraw = true;
         }
     }

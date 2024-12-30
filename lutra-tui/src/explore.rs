@@ -2,7 +2,7 @@ use layout::Offset;
 use lutra_bin::ir;
 use ratatui::prelude::*;
 
-use crate::terminal::Action;
+use crate::terminal::{Action, EventResult};
 
 pub fn prompt_for_decl(project: &lutra_frontend::Project) -> anyhow::Result<ir::Path> {
     let mut app = ExploreApp::new(project);
@@ -67,7 +67,8 @@ impl crate::terminal::Component for ExploreApp {
         }
     }
 
-    fn update(&mut self, action: Action) {
+    fn update(&mut self, action: Action) -> EventResult {
+        let mut res = EventResult::default();
         match action {
             Action::MoveUp => {
                 self.update_cursor_path_position(|p| p.saturating_sub(1));
@@ -75,8 +76,12 @@ impl crate::terminal::Component for ExploreApp {
             Action::MoveDown => {
                 self.update_cursor_path_position(|p| p.saturating_add(1));
             }
+            Action::Select => {
+                res.shutdown = true;
+            }
             _ => {}
         }
+        res
     }
 }
 

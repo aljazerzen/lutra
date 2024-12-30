@@ -1,7 +1,6 @@
 use lutra_bin::ir;
 use ratatui::{layout::Offset, prelude::*};
 
-use super::text::render_name_colon;
 use super::{Action, Form, FormName};
 
 const ACTIONS: [ArrayAction; 2] = [ArrayAction::Push, ArrayAction::Pop];
@@ -36,7 +35,7 @@ impl ArrayForm {
     }
 
     pub fn render(&self, form: &Form, frame: &mut Frame, area: Rect) -> Rect {
-        let focus_area = render_name_colon(form, frame, area);
+        let focus_area = super::render_name_colon(form, frame, area);
 
         if form.focus {
             let mut area = focus_area;

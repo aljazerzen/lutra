@@ -12,7 +12,7 @@ impl TextForm {
     }
 
     pub fn render(&self, form: &Form, frame: &mut Frame<'_>, area: Rect) -> Rect {
-        let area_value = render_name_colon(form, frame, area);
+        let area_value = super::render_name_colon(form, frame, area);
 
         let value_text = if self.value.is_empty() {
             "<empty>"
@@ -64,25 +64,4 @@ impl TextForm {
         };
         self.value = value;
     }
-}
-
-pub fn render_name_colon(form: &Form, frame: &mut Frame, area: Rect) -> Rect {
-    let name = form.get_name();
-
-    let name_span = if form.focus {
-        name.white().bold()
-    } else {
-        name.white()
-    };
-    frame.render_widget(name_span, area);
-
-    let area_colon = area.offset(Offset {
-        x: name.len() as i32,
-        y: 0,
-    });
-    frame.render_widget(":".white(), area_colon);
-
-    area_colon
-        .offset(Offset { x: 2, y: 0 })
-        .intersection(frame.area())
 }

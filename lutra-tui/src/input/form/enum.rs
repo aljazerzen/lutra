@@ -1,7 +1,6 @@
 use lutra_bin::ir;
 use ratatui::{layout::Offset, prelude::*};
 
-use super::text::render_name_colon;
 use super::{Action, Form, FormKind, FormName};
 
 pub struct EnumForm {
@@ -34,7 +33,7 @@ impl EnumForm {
     }
 
     pub fn render(&self, form: &Form, frame: &mut Frame, area: Rect) -> Rect {
-        let value_area = render_name_colon(form, frame, area);
+        let value_area = super::render_name_colon(form, frame, area);
 
         if let Some(selected) = self.variants.get(self.selected) {
             if !form.focus {

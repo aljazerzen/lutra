@@ -14,3 +14,4 @@ ratatui = "0.29.0"
 lutra-frontend = { path = "../lutra-frontend" }
 lutra-bin = { path = "../lutra-bin" }
 lutra-ir = { path = "../lutra-ir" }
+lutra-runtime = { path = "../lutra-runtime" }

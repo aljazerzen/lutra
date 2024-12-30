@@ -1,8 +1,13 @@
 mod array;
+mod bool;
 mod r#enum;
+mod int;
 mod text;
 mod tuple;
 
+use bool::BoolForm;
+use int::IntForm;
+use layout::Offset;
 use lutra_bin::ir;
 use ratatui::prelude::*;
 use std::borrow::Cow;
@@ -22,7 +27,9 @@ pub struct Form {
 }
 
 pub enum FormKind {
+    Bool(BoolForm),
     Text(TextForm),
+    Int(IntForm),
     Tuple(TupleForm),
     Enum(EnumForm),
     Array(ArrayForm),
@@ -34,6 +41,8 @@ impl Form {
             ir::TyKind::Primitive(ir::PrimitiveSet::text) => {
                 FormKind::Text(TextForm::new(String::new()))
             }
+            ir::TyKind::Primitive(ir::PrimitiveSet::int64) => FormKind::Int(IntForm::new(0)),
+            ir::TyKind::Primitive(ir::PrimitiveSet::bool) => FormKind::Bool(BoolForm::new(false)),
             ir::TyKind::Primitive(_) => todo!(),
 
             ir::TyKind::Enum(variants) => FormKind::Enum(EnumForm::new(variants)),
@@ -74,7 +83,9 @@ impl Form {
 
         // render inner
         match &self.kind {
+            FormKind::Bool(form) => form.render(self, frame, area),
             FormKind::Text(form) => form.render(self, frame, area),
+            FormKind::Int(form) => form.render(self, frame, area),
             FormKind::Tuple(form) => form.render(self, frame, area),
             FormKind::Enum(form) => form.render(self, frame, area),
             FormKind::Array(form) => form.render(self, frame, area),
@@ -83,7 +94,9 @@ impl Form {
 
     pub fn update(&mut self, action: &Action) -> bool {
         match &mut self.kind {
+            FormKind::Bool(form) => form.update(action),
             FormKind::Text(form) => form.update(action),
+            FormKind::Int(form) => form.update(action),
             FormKind::Tuple(form) => form.update(action),
             FormKind::Enum(form) => form.update(action),
             FormKind::Array(form) => form.update(action, &self.ty),
@@ -108,7 +121,7 @@ impl Form {
                 let variant = form.items.get_mut(path_step)?;
                 variant.get_mut(&path[1..])
             }
-            FormKind::Text(_) => unreachable!(),
+            FormKind::Text(_) | FormKind::Int(_) | FormKind::Bool(_) => unreachable!(),
         }
     }
 
@@ -157,7 +170,7 @@ impl Form {
                 }
                 position
             }
-            FormKind::Text(_) => 1,
+            FormKind::Text(_) | FormKind::Int(_) | FormKind::Bool(_) => 1,
         };
         (passed_forms, false)
     }
@@ -221,7 +234,7 @@ impl Form {
                 }
                 Err(position)
             }
-            FormKind::Text(_) => {
+            FormKind::Text(_) | FormKind::Int(_) | FormKind::Bool(_) => {
                 if position == 0 {
                     self.focus = true;
                     Ok(vec![])
@@ -234,7 +247,9 @@ impl Form {
 
     pub fn get_value(&self) -> lutra_bin::Value {
         match &self.kind {
+            FormKind::Bool(form) => form.get_value(),
             FormKind::Text(form) => form.get_value(),
+            FormKind::Int(form) => form.get_value(),
             FormKind::Tuple(form) => form.get_value(),
             FormKind::Enum(form) => form.get_value(),
             FormKind::Array(form) => form.get_value(),
@@ -243,7 +258,9 @@ impl Form {
 
     pub fn set_value(&mut self, value: lutra_bin::Value) {
         match &mut self.kind {
+            FormKind::Bool(form) => form.set_value(value),
             FormKind::Text(form) => form.set_value(value),
+            FormKind::Int(form) => form.set_value(value),
             FormKind::Tuple(form) => form.set_value(value),
             FormKind::Enum(form) => form.set_value(value),
             FormKind::Array(form) => form.set_value(value, &self.ty),
@@ -267,4 +284,25 @@ impl FormName {
         }
         None
     }
+}
+
+pub fn render_name_colon(form: &Form, frame: &mut Frame, area: Rect) -> Rect {
+    let name = form.get_name();
+
+    let name_span = if form.focus {
+        name.white().bold()
+    } else {
+        name.white()
+    };
+    frame.render_widget(name_span, area);
+
+    let area_colon = area.offset(Offset {
+        x: name.len() as i32,
+        y: 0,
+    });
+    frame.render_widget(":".white(), area_colon);
+
+    area_colon
+        .offset(Offset { x: 2, y: 0 })
+        .intersection(frame.area())
 }

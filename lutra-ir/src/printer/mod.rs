@@ -9,7 +9,7 @@ pub fn print(program: &ir::Program) -> String {
 }
 
 pub fn print_ty(ty: &ir::Ty) -> String {
-    let mut printer = Printer::default();
+    let printer = Printer::default();
 
     printer.print_ty(ty)
 }
