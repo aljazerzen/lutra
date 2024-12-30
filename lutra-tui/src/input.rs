@@ -2,11 +2,10 @@ mod form;
 
 use std::collections::VecDeque;
 
-use crossterm::event::{self, KeyCode, KeyEventKind};
 use lutra_bin::ir;
 use ratatui::prelude::*;
 
-use crate::terminal::{App, EventResult};
+use crate::terminal::{Action, Component};
 use form::{Form, FormName};
 
 /// Starts a TUI prompt for type `ty` on stdout terminal.
@@ -35,17 +34,6 @@ struct Cursor {
     pub form_path: Vec<usize>,
 }
 
-#[derive(Debug)]
-enum Action {
-    Write(String),
-    Erase,
-    MoveUp,
-    MoveDown,
-    MoveRight,
-    MoveLeft,
-    Select,
-}
-
 impl InputApp {
     pub fn new(ty: &ir::Ty) -> Self {
         let form = Form::new(ty, FormName::default());
@@ -59,49 +47,11 @@ impl InputApp {
     }
 }
 
-impl App for InputApp {
+impl Component for InputApp {
     fn render(&self, frame: &mut Frame) {
         self.form.render(frame, frame.area());
     }
 
-    fn handle_event(&mut self, event: event::Event) -> EventResult {
-        let mut res = EventResult::default();
-        match event {
-            event::Event::Key(key)
-                if key.kind == KeyEventKind::Press && key.code == KeyCode::Char('q') =>
-            {
-                res.shutdown = true;
-            }
-            event::Event::Resize(_, _) => {
-                res.redraw = true;
-            }
-            event::Event::Key(event) => {
-                let action = match event.code {
-                    KeyCode::Left => Action::MoveLeft,
-                    KeyCode::Right => Action::MoveRight,
-                    KeyCode::Down => Action::MoveDown,
-                    KeyCode::Up => Action::MoveUp,
-                    KeyCode::Enter => Action::Select,
-                    KeyCode::Backspace => Action::Erase,
-                    KeyCode::Char(char) => Action::Write(char.to_string()),
-                    _ => return res,
-                };
-                self.update(action);
-                res.redraw = true;
-            }
-            event::Event::FocusGained => {}
-            event::Event::FocusLost => {}
-            event::Event::Mouse(_) => {}
-            event::Event::Paste(text) => {
-                self.update(Action::Write(text));
-                res.redraw = true;
-            }
-        }
-        res
-    }
-}
-
-impl InputApp {
     fn update(&mut self, action: Action) {
         let mut queue = VecDeque::new();
         queue.push_back(action);
@@ -135,7 +85,9 @@ impl InputApp {
             }
         }
     }
+}
 
+impl InputApp {
     fn update_cursor_path_position(&mut self, update: impl FnOnce(usize) -> usize) {
         let (mut position, found) = self.form.take_focus();
         if !found {

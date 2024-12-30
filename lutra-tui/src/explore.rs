@@ -1,9 +1,8 @@
-use crossterm::event::{self, KeyCode};
 use layout::Offset;
 use lutra_bin::ir;
 use ratatui::prelude::*;
 
-use crate::terminal::EventResult;
+use crate::terminal::Action;
 
 pub fn prompt_for_decl(project: &lutra_frontend::Project) -> anyhow::Result<ir::Path> {
     let mut app = ExploreApp::new(project);
@@ -17,12 +16,6 @@ pub fn prompt_for_decl(project: &lutra_frontend::Project) -> anyhow::Result<ir::
 struct ExploreApp {
     root_decl: Decl,
     cursor: Vec<usize>,
-}
-
-#[derive(Debug)]
-enum Action {
-    MoveUp,
-    MoveDown,
 }
 
 impl ExploreApp {
@@ -40,17 +33,6 @@ impl ExploreApp {
 
         app.update_cursor_path_position(|p| p);
         app
-    }
-
-    fn update(&mut self, action: Action) {
-        match action {
-            Action::MoveUp => {
-                self.update_cursor_path_position(|p| p.saturating_sub(1));
-            }
-            Action::MoveDown => {
-                self.update_cursor_path_position(|p| p.saturating_add(1));
-            }
-        }
     }
 
     fn update_cursor_path_position(&mut self, update: impl FnOnce(usize) -> usize) {
@@ -72,7 +54,7 @@ impl ExploreApp {
     }
 }
 
-impl crate::terminal::App for ExploreApp {
+impl crate::terminal::Component for ExploreApp {
     fn render(&self, frame: &mut ratatui::Frame) {
         let DeclKind::Module(ModuleDecl { decls, .. }) = &self.root_decl.kind else {
             panic!()
@@ -85,31 +67,16 @@ impl crate::terminal::App for ExploreApp {
         }
     }
 
-    fn handle_event(&mut self, event: event::Event) -> EventResult {
-        let mut res = EventResult::default();
-        match event {
-            event::Event::Resize(_, _) => {
-                res.redraw = true;
+    fn update(&mut self, action: Action) {
+        match action {
+            Action::MoveUp => {
+                self.update_cursor_path_position(|p| p.saturating_sub(1));
             }
-            event::Event::Key(event) => {
-                let action = match event.code {
-                    KeyCode::Down => Action::MoveDown,
-                    KeyCode::Up => Action::MoveUp,
-                    KeyCode::Enter => {
-                        res.shutdown = true;
-                        return res;
-                    }
-                    _ => return res,
-                };
-                self.update(action);
-                res.redraw = true;
+            Action::MoveDown => {
+                self.update_cursor_path_position(|p| p.saturating_add(1));
             }
-            event::Event::FocusGained => {}
-            event::Event::FocusLost => {}
-            event::Event::Mouse(_) => {}
-            event::Event::Paste(_) => {}
+            _ => {}
         }
-        res
     }
 }
 
