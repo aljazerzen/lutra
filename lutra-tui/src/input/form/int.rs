@@ -21,7 +21,7 @@ impl IntForm {
     pub fn update(&mut self, action: &Action) -> bool {
         match action {
             Action::Write(text) => {
-                let text = text.chars().filter(|c| ('0'..'9').contains(c)).collect();
+                let text = text.chars().filter(|c| c.is_ascii_digit()).collect();
                 self.inner.update(&Action::Write(text))
             }
             _ => self.inner.update(action),

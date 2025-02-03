@@ -90,9 +90,7 @@ impl EnumForm {
                 }
                 true
             }
-            _ => {
-                false
-            }
+            _ => false,
         }
     }
 

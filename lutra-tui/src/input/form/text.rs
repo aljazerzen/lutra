@@ -43,7 +43,7 @@ impl TextForm {
     pub fn update(&mut self, action: &Action) -> bool {
         match action {
             Action::Write(text) => {
-                self.value.extend(text.chars());
+                self.value.push_str(text);
                 true
             }
             Action::Erase => {

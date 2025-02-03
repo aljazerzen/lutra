@@ -120,7 +120,7 @@ impl Decl {
 
     fn render(&self, frame: &mut ratatui::Frame, area: Rect) -> Rect {
         if self.focus {
-            let arrow_area = area.clone().offset(Offset {
+            let arrow_area = area.offset(Offset {
                 x: -(area.left() as i32),
                 y: 0,
             });
@@ -132,6 +132,14 @@ impl Decl {
             DeclKind::Function(d) => d.render(self, frame, area),
             DeclKind::Value(d) => d.render(self, frame, area),
             DeclKind::Ty(d) => d.render(self, frame, area),
+        }
+    }
+
+    fn name_widget(&self) -> Span {
+        if self.focus {
+            self.name.as_str().black().on_white()
+        } else {
+            self.name.as_str().white()
         }
     }
 
@@ -253,8 +261,8 @@ impl FunctionDecl {
     }
 
     fn render(&self, decl: &Decl, frame: &mut Frame<'_>, area: Rect) -> Rect {
-        let line = format!("let {}: func", decl.name);
-        frame.render_widget(line.white(), area);
+        let line = Line::from(vec!["let ".white(), decl.name_widget(), ": func".white()]);
+        frame.render_widget(line, area);
 
         area.offset(Offset { x: 0, y: 1 })
     }
@@ -269,8 +277,19 @@ impl ValueDecl {
     }
 
     fn render(&self, decl: &Decl, frame: &mut Frame<'_>, area: Rect) -> Rect {
-        let line = format!("let {}: {}", decl.name, lutra_ir::print_ty(&self.ty));
-        frame.render_widget(line.white(), area);
+        let line = Line::from(vec![
+            "let ".white(),
+            decl.name_widget(),
+            format!(": {}", lutra_ir::print_ty(&self.ty)).white(),
+        ]);
+        frame.render_widget(line, area);
+
+        if decl.focus {
+            frame.render_widget(
+                decl.name.as_str().black().on_white(),
+                area.offset(Offset { x: 4, y: 0 }),
+            );
+        }
 
         area.offset(Offset { x: 0, y: 1 })
     }
@@ -285,8 +304,12 @@ impl TypeDecl {
     }
 
     fn render(&self, decl: &Decl, frame: &mut Frame<'_>, area: Rect) -> Rect {
-        let line = format!("type {} = {}", decl.name, lutra_ir::print_ty(&self.ty));
-        frame.render_widget(line.white(), area);
+        let line = Line::from(vec![
+            "type ".white(),
+            decl.name_widget(),
+            format!(" = {}", lutra_ir::print_ty(&self.ty)).white(),
+        ]);
+        frame.render_widget(line, area);
 
         area.offset(Offset { x: 0, y: 1 })
     }

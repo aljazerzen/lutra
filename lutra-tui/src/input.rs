@@ -1,6 +1,6 @@
 mod form;
 
-use std::{collections::VecDeque, usize};
+use std::collections::VecDeque;
 
 use lutra_bin::ir;
 use ratatui::prelude::*;
@@ -22,19 +22,6 @@ pub fn prompt_for_ty(
     crate::terminal::within_alternate_screen(|term| crate::terminal::run_app(&mut app, term))??;
 
     Ok(app.form.get_value())
-}
-
-pub fn show_value(ty: &ir::Ty, initial: Option<lutra_bin::Value>) -> Result<(), anyhow::Error> {
-    let mut app = InputApp::new(ty);
-
-    if let Some(val) = initial {
-        app.form.set_value(val);
-    }
-    app.update_cursor_path_position(|_| usize::MAX);
-
-    crate::terminal::within_alternate_screen(|term| crate::terminal::run_app(&mut app, term))??;
-
-    Ok(())
 }
 
 pub struct InputApp {

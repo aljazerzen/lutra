@@ -71,9 +71,7 @@ impl Form {
     }
 
     fn get_name(&self) -> Cow<'_, str> {
-        self.name
-            .as_str()
-            .unwrap_or_else(|| Cow::Borrowed("(unnamed)"))
+        self.name.as_str().unwrap_or(Cow::Borrowed("(unnamed)"))
     }
 
     pub fn render(&self, frame: &mut Frame, area: Rect) -> Rect {
@@ -179,7 +177,9 @@ impl Form {
     /// position is not found, `Err(position - number of focusable nodes)` is returned.
     pub fn insert_focus(&mut self, mut position: usize) -> Result<Vec<usize>, usize> {
         match &mut self.kind {
-            FormKind::Tuple(form) => {
+            FormKind::Tuple(form) =>
+            {
+                #[allow(clippy::collapsible_else_if)]
                 if !form.is_folded {
                     for (pos, field) in form.fields.iter_mut().enumerate() {
                         match field.insert_focus(position) {

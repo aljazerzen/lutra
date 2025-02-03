@@ -9,16 +9,13 @@ fn main() {
     let path = pr::Path::new(path.0);
 
     let decl = project.root_module.module.get(&path).unwrap();
-    match &decl.kind {
-        decl::DeclKind::Expr(expr) => {
-            let ty = expr.ty.as_ref().unwrap();
-            if ty.kind.is_function() {
-                execute_function(&project, path);
-            } else {
-                todo!()
-            }
+    if let decl::DeclKind::Expr(expr) = &decl.kind {
+        let ty = expr.ty.as_ref().unwrap();
+        if ty.kind.is_function() {
+            execute_function(&project, path);
+        } else {
+            todo!()
         }
-        _ => {}
     }
 }
 
@@ -56,7 +53,7 @@ fn execute_function(project: &lutra_frontend::Project, path: pr::Path) {
 
     let mut output_ty = program.output_ty.clone();
     output_ty.name = Some("output".into());
-    lutra_tui::show_value(&output_ty, Some(result)).unwrap();
+    lutra_tui::show_value(&output_ty, result).unwrap();
 }
 
 fn get_project() -> lutra_frontend::Project {

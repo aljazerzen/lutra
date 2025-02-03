@@ -99,9 +99,7 @@ impl ArrayForm {
                 }
                 true
             }
-            _ => {
-                false
-            }
+            _ => false,
         }
     }
 
