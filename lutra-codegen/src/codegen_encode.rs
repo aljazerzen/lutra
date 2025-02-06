@@ -16,7 +16,6 @@ pub fn write_encode_impls(
 
     writeln!(w, "mod impls {{")?;
     writeln!(w, "#![allow(unused_imports)]")?;
-    writeln!(w, "use ::std::io::Write;")?;
     writeln!(w, "use {}::ReaderExt;", ctx.options.lutra_bin_path)?;
     writeln!(w, "use {}::bytes::BufMut;", ctx.options.lutra_bin_path)?;
     writeln!(w, "use super::*;\n")?;
@@ -366,7 +365,7 @@ fn write_ty_def_impl(
                 if is_unit_variant(&variant.ty) {
                     writeln!(w, "                {name}::{}", variant.name)?;
                 } else if needs_box {
-                    writeln!(w, "                {name}::{}(Box::new(inner))", variant.name)?;
+                    writeln!(w, "                {name}::{}({lutra_bin}::boxed::Box::new(inner))", variant.name)?;
                 } else {
                     writeln!(w, "                {name}::{}(inner)", variant.name)?;
                 }

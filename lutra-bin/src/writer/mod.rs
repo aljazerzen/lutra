@@ -1,12 +1,14 @@
 mod array;
 mod tuple;
 
-use std::iter::zip;
+use crate::vec;
+use core::iter::zip;
 
 pub use array::ArrayWriter;
 pub use tuple::TupleWriter;
 
 use crate::Data;
+use crate::ReaderExt;
 use crate::ReversePointer;
 
 #[derive(Debug)]
@@ -15,12 +17,12 @@ struct SeveredBodies {
     buf: Data,
 
     // Locations of pointers to bodies within the buffer of the head, in bytes.
-    body_ptr_offsets: Vec<u32>,
+    body_ptr_offsets: vec::Vec<u32>,
 
     // Locations of starts of bodies (except the first one) within the buf, in bytes.
     // The first body is skipped, because it is guaranteed to be 0.
     // This is because we skip the buf so the first body is always at the beginning of the buf.
-    body_offsets: Vec<u32>,
+    body_offsets: vec::Vec<u32>,
 }
 
 impl SeveredBodies {
@@ -57,7 +59,7 @@ fn extract_head_and_body<'b>(
         let first_body_offset = read_ptr(head, *first_body_ptr);
 
         // read body offsets
-        let mut body_offsets = Vec::new();
+        let mut body_offsets = vec::Vec::new();
         for ptr in ptrs {
             let body_offset = read_ptr(head, *ptr);
             body_offsets.push(body_offset - first_body_offset);
@@ -78,13 +80,12 @@ fn extract_head_and_body<'b>(
 /// Reads a pointers from buf, at given offset.
 /// Returns the pointers, *relative to the start of the buf*.
 fn read_ptr(buf: &[u8], offset: u32) -> u32 {
-    let mut r = crate::Reader::new(buf);
-    r.skip(offset as usize);
-    u32::from_le_bytes(r.read_const()) + offset
+    let buf = buf.skip(offset as usize);
+    u32::from_le_bytes(buf.read_const()) + offset
 }
 
 fn write_head(
-    out: &mut Vec<u8>,
+    out: &mut vec::Vec<u8>,
     data: Data,
     head_bytes: u32,
     body_ptrs: &[u32],

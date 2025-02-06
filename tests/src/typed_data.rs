@@ -6,7 +6,9 @@ fn _test_typed_data_roundtrip(value: Value, ty: &str) -> String {
     let ty = lutra_bin::ir::Ty::from(ty);
 
     let mut ltd_buf = Vec::new();
-    lutra_typed_data::encode_typed_data(&mut ltd_buf, value.clone(), &ty).unwrap();
+    lutra_typed_data::encode_typed_data(&mut ltd_buf, value.clone(), &ty)
+        .unwrap()
+        .unwrap();
 
     let (value_decoded, ty_decoded) = lutra_typed_data::decode_typed_data(&ltd_buf).unwrap();
 

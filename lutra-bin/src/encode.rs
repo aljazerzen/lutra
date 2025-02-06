@@ -1,6 +1,8 @@
+use crate::string;
+use crate::vec;
+
 use bytes::{BufMut, BytesMut};
 
-use crate::reader::{self, ReaderExt};
 use crate::{Layout, Result};
 
 pub trait Encode {
@@ -116,7 +118,7 @@ impl Encode for f64 {
     fn encode_body(&self, _head: Self::HeadPtr, _buf: &mut BytesMut) {}
 }
 
-impl Encode for String {
+impl Encode for string::String {
     type HeadPtr = ReversePointer;
 
     fn encode_head(&self, buf: &mut BytesMut) -> ReversePointer {
@@ -130,7 +132,7 @@ impl Encode for String {
         buf.put_slice(self.as_bytes());
     }
 }
-impl<E: Encode> Encode for Vec<E> {
+impl<E: Encode> Encode for vec::Vec<E> {
     type HeadPtr = ReversePointer;
 
     fn encode_head(&self, buf: &mut BytesMut) -> ReversePointer {
@@ -142,7 +144,7 @@ impl<E: Encode> Encode for Vec<E> {
     fn encode_body(&self, offset_ptr: Self::HeadPtr, buf: &mut BytesMut) {
         offset_ptr.write_cur_len(buf);
 
-        let mut heads: Vec<_> = Vec::with_capacity(self.len());
+        let mut heads: vec::Vec<_> = vec::Vec::with_capacity(self.len());
         for i in self {
             heads.push(i.encode_head(buf));
         }
@@ -215,7 +217,7 @@ impl ReversePointer {
         let r = ReversePointer {
             location: buf.len(),
         };
-        buf.put_slice(&[0_u8; 4]);
+        buf.put_bytes(0, 4);
         r
     }
 
@@ -234,109 +236,5 @@ impl ReversePointer {
     pub fn write(self, w: &mut [u8], absolute_ptr: usize) {
         let relative = absolute_ptr - self.location;
         w[self.location..(self.location + 4)].copy_from_slice(&(relative as u32).to_le_bytes());
-    }
-}
-
-pub trait Decode: Sized + Layout {
-    fn decode(buffer: &[u8]) -> Result<Self>;
-}
-impl Decode for bool {
-    fn decode(r: &[u8]) -> Result<Self> {
-        let [v] = r.read_const::<1>();
-        Ok(v != 0)
-    }
-}
-
-impl Decode for i8 {
-    fn decode(r: &[u8]) -> Result<Self> {
-        Ok(i8::from_le_bytes(r.read_const()))
-    }
-}
-impl Decode for i16 {
-    fn decode(r: &[u8]) -> Result<Self> {
-        Ok(i16::from_le_bytes(r.read_const()))
-    }
-}
-impl Decode for i32 {
-    fn decode(r: &[u8]) -> Result<Self> {
-        Ok(i32::from_le_bytes(r.read_const()))
-    }
-}
-impl Decode for i64 {
-    fn decode(r: &[u8]) -> Result<Self> {
-        Ok(i64::from_le_bytes(r.read_const()))
-    }
-}
-impl Decode for u8 {
-    fn decode(r: &[u8]) -> Result<Self> {
-        Ok(u8::from_le_bytes(r.read_const()))
-    }
-}
-impl Decode for u16 {
-    fn decode(r: &[u8]) -> Result<Self> {
-        Ok(u16::from_le_bytes(r.read_const()))
-    }
-}
-impl Decode for u32 {
-    fn decode(r: &[u8]) -> Result<Self> {
-        Ok(u32::from_le_bytes(r.read_const()))
-    }
-}
-impl Decode for u64 {
-    fn decode(r: &[u8]) -> Result<Self> {
-        Ok(u64::from_le_bytes(r.read_const()))
-    }
-}
-impl Decode for f32 {
-    fn decode(r: &[u8]) -> Result<Self> {
-        Ok(f32::from_le_bytes(r.read_const()))
-    }
-}
-impl Decode for f64 {
-    fn decode(r: &[u8]) -> Result<Self> {
-        Ok(f64::from_le_bytes(r.read_const()))
-    }
-}
-
-impl Decode for String {
-    fn decode(r: &[u8]) -> Result<Self> {
-        let offset = u32::from_le_bytes(r.read_const()) as usize;
-        let len = u32::from_le_bytes(r.skip(4).read_const()) as usize;
-
-        let buf = r.skip(offset).read_n(len).to_vec();
-        Ok(String::from_utf8(buf).unwrap())
-    }
-}
-impl<E: Decode> Decode for Vec<E> {
-    fn decode(r: &[u8]) -> Result<Self> {
-        let (offset, len) = reader::ArrayReader::read_head(r);
-        let mut buf = r.skip(offset);
-
-        let mut out = Vec::with_capacity(len);
-        let item_head_bytes = E::head_size().div_ceil(8);
-        for _ in 0..len {
-            out.push(E::decode(buf)?);
-            buf = buf.skip(item_head_bytes);
-        }
-        Ok(out)
-    }
-}
-impl<E: Decode> Decode for Option<E> {
-    fn decode(buf: &[u8]) -> Result<Self> {
-        let [tag] = buf.read_const::<1>();
-        if tag == 0 {
-            Ok(None)
-        } else {
-            let buf = buf.skip(1);
-            let inner_head_size = E::head_size();
-            let is_inline = inner_head_size <= 4;
-
-            Ok(Some(if is_inline {
-                E::decode(buf)?
-            } else {
-                let offset = u32::from_le_bytes(buf.read_const::<4>()) as usize;
-                E::decode(buf.skip(offset))?
-            }))
-        }
     }
 }

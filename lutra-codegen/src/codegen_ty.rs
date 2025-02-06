@@ -42,6 +42,8 @@ pub fn write_ty_def(
     annotations: &[pr::Annotation],
     ctx: &mut Context,
 ) -> Result<(), std::fmt::Error> {
+    let lutra_bin = &ctx.options.lutra_bin_path;
+
     let name = ty.name.as_ref().unwrap();
 
     // derive traits
@@ -108,7 +110,7 @@ pub fn write_ty_def(
 
                     write!(w, "(")?;
                     if needs_box {
-                        write!(w, "Box<")?;
+                        write!(w, "{lutra_bin}::boxed::Box<")?;
                     }
                     write_ty_ref(w, &variant.ty, false, ctx)?;
                     if needs_box {
@@ -144,6 +146,8 @@ pub fn write_ty_ref(
     as_expr: bool,
     ctx: &mut Context,
 ) -> Result<(), std::fmt::Error> {
+    let lutra_bin = &ctx.options.lutra_bin_path;
+
     match &ty.kind {
         ir::TyKind::Primitive(ir::PrimitiveSet::bool) => {
             write!(w, "bool")?;
@@ -179,7 +183,7 @@ pub fn write_ty_ref(
             write!(w, "f64")?;
         }
         ir::TyKind::Primitive(ir::PrimitiveSet::text) => {
-            write!(w, "String")?;
+            write!(w, "{lutra_bin}::string::String")?;
         }
         ir::TyKind::Ident(ident) => {
             let matching = zip(ident.0.iter(), ctx.current_module.iter())
@@ -197,7 +201,7 @@ pub fn write_ty_ref(
             }
         }
         ir::TyKind::Array(items_ty) => {
-            write!(w, "Vec")?;
+            write!(w, "{lutra_bin}::vec::Vec")?;
             if as_expr {
                 write!(w, "::<")?;
             } else {
@@ -209,7 +213,7 @@ pub fn write_ty_ref(
         ir::TyKind::Enum(variants) if is_option_enum(variants) => {
             let inner_ty = &variants[1].ty;
 
-            write!(w, "Option")?;
+            write!(w, "core::option::Option")?;
             if as_expr {
                 write!(w, "::<")?;
             } else {

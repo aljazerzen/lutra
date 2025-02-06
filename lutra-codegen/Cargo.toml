@@ -9,6 +9,6 @@ version.workspace = true
 
 
 [dependencies]
-bytes = "1"
+bytes = { version = "1" }
 lutra-frontend = { path = "../lutra-frontend" }
-lutra-bin = { path = "../lutra-bin" }
+lutra-bin = { path = "../lutra-bin", features = ["std"]}

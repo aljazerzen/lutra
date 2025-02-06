@@ -1,3 +1,5 @@
+#![cfg(feature = "std")]
+
 use crate::ir;
 use crate::{Result, Value};
 

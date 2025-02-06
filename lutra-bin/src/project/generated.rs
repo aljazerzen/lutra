@@ -4,17 +4,17 @@ pub mod br {
     #[derive(Debug, Clone)]
     #[allow(non_camel_case_types)]
     pub struct Program {
-        pub externals: Vec<ExternalSymbol>,
+        pub externals: crate::vec::Vec<ExternalSymbol>,
         pub main: Expr,
-        pub input_tys: Vec<super::ir::Ty>,
+        pub input_tys: crate::vec::Vec<super::ir::Ty>,
         pub output_ty: super::ir::Ty,
     }
 
     #[derive(Debug, Clone)]
     #[allow(non_camel_case_types)]
     pub struct ExternalSymbol {
-        pub id: String,
-        pub layout_args: Vec<u32>,
+        pub id: crate::string::String,
+        pub layout_args: crate::vec::Vec<u32>,
     }
 
     #[derive(Debug, Clone)]
@@ -28,12 +28,12 @@ pub mod br {
     pub enum ExprKind {
         Pointer(Sid),
         Literal(super::ir::Literal),
-        Call(Box<Call>),
-        Function(Box<Function>),
-        Tuple(Box<Tuple>),
-        Array(Box<Array>),
-        TupleLookup(Box<TupleLookup>),
-        Binding(Box<Binding>),
+        Call(crate::boxed::Box<Call>),
+        Function(crate::boxed::Box<Function>),
+        Tuple(crate::boxed::Box<Tuple>),
+        Array(crate::boxed::Box<Array>),
+        TupleLookup(crate::boxed::Box<TupleLookup>),
+        Binding(crate::boxed::Box<Binding>),
     }
 
     #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -44,7 +44,7 @@ pub mod br {
     #[allow(non_camel_case_types)]
     pub struct Call {
         pub function: Expr,
-        pub args: Vec<Expr>,
+        pub args: crate::vec::Vec<Expr>,
     }
 
     #[derive(Debug, Clone)]
@@ -57,15 +57,15 @@ pub mod br {
     #[derive(Debug, Clone)]
     #[allow(non_camel_case_types)]
     pub struct Tuple {
-        pub fields: Vec<Expr>,
-        pub field_layouts: Vec<TyLayout>,
+        pub fields: crate::vec::Vec<Expr>,
+        pub field_layouts: crate::vec::Vec<TyLayout>,
     }
 
     #[derive(Debug, Clone)]
     #[allow(non_camel_case_types)]
     pub struct Array {
         pub item_layout: TyLayout,
-        pub items: Vec<Expr>,
+        pub items: crate::vec::Vec<Expr>,
     }
 
     #[derive(Debug, Clone)]
@@ -87,7 +87,7 @@ pub mod br {
     #[allow(non_camel_case_types)]
     pub struct TyLayout {
         pub head_size: u32,
-        pub body_ptrs: Vec<u32>,
+        pub body_ptrs: crate::vec::Vec<u32>,
     }
 
     mod impls {
@@ -95,7 +95,6 @@ pub mod br {
         use super::*;
         use crate::bytes::BufMut;
         use crate::ReaderExt;
-        use ::std::io::Write;
 
         #[allow(clippy::all, unused_variables)]
         impl crate::Encode for Program {
@@ -121,9 +120,9 @@ pub mod br {
         }
         #[allow(non_camel_case_types)]
         pub struct ProgramHeadPtr {
-            externals: <Vec<super::ExternalSymbol> as crate::Encode>::HeadPtr,
+            externals: <crate::vec::Vec<super::ExternalSymbol> as crate::Encode>::HeadPtr,
             main: <super::Expr as crate::Encode>::HeadPtr,
-            input_tys: <Vec<super::super::ir::Ty> as crate::Encode>::HeadPtr,
+            input_tys: <crate::vec::Vec<super::super::ir::Ty> as crate::Encode>::HeadPtr,
             output_ty: <super::super::ir::Ty as crate::Encode>::HeadPtr,
         }
         impl crate::Layout for Program {
@@ -134,9 +133,9 @@ pub mod br {
 
         impl crate::Decode for Program {
             fn decode(buf: &[u8]) -> crate::Result<Self> {
-                let externals = Vec::<super::ExternalSymbol>::decode(buf.skip(0))?;
+                let externals = crate::vec::Vec::<super::ExternalSymbol>::decode(buf.skip(0))?;
                 let main = super::Expr::decode(buf.skip(8))?;
-                let input_tys = Vec::<super::super::ir::Ty>::decode(buf.skip(13))?;
+                let input_tys = crate::vec::Vec::<super::super::ir::Ty>::decode(buf.skip(13))?;
                 let output_ty = super::super::ir::Ty::decode(buf.skip(21))?;
                 Ok(Program {
                     externals,
@@ -162,8 +161,8 @@ pub mod br {
         }
         #[allow(non_camel_case_types)]
         pub struct ExternalSymbolHeadPtr {
-            id: <String as crate::Encode>::HeadPtr,
-            layout_args: <Vec<u32> as crate::Encode>::HeadPtr,
+            id: <crate::string::String as crate::Encode>::HeadPtr,
+            layout_args: <crate::vec::Vec<u32> as crate::Encode>::HeadPtr,
         }
         impl crate::Layout for ExternalSymbol {
             fn head_size() -> usize {
@@ -173,8 +172,8 @@ pub mod br {
 
         impl crate::Decode for ExternalSymbol {
             fn decode(buf: &[u8]) -> crate::Result<Self> {
-                let id = String::decode(buf.skip(0))?;
-                let layout_args = Vec::<u32>::decode(buf.skip(8))?;
+                let id = crate::string::String::decode(buf.skip(0))?;
+                let layout_args = crate::vec::Vec::<u32>::decode(buf.skip(8))?;
                 Ok(ExternalSymbol { id, layout_args })
             }
         }
@@ -367,32 +366,32 @@ pub mod br {
                     2 => {
                         let offset = u32::from_le_bytes(buf.read_const::<4>());
                         let inner = super::Call::decode(buf.skip(offset as usize))?;
-                        ExprKind::Call(Box::new(inner))
+                        ExprKind::Call(crate::boxed::Box::new(inner))
                     }
                     3 => {
                         let offset = u32::from_le_bytes(buf.read_const::<4>());
                         let inner = super::Function::decode(buf.skip(offset as usize))?;
-                        ExprKind::Function(Box::new(inner))
+                        ExprKind::Function(crate::boxed::Box::new(inner))
                     }
                     4 => {
                         let offset = u32::from_le_bytes(buf.read_const::<4>());
                         let inner = super::Tuple::decode(buf.skip(offset as usize))?;
-                        ExprKind::Tuple(Box::new(inner))
+                        ExprKind::Tuple(crate::boxed::Box::new(inner))
                     }
                     5 => {
                         let offset = u32::from_le_bytes(buf.read_const::<4>());
                         let inner = super::Array::decode(buf.skip(offset as usize))?;
-                        ExprKind::Array(Box::new(inner))
+                        ExprKind::Array(crate::boxed::Box::new(inner))
                     }
                     6 => {
                         let offset = u32::from_le_bytes(buf.read_const::<4>());
                         let inner = super::TupleLookup::decode(buf.skip(offset as usize))?;
-                        ExprKind::TupleLookup(Box::new(inner))
+                        ExprKind::TupleLookup(crate::boxed::Box::new(inner))
                     }
                     7 => {
                         let offset = u32::from_le_bytes(buf.read_const::<4>());
                         let inner = super::Binding::decode(buf.skip(offset as usize))?;
-                        ExprKind::Binding(Box::new(inner))
+                        ExprKind::Binding(crate::boxed::Box::new(inner))
                     }
                     _ => return Err(crate::Error::InvalidData),
                 })
@@ -434,7 +433,7 @@ pub mod br {
         #[allow(non_camel_case_types)]
         pub struct CallHeadPtr {
             function: <super::Expr as crate::Encode>::HeadPtr,
-            args: <Vec<super::Expr> as crate::Encode>::HeadPtr,
+            args: <crate::vec::Vec<super::Expr> as crate::Encode>::HeadPtr,
         }
         impl crate::Layout for Call {
             fn head_size() -> usize {
@@ -445,7 +444,7 @@ pub mod br {
         impl crate::Decode for Call {
             fn decode(buf: &[u8]) -> crate::Result<Self> {
                 let function = super::Expr::decode(buf.skip(0))?;
-                let args = Vec::<super::Expr>::decode(buf.skip(5))?;
+                let args = crate::vec::Vec::<super::Expr>::decode(buf.skip(5))?;
                 Ok(Call { function, args })
             }
         }
@@ -500,8 +499,8 @@ pub mod br {
         }
         #[allow(non_camel_case_types)]
         pub struct TupleHeadPtr {
-            fields: <Vec<super::Expr> as crate::Encode>::HeadPtr,
-            field_layouts: <Vec<super::TyLayout> as crate::Encode>::HeadPtr,
+            fields: <crate::vec::Vec<super::Expr> as crate::Encode>::HeadPtr,
+            field_layouts: <crate::vec::Vec<super::TyLayout> as crate::Encode>::HeadPtr,
         }
         impl crate::Layout for Tuple {
             fn head_size() -> usize {
@@ -511,8 +510,8 @@ pub mod br {
 
         impl crate::Decode for Tuple {
             fn decode(buf: &[u8]) -> crate::Result<Self> {
-                let fields = Vec::<super::Expr>::decode(buf.skip(0))?;
-                let field_layouts = Vec::<super::TyLayout>::decode(buf.skip(8))?;
+                let fields = crate::vec::Vec::<super::Expr>::decode(buf.skip(0))?;
+                let field_layouts = crate::vec::Vec::<super::TyLayout>::decode(buf.skip(8))?;
                 Ok(Tuple {
                     fields,
                     field_layouts,
@@ -536,7 +535,7 @@ pub mod br {
         #[allow(non_camel_case_types)]
         pub struct ArrayHeadPtr {
             item_layout: <super::TyLayout as crate::Encode>::HeadPtr,
-            items: <Vec<super::Expr> as crate::Encode>::HeadPtr,
+            items: <crate::vec::Vec<super::Expr> as crate::Encode>::HeadPtr,
         }
         impl crate::Layout for Array {
             fn head_size() -> usize {
@@ -547,7 +546,7 @@ pub mod br {
         impl crate::Decode for Array {
             fn decode(buf: &[u8]) -> crate::Result<Self> {
                 let item_layout = super::TyLayout::decode(buf.skip(0))?;
-                let items = Vec::<super::Expr>::decode(buf.skip(12))?;
+                let items = crate::vec::Vec::<super::Expr>::decode(buf.skip(12))?;
                 Ok(Array { item_layout, items })
             }
         }
@@ -639,7 +638,7 @@ pub mod br {
         #[allow(non_camel_case_types)]
         pub struct TyLayoutHeadPtr {
             head_size: <u32 as crate::Encode>::HeadPtr,
-            body_ptrs: <Vec<u32> as crate::Encode>::HeadPtr,
+            body_ptrs: <crate::vec::Vec<u32> as crate::Encode>::HeadPtr,
         }
         impl crate::Layout for TyLayout {
             fn head_size() -> usize {
@@ -650,7 +649,7 @@ pub mod br {
         impl crate::Decode for TyLayout {
             fn decode(buf: &[u8]) -> crate::Result<Self> {
                 let head_size = u32::decode(buf.skip(0))?;
-                let body_ptrs = Vec::<u32>::decode(buf.skip(4))?;
+                let body_ptrs = crate::vec::Vec::<u32>::decode(buf.skip(4))?;
                 Ok(TyLayout {
                     head_size,
                     body_ptrs,
@@ -679,13 +678,13 @@ pub mod ir {
     pub enum ExprKind {
         Pointer(Pointer),
         Literal(Literal),
-        Call(Box<Call>),
-        Function(Box<Function>),
-        Tuple(Vec<Expr>),
-        Array(Vec<Expr>),
-        TupleLookup(Box<TupleLookup>),
-        Binding(Box<Binding>),
-        RemoteCall(Box<RemoteCall>),
+        Call(crate::boxed::Box<Call>),
+        Function(crate::boxed::Box<Function>),
+        Tuple(crate::vec::Vec<Expr>),
+        Array(crate::vec::Vec<Expr>),
+        TupleLookup(crate::boxed::Box<TupleLookup>),
+        Binding(crate::boxed::Box<Binding>),
+        RemoteCall(crate::boxed::Box<RemoteCall>),
     }
 
     #[derive(Debug, Clone, enum_as_inner::EnumAsInner)]
@@ -700,7 +699,7 @@ pub mod ir {
     #[allow(non_camel_case_types)]
     pub struct ExternalPtr {
         pub host: ExecutionHost,
-        pub id: String,
+        pub id: crate::string::String,
     }
 
     #[derive(Debug, Clone)]
@@ -716,14 +715,14 @@ pub mod ir {
         Int(i64),
         Float(f64),
         Bool(bool),
-        Text(String),
+        Text(crate::string::String),
     }
 
     #[derive(Debug, Clone)]
     #[allow(non_camel_case_types)]
     pub struct Call {
         pub function: Expr,
-        pub args: Vec<Expr>,
+        pub args: crate::vec::Vec<Expr>,
     }
 
     #[derive(Debug, Clone)]
@@ -739,7 +738,7 @@ pub mod ir {
     pub enum ExecutionHost {
         Any,
         Local,
-        Remote(String),
+        Remote(crate::string::String),
     }
 
     #[derive(Debug, Clone)]
@@ -760,7 +759,7 @@ pub mod ir {
     #[derive(Debug, Clone)]
     #[allow(non_camel_case_types)]
     pub struct RemoteCall {
-        pub remote_id: String,
+        pub remote_id: crate::string::String,
         pub main: Expr,
     }
 
@@ -768,18 +767,18 @@ pub mod ir {
     #[allow(non_camel_case_types)]
     pub struct Ty {
         pub kind: TyKind,
-        pub layout: Option<TyLayout>,
-        pub name: Option<String>,
+        pub layout: core::option::Option<TyLayout>,
+        pub name: core::option::Option<crate::string::String>,
     }
 
     #[derive(Debug, Clone, PartialEq, enum_as_inner::EnumAsInner)]
     #[allow(non_camel_case_types)]
     pub enum TyKind {
         Primitive(PrimitiveSet),
-        Tuple(Vec<TyTupleField>),
-        Array(Box<Ty>),
-        Enum(Vec<TyEnumVariant>),
-        Function(Box<TyFunction>),
+        Tuple(crate::vec::Vec<TyTupleField>),
+        Array(crate::boxed::Box<Ty>),
+        Enum(crate::vec::Vec<TyEnumVariant>),
+        Function(crate::boxed::Box<TyFunction>),
         Ident(Path),
     }
 
@@ -803,14 +802,14 @@ pub mod ir {
     #[derive(Debug, Clone, PartialEq)]
     #[allow(non_camel_case_types)]
     pub struct TyTupleField {
-        pub name: Option<String>,
+        pub name: core::option::Option<crate::string::String>,
         pub ty: Ty,
     }
 
     #[derive(Debug, Clone, PartialEq)]
     #[allow(non_camel_case_types)]
     pub struct TyEnumVariant {
-        pub name: String,
+        pub name: crate::string::String,
         pub ty: Ty,
     }
 
@@ -818,27 +817,26 @@ pub mod ir {
     #[allow(non_camel_case_types)]
     pub struct TyLayout {
         pub head_size: u32,
-        pub body_ptrs: Vec<u32>,
-        pub variants_recursive: Vec<u16>,
+        pub body_ptrs: crate::vec::Vec<u32>,
+        pub variants_recursive: crate::vec::Vec<u16>,
     }
 
     #[derive(Debug, Clone, PartialEq)]
     #[allow(non_camel_case_types)]
     pub struct TyFunction {
-        pub params: Vec<Ty>,
+        pub params: crate::vec::Vec<Ty>,
         pub body: Ty,
     }
 
     #[derive(Debug, Clone, PartialEq)]
     #[allow(non_camel_case_types)]
-    pub struct Path(pub Vec<String>);
+    pub struct Path(pub crate::vec::Vec<crate::string::String>);
 
     mod impls {
         #![allow(unused_imports)]
         use super::*;
         use crate::bytes::BufMut;
         use crate::ReaderExt;
-        use ::std::io::Write;
 
         #[allow(clippy::all, unused_variables)]
         impl crate::Encode for Program {
@@ -1078,37 +1076,39 @@ pub mod ir {
                     2 => {
                         let offset = u32::from_le_bytes(buf.read_const::<4>());
                         let inner = super::Call::decode(buf.skip(offset as usize))?;
-                        ExprKind::Call(Box::new(inner))
+                        ExprKind::Call(crate::boxed::Box::new(inner))
                     }
                     3 => {
                         let offset = u32::from_le_bytes(buf.read_const::<4>());
                         let inner = super::Function::decode(buf.skip(offset as usize))?;
-                        ExprKind::Function(Box::new(inner))
+                        ExprKind::Function(crate::boxed::Box::new(inner))
                     }
                     4 => {
                         let offset = u32::from_le_bytes(buf.read_const::<4>());
-                        let inner = Vec::<super::Expr>::decode(buf.skip(offset as usize))?;
+                        let inner =
+                            crate::vec::Vec::<super::Expr>::decode(buf.skip(offset as usize))?;
                         ExprKind::Tuple(inner)
                     }
                     5 => {
                         let offset = u32::from_le_bytes(buf.read_const::<4>());
-                        let inner = Vec::<super::Expr>::decode(buf.skip(offset as usize))?;
+                        let inner =
+                            crate::vec::Vec::<super::Expr>::decode(buf.skip(offset as usize))?;
                         ExprKind::Array(inner)
                     }
                     6 => {
                         let offset = u32::from_le_bytes(buf.read_const::<4>());
                         let inner = super::TupleLookup::decode(buf.skip(offset as usize))?;
-                        ExprKind::TupleLookup(Box::new(inner))
+                        ExprKind::TupleLookup(crate::boxed::Box::new(inner))
                     }
                     7 => {
                         let offset = u32::from_le_bytes(buf.read_const::<4>());
                         let inner = super::Binding::decode(buf.skip(offset as usize))?;
-                        ExprKind::Binding(Box::new(inner))
+                        ExprKind::Binding(crate::boxed::Box::new(inner))
                     }
                     8 => {
                         let offset = u32::from_le_bytes(buf.read_const::<4>());
                         let inner = super::RemoteCall::decode(buf.skip(offset as usize))?;
-                        ExprKind::RemoteCall(Box::new(inner))
+                        ExprKind::RemoteCall(crate::boxed::Box::new(inner))
                     }
                     _ => return Err(crate::Error::InvalidData),
                 })
@@ -1223,7 +1223,7 @@ pub mod ir {
         #[allow(non_camel_case_types)]
         pub struct ExternalPtrHeadPtr {
             host: <super::ExecutionHost as crate::Encode>::HeadPtr,
-            id: <String as crate::Encode>::HeadPtr,
+            id: <crate::string::String as crate::Encode>::HeadPtr,
         }
         impl crate::Layout for ExternalPtr {
             fn head_size() -> usize {
@@ -1234,7 +1234,7 @@ pub mod ir {
         impl crate::Decode for ExternalPtr {
             fn decode(buf: &[u8]) -> crate::Result<Self> {
                 let host = super::ExecutionHost::decode(buf.skip(0))?;
-                let id = String::decode(buf.skip(5))?;
+                let id = crate::string::String::decode(buf.skip(5))?;
                 Ok(ExternalPtr { host, id })
             }
         }
@@ -1382,7 +1382,7 @@ pub mod ir {
                     }
                     3 => {
                         let offset = u32::from_le_bytes(buf.read_const::<4>());
-                        let inner = String::decode(buf.skip(offset as usize))?;
+                        let inner = crate::string::String::decode(buf.skip(offset as usize))?;
                         Literal::Text(inner)
                     }
                     _ => return Err(crate::Error::InvalidData),
@@ -1406,7 +1406,7 @@ pub mod ir {
         #[allow(non_camel_case_types)]
         pub struct CallHeadPtr {
             function: <super::Expr as crate::Encode>::HeadPtr,
-            args: <Vec<super::Expr> as crate::Encode>::HeadPtr,
+            args: <crate::vec::Vec<super::Expr> as crate::Encode>::HeadPtr,
         }
         impl crate::Layout for Call {
             fn head_size() -> usize {
@@ -1417,7 +1417,7 @@ pub mod ir {
         impl crate::Decode for Call {
             fn decode(buf: &[u8]) -> crate::Result<Self> {
                 let function = super::Expr::decode(buf.skip(0))?;
-                let args = Vec::<super::Expr>::decode(buf.skip(20))?;
+                let args = crate::vec::Vec::<super::Expr>::decode(buf.skip(20))?;
                 Ok(Call { function, args })
             }
         }
@@ -1521,7 +1521,7 @@ pub mod ir {
                     1 => ExecutionHost::Local,
                     2 => {
                         let offset = u32::from_le_bytes(buf.read_const::<4>());
-                        let inner = String::decode(buf.skip(offset as usize))?;
+                        let inner = crate::string::String::decode(buf.skip(offset as usize))?;
                         ExecutionHost::Remote(inner)
                     }
                     _ => return Err(crate::Error::InvalidData),
@@ -1612,7 +1612,7 @@ pub mod ir {
         }
         #[allow(non_camel_case_types)]
         pub struct RemoteCallHeadPtr {
-            remote_id: <String as crate::Encode>::HeadPtr,
+            remote_id: <crate::string::String as crate::Encode>::HeadPtr,
             main: <super::Expr as crate::Encode>::HeadPtr,
         }
         impl crate::Layout for RemoteCall {
@@ -1623,7 +1623,7 @@ pub mod ir {
 
         impl crate::Decode for RemoteCall {
             fn decode(buf: &[u8]) -> crate::Result<Self> {
-                let remote_id = String::decode(buf.skip(0))?;
+                let remote_id = crate::string::String::decode(buf.skip(0))?;
                 let main = super::Expr::decode(buf.skip(8))?;
                 Ok(RemoteCall { remote_id, main })
             }
@@ -1647,8 +1647,8 @@ pub mod ir {
         #[allow(non_camel_case_types)]
         pub struct TyHeadPtr {
             kind: <super::TyKind as crate::Encode>::HeadPtr,
-            layout: <Option<super::TyLayout> as crate::Encode>::HeadPtr,
-            name: <Option<String> as crate::Encode>::HeadPtr,
+            layout: <core::option::Option<super::TyLayout> as crate::Encode>::HeadPtr,
+            name: <core::option::Option<crate::string::String> as crate::Encode>::HeadPtr,
         }
         impl crate::Layout for Ty {
             fn head_size() -> usize {
@@ -1659,8 +1659,8 @@ pub mod ir {
         impl crate::Decode for Ty {
             fn decode(buf: &[u8]) -> crate::Result<Self> {
                 let kind = super::TyKind::decode(buf.skip(0))?;
-                let layout = Option::<super::TyLayout>::decode(buf.skip(5))?;
-                let name = Option::<String>::decode(buf.skip(10))?;
+                let layout = core::option::Option::<super::TyLayout>::decode(buf.skip(5))?;
+                let name = core::option::Option::<crate::string::String>::decode(buf.skip(10))?;
                 Ok(Ty { kind, layout, name })
             }
         }
@@ -1792,23 +1792,27 @@ pub mod ir {
                     }
                     1 => {
                         let offset = u32::from_le_bytes(buf.read_const::<4>());
-                        let inner = Vec::<super::TyTupleField>::decode(buf.skip(offset as usize))?;
+                        let inner = crate::vec::Vec::<super::TyTupleField>::decode(
+                            buf.skip(offset as usize),
+                        )?;
                         TyKind::Tuple(inner)
                     }
                     2 => {
                         let offset = u32::from_le_bytes(buf.read_const::<4>());
                         let inner = super::Ty::decode(buf.skip(offset as usize))?;
-                        TyKind::Array(Box::new(inner))
+                        TyKind::Array(crate::boxed::Box::new(inner))
                     }
                     3 => {
                         let offset = u32::from_le_bytes(buf.read_const::<4>());
-                        let inner = Vec::<super::TyEnumVariant>::decode(buf.skip(offset as usize))?;
+                        let inner = crate::vec::Vec::<super::TyEnumVariant>::decode(
+                            buf.skip(offset as usize),
+                        )?;
                         TyKind::Enum(inner)
                     }
                     4 => {
                         let offset = u32::from_le_bytes(buf.read_const::<4>());
                         let inner = super::TyFunction::decode(buf.skip(offset as usize))?;
-                        TyKind::Function(Box::new(inner))
+                        TyKind::Function(crate::boxed::Box::new(inner))
                     }
                     5 => {
                         let offset = u32::from_le_bytes(buf.read_const::<4>());
@@ -1922,7 +1926,7 @@ pub mod ir {
         }
         #[allow(non_camel_case_types)]
         pub struct TyTupleFieldHeadPtr {
-            name: <Option<String> as crate::Encode>::HeadPtr,
+            name: <core::option::Option<crate::string::String> as crate::Encode>::HeadPtr,
             ty: <super::Ty as crate::Encode>::HeadPtr,
         }
         impl crate::Layout for TyTupleField {
@@ -1933,7 +1937,7 @@ pub mod ir {
 
         impl crate::Decode for TyTupleField {
             fn decode(buf: &[u8]) -> crate::Result<Self> {
-                let name = Option::<String>::decode(buf.skip(0))?;
+                let name = core::option::Option::<crate::string::String>::decode(buf.skip(0))?;
                 let ty = super::Ty::decode(buf.skip(5))?;
                 Ok(TyTupleField { name, ty })
             }
@@ -1954,7 +1958,7 @@ pub mod ir {
         }
         #[allow(non_camel_case_types)]
         pub struct TyEnumVariantHeadPtr {
-            name: <String as crate::Encode>::HeadPtr,
+            name: <crate::string::String as crate::Encode>::HeadPtr,
             ty: <super::Ty as crate::Encode>::HeadPtr,
         }
         impl crate::Layout for TyEnumVariant {
@@ -1965,7 +1969,7 @@ pub mod ir {
 
         impl crate::Decode for TyEnumVariant {
             fn decode(buf: &[u8]) -> crate::Result<Self> {
-                let name = String::decode(buf.skip(0))?;
+                let name = crate::string::String::decode(buf.skip(0))?;
                 let ty = super::Ty::decode(buf.skip(8))?;
                 Ok(TyEnumVariant { name, ty })
             }
@@ -1994,8 +1998,8 @@ pub mod ir {
         #[allow(non_camel_case_types)]
         pub struct TyLayoutHeadPtr {
             head_size: <u32 as crate::Encode>::HeadPtr,
-            body_ptrs: <Vec<u32> as crate::Encode>::HeadPtr,
-            variants_recursive: <Vec<u16> as crate::Encode>::HeadPtr,
+            body_ptrs: <crate::vec::Vec<u32> as crate::Encode>::HeadPtr,
+            variants_recursive: <crate::vec::Vec<u16> as crate::Encode>::HeadPtr,
         }
         impl crate::Layout for TyLayout {
             fn head_size() -> usize {
@@ -2006,8 +2010,8 @@ pub mod ir {
         impl crate::Decode for TyLayout {
             fn decode(buf: &[u8]) -> crate::Result<Self> {
                 let head_size = u32::decode(buf.skip(0))?;
-                let body_ptrs = Vec::<u32>::decode(buf.skip(4))?;
-                let variants_recursive = Vec::<u16>::decode(buf.skip(12))?;
+                let body_ptrs = crate::vec::Vec::<u32>::decode(buf.skip(4))?;
+                let variants_recursive = crate::vec::Vec::<u16>::decode(buf.skip(12))?;
                 Ok(TyLayout {
                     head_size,
                     body_ptrs,
@@ -2031,7 +2035,7 @@ pub mod ir {
         }
         #[allow(non_camel_case_types)]
         pub struct TyFunctionHeadPtr {
-            params: <Vec<super::Ty> as crate::Encode>::HeadPtr,
+            params: <crate::vec::Vec<super::Ty> as crate::Encode>::HeadPtr,
             body: <super::Ty as crate::Encode>::HeadPtr,
         }
         impl crate::Layout for TyFunction {
@@ -2042,7 +2046,7 @@ pub mod ir {
 
         impl crate::Decode for TyFunction {
             fn decode(buf: &[u8]) -> crate::Result<Self> {
-                let params = Vec::<super::Ty>::decode(buf.skip(0))?;
+                let params = crate::vec::Vec::<super::Ty>::decode(buf.skip(0))?;
                 let body = super::Ty::decode(buf.skip(8))?;
                 Ok(TyFunction { params, body })
             }
@@ -2065,7 +2069,7 @@ pub mod ir {
 
         impl crate::Decode for Path {
             fn decode(buf: &[u8]) -> crate::Result<Self> {
-                Ok(Self(Vec::<String>::decode(buf)?))
+                Ok(Self(crate::vec::Vec::<crate::string::String>::decode(buf)?))
             }
         }
     }

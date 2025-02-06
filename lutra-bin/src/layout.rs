@@ -1,3 +1,6 @@
+use crate::string;
+use crate::vec;
+
 use crate::ir;
 
 pub trait Layout {
@@ -62,13 +65,13 @@ impl Layout for f64 {
     }
 }
 
-impl Layout for String {
+impl Layout for string::String {
     fn head_size() -> usize {
         64
     }
 }
 
-impl<I> Layout for Vec<I> {
+impl<I> Layout for vec::Vec<I> {
     fn head_size() -> usize {
         64
     }
@@ -120,7 +123,7 @@ pub fn get_layout_simple(ty: &ir::Ty) -> Option<ir::TyLayout> {
         }
         _ => return None,
     };
-    let body_ptr_offset: Vec<u32> = match &ty.kind {
+    let body_ptr_offset: vec::Vec<u32> = match &ty.kind {
         ir::TyKind::Primitive(ir::PrimitiveSet::text) => vec![0],
         ir::TyKind::Primitive(_) => vec![],
 
@@ -128,7 +131,7 @@ pub fn get_layout_simple(ty: &ir::Ty) -> Option<ir::TyLayout> {
         ir::TyKind::Enum(_) => vec![1], // TODO: this is wrong (in some cases)
 
         ir::TyKind::Tuple(fields) => {
-            let mut r = Vec::new();
+            let mut r = vec::Vec::new();
             for f in fields {
                 let ty = f.ty.layout.as_ref().unwrap();
                 r.extend(&ty.body_ptrs);
@@ -145,12 +148,12 @@ pub fn get_layout_simple(ty: &ir::Ty) -> Option<ir::TyLayout> {
     })
 }
 
-pub fn tuple_field_offsets(ty: &ir::Ty) -> Vec<u32> {
+pub fn tuple_field_offsets(ty: &ir::Ty) -> vec::Vec<u32> {
     let ir::TyKind::Tuple(ty_fields) = &ty.kind else {
         panic!()
     };
 
-    let mut field_offsets = Vec::with_capacity(ty_fields.len());
+    let mut field_offsets = vec::Vec::with_capacity(ty_fields.len());
     let mut offset = 0_u32;
     for field in ty_fields {
         field_offsets.push(offset);

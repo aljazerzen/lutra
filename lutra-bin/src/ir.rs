@@ -12,6 +12,7 @@ impl Program {
     }
 }
 
+#[cfg(feature = "std")]
 impl std::fmt::Display for Literal {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
@@ -31,6 +32,7 @@ impl PartialEq for Ty {
     }
 }
 
+#[cfg(feature = "std")]
 pub(crate) fn quote_string(s: &str) -> String {
     if !s.contains('"') {
         return format!(r#""{}""#, s);
@@ -72,6 +74,7 @@ pub(crate) fn quote_string(s: &str) -> String {
     format!("{}{}{}", delim, s, delim)
 }
 
+#[cfg(feature = "std")]
 pub(crate) fn escape_all_except_quotes(s: &str) -> String {
     let mut result = String::new();
     for ch in s.chars() {

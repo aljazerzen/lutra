@@ -1,48 +1,8 @@
-use std::borrow::Cow;
+use crate::borrow;
 
 use crate::ir;
 use crate::layout;
 use crate::Data;
-
-#[derive(Clone, Debug)]
-pub struct Reader<'a> {
-    buf: &'a [u8],
-}
-impl<'a> Reader<'a> {
-    pub fn new(buf: &'a [u8]) -> Self {
-        Reader { buf }
-    }
-
-    pub fn read_n(&mut self, n: usize) -> &[u8] {
-        let r = &self.buf[..n];
-        self.buf = &self.buf[n..];
-        r
-    }
-
-    pub fn read_const<const N: usize>(&mut self) -> [u8; N] {
-        let r = self.buf[..N].try_into().unwrap();
-        self.buf = &self.buf[N..];
-        r
-    }
-
-    pub fn skip(&mut self, byte_count: usize) {
-        self.buf = &self.buf[byte_count..];
-    }
-
-    pub fn remaining(&self) -> usize {
-        self.buf.len()
-    }
-
-    pub fn to_owned(&self) -> Vec<u8> {
-        self.buf.to_owned()
-    }
-}
-
-impl<'a> AsRef<[u8]> for Reader<'a> {
-    fn as_ref(&self) -> &[u8] {
-        self.buf
-    }
-}
 
 pub trait ReaderExt {
     fn read_n(&self, n: usize) -> &[u8];
@@ -61,6 +21,7 @@ impl<'a> ReaderExt for &'a [u8] {
         self[0..N].try_into().unwrap()
     }
 
+    #[must_use]
     fn skip(self, bytes: usize) -> Self {
         &self[bytes..]
     }
@@ -157,11 +118,11 @@ impl Iterator for ArrayReader {
 
 pub struct TupleReader<'d, 't> {
     data: &'d Data,
-    field_offsets: Cow<'t, [u32]>,
+    field_offsets: borrow::Cow<'t, [u32]>,
 }
 
 impl<'d, 't> TupleReader<'d, 't> {
-    pub fn new(data: &'d Data, field_offsets: Cow<'t, [u32]>) -> Self {
+    pub fn new(data: &'d Data, field_offsets: borrow::Cow<'t, [u32]>) -> Self {
         TupleReader {
             data,
             field_offsets,

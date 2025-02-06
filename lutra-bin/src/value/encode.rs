@@ -1,15 +1,16 @@
-use bytes::{BufMut, BytesMut};
+use crate::{boxed, string, vec};
 
-use crate::{ir, reader};
+use bytes::{Buf, BufMut, BytesMut};
 
 use super::{expect_ty, expect_ty_primitive, Value};
 use crate::encode::ReversePointer;
+use crate::ir;
 use crate::layout::{self, EnumHeadFormat, EnumVariantFormat, Layout};
-use crate::{ArrayReader, Decode, Encode, Error, Reader, Result};
+use crate::{ArrayReader, Decode, Encode, Error, Result};
 
 impl Value {
     /// Convert a Lutra [Value] to .ld binary encoding.
-    pub fn encode(&self, ty: &ir::Ty) -> Result<Vec<u8>> {
+    pub fn encode(&self, ty: &ir::Ty) -> Result<vec::Vec<u8>> {
         let mut buf = BytesMut::new();
 
         let mut ctx = Context::new(ty);
@@ -23,8 +24,8 @@ impl Value {
     pub fn decode(buf: &[u8], ty: &ir::Ty) -> Result<Value> {
         let mut ctx = Context::new(ty);
 
-        let mut reader = Reader::new(buf);
-        decode_inner(&mut reader, ty, &mut ctx)
+        let mut buf = buf;
+        decode_inner(&mut buf, ty, &mut ctx)
     }
 }
 
@@ -102,7 +103,7 @@ fn encode_head<'t>(
         Value::Tuple(fields) => {
             let ty_fields = expect_ty(ty, |k| k.as_tuple(), "tuple")?;
 
-            let mut head_ptrs = Vec::with_capacity(fields.len());
+            let mut head_ptrs = vec::Vec::with_capacity(fields.len());
             for (f, f_ty) in fields.iter().zip(ty_fields) {
                 head_ptrs.push(encode_head(buf, f, &f_ty.ty, ctx)?);
             }
@@ -144,7 +145,7 @@ fn encode_head<'t>(
 enum ValueHeadPtr {
     None,
     Offset(ReversePointer),
-    Tuple(Vec<ValueHeadPtr>),
+    Tuple(vec::Vec<ValueHeadPtr>),
 }
 
 fn encode_body<'t>(
@@ -196,7 +197,7 @@ fn encode_body<'t>(
             };
             offset_ptr.write_cur_len(w);
 
-            let mut head_ptrs = Vec::with_capacity(items.len());
+            let mut head_ptrs = vec::Vec::with_capacity(items.len());
             for i in items {
                 head_ptrs.push(encode_head(w, i, items_ty, ctx)?);
             }
@@ -239,7 +240,11 @@ fn enum_params_encode(
     Ok((head_format, variant_format, tag, &variant.ty))
 }
 
-fn decode_inner<'t>(r: &mut Reader<'_>, ty: &'t ir::Ty, ctx: &mut Context<'t>) -> Result<Value> {
+fn decode_inner<'t>(
+    r: &mut (impl bytes::Buf + Clone),
+    ty: &'t ir::Ty,
+    ctx: &mut Context<'t>,
+) -> Result<Value> {
     let ty = resolve_ident(ty, ctx);
 
     Ok(match &ty.kind {
@@ -255,13 +260,13 @@ fn decode_inner<'t>(r: &mut Reader<'_>, ty: &'t ir::Ty, ctx: &mut Context<'t>) -
         ir::TyKind::Primitive(ir::PrimitiveSet::float32) => Value::Float32(decode::<f32>(r)?),
         ir::TyKind::Primitive(ir::PrimitiveSet::float64) => Value::Float64(decode::<f64>(r)?),
         ir::TyKind::Primitive(ir::PrimitiveSet::text) => {
-            let res = String::decode(r.as_ref())?;
-            r.skip(String::head_size().div_ceil(8));
+            let res = string::String::decode(r.chunk())?;
+            r.advance(string::String::head_size().div_ceil(8));
             Value::Text(res)
         }
 
         ir::TyKind::Tuple(fields) => {
-            let mut res = Vec::with_capacity(fields.len());
+            let mut res = vec::Vec::with_capacity(fields.len());
             for field in fields {
                 res.push(decode_inner(r, &field.ty, ctx)?);
             }
@@ -270,12 +275,12 @@ fn decode_inner<'t>(r: &mut Reader<'_>, ty: &'t ir::Ty, ctx: &mut Context<'t>) -
         ir::TyKind::Array(item_ty) => {
             let mut body = r.clone();
 
-            let (offset, len) = ArrayReader::read_head(r.as_ref());
-            r.skip(8);
+            let (offset, len) = ArrayReader::read_head(r.chunk());
+            r.advance(8);
 
-            body.skip(offset);
+            body.advance(offset);
 
-            let mut buf = Vec::with_capacity(len);
+            let mut buf = vec::Vec::with_capacity(len);
             for _ in 0..len {
                 buf.push(decode_inner(&mut body, item_ty, ctx)?);
             }
@@ -286,7 +291,8 @@ fn decode_inner<'t>(r: &mut Reader<'_>, ty: &'t ir::Ty, ctx: &mut Context<'t>) -
         ir::TyKind::Enum(variants) => {
             let head = layout::enum_head_format(variants);
 
-            let mut tag_bytes = r.read_n(head.s / 8).to_vec();
+            let mut tag_bytes = vec![0; 8];
+            r.copy_to_slice(&mut tag_bytes[0..head.s / 8]);
             tag_bytes.resize(8, 0);
             let tag = u64::from_le_bytes(tag_bytes.try_into().unwrap()) as usize;
 
@@ -298,23 +304,21 @@ fn decode_inner<'t>(r: &mut Reader<'_>, ty: &'t ir::Ty, ctx: &mut Context<'t>) -
                 decode_inner(r, &variant.ty, ctx)?
             } else {
                 let mut body = r.clone();
-                let offset = r.read_const::<4>();
-                let offset = u32::from_le_bytes(offset) as usize;
-                body.skip(offset);
+                body.advance(r.get_u32_le() as usize);
                 decode_inner(&mut body, &variant.ty, ctx)?
             };
 
-            r.skip(variant_format.padding / 8);
-            Value::Enum(tag, Box::new(inner))
+            r.advance(variant_format.padding / 8);
+            Value::Enum(tag, boxed::Box::new(inner))
         }
 
         _ => return Err(Error::InvalidType),
     })
 }
 
-fn decode<D: Decode + Sized>(reader: &mut reader::Reader) -> Result<D> {
-    let res = D::decode(reader.as_ref());
-    reader.skip(D::head_size().div_ceil(8));
+fn decode<D: Decode + Sized>(reader: &mut impl bytes::Buf) -> Result<D> {
+    let res = D::decode(reader.chunk());
+    reader.advance(D::head_size().div_ceil(8));
     res
 }
 

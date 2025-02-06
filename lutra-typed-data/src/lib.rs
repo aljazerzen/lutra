@@ -14,7 +14,11 @@ pub fn decode_typed_data(buffer: &[u8]) -> Result<(Value, ir::Ty)> {
     Ok((value, ty))
 }
 
-pub fn encode_typed_data(w: &mut impl std::io::Write, value: Value, ty: &ir::Ty) -> Result<()> {
+pub fn encode_typed_data(
+    w: &mut impl std::io::Write,
+    value: Value,
+    ty: &ir::Ty,
+) -> Result<std::io::Result<()>> {
     let data = value.encode(ty)?;
 
     let ty = type_from_pr(ty);
@@ -24,8 +28,7 @@ pub fn encode_typed_data(w: &mut impl std::io::Write, value: Value, ty: &ir::Ty)
     let mut buf = lutra_bin::bytes::BytesMut::new();
     typed_data.encode(&mut buf);
 
-    w.write_all(&buf)?;
-    Ok(())
+    Ok(w.write_all(&buf))
 }
 
 fn type_to_ir(ty: &schema::Ty) -> ir::Ty {

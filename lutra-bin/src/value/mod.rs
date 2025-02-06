@@ -1,3 +1,6 @@
+use crate::string::ToString;
+use crate::{boxed, string, vec};
+
 mod encode;
 mod fold;
 mod print_pretty;
@@ -19,10 +22,10 @@ pub enum Value {
     Uint64(u64),
     Float32(f32),
     Float64(f64),
-    Text(String),
-    Tuple(Vec<Value>),
-    Array(Vec<Value>),
-    Enum(usize, Box<Value>),
+    Text(string::String),
+    Tuple(vec::Vec<Value>),
+    Array(vec::Vec<Value>),
+    Enum(usize, boxed::Box<Value>),
 }
 
 fn expect_ty<'t, F, K>(ty: &'t ir::Ty, cast: F, expected: &'static str) -> Result<&'t K>

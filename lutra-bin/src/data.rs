@@ -1,3 +1,6 @@
+use crate::rc;
+use crate::vec;
+
 #[derive(Debug, Clone)]
 #[allow(private_interfaces)]
 pub enum Data {
@@ -6,7 +9,7 @@ pub enum Data {
 }
 
 impl Data {
-    pub fn new(bytes: Vec<u8>) -> Self {
+    pub fn new(bytes: vec::Vec<u8>) -> Self {
         Data::Single(Slice::new(bytes))
     }
 
@@ -57,13 +60,13 @@ impl Data {
         }
     }
 
-    pub fn flatten(&self) -> Vec<u8> {
-        let mut out = Vec::with_capacity(self.len());
+    pub fn flatten(&self) -> vec::Vec<u8> {
+        let mut out = vec::Vec::with_capacity(self.len());
         self.write_all(&mut out);
         out
     }
 
-    pub fn write_all(&self, w: &mut Vec<u8>) {
+    pub fn write_all(&self, w: &mut vec::Vec<u8>) {
         match self {
             Data::Single(s) => s.write_all(w),
             Data::Combined(c) => c.write_all(w),
@@ -73,13 +76,13 @@ impl Data {
 
 #[derive(Debug, Clone)]
 struct Slice {
-    buf: std::rc::Rc<[u8]>,
+    buf: rc::Rc<[u8]>,
     offset: usize,
 }
 
 impl Slice {
-    fn new(bytes: Vec<u8>) -> Self {
-        let buf: std::rc::Rc<[u8]> = std::rc::Rc::from(bytes);
+    fn new(bytes: vec::Vec<u8>) -> Self {
+        let buf: rc::Rc<[u8]> = rc::Rc::from(bytes);
         Slice { buf, offset: 0 }
     }
 
@@ -107,18 +110,18 @@ impl Slice {
         self.buf.len() >= self.offset
     }
 
-    fn write_all(&self, w: &mut Vec<u8>) {
+    fn write_all(&self, w: &mut vec::Vec<u8>) {
         w.extend(&self.buf[self.offset..])
     }
 }
 
 #[derive(Debug, Clone)]
 struct CombinedSlices {
-    parts: Vec<Data>,
+    parts: vec::Vec<Data>,
 }
 
 impl CombinedSlices {
-    fn new(parts: Vec<Data>) -> Self {
+    fn new(parts: vec::Vec<Data>) -> Self {
         CombinedSlices { parts }
     }
 
@@ -165,7 +168,7 @@ impl CombinedSlices {
         self.parts.iter().all(|d| d.is_empty())
     }
 
-    fn write_all(&self, w: &mut Vec<u8>) {
+    fn write_all(&self, w: &mut vec::Vec<u8>) {
         for part in &self.parts {
             part.write_all(w);
         }

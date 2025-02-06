@@ -1,5 +1,6 @@
-use crate::ir;
+use crate::vec;
 
+use crate::ir;
 use crate::Data;
 
 use super::SeveredBodies;
@@ -8,10 +9,10 @@ pub struct ArrayWriter<'t> {
     item_head_bytes: u32,
     item_body_ptrs: &'t [u32],
 
-    buf: Vec<u8>,
+    buf: vec::Vec<u8>,
 
     count: usize,
-    item_bodies: Vec<SeveredBodies>,
+    item_bodies: vec::Vec<SeveredBodies>,
 }
 
 impl<'t> ArrayWriter<'t> {

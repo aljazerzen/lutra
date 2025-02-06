@@ -1,5 +1,8 @@
+#![cfg_attr(not(feature = "std"), no_std)]
+
 pub mod br;
 mod data;
+mod decode;
 mod encode;
 mod error;
 pub mod ir;
@@ -12,11 +15,40 @@ mod writer;
 mod generated;
 
 pub use data::Data;
-pub use encode::{Decode, Encode, ReversePointer};
+pub use decode::Decode;
+pub use encode::{Encode, ReversePointer};
 pub use error::{Error, Result};
 pub use layout::Layout;
-pub use reader::{ArrayReader, Reader, ReaderExt, TupleReader};
+pub use reader::{ArrayReader, ReaderExt, TupleReader};
 pub use value::Value;
 pub use writer::{ArrayWriter, TupleWriter};
 
 pub use bytes;
+
+#[cfg(not(feature = "std"))]
+extern crate alloc;
+
+#[cfg(not(feature = "std"))]
+pub use alloc::vec;
+#[cfg(feature = "std")]
+pub use std::vec;
+
+#[cfg(not(feature = "std"))]
+pub use alloc::string;
+#[cfg(feature = "std")]
+pub use std::string;
+
+#[cfg(not(feature = "std"))]
+use alloc::borrow;
+#[cfg(feature = "std")]
+use std::borrow;
+
+#[cfg(not(feature = "std"))]
+use alloc::rc;
+#[cfg(feature = "std")]
+use std::rc;
+
+#[cfg(not(feature = "std"))]
+pub use alloc::boxed;
+#[cfg(feature = "std")]
+pub use std::boxed;

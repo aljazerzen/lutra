@@ -15,7 +15,7 @@ bench = false
 doctest = false
 
 [dependencies]
-thiserror = { workspace = true }
+thiserror = { workspace = true, default-features = true }
 itertools = { workspace = true }
 log = { workspace = true }
 ariadne = "0.4.1"

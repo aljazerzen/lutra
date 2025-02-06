@@ -12,6 +12,7 @@ test-fast tests='':
     RUST_BACKTRACE=1 INSTA_FORCE_PASS=1 cargo nextest run -- {{tests}}
     cargo insta review
     cargo clippy --all-targets
+    cargo check -p lutra-bin --no-default-features
 
 generate:
     cargo run -p lutra-codegen -- lutra-bin/src/project lutra-bin/src/project/generated.rs

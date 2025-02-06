@@ -1,4 +1,4 @@
-use std::borrow::Cow;
+use crate::{borrow, vec};
 
 use crate::ir;
 use crate::Data;
@@ -7,12 +7,12 @@ use super::SeveredBodies;
 
 #[derive(Debug)]
 pub struct TupleWriter<'t> {
-    fields_layouts: Cow<'t, [(u32, &'t [u32])]>,
+    fields_layouts: borrow::Cow<'t, [(u32, &'t [u32])]>,
 
-    buf: Vec<u8>,
+    buf: vec::Vec<u8>,
 
     next: usize,
-    fields_bodies: Vec<SeveredBodies>,
+    fields_bodies: vec::Vec<SeveredBodies>,
 }
 
 impl<'t> TupleWriter<'t> {
@@ -32,11 +32,11 @@ impl<'t> TupleWriter<'t> {
         Self::new(fields_layouts)
     }
 
-    pub fn new(fields_layouts: Cow<'t, [(u32, &'t [u32])]>) -> Self {
+    pub fn new(fields_layouts: borrow::Cow<'t, [(u32, &'t [u32])]>) -> Self {
         TupleWriter {
             fields_layouts,
             next: 0,
-            buf: Vec::new(),
+            buf: vec::Vec::new(),
             fields_bodies: vec![],
         }
     }
