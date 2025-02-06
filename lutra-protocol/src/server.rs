@@ -12,6 +12,9 @@ where
 {
     rx: R,
     tx: W,
+
+    modules: Vec<(&'static str, &'static dyn lutra_runtime::NativeModule)>,
+
     prepared_programs: HashMap<u32, br::Program>,
 }
 
@@ -20,10 +23,15 @@ where
     R: AsyncRead + Unpin,
     W: AsyncWrite + Unpin,
 {
-    pub fn new(rx: R, tx: W) -> Self {
+    pub fn new(
+        rx: R,
+        tx: W,
+        modules: Vec<(&'static str, &'static dyn lutra_runtime::NativeModule)>,
+    ) -> Self {
         Self {
             rx,
             tx,
+            modules,
             prepared_programs: Default::default(),
         }
     }
@@ -47,11 +55,7 @@ where
             messages::ClientMessage::Execute(execute) => {
                 let program = self.prepared_programs.get(&execute.program_id).unwrap();
 
-                let result = lutra_runtime::evaluate(
-                    program,
-                    execute.inputs,
-                    lutra_runtime::BUILTIN_MODULES,
-                );
+                let result = lutra_runtime::evaluate(program, execute.inputs, &self.modules);
 
                 let response = messages::ServerMessage::Response(messages::Response {
                     request_id: execute.request_id,

@@ -5,7 +5,7 @@ mod codegen_ty;
 use std::path::PathBuf;
 use std::{collections::VecDeque, fs};
 
-use lutra_bin::ir;
+use lutra_bin::{ir, Encode};
 use lutra_frontend::{decl, pr, CompileParams, DiscoverParams};
 
 #[track_caller]
@@ -31,6 +31,32 @@ pub fn generate(
 
     // return vec of input files
     project.source.get_sources().map(|s| s.0.clone()).collect()
+}
+
+#[track_caller]
+pub fn compile_program(
+    project_dir: &std::path::Path,
+    expr_path: &[&str],
+    out_file: &std::path::Path,
+) {
+    // discover the project
+    let source = lutra_frontend::discover(DiscoverParams {
+        project_path: project_dir.into(),
+    })
+    .unwrap();
+
+    // compile
+    let project =
+        lutra_frontend::compile(source, CompileParams {}).unwrap_or_else(|e| panic!("{e}"));
+
+    // lower & bytecode
+    let program = lutra_frontend::lower(&project.root_module, &pr::Path::new(expr_path));
+    let program = lutra_frontend::bytecode_program(program);
+
+    let mut buf = Vec::new();
+    program.encode(&mut buf).unwrap();
+
+    std::fs::write(out_file, buf).unwrap();
 }
 
 #[derive(Debug, Clone)]
