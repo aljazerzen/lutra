@@ -1,3 +1,4 @@
+use lutra_bin::bytes;
 use lutra_bin::{Encode, Layout};
 
 use crate::interpreter::{Cell, Interpreter};
@@ -603,7 +604,7 @@ mod decode {
 }
 
 pub fn encode<T: Encode + Layout>(value: &T) -> lutra_bin::Data {
-    let mut buf = Vec::with_capacity(T::head_size() / 8);
-    value.encode(&mut buf).unwrap();
-    lutra_bin::Data::new(buf)
+    let mut buf = bytes::BytesMut::with_capacity(T::head_size() / 8);
+    value.encode(&mut buf);
+    lutra_bin::Data::new(buf.to_vec())
 }

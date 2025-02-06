@@ -93,30 +93,30 @@ pub mod br {
     mod impls {
         #![allow(unused_imports)]
         use super::*;
+        use crate::bytes::BufMut;
         use crate::ReaderExt;
         use ::std::io::Write;
 
         #[allow(clippy::all, unused_variables)]
         impl crate::Encode for Program {
             type HeadPtr = ProgramHeadPtr;
-            fn encode_head(&self, w: &mut Vec<u8>) -> crate::Result<Self::HeadPtr> {
-                let externals = self.externals.encode_head(w)?;
-                let main = self.main.encode_head(w)?;
-                let input_tys = self.input_tys.encode_head(w)?;
-                let output_ty = self.output_ty.encode_head(w)?;
-                Ok(ProgramHeadPtr {
+            fn encode_head(&self, buf: &mut crate::bytes::BytesMut) -> Self::HeadPtr {
+                let externals = self.externals.encode_head(buf);
+                let main = self.main.encode_head(buf);
+                let input_tys = self.input_tys.encode_head(buf);
+                let output_ty = self.output_ty.encode_head(buf);
+                ProgramHeadPtr {
                     externals,
                     main,
                     input_tys,
                     output_ty,
-                })
+                }
             }
-            fn encode_body(&self, head: Self::HeadPtr, w: &mut Vec<u8>) -> crate::Result<()> {
-                self.externals.encode_body(head.externals, w)?;
-                self.main.encode_body(head.main, w)?;
-                self.input_tys.encode_body(head.input_tys, w)?;
-                self.output_ty.encode_body(head.output_ty, w)?;
-                Ok(())
+            fn encode_body(&self, head: Self::HeadPtr, buf: &mut crate::bytes::BytesMut) {
+                self.externals.encode_body(head.externals, buf);
+                self.main.encode_body(head.main, buf);
+                self.input_tys.encode_body(head.input_tys, buf);
+                self.output_ty.encode_body(head.output_ty, buf);
             }
         }
         #[allow(non_camel_case_types)]
@@ -150,15 +150,14 @@ pub mod br {
         #[allow(clippy::all, unused_variables)]
         impl crate::Encode for ExternalSymbol {
             type HeadPtr = ExternalSymbolHeadPtr;
-            fn encode_head(&self, w: &mut Vec<u8>) -> crate::Result<Self::HeadPtr> {
-                let id = self.id.encode_head(w)?;
-                let layout_args = self.layout_args.encode_head(w)?;
-                Ok(ExternalSymbolHeadPtr { id, layout_args })
+            fn encode_head(&self, buf: &mut crate::bytes::BytesMut) -> Self::HeadPtr {
+                let id = self.id.encode_head(buf);
+                let layout_args = self.layout_args.encode_head(buf);
+                ExternalSymbolHeadPtr { id, layout_args }
             }
-            fn encode_body(&self, head: Self::HeadPtr, w: &mut Vec<u8>) -> crate::Result<()> {
-                self.id.encode_body(head.id, w)?;
-                self.layout_args.encode_body(head.layout_args, w)?;
-                Ok(())
+            fn encode_body(&self, head: Self::HeadPtr, buf: &mut crate::bytes::BytesMut) {
+                self.id.encode_body(head.id, buf);
+                self.layout_args.encode_body(head.layout_args, buf);
             }
         }
         #[allow(non_camel_case_types)]
@@ -183,13 +182,12 @@ pub mod br {
         #[allow(clippy::all, unused_variables)]
         impl crate::Encode for Expr {
             type HeadPtr = ExprHeadPtr;
-            fn encode_head(&self, w: &mut Vec<u8>) -> crate::Result<Self::HeadPtr> {
-                let kind = self.kind.encode_head(w)?;
-                Ok(ExprHeadPtr { kind })
+            fn encode_head(&self, buf: &mut crate::bytes::BytesMut) -> Self::HeadPtr {
+                let kind = self.kind.encode_head(buf);
+                ExprHeadPtr { kind }
             }
-            fn encode_body(&self, head: Self::HeadPtr, w: &mut Vec<u8>) -> crate::Result<()> {
-                self.kind.encode_body(head.kind, w)?;
-                Ok(())
+            fn encode_body(&self, head: Self::HeadPtr, buf: &mut crate::bytes::BytesMut) {
+                self.kind.encode_body(head.kind, buf);
             }
         }
         #[allow(non_camel_case_types)]
@@ -213,124 +211,123 @@ pub mod br {
         #[allow(clippy::all)]
         impl crate::Encode for ExprKind {
             type HeadPtr = ExprKindHeadPtr;
-            fn encode_head(&self, w: &mut Vec<u8>) -> crate::Result<ExprKindHeadPtr> {
-                Ok(match self {
+            fn encode_head(&self, w: &mut crate::bytes::BytesMut) -> ExprKindHeadPtr {
+                match self {
                     Self::Pointer(inner) => {
-                        w.write_all(&[0])?;
-                        let inner_head_ptr = inner.encode_head(w)?;
+                        w.put_slice(&[0]);
+                        let inner_head_ptr = inner.encode_head(w);
                         let r = ExprKindHeadPtr::Pointer(inner_head_ptr);
                         r
                     }
                     Self::Literal(_) => {
-                        w.write_all(&[1])?;
+                        w.put_slice(&[1]);
                         let head_ptr = crate::ReversePointer::new(w);
                         let r = ExprKindHeadPtr::Literal(head_ptr);
                         r
                     }
                     Self::Call(_) => {
-                        w.write_all(&[2])?;
+                        w.put_slice(&[2]);
                         let head_ptr = crate::ReversePointer::new(w);
                         let r = ExprKindHeadPtr::Call(head_ptr);
                         r
                     }
                     Self::Function(_) => {
-                        w.write_all(&[3])?;
+                        w.put_slice(&[3]);
                         let head_ptr = crate::ReversePointer::new(w);
                         let r = ExprKindHeadPtr::Function(head_ptr);
                         r
                     }
                     Self::Tuple(_) => {
-                        w.write_all(&[4])?;
+                        w.put_slice(&[4]);
                         let head_ptr = crate::ReversePointer::new(w);
                         let r = ExprKindHeadPtr::Tuple(head_ptr);
                         r
                     }
                     Self::Array(_) => {
-                        w.write_all(&[5])?;
+                        w.put_slice(&[5]);
                         let head_ptr = crate::ReversePointer::new(w);
                         let r = ExprKindHeadPtr::Array(head_ptr);
                         r
                     }
                     Self::TupleLookup(_) => {
-                        w.write_all(&[6])?;
+                        w.put_slice(&[6]);
                         let head_ptr = crate::ReversePointer::new(w);
                         let r = ExprKindHeadPtr::TupleLookup(head_ptr);
                         r
                     }
                     Self::Binding(_) => {
-                        w.write_all(&[7])?;
+                        w.put_slice(&[7]);
                         let head_ptr = crate::ReversePointer::new(w);
                         let r = ExprKindHeadPtr::Binding(head_ptr);
                         r
                     }
-                })
+                }
             }
-            fn encode_body(&self, head: ExprKindHeadPtr, w: &mut Vec<u8>) -> crate::Result<()> {
+            fn encode_body(&self, head: ExprKindHeadPtr, w: &mut crate::bytes::BytesMut) {
                 match self {
                     Self::Pointer(inner) => {
                         let ExprKindHeadPtr::Pointer(inner_head_ptr) = head else {
                             unreachable!()
                         };
-                        inner.encode_body(inner_head_ptr, w)?;
+                        inner.encode_body(inner_head_ptr, w);
                     }
                     Self::Literal(inner) => {
                         let ExprKindHeadPtr::Literal(offset_ptr) = head else {
                             unreachable!()
                         };
                         offset_ptr.write_cur_len(w);
-                        let inner_head_ptr = inner.encode_head(w)?;
-                        inner.encode_body(inner_head_ptr, w)?;
+                        let inner_head_ptr = inner.encode_head(w);
+                        inner.encode_body(inner_head_ptr, w);
                     }
                     Self::Call(inner) => {
                         let ExprKindHeadPtr::Call(offset_ptr) = head else {
                             unreachable!()
                         };
                         offset_ptr.write_cur_len(w);
-                        let inner_head_ptr = inner.encode_head(w)?;
-                        inner.encode_body(inner_head_ptr, w)?;
+                        let inner_head_ptr = inner.encode_head(w);
+                        inner.encode_body(inner_head_ptr, w);
                     }
                     Self::Function(inner) => {
                         let ExprKindHeadPtr::Function(offset_ptr) = head else {
                             unreachable!()
                         };
                         offset_ptr.write_cur_len(w);
-                        let inner_head_ptr = inner.encode_head(w)?;
-                        inner.encode_body(inner_head_ptr, w)?;
+                        let inner_head_ptr = inner.encode_head(w);
+                        inner.encode_body(inner_head_ptr, w);
                     }
                     Self::Tuple(inner) => {
                         let ExprKindHeadPtr::Tuple(offset_ptr) = head else {
                             unreachable!()
                         };
                         offset_ptr.write_cur_len(w);
-                        let inner_head_ptr = inner.encode_head(w)?;
-                        inner.encode_body(inner_head_ptr, w)?;
+                        let inner_head_ptr = inner.encode_head(w);
+                        inner.encode_body(inner_head_ptr, w);
                     }
                     Self::Array(inner) => {
                         let ExprKindHeadPtr::Array(offset_ptr) = head else {
                             unreachable!()
                         };
                         offset_ptr.write_cur_len(w);
-                        let inner_head_ptr = inner.encode_head(w)?;
-                        inner.encode_body(inner_head_ptr, w)?;
+                        let inner_head_ptr = inner.encode_head(w);
+                        inner.encode_body(inner_head_ptr, w);
                     }
                     Self::TupleLookup(inner) => {
                         let ExprKindHeadPtr::TupleLookup(offset_ptr) = head else {
                             unreachable!()
                         };
                         offset_ptr.write_cur_len(w);
-                        let inner_head_ptr = inner.encode_head(w)?;
-                        inner.encode_body(inner_head_ptr, w)?;
+                        let inner_head_ptr = inner.encode_head(w);
+                        inner.encode_body(inner_head_ptr, w);
                     }
                     Self::Binding(inner) => {
                         let ExprKindHeadPtr::Binding(offset_ptr) = head else {
                             unreachable!()
                         };
                         offset_ptr.write_cur_len(w);
-                        let inner_head_ptr = inner.encode_head(w)?;
-                        inner.encode_body(inner_head_ptr, w)?;
+                        let inner_head_ptr = inner.encode_head(w);
+                        inner.encode_body(inner_head_ptr, w);
                     }
                 }
-                Ok(())
             }
         }
         #[allow(non_camel_case_types, dead_code)]
@@ -404,12 +401,10 @@ pub mod br {
 
         impl crate::Encode for Sid {
             type HeadPtr = ();
-            fn encode_head(&self, w: &mut Vec<u8>) -> crate::Result<()> {
-                self.0.encode_head(w)
+            fn encode_head(&self, buf: &mut crate::bytes::BytesMut) {
+                self.0.encode_head(buf)
             }
-            fn encode_body(&self, _: (), _w: &mut Vec<u8>) -> crate::Result<()> {
-                Ok(())
-            }
+            fn encode_body(&self, _: (), _: &mut crate::bytes::BytesMut) {}
         }
         impl crate::Layout for Sid {
             fn head_size() -> usize {
@@ -426,15 +421,14 @@ pub mod br {
         #[allow(clippy::all, unused_variables)]
         impl crate::Encode for Call {
             type HeadPtr = CallHeadPtr;
-            fn encode_head(&self, w: &mut Vec<u8>) -> crate::Result<Self::HeadPtr> {
-                let function = self.function.encode_head(w)?;
-                let args = self.args.encode_head(w)?;
-                Ok(CallHeadPtr { function, args })
+            fn encode_head(&self, buf: &mut crate::bytes::BytesMut) -> Self::HeadPtr {
+                let function = self.function.encode_head(buf);
+                let args = self.args.encode_head(buf);
+                CallHeadPtr { function, args }
             }
-            fn encode_body(&self, head: Self::HeadPtr, w: &mut Vec<u8>) -> crate::Result<()> {
-                self.function.encode_body(head.function, w)?;
-                self.args.encode_body(head.args, w)?;
-                Ok(())
+            fn encode_body(&self, head: Self::HeadPtr, buf: &mut crate::bytes::BytesMut) {
+                self.function.encode_body(head.function, buf);
+                self.args.encode_body(head.args, buf);
             }
         }
         #[allow(non_camel_case_types)]
@@ -459,15 +453,14 @@ pub mod br {
         #[allow(clippy::all, unused_variables)]
         impl crate::Encode for Function {
             type HeadPtr = FunctionHeadPtr;
-            fn encode_head(&self, w: &mut Vec<u8>) -> crate::Result<Self::HeadPtr> {
-                let symbol_ns = self.symbol_ns.encode_head(w)?;
-                let body = self.body.encode_head(w)?;
-                Ok(FunctionHeadPtr { symbol_ns, body })
+            fn encode_head(&self, buf: &mut crate::bytes::BytesMut) -> Self::HeadPtr {
+                let symbol_ns = self.symbol_ns.encode_head(buf);
+                let body = self.body.encode_head(buf);
+                FunctionHeadPtr { symbol_ns, body }
             }
-            fn encode_body(&self, head: Self::HeadPtr, w: &mut Vec<u8>) -> crate::Result<()> {
-                self.symbol_ns.encode_body(head.symbol_ns, w)?;
-                self.body.encode_body(head.body, w)?;
-                Ok(())
+            fn encode_body(&self, head: Self::HeadPtr, buf: &mut crate::bytes::BytesMut) {
+                self.symbol_ns.encode_body(head.symbol_ns, buf);
+                self.body.encode_body(head.body, buf);
             }
         }
         #[allow(non_camel_case_types)]
@@ -492,18 +485,17 @@ pub mod br {
         #[allow(clippy::all, unused_variables)]
         impl crate::Encode for Tuple {
             type HeadPtr = TupleHeadPtr;
-            fn encode_head(&self, w: &mut Vec<u8>) -> crate::Result<Self::HeadPtr> {
-                let fields = self.fields.encode_head(w)?;
-                let field_layouts = self.field_layouts.encode_head(w)?;
-                Ok(TupleHeadPtr {
+            fn encode_head(&self, buf: &mut crate::bytes::BytesMut) -> Self::HeadPtr {
+                let fields = self.fields.encode_head(buf);
+                let field_layouts = self.field_layouts.encode_head(buf);
+                TupleHeadPtr {
                     fields,
                     field_layouts,
-                })
+                }
             }
-            fn encode_body(&self, head: Self::HeadPtr, w: &mut Vec<u8>) -> crate::Result<()> {
-                self.fields.encode_body(head.fields, w)?;
-                self.field_layouts.encode_body(head.field_layouts, w)?;
-                Ok(())
+            fn encode_body(&self, head: Self::HeadPtr, buf: &mut crate::bytes::BytesMut) {
+                self.fields.encode_body(head.fields, buf);
+                self.field_layouts.encode_body(head.field_layouts, buf);
             }
         }
         #[allow(non_camel_case_types)]
@@ -531,15 +523,14 @@ pub mod br {
         #[allow(clippy::all, unused_variables)]
         impl crate::Encode for Array {
             type HeadPtr = ArrayHeadPtr;
-            fn encode_head(&self, w: &mut Vec<u8>) -> crate::Result<Self::HeadPtr> {
-                let item_layout = self.item_layout.encode_head(w)?;
-                let items = self.items.encode_head(w)?;
-                Ok(ArrayHeadPtr { item_layout, items })
+            fn encode_head(&self, buf: &mut crate::bytes::BytesMut) -> Self::HeadPtr {
+                let item_layout = self.item_layout.encode_head(buf);
+                let items = self.items.encode_head(buf);
+                ArrayHeadPtr { item_layout, items }
             }
-            fn encode_body(&self, head: Self::HeadPtr, w: &mut Vec<u8>) -> crate::Result<()> {
-                self.item_layout.encode_body(head.item_layout, w)?;
-                self.items.encode_body(head.items, w)?;
-                Ok(())
+            fn encode_body(&self, head: Self::HeadPtr, buf: &mut crate::bytes::BytesMut) {
+                self.item_layout.encode_body(head.item_layout, buf);
+                self.items.encode_body(head.items, buf);
             }
         }
         #[allow(non_camel_case_types)]
@@ -564,15 +555,14 @@ pub mod br {
         #[allow(clippy::all, unused_variables)]
         impl crate::Encode for TupleLookup {
             type HeadPtr = TupleLookupHeadPtr;
-            fn encode_head(&self, w: &mut Vec<u8>) -> crate::Result<Self::HeadPtr> {
-                let base = self.base.encode_head(w)?;
-                let offset = self.offset.encode_head(w)?;
-                Ok(TupleLookupHeadPtr { base, offset })
+            fn encode_head(&self, buf: &mut crate::bytes::BytesMut) -> Self::HeadPtr {
+                let base = self.base.encode_head(buf);
+                let offset = self.offset.encode_head(buf);
+                TupleLookupHeadPtr { base, offset }
             }
-            fn encode_body(&self, head: Self::HeadPtr, w: &mut Vec<u8>) -> crate::Result<()> {
-                self.base.encode_body(head.base, w)?;
-                self.offset.encode_body(head.offset, w)?;
-                Ok(())
+            fn encode_body(&self, head: Self::HeadPtr, buf: &mut crate::bytes::BytesMut) {
+                self.base.encode_body(head.base, buf);
+                self.offset.encode_body(head.offset, buf);
             }
         }
         #[allow(non_camel_case_types)]
@@ -597,17 +587,16 @@ pub mod br {
         #[allow(clippy::all, unused_variables)]
         impl crate::Encode for Binding {
             type HeadPtr = BindingHeadPtr;
-            fn encode_head(&self, w: &mut Vec<u8>) -> crate::Result<Self::HeadPtr> {
-                let symbol = self.symbol.encode_head(w)?;
-                let expr = self.expr.encode_head(w)?;
-                let main = self.main.encode_head(w)?;
-                Ok(BindingHeadPtr { symbol, expr, main })
+            fn encode_head(&self, buf: &mut crate::bytes::BytesMut) -> Self::HeadPtr {
+                let symbol = self.symbol.encode_head(buf);
+                let expr = self.expr.encode_head(buf);
+                let main = self.main.encode_head(buf);
+                BindingHeadPtr { symbol, expr, main }
             }
-            fn encode_body(&self, head: Self::HeadPtr, w: &mut Vec<u8>) -> crate::Result<()> {
-                self.symbol.encode_body(head.symbol, w)?;
-                self.expr.encode_body(head.expr, w)?;
-                self.main.encode_body(head.main, w)?;
-                Ok(())
+            fn encode_body(&self, head: Self::HeadPtr, buf: &mut crate::bytes::BytesMut) {
+                self.symbol.encode_body(head.symbol, buf);
+                self.expr.encode_body(head.expr, buf);
+                self.main.encode_body(head.main, buf);
             }
         }
         #[allow(non_camel_case_types)]
@@ -634,18 +623,17 @@ pub mod br {
         #[allow(clippy::all, unused_variables)]
         impl crate::Encode for TyLayout {
             type HeadPtr = TyLayoutHeadPtr;
-            fn encode_head(&self, w: &mut Vec<u8>) -> crate::Result<Self::HeadPtr> {
-                let head_size = self.head_size.encode_head(w)?;
-                let body_ptrs = self.body_ptrs.encode_head(w)?;
-                Ok(TyLayoutHeadPtr {
+            fn encode_head(&self, buf: &mut crate::bytes::BytesMut) -> Self::HeadPtr {
+                let head_size = self.head_size.encode_head(buf);
+                let body_ptrs = self.body_ptrs.encode_head(buf);
+                TyLayoutHeadPtr {
                     head_size,
                     body_ptrs,
-                })
+                }
             }
-            fn encode_body(&self, head: Self::HeadPtr, w: &mut Vec<u8>) -> crate::Result<()> {
-                self.head_size.encode_body(head.head_size, w)?;
-                self.body_ptrs.encode_body(head.body_ptrs, w)?;
-                Ok(())
+            fn encode_body(&self, head: Self::HeadPtr, buf: &mut crate::bytes::BytesMut) {
+                self.head_size.encode_body(head.head_size, buf);
+                self.body_ptrs.encode_body(head.body_ptrs, buf);
             }
         }
         #[allow(non_camel_case_types)]
@@ -848,19 +836,19 @@ pub mod ir {
     mod impls {
         #![allow(unused_imports)]
         use super::*;
+        use crate::bytes::BufMut;
         use crate::ReaderExt;
         use ::std::io::Write;
 
         #[allow(clippy::all, unused_variables)]
         impl crate::Encode for Program {
             type HeadPtr = ProgramHeadPtr;
-            fn encode_head(&self, w: &mut Vec<u8>) -> crate::Result<Self::HeadPtr> {
-                let main = self.main.encode_head(w)?;
-                Ok(ProgramHeadPtr { main })
+            fn encode_head(&self, buf: &mut crate::bytes::BytesMut) -> Self::HeadPtr {
+                let main = self.main.encode_head(buf);
+                ProgramHeadPtr { main }
             }
-            fn encode_body(&self, head: Self::HeadPtr, w: &mut Vec<u8>) -> crate::Result<()> {
-                self.main.encode_body(head.main, w)?;
-                Ok(())
+            fn encode_body(&self, head: Self::HeadPtr, buf: &mut crate::bytes::BytesMut) {
+                self.main.encode_body(head.main, buf);
             }
         }
         #[allow(non_camel_case_types)]
@@ -883,15 +871,14 @@ pub mod ir {
         #[allow(clippy::all, unused_variables)]
         impl crate::Encode for Expr {
             type HeadPtr = ExprHeadPtr;
-            fn encode_head(&self, w: &mut Vec<u8>) -> crate::Result<Self::HeadPtr> {
-                let kind = self.kind.encode_head(w)?;
-                let ty = self.ty.encode_head(w)?;
-                Ok(ExprHeadPtr { kind, ty })
+            fn encode_head(&self, buf: &mut crate::bytes::BytesMut) -> Self::HeadPtr {
+                let kind = self.kind.encode_head(buf);
+                let ty = self.ty.encode_head(buf);
+                ExprHeadPtr { kind, ty }
             }
-            fn encode_body(&self, head: Self::HeadPtr, w: &mut Vec<u8>) -> crate::Result<()> {
-                self.kind.encode_body(head.kind, w)?;
-                self.ty.encode_body(head.ty, w)?;
-                Ok(())
+            fn encode_body(&self, head: Self::HeadPtr, buf: &mut crate::bytes::BytesMut) {
+                self.kind.encode_body(head.kind, buf);
+                self.ty.encode_body(head.ty, buf);
             }
         }
         #[allow(non_camel_case_types)]
@@ -917,140 +904,139 @@ pub mod ir {
         #[allow(clippy::all)]
         impl crate::Encode for ExprKind {
             type HeadPtr = ExprKindHeadPtr;
-            fn encode_head(&self, w: &mut Vec<u8>) -> crate::Result<ExprKindHeadPtr> {
-                Ok(match self {
+            fn encode_head(&self, w: &mut crate::bytes::BytesMut) -> ExprKindHeadPtr {
+                match self {
                     Self::Pointer(_) => {
-                        w.write_all(&[0])?;
+                        w.put_slice(&[0]);
                         let head_ptr = crate::ReversePointer::new(w);
                         let r = ExprKindHeadPtr::Pointer(head_ptr);
                         r
                     }
                     Self::Literal(_) => {
-                        w.write_all(&[1])?;
+                        w.put_slice(&[1]);
                         let head_ptr = crate::ReversePointer::new(w);
                         let r = ExprKindHeadPtr::Literal(head_ptr);
                         r
                     }
                     Self::Call(_) => {
-                        w.write_all(&[2])?;
+                        w.put_slice(&[2]);
                         let head_ptr = crate::ReversePointer::new(w);
                         let r = ExprKindHeadPtr::Call(head_ptr);
                         r
                     }
                     Self::Function(_) => {
-                        w.write_all(&[3])?;
+                        w.put_slice(&[3]);
                         let head_ptr = crate::ReversePointer::new(w);
                         let r = ExprKindHeadPtr::Function(head_ptr);
                         r
                     }
                     Self::Tuple(_) => {
-                        w.write_all(&[4])?;
+                        w.put_slice(&[4]);
                         let head_ptr = crate::ReversePointer::new(w);
                         let r = ExprKindHeadPtr::Tuple(head_ptr);
                         r
                     }
                     Self::Array(_) => {
-                        w.write_all(&[5])?;
+                        w.put_slice(&[5]);
                         let head_ptr = crate::ReversePointer::new(w);
                         let r = ExprKindHeadPtr::Array(head_ptr);
                         r
                     }
                     Self::TupleLookup(_) => {
-                        w.write_all(&[6])?;
+                        w.put_slice(&[6]);
                         let head_ptr = crate::ReversePointer::new(w);
                         let r = ExprKindHeadPtr::TupleLookup(head_ptr);
                         r
                     }
                     Self::Binding(_) => {
-                        w.write_all(&[7])?;
+                        w.put_slice(&[7]);
                         let head_ptr = crate::ReversePointer::new(w);
                         let r = ExprKindHeadPtr::Binding(head_ptr);
                         r
                     }
                     Self::RemoteCall(_) => {
-                        w.write_all(&[8])?;
+                        w.put_slice(&[8]);
                         let head_ptr = crate::ReversePointer::new(w);
                         let r = ExprKindHeadPtr::RemoteCall(head_ptr);
                         r
                     }
-                })
+                }
             }
-            fn encode_body(&self, head: ExprKindHeadPtr, w: &mut Vec<u8>) -> crate::Result<()> {
+            fn encode_body(&self, head: ExprKindHeadPtr, w: &mut crate::bytes::BytesMut) {
                 match self {
                     Self::Pointer(inner) => {
                         let ExprKindHeadPtr::Pointer(offset_ptr) = head else {
                             unreachable!()
                         };
                         offset_ptr.write_cur_len(w);
-                        let inner_head_ptr = inner.encode_head(w)?;
-                        inner.encode_body(inner_head_ptr, w)?;
+                        let inner_head_ptr = inner.encode_head(w);
+                        inner.encode_body(inner_head_ptr, w);
                     }
                     Self::Literal(inner) => {
                         let ExprKindHeadPtr::Literal(offset_ptr) = head else {
                             unreachable!()
                         };
                         offset_ptr.write_cur_len(w);
-                        let inner_head_ptr = inner.encode_head(w)?;
-                        inner.encode_body(inner_head_ptr, w)?;
+                        let inner_head_ptr = inner.encode_head(w);
+                        inner.encode_body(inner_head_ptr, w);
                     }
                     Self::Call(inner) => {
                         let ExprKindHeadPtr::Call(offset_ptr) = head else {
                             unreachable!()
                         };
                         offset_ptr.write_cur_len(w);
-                        let inner_head_ptr = inner.encode_head(w)?;
-                        inner.encode_body(inner_head_ptr, w)?;
+                        let inner_head_ptr = inner.encode_head(w);
+                        inner.encode_body(inner_head_ptr, w);
                     }
                     Self::Function(inner) => {
                         let ExprKindHeadPtr::Function(offset_ptr) = head else {
                             unreachable!()
                         };
                         offset_ptr.write_cur_len(w);
-                        let inner_head_ptr = inner.encode_head(w)?;
-                        inner.encode_body(inner_head_ptr, w)?;
+                        let inner_head_ptr = inner.encode_head(w);
+                        inner.encode_body(inner_head_ptr, w);
                     }
                     Self::Tuple(inner) => {
                         let ExprKindHeadPtr::Tuple(offset_ptr) = head else {
                             unreachable!()
                         };
                         offset_ptr.write_cur_len(w);
-                        let inner_head_ptr = inner.encode_head(w)?;
-                        inner.encode_body(inner_head_ptr, w)?;
+                        let inner_head_ptr = inner.encode_head(w);
+                        inner.encode_body(inner_head_ptr, w);
                     }
                     Self::Array(inner) => {
                         let ExprKindHeadPtr::Array(offset_ptr) = head else {
                             unreachable!()
                         };
                         offset_ptr.write_cur_len(w);
-                        let inner_head_ptr = inner.encode_head(w)?;
-                        inner.encode_body(inner_head_ptr, w)?;
+                        let inner_head_ptr = inner.encode_head(w);
+                        inner.encode_body(inner_head_ptr, w);
                     }
                     Self::TupleLookup(inner) => {
                         let ExprKindHeadPtr::TupleLookup(offset_ptr) = head else {
                             unreachable!()
                         };
                         offset_ptr.write_cur_len(w);
-                        let inner_head_ptr = inner.encode_head(w)?;
-                        inner.encode_body(inner_head_ptr, w)?;
+                        let inner_head_ptr = inner.encode_head(w);
+                        inner.encode_body(inner_head_ptr, w);
                     }
                     Self::Binding(inner) => {
                         let ExprKindHeadPtr::Binding(offset_ptr) = head else {
                             unreachable!()
                         };
                         offset_ptr.write_cur_len(w);
-                        let inner_head_ptr = inner.encode_head(w)?;
-                        inner.encode_body(inner_head_ptr, w)?;
+                        let inner_head_ptr = inner.encode_head(w);
+                        inner.encode_body(inner_head_ptr, w);
                     }
                     Self::RemoteCall(inner) => {
                         let ExprKindHeadPtr::RemoteCall(offset_ptr) = head else {
                             unreachable!()
                         };
                         offset_ptr.write_cur_len(w);
-                        let inner_head_ptr = inner.encode_head(w)?;
-                        inner.encode_body(inner_head_ptr, w)?;
+                        let inner_head_ptr = inner.encode_head(w);
+                        inner.encode_body(inner_head_ptr, w);
                     }
                 }
-                Ok(())
             }
         }
         #[allow(non_camel_case_types, dead_code)]
@@ -1133,54 +1119,53 @@ pub mod ir {
         #[allow(clippy::all)]
         impl crate::Encode for Pointer {
             type HeadPtr = PointerHeadPtr;
-            fn encode_head(&self, w: &mut Vec<u8>) -> crate::Result<PointerHeadPtr> {
-                Ok(match self {
+            fn encode_head(&self, w: &mut crate::bytes::BytesMut) -> PointerHeadPtr {
+                match self {
                     Self::External(_) => {
-                        w.write_all(&[0])?;
+                        w.put_slice(&[0]);
                         let head_ptr = crate::ReversePointer::new(w);
                         let r = PointerHeadPtr::External(head_ptr);
                         r
                     }
                     Self::Binding(inner) => {
-                        w.write_all(&[1])?;
-                        let inner_head_ptr = inner.encode_head(w)?;
+                        w.put_slice(&[1]);
+                        let inner_head_ptr = inner.encode_head(w);
                         let r = PointerHeadPtr::Binding(inner_head_ptr);
                         r
                     }
                     Self::Parameter(_) => {
-                        w.write_all(&[2])?;
+                        w.put_slice(&[2]);
                         let head_ptr = crate::ReversePointer::new(w);
                         let r = PointerHeadPtr::Parameter(head_ptr);
                         r
                     }
-                })
+                }
             }
-            fn encode_body(&self, head: PointerHeadPtr, w: &mut Vec<u8>) -> crate::Result<()> {
+            fn encode_body(&self, head: PointerHeadPtr, w: &mut crate::bytes::BytesMut) {
                 match self {
                     Self::External(inner) => {
                         let PointerHeadPtr::External(offset_ptr) = head else {
                             unreachable!()
                         };
                         offset_ptr.write_cur_len(w);
-                        let inner_head_ptr = inner.encode_head(w)?;
-                        inner.encode_body(inner_head_ptr, w)?;
+                        let inner_head_ptr = inner.encode_head(w);
+                        inner.encode_body(inner_head_ptr, w);
                     }
                     Self::Binding(inner) => {
                         let PointerHeadPtr::Binding(inner_head_ptr) = head else {
                             unreachable!()
                         };
-                        inner.encode_body(inner_head_ptr, w)?;
+                        inner.encode_body(inner_head_ptr, w);
                     }
                     Self::Parameter(inner) => {
                         let PointerHeadPtr::Parameter(offset_ptr) = head else {
                             unreachable!()
                         };
                         offset_ptr.write_cur_len(w);
-                        let inner_head_ptr = inner.encode_head(w)?;
-                        inner.encode_body(inner_head_ptr, w)?;
+                        let inner_head_ptr = inner.encode_head(w);
+                        inner.encode_body(inner_head_ptr, w);
                     }
                 }
-                Ok(())
             }
         }
         #[allow(non_camel_case_types, dead_code)]
@@ -1225,15 +1210,14 @@ pub mod ir {
         #[allow(clippy::all, unused_variables)]
         impl crate::Encode for ExternalPtr {
             type HeadPtr = ExternalPtrHeadPtr;
-            fn encode_head(&self, w: &mut Vec<u8>) -> crate::Result<Self::HeadPtr> {
-                let host = self.host.encode_head(w)?;
-                let id = self.id.encode_head(w)?;
-                Ok(ExternalPtrHeadPtr { host, id })
+            fn encode_head(&self, buf: &mut crate::bytes::BytesMut) -> Self::HeadPtr {
+                let host = self.host.encode_head(buf);
+                let id = self.id.encode_head(buf);
+                ExternalPtrHeadPtr { host, id }
             }
-            fn encode_body(&self, head: Self::HeadPtr, w: &mut Vec<u8>) -> crate::Result<()> {
-                self.host.encode_body(head.host, w)?;
-                self.id.encode_body(head.id, w)?;
-                Ok(())
+            fn encode_body(&self, head: Self::HeadPtr, buf: &mut crate::bytes::BytesMut) {
+                self.host.encode_body(head.host, buf);
+                self.id.encode_body(head.id, buf);
             }
         }
         #[allow(non_camel_case_types)]
@@ -1258,18 +1242,17 @@ pub mod ir {
         #[allow(clippy::all, unused_variables)]
         impl crate::Encode for ParameterPtr {
             type HeadPtr = ParameterPtrHeadPtr;
-            fn encode_head(&self, w: &mut Vec<u8>) -> crate::Result<Self::HeadPtr> {
-                let function_id = self.function_id.encode_head(w)?;
-                let param_position = self.param_position.encode_head(w)?;
-                Ok(ParameterPtrHeadPtr {
+            fn encode_head(&self, buf: &mut crate::bytes::BytesMut) -> Self::HeadPtr {
+                let function_id = self.function_id.encode_head(buf);
+                let param_position = self.param_position.encode_head(buf);
+                ParameterPtrHeadPtr {
                     function_id,
                     param_position,
-                })
+                }
             }
-            fn encode_body(&self, head: Self::HeadPtr, w: &mut Vec<u8>) -> crate::Result<()> {
-                self.function_id.encode_body(head.function_id, w)?;
-                self.param_position.encode_body(head.param_position, w)?;
-                Ok(())
+            fn encode_body(&self, head: Self::HeadPtr, buf: &mut crate::bytes::BytesMut) {
+                self.function_id.encode_body(head.function_id, buf);
+                self.param_position.encode_body(head.param_position, buf);
             }
         }
         #[allow(non_camel_case_types)]
@@ -1298,69 +1281,68 @@ pub mod ir {
         #[allow(clippy::all)]
         impl crate::Encode for Literal {
             type HeadPtr = LiteralHeadPtr;
-            fn encode_head(&self, w: &mut Vec<u8>) -> crate::Result<LiteralHeadPtr> {
-                Ok(match self {
+            fn encode_head(&self, w: &mut crate::bytes::BytesMut) -> LiteralHeadPtr {
+                match self {
                     Self::Int(_) => {
-                        w.write_all(&[0])?;
+                        w.put_slice(&[0]);
                         let head_ptr = crate::ReversePointer::new(w);
                         let r = LiteralHeadPtr::Int(head_ptr);
                         r
                     }
                     Self::Float(_) => {
-                        w.write_all(&[1])?;
+                        w.put_slice(&[1]);
                         let head_ptr = crate::ReversePointer::new(w);
                         let r = LiteralHeadPtr::Float(head_ptr);
                         r
                     }
                     Self::Bool(inner) => {
-                        w.write_all(&[2])?;
-                        let inner_head_ptr = inner.encode_head(w)?;
+                        w.put_slice(&[2]);
+                        let inner_head_ptr = inner.encode_head(w);
                         let r = LiteralHeadPtr::Bool(inner_head_ptr);
-                        w.write_all(&[0u8, 0u8, 0u8])?;
+                        w.put_bytes(0, 3);
                         r
                     }
                     Self::Text(_) => {
-                        w.write_all(&[3])?;
+                        w.put_slice(&[3]);
                         let head_ptr = crate::ReversePointer::new(w);
                         let r = LiteralHeadPtr::Text(head_ptr);
                         r
                     }
-                })
+                }
             }
-            fn encode_body(&self, head: LiteralHeadPtr, w: &mut Vec<u8>) -> crate::Result<()> {
+            fn encode_body(&self, head: LiteralHeadPtr, w: &mut crate::bytes::BytesMut) {
                 match self {
                     Self::Int(inner) => {
                         let LiteralHeadPtr::Int(offset_ptr) = head else {
                             unreachable!()
                         };
                         offset_ptr.write_cur_len(w);
-                        let inner_head_ptr = inner.encode_head(w)?;
-                        inner.encode_body(inner_head_ptr, w)?;
+                        let inner_head_ptr = inner.encode_head(w);
+                        inner.encode_body(inner_head_ptr, w);
                     }
                     Self::Float(inner) => {
                         let LiteralHeadPtr::Float(offset_ptr) = head else {
                             unreachable!()
                         };
                         offset_ptr.write_cur_len(w);
-                        let inner_head_ptr = inner.encode_head(w)?;
-                        inner.encode_body(inner_head_ptr, w)?;
+                        let inner_head_ptr = inner.encode_head(w);
+                        inner.encode_body(inner_head_ptr, w);
                     }
                     Self::Bool(inner) => {
                         let LiteralHeadPtr::Bool(inner_head_ptr) = head else {
                             unreachable!()
                         };
-                        inner.encode_body(inner_head_ptr, w)?;
+                        inner.encode_body(inner_head_ptr, w);
                     }
                     Self::Text(inner) => {
                         let LiteralHeadPtr::Text(offset_ptr) = head else {
                             unreachable!()
                         };
                         offset_ptr.write_cur_len(w);
-                        let inner_head_ptr = inner.encode_head(w)?;
-                        inner.encode_body(inner_head_ptr, w)?;
+                        let inner_head_ptr = inner.encode_head(w);
+                        inner.encode_body(inner_head_ptr, w);
                     }
                 }
-                Ok(())
             }
         }
         #[allow(non_camel_case_types, dead_code)]
@@ -1411,15 +1393,14 @@ pub mod ir {
         #[allow(clippy::all, unused_variables)]
         impl crate::Encode for Call {
             type HeadPtr = CallHeadPtr;
-            fn encode_head(&self, w: &mut Vec<u8>) -> crate::Result<Self::HeadPtr> {
-                let function = self.function.encode_head(w)?;
-                let args = self.args.encode_head(w)?;
-                Ok(CallHeadPtr { function, args })
+            fn encode_head(&self, buf: &mut crate::bytes::BytesMut) -> Self::HeadPtr {
+                let function = self.function.encode_head(buf);
+                let args = self.args.encode_head(buf);
+                CallHeadPtr { function, args }
             }
-            fn encode_body(&self, head: Self::HeadPtr, w: &mut Vec<u8>) -> crate::Result<()> {
-                self.function.encode_body(head.function, w)?;
-                self.args.encode_body(head.args, w)?;
-                Ok(())
+            fn encode_body(&self, head: Self::HeadPtr, buf: &mut crate::bytes::BytesMut) {
+                self.function.encode_body(head.function, buf);
+                self.args.encode_body(head.args, buf);
             }
         }
         #[allow(non_camel_case_types)]
@@ -1444,17 +1425,16 @@ pub mod ir {
         #[allow(clippy::all, unused_variables)]
         impl crate::Encode for Function {
             type HeadPtr = FunctionHeadPtr;
-            fn encode_head(&self, w: &mut Vec<u8>) -> crate::Result<Self::HeadPtr> {
-                let id = self.id.encode_head(w)?;
-                let host = self.host.encode_head(w)?;
-                let body = self.body.encode_head(w)?;
-                Ok(FunctionHeadPtr { id, host, body })
+            fn encode_head(&self, buf: &mut crate::bytes::BytesMut) -> Self::HeadPtr {
+                let id = self.id.encode_head(buf);
+                let host = self.host.encode_head(buf);
+                let body = self.body.encode_head(buf);
+                FunctionHeadPtr { id, host, body }
             }
-            fn encode_body(&self, head: Self::HeadPtr, w: &mut Vec<u8>) -> crate::Result<()> {
-                self.id.encode_body(head.id, w)?;
-                self.host.encode_body(head.host, w)?;
-                self.body.encode_body(head.body, w)?;
-                Ok(())
+            fn encode_body(&self, head: Self::HeadPtr, buf: &mut crate::bytes::BytesMut) {
+                self.id.encode_body(head.id, buf);
+                self.host.encode_body(head.host, buf);
+                self.body.encode_body(head.body, buf);
             }
         }
         #[allow(non_camel_case_types)]
@@ -1482,33 +1462,29 @@ pub mod ir {
         #[allow(clippy::all)]
         impl crate::Encode for ExecutionHost {
             type HeadPtr = ExecutionHostHeadPtr;
-            fn encode_head(&self, w: &mut Vec<u8>) -> crate::Result<ExecutionHostHeadPtr> {
-                Ok(match self {
+            fn encode_head(&self, w: &mut crate::bytes::BytesMut) -> ExecutionHostHeadPtr {
+                match self {
                     Self::Any => {
-                        w.write_all(&[0])?;
+                        w.put_slice(&[0]);
                         let r = ExecutionHostHeadPtr::None;
-                        w.write_all(&[0u8, 0u8, 0u8, 0u8])?;
+                        w.put_bytes(0, 4);
                         r
                     }
                     Self::Local => {
-                        w.write_all(&[1])?;
+                        w.put_slice(&[1]);
                         let r = ExecutionHostHeadPtr::None;
-                        w.write_all(&[0u8, 0u8, 0u8, 0u8])?;
+                        w.put_bytes(0, 4);
                         r
                     }
                     Self::Remote(_) => {
-                        w.write_all(&[2])?;
+                        w.put_slice(&[2]);
                         let head_ptr = crate::ReversePointer::new(w);
                         let r = ExecutionHostHeadPtr::Remote(head_ptr);
                         r
                     }
-                })
+                }
             }
-            fn encode_body(
-                &self,
-                head: ExecutionHostHeadPtr,
-                w: &mut Vec<u8>,
-            ) -> crate::Result<()> {
+            fn encode_body(&self, head: ExecutionHostHeadPtr, w: &mut crate::bytes::BytesMut) {
                 match self {
                     Self::Any => {}
                     Self::Local => {}
@@ -1517,11 +1493,10 @@ pub mod ir {
                             unreachable!()
                         };
                         offset_ptr.write_cur_len(w);
-                        let inner_head_ptr = inner.encode_head(w)?;
-                        inner.encode_body(inner_head_ptr, w)?;
+                        let inner_head_ptr = inner.encode_head(w);
+                        inner.encode_body(inner_head_ptr, w);
                     }
                 }
-                Ok(())
             }
         }
         #[allow(non_camel_case_types, dead_code)]
@@ -1557,15 +1532,14 @@ pub mod ir {
         #[allow(clippy::all, unused_variables)]
         impl crate::Encode for TupleLookup {
             type HeadPtr = TupleLookupHeadPtr;
-            fn encode_head(&self, w: &mut Vec<u8>) -> crate::Result<Self::HeadPtr> {
-                let base = self.base.encode_head(w)?;
-                let position = self.position.encode_head(w)?;
-                Ok(TupleLookupHeadPtr { base, position })
+            fn encode_head(&self, buf: &mut crate::bytes::BytesMut) -> Self::HeadPtr {
+                let base = self.base.encode_head(buf);
+                let position = self.position.encode_head(buf);
+                TupleLookupHeadPtr { base, position }
             }
-            fn encode_body(&self, head: Self::HeadPtr, w: &mut Vec<u8>) -> crate::Result<()> {
-                self.base.encode_body(head.base, w)?;
-                self.position.encode_body(head.position, w)?;
-                Ok(())
+            fn encode_body(&self, head: Self::HeadPtr, buf: &mut crate::bytes::BytesMut) {
+                self.base.encode_body(head.base, buf);
+                self.position.encode_body(head.position, buf);
             }
         }
         #[allow(non_camel_case_types)]
@@ -1590,17 +1564,16 @@ pub mod ir {
         #[allow(clippy::all, unused_variables)]
         impl crate::Encode for Binding {
             type HeadPtr = BindingHeadPtr;
-            fn encode_head(&self, w: &mut Vec<u8>) -> crate::Result<Self::HeadPtr> {
-                let id = self.id.encode_head(w)?;
-                let expr = self.expr.encode_head(w)?;
-                let main = self.main.encode_head(w)?;
-                Ok(BindingHeadPtr { id, expr, main })
+            fn encode_head(&self, buf: &mut crate::bytes::BytesMut) -> Self::HeadPtr {
+                let id = self.id.encode_head(buf);
+                let expr = self.expr.encode_head(buf);
+                let main = self.main.encode_head(buf);
+                BindingHeadPtr { id, expr, main }
             }
-            fn encode_body(&self, head: Self::HeadPtr, w: &mut Vec<u8>) -> crate::Result<()> {
-                self.id.encode_body(head.id, w)?;
-                self.expr.encode_body(head.expr, w)?;
-                self.main.encode_body(head.main, w)?;
-                Ok(())
+            fn encode_body(&self, head: Self::HeadPtr, buf: &mut crate::bytes::BytesMut) {
+                self.id.encode_body(head.id, buf);
+                self.expr.encode_body(head.expr, buf);
+                self.main.encode_body(head.main, buf);
             }
         }
         #[allow(non_camel_case_types)]
@@ -1627,15 +1600,14 @@ pub mod ir {
         #[allow(clippy::all, unused_variables)]
         impl crate::Encode for RemoteCall {
             type HeadPtr = RemoteCallHeadPtr;
-            fn encode_head(&self, w: &mut Vec<u8>) -> crate::Result<Self::HeadPtr> {
-                let remote_id = self.remote_id.encode_head(w)?;
-                let main = self.main.encode_head(w)?;
-                Ok(RemoteCallHeadPtr { remote_id, main })
+            fn encode_head(&self, buf: &mut crate::bytes::BytesMut) -> Self::HeadPtr {
+                let remote_id = self.remote_id.encode_head(buf);
+                let main = self.main.encode_head(buf);
+                RemoteCallHeadPtr { remote_id, main }
             }
-            fn encode_body(&self, head: Self::HeadPtr, w: &mut Vec<u8>) -> crate::Result<()> {
-                self.remote_id.encode_body(head.remote_id, w)?;
-                self.main.encode_body(head.main, w)?;
-                Ok(())
+            fn encode_body(&self, head: Self::HeadPtr, buf: &mut crate::bytes::BytesMut) {
+                self.remote_id.encode_body(head.remote_id, buf);
+                self.main.encode_body(head.main, buf);
             }
         }
         #[allow(non_camel_case_types)]
@@ -1660,17 +1632,16 @@ pub mod ir {
         #[allow(clippy::all, unused_variables)]
         impl crate::Encode for Ty {
             type HeadPtr = TyHeadPtr;
-            fn encode_head(&self, w: &mut Vec<u8>) -> crate::Result<Self::HeadPtr> {
-                let kind = self.kind.encode_head(w)?;
-                let layout = self.layout.encode_head(w)?;
-                let name = self.name.encode_head(w)?;
-                Ok(TyHeadPtr { kind, layout, name })
+            fn encode_head(&self, buf: &mut crate::bytes::BytesMut) -> Self::HeadPtr {
+                let kind = self.kind.encode_head(buf);
+                let layout = self.layout.encode_head(buf);
+                let name = self.name.encode_head(buf);
+                TyHeadPtr { kind, layout, name }
             }
-            fn encode_body(&self, head: Self::HeadPtr, w: &mut Vec<u8>) -> crate::Result<()> {
-                self.kind.encode_body(head.kind, w)?;
-                self.layout.encode_body(head.layout, w)?;
-                self.name.encode_body(head.name, w)?;
-                Ok(())
+            fn encode_body(&self, head: Self::HeadPtr, buf: &mut crate::bytes::BytesMut) {
+                self.kind.encode_body(head.kind, buf);
+                self.layout.encode_body(head.layout, buf);
+                self.name.encode_body(head.name, buf);
             }
         }
         #[allow(non_camel_case_types)]
@@ -1698,98 +1669,97 @@ pub mod ir {
         #[allow(clippy::all)]
         impl crate::Encode for TyKind {
             type HeadPtr = TyKindHeadPtr;
-            fn encode_head(&self, w: &mut Vec<u8>) -> crate::Result<TyKindHeadPtr> {
-                Ok(match self {
+            fn encode_head(&self, w: &mut crate::bytes::BytesMut) -> TyKindHeadPtr {
+                match self {
                     Self::Primitive(_) => {
-                        w.write_all(&[0])?;
+                        w.put_slice(&[0]);
                         let head_ptr = crate::ReversePointer::new(w);
                         let r = TyKindHeadPtr::Primitive(head_ptr);
                         r
                     }
                     Self::Tuple(_) => {
-                        w.write_all(&[1])?;
+                        w.put_slice(&[1]);
                         let head_ptr = crate::ReversePointer::new(w);
                         let r = TyKindHeadPtr::Tuple(head_ptr);
                         r
                     }
                     Self::Array(_) => {
-                        w.write_all(&[2])?;
+                        w.put_slice(&[2]);
                         let head_ptr = crate::ReversePointer::new(w);
                         let r = TyKindHeadPtr::Array(head_ptr);
                         r
                     }
                     Self::Enum(_) => {
-                        w.write_all(&[3])?;
+                        w.put_slice(&[3]);
                         let head_ptr = crate::ReversePointer::new(w);
                         let r = TyKindHeadPtr::Enum(head_ptr);
                         r
                     }
                     Self::Function(_) => {
-                        w.write_all(&[4])?;
+                        w.put_slice(&[4]);
                         let head_ptr = crate::ReversePointer::new(w);
                         let r = TyKindHeadPtr::Function(head_ptr);
                         r
                     }
                     Self::Ident(_) => {
-                        w.write_all(&[5])?;
+                        w.put_slice(&[5]);
                         let head_ptr = crate::ReversePointer::new(w);
                         let r = TyKindHeadPtr::Ident(head_ptr);
                         r
                     }
-                })
+                }
             }
-            fn encode_body(&self, head: TyKindHeadPtr, w: &mut Vec<u8>) -> crate::Result<()> {
+            fn encode_body(&self, head: TyKindHeadPtr, w: &mut crate::bytes::BytesMut) {
                 match self {
                     Self::Primitive(inner) => {
                         let TyKindHeadPtr::Primitive(offset_ptr) = head else {
                             unreachable!()
                         };
                         offset_ptr.write_cur_len(w);
-                        let inner_head_ptr = inner.encode_head(w)?;
-                        inner.encode_body(inner_head_ptr, w)?;
+                        let inner_head_ptr = inner.encode_head(w);
+                        inner.encode_body(inner_head_ptr, w);
                     }
                     Self::Tuple(inner) => {
                         let TyKindHeadPtr::Tuple(offset_ptr) = head else {
                             unreachable!()
                         };
                         offset_ptr.write_cur_len(w);
-                        let inner_head_ptr = inner.encode_head(w)?;
-                        inner.encode_body(inner_head_ptr, w)?;
+                        let inner_head_ptr = inner.encode_head(w);
+                        inner.encode_body(inner_head_ptr, w);
                     }
                     Self::Array(inner) => {
                         let TyKindHeadPtr::Array(offset_ptr) = head else {
                             unreachable!()
                         };
                         offset_ptr.write_cur_len(w);
-                        let inner_head_ptr = inner.encode_head(w)?;
-                        inner.encode_body(inner_head_ptr, w)?;
+                        let inner_head_ptr = inner.encode_head(w);
+                        inner.encode_body(inner_head_ptr, w);
                     }
                     Self::Enum(inner) => {
                         let TyKindHeadPtr::Enum(offset_ptr) = head else {
                             unreachable!()
                         };
                         offset_ptr.write_cur_len(w);
-                        let inner_head_ptr = inner.encode_head(w)?;
-                        inner.encode_body(inner_head_ptr, w)?;
+                        let inner_head_ptr = inner.encode_head(w);
+                        inner.encode_body(inner_head_ptr, w);
                     }
                     Self::Function(inner) => {
                         let TyKindHeadPtr::Function(offset_ptr) = head else {
                             unreachable!()
                         };
                         offset_ptr.write_cur_len(w);
-                        let inner_head_ptr = inner.encode_head(w)?;
-                        inner.encode_body(inner_head_ptr, w)?;
+                        let inner_head_ptr = inner.encode_head(w);
+                        inner.encode_body(inner_head_ptr, w);
                     }
                     Self::Ident(inner) => {
                         let TyKindHeadPtr::Ident(offset_ptr) = head else {
                             unreachable!()
                         };
                         offset_ptr.write_cur_len(w);
-                        let inner_head_ptr = inner.encode_head(w)?;
-                        inner.encode_body(inner_head_ptr, w)?;
+                        let inner_head_ptr = inner.encode_head(w);
+                        inner.encode_body(inner_head_ptr, w);
                     }
                 }
-                Ok(())
             }
         }
         #[allow(non_camel_case_types, dead_code)]
@@ -1854,61 +1824,59 @@ pub mod ir {
         #[allow(clippy::all)]
         impl crate::Encode for PrimitiveSet {
             type HeadPtr = ();
-            fn encode_head(&self, w: &mut Vec<u8>) -> crate::Result<()> {
-                Ok(match self {
+            fn encode_head(&self, w: &mut crate::bytes::BytesMut) -> () {
+                match self {
                     Self::bool => {
-                        w.write_all(&[0])?;
-                        w.write_all(&[0u8, 0u8, 0u8, 0u8])?;
+                        w.put_slice(&[0]);
+                        w.put_bytes(0, 4);
                     }
                     Self::int8 => {
-                        w.write_all(&[1])?;
-                        w.write_all(&[0u8, 0u8, 0u8, 0u8])?;
+                        w.put_slice(&[1]);
+                        w.put_bytes(0, 4);
                     }
                     Self::int16 => {
-                        w.write_all(&[2])?;
-                        w.write_all(&[0u8, 0u8, 0u8, 0u8])?;
+                        w.put_slice(&[2]);
+                        w.put_bytes(0, 4);
                     }
                     Self::int32 => {
-                        w.write_all(&[3])?;
-                        w.write_all(&[0u8, 0u8, 0u8, 0u8])?;
+                        w.put_slice(&[3]);
+                        w.put_bytes(0, 4);
                     }
                     Self::int64 => {
-                        w.write_all(&[4])?;
-                        w.write_all(&[0u8, 0u8, 0u8, 0u8])?;
+                        w.put_slice(&[4]);
+                        w.put_bytes(0, 4);
                     }
                     Self::uint8 => {
-                        w.write_all(&[5])?;
-                        w.write_all(&[0u8, 0u8, 0u8, 0u8])?;
+                        w.put_slice(&[5]);
+                        w.put_bytes(0, 4);
                     }
                     Self::uint16 => {
-                        w.write_all(&[6])?;
-                        w.write_all(&[0u8, 0u8, 0u8, 0u8])?;
+                        w.put_slice(&[6]);
+                        w.put_bytes(0, 4);
                     }
                     Self::uint32 => {
-                        w.write_all(&[7])?;
-                        w.write_all(&[0u8, 0u8, 0u8, 0u8])?;
+                        w.put_slice(&[7]);
+                        w.put_bytes(0, 4);
                     }
                     Self::uint64 => {
-                        w.write_all(&[8])?;
-                        w.write_all(&[0u8, 0u8, 0u8, 0u8])?;
+                        w.put_slice(&[8]);
+                        w.put_bytes(0, 4);
                     }
                     Self::float32 => {
-                        w.write_all(&[9])?;
-                        w.write_all(&[0u8, 0u8, 0u8, 0u8])?;
+                        w.put_slice(&[9]);
+                        w.put_bytes(0, 4);
                     }
                     Self::float64 => {
-                        w.write_all(&[10])?;
-                        w.write_all(&[0u8, 0u8, 0u8, 0u8])?;
+                        w.put_slice(&[10]);
+                        w.put_bytes(0, 4);
                     }
                     Self::text => {
-                        w.write_all(&[11])?;
-                        w.write_all(&[0u8, 0u8, 0u8, 0u8])?;
+                        w.put_slice(&[11]);
+                        w.put_bytes(0, 4);
                     }
-                })
+                }
             }
-            fn encode_body(&self, head: (), w: &mut Vec<u8>) -> crate::Result<()> {
-                Ok(())
-            }
+            fn encode_body(&self, head: (), w: &mut crate::bytes::BytesMut) {}
         }
         impl crate::Layout for PrimitiveSet {
             fn head_size() -> usize {
@@ -1942,15 +1910,14 @@ pub mod ir {
         #[allow(clippy::all, unused_variables)]
         impl crate::Encode for TyTupleField {
             type HeadPtr = TyTupleFieldHeadPtr;
-            fn encode_head(&self, w: &mut Vec<u8>) -> crate::Result<Self::HeadPtr> {
-                let name = self.name.encode_head(w)?;
-                let ty = self.ty.encode_head(w)?;
-                Ok(TyTupleFieldHeadPtr { name, ty })
+            fn encode_head(&self, buf: &mut crate::bytes::BytesMut) -> Self::HeadPtr {
+                let name = self.name.encode_head(buf);
+                let ty = self.ty.encode_head(buf);
+                TyTupleFieldHeadPtr { name, ty }
             }
-            fn encode_body(&self, head: Self::HeadPtr, w: &mut Vec<u8>) -> crate::Result<()> {
-                self.name.encode_body(head.name, w)?;
-                self.ty.encode_body(head.ty, w)?;
-                Ok(())
+            fn encode_body(&self, head: Self::HeadPtr, buf: &mut crate::bytes::BytesMut) {
+                self.name.encode_body(head.name, buf);
+                self.ty.encode_body(head.ty, buf);
             }
         }
         #[allow(non_camel_case_types)]
@@ -1975,15 +1942,14 @@ pub mod ir {
         #[allow(clippy::all, unused_variables)]
         impl crate::Encode for TyEnumVariant {
             type HeadPtr = TyEnumVariantHeadPtr;
-            fn encode_head(&self, w: &mut Vec<u8>) -> crate::Result<Self::HeadPtr> {
-                let name = self.name.encode_head(w)?;
-                let ty = self.ty.encode_head(w)?;
-                Ok(TyEnumVariantHeadPtr { name, ty })
+            fn encode_head(&self, buf: &mut crate::bytes::BytesMut) -> Self::HeadPtr {
+                let name = self.name.encode_head(buf);
+                let ty = self.ty.encode_head(buf);
+                TyEnumVariantHeadPtr { name, ty }
             }
-            fn encode_body(&self, head: Self::HeadPtr, w: &mut Vec<u8>) -> crate::Result<()> {
-                self.name.encode_body(head.name, w)?;
-                self.ty.encode_body(head.ty, w)?;
-                Ok(())
+            fn encode_body(&self, head: Self::HeadPtr, buf: &mut crate::bytes::BytesMut) {
+                self.name.encode_body(head.name, buf);
+                self.ty.encode_body(head.ty, buf);
             }
         }
         #[allow(non_camel_case_types)]
@@ -2008,22 +1974,21 @@ pub mod ir {
         #[allow(clippy::all, unused_variables)]
         impl crate::Encode for TyLayout {
             type HeadPtr = TyLayoutHeadPtr;
-            fn encode_head(&self, w: &mut Vec<u8>) -> crate::Result<Self::HeadPtr> {
-                let head_size = self.head_size.encode_head(w)?;
-                let body_ptrs = self.body_ptrs.encode_head(w)?;
-                let variants_recursive = self.variants_recursive.encode_head(w)?;
-                Ok(TyLayoutHeadPtr {
+            fn encode_head(&self, buf: &mut crate::bytes::BytesMut) -> Self::HeadPtr {
+                let head_size = self.head_size.encode_head(buf);
+                let body_ptrs = self.body_ptrs.encode_head(buf);
+                let variants_recursive = self.variants_recursive.encode_head(buf);
+                TyLayoutHeadPtr {
                     head_size,
                     body_ptrs,
                     variants_recursive,
-                })
+                }
             }
-            fn encode_body(&self, head: Self::HeadPtr, w: &mut Vec<u8>) -> crate::Result<()> {
-                self.head_size.encode_body(head.head_size, w)?;
-                self.body_ptrs.encode_body(head.body_ptrs, w)?;
+            fn encode_body(&self, head: Self::HeadPtr, buf: &mut crate::bytes::BytesMut) {
+                self.head_size.encode_body(head.head_size, buf);
+                self.body_ptrs.encode_body(head.body_ptrs, buf);
                 self.variants_recursive
-                    .encode_body(head.variants_recursive, w)?;
-                Ok(())
+                    .encode_body(head.variants_recursive, buf);
             }
         }
         #[allow(non_camel_case_types)]
@@ -2054,15 +2019,14 @@ pub mod ir {
         #[allow(clippy::all, unused_variables)]
         impl crate::Encode for TyFunction {
             type HeadPtr = TyFunctionHeadPtr;
-            fn encode_head(&self, w: &mut Vec<u8>) -> crate::Result<Self::HeadPtr> {
-                let params = self.params.encode_head(w)?;
-                let body = self.body.encode_head(w)?;
-                Ok(TyFunctionHeadPtr { params, body })
+            fn encode_head(&self, buf: &mut crate::bytes::BytesMut) -> Self::HeadPtr {
+                let params = self.params.encode_head(buf);
+                let body = self.body.encode_head(buf);
+                TyFunctionHeadPtr { params, body }
             }
-            fn encode_body(&self, head: Self::HeadPtr, w: &mut Vec<u8>) -> crate::Result<()> {
-                self.params.encode_body(head.params, w)?;
-                self.body.encode_body(head.body, w)?;
-                Ok(())
+            fn encode_body(&self, head: Self::HeadPtr, buf: &mut crate::bytes::BytesMut) {
+                self.params.encode_body(head.params, buf);
+                self.body.encode_body(head.body, buf);
             }
         }
         #[allow(non_camel_case_types)]
@@ -2086,11 +2050,11 @@ pub mod ir {
 
         impl crate::Encode for Path {
             type HeadPtr = crate::ReversePointer;
-            fn encode_head(&self, w: &mut Vec<u8>) -> crate::Result<Self::HeadPtr> {
-                self.0.encode_head(w)
+            fn encode_head(&self, buf: &mut crate::bytes::BytesMut) -> Self::HeadPtr {
+                self.0.encode_head(buf)
             }
-            fn encode_body(&self, head: Self::HeadPtr, w: &mut Vec<u8>) -> crate::Result<()> {
-                self.0.encode_body(head, w)
+            fn encode_body(&self, head: Self::HeadPtr, buf: &mut crate::bytes::BytesMut) {
+                self.0.encode_body(head, buf)
             }
         }
         impl crate::Layout for Path {

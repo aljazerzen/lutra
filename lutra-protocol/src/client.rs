@@ -1,6 +1,7 @@
 use std::marker::Unpin;
 
-use lutra_bin::{br, Encode};
+use lutra_bin::br;
+use lutra_bin::Encode;
 use tokio::io::{AsyncRead, AsyncWrite, AsyncWriteExt};
 
 use crate::messages;
@@ -52,12 +53,12 @@ where
         let program_id = self.next_program_id;
         self.next_program_id += 1;
 
-        let mut program_buf = Vec::new();
-        program.encode(&mut program_buf).unwrap();
+        let mut program_buf = lutra_bin::bytes::BytesMut::new();
+        program.encode(&mut program_buf);
 
         let prepare = messages::ClientMessage::Prepare(messages::Prepare {
             program_id,
-            program: program_buf,
+            program: program_buf.to_vec(),
         });
 
         write_message(&mut self.tx, prepare).await.unwrap();

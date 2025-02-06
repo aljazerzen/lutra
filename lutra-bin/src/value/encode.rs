@@ -1,4 +1,4 @@
-use std::io::Write;
+use bytes::{BufMut, BytesMut};
 
 use crate::{ir, reader};
 
@@ -10,13 +10,13 @@ use crate::{ArrayReader, Decode, Encode, Error, Reader, Result};
 impl Value {
     /// Convert a Lutra [Value] to .ld binary encoding.
     pub fn encode(&self, ty: &ir::Ty) -> Result<Vec<u8>> {
-        let mut res = Vec::new();
+        let mut buf = BytesMut::new();
 
         let mut ctx = Context::new(ty);
 
-        let head_ptr = encode_head(&mut res, self, ty, &mut ctx)?;
-        encode_body(&mut res, self, head_ptr, ty, &mut ctx)?;
-        Ok(res)
+        let head_ptr = encode_head(&mut buf, self, ty, &mut ctx)?;
+        encode_body(&mut buf, self, head_ptr, ty, &mut ctx)?;
+        Ok(buf.to_vec())
     }
 
     /// Convert .ld binary encoding into Lutra [Value].
@@ -29,7 +29,7 @@ impl Value {
 }
 
 fn encode_head<'t>(
-    w: &mut Vec<u8>,
+    buf: &mut BytesMut,
     value: &Value,
     ty: &'t ir::Ty,
     ctx: &mut Context<'t>,
@@ -40,71 +40,71 @@ fn encode_head<'t>(
         Value::Bool(v) => {
             expect_ty_primitive(ty, ir::PrimitiveSet::bool)?;
 
-            v.encode_head(w)?;
+            v.encode_head(buf);
             Ok(ValueHeadPtr::None)
         }
 
         Value::Int8(v) => {
             expect_ty_primitive(ty, ir::PrimitiveSet::int8)?;
-            v.encode_head(w)?;
+            v.encode_head(buf);
             Ok(ValueHeadPtr::None)
         }
         Value::Int16(v) => {
             expect_ty_primitive(ty, ir::PrimitiveSet::int16)?;
-            v.encode_head(w)?;
+            v.encode_head(buf);
             Ok(ValueHeadPtr::None)
         }
         Value::Int32(v) => {
             expect_ty_primitive(ty, ir::PrimitiveSet::int32)?;
-            v.encode_head(w)?;
+            v.encode_head(buf);
             Ok(ValueHeadPtr::None)
         }
         Value::Int64(v) => {
             expect_ty_primitive(ty, ir::PrimitiveSet::int64)?;
-            v.encode_head(w)?;
+            v.encode_head(buf);
             Ok(ValueHeadPtr::None)
         }
         Value::Uint8(v) => {
             expect_ty_primitive(ty, ir::PrimitiveSet::uint8)?;
-            v.encode_head(w)?;
+            v.encode_head(buf);
             Ok(ValueHeadPtr::None)
         }
         Value::Uint16(v) => {
             expect_ty_primitive(ty, ir::PrimitiveSet::uint16)?;
-            v.encode_head(w)?;
+            v.encode_head(buf);
             Ok(ValueHeadPtr::None)
         }
         Value::Uint32(v) => {
             expect_ty_primitive(ty, ir::PrimitiveSet::uint32)?;
-            v.encode_head(w)?;
+            v.encode_head(buf);
             Ok(ValueHeadPtr::None)
         }
         Value::Uint64(v) => {
             expect_ty_primitive(ty, ir::PrimitiveSet::uint64)?;
-            v.encode_head(w)?;
+            v.encode_head(buf);
             Ok(ValueHeadPtr::None)
         }
         Value::Float32(v) => {
             expect_ty_primitive(ty, ir::PrimitiveSet::float32)?;
-            v.encode_head(w)?;
+            v.encode_head(buf);
             Ok(ValueHeadPtr::None)
         }
         Value::Float64(v) => {
             expect_ty_primitive(ty, ir::PrimitiveSet::float64)?;
-            v.encode_head(w)?;
+            v.encode_head(buf);
             Ok(ValueHeadPtr::None)
         }
         Value::Text(v) => {
             expect_ty_primitive(ty, ir::PrimitiveSet::text)?;
 
-            v.encode_head(w).map(ValueHeadPtr::Offset)
+            Ok(ValueHeadPtr::Offset(v.encode_head(buf)))
         }
         Value::Tuple(fields) => {
             let ty_fields = expect_ty(ty, |k| k.as_tuple(), "tuple")?;
 
             let mut head_ptrs = Vec::with_capacity(fields.len());
             for (f, f_ty) in fields.iter().zip(ty_fields) {
-                head_ptrs.push(encode_head(w, f, &f_ty.ty, ctx)?);
+                head_ptrs.push(encode_head(buf, f, &f_ty.ty, ctx)?);
             }
 
             Ok(ValueHeadPtr::Tuple(head_ptrs))
@@ -112,8 +112,8 @@ fn encode_head<'t>(
         Value::Array(items) => {
             expect_ty(ty, |k| k.as_array(), "array")?;
 
-            let offset_ptr = ReversePointer::new(w);
-            w.write_all(&(items.len() as u32).to_le_bytes())?;
+            let offset_ptr = ReversePointer::new(buf);
+            buf.put_u32_le(items.len() as u32);
             Ok(ValueHeadPtr::Offset(offset_ptr))
         }
         Value::Enum(tag, inner) => {
@@ -124,17 +124,17 @@ fn encode_head<'t>(
             let tag_bytes = &(tag as u64).to_le_bytes()[0..(head.s / 8)];
 
             let r = if variant.is_inline {
-                w.write_all(tag_bytes)?;
-                encode_head(w, inner, variant_ty, ctx)?
+                buf.put_slice(tag_bytes);
+                encode_head(buf, inner, variant_ty, ctx)?
             } else {
-                w.write_all(tag_bytes)?;
-                let offset = ReversePointer::new(w);
+                buf.put_slice(tag_bytes);
+                let offset = ReversePointer::new(buf);
 
                 ValueHeadPtr::Offset(offset)
             };
 
             if variant.padding > 0 {
-                w.write_all(&vec![0; variant.padding / 8])?;
+                buf.put_bytes(0, variant.padding / 8);
             }
             Ok(r)
         }
@@ -148,7 +148,7 @@ enum ValueHeadPtr {
 }
 
 fn encode_body<'t>(
-    w: &mut Vec<u8>,
+    w: &mut BytesMut,
     value: &Value,
     head_ptr: ValueHeadPtr,
     ty: &'t ir::Ty,
@@ -175,7 +175,7 @@ fn encode_body<'t>(
                 unreachable!()
             };
 
-            v.encode_body(offset_ptr, w)?;
+            v.encode_body(offset_ptr, w);
         }
         Value::Tuple(fields) => {
             let ty_fields = expect_ty(ty, |k| k.as_tuple(), "tuple")?;

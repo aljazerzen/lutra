@@ -57,7 +57,7 @@ pub fn write_functions(
         writeln!(w, "    ) -> ::lutra_runtime::Cell {{")?;
 
         if !func.params.is_empty() {
-            writeln!(w, "        use {lutra_bin}::{{Encode, Decode}};", )?;
+            writeln!(w, "        use {lutra_bin}::Decode;", )?;
 
             // decode args
             writeln!(w, "        let mut args = args.into_iter();")?;
@@ -82,9 +82,9 @@ pub fn write_functions(
         writeln!(w, "        );")?;
 
         // encode result
-        writeln!(w, "        let mut buf = Vec::new();")?;
-        writeln!(w, "        res.encode(&mut buf).unwrap();")?;
-        writeln!(w, "        ::lutra_runtime::Cell::Data({lutra_bin}::Data::new(buf))")?;
+        writeln!(w, "        let mut buf = {lutra_bin}::bytes::BytesMut::new();")?;
+        writeln!(w, "        {lutra_bin}::Encode::encode(&res, &mut buf);")?;
+        writeln!(w, "        ::lutra_runtime::Cell::Data({lutra_bin}::Data::new(buf.to_vec()))")?;
         writeln!(w, "    }}")?;
     }
     writeln!(w, "}}\n")?;

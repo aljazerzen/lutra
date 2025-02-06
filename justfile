@@ -14,7 +14,8 @@ test-fast tests='':
     cargo clippy --all-targets
 
 generate:
-    ./target/debug/lutra-codegen lutra-bin/src/project lutra-bin/src/project/generated.rs
-    cargo fmt -p lutra-bin
     cargo run -p lutra-codegen -- lutra-bin/src/project lutra-bin/src/project/generated.rs
     cargo fmt -p lutra-bin
+    ./target/debug/lutra-codegen lutra-bin/src/project lutra-bin/src/project/generated.rs
+    cargo fmt -p lutra-bin
+    

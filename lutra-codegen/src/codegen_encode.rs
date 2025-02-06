@@ -18,6 +18,7 @@ pub fn write_encode_impls(
     writeln!(w, "#![allow(unused_imports)]")?;
     writeln!(w, "use ::std::io::Write;")?;
     writeln!(w, "use {}::ReaderExt;", ctx.options.lutra_bin_path)?;
+    writeln!(w, "use {}::bytes::BufMut;", ctx.options.lutra_bin_path)?;
     writeln!(w, "use super::*;\n")?;
 
     ctx.current_module.push("impls".into());
@@ -46,23 +47,21 @@ fn write_ty_def_impl(
         ir::TyKind::Primitive(_) => {
             writeln!(w, "impl {lutra_bin}::Encode for {name} {{")?;
             writeln!(w, "    type HeadPtr = ();")?;
-            writeln!(w, "    fn encode_head(&self, w: &mut Vec<u8>) -> {lutra_bin}::Result<()> {{")?;
-            writeln!(w, "        self.0.encode_head(w)")?;
+            writeln!(w, "    fn encode_head(&self, buf: &mut {lutra_bin}::bytes::BytesMut) {{")?;
+            writeln!(w, "        self.0.encode_head(buf)")?;
             writeln!(w, "    }}")?;
-            writeln!(w, "    fn encode_body(&self, _: (), _w: &mut Vec<u8>) -> {lutra_bin}::Result<()> {{")?;
-            writeln!(w, "        Ok(())")?;
-            writeln!(w, "    }}")?;
+            writeln!(w, "    fn encode_body(&self, _: (), _: &mut {lutra_bin}::bytes::BytesMut) {{}}")?;
             writeln!(w, "}}")?;
         }
 
         ir::TyKind::Array(_) => {
             writeln!(w, "impl {lutra_bin}::Encode for {name} {{")?;
             writeln!(w, "    type HeadPtr = {lutra_bin}::ReversePointer;")?;
-            writeln!(w, "    fn encode_head(&self, w: &mut Vec<u8>) -> {lutra_bin}::Result<Self::HeadPtr> {{")?;
-            writeln!(w, "        self.0.encode_head(w)")?;
+            writeln!(w, "    fn encode_head(&self, buf: &mut {lutra_bin}::bytes::BytesMut) -> Self::HeadPtr {{")?;
+            writeln!(w, "        self.0.encode_head(buf)")?;
             writeln!(w, "    }}")?;
-            writeln!(w, "    fn encode_body(&self, head: Self::HeadPtr, w: &mut Vec<u8>) -> {lutra_bin}::Result<()> {{")?;
-            writeln!(w, "        self.0.encode_body(head, w)")?;
+            writeln!(w, "    fn encode_body(&self, head: Self::HeadPtr, buf: &mut {lutra_bin}::bytes::BytesMut) {{")?;
+            writeln!(w, "        self.0.encode_body(head, buf)")?;
             writeln!(w, "    }}")?;
             writeln!(w, "}}")?;
         }
@@ -78,11 +77,11 @@ fn write_ty_def_impl(
             writeln!(w, "         <{inner_head_ptr} as {lutra_bin}::Encode>::HeadPtr,")?;
             writeln!(w, "         {lutra_bin}::ReversePointer,")?;
             writeln!(w, "    >>;")?;
-            writeln!(w, "    fn encode_head(&self, w: &mut Vec<u8>) -> {lutra_bin}::Result<Self::HeadPtr> {{")?;
-            writeln!(w, "        self.0.encode_head(w)")?;
+            writeln!(w, "    fn encode_head(&self, buf: &mut {lutra_bin}::bytes::BytesMut) -> Self::HeadPtr {{")?;
+            writeln!(w, "        self.0.encode_head(buf)")?;
             writeln!(w, "    }}")?;
-            writeln!(w, "    fn encode_body(&self, head: Self::HeadPtr, w: &mut Vec<u8>) -> {lutra_bin}::Result<()> {{")?;
-            writeln!(w, "        self.0.encode_body(head, w)")?;
+            writeln!(w, "    fn encode_body(&self, head: Self::HeadPtr, buf: &mut {lutra_bin}::bytes::BytesMut) {{")?;
+            writeln!(w, "        self.0.encode_body(head, buf)")?;
             writeln!(w, "    }}")?;
             writeln!(w, "}}")?;
         }
@@ -93,30 +92,29 @@ fn write_ty_def_impl(
             writeln!(w, "    type HeadPtr = {name}HeadPtr;")?;
 
             // encode head
-            writeln!(w, "    fn encode_head(&self, w: &mut Vec<u8>) -> {lutra_bin}::Result<Self::HeadPtr> {{")?;
+            writeln!(w, "    fn encode_head(&self, buf: &mut {lutra_bin}::bytes::BytesMut) -> Self::HeadPtr {{")?;
             for (index, field) in fields.iter().enumerate() {
                 let field_name = tuple_field_name(&field.name, index);
 
-                writeln!(w, "        let {0} = self.{0}.encode_head(w)?;", field_name)?;
+                writeln!(w, "        let {0} = self.{0}.encode_head(buf);", field_name)?;
             }
-            writeln!(w, "        Ok({name}HeadPtr {{")?;
+            writeln!(w, "        {name}HeadPtr {{")?;
             for (index, field) in fields.iter().enumerate() {
                 let field_name = tuple_field_name(&field.name, index);
 
                 writeln!(w, "            {field_name},")?;
             }
-            writeln!(w, "        }})")?;
+            writeln!(w, "        }}")?;
             writeln!(w, "    }}")?;
 
             // encode body
-            writeln!(w, "    fn encode_body(&self, head: Self::HeadPtr, w: &mut Vec<u8>) -> {lutra_bin}::Result<()> {{")?;
+            writeln!(w, "    fn encode_body(&self, head: Self::HeadPtr, buf: &mut {lutra_bin}::bytes::BytesMut) {{")?;
 
             for (index, field) in fields.iter().enumerate() {
                 let field_name = tuple_field_name(&field.name, index);
 
-                writeln!(w, "        self.{0}.encode_body(head.{0}, w)?;", field_name)?;
+                writeln!(w, "        self.{0}.encode_body(head.{0}, buf);", field_name)?;
             }
-            writeln!(w, "        Ok(())")?;
 
             writeln!(w, "    }}")?;
 
@@ -151,8 +149,8 @@ fn write_ty_def_impl(
             writeln!(w, "#[allow(clippy::all)]")?;
             writeln!(w, "impl {lutra_bin}::Encode for {name} {{")?;
             writeln!(w, "    type HeadPtr = {head_ptr_name};")?;
-            writeln!(w, "    fn encode_head(&self, w: &mut Vec<u8>) -> {lutra_bin}::Result<{head_ptr_name}> {{")?;
-            writeln!(w, "        Ok(match self {{")?;
+            writeln!(w, "    fn encode_head(&self, w: &mut {lutra_bin}::bytes::BytesMut) -> {head_ptr_name} {{")?;
+            writeln!(w, "        match self {{")?;
 
             for (tag, variant) in variants.iter().enumerate() {
                 let va_format = layout::enum_variant_format(&variant.ty);
@@ -167,24 +165,20 @@ fn write_ty_def_impl(
                 writeln!(w, " => {{")?;
 
                 let tag_bytes = &tag.to_le_bytes()[0..head.s / 8];
-                writeln!(w, "                w.write_all(&{tag_bytes:?})?;")?;
+                writeln!(w, "                w.put_slice(&{tag_bytes:?});")?;
 
                 if !va_format.is_inline {
                     writeln!(w, "                let head_ptr = {lutra_bin}::ReversePointer::new(w);")?;
                     writeln!(w, "                let r = {head_ptr_name}::{}(head_ptr);", variant.name)?;
                 } else if !is_unit_variant(&variant.ty) {
-                    writeln!(w, "                let inner_head_ptr = inner.encode_head(w)?;")?;
+                    writeln!(w, "                let inner_head_ptr = inner.encode_head(w);")?;
                     writeln!(w, "                let r = {head_ptr_name}::{}(inner_head_ptr);", variant.name)?;
                 } else if needs_head_ptr {
                     writeln!(w, "                let r = {head_ptr_name}::None;")?;
                 }
 
                 if va_format.padding > 0 {
-                    write!(w, "                w.write_all(&[")?;
-                    for _ in 0..(va_format.padding / 8) {
-                        write!(w, "0u8,")?;
-                    }
-                    writeln!(w, "])?;")?;
+                    write!(w, "                w.put_bytes(0, {});", va_format.padding / 8)?;
                 }
                 if needs_head_ptr {
                     writeln!(w, "                r")?;
@@ -192,9 +186,9 @@ fn write_ty_def_impl(
 
                 writeln!(w, "            }},")?;
             }
-            writeln!(w, "        }})")?;
+            writeln!(w, "        }}")?;
             writeln!(w, "    }}")?;
-            writeln!(w, "    fn encode_body(&self, head: {head_ptr_name}, w: &mut Vec<u8>) -> {lutra_bin}::Result<()> {{")?;
+            writeln!(w, "    fn encode_body(&self, head: {head_ptr_name}, w: &mut {lutra_bin}::bytes::BytesMut) {{")?;
             if needs_head_ptr {
                 writeln!(w, "        match self {{")?;
 
@@ -210,11 +204,11 @@ fn write_ty_def_impl(
                     if !variant_format.is_inline {
                         writeln!(w, "                let {head_ptr_name}::{}(offset_ptr) = head else {{ unreachable!() }};", variant.name)?;
                         writeln!(w, "                offset_ptr.write_cur_len(w);")?;
-                        writeln!(w, "                let inner_head_ptr = inner.encode_head(w)?;")?;
-                        writeln!(w, "                inner.encode_body(inner_head_ptr, w)?;")?;
+                        writeln!(w, "                let inner_head_ptr = inner.encode_head(w);")?;
+                        writeln!(w, "                inner.encode_body(inner_head_ptr, w);")?;
                     } else if !is_unit_variant(&variant.ty) {
                         writeln!(w, "                let {head_ptr_name}::{}(inner_head_ptr) = head else {{ unreachable!() }};", variant.name)?;
-                        writeln!(w, "                inner.encode_body(inner_head_ptr, w)?;")?;
+                        writeln!(w, "                inner.encode_body(inner_head_ptr, w);")?;
                     }
 
                     writeln!(w, "            }},")?;
@@ -222,7 +216,6 @@ fn write_ty_def_impl(
 
                 writeln!(w, "        }}")?;
             }
-            writeln!(w, "        Ok(())")?;
             writeln!(w, "    }}")?;
             writeln!(w, "}}")?;
 

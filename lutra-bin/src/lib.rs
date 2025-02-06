@@ -18,3 +18,5 @@ pub use layout::Layout;
 pub use reader::{ArrayReader, Reader, ReaderExt, TupleReader};
 pub use value::Value;
 pub use writer::{ArrayWriter, TupleWriter};
+
+pub use bytes;

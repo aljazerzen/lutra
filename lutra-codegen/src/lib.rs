@@ -53,8 +53,8 @@ pub fn compile_program(
     let program = lutra_frontend::lower(&project.root_module, &pr::Path::new(expr_path));
     let program = lutra_frontend::bytecode_program(program);
 
-    let mut buf = Vec::new();
-    program.encode(&mut buf).unwrap();
+    let mut buf = bytes::BytesMut::new();
+    program.encode(&mut buf);
 
     std::fs::write(out_file, buf).unwrap();
 }

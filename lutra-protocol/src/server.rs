@@ -78,8 +78,8 @@ pub async fn write_message(
     mut tx: impl AsyncWrite + Unpin,
     e: impl lutra_bin::Encode,
 ) -> std::io::Result<()> {
-    let mut buf = Vec::new();
-    e.encode(&mut buf).unwrap();
+    let mut buf = lutra_bin::bytes::BytesMut::new();
+    e.encode(&mut buf);
 
     tx.write_all(&(buf.len() as u32).to_le_bytes()).await?;
     tx.write_all(&buf).await?;

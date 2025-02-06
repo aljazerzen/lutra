@@ -22,8 +22,8 @@ fn _test_encode_decode<T: Encode + Decode + std::fmt::Debug>(value: Value, ty: &
     let native = T::decode(&buf).unwrap();
 
     // native encode
-    let mut buf2 = Vec::new();
-    native.encode(&mut buf2).unwrap();
+    let mut buf2 = lutra_bin::bytes::BytesMut::new();
+    native.encode(&mut buf2);
     assert_eq!(buf, buf2);
 
     pretty_hex::pretty_hex(&buf)

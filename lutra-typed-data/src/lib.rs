@@ -21,8 +21,8 @@ pub fn encode_typed_data(w: &mut impl std::io::Write, value: Value, ty: &ir::Ty)
 
     let typed_data = schema::TypedData { ty, data };
 
-    let mut buf = Vec::new();
-    typed_data.encode(&mut buf)?;
+    let mut buf = lutra_bin::bytes::BytesMut::new();
+    typed_data.encode(&mut buf);
 
     w.write_all(&buf)?;
     Ok(())

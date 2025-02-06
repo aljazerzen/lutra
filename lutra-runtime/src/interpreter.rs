@@ -4,6 +4,7 @@ use std::ops::{BitAnd, Shr};
 use std::rc::Rc;
 
 use lutra_bin::br;
+use lutra_bin::bytes;
 use lutra_bin::{Data, Encode};
 
 use crate::NativeModule;
@@ -169,14 +170,14 @@ impl Interpreter {
             }
 
             br::ExprKind::Literal(l) => {
-                let mut buf = Vec::new();
+                let mut buf = bytes::BytesMut::with_capacity(8);
                 match l {
-                    br::Literal::Int(i) => i.encode(&mut buf).unwrap(),
-                    br::Literal::Float(i) => i.encode(&mut buf).unwrap(),
-                    br::Literal::Bool(i) => i.encode(&mut buf).unwrap(),
-                    br::Literal::Text(i) => i.encode(&mut buf).unwrap(),
+                    br::Literal::Int(i) => i.encode(&mut buf),
+                    br::Literal::Float(i) => i.encode(&mut buf),
+                    br::Literal::Bool(i) => i.encode(&mut buf),
+                    br::Literal::Text(i) => i.encode(&mut buf),
                 };
-                Cell::Data(Data::new(buf))
+                Cell::Data(Data::new(buf.to_vec()))
             }
 
             br::ExprKind::Tuple(tuple) => {
