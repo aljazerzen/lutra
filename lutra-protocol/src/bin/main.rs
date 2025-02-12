@@ -3,15 +3,11 @@ use lutra_protocol::messages;
 
 #[tokio::main(flavor = "current_thread")]
 async fn main() {
-    let (up_rx, up_tx) = tokio::io::simplex(1000);
-    let (down_rx, down_tx) = tokio::io::simplex(1000);
+    let (io_client, io_server) = tokio::io::duplex(1000);
 
-    let mut client = lutra_protocol::ClientConnection::new(down_rx, up_tx);
-    let mut server = lutra_protocol::ServerConnection::new(
-        up_rx,
-        down_tx,
-        lutra_runtime::BUILTIN_MODULES.to_vec(),
-    );
+    let mut client = lutra_protocol::ClientConnection::new(io_client);
+    let mut server =
+        lutra_protocol::ServerConnection::new(io_server, lutra_runtime::BUILTIN_MODULES.to_vec());
 
     let source = "let main = func (x: int64) -> 3 * x + 2";
     let program = lutra_frontend::_test_compile(source);

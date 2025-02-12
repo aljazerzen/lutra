@@ -12,8 +12,7 @@ async fn main() {
 
     println!("connected");
 
-    let (rpc_rx, rpc_tx) = tokio::io::split(rpc_io);
-    let mut client = lutra_protocol::ClientConnection::new(rpc_rx, rpc_tx);
+    let mut client = lutra_protocol::ClientConnection::new(rpc_io);
 
     let c = async {
         let source = "let main = func (x: int64) -> 3 * x + 2";

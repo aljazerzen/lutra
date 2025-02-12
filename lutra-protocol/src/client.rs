@@ -7,33 +7,29 @@ use tokio::io::{AsyncRead, AsyncWrite, AsyncWriteExt};
 use crate::messages;
 use crate::server::{read_message, write_message};
 
-pub struct ClientConnection<R, W>
+pub struct ClientConnection<C>
 where
-    R: AsyncRead + Unpin,
-    W: AsyncWrite + Unpin,
+    C: AsyncRead + AsyncWrite + Unpin,
 {
-    rx: R,
-    tx: W,
+    inner: C,
     next_program_id: u32,
     next_request_id: u32,
 }
 
-impl<R, W> ClientConnection<R, W>
+impl<C> ClientConnection<C>
 where
-    R: AsyncRead + Unpin,
-    W: AsyncWrite + Unpin,
+    C: AsyncRead + AsyncWrite + Unpin,
 {
-    pub fn new(rx: R, tx: W) -> Self {
+    pub fn new(inner: C) -> Self {
         ClientConnection {
-            rx,
-            tx,
+            inner,
             next_program_id: 0,
             next_request_id: 0,
         }
     }
 
     pub async fn shutdown(&mut self) -> std::io::Result<()> {
-        self.tx.shutdown().await
+        self.inner.shutdown().await
     }
 
     /// Prepare, execute and release.
@@ -61,7 +57,7 @@ where
             program: program_buf.to_vec(),
         });
 
-        write_message(&mut self.tx, prepare).await.unwrap();
+        write_message(&mut self.inner, prepare).await.unwrap();
         program_id
     }
 
@@ -75,17 +71,17 @@ where
             request_id,
         });
 
-        write_message(&mut self.tx, execute).await.unwrap();
+        write_message(&mut self.inner, execute).await.unwrap();
         request_id
     }
 
     pub async fn release(&mut self, program_id: u32) {
         let release = messages::ClientMessage::Release(messages::Release { program_id });
-        write_message(&mut self.tx, release).await.unwrap();
+        write_message(&mut self.inner, release).await.unwrap();
     }
 
     pub async fn recv_response(&mut self, request_id: u32) -> messages::Result {
-        while let Ok(message) = read_message(&mut self.rx).await {
+        while let Ok(message) = read_message(&mut self.inner).await {
             // TODO: error handling
 
             match message {

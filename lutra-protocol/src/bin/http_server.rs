@@ -8,12 +8,8 @@ async fn main() {
 
         let (http_serve, rpc_io) = lutra_protocol::http::server(stream);
 
-        let (rpc_rx, rpc_tx) = tokio::io::split(rpc_io);
-        let mut server = lutra_protocol::ServerConnection::new(
-            rpc_rx,
-            rpc_tx,
-            lutra_runtime::BUILTIN_MODULES.to_vec(),
-        );
+        let mut server =
+            lutra_protocol::ServerConnection::new(rpc_io, lutra_runtime::BUILTIN_MODULES.to_vec());
 
         tokio::join!(server.run(), http_serve);
     }

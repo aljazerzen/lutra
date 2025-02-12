@@ -1,0 +1,40 @@
+type ClientMessage = enum {
+    Prepare = Prepare,
+    Execute = Execute,
+    Release = Release,
+}
+
+type ServerMessage = enum {
+    Response = Response,
+}
+
+type Prepare = {
+    program_id = uint32,
+    program = [uint8],
+}
+
+type Execute = {
+    program_id = uint32,
+    inputs = [[uint8]],
+    request_id = uint32,
+}
+
+type Release = {
+    program_id = uint32,
+}
+
+type Response = {
+    request_id = uint32,
+    result = Result,
+}
+
+type Result = enum {
+    Ok = [uint8],
+    Err = Error,
+}
+
+## Invalid request. This can either be attributed to:
+## - invalid program,
+## - invalid inputs,
+## - invalid responses from native functions.
+type Error = {}

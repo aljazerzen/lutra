@@ -224,7 +224,11 @@ fn enum_tag_size(variants_len: usize) -> u32 {
 }
 
 fn enum_tag_size_used(variants_len: usize) -> u32 {
-    f64::log2(variants_len as f64).ceil() as u32
+    variants_len
+        .saturating_sub(1)
+        .checked_ilog2()
+        .map(|x| x + 1)
+        .unwrap_or_default()
 }
 
 #[test]
