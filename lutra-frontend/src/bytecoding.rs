@@ -8,13 +8,6 @@ pub fn compile_program(value: ir::Program) -> Program {
     };
 
     Program {
-        input_tys: value
-            .get_input_tys()
-            .iter()
-            .map(|x| b.compile_ty(x.clone()))
-            .collect(),
-        output_ty: b.compile_ty(value.get_output_ty().clone()),
-
         main: b.compile_expr(value.main),
         externals: b
             .externals
@@ -122,10 +115,6 @@ impl ByteCoder {
             expr: self.compile_expr(value.expr),
             main: self.compile_expr(value.main),
         }
-    }
-
-    fn compile_ty(&mut self, value: ir::Ty) -> ir::Ty {
-        value
     }
 
     fn compile_ty_layout(&mut self, value: ir::TyLayout) -> TyLayout {

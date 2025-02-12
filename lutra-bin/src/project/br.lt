@@ -1,9 +1,6 @@
 type Program = {
   externals = [ExternalSymbol],
   main = Expr,
-
-  input_tys = [project::ir::Ty],
-  output_ty = project::ir::Ty,
 }
 
 type ExternalSymbol = {

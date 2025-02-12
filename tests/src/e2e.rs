@@ -4,13 +4,14 @@ fn _test_run(lutra_source: &str) -> String {
 
     let program = lutra_frontend::_test_compile(&source);
     eprintln!("--- ir:\n{}\n---", lutra_ir::print(&program));
-    let program = lutra_frontend::bytecode_program(program);
+    let output_ty = program.get_output_ty().clone();
+    let bytecode = lutra_frontend::bytecode_program(program);
 
-    let output = lutra_runtime::evaluate(&program, vec![], lutra_runtime::BUILTIN_MODULES);
+    let output = lutra_runtime::evaluate(&bytecode, vec![], lutra_runtime::BUILTIN_MODULES);
 
     dbg!(&output);
-    let output = lutra_bin::Value::decode(&output, &program.output_ty).unwrap();
-    output.print_source(&program.output_ty).unwrap()
+    let output = lutra_bin::Value::decode(&output, &output_ty).unwrap();
+    output.print_source(&output_ty).unwrap()
 }
 
 #[test]

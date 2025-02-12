@@ -17,6 +17,7 @@ async fn main() {
     let c = async {
         let source = "let main = func (x: int64) -> 3 * x + 2";
         let program = lutra_frontend::_test_compile(source);
+        let output_ty = program.get_output_ty().clone();
         let program = lutra_frontend::bytecode_program(program);
 
         println!("preparing...");
@@ -25,13 +26,13 @@ async fn main() {
         let res = client
             .run_once(&program, vec![vec![1, 0, 0, 0, 0, 0, 0, 0]])
             .await;
-        print_res(res, &program);
+        print_res(res, &output_ty);
 
         let request_id = client
             .execute(program_id, vec![vec![5, 0, 0, 0, 0, 0, 0, 0]])
             .await;
         let res = client.recv_response(request_id).await;
-        print_res(res, &program);
+        print_res(res, &output_ty);
 
         client.shutdown().await.unwrap();
         println!("sending shutdown");
@@ -41,10 +42,10 @@ async fn main() {
     tokio::join!(f, c);
 }
 
-fn print_res(res: messages::Result, program: &br::Program) {
+fn print_res(res: messages::Result, output_ty: &br::Ty) {
     let messages::Result::Ok(res) = res else {
         panic!()
     };
-    let res = lutra_bin::Value::decode(&res, &program.output_ty).unwrap();
-    println!("{}", res.print_source(&program.output_ty).unwrap());
+    let res = lutra_bin::Value::decode(&res, output_ty).unwrap();
+    println!("{}", res.print_source(output_ty).unwrap());
 }

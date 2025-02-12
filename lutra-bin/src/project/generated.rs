@@ -6,8 +6,6 @@ pub mod br {
     pub struct Program {
         pub externals: crate::vec::Vec<ExternalSymbol>,
         pub main: Expr,
-        pub input_tys: crate::vec::Vec<super::ir::Ty>,
-        pub output_ty: super::ir::Ty,
     }
 
     #[derive(Debug, Clone)]
@@ -102,32 +100,21 @@ pub mod br {
             fn encode_head(&self, buf: &mut crate::bytes::BytesMut) -> Self::HeadPtr {
                 let externals = self.externals.encode_head(buf);
                 let main = self.main.encode_head(buf);
-                let input_tys = self.input_tys.encode_head(buf);
-                let output_ty = self.output_ty.encode_head(buf);
-                ProgramHeadPtr {
-                    externals,
-                    main,
-                    input_tys,
-                    output_ty,
-                }
+                ProgramHeadPtr { externals, main }
             }
             fn encode_body(&self, head: Self::HeadPtr, buf: &mut crate::bytes::BytesMut) {
                 self.externals.encode_body(head.externals, buf);
                 self.main.encode_body(head.main, buf);
-                self.input_tys.encode_body(head.input_tys, buf);
-                self.output_ty.encode_body(head.output_ty, buf);
             }
         }
         #[allow(non_camel_case_types)]
         pub struct ProgramHeadPtr {
             externals: <crate::vec::Vec<super::ExternalSymbol> as crate::Encode>::HeadPtr,
             main: <super::Expr as crate::Encode>::HeadPtr,
-            input_tys: <crate::vec::Vec<super::super::ir::Ty> as crate::Encode>::HeadPtr,
-            output_ty: <super::super::ir::Ty as crate::Encode>::HeadPtr,
         }
         impl crate::Layout for Program {
             fn head_size() -> usize {
-                288
+                104
             }
         }
 
@@ -135,14 +122,7 @@ pub mod br {
             fn decode(buf: &[u8]) -> crate::Result<Self> {
                 let externals = crate::vec::Vec::<super::ExternalSymbol>::decode(buf.skip(0))?;
                 let main = super::Expr::decode(buf.skip(8))?;
-                let input_tys = crate::vec::Vec::<super::super::ir::Ty>::decode(buf.skip(13))?;
-                let output_ty = super::super::ir::Ty::decode(buf.skip(21))?;
-                Ok(Program {
-                    externals,
-                    main,
-                    input_tys,
-                    output_ty,
-                })
+                Ok(Program { externals, main })
             }
         }
 

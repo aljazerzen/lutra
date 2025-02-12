@@ -138,11 +138,12 @@ pub fn run(cmd: RunCommand) -> anyhow::Result<()> {
     let path = pr::Path::new(cmd.path.split("::"));
     let program = lutra_frontend::lower(&project.root_module, &path);
     log::debug!("ir: {}", lutra_ir::print(&program));
-    let program = lutra_frontend::bytecode_program(program);
+    let output_ty = program.get_output_ty().clone();
+    let bytecode = lutra_frontend::bytecode_program(program);
 
-    let res = lutra_runtime::evaluate(&program, vec![], lutra_runtime::BUILTIN_MODULES);
-    let value = lutra_bin::Value::decode(&res, &program.output_ty)?;
+    let res = lutra_runtime::evaluate(&bytecode, vec![], lutra_runtime::BUILTIN_MODULES);
+    let value = lutra_bin::Value::decode(&res, &output_ty)?;
 
-    println!("{}", value.print_source(&program.output_ty).unwrap());
+    println!("{}", value.print_source(&output_ty).unwrap());
     Ok(())
 }
