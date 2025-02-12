@@ -14,37 +14,8 @@ impl Resolver<'_> {
     // This function is named fold_type_actual, because fold_type must be in
     // expr.rs, where we implement PlFold.
     pub fn fold_type_actual(&mut self, ty: Ty) -> Result<Ty> {
-        // inline idents / fold inner
-        let mut ty = match ty.kind {
-            TyKind::Ident(ident) => {
-                // this will not panic, because names should be resolved at this point
-                let decl = self.get_ident(&ident).unwrap();
-
-                match &decl.kind {
-                    crate::decl::DeclKind::Ty(decl_ty) => pr::Ty {
-                        kind: pr::TyKind::Ident(ident),
-                        layout: decl_ty.layout.clone(),
-                        ..ty
-                    },
-                    crate::decl::DeclKind::Unresolved(_) => {
-                        // recursive type, skip inlining
-                        // TODO: maybe determine that some decls should not be inlined because we already know that they are recursive
-                        Ty {
-                            kind: TyKind::Ident(ident),
-                            ..ty
-                        }
-                    }
-                    _ => {
-                        return Err(Diagnostic::new_custom(format!(
-                            "expected a type, found {}",
-                            decl.kind.as_ref()
-                        ))
-                        .with_span(ty.span));
-                    }
-                }
-            }
-            _ => fold::fold_type(self, ty)?,
-        };
+        // fold inner containers
+        let mut ty = fold::fold_type(self, ty)?;
 
         // compute memory layout
         self.compute_ty_layout(&mut ty)?;
@@ -61,6 +32,24 @@ impl Resolver<'_> {
         }
 
         Ok(ty)
+    }
+
+    /// Resolves if type is an ident. Does not recurse.
+    pub fn resolve_ty_ident<'t>(&'t self, ty: &'t Ty) -> Result<&'t Ty> {
+        let TyKind::Ident(ident) = &ty.kind else {
+            return Ok(ty);
+        };
+        let decl = self.get_ident(ident).ok_or_else(|| {
+            Diagnostic::new_assert("cannot find type ident")
+                .push_hint(format!("ident={ident:?}"))
+                .with_span(ty.span)
+        })?;
+        let crate::decl::DeclKind::Ty(t) = &decl.kind else {
+            return Err(Diagnostic::new_assert("expected reference to a type")
+                .push_hint(format!("got {:?}", &decl.kind))
+                .with_span(ty.span));
+        };
+        Ok(t)
     }
 
     pub fn infer_type(&mut self, expr: &Expr) -> Result<Ty> {
@@ -208,7 +197,7 @@ impl Resolver<'_> {
     /// Validates that found node has expected type. Returns assumed type of the node.
     #[allow(clippy::only_used_in_recursion)]
     pub fn validate_type<F>(
-        &mut self,
+        &self,
         found: &Ty,
         expected: &Ty,
         span: Option<Span>,
@@ -217,21 +206,11 @@ impl Resolver<'_> {
     where
         F: Fn() -> Option<String>,
     {
+        let found = self.resolve_ty_ident(found)?;
+        let expected = self.resolve_ty_ident(expected)?;
         match (&found.kind, &expected.kind) {
             // base case
             (TyKind::Primitive(f), TyKind::Primitive(e)) if e == f => Ok(()),
-
-            // lookup idents
-            (_, TyKind::Ident(expected_fq)) => {
-                let expected_decl = self.get_ident(expected_fq).unwrap();
-                let expected = expected_decl.kind.as_ty().unwrap().clone();
-                self.validate_type(found, &expected, span, who)
-            }
-            (TyKind::Ident(found_fq), _) => {
-                let found_decl = self.get_ident(found_fq).unwrap();
-                let found = found_decl.kind.as_ty().unwrap().clone();
-                self.validate_type(&found, expected, span, who)
-            }
 
             // containers: recurse
             (TyKind::Array(found_items), TyKind::Array(expected_items)) => {

@@ -217,12 +217,9 @@ impl super::Resolver<'_> {
         base: &'a Ty,
         indirection: &pr::IndirectionKind,
     ) -> Result<Step<'a>> {
+        let base = self.resolve_ty_ident(base)?;
         match &base.kind {
-            pr::TyKind::Ident(fq_ident) => {
-                let decl_ty = self.get_ident(fq_ident).unwrap();
-                let base = decl_ty.kind.as_ty().unwrap();
-                self.resolve_indirection(base, indirection)
-            }
+            pr::TyKind::Ident(_) => panic!(),
 
             pr::TyKind::Tuple(fields) => match indirection {
                 pr::IndirectionKind::Name(name) => {

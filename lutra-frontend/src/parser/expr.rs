@@ -364,16 +364,16 @@ where
             default_value: None,
         });
 
-    let generic_args = ident_part()
+    let generic_params = ident_part()
         .then(
             ctrl(':')
                 .ignore_then(type_expr().separated_by(ctrl('|')).at_least(1))
                 .or_not()
                 .map(|x| x.unwrap_or_default()),
         )
-        .map_with_span(|(name, domain), span| GenericTypeParam {
+        .map_with_span(|(name, _domain), span| GenericTypeParam {
             name,
-            domain,
+            // domain,
             span: Some(span),
         })
         .separated_by(ctrl(','))
@@ -384,7 +384,7 @@ where
 
     // func
     keyword("func")
-        .ignore_then(generic_args)
+        .ignore_then(generic_params)
         .then(
             param
                 .clone()

@@ -146,12 +146,15 @@ impl<'a> Lowerer<'a> {
             pr::ExprKind::Ident(path) => {
                 if path.starts_with_part("func") {
                     let mut path = path.iter().peekable();
-                    path.next();
+                    path.next(); // func
+
+                    // walk the scope stack for each `up` in ident
                     let mut scope = self.function_scopes.iter().rev();
                     while path.peek().map_or(false, |x| *x == "up") {
                         path.next();
                         scope.next();
                     }
+
                     let param_position = path.next().unwrap().parse::<u8>().unwrap();
                     let function_id = *scope.next().unwrap();
                     ir::ExprKind::Pointer(ir::Pointer::Parameter(ir::ParameterPtr {

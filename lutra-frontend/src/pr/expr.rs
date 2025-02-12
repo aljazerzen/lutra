@@ -116,7 +116,6 @@ pub struct Func {
     /// Function parameters.
     pub params: Vec<FuncParam>,
 
-    /// Generic type arguments within this function.
     pub generic_type_params: Vec<GenericTypeParam>,
 }
 
@@ -133,8 +132,6 @@ pub struct FuncParam {
 pub struct GenericTypeParam {
     /// Assigned name of this generic type argument.
     pub name: String,
-
-    pub domain: Vec<Ty>,
 
     pub span: Option<Span>,
 }
@@ -203,7 +200,8 @@ impl From<Range> for ExprKind {
 
 impl PartialEq for GenericTypeParam {
     fn eq(&self, other: &Self) -> bool {
-        self.name == other.name && self.domain == other.domain
+        self.name == other.name
+        // && self.domain == other.domain
     }
 }
 
@@ -212,6 +210,6 @@ impl Eq for GenericTypeParam {}
 impl std::hash::Hash for GenericTypeParam {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
         self.name.hash(state);
-        self.domain.hash(state);
+        // self.domain.hash(state);
     }
 }

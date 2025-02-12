@@ -39,7 +39,7 @@ impl Scope {
         Self { names }
     }
 
-    pub fn populate_from_func(&mut self, func: &pr::Func) -> crate::Result<()> {
+    pub fn insert_params(&mut self, func: &pr::Func) -> crate::Result<()> {
         for (index, param) in func.params.iter().enumerate() {
             let ty = param
                 .ty
@@ -78,8 +78,9 @@ impl Resolver<'_> {
     pub(super) fn get_ident(&self, ident: &Path) -> Option<&decl::Decl> {
         if ident.starts_with_part("func") {
             let mut parts = ident.iter().peekable();
-            parts.next();
+            parts.next(); // func
 
+            // walk up the scope stack for each `up` in the ident
             let mut scope = self.scopes.iter().rev();
             while parts.peek().map_or(false, |x| *x == "up") {
                 parts.next();

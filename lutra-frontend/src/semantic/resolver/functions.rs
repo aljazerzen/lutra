@@ -19,16 +19,7 @@ impl Resolver<'_> {
         let scope = Scope::new();
 
         // prepare generic arguments
-        for generic_param in &func.generic_type_params {
-            let _domain: Vec<Ty> = generic_param
-                .domain
-                .iter()
-                .map(|b| self.fold_type(b.clone()))
-                .try_collect()?;
-
-            // register the generic type param in the resolver
-            todo!();
-        }
+        // for generic_param in &func.generic_type_params {}
         self.scopes.push(scope);
 
         // fold types
@@ -36,7 +27,7 @@ impl Resolver<'_> {
         func.return_ty = fold::fold_type_opt(self, func.return_ty)?;
 
         // put params into scope
-        self.scopes.last_mut().unwrap().populate_from_func(&func)?;
+        self.scopes.last_mut().unwrap().insert_params(&func)?;
 
         func.body = Box::new(self.fold_expr(*func.body)?);
 
