@@ -358,10 +358,11 @@ where
 {
     let param = ident_part()
         .then(ctrl(':').ignore_then(type_expr()).or_not())
-        .map(|(name, ty)| FuncParam {
+        .map_with_span(|(name, ty), span| FuncParam {
             name,
             ty,
             default_value: None,
+            span,
         });
 
     let generic_params = ident_part()

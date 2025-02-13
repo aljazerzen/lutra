@@ -200,7 +200,7 @@ impl fold::PrFold for NameResolver<'_> {
     }
 
     fn fold_func(&mut self, func: pr::Func) -> Result<pr::Func> {
-        let scope = Scope::new_of_func(&func);
+        let scope = Scope::new_of_func(&func)?;
         self.scopes.push(scope);
         let r = fold::fold_func(self, func);
         self.scopes.pop();
@@ -212,7 +212,7 @@ impl NameResolver<'_> {
     /// Returns resolved fully-qualified ident
     fn resolve_ident(&mut self, mut ident: pr::Path) -> Result<pr::Path> {
         for (up, scope) in self.scopes.iter().rev().enumerate() {
-            if let Some(param_index) = scope.get_index(ident.first()) {
+            if let Some(index) = scope.get_index(ident.first()) {
                 // match: this ident is a param ref
 
                 if ident.len() != 1 {
@@ -226,7 +226,7 @@ impl NameResolver<'_> {
                 for _ in 0..up {
                     fq_ident.push("up".to_string())
                 }
-                fq_ident.push(param_index.to_string());
+                fq_ident.push(index.to_string());
                 return Ok(fq_ident);
             }
         }

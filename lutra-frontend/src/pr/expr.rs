@@ -126,6 +126,8 @@ pub struct FuncParam {
     pub ty: Option<Ty>,
 
     pub default_value: Option<Box<Expr>>,
+
+    pub span: Span,
 }
 
 #[derive(Debug, Clone)]

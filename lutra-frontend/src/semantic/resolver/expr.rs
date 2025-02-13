@@ -6,6 +6,7 @@ use crate::decl::DeclKind;
 use crate::diagnostic::{Diagnostic, WithErrorInfo};
 use crate::pr;
 use crate::pr::Ty;
+use crate::semantic::resolver::scope::{Named, ScopedKind};
 use crate::semantic::{NS_STD, NS_THIS};
 use crate::utils::fold::{self, PrFold};
 use crate::{Result, Span};
@@ -36,45 +37,55 @@ impl fold::PrFold for super::Resolver<'_> {
             pr::ExprKind::Ident(ident) => {
                 log::debug!("resolving ident {ident:?}...");
 
-                let decl = self.get_ident(&ident).unwrap();
+                let named = self.get_ident(&ident).unwrap();
 
                 let log_debug = !ident.starts_with_part(NS_STD);
                 if log_debug {
-                    log::debug!("... resolved to {decl:?}");
+                    log::debug!("... resolved to {named:?}");
                 }
 
-                let mut expr = match &decl.kind {
-                    DeclKind::Expr(expr) => {
-                        // keep as ident, but pull in the type
-                        let ty = expr.ty.clone().unwrap();
-
-                        // if the type contains generics, we need to instantiate those
-                        // generics into current function scope
-                        // let ty = self.instantiate_type(ty, id);
-
-                        pr::Expr {
-                            kind: pr::ExprKind::Ident(ident),
-                            ty: Some(ty),
-                            ..node
+                let ty = match named {
+                    Named::Decl(decl) => match &decl.kind {
+                        DeclKind::Expr(expr) => {
+                            // if the type contains generics, we need to instantiate those
+                            // generics into current function scope
+                            // let ty = self.instantiate_type(ty, id);
+                            expr.ty.clone().unwrap()
                         }
-                    }
 
-                    DeclKind::Ty(_) => {
-                        return Err(Diagnostic::new_custom("expected a value, but found a type")
-                            .with_span(*span));
-                    }
+                        DeclKind::Ty(_) => {
+                            return Err(Diagnostic::new_custom(
+                                "expected a value, but found a type",
+                            )
+                            .with_span(*span))
+                        }
 
-                    DeclKind::Unresolved(_) => {
-                        return Err(Diagnostic::new_assert(format!(
-                            "bad resolution order: unresolved {ident} while resolving {}",
-                            self.debug_current_decl
-                        )));
-                    }
+                        DeclKind::Unresolved(_) => {
+                            return Err(Diagnostic::new_assert(format!(
+                                "bad resolution order: unresolved {ident} while resolving {}",
+                                self.debug_current_decl
+                            )))
+                        }
 
-                    DeclKind::Module(_) | DeclKind::Import(_) => {
-                        // handled during name resolution
-                        unreachable!()
-                    }
+                        DeclKind::Module(_) | DeclKind::Import(_) => {
+                            // handled during name resolution
+                            unreachable!()
+                        }
+                    },
+                    Named::Scoped(scoped) => match &scoped.kind {
+                        ScopedKind::Param { ty, .. } => ty.clone(),
+                        ScopedKind::Generic => {
+                            return Err(Diagnostic::new_custom(
+                                "expected a value, but found a type",
+                            )
+                            .with_span(*span))
+                        }
+                    },
+                };
+                let mut expr = pr::Expr {
+                    kind: pr::ExprKind::Ident(ident),
+                    ty: Some(ty),
+                    ..node
                 };
 
                 expr.id = expr.id.or(Some(id));

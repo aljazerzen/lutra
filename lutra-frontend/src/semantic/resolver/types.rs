@@ -5,8 +5,9 @@ use itertools::Itertools;
 use crate::diagnostic::{Diagnostic, WithErrorInfo};
 use crate::pr::{self, *};
 use crate::utils::fold::{self, PrFold};
-use crate::{Result, Span};
+use crate::{decl, Result, Span};
 
+use super::scope::{Named, ScopedKind};
 use super::Resolver;
 
 impl Resolver<'_> {
@@ -36,20 +37,41 @@ impl Resolver<'_> {
 
     /// Resolves if type is an ident. Does not recurse.
     pub fn resolve_ty_ident<'t>(&'t self, ty: &'t Ty) -> Result<&'t Ty> {
-        let TyKind::Ident(ident) = &ty.kind else {
-            return Ok(ty);
+        let Some(ty) = self.try_resolve_ty_ident(ty)? else {
+            return Err(Diagnostic::new_assert(format!(
+                "Unresolved ident at {:?}: (during eval of {})",
+                ty.span, self.debug_current_decl
+            )));
         };
-        let decl = self.get_ident(ident).ok_or_else(|| {
+        Ok(ty)
+    }
+
+    /// Resolves if type is an ident. Does not recurse.
+    /// Returns Ok(None) for unresolved decls.
+    pub fn try_resolve_ty_ident<'t>(&'t self, ty: &'t Ty) -> Result<Option<&'t Ty>> {
+        let TyKind::Ident(ident) = &ty.kind else {
+            return Ok(Some(ty));
+        };
+        let named = self.get_ident(ident).ok_or_else(|| {
             Diagnostic::new_assert("cannot find type ident")
                 .push_hint(format!("ident={ident:?}"))
                 .with_span(ty.span)
         })?;
-        let crate::decl::DeclKind::Ty(t) = &decl.kind else {
-            return Err(Diagnostic::new_assert("expected reference to a type")
-                .push_hint(format!("got {:?}", &decl.kind))
-                .with_span(ty.span));
-        };
-        Ok(t)
+        match named {
+            Named::Decl(decl) => match &decl.kind {
+                decl::DeclKind::Ty(t) => Ok(Some(t)),
+                decl::DeclKind::Unresolved(_) => Ok(None),
+                _ => Err(Diagnostic::new_assert("expected reference to a type")
+                    .push_hint(format!("got {:?}", &decl.kind))
+                    .with_span(ty.span)),
+            },
+            Named::Scoped(scoped) => match &scoped.kind {
+                ScopedKind::Param { ty, .. } => Ok(Some(ty)),
+                ScopedKind::Generic => {
+                    todo!("resole_ty_ident: {ident}")
+                }
+            },
+        }
     }
 
     pub fn infer_type(&mut self, expr: &Expr) -> Result<Ty> {

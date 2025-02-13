@@ -1,5 +1,4 @@
-use crate::decl;
-use crate::diagnostic::{Diagnostic, WithErrorInfo};
+use crate::diagnostic::Diagnostic;
 use crate::pr;
 use crate::Result;
 
@@ -37,15 +36,11 @@ impl Resolver<'_> {
             }
 
             pr::TyKind::Ident(ident) => {
-                let decl = self.get_ident(ident).ok_or_else(|| {
-                    Diagnostic::new_assert("cannot find type ident")
-                        .push_hint(format!("ident={ident:?}"))
-                        .with_span(ty.span)
-                })?;
+                let decl = self.try_resolve_ty_ident(&*ty)?;
 
-                match &decl.kind {
-                    // reference to a type: use it's layout
-                    decl::DeclKind::Ty(ty) => {
+                match decl {
+                    // resolves to a type: use it's layout
+                    Some(ty) => {
                         if let Some(layout) = &ty.layout {
                             layout.clone()
                         } else if self.strict_mode {
@@ -55,22 +50,15 @@ impl Resolver<'_> {
                         }
                     }
 
-                    // recursive reference to a type
-                    decl::DeclKind::Unresolved(u) => {
+                    // unresolved: recursive reference to a type
+                    None => {
                         if self.strict_mode {
                             panic!(
-                                "Unresolved {ident} at {:?}: {u:?} (during eval of {})",
+                                "unresolved {ident} at {:?}: (during eval of {})",
                                 ty.span, self.debug_current_decl
                             )
                         }
                         return Ok(());
-                    }
-
-                    _ => {
-                        return Err(Diagnostic::new_custom(format!(
-                            "expected a type, but found {decl:?}"
-                        ))
-                        .with_span(ty.span))
                     }
                 }
             }

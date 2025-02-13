@@ -211,6 +211,7 @@ pub fn fold_func_param<T: ?Sized + PrFold>(
                 name: param.name,
                 ty: fold_type_opt(fold, param.ty)?,
                 default_value: fold_optional_box(fold, param.default_value)?,
+                span: param.span,
             })
         })
         .try_collect()
