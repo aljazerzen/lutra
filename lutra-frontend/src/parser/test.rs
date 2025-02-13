@@ -2,6 +2,7 @@
 
 use chumsky::Parser;
 use insta::assert_debug_snapshot;
+use itertools::Itertools;
 use std::fmt::Debug;
 
 use crate::diagnostic::Diagnostic;
@@ -9,6 +10,7 @@ use crate::parser::lexer::TokenKind;
 use crate::parser::perror::PError;
 use crate::parser::prepare_stream;
 use crate::parser::stmt;
+use crate::pr;
 use crate::pr::Stmt;
 
 /// Parse source code based on the supplied parser.
@@ -19,6 +21,7 @@ pub(crate) fn parse_with_parser<O: Debug>(
     parser: impl Parser<TokenKind, O, Error = PError>,
 ) -> Result<O, Vec<Diagnostic>> {
     let tokens = crate::parser::lexer::lex_source(source)?;
+    dbg!(&tokens);
     let stream = prepare_stream(tokens.0, 0);
 
     // TODO: possibly should check we consume all the input? Either with an
@@ -34,8 +37,24 @@ pub(crate) fn parse_with_parser<O: Debug>(
 }
 
 /// Parse into statements
-pub(crate) fn parse_source(source: &str) -> Result<Vec<Stmt>, Vec<Diagnostic>> {
+#[track_caller]
+fn parse_source(source: &str) -> Result<Vec<Stmt>, Vec<Diagnostic>> {
     parse_with_parser(source, stmt::source())
+}
+
+#[track_caller]
+fn parse_expr(source: &str) -> pr::Expr {
+    let stmts = parse_with_parser(source, stmt::source()).unwrap();
+    let stmt = stmts.into_iter().exactly_one().unwrap();
+    let var = stmt.kind.into_var_def().unwrap();
+    let expr = var.value.unwrap();
+    *expr
+}
+
+#[test]
+fn parse_01() {
+    assert!(parse_expr("func () -> 4").kind.is_func());
+    assert!(parse_expr("func() -> 4").kind.is_func());
 }
 
 #[test]

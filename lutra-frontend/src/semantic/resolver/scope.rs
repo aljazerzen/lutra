@@ -49,6 +49,7 @@ impl Scope {
         }
         Ok(())
     }
+
     pub fn insert_params(&mut self, func: &pr::Func) -> crate::Result<()> {
         for param in func.params.iter() {
             let ty = param

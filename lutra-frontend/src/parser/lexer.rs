@@ -62,8 +62,8 @@ fn lexer() -> impl Parser<char, Vec<Token>, Error = Cheap<char>> {
         just(">=").to(TokenKind::Gte),
         just("<=").to(TokenKind::Lte),
         just("~=").to(TokenKind::RegexSearch),
-        just("&&").then_ignore(end_expr()).to(TokenKind::And),
-        just("||").then_ignore(end_expr()).to(TokenKind::Or),
+        just("&&").to(TokenKind::And),
+        just("||").to(TokenKind::Or),
         just("??").to(TokenKind::Coalesce),
         just("//").to(TokenKind::DivInt),
         just("**").to(TokenKind::Pow),
@@ -87,7 +87,7 @@ fn lexer() -> impl Parser<char, Vec<Token>, Error = Cheap<char>> {
         just("import"),
         just("enum"),
     ))
-    .then_ignore(end_expr())
+    .then_ignore(non_ident())
     .map(|x| x.to_string())
     .map(TokenKind::Keyword);
 
@@ -226,7 +226,7 @@ fn literal() -> impl Parser<char, Literal, Error = Cheap<char>> {
 
     let bool = (just("true").to(true))
         .or(just("false").to(false))
-        .then_ignore(end_expr())
+        .then_ignore(non_ident())
         .map(Literal::Boolean);
 
     let date_inner = digits(4)
@@ -274,13 +274,13 @@ fn literal() -> impl Parser<char, Literal, Error = Cheap<char>> {
 
     let date = dt_prefix
         .ignore_then(date_inner.clone())
-        .then_ignore(end_expr())
+        .then_ignore(non_ident())
         .collect::<String>()
         .map(Literal::Date);
 
     let time = dt_prefix
         .ignore_then(time_inner.clone())
-        .then_ignore(end_expr())
+        .then_ignore(non_ident())
         .collect::<String>()
         .map(Literal::Time);
 
@@ -288,7 +288,7 @@ fn literal() -> impl Parser<char, Literal, Error = Cheap<char>> {
         .ignore_then(date_inner)
         .chain(just('T'))
         .chain::<char, _, _>(time_inner)
-        .then_ignore(end_expr())
+        .then_ignore(non_ident())
         .collect::<String>()
         .map(Literal::Timestamp);
 
@@ -390,12 +390,8 @@ fn digits(count: usize) -> impl Parser<char, Vec<char>, Error = Cheap<char>> {
         .exactly(count)
 }
 
-fn end_expr() -> impl Parser<char, (), Error = Cheap<char>> {
-    choice((
-        end(),
-        one_of(",)]}\t >").ignored(),
-        newline(),
-        just("..").ignored(),
-    ))
-    .rewind()
+fn non_ident() -> impl Parser<char, char, Error = Cheap<char>> {
+    filter(|c: &char| c.is_alphanumeric() || *c == '_')
+        .not()
+        .rewind()
 }
