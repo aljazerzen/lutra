@@ -105,12 +105,12 @@ impl Resolver<'_> {
                 let mut ty_fields: Vec<TyTupleField> = Vec::with_capacity(fields.len());
 
                 for field in fields {
-                    let ty = self.infer_type(field)?;
+                    let ty = self.infer_type(&field.expr)?;
 
                     let name = field
-                        .alias
+                        .name
                         .clone()
-                        .or_else(|| self.infer_tuple_field_name(field));
+                        .or_else(|| self.infer_tuple_field_name(&field.expr));
 
                     ty_fields.push(TyTupleField { name, ty });
                 }

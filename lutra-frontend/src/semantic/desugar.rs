@@ -14,9 +14,7 @@ impl PrFold for Desugarator {
     fn fold_expr(&mut self, mut expr: pr::Expr) -> Result<pr::Expr> {
         expr.kind = match expr.kind {
             pr::ExprKind::Pipeline(p) => {
-                let mut e = self.desugar_pipeline(p)?;
-                e.alias = expr.alias.or(e.alias);
-                return Ok(e);
+                return self.desugar_pipeline(p);
             }
             pr::ExprKind::Range(r) => self.desugar_range(r)?,
             pr::ExprKind::Unary(unary) => self.desugar_unary(unary)?,
@@ -32,16 +30,24 @@ impl Desugarator {
     ///
     /// TODO: Open bounds are mapped into `null`.
     fn desugar_range(&mut self, v: pr::Range) -> Result<pr::ExprKind> {
-        let mut start = fold::fold_optional_box(self, v.start)?
+        let start = fold::fold_optional_box(self, v.start)?
             .map(|b| *b)
             .unwrap_or_else(|| pr::Expr::new(pr::Literal::Integer(0))); // TODO
-        start.alias = Some("start".into());
 
-        let mut end = fold::fold_optional_box(self, v.end)?
+        let end = fold::fold_optional_box(self, v.end)?
             .map(|b| *b)
             .unwrap_or_else(|| pr::Expr::new(pr::Literal::Integer(10000))); // TODO
-        end.alias = Some("end".into());
-        Ok(pr::ExprKind::Tuple(vec![start, end]))
+
+        Ok(pr::ExprKind::Tuple(vec![
+            pr::TupleField {
+                name: Some("start".into()),
+                expr: start,
+            },
+            pr::TupleField {
+                name: Some("end".into()),
+                expr: end,
+            },
+        ]))
     }
 
     fn desugar_pipeline(&mut self, mut pipeline: pr::Pipeline) -> Result<pr::Expr> {

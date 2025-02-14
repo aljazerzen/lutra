@@ -72,10 +72,7 @@ fn tuple<'a>(
             .then_ignore(ctrl('='))
             .or_not()
             .then(nested_expr)
-            .map(|(alias, mut expr)| {
-                expr.alias = alias.or(expr.alias);
-                expr
-            }),
+            .map(|(name, expr)| TupleField { name, expr }),
     )
     .delimited_by(ctrl('{'), ctrl('}'))
     .recover_with(nested_delimiters(
@@ -301,26 +298,6 @@ where
         })
         .map(|(e, _)| e)
         .boxed()
-}
-
-// Can remove if we don't end up using this
-#[allow(dead_code)]
-fn aliased<'a, E>(expr: E) -> impl Parser<TokenKind, Expr, Error = PError> + Clone + 'a
-where
-    E: Parser<TokenKind, Expr, Error = PError> + Clone + 'a,
-{
-    let aliased = ident_part()
-        .then_ignore(ctrl('='))
-        .then(expr)
-        .map(|(alias, mut expr)| {
-            expr.alias = Some(alias);
-            expr
-        });
-    // Because `expr` accounts for parentheses, and aliased is `x=$expr`, we
-    // need to allow another layer of parentheses here.
-    aliased
-        .clone()
-        .or(aliased.delimited_by(ctrl('('), ctrl(')')))
 }
 
 fn func_call<'a, E>(expr: E) -> impl Parser<TokenKind, ExprKind, Error = PError> + Clone + 'a

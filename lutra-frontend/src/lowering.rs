@@ -109,7 +109,12 @@ impl<'a> Lowerer<'a> {
                 ir::ExprKind::Literal(lit)
             }
 
-            pr::ExprKind::Tuple(fields) => ir::ExprKind::Tuple(self.lower_exprs(fields)?),
+            pr::ExprKind::Tuple(fields) => ir::ExprKind::Tuple(
+                fields
+                    .iter()
+                    .map(|f| self.lower_expr(&f.expr))
+                    .try_collect()?,
+            ),
             pr::ExprKind::Array(items) => ir::ExprKind::Array(self.lower_exprs(items)?),
             pr::ExprKind::Indirection { base, field } => {
                 ir::ExprKind::TupleLookup(Box::new(ir::TupleLookup {

@@ -5,9 +5,9 @@ use crate::diagnostic::{Diagnostic, WithErrorInfo};
 use crate::pr;
 use crate::pr::Ty;
 use crate::semantic::resolver::scope::{Named, ScopedKind};
-use crate::semantic::{NS_STD, NS_THIS};
+use crate::semantic::NS_STD;
 use crate::utils::fold::{self, PrFold};
-use crate::{Result, Span};
+use crate::Result;
 
 use super::scope;
 use super::tuple::Step;
@@ -22,7 +22,6 @@ impl fold::PrFold for super::Resolver<'_> {
     }
 
     fn fold_expr(&mut self, node: pr::Expr) -> Result<pr::Expr> {
-        let alias = Box::new(node.alias.clone());
         let span = Box::new(node.span);
 
         log::trace!("folding expr {node:?}");
@@ -79,17 +78,11 @@ impl fold::PrFold for super::Resolver<'_> {
                     },
                 };
                 let ty = self.introduce_ty_into_scope(ty);
-                let mut expr = pr::Expr {
+                pr::Expr {
                     kind: pr::ExprKind::Ident(ident),
                     ty: Some(ty),
                     ..node
-                };
-
-                let alias = expr.alias.take();
-
-                let mut expr = expr;
-                expr.alias = alias;
-                expr
+                }
             }
 
             pr::ExprKind::Indirection { base, field } => {
@@ -154,54 +147,17 @@ impl fold::PrFold for super::Resolver<'_> {
                 ..node
             },
         };
-        self.finish_expr_resolve(r, *alias, *span)
+
+        let mut r = r;
+        r.span = r.span.or(*span);
+        if r.ty.is_none() {
+            r.ty = Some(self.infer_type(&r)?);
+        }
+        Ok(r)
     }
 }
 
 impl super::Resolver<'_> {
-    fn finish_expr_resolve(
-        &mut self,
-        expr: pr::Expr,
-        alias: Option<String>,
-        span: Option<Span>,
-    ) -> Result<pr::Expr> {
-        let mut r = Box::new(expr);
-
-        r.alias = r.alias.or(alias);
-        r.span = r.span.or(span);
-
-        if r.ty.is_none() {
-            r.ty = Some(self.infer_type(&r)?);
-        }
-        if let Some(ty) = &mut r.ty {
-            if ty.is_relation() {
-                if let Some(alias) = r.alias.take() {
-                    // This is relation wrapping operation.
-                    // Convert:
-                    //     alias = r
-                    // into:
-                    //     _local.select {alias = _local.this} r
-
-                    let expr = pr::Expr::new(pr::ExprKind::FuncCall(pr::FuncCall {
-                        func: Box::new(pr::Expr::new(pr::ExprKind::Ident(pr::Path::new(vec![
-                            NS_STD, "select",
-                        ])))),
-                        args: vec![
-                            pr::Expr::new(pr::ExprKind::Tuple(vec![pr::Expr {
-                                alias: Some(alias),
-                                ..pr::Expr::new(pr::Path::new(vec![NS_THIS]))
-                            }])),
-                            *r,
-                        ],
-                    }));
-                    return self.fold_expr(expr);
-                }
-            }
-        }
-
-        Ok(*r)
-    }
-
     pub fn resolve_column_exclusion(&mut self, expr: pr::Expr) -> Result<pr::Expr> {
         let expr = self.fold_expr(expr)?;
         let _except = self.coerce_into_tuple(expr)?;

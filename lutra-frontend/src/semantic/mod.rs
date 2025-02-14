@@ -69,5 +69,4 @@ pub fn as_ident_or_func_call<'e>(expr: &'e pr::Expr, name: &pr::Path) -> Option<
 }
 
 pub const NS_STD: &str = "std";
-pub const NS_THIS: &str = "this";
 pub const NS_MAIN: &str = "main";

@@ -99,7 +99,6 @@ fn parse_interpolate() {
                 span: Some(
                     0:8-9,
                 ),
-                alias: None,
                 ty: None,
             },
             format: None,
@@ -147,7 +146,6 @@ fn parse_interpolate() {
                 span: Some(
                     0:14-15,
                 ),
-                alias: None,
                 ty: None,
             },
             format: None,

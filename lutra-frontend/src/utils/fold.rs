@@ -77,7 +77,17 @@ pub fn fold_expr_kind<T: ?Sized + PrFold>(fold: &mut T, expr_kind: ExprKind) -> 
             base: Box::new(fold.fold_expr(*base)?),
             field,
         },
-        Tuple(items) => Tuple(fold.fold_exprs(items)?),
+        Tuple(items) => Tuple(
+            items
+                .into_iter()
+                .map(|field| -> Result<TupleField> {
+                    Ok(TupleField {
+                        name: field.name,
+                        expr: fold.fold_expr(field.expr)?,
+                    })
+                })
+                .try_collect()?,
+        ),
         Array(items) => Array(fold.fold_exprs(items)?),
         FString(items) => FString(
             items

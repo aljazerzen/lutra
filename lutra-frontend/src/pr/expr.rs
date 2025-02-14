@@ -10,7 +10,6 @@ impl Expr {
         Expr {
             kind: kind.into(),
             span: None,
-            alias: None,
             ty: None,
         }
     }
@@ -25,8 +24,6 @@ pub struct Expr {
     pub kind: ExprKind,
 
     pub span: Option<Span>,
-
-    pub alias: Option<String>,
 
     /// Type of expression this node represents.
     /// [None] means that type should be inferred.
@@ -46,7 +43,7 @@ pub enum ExprKind {
     Literal(Literal),
     Pipeline(Pipeline),
 
-    Tuple(Vec<Expr>),
+    Tuple(Vec<TupleField>),
     Array(Vec<Expr>),
     Range(Range),
     Binary(BinaryExpr),
@@ -64,7 +61,6 @@ impl ExprKind {
         Expr {
             span: Some(span),
             kind: self,
-            alias: None,
             ty: None,
         }
     }
@@ -138,6 +134,12 @@ pub struct GenericTypeParam {
 #[derive(Debug, PartialEq, Clone)]
 pub struct Pipeline {
     pub exprs: Vec<Expr>,
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub struct TupleField {
+    pub name: Option<String>,
+    pub expr: Expr,
 }
 
 /// Inclusive-inclusive range.
