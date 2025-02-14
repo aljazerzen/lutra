@@ -12,7 +12,6 @@ impl Expr {
             span: None,
             alias: None,
             ty: None,
-            id: None,
         }
     }
 }
@@ -32,8 +31,6 @@ pub struct Expr {
     /// Type of expression this node represents.
     /// [None] means that type should be inferred.
     pub ty: Option<Ty>,
-
-    pub id: Option<usize>,
 }
 
 #[derive(Debug, EnumAsInner, PartialEq, Clone)]
@@ -69,7 +66,6 @@ impl ExprKind {
             kind: self,
             alias: None,
             ty: None,
-            id: None,
         }
     }
 }

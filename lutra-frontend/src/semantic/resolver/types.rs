@@ -488,10 +488,12 @@ impl Resolver<'_> {
     // }
 
     /// Add type's params into scope as type arguments.
-    pub fn introduce_ty_into_scope(&mut self, expr_id: usize, ty: Ty) -> Ty {
+    pub fn introduce_ty_into_scope(&mut self, ty: Ty) -> Ty {
         let TyKind::Function(Some(mut ty_func)) = ty.kind else {
             return ty;
         };
+
+        let expr_id = self.id.gen();
 
         // TODO: recurse? There might be type params deeper in the type.
 

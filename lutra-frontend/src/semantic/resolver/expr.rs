@@ -22,11 +22,6 @@ impl fold::PrFold for super::Resolver<'_> {
     }
 
     fn fold_expr(&mut self, node: pr::Expr) -> Result<pr::Expr> {
-        if node.id.is_some() && !matches!(node.kind, pr::ExprKind::Func(_)) {
-            return Ok(node);
-        }
-
-        let id = self.id.gen();
         let alias = Box::new(node.alias.clone());
         let span = Box::new(node.span);
 
@@ -83,14 +78,13 @@ impl fold::PrFold for super::Resolver<'_> {
                         }
                     },
                 };
-                let ty = self.introduce_ty_into_scope(id, ty);
+                let ty = self.introduce_ty_into_scope(ty);
                 let mut expr = pr::Expr {
                     kind: pr::ExprKind::Ident(ident),
                     ty: Some(ty),
                     ..node
                 };
 
-                expr.id = Some(id);
                 let alias = expr.alias.take();
 
                 let mut expr = expr;
@@ -125,7 +119,6 @@ impl fold::PrFold for super::Resolver<'_> {
                 };
 
                 pr::Expr {
-                    id: Some(id),
                     ty: target_ty,
                     kind,
                     ..node
@@ -161,7 +154,7 @@ impl fold::PrFold for super::Resolver<'_> {
                 ..node
             },
         };
-        self.finish_expr_resolve(r, id, *alias, *span)
+        self.finish_expr_resolve(r, *alias, *span)
     }
 }
 
@@ -169,13 +162,11 @@ impl super::Resolver<'_> {
     fn finish_expr_resolve(
         &mut self,
         expr: pr::Expr,
-        id: usize,
         alias: Option<String>,
         span: Option<Span>,
     ) -> Result<pr::Expr> {
         let mut r = Box::new(expr);
 
-        r.id = r.id.or(Some(id));
         r.alias = r.alias.or(alias);
         r.span = r.span.or(span);
 
