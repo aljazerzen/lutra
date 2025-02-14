@@ -19,4 +19,3 @@ generate:
     cargo fmt -p lutra-bin
     ./target/debug/lutra-codegen lutra-bin/src/project lutra-bin/src/project/generated.rs
     cargo fmt -p lutra-bin
-    

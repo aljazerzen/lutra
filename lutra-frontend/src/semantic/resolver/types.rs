@@ -493,8 +493,6 @@ impl Resolver<'_> {
             return ty;
         };
 
-        let expr_id = self.id.gen();
-
         // TODO: recurse? There might be type params deeper in the type.
 
         if ty_func.type_params.is_empty() {
@@ -503,6 +501,10 @@ impl Resolver<'_> {
                 ..ty
             };
         }
+
+        let expr_id = self.id.gen();
+        log::debug!("introducing generics for {expr_id} {ty_func:?}");
+
         let mut mapping = HashMap::new();
         let scope = self.scopes.last_mut().unwrap();
         for gtp in ty_func.type_params.drain(..) {

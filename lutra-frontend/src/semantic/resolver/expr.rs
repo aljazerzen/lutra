@@ -22,7 +22,7 @@ impl fold::PrFold for super::Resolver<'_> {
     }
 
     fn fold_expr(&mut self, node: pr::Expr) -> Result<pr::Expr> {
-        let span = Box::new(node.span);
+        let span = node.span;
 
         log::trace!("folding expr {node:?}");
 
@@ -50,7 +50,7 @@ impl fold::PrFold for super::Resolver<'_> {
                             return Err(Diagnostic::new_custom(
                                 "expected a value, but found a type",
                             )
-                            .with_span(*span))
+                            .with_span(span))
                         }
 
                         DeclKind::Unresolved(_) => {
@@ -73,7 +73,7 @@ impl fold::PrFold for super::Resolver<'_> {
                             return Err(Diagnostic::new_custom(
                                 "expected a value, but found a type",
                             )
-                            .with_span(*span))
+                            .with_span(span))
                         }
                     },
                 };
@@ -87,34 +87,40 @@ impl fold::PrFold for super::Resolver<'_> {
 
             pr::ExprKind::Indirection { base, field } => {
                 let base = self.fold_expr(*base)?;
-                let base_ty = base.ty.as_ref().unwrap();
 
-                let step = self.resolve_indirection(base_ty, &field).with_span(*span)?;
+                let base_ty = base.ty.as_ref().unwrap();
+                let base_ty = self.resolve_ty_ident(base_ty)?;
+                let base_ty = match base_ty {
+                    scope::TyRef::Ty(b) => b,
+                    scope::TyRef::Param => todo!("tuple indirection into generic type Param"),
+                    scope::TyRef::Arg(id) => {
+                        todo!("tuple indirection into generic type Arg: {id:?}")
+                    }
+                };
+
+                let step = self.resolve_indirection(&base_ty, &field).with_span(span)?;
                 let position = step.position;
                 let target_ty = Some(step.target_ty);
 
-                let kind = if base_ty.kind.is_tuple() {
+                if base_ty.kind.is_tuple() {
                     // tuples
-                    pr::ExprKind::Indirection {
+                    let kind = pr::ExprKind::Indirection {
                         base: Box::new(base),
                         field: pr::IndirectionKind::Position(position as i64),
+                    };
+                    pr::Expr {
+                        ty: target_ty,
+                        kind,
+                        ..node
                     }
                 } else {
                     // arrays
-                    let std_index =
-                        self.fold_expr(pr::Expr::new(pr::Path::new(vec!["std", "index"])))?;
-                    let position =
-                        self.fold_expr(pr::Expr::new(pr::Literal::Integer(position as i64)))?;
-                    pr::ExprKind::FuncCall(pr::FuncCall {
-                        func: Box::new(std_index),
-                        args: vec![base, position],
-                    })
-                };
+                    let std_index = pr::Expr::new(pr::Path::new(vec!["std", "index"]));
+                    let position = pr::Expr::new(pr::Literal::Integer(position as i64));
 
-                pr::Expr {
-                    ty: target_ty,
-                    kind,
-                    ..node
+                    let func = Box::new(self.fold_expr(std_index)?);
+
+                    self.resolve_func_call(func, vec![base, position], span)?
                 }
             }
 
@@ -131,11 +137,11 @@ impl fold::PrFold for super::Resolver<'_> {
                 // fold function name
                 let func = Box::new(self.fold_expr(*name)?);
 
-                self.resolve_func_call(func, args, *span)?
+                self.resolve_func_call(func, args, span)?
             }
 
             pr::ExprKind::Func(func) => {
-                let func = self.resolve_func(func).with_span_fallback(*span)?;
+                let func = self.resolve_func(func).with_span_fallback(span)?;
                 pr::Expr {
                     kind: pr::ExprKind::Func(func),
                     ..node
@@ -149,7 +155,7 @@ impl fold::PrFold for super::Resolver<'_> {
         };
 
         let mut r = r;
-        r.span = r.span.or(*span);
+        r.span = r.span.or(span);
         if r.ty.is_none() {
             r.ty = Some(self.infer_type(&r)?);
         }
@@ -178,14 +184,6 @@ impl super::Resolver<'_> {
         base: &'a Ty,
         indirection: &pr::IndirectionKind,
     ) -> Result<Step> {
-        let base = self.resolve_ty_ident(base)?;
-
-        let base = match base {
-            scope::TyRef::Ty(b) => b,
-            scope::TyRef::Param => todo!("tuple indirection into generic type Param"),
-            scope::TyRef::Arg(id) => todo!("tuple indirection into generic type Arg: {id:?}"),
-        };
-
         match &base.kind {
             pr::TyKind::Ident(_) => panic!(),
 
@@ -196,7 +194,7 @@ impl super::Resolver<'_> {
                     })
                 }
                 pr::IndirectionKind::Position(pos) => {
-                    let step = super::tuple::lookup_position_in_tuple(&base, *pos as usize)?
+                    let step = super::tuple::lookup_position_in_tuple(base, *pos as usize)?
                         .ok_or_else(|| Diagnostic::new_custom("Out of bounds"))?;
 
                     Ok(step)

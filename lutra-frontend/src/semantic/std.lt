@@ -20,7 +20,7 @@ let not: func (expr: bool): bool
 
 # Array functions
 
-let index: func (array: [int], position: int): int
+let index: func <T> (array: [T], position: int): T
 
 let map: func <I, O> (
   array: [I],

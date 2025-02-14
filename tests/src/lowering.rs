@@ -2,7 +2,7 @@ use insta::assert_snapshot;
 
 #[track_caller]
 fn _test_compile_and_print(source: &str) -> String {
-    let program = lutra_frontend::_test_compile(source).unwrap();
+    let program = lutra_frontend::_test_compile(source).unwrap_or_else(|e| panic!("{e}"));
     lutra_ir::print(&program)
 }
 
@@ -22,12 +22,12 @@ fn lower_01() {
 
     @remote('postgres_chinook')
     module box_office {
-      type album_sale = int
+      type album_sale = {id = int, total = float}
 
       let get_album_sales: func (): [album_sale]
 
       let get_album_sales_by_id = func (album_id: int): album_sale -> (
-        get_album_sales() | std::filter(func (this: album_sale) -> this == album_id) | std::index(0)
+        get_album_sales() | std::filter(func (this: album_sale) -> this.id == album_id) | std::index(0)
       )
     }
 
@@ -40,22 +40,23 @@ fn lower_01() {
     let main =
       let 1 = (
         func 3 @"postgres_chinook" -> (
-          call external.std::index: func ([int64], int64) -> int64, 
+          call external.std::index: func ([{id = int64, total = float64}], int64) -> {id = int64, total = float64}, 
           (
-            call external.std::filter: func ([int64], func (int64) -> bool) -> [int64], 
+            call external.std::filter: func ([{id = int64, total = float64}], func ({id = int64, total = float64}) -> bool) -> [{id = int64, total = float64}], 
             (
               call external.box_office::get_album_sales @"postgres_chinook": func () -> [box_office.album_sale], 
             ): [box_office.album_sale], 
             (
               func 4 @"postgres_chinook" -> (
                 call external.std::eq: func (int64, int64) -> bool, 
-                fn.4+0: box_office.album_sale, 
+                fn.4+0: box_office.album_sale
+                .0: int64, 
                 fn.3+0: int64, 
               ): bool
             ): func (box_office.album_sale) -> bool, 
-          ): [int64], 
+          ): [{id = int64, total = float64}], 
           0: int64, 
-        ): int64
+        ): {id = int64, total = float64}
       ): func (int64) -> box_office.album_sale;
       let 0 = (
         func 1 @"sqlite_chinook" -> (

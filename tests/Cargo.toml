@@ -20,3 +20,4 @@ lutra-codegen = { path = "../lutra-codegen" }
 insta = { workspace = true }
 pretty-hex = { workspace = true }
 env_logger = { workspace = true }
+log = { workspace = true }

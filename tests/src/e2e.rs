@@ -2,7 +2,7 @@
 fn _test_run(lutra_source: &str) -> String {
     let source = format!("let main = func () -> {lutra_source}");
 
-    let program = lutra_frontend::_test_compile(&source).unwrap();
+    let program = lutra_frontend::_test_compile(&source).unwrap_or_else(|e| panic!("{e}"));
     eprintln!("--- ir:\n{}\n---", lutra_ir::print(&program));
     let output_ty = program.get_output_ty().clone();
     let bytecode = lutra_frontend::bytecode_program(program);

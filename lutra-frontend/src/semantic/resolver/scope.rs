@@ -97,8 +97,8 @@ impl Scope {
         for (id, ty) in self.type_args.into_iter() {
             let Some(ty) = ty.get() else {
                 return Err(Diagnostic::new_custom(format!(
-                    "cannot infer type: {}",
-                    id.name
+                    "cannot infer type: {}.{}",
+                    id.expr_id, id.name
                 )));
             };
 

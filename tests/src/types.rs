@@ -1,6 +1,9 @@
 #[track_caller]
 fn _test_run(source: &str) -> String {
-    env_logger::init();
+    env_logger::Builder::new()
+        .filter_level(log::LevelFilter::Debug)
+        .format_timestamp(None)
+        .init();
 
     let program = match lutra_frontend::_test_compile(source) {
         Ok(program) => program,
@@ -111,4 +114,25 @@ fn types_10() {
     insta::assert_snapshot!(_test_run(r#"
         func () -> 3..5
     "#), @"{start = int64, end = int64}");
+}
+#[test]
+fn types_11() {
+    insta::assert_snapshot!(_test_run(r#"
+        type album_sale = {id = int, total = float}
+        let get_album_sales: func (): [album_sale]
+
+        let filter: func <T> (array: [T], condition: func (T): bool): [T]
+
+        func (): [album_sale] -> (
+            get_album_sales()
+            | std::filter(func (this: album_sale) -> this.id == 6)
+        )
+    "#), @"[album_sale]");
+}
+#[test]
+fn types_12() {
+    insta::assert_snapshot!(_test_run(r#"
+        let a = {id = 4, total = 4.5}
+        func () -> a.total
+    "#), @"float64");
 }
