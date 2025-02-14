@@ -106,3 +106,9 @@ fn types_09() {
         let peek: func <T> (array: [T], condition: func <R> (T): R): [T]
     "#), @"generic type parameters are not allowed here");
 }
+#[test]
+fn types_10() {
+    insta::assert_snapshot!(_test_run(r#"
+        func () -> 3..5
+    "#), @"{start = int64, end = int64}");
+}

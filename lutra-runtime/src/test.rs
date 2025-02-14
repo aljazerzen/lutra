@@ -7,7 +7,6 @@ fn _test_interpret(program: &str) -> String {
     let program = lutra_ir::_test_parse(program);
     let output_ty = program.get_output_ty().clone();
     let program = lutra_frontend::bytecode_program(program);
-    dbg!(&program);
 
     let output = crate::interpreter::evaluate(&program, vec![], crate::BUILTIN_MODULES);
 

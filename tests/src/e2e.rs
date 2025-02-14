@@ -9,7 +9,6 @@ fn _test_run(lutra_source: &str) -> String {
 
     let output = lutra_runtime::evaluate(&bytecode, vec![], lutra_runtime::BUILTIN_MODULES);
 
-    dbg!(&output);
     let output = lutra_bin::Value::decode(&output, &output_ty).unwrap();
     output.print_source(&output_ty).unwrap()
 }

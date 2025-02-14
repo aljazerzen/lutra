@@ -49,7 +49,6 @@ pub(crate) fn expr() -> impl Parser<TokenKind, Expr, Error = PError> + Clone {
 
         let term = field_lookup(term);
         let term = unary(term);
-        let term = range(term);
 
         // Binary operators
         let expr = term;
@@ -59,8 +58,10 @@ pub(crate) fn expr() -> impl Parser<TokenKind, Expr, Error = PError> + Clone {
         let expr = binary_op_parser(expr, operator_compare());
         let expr = binary_op_parser(expr, operator_coalesce());
         let expr = binary_op_parser(expr, operator_and());
+        let expr = binary_op_parser(expr, operator_or());
+        let expr = range(expr);
 
-        binary_op_parser(expr, operator_or()).labelled("expression")
+        expr.labelled("expression")
     })
 }
 
@@ -177,8 +178,29 @@ fn range<'a, E>(expr: E) -> impl Parser<TokenKind, Expr, Error = PError> + Clone
 where
     E: Parser<TokenKind, Expr, Error = PError> + Clone + 'a,
 {
-    // TODO
-    expr.or(just(TokenKind::Range).to(Expr::new(Range::unbounded())))
+    let end_only = just(TokenKind::Range)
+        .ignore_then(expr.clone())
+        .map(|end| Range {
+            start: None,
+            end: Some(Box::new(end)),
+        })
+        .map(ExprKind::Range)
+        .map_with_span(ExprKind::into_expr);
+
+    end_only.or(expr
+        .clone()
+        .then(just(TokenKind::Range).ignore_then(expr.or_not()).or_not())
+        .map_with_span(|(start, range), span| {
+            if let Some(end) = range {
+                ExprKind::Range(Range {
+                    start: Some(Box::new(start)),
+                    end: end.map(Box::new),
+                })
+                .into_expr(span)
+            } else {
+                start
+            }
+        }))
 }
 
 /// A pipeline of `expr`, separated by pipes. Doesn't require parentheses.

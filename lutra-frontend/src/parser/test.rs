@@ -21,7 +21,6 @@ pub(crate) fn parse_with_parser<O: Debug>(
     parser: impl Parser<TokenKind, O, Error = PError>,
 ) -> Result<O, Vec<Diagnostic>> {
     let tokens = crate::parser::lexer::lex_source(source)?;
-    dbg!(&tokens);
     let stream = prepare_stream(tokens.0, 0);
 
     // TODO: possibly should check we consume all the input? Either with an
@@ -45,7 +44,10 @@ fn parse_source(source: &str) -> Result<Vec<Stmt>, Vec<Diagnostic>> {
 #[track_caller]
 fn parse_expr(source: &str) -> pr::Expr {
     let stmts = parse_with_parser(source, stmt::source()).unwrap();
-    let stmt = stmts.into_iter().exactly_one().unwrap();
+    let stmt = stmts
+        .into_iter()
+        .exactly_one()
+        .unwrap_or_else(|e| panic!("{e:#?}"));
     let var = stmt.kind.into_var_def().unwrap();
     let expr = var.value.unwrap();
     *expr
@@ -55,6 +57,44 @@ fn parse_expr(source: &str) -> pr::Expr {
 fn parse_01() {
     assert!(parse_expr("func () -> 4").kind.is_func());
     assert!(parse_expr("func() -> 4").kind.is_func());
+}
+
+#[test]
+fn parse_02() {
+    assert!(parse_expr("(4..5)").kind.is_range());
+    assert!(parse_expr("func () -> 4..5").kind.is_func());
+    assert_debug_snapshot!(parse_expr("4..5").kind, @r#"
+    Range(
+        Range {
+            start: Some(
+                Expr {
+                    kind: Literal(
+                        Integer(
+                            4,
+                        ),
+                    ),
+                    span: Some(
+                        0:0-1,
+                    ),
+                    ty: None,
+                },
+            ),
+            end: Some(
+                Expr {
+                    kind: Literal(
+                        Integer(
+                            5,
+                        ),
+                    ),
+                    span: Some(
+                        0:3-4,
+                    ),
+                    ty: None,
+                },
+            ),
+        },
+    )
+    "#);
 }
 
 #[test]

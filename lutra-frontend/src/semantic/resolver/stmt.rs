@@ -81,7 +81,6 @@ impl super::Resolver<'_> {
                 // it should have been converted into Module in resolve_decls::init_module_tree
             }
             pr::StmtKind::VarDef(var_def) => {
-                dbg!(&var_def);
                 let def = self.fold_var_def(var_def)?;
                 let expected_ty = def.ty;
 
