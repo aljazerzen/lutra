@@ -123,7 +123,7 @@ impl<'a> Lowerer<'a> {
             }
 
             pr::ExprKind::FuncCall(call) => ir::ExprKind::Call(Box::new(ir::Call {
-                function: self.lower_expr(&call.name)?,
+                function: self.lower_expr(&call.func)?,
                 args: self.lower_exprs(&call.args)?,
             })),
             pr::ExprKind::Func(func) => {
@@ -144,7 +144,7 @@ impl<'a> Lowerer<'a> {
             }
 
             pr::ExprKind::Ident(path) => {
-                if path.starts_with_part("func") {
+                if path.starts_with_part("scope") {
                     let mut path = path.iter().peekable();
                     path.next(); // func
 

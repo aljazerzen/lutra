@@ -1,3 +1,4 @@
+use std::borrow::Cow;
 use std::collections::HashMap;
 
 use itertools::Itertools;
@@ -7,7 +8,7 @@ use crate::pr::{self, *};
 use crate::utils::fold::{self, PrFold};
 use crate::{decl, Result, Span};
 
-use super::scope::{Named, ScopedKind};
+use super::scope::{Named, Scope, ScopedKind, TyRef, TypeArgId};
 use super::Resolver;
 
 impl Resolver<'_> {
@@ -16,11 +17,25 @@ impl Resolver<'_> {
     // expr.rs, where we implement PlFold.
     pub fn fold_type_actual(&mut self, ty: Ty) -> Result<Ty> {
         // fold inner containers
-        let mut ty = fold::fold_type(self, ty)?;
+        let mut ty = match ty.kind {
+            TyKind::Function(Some(ty_func)) if !ty_func.type_params.is_empty() => {
+                let mut scope = Scope::new();
+                scope.insert_generics_params(&ty_func.type_params);
+                self.scopes.push(scope);
+                let ty_func = fold::fold_ty_func(self, ty_func)?;
+                self.scopes.pop();
+
+                Ty {
+                    kind: TyKind::Function(Some(ty_func)),
+                    ..ty
+                }
+            }
+            _ => fold::fold_type(self, ty)?,
+        };
 
         // compute memory layout
-        self.compute_ty_layout(&mut ty)?;
-        if ty.layout.is_none() {
+        let missing_layout = self.compute_ty_layout(&mut ty)?;
+        if missing_layout {
             if self.strict_mode {
                 return Err(Diagnostic::new_custom(
                     "type has an infinite size due to recursive type references".to_string(),
@@ -36,40 +51,36 @@ impl Resolver<'_> {
     }
 
     /// Resolves if type is an ident. Does not recurse.
-    pub fn resolve_ty_ident<'t>(&'t self, ty: &'t Ty) -> Result<&'t Ty> {
-        let Some(ty) = self.try_resolve_ty_ident(ty)? else {
-            return Err(Diagnostic::new_assert(format!(
-                "Unresolved ident at {:?}: (during eval of {})",
-                ty.span, self.debug_current_decl
-            )));
-        };
-        Ok(ty)
-    }
-
-    /// Resolves if type is an ident. Does not recurse.
-    /// Returns Ok(None) for unresolved decls.
-    pub fn try_resolve_ty_ident<'t>(&'t self, ty: &'t Ty) -> Result<Option<&'t Ty>> {
+    pub fn resolve_ty_ident<'t>(&'t self, ty: &'t Ty) -> Result<TyRef<'t>> {
         let TyKind::Ident(ident) = &ty.kind else {
-            return Ok(Some(ty));
+            return Ok(TyRef::Ty(Cow::Borrowed(ty)));
         };
         let named = self.get_ident(ident).ok_or_else(|| {
+            log::debug!("scope: {:?}", self.scopes.last().unwrap());
             Diagnostic::new_assert("cannot find type ident")
                 .push_hint(format!("ident={ident:?}"))
                 .with_span(ty.span)
         })?;
         match named {
             Named::Decl(decl) => match &decl.kind {
-                decl::DeclKind::Ty(t) => Ok(Some(t)),
-                decl::DeclKind::Unresolved(_) => Ok(None),
+                decl::DeclKind::Ty(t) => Ok(TyRef::Ty(Cow::Borrowed(t))),
+                decl::DeclKind::Unresolved(_) => Err(Diagnostic::new_assert(format!(
+                    "Unresolved ident at {:?}: (during eval of {})",
+                    ty.span, self.debug_current_decl
+                ))),
                 _ => Err(Diagnostic::new_assert("expected reference to a type")
                     .push_hint(format!("got {:?}", &decl.kind))
                     .with_span(ty.span)),
             },
-            Named::Scoped(scoped) => match &scoped.kind {
-                ScopedKind::Param { ty, .. } => Ok(Some(ty)),
-                ScopedKind::Generic => {
-                    todo!("resole_ty_ident: {ident}")
+            Named::Scoped(scoped) => match scoped {
+                ScopedKind::Param { ty, .. } => {
+                    Err(Diagnostic::new_assert("expected type found an expression")
+                        .push_hint(format!("got {:?}", &ty))
+                        .with_span(ty.span))
                 }
+                ScopedKind::Type { ty } => Ok(TyRef::Ty(Cow::Owned(ty))),
+                ScopedKind::TypeParam => Ok(TyRef::Param),
+                ScopedKind::TypeArg(type_arg_id) => Ok(TyRef::Arg(type_arg_id)),
             },
         }
     }
@@ -167,7 +178,7 @@ impl Resolver<'_> {
                     .clone()
                     .or_else(|| func.body.ty.clone())
                     .map(Box::new),
-                // generic_type_params: func.generic_type_params.clone(),
+                type_params: func.generic_type_params.clone(),
             })),
 
             ExprKind::Ident(_)
@@ -185,9 +196,11 @@ impl Resolver<'_> {
             span: expr.span,
             layout: None,
         };
-        self.compute_ty_layout(&mut ty)?;
-        if ty.layout.is_none() {
-            panic!();
+        let missing_layout = self.compute_ty_layout(&mut ty)?;
+        if missing_layout {
+            return Err(Diagnostic::new_assert("missing type layout")
+                .push_hint(format!("ty: {ty:?}"))
+                .with_span(ty.span));
         }
         Ok(ty)
     }
@@ -219,7 +232,7 @@ impl Resolver<'_> {
     /// Validates that found node has expected type. Returns assumed type of the node.
     #[allow(clippy::only_used_in_recursion)]
     pub fn validate_type<F>(
-        &self,
+        &mut self,
         found: &Ty,
         expected: &Ty,
         span: Option<Span>,
@@ -228,8 +241,32 @@ impl Resolver<'_> {
     where
         F: Fn() -> Option<String>,
     {
+        log::trace!("validate_type, \nf: {found:?}, \ne: {expected:?}");
         let found = self.resolve_ty_ident(found)?;
         let expected = self.resolve_ty_ident(expected)?;
+
+        let (found, expected) = match (found, expected) {
+            // base case: neither found or expected are generic
+            (TyRef::Ty(f), TyRef::Ty(e)) => (f.into_owned(), e.into_owned()),
+
+            // generic params: cannot infer anything
+            (TyRef::Param, _) | (_, TyRef::Param) => return Ok(()),
+
+            // inference of generic args
+            (TyRef::Ty(ty), TyRef::Arg(ty_arg_id)) | (TyRef::Arg(ty_arg_id), TyRef::Ty(ty)) => {
+                let ty = ty.into_owned();
+
+                let scope = self.scopes.last_mut().unwrap();
+                scope.infer_type_arg(&ty_arg_id, ty);
+                return Ok(());
+            }
+            (TyRef::Arg(a), TyRef::Arg(b)) => {
+                let scope = self.scopes.last_mut().unwrap();
+                scope.infer_type_args_equal(a, b);
+                return Ok(());
+            }
+        };
+
         match (&found.kind, &expected.kind) {
             // base case
             (TyKind::Primitive(f), TyKind::Primitive(e)) if e == f => Ok(()),
@@ -237,7 +274,7 @@ impl Resolver<'_> {
             // containers: recurse
             (TyKind::Array(found_items), TyKind::Array(expected_items)) => {
                 // co-variant contained type
-                self.validate_type(found_items, expected_items, span, who)
+                self.validate_type(&found_items.clone(), &expected_items.clone(), span, who)
             }
             (TyKind::Tuple(found_fields), TyKind::Tuple(expected_fields)) => {
                 // here we need to check that found tuple has all fields that are expected.
@@ -269,7 +306,7 @@ impl Resolver<'_> {
 
                 if !expected_but_not_found.is_empty() {
                     // not all fields were found
-                    return Err(compose_type_error(found, expected, who).with_span(span));
+                    return Err(compose_type_error(&found, &expected, who).with_span(span));
                 }
 
                 Ok(())
@@ -293,7 +330,7 @@ impl Resolver<'_> {
                 }
                 Ok(())
             }
-            _ => Err(compose_type_error(found, expected, who).with_span(span)),
+            _ => Err(compose_type_error(&found, &expected, who).with_span(span)),
         }
     }
 
@@ -449,6 +486,47 @@ impl Resolver<'_> {
     //     }
     //     Ok(mask)
     // }
+
+    /// Add type's params into scope as type arguments.
+    pub fn introduce_ty_into_scope(&mut self, expr_id: usize, ty: Ty) -> Ty {
+        let TyKind::Function(Some(mut ty_func)) = ty.kind else {
+            return ty;
+        };
+
+        // TODO: recurse? There might be type params deeper in the type.
+
+        if ty_func.type_params.is_empty() {
+            return Ty {
+                kind: TyKind::Function(Some(ty_func)),
+                ..ty
+            };
+        }
+        let mut mapping = HashMap::new();
+        let scope = self.scopes.last_mut().unwrap();
+        for gtp in ty_func.type_params.drain(..) {
+            mapping.insert(
+                Path::new(vec!["scope", gtp.name.as_str()]),
+                Ty::new(Path::new(vec![
+                    "scope".to_string(),
+                    "type_args".to_string(),
+                    expr_id.to_string(),
+                    gtp.name.clone(),
+                ])),
+            );
+
+            let type_arg_id = TypeArgId {
+                expr_id,
+                name: gtp.name,
+            };
+            scope.insert_generic_arg(type_arg_id);
+        }
+
+        let ty = Ty {
+            kind: TyKind::Function(Some(ty_func)),
+            ..ty
+        };
+        TypeReplacer::on_ty(ty, mapping)
+    }
 }
 
 pub fn ty_tuple_kind(fields: Vec<TyTupleField>) -> TyKind {
@@ -527,16 +605,17 @@ impl TypeReplacer {
 
 impl PrFold for TypeReplacer {
     fn fold_type(&mut self, mut ty: Ty) -> Result<Ty> {
-        ty.kind = match ty.kind {
+        match ty.kind {
             TyKind::Ident(ident) => {
                 if let Some(new_ty) = self.mapping.get(&ident) {
-                    return Ok(new_ty.clone());
+                    let ty = new_ty.clone();
+                    self.fold_type(ty)
                 } else {
-                    TyKind::Ident(ident)
+                    ty.kind = TyKind::Ident(ident);
+                    Ok(ty)
                 }
             }
-            _ => return fold::fold_type(self, ty),
-        };
-        Ok(ty)
+            _ => fold::fold_type(self, ty),
+        }
     }
 }

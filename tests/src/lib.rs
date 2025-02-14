@@ -9,3 +9,4 @@ mod lbin;
 mod lowering;
 mod native_functions;
 mod typed_data;
+mod types;

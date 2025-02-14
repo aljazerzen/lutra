@@ -23,25 +23,25 @@ let not: func (expr: bool): bool
 let index: func (array: [int], position: int): int
 
 let map: func <I, O> (
-  array: [int],
-  mapper: func (int): int,
-): [int]
+  array: [I],
+  mapper: func (I): O,
+): [O]
 
 let filter: func <T> (
-  array: [int],
-  condition: func (int): bool,
-): [int]
+  array: [T],
+  condition: func (T): bool,
+): [T]
 
-let slice: func <int> (
-  array: [int],
+let slice: func <T> (
+  array: [T],
   start: int64,
   end: int64,
-): [int]
+): [T]
 
 let sort: func <I> (
-  array: [int],
-  key: func (int): int,
-): [int]
+  array: [I],
+  key: func (I): int,
+): [I]
 
 let to_columnar: func ( # <I: {i1 = I1}>
   array: [{int, int}]

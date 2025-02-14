@@ -1,5 +1,3 @@
-use std::borrow::Cow;
-
 use crate::pr;
 use crate::Result;
 
@@ -14,7 +12,7 @@ pub fn lookup_position_in_tuple(base: &pr::Ty, position: usize) -> Result<Option
     Ok(if position < singles.len() {
         fields.get(position).map(|f| Step {
             position,
-            target_ty: Cow::Borrowed(&f.ty),
+            target_ty: f.ty.clone(),
         })
     } else {
         None
@@ -27,14 +25,14 @@ impl super::Resolver<'_> {
         &'a self,
         fields: &'a [pr::TyTupleField],
         name: &str,
-    ) -> Result<Option<Step<'a>>> {
+    ) -> Result<Option<Step>> {
         log::debug!("looking up `.{name}` in {:?}", fields);
 
         for (position, field) in fields.iter().enumerate() {
             if field.name.as_ref().map_or(false, |n| n == name) {
                 return Ok(Some(Step {
                     position,
-                    target_ty: Cow::Borrowed(&field.ty),
+                    target_ty: field.ty.clone(),
                 }));
             }
         }
@@ -43,7 +41,7 @@ impl super::Resolver<'_> {
 }
 
 #[derive(Debug, Clone)]
-pub struct Step<'a> {
+pub struct Step {
     pub position: usize,
-    pub target_ty: Cow<'a, pr::Ty>,
+    pub target_ty: pr::Ty,
 }

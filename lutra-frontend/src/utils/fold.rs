@@ -186,7 +186,7 @@ pub fn fold_switch_case<F: ?Sized + PrFold>(fold: &mut F, case: SwitchCase) -> R
 
 pub fn fold_func_call<T: ?Sized + PrFold>(fold: &mut T, func_call: FuncCall) -> Result<FuncCall> {
     Ok(FuncCall {
-        name: Box::new(fold.fold_expr(*func_call.name)?),
+        func: Box::new(fold.fold_expr(*func_call.func)?),
         args: fold.fold_exprs(func_call.args)?,
     })
 }
@@ -260,7 +260,7 @@ pub fn fold_ty_func<F: ?Sized + PrFold>(fold: &mut F, f: TyFunc) -> Result<TyFun
             .body
             .map(|t| fold.fold_type(*t).map(Box::new))
             .transpose()?,
-        // generic_type_params: f.generic_type_params,
+        type_params: f.type_params,
     })
 }
 

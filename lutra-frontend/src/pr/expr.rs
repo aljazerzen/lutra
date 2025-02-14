@@ -99,7 +99,7 @@ pub struct UnaryExpr {
 /// Function call.
 #[derive(Debug, PartialEq, Clone)]
 pub struct FuncCall {
-    pub name: Box<Expr>,
+    pub func: Box<Expr>,
     pub args: Vec<Expr>,
 }
 

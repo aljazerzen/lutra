@@ -1,5 +1,3 @@
-use std::borrow::Cow;
-
 use itertools::Itertools;
 
 use crate::decl::DeclKind;
@@ -11,6 +9,7 @@ use crate::semantic::{NS_STD, NS_THIS};
 use crate::utils::fold::{self, PrFold};
 use crate::{Result, Span};
 
+use super::scope;
 use super::tuple::Step;
 
 impl fold::PrFold for super::Resolver<'_> {
@@ -41,7 +40,7 @@ impl fold::PrFold for super::Resolver<'_> {
 
                 let log_debug = !ident.starts_with_part(NS_STD);
                 if log_debug {
-                    log::debug!("... resolved to {named:?}");
+                    log::debug!("... resolved to {}", named.as_ref());
                 }
 
                 let ty = match named {
@@ -72,9 +71,11 @@ impl fold::PrFold for super::Resolver<'_> {
                             unreachable!()
                         }
                     },
-                    Named::Scoped(scoped) => match &scoped.kind {
-                        ScopedKind::Param { ty, .. } => ty.clone(),
-                        ScopedKind::Generic => {
+                    Named::Scoped(scoped) => match scoped {
+                        ScopedKind::Param { ty } => ty.clone(),
+                        ScopedKind::Type { .. }
+                        | ScopedKind::TypeParam
+                        | ScopedKind::TypeArg(_) => {
                             return Err(Diagnostic::new_custom(
                                 "expected a value, but found a type",
                             )
@@ -82,13 +83,14 @@ impl fold::PrFold for super::Resolver<'_> {
                         }
                     },
                 };
+                let ty = self.introduce_ty_into_scope(id, ty);
                 let mut expr = pr::Expr {
                     kind: pr::ExprKind::Ident(ident),
                     ty: Some(ty),
                     ..node
                 };
 
-                expr.id = expr.id.or(Some(id));
+                expr.id = Some(id);
                 let alias = expr.alias.take();
 
                 let mut expr = expr;
@@ -102,7 +104,7 @@ impl fold::PrFold for super::Resolver<'_> {
 
                 let step = self.resolve_indirection(base_ty, &field).with_span(*span)?;
                 let position = step.position;
-                let target_ty = Some(step.target_ty.into_owned());
+                let target_ty = Some(step.target_ty);
 
                 let kind = if base_ty.kind.is_tuple() {
                     // tuples
@@ -117,7 +119,7 @@ impl fold::PrFold for super::Resolver<'_> {
                     let position =
                         self.fold_expr(pr::Expr::new(pr::Literal::Integer(position as i64)))?;
                     pr::ExprKind::FuncCall(pr::FuncCall {
-                        name: Box::new(std_index),
+                        func: Box::new(std_index),
                         args: vec![base, position],
                     })
                 };
@@ -130,19 +132,20 @@ impl fold::PrFold for super::Resolver<'_> {
                 }
             }
 
-            pr::ExprKind::FuncCall(pr::FuncCall { name, args, .. })
-                if (name.kind.as_ident()).map_or(false, |i| i.to_string() == "std.not")
-                    && matches!(args[0].kind, pr::ExprKind::Tuple(_)) =>
+            pr::ExprKind::FuncCall(pr::FuncCall {
+                func: name, args, ..
+            }) if (name.kind.as_ident()).map_or(false, |i| i.to_string() == "std.not")
+                && matches!(args[0].kind, pr::ExprKind::Tuple(_)) =>
             {
                 let arg = args.into_iter().exactly_one().unwrap();
                 self.resolve_column_exclusion(arg)?
             }
 
-            pr::ExprKind::FuncCall(pr::FuncCall { name, args }) => {
+            pr::ExprKind::FuncCall(pr::FuncCall { func: name, args }) => {
                 // fold function name
                 let func = Box::new(self.fold_expr(*name)?);
 
-                self.resolve_func_application(func, args, *span)?
+                self.resolve_func_call(func, args, *span)?
             }
 
             pr::ExprKind::Func(func) => {
@@ -189,7 +192,7 @@ impl super::Resolver<'_> {
                     //     _local.select {alias = _local.this} r
 
                     let expr = pr::Expr::new(pr::ExprKind::FuncCall(pr::FuncCall {
-                        name: Box::new(pr::Expr::new(pr::ExprKind::Ident(pr::Path::new(vec![
+                        func: Box::new(pr::Expr::new(pr::ExprKind::Ident(pr::Path::new(vec![
                             NS_STD, "select",
                         ])))),
                         args: vec![
@@ -227,8 +230,15 @@ impl super::Resolver<'_> {
         &'a self,
         base: &'a Ty,
         indirection: &pr::IndirectionKind,
-    ) -> Result<Step<'a>> {
+    ) -> Result<Step> {
         let base = self.resolve_ty_ident(base)?;
+
+        let base = match base {
+            scope::TyRef::Ty(b) => b,
+            scope::TyRef::Param => todo!("tuple indirection into generic type Param"),
+            scope::TyRef::Arg(id) => todo!("tuple indirection into generic type Arg: {id:?}"),
+        };
+
         match &base.kind {
             pr::TyKind::Ident(_) => panic!(),
 
@@ -239,7 +249,7 @@ impl super::Resolver<'_> {
                     })
                 }
                 pr::IndirectionKind::Position(pos) => {
-                    let step = super::tuple::lookup_position_in_tuple(base, *pos as usize)?
+                    let step = super::tuple::lookup_position_in_tuple(&base, *pos as usize)?
                         .ok_or_else(|| Diagnostic::new_custom("Out of bounds"))?;
 
                     Ok(step)
@@ -254,7 +264,7 @@ impl super::Resolver<'_> {
                 }
                 pr::IndirectionKind::Position(pos) => Ok(Step {
                     position: *pos as usize,
-                    target_ty: Cow::Borrowed(items_ty.as_ref()),
+                    target_ty: *items_ty.clone(),
                 }),
                 pr::IndirectionKind::Star => todo!(),
             },

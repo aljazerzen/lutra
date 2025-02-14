@@ -59,7 +59,7 @@ pub fn decl_get_annotation<'e>(
 pub fn as_ident_or_func_call<'e>(expr: &'e pr::Expr, name: &pr::Path) -> Option<&'e [pr::Expr]> {
     match &expr.kind {
         pr::ExprKind::Ident(i) if i == name => Some(&[]),
-        pr::ExprKind::FuncCall(pr::FuncCall { name: n_expr, args })
+        pr::ExprKind::FuncCall(pr::FuncCall { func: n_expr, args })
             if n_expr.kind.as_ident().map_or(false, |i| i == name) =>
         {
             Some(args.as_slice())

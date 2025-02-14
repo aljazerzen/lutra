@@ -58,6 +58,11 @@ impl super::Resolver<'_> {
             DeclKind::Import(_) => unreachable!(),
         };
 
+        // never re-resolve exprs
+        if decl_kind.is_expr() {
+            self.strict_mode_needed = false;
+        }
+
         // put decl back in
         let decl = self.root_mod.module.get_mut(fq_ident).unwrap();
         decl.kind = decl_kind;
@@ -76,6 +81,7 @@ impl super::Resolver<'_> {
                 // it should have been converted into Module in resolve_decls::init_module_tree
             }
             pr::StmtKind::VarDef(var_def) => {
+                dbg!(&var_def);
                 let def = self.fold_var_def(var_def)?;
                 let expected_ty = def.ty;
 

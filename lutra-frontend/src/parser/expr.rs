@@ -348,7 +348,7 @@ where
                     |_| vec![],
                 )),
         )
-        .map(|(name, args)| ExprKind::FuncCall(FuncCall { name, args }))
+        .map(|(name, args)| ExprKind::FuncCall(FuncCall { func: name, args }))
         .labelled("function call")
 }
 

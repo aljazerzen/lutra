@@ -1,13 +1,17 @@
+use crate::decl;
 use crate::diagnostic::Diagnostic;
+use crate::diagnostic::WithErrorInfo;
 use crate::pr;
 use crate::Result;
 
+use super::scope::Named;
+use super::scope::ScopedKind;
 use super::Resolver;
 
 impl Resolver<'_> {
-    pub fn compute_ty_layout(&mut self, ty: &mut pr::Ty) -> Result<(), Diagnostic> {
+    pub fn compute_ty_layout(&mut self, ty: &mut pr::Ty) -> Result<bool, Diagnostic> {
         if ty.layout.is_some() {
-            return Ok(());
+            return Ok(false);
         }
 
         let layout = match &ty.kind {
@@ -15,7 +19,7 @@ impl Resolver<'_> {
                 if let Some(layout) = ty.kind.get_layout_simple() {
                     layout
                 } else {
-                    return Ok(());
+                    return Ok(false);
                 }
             }
 
@@ -32,34 +36,56 @@ impl Resolver<'_> {
                 }
 
                 ty.layout = Some(layout);
-                return Ok(());
+                return Ok(false);
             }
 
             pr::TyKind::Ident(ident) => {
-                let decl = self.try_resolve_ty_ident(&*ty)?;
+                let named = self.get_ident(ident).ok_or_else(|| {
+                    Diagnostic::new_assert("cannot find type ident")
+                        .push_hint(format!("ident={ident:?}"))
+                        .push_hint("compute_ty_layout")
+                        .with_span(ty.span)
+                })?;
+                let ty = match &named {
+                    Named::Decl(decl) => match &decl.kind {
+                        decl::DeclKind::Ty(ty) => ty,
 
-                match decl {
-                    // resolves to a type: use it's layout
-                    Some(ty) => {
-                        if let Some(layout) = &ty.layout {
-                            layout.clone()
-                        } else if self.strict_mode {
-                            panic!("Unresolved layout of reference {ident} at {:?}: {ty:?} (during eval of {})", ty.span, self.debug_current_decl)
-                        } else {
-                            return Ok(());
+                        // unresolved: recursive reference to a type
+                        decl::DeclKind::Unresolved(_) => {
+                            if self.strict_mode {
+                                panic!(
+                                    "unresolved {ident} at {:?}: (during eval of {})",
+                                    ty.span, self.debug_current_decl
+                                )
+                            }
+                            return Ok(true);
                         }
-                    }
-
-                    // unresolved: recursive reference to a type
-                    None => {
-                        if self.strict_mode {
-                            panic!(
-                                "unresolved {ident} at {:?}: (during eval of {})",
-                                ty.span, self.debug_current_decl
-                            )
+                        _ => {
+                            return Err(Diagnostic::new_assert("expected reference to a type")
+                                .push_hint(format!("got {:?}", &decl.kind))
+                                .with_span(ty.span))
                         }
-                        return Ok(());
-                    }
+                    },
+                    Named::Scoped(scoped) => match scoped {
+                        ScopedKind::Param { ty } => {
+                            return Err(Diagnostic::new_assert("expected reference to a type")
+                                .push_hint(format!("got {:?}", &scoped))
+                                .with_span(ty.span))
+                        }
+                        ScopedKind::Type { ty } => ty,
+                        ScopedKind::TypeParam | ScopedKind::TypeArg(_) => {
+                            // generic type params do not have a layout
+                            return Ok(false); // not missing
+                        }
+                    },
+                };
+                // resolves to a type: use it's layout
+                if let Some(layout) = &ty.layout {
+                    layout.clone()
+                } else if self.strict_mode {
+                    panic!("Unresolved layout of reference {ident} at {:?}: {ty:?} (during eval of {})", ty.span, self.debug_current_decl)
+                } else {
+                    return Ok(true);
                 }
             }
 
@@ -71,6 +97,6 @@ impl Resolver<'_> {
             },
         };
         ty.layout = Some(layout);
-        Ok(())
+        Ok(false)
     }
 }

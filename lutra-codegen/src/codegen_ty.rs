@@ -53,7 +53,7 @@ pub fn write_ty_def(
         x.expr
             .kind
             .as_func_call()
-            .and_then(|c| c.name.kind.as_ident())
+            .and_then(|c| c.func.kind.as_ident())
             .map_or(false, |i| i.name() == "derive")
     });
     if let Some(derive_annotation) = derive_annotation {

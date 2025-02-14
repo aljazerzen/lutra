@@ -4,6 +4,8 @@ use strum::AsRefStr;
 use crate::pr::path::Path;
 use crate::span::Span;
 
+use super::GenericTypeParam;
+
 #[derive(Debug, Clone)]
 pub struct Ty {
     pub kind: TyKind,
@@ -52,6 +54,7 @@ pub enum TyKind {
     Enum(Vec<TyEnumVariant>),
 
     /// Type of functions with defined params and return types.
+    // TODO: remove this option
     Function(Option<TyFunc>),
     // /// Tuples that have fields of `base` tuple, but don't have fields of `except` tuple.
     // /// Implies that `base` has all fields of `except`.
@@ -166,6 +169,7 @@ pub enum PrimitiveSet {
 pub struct TyFunc {
     pub params: Vec<Option<Ty>>,
     pub body: Option<Box<Ty>>,
+    pub type_params: Vec<GenericTypeParam>,
 }
 
 impl Ty {
@@ -214,6 +218,12 @@ impl From<PrimitiveSet> for TyKind {
 impl From<TyFunc> for TyKind {
     fn from(value: TyFunc) -> Self {
         TyKind::Function(Some(value))
+    }
+}
+
+impl From<Path> for TyKind {
+    fn from(value: Path) -> Self {
+        TyKind::Ident(value)
     }
 }
 

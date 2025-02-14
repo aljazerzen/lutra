@@ -2,6 +2,7 @@ use itertools::Itertools;
 
 use crate::diagnostic::{Diagnostic, WithErrorInfo};
 use crate::pr::*;
+use crate::semantic::resolver::types::TypeReplacer;
 use crate::utils::fold::{self, PrFold};
 use crate::{Result, Span};
 
@@ -16,10 +17,10 @@ impl Resolver<'_> {
             "resolving func with params: {}",
             func.params.iter().map(|p| &p.name).join(", ")
         );
-        let scope = Scope::new();
+        let mut scope = Scope::new();
 
         // prepare generic arguments
-        // for generic_param in &func.generic_type_params {}
+        scope.insert_generics_params(&func.generic_type_params);
         self.scopes.push(scope);
 
         // fold types
@@ -35,17 +36,16 @@ impl Resolver<'_> {
         self.validate_expr_type(&mut func.body, func.return_ty.as_ref(), &|| None)?;
 
         // pop the scope
-        let _scope = self.scopes.pop().unwrap();
+        let scope = self.scopes.pop().unwrap();
 
-        // pop generic types
-        if !func.generic_type_params.is_empty() {
-            todo!()
-        }
+        // finalize generic type args
+        let mapping = scope.finalize_type_args().with_span(func.body.span)?;
+        let func = TypeReplacer::on_func(*func, mapping);
 
-        Ok(func)
+        Ok(Box::new(func))
     }
 
-    pub fn resolve_func_application(
+    pub fn resolve_func_call(
         &mut self,
         func: Box<Expr>,
         args: Vec<Expr>,
@@ -78,13 +78,8 @@ impl Resolver<'_> {
             .with_span(span));
         }
 
-        self.init_func_app_generic_args(&fn_ty, func.id.unwrap());
-
         log::debug!("resolving args of function {}", metadata.as_debug_name());
         let args = self.resolve_func_app_args(&func, args, &metadata)?;
-
-        self.finalize_func_app_generic_args(&fn_ty, func.id.unwrap())
-            .with_span_fallback(span)?;
 
         // run fold again, so idents that used to point to generics get inlined
         let return_ty = fn_ty
@@ -93,7 +88,11 @@ impl Resolver<'_> {
             .map(|ty| self.fold_type(*ty))
             .transpose()?;
 
-        Ok(expr_of_func_application(*func, args, return_ty, span))
+        Ok(Expr {
+            ty: return_ty,
+            span,
+            ..Expr::new(ExprKind::FuncCall(FuncCall { func, args }))
+        })
     }
 
     /// In PRQL, func is just an expression and does not have a name (the same way
@@ -106,96 +105,9 @@ impl Resolver<'_> {
         let ExprKind::Ident(fq_ident) = &func.kind else {
             return res;
         };
-        // let fq_ident = loop {
-        //     match &func.kind {
-        //         ExprKind::Ident(i) => break i,
-        //         ExprKind::FuncApplication(FuncApplication { func: f, .. }) => {
-        //             func = f.as_ref();
-        //         }
-        //         _ => return res,
-        //     }
-        // };
-
-        // populate name hint
         res.name_hint = Some(fq_ident.clone());
 
         res
-    }
-
-    fn init_func_app_generic_args(&mut self, _fn_ty: &TyFunc, _func_id: usize) {
-        /*
-        for generic_param in &fn_ty.generic_type_params {
-            // register the generic type param in the resolver
-            let generic_ident = Ident::from_path(vec![
-                NS_GENERIC.to_string(),
-                func_id.to_string(),
-                generic_param.name.clone(),
-            ]);
-
-            let generic = Decl::from(DeclKind::GenericArg(Vec::new()));
-            self.root_mod.module.insert(generic_ident, generic).unwrap();
-        }
-         */
-    }
-
-    fn finalize_func_app_generic_args(&mut self, _fn_ty: &TyFunc, _func_id: usize) -> Result<()> {
-        /*
-        for generic_param in &fn_ty.generic_type_params {
-            let ident = Ident::from_path(vec![
-                NS_GENERIC.to_string(),
-                func_id.to_string(),
-                generic_param.name.clone(),
-            ]);
-
-            let decl = self.root_mod.module.get_mut(&ident).unwrap();
-
-            let DeclKind::GenericArg(bounds) = &decl.kind else {
-                // this case means that we have already finalized this generic arg and should never happen
-                // hack: this case does happen, because our resolution order is all over the place,
-                //    so I had to add "finalize_function_generic_args" into "resolve_function_arg".
-                //    This only sorta makes sense, so I want to mark this case as "will remove in the future".
-                panic!()
-            };
-
-            let res: Vec<&Ty> = if generic_param.domain.is_empty() {
-                // deduplicate bounds
-                let mut passed = Vec::new();
-                for domain_type in &generic_param.domain {
-                    if !passed.contains(&domain_type) {
-                        passed.push(domain_type);
-                    }
-                }
-                passed
-            } else {
-                // type check each of bounds against all domain candidates
-                let mut passed = Vec::new();
-                for domain_type in &generic_param.domain {
-                    let mut pass = true;
-                    for bound in bounds {
-                        if bound != domain_type {
-                            pass = false;
-                            break;
-                        }
-                    }
-                    if pass {
-                        passed.push(domain_type);
-                    }
-                }
-                passed
-            };
-
-            if res.len() != 1 {
-                return Err(Diagnostic::new_simple(format!(
-                    "cannot determine the type {}",
-                    generic_param.name
-                )));
-            };
-            let ty = res.into_iter().next().unwrap();
-            log::debug!("finalizing {ident} into {}", write_ty(ty));
-            decl.kind = DeclKind::Ty(ty.clone());
-        }
-        */
-        Ok(())
     }
 
     /// Resolves function arguments. Will return `Err(func)` is partial application is required.
@@ -213,33 +125,22 @@ impl Resolver<'_> {
         let func_ty = func_ty.kind.as_function().unwrap();
         let func_ty = func_ty.as_ref().unwrap();
 
-        for (param, mut arg) in itertools::zip_eq(&func_ty.params, args_to_resolve) {
-            arg = self.resolve_func_app_arg(arg, param, func_name)?;
+        for (param, arg) in itertools::zip_eq(&func_ty.params, args_to_resolve) {
+            // fold
+            let mut arg = self.fold_expr(arg)?;
+
+            // validate type
+            let who = || {
+                func_name
+                    .as_ref()
+                    .map(|n| format!("function {n}, one of the params")) // TODO: param name
+            };
+            self.validate_expr_type(&mut arg, param.as_ref(), &who)?;
 
             args.push(arg);
         }
 
         Ok(args)
-    }
-
-    fn resolve_func_app_arg(
-        &mut self,
-        arg: Expr,
-        param: &Option<Ty>,
-        func_name: &Option<Path>,
-    ) -> Result<Expr> {
-        // fold
-        let mut arg = self.fold_expr(arg)?;
-
-        // validate type
-        let who = || {
-            func_name
-                .as_ref()
-                .map(|n| format!("function {n}, one of the params")) // TODO: param name
-        };
-        self.validate_expr_type(&mut arg, param.as_ref(), &who)?;
-
-        Ok(arg)
     }
 
     /// Wraps non-tuple Exprs into a singleton Tuple.
@@ -284,36 +185,5 @@ impl FuncMetadata {
         let ident = self.name_hint.as_ref();
 
         ident.map(|n| n.name()).unwrap_or("<anonymous>")
-    }
-}
-
-pub fn expr_of_func_application(
-    func: Expr,
-    args: Vec<Expr>,
-    body_ty: Option<Ty>,
-    span: Option<Span>,
-) -> Expr {
-    let fn_ty = func.ty.as_ref().unwrap();
-    let fn_ty = fn_ty.kind.as_function().unwrap();
-    let fn_ty = fn_ty.as_ref().unwrap();
-
-    let ty_func_params: Vec<_> = fn_ty.params[args.len()..].to_vec();
-
-    let ty = if ty_func_params.is_empty() {
-        body_ty
-    } else {
-        Some(Ty::new(TyFunc {
-            params: ty_func_params,
-            body: body_ty.map(Box::new),
-        }))
-    };
-
-    Expr {
-        ty,
-        span,
-        ..Expr::new(ExprKind::FuncCall(FuncCall {
-            name: Box::new(func),
-            args,
-        }))
     }
 }

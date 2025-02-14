@@ -29,27 +29,35 @@ pub(crate) fn type_expr() -> impl Parser<TokenKind, Ty, Error = PError> + Clone 
 
         let ident = ident().map(TyKind::Ident);
 
+        let func_type_params = ident_part()
+            .then(ctrl(':').ignore_then(nested_type_expr.clone()).or_not())
+            .map_with_span(|(name, _domain), span| GenericTypeParam {
+                name,
+                span: Some(span),
+            })
+            .separated_by(ctrl(','))
+            .allow_trailing()
+            .at_least(1)
+            .delimited_by(ctrl('<'), ctrl('>'))
+            .or_not()
+            .map(|x| x.unwrap_or_default());
+
+        let func_params = (ident_part().then_ignore(ctrl(':')).or_not())
+            .ignore_then(nested_type_expr.clone().map(Some))
+            .separated_by(ctrl(','))
+            .allow_trailing()
+            .delimited_by(ctrl('('), ctrl(')'));
+
         let func = keyword("func")
             .ignore_then(
-                ident_part()
-                    .then(ctrl(':').ignore_then(nested_type_expr.clone()).or_not())
-                    .separated_by(ctrl(','))
-                    .allow_trailing()
-                    .at_least(1)
-                    .delimited_by(ctrl('<'), ctrl('>'))
-                    .or_not(),
-            )
-            .ignore_then(
-                (ident_part().then_ignore(ctrl(':')).or_not())
-                    .ignore_then(nested_type_expr.clone().map(Some))
-                    .separated_by(ctrl(','))
-                    .allow_trailing()
-                    .delimited_by(ctrl('('), ctrl(')'))
+                func_type_params
+                    .then(func_params)
                     .then_ignore(ctrl(':'))
                     .then(nested_type_expr.clone().map(Box::new).map(Some))
-                    .map(|(params, return_ty)| TyFunc {
+                    .map(|((type_params, params), body)| TyFunc {
                         params,
-                        body: return_ty,
+                        body,
+                        type_params,
                     })
                     .or_not(),
             )

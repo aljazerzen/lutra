@@ -1,8 +1,8 @@
+use indexmap::IndexMap;
 use itertools::Itertools;
 
 use crate::decl;
 use crate::diagnostic::{Diagnostic, WithErrorInfo};
-use crate::semantic::resolver::Scope;
 use crate::semantic::NS_STD;
 use crate::utils::fold::{self, PrFold};
 use crate::Result;
@@ -125,7 +125,7 @@ impl ModuleRefResolver<'_> {
 struct NameResolver<'a> {
     root: &'a mut decl::RootModule,
     decl_module_path: &'a [String],
-    scopes: Vec<crate::semantic::resolver::Scope>,
+    scopes: Vec<Scope>,
     refs: Vec<pr::Path>,
 }
 
@@ -195,6 +195,17 @@ impl fold::PrFold for NameResolver<'_> {
                     ..ty
                 }
             }
+            pr::TyKind::Function(Some(ty_func)) if !ty_func.type_params.is_empty() => {
+                let scope = Scope::new_of_ty_func(&ty_func)?;
+                self.scopes.push(scope);
+                let r = fold::fold_ty_func(self, ty_func);
+                self.scopes.pop();
+
+                pr::Ty {
+                    kind: pr::TyKind::Function(Some(r?)),
+                    ..ty
+                }
+            }
             _ => fold::fold_type(self, ty)?,
         })
     }
@@ -212,7 +223,7 @@ impl NameResolver<'_> {
     /// Returns resolved fully-qualified ident
     fn resolve_ident(&mut self, mut ident: pr::Path) -> Result<pr::Path> {
         for (up, scope) in self.scopes.iter().rev().enumerate() {
-            if let Some(index) = scope.get_index(ident.first()) {
+            if let Some((position, scoped)) = scope.get(ident.first()) {
                 // match: this ident is a param ref
 
                 if ident.len() != 1 {
@@ -222,11 +233,14 @@ impl NameResolver<'_> {
                     )));
                 }
 
-                let mut fq_ident = pr::Path::new(vec!["func"]);
+                let mut fq_ident = pr::Path::new(vec!["scope"]);
                 for _ in 0..up {
                     fq_ident.push("up".to_string())
                 }
-                fq_ident.push(index.to_string());
+                fq_ident.push(match &scoped {
+                    ScopedKind::Param => position.to_string(),
+                    ScopedKind::Generic => ident.first().to_string(),
+                });
                 return Ok(fq_ident);
             }
         }
@@ -262,6 +276,7 @@ impl NameResolver<'_> {
 
         let decl = mod_decl.and_then(|module| module.get(&ident));
         if decl.is_none() {
+            log::debug!("scopes: {:?}", self.scopes);
             return Err(Diagnostic::new_custom("unknown name"));
         }
 
@@ -274,5 +289,55 @@ impl NameResolver<'_> {
         self.refs.push(fq_ident.clone());
 
         Ok(fq_ident)
+    }
+}
+
+#[derive(Debug)]
+pub struct Scope {
+    names: IndexMap<String, ScopedKind>,
+}
+
+#[derive(Debug, Clone, enum_as_inner::EnumAsInner)]
+pub enum ScopedKind {
+    Param,
+    Generic,
+}
+
+impl Scope {
+    pub fn new_of_func(func: &pr::Func) -> crate::Result<Self> {
+        let mut scope = Self {
+            names: IndexMap::new(),
+        };
+        scope.insert_params(func)?;
+        scope.insert_generics(&func.generic_type_params)?;
+        Ok(scope)
+    }
+
+    pub fn new_of_ty_func(func: &pr::TyFunc) -> crate::Result<Self> {
+        let mut scope = Self {
+            names: IndexMap::new(),
+        };
+        scope.insert_generics(&func.type_params)?;
+        Ok(scope)
+    }
+
+    pub fn insert_generics(&mut self, type_params: &[pr::GenericTypeParam]) -> crate::Result<()> {
+        for param in type_params {
+            let scoped = ScopedKind::Generic;
+            self.names.insert(param.name.clone(), scoped);
+        }
+        Ok(())
+    }
+
+    pub fn insert_params(&mut self, func: &pr::Func) -> crate::Result<()> {
+        for param in func.params.iter() {
+            self.names.insert(param.name.clone(), ScopedKind::Param);
+        }
+        Ok(())
+    }
+
+    pub fn get(&self, name: &str) -> Option<(usize, &ScopedKind)> {
+        let (position, _, scoped) = self.names.get_full(name)?;
+        Some((position, scoped))
     }
 }
