@@ -16,7 +16,7 @@ pub enum Error {
     InvalidSourceStructure { problem: String },
 
     #[error("{}", DisplayMessages(.diagnostics))]
-    InvalidSource { diagnostics: Vec<DiagnosticMessage> },
+    Compile { diagnostics: Vec<DiagnosticMessage> },
 }
 
 impl Error {
@@ -25,7 +25,7 @@ impl Error {
         source: &crate::SourceTree,
     ) -> Self {
         let diagnostics = compose_diagnostic_messages(diagnostics, source);
-        Error::InvalidSource { diagnostics }
+        Error::Compile { diagnostics }
     }
 }
 
@@ -116,7 +116,6 @@ fn compose_display(
 ) -> String {
     use ariadne::{Config, Label, Report, ReportKind};
 
-    // We always pass color to ariadne as true, and then (currently) strip later.
     let config = Config::default().with_color(true);
 
     let span = std::ops::Range::from(diagnostic.span.unwrap());

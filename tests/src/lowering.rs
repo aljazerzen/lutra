@@ -2,7 +2,7 @@ use insta::assert_snapshot;
 
 #[track_caller]
 fn _test_compile_and_print(source: &str) -> String {
-    let program = lutra_frontend::_test_compile(source);
+    let program = lutra_frontend::_test_compile(source).unwrap();
     lutra_ir::print(&program)
 }
 

@@ -195,15 +195,29 @@ impl fold::PrFold for NameResolver<'_> {
                     ..ty
                 }
             }
-            pr::TyKind::Function(Some(ty_func)) if !ty_func.type_params.is_empty() => {
-                let scope = Scope::new_of_ty_func(&ty_func)?;
-                self.scopes.push(scope);
-                let r = fold::fold_ty_func(self, ty_func);
-                self.scopes.pop();
+            pr::TyKind::Function(Some(ty_func)) => {
+                if self.scopes.is_empty() {
+                    let scope = Scope::new_of_ty_func(&ty_func)?;
+                    self.scopes.push(scope);
+                    let r = fold::fold_ty_func(self, ty_func);
+                    self.scopes.pop();
 
-                pr::Ty {
-                    kind: pr::TyKind::Function(Some(r?)),
-                    ..ty
+                    pr::Ty {
+                        kind: pr::TyKind::Function(Some(r?)),
+                        ..ty
+                    }
+                } else {
+                    if let Some(param) = ty_func.type_params.first() {
+                        return Err(Diagnostic::new_custom(
+                            "generic type parameters are not allowed here",
+                        )
+                        .with_span(param.span));
+                    }
+                    let ty = pr::Ty {
+                        kind: pr::TyKind::Function(Some(ty_func)),
+                        ..ty
+                    };
+                    fold::fold_type(self, ty)?
                 }
             }
             _ => fold::fold_type(self, ty)?,

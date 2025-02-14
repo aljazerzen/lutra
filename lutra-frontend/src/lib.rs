@@ -2,7 +2,6 @@ mod bytecoding;
 mod compile;
 mod diagnostic;
 mod discover;
-mod error;
 mod lowering;
 mod parser;
 mod project;
@@ -13,14 +12,16 @@ mod utils;
 type Result<T, E = diagnostic::Diagnostic> = core::result::Result<T, E>;
 
 pub mod decl;
+pub mod error;
 pub mod pr;
 pub use bytecoding::compile_program as bytecode_program;
 pub use compile::{compile, CompileParams};
 pub use discover::{discover, DiscoverParams};
 pub use lowering::lower;
-use lutra_bin::ir;
 pub use project::{Project, SourceTree};
 pub use span::Span;
+
+use lutra_bin::ir;
 
 pub mod _lexer {
     pub use crate::diagnostic::Diagnostic;
@@ -44,11 +45,10 @@ pub fn _test_compile_ty(ty_source: &str) -> pr::Ty {
     ty
 }
 
-#[track_caller]
-pub fn _test_compile(source: &str) -> ir::Program {
+pub fn _test_compile(source: &str) -> Result<ir::Program, error::Error> {
     let source = SourceTree::single("".into(), source.to_string());
-    let project = compile(source, CompileParams {}).unwrap_or_else(|e| panic!("{e}"));
+    let project = compile(source, CompileParams {})?;
 
     let path = pr::Path::from_name("main");
-    lowering::lower(&project.root_module, &path)
+    Ok(lowering::lower(&project.root_module, &path))
 }

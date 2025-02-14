@@ -18,7 +18,7 @@ impl Resolver<'_> {
     pub fn fold_type_actual(&mut self, ty: Ty) -> Result<Ty> {
         // fold inner containers
         let mut ty = match ty.kind {
-            TyKind::Function(Some(ty_func)) if !ty_func.type_params.is_empty() => {
+            TyKind::Function(Some(ty_func)) if self.scopes.is_empty() => {
                 let mut scope = Scope::new();
                 scope.insert_generics_params(&ty_func.type_params);
                 self.scopes.push(scope);

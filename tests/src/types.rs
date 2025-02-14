@@ -2,10 +2,26 @@
 fn _test_run(source: &str) -> String {
     env_logger::init();
 
-    let program = lutra_frontend::_test_compile(source);
+    let program = match lutra_frontend::_test_compile(source) {
+        Ok(program) => program,
+        Err(e) => panic!("{e}"),
+    };
     let output_ty = program.get_output_ty();
 
     lutra_ir::print_ty(output_ty)
+}
+
+#[track_caller]
+fn _test_err(source: &str) -> String {
+    use lutra_frontend::error::Error;
+
+    env_logger::init();
+
+    let Error::Compile { diagnostics } = lutra_frontend::_test_compile(source).unwrap_err() else {
+        unreachable!()
+    };
+    let diagnostic = diagnostics.into_iter().next().unwrap();
+    diagnostic.message().to_string()
 }
 
 #[test]
@@ -73,10 +89,20 @@ fn types_07() {
 fn types_08() {
     insta::assert_snapshot!(_test_run(r#"
         let filter: func <T> (array: [T], condition: func (T): bool): [T]
+        let map: func <I, O> (x: [I], mapper: func (I): O): [O]
+        let slice: func <T> (x: [T], start: int64, end: int64): [T]
 
-        func () -> filter(
-            [{5, false}, {4, true}, {1, true}],
-            func (x: {int64, bool}) -> x.0 < 3 && x.1
+        func () -> (
+            [{5, false}, {4, true}, {1, true}]
+            | filter(func (x: {int64, bool}) -> x.1)
+            | map(func (x: {int64, bool}) -> x.0)
+            | slice(0, 1)
         )
-    "#), @"[{int64, bool}]");
+    "#), @"[int64]");
+}
+#[test]
+fn types_09() {
+    insta::assert_snapshot!(_test_err(r#"
+        let peek: func <T> (array: [T], condition: func <R> (T): R): [T]
+    "#), @"generic type parameters are not allowed here");
 }
