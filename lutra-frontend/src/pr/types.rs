@@ -4,7 +4,7 @@ use strum::AsRefStr;
 use crate::pr::path::Path;
 use crate::span::Span;
 
-use super::GenericTypeParam;
+use super::TyParam;
 
 #[derive(Debug, Clone)]
 pub struct Ty {
@@ -169,7 +169,7 @@ pub enum PrimitiveSet {
 pub struct TyFunc {
     pub params: Vec<Option<Ty>>,
     pub body: Option<Box<Ty>>,
-    pub type_params: Vec<GenericTypeParam>,
+    pub ty_params: Vec<TyParam>,
 }
 
 impl Ty {

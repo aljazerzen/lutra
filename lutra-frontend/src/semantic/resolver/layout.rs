@@ -73,7 +73,7 @@ impl Resolver<'_> {
                                 .with_span(ty.span))
                         }
                         ScopedKind::Type { ty } => ty,
-                        ScopedKind::TypeParam | ScopedKind::TypeArg(_) => {
+                        ScopedKind::TypeParam { .. } | ScopedKind::TypeArg { .. } => {
                             // generic type params do not have a layout
                             return Ok(false); // not missing
                         }

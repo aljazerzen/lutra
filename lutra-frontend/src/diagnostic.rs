@@ -59,6 +59,9 @@ impl DiagnosticCode {
     pub const ASSERT: DiagnosticCode = DiagnosticCode("E0002");
     pub const PARSER: DiagnosticCode = DiagnosticCode("E0003");
 
+    pub const TYPE: DiagnosticCode = DiagnosticCode("E0004");
+    pub const TYPE_DOMAIN: DiagnosticCode = DiagnosticCode("E0005");
+
     pub fn get(&self) -> &'static str {
         self.0
     }

@@ -9,38 +9,9 @@ use crate::pr::*;
 
 pub(crate) fn type_expr() -> impl Parser<TokenKind, Ty, Error = PError> + Clone {
     recursive(|nested_type_expr| {
-        let basic = select! {
-            TokenKind::Ident(i) if i == "int8" => PrimitiveSet::int8,
-            TokenKind::Ident(i) if i == "int16" => PrimitiveSet::int16,
-            TokenKind::Ident(i) if i == "int32" => PrimitiveSet::int32,
-            TokenKind::Ident(i) if i == "int64" => PrimitiveSet::int64,
-            TokenKind::Ident(i) if i == "int" => PrimitiveSet::int64,
-            TokenKind::Ident(i) if i == "uint8" => PrimitiveSet::uint8,
-            TokenKind::Ident(i) if i == "uint16" => PrimitiveSet::uint16,
-            TokenKind::Ident(i) if i == "uint32" => PrimitiveSet::uint32,
-            TokenKind::Ident(i) if i == "uint64" => PrimitiveSet::uint64,
-            TokenKind::Ident(i) if i == "float32" => PrimitiveSet::float32,
-            TokenKind::Ident(i) if i == "float64" => PrimitiveSet::float64,
-            TokenKind::Ident(i) if i == "float" => PrimitiveSet::float64,
-            TokenKind::Ident(i) if i == "bool"=> PrimitiveSet::bool,
-            TokenKind::Ident(i) if i == "text"=> PrimitiveSet::text,
-        }
-        .map(TyKind::Primitive);
+        let primitive = primitive_set().map(TyKind::Primitive);
 
         let ident = ident().map(TyKind::Ident);
-
-        let func_type_params = ident_part()
-            .then(ctrl(':').ignore_then(nested_type_expr.clone()).or_not())
-            .map_with_span(|(name, _domain), span| GenericTypeParam {
-                name,
-                span: Some(span),
-            })
-            .separated_by(ctrl(','))
-            .allow_trailing()
-            .at_least(1)
-            .delimited_by(ctrl('<'), ctrl('>'))
-            .or_not()
-            .map(|x| x.unwrap_or_default());
 
         let func_params = (ident_part().then_ignore(ctrl(':')).or_not())
             .ignore_then(nested_type_expr.clone().map(Some))
@@ -50,14 +21,14 @@ pub(crate) fn type_expr() -> impl Parser<TokenKind, Ty, Error = PError> + Clone 
 
         let func = keyword("func")
             .ignore_then(
-                func_type_params
+                type_params()
                     .then(func_params)
                     .then_ignore(ctrl(':'))
                     .then(nested_type_expr.clone().map(Box::new).map(Some))
                     .map(|((type_params, params), body)| TyFunc {
                         params,
                         body,
-                        type_params,
+                        ty_params: type_params,
                     })
                     .or_not(),
             )
@@ -125,7 +96,7 @@ pub(crate) fn type_expr() -> impl Parser<TokenKind, Ty, Error = PError> + Clone 
             .map(TyKind::Array)
             .labelled("array");
 
-        let term = choice((basic, ident, func, tuple, array, enum_))
+        let term = choice((primitive, ident, func, tuple, array, enum_))
             .map_with_span(TyKind::into_ty)
             .boxed();
 
@@ -150,4 +121,52 @@ pub(crate) fn type_expr() -> impl Parser<TokenKind, Ty, Error = PError> + Clone 
         term
     })
     .labelled("type expression")
+}
+
+fn primitive_set() -> impl Parser<TokenKind, PrimitiveSet, Error = PError> {
+    select! {
+        TokenKind::Ident(i) if i == "int8" => PrimitiveSet::int8,
+        TokenKind::Ident(i) if i == "int16" => PrimitiveSet::int16,
+        TokenKind::Ident(i) if i == "int32" => PrimitiveSet::int32,
+        TokenKind::Ident(i) if i == "int64" => PrimitiveSet::int64,
+        TokenKind::Ident(i) if i == "int" => PrimitiveSet::int64,
+        TokenKind::Ident(i) if i == "uint8" => PrimitiveSet::uint8,
+        TokenKind::Ident(i) if i == "uint16" => PrimitiveSet::uint16,
+        TokenKind::Ident(i) if i == "uint32" => PrimitiveSet::uint32,
+        TokenKind::Ident(i) if i == "uint64" => PrimitiveSet::uint64,
+        TokenKind::Ident(i) if i == "float32" => PrimitiveSet::float32,
+        TokenKind::Ident(i) if i == "float64" => PrimitiveSet::float64,
+        TokenKind::Ident(i) if i == "float" => PrimitiveSet::float64,
+        TokenKind::Ident(i) if i == "bool"=> PrimitiveSet::bool,
+        TokenKind::Ident(i) if i == "text"=> PrimitiveSet::text,
+    }
+}
+
+pub fn type_params() -> impl Parser<TokenKind, Vec<TyParam>, Error = PError> + Clone {
+    // domain
+    let domain = ctrl(':')
+        .ignore_then(primitive_set().separated_by(ctrl('|')).at_least(1))
+        .or_not()
+        .map(|x| match x {
+            Some(tys) => TyParamDomain::OneOf(tys),
+            None => TyParamDomain::Open,
+        });
+
+    // param name
+    let param = ident_part()
+        .then(domain)
+        .map_with_span(|(name, domain), span| TyParam {
+            name,
+            domain,
+            span: Some(span),
+        });
+
+    param
+        .separated_by(ctrl(','))
+        .allow_trailing()
+        .at_least(1)
+        .delimited_by(ctrl('<'), ctrl('>'))
+        .or_not()
+        .map(|x| x.unwrap_or_default())
+        .boxed()
 }

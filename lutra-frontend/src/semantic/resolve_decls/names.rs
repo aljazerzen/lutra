@@ -207,7 +207,7 @@ impl fold::PrFold for NameResolver<'_> {
                         ..ty
                     }
                 } else {
-                    if let Some(param) = ty_func.type_params.first() {
+                    if let Some(param) = ty_func.ty_params.first() {
                         return Err(Diagnostic::new_custom(
                             "generic type parameters are not allowed here",
                         )
@@ -323,7 +323,7 @@ impl Scope {
             names: IndexMap::new(),
         };
         scope.insert_params(func)?;
-        scope.insert_generics(&func.generic_type_params)?;
+        scope.insert_generics(&func.ty_params)?;
         Ok(scope)
     }
 
@@ -331,11 +331,11 @@ impl Scope {
         let mut scope = Self {
             names: IndexMap::new(),
         };
-        scope.insert_generics(&func.type_params)?;
+        scope.insert_generics(&func.ty_params)?;
         Ok(scope)
     }
 
-    pub fn insert_generics(&mut self, type_params: &[pr::GenericTypeParam]) -> crate::Result<()> {
+    pub fn insert_generics(&mut self, type_params: &[pr::TyParam]) -> crate::Result<()> {
         for param in type_params {
             let scoped = ScopedKind::Generic;
             self.names.insert(param.name.clone(), scoped);

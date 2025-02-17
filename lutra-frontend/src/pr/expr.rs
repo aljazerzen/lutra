@@ -3,7 +3,7 @@ use enum_as_inner::EnumAsInner;
 use crate::pr::{BinOp, Literal, Ty, UnOp};
 use crate::span::Span;
 
-use super::Path;
+use super::{Path, PrimitiveSet};
 
 impl Expr {
     pub fn new<K: Into<ExprKind>>(kind: K) -> Self {
@@ -108,7 +108,7 @@ pub struct Func {
     /// Function parameters.
     pub params: Vec<FuncParam>,
 
-    pub generic_type_params: Vec<GenericTypeParam>,
+    pub ty_params: Vec<TyParam>,
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -123,11 +123,19 @@ pub struct FuncParam {
 }
 
 #[derive(Debug, Clone)]
-pub struct GenericTypeParam {
+pub struct TyParam {
     /// Assigned name of this generic type argument.
     pub name: String,
 
+    pub domain: TyParamDomain,
+
     pub span: Option<Span>,
+}
+
+#[derive(Debug, Clone)]
+pub enum TyParamDomain {
+    Open,
+    OneOf(Vec<PrimitiveSet>),
 }
 
 /// A value and a series of functions that are to be applied to that value one after another.
@@ -198,16 +206,16 @@ impl From<Range> for ExprKind {
     }
 }
 
-impl PartialEq for GenericTypeParam {
+impl PartialEq for TyParam {
     fn eq(&self, other: &Self) -> bool {
         self.name == other.name
         // && self.domain == other.domain
     }
 }
 
-impl Eq for GenericTypeParam {}
+impl Eq for TyParam {}
 
-impl std::hash::Hash for GenericTypeParam {
+impl std::hash::Hash for TyParam {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
         self.name.hash(state);
         // self.domain.hash(state);

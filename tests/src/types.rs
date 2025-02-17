@@ -3,7 +3,8 @@ fn _test_run(source: &str) -> String {
     env_logger::Builder::new()
         .filter_level(log::LevelFilter::Debug)
         .format_timestamp(None)
-        .init();
+        .try_init()
+        .ok();
 
     let program = match lutra_frontend::_test_compile(source) {
         Ok(program) => program,
@@ -18,7 +19,11 @@ fn _test_run(source: &str) -> String {
 fn _test_err(source: &str) -> String {
     use lutra_frontend::error::Error;
 
-    env_logger::init();
+    env_logger::Builder::new()
+        .filter_level(log::LevelFilter::Debug)
+        .format_timestamp(None)
+        .try_init()
+        .ok();
 
     let Error::Compile { diagnostics } = lutra_frontend::_test_compile(source).unwrap_err() else {
         unreachable!()
@@ -135,4 +140,34 @@ fn types_12() {
         let a = {id = 4, total = 4.5}
         func () -> a.total
     "#), @"float64");
+}
+#[test]
+fn types_13() {
+    insta::assert_snapshot!(_test_run(r#"
+        let floor: func <T: float32 | float64> (x: T): T
+        func () -> floor(2.4)
+    "#), @"float64");
+
+    insta::assert_snapshot!(_test_err(r#"
+        let floor: func <T: float32 | float64> (x: T): T
+        func () -> floor(false)
+    "#), @"T is restricted to one of float32, float64, found Ty { kind: Primitive(bool), span: Some(1:83-88), name: None, layout: Some(TyLayout { head_size: 8, body_ptrs: [], variants_recursive: [] }) }");
+}
+#[test]
+fn types_14() {
+    insta::assert_snapshot!(_test_run(r#"
+        let identity: func (x: float64): float64
+        let floor = func <T: float32 | float64> (x: T): T -> (
+            identity(x)
+        )
+        func () -> floor(2.3)
+    "#), @"float64");
+
+    insta::assert_snapshot!(_test_err(r#"
+        let identity: func (x: bool): bool
+        let floor = func <T: float32 | float64> (x: T): T -> (
+            identity(x)
+        )
+        func () -> floor(2.3)
+    "#), @"T is restricted to one of float32, float64, found Ty { kind: Primitive(bool), span: Some(1:32-36), name: None, layout: Some(TyLayout { head_size: 8, body_ptrs: [], variants_recursive: [] }) }");
 }

@@ -20,7 +20,7 @@ impl Resolver<'_> {
         let mut scope = Scope::new();
 
         // prepare generic arguments
-        scope.insert_generics_params(&func.generic_type_params);
+        scope.insert_generics_params(&func.ty_params);
         self.scopes.push(scope);
 
         // fold types

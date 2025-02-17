@@ -10,6 +10,7 @@ use crate::pr::*;
 use crate::span::Span;
 
 use super::pipe;
+use super::types;
 
 pub(crate) fn expr_call() -> impl Parser<TokenKind, Expr, Error = PError> + Clone {
     expr()
@@ -364,27 +365,11 @@ where
             span,
         });
 
-    let generic_params = ident_part()
-        .then(
-            ctrl(':')
-                .ignore_then(type_expr().separated_by(ctrl('|')).at_least(1))
-                .or_not()
-                .map(|x| x.unwrap_or_default()),
-        )
-        .map_with_span(|(name, _domain), span| GenericTypeParam {
-            name,
-            // domain,
-            span: Some(span),
-        })
-        .separated_by(ctrl(','))
-        .at_least(1)
-        .delimited_by(ctrl('<'), ctrl('>'))
-        .or_not()
-        .map(|x| x.unwrap_or_default());
+    let type_params = types::type_params();
 
     // func
     keyword("func")
-        .ignore_then(generic_params)
+        .ignore_then(type_params)
         .then(
             param
                 .clone()
@@ -400,7 +385,7 @@ where
         .then(expr.map(Box::new))
         .map(|(((generic_type_params, params), return_ty), body)| {
             Box::new(Func {
-                generic_type_params,
+                ty_params: generic_type_params,
                 params,
                 return_ty,
                 body,

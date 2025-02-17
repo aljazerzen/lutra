@@ -50,7 +50,7 @@ impl From<ir::Ty> for super::Ty {
                     .map(Some)
                     .collect(),
                 body: Some(Box::new(super::Ty::from(func.body))),
-                type_params: Vec::new(),
+                ty_params: Vec::new(),
             })),
             ir::TyKind::Ident(_) => todo!(),
         };

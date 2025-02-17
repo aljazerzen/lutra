@@ -6,7 +6,7 @@ use std::rc::Rc;
 
 use crate::decl;
 use crate::diagnostic::Diagnostic;
-use crate::pr::{self, Path};
+use crate::pr::{self, Path, TyParamDomain};
 
 use super::Resolver;
 
@@ -14,19 +14,25 @@ use super::Resolver;
 pub struct Scope {
     names: IndexMap<String, ScopedKind>,
 
-    type_args: IndexMap<TypeArgId, Rc<OnceCell<pr::Ty>>>,
+    type_args: IndexMap<TyArgId, TyArg>,
 }
 
 #[derive(Debug, Clone, enum_as_inner::EnumAsInner)]
 pub enum ScopedKind {
     Param { ty: pr::Ty },
     Type { ty: pr::Ty },
-    TypeParam,
-    TypeArg(TypeArgId),
+    TypeParam { domain: TyParamDomain },
+    TypeArg { id: TyArgId },
+}
+
+#[derive(Debug, Clone)]
+pub struct TyArg {
+    pub domain: TyParamDomain,
+    pub inferred: Rc<OnceCell<pr::Ty>>,
 }
 
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
-pub struct TypeArgId {
+pub struct TyArgId {
     pub expr_id: usize,
     pub name: String,
 }
@@ -40,8 +46,8 @@ pub enum Named<'a> {
 #[derive(Clone)]
 pub enum TyRef<'a> {
     Ty(Cow<'a, pr::Ty>),
-    Param,
-    Arg(TypeArgId),
+    Param(&'a str),
+    Arg(TyArgId),
 }
 
 impl Scope {
@@ -52,9 +58,11 @@ impl Scope {
         }
     }
 
-    pub fn insert_generics_params(&mut self, type_params: &[pr::GenericTypeParam]) {
+    pub fn insert_generics_params(&mut self, type_params: &[pr::TyParam]) {
         for gtp in type_params {
-            let scoped = ScopedKind::TypeParam;
+            let scoped = ScopedKind::TypeParam {
+                domain: gtp.domain.clone(),
+            };
             self.names.insert(gtp.name.clone(), scoped);
         }
     }
@@ -72,30 +80,41 @@ impl Scope {
         Ok(())
     }
 
-    pub fn insert_generic_arg(&mut self, type_arg_id: TypeArgId) {
+    pub fn insert_generic_arg(&mut self, type_arg_id: TyArgId, domain: TyParamDomain) {
         let empty = Rc::new(OnceCell::new());
 
-        self.type_args.insert(type_arg_id, empty);
+        let type_arg = TyArg {
+            domain,
+            inferred: empty,
+        };
+
+        self.type_args.insert(type_arg_id, type_arg);
     }
 
-    pub fn infer_type_arg(&mut self, id: &TypeArgId, ty: pr::Ty) {
+    pub fn get_ty_arg<'a>(&'a self, id: &TyArgId) -> &'a TyArg {
+        self.type_args.get(id).unwrap()
+    }
+
+    pub fn infer_type_arg(&mut self, id: &TyArgId, ty: pr::Ty) {
         log::debug!("inferring {id:?} is {ty:?}");
         let type_arg = self.type_args.get(id).unwrap();
-        type_arg.set(ty).unwrap();
+        type_arg.inferred.set(ty).unwrap();
     }
 
-    pub fn infer_type_args_equal(&mut self, a: TypeArgId, b: TypeArgId) {
+    pub fn infer_type_args_equal(&mut self, a: TyArgId, b: TyArgId) {
         log::debug!("inferring equality between {a:?} and {b:?}");
-        let a_cell = self.type_args.get(&a).unwrap();
+        let a_arg = self.type_args.get(&a).unwrap();
+        let a_cell = Rc::clone(&a_arg.inferred);
 
-        let existing = self.type_args.insert(b, Rc::clone(a_cell));
-        assert!(existing.is_some());
+        let b_arg = self.type_args.get_mut(&b).unwrap();
+        assert!(b_arg.inferred.get().is_none());
+        b_arg.inferred = a_cell;
     }
 
     pub fn finalize_type_args(self) -> crate::Result<HashMap<Path, pr::Ty>> {
         let mut mapping = HashMap::new();
-        for (id, ty) in self.type_args.into_iter() {
-            let Some(ty) = ty.get() else {
+        for (id, arg) in self.type_args.into_iter() {
+            let Some(ty) = arg.inferred.get() else {
                 return Err(Diagnostic::new_custom(format!(
                     "cannot infer type: {}.{}",
                     id.expr_id, id.name
@@ -141,16 +160,16 @@ impl Resolver<'_> {
             let part = parts.next().unwrap();
             if part == "type_args" {
                 // special case: type_args
-                let id = TypeArgId {
+                let id = TyArgId {
                     expr_id: parts.next().unwrap().parse::<usize>().unwrap(),
                     name: parts.next().unwrap().clone(),
                 };
 
                 let type_arg = scope.type_args.get(&id)?;
-                if let Some(ty) = type_arg.get() {
+                if let Some(ty) = type_arg.inferred.get() {
                     Some(Named::Scoped(ScopedKind::Type { ty: ty.clone() }))
                 } else {
-                    Some(Named::Scoped(ScopedKind::TypeArg(id)))
+                    Some(Named::Scoped(ScopedKind::TypeArg { id }))
                 }
             } else {
                 scope.names.get(part).cloned().map(Named::Scoped)
@@ -158,5 +177,13 @@ impl Resolver<'_> {
         } else {
             self.root_mod.module.get(ident).map(Named::Decl)
         }
+    }
+
+    pub fn get_ty_param(&self, param_id: &str) -> &TyParamDomain {
+        let scope = self.scopes.last().unwrap();
+        let scoped = scope.names.get(param_id).unwrap();
+        let domain = scoped.as_type_param().unwrap();
+
+        domain
     }
 }

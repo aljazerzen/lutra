@@ -3,12 +3,12 @@ use std::collections::HashMap;
 
 use itertools::Itertools;
 
-use crate::diagnostic::{Diagnostic, WithErrorInfo};
+use crate::diagnostic::{Diagnostic, DiagnosticCode, WithErrorInfo};
 use crate::pr::{self, *};
 use crate::utils::fold::{self, PrFold};
 use crate::{decl, Result, Span};
 
-use super::scope::{Named, Scope, ScopedKind, TyRef, TypeArgId};
+use super::scope::{Named, Scope, ScopedKind, TyArgId, TyRef};
 use super::Resolver;
 
 impl Resolver<'_> {
@@ -20,7 +20,7 @@ impl Resolver<'_> {
         let mut ty = match ty.kind {
             TyKind::Function(Some(ty_func)) if self.scopes.is_empty() => {
                 let mut scope = Scope::new();
-                scope.insert_generics_params(&ty_func.type_params);
+                scope.insert_generics_params(&ty_func.ty_params);
                 self.scopes.push(scope);
                 let ty_func = fold::fold_ty_func(self, ty_func)?;
                 self.scopes.pop();
@@ -79,8 +79,8 @@ impl Resolver<'_> {
                         .with_span(ty.span))
                 }
                 ScopedKind::Type { ty } => Ok(TyRef::Ty(Cow::Owned(ty))),
-                ScopedKind::TypeParam => Ok(TyRef::Param),
-                ScopedKind::TypeArg(type_arg_id) => Ok(TyRef::Arg(type_arg_id)),
+                ScopedKind::TypeParam { .. } => Ok(TyRef::Param(ident.name())),
+                ScopedKind::TypeArg { id } => Ok(TyRef::Arg(id)),
             },
         }
     }
@@ -178,7 +178,7 @@ impl Resolver<'_> {
                     .clone()
                     .or_else(|| func.body.ty.clone())
                     .map(Box::new),
-                type_params: func.generic_type_params.clone(),
+                ty_params: func.ty_params.clone(),
             })),
 
             ExprKind::Ident(_)
@@ -230,7 +230,6 @@ impl Resolver<'_> {
     }
 
     /// Validates that found node has expected type. Returns assumed type of the node.
-    #[allow(clippy::only_used_in_recursion)]
     pub fn validate_type<F>(
         &mut self,
         found: &Ty,
@@ -249,20 +248,50 @@ impl Resolver<'_> {
             // base case: neither found or expected are generic
             (TyRef::Ty(f), TyRef::Ty(e)) => (f.into_owned(), e.into_owned()),
 
-            // generic params: cannot infer anything
-            (TyRef::Param, _) | (_, TyRef::Param) => return Ok(()),
+            // type params
+            (TyRef::Param(param_id), TyRef::Ty(ty)) | (TyRef::Ty(ty), TyRef::Param(param_id)) => {
+                let ty_param = self.get_ty_param(param_id);
+                self.validate_type_domain(ty.as_ref(), ty_param, param_id)?;
 
-            // inference of generic args
+                return Ok(());
+            }
+            (TyRef::Param(_), TyRef::Param(_)) => {
+                return Ok(());
+            }
+            (TyRef::Param(_), TyRef::Arg(_)) | (TyRef::Arg(_), TyRef::Param(_)) => {
+                todo!();
+            }
+
+            // type args
             (TyRef::Ty(ty), TyRef::Arg(ty_arg_id)) | (TyRef::Arg(ty_arg_id), TyRef::Ty(ty)) => {
                 let ty = ty.into_owned();
 
+                // validate
+                let scope = self.scopes.last().unwrap();
+                let ty_arg = scope.get_ty_arg(&ty_arg_id);
+                self.validate_type_domain(&ty, &ty_arg.domain, &ty_arg_id.name)?;
+
+                // infer
                 let scope = self.scopes.last_mut().unwrap();
                 scope.infer_type_arg(&ty_arg_id, ty);
                 return Ok(());
             }
-            (TyRef::Arg(a), TyRef::Arg(b)) => {
+            (TyRef::Arg(a_id), TyRef::Arg(b_id)) => {
+                // validate
+                let scope = self.scopes.last().unwrap();
+                let a = scope.get_ty_arg(&a_id);
+                let b = scope.get_ty_arg(&b_id);
+                if let Some(a_inferred) = a.inferred.get() {
+                    self.validate_type_domain(a_inferred, &b.domain, &a_id.name)?;
+                }
+                if let Some(b_inferred) = b.inferred.get() {
+                    self.validate_type_domain(b_inferred, &a.domain, &b_id.name)?;
+                }
+
+                // infer
                 let scope = self.scopes.last_mut().unwrap();
-                scope.infer_type_args_equal(a, b);
+                scope.infer_type_args_equal(a_id, b_id);
+
                 return Ok(());
             }
         };
@@ -331,6 +360,36 @@ impl Resolver<'_> {
                 Ok(())
             }
             _ => Err(compose_type_error(&found, &expected, who).with_span(span)),
+        }
+    }
+
+    /// Validates that found node has expected type. Returns assumed type of the node.
+    pub fn validate_type_domain(
+        &self,
+        ty: &Ty,
+        domain: &TyParamDomain,
+        param_name: &str,
+    ) -> Result<(), Diagnostic> {
+        match domain {
+            TyParamDomain::Open => Ok(()),
+
+            TyParamDomain::OneOf(possible_tys) => {
+                let is_match = ty
+                    .kind
+                    .as_primitive()
+                    .map_or(false, |t| possible_tys.iter().any(|p| t == p));
+
+                if is_match {
+                    return Ok(());
+                }
+
+                let possible_tys = possible_tys.iter().map(|t| t.to_string()).join(", ");
+
+                Err(Diagnostic::new(
+                    format!("{param_name} is restricted to one of {possible_tys}, found {ty:?}"),
+                    DiagnosticCode::TYPE_DOMAIN,
+                ))
+            }
         }
     }
 
@@ -495,7 +554,7 @@ impl Resolver<'_> {
 
         // TODO: recurse? There might be type params deeper in the type.
 
-        if ty_func.type_params.is_empty() {
+        if ty_func.ty_params.is_empty() {
             return Ty {
                 kind: TyKind::Function(Some(ty_func)),
                 ..ty
@@ -507,7 +566,7 @@ impl Resolver<'_> {
 
         let mut mapping = HashMap::new();
         let scope = self.scopes.last_mut().unwrap();
-        for gtp in ty_func.type_params.drain(..) {
+        for gtp in ty_func.ty_params.drain(..) {
             mapping.insert(
                 Path::new(vec!["scope", gtp.name.as_str()]),
                 Ty::new(Path::new(vec![
@@ -518,11 +577,11 @@ impl Resolver<'_> {
                 ])),
             );
 
-            let type_arg_id = TypeArgId {
+            let type_arg_id = TyArgId {
                 expr_id,
                 name: gtp.name,
             };
-            scope.insert_generic_arg(type_arg_id);
+            scope.insert_generic_arg(type_arg_id, gtp.domain);
         }
 
         let ty = Ty {
@@ -567,11 +626,14 @@ where
         .unwrap_or_default();
     let who = who.map(|x| format!("{x} ")).unwrap_or_default();
 
-    let mut e = Diagnostic::new_custom(format!(
-        "{who}expected {}, but found {}",
-        display_ty(expected),
-        display_ty(found_ty)
-    ));
+    let mut e = Diagnostic::new(
+        format!(
+            "{who}expected {}, but found {}",
+            display_ty(expected),
+            display_ty(found_ty)
+        ),
+        DiagnosticCode::TYPE,
+    );
 
     if found_ty.kind.is_function() && !expected.kind.is_function() {
         let to_what = "in this function call?";

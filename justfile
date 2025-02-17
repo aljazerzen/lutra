@@ -9,8 +9,11 @@ show-deps-workspace:
 test-fast tests='':
     cargo fmt
     cargo check --all-targets --profile=test
-    RUST_LOG=debug RUST_BACKTRACE=1 INSTA_FORCE_PASS=1 cargo nextest run -- {{tests}}
+
+    RUST_LOG=debug RUST_BACKTRACE=1 INSTA_FORCE_PASS=1 \
+    cargo nextest run -- {{tests}}
     cargo insta review
+
     cargo clippy --all-targets
     cargo check -p lutra-bin --no-default-features
 

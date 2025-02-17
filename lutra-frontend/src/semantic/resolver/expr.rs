@@ -68,8 +68,8 @@ impl fold::PrFold for super::Resolver<'_> {
                     Named::Scoped(scoped) => match scoped {
                         ScopedKind::Param { ty } => ty.clone(),
                         ScopedKind::Type { .. }
-                        | ScopedKind::TypeParam
-                        | ScopedKind::TypeArg(_) => {
+                        | ScopedKind::TypeParam { .. }
+                        | ScopedKind::TypeArg { .. } => {
                             return Err(Diagnostic::new_custom(
                                 "expected a value, but found a type",
                             )
@@ -92,7 +92,7 @@ impl fold::PrFold for super::Resolver<'_> {
                 let base_ty = self.resolve_ty_ident(base_ty)?;
                 let base_ty = match base_ty {
                     scope::TyRef::Ty(b) => b,
-                    scope::TyRef::Param => todo!("tuple indirection into generic type Param"),
+                    scope::TyRef::Param(_) => todo!("tuple indirection into generic type Param"),
                     scope::TyRef::Arg(id) => {
                         todo!("tuple indirection into generic type Arg: {id:?}")
                     }

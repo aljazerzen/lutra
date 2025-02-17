@@ -206,7 +206,7 @@ pub fn fold_func<T: ?Sized + PrFold>(fold: &mut T, func: Func) -> Result<Func> {
         body: Box::new(fold.fold_expr(*func.body)?),
         return_ty: fold_type_opt(fold, func.return_ty)?,
         params: fold_func_param(fold, func.params)?,
-        generic_type_params: func.generic_type_params, // recurse into this too?
+        ty_params: func.ty_params, // recurse into this too?
     })
 }
 
@@ -270,7 +270,7 @@ pub fn fold_ty_func<F: ?Sized + PrFold>(fold: &mut F, f: TyFunc) -> Result<TyFun
             .body
             .map(|t| fold.fold_type(*t).map(Box::new))
             .transpose()?,
-        type_params: f.type_params,
+        ty_params: f.ty_params,
     })
 }
 

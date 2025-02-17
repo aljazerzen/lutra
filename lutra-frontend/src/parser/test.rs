@@ -95,6 +95,52 @@ fn parse_02() {
         },
     )
     "#);
+    assert_debug_snapshot!(parse_expr("func <A, B: int8 | int16> () -> 1"), @r#"
+    Expr {
+        kind: Func(
+            Func {
+                return_ty: None,
+                body: Expr {
+                    kind: Literal(
+                        Integer(
+                            1,
+                        ),
+                    ),
+                    span: Some(
+                        0:32-33,
+                    ),
+                    ty: None,
+                },
+                params: [],
+                ty_params: [
+                    TyParam {
+                        name: "A",
+                        domain: Open,
+                        span: Some(
+                            0:6-7,
+                        ),
+                    },
+                    TyParam {
+                        name: "B",
+                        domain: OneOf(
+                            [
+                                int8,
+                                int16,
+                            ],
+                        ),
+                        span: Some(
+                            0:9-24,
+                        ),
+                    },
+                ],
+            },
+        ),
+        span: Some(
+            0:0-33,
+        ),
+        ty: None,
+    }
+    "#);
 }
 
 #[test]
