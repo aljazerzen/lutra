@@ -329,6 +329,7 @@ fn types_17() {
        │                                                              ╰── function get_int, one of the params expected type `{int64}`, but found type `scope::T`
     ───╯
     "#);
+
     insta::assert_snapshot!(_test_err(r#"
         let get_int: func (x: {a = int64}): int64
         let get = func <T: {a = int64, ..}> (x: T): T -> get_int(x)
@@ -356,9 +357,25 @@ fn types_17() {
        │                                                                      ╰── I is restricted to tuples with at least 2 fields
     ───╯
     "#);
+
     insta::assert_snapshot!(_test_run(r#"
         let needs_one: func <I: {int64, ..}> (x: I): I
         let needs_two = func <T: {int64, bool, ..}> (x: T): T -> needs_one(x)
         func () -> needs_two({4, false})
     "#), @"{int64, bool}");
+}
+
+#[test]
+fn types_18() {
+    // indirection into type params
+
+    insta::assert_snapshot!(_test_run(r#"
+        let f = func <T: {int64, ..}> (x: T) -> x.0
+        func () -> f({4, false})
+    "#), @"int64");
+
+    insta::assert_snapshot!(_test_run(r#"
+        let f = func <T: {a = int64, ..}> (x: T) -> x.a
+        func () -> f({false, a = 4})
+    "#), @"int64");
 }

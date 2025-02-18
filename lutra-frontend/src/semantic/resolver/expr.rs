@@ -2,16 +2,16 @@ use itertools::Itertools;
 
 use crate::decl::DeclKind;
 use crate::diagnostic::{Diagnostic, WithErrorInfo};
-use crate::pr;
 use crate::pr::Ty;
 use crate::semantic::resolver::scope::{Named, ScopedKind};
 use crate::semantic::resolver::tuple::BaseKind;
 use crate::semantic::NS_STD;
 use crate::utils::fold::{self, PrFold};
 use crate::Result;
+use crate::{pr, printer};
 
-use super::scope;
 use super::tuple::Indirection;
+use super::{scope, tuple};
 
 impl fold::PrFold for super::Resolver<'_> {
     fn fold_stmts(&mut self, _: Vec<pr::Stmt>) -> Result<Vec<pr::Stmt>> {
@@ -179,7 +179,26 @@ impl super::Resolver<'_> {
 
         let base = match base_ref {
             scope::TyRef::Ty(b) => b,
-            scope::TyRef::Param(_) => todo!("tuple indirection into generic type Param"),
+            scope::TyRef::Param(id) => {
+                let param = self.get_ty_param(&id);
+                return match param {
+                    pr::TyParamDomain::Open | pr::TyParamDomain::OneOf(_) => {
+                        Err(Diagnostic::new_custom(format!(
+                            "expected a tuple or an array, found {}",
+                            base.kind.as_ref()
+                        )))
+                    }
+                    pr::TyParamDomain::TupleFields(fields) => {
+                        tuple::lookup_in_domain(fields, indirection).ok_or_else(|| {
+                            Diagnostic::new_custom(format!(
+                                "Field {} does not exist in type {}",
+                                tuple::print_indirection_kind(indirection),
+                                printer::print_ty(base)
+                            ))
+                        })
+                    }
+                };
+            }
             scope::TyRef::Arg(id) => {
                 todo!("tuple indirection into generic type Arg: {id:?}")
             }
@@ -188,25 +207,19 @@ impl super::Resolver<'_> {
         match &base.kind {
             pr::TyKind::Ident(_) => unreachable!(),
 
-            pr::TyKind::Tuple(fields) => match indirection {
-                pr::IndirectionKind::Name(name) => {
-                    self.lookup_name_in_tuple(fields, name).and_then(|res| {
-                        res.ok_or_else(|| Diagnostic::new_custom(format!("Unknown name {name}")))
-                    })
-                }
-                pr::IndirectionKind::Position(pos) => {
-                    let step = super::tuple::lookup_position_in_tuple(&base, *pos as usize)?
-                        .ok_or_else(|| Diagnostic::new_custom("Out of bounds"))?;
-
-                    Ok(step)
-                }
-                pr::IndirectionKind::Star => todo!(),
-            },
+            pr::TyKind::Tuple(fields) => {
+                tuple::lookup_in_tuple(fields, indirection).ok_or_else(|| {
+                    Diagnostic::new_custom(format!(
+                        "Field {} does not exist in type {}",
+                        tuple::print_indirection_kind(indirection),
+                        printer::print_ty(&base)
+                    ))
+                })
+            }
 
             pr::TyKind::Array(items_ty) => match indirection {
                 pr::IndirectionKind::Name(_) => {
-                    Err(Diagnostic::new_custom("cannot lookup array items by name")
-                        .with_span(base.span))
+                    Err(Diagnostic::new_custom("cannot lookup array items by name"))
                 }
                 pr::IndirectionKind::Position(pos) => Ok(Indirection {
                     base: BaseKind::Array,
@@ -220,8 +233,7 @@ impl super::Resolver<'_> {
                 Err(Diagnostic::new_custom(format!(
                     "expected a tuple or an array, found {}",
                     base.kind.as_ref()
-                ))
-                .with_span(base.span))
+                )))
             }
         }
     }
