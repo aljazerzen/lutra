@@ -4,8 +4,6 @@ use strum::AsRefStr;
 use crate::pr::path::Path;
 use crate::span::Span;
 
-use super::TyParam;
-
 #[derive(Debug, Clone)]
 pub struct Ty {
     pub kind: TyKind,
@@ -172,6 +170,35 @@ pub struct TyFunc {
     pub ty_params: Vec<TyParam>,
 }
 
+#[derive(Debug, Clone)]
+pub struct TyParam {
+    /// Assigned name of this generic type argument.
+    pub name: String,
+
+    pub domain: TyParamDomain,
+
+    pub span: Option<Span>,
+}
+
+#[derive(Debug, Clone)]
+pub enum TyParamDomain {
+    /// This param can be any type
+    Open,
+
+    /// This param must be one of the following
+    OneOf(Vec<PrimitiveSet>),
+
+    /// This param must be a tuple with following fields
+    // TODO: generalize and replace this with TyTupleField
+    TupleFields(Vec<TyDomainTupleField>),
+}
+
+#[derive(Debug, Clone)]
+pub struct TyDomainTupleField {
+    pub name: Option<String>,
+    pub ty: PrimitiveSet,
+}
+
 impl Ty {
     pub fn new<K: Into<TyKind>>(kind: K) -> Ty {
         Ty {
@@ -238,6 +265,22 @@ impl Eq for Ty {}
 impl std::hash::Hash for Ty {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
         self.kind.hash(state);
+    }
+}
+
+impl PartialEq for TyParam {
+    fn eq(&self, other: &Self) -> bool {
+        self.name == other.name
+        // && self.domain == other.domain
+    }
+}
+
+impl Eq for TyParam {}
+
+impl std::hash::Hash for TyParam {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.name.hash(state);
+        // self.domain.hash(state);
     }
 }
 

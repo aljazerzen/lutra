@@ -141,6 +141,49 @@ fn parse_02() {
         ty: None,
     }
     "#);
+    assert_debug_snapshot!(parse_expr("func <T: {b = int64, ..}> () -> 1"), @r#"
+    Expr {
+        kind: Func(
+            Func {
+                return_ty: None,
+                body: Expr {
+                    kind: Literal(
+                        Integer(
+                            1,
+                        ),
+                    ),
+                    span: Some(
+                        0:32-33,
+                    ),
+                    ty: None,
+                },
+                params: [],
+                ty_params: [
+                    TyParam {
+                        name: "T",
+                        domain: TupleFields(
+                            [
+                                TyDomainTupleField {
+                                    name: Some(
+                                        "b",
+                                    ),
+                                    ty: int64,
+                                },
+                            ],
+                        ),
+                        span: Some(
+                            0:6-24,
+                        ),
+                    },
+                ],
+            },
+        ),
+        span: Some(
+            0:0-33,
+        ),
+        ty: None,
+    }
+    "#);
 }
 
 #[test]

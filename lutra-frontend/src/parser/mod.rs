@@ -73,9 +73,9 @@ fn ctrl(char: char) -> impl Parser<TokenKind, (), Error = PError> + Clone {
 
 /// Parse a sequence, allowing commas and new lines between items. Doesn't
 /// include the surrounding delimiters.
-fn sequence<'a, P, O>(parser: P) -> impl Parser<TokenKind, Vec<O>, Error = PError> + Clone + 'a
+fn sequence<'a, P, O>(parser: P) -> impl Parser<TokenKind, Vec<O>, Error = PError> + Clone
 where
-    P: Parser<TokenKind, O, Error = PError> + Clone + 'a,
+    P: Parser<TokenKind, O, Error = PError> + Clone,
     O: 'a,
 {
     parser.separated_by(ctrl(',')).allow_trailing()

@@ -143,14 +143,39 @@ fn primitive_set() -> impl Parser<TokenKind, PrimitiveSet, Error = PError> {
 }
 
 pub fn type_params() -> impl Parser<TokenKind, Vec<TyParam>, Error = PError> + Clone {
+    let tuple = ident_part()
+        .then_ignore(ctrl('='))
+        .or_not()
+        .then(primitive_set())
+        .map(|(name, ty)| TyDomainTupleField { name, ty })
+        .separated_by(ctrl(','))
+        .then_ignore(ctrl(',').then(just(TokenKind::Range)))
+        .delimited_by(ctrl('{'), ctrl('}'))
+        .recover_with(nested_delimiters(
+            TokenKind::Control('{'),
+            TokenKind::Control('}'),
+            [
+                (TokenKind::Control('{'), TokenKind::Control('}')),
+                (TokenKind::Control('('), TokenKind::Control(')')),
+                (TokenKind::Control('['), TokenKind::Control(']')),
+            ],
+            |_| vec![],
+        ))
+        .map(TyParamDomain::TupleFields)
+        .labelled("tuple domain");
+
     // domain
     let domain = ctrl(':')
-        .ignore_then(primitive_set().separated_by(ctrl('|')).at_least(1))
+        .ignore_then(choice((
+            tuple,
+            primitive_set()
+                .separated_by(ctrl('|'))
+                .at_least(1)
+                .map(TyParamDomain::OneOf),
+        )))
         .or_not()
-        .map(|x| match x {
-            Some(tys) => TyParamDomain::OneOf(tys),
-            None => TyParamDomain::Open,
-        });
+        .map(|x| x.unwrap_or(TyParamDomain::Open))
+        .labelled("type parameter domain");
 
     // param name
     let param = ident_part()

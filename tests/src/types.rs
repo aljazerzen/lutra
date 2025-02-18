@@ -171,3 +171,42 @@ fn types_14() {
         func () -> floor(2.3)
     "#), @"T is restricted to one of float32, float64, found Ty { kind: Primitive(bool), span: Some(1:32-36), name: None, layout: Some(TyLayout { head_size: 8, body_ptrs: [], variants_recursive: [] }) }");
 }
+#[test]
+fn types_15() {
+    // tuple domain with named arg
+    insta::assert_snapshot!(_test_run(r#"
+        let get_b: func <T: {b = int64, ..}> (x: T): T
+        func () -> get_b({a = false, b = 4})
+    "#), @"{a = bool, b = int64}");
+
+    insta::assert_snapshot!(_test_err(r#"
+        let get_b: func <T: {b = int64, ..}> (x: T): T
+        func () -> get_b({a = false, b = 4.6})
+    "#), @"T.b is restricted to int64");
+    insta::assert_snapshot!(_test_err(r#"
+        let get_b: func <T: {b = int64, ..}> (x: T): T
+        func () -> get_b({a = false, c = 4})
+    "#), @"T is restricted to tuples with a field named `b`");
+}
+#[test]
+fn types_16() {
+    // tuple domain with positional arg
+    insta::assert_snapshot!(_test_run(r#"
+        let get_b: func <T: {bool, int64, ..}> (x: T): T
+        func () -> get_b({a = false, 4, c = 5.7})
+    "#), @"{a = bool, int64, c = float64}");
+
+    insta::assert_snapshot!(_test_err(r#"
+        let get_b: func <T: {bool, int64, ..}> (x: T): T
+        func () -> get_b({a = 7, 4, c = 5.7})
+    "#), @"T.0 is restricted to bool");
+
+    insta::assert_snapshot!(_test_err(r#"
+        let get_b: func <T: {bool, int64, a = bool, ..}> (x: T): T
+        func () -> get_b({a = false})
+    "#), @"T is restricted to tuples with at least 2 fields");
+    insta::assert_snapshot!(_test_run(r#"
+        let get_b: func <T: {bool, int64, a = bool, ..}> (x: T): T
+        func () -> get_b({a = false, 4})
+    "#), @"{a = bool, int64}");
+}

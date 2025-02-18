@@ -379,16 +379,80 @@ impl Resolver<'_> {
                     .as_primitive()
                     .map_or(false, |t| possible_tys.iter().any(|p| t == p));
 
-                if is_match {
-                    return Ok(());
+                if !is_match {
+                    let possible_tys = possible_tys.iter().map(|t| t.to_string()).join(", ");
+
+                    return Err(Diagnostic::new(
+                        format!(
+                            "{param_name} is restricted to one of {possible_tys}, found {ty:?}"
+                        ),
+                        DiagnosticCode::TYPE_DOMAIN,
+                    ));
                 }
 
-                let possible_tys = possible_tys.iter().map(|t| t.to_string()).join(", ");
+                Ok(())
+            }
 
-                Err(Diagnostic::new(
-                    format!("{param_name} is restricted to one of {possible_tys}, found {ty:?}"),
-                    DiagnosticCode::TYPE_DOMAIN,
-                ))
+            TyParamDomain::TupleFields(domain_fields) => {
+                let TyKind::Tuple(ty_fields) = &ty.kind else {
+                    return Err(Diagnostic::new(
+                        format!("{param_name} is restricted to tuples, found {ty:?}"),
+                        DiagnosticCode::TYPE_DOMAIN,
+                    ));
+                };
+
+                let num_positional = domain_fields
+                    .iter()
+                    .enumerate()
+                    .filter(|(_, f)| f.name.is_none())
+                    .last()
+                    .map(|(p, _)| p + 1)
+                    .unwrap_or_default();
+
+                for (position, domain_field) in domain_fields.iter().enumerate() {
+                    let (ind_display, ty_field) = if let Some(name) = &domain_field.name {
+                        // named
+                        let res = ty_fields.iter().find(|f| f.name.as_ref() == Some(name));
+
+                        (name.clone(), res.ok_or_else(|| {
+                            Diagnostic::new(
+                                format!("{param_name} is restricted to tuples with a field named `{name}`"),
+                                DiagnosticCode::TYPE_DOMAIN,
+                            )
+                        })?)
+                    } else {
+                        // positional
+                        (position.to_string(), ty_fields.get(position).ok_or_else(|| {
+                            Diagnostic::new(
+                                format!("{param_name} is restricted to tuples with at least {num_positional} fields"),
+                                DiagnosticCode::TYPE_DOMAIN,
+                            )
+                        })?)
+                    };
+
+                    let TyKind::Primitive(ty_field_ty) = &ty_field.ty.kind else {
+                        return Err(Diagnostic::new(
+                            format!("{param_name}.{ind_display} is restricted to primitive types"),
+                            DiagnosticCode::TYPE_DOMAIN,
+                        )
+                        .push_hint("This is a temporary restriction. Work in progress."));
+                    };
+
+                    if ty_field_ty != &domain_field.ty {
+                        return Err(Diagnostic::new(
+                            format!(
+                                "{param_name}.{ind_display} is restricted to {}",
+                                domain_field.ty
+                            ),
+                            DiagnosticCode::TYPE_DOMAIN,
+                        ));
+                    }
+
+                    // ok
+                }
+
+                // all ok
+                Ok(())
             }
         }
     }
