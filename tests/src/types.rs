@@ -29,7 +29,7 @@ fn _test_err(source: &str) -> String {
         unreachable!()
     };
     let diagnostic = diagnostics.into_iter().next().unwrap();
-    diagnostic.message().to_string()
+    diagnostic.display().to_string()
 }
 
 #[test]
@@ -70,7 +70,15 @@ fn types_03() {
         let floor = func <T> (x: T) -> floor_64(x)
 
         func () -> floor(4.4)
-    "#), @r#"function floor_64, one of the params expected type `Ty { kind: Primitive(float64), span: Some(1:32-39), name: None, layout: Some(TyLayout { head_size: 64, body_ptrs: [], variants_recursive: [] }) }`, but found type `Ty { kind: Ident(["scope", "T"]), span: Some(1:84-85), name: None, layout: None }`"#);
+    "#), @r#"
+    [E0004] Error: 
+       ╭─[:4:49]
+       │
+     4 │         let floor = func <T> (x: T) -> floor_64(x)
+       │                                                 ┬  
+       │                                                 ╰── function floor_64, one of the params expected type `float64`, but found type `scope::T`
+    ───╯
+    "#);
 }
 #[test]
 fn types_05() {
@@ -125,7 +133,15 @@ fn types_08() {
 fn types_09() {
     insta::assert_snapshot!(_test_err(r#"
         let peek: func <T> (array: [T], condition: func <R> (T): R): [T]
-    "#), @"generic type parameters are not allowed here");
+    "#), @r#"
+    Error: 
+       ╭─[:2:58]
+       │
+     2 │         let peek: func <T> (array: [T], condition: func <R> (T): R): [T]
+       │                                                          ┬  
+       │                                                          ╰── generic type parameters are not allowed here
+    ───╯
+    "#);
 }
 #[test]
 fn types_10() {
@@ -168,7 +184,15 @@ fn types_13() {
     insta::assert_snapshot!(_test_err(r#"
         let floor: func <T: float32 | float64> (x: T): T
         func () -> floor(false)
-    "#), @"T is restricted to one of float32, float64, found Ty { kind: Primitive(bool), span: Some(1:83-88), name: None, layout: Some(TyLayout { head_size: 8, body_ptrs: [], variants_recursive: [] }) }");
+    "#), @r#"
+    [E0005] Error: 
+       ╭─[:3:26]
+       │
+     3 │         func () -> floor(false)
+       │                          ──┬──  
+       │                            ╰──── T is restricted to one of float32, float64, found bool
+    ───╯
+    "#);
 }
 #[test]
 fn types_14() {
@@ -180,7 +204,15 @@ fn types_14() {
             floor_64(x)
         )
         func () -> floor(2.3)
-    "#), @r#"function floor_64, one of the params expected type `Ty { kind: Primitive(float64), span: Some(1:32-39), name: None, layout: Some(TyLayout { head_size: 64, body_ptrs: [], variants_recursive: [] }) }`, but found type `Ty { kind: Ident(["scope", "T"]), span: Some(1:102-103), name: None, layout: None }`"#);
+    "#), @r#"
+    [E0004] Error: 
+       ╭─[:4:22]
+       │
+     4 │             floor_64(x)
+       │                      ┬  
+       │                      ╰── function floor_64, one of the params expected type `float64`, but found type `scope::T`
+    ───╯
+    "#);
 
     insta::assert_snapshot!(_test_run(r#"
         let floor: func <F: float32 | float64> (x: F): F
@@ -198,7 +230,15 @@ fn types_14() {
         let floor: func <F: float32 | float64> (x: F): F
         let twice_floored = func <T: float64 | bool> (x: T) -> {floor(x), floor(x)}
         func () -> twice_floored(2.3)
-    "#), @"T is restricted to one of float32, float64, found Ty { kind: Primitive(bool), span: None, name: None, layout: None }");
+    "#), @r#"
+    [E0005] Error: 
+       ╭─[:3:71]
+       │
+     3 │         let twice_floored = func <T: float64 | bool> (x: T) -> {floor(x), floor(x)}
+       │                                                                       ┬  
+       │                                                                       ╰── T is restricted to one of float32, float64, found bool
+    ───╯
+    "#);
 }
 #[test]
 fn types_15() {
@@ -211,11 +251,27 @@ fn types_15() {
     insta::assert_snapshot!(_test_err(r#"
         let get_b: func <T: {b = int64, ..}> (x: T): T
         func () -> get_b({a = false, b = 4.6})
-    "#), @"T.b is restricted to int64");
+    "#), @r#"
+    [E0005] Error: 
+       ╭─[:3:42]
+       │
+     3 │         func () -> get_b({a = false, b = 4.6})
+       │                                          ─┬─  
+       │                                           ╰─── T.b is restricted to int64
+    ───╯
+    "#);
     insta::assert_snapshot!(_test_err(r#"
         let get_b: func <T: {b = int64, ..}> (x: T): T
         func () -> get_b({a = false, c = 4})
-    "#), @"T is restricted to tuples with a field named `b`");
+    "#), @r#"
+    [E0005] Error: 
+       ╭─[:3:26]
+       │
+     3 │         func () -> get_b({a = false, c = 4})
+       │                          ─────────┬────────  
+       │                                   ╰────────── T is restricted to tuples with a field named `b`
+    ───╯
+    "#);
 }
 #[test]
 fn types_16() {
@@ -228,12 +284,28 @@ fn types_16() {
     insta::assert_snapshot!(_test_err(r#"
         let get_b: func <T: {bool, int64, ..}> (x: T): T
         func () -> get_b({a = 7, 4, c = 5.7})
-    "#), @"T.0 is restricted to bool");
+    "#), @r#"
+    [E0005] Error: 
+       ╭─[:3:31]
+       │
+     3 │         func () -> get_b({a = 7, 4, c = 5.7})
+       │                               ┬  
+       │                               ╰── T.0 is restricted to bool
+    ───╯
+    "#);
 
     insta::assert_snapshot!(_test_err(r#"
         let get_b: func <T: {bool, int64, a = bool, ..}> (x: T): T
         func () -> get_b({a = false})
-    "#), @"T is restricted to tuples with at least 2 fields");
+    "#), @r#"
+    [E0005] Error: 
+       ╭─[:3:26]
+       │
+     3 │         func () -> get_b({a = false})
+       │                          ─────┬─────  
+       │                               ╰─────── T is restricted to tuples with at least 2 fields
+    ───╯
+    "#);
     insta::assert_snapshot!(_test_run(r#"
         let get_b: func <T: {bool, int64, a = bool, ..}> (x: T): T
         func () -> get_b({a = false, 4})
@@ -248,18 +320,42 @@ fn types_17() {
         let get_int: func (x: {int64}): int64
         let get = func <T: {int64, ..}> (x: T): T -> get_int(x)
         func () -> get({4})
-    "#), @r#"function get_int, one of the params expected type `Ty { kind: Tuple([TyTupleField { name: None, ty: Ty { kind: Primitive(int64), span: Some(1:32-37), name: None, layout: Some(TyLayout { head_size: 64, body_ptrs: [], variants_recursive: [] }) } }]), span: Some(1:31-38), name: None, layout: Some(TyLayout { head_size: 64, body_ptrs: [], variants_recursive: [] }) }`, but found type `Ty { kind: Ident(["scope", "T"]), span: Some(1:91-92), name: None, layout: None }`"#);
+    "#), @r#"
+    [E0004] Error: 
+       ╭─[:3:62]
+       │
+     3 │         let get = func <T: {int64, ..}> (x: T): T -> get_int(x)
+       │                                                              ┬  
+       │                                                              ╰── function get_int, one of the params expected type `{int64}`, but found type `scope::T`
+    ───╯
+    "#);
     insta::assert_snapshot!(_test_err(r#"
         let get_int: func (x: {a = int64}): int64
         let get = func <T: {a = int64, ..}> (x: T): T -> get_int(x)
         func () -> get({4})
-    "#), @r#"function get_int, one of the params expected type `Ty { kind: Tuple([TyTupleField { name: Some("a"), ty: Ty { kind: Primitive(int64), span: Some(1:36-41), name: None, layout: Some(TyLayout { head_size: 64, body_ptrs: [], variants_recursive: [] }) } }]), span: Some(1:31-42), name: None, layout: Some(TyLayout { head_size: 64, body_ptrs: [], variants_recursive: [] }) }`, but found type `Ty { kind: Ident(["scope", "T"]), span: Some(1:99-100), name: None, layout: None }`"#);
+    "#), @r#"
+    [E0004] Error: 
+       ╭─[:3:66]
+       │
+     3 │         let get = func <T: {a = int64, ..}> (x: T): T -> get_int(x)
+       │                                                                  ┬  
+       │                                                                  ╰── function get_int, one of the params expected type `{a = int64}`, but found type `scope::T`
+    ───╯
+    "#);
 
     insta::assert_snapshot!(_test_err(r#"
         let needs_two: func <I: {int64, bool, ..}> (x: I): int64
         let needs_one = func <T: {int64, ..}> (x: T): T -> needs_two(x)
         func () -> needs_one({4})
-    "#), @"I is restricted to tuples with at least 2 fields");
+    "#), @r#"
+    [E0005] Error: 
+       ╭─[:3:70]
+       │
+     3 │         let needs_one = func <T: {int64, ..}> (x: T): T -> needs_two(x)
+       │                                                                      ┬  
+       │                                                                      ╰── I is restricted to tuples with at least 2 fields
+    ───╯
+    "#);
     insta::assert_snapshot!(_test_run(r#"
         let needs_one: func <I: {int64, ..}> (x: I): I
         let needs_two = func <T: {int64, bool, ..}> (x: T): T -> needs_one(x)

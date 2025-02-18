@@ -1,5 +1,3 @@
-use std::fmt::Write;
-
 /// A name referring to a statement within the module tree.
 /// This is glorified way of writing a "vec with at least one element".
 #[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Clone)]
@@ -111,7 +109,7 @@ impl std::fmt::Debug for Path {
 
 impl std::fmt::Display for Path {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        display_ident(f, self)
+        f.write_str(&display_path(self))
     }
 }
 
@@ -133,25 +131,20 @@ impl std::ops::Add<Path> for Path {
     }
 }
 
-pub fn display_ident(f: &mut std::fmt::Formatter, ident: &Path) -> Result<(), std::fmt::Error> {
-    let mut path = &ident.path[..];
+fn display_path(ident: &Path) -> String {
+    let path = &ident.path[..];
 
-    // HACK: don't display `_local` prefix
-    // (this workaround is needed on feat-types branch)
-    if path.first().map_or(false, |f| f == "_local") {
-        path = &path[1..];
-    }
-
+    let mut r = String::new();
     for (index, part) in path.iter().enumerate() {
         if index > 0 {
-            f.write_char('.')?;
+            r += "::";
         }
-        display_ident_part(f, part)?;
+        r += display_ident_part(part).as_ref();
     }
-    Ok(())
+    r
 }
 
-pub fn display_ident_part(f: &mut std::fmt::Formatter, s: &str) -> Result<(), std::fmt::Error> {
+pub fn display_ident_part(s: &str) -> std::borrow::Cow<'_, str> {
     fn forbidden_start(c: char) -> bool {
         !(c.is_ascii() || matches!(c, '_' | '$'))
     }
@@ -163,8 +156,8 @@ pub fn display_ident_part(f: &mut std::fmt::Formatter, s: &str) -> Result<(), st
         || (s.len() > 1 && s.chars().skip(1).any(forbidden_subsequent));
 
     if needs_escape {
-        write!(f, "`{s}`")
+        format!("`{s}`").into()
     } else {
-        write!(f, "{s}")
+        s.into()
     }
 }

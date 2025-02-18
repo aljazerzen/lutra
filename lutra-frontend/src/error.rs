@@ -116,7 +116,7 @@ fn compose_display(
 ) -> String {
     use ariadne::{Config, Label, Report, ReportKind};
 
-    let config = Config::default().with_color(true);
+    let config = Config::default().with_color(false);
 
     let span = std::ops::Range::from(diagnostic.span.unwrap());
 

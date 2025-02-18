@@ -3,11 +3,11 @@ use std::collections::HashMap;
 
 use itertools::Itertools;
 
-use crate::decl;
 use crate::diagnostic::{Diagnostic, DiagnosticCode, WithErrorInfo};
 use crate::pr::{self, *};
 use crate::utils::fold::{self, PrFold};
 use crate::Result;
+use crate::{decl, printer};
 
 use super::scope::{Named, Scope, ScopedKind, TyArgId, TyRef};
 use super::Resolver;
@@ -59,7 +59,7 @@ impl Resolver<'_> {
         let named = self.get_ident(&ident).ok_or_else(|| {
             log::debug!("scope: {:?}", self.scopes.last().unwrap());
             Diagnostic::new_assert("cannot find type ident")
-                .push_hint(format!("ident={ident:?}"))
+                .push_hint(format!("ident={ident}"))
                 .with_span(ty.span)
         })?;
         match named {
@@ -69,14 +69,14 @@ impl Resolver<'_> {
                     "Unresolved ident at {:?}: (during eval of {})",
                     ty.span, self.debug_current_decl
                 ))),
-                _ => Err(Diagnostic::new_assert("expected reference to a type")
+                _ => Err(Diagnostic::new_assert("expected a type")
                     .push_hint(format!("got {:?}", &decl.kind))
                     .with_span(ty.span)),
             },
             Named::Scoped(scoped) => match scoped {
                 ScopedKind::Param { ty, .. } => {
-                    Err(Diagnostic::new_assert("expected type found an expression")
-                        .push_hint(format!("got {:?}", &ty))
+                    Err(Diagnostic::new_assert("expected a type, found a value")
+                        .push_hint(format!("got param of type `{}`", printer::print_ty(&ty)))
                         .with_span(ty.span))
                 }
                 ScopedKind::Type { ty } => self.resolve_ty_ident(ty),
@@ -200,7 +200,7 @@ impl Resolver<'_> {
         let missing_layout = self.compute_ty_layout(&mut ty)?;
         if missing_layout {
             return Err(Diagnostic::new_assert("missing type layout")
-                .push_hint(format!("ty: {ty:?}"))
+                .push_hint(format!("ty: {}", printer::print_ty(&ty)))
                 .with_span(ty.span));
         }
         Ok(ty)
@@ -236,7 +236,11 @@ impl Resolver<'_> {
     where
         F: Fn() -> Option<String>,
     {
-        log::trace!("validate_type, \nf: {found:?}, \ne: {expected:?}");
+        log::trace!(
+            "validate_type, f: {}, e: {}",
+            printer::print_ty(found),
+            printer::print_ty(expected)
+        );
         let found_ref = self.resolve_ty_ident(found.clone())?;
         let expected_ref = self.resolve_ty_ident(expected.clone())?;
 
@@ -392,7 +396,10 @@ impl Resolver<'_> {
                     let possible_tys = possible_tys.iter().map(|t| t.to_string()).join(", ");
 
                     return Err(Diagnostic::new(
-                        format!("{arg_name} is restricted to one of {possible_tys}, found {ty:?}"),
+                        format!(
+                            "{arg_name} is restricted to one of {possible_tys}, found {}",
+                            printer::print_ty(ty)
+                        ),
                         DiagnosticCode::TYPE_DOMAIN,
                     ));
                 }
@@ -403,7 +410,10 @@ impl Resolver<'_> {
             TyParamDomain::TupleFields(domain_fields) => {
                 let TyKind::Tuple(ty_fields) = &ty.kind else {
                     return Err(Diagnostic::new(
-                        format!("{arg_name} is restricted to tuples, found {ty:?}"),
+                        format!(
+                            "{arg_name} is restricted to tuples, found {}",
+                            printer::print_ty(ty)
+                        ),
                         DiagnosticCode::TYPE_DOMAIN,
                     ));
                 };
@@ -442,7 +452,8 @@ impl Resolver<'_> {
                             format!("{arg_name}.{ind_display} is restricted to primitive types"),
                             DiagnosticCode::TYPE_DOMAIN,
                         )
-                        .push_hint("This is a temporary restriction. Work in progress."));
+                        .push_hint("This is a temporary restriction. Work in progress."))
+                        .with_span(ty_field.ty.span);
                     };
 
                     if ty_field_ty != &domain_field.ty {
@@ -452,7 +463,8 @@ impl Resolver<'_> {
                                 domain_field.ty
                             ),
                             DiagnosticCode::TYPE_DOMAIN,
-                        ));
+                        )
+                        .with_span(ty_field.ty.span));
                     }
 
                     // ok
@@ -771,7 +783,7 @@ where
     F: Fn() -> Option<String>,
 {
     fn display_ty(ty: &Ty) -> String {
-        format!("type `{:?}`", ty)
+        format!("type `{}`", printer::print_ty(ty))
     }
 
     let who = who();
@@ -802,8 +814,8 @@ where
 
     if let Some(expected_name) = &expected.name {
         e = e.push_hint(format!(
-            "Type `{expected_name}` expands to `{:?}`",
-            expected.kind
+            "Type `{expected_name}` expands to `{}`",
+            printer::print_ty(expected)
         ));
     }
     e

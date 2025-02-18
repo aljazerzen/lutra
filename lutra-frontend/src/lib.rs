@@ -4,6 +4,7 @@ mod diagnostic;
 mod discover;
 mod lowering;
 mod parser;
+mod printer;
 mod project;
 mod semantic;
 mod span;
