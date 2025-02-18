@@ -1,7 +1,7 @@
 use crate::pr;
 use crate::Result;
 
-pub fn lookup_position_in_tuple(base: &pr::Ty, position: usize) -> Result<Option<Step>> {
+pub fn lookup_position_in_tuple(base: &pr::Ty, position: usize) -> Result<Option<Indirection>> {
     // get base fields
     let pr::TyKind::Tuple(fields) = &base.kind else {
         return Ok(None);
@@ -10,7 +10,8 @@ pub fn lookup_position_in_tuple(base: &pr::Ty, position: usize) -> Result<Option
     let singles = fields.as_slice();
 
     Ok(if position < singles.len() {
-        fields.get(position).map(|f| Step {
+        fields.get(position).map(|f| Indirection {
+            base: BaseKind::Tuple,
             position,
             target_ty: f.ty.clone(),
         })
@@ -25,12 +26,13 @@ impl super::Resolver<'_> {
         &'a self,
         fields: &'a [pr::TyTupleField],
         name: &str,
-    ) -> Result<Option<Step>> {
+    ) -> Result<Option<Indirection>> {
         log::debug!("looking up `.{name}` in {:?}", fields);
 
         for (position, field) in fields.iter().enumerate() {
             if field.name.as_ref().map_or(false, |n| n == name) {
-                return Ok(Some(Step {
+                return Ok(Some(Indirection {
+                    base: BaseKind::Tuple,
                     position,
                     target_ty: field.ty.clone(),
                 }));
@@ -41,7 +43,14 @@ impl super::Resolver<'_> {
 }
 
 #[derive(Debug, Clone)]
-pub struct Step {
+pub struct Indirection {
+    pub base: BaseKind,
     pub position: usize,
     pub target_ty: pr::Ty,
+}
+
+#[derive(Debug, Clone)]
+pub enum BaseKind {
+    Tuple,
+    Array,
 }

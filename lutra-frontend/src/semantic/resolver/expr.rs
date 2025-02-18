@@ -5,12 +5,13 @@ use crate::diagnostic::{Diagnostic, WithErrorInfo};
 use crate::pr;
 use crate::pr::Ty;
 use crate::semantic::resolver::scope::{Named, ScopedKind};
+use crate::semantic::resolver::tuple::BaseKind;
 use crate::semantic::NS_STD;
 use crate::utils::fold::{self, PrFold};
 use crate::Result;
 
 use super::scope;
-use super::tuple::Step;
+use super::tuple::Indirection;
 
 impl fold::PrFold for super::Resolver<'_> {
     fn fold_stmts(&mut self, _: Vec<pr::Stmt>) -> Result<Vec<pr::Stmt>> {
@@ -87,40 +88,30 @@ impl fold::PrFold for super::Resolver<'_> {
 
             pr::ExprKind::Indirection { base, field } => {
                 let base = self.fold_expr(*base)?;
+                let base_ty = base.ty.as_ref().unwrap();
 
-                let base_ty = base.ty.clone().unwrap();
-                let base_ty = self.resolve_ty_ident(base_ty)?;
-                let base_ty = match base_ty {
-                    scope::TyRef::Ty(b) => b,
-                    scope::TyRef::Param(_) => todo!("tuple indirection into generic type Param"),
-                    scope::TyRef::Arg(id) => {
-                        todo!("tuple indirection into generic type Arg: {id:?}")
+                let indirection = self.resolve_indirection(base_ty, &field).with_span(span)?;
+                match indirection.base {
+                    BaseKind::Tuple => {
+                        let kind = pr::ExprKind::Indirection {
+                            base: Box::new(base),
+                            field: pr::IndirectionKind::Position(indirection.position as i64),
+                        };
+                        pr::Expr {
+                            ty: Some(indirection.target_ty),
+                            kind,
+                            ..node
+                        }
                     }
-                };
+                    BaseKind::Array => {
+                        let std_index = pr::Expr::new(pr::Path::new(vec!["std", "index"]));
+                        let position =
+                            pr::Expr::new(pr::Literal::Integer(indirection.position as i64));
 
-                let step = self.resolve_indirection(&base_ty, &field).with_span(span)?;
-                let position = step.position;
-                let target_ty = Some(step.target_ty);
+                        let func = Box::new(self.fold_expr(std_index)?);
 
-                if base_ty.kind.is_tuple() {
-                    // tuples
-                    let kind = pr::ExprKind::Indirection {
-                        base: Box::new(base),
-                        field: pr::IndirectionKind::Position(position as i64),
-                    };
-                    pr::Expr {
-                        ty: target_ty,
-                        kind,
-                        ..node
+                        self.resolve_func_call(func, vec![base, position], span)?
                     }
-                } else {
-                    // arrays
-                    let std_index = pr::Expr::new(pr::Path::new(vec!["std", "index"]));
-                    let position = pr::Expr::new(pr::Literal::Integer(position as i64));
-
-                    let func = Box::new(self.fold_expr(std_index)?);
-
-                    self.resolve_func_call(func, vec![base, position], span)?
                 }
             }
 
@@ -175,17 +166,27 @@ impl super::Resolver<'_> {
         // }))
     }
 
-    /// Resolve tuple indirections.
-    /// For example, `base.indirection` where `base` has a tuple type.
+    /// Resolve indirections (lookups).
+    /// For example, `base.indirection` where `base` either has a tuple or array type.
     ///
-    /// Returns the position of the tuple field within the base tuple.
-    pub fn resolve_indirection<'a>(
-        &'a self,
-        base: &'a Ty,
+    /// Returns a positional indirection into the base.
+    pub fn resolve_indirection(
+        &self,
+        base: &Ty,
         indirection: &pr::IndirectionKind,
-    ) -> Result<Step> {
+    ) -> Result<Indirection> {
+        let base_ref = self.resolve_ty_ident(base.clone())?;
+
+        let base = match base_ref {
+            scope::TyRef::Ty(b) => b,
+            scope::TyRef::Param(_) => todo!("tuple indirection into generic type Param"),
+            scope::TyRef::Arg(id) => {
+                todo!("tuple indirection into generic type Arg: {id:?}")
+            }
+        };
+
         match &base.kind {
-            pr::TyKind::Ident(_) => panic!(),
+            pr::TyKind::Ident(_) => unreachable!(),
 
             pr::TyKind::Tuple(fields) => match indirection {
                 pr::IndirectionKind::Name(name) => {
@@ -194,7 +195,7 @@ impl super::Resolver<'_> {
                     })
                 }
                 pr::IndirectionKind::Position(pos) => {
-                    let step = super::tuple::lookup_position_in_tuple(base, *pos as usize)?
+                    let step = super::tuple::lookup_position_in_tuple(&base, *pos as usize)?
                         .ok_or_else(|| Diagnostic::new_custom("Out of bounds"))?;
 
                     Ok(step)
@@ -207,7 +208,8 @@ impl super::Resolver<'_> {
                     Err(Diagnostic::new_custom("cannot lookup array items by name")
                         .with_span(base.span))
                 }
-                pr::IndirectionKind::Position(pos) => Ok(Step {
+                pr::IndirectionKind::Position(pos) => Ok(Indirection {
+                    base: BaseKind::Array,
                     position: *pos as usize,
                     target_ty: *items_ty.clone(),
                 }),
@@ -216,7 +218,7 @@ impl super::Resolver<'_> {
 
             pr::TyKind::Primitive(_) | pr::TyKind::Enum(_) | pr::TyKind::Function(_) => {
                 Err(Diagnostic::new_custom(format!(
-                    "expected a struct or array, found {}",
+                    "expected a tuple or an array, found {}",
                     base.kind.as_ref()
                 ))
                 .with_span(base.span))

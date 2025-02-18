@@ -310,6 +310,8 @@ impl Resolver<'_> {
         };
 
         match (&found.kind, &expected.kind) {
+            (TyKind::Ident(_), _) | (_, TyKind::Ident(_)) => unreachable!(),
+
             // base case
             (TyKind::Primitive(f), TyKind::Primitive(e)) if e == f => Ok(()),
 
