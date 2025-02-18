@@ -88,7 +88,7 @@ impl fold::PrFold for super::Resolver<'_> {
             pr::ExprKind::Indirection { base, field } => {
                 let base = self.fold_expr(*base)?;
 
-                let base_ty = base.ty.as_ref().unwrap();
+                let base_ty = base.ty.clone().unwrap();
                 let base_ty = self.resolve_ty_ident(base_ty)?;
                 let base_ty = match base_ty {
                     scope::TyRef::Ty(b) => b,

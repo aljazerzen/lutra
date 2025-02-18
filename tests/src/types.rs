@@ -34,6 +34,8 @@ fn _test_err(source: &str) -> String {
 
 #[test]
 fn types_01() {
+    // type of a literal
+
     insta::assert_snapshot!(
         _test_run(
             "func () -> 4"
@@ -43,14 +45,15 @@ fn types_01() {
 }
 #[test]
 fn types_02() {
+    // inference of type arg
+
     insta::assert_snapshot!(_test_run(r#"
         let identity = func <T> (x: T) -> x
 
         func () -> identity(4)
     "#), @"int64");
-}
-#[test]
-fn types_02a() {
+
+    // same, but describe function as a type, not an expression
     insta::assert_snapshot!(_test_run(r#"
         let identity: func <T> (x: T): T
 
@@ -59,15 +62,25 @@ fn types_02a() {
 }
 #[test]
 fn types_03() {
+    // validation of type params
+
+    insta::assert_snapshot!(_test_err(r#"
+        let floor_64: func (x: float64): float64
+
+        let floor = func <T> (x: T) -> floor_64(x)
+
+        func () -> floor(4.4)
+    "#), @r#"function floor_64, one of the params expected type `Ty { kind: Primitive(float64), span: Some(1:32-39), name: None, layout: Some(TyLayout { head_size: 64, body_ptrs: [], variants_recursive: [] }) }`, but found type `Ty { kind: Ident(["scope", "T"]), span: Some(1:84-85), name: None, layout: None }`"#);
+}
+#[test]
+fn types_05() {
     insta::assert_snapshot!(_test_run(r#"
         let identity = func <T> (x: T) -> x
         let apply = func <I, O> (x: I, mapper: func (I): O): O -> mapper(x)
 
         func () -> apply(5, identity)
     "#), @"int64");
-}
-#[test]
-fn types_04() {
+
     insta::assert_snapshot!(_test_run(r#"
         let twice = func <T> (x: T) -> {x, x}
         let apply = func <I, O> (x: I, mapper: func (I): O): O -> mapper(x)
@@ -116,6 +129,8 @@ fn types_09() {
 }
 #[test]
 fn types_10() {
+    // range
+
     insta::assert_snapshot!(_test_run(r#"
         func () -> 3..5
     "#), @"{start = int64, end = int64}");
@@ -136,6 +151,8 @@ fn types_11() {
 }
 #[test]
 fn types_12() {
+    // tuple indirection
+
     insta::assert_snapshot!(_test_run(r#"
         let a = {id = 4, total = 4.5}
         func () -> a.total
@@ -155,25 +172,37 @@ fn types_13() {
 }
 #[test]
 fn types_14() {
-    insta::assert_snapshot!(_test_run(r#"
-        let identity: func (x: float64): float64
-        let floor = func <T: float32 | float64> (x: T): T -> (
-            identity(x)
-        )
-        func () -> floor(2.3)
-    "#), @"float64");
+    // validate type params: one of
 
     insta::assert_snapshot!(_test_err(r#"
-        let identity: func (x: bool): bool
+        let floor_64: func (x: float64): float64
         let floor = func <T: float32 | float64> (x: T): T -> (
-            identity(x)
+            floor_64(x)
         )
         func () -> floor(2.3)
-    "#), @"T is restricted to one of float32, float64, found Ty { kind: Primitive(bool), span: Some(1:32-36), name: None, layout: Some(TyLayout { head_size: 8, body_ptrs: [], variants_recursive: [] }) }");
+    "#), @r#"function floor_64, one of the params expected type `Ty { kind: Primitive(float64), span: Some(1:32-39), name: None, layout: Some(TyLayout { head_size: 64, body_ptrs: [], variants_recursive: [] }) }`, but found type `Ty { kind: Ident(["scope", "T"]), span: Some(1:102-103), name: None, layout: None }`"#);
+
+    insta::assert_snapshot!(_test_run(r#"
+        let floor: func <F: float32 | float64> (x: F): F
+        let twice_floored = func <T: float32 | float64> (x: T) -> {floor(4.5), floor(x)}
+        func (f: float32) -> twice_floored(f)
+    "#), @"{float64, float32}");
+
+    insta::assert_snapshot!(_test_run(r#"
+        let floor: func <F: float32 | float64> (x: F): F
+        let twice_floored = func <T: float64> (x: T) -> {floor(x), floor(x)}
+        func () -> twice_floored(2.3)
+    "#), @"{float64, float64}");
+
+    insta::assert_snapshot!(_test_err(r#"
+        let floor: func <F: float32 | float64> (x: F): F
+        let twice_floored = func <T: float64 | bool> (x: T) -> {floor(x), floor(x)}
+        func () -> twice_floored(2.3)
+    "#), @"T is restricted to one of float32, float64, found Ty { kind: Primitive(bool), span: None, name: None, layout: None }");
 }
 #[test]
 fn types_15() {
-    // tuple domain with named arg
+    // type param: tuple domain with named arg
     insta::assert_snapshot!(_test_run(r#"
         let get_b: func <T: {b = int64, ..}> (x: T): T
         func () -> get_b({a = false, b = 4})
@@ -190,7 +219,7 @@ fn types_15() {
 }
 #[test]
 fn types_16() {
-    // tuple domain with positional arg
+    // type param: tuple domain with positional arg
     insta::assert_snapshot!(_test_run(r#"
         let get_b: func <T: {bool, int64, ..}> (x: T): T
         func () -> get_b({a = false, 4, c = 5.7})
@@ -209,4 +238,31 @@ fn types_16() {
         let get_b: func <T: {bool, int64, a = bool, ..}> (x: T): T
         func () -> get_b({a = false, 4})
     "#), @"{a = bool, int64}");
+}
+
+#[test]
+fn types_17() {
+    // validate type params: tuple domain
+
+    insta::assert_snapshot!(_test_err(r#"
+        let get_int: func (x: {int64}): int64
+        let get = func <T: {int64, ..}> (x: T): T -> get_int(x)
+        func () -> get({4})
+    "#), @r#"function get_int, one of the params expected type `Ty { kind: Tuple([TyTupleField { name: None, ty: Ty { kind: Primitive(int64), span: Some(1:32-37), name: None, layout: Some(TyLayout { head_size: 64, body_ptrs: [], variants_recursive: [] }) } }]), span: Some(1:31-38), name: None, layout: Some(TyLayout { head_size: 64, body_ptrs: [], variants_recursive: [] }) }`, but found type `Ty { kind: Ident(["scope", "T"]), span: Some(1:91-92), name: None, layout: None }`"#);
+    insta::assert_snapshot!(_test_err(r#"
+        let get_int: func (x: {a = int64}): int64
+        let get = func <T: {a = int64, ..}> (x: T): T -> get_int(x)
+        func () -> get({4})
+    "#), @r#"function get_int, one of the params expected type `Ty { kind: Tuple([TyTupleField { name: Some("a"), ty: Ty { kind: Primitive(int64), span: Some(1:36-41), name: None, layout: Some(TyLayout { head_size: 64, body_ptrs: [], variants_recursive: [] }) } }]), span: Some(1:31-42), name: None, layout: Some(TyLayout { head_size: 64, body_ptrs: [], variants_recursive: [] }) }`, but found type `Ty { kind: Ident(["scope", "T"]), span: Some(1:99-100), name: None, layout: None }`"#);
+
+    insta::assert_snapshot!(_test_err(r#"
+        let needs_two: func <I: {int64, bool, ..}> (x: I): int64
+        let needs_one = func <T: {int64, ..}> (x: T): T -> needs_two(x)
+        func () -> needs_one({4})
+    "#), @"I is restricted to tuples with at least 2 fields");
+    insta::assert_snapshot!(_test_run(r#"
+        let needs_one: func <I: {int64, ..}> (x: I): I
+        let needs_two = func <T: {int64, bool, ..}> (x: T): T -> needs_one(x)
+        func () -> needs_two({4, false})
+    "#), @"{int64, bool}");
 }

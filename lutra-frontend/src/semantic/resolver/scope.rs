@@ -43,10 +43,10 @@ pub enum Named<'a> {
     Scoped(ScopedKind),
 }
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub enum TyRef<'a> {
     Ty(Cow<'a, pr::Ty>),
-    Param(&'a str),
+    Param(String),
     Arg(TyArgId),
 }
 
@@ -142,7 +142,7 @@ impl Resolver<'_> {
     /// Get declaration from within the current scope.
     ///
     /// Does not mutate the current scope or module structure.
-    pub(super) fn get_ident(&self, ident: &Path) -> Option<Named<'_>> {
+    pub(super) fn get_ident<'a>(&'a self, ident: &Path) -> Option<Named<'a>> {
         log::debug!("get_ident: {ident}");
 
         if ident.starts_with_part("scope") {

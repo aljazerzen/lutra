@@ -3,10 +3,11 @@ use std::collections::HashMap;
 
 use itertools::Itertools;
 
+use crate::decl;
 use crate::diagnostic::{Diagnostic, DiagnosticCode, WithErrorInfo};
 use crate::pr::{self, *};
 use crate::utils::fold::{self, PrFold};
-use crate::{decl, Result, Span};
+use crate::Result;
 
 use super::scope::{Named, Scope, ScopedKind, TyArgId, TyRef};
 use super::Resolver;
@@ -51,11 +52,11 @@ impl Resolver<'_> {
     }
 
     /// Resolves if type is an ident. Does not recurse.
-    pub fn resolve_ty_ident<'t>(&'t self, ty: &'t Ty) -> Result<TyRef<'t>> {
-        let TyKind::Ident(ident) = &ty.kind else {
-            return Ok(TyRef::Ty(Cow::Borrowed(ty)));
+    pub fn resolve_ty_ident(&self, ty: Ty) -> Result<TyRef<'_>> {
+        let TyKind::Ident(ident) = ty.kind else {
+            return Ok(TyRef::Ty(Cow::Owned(ty)));
         };
-        let named = self.get_ident(ident).ok_or_else(|| {
+        let named = self.get_ident(&ident).ok_or_else(|| {
             log::debug!("scope: {:?}", self.scopes.last().unwrap());
             Diagnostic::new_assert("cannot find type ident")
                 .push_hint(format!("ident={ident:?}"))
@@ -78,8 +79,8 @@ impl Resolver<'_> {
                         .push_hint(format!("got {:?}", &ty))
                         .with_span(ty.span))
                 }
-                ScopedKind::Type { ty } => Ok(TyRef::Ty(Cow::Owned(ty))),
-                ScopedKind::TypeParam { .. } => Ok(TyRef::Param(ident.name())),
+                ScopedKind::Type { ty } => self.resolve_ty_ident(ty),
+                ScopedKind::TypeParam { .. } => Ok(TyRef::Param(ident.name().to_string())),
                 ScopedKind::TypeArg { id } => Ok(TyRef::Arg(id)),
             },
         }
@@ -226,41 +227,49 @@ impl Resolver<'_> {
             return Ok(());
         };
 
-        self.validate_type(found_ty, expected, found.span, who)
+        self.validate_type(found_ty, expected, who)
+            .with_span_fallback(found.span)
     }
 
     /// Validates that found node has expected type. Returns assumed type of the node.
-    pub fn validate_type<F>(
-        &mut self,
-        found: &Ty,
-        expected: &Ty,
-        span: Option<Span>,
-        who: &F,
-    ) -> Result<(), Diagnostic>
+    pub fn validate_type<F>(&mut self, found: &Ty, expected: &Ty, who: &F) -> Result<(), Diagnostic>
     where
         F: Fn() -> Option<String>,
     {
         log::trace!("validate_type, \nf: {found:?}, \ne: {expected:?}");
-        let found = self.resolve_ty_ident(found)?;
-        let expected = self.resolve_ty_ident(expected)?;
+        let found_ref = self.resolve_ty_ident(found.clone())?;
+        let expected_ref = self.resolve_ty_ident(expected.clone())?;
 
-        let (found, expected) = match (found, expected) {
+        let (found, expected) = match (found_ref, expected_ref) {
             // base case: neither found or expected are generic
             (TyRef::Ty(f), TyRef::Ty(e)) => (f.into_owned(), e.into_owned()),
 
             // type params
-            (TyRef::Param(param_id), TyRef::Ty(ty)) | (TyRef::Ty(ty), TyRef::Param(param_id)) => {
-                let ty_param = self.get_ty_param(param_id);
-                self.validate_type_domain(ty.as_ref(), ty_param, param_id)?;
+            (TyRef::Param(_), TyRef::Ty(expected)) => {
+                return Err(compose_type_error(found, &expected, who));
+            }
+            (TyRef::Param(param_id), TyRef::Arg(arg_id)) => {
+                // validate
+                let scope = self.scopes.last().unwrap();
+                let ty_param = self.get_ty_param(&param_id);
+                let ty_arg = scope.get_ty_arg(&arg_id);
+                self.validate_type_domains(ty_param, &ty_arg.domain, &param_id, &arg_id.name)?;
 
+                // infer
+                let scope = self.scopes.last_mut().unwrap();
+                scope.infer_type_arg(&arg_id, found.clone());
                 return Ok(());
             }
-            (TyRef::Param(_), TyRef::Param(_)) => {
-                return Ok(());
+            (TyRef::Param(found_id), TyRef::Param(expected_id)) => {
+                return if found_id == expected_id {
+                    Ok(())
+                } else {
+                    Err(compose_type_error(found, expected, who))
+                };
             }
-            (TyRef::Param(_), TyRef::Arg(_)) | (TyRef::Arg(_), TyRef::Param(_)) => {
-                todo!();
-            }
+
+            // I don't know how to construct a test case for this
+            (found, TyRef::Param(expected_id)) => todo!("found={found:?} expected={expected_id}"),
 
             // type args
             (TyRef::Ty(ty), TyRef::Arg(ty_arg_id)) | (TyRef::Arg(ty_arg_id), TyRef::Ty(ty)) => {
@@ -303,7 +312,7 @@ impl Resolver<'_> {
             // containers: recurse
             (TyKind::Array(found_items), TyKind::Array(expected_items)) => {
                 // co-variant contained type
-                self.validate_type(&found_items.clone(), &expected_items.clone(), span, who)
+                self.validate_type(&found_items.clone(), &expected_items.clone(), who)
             }
             (TyKind::Tuple(found_fields), TyKind::Tuple(expected_fields)) => {
                 // here we need to check that found tuple has all fields that are expected.
@@ -324,7 +333,7 @@ impl Resolver<'_> {
                             // check its type
 
                             // co-variant contained type
-                            self.validate_type(f_ty, &e_field.ty, span, who)?;
+                            self.validate_type(f_ty, &e_field.ty, who)?;
                         } else {
                             expected_but_not_found.push(e_field);
                         }
@@ -335,7 +344,7 @@ impl Resolver<'_> {
 
                 if !expected_but_not_found.is_empty() {
                     // not all fields were found
-                    return Err(compose_type_error(&found, &expected, who).with_span(span));
+                    return Err(compose_type_error(&found, &expected, who));
                 }
 
                 Ok(())
@@ -346,7 +355,7 @@ impl Resolver<'_> {
                 for (f_arg, e_arg) in itertools::zip_eq(&f_func.params, &e_func.params) {
                     if let Some((f_arg, e_arg)) = Option::zip(f_arg.as_ref(), e_arg.as_ref()) {
                         // contra-variant contained types
-                        self.validate_type(e_arg, f_arg, span, who)?;
+                        self.validate_type(e_arg, f_arg, who)?;
                     }
                 }
 
@@ -355,20 +364,20 @@ impl Resolver<'_> {
                     Option::zip(Option::as_ref(&f_func.body), Option::as_ref(&e_func.body))
                 {
                     // co-variant contained type
-                    self.validate_type(f_ret, e_ret, span, who)?;
+                    self.validate_type(f_ret, e_ret, who)?;
                 }
                 Ok(())
             }
-            _ => Err(compose_type_error(&found, &expected, who).with_span(span)),
+            _ => Err(compose_type_error(&found, &expected, who)),
         }
     }
 
-    /// Validates that found node has expected type. Returns assumed type of the node.
+    /// Validates that a type is an a domain of a type param.
     pub fn validate_type_domain(
         &self,
         ty: &Ty,
         domain: &TyParamDomain,
-        param_name: &str,
+        arg_name: &str,
     ) -> Result<(), Diagnostic> {
         match domain {
             TyParamDomain::Open => Ok(()),
@@ -383,9 +392,7 @@ impl Resolver<'_> {
                     let possible_tys = possible_tys.iter().map(|t| t.to_string()).join(", ");
 
                     return Err(Diagnostic::new(
-                        format!(
-                            "{param_name} is restricted to one of {possible_tys}, found {ty:?}"
-                        ),
+                        format!("{arg_name} is restricted to one of {possible_tys}, found {ty:?}"),
                         DiagnosticCode::TYPE_DOMAIN,
                     ));
                 }
@@ -396,7 +403,7 @@ impl Resolver<'_> {
             TyParamDomain::TupleFields(domain_fields) => {
                 let TyKind::Tuple(ty_fields) = &ty.kind else {
                     return Err(Diagnostic::new(
-                        format!("{param_name} is restricted to tuples, found {ty:?}"),
+                        format!("{arg_name} is restricted to tuples, found {ty:?}"),
                         DiagnosticCode::TYPE_DOMAIN,
                     ));
                 };
@@ -416,7 +423,7 @@ impl Resolver<'_> {
 
                         (name.clone(), res.ok_or_else(|| {
                             Diagnostic::new(
-                                format!("{param_name} is restricted to tuples with a field named `{name}`"),
+                                format!("{arg_name} is restricted to tuples with a field named `{name}`"),
                                 DiagnosticCode::TYPE_DOMAIN,
                             )
                         })?)
@@ -424,7 +431,7 @@ impl Resolver<'_> {
                         // positional
                         (position.to_string(), ty_fields.get(position).ok_or_else(|| {
                             Diagnostic::new(
-                                format!("{param_name} is restricted to tuples with at least {num_positional} fields"),
+                                format!("{arg_name} is restricted to tuples with at least {num_positional} fields"),
                                 DiagnosticCode::TYPE_DOMAIN,
                             )
                         })?)
@@ -432,7 +439,7 @@ impl Resolver<'_> {
 
                     let TyKind::Primitive(ty_field_ty) = &ty_field.ty.kind else {
                         return Err(Diagnostic::new(
-                            format!("{param_name}.{ind_display} is restricted to primitive types"),
+                            format!("{arg_name}.{ind_display} is restricted to primitive types"),
                             DiagnosticCode::TYPE_DOMAIN,
                         )
                         .push_hint("This is a temporary restriction. Work in progress."));
@@ -441,7 +448,7 @@ impl Resolver<'_> {
                     if ty_field_ty != &domain_field.ty {
                         return Err(Diagnostic::new(
                             format!(
-                                "{param_name}.{ind_display} is restricted to {}",
+                                "{arg_name}.{ind_display} is restricted to {}",
                                 domain_field.ty
                             ),
                             DiagnosticCode::TYPE_DOMAIN,
@@ -454,6 +461,90 @@ impl Resolver<'_> {
                 // all ok
                 Ok(())
             }
+        }
+    }
+
+    /// Validates that found domain is subset of expected domain.
+    pub fn validate_type_domains(
+        &self,
+        found: &TyParamDomain,
+        expected: &TyParamDomain,
+        found_name: &str,
+        expected_name: &str,
+    ) -> Result<(), Diagnostic> {
+        match (found, expected) {
+            // if expected is open, any found domain is ok
+            (_, TyParamDomain::Open) => Ok(()),
+
+            // if found is open, expected must be open too (but that was matched above)
+            (TyParamDomain::Open, _) => Err(Diagnostic::new(
+                format!("{found_name} can be any type, but {expected_name} has restrictions"),
+                DiagnosticCode::TYPE_DOMAIN,
+            )),
+
+            // each found must be in expected domain
+            (TyParamDomain::OneOf(found_tys), expected_domain) => {
+                for found_ty in found_tys {
+                    let ty = Ty::new(found_ty.clone());
+                    self.validate_type_domain(&ty, expected_domain, found_name)?;
+                }
+                Ok(())
+            }
+
+            (TyParamDomain::TupleFields(_), TyParamDomain::OneOf(_)) => Err(Diagnostic::new(
+                // TODO: bad error message
+                format!("{expected_name} is restricted to concrete types, but {found_name} is a tuple with possibly unknown fields"),
+                DiagnosticCode::TYPE_DOMAIN,
+            )),
+
+            (TyParamDomain::TupleFields(found_fields), TyParamDomain::TupleFields(expected_fields)) => {
+                // TODO: maybe reuse the code from [validate_type_domain]?
+
+                let num_positional = expected_fields
+                    .iter()
+                    .enumerate()
+                    .filter(|(_, f)| f.name.is_none())
+                    .last()
+                    .map(|(p, _)| p + 1)
+                    .unwrap_or_default();
+
+                for (position, expected_field) in expected_fields.iter().enumerate() {
+                    let (ind_display, ty_field) = if let Some(name) = &expected_field.name {
+                        // named
+                        let res = found_fields.iter().find(|f| f.name.as_ref() == Some(name));
+
+                        (name.clone(), res.ok_or_else(|| {
+                            Diagnostic::new(
+                                format!("{expected_name} is restricted to tuples with a field named `{name}`"),
+                                DiagnosticCode::TYPE_DOMAIN,
+                            )
+                        })?)
+                    } else {
+                        // positional
+                        (position.to_string(), found_fields.get(position).ok_or_else(|| {
+                            Diagnostic::new(
+                                format!("{expected_name} is restricted to tuples with at least {num_positional} fields"),
+                                DiagnosticCode::TYPE_DOMAIN,
+                            )
+                        })?)
+                    };
+
+                    if ty_field.ty != expected_field.ty {
+                        return Err(Diagnostic::new(
+                            format!(
+                                "{expected_name}.{ind_display} is restricted to {}",
+                                expected_field.ty
+                            ),
+                            DiagnosticCode::TYPE_DOMAIN,
+                        ));
+                    }
+
+                    // ok
+                }
+
+                // all ok
+                Ok(())
+            },
         }
     }
 
