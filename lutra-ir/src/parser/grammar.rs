@@ -65,18 +65,7 @@ fn external_ptr() -> impl Parser<TokenKind, ExternalPtr, Error = PError> {
         .at_least(1)
         .map(|id| id.join("::"));
 
-    id.then(execution_host())
-        .map(|(id, host)| ExternalPtr { host, id })
-}
-
-fn execution_host() -> impl Parser<TokenKind, ExecutionHost, Error = PError> {
-    ctrl('@')
-        .ignore_then(choice((
-            ident_keyword("local").to(ExecutionHost::Local),
-            select! { TokenKind::Literal(pr::Literal::Text(i)) => ExecutionHost::Remote(i) },
-        )))
-        .or_not()
-        .map(|host| host.unwrap_or(ExecutionHost::Any))
+    id.map(|id| ExternalPtr { id })
 }
 
 fn ty() -> impl Parser<TokenKind, Ty, Error = PError> {
@@ -272,12 +261,11 @@ where
     keyword("func")
         // scope id
         .ignore_then(uint32())
-        .then(execution_host())
         .then_ignore(just(TokenKind::ArrowThin))
         // body
         .then(expr)
         .delimited_by(ctrl('('), ctrl(')'))
-        .map(|((id, host), body)| ExprKind::Function(Box::new(Function { id, host, body })))
+        .map(|(id, body)| ExprKind::Function(Box::new(Function { id, body })))
         .labelled("function")
 }
 

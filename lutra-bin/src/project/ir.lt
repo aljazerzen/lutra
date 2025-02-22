@@ -28,7 +28,6 @@ type Pointer = enum {
 }
 
 type ExternalPtr = {
-  host = ExecutionHost,
   id = text,
 }
 
@@ -53,15 +52,7 @@ type Call = {
 
 type Function = {
   id = uint32,
-  host = ExecutionHost,
   body = Expr,
-}
-
-@derive(["Debug", "Clone", "PartialEq", "Eq", "Hash"])
-type ExecutionHost = enum {
-    Any,
-    Local,
-    Remote = text
 }
 
 type TupleLookup = {

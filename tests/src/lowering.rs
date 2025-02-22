@@ -39,15 +39,15 @@ fn lower_01() {
     "#), @r#"
     let main =
       let 1 = (
-        func 3 @"postgres_chinook" -> (
+        func 3 -> (
           call external.std::index: func ([{id = int64, total = float64}], int64) -> {id = int64, total = float64}, 
           (
             call external.std::filter: func ([{id = int64, total = float64}], func ({id = int64, total = float64}) -> bool) -> [{id = int64, total = float64}], 
             (
-              call external.box_office::get_album_sales @"postgres_chinook": func () -> [box_office.album_sale], 
+              call external.box_office::get_album_sales: func () -> [box_office.album_sale], 
             ): [box_office.album_sale], 
             (
-              func 4 @"postgres_chinook" -> (
+              func 4 -> (
                 call external.std::eq: func (int64, int64) -> bool, 
                 fn.4+0: box_office.album_sale
                 .0: int64, 
@@ -59,15 +59,15 @@ fn lower_01() {
         ): {id = int64, total = float64}
       ): func (int64) -> box_office.album_sale;
       let 0 = (
-        func 1 @"sqlite_chinook" -> (
+        func 1 -> (
           call external.std::index: func ([int64], int64) -> int64, 
           (
             call external.std::filter: func ([int64], func (int64) -> bool) -> [int64], 
             (
-              call external.chinook::get_albums @"sqlite_chinook": func () -> [chinook.album], 
+              call external.chinook::get_albums: func () -> [chinook.album], 
             ): [chinook.album], 
             (
-              func 2 @"sqlite_chinook" -> (
+              func 2 -> (
                 call external.std::eq: func (int64, int64) -> bool, 
                 fn.2+0: chinook.album, 
                 fn.1+0: int64, 
@@ -78,9 +78,9 @@ fn lower_01() {
         ): int64
       ): func (int64) -> chinook.album;
       (
-        func 0 @local -> {
+        func 0 -> {
           (
-            call external.chinook::get_albums @"sqlite_chinook": func () -> [chinook.album], 
+            call external.chinook::get_albums: func () -> [chinook.album], 
           ): [chinook.album],
           (
             call var.0: func (int64) -> chinook.album, 

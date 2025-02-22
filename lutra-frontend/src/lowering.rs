@@ -1,13 +1,10 @@
-use std::iter::zip;
-
-use indexmap::{IndexMap, IndexSet};
+use indexmap::IndexMap;
 use itertools::Itertools;
-use lutra_bin::ir::{self, ExecutionHost};
+use lutra_bin::ir::{self};
 
-use crate::diagnostic::Diagnostic;
 use crate::utils::IdGenerator;
 use crate::Result;
-use crate::{decl, pr, semantic};
+use crate::{decl, pr};
 
 pub fn lower(root_module: &decl::RootModule, path: &pr::Path) -> ir::Program {
     let mut lowerer = Lowerer::new(root_module);
@@ -20,11 +17,9 @@ pub fn lower(root_module: &decl::RootModule, path: &pr::Path) -> ir::Program {
 
 struct Lowerer<'a> {
     root_module: &'a decl::RootModule,
-    current_host: ir::ExecutionHost,
 
     function_scopes: Vec<u32>,
     var_bindings: IndexMap<pr::Path, u32>,
-    var_bindings_host: IndexMap<u32, ir::ExecutionHost>,
 
     generator_function_scope: IdGenerator<usize>,
     generator_var_binding: IdGenerator<usize>,
@@ -34,11 +29,9 @@ impl<'a> Lowerer<'a> {
     fn new(root_module: &'a decl::RootModule) -> Self {
         Self {
             root_module,
-            current_host: ir::ExecutionHost::Any,
 
             function_scopes: vec![],
             var_bindings: Default::default(),
-            var_bindings_host: Default::default(),
 
             generator_function_scope: Default::default(),
             generator_var_binding: Default::default(),
@@ -59,13 +52,10 @@ impl<'a> Lowerer<'a> {
             return Ok(None);
         }
 
-        let host = determine_decl_execution_host(self.root_module, path)?;
-
         let external_symbol_id = path.iter().join("::");
         Ok(Some(ir::ExprKind::Pointer(ir::Pointer::External(
             ir::ExternalPtr {
                 id: external_symbol_id,
-                host,
             },
         ))))
     }
@@ -83,13 +73,7 @@ impl<'a> Lowerer<'a> {
         // should have been lowered earlier
         assert!(!matches!(expr.kind, pr::ExprKind::Internal));
 
-        // determine the execution host requirements of this decl
-        let host = determine_decl_execution_host(self.root_module, path)?;
-
-        let prev_host = self.current_host.clone();
-        self.current_host = host;
         let res = self.lower_expr(expr.as_ref())?;
-        self.current_host = prev_host;
 
         Ok(res)
     }
@@ -138,12 +122,10 @@ impl<'a> Lowerer<'a> {
                 let body = self.lower_expr(&func.body)?;
                 self.function_scopes.pop();
 
-                let mut func = ir::Function {
+                let func = ir::Function {
                     id: function_id,
-                    host: self.current_host.clone(),
                     body,
                 };
-                func.host = determine_func_execution_host(&func, &self.var_bindings_host);
 
                 ir::ExprKind::Function(Box::new(func))
             }
@@ -175,10 +157,6 @@ impl<'a> Lowerer<'a> {
                         indexmap::map::Entry::Vacant(e) => {
                             let id = self.generator_var_binding.gen() as u32;
                             e.insert(id);
-
-                            let host = determine_decl_execution_host(self.root_module, path)?;
-                            self.var_bindings_host.insert(id, host);
-
                             id
                         }
                     };
@@ -226,102 +204,5 @@ impl<'a> Lowerer<'a> {
             }
         }
         main
-    }
-}
-
-fn determine_decl_execution_host(
-    root_module: &decl::RootModule,
-    path: &pr::Path,
-) -> Result<ir::ExecutionHost, Diagnostic> {
-    let module_path = root_module.module.get_module_path(path.path()).unwrap();
-    let remote = pr::Path::from_name("remote");
-
-    for (module, step) in zip(module_path.into_iter().rev(), path.iter().rev()) {
-        let decl = module.names.get(step).unwrap();
-        if let Some(args) = semantic::decl_get_annotation(decl, &remote) {
-            let arg = args.iter().exactly_one().map_err(|_| {
-                Diagnostic::new_custom("@remote requires exactly one argument").with_span(decl.span)
-            })?;
-
-            let arg = arg
-                .kind
-                .as_literal()
-                .and_then(|l| l.as_text())
-                .ok_or_else(|| {
-                    Diagnostic::new_custom("@remote requires a text literal").with_span(arg.span)
-                })?;
-
-            return Ok(ir::ExecutionHost::Remote(arg.clone()));
-        }
-    }
-    Ok(ir::ExecutionHost::Any)
-}
-
-fn determine_func_execution_host(
-    func: &ir::Function,
-    bindings: &IndexMap<u32, ir::ExecutionHost>,
-) -> ir::ExecutionHost {
-    if func.host != ir::ExecutionHost::Any {
-        return func.host.clone();
-    }
-
-    let mut finder = HostFinder {
-        hosts: Default::default(),
-        bindings,
-    };
-    finder.fold_expr(&func.body);
-
-    finder.hosts.retain(|h| h != &ir::ExecutionHost::Any);
-
-    let all_equal = finder.hosts.into_iter().all_equal_value();
-    match all_equal {
-        Ok(host) => host,
-        Err(None) => ir::ExecutionHost::Any,
-        Err(Some(_)) => ir::ExecutionHost::Local,
-    }
-}
-
-struct HostFinder<'a> {
-    hosts: IndexSet<ExecutionHost>,
-    bindings: &'a IndexMap<u32, ir::ExecutionHost>,
-}
-
-impl HostFinder<'_> {
-    fn fold_expr(&mut self, expr: &ir::Expr) {
-        match &expr.kind {
-            ir::ExprKind::Pointer(ir::Pointer::External(external_ptr)) => {
-                self.hosts.insert(external_ptr.host.clone());
-            }
-            ir::ExprKind::Pointer(ir::Pointer::Parameter(_)) => {}
-            ir::ExprKind::Pointer(ir::Pointer::Binding(id)) => {
-                let host = self.bindings.get(id).unwrap();
-                self.hosts.insert(host.clone());
-            }
-            ir::ExprKind::Literal(_) => {}
-            ir::ExprKind::Call(call) => {
-                self.fold_expr(&call.function);
-                self.fold_exprs(&call.args);
-            }
-            ir::ExprKind::Function(func) => {
-                self.hosts.insert(func.host.clone());
-            }
-            ir::ExprKind::Tuple(fields) => self.fold_exprs(fields),
-            ir::ExprKind::Array(items) => self.fold_exprs(items),
-            ir::ExprKind::TupleLookup(lookup) => self.fold_expr(&lookup.base),
-            ir::ExprKind::Binding(binding) => {
-                self.fold_expr(&binding.expr);
-                self.fold_expr(&binding.main);
-            }
-            ir::ExprKind::RemoteCall(call) => {
-                self.hosts
-                    .insert(ExecutionHost::Remote(call.remote_id.clone()));
-            }
-        }
-    }
-
-    fn fold_exprs(&mut self, exprs: &[ir::Expr]) {
-        for expr in exprs {
-            self.fold_expr(expr);
-        }
     }
 }

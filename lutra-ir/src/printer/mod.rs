@@ -1,6 +1,6 @@
 mod test;
 
-use lutra_bin::ir::{self, ExecutionHost};
+use lutra_bin::ir;
 
 pub fn print(program: &ir::Program) -> String {
     let mut printer = Printer::default();
@@ -50,9 +50,7 @@ impl Printer {
         let mut r = match &expr.kind {
             ir::ExprKind::Pointer(ptr) => match ptr {
                 ir::Pointer::External(ptr) => {
-                    let mut r = format!("external.{}", ptr.id);
-                    r += &self.print_execution_host(&ptr.host);
-                    r
+                    format!("external.{}", ptr.id)
                 }
                 ir::Pointer::Binding(id) => format!("var.{id}"),
                 ir::Pointer::Parameter(ir::ParameterPtr {
@@ -87,7 +85,6 @@ impl Printer {
 
                 r += "func ";
                 r += &func.id.to_string();
-                r += &self.print_execution_host(&func.host);
                 r += " -> ";
                 r += &self.print_expr(&func.body);
 
@@ -245,20 +242,6 @@ impl Printer {
                 path.0.join(".")
             }
         }
-    }
-
-    fn print_execution_host(&self, host: &ir::ExecutionHost) -> String {
-        let mut r = String::new();
-        match host {
-            ExecutionHost::Any => {}
-            ExecutionHost::Local => {
-                r += " @local";
-            }
-            ExecutionHost::Remote(id) => {
-                r += &format!(" @\"{id}\"");
-            }
-        }
-        r
     }
 }
 
