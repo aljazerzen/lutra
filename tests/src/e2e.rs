@@ -1,5 +1,7 @@
 #[track_caller]
 fn _test_run(lutra_source: &str) -> String {
+    env_logger::builder().format_timestamp(None).try_init().ok();
+
     let source = format!("let main = func () -> {lutra_source}");
 
     let program = lutra_frontend::_test_compile(&source).unwrap_or_else(|e| panic!("{e}"));
@@ -165,6 +167,28 @@ fn std_index() {
     insta::assert_snapshot!(_test_run(r#"
     [1, 2, 3].2
     "#), @"3");
+
+    insta::assert_snapshot!(_test_run(r#"
+    std::index([5.3,3.2,65.4,3.1,2.0], 3)
+    "#), @"3.1");
+
+    insta::assert_snapshot!(_test_run(r#"
+    [1.1, 2.2, 3.3].2
+    "#), @"3.3");
+
+    insta::assert_snapshot!(_test_run(r#"
+    std::index([false, false, false, true, false], 3)
+    "#), @"true");
+
+    insta::assert_snapshot!(_test_run(r#"
+    [true, true, false].2
+    "#), @"false");
+
+    insta::assert_snapshot!(_test_run(r#"
+    ["hello", "world", "!"].2
+    "#), @r#"
+    "!"
+    "#);
 }
 
 #[test]
@@ -183,6 +207,26 @@ fn std_map() {
     insta::assert_snapshot!(_test_run(r#"
     std::map([], func (x: int) -> x + 1)
     "#), @"[]");
+
+    insta::assert_snapshot!(_test_run(r#"
+    std::map([false, true, false], func (x: bool) -> !x)
+    "#), @r#"
+    [
+      true,
+      false,
+      true,
+    ]
+    "#);
+
+    insta::assert_snapshot!(_test_run(r#"
+    std::map(["hello", "world", "!"], func (x: text) -> std::text_ops::length(x))
+    "#), @r#"
+    [
+      5,
+      5,
+      1,
+    ]
+    "#);
 }
 
 #[test]
@@ -195,12 +239,42 @@ fn std_filter() {
       65,
     ]
     "#);
+
     insta::assert_snapshot!(_test_run(r#"
     std::filter([5,3,65,3,2], func (x: int) -> x < 1)
     "#), @"[]");
+
     insta::assert_snapshot!(_test_run(r#"
     std::filter([], func (x: int) -> x > 3)
     "#), @"[]");
+
+    insta::assert_snapshot!(_test_run(r#"
+    std::filter([false,true,true,false,true], func (x: bool) -> !x)
+    "#), @r#"
+    [
+      false,
+      false,
+    ]
+    "#);
+
+    insta::assert_snapshot!(_test_run(r#"
+    std::filter([{false, "one"},{true, "two"},{true, "three"},{false, "four"},{true, "five"}], func (x: {bool, text}) -> x.0)
+    "#), @r#"
+    [
+      {
+        true,
+        "two",
+      },
+      {
+        true,
+        "three",
+      },
+      {
+        true,
+        "five",
+      },
+    ]
+    "#);
 }
 
 #[test]
@@ -235,6 +309,35 @@ fn std_slice() {
     insta::assert_snapshot!(_test_run(r#"
     std::slice([5,3,65,3,2], -7, 0)
     "#), @"[]");
+
+    insta::assert_snapshot!(_test_run(r#"
+    std::slice([false,true,false,false,true], 1, 4)
+    "#), @r#"
+    [
+      true,
+      false,
+      false,
+    ]
+    "#);
+
+    insta::assert_snapshot!(_test_run(r#"
+    std::slice([{false,"hello"}, {false,"world"},{true, "!"},{false,"foo"},{true, "bar"}], 1, 4)
+    "#), @r#"
+    [
+      {
+        false,
+        "world",
+      },
+      {
+        true,
+        "!",
+      },
+      {
+        false,
+        "foo",
+      },
+    ]
+    "#);
 }
 
 #[test]
@@ -248,6 +351,33 @@ fn std_sort() {
       3,
       3,
       2,
+    ]
+    "#);
+
+    insta::assert_snapshot!(_test_run(r#"
+    std::sort([{5,"hello"}, {3,"world"},{65, "!"},{3,"foo"},{2, "bar"}], func (x: {int, text}) -> x.0)
+    "#), @r#"
+    [
+      {
+        2,
+        "bar",
+      },
+      {
+        3,
+        "world",
+      },
+      {
+        3,
+        "foo",
+      },
+      {
+        5,
+        "hello",
+      },
+      {
+        65,
+        "!",
+      },
     ]
     "#);
 }

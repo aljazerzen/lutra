@@ -9,22 +9,18 @@ pub fn compile_program(value: ir::Program) -> Program {
 
     Program {
         main: b.compile_expr(value.main),
-        externals: b
-            .externals
-            .into_iter()
-            .map(compile_external_symbol)
-            .collect(),
+        externals: b.externals.into_iter().collect(),
     }
 }
 
 struct ByteCoder {
-    externals: IndexSet<String>,
+    externals: IndexSet<ExternalSymbol>,
 }
 
 impl ByteCoder {
     fn compile_expr(&mut self, expr: ir::Expr) -> Expr {
         let kind = match expr.kind {
-            ir::ExprKind::Pointer(v) => ExprKind::Pointer(self.compile_pointer(v)),
+            ir::ExprKind::Pointer(v) => ExprKind::Pointer(self.compile_pointer(v, &expr.ty)),
             ir::ExprKind::Literal(v) => ExprKind::Literal(self.compile_literal(v)),
             ir::ExprKind::Call(v) => ExprKind::Call(Box::new(self.compile_call(*v))),
             ir::ExprKind::Function(v) => ExprKind::Function(Box::new(self.compile_function(*v))),
@@ -40,10 +36,11 @@ impl ByteCoder {
         Expr { kind }
     }
 
-    fn compile_pointer(&mut self, ptr: ir::Pointer) -> Sid {
+    fn compile_pointer(&mut self, ptr: ir::Pointer, ty: &ir::Ty) -> Sid {
         match ptr {
-            ir::Pointer::External(ptr) => {
-                let (index, _) = self.externals.insert_full(ptr.id);
+            ir::Pointer::External(e_ptr) => {
+                let e_symbol = compile_external_symbol(e_ptr.id, ty);
+                let (index, _) = self.externals.insert_full(e_symbol);
 
                 Sid(index as u32).with_tag(SidKind::External)
             }
@@ -125,65 +122,114 @@ impl ByteCoder {
     }
 }
 
-fn compile_external_symbol(external_symbol_id: String) -> ExternalSymbol {
-    let layout_args: Vec<u32> = match external_symbol_id.as_str() {
-        "std::index" => vec![8],
-        "std::map" => vec![8, 8, 0],
-        "std::filter" => vec![
-            8, // item_head_size
-            0, // item_body_ptrs
-        ],
-        "std::slice" => vec![
-            8, // item_head_size
-            0, // item_body_ptrs
-        ],
-        "std::sort" => vec![
-            8, // item_head_size
-            0, // item_body_ptrs
-        ],
-        "std::to_columnar" => vec![
-            16, // item_head_size
-            2, 0, 8, // fields_offsets
-            2, 8, 8, // fields_head_bytes
-            0, // fields_body_ptrs[0]
-            0, // fields_body_ptrs[1]
-        ],
-        "std::from_columnar" => vec![
-            16, // output_head_bytes
-            0,  // output_body_ptrs
-            2, 8, 8, // fields_item_head_bytes
-            0, // fields_body_ptrs[0]
-            0, // fields_body_ptrs[1]
-        ],
-
-        "std::min" => vec![
-            8, // item_head_size
-        ],
-        "std::max" => vec![
-            8, // item_head_size
-        ],
-        "std::sum" => vec![
-            8, // item_head_size
-        ],
+fn compile_external_symbol(id: String, ty: &ir::Ty) -> ExternalSymbol {
+    let layout_args: Vec<u32> = match id.as_str() {
         "std::count" => vec![],
-        "std::average" => vec![
-            8, // item_head_size
-        ],
-        "std::contains" => vec![
-            8, // item_head_size
-        ],
-        "std::lag" => vec![
-            8, // item_head_size
-            0, // items_body_ptrs
-        ],
-        "std::lead" => vec![
-            8, // item_head_size
-            0, // items_body_ptrs
-        ],
+
+        "std::index" | "std::min" | "std::max" | "std::sum" | "std::average" | "std::contains" => {
+            let item_layout = as_layout_of_param_array(ty);
+            vec![
+                item_layout.head_size.div_ceil(8), // item_head_size
+            ]
+        }
+
+        "std::filter" | "std::slice" | "std::sort" | "std::lag" | "std::lead" => {
+            let item_layout = as_layout_of_param_array(ty);
+
+            let mut r = Vec::with_capacity(1 + 1 + item_layout.body_ptrs.len());
+            r.push(item_layout.head_size.div_ceil(8)); // item_head_size
+            r.extend(as_len_and_items(&item_layout.body_ptrs)); // item_body_ptrs
+            r
+        }
+
+        "std::map" => {
+            let input_layout = as_layout_of_param_array(ty);
+            let output_layout = as_layout_of_return_array(ty);
+
+            let mut r = Vec::with_capacity(2 + 1 + output_layout.body_ptrs.len());
+            r.push(input_layout.head_size.div_ceil(8)); // input_item_head
+            r.push(output_layout.head_size.div_ceil(8)); // output_item_head
+            r.extend(as_len_and_items(&output_layout.body_ptrs)); // output_item_body_ptrs
+            r
+        }
+
+        "std::to_columnar" => {
+            let ty_func = ty.kind.as_function().unwrap();
+
+            let input_item = ty_func.params[0].kind.as_array().unwrap();
+            let input_layout = input_item.layout.as_ref().unwrap();
+
+            let mut r = Vec::new();
+            r.push(input_layout.head_size.div_ceil(8)); // item_head_size
+
+            let input_field_offsets = lutra_bin::layout::tuple_field_offsets(input_item);
+            r.extend(as_len_and_items(&input_field_offsets)); // field_offsets
+
+            // fields_head_bytes
+            let fields = input_item.kind.as_tuple().unwrap();
+            r.push(fields.len() as u32);
+            for field in fields {
+                let field_layout = field.ty.layout.as_ref().unwrap();
+                r.push(field_layout.head_size.div_ceil(8));
+            }
+
+            // fields_body_ptrs
+            for field in fields {
+                let field_layout = field.ty.layout.as_ref().unwrap();
+                r.extend(as_len_and_items(&field_layout.body_ptrs));
+            }
+
+            r
+        }
+        "std::from_columnar" => {
+            let ty_func = ty.kind.as_function().unwrap();
+
+            let output_item = ty_func.body.kind.as_array().unwrap();
+            let output_layout = output_item.layout.as_ref().unwrap();
+
+            let mut r = Vec::new();
+            r.push(output_layout.head_size.div_ceil(8)); // output_head_bytes
+
+            r.extend(as_len_and_items(&output_layout.body_ptrs)); // output_body_ptrs
+
+            // fields_item_head_bytes
+            let fields = output_item.kind.as_tuple().unwrap();
+            r.push(fields.len() as u32);
+            for field in fields {
+                let field_layout = field.ty.layout.as_ref().unwrap();
+                r.push(field_layout.head_size.div_ceil(8));
+            }
+
+            // fields_body_ptrs
+            for field in fields {
+                let field_layout = field.ty.layout.as_ref().unwrap();
+                r.extend(as_len_and_items(&field_layout.body_ptrs));
+            }
+
+            r
+        }
+
         _ => vec![],
     };
-    ExternalSymbol {
-        id: external_symbol_id,
-        layout_args,
-    }
+    ExternalSymbol { id, layout_args }
+}
+
+fn as_len_and_items(items: &[u32]) -> impl Iterator<Item = u32> + '_ {
+    Some(items.len() as u32)
+        .into_iter()
+        .chain(items.iter().cloned())
+}
+
+fn as_layout_of_param_array(ty: &Ty) -> &ir::TyLayout {
+    let ty_func = ty.kind.as_function().unwrap();
+    let ty_array = ty_func.params[0].kind.as_array().unwrap();
+    let ty_layout = ty_array.layout.as_ref().unwrap();
+    ty_layout
+}
+
+fn as_layout_of_return_array(ty: &Ty) -> &ir::TyLayout {
+    let ty_func = ty.kind.as_function().unwrap();
+    let ty_array = ty_func.body.kind.as_array().unwrap();
+    let ty_layout = ty_array.layout.as_ref().unwrap();
+    ty_layout
 }

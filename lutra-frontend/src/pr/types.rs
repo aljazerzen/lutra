@@ -69,6 +69,7 @@ impl TyKind {
         }
     }
 
+    // Keep in sync with [lutra_bin::layout::get_layout_simple]
     pub fn get_layout_simple(&self) -> Option<TyLayout> {
         let head_size = match self {
             TyKind::Primitive(prim) => match prim {
@@ -112,9 +113,11 @@ impl TyKind {
 
             TyKind::Tuple(fields) => {
                 let mut r = Vec::new();
+                let mut field_start = 0;
                 for f in fields {
-                    let ty = f.ty.layout.as_ref().unwrap();
-                    r.extend(&ty.body_ptrs);
+                    let layout = f.ty.layout.as_ref().unwrap();
+                    r.extend(layout.body_ptrs.iter().map(|p| p + field_start));
+                    field_start += layout.head_size.div_ceil(8);
                 }
                 r
             }

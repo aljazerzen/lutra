@@ -86,7 +86,7 @@ pub mod std {
     macro_rules! reduce_func {
         ($name: ident, $item_decode: path, $reduce: expr, $default: literal) => {
             pub fn $name(_: &mut Interpreter, layout_args: &[u32], args: Vec<Cell>) -> Cell {
-                let [array] = assume::args(args);
+                let [array] = assume::exactly_n(args);
                 let array = assume::array(array, layout_args[0]);
 
                 let res = array
@@ -133,7 +133,7 @@ pub mod std {
         pub fn index(_it: &mut Interpreter, layout_args: &[u32], args: Vec<Cell>) -> Cell {
             let input_item_head_bytes = layout_args[0];
 
-            let [array, position] = assume::args(args);
+            let [array, position] = assume::exactly_n(args);
 
             let array = assume::array(array, input_item_head_bytes);
             let position = assume::int(&position);
@@ -148,7 +148,7 @@ pub mod std {
             let output_item_head_bytes = layout_args.next_u32();
             let output_item_body_ptrs = layout_args.next_slice();
 
-            let [array, func] = assume::args(args);
+            let [array, func] = assume::exactly_n(args);
 
             let mut output = ArrayWriter::new(output_item_head_bytes, output_item_body_ptrs);
             for item in assume::array(array, input_item_head_bytes) {
@@ -167,7 +167,7 @@ pub mod std {
             let item_head_bytes = layout_args.next_u32();
             let item_body_ptrs = layout_args.next_slice();
 
-            let [array, func] = assume::args(args);
+            let [array, func] = assume::exactly_n(args);
             let input = assume::array(array, item_head_bytes);
 
             let mut output = ArrayWriter::new(item_head_bytes, item_body_ptrs);
@@ -190,7 +190,7 @@ pub mod std {
             let item_head_bytes = layout_args.next_u32();
             let item_body_ptrs = layout_args.next_slice();
 
-            let [array, start, end] = assume::args(args);
+            let [array, start, end] = assume::exactly_n(args);
 
             let input = assume::array(array, item_head_bytes);
 
@@ -218,7 +218,7 @@ pub mod std {
             let item_head_bytes = layout_args.next_u32();
             let item_body_ptrs = layout_args.next_slice();
 
-            let [array, func] = assume::args(args);
+            let [array, func] = assume::exactly_n(args);
 
             let input = assume::array(array, item_head_bytes);
 
@@ -247,7 +247,7 @@ pub mod std {
             let fields_offsets = layout_args.next_slice();
             let fields_head_bytes = layout_args.next_slice();
 
-            let [array] = assume::args(args);
+            let [array] = assume::exactly_n(args);
             let input = assume::array(array, input_item_head_bytes);
 
             // init output arrays
@@ -297,7 +297,7 @@ pub mod std {
                 output_fields_layouts.push((*field_head_bytes, layout_args.next_slice()));
             }
 
-            let [columnar] = assume::args(args);
+            let [columnar] = assume::exactly_n(args);
 
             // hard-coded tuple of arrays layout
             let mut field_offsets = Vec::with_capacity(fields_item_head_bytes.len());
@@ -342,7 +342,7 @@ pub mod std {
         reduce_func!(sum, decode::int, |a, b| a + b, 0);
 
         pub fn count(_it: &mut Interpreter, _layout_args: &[u32], args: Vec<Cell>) -> Cell {
-            let [array] = assume::args(args);
+            let [array] = assume::exactly_n(args);
             let array = assume::into_value(array);
 
             let (_offset, len) = lutra_bin::ArrayReader::read_head(array.slice(8));
@@ -352,7 +352,7 @@ pub mod std {
         }
 
         pub fn average(_it: &mut Interpreter, layout_args: &[u32], args: Vec<Cell>) -> Cell {
-            let [array] = assume::args(args);
+            let [array] = assume::exactly_n(args);
             let array = assume::array(array, layout_args[0]);
 
             let (sum, count) = array
@@ -368,7 +368,7 @@ pub mod std {
         }
 
         pub fn all(_it: &mut Interpreter, _layout_args: &[u32], args: Vec<Cell>) -> Cell {
-            let [array] = assume::args(args);
+            let [array] = assume::exactly_n(args);
             let mut array = assume::array(array, 1);
 
             let res = array.all(|x| decode::bool(&x));
@@ -376,7 +376,7 @@ pub mod std {
         }
 
         pub fn any(_it: &mut Interpreter, _layout_args: &[u32], args: Vec<Cell>) -> Cell {
-            let [array] = assume::args(args);
+            let [array] = assume::exactly_n(args);
             let mut array = assume::array(array, 1);
 
             let res = array.any(|x| decode::bool(&x));
@@ -384,7 +384,7 @@ pub mod std {
         }
 
         pub fn contains(_it: &mut Interpreter, layout_args: &[u32], args: Vec<Cell>) -> Cell {
-            let [array, item] = assume::args(args);
+            let [array, item] = assume::exactly_n(args);
             let array = assume::array(array, layout_args[0]);
             let item = assume::int(&item);
 
@@ -393,7 +393,7 @@ pub mod std {
         }
 
         pub fn concat_array(_it: &mut Interpreter, _layout_args: &[u32], args: Vec<Cell>) -> Cell {
-            let [array, separator] = assume::args(args);
+            let [array, separator] = assume::exactly_n(args);
 
             let array = assume::array(array, 8); // text head = 8
             let separator = assume::text(&separator);
@@ -408,7 +408,7 @@ pub mod std {
             let head_bytes = layout_args.next_u32();
             let body_ptrs = layout_args.next_slice();
 
-            let [array, offset] = assume::args(args);
+            let [array, offset] = assume::exactly_n(args);
 
             let array = assume::array(array, head_bytes);
             let offset = assume::int(&offset).max(0) as usize;
@@ -433,7 +433,7 @@ pub mod std {
             let head_bytes = layout_args.next_u32();
             let body_ptrs = layout_args.next_slice();
 
-            let [array, offset] = assume::args(args);
+            let [array, offset] = assume::exactly_n(args);
 
             let array = assume::array(array, head_bytes);
             let offset = assume::int(&offset).max(0) as usize;
@@ -455,7 +455,7 @@ pub mod std {
         }
 
         pub fn row_number(_it: &mut Interpreter, _layout_args: &[u32], args: Vec<Cell>) -> Cell {
-            let [array] = assume::args(args);
+            let [array] = assume::exactly_n(args);
             let array = assume::into_value(array);
 
             let (_offset, len) = lutra_bin::ArrayReader::read_head(array.slice(8));
@@ -473,6 +473,38 @@ pub mod std {
             array_len.saturating_sub((-index) as usize)
         } else {
             index as usize
+        }
+    }
+}
+
+pub mod std_text_ops {
+    use crate::native::*;
+    use lutra_bin::ReaderExt;
+
+    pub const MODULE: Module = Module;
+
+    pub struct Module;
+
+    impl NativeModule for Module {
+        fn lookup_native_symbol(&self, id: &str) -> crate::interpreter::NativeFunction {
+            match id {
+                "length" => &Self::length,
+
+                _ => panic!(),
+            }
+        }
+    }
+
+    impl Module {
+        pub fn length(_it: &mut Interpreter, _layout_args: &[u32], args: Vec<Cell>) -> Cell {
+            let [text] = assume::exactly_n(args);
+
+            // TODO: string reader
+            // TODO: report length in chars, not bytes (length of ž should be 1)
+            let text = assume::as_value(&text).slice(8).skip(4);
+            let length = u32::from_le_bytes(text.read_const());
+
+            Cell::Data(encode(&length))
         }
     }
 }
@@ -522,7 +554,7 @@ mod assume {
         }
     }
 
-    pub fn args<const N: usize>(args: Vec<Cell>) -> [Cell; N] {
+    pub fn exactly_n<const N: usize>(args: Vec<Cell>) -> [Cell; N] {
         let mut res = [const { Cell::Vacant }; N];
         assert_eq!(args.len(), N);
         for (i, cell) in args.into_iter().enumerate() {

@@ -10,6 +10,7 @@ pub trait NativeModule: Sync {
 
 pub static BUILTIN_MODULES: &[(&str, &dyn NativeModule)] = &[
     ("std", &native::std::MODULE),
+    ("std::text_ops", &native::std_text_ops::MODULE),
     ("interpreter", &native::interpreter::MODULE),
 ];
 

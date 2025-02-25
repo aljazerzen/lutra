@@ -810,7 +810,7 @@ fn parse_01() {
                                                             head_size: 192,
                                                             body_ptrs: [
                                                                 0,
-                                                                0,
+                                                                8,
                                                             ],
                                                             variants_recursive: [],
                                                         },

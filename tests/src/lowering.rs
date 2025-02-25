@@ -9,28 +9,30 @@ fn _test_compile_and_print(source: &str) -> String {
 #[test]
 fn lower_01() {
     assert_snapshot!(_test_compile_and_print(r#"
-    @remote('sqlite_chinook')
     module chinook {
-      type album = int
+      type album = {id = int, title = text}
 
       let get_albums: func (): [album]
 
       let get_album_by_id = func (album_id: int): album -> (
-        get_albums() | std::filter(func (this: album) -> this == album_id) | std::index(0)
+        get_albums()
+        | std::filter(func (this: album) -> this.id == album_id)
+        | std::index(0)
       )
     }
 
-    @remote('postgres_chinook')
     module box_office {
       type album_sale = {id = int, total = float}
 
       let get_album_sales: func (): [album_sale]
 
       let get_album_sales_by_id = func (album_id: int): album_sale -> (
-        get_album_sales() | std::filter(func (this: album_sale) -> this.id == album_id) | std::index(0)
+        get_album_sales()
+        | std::filter(func (this: album_sale) -> this.id == album_id)
+        | std::index(0)
       )
     }
-
+ 
     func (album_id: int) -> {
       chinook::get_albums(),
       chinook::get_album_by_id(album_id),
@@ -60,22 +62,23 @@ fn lower_01() {
       ): func (int64) -> box_office.album_sale;
       let 0 = (
         func 1 -> (
-          call external.std::index: func ([int64], int64) -> int64, 
+          call external.std::index: func ([{id = int64, title = text}], int64) -> {id = int64, title = text}, 
           (
-            call external.std::filter: func ([int64], func (int64) -> bool) -> [int64], 
+            call external.std::filter: func ([{id = int64, title = text}], func ({id = int64, title = text}) -> bool) -> [{id = int64, title = text}], 
             (
               call external.chinook::get_albums: func () -> [chinook.album], 
             ): [chinook.album], 
             (
               func 2 -> (
                 call external.std::eq: func (int64, int64) -> bool, 
-                fn.2+0: chinook.album, 
+                fn.2+0: chinook.album
+                .0: int64, 
                 fn.1+0: int64, 
               ): bool
             ): func (chinook.album) -> bool, 
-          ): [int64], 
+          ): [{id = int64, title = text}], 
           0: int64, 
-        ): int64
+        ): {id = int64, title = text}
       ): func (int64) -> chinook.album;
       (
         func 0 -> {

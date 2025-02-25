@@ -3,6 +3,7 @@ type Program = {
   main = Expr,
 }
 
+@derive(["Debug", "Clone", "PartialEq", "Eq", "Hash"])
 type ExternalSymbol = {
   id = text,
   layout_args = [uint32],

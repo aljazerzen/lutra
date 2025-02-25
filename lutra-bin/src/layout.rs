@@ -87,6 +87,7 @@ impl<I: Layout> Layout for Option<I> {
     }
 }
 
+// Keep in sync with [pr::TyKind::get_layout_simple]
 pub fn get_layout_simple(ty: &ir::Ty) -> Option<ir::TyLayout> {
     let head_size = match &ty.kind {
         ir::TyKind::Primitive(prim) => match prim {
@@ -123,7 +124,7 @@ pub fn get_layout_simple(ty: &ir::Ty) -> Option<ir::TyLayout> {
         }
         _ => return None,
     };
-    let body_ptr_offset: vec::Vec<u32> = match &ty.kind {
+    let body_ptrs: vec::Vec<u32> = match &ty.kind {
         ir::TyKind::Primitive(ir::PrimitiveSet::text) => vec![0],
         ir::TyKind::Primitive(_) => vec![],
 
@@ -132,9 +133,11 @@ pub fn get_layout_simple(ty: &ir::Ty) -> Option<ir::TyLayout> {
 
         ir::TyKind::Tuple(fields) => {
             let mut r = vec::Vec::new();
+            let mut field_start = 0;
             for f in fields {
-                let ty = f.ty.layout.as_ref().unwrap();
-                r.extend(&ty.body_ptrs);
+                let layout = f.ty.layout.as_ref().unwrap();
+                r.extend(layout.body_ptrs.iter().map(|p| p + field_start));
+                field_start += layout.head_size.div_ceil(8);
             }
             r
         }
@@ -143,7 +146,7 @@ pub fn get_layout_simple(ty: &ir::Ty) -> Option<ir::TyLayout> {
     };
     Some(ir::TyLayout {
         head_size,
-        body_ptrs: body_ptr_offset,
+        body_ptrs,
         variants_recursive: vec![],
     })
 }

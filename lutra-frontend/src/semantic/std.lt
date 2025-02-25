@@ -5,18 +5,22 @@ let div: func (left: int, right: int): int
 let mod: func (left: int, right: int): int
 let add: func (left: int, right: int): int
 let sub: func (left: int, right: int): int
+let neg: func (x: int): int
+
 let eq: func (left: int, right: int): bool
 let ne: func (left: int, right: int): bool
+
 let gt: func (left: int, right: int): bool
 let lt: func (left: int, right: int): bool
 let gte: func (left: int, right: int): bool
 let lte: func (left: int, right: int): bool
+
 let and: func (left: bool, right: bool): bool
 let or: func (left: bool, right: bool): bool
+let not: func (expr: bool): bool
+
 let regex_search: func (text: text, pattern: text): bool
 
-let neg: func (expr: int): int
-let not: func (expr: bool): bool
 
 # Array functions
 
@@ -138,7 +142,7 @@ module text_ops {
   let rtrim: func (value: text): text
   let trim: func (value: text): text
 
-  let length: func (value: text): int
+  let length: func (value: text): uint32
 
   let substring: func (value: text, offset: int, length: int): text
   let replace: func (value: text, pattern: text, replacement: text): text

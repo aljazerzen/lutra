@@ -8,7 +8,7 @@ pub mod br {
         pub main: Expr,
     }
 
-    #[derive(Debug, Clone)]
+    #[derive(Debug, Clone, PartialEq, Eq, Hash)]
     #[allow(non_camel_case_types)]
     pub struct ExternalSymbol {
         pub id: crate::string::String,
