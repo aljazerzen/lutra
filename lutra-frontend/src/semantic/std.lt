@@ -1,11 +1,28 @@
 # Operators
 
-let mul: func (left: int, right: int): int
-let div: func (left: int, right: int): int
-let mod: func (left: int, right: int): int
-let add: func (left: int, right: int): int
-let sub: func (left: int, right: int): int
-let neg: func (x: int): int
+let mul: func <T: int8 | int16 | int32 | int64 | uint8 | uint16 | uint32 | uint64 | float32 | float64> (
+    left: T, right: T
+): T
+
+let div: func <T: int8 | int16 | int32 | int64 | uint8 | uint16 | uint32 | uint64 | float32 | float64> (
+    left: T, right: T
+): T
+
+let mod: func <T: int8 | int16 | int32 | int64 | uint8 | uint16 | uint32 | uint64 | float32 | float64> (
+    left: T, right: T
+): T
+
+let add: func <T: int8 | int16 | int32 | int64 | uint8 | uint16 | uint32 | uint64 | float32 | float64> (
+    left: T, right: T
+): T
+
+let sub: func <T: int8 | int16 | int32 | int64 | uint8 | uint16 | uint32 | uint64 | float32 | float64> (
+    left: T, right: T
+): T
+
+let neg: func <T: int8 | int16 | int32 | int64 | uint8 | float32 | float64> (
+    x: T
+): T
 
 let eq: func (left: int, right: int): bool
 let ne: func (left: int, right: int): bool

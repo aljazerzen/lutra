@@ -18,16 +18,34 @@ fn _test_run(lutra_source: &str) -> String {
 #[test]
 fn std_mul() {
     insta::assert_snapshot!(_test_run("2 * 3"), @"6");
+
+    insta::assert_snapshot!(_test_run("2.1 * 3.5"), @"7.3500000000000005");
 }
 
 #[test]
 fn std_div() {
     insta::assert_snapshot!(_test_run("10 / 6"), @"1");
+    insta::assert_snapshot!(_test_run("-10 / 6"), @"-1");
+    insta::assert_snapshot!(_test_run("10 / -6"), @"-1");
+    insta::assert_snapshot!(_test_run("-10 / -6"), @"1");
+
+    insta::assert_snapshot!(_test_run("10.0 / 6.0"), @"1.6666666666666667");
+    insta::assert_snapshot!(_test_run("-10.0 / 6.0"), @"-1.6666666666666667");
+    insta::assert_snapshot!(_test_run("10.0 / -6.0"), @"-1.6666666666666667");
+    insta::assert_snapshot!(_test_run("-10.0 / -6.0"), @"1.6666666666666667");
 }
 
 #[test]
 fn std_mod() {
     insta::assert_snapshot!(_test_run("10 % 6"), @"4");
+    insta::assert_snapshot!(_test_run("-10 % 6"), @"-4");
+    insta::assert_snapshot!(_test_run("10 % -6"), @"4");
+    insta::assert_snapshot!(_test_run("-10 % -6"), @"-4");
+
+    insta::assert_snapshot!(_test_run("10.0 % 6.0"), @"4");
+    insta::assert_snapshot!(_test_run("-10.0 % 6.0"), @"-4");
+    insta::assert_snapshot!(_test_run("10.0 % -6.0"), @"4");
+    insta::assert_snapshot!(_test_run("-10.0 % -6.0"), @"-4");
 }
 
 #[test]
@@ -38,6 +56,9 @@ fn std_add() {
       32,
     }
     "#);
+
+    insta::assert_snapshot!(_test_run("30.2 + 2.30"), @"32.5");
+    insta::assert_snapshot!(_test_run("2.30 + 30.2"), @"32.5");
 }
 
 #[test]
@@ -46,6 +67,25 @@ fn std_sub() {
     {
       28,
       -28,
+    }
+    "#);
+
+    insta::assert_snapshot!(_test_run("30.2 - 2.30"), @"27.9");
+    insta::assert_snapshot!(_test_run("2.30 - 30.2"), @"-27.9");
+}
+
+#[test]
+fn std_neg() {
+    insta::assert_snapshot!(_test_run("{-2, - (-3)}"), @r#"
+    {
+      -2,
+      3,
+    }
+    "#);
+    insta::assert_snapshot!(_test_run("{-2.1, - (-3.1)}"), @r#"
+    {
+      -2.1,
+      3.1,
     }
     "#);
 }
@@ -139,21 +179,11 @@ fn std_or() {
 }
 
 #[test]
-fn std_neg() {
+fn std_not() {
     insta::assert_snapshot!(_test_run("{!false, !true}"), @r#"
     {
       true,
       false,
-    }
-    "#);
-}
-
-#[test]
-fn std_not() {
-    insta::assert_snapshot!(_test_run("{-2, - (-3)}"), @r#"
-    {
-      -2,
-      3,
     }
     "#);
 }

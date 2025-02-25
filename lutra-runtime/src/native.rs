@@ -9,7 +9,7 @@ pub mod std {
 
     use crate::native::*;
     use assume::LayoutArgsReader;
-    use lutra_bin::{ArrayReader, ArrayWriter, TupleReader, TupleWriter};
+    use lutra_bin::{ArrayReader, ArrayWriter, Decode, TupleReader, TupleWriter};
 
     pub const MODULE: Module = Module;
 
@@ -73,16 +73,6 @@ pub mod std {
         };
     }
 
-    macro_rules! un_func {
-        ($name: ident, $assume: path, $op: tt) => {
-            pub fn $name(_: &mut Interpreter, _layout_args: &[u32], args: Vec<Cell>) -> Cell {
-                let operand = $assume(&args[0]);
-                let res = $op operand;
-                Cell::Data(encode(&res))
-            }
-        };
-    }
-
     macro_rules! reduce_func {
         ($name: ident, $item_decode: path, $reduce: expr, $default: literal) => {
             pub fn $name(_: &mut Interpreter, layout_args: &[u32], args: Vec<Cell>) -> Cell {
@@ -99,16 +89,72 @@ pub mod std {
         };
     }
 
+    macro_rules! bin_op {
+        ($prim: ty, $args: ident, $op: tt) => {
+            {
+                let left = assume::primitive::<$prim>(&$args[0]);
+                let right = assume::primitive::<$prim>(&$args[1]);
+                let res = left $op right;
+                Cell::Data(encode::<$prim>(&res))
+            }
+        };
+    }
+
+    macro_rules! bin_num_func {
+        ($name: ident, $op: tt) => {
+            pub fn $name(_: &mut Interpreter, layout_args: &[u32], args: Vec<Cell>) -> Cell {
+                let prim_set = layout_args[0].to_be_bytes();
+                let prim_set = lutra_bin::ir::PrimitiveSet::decode(&prim_set).unwrap();
+
+                match prim_set {
+                    lutra_bin::ir::PrimitiveSet::int8 => bin_op!(i8, args, $op),
+                    lutra_bin::ir::PrimitiveSet::int16 => bin_op!(i16, args, $op),
+                    lutra_bin::ir::PrimitiveSet::int32 => bin_op!(i32, args, $op),
+                    lutra_bin::ir::PrimitiveSet::int64 => bin_op!(i64, args, $op),
+                    lutra_bin::ir::PrimitiveSet::uint8 => bin_op!(u8, args, $op),
+                    lutra_bin::ir::PrimitiveSet::uint16 => bin_op!(u16, args, $op),
+                    lutra_bin::ir::PrimitiveSet::uint32 => bin_op!(u32, args, $op),
+                    lutra_bin::ir::PrimitiveSet::uint64 => bin_op!(u64, args, $op),
+                    lutra_bin::ir::PrimitiveSet::float32 => bin_op!(f32, args, $op),
+                    lutra_bin::ir::PrimitiveSet::float64 => bin_op!(f64, args, $op),
+                    _ => panic!(),
+                }
+            }
+        };
+    }
+
+    macro_rules! neg_arg {
+        ($prim: ty, $args: ident) => {{
+            let operand = assume::primitive::<$prim>(&$args[0]);
+            let res = -operand;
+            Cell::Data(encode::<$prim>(&res))
+        }};
+    }
+
     impl Module {
-        bin_func!(mul, assume::int, assume::int, *);
+        bin_num_func!(mul, *);
 
-        bin_func!(div, assume::int, assume::int, /);
+        bin_num_func!(div, /);
 
-        bin_func!(r#mod, assume::int, assume::int, %);
+        bin_num_func!(r#mod, %);
 
-        bin_func!(add, assume::int, assume::int, +);
+        bin_num_func!(add, +);
 
-        bin_func!(sub, assume::int, assume::int, -);
+        bin_num_func!(sub, -);
+
+        pub fn neg(_: &mut Interpreter, layout_args: &[u32], args: Vec<Cell>) -> Cell {
+            let prim_set = layout_args[0].to_be_bytes();
+            let prim_set = lutra_bin::ir::PrimitiveSet::decode(&prim_set).unwrap();
+            match prim_set {
+                lutra_bin::ir::PrimitiveSet::int8 => neg_arg!(i8, args),
+                lutra_bin::ir::PrimitiveSet::int16 => neg_arg!(i16, args),
+                lutra_bin::ir::PrimitiveSet::int32 => neg_arg!(i32, args),
+                lutra_bin::ir::PrimitiveSet::int64 => neg_arg!(i64, args),
+                lutra_bin::ir::PrimitiveSet::float32 => neg_arg!(f32, args),
+                lutra_bin::ir::PrimitiveSet::float64 => neg_arg!(f64, args),
+                _ => panic!(),
+            }
+        }
 
         bin_func!(eq, assume::int, assume::int, ==);
 
@@ -126,9 +172,11 @@ pub mod std {
 
         bin_func!(or, assume::bool, assume::bool, ||);
 
-        un_func!(not, assume::bool, !);
-
-        un_func!(neg, assume::int, -);
+        pub fn not(_it: &mut Interpreter, _layout_args: &[u32], args: Vec<Cell>) -> Cell {
+            let operand = assume::bool(&args[0]);
+            let res = !operand;
+            Cell::Data(encode(&res))
+        }
 
         pub fn index(_it: &mut Interpreter, layout_args: &[u32], args: Vec<Cell>) -> Cell {
             let input_item_head_bytes = layout_args[0];
@@ -534,7 +582,7 @@ pub mod interpreter {
 mod assume {
     use super::decode;
     use crate::interpreter::Cell;
-    use lutra_bin::ArrayReader;
+    use lutra_bin::{ArrayReader, Decode};
 
     pub fn into_value(cell: Cell) -> lutra_bin::Data {
         match cell {
@@ -563,12 +611,16 @@ mod assume {
         res
     }
 
+    pub fn primitive<T: Decode>(cell: &Cell) -> T {
+        decode::primitive::<T>(as_value(cell))
+    }
+
     pub fn int(cell: &Cell) -> i64 {
-        decode::int(as_value(cell))
+        decode::primitive(as_value(cell))
     }
 
     pub fn bool(cell: &Cell) -> bool {
-        decode::bool(as_value(cell))
+        decode::primitive(as_value(cell))
     }
 
     pub fn text(cell: &Cell) -> String {
@@ -615,6 +667,10 @@ mod assume {
 
 mod decode {
     use lutra_bin::{Data, Decode};
+
+    pub fn primitive<T: Decode>(data: &Data) -> T {
+        T::decode(data.slice(T::head_size().div_ceil(8))).unwrap()
+    }
 
     pub fn int(data: &Data) -> i64 {
         i64::decode(data.slice(8)).unwrap()

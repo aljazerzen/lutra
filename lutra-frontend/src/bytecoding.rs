@@ -1,6 +1,9 @@
 use indexmap::IndexSet;
 use lutra_bin::br::*;
+use lutra_bin::bytes::Buf;
+use lutra_bin::bytes::BufMut;
 use lutra_bin::ir;
+use lutra_bin::Encode;
 
 pub fn compile_program(value: ir::Program) -> Program {
     let mut b = ByteCoder {
@@ -124,6 +127,16 @@ impl ByteCoder {
 
 fn compile_external_symbol(id: String, ty: &ir::Ty) -> ExternalSymbol {
     let layout_args: Vec<u32> = match id.as_str() {
+        "std::mul" | "std::div" | "std::mod" | "std::add" | "std::sub" | "std::neg" => {
+            let param_ty = as_ty_of_param(ty);
+            let primitive = param_ty.kind.as_primitive().unwrap();
+
+            let mut buf = lutra_bin::bytes::BytesMut::with_capacity(1);
+            primitive.encode(&mut buf);
+            buf.put_bytes(0, 3); // padding
+            vec![buf.get_u32()]
+        }
+
         "std::count" => vec![],
 
         "std::index" | "std::min" | "std::max" | "std::sum" | "std::average" | "std::contains" => {
@@ -232,4 +245,9 @@ fn as_layout_of_return_array(ty: &Ty) -> &ir::TyLayout {
     let ty_array = ty_func.body.kind.as_array().unwrap();
     let ty_layout = ty_array.layout.as_ref().unwrap();
     ty_layout
+}
+
+fn as_ty_of_param(ty: &Ty) -> &ir::Ty {
+    let ty_func = ty.kind.as_function().unwrap();
+    &ty_func.params[0]
 }
