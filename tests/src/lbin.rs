@@ -136,8 +136,8 @@ fn test_v() {
     let value = Value::Enum(1, Box::new(Value::Tuple(vec![])));
 
     assert_snapshot!(_test_encode_decode::<types::v>(value, &ty), @r#"
-    Length: 5 (0x5) bytes
-    0000:   01 00 00 00  00                                      .....
+    Length: 1 (0x1) bytes
+    0000:   01                                                   .
     "#
     );
 }

@@ -134,8 +134,8 @@ fn encode_head<'t>(
                 ValueHeadPtr::Offset(offset)
             };
 
-            if variant.padding > 0 {
-                buf.put_bytes(0, variant.padding / 8);
+            if variant.padding_bytes > 0 {
+                buf.put_bytes(0, variant.padding_bytes);
             }
             Ok(r)
         }
@@ -236,7 +236,7 @@ fn enum_params_encode(
 
     let variant = ty_variants.get(tag).ok_or(Error::InvalidData)?;
 
-    let variant_format = layout::enum_variant_format(&variant.ty);
+    let variant_format = layout::enum_variant_format(&head_format, &variant.ty);
     Ok((head_format, variant_format, tag, &variant.ty))
 }
 
@@ -298,7 +298,7 @@ fn decode_inner<'t>(
 
             let variant = variants.get(tag).unwrap();
 
-            let variant_format = layout::enum_variant_format(&variant.ty);
+            let variant_format = layout::enum_variant_format(&head, &variant.ty);
 
             let inner = if variant_format.is_inline {
                 decode_inner(r, &variant.ty, ctx)?
@@ -308,7 +308,7 @@ fn decode_inner<'t>(
                 decode_inner(&mut body, &variant.ty, ctx)?
             };
 
-            r.advance(variant_format.padding / 8);
+            r.advance(variant_format.padding_bytes);
             Value::Enum(tag, boxed::Box::new(inner))
         }
 

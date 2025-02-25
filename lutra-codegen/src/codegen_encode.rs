@@ -152,7 +152,7 @@ fn write_ty_def_impl(
             writeln!(w, "        match self {{")?;
 
             for (tag, variant) in variants.iter().enumerate() {
-                let va_format = layout::enum_variant_format(&variant.ty);
+                let va_format = layout::enum_variant_format(&head, &variant.ty);
 
                 write!(w, "            Self::{}", variant.name)?;
 
@@ -176,8 +176,8 @@ fn write_ty_def_impl(
                     writeln!(w, "                let r = {head_ptr_name}::None;")?;
                 }
 
-                if va_format.padding > 0 {
-                    write!(w, "                w.put_bytes(0, {});", va_format.padding / 8)?;
+                if va_format.padding_bytes > 0 {
+                    write!(w, "                w.put_bytes(0, {});", va_format.padding_bytes)?;
                 }
                 if needs_head_ptr {
                     writeln!(w, "                r")?;
@@ -198,7 +198,7 @@ fn write_ty_def_impl(
                     }
                     writeln!(w, " => {{")?;
 
-                    let variant_format = layout::enum_variant_format(&variant.ty);
+                    let variant_format = layout::enum_variant_format(&head, &variant.ty);
 
                     if !variant_format.is_inline {
                         writeln!(w, "                let {head_ptr_name}::{}(offset_ptr) = head else {{ unreachable!() }};", variant.name)?;
@@ -227,7 +227,7 @@ fn write_ty_def_impl(
                         continue;
                     }
 
-                    let variant_format = layout::enum_variant_format(&variant.ty);
+                    let variant_format = layout::enum_variant_format(&head, &variant.ty);
 
                     write!(w, "    {}", variant.name)?;
 
@@ -344,7 +344,7 @@ fn write_ty_def_impl(
             for (index, variant) in variants.iter().enumerate() {
                 writeln!(w, "            {index} => {{")?;
 
-                let variant_format = layout::enum_variant_format(&variant.ty);
+                let variant_format = layout::enum_variant_format(&head, &variant.ty);
 
                 if variant_format.is_inline {
                     if !is_unit_variant(&variant.ty) {

@@ -194,17 +194,26 @@ pub fn enum_head_format(variants: &[ir::TyEnumVariant]) -> EnumHeadFormat {
     }
 }
 pub struct EnumVariantFormat {
-    pub padding: usize,
+    pub padding_bytes: usize,
     pub is_inline: bool,
 }
 
-pub fn enum_variant_format(variant_ty: &ir::Ty) -> EnumVariantFormat {
-    let variant_size = variant_ty.layout.as_ref().unwrap().head_size as usize;
+pub fn enum_variant_format(head: &EnumHeadFormat, variant_ty: &ir::Ty) -> EnumVariantFormat {
+    let inner_head_size = variant_ty.layout.as_ref().unwrap().head_size as usize;
+    let inner_head_bytes = inner_head_size.div_ceil(8);
 
-    let is_inline = variant_size <= 32;
-    let padding = 32_usize.saturating_sub(variant_size);
+    let is_inline = inner_head_bytes <= 4;
 
-    EnumVariantFormat { is_inline, padding }
+    let padding_bytes = if head.no_pointer {
+        0
+    } else {
+        4_usize.saturating_sub(inner_head_bytes)
+    };
+
+    EnumVariantFormat {
+        is_inline,
+        padding_bytes,
+    }
 }
 
 fn enum_max_variant_head_size(variants: &[ir::TyEnumVariant]) -> usize {
@@ -259,4 +268,32 @@ fn test_enum_tag_size() {
     assert_eq!(5, enum_tag_size_used(20));
     assert_eq!(5, enum_tag_size_used(21));
     assert_eq!(5, enum_tag_size_used(22));
+    assert_eq!(8, enum_tag_size_used(256));
+    assert_eq!(9, enum_tag_size_used(257));
+
+    assert_eq!(0, enum_tag_size(0));
+    assert_eq!(0, enum_tag_size(1));
+    assert_eq!(8, enum_tag_size(2));
+    assert_eq!(8, enum_tag_size(3));
+    assert_eq!(8, enum_tag_size(4));
+    assert_eq!(8, enum_tag_size(5));
+    assert_eq!(8, enum_tag_size(6));
+    assert_eq!(8, enum_tag_size(7));
+    assert_eq!(8, enum_tag_size(8));
+    assert_eq!(8, enum_tag_size(9));
+    assert_eq!(8, enum_tag_size(10));
+    assert_eq!(8, enum_tag_size(11));
+    assert_eq!(8, enum_tag_size(12));
+    assert_eq!(8, enum_tag_size(13));
+    assert_eq!(8, enum_tag_size(14));
+    assert_eq!(8, enum_tag_size(15));
+    assert_eq!(8, enum_tag_size(16));
+    assert_eq!(8, enum_tag_size(17));
+    assert_eq!(8, enum_tag_size(18));
+    assert_eq!(8, enum_tag_size(19));
+    assert_eq!(8, enum_tag_size(20));
+    assert_eq!(8, enum_tag_size(21));
+    assert_eq!(8, enum_tag_size(22));
+    assert_eq!(8, enum_tag_size(256));
+    assert_eq!(16, enum_tag_size(257));
 }

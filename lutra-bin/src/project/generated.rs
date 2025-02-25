@@ -1723,51 +1723,39 @@ pub mod ir {
                 match self {
                     Self::bool => {
                         w.put_slice(&[0]);
-                        w.put_bytes(0, 4);
                     }
                     Self::int8 => {
                         w.put_slice(&[1]);
-                        w.put_bytes(0, 4);
                     }
                     Self::int16 => {
                         w.put_slice(&[2]);
-                        w.put_bytes(0, 4);
                     }
                     Self::int32 => {
                         w.put_slice(&[3]);
-                        w.put_bytes(0, 4);
                     }
                     Self::int64 => {
                         w.put_slice(&[4]);
-                        w.put_bytes(0, 4);
                     }
                     Self::uint8 => {
                         w.put_slice(&[5]);
-                        w.put_bytes(0, 4);
                     }
                     Self::uint16 => {
                         w.put_slice(&[6]);
-                        w.put_bytes(0, 4);
                     }
                     Self::uint32 => {
                         w.put_slice(&[7]);
-                        w.put_bytes(0, 4);
                     }
                     Self::uint64 => {
                         w.put_slice(&[8]);
-                        w.put_bytes(0, 4);
                     }
                     Self::float32 => {
                         w.put_slice(&[9]);
-                        w.put_bytes(0, 4);
                     }
                     Self::float64 => {
                         w.put_slice(&[10]);
-                        w.put_bytes(0, 4);
                     }
                     Self::text => {
                         w.put_slice(&[11]);
-                        w.put_bytes(0, 4);
                     }
                 }
             }
