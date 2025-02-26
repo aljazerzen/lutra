@@ -29,9 +29,10 @@ impl super::Resolver<'_> {
 
     /// Entry point to the resolver.
     /// fq_ident must point to an unresolved declaration.
+    #[tracing::instrument(name = "d", skip_all, fields(n = fq_ident.to_string()))]
     pub fn resolve_decl(&mut self, fq_ident: &pr::Path) -> Result<()> {
         if !fq_ident.starts_with_part(NS_STD) {
-            log::debug!("resolving decl {fq_ident}");
+            tracing::debug!("resolving decl {fq_ident}");
         }
 
         self.debug_current_decl = fq_ident.clone();

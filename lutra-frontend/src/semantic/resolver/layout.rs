@@ -79,6 +79,7 @@ impl Resolver<'_> {
                         }
                     },
                 };
+                tracing::trace!("resolved ident to: {}", crate::printer::print_ty(ty));
                 // resolves to a type: use it's layout
                 if let Some(layout) = &ty.layout {
                     layout.clone()

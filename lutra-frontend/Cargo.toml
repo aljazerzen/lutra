@@ -18,6 +18,7 @@ doctest = false
 thiserror = { workspace = true, default-features = true }
 itertools = { workspace = true }
 log = { workspace = true }
+tracing = { workspace = true }
 ariadne = "0.4.1"
 
 # discover

@@ -57,7 +57,7 @@ impl Resolver<'_> {
             return Ok(TyRef::Ty(Cow::Owned(ty)));
         };
         let named = self.get_ident(&ident).ok_or_else(|| {
-            log::debug!("scope: {:?}", self.scopes.last().unwrap());
+            tracing::debug!("scope: {:?}", self.scopes.last().unwrap());
             Diagnostic::new_assert("cannot find type ident")
                 .push_hint(format!("ident={ident}"))
                 .with_span(ty.span)
@@ -236,7 +236,7 @@ impl Resolver<'_> {
     where
         F: Fn() -> Option<String>,
     {
-        log::trace!(
+        tracing::trace!(
             "validate_type, f: {}, e: {}",
             printer::print_ty(found),
             printer::print_ty(expected)
@@ -330,7 +330,7 @@ impl Resolver<'_> {
                     .collect();
 
                 let mut expected_but_not_found = Vec::new();
-                for e_field in expected_fields {
+                for (index, e_field) in expected_fields.iter().enumerate() {
                     if let Some(e_name) = &e_field.name {
                         // when a named field is expected
 
@@ -344,7 +344,13 @@ impl Resolver<'_> {
                             expected_but_not_found.push(e_field);
                         }
                     } else {
-                        // TODO: positional expected fields
+                        // when a positional field is expected
+                        if let Some(f_field) = found_fields.get(index) {
+                            // co-variant contained type
+                            self.validate_type(&f_field.ty, &e_field.ty, who)?;
+                        } else {
+                            expected_but_not_found.push(e_field);
+                        }
                     }
                 }
 
@@ -599,122 +605,6 @@ impl Resolver<'_> {
         }
     }
 
-    // /// Instantiate generic type parameters into generic type arguments.
-    // ///
-    // /// When resolving a type of reference to a variable, we cannot just use the type
-    // /// of the variable as the type of the reference. That's because the variable might contain
-    // /// generic type arguments that need to differ between references to the same variable.
-    // ///
-    // /// For example:
-    // /// ```prql
-    // /// let plus_one = func <T> x<T> -> <T> x + 1
-    // ///
-    // /// let a = plus_one 1
-    // /// let b = plus_one 1.5
-    // /// ```
-    // ///
-    // /// Here, the first reference to `plus_one` must resolve with T=int and the second with T=float.
-    // ///
-    // /// This struct makes sure that distinct instanced of T are created from generic type param T.
-    // pub fn instantiate_type(&mut self, ty: Ty, id: usize) -> Ty {
-    //     let TyKind::Function(Some(ty_func)) = &ty.kind else {
-    //         return ty;
-    //     };
-    //     if ty_func.generic_type_params.is_empty() {
-    //         return ty;
-    //     }
-    //     let prev_scope = Ident::from_path(vec![NS_LOCAL]);
-    //     let new_scope = Ident::from_path(vec![NS_GENERIC.to_string(), id.to_string()]);
-
-    //     let mut ident_mapping: HashMap<Ident, Ty> =
-    //         HashMap::with_capacity(ty_func.generic_type_params.len());
-
-    //     for gtp in &ty_func.generic_type_params {
-    //         let new_ident = new_scope.clone() + Ident::from_name(&gtp.name);
-
-    //         // TODO: this should create GenericArg, not GenericParam
-    //         let decl = Decl::from(DeclKind::GenericArg(GenericParam {
-    //             domain: gtp.domain,
-    //             bounds: Vec::new(),
-    //         }));
-    //         self.root_mod
-    //             .module
-    //             .insert(new_ident.clone(), decl)
-    //             .unwrap();
-
-    //         ident_mapping.insert(
-    //             prev_scope.clone() + Ident::from_name(&gtp.name),
-    //             Ty::new(TyKind::Ident(new_ident)),
-    //         );
-    //     }
-
-    //     TypeReplacer::on_ty(ty, ident_mapping)
-    // }
-
-    // pub fn ty_tuple_exclusion(&self, base: Ty, except: Ty) -> Result<TyKind> {
-    //     let mask = self.ty_tuple_exclusion_mask(&base, &except)?;
-
-    //     let new_fields = itertools::zip_eq(base.kind.as_tuple().unwrap(), mask)
-    //         .filter(|(_, p)| *p)
-    //         .map(|(x, _)| x.clone())
-    //         .collect();
-
-    //     Ok(TyKind::Tuple(new_fields))
-    // }
-
-    // /// Computes the "field mask", which is a vector of booleans indicating if a field of
-    // /// base tuple type should appear in the resulting type.
-    // ///
-    // /// Returns `None` if:
-    // /// - base or exclude is a generic type argument, or
-    // /// - either of the types contains Unpack.
-    // pub fn ty_tuple_exclusion_mask(&self, base: &Ty, except: &Ty) -> Result<Vec<bool>> {
-    //     let within_fields = match &base.kind {
-    //         TyKind::Tuple(f) => f,
-
-    //         // this is a generic, exclusion cannot be inlined
-    //         TyKind::Ident(_) => todo!(),
-
-    //         _ => {
-    //             return Err(
-    //                 Diagnostic::new_simple("fields can only be excluded from a tuple")
-    //                     .with_span(base.span),
-    //             )
-    //         }
-    //     };
-
-    //     let except_fields = match &except.kind {
-    //         TyKind::Tuple(f) => f,
-
-    //         // this is a generic, exclusion cannot be inlined
-    //         TyKind::Ident(_) => todo!(),
-
-    //         _ => {
-    //             return Err(Diagnostic::new_simple("expected excluded fields to be a tuple")
-    //                 .with_span(except.span));
-    //         }
-    //     };
-
-    //     let except_fields: HashSet<&String> = except_fields
-    //         .iter()
-    //         .map(|field| match &field.name {
-    //             Some(name) => Ok(name),
-    //             None => Err(Diagnostic::new_simple("excluded fields must be named")),
-    //         })
-    //         .collect::<Result<_>>()
-    //         .with_span(except.span)?;
-
-    //     let mut mask = Vec::new();
-    //     for field in within_fields {
-    //         if let Some(name) = &field.name {
-    //             mask.push(!except_fields.contains(&name));
-    //         } else {
-    //             mask.push(true);
-    //         }
-    //     }
-    //     Ok(mask)
-    // }
-
     /// Add type's params into scope as type arguments.
     pub fn introduce_ty_into_scope(&mut self, ty: Ty) -> Ty {
         let TyKind::Function(Some(mut ty_func)) = ty.kind else {
@@ -731,7 +621,10 @@ impl Resolver<'_> {
         }
 
         let expr_id = self.id.gen();
-        log::debug!("introducing generics for {expr_id} {ty_func:?}");
+        tracing::debug!(
+            "introducing generics with expr_id={expr_id}, ty_func={}",
+            crate::printer::print_ty(&Ty::new(ty_func.clone()))
+        );
 
         let mut mapping = HashMap::new();
         let scope = self.scopes.last_mut().unwrap();
@@ -827,12 +720,13 @@ pub struct TypeReplacer {
     mapping: HashMap<Path, Ty>,
 }
 
-#[allow(dead_code)]
 impl TypeReplacer {
+    #[tracing::instrument(name = "TypeReplacer", skip_all)]
     pub fn on_ty(ty: Ty, mapping: HashMap<Path, Ty>) -> Ty {
         TypeReplacer { mapping }.fold_type(ty).unwrap()
     }
 
+    #[tracing::instrument(name = "TypeReplacer", skip_all)]
     pub fn on_func(func: pr::Func, mapping: HashMap<Path, Ty>) -> pr::Func {
         TypeReplacer { mapping }.fold_func(func).unwrap()
     }
@@ -852,5 +746,31 @@ impl PrFold for TypeReplacer {
             }
             _ => fold::fold_type(self, ty),
         }
+    }
+}
+
+pub struct TypeLayoutResolver<'a, 'b> {
+    resolver: &'a mut super::Resolver<'b>,
+}
+
+impl<'a, 'b> TypeLayoutResolver<'a, 'b> {
+    #[tracing::instrument(name = "TypeLayoutResolver", skip_all)]
+    pub fn on_func(func: pr::Func, resolver: &'a mut super::Resolver<'b>) -> Result<pr::Func> {
+        TypeLayoutResolver { resolver }.fold_func(func)
+    }
+}
+
+impl<'a, 'b> PrFold for TypeLayoutResolver<'a, 'b> {
+    fn fold_type(&mut self, ty: Ty) -> Result<Ty> {
+        // Don't re-resolve idents
+        // I do this because I don't want to set up proper scopes.
+        // It might be needed.
+        if let TyKind::Ident(_) = &ty.kind {
+            return Ok(ty);
+        }
+
+        let mut ty = fold::fold_type(self, ty)?;
+        self.resolver.compute_ty_layout(&mut ty)?;
+        Ok(ty)
     }
 }

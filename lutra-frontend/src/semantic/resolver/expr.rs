@@ -5,7 +5,6 @@ use crate::diagnostic::{Diagnostic, WithErrorInfo};
 use crate::pr::Ty;
 use crate::semantic::resolver::scope::{Named, ScopedKind};
 use crate::semantic::resolver::tuple::BaseKind;
-use crate::semantic::NS_STD;
 use crate::utils::fold::{self, PrFold};
 use crate::Result;
 use crate::{pr, printer};
@@ -22,21 +21,18 @@ impl fold::PrFold for super::Resolver<'_> {
         self.fold_type_actual(ty)
     }
 
+    #[tracing::instrument(name = "e", skip(self, node))]
     fn fold_expr(&mut self, node: pr::Expr) -> Result<pr::Expr> {
+        tracing::debug!("{}", node.kind.as_ref());
         let span = node.span;
-
-        log::trace!("folding expr {node:?}");
 
         let r = match node.kind {
             pr::ExprKind::Ident(ident) => {
-                log::debug!("resolving ident {ident:?}...");
+                tracing::debug!("resolving ident {ident:?}...");
 
                 let named = self.get_ident(&ident).unwrap();
 
-                let log_debug = !ident.starts_with_part(NS_STD);
-                if log_debug {
-                    log::debug!("... resolved to {}", named.as_ref());
-                }
+                tracing::debug!("... resolved to {}", named.as_ref());
 
                 let ty = match named {
                     Named::Decl(decl) => match &decl.kind {

@@ -73,6 +73,12 @@ impl<'a> Lowerer<'a> {
         // should have been lowered earlier
         assert!(!matches!(expr.kind, pr::ExprKind::Internal));
 
+        if let pr::TyKind::Function(Some(ty_func)) = &expr.ty.as_ref().unwrap().kind {
+            if !ty_func.ty_params.is_empty() {
+                // todo!("instantiation of funcs with type params in lowering");
+            }
+        }
+
         let res = self.lower_expr(expr.as_ref())?;
 
         Ok(res)

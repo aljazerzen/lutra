@@ -29,7 +29,7 @@ pub(crate) fn parse_with_parser<O: Debug>(
     let (ast, parse_errors) = parser.parse_recovery_verbose(stream);
 
     if !parse_errors.is_empty() {
-        log::info!("ast: {ast:?}");
+        tracing::info!("ast: {ast:?}");
         return Err(parse_errors.into_iter().map(|e| e.into()).collect());
     }
     Ok(ast.unwrap())

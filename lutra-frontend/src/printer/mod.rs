@@ -99,6 +99,24 @@ impl Printer {
                     }
                     r += ">";
                 }
+                r += " (";
+                for (i, ty_param) in func.params.iter().enumerate() {
+                    if i > 0 {
+                        r += ", ";
+                    }
+
+                    if let Some(ty) = ty_param {
+                        r += &self.print_ty(ty);
+                    } else {
+                        r += "?";
+                    }
+                }
+                r += ")";
+                if let Some(body) = &func.body {
+                    r += ": ";
+                    r += &self.print_ty(body);
+                }
+
                 r
             }
             pr::TyKind::Function(None) => {

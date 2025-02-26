@@ -290,7 +290,7 @@ impl NameResolver<'_> {
 
         let decl = mod_decl.and_then(|module| module.get(&ident));
         if decl.is_none() {
-            log::debug!("scopes: {:?}", self.scopes);
+            tracing::debug!("scopes: {:?}", self.scopes);
             return Err(Diagnostic::new_custom(format!("unknown name {ident}")));
         }
 

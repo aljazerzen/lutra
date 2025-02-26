@@ -96,13 +96,13 @@ impl Scope {
     }
 
     pub fn infer_type_arg(&mut self, id: &TyArgId, ty: pr::Ty) {
-        log::debug!("inferring {id:?} is {ty:?}");
+        tracing::debug!("inferring {id:?} is {ty:?}");
         let type_arg = self.type_args.get(id).unwrap();
         type_arg.inferred.set(ty).unwrap();
     }
 
     pub fn infer_type_args_equal(&mut self, a: TyArgId, b: TyArgId) {
-        log::debug!("inferring equality between {a:?} and {b:?}");
+        tracing::debug!("inferring equality between {a:?} and {b:?}");
         let a_arg = self.type_args.get(&a).unwrap();
         let a_cell = Rc::clone(&a_arg.inferred);
 
@@ -132,7 +132,7 @@ impl Scope {
             );
         }
         if !mapping.is_empty() {
-            log::debug!("finalized scope: {mapping:#?}");
+            tracing::debug!("finalized scope: {mapping:#?}");
         }
         Ok(mapping)
     }
@@ -143,7 +143,7 @@ impl Resolver<'_> {
     ///
     /// Does not mutate the current scope or module structure.
     pub(super) fn get_ident<'a>(&'a self, ident: &Path) -> Option<Named<'a>> {
-        log::debug!("get_ident: {ident}");
+        tracing::trace!("get_ident: {ident}");
 
         if ident.starts_with_part("scope") {
             let mut parts = ident.iter().peekable();

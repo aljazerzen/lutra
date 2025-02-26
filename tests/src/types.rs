@@ -1,10 +1,10 @@
 #[track_caller]
 fn _test_run(source: &str) -> String {
-    env_logger::Builder::new()
-        .filter_level(log::LevelFilter::Debug)
-        .format_timestamp(None)
-        .try_init()
-        .ok();
+    // env_logger::Builder::new()
+    //     .filter_level(log::LevelFilter::Debug)
+    //     .format_timestamp(None)
+    //     .try_init()
+    //     .ok();
 
     let program = match lutra_frontend::_test_compile(source) {
         Ok(program) => program,
@@ -19,11 +19,11 @@ fn _test_run(source: &str) -> String {
 fn _test_err(source: &str) -> String {
     use lutra_frontend::error::Error;
 
-    env_logger::Builder::new()
-        .filter_level(log::LevelFilter::Debug)
-        .format_timestamp(None)
-        .try_init()
-        .ok();
+    // env_logger::Builder::new()
+    //     .filter_level(log::LevelFilter::Debug)
+    //     .format_timestamp(None)
+    //     .try_init()
+    //     .ok();
 
     let Error::Compile { diagnostics } = lutra_frontend::_test_compile(source).unwrap_err() else {
         unreachable!()

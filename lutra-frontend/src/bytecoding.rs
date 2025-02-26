@@ -169,6 +169,7 @@ fn compile_external_symbol(id: String, ty: &ir::Ty) -> ExternalSymbol {
         "std::to_columnar" => {
             let ty_func = ty.kind.as_function().unwrap();
 
+            dbg!(ty_func);
             let input_item = ty_func.params[0].kind.as_array().unwrap();
             let input_layout = input_item.layout.as_ref().unwrap();
 

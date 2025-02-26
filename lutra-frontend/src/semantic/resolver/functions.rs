@@ -2,7 +2,7 @@ use itertools::Itertools;
 
 use crate::diagnostic::{Diagnostic, WithErrorInfo};
 use crate::pr::{self, *};
-use crate::semantic::resolver::types::TypeReplacer;
+use crate::semantic::resolver::types::{TypeLayoutResolver, TypeReplacer};
 use crate::utils::fold::{self, PrFold};
 use crate::{Result, Span};
 
@@ -12,8 +12,9 @@ use super::Resolver;
 impl Resolver<'_> {
     /// Folds function types, so they are resolved to material types, ready for type checking.
     /// Requires id of the function call node, so it can be used to generic type arguments.
+    #[tracing::instrument(name = "func", skip_all, fields(f = func.params.iter().map(|p| &p.name).join(",")))]
     pub fn resolve_func(&mut self, mut func: Box<Func>) -> Result<Box<Func>> {
-        log::debug!(
+        tracing::debug!(
             "resolving func with params: {}",
             func.params.iter().map(|p| &p.name).join(", ")
         );
@@ -24,7 +25,7 @@ impl Resolver<'_> {
         self.scopes.push(scope);
 
         // fold types
-        func.params = fold::fold_func_param(self, func.params)?;
+        func.params = fold::fold_func_params(self, func.params)?;
         func.return_ty = fold::fold_type_opt(self, func.return_ty)?;
 
         // put params into scope
@@ -42,6 +43,10 @@ impl Resolver<'_> {
         let mapping = scope.finalize_type_args().with_span(func.body.span)?;
         let func = TypeReplacer::on_func(*func, mapping);
 
+        // fold again, but only for computing layouts
+        // (before type arg finalization, some layouts might have not been able to compute)
+        let func = TypeLayoutResolver::on_func(func, self)?;
+
         Ok(Box::new(func))
     }
 
@@ -52,17 +57,12 @@ impl Resolver<'_> {
         span: Option<Span>,
     ) -> Result<Expr> {
         let metadata = self.gather_func_metadata(&func);
+        let tspan = tracing::span!(tracing::Level::TRACE, "call", f = metadata.as_debug_name());
+        let _enter = tspan.enter();
 
         let fn_ty = func.ty.as_ref().unwrap();
         let fn_ty = fn_ty.kind.as_function().unwrap();
         let fn_ty = fn_ty.as_ref().unwrap().clone();
-
-        log::debug!(
-            "func {} {}/{} params",
-            metadata.as_debug_name(),
-            args.len(),
-            fn_ty.params.len()
-        );
 
         let args_match_params = args.len() == fn_ty.params.len();
         if !args_match_params {
@@ -78,20 +78,30 @@ impl Resolver<'_> {
             .with_span(span));
         }
 
-        log::debug!("resolving args of function {}", metadata.as_debug_name());
-        let args = self.resolve_func_app_args(&func, args, &metadata)?;
+        let mut args_resolved = Vec::with_capacity(args.len());
+        for (param, arg) in itertools::zip_eq(&fn_ty.params, args) {
+            // fold
+            let mut arg = self.fold_expr(arg)?;
 
-        // run fold again, so idents that used to point to generics get inlined
-        let return_ty = fn_ty
-            .body
-            .clone()
-            .map(|ty| self.fold_type(*ty))
-            .transpose()?;
+            // validate type
+            let who = || {
+                metadata
+                    .name_hint
+                    .as_ref()
+                    .map(|n| format!("function {n}, one of the params")) // TODO: param name
+            };
+            self.validate_expr_type(&mut arg, param.as_ref(), &who)?;
+
+            args_resolved.push(arg);
+        }
 
         Ok(Expr {
-            ty: return_ty,
+            ty: fn_ty.body.clone().map(|x| *x),
             span,
-            ..Expr::new(ExprKind::FuncCall(FuncCall { func, args }))
+            ..Expr::new(ExprKind::FuncCall(FuncCall {
+                func,
+                args: args_resolved,
+            }))
         })
     }
 
@@ -108,39 +118,6 @@ impl Resolver<'_> {
         res.name_hint = Some(fq_ident.clone());
 
         res
-    }
-
-    /// Resolves function arguments. Will return `Err(func)` is partial application is required.
-    fn resolve_func_app_args(
-        &mut self,
-        func: &Expr,
-        args_to_resolve: Vec<Expr>,
-        metadata: &FuncMetadata,
-    ) -> Result<Vec<Expr>> {
-        let mut args = Vec::with_capacity(args_to_resolve.len());
-
-        let func_name = &metadata.name_hint;
-
-        let func_ty = func.ty.as_ref().unwrap();
-        let func_ty = func_ty.kind.as_function().unwrap();
-        let func_ty = func_ty.as_ref().unwrap();
-
-        for (param, arg) in itertools::zip_eq(&func_ty.params, args_to_resolve) {
-            // fold
-            let mut arg = self.fold_expr(arg)?;
-
-            // validate type
-            let who = || {
-                func_name
-                    .as_ref()
-                    .map(|n| format!("function {n}, one of the params")) // TODO: param name
-            };
-            self.validate_expr_type(&mut arg, param.as_ref(), &who)?;
-
-            args.push(arg);
-        }
-
-        Ok(args)
     }
 
     /// Wraps non-tuple Exprs into a singleton Tuple.

@@ -64,26 +64,26 @@ let sort: func <I> (
   key: func (I): int,
 ): [I]
 
-let to_columnar: func ( # <I: {i1 = I1}>
-  array: [{int, int}]
-): {[int], [int]}
+let to_columnar: func <A, B> ( # <I: {i1 = I1}>
+  x: [{A, B}]
+): {[A], [B]}
 
-let from_columnar: func ( # <I: {i1 = [I1]}>
-  columnar: {[int], [int]}
-): [{int, int}]
+let from_columnar: func <A, B> ( # <I: {i1 = [I1]}>
+  columnar: {[A], [B]}
+): [{A, B}]
 
-let map_columnar = func ( # <I: {i1 = I1}, O: {o1 = O1}>
-  array: [{int, int}],
-  mapper: func ({[int], [int]}): {[int], [int]},
-): [{int, int}] -> (
-  array | to_columnar | mapper | from_columnar
+let map_columnar = func <A, B> ( # <I: {i1 = I1}, O: {o1 = O1}>
+  x: [{A, B}],
+  mapper: func ({[A], [B]}): {[A], [B]},
+): [{A, B}] -> (
+  x | to_columnar | mapper | from_columnar
 )
 
-let aggregate = func ( # <I: {i1 = I1}, O>
-  array: [{int, int}],
-  mapper: func ({[int], [int]}): {int, int},
-): {int, int} -> (
-  array | to_columnar | mapper
+let aggregate = func <A, B> ( # <I: {i1 = I1}, O>
+  x: [{A, B}],
+  mapper: func ({[A], [B]}): {A, B},
+): {A, B} -> (
+  x | to_columnar | mapper
 )
 
 # let join = func <A, B> (

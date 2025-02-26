@@ -30,7 +30,7 @@ pub struct Expr {
     pub ty: Option<Ty>,
 }
 
-#[derive(Debug, EnumAsInner, PartialEq, Clone)]
+#[derive(Debug, EnumAsInner, PartialEq, Clone, strum::AsRefStr)]
 pub enum ExprKind {
     Ident(Path),
 

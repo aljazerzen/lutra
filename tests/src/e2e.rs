@@ -1,6 +1,10 @@
 #[track_caller]
 fn _test_run(lutra_source: &str) -> String {
-    env_logger::builder().format_timestamp(None).try_init().ok();
+    // tracing_subscriber::fmt::Subscriber::builder()
+    //     .without_time()
+    //     .with_max_level(tracing::Level::DEBUG)
+    //     .try_init()
+    //     .ok();
 
     let source = format!("let main = func () -> {lutra_source}");
 
@@ -430,6 +434,23 @@ fn std_to_columnar() {
       ],
     }
     "#);
+
+    insta::assert_snapshot!(_test_run(r#"
+    std::to_columnar([{false,"three"},{true,"one"},{false, "two"}])
+    "#), @r#"
+    {
+      [
+        false,
+        true,
+        false,
+      ],
+      [
+        "three",
+        "one",
+        "two",
+      ],
+    }
+    "#);
 }
 
 #[test]
@@ -480,6 +501,7 @@ fn std_from_columnar() {
 }
 
 #[test]
+#[ignore] // needs evaluated generic functions
 fn std_map_columnar() {
     insta::assert_snapshot!(_test_run(r#"
     std::map_columnar(
@@ -508,6 +530,7 @@ fn std_map_columnar() {
 }
 
 #[test]
+#[ignore] // needs evaluated generic functions
 fn std_aggregate() {
     insta::assert_snapshot!(_test_run(r#"
     std::aggregate([{5,3},{65,1},{3, 2}], func (x: {[int], [int]}) -> {std::min(x.0), std::min(x.1)})

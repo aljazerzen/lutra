@@ -205,12 +205,12 @@ pub fn fold_func<T: ?Sized + PrFold>(fold: &mut T, func: Func) -> Result<Func> {
     Ok(Func {
         body: Box::new(fold.fold_expr(*func.body)?),
         return_ty: fold_type_opt(fold, func.return_ty)?,
-        params: fold_func_param(fold, func.params)?,
+        params: fold_func_params(fold, func.params)?,
         ty_params: func.ty_params, // recurse into this too?
     })
 }
 
-pub fn fold_func_param<T: ?Sized + PrFold>(
+pub fn fold_func_params<T: ?Sized + PrFold>(
     fold: &mut T,
     params: Vec<FuncParam>,
 ) -> Result<Vec<FuncParam>> {
