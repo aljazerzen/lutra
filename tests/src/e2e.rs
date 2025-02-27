@@ -483,12 +483,31 @@ fn std_from_columnar() {
     "#), @"[]");
 
     insta::assert_snapshot!(_test_run(r#"
-    std::from_columnar({[1], [2, 3]})
+    std::from_columnar({[1, 2], [3, 4, 5]})
     "#), @r#"
     [
       {
         1,
+        3,
+      },
+      {
         2,
+        4,
+      },
+    ]
+    "#);
+
+    insta::assert_snapshot!(_test_run(r#"
+    std::from_columnar({[false, true], ["false", "true", "neither"]})
+    "#), @r#"
+    [
+      {
+        false,
+        "false",
+      },
+      {
+        true,
+        "true",
       },
     ]
     "#);
@@ -501,7 +520,6 @@ fn std_from_columnar() {
 }
 
 #[test]
-#[ignore] // needs evaluated generic functions
 fn std_map_columnar() {
     insta::assert_snapshot!(_test_run(r#"
     std::map_columnar(
@@ -527,10 +545,34 @@ fn std_map_columnar() {
       },
     ]
     "#);
+
+    insta::assert_snapshot!(_test_run(r#"
+    std::map_columnar(
+        [{false,"hello"},{false,"world"},{true, "!"}], 
+        func (x: {[bool], [text]}) -> {
+            std::lead(x.0, 1),
+            std::lag(x.1, 1),
+        }
+    )
+    "#), @r#"
+    [
+      {
+        false,
+        "",
+      },
+      {
+        true,
+        "hello",
+      },
+      {
+        false,
+        "world",
+      },
+    ]
+    "#);
 }
 
 #[test]
-#[ignore] // needs evaluated generic functions
 fn std_aggregate() {
     insta::assert_snapshot!(_test_run(r#"
     std::aggregate([{5,3},{65,1},{3, 2}], func (x: {[int], [int]}) -> {std::min(x.0), std::min(x.1)})
@@ -538,6 +580,15 @@ fn std_aggregate() {
     {
       3,
       1,
+    }
+    "#);
+
+    insta::assert_snapshot!(_test_run(r#"
+    std::aggregate([{false,"hello"},{false,"world"},{true, "!"}], func (x: {[bool], [text]}) -> {x.0 .0, x.1 .2})
+    "#), @r#"
+    {
+      false,
+      "!",
     }
     "#);
 }

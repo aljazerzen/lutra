@@ -74,10 +74,11 @@ impl fold::PrFold for super::Resolver<'_> {
                         }
                     },
                 };
-                let ty = self.introduce_ty_into_scope(ty);
+                let (ty, ty_args) = self.introduce_ty_into_scope(ty);
                 pr::Expr {
                     kind: pr::ExprKind::Ident(ident),
                     ty: Some(ty),
+                    ty_args,
                     ..node
                 }
             }

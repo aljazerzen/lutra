@@ -5,6 +5,8 @@ mod module;
 mod resolve_decls;
 mod resolver;
 
+pub use resolver::{TypeLayoutResolverSimple, TypeReplacer};
+
 use std::str::FromStr;
 
 use self::resolver::Resolver;

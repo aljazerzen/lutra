@@ -11,6 +11,16 @@ impl Expr {
             kind: kind.into(),
             span: None,
             ty: None,
+            ty_args: Vec::new(),
+        }
+    }
+
+    pub fn new_with_span<K: Into<ExprKind>>(kind: K, span: Span) -> Expr {
+        Expr {
+            kind: kind.into(),
+            span: Some(span),
+            ty: None,
+            ty_args: Vec::new(),
         }
     }
 }
@@ -28,6 +38,11 @@ pub struct Expr {
     /// Type of expression this node represents.
     /// [None] means that type should be inferred.
     pub ty: Option<Ty>,
+
+    /// When this expression refers to a function with type parameters,
+    /// these params are instantiated into these args and finalized when
+    /// scope closes.
+    pub ty_args: Vec<Ty>,
 }
 
 #[derive(Debug, EnumAsInner, PartialEq, Clone, strum::AsRefStr)]
@@ -54,16 +69,6 @@ pub enum ExprKind {
     Case(Vec<SwitchCase>),
 
     Internal,
-}
-
-impl ExprKind {
-    pub fn into_expr(self, span: Span) -> Expr {
-        Expr {
-            span: Some(span),
-            kind: self,
-            ty: None,
-        }
-    }
 }
 
 #[derive(Debug, EnumAsInner, PartialEq, Clone)]

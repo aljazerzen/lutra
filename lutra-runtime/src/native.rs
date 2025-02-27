@@ -465,7 +465,7 @@ pub mod std {
 
             let n_blanks = offset.min(array.remaining());
             for _ in 0..n_blanks {
-                out.write_item(encode(&0_i64));
+                out.write_item(lutra_bin::Data::new(vec![0; head_bytes as usize]));
             }
 
             let n_copies = array.remaining().saturating_sub(offset);

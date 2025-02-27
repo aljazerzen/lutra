@@ -36,11 +36,12 @@ fn interpolated_parser() -> impl Parser<char, Vec<InterpolateItem>, Error = Chum
             let mut parts = ident_parts.into_iter();
 
             let (first, first_span) = parts.next().unwrap();
-            let mut base = Box::new(ExprKind::Ident(Path::from_name(first)).into_expr(first_span));
+            let mut base = Box::new(Expr::new_with_span(Path::from_name(first), first_span));
 
             for (part, span) in parts {
                 let field = IndirectionKind::Name(part);
-                base = Box::new(ExprKind::Indirection { base, field }.into_expr(span));
+                let kind = ExprKind::Indirection { base, field };
+                base = Box::new(Expr::new_with_span(kind, span));
             }
             base
         })
@@ -100,6 +101,7 @@ fn parse_interpolate() {
                     0:8-9,
                 ),
                 ty: None,
+                ty_args: [],
             },
             format: None,
         },
@@ -147,6 +149,7 @@ fn parse_interpolate() {
                     0:14-15,
                 ),
                 ty: None,
+                ty_args: [],
             },
             format: None,
         },

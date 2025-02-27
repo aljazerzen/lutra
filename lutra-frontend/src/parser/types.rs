@@ -96,7 +96,7 @@ pub(crate) fn type_expr() -> impl Parser<TokenKind, Ty, Error = PError> + Clone 
             .labelled("array");
 
         let term = choice((primitive, ident, func, tuple, array, enum_))
-            .map_with_span(TyKind::into_ty)
+            .map_with_span(Ty::new_with_span)
             .boxed();
 
         // exclude

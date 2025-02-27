@@ -59,15 +59,6 @@ pub enum TyKind {
 }
 
 impl TyKind {
-    pub fn into_ty(self: TyKind, span: Span) -> Ty {
-        Ty {
-            kind: self,
-            span: Some(span),
-            name: None,
-            layout: None,
-        }
-    }
-
     // Keep in sync with [lutra_bin::layout::get_layout_simple]
     pub fn get_layout_simple(&self) -> Option<TyLayout> {
         let head_size = match self {
@@ -202,10 +193,19 @@ pub struct TyDomainTupleField {
 }
 
 impl Ty {
-    pub fn new<K: Into<TyKind>>(kind: K) -> Ty {
+    pub fn new(kind: impl Into<TyKind>) -> Ty {
         Ty {
             kind: kind.into(),
             span: None,
+            name: None,
+            layout: None,
+        }
+    }
+
+    pub fn new_with_span(kind: impl Into<TyKind>, span: Span) -> Ty {
+        Ty {
+            kind: kind.into(),
+            span: Some(span),
             name: None,
             layout: None,
         }

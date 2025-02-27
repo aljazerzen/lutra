@@ -31,6 +31,11 @@ pub trait PrFold {
     fn fold_expr(&mut self, mut expr: Expr) -> Result<Expr> {
         expr.kind = self.fold_expr_kind(expr.kind)?;
         expr.ty = fold_type_opt(self, expr.ty)?;
+        expr.ty_args = expr
+            .ty_args
+            .into_iter()
+            .map(|t| self.fold_type(t))
+            .try_collect()?;
         Ok(expr)
     }
     fn fold_expr_kind(&mut self, expr_kind: ExprKind) -> Result<ExprKind> {

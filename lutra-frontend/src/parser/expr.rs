@@ -41,7 +41,7 @@ pub(crate) fn expr() -> impl Parser<TokenKind, Expr, Error = PError> + Clone {
             ident_kind,
             case,
         ))
-        .map_with_span(ExprKind::into_expr)
+        .map_with_span(Expr::new_with_span)
         // No longer used given the TODO in `pipeline`; can remove if we
         // don't resolve.
         // .or(aliased(expr.clone()))
@@ -150,7 +150,7 @@ where
         .or(operator_unary()
             .then(expr.map(Box::new))
             .map(|(op, expr)| ExprKind::Unary(UnaryExpr { op, expr }))
-            .map_with_span(ExprKind::into_expr))
+            .map_with_span(Expr::new_with_span))
         .boxed()
 }
 
@@ -171,7 +171,8 @@ where
     )
     .foldl(|base, (field, span)| {
         let base = Box::new(base);
-        ExprKind::Indirection { base, field }.into_expr(span)
+        let kind = ExprKind::Indirection { base, field };
+        Expr::new_with_span(kind, span)
     })
 }
 
@@ -186,18 +187,20 @@ where
             end: Some(Box::new(end)),
         })
         .map(ExprKind::Range)
-        .map_with_span(ExprKind::into_expr);
+        .map_with_span(Expr::new_with_span);
 
     end_only.or(expr
         .clone()
         .then(just(TokenKind::Range).ignore_then(expr.or_not()).or_not())
         .map_with_span(|(start, range), span| {
             if let Some(end) = range {
-                ExprKind::Range(Range {
-                    start: Some(Box::new(start)),
-                    end: end.map(Box::new),
-                })
-                .into_expr(span)
+                Expr::new_with_span(
+                    ExprKind::Range(Range {
+                        start: Some(Box::new(start)),
+                        end: end.map(Box::new),
+                    }),
+                    span,
+                )
             } else {
                 start
             }
@@ -222,10 +225,12 @@ where
             // in a pipeline — just return the lone expr. Otherwise,
             // wrap them in a pipeline.
             exprs.into_iter().exactly_one().unwrap_or_else(|exprs| {
-                ExprKind::Pipeline(Pipeline {
-                    exprs: exprs.collect(),
-                })
-                .into_expr(span)
+                Expr::new_with_span(
+                    ExprKind::Pipeline(Pipeline {
+                        exprs: exprs.collect(),
+                    }),
+                    span,
+                )
             })
         })
         .recover_with(nested_delimiters(
@@ -263,7 +268,7 @@ where
                 op,
                 right: Box::new(right.0),
             });
-            (ExprKind::into_expr(kind, span), span)
+            (Expr::new_with_span(kind, span), span)
         })
         .map(|(e, _)| e)
         .boxed()
@@ -317,7 +322,7 @@ where
                 op,
                 right: Box::new(right.0),
             });
-            (kind.into_expr(span), span)
+            (Expr::new_with_span(kind, span), span)
         })
         .map(|(e, _)| e)
         .boxed()
@@ -329,7 +334,7 @@ where
 {
     let func_name = ident()
         .map(ExprKind::from)
-        .map_with_span(ExprKind::into_expr)
+        .map_with_span(Expr::new_with_span)
         .map(Box::new);
 
     func_name

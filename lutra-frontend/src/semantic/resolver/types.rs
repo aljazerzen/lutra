@@ -606,18 +606,21 @@ impl Resolver<'_> {
     }
 
     /// Add type's params into scope as type arguments.
-    pub fn introduce_ty_into_scope(&mut self, ty: Ty) -> Ty {
+    pub fn introduce_ty_into_scope(&mut self, ty: Ty) -> (Ty, Vec<Ty>) {
         let TyKind::Function(mut ty_func) = ty.kind else {
-            return ty;
+            return (ty, Vec::new());
         };
 
         // TODO: recurse? There might be type params deeper in the type.
 
         if ty_func.ty_params.is_empty() {
-            return Ty {
-                kind: TyKind::Function(ty_func),
-                ..ty
-            };
+            return (
+                Ty {
+                    kind: TyKind::Function(ty_func),
+                    ..ty
+                },
+                Vec::new(),
+            );
         }
 
         let expr_id = self.id.gen();
@@ -627,17 +630,18 @@ impl Resolver<'_> {
         );
 
         let mut mapping = HashMap::new();
+        let mut ty_args = Vec::with_capacity(ty_func.ty_params.len());
+
         let scope = self.scopes.last_mut().unwrap();
         for gtp in ty_func.ty_params.drain(..) {
-            mapping.insert(
-                Path::new(vec!["scope", gtp.name.as_str()]),
-                Ty::new(Path::new(vec![
-                    "scope".to_string(),
-                    "type_args".to_string(),
-                    expr_id.to_string(),
-                    gtp.name.clone(),
-                ])),
-            );
+            let ty_arg = Ty::new(Path::new(vec![
+                "scope".to_string(),
+                "type_args".to_string(),
+                expr_id.to_string(),
+                gtp.name.clone(),
+            ]));
+            mapping.insert(Path::new(vec!["scope", gtp.name.as_str()]), ty_arg.clone());
+            ty_args.push(ty_arg);
 
             let type_arg_id = TyArgId {
                 expr_id,
@@ -650,7 +654,7 @@ impl Resolver<'_> {
             kind: TyKind::Function(ty_func),
             ..ty
         };
-        TypeReplacer::on_ty(ty, mapping)
+        (TypeReplacer::on_ty(ty, mapping), ty_args)
     }
 }
 
@@ -730,6 +734,10 @@ impl TypeReplacer {
     pub fn on_func(func: pr::Func, mapping: HashMap<Path, Ty>) -> pr::Func {
         TypeReplacer { mapping }.fold_func(func).unwrap()
     }
+    #[tracing::instrument(name = "TypeReplacer", skip_all)]
+    pub fn on_expr(func: pr::Expr, mapping: HashMap<Path, Ty>) -> pr::Expr {
+        TypeReplacer { mapping }.fold_expr(func).unwrap()
+    }
 }
 
 impl PrFold for TypeReplacer {
@@ -771,6 +779,24 @@ impl<'a, 'b> PrFold for TypeLayoutResolver<'a, 'b> {
 
         let mut ty = fold::fold_type(self, ty)?;
         self.resolver.compute_ty_layout(&mut ty)?;
+        Ok(ty)
+    }
+}
+pub struct TypeLayoutResolverSimple {}
+
+impl TypeLayoutResolverSimple {
+    #[tracing::instrument(name = "TypeLayoutResolverSimple", skip_all)]
+    pub fn on_expr(expr: pr::Expr) -> pr::Expr {
+        TypeLayoutResolverSimple {}.fold_expr(expr).unwrap()
+    }
+}
+
+impl PrFold for TypeLayoutResolverSimple {
+    fn fold_type(&mut self, ty: Ty) -> Result<Ty> {
+        let mut ty = fold::fold_type(self, ty).unwrap();
+        if ty.layout.is_none() {
+            ty.layout = ty.kind.get_layout_simple();
+        }
         Ok(ty)
     }
 }

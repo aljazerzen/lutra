@@ -77,6 +77,7 @@ fn parse_02() {
                         0:0-1,
                     ),
                     ty: None,
+                    ty_args: [],
                 },
             ),
             end: Some(
@@ -90,6 +91,7 @@ fn parse_02() {
                         0:3-4,
                     ),
                     ty: None,
+                    ty_args: [],
                 },
             ),
         },
@@ -110,6 +112,7 @@ fn parse_02() {
                         0:32-33,
                     ),
                     ty: None,
+                    ty_args: [],
                 },
                 params: [],
                 ty_params: [
@@ -139,6 +142,7 @@ fn parse_02() {
             0:0-33,
         ),
         ty: None,
+        ty_args: [],
     }
     "#);
     assert_debug_snapshot!(parse_expr("func <T: {b = int64, ..}> () -> 1"), @r#"
@@ -156,6 +160,7 @@ fn parse_02() {
                         0:32-33,
                     ),
                     ty: None,
+                    ty_args: [],
                 },
                 params: [],
                 ty_params: [
@@ -182,6 +187,7 @@ fn parse_02() {
             0:0-33,
         ),
         ty: None,
+        ty_args: [],
     }
     "#);
 }

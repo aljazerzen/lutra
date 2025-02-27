@@ -123,9 +123,9 @@ let join: func (column: [text], separator: text): text
 
 # Window functions
 
-let lag: func (column: [int], offset: int): [int]
-let lead: func (column: [int], offset: int): [int]
-let row_number: func (column: [int]): [int]
+let lag: func <T> (array: [T], offset: int): [T]
+let lead: func <T> (array: [T], offset: int): [T]
+let row_number: func <T> (array: [T]): [int]
 
 ## Mathematical functions
 module math {

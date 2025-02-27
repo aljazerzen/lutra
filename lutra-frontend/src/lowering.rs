@@ -1,15 +1,18 @@
+use std::collections::HashMap;
+use std::iter::zip;
+
 use indexmap::IndexMap;
 use itertools::Itertools;
 use lutra_bin::ir::{self};
 
 use crate::utils::IdGenerator;
-use crate::Result;
 use crate::{decl, pr};
+use crate::{semantic, Result};
 
 pub fn lower(root_module: &decl::RootModule, path: &pr::Path) -> ir::Program {
     let mut lowerer = Lowerer::new(root_module);
 
-    let main = lowerer.lower_expr_decl(path).unwrap();
+    let main = lowerer.lower_expr_decl(path, vec![]).unwrap();
     let main = lowerer.lower_var_bindings(main);
 
     ir::Program { main }
@@ -19,7 +22,7 @@ struct Lowerer<'a> {
     root_module: &'a decl::RootModule,
 
     function_scopes: Vec<u32>,
-    var_bindings: IndexMap<pr::Path, u32>,
+    var_bindings: IndexMap<(pr::Path, Vec<pr::Ty>), u32>,
 
     generator_function_scope: IdGenerator<usize>,
     generator_var_binding: IdGenerator<usize>,
@@ -60,7 +63,7 @@ impl<'a> Lowerer<'a> {
         ))))
     }
 
-    fn lower_expr_decl(&mut self, path: &pr::Path) -> Result<ir::Expr> {
+    fn lower_expr_decl(&mut self, path: &pr::Path, ty_args: Vec<pr::Ty>) -> Result<ir::Expr> {
         let decl = self
             .root_module
             .module
@@ -73,13 +76,25 @@ impl<'a> Lowerer<'a> {
         // should have been lowered earlier
         assert!(!matches!(expr.kind, pr::ExprKind::Internal));
 
+        let mut expr = *expr.clone();
+
         if let pr::TyKind::Function(ty_func) = &expr.ty.as_ref().unwrap().kind {
             if !ty_func.ty_params.is_empty() {
-                // todo!("instantiation of funcs with type params in lowering");
+                // replace refs to type params with inferred type args
+                // For example:
+                // - `let identity = func<T>(x: T) -> x` contains type param T,
+                // - `identity(false)` instantiates param into arg that is inferred to be bool,
+                // - when identify is lowered, we finalize the function into `func (x: bool): bool -> x`.
+                let mut mapping = HashMap::<pr::Path, pr::Ty>::new();
+                for (param, arg) in zip(&ty_func.ty_params, ty_args) {
+                    mapping.insert(pr::Path::new(vec!["scope", param.name.as_str()]), arg);
+                }
+                expr = semantic::TypeReplacer::on_expr(expr, mapping);
+                expr = semantic::TypeLayoutResolverSimple::on_expr(expr);
             }
         }
 
-        let res = self.lower_expr(expr.as_ref())?;
+        let res = self.lower_expr(&expr)?;
 
         Ok(res)
     }
@@ -157,7 +172,8 @@ impl<'a> Lowerer<'a> {
                 } else if let Some(ptr) = self.lower_external_expr_decl(path)? {
                     ptr
                 } else {
-                    let entry = self.var_bindings.entry(path.clone());
+                    let reference = (path.clone(), expr.ty_args.clone());
+                    let entry = self.var_bindings.entry(reference);
                     let binding_id = match entry {
                         indexmap::map::Entry::Occupied(e) => *e.get(),
                         indexmap::map::Entry::Vacant(e) => {
@@ -196,14 +212,14 @@ impl<'a> Lowerer<'a> {
         let mut main = main;
         let mut i = 0;
         loop {
-            let Some((path, id)) = self.var_bindings.get_index(i) else {
+            let Some((reference, id)) = self.var_bindings.get_index(i) else {
                 break;
             };
             i += 1;
-            let path = path.clone();
+            let reference = reference.clone();
             let id = *id;
 
-            let expr = self.lower_expr_decl(&path).unwrap();
+            let expr = self.lower_expr_decl(&reference.0, reference.1).unwrap();
             main = ir::Expr {
                 ty: main.ty.clone(),
                 kind: ir::ExprKind::Binding(Box::new(ir::Binding { id, expr, main })),
