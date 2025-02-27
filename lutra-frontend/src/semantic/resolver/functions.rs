@@ -61,8 +61,7 @@ impl Resolver<'_> {
         let _enter = tspan.enter();
 
         let fn_ty = func.ty.as_ref().unwrap();
-        let fn_ty = fn_ty.kind.as_function().unwrap();
-        let fn_ty = fn_ty.as_ref().unwrap().clone();
+        let fn_ty = fn_ty.kind.as_function().unwrap().clone();
 
         let args_match_params = args.len() == fn_ty.params.len();
         if !args_match_params {

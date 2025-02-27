@@ -237,9 +237,7 @@ pub fn fold_type<T: ?Sized + PrFold>(fold: &mut T, ty: Ty) -> Result<Ty> {
         kind: match ty.kind {
             TyKind::Tuple(fields) => TyKind::Tuple(fold_ty_tuple_fields(fold, fields)?),
             TyKind::Array(ty) => TyKind::Array(Box::new(fold.fold_type(*ty)?)),
-            TyKind::Function(func) => {
-                TyKind::Function(func.map(|f| fold_ty_func(fold, f)).transpose()?)
-            }
+            TyKind::Function(func) => TyKind::Function(fold_ty_func(fold, func)?),
             TyKind::Enum(variants) => TyKind::Enum(
                 variants
                     .into_iter()

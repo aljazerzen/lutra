@@ -52,8 +52,7 @@ pub enum TyKind {
     Enum(Vec<TyEnumVariant>),
 
     /// Type of functions with defined params and return types.
-    // TODO: remove this option
-    Function(Option<TyFunc>),
+    Function(TyFunc),
     // /// Tuples that have fields of `base` tuple, but don't have fields of `except` tuple.
     // /// Implies that `base` has all fields of `except`.
     // Exclude { base: Box<Ty>, except: Box<Ty> },
@@ -247,7 +246,7 @@ impl From<PrimitiveSet> for TyKind {
 
 impl From<TyFunc> for TyKind {
     fn from(value: TyFunc) -> Self {
-        TyKind::Function(Some(value))
+        TyKind::Function(value)
     }
 }
 

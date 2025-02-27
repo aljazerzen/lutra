@@ -42,7 +42,7 @@ impl From<ir::Ty> for super::Ty {
                     })
                     .collect(),
             ),
-            ir::TyKind::Function(func) => super::TyKind::Function(Some(super::TyFunc {
+            ir::TyKind::Function(func) => super::TyKind::Function(super::TyFunc {
                 params: func
                     .params
                     .into_iter()
@@ -51,7 +51,7 @@ impl From<ir::Ty> for super::Ty {
                     .collect(),
                 body: Some(Box::new(super::Ty::from(func.body))),
                 ty_params: Vec::new(),
-            })),
+            }),
             ir::TyKind::Ident(_) => todo!(),
         };
 
@@ -111,7 +111,7 @@ impl From<super::Ty> for ir::Ty {
                     .collect(),
             ),
             super::TyKind::Ident(path) => ir::TyKind::Ident(ir::Path(path.into_iter().collect())),
-            super::TyKind::Function(Some(func)) => ir::TyKind::Function(Box::new(ir::TyFunction {
+            super::TyKind::Function(func) => ir::TyKind::Function(Box::new(ir::TyFunction {
                 params: func
                     .params
                     .into_iter()
@@ -119,7 +119,6 @@ impl From<super::Ty> for ir::Ty {
                     .collect(),
                 body: ir::Ty::from(*func.body.clone().unwrap()),
             })),
-            super::TyKind::Function(None) => todo!(),
         };
 
         let layout = ty.layout.map(|layout| ir::TyLayout {

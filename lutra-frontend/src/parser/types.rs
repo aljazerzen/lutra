@@ -29,8 +29,7 @@ pub(crate) fn type_expr() -> impl Parser<TokenKind, Ty, Error = PError> + Clone 
                         params,
                         body,
                         ty_params: type_params,
-                    })
-                    .or_not(),
+                    }),
             )
             .map(TyKind::Function);
 

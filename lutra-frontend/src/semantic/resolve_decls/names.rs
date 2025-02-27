@@ -195,7 +195,7 @@ impl fold::PrFold for NameResolver<'_> {
                     ..ty
                 }
             }
-            pr::TyKind::Function(Some(ty_func)) => {
+            pr::TyKind::Function(ty_func) => {
                 if self.scopes.is_empty() {
                     let scope = Scope::new_of_ty_func(&ty_func)?;
                     self.scopes.push(scope);
@@ -203,7 +203,7 @@ impl fold::PrFold for NameResolver<'_> {
                     self.scopes.pop();
 
                     pr::Ty {
-                        kind: pr::TyKind::Function(Some(r?)),
+                        kind: pr::TyKind::Function(r?),
                         ..ty
                     }
                 } else {
@@ -214,7 +214,7 @@ impl fold::PrFold for NameResolver<'_> {
                         .with_span(param.span));
                     }
                     let ty = pr::Ty {
-                        kind: pr::TyKind::Function(Some(ty_func)),
+                        kind: pr::TyKind::Function(ty_func),
                         ..ty
                     };
                     fold::fold_type(self, ty)?

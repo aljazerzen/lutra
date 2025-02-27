@@ -19,7 +19,7 @@ impl Resolver<'_> {
     pub fn fold_type_actual(&mut self, ty: Ty) -> Result<Ty> {
         // fold inner containers
         let mut ty = match ty.kind {
-            TyKind::Function(Some(ty_func)) if self.scopes.is_empty() => {
+            TyKind::Function(ty_func) if self.scopes.is_empty() => {
                 let mut scope = Scope::new();
                 scope.insert_generics_params(&ty_func.ty_params);
                 self.scopes.push(scope);
@@ -27,7 +27,7 @@ impl Resolver<'_> {
                 self.scopes.pop();
 
                 Ty {
-                    kind: TyKind::Function(Some(ty_func)),
+                    kind: TyKind::Function(ty_func),
                     ..ty
                 }
             }
@@ -172,7 +172,7 @@ impl Resolver<'_> {
                 return Ok(inferred_ty.clone());
             }
 
-            ExprKind::Func(func) => TyKind::Function(Some(TyFunc {
+            ExprKind::Func(func) => TyKind::Function(TyFunc {
                 params: func.params.iter().map(|p| p.ty.clone()).collect_vec(),
                 body: func
                     .return_ty
@@ -180,7 +180,7 @@ impl Resolver<'_> {
                     .or_else(|| func.body.ty.clone())
                     .map(Box::new),
                 ty_params: func.ty_params.clone(),
-            })),
+            }),
 
             ExprKind::Ident(_)
             | ExprKind::FuncCall(_)
@@ -361,7 +361,7 @@ impl Resolver<'_> {
 
                 Ok(())
             }
-            (TyKind::Function(Some(f_func)), TyKind::Function(Some(e_func)))
+            (TyKind::Function(f_func), TyKind::Function(e_func))
                 if f_func.params.len() == e_func.params.len() =>
             {
                 for (f_arg, e_arg) in itertools::zip_eq(&f_func.params, &e_func.params) {
@@ -607,7 +607,7 @@ impl Resolver<'_> {
 
     /// Add type's params into scope as type arguments.
     pub fn introduce_ty_into_scope(&mut self, ty: Ty) -> Ty {
-        let TyKind::Function(Some(mut ty_func)) = ty.kind else {
+        let TyKind::Function(mut ty_func) = ty.kind else {
             return ty;
         };
 
@@ -615,7 +615,7 @@ impl Resolver<'_> {
 
         if ty_func.ty_params.is_empty() {
             return Ty {
-                kind: TyKind::Function(Some(ty_func)),
+                kind: TyKind::Function(ty_func),
                 ..ty
             };
         }
@@ -647,7 +647,7 @@ impl Resolver<'_> {
         }
 
         let ty = Ty {
-            kind: TyKind::Function(Some(ty_func)),
+            kind: TyKind::Function(ty_func),
             ..ty
         };
         TypeReplacer::on_ty(ty, mapping)
