@@ -52,7 +52,7 @@ impl From<ir::Ty> for super::Ty {
                 body: Some(Box::new(super::Ty::from(func.body))),
                 ty_params: Vec::new(),
             }),
-            ir::TyKind::Ident(_) => todo!(),
+            ir::TyKind::Ident(path) => super::TyKind::Ident(super::Path::new(path.0)),
         };
 
         let layout = ty.layout.map(|layout| super::TyLayout {

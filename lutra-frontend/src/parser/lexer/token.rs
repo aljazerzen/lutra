@@ -122,23 +122,23 @@ mod test {
 
         assert_snapshot!(
             make_str(r#"he said "what up""#).to_string(),
-            @r###"'he said "what up"'"###
+            @r#""""he said "what up"""""#
         );
 
         assert_snapshot!(
             make_str(r#"he said "what's up""#).to_string(),
-            @r###"'''he said "what's up"'''"###
+            @r#""""he said "what's up"""""#
         );
 
         assert_snapshot!(
             make_str(r#" single' three double""" four double"""" "#).to_string(),
-            @r###"""""" single' three double""" four double"""" """"""###
+            @r#"""""" single' three double""" four double"""" """"""#
 
         );
 
         assert_snapshot!(
             make_str(r#""Starts with a double quote and ' contains a single quote"#).to_string(),
-            @r###"'''"Starts with a double quote and ' contains a single quote'''"###
+            @r#"""""Starts with a double quote and ' contains a single quote""""#
         );
     }
 

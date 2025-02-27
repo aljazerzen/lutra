@@ -307,12 +307,9 @@ fn literal() -> impl Parser<char, Literal, Error = Cheap<char>> {
 }
 
 fn quoted_string(escaped: bool) -> impl Parser<char, String, Error = Cheap<char>> {
-    choice((
-        quoted_string_of_quote(&'"', escaped),
-        quoted_string_of_quote(&'\'', escaped),
-    ))
-    .collect::<String>()
-    .labelled("string")
+    choice((quoted_string_of_quote(&'"', escaped),))
+        .collect::<String>()
+        .labelled("string")
 }
 
 fn quoted_string_of_quote(

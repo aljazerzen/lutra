@@ -86,13 +86,13 @@ fn doc_comment() {
 #[test]
 fn quotes() {
     // All these are valid & equal.
-    assert_snapshot!(quoted_string(false).parse(r#"'aoeu'"#).unwrap(), @"aoeu");
-    assert_snapshot!(quoted_string(false).parse(r#"'''aoeu'''"#).unwrap(), @"aoeu");
-    assert_snapshot!(quoted_string(false).parse(r#"'''''aoeu'''''"#).unwrap(), @"aoeu");
-    assert_snapshot!(quoted_string(false).parse(r#"'''''''aoeu'''''''"#).unwrap(), @"aoeu");
+    assert_snapshot!(quoted_string(false).parse(r#""aoeu""#).unwrap(), @"aoeu");
+    assert_snapshot!(quoted_string(false).parse(r#""""aoeu""""#).unwrap(), @"aoeu");
+    assert_snapshot!(quoted_string(false).parse(r#""""""aoeu""""""#).unwrap(), @"aoeu");
+    assert_snapshot!(quoted_string(false).parse(r#""""""""aoeu""""""""#).unwrap(), @"aoeu");
 
     // An even number is interpreted as a closed string (and the remainder is unparsed)
-    assert_snapshot!(quoted_string(false).parse(r#"''aoeu''"#).unwrap(), @"");
+    assert_snapshot!(quoted_string(false).parse(r#"""aoeu"""#).unwrap(), @"");
 
     // When not escaping, we take the inner string between the three quotes
     assert_snapshot!(quoted_string(false).parse(r#""""\"hello\""""#).unwrap(), @r#"\"hello\"#);
@@ -101,21 +101,21 @@ fn quotes() {
 
     // Escape each inner quote depending on the outer quote
     assert_snapshot!(quoted_string(true).parse(r#""\"hello\"""#).unwrap(), @r#""hello""#);
-    assert_snapshot!(quoted_string(true).parse(r"'\'hello\''").unwrap(), @"'hello'");
+    assert_snapshot!(quoted_string(true).parse(r#""\"hello\"""#).unwrap(), @r#""hello""#);
 
-    assert_snapshot!(quoted_string(true).parse(r#"''"#).unwrap(), @"");
+    assert_snapshot!(quoted_string(true).parse(r#""""#).unwrap(), @"");
 
     // An empty input should fail
     quoted_string(false).parse(r#""#).unwrap_err();
 
     // An even number of quotes is an empty string
-    assert_snapshot!(quoted_string(true).parse(r#"''''''"#).unwrap(), @"");
+    assert_snapshot!(quoted_string(true).parse(r#""""""""#).unwrap(), @"");
 
     // Hex escape
-    assert_snapshot!(quoted_string(true).parse(r"'\x61\x62\x63'").unwrap(), @"abc");
+    assert_snapshot!(quoted_string(true).parse(r#""\x61\x62\x63""#).unwrap(), @"abc");
 
     // Unicode escape
-    assert_snapshot!(quoted_string(true).parse(r"'\u{01f422}'").unwrap(), @"🐢");
+    assert_snapshot!(quoted_string(true).parse(r#""\u{01f422}""#).unwrap(), @"🐢");
 }
 
 #[test]
