@@ -4,7 +4,7 @@ use lutra_bin::Value;
 
 #[test]
 fn test_print_01() {
-    let ty = lutra_frontend::_test_compile_ty(
+    let ty = lutra_compiler::_test_compile_ty(
         "{
         n_rows = int64,
         page = [{
@@ -81,7 +81,7 @@ fn test_print_01() {
 
 #[test]
 fn test_print_02() {
-    let ty = lutra_frontend::_test_compile_ty("[int64]");
+    let ty = lutra_compiler::_test_compile_ty("[int64]");
 
     let value = Value::Array(vec![
         Value::Int64(1),

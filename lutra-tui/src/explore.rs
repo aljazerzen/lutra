@@ -4,7 +4,7 @@ use ratatui::prelude::*;
 
 use crate::terminal::{Action, EventResult};
 
-pub fn prompt_for_decl(project: &lutra_frontend::Project) -> anyhow::Result<ir::Path> {
+pub fn prompt_for_decl(project: &lutra_compiler::Project) -> anyhow::Result<ir::Path> {
     let mut app = ExploreApp::new(project);
 
     crate::terminal::within_alternate_screen(|term| crate::terminal::run_app(&mut app, term))??;
@@ -19,7 +19,7 @@ struct ExploreApp {
 }
 
 impl ExploreApp {
-    fn new(project: &lutra_frontend::Project) -> Self {
+    fn new(project: &lutra_compiler::Project) -> Self {
         let root_decl = Decl {
             name: "".into(),
             kind: DeclKind::Module(ModuleDecl::new(&project.root_module.module)),
@@ -92,12 +92,12 @@ struct Decl {
 }
 
 impl Decl {
-    fn new(name: &str, decl: &lutra_frontend::decl::Decl) -> Option<Self> {
+    fn new(name: &str, decl: &lutra_compiler::decl::Decl) -> Option<Self> {
         let kind = match &decl.kind {
-            lutra_frontend::decl::DeclKind::Module(module) => {
+            lutra_compiler::decl::DeclKind::Module(module) => {
                 DeclKind::Module(ModuleDecl::new(module))
             }
-            lutra_frontend::decl::DeclKind::Expr(e) => {
+            lutra_compiler::decl::DeclKind::Expr(e) => {
                 let ty = ir::Ty::from(e.ty.clone().unwrap());
                 if ty.kind.is_function() {
                     DeclKind::Function(FunctionDecl::new(ty))
@@ -105,7 +105,7 @@ impl Decl {
                     DeclKind::Value(ValueDecl::new(ty))
                 }
             }
-            lutra_frontend::decl::DeclKind::Ty(ty) => {
+            lutra_compiler::decl::DeclKind::Ty(ty) => {
                 let ty = ir::Ty::from(ty.clone());
                 DeclKind::Ty(TypeDecl::new(ty))
             }
@@ -221,7 +221,7 @@ struct ModuleDecl {
     decls: Vec<Decl>,
 }
 impl ModuleDecl {
-    fn new(module: &lutra_frontend::decl::Module) -> Self {
+    fn new(module: &lutra_compiler::decl::Module) -> Self {
         let decls = module.get_decls();
         let decls = decls
             .into_iter()

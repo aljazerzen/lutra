@@ -11,7 +11,7 @@ version.workspace = true
 chumsky = { workspace = true }
 itertools = { workspace = true }
 log = { workspace = true }
-lutra-frontend = { path = "../lutra-frontend" }
+lutra-compiler = { path = "../lutra-compiler" }
 lutra-bin = { path = "../lutra-bin" }
 
 [dev-dependencies]

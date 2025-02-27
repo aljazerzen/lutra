@@ -1,6 +1,6 @@
 use itertools::Itertools;
 use lutra_bin::ir;
-use lutra_frontend::{decl, pr};
+use lutra_compiler::{decl, pr};
 
 fn main() {
     let project = get_project();
@@ -19,8 +19,8 @@ fn main() {
     }
 }
 
-fn execute_function(project: &lutra_frontend::Project, path: pr::Path) {
-    let program = lutra_frontend::lower(&project.root_module, &path);
+fn execute_function(project: &lutra_compiler::Project, path: pr::Path) {
+    let program = lutra_compiler::lower(&project.root_module, &path);
 
     let output_ty = program.get_output_ty().clone();
     let input_tys = program.get_input_tys().to_vec();
@@ -38,7 +38,7 @@ fn execute_function(project: &lutra_frontend::Project, path: pr::Path) {
         name: Some("input".into()),
     };
 
-    let bytecode = lutra_frontend::bytecode_program(program);
+    let bytecode = lutra_compiler::bytecode_program(program);
 
     let input_val = lutra_tui::prompt_for_ty(&input_ty, None).unwrap();
     let lutra_bin::Value::Tuple(input_args) = input_val else {
@@ -56,7 +56,7 @@ fn execute_function(project: &lutra_frontend::Project, path: pr::Path) {
     lutra_tui::show_value(&output_ty, result).unwrap();
 }
 
-fn get_project() -> lutra_frontend::Project {
+fn get_project() -> lutra_compiler::Project {
     let source = r#"
         let is_even = func (a: int): bool -> a % 2 == 0
 
@@ -71,6 +71,6 @@ fn get_project() -> lutra_frontend::Project {
         }
     "#;
 
-    let source = lutra_frontend::SourceTree::single("".into(), source.into());
-    lutra_frontend::compile(source, Default::default()).unwrap()
+    let source = lutra_compiler::SourceTree::single("".into(), source.into());
+    lutra_compiler::compile(source, Default::default()).unwrap()
 }

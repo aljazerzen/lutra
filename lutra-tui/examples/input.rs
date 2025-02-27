@@ -25,7 +25,7 @@ fn get_ty() -> ir::Ty {
         }
     "#;
 
-    ir::Ty::from(lutra_frontend::_test_compile_ty(source))
+    ir::Ty::from(lutra_compiler::_test_compile_ty(source))
 }
 
 fn get_value() -> lutra_bin::Value {

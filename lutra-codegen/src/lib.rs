@@ -6,7 +6,7 @@ use std::path::PathBuf;
 use std::{collections::VecDeque, fs};
 
 use lutra_bin::{ir, Encode};
-use lutra_frontend::{decl, pr, CompileParams, DiscoverParams};
+use lutra_compiler::{decl, pr, CompileParams, DiscoverParams};
 
 #[track_caller]
 pub fn generate(
@@ -15,14 +15,14 @@ pub fn generate(
     options: GenerateOptions,
 ) -> Vec<PathBuf> {
     // discover the project
-    let source = lutra_frontend::discover(DiscoverParams {
+    let source = lutra_compiler::discover(DiscoverParams {
         project_path: project_dir.into(),
     })
     .unwrap();
 
     // compile
     let project =
-        lutra_frontend::compile(source, CompileParams {}).unwrap_or_else(|e| panic!("{e}"));
+        lutra_compiler::compile(source, CompileParams {}).unwrap_or_else(|e| panic!("{e}"));
 
     // generate
     let mut file = fs::File::create(out_file).unwrap();
@@ -40,18 +40,18 @@ pub fn compile_program(
     out_file: &std::path::Path,
 ) {
     // discover the project
-    let source = lutra_frontend::discover(DiscoverParams {
+    let source = lutra_compiler::discover(DiscoverParams {
         project_path: project_dir.into(),
     })
     .unwrap();
 
     // compile
     let project =
-        lutra_frontend::compile(source, CompileParams {}).unwrap_or_else(|e| panic!("{e}"));
+        lutra_compiler::compile(source, CompileParams {}).unwrap_or_else(|e| panic!("{e}"));
 
     // lower & bytecode
-    let program = lutra_frontend::lower(&project.root_module, &pr::Path::new(expr_path));
-    let program = lutra_frontend::bytecode_program(program);
+    let program = lutra_compiler::lower(&project.root_module, &pr::Path::new(expr_path));
+    let program = lutra_compiler::bytecode_program(program);
 
     let mut buf = bytes::BytesMut::new();
     program.encode(&mut buf);
@@ -155,16 +155,16 @@ fn codegen_in(
             continue;
         }
         match &decl.kind {
-            lutra_frontend::decl::DeclKind::Module(module) => {
+            lutra_compiler::decl::DeclKind::Module(module) => {
                 sub_modules.push((name, module));
             }
-            lutra_frontend::decl::DeclKind::Ty(ty) => {
+            lutra_compiler::decl::DeclKind::Ty(ty) => {
                 let mut ty = lutra_bin::ir::Ty::from(ty.clone());
                 infer_names(name, &mut ty);
 
                 tys.push((ty, decl.annotations.as_slice()));
             }
-            lutra_frontend::decl::DeclKind::Expr(expr) => {
+            lutra_compiler::decl::DeclKind::Expr(expr) => {
                 let ty = expr.ty.as_ref().unwrap();
                 let mut ty = lutra_bin::ir::Ty::from(ty.clone());
                 infer_names(name, &mut ty);

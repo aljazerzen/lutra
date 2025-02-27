@@ -29,7 +29,7 @@ fn test_01() {
     ",
     );
     let output_ty = program.get_output_ty().clone();
-    let bytecode = lutra_frontend::bytecode_program(program);
+    let bytecode = lutra_compiler::bytecode_program(program);
 
     let value = lutra_runtime::evaluate(&bytecode, vec![], &modules);
 

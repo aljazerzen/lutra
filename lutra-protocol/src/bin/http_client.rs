@@ -16,9 +16,9 @@ async fn main() {
 
     let c = async {
         let source = "let main = func (x: int64) -> 3 * x + 2";
-        let program = lutra_frontend::_test_compile(source).unwrap();
+        let program = lutra_compiler::_test_compile(source).unwrap();
         let output_ty = program.get_output_ty().clone();
-        let program = lutra_frontend::bytecode_program(program);
+        let program = lutra_compiler::bytecode_program(program);
 
         println!("preparing...");
         let program_id = client.prepare(&program).await;

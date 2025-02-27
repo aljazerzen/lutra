@@ -1,6 +1,6 @@
 use clap::{Parser, Subcommand};
 
-use lutra_frontend::{pr, CompileParams, DiscoverParams};
+use lutra_compiler::{pr, CompileParams, DiscoverParams};
 
 fn main() {
     env_logger::builder().format_timestamp(None).init();
@@ -51,7 +51,7 @@ pub struct DiscoverCommand {
 }
 
 pub fn discover(cmd: DiscoverCommand) -> anyhow::Result<()> {
-    let project = lutra_frontend::discover(cmd.discover)?;
+    let project = lutra_compiler::discover(cmd.discover)?;
 
     println!("{project}");
     Ok(())
@@ -75,9 +75,9 @@ enum CheckPrint {
 }
 
 pub fn check(cmd: CheckCommand) -> anyhow::Result<()> {
-    let project = lutra_frontend::discover(cmd.discover)?;
+    let project = lutra_compiler::discover(cmd.discover)?;
 
-    let project = lutra_frontend::compile(project, cmd.compile)?;
+    let project = lutra_compiler::compile(project, cmd.compile)?;
 
     match cmd.print {
         Some(CheckPrint::Debug) => {
@@ -104,12 +104,12 @@ pub struct CompileCommand {
 }
 
 pub fn compile(cmd: CompileCommand) -> anyhow::Result<()> {
-    let project = lutra_frontend::discover(cmd.discover)?;
+    let project = lutra_compiler::discover(cmd.discover)?;
 
-    let project = lutra_frontend::compile(project, cmd.compile)?;
+    let project = lutra_compiler::compile(project, cmd.compile)?;
 
     let path = pr::Path::new(cmd.path.split("::"));
-    let program = lutra_frontend::lower(&project.root_module, &path);
+    let program = lutra_compiler::lower(&project.root_module, &path);
 
     let program_source = lutra_ir::print(&program);
     println!("------ IR ------");
@@ -131,15 +131,15 @@ pub struct RunCommand {
 }
 
 pub fn run(cmd: RunCommand) -> anyhow::Result<()> {
-    let project = lutra_frontend::discover(cmd.discover)?;
+    let project = lutra_compiler::discover(cmd.discover)?;
 
-    let project = lutra_frontend::compile(project, cmd.compile)?;
+    let project = lutra_compiler::compile(project, cmd.compile)?;
 
     let path = pr::Path::new(cmd.path.split("::"));
-    let program = lutra_frontend::lower(&project.root_module, &path);
+    let program = lutra_compiler::lower(&project.root_module, &path);
     log::debug!("ir: {}", lutra_ir::print(&program));
     let output_ty = program.get_output_ty().clone();
-    let bytecode = lutra_frontend::bytecode_program(program);
+    let bytecode = lutra_compiler::bytecode_program(program);
 
     let res = lutra_runtime::evaluate(&bytecode, vec![], lutra_runtime::BUILTIN_MODULES);
     let value = lutra_bin::Value::decode(&res, &output_ty)?;

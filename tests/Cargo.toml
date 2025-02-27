@@ -9,7 +9,7 @@ version.workspace = true
 [dependencies]
 lutra-bin = { path = "../lutra-bin" }
 lutra-typed-data = { path = "../lutra-typed-data" }
-lutra-frontend = { path = "../lutra-frontend" }
+lutra-compiler = { path = "../lutra-compiler" }
 lutra-runtime = { path = "../lutra-runtime" }
 lutra-ir = { path = "../lutra-ir" }
 

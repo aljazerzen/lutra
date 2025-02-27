@@ -6,7 +6,7 @@ pub use perror::{Error, Span};
 
 use chumsky::{prelude::*, Stream};
 use lutra_bin::ir;
-use lutra_frontend::_lexer::{lex, Token, TokenKind};
+use lutra_compiler::_lexer::{lex, Token, TokenKind};
 
 pub fn parse(source: &str) -> (Option<ir::Program>, Vec<Error>) {
     let (tokens, errors) = lex(source, 0);

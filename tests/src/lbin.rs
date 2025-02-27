@@ -7,7 +7,7 @@ use std::sync::OnceLock;
 
 use insta::assert_snapshot;
 use lutra_bin::{ir, Decode, Encode, Value};
-use lutra_frontend::{pr, Project};
+use lutra_compiler::{pr, Project};
 
 #[track_caller]
 fn _test_encode_decode<T: Encode + Decode + std::fmt::Debug>(value: Value, ty: &ir::Ty) -> String {
@@ -35,9 +35,9 @@ static SCHEMA: OnceLock<Project> = OnceLock::new();
 fn _test_get_type(name: &'static str) -> ir::Ty {
     let project = SCHEMA.get_or_init(|| {
         let source = include_str!("../lutra/bin.lt");
-        let source = lutra_frontend::SourceTree::single("".into(), source.into());
+        let source = lutra_compiler::SourceTree::single("".into(), source.into());
 
-        lutra_frontend::compile(source, lutra_frontend::CompileParams {})
+        lutra_compiler::compile(source, lutra_compiler::CompileParams {})
             .unwrap_or_else(|e| panic!("{e}"))
     });
 

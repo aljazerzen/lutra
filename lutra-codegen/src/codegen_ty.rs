@@ -1,7 +1,7 @@
 use std::{borrow::Cow, fmt::Write, iter::zip};
 
 use lutra_bin::{ir, layout};
-use lutra_frontend::pr;
+use lutra_compiler::pr;
 
 use crate::Context;
 

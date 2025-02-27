@@ -14,7 +14,7 @@ test = false
 
 [dependencies]
 lutra-bin = { path = "../lutra-bin" }
-lutra-frontend = { path = "../lutra-frontend", features = ["clap"] }
+lutra-compiler = { path = "../lutra-compiler", features = ["clap"] }
 lutra-ir = { path = "../lutra-ir" }
 lutra-runtime = { path = "../lutra-runtime" }
 

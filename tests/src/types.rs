@@ -6,7 +6,7 @@ fn _test_run(source: &str) -> String {
     //     .try_init()
     //     .ok();
 
-    let program = match lutra_frontend::_test_compile(source) {
+    let program = match lutra_compiler::_test_compile(source) {
         Ok(program) => program,
         Err(e) => panic!("{e}"),
     };
@@ -17,7 +17,7 @@ fn _test_run(source: &str) -> String {
 
 #[track_caller]
 fn _test_err(source: &str) -> String {
-    use lutra_frontend::error::Error;
+    use lutra_compiler::error::Error;
 
     // env_logger::Builder::new()
     //     .filter_level(log::LevelFilter::Debug)
@@ -25,7 +25,7 @@ fn _test_err(source: &str) -> String {
     //     .try_init()
     //     .ok();
 
-    let Error::Compile { diagnostics } = lutra_frontend::_test_compile(source).unwrap_err() else {
+    let Error::Compile { diagnostics } = lutra_compiler::_test_compile(source).unwrap_err() else {
         unreachable!()
     };
     let diagnostic = diagnostics.into_iter().next().unwrap();

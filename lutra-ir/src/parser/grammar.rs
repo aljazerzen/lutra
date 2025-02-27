@@ -1,9 +1,9 @@
 use chumsky::prelude::*;
-use lutra_frontend::pr;
+use lutra_compiler::pr;
 
 use super::perror::PError;
 use lutra_bin::ir::*;
-use lutra_frontend::_lexer::TokenKind;
+use lutra_compiler::_lexer::TokenKind;
 
 pub fn program() -> impl Parser<TokenKind, Program, Error = PError> {
     let main = keyword("let")

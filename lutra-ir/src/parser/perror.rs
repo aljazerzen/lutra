@@ -1,6 +1,6 @@
 use std::fmt::Debug;
 
-use lutra_frontend::_lexer::TokenKind;
+use lutra_compiler::_lexer::TokenKind;
 
 pub type PError = chumsky::error::Cheap<TokenKind, Span>;
 
@@ -37,8 +37,8 @@ impl Error {
     }
 }
 
-impl From<lutra_frontend::_lexer::Diagnostic> for Error {
-    fn from(d: lutra_frontend::_lexer::Diagnostic) -> Self {
+impl From<lutra_compiler::_lexer::Diagnostic> for Error {
+    fn from(d: lutra_compiler::_lexer::Diagnostic) -> Self {
         let span = d.span.unwrap();
         Self {
             message: d.message,
