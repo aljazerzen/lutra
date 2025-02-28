@@ -28,6 +28,9 @@ walkdir = "2.5.0"
 semver = { version = "1.0.23", features = ["serde"] }
 chumsky = { workspace = true }
 
+# sql backend
+sqlparser = {version = "0.54.0", features = ["std"]}
+
 enum-as-inner = { workspace = true }
 strum = { version = "0.26.3", features = ["std", "derive"] }
 indexmap = { workspace = true }

@@ -12,6 +12,7 @@ fn main() {
         Action::Check(cmd) => check(cmd),
         Action::Compile(cmd) => compile(cmd),
         Action::Run(cmd) => run(cmd),
+        Action::Sql(cmd) => sql(cmd),
     };
 
     match res {
@@ -42,6 +43,9 @@ pub enum Action {
 
     /// Compile the project and run a program
     Run(RunCommand),
+
+    /// Compile the project to SQL
+    Sql(SqlCommand),
 }
 
 #[derive(clap::Parser)]
@@ -145,5 +149,32 @@ pub fn run(cmd: RunCommand) -> anyhow::Result<()> {
     let value = lutra_bin::Value::decode(&res, &output_ty)?;
 
     println!("{}", value.print_source(&output_ty).unwrap());
+    Ok(())
+}
+
+#[derive(clap::Parser)]
+pub struct SqlCommand {
+    #[clap(flatten)]
+    discover: DiscoverParams,
+
+    #[clap(flatten)]
+    compile: CompileParams,
+
+    #[clap(default_value = "main")]
+    path: String,
+}
+
+pub fn sql(cmd: SqlCommand) -> anyhow::Result<()> {
+    let project = lutra_compiler::discover(cmd.discover)?;
+
+    let project = lutra_compiler::compile(project, cmd.compile)?;
+
+    let path = pr::Path::new(cmd.path.split("::"));
+    let program = lutra_compiler::lower(&project.root_module, &path);
+
+    log::debug!("ir: {}", lutra_ir::print(&program));
+    let sql = lutra_compiler::compile_to_sql(&program);
+
+    println!("{}", sql);
     Ok(())
 }

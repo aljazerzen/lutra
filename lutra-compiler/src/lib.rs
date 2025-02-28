@@ -8,6 +8,7 @@ mod printer;
 mod project;
 mod semantic;
 mod span;
+mod sql;
 mod utils;
 
 type Result<T, E = diagnostic::Diagnostic> = core::result::Result<T, E>;
@@ -21,6 +22,7 @@ pub use discover::{discover, DiscoverParams};
 pub use lowering::lower;
 pub use project::{Project, SourceTree};
 pub use span::Span;
+pub use sql::compile as compile_to_sql;
 
 use lutra_bin::ir;
 
