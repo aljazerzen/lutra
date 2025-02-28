@@ -1,0 +1,13 @@
+[package]
+name = "lutra-db-driver"
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+version.workspace = true
+
+[dependencies]
+bytes = { workspace = true }
+futures = { version = "0.3.31", default-features = false }
+lutra-bin = { version = "0.1.0", path = "../lutra-bin" }
+tokio-postgres = { version = "0.7.13", default-features = false }

@@ -12,3 +12,5 @@ flamegraph.svg
 perf.data
 
 Cargo.lock
+
+examples/

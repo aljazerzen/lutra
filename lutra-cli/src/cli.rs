@@ -3,9 +3,15 @@ use clap::{Parser, Subcommand};
 use lutra_compiler::{pr, CompileParams, DiscoverParams};
 
 fn main() {
-    env_logger::builder().format_timestamp(None).init();
-
     let action = Command::parse();
+
+    if action.verbose {
+        tracing_subscriber::fmt::Subscriber::builder()
+            .without_time()
+            .with_max_level(tracing::Level::DEBUG)
+            .with_writer(|| std::io::stderr())
+            .init();
+    }
 
     let res = match action.command {
         Action::Discover(cmd) => discover(cmd),
@@ -13,6 +19,7 @@ fn main() {
         Action::Compile(cmd) => compile(cmd),
         Action::Run(cmd) => run(cmd),
         Action::Sql(cmd) => sql(cmd),
+        Action::RunPostgres(cmd) => run_postgres(cmd),
     };
 
     match res {
@@ -26,6 +33,9 @@ fn main() {
 
 #[derive(Parser)]
 pub struct Command {
+    #[clap(short, long)]
+    pub verbose: bool,
+
     #[clap(subcommand)]
     pub command: Action,
 }
@@ -46,6 +56,9 @@ pub enum Action {
 
     /// Compile the project to SQL
     Sql(SqlCommand),
+
+    /// Compile the project and run against PostgreSQL
+    RunPostgres(RunPostgresCommand),
 }
 
 #[derive(clap::Parser)]
@@ -141,7 +154,7 @@ pub fn run(cmd: RunCommand) -> anyhow::Result<()> {
 
     let path = pr::Path::new(cmd.path.split("::"));
     let program = lutra_compiler::lower(&project.root_module, &path);
-    log::debug!("ir: {}", lutra_ir::print(&program));
+    tracing::debug!("ir: {}", lutra_ir::print(&program));
     let output_ty = program.get_output_ty().clone();
     let bytecode = lutra_compiler::bytecode_program(program);
 
@@ -172,9 +185,55 @@ pub fn sql(cmd: SqlCommand) -> anyhow::Result<()> {
     let path = pr::Path::new(cmd.path.split("::"));
     let program = lutra_compiler::lower(&project.root_module, &path);
 
-    log::debug!("ir: {}", lutra_ir::print(&program));
+    tracing::debug!("ir: {}", lutra_ir::print(&program));
     let sql = lutra_compiler::compile_to_sql(&program);
 
     println!("{}", sql);
+    Ok(())
+}
+
+#[derive(clap::Parser)]
+pub struct RunPostgresCommand {
+    #[clap(flatten)]
+    discover: DiscoverParams,
+
+    #[clap(flatten)]
+    compile: CompileParams,
+
+    #[clap(default_value = "main")]
+    path: String,
+
+    #[clap(default_value = "postgresql://localhost:5432")]
+    postgres_url: String,
+}
+
+#[tokio::main(flavor = "current_thread")]
+pub async fn run_postgres(cmd: RunPostgresCommand) -> anyhow::Result<()> {
+    let project = lutra_compiler::discover(cmd.discover)?;
+
+    let project = lutra_compiler::compile(project, cmd.compile)?;
+
+    let path = pr::Path::new(cmd.path.split("::"));
+    let program = lutra_compiler::lower(&project.root_module, &path);
+
+    tracing::debug!("ir: {}", lutra_ir::print(&program));
+    let sql = lutra_compiler::compile_to_sql(&program);
+    tracing::debug!("sql: {sql}");
+
+    let (client, connection) =
+        tokio_postgres::connect(&cmd.postgres_url, tokio_postgres::NoTls).await?;
+
+    tokio::spawn(async move {
+        if let Err(e) = connection.await {
+            eprintln!("connection error: {}", e);
+        }
+    });
+
+    let data = lutra_db_driver::query(client, &sql).await?;
+    let data = data.flatten();
+
+    let value = lutra_bin::Value::decode(&data, program.get_output_ty())?;
+
+    println!("{}", value.print_source(program.get_output_ty())?);
     Ok(())
 }
