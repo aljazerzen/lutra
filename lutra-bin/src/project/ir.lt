@@ -17,7 +17,6 @@ type ExprKind = enum {
   Array = [Expr],
   TupleLookup = TupleLookup,
   Binding = Binding,
-  RemoteCall = RemoteCall,
 }
 
 @derive(["Debug", "Clone", "enum_as_inner::EnumAsInner"])
@@ -63,11 +62,6 @@ type TupleLookup = {
 type Binding = {
   id = uint32,
   expr = Expr,
-  main = Expr,
-}
-
-type RemoteCall = {
-  remote_id = text,
   main = Expr,
 }
 

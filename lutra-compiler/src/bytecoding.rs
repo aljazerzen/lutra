@@ -33,7 +33,6 @@ impl ByteCoder {
                 ExprKind::TupleLookup(Box::new(self.compile_tuple_lookup(*v)))
             }
             ir::ExprKind::Binding(v) => ExprKind::Binding(Box::new(self.compile_binding(*v))),
-            ir::ExprKind::RemoteCall(_) => todo!(),
         };
 
         Expr { kind }

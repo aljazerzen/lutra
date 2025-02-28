@@ -154,21 +154,6 @@ impl Printer {
                 self.dedent();
                 r
             }
-            ir::ExprKind::RemoteCall(call) => {
-                let mut r = "(".to_string();
-                self.indent();
-                r += &self.new_line();
-                r += "remote_call \"";
-                r += &call.remote_id;
-                r += "\", ";
-                r += &self.new_line();
-                r += &self.print_expr(&call.main);
-                r += ", ";
-                self.dedent();
-                r += &self.new_line();
-                r += ")";
-                r
-            }
         };
 
         let print_ty = !matches!(expr.kind, ir::ExprKind::Binding(_));

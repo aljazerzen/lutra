@@ -664,7 +664,6 @@ pub mod ir {
         Array(crate::vec::Vec<Expr>),
         TupleLookup(crate::boxed::Box<TupleLookup>),
         Binding(crate::boxed::Box<Binding>),
-        RemoteCall(crate::boxed::Box<RemoteCall>),
     }
 
     #[derive(Debug, Clone, enum_as_inner::EnumAsInner)]
@@ -723,13 +722,6 @@ pub mod ir {
     pub struct Binding {
         pub id: u32,
         pub expr: Expr,
-        pub main: Expr,
-    }
-
-    #[derive(Debug, Clone)]
-    #[allow(non_camel_case_types)]
-    pub struct RemoteCall {
-        pub remote_id: crate::string::String,
         pub main: Expr,
     }
 
@@ -922,12 +914,6 @@ pub mod ir {
                         let r = ExprKindHeadPtr::Binding(head_ptr);
                         r
                     }
-                    Self::RemoteCall(_) => {
-                        w.put_slice(&[8]);
-                        let head_ptr = crate::ReversePointer::new(w);
-                        let r = ExprKindHeadPtr::RemoteCall(head_ptr);
-                        r
-                    }
                 }
             }
             fn encode_body(&self, head: ExprKindHeadPtr, w: &mut crate::bytes::BytesMut) {
@@ -996,14 +982,6 @@ pub mod ir {
                         let inner_head_ptr = inner.encode_head(w);
                         inner.encode_body(inner_head_ptr, w);
                     }
-                    Self::RemoteCall(inner) => {
-                        let ExprKindHeadPtr::RemoteCall(offset_ptr) = head else {
-                            unreachable!()
-                        };
-                        offset_ptr.write_cur_len(w);
-                        let inner_head_ptr = inner.encode_head(w);
-                        inner.encode_body(inner_head_ptr, w);
-                    }
                 }
             }
         }
@@ -1018,7 +996,6 @@ pub mod ir {
             Array(crate::ReversePointer),
             TupleLookup(crate::ReversePointer),
             Binding(crate::ReversePointer),
-            RemoteCall(crate::ReversePointer),
         }
         impl crate::Layout for ExprKind {
             fn head_size() -> usize {
@@ -1074,11 +1051,6 @@ pub mod ir {
                         let offset = u32::from_le_bytes(buf.read_const::<4>());
                         let inner = super::Binding::decode(buf.skip(offset as usize))?;
                         ExprKind::Binding(crate::boxed::Box::new(inner))
-                    }
-                    8 => {
-                        let offset = u32::from_le_bytes(buf.read_const::<4>());
-                        let inner = super::RemoteCall::decode(buf.skip(offset as usize))?;
-                        ExprKind::RemoteCall(crate::boxed::Box::new(inner))
                     }
                     _ => return Err(crate::Error::InvalidData),
                 })
@@ -1485,38 +1457,6 @@ pub mod ir {
                 let expr = super::Expr::decode(buf.skip(4))?;
                 let main = super::Expr::decode(buf.skip(24))?;
                 Ok(Binding { id, expr, main })
-            }
-        }
-
-        #[allow(clippy::all, unused_variables)]
-        impl crate::Encode for RemoteCall {
-            type HeadPtr = RemoteCallHeadPtr;
-            fn encode_head(&self, buf: &mut crate::bytes::BytesMut) -> Self::HeadPtr {
-                let remote_id = self.remote_id.encode_head(buf);
-                let main = self.main.encode_head(buf);
-                RemoteCallHeadPtr { remote_id, main }
-            }
-            fn encode_body(&self, head: Self::HeadPtr, buf: &mut crate::bytes::BytesMut) {
-                self.remote_id.encode_body(head.remote_id, buf);
-                self.main.encode_body(head.main, buf);
-            }
-        }
-        #[allow(non_camel_case_types)]
-        pub struct RemoteCallHeadPtr {
-            remote_id: <crate::string::String as crate::Encode>::HeadPtr,
-            main: <super::Expr as crate::Encode>::HeadPtr,
-        }
-        impl crate::Layout for RemoteCall {
-            fn head_size() -> usize {
-                224
-            }
-        }
-
-        impl crate::Decode for RemoteCall {
-            fn decode(buf: &[u8]) -> crate::Result<Self> {
-                let remote_id = crate::string::String::decode(buf.skip(0))?;
-                let main = super::Expr::decode(buf.skip(8))?;
-                Ok(RemoteCall { remote_id, main })
             }
         }
 

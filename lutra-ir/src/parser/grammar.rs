@@ -48,9 +48,8 @@ fn expr() -> impl Parser<TokenKind, Expr, Error = PError> + Clone {
         let array = array(expr.clone());
         let function = function(expr.clone());
         let call = func_call(expr.clone());
-        let remote_call = remote_call(expr);
 
-        let term = choice((pointer, literal, tuple, array, function, call, remote_call))
+        let term = choice((pointer, literal, tuple, array, function, call))
             .then(ty())
             .map(|(kind, ty)| Expr { kind, ty })
             .boxed();
@@ -227,30 +226,6 @@ where
             |_| ExprKind::Tuple(vec![]),
         ))
         .labelled("function call")
-}
-
-fn remote_call<'a, E>(expr: E) -> impl Parser<TokenKind, ExprKind, Error = PError> + Clone + 'a
-where
-    E: Parser<TokenKind, Expr, Error = PError> + Clone + 'a,
-{
-    ident_keyword("remote_call")
-        .ignore_then(select! { TokenKind::Literal(pr::Literal::Text(i)) => i })
-        .then_ignore(ctrl(','))
-        .then(expr.clone())
-        .then_ignore(ctrl(',').or_not())
-        .map(|(remote_id, main)| ExprKind::RemoteCall(Box::new(RemoteCall { remote_id, main })))
-        .delimited_by(ctrl('('), ctrl(')'))
-        .recover_with(nested_delimiters(
-            TokenKind::Control('('),
-            TokenKind::Control(')'),
-            [
-                (TokenKind::Control('{'), TokenKind::Control('}')),
-                (TokenKind::Control('('), TokenKind::Control(')')),
-                (TokenKind::Control('['), TokenKind::Control(']')),
-            ],
-            |_| ExprKind::Tuple(vec![]),
-        ))
-        .labelled("remote call")
 }
 
 fn function<E>(expr: E) -> impl Parser<TokenKind, ExprKind, Error = PError>
