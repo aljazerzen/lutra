@@ -8,6 +8,6 @@ mod e2e;
 mod lbin;
 mod lowering;
 mod native_functions;
-mod sql;
+mod postgres;
 mod typed_data;
 mod types;

@@ -13,14 +13,14 @@ pub fn compile(program: &ir::Program) -> cr::RelExpr {
 
 pub fn compile_rel(expr: &ir::Expr) -> cr::RelExpr {
     let kind = match &expr.kind {
-        ir::ExprKind::Literal(_) => cr::RelExprKind::Literal(compile_expr(expr)),
+        ir::ExprKind::Literal(_) => cr::RelExprKind::Constructed(vec![vec![compile_expr(expr)]]),
         ir::ExprKind::Tuple(fields) => {
             let row = fields.iter().map(compile_expr).collect();
-            cr::RelExprKind::Tuple(row)
+            cr::RelExprKind::Constructed(vec![row])
         }
         ir::ExprKind::Array(items) => {
             let rows = items.iter().map(compile_tuple).collect();
-            cr::RelExprKind::Array(rows)
+            cr::RelExprKind::Constructed(rows)
         }
 
         ir::ExprKind::Call(call) => match &call.function.kind {
@@ -68,10 +68,10 @@ pub fn compile_rel_std(expr: &ir::Expr) -> cr::RelExprKind {
     let ir::ExprKind::Call(call) = &expr.kind else {
         unreachable!()
     };
-
     let ir::ExprKind::Pointer(ir::Pointer::External(ptr)) = &call.function.kind else {
         unreachable!()
     };
+
     match ptr.id.as_str() {
         "std::slice" => {
             let array = compile_rel(&call.args[0]);
@@ -85,19 +85,22 @@ pub fn compile_rel_std(expr: &ir::Expr) -> cr::RelExprKind {
 
             cr::RelExprKind::Limit(Box::new(offset), new_bin_op(end, "std::sub", start))
         }
-        _ => todo!(),
+        _ => {
+            let expr = compile_expr_std(expr);
+            cr::RelExprKind::Constructed(vec![vec![expr]])
+        }
     }
 }
 
 fn new_bin_op(left: cr::Expr, op: &str, right: cr::Expr) -> cr::Expr {
-    cr::Expr::BinOp(Box::new(left), op.into(), Box::new(right))
+    cr::Expr::FuncCall(op.to_string(), vec![left, right])
 }
 
 /// Compiles an expression that can be placed into a list of columns.
 /// It must have type of tuple.
 pub fn compile_tuple(expr: &ir::Expr) -> Vec<cr::Expr> {
     match &expr.kind {
-        ir::ExprKind::Literal(_) => unreachable!(),
+        ir::ExprKind::Literal(_) => vec![compile_expr(expr)],
 
         ir::ExprKind::Tuple(fields) => fields.iter().map(compile_expr).collect(),
 
@@ -136,13 +139,19 @@ pub fn compile_expr_std(expr: &ir::Expr) -> cr::Expr {
     let ir::ExprKind::Pointer(ir::Pointer::External(ptr)) = &call.function.kind else {
         unreachable!()
     };
+
+    let args = call.args.iter().map(compile_expr).collect();
+
     match ptr.id.as_str() {
-        "std::mul" | "std::div" | "std::mod" | "std::add" | "std::sub" | "std::eq" | "std::ne"
-        | "std::gt" | "std::lt" | "std::gte" | "std::lte" | "std::and" | "std::or" => {
-            let left = compile_expr(&call.args[0]);
-            let right = compile_expr(&call.args[1]);
-            new_bin_op(left, &ptr.id, right)
+        "std::mod" => {
+            let prim = expr.ty.kind.as_primitive().unwrap();
+            match prim {
+                ir::PrimitiveSet::float32 | ir::PrimitiveSet::float64 => {
+                    cr::Expr::FuncCall("std::mod_f".into(), args)
+                }
+                _ => cr::Expr::FuncCall("std::mod_i".into(), args),
+            }
         }
-        _ => todo!(),
+        _ => cr::Expr::FuncCall(ptr.id.clone(), args),
     }
 }

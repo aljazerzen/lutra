@@ -3,38 +3,47 @@ use sqlparser::ast as sql_ast;
 
 use crate::sql::{COL_ARRAY_INDEX, COL_VALUE};
 
-pub fn projection_for_ty(rel_var_name: &str, ty: &ir::Ty) -> Vec<sql_ast::SelectItem> {
+/// Generates an identity (no-op) projection of a relation of type `ty`, from relation variable `rel_var_name`.
+/// When `top_level` is set, the projection does not include array index.
+pub fn projection_for_ty(
+    rel_var_name: Option<&str>,
+    ty: &ir::Ty,
+    top_level: bool,
+) -> Vec<sql_ast::SelectItem> {
     let mut r = Vec::new();
-    projection_for_ty_re(rel_var_name, ty, &mut r);
+    projection_for_ty_re(rel_var_name, ty, top_level, &mut r);
     r
 }
 
-fn projection_for_ty_re(rel_var_name: &str, ty: &ir::Ty, r: &mut Vec<sql_ast::SelectItem>) {
+fn projection_for_ty_re(
+    rel_var_name: Option<&str>,
+    ty: &ir::Ty,
+    top_level: bool,
+    r: &mut Vec<sql_ast::SelectItem>,
+) {
     match &ty.kind {
         ir::TyKind::Primitive(_) => {
-            r.push(sql_ast::SelectItem::UnnamedExpr(
-                sql_ast::Expr::CompoundIdentifier(vec![
-                    sql_ast::Ident::new(rel_var_name),
-                    sql_ast::Ident::new(COL_VALUE),
-                ]),
-            ));
+            r.push(sql_ast::SelectItem::UnnamedExpr(super::ident(
+                rel_var_name,
+                COL_VALUE,
+            )));
         }
         ir::TyKind::Tuple(fields) => {
             for (index, _) in fields.iter().enumerate() {
-                r.push(sql_ast::SelectItem::UnnamedExpr(
-                    sql_ast::Expr::CompoundIdentifier(vec![
-                        sql_ast::Ident::new(rel_var_name),
-                        sql_ast::Ident::new(format!("f_{index}")),
-                    ]),
-                ));
+                r.push(sql_ast::SelectItem::UnnamedExpr(super::ident(
+                    rel_var_name,
+                    format!("f_{index}"),
+                )));
             }
         }
         ir::TyKind::Array(items) => {
-            r.push(sql_ast::SelectItem::ExprWithAlias {
-                expr: sql_ast::Expr::Value(sql_ast::Value::Null),
-                alias: sql_ast::Ident::new(COL_ARRAY_INDEX),
-            });
-            projection_for_ty_re(rel_var_name, items, r)
+            if !top_level {
+                r.push(sql_ast::SelectItem::UnnamedExpr(super::ident(
+                    rel_var_name,
+                    COL_ARRAY_INDEX,
+                )));
+            }
+            projection_for_ty_re(rel_var_name, items, top_level, r)
         }
         ir::TyKind::Enum(_) => todo!(),
         ir::TyKind::Function(_) => todo!(),

@@ -1,88 +1,25 @@
-use super::cr;
-use super::utils;
-use super::COL_ARRAY_INDEX;
-use super::COL_VALUE;
+use super::utils::ExprOrSource;
+use super::{cr, utils};
+use super::{COL_ARRAY_INDEX, COL_VALUE};
+use itertools::Itertools;
 use lutra_bin::ir;
 use sqlparser::ast as sql_ast;
 
 pub fn compile(rel: cr::RelExpr) -> sql_ast::Query {
+    let rel_ty = rel.ty.clone();
+    let query = compile_re(rel);
+
+    if rel_ty.kind.is_array() {
+        // wrap into a top-level projection to remove array indexes
+        utils::query_wrap(query, &rel_ty, true)
+    } else {
+        query
+    }
+}
+
+fn compile_re(rel: cr::RelExpr) -> sql_ast::Query {
     match rel.kind {
-        cr::RelExprKind::Literal(expr) => {
-            let mut select = utils::select_empty();
-
-            let value = sql_ast::SelectItem::ExprWithAlias {
-                expr: compile_expr(expr),
-                alias: sql_ast::Ident::new(COL_VALUE),
-            };
-            select.projection = vec![value];
-
-            utils::query_select(select)
-        }
-        cr::RelExprKind::Tuple(exprs) => {
-            let mut select = utils::select_empty();
-            select.projection = exprs
-                .into_iter()
-                .enumerate()
-                .map(|(index, expr)| sql_ast::SelectItem::ExprWithAlias {
-                    expr: compile_expr(expr),
-                    alias: sql_ast::Ident::new(format!("f_{index}")),
-                })
-                .collect();
-
-            utils::query_select(select)
-        }
-        cr::RelExprKind::Array(rows) => {
-            let mut res = None;
-            let mut rows = rows.into_iter().enumerate();
-
-            // first row with aliases
-            if let Some((order, row)) = rows.next() {
-                let mut select = utils::select_empty();
-                select.projection = Vec::with_capacity(1 + row.len());
-                select.projection.push(sql_ast::SelectItem::ExprWithAlias {
-                    expr: utils::number(order.to_string()),
-                    alias: sql_ast::Ident::new(COL_ARRAY_INDEX),
-                });
-                select
-                    .projection
-                    .extend(row.into_iter().map(compile_expr).enumerate().map(
-                        |(field_n, expr)| sql_ast::SelectItem::ExprWithAlias {
-                            expr,
-                            alias: sql_ast::Ident::new(format!("f_{field_n}")),
-                        },
-                    ));
-
-                res = Some(sql_ast::SetExpr::Select(Box::new(select)));
-            }
-
-            // all following rows
-            for (order, row) in rows {
-                let mut select = utils::select_empty();
-                select.projection = Vec::with_capacity(1 + row.len());
-                select
-                    .projection
-                    .push(sql_ast::SelectItem::UnnamedExpr(utils::number(
-                        order.to_string(),
-                    )));
-                select.projection.extend(
-                    row.into_iter()
-                        .map(compile_expr)
-                        .map(sql_ast::SelectItem::UnnamedExpr),
-                );
-
-                res = Some(utils::union(
-                    res.unwrap(),
-                    sql_ast::SetExpr::Select(Box::new(select)),
-                ))
-            }
-
-            utils::query_new(res.unwrap_or_else(|| {
-                // construct a rel without rows
-                let mut select = utils::select_empty();
-                select.selection = Some(utils::bool(false));
-                sql_ast::SetExpr::Select(Box::new(select))
-            }))
-        }
+        cr::RelExprKind::Constructed(rows) => compile_rel_constructed(rows, &rel.ty),
 
         cr::RelExprKind::From(table_name) => {
             let mut select = utils::select_empty();
@@ -120,18 +57,23 @@ pub fn compile(rel: cr::RelExpr) -> sql_ast::Query {
             utils::query_select(select)
         }
         cr::RelExprKind::Limit(inner, limit) => {
-            let mut inner = compile(*inner);
-            // TODO: wrap if limit cannot be applied to the query
-            inner.limit = Some(compile_expr(limit));
+            let mut inner = compile_re(*inner);
+            if inner.limit.is_some() {
+                inner = utils::query_wrap(inner, &rel.ty, false);
+            }
+
+            inner.limit = Some(compile_expr(limit).into_expr());
             inner
         }
         cr::RelExprKind::Offset(inner, offset) => {
-            let mut inner = compile(*inner);
+            let mut inner = compile_re(*inner);
 
-            // TODO: wrap if limit cannot be applied to the query
+            if inner.limit.is_some() | inner.offset.is_some() {
+                inner = utils::query_wrap(inner, &rel.ty, false);
+            }
 
             inner.offset = Some(sql_ast::Offset {
-                value: compile_expr(offset),
+                value: compile_expr(offset).into_expr(),
                 rows: sql_ast::OffsetRows::None,
             });
 
@@ -140,15 +82,93 @@ pub fn compile(rel: cr::RelExpr) -> sql_ast::Query {
     }
 }
 
-fn compile_expr(expr: cr::Expr) -> sql_ast::Expr {
+fn compile_rel_constructed(rows: Vec<Vec<cr::Expr>>, ty: &ir::Ty) -> sql_ast::Query {
+    let mut res = None;
+    let mut rows = rows.into_iter().enumerate();
+
+    let represents_array = ty.kind.is_array();
+    let item_ty = match &ty.kind {
+        ir::TyKind::Primitive(_) | ir::TyKind::Tuple(_) => ty,
+        ir::TyKind::Array(item_ty) => item_ty,
+        ir::TyKind::Enum(_) | ir::TyKind::Function(_) | ir::TyKind::Ident(_) => todo!(),
+    };
+
+    // first row with aliases
+    if let Some((order, row)) = rows.next() {
+        let mut select = utils::select_empty();
+        select.projection = Vec::with_capacity(1 + row.len());
+
+        if represents_array {
+            select.projection.push(sql_ast::SelectItem::ExprWithAlias {
+                expr: utils::number(order.to_string()),
+                alias: sql_ast::Ident::new(COL_ARRAY_INDEX),
+            });
+        }
+
+        match &item_ty.kind {
+            ir::TyKind::Primitive(_) => {
+                let expr = row.into_iter().exactly_one().unwrap();
+                let expr = compile_expr(expr).into_expr();
+
+                select.projection.push(sql_ast::SelectItem::ExprWithAlias {
+                    expr,
+                    alias: sql_ast::Ident::new(COL_VALUE),
+                });
+            }
+            ir::TyKind::Tuple(_) => {
+                select.projection.extend(
+                    row.into_iter()
+                        .map(compile_expr)
+                        .map(ExprOrSource::into_expr)
+                        .enumerate()
+                        .map(|(field_n, expr)| sql_ast::SelectItem::ExprWithAlias {
+                            expr,
+                            alias: sql_ast::Ident::new(format!("f_{field_n}")),
+                        }),
+                );
+            }
+            _ => todo!(),
+        }
+
+        res = Some(sql_ast::SetExpr::Select(Box::new(select)));
+    }
+
+    // all following rows
+    for (order, row) in rows {
+        let mut select = utils::select_empty();
+        select.projection = Vec::with_capacity(1 + row.len());
+        select
+            .projection
+            .push(sql_ast::SelectItem::UnnamedExpr(utils::number(
+                order.to_string(),
+            )));
+        select.projection.extend(
+            row.into_iter()
+                .map(compile_expr)
+                .map(ExprOrSource::into_expr)
+                .map(sql_ast::SelectItem::UnnamedExpr),
+        );
+
+        res = Some(utils::union(
+            res.unwrap(),
+            sql_ast::SetExpr::Select(Box::new(select)),
+        ))
+    }
+
+    utils::query_new(res.unwrap_or_else(|| {
+        // construct a rel without rows
+        let mut select = utils::select_empty();
+        select.selection = Some(utils::bool(false));
+        sql_ast::SetExpr::Select(Box::new(select))
+    }))
+}
+
+fn compile_expr(expr: cr::Expr) -> ExprOrSource {
     match expr {
-        cr::Expr::Literal(literal) => compile_literal(literal),
-        cr::Expr::BinOp(left, op_id, right) => {
-            sql_ast::Expr::Nested(Box::new(sql_ast::Expr::BinaryOp {
-                left: Box::new(compile_expr(*left)),
-                op: compile_bin_op(&op_id),
-                right: Box::new(compile_expr(*right)),
-            }))
+        cr::Expr::Literal(literal) => ExprOrSource::Expr(compile_literal(literal)),
+        cr::Expr::FuncCall(func_name, args) => {
+            let args = args.into_iter().map(compile_expr);
+            compile_func_call(&func_name, args)
         }
     }
 }
@@ -156,27 +176,41 @@ fn compile_expr(expr: cr::Expr) -> sql_ast::Expr {
 fn compile_literal(lit: ir::Literal) -> sql_ast::Expr {
     sql_ast::Expr::Value(match lit {
         ir::Literal::Bool(b) => sql_ast::Value::Boolean(b),
-        ir::Literal::Int(i) => sql_ast::Value::Number(format!("{i}"), false),
-        ir::Literal::Float(f) => sql_ast::Value::Number(format!("{f:?}"), false),
+        ir::Literal::Int(i) => sql_ast::Value::Number(format!("{i}::int8"), false),
+        ir::Literal::Float(f) => sql_ast::Value::Number(format!("{f:?}::float8"), false),
         ir::Literal::Text(s) => sql_ast::Value::SingleQuotedString(s),
     })
 }
 
-fn compile_bin_op(id: &str) -> sql_ast::BinaryOperator {
+fn compile_func_call(id: &str, args: impl IntoIterator<Item = ExprOrSource>) -> ExprOrSource {
     match id {
-        "std::mul" => sql_ast::BinaryOperator::Multiply,
-        "std::div" => sql_ast::BinaryOperator::Divide,
-        "std::mod" => sql_ast::BinaryOperator::Modulo,
-        "std::add" => sql_ast::BinaryOperator::Plus,
-        "std::sub" => sql_ast::BinaryOperator::Minus,
-        "std::eq" => sql_ast::BinaryOperator::Eq,
-        "std::ne" => sql_ast::BinaryOperator::NotEq,
-        "std::gt" => sql_ast::BinaryOperator::Gt,
-        "std::lt" => sql_ast::BinaryOperator::Lt,
-        "std::gte" => sql_ast::BinaryOperator::GtEq,
-        "std::lte" => sql_ast::BinaryOperator::LtEq,
-        "std::and" => sql_ast::BinaryOperator::And,
-        "std::or" => sql_ast::BinaryOperator::Or,
-        _ => todo!(),
+        "std::mul" => utils::new_bin_op("*", args),
+        "std::div" => utils::new_bin_op("/", args),
+        "std::mod_i" => utils::new_bin_op("%", args),
+        "std::mod_f" => {
+            let mut args = args.into_iter();
+            ExprOrSource::Source(format!(
+                "MOD({}::numeric, {}::numeric)::float8",
+                args.next().unwrap(),
+                args.next().unwrap(),
+            ))
+        }
+
+        "std::add" => utils::new_bin_op("+", args),
+        "std::sub" => utils::new_bin_op("-", args),
+        "std::neg" => utils::new_un_op("-", args),
+
+        "std::eq" => utils::new_bin_op("=", args),
+        "std::ne" => utils::new_bin_op("<>", args),
+
+        "std::gt" => utils::new_bin_op(">", args),
+        "std::lt" => utils::new_bin_op("<", args),
+        "std::gte" => utils::new_bin_op(">=", args),
+        "std::lte" => utils::new_bin_op("<=", args),
+
+        "std::and" => utils::new_bin_op("AND", args),
+        "std::or" => utils::new_bin_op("OR", args),
+        "std::not" => utils::new_un_op("NOT", args),
+        _ => todo!("sql impl for {id}"),
     }
 }

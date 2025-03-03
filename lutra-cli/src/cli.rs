@@ -9,7 +9,7 @@ fn main() {
         tracing_subscriber::fmt::Subscriber::builder()
             .without_time()
             .with_max_level(tracing::Level::DEBUG)
-            .with_writer(|| std::io::stderr())
+            .with_writer(std::io::stderr)
             .init();
     }
 
@@ -200,11 +200,11 @@ pub struct RunPostgresCommand {
     #[clap(flatten)]
     compile: CompileParams,
 
-    #[clap(default_value = "main")]
-    path: String,
-
     #[clap(default_value = "postgresql://localhost:5432")]
     postgres_url: String,
+
+    #[clap(default_value = "main")]
+    path: String,
 }
 
 #[tokio::main(flavor = "current_thread")]
@@ -229,7 +229,8 @@ pub async fn run_postgres(cmd: RunPostgresCommand) -> anyhow::Result<()> {
         }
     });
 
-    let data = lutra_db_driver::query(client, &sql).await?;
+    let (db_ty, data) = lutra_db_driver::query(client, &sql).await?;
+    let data = lutra_db_driver::repack(&db_ty, data, program.get_output_ty());
     let data = data.flatten();
 
     let value = lutra_bin::Value::decode(&data, program.get_output_ty())?;
