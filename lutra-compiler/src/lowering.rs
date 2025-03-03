@@ -209,7 +209,35 @@ impl<'a> Lowerer<'a> {
     }
 
     fn lower_var_bindings(&mut self, main: ir::Expr) -> ir::Expr {
-        let mut main = main;
+        if self.var_bindings.is_empty() {
+            return main;
+        }
+
+        let main_ty = main.ty.clone();
+        let main_func_ty = main.ty.kind.as_function().unwrap().clone();
+
+        // construct a new main function
+        let f_id = self.generator_function_scope.gen() as u32;
+        let mut main = ir::Expr {
+            kind: ir::ExprKind::Call(Box::new(ir::Call {
+                function: main,
+                args: main_func_ty
+                    .params
+                    .iter()
+                    .enumerate()
+                    .map(|(p_pos, p)| ir::Expr {
+                        kind: ir::ExprKind::Pointer(ir::Pointer::Parameter(ir::ParameterPtr {
+                            function_id: f_id,
+                            param_position: p_pos as u8,
+                        })),
+                        ty: p.clone(),
+                    })
+                    .collect(),
+            })),
+            ty: main_func_ty.body.clone(),
+        };
+
+        // fold each of the bindings
         let mut i = 0;
         loop {
             let Some((reference, id)) = self.var_bindings.get_index(i) else {
@@ -225,6 +253,14 @@ impl<'a> Lowerer<'a> {
                 kind: ir::ExprKind::Binding(Box::new(ir::Binding { id, expr, main })),
             }
         }
-        main
+
+        // place bindings into function body
+        ir::Expr {
+            kind: ir::ExprKind::Function(Box::new(ir::Function {
+                id: f_id,
+                body: main,
+            })),
+            ty: main_ty,
+        }
     }
 }

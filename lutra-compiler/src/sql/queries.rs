@@ -26,17 +26,12 @@ fn compile_re(rel: cr::RelExpr) -> sql_ast::Query {
     match rel.kind {
         cr::RelExprKind::Constructed(rows) => compile_rel_constructed(rows, &rel.ty),
 
-        cr::RelExprKind::From(table_name) => {
+        cr::RelExprKind::FromTable(table_name) => {
             let mut select = utils::select_empty();
 
             let name = sql_ast::ObjectName(vec![sql_ast::Ident::new(table_name)]);
-            let alias = Some(sql_ast::TableAlias {
-                name: sql_ast::Ident::new("a"),
-                columns: vec![],
-            });
-
             select.from = vec![sql_ast::TableWithJoins {
-                relation: utils::new_table(name, alias),
+                relation: utils::new_table(name, None),
                 joins: vec![],
             }];
 
@@ -59,6 +54,18 @@ fn compile_re(rel: cr::RelExpr) -> sql_ast::Query {
                         alias: sql_ast::Ident::new(format!("f_{field_n}")),
                     }
                 }));
+            utils::query_select(select)
+        }
+        cr::RelExprKind::FromBinding(alias) => {
+            let mut select = utils::select_empty();
+
+            let name = sql_ast::ObjectName(vec![sql_ast::Ident::new(alias)]);
+
+            select.from = vec![sql_ast::TableWithJoins {
+                relation: utils::new_table(name, None),
+                joins: vec![],
+            }];
+            select.projection = utils::projection_for_ty(None, &rel.ty, false);
             utils::query_select(select)
         }
         cr::RelExprKind::Limit(inner, limit) => {
@@ -104,6 +111,28 @@ fn compile_re(rel: cr::RelExpr) -> sql_ast::Query {
                 COL_ARRAY_INDEX,
             )));
             inner
+        }
+        cr::RelExprKind::ProjectColumn(inner, position) => {
+            let mut inner = compile_re(*inner);
+
+            let select = utils::query_as_mut_select(&mut inner, &rel.ty);
+            select.projection.swap(0, position as usize);
+            select.projection.truncate(1);
+
+            inner
+        }
+        cr::RelExprKind::With(name, val, main) => {
+            let val = compile_re(*val);
+
+            let mut main = compile_re(*main);
+
+            if main.with.is_none() {
+                main.with = Some(utils::with());
+            }
+            let ctes = &mut main.with.as_mut().unwrap().cte_tables;
+            ctes.insert(0, utils::cte(name, val));
+
+            main
         }
     }
 }
@@ -195,6 +224,12 @@ fn compile_expr(expr: cr::Expr) -> ExprOrSource {
         cr::ExprKind::FuncCall(func_name, args) => {
             let args = args.into_iter().map(compile_expr);
             compile_func_call(&func_name, expr.ty, args)
+        }
+        cr::ExprKind::Ident(ident) => ExprOrSource::Expr(sql_ast::Expr::CompoundIdentifier(
+            ident.into_iter().map(sql_ast::Ident::new).collect(),
+        )),
+        cr::ExprKind::Subquery(sub) => {
+            ExprOrSource::Expr(sql_ast::Expr::Subquery(Box::new(compile_re(*sub))))
         }
     }
 }

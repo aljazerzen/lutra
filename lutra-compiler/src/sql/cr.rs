@@ -13,11 +13,21 @@ pub enum RelExprKind {
     Constructed(Vec<Vec<Expr>>),
 
     /// Read from a table
-    From(String),
+    FromTable(String),
+    /// Read from a common table table
+    FromBinding(String),
 
     Limit(Box<RelExpr>, Expr),
     Offset(Box<RelExpr>, Expr),
+
+    /// Projection that just removes array index
     ProjectUnIndex(Box<RelExpr>),
+
+    /// Projection that picks a column by position
+    ProjectColumn(Box<RelExpr>, u16),
+
+    /// Bind a common table expression to a name
+    With(String, Box<RelExpr>, Box<RelExpr>),
 }
 
 #[derive(Clone)]
@@ -26,10 +36,13 @@ pub struct Expr {
     pub ty: ir::Ty,
 }
 
+#[allow(dead_code)]
 #[derive(Debug, Clone)]
 pub enum ExprKind {
     Literal(ir::Literal),
     FuncCall(String, Vec<Expr>),
+    Subquery(Box<RelExpr>),
+    Ident(Vec<String>),
 }
 
 impl std::fmt::Debug for Expr {

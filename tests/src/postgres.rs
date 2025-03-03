@@ -154,13 +154,17 @@ fn primitive() {
 
 #[test]
 fn std_mul() {
-    insta::assert_snapshot!(_test_run("func () -> 2 * 3"), @r#"
+    insta::assert_snapshot!(_test_run(r#"
+    func () -> 2 * 3
+    "#), @r#"
     SELECT
       (2::int8 * 3::int8) AS value
     6
     "#);
 
-    insta::assert_snapshot!(_test_run("func () -> 2.1 * 3.5"), @r#"
+    insta::assert_snapshot!(_test_run(r#"
+    func () -> 2.1 * 3.5
+    "#), @r#"
     SELECT
       (2.1::float8 * 3.5::float8) AS value
     7.3500000000000005
@@ -169,43 +173,65 @@ fn std_mul() {
 
 #[test]
 fn std_div() {
-    insta::assert_snapshot!(_test_run("func () -> 10 / 6"), @r#"
+    insta::assert_snapshot!(_test_run(r#"
+    func () -> 10 / 6
+    "#), @r#"
     SELECT
       (10::int8 / 6::int8) AS value
     1
     "#);
-    insta::assert_snapshot!(_test_run("func () -> -10 / 6"), @r#"
+
+    insta::assert_snapshot!(_test_run(r#"
+    func () -> -10 / 6
+    "#), @r#"
     SELECT
       ((- 10::int8) / 6::int8) AS value
     -1
     "#);
-    insta::assert_snapshot!(_test_run("func () -> 10 / -6"), @r#"
+
+    insta::assert_snapshot!(_test_run(r#"
+    func () -> 10 / -6
+    "#), @r#"
     SELECT
       (10::int8 / (- 6::int8)) AS value
     -1
     "#);
-    insta::assert_snapshot!(_test_run("func () -> -10 / -6"), @r#"
+
+    insta::assert_snapshot!(_test_run(r#"
+    func () -> -10 / -6
+    "#), @r#"
     SELECT
       ((- 10::int8) / (- 6::int8)) AS value
     1
     "#);
 
-    insta::assert_snapshot!(_test_run("func () -> 10.0 / 6.0"), @r#"
+    insta::assert_snapshot!(_test_run(r#"
+    func () -> 10.0 / 6.0
+    "#), @r#"
     SELECT
       (10.0::float8 / 6.0::float8) AS value
     1.6666666666666667
     "#);
-    insta::assert_snapshot!(_test_run("func () -> -10.0 / 6.0"), @r#"
+
+    insta::assert_snapshot!(_test_run(r#"
+    func () -> -10.0 / 6.0
+    "#), @r#"
     SELECT
       ((- 10.0::float8) / 6.0::float8) AS value
     -1.6666666666666667
     "#);
-    insta::assert_snapshot!(_test_run("func () -> 10.0 / -6.0"), @r#"
+
+    insta::assert_snapshot!(_test_run(r#"
+    func () -> 10.0 / -6.0
+    "#), @r#"
     SELECT
       (10.0::float8 / (- 6.0::float8)) AS value
     -1.6666666666666667
     "#);
-    insta::assert_snapshot!(_test_run("func () -> -10.0 / -6.0"), @r#"
+
+    insta::assert_snapshot!(_test_run(r#"
+    func () -> -10.0 / -6.0
+    "#), @r#"
     SELECT
       ((- 10.0::float8) / (- 6.0::float8)) AS value
     1.6666666666666667
@@ -214,43 +240,65 @@ fn std_div() {
 
 #[test]
 fn std_mod() {
-    insta::assert_snapshot!(_test_run("func () -> 10 % 6"), @r#"
+    insta::assert_snapshot!(_test_run(r#"
+    func () -> 10 % 6
+    "#), @r#"
     SELECT
       (10::int8 % 6::int8) AS value
     4
     "#);
-    insta::assert_snapshot!(_test_run("func () -> -10 % 6"), @r#"
+
+    insta::assert_snapshot!(_test_run(r#"
+    func () -> -10 % 6
+    "#), @r#"
     SELECT
       ((- 10::int8) % 6::int8) AS value
     -4
     "#);
-    insta::assert_snapshot!(_test_run("func () -> 10 % -6"), @r#"
+
+    insta::assert_snapshot!(_test_run(r#"
+    func () -> 10 % -6
+    "#), @r#"
     SELECT
       (10::int8 % (- 6::int8)) AS value
     4
     "#);
-    insta::assert_snapshot!(_test_run("func () -> -10 % -6"), @r#"
+
+    insta::assert_snapshot!(_test_run(r#"
+    func () -> -10 % -6
+    "#), @r#"
     SELECT
       ((- 10::int8) % (- 6::int8)) AS value
     -4
     "#);
 
-    insta::assert_snapshot!(_test_run("func () -> 10.0 % 6.0"), @r#"
+    insta::assert_snapshot!(_test_run(r#"
+    func () -> 10.0 % 6.0
+    "#), @r#"
     SELECT
       MOD(10.0::float8::numeric, 6.0::float8::numeric)::float8 AS value
     4
     "#);
-    insta::assert_snapshot!(_test_run("func () -> -10.0 % 6.0"), @r#"
+
+    insta::assert_snapshot!(_test_run(r#"
+    func () -> -10.0 % 6.0
+    "#), @r#"
     SELECT
       MOD((- 10.0::float8)::numeric, 6.0::float8::numeric)::float8 AS value
     -4
     "#);
-    insta::assert_snapshot!(_test_run("func () -> 10.0 % -6.0"), @r#"
+
+    insta::assert_snapshot!(_test_run(r#"
+    func () -> 10.0 % -6.0
+    "#), @r#"
     SELECT
       MOD(10.0::float8::numeric, (- 6.0::float8)::numeric)::float8 AS value
     4
     "#);
-    insta::assert_snapshot!(_test_run("func () -> -10.0 % -6.0"), @r#"
+
+    insta::assert_snapshot!(_test_run(r#"
+    func () -> -10.0 % -6.0
+    "#), @r#"
     SELECT
       MOD(
         (- 10.0::float8)::numeric,
@@ -262,7 +310,9 @@ fn std_mod() {
 
 #[test]
 fn std_add() {
-    insta::assert_snapshot!(_test_run("func () -> {30 + 2, 2 + 30}"), @r#"
+    insta::assert_snapshot!(_test_run(r#"
+    func () -> {30 + 2, 2 + 30}
+    "#), @r#"
     SELECT
       (30::int8 + 2::int8) AS f_0,
       (2::int8 + 30::int8) AS f_1
@@ -272,12 +322,17 @@ fn std_add() {
     }
     "#);
 
-    insta::assert_snapshot!(_test_run("func () -> 30.2 + 2.30"), @r#"
+    insta::assert_snapshot!(_test_run(r#"
+    func () -> 30.2 + 2.30
+    "#), @r#"
     SELECT
       (30.2::float8 + 2.3::float8) AS value
     32.5
     "#);
-    insta::assert_snapshot!(_test_run("func () -> 2.30 + 30.2"), @r#"
+
+    insta::assert_snapshot!(_test_run(r#"
+    func () -> 2.30 + 30.2
+    "#), @r#"
     SELECT
       (2.3::float8 + 30.2::float8) AS value
     32.5
@@ -286,7 +341,9 @@ fn std_add() {
 
 #[test]
 fn std_sub() {
-    insta::assert_snapshot!(_test_run("func () -> {30 - 2, 2 - 30}"), @r#"
+    insta::assert_snapshot!(_test_run(r#"
+    func () -> {30 - 2, 2 - 30}
+    "#), @r#"
     SELECT
       (30::int8 - 2::int8) AS f_0,
       (2::int8 - 30::int8) AS f_1
@@ -296,12 +353,17 @@ fn std_sub() {
     }
     "#);
 
-    insta::assert_snapshot!(_test_run("func () -> 30.2 - 2.30"), @r#"
+    insta::assert_snapshot!(_test_run(r#"
+    func () -> 30.2 - 2.30
+    "#), @r#"
     SELECT
       (30.2::float8 - 2.3::float8) AS value
     27.9
     "#);
-    insta::assert_snapshot!(_test_run("func () -> 2.30 - 30.2"), @r#"
+
+    insta::assert_snapshot!(_test_run(r#"
+    func () -> 2.30 - 30.2
+    "#), @r#"
     SELECT
       (2.3::float8 - 30.2::float8) AS value
     -27.9
@@ -310,7 +372,9 @@ fn std_sub() {
 
 #[test]
 fn std_neg() {
-    insta::assert_snapshot!(_test_run("func () -> {-2, - (-3)}"), @r#"
+    insta::assert_snapshot!(_test_run(r#"
+    func () -> {-2, - (-3)}
+    "#), @r#"
     SELECT
       (- 2::int8) AS f_0,
       (- (- 3::int8)) AS f_1
@@ -319,7 +383,10 @@ fn std_neg() {
       3,
     }
     "#);
-    insta::assert_snapshot!(_test_run("func () -> {-2.1, - (-3.1)}"), @r#"
+
+    insta::assert_snapshot!(_test_run(r#"
+    func () -> {-2.1, - (-3.1)}
+    "#), @r#"
     SELECT
       (- 2.1::float8) AS f_0,
       (- (- 3.1::float8)) AS f_1
@@ -332,7 +399,9 @@ fn std_neg() {
 
 #[test]
 fn std_eq() {
-    insta::assert_snapshot!(_test_run("func () -> {30 == 2, 30 == 30}"), @r#"
+    insta::assert_snapshot!(_test_run(r#"
+    func () -> {30 == 2, 30 == 30}
+    "#), @r#"
     SELECT
       (30::int8 = 2::int8) AS f_0,
       (30::int8 = 30::int8) AS f_1
@@ -345,7 +414,9 @@ fn std_eq() {
 
 #[test]
 fn std_ne() {
-    insta::assert_snapshot!(_test_run("func () -> {30 != 2, 30 != 30}"), @r#"
+    insta::assert_snapshot!(_test_run(r#"
+    func () -> {30 != 2, 30 != 30}
+    "#), @r#"
     SELECT
       (30::int8 <> 2::int8) AS f_0,
       (30::int8 <> 30::int8) AS f_1
@@ -358,7 +429,9 @@ fn std_ne() {
 
 #[test]
 fn std_gt() {
-    insta::assert_snapshot!(_test_run("func () -> {3 > 2, 2 > 3, 2 > 2}"), @r#"
+    insta::assert_snapshot!(_test_run(r#"
+    func () -> {3 > 2, 2 > 3, 2 > 2}
+    "#), @r#"
     SELECT
       (3::int8 > 2::int8) AS f_0,
       (2::int8 > 3::int8) AS f_1,
@@ -373,7 +446,9 @@ fn std_gt() {
 
 #[test]
 fn std_lt() {
-    insta::assert_snapshot!(_test_run("func () -> {3 < 2, 2 < 3, 2 < 2}"), @r#"
+    insta::assert_snapshot!(_test_run(r#"
+    func () -> {3 < 2, 2 < 3, 2 < 2}
+    "#), @r#"
     SELECT
       (3::int8 < 2::int8) AS f_0,
       (2::int8 < 3::int8) AS f_1,
@@ -388,7 +463,9 @@ fn std_lt() {
 
 #[test]
 fn std_gte() {
-    insta::assert_snapshot!(_test_run("func () -> {3 >= 2, 2 >= 3, 2 >= 2}"), @r#"
+    insta::assert_snapshot!(_test_run(r#"
+    func () -> {3 >= 2, 2 >= 3, 2 >= 2}
+    "#), @r#"
     SELECT
       (3::int8 >= 2::int8) AS f_0,
       (2::int8 >= 3::int8) AS f_1,
@@ -403,7 +480,9 @@ fn std_gte() {
 
 #[test]
 fn std_lte() {
-    insta::assert_snapshot!(_test_run("func () -> {3 <= 2, 2 <= 3, 2 <= 2}"), @r#"
+    insta::assert_snapshot!(_test_run(r#"
+    func () -> {3 <= 2, 2 <= 3, 2 <= 2}
+    "#), @r#"
     SELECT
       (3::int8 <= 2::int8) AS f_0,
       (2::int8 <= 3::int8) AS f_1,
@@ -418,7 +497,9 @@ fn std_lte() {
 
 #[test]
 fn std_and() {
-    insta::assert_snapshot!(_test_run("func () -> {false && false, false && true, true && false, true && true}"), @r#"
+    insta::assert_snapshot!(_test_run(r#"
+    func () -> {false && false, false && true, true && false, true && true}
+    "#), @r#"
     SELECT
       (
         false
@@ -447,7 +528,9 @@ fn std_and() {
 
 #[test]
 fn std_or() {
-    insta::assert_snapshot!(_test_run("func () -> {false || false, false || true, true || false, true || true}"), @r#"
+    insta::assert_snapshot!(_test_run(r#"
+    func () -> {false || false, false || true, true || false, true || true}
+    "#), @r#"
     SELECT
       (
         false
@@ -476,7 +559,9 @@ fn std_or() {
 
 #[test]
 fn std_not() {
-    insta::assert_snapshot!(_test_run("func () -> {!false, !true}"), @r#"
+    insta::assert_snapshot!(_test_run(r#"
+    func () -> {!false, !true}
+    "#), @r#"
     SELECT
       (NOT false) AS f_0,
       (NOT true) AS f_1
@@ -733,10 +818,152 @@ fn std_index() {
 #[test]
 fn std_slice() {
     insta::assert_snapshot!(_test_run(r#"
-    func () -> (
-        [{3, false}, {6, true}, {12, false}]
-        | std::slice(1, 3)
-    )
+    func () -> std::slice([5,3,65,3,2], 1, 3)
+    "#), @r#"
+    SELECT
+      value
+    FROM
+      (
+        SELECT
+          0 AS index,
+          5::int8 AS value
+        UNION
+        ALL
+        SELECT
+          1,
+          3::int8
+        UNION
+        ALL
+        SELECT
+          2,
+          65::int8
+        UNION
+        ALL
+        SELECT
+          3,
+          3::int8
+        UNION
+        ALL
+        SELECT
+          4,
+          2::int8
+        ORDER BY
+          index
+        LIMIT
+          (3::int8 - 1::int8) OFFSET 1::int8
+      )
+    ORDER BY
+      index
+    [
+      3,
+      65,
+    ]
+    "#);
+
+    // insta::assert_snapshot!(_test_run(r#"
+    // func () -> std::slice([5,3,65,3,2], 1, -1)
+    // "#), @r#"
+    // [
+    //   3,
+    //   65,
+    //   3,
+    // ]
+    // "#);
+
+    // insta::assert_snapshot!(_test_run(r#"
+    // func () -> std::slice([5,3,65,3,2], 4, 2)
+    // "#), @"[]");
+
+    insta::assert_snapshot!(_test_run(r#"
+    func () -> std::slice([5,3,65,3,2], 6, 7)
+    "#), @r#"
+    SELECT
+      value
+    FROM
+      (
+        SELECT
+          0 AS index,
+          5::int8 AS value
+        UNION
+        ALL
+        SELECT
+          1,
+          3::int8
+        UNION
+        ALL
+        SELECT
+          2,
+          65::int8
+        UNION
+        ALL
+        SELECT
+          3,
+          3::int8
+        UNION
+        ALL
+        SELECT
+          4,
+          2::int8
+        ORDER BY
+          index
+        LIMIT
+          (7::int8 - 6::int8) OFFSET 6::int8
+      )
+    ORDER BY
+      index
+    []
+    "#);
+
+    // insta::assert_snapshot!(_test_run(r#"
+    // func () -> std::slice([5,3,65,3,2], -7, 0)
+    // "#), @"[]");
+
+    insta::assert_snapshot!(_test_run(r#"
+    func () -> std::slice([false,true,false,false,true], 1, 4)
+    "#), @r#"
+    SELECT
+      value
+    FROM
+      (
+        SELECT
+          0 AS index,
+          false AS value
+        UNION
+        ALL
+        SELECT
+          1,
+          true
+        UNION
+        ALL
+        SELECT
+          2,
+          false
+        UNION
+        ALL
+        SELECT
+          3,
+          false
+        UNION
+        ALL
+        SELECT
+          4,
+          true
+        ORDER BY
+          index
+        LIMIT
+          (4::int8 - 1::int8) OFFSET 1::int8
+      )
+    ORDER BY
+      index
+    [
+      true,
+      false,
+      false,
+    ]
+    "#);
+
+    insta::assert_snapshot!(_test_run(r#"
+    func () -> std::slice([{false,"hello"}, {false,"world"},{true, "!"},{false,"foo"},{true, "bar"}], 1, 4)
     "#), @r#"
     SELECT
       f_0,
@@ -745,133 +972,298 @@ fn std_slice() {
       (
         SELECT
           0 AS index,
-          3::int8 AS f_0,
-          false AS f_1
+          false AS f_0,
+          'hello' AS f_1
         UNION
         ALL
         SELECT
           1,
-          6::int8,
-          true
+          false,
+          'world'
         UNION
         ALL
         SELECT
           2,
-          12::int8,
-          false
+          true,
+          '!'
+        UNION
+        ALL
+        SELECT
+          3,
+          false,
+          'foo'
+        UNION
+        ALL
+        SELECT
+          4,
+          true,
+          'bar'
         ORDER BY
           index
         LIMIT
-          (3::int8 - 1::int8) OFFSET 1::int8
+          (4::int8 - 1::int8) OFFSET 1::int8
       )
     ORDER BY
       index
     [
       {
-        6,
-        true,
+        false,
+        "world",
       },
       {
-        12,
+        true,
+        "!",
+      },
+      {
         false,
+        "foo",
+      },
+    ]
+    "#);
+}
+
+#[test]
+fn bindings() {
+    insta::assert_snapshot!(_test_run(r#"
+    let a = 4
+    func () -> [{a, a + 1}, {a + 2, a + 3}]
+    "#), @r#"
+    SELECT
+      f_0,
+      f_1
+    FROM
+      (
+        WITH t0 AS (
+          SELECT
+            4::int8 AS value
+        )
+        SELECT
+          0 AS index,
+          (
+            SELECT
+              value
+            FROM
+              t0
+          ) AS f_0,
+          (
+            (
+              SELECT
+                value
+              FROM
+                t0
+            ) + 1::int8
+          ) AS f_1
+        UNION
+        ALL
+        SELECT
+          1,
+          (
+            (
+              SELECT
+                value
+              FROM
+                t0
+            ) + 2::int8
+          ),
+          (
+            (
+              SELECT
+                value
+              FROM
+                t0
+            ) + 3::int8
+          )
+      )
+    ORDER BY
+      index
+    [
+      {
+        4,
+        5,
+      },
+      {
+        6,
+        7,
       },
     ]
     "#);
 
     insta::assert_snapshot!(_test_run(r#"
-    func () -> (
-        [3, 6, 12, 24]
-        | std::slice(1, 3)
-    )
+    let a = {3, false}
+    func () -> [{a.0, a.1}, {a.0 + 1, !a.1}]
     "#), @r#"
     SELECT
-      value
+      f_0,
+      f_1
     FROM
       (
+        WITH t0 AS (
+          SELECT
+            3::int8 AS f_0,
+            false AS f_1
+        )
         SELECT
           0 AS index,
-          3::int8 AS value
+          (
+            SELECT
+              f_0
+            FROM
+              t0
+          ) AS f_0,
+          (
+            SELECT
+              f_1
+            FROM
+              t0
+          ) AS f_1
         UNION
         ALL
         SELECT
           1,
-          6::int8
-        UNION
-        ALL
-        SELECT
-          2,
-          12::int8
-        UNION
-        ALL
-        SELECT
-          3,
-          24::int8
-        ORDER BY
-          index
-        LIMIT
-          (3::int8 - 1::int8) OFFSET 1::int8
+          (
+            (
+              SELECT
+                f_0
+              FROM
+                t0
+            ) + 1::int8
+          ),
+          (
+            NOT (
+              SELECT
+                f_1
+              FROM
+                t0
+            )
+          )
       )
     ORDER BY
       index
     [
-      6,
-      12,
+      {
+        3,
+        false,
+      },
+      {
+        4,
+        true,
+      },
     ]
     "#);
+
     insta::assert_snapshot!(_test_run(r#"
-    func () -> (
-        [3, 6, 12, 24, 48]
-        | std::slice(1, 4)
-        | std::slice(1, 3)
-    )
+    let a = [1, 2]
+    func () -> [{a.0, a.1}, {a.0 + 1, a.1 + 1}]
     "#), @r#"
     SELECT
-      value
+      f_0,
+      f_1
     FROM
       (
+        WITH t0 AS (
+          SELECT
+            0 AS index,
+            1::int8 AS value
+          UNION
+          ALL
+          SELECT
+            1,
+            2::int8
+        )
         SELECT
-          index,
-          value
-        FROM
+          0 AS index,
           (
             SELECT
-              0 AS index,
-              3::int8 AS value
-            UNION
-            ALL
-            SELECT
-              1,
-              6::int8
-            UNION
-            ALL
-            SELECT
-              2,
-              12::int8
-            UNION
-            ALL
-            SELECT
-              3,
-              24::int8
-            UNION
-            ALL
-            SELECT
-              4,
-              48::int8
+              value
+            FROM
+              (
+                SELECT
+                  index,
+                  value
+                FROM
+                  t0
+                ORDER BY
+                  index
+                LIMIT
+                  1::int8 OFFSET 0::int8
+              )
             ORDER BY
               index
-            LIMIT
-              (4::int8 - 1::int8) OFFSET 1::int8
+          ) AS f_0,
+          (
+            SELECT
+              value
+            FROM
+              (
+                SELECT
+                  index,
+                  value
+                FROM
+                  t0
+                ORDER BY
+                  index
+                LIMIT
+                  1::int8 OFFSET 1::int8
+              )
+            ORDER BY
+              index
+          ) AS f_1
+        UNION
+        ALL
+        SELECT
+          1,
+          (
+            (
+              SELECT
+                value
+              FROM
+                (
+                  SELECT
+                    index,
+                    value
+                  FROM
+                    t0
+                  ORDER BY
+                    index
+                  LIMIT
+                    1::int8 OFFSET 0::int8
+                )
+              ORDER BY
+                index
+            ) + 1::int8
+          ),
+          (
+            (
+              SELECT
+                value
+              FROM
+                (
+                  SELECT
+                    index,
+                    value
+                  FROM
+                    t0
+                  ORDER BY
+                    index
+                  LIMIT
+                    1::int8 OFFSET 1::int8
+                )
+              ORDER BY
+                index
+            ) + 1::int8
           )
-        ORDER BY
-          index
-        LIMIT
-          (3::int8 - 1::int8) OFFSET 1::int8
       )
     ORDER BY
       index
     [
-      12,
-      24,
+      {
+        1,
+        2,
+      },
+      {
+        2,
+        3,
+      },
     ]
     "#);
 }
