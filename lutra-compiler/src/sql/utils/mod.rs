@@ -155,3 +155,15 @@ pub fn func_call(
         within_group: Default::default(),
     })
 }
+
+pub fn order_by_one(expr: sql_ast::Expr) -> sql_ast::OrderBy {
+    sql_ast::OrderBy {
+        exprs: vec![sql_ast::OrderByExpr {
+            expr,
+            asc: Default::default(),
+            nulls_first: Default::default(),
+            with_fill: Default::default(),
+        }],
+        interpolate: Default::default(),
+    }
+}

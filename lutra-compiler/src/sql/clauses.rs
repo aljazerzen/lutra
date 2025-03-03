@@ -83,7 +83,26 @@ pub fn compile_rel_std(expr: &ir::Expr) -> cr::RelExprKind {
                 ty: expr.ty.clone(),
             };
 
-            cr::RelExprKind::Limit(Box::new(offset), new_bin_op(end, "std::sub", start))
+            cr::RelExprKind::Limit(
+                Box::new(offset),
+                new_bin_op(end, "std::sub", start, ir::PrimitiveSet::int64),
+            )
+        }
+        "std::index" => {
+            let array = compile_rel(&call.args[0]);
+            let index = compile_expr(&call.args[1]);
+
+            let offset = cr::RelExpr {
+                kind: cr::RelExprKind::Offset(Box::new(array), index.clone()),
+                ty: expr.ty.clone(),
+            };
+
+            let limit = cr::RelExpr {
+                kind: cr::RelExprKind::Limit(Box::new(offset), new_int(1)),
+                ty: expr.ty.clone(),
+            };
+
+            cr::RelExprKind::ProjectUnIndex(Box::new(limit))
         }
         _ => {
             let expr = compile_expr_std(expr);
@@ -92,8 +111,28 @@ pub fn compile_rel_std(expr: &ir::Expr) -> cr::RelExprKind {
     }
 }
 
-fn new_bin_op(left: cr::Expr, op: &str, right: cr::Expr) -> cr::Expr {
-    cr::Expr::FuncCall(op.to_string(), vec![left, right])
+fn new_bin_op(left: cr::Expr, op: &str, right: cr::Expr, ty: ir::PrimitiveSet) -> cr::Expr {
+    let kind = cr::ExprKind::FuncCall(op.to_string(), vec![left, right]);
+    cr::Expr {
+        kind,
+        ty: ir::Ty {
+            kind: ir::TyKind::Primitive(ty),
+            name: None,
+            layout: None,
+        },
+    }
+}
+
+fn new_int(int: i64) -> cr::Expr {
+    let kind = cr::ExprKind::Literal(ir::Literal::Int(int));
+    cr::Expr {
+        kind,
+        ty: ir::Ty {
+            kind: ir::TyKind::Primitive(ir::PrimitiveSet::int64),
+            name: None,
+            layout: None,
+        },
+    }
 }
 
 /// Compiles an expression that can be placed into a list of columns.
@@ -114,12 +153,12 @@ pub fn compile_tuple(expr: &ir::Expr) -> Vec<cr::Expr> {
 }
 
 pub fn compile_expr(expr: &ir::Expr) -> cr::Expr {
-    match &expr.kind {
+    let kind = match &expr.kind {
         ir::ExprKind::Pointer(_) => todo!(),
-        ir::ExprKind::Literal(lit) => cr::Expr::Literal(lit.clone()),
+        ir::ExprKind::Literal(lit) => cr::ExprKind::Literal(lit.clone()),
         ir::ExprKind::Call(call) => match &call.function.kind {
             ir::ExprKind::Pointer(ir::Pointer::External(ptr)) if ptr.id.starts_with("std::") => {
-                compile_expr_std(expr)
+                return compile_expr_std(expr)
             }
             _ => todo!(),
         },
@@ -128,6 +167,10 @@ pub fn compile_expr(expr: &ir::Expr) -> cr::Expr {
         ir::ExprKind::Array(_) => todo!(),
         ir::ExprKind::TupleLookup(_) => todo!(),
         ir::ExprKind::Binding(_) => todo!(),
+    };
+    cr::Expr {
+        kind,
+        ty: expr.ty.clone(),
     }
 }
 
@@ -141,17 +184,8 @@ pub fn compile_expr_std(expr: &ir::Expr) -> cr::Expr {
     };
 
     let args = call.args.iter().map(compile_expr).collect();
-
-    match ptr.id.as_str() {
-        "std::mod" => {
-            let prim = expr.ty.kind.as_primitive().unwrap();
-            match prim {
-                ir::PrimitiveSet::float32 | ir::PrimitiveSet::float64 => {
-                    cr::Expr::FuncCall("std::mod_f".into(), args)
-                }
-                _ => cr::Expr::FuncCall("std::mod_i".into(), args),
-            }
-        }
-        _ => cr::Expr::FuncCall(ptr.id.clone(), args),
+    cr::Expr {
+        kind: cr::ExprKind::FuncCall(ptr.id.clone(), args),
+        ty: expr.ty.clone(),
     }
 }

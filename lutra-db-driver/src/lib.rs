@@ -104,6 +104,7 @@ fn get_column_ty(ty: &tokio_postgres::types::Type) -> lutra_bin::ir::Ty {
         "int8" => ir::TyKind::Primitive(ir::PrimitiveSet::int64),
         "float4" => ir::TyKind::Primitive(ir::PrimitiveSet::float32),
         "float8" => ir::TyKind::Primitive(ir::PrimitiveSet::float64),
+        "text" => ir::TyKind::Primitive(ir::PrimitiveSet::text),
         _ => todo!("pg type: {}", ty.name()),
     };
     let mut ty = lutra_bin::ir::Ty {
@@ -132,7 +133,7 @@ fn get_cell(row: &Row, idx: usize, ty: &ir::Ty) -> Data {
         ir::PrimitiveSet::uint64 => todo!(),
         ir::PrimitiveSet::float32 => encode(&row.get::<_, f32>(idx)),
         ir::PrimitiveSet::float64 => encode(&row.get::<_, f64>(idx)),
-        ir::PrimitiveSet::text => todo!(),
+        ir::PrimitiveSet::text => encode(&row.get::<_, String>(idx)),
     }
 }
 

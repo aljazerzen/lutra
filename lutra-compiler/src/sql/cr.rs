@@ -17,11 +17,23 @@ pub enum RelExprKind {
 
     Limit(Box<RelExpr>, Expr),
     Offset(Box<RelExpr>, Expr),
+    ProjectUnIndex(Box<RelExpr>),
 }
 
-#[allow(dead_code)]
+#[derive(Clone)]
+pub struct Expr {
+    pub kind: ExprKind,
+    pub ty: ir::Ty,
+}
+
 #[derive(Debug, Clone)]
-pub enum Expr {
+pub enum ExprKind {
     Literal(ir::Literal),
     FuncCall(String, Vec<Expr>),
+}
+
+impl std::fmt::Debug for Expr {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.kind.fmt(f)
+    }
 }

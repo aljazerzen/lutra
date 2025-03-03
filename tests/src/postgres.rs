@@ -74,6 +74,8 @@ fn array_of_tuples() {
           12::int8,
           false
       )
+    ORDER BY
+      index
     [
       {
         3,
@@ -114,6 +116,8 @@ fn array_of_primitives() {
           2,
           12::int8
       )
+    ORDER BY
+      index
     [
       3,
       6,
@@ -484,6 +488,249 @@ fn std_not() {
 }
 
 #[test]
+fn std_index() {
+    insta::assert_snapshot!(_test_run(r#"
+    func () -> std::index([5,3,65,3,2], 3)
+    "#), @r#"
+    SELECT
+      value
+    FROM
+      (
+        SELECT
+          0 AS index,
+          5::int8 AS value
+        UNION
+        ALL
+        SELECT
+          1,
+          3::int8
+        UNION
+        ALL
+        SELECT
+          2,
+          65::int8
+        UNION
+        ALL
+        SELECT
+          3,
+          3::int8
+        UNION
+        ALL
+        SELECT
+          4,
+          2::int8
+        ORDER BY
+          index
+        LIMIT
+          1::int8 OFFSET 3::int8
+      )
+    ORDER BY
+      index
+    3
+    "#);
+
+    insta::assert_snapshot!(_test_run(r#"
+    func () -> [1, 2, 3].2
+    "#), @r#"
+    SELECT
+      value
+    FROM
+      (
+        SELECT
+          0 AS index,
+          1::int8 AS value
+        UNION
+        ALL
+        SELECT
+          1,
+          2::int8
+        UNION
+        ALL
+        SELECT
+          2,
+          3::int8
+        ORDER BY
+          index
+        LIMIT
+          1::int8 OFFSET 2::int8
+      )
+    ORDER BY
+      index
+    3
+    "#);
+
+    insta::assert_snapshot!(_test_run(r#"
+    func () -> std::index([5.3,3.2,65.4,3.1,2.0], 3)
+    "#), @r#"
+    SELECT
+      value
+    FROM
+      (
+        SELECT
+          0 AS index,
+          5.3::float8 AS value
+        UNION
+        ALL
+        SELECT
+          1,
+          3.2::float8
+        UNION
+        ALL
+        SELECT
+          2,
+          65.4::float8
+        UNION
+        ALL
+        SELECT
+          3,
+          3.1::float8
+        UNION
+        ALL
+        SELECT
+          4,
+          2.0::float8
+        ORDER BY
+          index
+        LIMIT
+          1::int8 OFFSET 3::int8
+      )
+    ORDER BY
+      index
+    3.1
+    "#);
+
+    insta::assert_snapshot!(_test_run(r#"
+    func () -> [1.1, 2.2, 3.3].2
+    "#), @r#"
+    SELECT
+      value
+    FROM
+      (
+        SELECT
+          0 AS index,
+          1.1::float8 AS value
+        UNION
+        ALL
+        SELECT
+          1,
+          2.2::float8
+        UNION
+        ALL
+        SELECT
+          2,
+          3.3::float8
+        ORDER BY
+          index
+        LIMIT
+          1::int8 OFFSET 2::int8
+      )
+    ORDER BY
+      index
+    3.3
+    "#);
+
+    insta::assert_snapshot!(_test_run(r#"
+    func () -> std::index([false, false, false, true, false], 3)
+    "#), @r#"
+    SELECT
+      value
+    FROM
+      (
+        SELECT
+          0 AS index,
+          false AS value
+        UNION
+        ALL
+        SELECT
+          1,
+          false
+        UNION
+        ALL
+        SELECT
+          2,
+          false
+        UNION
+        ALL
+        SELECT
+          3,
+          true
+        UNION
+        ALL
+        SELECT
+          4,
+          false
+        ORDER BY
+          index
+        LIMIT
+          1::int8 OFFSET 3::int8
+      )
+    ORDER BY
+      index
+    true
+    "#);
+
+    insta::assert_snapshot!(_test_run(r#"
+    func () -> [true, true, false].2
+    "#), @r#"
+    SELECT
+      value
+    FROM
+      (
+        SELECT
+          0 AS index,
+          true AS value
+        UNION
+        ALL
+        SELECT
+          1,
+          true
+        UNION
+        ALL
+        SELECT
+          2,
+          false
+        ORDER BY
+          index
+        LIMIT
+          1::int8 OFFSET 2::int8
+      )
+    ORDER BY
+      index
+    false
+    "#);
+
+    insta::assert_snapshot!(_test_run(r#"
+    func () -> ["hello", "world", "!"].2
+    "#), @r#"
+    SELECT
+      value
+    FROM
+      (
+        SELECT
+          0 AS index,
+          'hello' AS value
+        UNION
+        ALL
+        SELECT
+          1,
+          'world'
+        UNION
+        ALL
+        SELECT
+          2,
+          '!'
+        ORDER BY
+          index
+        LIMIT
+          1::int8 OFFSET 2::int8
+      )
+    ORDER BY
+      index
+    "!"
+    "#);
+}
+
+#[test]
 fn std_slice() {
     insta::assert_snapshot!(_test_run(r#"
     func () -> (
@@ -512,9 +759,13 @@ fn std_slice() {
           2,
           12::int8,
           false
+        ORDER BY
+          index
         LIMIT
           (3::int8 - 1::int8) OFFSET 1::int8
       )
+    ORDER BY
+      index
     [
       {
         6,
@@ -555,9 +806,13 @@ fn std_slice() {
         SELECT
           3,
           24::int8
+        ORDER BY
+          index
         LIMIT
           (3::int8 - 1::int8) OFFSET 1::int8
       )
+    ORDER BY
+      index
     [
       6,
       12,
@@ -602,12 +857,18 @@ fn std_slice() {
             SELECT
               4,
               48::int8
+            ORDER BY
+              index
             LIMIT
               (4::int8 - 1::int8) OFFSET 1::int8
           )
+        ORDER BY
+          index
         LIMIT
           (3::int8 - 1::int8) OFFSET 1::int8
       )
+    ORDER BY
+      index
     [
       12,
       24,

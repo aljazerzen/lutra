@@ -11,7 +11,12 @@ pub fn compile(rel: cr::RelExpr) -> sql_ast::Query {
 
     if rel_ty.kind.is_array() {
         // wrap into a top-level projection to remove array indexes
-        utils::query_wrap(query, &rel_ty, true)
+        let mut query = utils::query_wrap(query, &rel_ty, true);
+        query.order_by = Some(utils::order_by_one(utils::ident(
+            None::<&str>,
+            COL_ARRAY_INDEX,
+        )));
+        query
     } else {
         query
     }
@@ -63,6 +68,12 @@ fn compile_re(rel: cr::RelExpr) -> sql_ast::Query {
             }
 
             inner.limit = Some(compile_expr(limit).into_expr());
+            if inner.order_by.is_none() {
+                inner.order_by = Some(utils::order_by_one(utils::ident(
+                    None::<&str>,
+                    COL_ARRAY_INDEX,
+                )));
+            }
             inner
         }
         cr::RelExprKind::Offset(inner, offset) => {
@@ -76,7 +87,22 @@ fn compile_re(rel: cr::RelExpr) -> sql_ast::Query {
                 value: compile_expr(offset).into_expr(),
                 rows: sql_ast::OffsetRows::None,
             });
+            if inner.order_by.is_none() {
+                inner.order_by = Some(utils::order_by_one(utils::ident(
+                    None::<&str>,
+                    COL_ARRAY_INDEX,
+                )));
+            }
 
+            inner
+        }
+        cr::RelExprKind::ProjectUnIndex(inner) => {
+            let inner = compile_re(*inner);
+            let mut inner = utils::query_wrap(inner, &rel.ty, true);
+            inner.order_by = Some(utils::order_by_one(utils::ident(
+                None::<&str>,
+                COL_ARRAY_INDEX,
+            )));
             inner
         }
     }
@@ -164,11 +190,11 @@ fn compile_rel_constructed(rows: Vec<Vec<cr::Expr>>, ty: &ir::Ty) -> sql_ast::Qu
 }
 
 fn compile_expr(expr: cr::Expr) -> ExprOrSource {
-    match expr {
-        cr::Expr::Literal(literal) => ExprOrSource::Expr(compile_literal(literal)),
-        cr::Expr::FuncCall(func_name, args) => {
+    match expr.kind {
+        cr::ExprKind::Literal(literal) => ExprOrSource::Expr(compile_literal(literal)),
+        cr::ExprKind::FuncCall(func_name, args) => {
             let args = args.into_iter().map(compile_expr);
-            compile_func_call(&func_name, args)
+            compile_func_call(&func_name, expr.ty, args)
         }
     }
 }
@@ -182,20 +208,25 @@ fn compile_literal(lit: ir::Literal) -> sql_ast::Expr {
     })
 }
 
-fn compile_func_call(id: &str, args: impl IntoIterator<Item = ExprOrSource>) -> ExprOrSource {
+fn compile_func_call(
+    id: &str,
+    ty: ir::Ty,
+    args: impl IntoIterator<Item = ExprOrSource>,
+) -> ExprOrSource {
     match id {
         "std::mul" => utils::new_bin_op("*", args),
         "std::div" => utils::new_bin_op("/", args),
-        "std::mod_i" => utils::new_bin_op("%", args),
-        "std::mod_f" => {
-            let mut args = args.into_iter();
-            ExprOrSource::Source(format!(
-                "MOD({}::numeric, {}::numeric)::float8",
-                args.next().unwrap(),
-                args.next().unwrap(),
-            ))
-        }
-
+        "std::mod" => match ty.kind.as_primitive().unwrap() {
+            ir::PrimitiveSet::float32 | ir::PrimitiveSet::float64 => {
+                let mut args = args.into_iter();
+                ExprOrSource::Source(format!(
+                    "MOD({}::numeric, {}::numeric)::float8",
+                    args.next().unwrap(),
+                    args.next().unwrap(),
+                ))
+            }
+            _ => utils::new_bin_op("%", args),
+        },
         "std::add" => utils::new_bin_op("+", args),
         "std::sub" => utils::new_bin_op("-", args),
         "std::neg" => utils::new_un_op("-", args),
