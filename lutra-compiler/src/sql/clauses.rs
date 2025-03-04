@@ -194,6 +194,63 @@ impl Context {
 
                 cr::RelExprKind::OrderBy(Box::new(array), key)
             }
+            "std::min" | "std::max" | "std::sum" | "std::average" | "std::count" | "std::any"
+            | "std::all" => {
+                let array = self.compile_rel(&call.args[0]);
+
+                let item_ty = call.args[0].ty.kind.as_array().unwrap();
+
+                cr::RelExprKind::Aggregate(
+                    Box::new(array),
+                    vec![cr::Expr {
+                        kind: cr::ExprKind::FuncCall(
+                            ptr.id.clone(),
+                            vec![cr::Expr {
+                                kind: cr::ExprKind::Subquery(Box::new(cr::RelExpr {
+                                    kind: cr::RelExprKind::SelectRelVar,
+                                    ty: *item_ty.clone(),
+                                })),
+                                ty: *item_ty.clone(),
+                            }],
+                        ),
+                        ty: expr.ty.clone(),
+                    }],
+                )
+            }
+
+            "std::contains" => {
+                let haystack = self.compile_rel(&call.args[0]);
+                let needle = self.compile_col(&call.args[1]);
+
+                let item_ty = call.args[0].ty.kind.as_array().unwrap();
+
+                cr::RelExprKind::Aggregate(
+                    Box::new(haystack),
+                    vec![cr::Expr {
+                        kind: cr::ExprKind::FuncCall(
+                            "std::any".to_string(),
+                            vec![cr::Expr {
+                                kind: cr::ExprKind::FuncCall(
+                                    "std::eq".to_string(),
+                                    vec![
+                                        needle,
+                                        cr::Expr {
+                                            kind: cr::ExprKind::Subquery(Box::new(cr::RelExpr {
+                                                kind: cr::RelExprKind::SelectRelVar,
+                                                ty: *item_ty.clone(),
+                                            })),
+                                            ty: *item_ty.clone(),
+                                        },
+                                    ],
+                                ),
+                                ty: *item_ty.clone(), // TODO: this should be bool
+                            }],
+                        ),
+                        ty: expr.ty.clone(),
+                    }],
+                )
+            }
+
             _ => {
                 let expr = self.compile_expr_std(expr);
                 cr::RelExprKind::Constructed(vec![vec![expr]])

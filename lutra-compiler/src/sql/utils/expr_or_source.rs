@@ -19,7 +19,6 @@ pub fn new_un_op(op: &str, args: impl IntoIterator<Item = ExprOrSource>) -> Expr
     ExprOrSource::Source(format!("({op} {})", args.next().unwrap()))
 }
 
-#[allow(dead_code)]
 pub fn new_func_call(
     func_name: &str,
     args: impl IntoIterator<Item = ExprOrSource>,

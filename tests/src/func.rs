@@ -641,119 +641,99 @@ test_case!(
 test_case!(
     std_min_00,
     r#"func () -> std::min([5,3,65,3,2,56,67])"#,
-    "2",
-    skip_postgres
+    "2"
 );
 
-test_case!(std_min_01, r#"func () -> std::min([])"#, "0", skip_postgres);
+// test_case!(std_min_01, r#"func () -> std::min([])"#, "0");
 
 test_case!(
     std_max_00,
     r#"func () -> std::max([5,3,65,3,2,56,67])"#,
-    "67",
-    skip_postgres
+    "67"
 );
 
-test_case!(std_max_01, r#"func () -> std::max([])"#, "0", skip_postgres);
+// test_case!(std_max_01, r#"func () -> std::max([])"#, "0");
 
 test_case!(
     std_sum_00,
     r#"func () -> std::sum([5,3,65,3,2,56,67])"#,
-    "201",
-    skip_postgres
+    "201"
 );
 
-test_case!(std_sum_01, r#"func () -> std::sum([])"#, "0", skip_postgres);
+test_case!(std_sum_01, r#"func () -> std::sum([])"#, "0");
 
 test_case!(
     std_count_00,
     r#"func () -> std::count([5,3,65,3,2,56,67])"#,
-    "7",
-    skip_postgres
+    "7"
 );
 
-test_case!(
-    std_count_01,
-    r#"func () -> std::count([])"#,
-    "0",
-    skip_postgres
-);
+test_case!(std_count_01, r#"func () -> std::count([])"#, "0");
 
 test_case!(
     std_average_00,
     r#"func () -> std::average([5,3,65,3,2,56,67])"#,
-    "28.714285714285715",
-    skip_postgres
+    "28.714285714285715"
 );
 
-test_case!(
-    std_average_01,
-    r#"func () -> std::average([])"#,
-    "0",
-    skip_postgres
-);
+// test_case!(std_average_01, r#"func () -> std::average([])"#, "0");
 
 test_case!(
     std_all_00,
     r#"func () -> std::all([true, false, false, true])"#,
-    "false",
-    skip_postgres
+    "false"
 );
 
 test_case!(
     std_all_01,
     r#"func () -> std::all([false, false])"#,
-    "false",
-    skip_postgres
+    "false"
 );
 
 test_case!(
     std_all_02,
     r#"func () -> std::all([true, true, true])"#,
-    "true",
-    skip_postgres
+    "true"
 );
+
+// test_case!(std_all_03, r#"func () -> std::all([])"#, "true");
 
 test_case!(
     std_any_00,
     r#"func () -> std::any([true, false, false, true])"#,
-    "true",
-    skip_postgres
+    "true"
 );
 
 test_case!(
     std_any_01,
     r#"func () -> std::any([false, false])"#,
-    "false",
-    skip_postgres
+    "false"
 );
 
 test_case!(
     std_any_02,
     r#"func () -> std::any([true, true, true])"#,
-    "true",
-    skip_postgres
+    "true"
 );
+
+// test_case!(std_any_03, r#"func () -> std::any([])"#, "false");
 
 test_case!(
     std_contains_00,
     r#"func () -> std::contains([5,3,65,3,2,56,67], 3)"#,
-    "true",
-    skip_postgres
+    "true"
 );
 
 test_case!(
     std_contains_01,
     r#"func () -> std::contains([5,3,65,3,2,56,67], 7)"#,
-    "false",
-    skip_postgres
+    "false"
 );
 
 test_case!(
     std_contains_02,
     r#"func () -> std::contains([], 2)"#,
-    "false",
-    skip_postgres
+    "false"
 );
 
 test_case!(

@@ -134,14 +134,64 @@ fn compile_re(rel: cr::RelExpr) -> sql_ast::Query {
             let mut select = utils::select_empty();
             select.from = utils::from(utils::subquery(inner, None));
 
-            let item_ty = rel.ty.kind.as_array().unwrap();
+            let item_ty = match &rel.ty.kind {
+                ir::TyKind::Primitive(_) | ir::TyKind::Tuple(_) => &rel.ty,
+                ir::TyKind::Array(item_ty) => item_ty,
+                ir::TyKind::Enum(_) | ir::TyKind::Function(_) | ir::TyKind::Ident(_) => todo!(),
+            };
 
-            select
-                .projection
-                .push(sql_ast::SelectItem::UnnamedExpr(utils::ident(
-                    None::<&str>,
-                    "index",
-                )));
+            if rel.ty.kind.is_array() {
+                select
+                    .projection
+                    .push(sql_ast::SelectItem::UnnamedExpr(utils::ident(
+                        None::<&str>,
+                        "index",
+                    )));
+            }
+
+            let columns = columns.into_iter().map(compile_expr).map(|e| e.into_expr());
+
+            match &item_ty.kind {
+                ir::TyKind::Primitive(_) => {
+                    let expr = columns.exactly_one().unwrap();
+                    select.projection.push(sql_ast::SelectItem::ExprWithAlias {
+                        expr,
+                        alias: sql_ast::Ident::new(COL_VALUE),
+                    });
+                }
+                ir::TyKind::Tuple(ty_fields) => {
+                    select
+                        .projection
+                        .extend(zip(columns, ty_fields.iter().enumerate()).map(
+                            |(expr, (field_n, _))| sql_ast::SelectItem::ExprWithAlias {
+                                expr,
+                                alias: sql_ast::Ident::new(format!("f_{field_n}")),
+                            },
+                        ));
+                }
+                _ => todo!(),
+            };
+
+            utils::query_select(select)
+        }
+        cr::RelExprKind::Aggregate(inner, columns) => {
+            let inner = compile_re(*inner);
+
+            let mut select = utils::select_empty();
+            select.from = utils::from(utils::subquery(inner, None));
+
+            let item_ty = match &rel.ty.kind {
+                ir::TyKind::Primitive(_) | ir::TyKind::Tuple(_) => &rel.ty,
+                ir::TyKind::Array(item_ty) => item_ty,
+                ir::TyKind::Enum(_) | ir::TyKind::Function(_) | ir::TyKind::Ident(_) => todo!(),
+            };
+
+            if rel.ty.kind.is_array() {
+                select.projection.push(sql_ast::SelectItem::ExprWithAlias {
+                    expr: utils::value(sql_ast::Value::Null),
+                    alias: sql_ast::Ident::new(COL_ARRAY_INDEX),
+                });
+            }
 
             let columns = columns.into_iter().map(compile_expr).map(|e| e.into_expr());
 
@@ -374,6 +424,29 @@ fn compile_func_call(
         "std::not" => utils::new_un_op("NOT", args),
 
         "std::text_ops::length" => utils::new_func_call("LENGTH", args),
+
+        "std::min" => utils::new_func_call("MIN", args),
+        "std::max" => utils::new_func_call("MAX", args),
+        "std::sum" => {
+            let arg = args.into_iter().next().unwrap();
+            let ty = compile_ty_name(&ty);
+            ExprOrSource::Source(format!("COALESCE(SUM({arg}), 0)::{ty}"))
+        }
+        "std::average" => {
+            let arg = args.into_iter().next().unwrap();
+            let ty = compile_ty_name(&ty);
+            ExprOrSource::Source(format!("AVG({arg})::{ty}"))
+        }
+        "std::count" => ExprOrSource::Source("COUNT(*)".into()),
+        "std::any" => ExprOrSource::Source(format!(
+            "COALESCE({}, FALSE)",
+            utils::new_func_call("bool_or", args)
+        )),
+        "std::all" => ExprOrSource::Source(format!(
+            "COALESCE({}, TRUE)",
+            utils::new_func_call("bool_and", args)
+        )),
+
         _ => todo!("sql impl for {id}"),
     }
 }

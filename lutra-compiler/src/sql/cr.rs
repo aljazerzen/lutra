@@ -31,6 +31,8 @@ pub enum RelExprKind {
     /// Projection that replaces all columns
     ProjectReplace(Box<RelExpr>, Vec<Expr>),
 
+    Aggregate(Box<RelExpr>, Vec<Expr>),
+
     /// Filtering (also known as selection)
     Where(Box<RelExpr>, Expr),
 
