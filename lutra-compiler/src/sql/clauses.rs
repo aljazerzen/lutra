@@ -218,6 +218,17 @@ impl Context {
                 )
             }
 
+            "std::row_number" => {
+                let array = self.compile_rel(&call.args[0]);
+                cr::RelExprKind::ProjectReplace(
+                    Box::new(array),
+                    vec![cr::Expr {
+                        kind: cr::ExprKind::FuncCall(ptr.id.clone(), vec![]),
+                        ty: expr.ty.clone(),
+                    }],
+                )
+            }
+
             "std::contains" => {
                 let haystack = self.compile_rel(&call.args[0]);
                 let needle = self.compile_col(&call.args[1]);

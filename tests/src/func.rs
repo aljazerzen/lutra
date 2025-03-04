@@ -845,16 +845,10 @@ test_case!(
   4,
   5,
   6,
-]"#,
-    skip_postgres
+]"#
 );
 
-test_case!(
-    std_row_number_01,
-    r#"func () -> std::row_number([])"#,
-    "[]",
-    skip_postgres
-);
+test_case!(std_row_number_01, r#"func () -> std::row_number([])"#, "[]");
 
 test_case!(
     bindings_00,

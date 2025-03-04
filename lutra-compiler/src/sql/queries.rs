@@ -447,6 +447,8 @@ fn compile_func_call(
             utils::new_func_call("bool_and", args)
         )),
 
+        "std::row_number" => ExprOrSource::Source("(ROW_NUMBER() OVER () - 1)".to_string()),
+
         _ => todo!("sql impl for {id}"),
     }
 }
