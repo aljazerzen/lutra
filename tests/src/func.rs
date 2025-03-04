@@ -4,11 +4,11 @@
 
 #[track_caller]
 fn _runtime(lutra_source: &str) -> String {
-    // tracing_subscriber::fmt::Subscriber::builder()
-    //     .without_time()
-    //     .with_max_level(tracing::Level::DEBUG)
-    //     .try_init()
-    //     .ok();
+    tracing_subscriber::fmt::Subscriber::builder()
+        .without_time()
+        .with_max_level(tracing::Level::DEBUG)
+        .try_init()
+        .ok();
 
     let program = lutra_compiler::_test_compile(lutra_source).unwrap_or_else(|e| panic!("{e}"));
     tracing::debug!("ir:\n{}", lutra_ir::print(&program));
@@ -269,15 +269,13 @@ test_case!(
   66,
   4,
   3,
-]"#,
-    skip_postgres
+]"#
 );
 
 test_case!(
     std_map_01,
     "func () -> std::map([], func (x: int) -> x + 1)",
-    "[]",
-    skip_postgres
+    "[]"
 );
 
 test_case!(
@@ -287,8 +285,7 @@ test_case!(
   true,
   false,
   true,
-]"#,
-    skip_postgres
+]"#
 );
 
 test_case!(
@@ -298,8 +295,7 @@ test_case!(
   5,
   5,
   1,
-]"#,
-    skip_postgres
+]"#
 );
 
 test_case!(

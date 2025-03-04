@@ -1,10 +1,10 @@
 #[track_caller]
 pub fn _run(lutra_source: &str) -> (String, String) {
-    // tracing_subscriber::fmt::Subscriber::builder()
-    //     .without_time()
-    //     .with_max_level(tracing::Level::DEBUG)
-    //     .try_init()
-    //     .ok();
+    tracing_subscriber::fmt::Subscriber::builder()
+        .without_time()
+        .with_max_level(tracing::Level::DEBUG)
+        .try_init()
+        .ok();
 
     // compile
     let program = lutra_compiler::_test_compile(lutra_source).unwrap_or_else(|e| panic!("{e}"));

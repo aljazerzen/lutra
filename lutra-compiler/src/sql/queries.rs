@@ -1,3 +1,5 @@
+use std::iter::zip;
+
 use super::utils::ExprOrSource;
 use super::{cr, utils};
 use super::{COL_ARRAY_INDEX, COL_VALUE};
@@ -68,6 +70,11 @@ fn compile_re(rel: cr::RelExpr) -> sql_ast::Query {
             select.projection = utils::projection_for_ty(None, &rel.ty, false);
             utils::query_select(select)
         }
+        cr::RelExprKind::SelectRelVar => {
+            let mut select = utils::select_empty();
+            select.projection = utils::projection_for_ty(None, &rel.ty, false);
+            utils::query_select(select)
+        }
         cr::RelExprKind::Limit(inner, limit) => {
             let mut inner = compile_re(*inner);
             if inner.limit.is_some() {
@@ -120,6 +127,46 @@ fn compile_re(rel: cr::RelExpr) -> sql_ast::Query {
             select.projection.truncate(1);
 
             inner
+        }
+        cr::RelExprKind::ProjectReplace(inner, columns) => {
+            let inner = compile_re(*inner);
+
+            let mut select = utils::select_empty();
+            select.from = utils::from(utils::subquery(inner, None));
+
+            let item_ty = rel.ty.kind.as_array().unwrap();
+
+            select
+                .projection
+                .push(sql_ast::SelectItem::UnnamedExpr(utils::ident(
+                    None::<&str>,
+                    "index",
+                )));
+
+            let columns = columns.into_iter().map(compile_expr).map(|e| e.into_expr());
+
+            match &item_ty.kind {
+                ir::TyKind::Primitive(_) => {
+                    let expr = columns.exactly_one().unwrap();
+                    select.projection.push(sql_ast::SelectItem::ExprWithAlias {
+                        expr,
+                        alias: sql_ast::Ident::new(COL_VALUE),
+                    });
+                }
+                ir::TyKind::Tuple(ty_fields) => {
+                    select
+                        .projection
+                        .extend(zip(columns, ty_fields.iter().enumerate()).map(
+                            |(expr, (field_n, _))| sql_ast::SelectItem::ExprWithAlias {
+                                expr,
+                                alias: sql_ast::Ident::new(format!("f_{field_n}")),
+                            },
+                        ));
+                }
+                _ => todo!(),
+            };
+
+            utils::query_select(select)
         }
         cr::RelExprKind::With(name, val, main) => {
             let val = compile_re(*val);
@@ -213,6 +260,31 @@ fn compile_rel_constructed(rows: Vec<Vec<cr::Expr>>, ty: &ir::Ty) -> sql_ast::Qu
     utils::query_new(res.unwrap_or_else(|| {
         // construct a rel without rows
         let mut select = utils::select_empty();
+
+        if represents_array {
+            select.projection = vec![sql_ast::SelectItem::ExprWithAlias {
+                expr: utils::number("0"),
+                alias: sql_ast::Ident::new(COL_ARRAY_INDEX),
+            }]
+        }
+        match &item_ty.kind {
+            ir::TyKind::Primitive(_) => {
+                select.projection.push(sql_ast::SelectItem::ExprWithAlias {
+                    expr: null(item_ty),
+                    alias: sql_ast::Ident::new(COL_VALUE),
+                });
+            }
+            ir::TyKind::Tuple(ty_fields) => {
+                select.projection.extend(ty_fields.iter().enumerate().map(
+                    |(field_n, ty_field)| sql_ast::SelectItem::ExprWithAlias {
+                        expr: null(&ty_field.ty),
+                        alias: sql_ast::Ident::new(format!("f_{field_n}")),
+                    },
+                ));
+            }
+            _ => todo!(),
+        }
+
         select.selection = Some(utils::bool(false));
         sql_ast::SetExpr::Select(Box::new(select))
     }))
@@ -277,6 +349,44 @@ fn compile_func_call(
         "std::and" => utils::new_bin_op("AND", args),
         "std::or" => utils::new_bin_op("OR", args),
         "std::not" => utils::new_un_op("NOT", args),
+
+        "std::text_ops::length" => utils::new_func_call("LENGTH", args),
         _ => todo!("sql impl for {id}"),
+    }
+}
+
+fn null(ty: &ir::Ty) -> sql_ast::Expr {
+    sql_ast::Expr::Cast {
+        kind: sql_ast::CastKind::DoubleColon,
+        expr: Box::new(utils::value(sql_ast::Value::Null)),
+        data_type: compile_ty_name(ty),
+        format: None,
+    }
+}
+
+fn compile_ty_name(ty: &ir::Ty) -> sql_ast::DataType {
+    match ty.kind {
+        ir::TyKind::Primitive(prim) => {
+            let name = match prim {
+                ir::PrimitiveSet::bool => "bool",
+                ir::PrimitiveSet::int8 => "int1",
+                ir::PrimitiveSet::int16 => "int2",
+                ir::PrimitiveSet::int32 => "int4",
+                ir::PrimitiveSet::int64 => "int8",
+                ir::PrimitiveSet::uint8 => todo!(),
+                ir::PrimitiveSet::uint16 => todo!(),
+                ir::PrimitiveSet::uint32 => todo!(),
+                ir::PrimitiveSet::uint64 => todo!(),
+                ir::PrimitiveSet::float32 => "float4",
+                ir::PrimitiveSet::float64 => "float8",
+                ir::PrimitiveSet::text => "text",
+            };
+            sql_ast::DataType::Custom(sql_ast::ObjectName(vec![sql_ast::Ident::new(name)]), vec![])
+        }
+        ir::TyKind::Tuple(_) => todo!(),
+        ir::TyKind::Array(_) => todo!(),
+        ir::TyKind::Enum(_) => todo!(),
+        ir::TyKind::Function(_) => todo!(),
+        ir::TyKind::Ident(_) => todo!(),
     }
 }

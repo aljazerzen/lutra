@@ -16,6 +16,8 @@ pub enum RelExprKind {
     FromTable(String),
     /// Read from a common table table
     FromBinding(String),
+    /// Select all columns of a relational variable
+    SelectRelVar,
 
     Limit(Box<RelExpr>, Expr),
     Offset(Box<RelExpr>, Expr),
@@ -25,6 +27,9 @@ pub enum RelExprKind {
 
     /// Projection that picks a column by position
     ProjectColumn(Box<RelExpr>, u16),
+
+    /// Projection that replaces all columns
+    ProjectReplace(Box<RelExpr>, Vec<Expr>),
 
     /// Bind a common table expression to a name
     With(String, Box<RelExpr>, Box<RelExpr>),

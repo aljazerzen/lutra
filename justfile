@@ -6,12 +6,12 @@ show-deps-workspace:
     dot ./target/deps-workspace.dot -Tsvg -o ./target/graph.svg
     xdg-open ./target/graph.svg 2> /dev/null
 
-test-fast tests='':
+test-fast filterset='all()' nextest_args='':
     cargo fmt
     cargo check --all-targets --profile=test
 
     RUST_LOG=debug RUST_BACKTRACE=0 INSTA_FORCE_PASS=1 \
-    cargo nextest run --no-fail-fast -- {{tests}}
+    cargo nextest run --no-fail-fast -E '{{filterset}}' {{nextest_args}}
     cargo insta review
 
     cargo clippy --all-targets

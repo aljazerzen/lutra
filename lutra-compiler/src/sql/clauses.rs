@@ -6,12 +6,14 @@ use lutra_bin::ir;
 
 struct Context {
     bindings: IndexMap<u32, String>,
+    functions: IndexMap<u32, String>,
     cte_alias_gen: IdGenerator<usize>,
 }
 
 pub fn compile(program: &ir::Program) -> cr::RelExpr {
     let mut ctx = Context {
         bindings: Default::default(),
+        functions: Default::default(),
         cte_alias_gen: Default::default(),
     };
 
@@ -26,9 +28,10 @@ pub fn compile(program: &ir::Program) -> cr::RelExpr {
 impl Context {
     fn compile_rel(&mut self, expr: &ir::Expr) -> cr::RelExpr {
         let kind = match &expr.kind {
-            ir::ExprKind::Literal(_) => {
-                cr::RelExprKind::Constructed(vec![vec![self.compile_expr(expr)]])
-            }
+            ir::ExprKind::Literal(lit) => cr::RelExprKind::Constructed(vec![vec![cr::Expr {
+                kind: cr::ExprKind::Literal(lit.clone()),
+                ty: expr.ty.clone(),
+            }]]),
             ir::ExprKind::Tuple(fields) => {
                 let row = fields.iter().map(|x| self.compile_expr(x)).collect();
                 cr::RelExprKind::Constructed(vec![row])
@@ -79,7 +82,13 @@ impl Context {
                 let name = self.bindings.get(ptr).unwrap();
                 cr::RelExprKind::FromBinding(name.clone())
             }
-            ir::ExprKind::Pointer(_) => todo!(),
+            ir::ExprKind::Pointer(ir::Pointer::Parameter(ptr)) => {
+                let _ = self.functions.get(&ptr.function_id).unwrap();
+                assert_eq!(ptr.param_position, 0);
+
+                cr::RelExprKind::SelectRelVar
+            }
+            ir::ExprKind::Pointer(ir::Pointer::External(_)) => todo!(),
 
             ir::ExprKind::Function(_) => todo!(),
 
@@ -151,6 +160,24 @@ impl Context {
 
                 cr::RelExprKind::ProjectUnIndex(Box::new(limit))
             }
+            "std::map" => {
+                let array = self.compile_rel(&call.args[0]);
+
+                let row = match &call.args[1].kind {
+                    ir::ExprKind::Function(func) => {
+                        self.functions.insert(func.id, "does_not_matter".into());
+
+                        let row = self.compile_tuple(&func.body);
+
+                        self.functions.swap_remove(&func.id);
+
+                        row
+                    }
+                    k => todo!("std::map with {k:?}"),
+                };
+
+                cr::RelExprKind::ProjectReplace(Box::new(array), row)
+            }
             _ => {
                 let expr = self.compile_expr_std(expr);
                 cr::RelExprKind::Constructed(vec![vec![expr]])
@@ -162,12 +189,11 @@ impl Context {
     /// It must have type of tuple.
     fn compile_tuple(&mut self, expr: &ir::Expr) -> Vec<cr::Expr> {
         match &expr.kind {
-            ir::ExprKind::Literal(_) => vec![self.compile_expr(expr)],
+            ir::ExprKind::Literal(_) | ir::ExprKind::Call(_) => vec![self.compile_expr(expr)],
 
             ir::ExprKind::Tuple(fields) => fields.iter().map(|x| self.compile_expr(x)).collect(),
 
             ir::ExprKind::Pointer(_) => todo!(),
-            ir::ExprKind::Call(_) => todo!(),
             ir::ExprKind::Function(_) => todo!(),
             ir::ExprKind::Array(_) => todo!(),
             ir::ExprKind::TupleLookup(_) => todo!(),
@@ -176,14 +202,6 @@ impl Context {
     }
 
     fn compile_expr(&mut self, expr: &ir::Expr) -> cr::Expr {
-        // for simple things, return immediately
-        if let ir::ExprKind::Literal(lit) = &expr.kind {
-            return cr::Expr {
-                kind: cr::ExprKind::Literal(lit.clone()),
-                ty: expr.ty.clone(),
-            };
-        }
-
         // compile as if this was a rel, which can sink complex operations
         // into the relational expression
         let rel = self.compile_rel(expr);
