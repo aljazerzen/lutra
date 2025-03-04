@@ -10,7 +10,7 @@ test-fast tests='':
     cargo fmt
     cargo check --all-targets --profile=test
 
-    RUST_LOG=debug RUST_BACKTRACE=1 INSTA_FORCE_PASS=1 \
+    RUST_LOG=debug RUST_BACKTRACE=0 INSTA_FORCE_PASS=1 \
     cargo nextest run --no-fail-fast -- {{tests}}
     cargo insta review
 
