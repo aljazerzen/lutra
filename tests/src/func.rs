@@ -304,22 +304,19 @@ test_case!(
     r#"[
   5,
   65,
-]"#,
-    skip_postgres
+]"#
 );
 
 test_case!(
     std_filter_01,
     r#"func () -> std::filter([5,3,65,3,2], func (x: int) -> x < 1)"#,
-    "[]",
-    skip_postgres
+    "[]"
 );
 
 test_case!(
     std_filter_02,
     r#"func () -> std::filter([], func (x: int) -> x > 3)"#,
-    "[]",
-    skip_postgres
+    "[]"
 );
 
 test_case!(
@@ -328,8 +325,7 @@ test_case!(
     r#"[
   false,
   false,
-]"#,
-    skip_postgres
+]"#
 );
 
 test_case!(
@@ -348,8 +344,7 @@ test_case!(
     true,
     "five",
   },
-]"#,
-    skip_postgres
+]"#
 );
 
 test_case!(
@@ -430,8 +425,7 @@ test_case!(
   3,
   3,
   2,
-]"#,
-    skip_postgres
+]"#
 );
 
 test_case!(
@@ -458,8 +452,7 @@ test_case!(
     65,
     "!",
   },
-]"#,
-    skip_postgres
+]"#
 );
 
 test_case!(

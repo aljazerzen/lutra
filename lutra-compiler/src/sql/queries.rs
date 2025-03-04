@@ -168,6 +168,29 @@ fn compile_re(rel: cr::RelExpr) -> sql_ast::Query {
 
             utils::query_select(select)
         }
+        cr::RelExprKind::Where(inner, cond) => {
+            let inner = compile_re(*inner);
+            let mut query = utils::query_wrap(inner, &rel.ty, false);
+            let select = utils::query_as_mut_select(&mut query, &rel.ty);
+            select.selection = Some(compile_expr(cond).into_expr());
+            query
+        }
+        cr::RelExprKind::OrderBy(inner, key) => {
+            let inner = compile_re(*inner);
+
+            // wrap into a new query
+            let mut select = utils::select_empty();
+            select.from = utils::from(utils::subquery(inner, None));
+            select.projection = utils::projection_for_ty(None, &rel.ty, false);
+
+            // overwrite array index
+            select.projection[0] = sql_ast::SelectItem::ExprWithAlias {
+                expr: compile_expr(key).into_expr(),
+                alias: sql_ast::Ident::new(COL_ARRAY_INDEX),
+            };
+
+            utils::query_select(select)
+        }
         cr::RelExprKind::With(name, val, main) => {
             let val = compile_re(*val);
 

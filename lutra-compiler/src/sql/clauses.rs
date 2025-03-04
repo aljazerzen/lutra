@@ -33,11 +33,11 @@ impl Context {
                 ty: expr.ty.clone(),
             }]]),
             ir::ExprKind::Tuple(fields) => {
-                let row = fields.iter().map(|x| self.compile_expr(x)).collect();
+                let row = fields.iter().map(|x| self.compile_col(x)).collect();
                 cr::RelExprKind::Constructed(vec![row])
             }
             ir::ExprKind::Array(items) => {
-                let rows = items.iter().map(|x| self.compile_tuple(x)).collect();
+                let rows = items.iter().map(|x| self.compile_cols(x)).collect();
                 cr::RelExprKind::Constructed(rows)
             }
 
@@ -131,8 +131,8 @@ impl Context {
         match ptr.id.as_str() {
             "std::slice" => {
                 let array = self.compile_rel(&call.args[0]);
-                let start = self.compile_expr(&call.args[1]);
-                let end = self.compile_expr(&call.args[2]);
+                let start = self.compile_col(&call.args[1]);
+                let end = self.compile_col(&call.args[2]);
 
                 let offset = cr::RelExpr {
                     kind: cr::RelExprKind::Offset(Box::new(array), start.clone()),
@@ -146,7 +146,7 @@ impl Context {
             }
             "std::index" => {
                 let array = self.compile_rel(&call.args[0]);
-                let index = self.compile_expr(&call.args[1]);
+                let index = self.compile_col(&call.args[1]);
 
                 let offset = cr::RelExpr {
                     kind: cr::RelExprKind::Offset(Box::new(array), index.clone()),
@@ -162,21 +162,37 @@ impl Context {
             }
             "std::map" => {
                 let array = self.compile_rel(&call.args[0]);
+                let func = &call.args[1];
+                let func = func.kind.as_function().unwrap();
 
-                let row = match &call.args[1].kind {
-                    ir::ExprKind::Function(func) => {
-                        self.functions.insert(func.id, "does_not_matter".into());
-
-                        let row = self.compile_tuple(&func.body);
-
-                        self.functions.swap_remove(&func.id);
-
-                        row
-                    }
-                    k => todo!("std::map with {k:?}"),
-                };
+                self.functions.insert(func.id, "does_not_matter".into());
+                let row = self.compile_cols(&func.body);
+                self.functions.swap_remove(&func.id);
 
                 cr::RelExprKind::ProjectReplace(Box::new(array), row)
+            }
+            "std::filter" => {
+                let array = self.compile_rel(&call.args[0]);
+                let func = &call.args[1];
+                let func = func.kind.as_function().unwrap();
+
+                self.functions.insert(func.id, "does_not_matter".into());
+                let cond = self.compile_col(&func.body);
+                self.functions.swap_remove(&func.id);
+
+                cr::RelExprKind::Where(Box::new(array), cond)
+            }
+            "std::sort" => {
+                let array = self.compile_rel(&call.args[0]);
+
+                let func = &call.args[1];
+                let func = func.kind.as_function().unwrap();
+
+                self.functions.insert(func.id, "does_not_matter".into());
+                let key = self.compile_col(&func.body);
+                self.functions.swap_remove(&func.id);
+
+                cr::RelExprKind::OrderBy(Box::new(array), key)
             }
             _ => {
                 let expr = self.compile_expr_std(expr);
@@ -187,21 +203,24 @@ impl Context {
 
     /// Compiles an expression that can be placed into a list of columns.
     /// It must have type of tuple.
-    fn compile_tuple(&mut self, expr: &ir::Expr) -> Vec<cr::Expr> {
-        match &expr.kind {
-            ir::ExprKind::Literal(_) | ir::ExprKind::Call(_) => vec![self.compile_expr(expr)],
+    fn compile_cols(&mut self, expr: &ir::Expr) -> Vec<cr::Expr> {
+        // compile as if this was a rel, which can sink complex operations
+        // into the relational expression
+        let rel = self.compile_rel(expr);
 
-            ir::ExprKind::Tuple(fields) => fields.iter().map(|x| self.compile_expr(x)).collect(),
+        match rel.kind {
+            // it is just one value: unwrap
+            cr::RelExprKind::Constructed(mut rows) if rows.len() == 1 => rows.remove(0),
 
-            ir::ExprKind::Pointer(_) => todo!(),
-            ir::ExprKind::Function(_) => todo!(),
-            ir::ExprKind::Array(_) => todo!(),
-            ir::ExprKind::TupleLookup(_) => todo!(),
-            ir::ExprKind::Binding(_) => todo!(),
+            // it is actually complex: subquery
+            _ => vec![cr::Expr {
+                kind: cr::ExprKind::Subquery(Box::new(rel)),
+                ty: expr.ty.clone(),
+            }],
         }
     }
 
-    fn compile_expr(&mut self, expr: &ir::Expr) -> cr::Expr {
+    fn compile_col(&mut self, expr: &ir::Expr) -> cr::Expr {
         // compile as if this was a rel, which can sink complex operations
         // into the relational expression
         let rel = self.compile_rel(expr);
@@ -229,7 +248,7 @@ impl Context {
             unreachable!()
         };
 
-        let args = call.args.iter().map(|x| self.compile_expr(x)).collect();
+        let args = call.args.iter().map(|x| self.compile_col(x)).collect();
         cr::Expr {
             kind: cr::ExprKind::FuncCall(ptr.id.clone(), args),
             ty: expr.ty.clone(),
