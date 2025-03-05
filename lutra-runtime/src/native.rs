@@ -459,21 +459,9 @@ pub mod std {
             let [array, offset] = assume::exactly_n(args);
 
             let array = assume::array(array, head_bytes);
-            let offset = assume::int(&offset).max(0) as usize;
+            let offset = assume::int(&offset) as isize;
 
-            let mut out = ArrayWriter::new(head_bytes, body_ptrs);
-
-            let n_blanks = offset.min(array.remaining());
-            for _ in 0..n_blanks {
-                out.write_item(lutra_bin::Data::new(vec![0; head_bytes as usize]));
-            }
-
-            let n_copies = array.remaining().saturating_sub(offset);
-            for item in array.take(n_copies) {
-                out.write_item(item);
-            }
-
-            Cell::Data(out.finish())
+            Self::shift(array, offset, head_bytes, body_ptrs)
         }
 
         pub fn lead(_it: &mut Interpreter, layout_args: &[u32], args: Vec<Cell>) -> Cell {
@@ -484,19 +472,31 @@ pub mod std {
             let [array, offset] = assume::exactly_n(args);
 
             let array = assume::array(array, head_bytes);
-            let offset = assume::int(&offset).max(0) as usize;
+            let offset = (assume::int(&offset) as isize).saturating_neg();
 
+            Self::shift(array, offset, head_bytes, body_ptrs)
+        }
+
+        fn shift(array: ArrayReader, offset: isize, head_bytes: u32, body_ptrs: &[u32]) -> Cell {
             let array_len = array.remaining();
 
-            let mut out = ArrayWriter::new(head_bytes, body_ptrs);
+            let n_blanks_before = (offset.max(0) as usize).min(array_len);
+            let n_blanks_after = (offset.saturating_neg().max(0) as usize).min(array_len);
 
-            for item in array.skip(offset) {
+            let mut out = ArrayWriter::new(head_bytes, body_ptrs);
+            for _ in 0..n_blanks_before {
+                // TODO: write something else than just zeros
+                out.write_item(lutra_bin::Data::new(vec![0; head_bytes as usize]));
+            }
+
+            let n_copies = array_len.saturating_sub(n_blanks_before + n_blanks_after);
+            for item in array.skip(n_blanks_after).take(n_copies) {
                 out.write_item(item);
             }
 
-            let n_blanks = offset.min(array_len);
-            for _ in 0..n_blanks {
-                out.write_item(encode(&0_i64));
+            for _ in 0..n_blanks_after {
+                // TODO: write something else than just zeros
+                out.write_item(lutra_bin::Data::new(vec![0; head_bytes as usize]));
             }
 
             Cell::Data(out.finish())

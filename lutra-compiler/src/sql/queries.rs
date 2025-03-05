@@ -440,14 +440,36 @@ fn compile_func_call(
         "std::count" => ExprOrSource::Source("COUNT(*)".into()),
         "std::any" => ExprOrSource::Source(format!(
             "COALESCE({}, FALSE)",
-            utils::new_func_call("bool_or", args)
+            utils::new_func_call("BOOL_OR", args)
         )),
         "std::all" => ExprOrSource::Source(format!(
             "COALESCE({}, TRUE)",
-            utils::new_func_call("bool_and", args)
+            utils::new_func_call("BOOL_AND", args)
         )),
+        "std::contains" => {
+            let mut args = args.into_iter();
+            let haystack = args.next().unwrap();
+            let needle = args.next().unwrap();
+            ExprOrSource::Source(format!("COALESCE(BOOL_OR({needle} = {haystack}), FALSE)"))
+        }
 
         "std::row_number" => ExprOrSource::Source("(ROW_NUMBER() OVER () - 1)".to_string()),
+        "std::lead" => {
+            let mut args = args.into_iter();
+            let arg = args.next().unwrap();
+            let offset = args.next().unwrap();
+            ExprOrSource::Source(format!(
+                "COALESCE(LEAD({arg}, {offset}::int4) OVER (ORDER BY index), 0)"
+            ))
+        }
+        "std::lag" => {
+            let mut args = args.into_iter();
+            let arg = args.next().unwrap();
+            let offset = args.next().unwrap();
+            ExprOrSource::Source(format!(
+                "COALESCE(LAG({arg}, {offset}::int4) OVER (ORDER BY index), 0)"
+            ))
+        }
 
         _ => todo!("sql impl for {id}"),
     }

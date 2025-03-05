@@ -27,18 +27,19 @@ pub struct TestCase {
     pub output: &'static str,
 }
 
-macro_rules! test_postgres {
-    ($case: expr, skip_postgres) => {
+/// A test function, with a conditional #[ignore] attribute
+macro_rules! test_fn {
+    (skip_postgres, $name: ident, $test: expr) => {
         #[test]
         #[ignore]
-        fn postgres() {
-            assert_eq!(crate::postgres::_run($case.source).1, $case.output);
+        fn $name() {
+            $test
         }
     };
-    ($case: expr, no_skip) => {
+    (no_skip, $name: ident, $test: expr) => {
         #[test]
-        fn postgres() {
-            assert_eq!(crate::postgres::_run($case.source).1, $case.output);
+        fn $name() {
+            $test
         }
     };
 }
@@ -57,10 +58,22 @@ macro_rules! test_case {
 
             #[test]
             fn runtime() {
-                assert_eq!(super::_runtime(CASE.source), CASE.output)
+                assert_eq!(
+                    super::_runtime(CASE.source),
+                    CASE.output,
+                    "runtime != expected"
+                )
             }
 
-            test_postgres!(CASE, $ignore_postgres);
+            test_fn!(
+                $ignore_postgres,
+                postgres,
+                assert_eq!(
+                    crate::postgres::_run(CASE.source).1,
+                    CASE.output,
+                    "pg != expected"
+                )
+            );
         }
     };
 }
@@ -747,8 +760,7 @@ test_case!(
   65,
   3,
   2,
-]"#,
-    skip_postgres
+]"#
 );
 
 test_case!(
@@ -762,27 +774,20 @@ test_case!(
   0,
   0,
   0,
-]"#,
-    skip_postgres
+]"#
 );
 
-test_case!(
-    std_lag_02,
-    r#"func () -> std::lag([], 3)"#,
-    "[]",
-    skip_postgres
-);
+test_case!(std_lag_02, r#"func () -> std::lag([], 3)"#, "[]");
 
 test_case!(
     std_lag_03,
     r#"func () -> std::lag([5,3,65,4], -2)"#,
     r#"[
-  5,
-  3,
   65,
   4,
-]"#,
-    skip_postgres
+  0,
+  0,
+]"#
 );
 
 test_case!(
@@ -796,8 +801,7 @@ test_case!(
   67,
   0,
   0,
-]"#,
-    skip_postgres
+]"#
 );
 
 test_case!(
@@ -811,27 +815,20 @@ test_case!(
   0,
   0,
   0,
-]"#,
-    skip_postgres
+]"#
 );
 
-test_case!(
-    std_lead_02,
-    r#"func () -> std::lead([], 3)"#,
-    "[]",
-    skip_postgres
-);
+test_case!(std_lead_02, r#"func () -> std::lead([], 3)"#, "[]");
 
 test_case!(
     std_lead_03,
     r#"func () -> std::lead([5,3,65,4], -2)"#,
     r#"[
+  0,
+  0,
   5,
   3,
-  65,
-  4,
-]"#,
-    skip_postgres
+]"#
 );
 
 test_case!(

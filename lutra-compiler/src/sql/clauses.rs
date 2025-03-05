@@ -194,69 +194,54 @@ impl Context {
 
                 cr::RelExprKind::OrderBy(Box::new(array), key)
             }
-            "std::min" | "std::max" | "std::sum" | "std::average" | "std::count" | "std::any"
-            | "std::all" => {
-                let array = self.compile_rel(&call.args[0]);
 
+            // aggregation functions
+            "std::min" | "std::max" | "std::sum" | "std::average" | "std::count" | "std::any"
+            | "std::all" | "std::contains" => {
+                let array = self.compile_rel(&call.args[0]);
                 let item_ty = call.args[0].ty.kind.as_array().unwrap();
+
+                let item = cr::Expr {
+                    kind: cr::ExprKind::Subquery(Box::new(cr::RelExpr {
+                        kind: cr::RelExprKind::SelectRelVar,
+                        ty: *item_ty.clone(),
+                    })),
+                    ty: *item_ty.clone(),
+                };
+
+                let mut args = vec![item];
+                args.extend(call.args[1..].iter().map(|a| self.compile_col(a)));
 
                 cr::RelExprKind::Aggregate(
                     Box::new(array),
                     vec![cr::Expr {
-                        kind: cr::ExprKind::FuncCall(
-                            ptr.id.clone(),
-                            vec![cr::Expr {
-                                kind: cr::ExprKind::Subquery(Box::new(cr::RelExpr {
-                                    kind: cr::RelExprKind::SelectRelVar,
-                                    ty: *item_ty.clone(),
-                                })),
-                                ty: *item_ty.clone(),
-                            }],
-                        ),
+                        kind: cr::ExprKind::FuncCall(ptr.id.clone(), args),
                         ty: expr.ty.clone(),
                     }],
                 )
             }
 
-            "std::row_number" => {
+            // window functions
+            "std::row_number" | "std::lead" | "std::lag" => {
                 let array = self.compile_rel(&call.args[0]);
+
+                let item_ty = expr.ty.kind.as_array().unwrap();
+
+                let item = cr::Expr {
+                    kind: cr::ExprKind::Subquery(Box::new(cr::RelExpr {
+                        kind: cr::RelExprKind::SelectRelVar,
+                        ty: *item_ty.clone(),
+                    })),
+                    ty: *item_ty.clone(),
+                };
+
+                let mut args = vec![item];
+                args.extend(call.args[1..].iter().map(|a| self.compile_col(a)));
+
                 cr::RelExprKind::ProjectReplace(
                     Box::new(array),
                     vec![cr::Expr {
-                        kind: cr::ExprKind::FuncCall(ptr.id.clone(), vec![]),
-                        ty: expr.ty.clone(),
-                    }],
-                )
-            }
-
-            "std::contains" => {
-                let haystack = self.compile_rel(&call.args[0]);
-                let needle = self.compile_col(&call.args[1]);
-
-                let item_ty = call.args[0].ty.kind.as_array().unwrap();
-
-                cr::RelExprKind::Aggregate(
-                    Box::new(haystack),
-                    vec![cr::Expr {
-                        kind: cr::ExprKind::FuncCall(
-                            "std::any".to_string(),
-                            vec![cr::Expr {
-                                kind: cr::ExprKind::FuncCall(
-                                    "std::eq".to_string(),
-                                    vec![
-                                        needle,
-                                        cr::Expr {
-                                            kind: cr::ExprKind::Subquery(Box::new(cr::RelExpr {
-                                                kind: cr::RelExprKind::SelectRelVar,
-                                                ty: *item_ty.clone(),
-                                            })),
-                                            ty: *item_ty.clone(),
-                                        },
-                                    ],
-                                ),
-                                ty: *item_ty.clone(), // TODO: this should be bool
-                            }],
-                        ),
+                        kind: cr::ExprKind::FuncCall(ptr.id.clone(), args),
                         ty: expr.ty.clone(),
                     }],
                 )
