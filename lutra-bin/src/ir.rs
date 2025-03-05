@@ -1,5 +1,7 @@
 pub use crate::generated::ir::*;
 
+use crate::{boxed, vec};
+
 impl Program {
     pub fn get_output_ty(&self) -> &Ty {
         let main_ty = self.main.ty.kind.as_function().unwrap();
@@ -29,6 +31,37 @@ impl std::fmt::Display for Literal {
 impl PartialEq for Ty {
     fn eq(&self, other: &Self) -> bool {
         self.kind == other.kind && self.name == other.name
+    }
+}
+
+impl Ty {
+    pub fn new(kind: impl Into<TyKind>) -> Self {
+        Ty {
+            kind: kind.into(),
+            layout: None,
+            name: None,
+        }
+    }
+}
+
+impl From<PrimitiveSet> for TyKind {
+    fn from(value: PrimitiveSet) -> Self {
+        TyKind::Primitive(value)
+    }
+}
+impl From<vec::Vec<TyTupleField>> for TyKind {
+    fn from(value: vec::Vec<TyTupleField>) -> Self {
+        TyKind::Tuple(value)
+    }
+}
+impl From<TyFunction> for TyKind {
+    fn from(value: TyFunction) -> Self {
+        TyKind::Function(boxed::Box::new(value))
+    }
+}
+impl From<Path> for TyKind {
+    fn from(value: Path) -> Self {
+        TyKind::Ident(value)
     }
 }
 

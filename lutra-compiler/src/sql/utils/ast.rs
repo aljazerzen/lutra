@@ -90,10 +90,10 @@ pub fn query_select(select: sql_ast::Select) -> sql_ast::Query {
     query_new(sql_ast::SetExpr::Select(Box::new(select)))
 }
 
-pub fn query_wrap(inner: sql_ast::Query, rel_ty: &ir::Ty, top_level: bool) -> sql_ast::Query {
+pub fn query_wrap(inner: sql_ast::Query, rel_ty: &ir::Ty, include_index: bool) -> sql_ast::Query {
     let mut select = select_empty();
     select.from = from(subquery(inner, None));
-    select.projection = super::projection_for_ty(None, rel_ty, top_level);
+    select.projection = super::projection_noop(None, rel_ty, include_index);
 
     query_select(select)
 }
@@ -109,7 +109,7 @@ pub fn query_as_mut_select<'q>(
         let original = std::mem::replace(query, dummy);
 
         // wrap it into a select
-        let wrapped = query_wrap(original, rel_ty, false);
+        let wrapped = query_wrap(original, rel_ty, true);
 
         // place it back
         let _dummy = std::mem::replace(query, wrapped);

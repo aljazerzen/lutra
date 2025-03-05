@@ -33,11 +33,22 @@ impl Context {
                 ty: expr.ty.clone(),
             }]]),
             ir::ExprKind::Tuple(fields) => {
-                let row = fields.iter().map(|x| self.compile_col(x)).collect();
+                let row = fields.iter().flat_map(|x| self.compile_cols(x)).collect();
                 cr::RelExprKind::Constructed(vec![row])
             }
             ir::ExprKind::Array(items) => {
-                let rows = items.iter().map(|x| self.compile_cols(x)).collect();
+                let rows = items
+                    .iter()
+                    .enumerate()
+                    .map(|(index, x)| {
+                        let mut cols = vec![cr::Expr {
+                            kind: cr::ExprKind::Literal(ir::Literal::Int(index as i64)),
+                            ty: ir::Ty::new(ir::PrimitiveSet::int64),
+                        }];
+                        cols.extend(self.compile_cols(x));
+                        cols
+                    })
+                    .collect();
                 cr::RelExprKind::Constructed(rows)
             }
 
@@ -94,7 +105,7 @@ impl Context {
 
             ir::ExprKind::TupleLookup(lookup) => {
                 let base = self.compile_rel(&lookup.base);
-                cr::RelExprKind::ProjectColumn(Box::new(base), lookup.position)
+                cr::RelExprKind::ProjectRetain(Box::new(base), vec![lookup.position as usize])
             }
             ir::ExprKind::Binding(binding) => {
                 if let ir::TyKind::Function(_) = &binding.expr.ty.kind {
@@ -149,24 +160,30 @@ impl Context {
                 let index = self.compile_col(&call.args[1]);
 
                 let offset = cr::RelExpr {
+                    ty: array.ty.clone(),
                     kind: cr::RelExprKind::Offset(Box::new(array), index.clone()),
-                    ty: expr.ty.clone(),
                 };
 
                 let limit = cr::RelExpr {
+                    ty: offset.ty.clone(),
                     kind: cr::RelExprKind::Limit(Box::new(offset), new_int(1)),
-                    ty: expr.ty.clone(),
                 };
 
-                cr::RelExprKind::ProjectUnIndex(Box::new(limit))
+                cr::RelExprKind::ProjectDrop(Box::new(limit), vec![0])
             }
             "std::map" => {
                 let array = self.compile_rel(&call.args[0]);
                 let func = &call.args[1];
                 let func = func.kind.as_function().unwrap();
 
+                let mut row = vec![new_column_of(
+                    array.ty.clone(),
+                    0,
+                    ir::Ty::new(ir::PrimitiveSet::int64),
+                )];
+
                 self.functions.insert(func.id, "does_not_matter".into());
-                let row = self.compile_cols(&func.body);
+                row.extend(self.compile_cols(&func.body));
                 self.functions.swap_remove(&func.id);
 
                 cr::RelExprKind::ProjectReplace(Box::new(array), row)
@@ -240,10 +257,17 @@ impl Context {
 
                 cr::RelExprKind::ProjectReplace(
                     Box::new(array),
-                    vec![cr::Expr {
-                        kind: cr::ExprKind::FuncCall(ptr.id.clone(), args),
-                        ty: expr.ty.clone(),
-                    }],
+                    vec![
+                        new_column_of(
+                            call.args[0].ty.clone(),
+                            0,
+                            ir::Ty::new(ir::PrimitiveSet::int64),
+                        ),
+                        cr::Expr {
+                            kind: cr::ExprKind::FuncCall(ptr.id.clone(), args),
+                            ty: expr.ty.clone(),
+                        },
+                    ],
                 )
             }
 
@@ -331,4 +355,18 @@ fn new_int(int: i64) -> cr::Expr {
             layout: None,
         },
     }
+}
+
+fn new_column_of(ty: ir::Ty, col_index: usize, col_ty: ir::Ty) -> cr::Expr {
+    let kind = cr::ExprKind::Subquery(Box::new(cr::RelExpr {
+        kind: cr::RelExprKind::ProjectRetain(
+            Box::new(cr::RelExpr {
+                kind: cr::RelExprKind::SelectRelVar,
+                ty,
+            }),
+            vec![col_index],
+        ),
+        ty: col_ty.clone(),
+    }));
+    cr::Expr { kind, ty: col_ty }
 }

@@ -56,11 +56,153 @@ pub fn _run(lutra_source: &str) -> (String, String) {
 #[track_caller]
 pub fn _run_to_str(lutra_source: &str) -> String {
     let (sql, output) = _run(lutra_source);
-    format!("{sql}\n{output}")
+    format!("{sql}\n---\n{output}")
 }
 
 #[test]
-fn array_of_tuples() {
+fn prim() {
+    insta::assert_snapshot!(_run_to_str(r#"
+        func () -> 3
+    "#), @r#"
+    SELECT
+      3::int8 AS value
+    ---
+    3
+    "#);
+}
+
+#[test]
+fn tuple_prim() {
+    insta::assert_snapshot!(_run_to_str(r#"
+        func () -> {3, false}
+    "#), @r#"
+    SELECT
+      3::int8 AS f_0,
+      false AS f_1
+    ---
+    {
+      3,
+      false,
+    }
+    "#);
+}
+
+#[test]
+fn array_prim() {
+    insta::assert_snapshot!(_run_to_str(r#"
+        func () -> [3, 6, 12]
+    "#), @r#"
+    SELECT
+      value
+    FROM
+      (
+        SELECT
+          0::int8 AS index,
+          3::int8 AS value
+        UNION
+        ALL
+        SELECT
+          1::int8,
+          6::int8
+        UNION
+        ALL
+        SELECT
+          2::int8,
+          12::int8
+      )
+    ORDER BY
+      index
+    ---
+    [
+      3,
+      6,
+      12,
+    ]
+    "#);
+}
+
+#[test]
+fn tuple_tuple_prim() {
+    insta::assert_snapshot!(_run_to_str(r#"
+        func () -> {3, {false, true, {"hello"}, 4}}
+    "#), @r#"
+    SELECT
+      3::int8 AS f_0,
+      false AS f_1_0,
+      true AS f_1_1,
+      'hello' AS f_1_2_0,
+      4::int8 AS f_1_3
+    ---
+    {
+      3,
+      {
+        false,
+        true,
+        {
+          "hello",
+        },
+        4,
+      },
+    }
+    "#);
+}
+
+#[test]
+#[ignore]
+fn tuple_array_prim() {
+    insta::assert_snapshot!(_run_to_str(r#"
+        func () -> {true, [1, 2, 3], false}
+    "#), @r#"
+    SELECT
+      3::int8 AS f_0,
+      false AS f_1_0,
+      true AS f_1_1,
+      'hello' AS f_1_2_0,
+      4::int8 AS f_1_3
+    ---
+    {
+      3,
+      {
+        false,
+        true,
+        {
+          "hello",
+        },
+        4,
+      },
+    }
+    "#);
+}
+
+#[test]
+#[ignore]
+fn array_array_prim() {
+    insta::assert_snapshot!(_run_to_str(r#"
+        func () -> [[1, 2, 3], [4, 5]]
+    "#), @r#"
+    SELECT
+      3::int8 AS f_0,
+      false AS f_1_0,
+      true AS f_1_1,
+      'hello' AS f_1_2_0,
+      4::int8 AS f_1_3
+    ---
+    {
+      3,
+      {
+        false,
+        true,
+        {
+          "hello",
+        },
+        4,
+      },
+    }
+    "#);
+}
+
+#[test]
+fn array_tuple_prim() {
     insta::assert_snapshot!(_run_to_str(r#"
         func () -> [{3, false}, {6, true}, {12, false}]
     "#), @r#"
@@ -70,24 +212,25 @@ fn array_of_tuples() {
     FROM
       (
         SELECT
-          0 AS index,
+          0::int8 AS index,
           3::int8 AS f_0,
           false AS f_1
         UNION
         ALL
         SELECT
-          1,
+          1::int8,
           6::int8,
           true
         UNION
         ALL
         SELECT
-          2,
+          2::int8,
           12::int8,
           false
       )
     ORDER BY
       index
+    ---
     [
       {
         3,
@@ -102,64 +245,5 @@ fn array_of_tuples() {
         false,
       },
     ]
-    "#);
-}
-
-#[test]
-fn array_of_primitives() {
-    insta::assert_snapshot!(_run_to_str(r#"
-        func () -> [3, 6, 12]
-    "#), @r#"
-    SELECT
-      value
-    FROM
-      (
-        SELECT
-          0 AS index,
-          3::int8 AS value
-        UNION
-        ALL
-        SELECT
-          1,
-          6::int8
-        UNION
-        ALL
-        SELECT
-          2,
-          12::int8
-      )
-    ORDER BY
-      index
-    [
-      3,
-      6,
-      12,
-    ]
-    "#);
-}
-
-#[test]
-fn tuple() {
-    insta::assert_snapshot!(_run_to_str(r#"
-        func () -> {3, false}
-    "#), @r#"
-    SELECT
-      3::int8 AS f_0,
-      false AS f_1
-    {
-      3,
-      false,
-    }
-    "#);
-}
-
-#[test]
-fn primitive() {
-    insta::assert_snapshot!(_run_to_str(r#"
-        func () -> 3
-    "#), @r#"
-    SELECT
-      3::int8 AS value
-    3
     "#);
 }

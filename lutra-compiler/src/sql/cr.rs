@@ -1,5 +1,7 @@
 use lutra_bin::ir;
 
+/// A relational expression (something that can be used in `FROM (...)`).
+/// Its columns are dictated by its lutra type.
 #[derive(Debug, Clone)]
 pub struct RelExpr {
     pub kind: RelExprKind,
@@ -22,13 +24,12 @@ pub enum RelExprKind {
     Limit(Box<RelExpr>, Expr),
     Offset(Box<RelExpr>, Expr),
 
-    /// Projection that just removes array index
-    ProjectUnIndex(Box<RelExpr>),
+    /// Projection that retains columns by position
+    ProjectRetain(Box<RelExpr>, Vec<usize>),
+    /// Projection that discards columns by position
+    ProjectDrop(Box<RelExpr>, Vec<usize>),
 
-    /// Projection that picks a column by position
-    ProjectColumn(Box<RelExpr>, u16),
-
-    /// Projection that replaces all columns
+    /// Projection that replaces all columns (but not the index)
     ProjectReplace(Box<RelExpr>, Vec<Expr>),
 
     Aggregate(Box<RelExpr>, Vec<Expr>),
@@ -49,13 +50,11 @@ pub struct Expr {
     pub ty: ir::Ty,
 }
 
-#[allow(dead_code)]
 #[derive(Debug, Clone)]
 pub enum ExprKind {
     Literal(ir::Literal),
     FuncCall(String, Vec<Expr>),
     Subquery(Box<RelExpr>),
-    Ident(Vec<String>),
 }
 
 impl std::fmt::Debug for Expr {
