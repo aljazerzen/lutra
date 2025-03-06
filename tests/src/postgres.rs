@@ -23,8 +23,7 @@ pub fn _run(lutra_source: &str) -> (String, String) {
     // execute
     async fn inner(
         query_sql: &str,
-        output_ty: lutra_bin::ir::Ty,
-    ) -> Result<String, tokio_postgres::Error> {
+    ) -> Result<(lutra_bin::ir::Ty, lutra_bin::Data), tokio_postgres::Error> {
         const POSTGRES_URL: &str = "postgresql://postgres:pass@localhost:5416";
 
         let (client, connection) = tokio_postgres::connect(POSTGRES_URL, tokio_postgres::NoTls)
@@ -37,18 +36,20 @@ pub fn _run(lutra_source: &str) -> (String, String) {
             }
         });
 
-        let (rel_ty, rel_data) = lutra_db_driver::query(client, query_sql).await?;
-        let output = lutra_db_driver::repack(&rel_ty, rel_data, &output_ty);
-        let output = output.flatten();
-
-        let output = lutra_bin::Value::decode(&output, &output_ty).unwrap();
-        Ok(output.print_source(&output_ty).unwrap())
+        lutra_db_driver::query(client, query_sql).await
     }
     let rt = tokio::runtime::Builder::new_current_thread()
         .enable_all()
         .build()
         .unwrap();
-    let output = rt.block_on(inner(&query_sql, output_ty)).unwrap();
+
+    let (rel_ty, rel_data) = rt.block_on(inner(&query_sql)).unwrap();
+
+    let output = lutra_db_driver::repack(&rel_ty, rel_data, &output_ty);
+    let output = output.flatten();
+
+    let output = lutra_bin::Value::decode(&output, &output_ty).unwrap();
+    let output = output.print_source(&output_ty).unwrap();
 
     (formatted_sql, output)
 }
@@ -148,56 +149,123 @@ fn tuple_tuple_prim() {
 }
 
 #[test]
-#[ignore]
 fn tuple_array_prim() {
     insta::assert_snapshot!(_run_to_str(r#"
         func () -> {true, [1, 2, 3], false}
     "#), @r#"
     SELECT
-      3::int8 AS f_0,
-      false AS f_1_0,
-      true AS f_1_1,
-      'hello' AS f_1_2_0,
-      4::int8 AS f_1_3
+      true AS f_0,
+      (
+        SELECT
+          json_agg(
+            value
+            ORDER BY
+              index
+          )
+        FROM
+          (
+            SELECT
+              0::int8 AS index,
+              1::int8 AS value
+            UNION
+            ALL
+            SELECT
+              1::int8,
+              2::int8
+            UNION
+            ALL
+            SELECT
+              2::int8,
+              3::int8
+          )
+      ) AS f_1,
+      false AS f_2
     ---
     {
-      3,
-      {
-        false,
-        true,
-        {
-          "hello",
-        },
-        4,
-      },
+      true,
+      [
+        1,
+        2,
+        3,
+      ],
+      false,
     }
     "#);
 }
 
 #[test]
-#[ignore]
 fn array_array_prim() {
     insta::assert_snapshot!(_run_to_str(r#"
         func () -> [[1, 2, 3], [4, 5]]
     "#), @r#"
     SELECT
-      3::int8 AS f_0,
-      false AS f_1_0,
-      true AS f_1_1,
-      'hello' AS f_1_2_0,
-      4::int8 AS f_1_3
+      value
+    FROM
+      (
+        SELECT
+          0::int8 AS index,
+          (
+            SELECT
+              json_agg(
+                value
+                ORDER BY
+                  index
+              )
+            FROM
+              (
+                SELECT
+                  0::int8 AS index,
+                  1::int8 AS value
+                UNION
+                ALL
+                SELECT
+                  1::int8,
+                  2::int8
+                UNION
+                ALL
+                SELECT
+                  2::int8,
+                  3::int8
+              )
+          ) AS value
+        UNION
+        ALL
+        SELECT
+          1::int8,
+          (
+            SELECT
+              json_agg(
+                value
+                ORDER BY
+                  index
+              )
+            FROM
+              (
+                SELECT
+                  0::int8 AS index,
+                  4::int8 AS value
+                UNION
+                ALL
+                SELECT
+                  1::int8,
+                  5::int8
+              )
+          )
+      )
+    ORDER BY
+      index
     ---
-    {
-      3,
-      {
-        false,
-        true,
-        {
-          "hello",
-        },
+    [
+      [
+        1,
+        2,
+        3,
+      ],
+      [
         4,
-      },
-    }
+        5,
+      ],
+    ]
     "#);
 }
 
@@ -245,5 +313,156 @@ fn array_tuple_prim() {
         false,
       },
     ]
+    "#);
+}
+
+#[test]
+fn complex() {
+    insta::assert_snapshot!(_run_to_str(r#"
+        let x = [
+          1, 4, 2, 3, 2, 3, 4, 5, 1, 2
+        ]
+        
+        let y = [
+          {1, 20},
+          {4, 15},
+          {2, 14},
+          {6, 17},
+          {4, 22},
+          {7, 12},
+          {8, 23},
+          {3, 16},
+        ]
+        
+        func () -> {
+          a = 1 + 2,
+          {3, 3 + 1},
+          {2, 2 + 1},
+          hello = (
+            x
+            | std::map(func (y: int) -> y + 1)
+            | std::filter(func (y: int) -> !(y > 3))
+            | std::sort(func (x: int) -> x)
+            | std::map(func (y: int) -> y % 3)
+          )
+        }        
+    "#), @r#"
+    WITH t0 AS (
+      SELECT
+        0::int8 AS index,
+        1::int8 AS value
+      UNION
+      ALL
+      SELECT
+        1::int8,
+        4::int8
+      UNION
+      ALL
+      SELECT
+        2::int8,
+        2::int8
+      UNION
+      ALL
+      SELECT
+        3::int8,
+        3::int8
+      UNION
+      ALL
+      SELECT
+        4::int8,
+        2::int8
+      UNION
+      ALL
+      SELECT
+        5::int8,
+        3::int8
+      UNION
+      ALL
+      SELECT
+        6::int8,
+        4::int8
+      UNION
+      ALL
+      SELECT
+        7::int8,
+        5::int8
+      UNION
+      ALL
+      SELECT
+        8::int8,
+        1::int8
+      UNION
+      ALL
+      SELECT
+        9::int8,
+        2::int8
+    )
+    SELECT
+      (1::int8 + 2::int8) AS f_0,
+      3::int8 AS f_1_0,
+      (3::int8 + 1::int8) AS f_1_1,
+      2::int8 AS f_2_0,
+      (2::int8 + 1::int8) AS f_2_1,
+      (
+        SELECT
+          json_agg(
+            value
+            ORDER BY
+              index
+          )
+        FROM
+          (
+            SELECT
+              index AS index,
+              (value % 3::int8) AS value
+            FROM
+              (
+                SELECT
+                  value AS index,
+                  value
+                FROM
+                  (
+                    SELECT
+                      index,
+                      value
+                    FROM
+                      (
+                        SELECT
+                          index AS index,
+                          (value + 1::int8) AS value
+                        FROM
+                          (
+                            SELECT
+                              index,
+                              value
+                            FROM
+                              t0
+                          )
+                      )
+                    WHERE
+                      (NOT (value > 3::int8))
+                  )
+              )
+          )
+      ) AS f_3
+    ---
+    {
+      a = 3,
+      {
+        3,
+        4,
+      },
+      {
+        2,
+        3,
+      },
+      hello = [
+        2,
+        2,
+        0,
+        0,
+        0,
+      ],
+    }
     "#);
 }

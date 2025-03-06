@@ -251,7 +251,7 @@ fn compile_expr(expr: cr::Expr) -> ExprOrSource {
             compile_func_call(&func_name, expr.ty, args)
         }
         cr::ExprKind::Subquery(sub) => {
-            // optimization: unwrap simple subqueries
+            // optimization: unwrap simple sub-queries
             if let cr::RelExprKind::ProjectRetain(inner, cols) = &sub.kind {
                 if let cr::RelExprKind::SelectRelVar = &inner.kind {
                     if cols.len() == 1 {
@@ -260,9 +260,19 @@ fn compile_expr(expr: cr::Expr) -> ExprOrSource {
                     }
                 }
             }
+            if let cr::RelExprKind::SelectRelVar = &sub.kind {
+                if let ir::TyKind::Primitive(_) = sub.ty.kind {
+                    let col = utils::rel_cols(&sub.ty, true).next().unwrap();
+                    return ExprOrSource::Expr(utils::ident(None::<&str>, col));
+                }
+            }
 
             ExprOrSource::Expr(sql_ast::Expr::Subquery(Box::new(compile_re(*sub))))
         }
+        cr::ExprKind::JsonPack(sub) => ExprOrSource::Source(format!(
+            "(SELECT json_agg(value ORDER BY index) FROM ({}))",
+            compile_re(*sub)
+        )),
     }
 }
 

@@ -30,9 +30,11 @@ impl std::fmt::Display for Literal {
 
 impl PartialEq for Ty {
     fn eq(&self, other: &Self) -> bool {
-        self.kind == other.kind && self.name == other.name
+        self.kind == other.kind
     }
 }
+
+impl Eq for Ty {}
 
 impl Ty {
     pub fn new(kind: impl Into<TyKind>) -> Self {

@@ -290,10 +290,18 @@ impl Context {
             cr::RelExprKind::Constructed(mut rows) if rows.len() == 1 => rows.remove(0),
 
             // it is actually complex: subquery
-            _ => vec![cr::Expr {
-                kind: cr::ExprKind::Subquery(Box::new(rel)),
-                ty: expr.ty.clone(),
-            }],
+            _ => {
+                let kind = if expr.ty.kind.is_primitive() {
+                    cr::ExprKind::Subquery(Box::new(rel))
+                } else {
+                    // type cannot be a single column, we must pack it into JSON
+                    cr::ExprKind::JsonPack(Box::new(rel))
+                };
+                vec![cr::Expr {
+                    kind,
+                    ty: expr.ty.clone(),
+                }]
+            }
         }
     }
 
@@ -309,10 +317,18 @@ impl Context {
             }
 
             // it is actually complex: subquery
-            _ => cr::Expr {
-                kind: cr::ExprKind::Subquery(Box::new(rel)),
-                ty: expr.ty.clone(),
-            },
+            _ => {
+                let kind = if expr.ty.kind.is_primitive() {
+                    cr::ExprKind::Subquery(Box::new(rel))
+                } else {
+                    // type cannot be a single column, we must pack it into JSON
+                    cr::ExprKind::JsonPack(Box::new(rel))
+                };
+                cr::Expr {
+                    kind,
+                    ty: expr.ty.clone(),
+                }
+            }
         }
     }
 

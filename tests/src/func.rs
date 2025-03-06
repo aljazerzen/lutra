@@ -897,3 +897,31 @@ test_case!(
   },
 ]"#
 );
+
+test_case!(
+    bindings_03,
+    r#"let a = [1, 2, 3]
+    func () -> {true, std::map(a, func (x: int64) -> x * 2), false}
+    "#,
+    r#"{
+  true,
+  [
+    2,
+    4,
+    6,
+  ],
+  false,
+}"#
+);
+
+test_case!(
+    bindings_04,
+    r#"let a = [1, 2, 3]
+    func () -> {true, std::map(a, func (x: int64) -> x * 2).1, false}
+    "#,
+    r#"{
+  true,
+  4,
+  false,
+}"#
+);

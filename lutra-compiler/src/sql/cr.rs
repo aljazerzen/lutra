@@ -55,6 +55,7 @@ pub enum ExprKind {
     Literal(ir::Literal),
     FuncCall(String, Vec<Expr>),
     Subquery(Box<RelExpr>),
+    JsonPack(Box<RelExpr>),
 }
 
 impl std::fmt::Debug for Expr {
