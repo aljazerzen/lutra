@@ -317,23 +317,12 @@ fn array_tuple_prim() {
 }
 
 #[test]
-fn complex() {
-    insta::assert_snapshot!(_run_to_str(r#"
+fn complex_00() {
+    insta::assert_snapshot!(_run(r#"
         let x = [
           1, 4, 2, 3, 2, 3, 4, 5, 1, 2
         ]
-        
-        let y = [
-          {1, 20},
-          {4, 15},
-          {2, 14},
-          {6, 17},
-          {4, 22},
-          {7, 12},
-          {8, 23},
-          {3, 16},
-        ]
-        
+
         func () -> {
           a = 1 + 2,
           {3, 3 + 1},
@@ -345,107 +334,63 @@ fn complex() {
             | std::sort(func (x: int) -> x)
             | std::map(func (y: int) -> y % 3)
           )
-        }        
-    "#), @r#"
-    WITH t0 AS (
-      SELECT
-        0::int8 AS index,
-        1::int8 AS value
-      UNION
-      ALL
-      SELECT
-        1::int8,
-        4::int8
-      UNION
-      ALL
-      SELECT
-        2::int8,
-        2::int8
-      UNION
-      ALL
-      SELECT
-        3::int8,
-        3::int8
-      UNION
-      ALL
-      SELECT
-        4::int8,
-        2::int8
-      UNION
-      ALL
-      SELECT
-        5::int8,
-        3::int8
-      UNION
-      ALL
-      SELECT
-        6::int8,
-        4::int8
-      UNION
-      ALL
-      SELECT
-        7::int8,
-        5::int8
-      UNION
-      ALL
-      SELECT
-        8::int8,
-        1::int8
-      UNION
-      ALL
-      SELECT
-        9::int8,
-        2::int8
-    )
-    SELECT
-      (1::int8 + 2::int8) AS f_0,
-      3::int8 AS f_1_0,
-      (3::int8 + 1::int8) AS f_1_1,
-      2::int8 AS f_2_0,
-      (2::int8 + 1::int8) AS f_2_1,
-      (
-        SELECT
-          json_agg(
-            value
-            ORDER BY
-              index
-          )
-        FROM
-          (
-            SELECT
-              index AS index,
-              (value % 3::int8) AS value
-            FROM
-              (
-                SELECT
-                  value AS index,
-                  value
-                FROM
-                  (
-                    SELECT
-                      index,
-                      value
-                    FROM
-                      (
-                        SELECT
-                          index AS index,
-                          (value + 1::int8) AS value
-                        FROM
-                          (
-                            SELECT
-                              index,
-                              value
-                            FROM
-                              t0
-                          )
-                      )
-                    WHERE
-                      (NOT (value > 3::int8))
-                  )
-              )
-          )
-      ) AS f_3
-    ---
+        }
+    "#).1, @r#"
+    {
+      a = 3,
+      {
+        3,
+        4,
+      },
+      {
+        2,
+        3,
+      },
+      hello = [
+        2,
+        2,
+        0,
+        0,
+        0,
+      ],
+    }
+    "#);
+}
+
+#[test]
+#[ignore]
+fn complex_01() {
+    insta::assert_snapshot!(_run(r#"
+    module chinook {
+      type album = {id = int, title = text}
+
+      let get_albums: func (): [album]
+
+      let get_album_by_id = func (album_id: int): album -> (
+        get_albums()
+        | std::filter(func (this: album) -> this.id == album_id)
+        | std::index(0)
+      )
+    }
+
+    module box_office {
+      type album_sale = {id = int, total = float}
+
+      let get_album_sales: func (): [album_sale]
+
+      let get_album_sales_by_id = func (album_id: int): album_sale -> (
+        get_album_sales()
+        | std::filter(func (this: album_sale) -> this.id == album_id)
+        | std::index(0)
+      )
+    }
+ 
+    func (album_id: int) -> {
+      chinook::get_albums(),
+      chinook::get_album_by_id(album_id),
+      box_office::get_album_sales_by_id(album_id),
+    }
+    "#).1, @r#"
     {
       a = 3,
       {

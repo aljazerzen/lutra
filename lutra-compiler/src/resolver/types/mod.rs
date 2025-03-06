@@ -1,18 +1,30 @@
 mod expr;
 mod functions;
+mod inference;
 mod layout;
 mod scope;
 mod stmt;
 mod tuple;
-mod types;
-
-pub use types::{TypeLayoutResolverSimple, TypeReplacer};
+mod validation;
 
 use crate::decl::RootModule;
+use crate::pr;
 use crate::utils::IdGenerator;
 
+pub fn resolve_types(
+    root_module: &mut RootModule,
+    resolution_order: &[Vec<pr::Path>],
+) -> Result<(), Vec<crate::diagnostic::Diagnostic>> {
+    let mut resolver = TypeResolver::new(root_module);
+    resolver
+        .resolve_decls(resolution_order)
+        .map_err(|d| vec![d])?;
+
+    Ok(())
+}
+
 /// Can fold (walk) over AST and for each function call or variable find what they are referencing.
-pub struct Resolver<'a> {
+struct TypeResolver<'a> {
     root_mod: &'a mut RootModule,
 
     /// For recursive stmt references (recursive types and functions),
@@ -21,22 +33,19 @@ pub struct Resolver<'a> {
     ///   unresolved references.
     ///   After this pass, all top-level types should be resolved.
     /// - strict mode, where we require all types to be resolved.
-    pub strict_mode: bool,
-    pub strict_mode_needed: bool,
+    strict_mode: bool,
+    strict_mode_needed: bool,
 
-    pub debug_current_decl: crate::pr::Path,
+    debug_current_decl: crate::pr::Path,
 
-    pub id: IdGenerator<usize>,
+    id: IdGenerator<usize>,
 
     scopes: Vec<scope::Scope>,
 }
 
-#[derive(Default, Clone)]
-pub struct ResolverOptions {}
-
-impl Resolver<'_> {
-    pub fn new(root_mod: &mut RootModule) -> Resolver {
-        Resolver {
+impl TypeResolver<'_> {
+    fn new(root_mod: &mut RootModule) -> TypeResolver {
+        TypeResolver {
             root_mod,
             debug_current_decl: crate::pr::Path::from_name("?"),
             id: IdGenerator::new(),

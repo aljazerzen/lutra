@@ -5,9 +5,9 @@ use indexmap::IndexMap;
 use itertools::Itertools;
 use lutra_bin::ir::{self};
 
-use crate::utils::IdGenerator;
+use crate::utils::{self, IdGenerator};
+use crate::Result;
 use crate::{decl, pr};
-use crate::{semantic, Result};
 
 pub fn lower(root_module: &decl::RootModule, path: &pr::Path) -> ir::Program {
     let mut lowerer = Lowerer::new(root_module);
@@ -89,8 +89,8 @@ impl<'a> Lowerer<'a> {
                 for (param, arg) in zip(&ty_func.ty_params, ty_args) {
                     mapping.insert(pr::Path::new(vec!["scope", param.name.as_str()]), arg);
                 }
-                expr = semantic::TypeReplacer::on_expr(expr, mapping);
-                expr = semantic::TypeLayoutResolverSimple::on_expr(expr);
+                expr = utils::TypeReplacer::on_expr(expr, mapping);
+                expr = utils::TypeLayoutResolver::on_expr(expr);
             }
         }
 

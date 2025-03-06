@@ -6,9 +6,9 @@ use crate::Result;
 
 use super::scope::Named;
 use super::scope::ScopedKind;
-use super::Resolver;
+use super::TypeResolver;
 
-impl Resolver<'_> {
+impl TypeResolver<'_> {
     pub fn compute_ty_layout(&mut self, ty: &mut pr::Ty) -> Result<bool, Diagnostic> {
         if ty.layout.is_some() {
             return Ok(false);

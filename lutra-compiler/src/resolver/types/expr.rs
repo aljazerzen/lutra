@@ -2,23 +2,18 @@ use itertools::Itertools;
 
 use crate::decl::DeclKind;
 use crate::diagnostic::{Diagnostic, WithErrorInfo};
+use crate::pr;
 use crate::pr::Ty;
-use crate::semantic::resolver::scope::{Named, ScopedKind};
-use crate::semantic::resolver::tuple::BaseKind;
-use crate::utils::fold::{self, PrFold};
+use crate::resolver::types::scope::{Named, ScopedKind};
+use crate::resolver::types::tuple::BaseKind;
+use crate::utils::fold;
 use crate::Result;
-use crate::{pr, printer};
 
-use super::tuple::Indirection;
-use super::{scope, tuple};
+use super::scope::Scope;
 
-impl fold::PrFold for super::Resolver<'_> {
+impl fold::PrFold for super::TypeResolver<'_> {
     fn fold_stmts(&mut self, _: Vec<pr::Stmt>) -> Result<Vec<pr::Stmt>> {
         unreachable!()
-    }
-
-    fn fold_type(&mut self, ty: Ty) -> Result<Ty> {
-        self.fold_type_actual(ty)
     }
 
     #[tracing::instrument(name = "e", skip(self, node))]
@@ -149,89 +144,39 @@ impl fold::PrFold for super::Resolver<'_> {
         }
         Ok(r)
     }
-}
 
-impl super::Resolver<'_> {
-    pub fn resolve_column_exclusion(&mut self, expr: pr::Expr) -> Result<pr::Expr> {
-        let expr = self.fold_expr(expr)?;
-        let _except = self.coerce_into_tuple(expr)?;
+    fn fold_type(&mut self, ty: Ty) -> Result<Ty> {
+        // fold inner containers
+        let mut ty = match ty.kind {
+            pr::TyKind::Function(ty_func) if self.scopes.is_empty() => {
+                let mut scope = Scope::new();
+                scope.insert_generics_params(&ty_func.ty_params);
+                self.scopes.push(scope);
+                let ty_func = fold::fold_ty_func(self, ty_func)?;
+                self.scopes.pop();
 
-        todo!()
-        // self.fold_expr(pr::Expr::new(pr::ExprKind::All {
-        //     within: Box::new(pr::Expr::new(pr::Path::from_path(vec![NS_THIS]))),
-        //     except: Box::new(except),
-        // }))
-    }
-
-    /// Resolve indirections (lookups).
-    /// For example, `base.indirection` where `base` either has a tuple or array type.
-    ///
-    /// Returns a positional indirection into the base.
-    pub fn resolve_indirection(
-        &self,
-        base: &Ty,
-        indirection: &pr::IndirectionKind,
-    ) -> Result<Indirection> {
-        let base_ref = self.resolve_ty_ident(base.clone())?;
-
-        let base = match base_ref {
-            scope::TyRef::Ty(b) => b,
-            scope::TyRef::Param(id) => {
-                let param = self.get_ty_param(&id);
-                return match param {
-                    pr::TyParamDomain::Open | pr::TyParamDomain::OneOf(_) => {
-                        Err(Diagnostic::new_custom(format!(
-                            "expected a tuple or an array, found {}",
-                            base.kind.as_ref()
-                        )))
-                    }
-                    pr::TyParamDomain::TupleFields(fields) => {
-                        tuple::lookup_in_domain(fields, indirection).ok_or_else(|| {
-                            Diagnostic::new_custom(format!(
-                                "Field {} does not exist in type {}",
-                                tuple::print_indirection_kind(indirection),
-                                printer::print_ty(base)
-                            ))
-                        })
-                    }
-                };
+                Ty {
+                    kind: pr::TyKind::Function(ty_func),
+                    ..ty
+                }
             }
-            scope::TyRef::Arg(id) => {
-                todo!("tuple indirection into generic type Arg: {id:?}")
-            }
+            _ => fold::fold_type(self, ty)?,
         };
 
-        match &base.kind {
-            pr::TyKind::Ident(_) => unreachable!(),
-
-            pr::TyKind::Tuple(fields) => {
-                tuple::lookup_in_tuple(fields, indirection).ok_or_else(|| {
-                    Diagnostic::new_custom(format!(
-                        "Field {} does not exist in type {}",
-                        tuple::print_indirection_kind(indirection),
-                        printer::print_ty(&base)
-                    ))
-                })
-            }
-
-            pr::TyKind::Array(items_ty) => match indirection {
-                pr::IndirectionKind::Name(_) => {
-                    Err(Diagnostic::new_custom("cannot lookup array items by name"))
-                }
-                pr::IndirectionKind::Position(pos) => Ok(Indirection {
-                    base: BaseKind::Array,
-                    position: *pos as usize,
-                    target_ty: *items_ty.clone(),
-                }),
-                pr::IndirectionKind::Star => todo!(),
-            },
-
-            pr::TyKind::Primitive(_) | pr::TyKind::Enum(_) | pr::TyKind::Function(_) => {
-                Err(Diagnostic::new_custom(format!(
-                    "expected a tuple or an array, found {}",
-                    base.kind.as_ref()
-                )))
+        // compute memory layout
+        let missing_layout = self.compute_ty_layout(&mut ty)?;
+        if missing_layout {
+            if self.strict_mode {
+                return Err(Diagnostic::new_custom(
+                    "type has an infinite size due to recursive type references".to_string(),
+                )
+                .push_hint("add an array or an enum onto the path of recursion")
+                .with_span(ty.span));
+            } else {
+                self.strict_mode_needed = true;
             }
         }
+
+        Ok(ty)
     }
 }

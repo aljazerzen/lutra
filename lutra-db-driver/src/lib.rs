@@ -15,6 +15,15 @@ pub fn repack(ty: &ir::Ty, data: Data, expected_ty: &ir::Ty) -> Data {
         return data;
     }
 
+    // TODO: currently, this function is very inefficient:
+    // - it does two copies when repacking JSON,
+    // - it compares types a lot (for each element of array), even though the two type do not change
+    //   this should be improved via generating mapping functions which would perform such comparison only once
+    // - having this as a separate step from the main query function means that we are copying
+    //   data at least once. Maybe we would implement it as a facade on writers in query, which
+    //   would just redirect the writes.
+    // All this should be done under benchmarks, so we know that the changes actually have an impact.
+
     match (&ty.kind, &expected_ty.kind) {
         (ir::TyKind::Primitive(p), ir::TyKind::Primitive(e)) => {
             panic!("cannot convert from {p:?} to {e:?}");

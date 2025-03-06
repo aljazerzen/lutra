@@ -1,10 +1,11 @@
 use crate::decl::DeclKind;
 use crate::pr;
-use crate::semantic::NS_STD;
+use crate::resolver::NS_STD;
 use crate::utils::fold::PrFold;
 use crate::Result;
 
-impl super::Resolver<'_> {
+impl super::TypeResolver<'_> {
+    /// Entry point to the resolver.
     pub fn resolve_decls(&mut self, order: &[Vec<pr::Path>]) -> Result<()> {
         for group in order {
             self.strict_mode = false;
@@ -27,10 +28,9 @@ impl super::Resolver<'_> {
         Ok(())
     }
 
-    /// Entry point to the resolver.
     /// fq_ident must point to an unresolved declaration.
     #[tracing::instrument(name = "d", skip_all, fields(n = fq_ident.to_string()))]
-    pub fn resolve_decl(&mut self, fq_ident: &pr::Path) -> Result<()> {
+    fn resolve_decl(&mut self, fq_ident: &pr::Path) -> Result<()> {
         if !fq_ident.starts_with_part(NS_STD) {
             tracing::debug!("resolving decl {fq_ident}");
         }

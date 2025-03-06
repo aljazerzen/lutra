@@ -6,7 +6,7 @@ mod lowering;
 mod parser;
 mod printer;
 mod project;
-mod semantic;
+mod resolver;
 mod span;
 mod sql;
 mod utils;

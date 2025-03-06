@@ -4,11 +4,11 @@ use std::cell::OnceCell;
 use std::collections::HashMap;
 use std::rc::Rc;
 
-use crate::decl;
-use crate::diagnostic::Diagnostic;
+use crate::diagnostic::{Diagnostic, WithErrorInfo};
 use crate::pr::{self, Path, TyParamDomain};
+use crate::{decl, printer, utils, Result};
 
-use super::Resolver;
+use super::TypeResolver;
 
 #[derive(Debug)]
 pub struct Scope {
@@ -138,7 +138,7 @@ impl Scope {
     }
 }
 
-impl Resolver<'_> {
+impl TypeResolver<'_> {
     /// Get declaration from within the current scope.
     ///
     /// Does not mutate the current scope or module structure.
@@ -185,5 +185,92 @@ impl Resolver<'_> {
         let domain = scoped.as_type_param().unwrap();
 
         domain
+    }
+
+    /// Resolves if type is an ident. Does not recurse.
+    pub fn resolve_ty_ident(&self, ty: pr::Ty) -> Result<TyRef<'_>> {
+        let pr::TyKind::Ident(ident) = ty.kind else {
+            return Ok(TyRef::Ty(Cow::Owned(ty)));
+        };
+        let named = self.get_ident(&ident).ok_or_else(|| {
+            tracing::debug!("scope: {:?}", self.scopes.last().unwrap());
+            Diagnostic::new_assert("cannot find type ident")
+                .push_hint(format!("ident={ident}"))
+                .with_span(ty.span)
+        })?;
+        match named {
+            Named::Decl(decl) => match &decl.kind {
+                decl::DeclKind::Ty(t) => Ok(TyRef::Ty(Cow::Borrowed(t))),
+                decl::DeclKind::Unresolved(_) => Err(Diagnostic::new_assert(format!(
+                    "Unresolved ident at {:?}: (during eval of {})",
+                    ty.span, self.debug_current_decl
+                ))),
+                _ => Err(Diagnostic::new_assert("expected a type")
+                    .push_hint(format!("got {:?}", &decl.kind))
+                    .with_span(ty.span)),
+            },
+            Named::Scoped(scoped) => match scoped {
+                ScopedKind::Param { ty, .. } => {
+                    Err(Diagnostic::new_assert("expected a type, found a value")
+                        .push_hint(format!("got param of type `{}`", printer::print_ty(&ty)))
+                        .with_span(ty.span))
+                }
+                ScopedKind::Type { ty } => self.resolve_ty_ident(ty),
+                ScopedKind::TypeParam { .. } => Ok(TyRef::Param(ident.name().to_string())),
+                ScopedKind::TypeArg { id } => Ok(TyRef::Arg(id)),
+            },
+        }
+    }
+
+    /// Add type's params into scope as type arguments.
+    pub fn introduce_ty_into_scope(&mut self, ty: pr::Ty) -> (pr::Ty, Vec<pr::Ty>) {
+        let pr::TyKind::Function(mut ty_func) = ty.kind else {
+            return (ty, Vec::new());
+        };
+
+        // TODO: recurse? There might be type params deeper in the type.
+
+        if ty_func.ty_params.is_empty() {
+            return (
+                pr::Ty {
+                    kind: pr::TyKind::Function(ty_func),
+                    ..ty
+                },
+                Vec::new(),
+            );
+        }
+
+        let expr_id = self.id.gen();
+        tracing::debug!(
+            "introducing generics with expr_id={expr_id}, ty_func={}",
+            crate::printer::print_ty(&pr::Ty::new(ty_func.clone()))
+        );
+
+        let mut mapping = HashMap::new();
+        let mut ty_args = Vec::with_capacity(ty_func.ty_params.len());
+
+        let scope = self.scopes.last_mut().unwrap();
+        for gtp in ty_func.ty_params.drain(..) {
+            let ty_arg = pr::Ty::new(Path::new(vec![
+                "scope".to_string(),
+                "type_args".to_string(),
+                expr_id.to_string(),
+                gtp.name.clone(),
+            ]));
+            mapping.insert(Path::new(vec!["scope", gtp.name.as_str()]), ty_arg.clone());
+            ty_args.push(ty_arg);
+
+            let type_arg_id = TyArgId {
+                expr_id,
+                name: gtp.name,
+            };
+            scope.insert_generic_arg(type_arg_id, gtp.domain);
+        }
+
+        let ty = pr::Ty {
+            kind: pr::TyKind::Function(ty_func),
+            ..ty
+        };
+        (utils::TypeReplacer::on_ty(ty, mapping), ty_args)
     }
 }

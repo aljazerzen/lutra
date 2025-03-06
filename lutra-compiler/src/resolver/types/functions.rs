@@ -2,14 +2,14 @@ use itertools::Itertools;
 
 use crate::diagnostic::{Diagnostic, WithErrorInfo};
 use crate::pr::{self, *};
-use crate::semantic::resolver::types::{TypeLayoutResolver, TypeReplacer};
+use crate::utils;
 use crate::utils::fold::{self, PrFold};
 use crate::{Result, Span};
 
 use super::scope::Scope;
-use super::Resolver;
+use super::TypeResolver;
 
-impl Resolver<'_> {
+impl TypeResolver<'_> {
     /// Folds function types, so they are resolved to material types, ready for type checking.
     /// Requires id of the function call node, so it can be used to generic type arguments.
     #[tracing::instrument(name = "func", skip_all, fields(f = func.params.iter().map(|p| &p.name).join(",")))]
@@ -41,11 +41,11 @@ impl Resolver<'_> {
 
         // finalize generic type args
         let mapping = scope.finalize_type_args().with_span(func.body.span)?;
-        let func = TypeReplacer::on_func(*func, mapping);
+        let func = utils::TypeReplacer::on_func(*func, mapping);
 
         // fold again, but only for computing layouts
         // (before type arg finalization, some layouts might have not been able to compute)
-        let func = TypeLayoutResolver::on_func(func, self)?;
+        let func = utils::TypeLayoutResolver::on_func(func)?;
 
         Ok(Box::new(func))
     }

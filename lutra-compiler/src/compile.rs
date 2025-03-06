@@ -15,13 +15,13 @@ pub fn compile(
     mut source: project::SourceTree,
     _: CompileParams,
 ) -> Result<project::Project, error::Error> {
-    crate::semantic::load_std_lib(&mut source);
+    crate::resolver::load_std_lib(&mut source);
     let source = source;
 
     let source_files = linearize::linearize_tree(&source)?;
 
     let root_module = parse(&source, source_files)
-        .and_then(crate::semantic::resolve)
+        .and_then(crate::resolver::resolve)
         .map_err(|e| Error::from_diagnostics(e, &source))?;
 
     Ok(crate::Project {
