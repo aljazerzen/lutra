@@ -3,10 +3,15 @@ use crate::ir;
 use crate::Value;
 
 #[allow(dead_code)]
-pub trait ValueVisitor {
+pub trait ValueVisitor<'t> {
     type Res;
 
-    fn visit_value(&mut self, value: &Value, ty: &ir::Ty) -> Result<Self::Res, crate::Error> {
+    fn get_mat_ty(&self, ty: &'t ir::Ty) -> &'t ir::Ty {
+        ty
+    }
+
+    fn visit_value(&mut self, value: &Value, ty: &'t ir::Ty) -> Result<Self::Res, crate::Error> {
+        let ty = self.get_mat_ty(ty);
         match value {
             Value::Bool(v) => {
                 super::expect_ty_primitive(ty, ir::TyPrimitive::bool)?;
@@ -87,19 +92,19 @@ pub trait ValueVisitor {
     fn visit_tuple(
         &mut self,
         fields: &[Value],
-        ty_fields: &[ir::TyTupleField],
+        ty_fields: &'t [ir::TyTupleField],
     ) -> Result<Self::Res, crate::Error>;
 
     fn visit_array(
         &mut self,
         items: &[Value],
-        ty_items: &ir::Ty,
+        ty_items: &'t ir::Ty,
     ) -> Result<Self::Res, crate::Error>;
 
     fn visit_enum(
         &mut self,
         tag: usize,
         inner: &Value,
-        ty_variants: &[ir::TyEnumVariant],
+        ty_variants: &'t [ir::TyEnumVariant],
     ) -> Result<Self::Res, crate::Error>;
 }

@@ -50,7 +50,7 @@ fn test_print_01() {
     ]);
 
     let ty = ir::Ty::from(ty);
-    assert_snapshot!(value.print_source(&ty).unwrap(), @r#"
+    assert_snapshot!(value.print_source(&ty, &[]).unwrap(), @r#"
     {
       n_rows = 100,
       page = [
@@ -91,7 +91,7 @@ fn test_print_02() {
     ]);
 
     let ty = ir::Ty::from(ty);
-    assert_snapshot!(value.print_source(&ty).unwrap(), @r#"
+    assert_snapshot!(value.print_source(&ty, &[]).unwrap(), @r#"
     [
       1,
       2,

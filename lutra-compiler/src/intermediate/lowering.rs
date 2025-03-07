@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet, VecDeque};
 use std::iter::zip;
 
 use indexmap::IndexMap;
@@ -9,13 +9,17 @@ use crate::utils::{self, IdGenerator};
 use crate::Result;
 use crate::{decl, pr};
 
+use super::fold::{self, IrFold};
+
 pub fn lower_expr(root_module: &decl::RootModule, main: &pr::Expr) -> ir::Program {
     let mut lowerer = Lowerer::new(root_module);
 
     let main = lowerer.lower_expr(main).unwrap();
     let main = lowerer.lower_var_bindings(main);
 
-    ir::Program { main }
+    let types = lowerer.lower_ty_defs();
+
+    ir::Program { main, types }
 }
 
 pub fn lower(root_module: &decl::RootModule, path: &pr::Path) -> ir::Program {
@@ -24,7 +28,9 @@ pub fn lower(root_module: &decl::RootModule, path: &pr::Path) -> ir::Program {
     let main = lowerer.lower_expr_decl(path, vec![]).unwrap();
     let main = lowerer.lower_var_bindings(main);
 
-    ir::Program { main }
+    let types = lowerer.lower_ty_defs();
+
+    ir::Program { main, types }
 }
 
 struct Lowerer<'a> {
@@ -32,6 +38,7 @@ struct Lowerer<'a> {
 
     function_scopes: Vec<u32>,
     var_bindings: IndexMap<(pr::Path, Vec<pr::Ty>), u32>,
+    type_defs_needed: VecDeque<pr::Path>,
 
     generator_function_scope: IdGenerator<usize>,
     generator_var_binding: IdGenerator<usize>,
@@ -44,6 +51,7 @@ impl<'a> Lowerer<'a> {
 
             function_scopes: vec![],
             var_bindings: Default::default(),
+            type_defs_needed: Default::default(),
 
             generator_function_scope: Default::default(),
             generator_var_binding: Default::default(),
@@ -209,7 +217,7 @@ impl<'a> Lowerer<'a> {
         };
         Ok(ir::Expr {
             kind,
-            ty: ir::Ty::from(expr.ty.clone().unwrap()),
+            ty: self.lower_ty(expr.ty.clone().unwrap()),
         })
     }
 
@@ -271,5 +279,57 @@ impl<'a> Lowerer<'a> {
             })),
             ty: main_ty,
         }
+    }
+
+    fn lower_ty(&mut self, ty: pr::Ty) -> ir::Ty {
+        // this function is direct no-op mapping, expect for idents
+        let ty = ir::Ty::from(ty);
+        let (ty, idents) = IdentCollector::run(ty);
+        self.type_defs_needed.extend(idents);
+        ty
+    }
+
+    fn lower_ty_defs(&mut self) -> Vec<ir::TyDef> {
+        let mut defs = Vec::with_capacity(self.type_defs_needed.len());
+        let mut names_done = HashSet::new();
+
+        while let Some(path) = self.type_defs_needed.pop_front() {
+            if names_done.contains(&path) {
+                continue;
+            }
+
+            let decl = self.root_module.module.get(&path).unwrap();
+            let ty = decl.kind.as_ty().unwrap().clone();
+
+            let ty = self.lower_ty(ty);
+
+            defs.push(ir::TyDef {
+                name: ir::Path(path.clone().into_iter().collect()),
+                ty,
+            });
+            names_done.insert(path);
+        }
+
+        defs
+    }
+}
+
+#[derive(Default)]
+struct IdentCollector {
+    idents: Vec<pr::Path>,
+}
+impl IdentCollector {
+    fn run(ty: ir::Ty) -> (ir::Ty, Vec<pr::Path>) {
+        let mut c = IdentCollector::default();
+        let ty = c.fold_ty(ty).unwrap();
+        (ty, c.idents)
+    }
+}
+impl fold::IrFold for IdentCollector {
+    fn fold_ty(&mut self, ty: ir::Ty) -> Result<ir::Ty, ()> {
+        if let ir::TyKind::Ident(ident) = &ty.kind {
+            self.idents.push(pr::Path::new(&ident.0));
+        }
+        fold::fold_ty(self, ty)
     }
 }

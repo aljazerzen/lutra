@@ -51,8 +51,11 @@ pub fn _run(source: &str) -> (String, String) {
     let output = lutra_db_driver::repack(&rel_ty, rel_data, program.get_output_ty());
     let output = output.flatten();
 
-    let output = lutra_bin::Value::decode(&output, program.get_output_ty()).unwrap();
-    let output = output.print_source(program.get_output_ty()).unwrap();
+    let output =
+        lutra_bin::Value::decode(&output, program.get_output_ty(), &program.types).unwrap();
+    let output = output
+        .print_source(program.get_output_ty(), &program.types)
+        .unwrap();
 
     (formatted_sql, output)
 }

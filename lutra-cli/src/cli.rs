@@ -153,14 +153,18 @@ pub fn run(cmd: RunCommand) -> anyhow::Result<()> {
     let project = lutra_compiler::compile(project, cmd.compile)?;
 
     let program = lutra_compiler::_lower_expr(&project, &cmd.main)?;
-    tracing::debug!("ir: {}", lutra_bin::ir::print(&program));
-    let output_ty = program.get_output_ty().clone();
-    let bytecode = lutra_compiler::bytecode_program(program);
+    tracing::debug!("ir:\n{}", lutra_bin::ir::print(&program));
+    let bytecode = lutra_compiler::bytecode_program(program.clone());
 
     let res = lutra_runtime::evaluate(&bytecode, vec![], lutra_runtime::BUILTIN_MODULES);
-    let value = lutra_bin::Value::decode(&res, &output_ty)?;
+    let value = lutra_bin::Value::decode(&res, program.get_output_ty(), &program.types)?;
 
-    println!("{}", value.print_source(&output_ty).unwrap());
+    println!(
+        "{}",
+        value
+            .print_source(program.get_output_ty(), &program.types)
+            .unwrap()
+    );
     Ok(())
 }
 
@@ -228,8 +232,11 @@ pub async fn run_postgres(cmd: RunPostgresCommand) -> anyhow::Result<()> {
     let data = lutra_db_driver::repack(&db_ty, data, program.get_output_ty());
     let data = data.flatten();
 
-    let value = lutra_bin::Value::decode(&data, program.get_output_ty())?;
+    let value = lutra_bin::Value::decode(&data, program.get_output_ty(), &program.types)?;
 
-    println!("{}", value.print_source(program.get_output_ty())?);
+    println!(
+        "{}",
+        value.print_source(program.get_output_ty(), &program.types)?
+    );
     Ok(())
 }

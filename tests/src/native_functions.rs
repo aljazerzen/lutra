@@ -33,7 +33,7 @@ fn test_01() {
 
     let value = lutra_runtime::evaluate(&bytecode, vec![], &modules);
 
-    let value = Value::decode(&value, &output_ty).unwrap();
+    let value = Value::decode(&value, &output_ty, &[]).unwrap();
 
     assert_eq!(value, Value::Int64(6));
 }

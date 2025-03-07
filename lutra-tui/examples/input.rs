@@ -8,7 +8,7 @@ fn main() {
 
     let result = lutra_tui::prompt_for_ty(&ty, Some(initial)).unwrap();
 
-    println!("{}", result.print_source(&ty).unwrap());
+    println!("{}", result.print_source(&ty, &[]).unwrap());
 }
 
 fn get_ty() -> ir::Ty {

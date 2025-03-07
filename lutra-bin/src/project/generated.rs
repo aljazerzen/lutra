@@ -644,6 +644,7 @@ pub mod ir {
     #[allow(non_camel_case_types)]
     pub struct Program {
         pub main: Expr,
+        pub types: crate::vec::Vec<TyDef>,
     }
 
     #[derive(Debug, Clone)]
@@ -727,6 +728,13 @@ pub mod ir {
 
     #[derive(Debug, Clone)]
     #[allow(non_camel_case_types)]
+    pub struct TyDef {
+        pub name: Path,
+        pub ty: Ty,
+    }
+
+    #[derive(Debug, Clone)]
+    #[allow(non_camel_case_types)]
     pub struct Ty {
         pub kind: TyKind,
         pub layout: core::option::Option<TyLayout>,
@@ -790,7 +798,7 @@ pub mod ir {
         pub body: Ty,
     }
 
-    #[derive(Debug, Clone, PartialEq)]
+    #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
     #[allow(non_camel_case_types)]
     pub struct Path(pub crate::vec::Vec<crate::string::String>);
 
@@ -805,26 +813,30 @@ pub mod ir {
             type HeadPtr = ProgramHeadPtr;
             fn encode_head(&self, buf: &mut crate::bytes::BytesMut) -> Self::HeadPtr {
                 let main = self.main.encode_head(buf);
-                ProgramHeadPtr { main }
+                let types = self.types.encode_head(buf);
+                ProgramHeadPtr { main, types }
             }
             fn encode_body(&self, head: Self::HeadPtr, buf: &mut crate::bytes::BytesMut) {
                 self.main.encode_body(head.main, buf);
+                self.types.encode_body(head.types, buf);
             }
         }
         #[allow(non_camel_case_types)]
         pub struct ProgramHeadPtr {
             main: <super::Expr as crate::Encode>::HeadPtr,
+            types: <crate::vec::Vec<super::TyDef> as crate::Encode>::HeadPtr,
         }
         impl crate::Layout for Program {
             fn head_size() -> usize {
-                160
+                224
             }
         }
 
         impl crate::Decode for Program {
             fn decode(buf: &[u8]) -> crate::Result<Self> {
                 let main = super::Expr::decode(buf.skip(0))?;
-                Ok(Program { main })
+                let types = crate::vec::Vec::<super::TyDef>::decode(buf.skip(20))?;
+                Ok(Program { main, types })
             }
         }
 
@@ -1457,6 +1469,38 @@ pub mod ir {
                 let expr = super::Expr::decode(buf.skip(4))?;
                 let main = super::Expr::decode(buf.skip(24))?;
                 Ok(Binding { id, expr, main })
+            }
+        }
+
+        #[allow(clippy::all, unused_variables)]
+        impl crate::Encode for TyDef {
+            type HeadPtr = TyDefHeadPtr;
+            fn encode_head(&self, buf: &mut crate::bytes::BytesMut) -> Self::HeadPtr {
+                let name = self.name.encode_head(buf);
+                let ty = self.ty.encode_head(buf);
+                TyDefHeadPtr { name, ty }
+            }
+            fn encode_body(&self, head: Self::HeadPtr, buf: &mut crate::bytes::BytesMut) {
+                self.name.encode_body(head.name, buf);
+                self.ty.encode_body(head.ty, buf);
+            }
+        }
+        #[allow(non_camel_case_types)]
+        pub struct TyDefHeadPtr {
+            name: <super::Path as crate::Encode>::HeadPtr,
+            ty: <super::Ty as crate::Encode>::HeadPtr,
+        }
+        impl crate::Layout for TyDef {
+            fn head_size() -> usize {
+                184
+            }
+        }
+
+        impl crate::Decode for TyDef {
+            fn decode(buf: &[u8]) -> crate::Result<Self> {
+                let name = super::Path::decode(buf.skip(0))?;
+                let ty = super::Ty::decode(buf.skip(8))?;
+                Ok(TyDef { name, ty })
             }
         }
 

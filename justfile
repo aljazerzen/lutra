@@ -18,7 +18,9 @@ test-fast filterset='all()' nextest_args='':
     cargo check -p lutra-bin --no-default-features
 
 generate:
+    # For when current code does not compile
+    # ./target/debug/lutra-codegen lutra-bin/src/project lutra-bin/src/project/generated.rs
+    # cargo fmt -p lutra-bin
+
     cargo run -p lutra-codegen -- lutra-bin/src/project lutra-bin/src/project/generated.rs
-    cargo fmt -p lutra-bin
-    ./target/debug/lutra-codegen lutra-bin/src/project lutra-bin/src/project/generated.rs
     cargo fmt -p lutra-bin

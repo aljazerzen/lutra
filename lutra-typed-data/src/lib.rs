@@ -9,7 +9,7 @@ pub fn decode_typed_data(buffer: &[u8]) -> Result<(Value, ir::Ty)> {
 
     let ty = type_to_ir(&typed_data.ty);
 
-    let value = Value::decode(&typed_data.data, &ty)?;
+    let value = Value::decode(&typed_data.data, &ty, &[])?;
 
     Ok((value, ty))
 }
@@ -19,7 +19,7 @@ pub fn encode_typed_data(
     value: Value,
     ty: &ir::Ty,
 ) -> Result<std::io::Result<()>> {
-    let data = value.encode(ty)?;
+    let data = value.encode(ty, &[])?;
 
     let ty = type_from_pr(ty);
 

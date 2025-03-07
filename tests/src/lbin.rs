@@ -11,11 +11,19 @@ use lutra_compiler::{pr, Project};
 
 #[track_caller]
 fn _test_encode_decode<T: Encode + Decode + std::fmt::Debug>(value: Value, ty: &ir::Ty) -> String {
+    let mut ty_defs = Vec::new();
+    if let Some(name) = &ty.name {
+        ty_defs.push(ir::TyDef {
+            name: ir::Path(vec![name.clone()]),
+            ty: ty.clone(),
+        });
+    }
+
     // Value::encode
-    let buf = value.encode(ty).unwrap();
+    let buf = value.encode(ty, &ty_defs).unwrap();
 
     // Value::decode
-    let value_decoded = Value::decode(&buf, ty).unwrap();
+    let value_decoded = Value::decode(&buf, ty, &ty_defs).unwrap();
     assert_eq!(value, value_decoded);
 
     // native decode

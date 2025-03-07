@@ -1,26 +1,33 @@
 #![cfg(feature = "std")]
 
+use std::collections::HashMap;
+
 use crate::ir;
 use crate::{Result, Value};
 
 use super::fold::ValueVisitor;
 
 impl Value {
-    pub fn print_pretty(&self, ty: &ir::Ty) -> Result<String> {
-        let mut printer = Printer::default();
+    pub fn print_pretty(&self, ty: &ir::Ty, ty_defs: &[ir::TyDef]) -> Result<String> {
+        let ty_defs: HashMap<_, _, _> = ty_defs.iter().map(|def| (&def.name, &def.ty)).collect();
+        let mut printer = Printer {
+            indent: 0,
+            ty_defs: &ty_defs,
+        };
 
         printer.visit_value(self, ty)
     }
 }
 
-#[derive(Clone, Default)]
-struct Printer {
+#[derive(Clone)]
+struct Printer<'t> {
     indent: usize,
+    ty_defs: &'t HashMap<&'t ir::Path, &'t ir::Ty>,
 }
 
 const INDENT: usize = 2;
 
-impl Printer {
+impl<'t> Printer<'t> {
     fn indent(&mut self) {
         self.indent += INDENT;
     }
@@ -36,8 +43,16 @@ impl Printer {
     }
 }
 
-impl ValueVisitor for Printer {
+impl<'t> ValueVisitor<'t> for Printer<'t> {
     type Res = String;
+
+    fn get_mat_ty(&self, ty: &'t ir::Ty) -> &'t ir::Ty {
+        if let ir::TyKind::Ident(path) = &ty.kind {
+            self.ty_defs.get(path).unwrap()
+        } else {
+            ty
+        }
+    }
 
     fn visit_bool(&mut self, v: bool) -> Result<Self::Res, crate::Error> {
         Ok(if v {
@@ -86,7 +101,7 @@ impl ValueVisitor for Printer {
     fn visit_tuple(
         &mut self,
         fields: &[Value],
-        ty_fields: &[ir::TyTupleField],
+        ty_fields: &'t [ir::TyTupleField],
     ) -> Result<Self::Res, crate::Error> {
         let mut r = "{".to_string();
         self.indent();
@@ -110,7 +125,7 @@ impl ValueVisitor for Printer {
     fn visit_array(
         &mut self,
         items: &[Value],
-        ty_items: &ir::Ty,
+        ty_items: &'t ir::Ty,
     ) -> Result<Self::Res, crate::Error> {
         if let Some(mut table) = try_tabular(ty_items) {
             for item in items {
@@ -150,7 +165,7 @@ impl ValueVisitor for Printer {
         &mut self,
         tag: usize,
         inner: &Value,
-        ty_variants: &[ir::TyEnumVariant],
+        ty_variants: &'t [ir::TyEnumVariant],
     ) -> Result<Self::Res, crate::Error> {
         let variant = ty_variants.get(tag).ok_or(crate::Error::InvalidData)?;
 

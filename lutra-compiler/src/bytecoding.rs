@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use indexmap::IndexSet;
 use lutra_bin::br::*;
 use lutra_bin::bytes::Buf;
@@ -8,6 +10,11 @@ use lutra_bin::Encode;
 pub fn compile_program(value: ir::Program) -> Program {
     let mut b = ByteCoder {
         externals: Default::default(),
+        types: value
+            .types
+            .into_iter()
+            .map(|def| (def.name, def.ty))
+            .collect(),
     };
 
     Program {
@@ -18,9 +25,17 @@ pub fn compile_program(value: ir::Program) -> Program {
 
 struct ByteCoder {
     externals: IndexSet<ExternalSymbol>,
+    types: HashMap<ir::Path, ir::Ty>,
 }
 
 impl ByteCoder {
+    fn get_ty_mat<'a>(&'a self, ty: &'a ir::Ty) -> &'a ir::Ty {
+        match &ty.kind {
+            TyKind::Ident(path) => self.types.get(path).unwrap(),
+            _ => ty,
+        }
+    }
+
     fn compile_expr(&mut self, expr: ir::Expr) -> Expr {
         let kind = match expr.kind {
             ir::ExprKind::Pointer(v) => ExprKind::Pointer(self.compile_pointer(v, &expr.ty)),
@@ -41,6 +56,7 @@ impl ByteCoder {
     fn compile_pointer(&mut self, ptr: ir::Pointer, ty: &ir::Ty) -> Sid {
         match ptr {
             ir::Pointer::External(e_ptr) => {
+                let ty = self.get_ty_mat(ty);
                 let e_symbol = compile_external_symbol(e_ptr.id, ty);
                 let (index, _) = self.externals.insert_full(e_symbol);
 
@@ -100,7 +116,8 @@ impl ByteCoder {
     }
 
     fn compile_tuple_lookup(&mut self, value: ir::TupleLookup) -> TupleLookup {
-        let offset = lutra_bin::layout::tuple_field_offset(&value.base.ty, value.position);
+        let base_ty = self.get_ty_mat(&value.base.ty);
+        let offset = lutra_bin::layout::tuple_field_offset(base_ty, value.position);
 
         TupleLookup {
             base: self.compile_expr(value.base),

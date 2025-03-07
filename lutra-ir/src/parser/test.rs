@@ -3,7 +3,9 @@ use insta::assert_debug_snapshot;
 
 #[test]
 fn parse_01() {
-    assert_debug_snapshot!(super::_test_parse(r#"let main =
+    assert_debug_snapshot!(super::_test_parse(r#"type a = int64;
+type b::c = text;
+let main =
   let 1 = (
     func 2 -> [
         fn.2+0: float64,
@@ -909,6 +911,51 @@ fn parse_01() {
                 name: None,
             },
         },
+        types: [
+            TyDef {
+                name: Path(
+                    [
+                        "a",
+                    ],
+                ),
+                ty: Ty {
+                    kind: Primitive(
+                        int64,
+                    ),
+                    layout: Some(
+                        TyLayout {
+                            head_size: 64,
+                            body_ptrs: [],
+                            variants_recursive: [],
+                        },
+                    ),
+                    name: None,
+                },
+            },
+            TyDef {
+                name: Path(
+                    [
+                        "b",
+                        "c",
+                    ],
+                ),
+                ty: Ty {
+                    kind: Primitive(
+                        text,
+                    ),
+                    layout: Some(
+                        TyLayout {
+                            head_size: 64,
+                            body_ptrs: [
+                                0,
+                            ],
+                            variants_recursive: [],
+                        },
+                    ),
+                    name: None,
+                },
+            },
+        ],
     }
     "#);
 }

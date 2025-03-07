@@ -1,5 +1,10 @@
 use crate::{boxed, string, vec};
 
+#[cfg(not(feature = "std"))]
+use alloc::collections::BTreeMap as Map;
+#[cfg(feature = "std")]
+use std::collections::HashMap as Map;
+
 use bytes::{Buf, BufMut, BytesMut};
 
 use super::{expect_ty, expect_ty_primitive, Value};
@@ -10,10 +15,10 @@ use crate::{ArrayReader, Decode, Encode, Error, Result};
 
 impl Value {
     /// Convert a Lutra [Value] to .ld binary encoding.
-    pub fn encode(&self, ty: &ir::Ty) -> Result<vec::Vec<u8>> {
+    pub fn encode(&self, ty: &ir::Ty, ty_defs: &[ir::TyDef]) -> Result<vec::Vec<u8>> {
         let mut buf = BytesMut::new();
 
-        let mut ctx = Context::new(ty);
+        let mut ctx = Context::new(ty_defs);
 
         let head_ptr = encode_head(&mut buf, self, ty, &mut ctx)?;
         encode_body(&mut buf, self, head_ptr, ty, &mut ctx)?;
@@ -21,8 +26,8 @@ impl Value {
     }
 
     /// Convert .ld binary encoding into Lutra [Value].
-    pub fn decode(buf: &[u8], ty: &ir::Ty) -> Result<Value> {
-        let mut ctx = Context::new(ty);
+    pub fn decode(buf: &[u8], ty: &ir::Ty, ty_defs: &[ir::TyDef]) -> Result<Value> {
+        let mut ctx = Context::new(ty_defs);
 
         let mut buf = buf;
         decode_inner(&mut buf, ty, &mut ctx)
@@ -35,7 +40,7 @@ fn encode_head<'t>(
     ty: &'t ir::Ty,
     ctx: &mut Context<'t>,
 ) -> Result<ValueHeadPtr> {
-    let ty = resolve_ident(ty, ctx);
+    let ty = get_mat_ty(ty, ctx);
 
     match value {
         Value::Bool(v) => {
@@ -155,7 +160,7 @@ fn encode_body<'t>(
     ty: &'t ir::Ty,
     ctx: &mut Context<'t>,
 ) -> Result<()> {
-    let ty = resolve_ident(ty, ctx);
+    let ty = get_mat_ty(ty, ctx);
 
     match value {
         Value::Int8(_)
@@ -245,7 +250,7 @@ fn decode_inner<'t>(
     ty: &'t ir::Ty,
     ctx: &mut Context<'t>,
 ) -> Result<Value> {
-    let ty = resolve_ident(ty, ctx);
+    let ty = get_mat_ty(ty, ctx);
 
     Ok(match &ty.kind {
         ir::TyKind::Primitive(ir::TyPrimitive::bool) => Value::Bool(decode::<bool>(r)?),
@@ -323,22 +328,20 @@ fn decode<D: Decode + Sized>(reader: &mut impl bytes::Buf) -> Result<D> {
 }
 
 struct Context<'t> {
-    top_level_ty: &'t ir::Ty,
+    ty_defs: Map<&'t ir::Path, &'t ir::Ty>,
 }
 
 impl<'t> Context<'t> {
-    fn new(top_level_ty: &'t ir::Ty) -> Self {
-        Context { top_level_ty }
+    fn new(ty_defs: &'t [ir::TyDef]) -> Self {
+        Context {
+            ty_defs: ty_defs.iter().map(|def| (&def.name, &def.ty)).collect(),
+        }
     }
 }
 
-fn resolve_ident<'t>(ty: &'t ir::Ty, ctx: &mut Context<'t>) -> &'t ir::Ty {
+fn get_mat_ty<'t>(ty: &'t ir::Ty, ctx: &mut Context<'t>) -> &'t ir::Ty {
     if let ir::TyKind::Ident(ident) = &ty.kind {
-        if ctx.top_level_ty.name.as_ref() == ident.0.last() {
-            ctx.top_level_ty
-        } else {
-            ty
-        }
+        ctx.ty_defs.get(ident).unwrap()
     } else {
         ty
     }

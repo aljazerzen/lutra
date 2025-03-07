@@ -38,6 +38,6 @@ fn print_res(res: messages::Result, output_ty: &br::Ty) {
     let messages::Result::Ok(res) = res else {
         panic!()
     };
-    let res = lutra_bin::Value::decode(&res, output_ty).unwrap();
-    println!("{}", res.print_source(output_ty).unwrap());
+    let res = lutra_bin::Value::decode(&res, output_ty, &[]).unwrap();
+    println!("{}", res.print_source(output_ty, &[]).unwrap());
 }

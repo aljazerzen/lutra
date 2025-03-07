@@ -13,13 +13,15 @@ fn _runtime(lutra_source: &str) -> String {
     let program = lutra_compiler::_test_compile(lutra_source).unwrap_or_else(|e| panic!("{e}"));
     tracing::debug!("ir:\n{}", lutra_bin::ir::print(&program));
 
-    let output_ty = program.get_output_ty().clone();
-    let bytecode = lutra_compiler::bytecode_program(program);
+    let bytecode = lutra_compiler::bytecode_program(program.clone());
 
     let output = lutra_runtime::evaluate(&bytecode, vec![], lutra_runtime::BUILTIN_MODULES);
 
-    let output = lutra_bin::Value::decode(&output, &output_ty).unwrap();
-    output.print_source(&output_ty).unwrap()
+    let output =
+        lutra_bin::Value::decode(&output, program.get_output_ty(), &program.types).unwrap();
+    output
+        .print_source(program.get_output_ty(), &program.types)
+        .unwrap()
 }
 
 pub struct TestCase {

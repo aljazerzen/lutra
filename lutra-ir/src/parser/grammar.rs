@@ -6,12 +6,23 @@ use lutra_bin::ir::*;
 use lutra_compiler::_lexer::TokenKind;
 
 pub fn program() -> impl Parser<TokenKind, Program, Error = PError> {
+    let types = keyword("type")
+        .ignore_then(path())
+        .then_ignore(ctrl('='))
+        .then(ty())
+        .then_ignore(ctrl(';'))
+        .map(|(name, ty)| TyDef { name, ty })
+        .repeated()
+        .labelled("type defs");
+
     let main = keyword("let")
         .then(ident_keyword("main"))
         .then(ctrl('='))
         .ignore_then(expr());
 
-    main.map(|main| Program { main })
+    types
+        .then(main)
+        .map(|(types, main)| Program { main, types })
 }
 
 fn expr() -> impl Parser<TokenKind, Expr, Error = PError> + Clone {
@@ -50,7 +61,7 @@ fn expr() -> impl Parser<TokenKind, Expr, Error = PError> + Clone {
         let call = func_call(expr.clone());
 
         let term = choice((pointer, literal, tuple, array, function, call))
-            .then(ty())
+            .then(ctrl(':').ignore_then(ty()))
             .map(|(kind, ty)| Expr { kind, ty })
             .boxed();
 
@@ -68,7 +79,7 @@ fn external_ptr() -> impl Parser<TokenKind, ExternalPtr, Error = PError> {
 }
 
 fn ty() -> impl Parser<TokenKind, Ty, Error = PError> {
-    let ty_expr = recursive(|ty_inner| {
+    recursive(|ty_inner| {
         let primitive = choice((
             ident_keyword("bool").to(TyPrimitive::bool),
             ident_keyword("int8").to(TyPrimitive::int8),
@@ -127,7 +138,9 @@ fn ty() -> impl Parser<TokenKind, Ty, Error = PError> {
             .map(Box::new)
             .map(TyKind::Function);
 
-        choice((primitive, array, tuple, enum_, func)).map(|kind| {
+        let ident = path().map(TyKind::Ident);
+
+        choice((primitive, array, tuple, enum_, func, ident)).map(|kind| {
             let mut ty = Ty {
                 kind,
                 layout: None,
@@ -137,9 +150,7 @@ fn ty() -> impl Parser<TokenKind, Ty, Error = PError> {
             ty
         })
     })
-    .labelled("a type");
-
-    ctrl(':').ignore_then(ty_expr)
+    .labelled("a type")
 }
 
 fn uint32() -> impl Parser<TokenKind, u32, Error = PError> {
@@ -196,6 +207,7 @@ where
             .ignore_then(select! {
                 TokenKind::Literal(pr::Literal::Integer(i)) => i as u16
             })
+            .then_ignore(ctrl(':'))
             .then(ty())
             .repeated(),
     )
@@ -264,6 +276,13 @@ where
             kind: ExprKind::Binding(Box::new(Binding { id, expr, main })),
         })
         .labelled("binding")
+}
+
+fn path() -> impl Parser<TokenKind, Path, Error = PError> + Clone {
+    ident_part()
+        .separated_by(just(TokenKind::PathSep))
+        .at_least(1)
+        .map(Path)
 }
 
 fn ident_part() -> impl Parser<TokenKind, String, Error = PError> + Clone {

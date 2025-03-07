@@ -1,5 +1,6 @@
 type Program = {
   main = Expr,
+  types = [TyDef]
 }
 
 type Expr = {
@@ -65,6 +66,11 @@ type Binding = {
   main = Expr,
 }
 
+type TyDef = {
+  name = Path,
+  ty = Ty,
+}
+
 @derive(["Debug", "Clone"])
 type Ty = {
   kind = TyKind,
@@ -128,5 +134,5 @@ type TyFunction = {
   body = Ty
 }
 
-@derive(["Debug", "Clone", "PartialEq"])
+@derive(["Debug", "Clone", "PartialEq", "Eq", "PartialOrd", "Ord", "Hash"])
 type Path = [text]

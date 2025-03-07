@@ -10,10 +10,10 @@ pub(crate) fn _test_array_writer(items: Vec<Data>, output_ty: &ir::Ty) -> String
     }
 
     let output_buf = output.finish().flatten();
-    let output_val = Value::decode(&output_buf, output_ty).unwrap();
+    let output_val = Value::decode(&output_buf, output_ty, &[]).unwrap();
 
     String::new()
-        + &output_val.print_source(output_ty).unwrap()
+        + &output_val.print_source(output_ty, &[]).unwrap()
         + "\n"
         + &pretty_hex::pretty_hex(&output_buf)
 }
@@ -26,10 +26,10 @@ pub(crate) fn _test_tuple_writer(fields: Vec<Data>, output_ty: &ir::Ty) -> Strin
     }
 
     let output_buf = output.finish().flatten();
-    let output_val = Value::decode(&output_buf, output_ty).unwrap();
+    let output_val = Value::decode(&output_buf, output_ty, &[]).unwrap();
 
     String::new()
-        + &output_val.print_source(output_ty).unwrap()
+        + &output_val.print_source(output_ty, &[]).unwrap()
         + "\n"
         + &pretty_hex::pretty_hex(&output_buf)
 }

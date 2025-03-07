@@ -41,6 +41,14 @@ impl Printer {
     fn print_program(&mut self, program: &ir::Program) -> String {
         let mut r = String::new();
 
+        for ty_def in &program.types {
+            r += "type ";
+            r += &self.print_path(&ty_def.name);
+            r += " = ";
+            r += &self.print_ty(&ty_def.ty);
+            r += ";\n";
+        }
+
         r += "let main =";
         r += &self.print_expr(&program.main);
         r
@@ -222,10 +230,13 @@ impl Printer {
                 r += &self.print_ty(&func.body);
                 r
             }
-            ir::TyKind::Ident(path) => {
-                // TODO: quote
-                path.0.join(".")
-            }
+            ir::TyKind::Ident(path) => self.print_path(path),
         }
+    }
+
+    #[allow(clippy::only_used_in_recursion)]
+    fn print_path(&self, path: &ir::Path) -> String {
+        // TODO: quote
+        path.0.join("::")
     }
 }

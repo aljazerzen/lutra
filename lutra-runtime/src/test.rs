@@ -5,13 +5,15 @@ use insta::assert_snapshot;
 #[track_caller]
 fn _test_interpret(program: &str) -> String {
     let program = lutra_ir::_test_parse(program);
-    let output_ty = program.get_output_ty().clone();
-    let program = lutra_compiler::bytecode_program(program);
+    let bytecode = lutra_compiler::bytecode_program(program.clone());
 
-    let output = crate::interpreter::evaluate(&program, vec![], crate::BUILTIN_MODULES);
+    let output = crate::interpreter::evaluate(&bytecode, vec![], crate::BUILTIN_MODULES);
 
-    let output = lutra_bin::Value::decode(&output, &output_ty).unwrap();
-    output.print_source(&output_ty).unwrap()
+    let output =
+        lutra_bin::Value::decode(&output, program.get_output_ty(), &program.types).unwrap();
+    output
+        .print_source(program.get_output_ty(), &program.types)
+        .unwrap()
 }
 
 #[test]
