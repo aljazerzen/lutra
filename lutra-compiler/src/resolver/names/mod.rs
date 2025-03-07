@@ -14,7 +14,7 @@ use crate::{pr, utils};
 ///
 /// Keeps track of all inter-declaration references.
 /// Returns a resolution order.
-pub fn resolve_names(root: &mut decl::RootModule) -> Result<Vec<Vec<pr::Path>>> {
+pub fn run(root: &mut decl::RootModule) -> Result<Vec<Vec<pr::Path>>> {
     // resolve inter-declaration references
     let (refs_tys, refs_vars) = {
         let mut r = module::ModuleRefResolver {

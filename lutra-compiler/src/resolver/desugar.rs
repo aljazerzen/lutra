@@ -8,6 +8,10 @@ pub fn run(module_def: pr::ModuleDef) -> Result<pr::ModuleDef> {
     Desugarator.fold_module_def(module_def)
 }
 
+pub fn run_expr(expr: pr::Expr) -> Result<pr::Expr> {
+    Desugarator.fold_expr(expr)
+}
+
 struct Desugarator;
 
 impl PrFold for Desugarator {

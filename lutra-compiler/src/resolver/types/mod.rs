@@ -11,7 +11,7 @@ use crate::decl::RootModule;
 use crate::pr;
 use crate::utils::IdGenerator;
 
-pub fn resolve_types(
+pub fn run(
     root_module: &mut RootModule,
     resolution_order: &[Vec<pr::Path>],
 ) -> Result<(), Vec<crate::diagnostic::Diagnostic>> {

@@ -144,7 +144,7 @@ pub struct RunCommand {
     compile: CompileParams,
 
     #[clap(default_value = "main")]
-    path: String,
+    main: String,
 }
 
 pub fn run(cmd: RunCommand) -> anyhow::Result<()> {
@@ -152,8 +152,7 @@ pub fn run(cmd: RunCommand) -> anyhow::Result<()> {
 
     let project = lutra_compiler::compile(project, cmd.compile)?;
 
-    let path = pr::Path::new(cmd.path.split("::"));
-    let program = lutra_compiler::lower(&project.root_module, &path);
+    let program = lutra_compiler::_lower_expr(&project, &cmd.main)?;
     tracing::debug!("ir: {}", lutra_bin::ir::print(&program));
     let output_ty = program.get_output_ty().clone();
     let bytecode = lutra_compiler::bytecode_program(program);

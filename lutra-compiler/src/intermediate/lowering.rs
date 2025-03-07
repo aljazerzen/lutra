@@ -9,6 +9,15 @@ use crate::utils::{self, IdGenerator};
 use crate::Result;
 use crate::{decl, pr};
 
+pub fn lower_expr(root_module: &decl::RootModule, main: &pr::Expr) -> ir::Program {
+    let mut lowerer = Lowerer::new(root_module);
+
+    let main = lowerer.lower_expr(main).unwrap();
+    let main = lowerer.lower_var_bindings(main);
+
+    ir::Program { main }
+}
+
 pub fn lower(root_module: &decl::RootModule, path: &pr::Path) -> ir::Program {
     let mut lowerer = Lowerer::new(root_module);
 
