@@ -3,7 +3,7 @@ use insta::assert_snapshot;
 #[track_caller]
 fn _test_compile_and_print(source: &str) -> String {
     let program = lutra_compiler::_test_compile(source).unwrap_or_else(|e| panic!("{e}"));
-    lutra_ir::print(&program)
+    lutra_bin::ir::print(&program)
 }
 
 #[test]

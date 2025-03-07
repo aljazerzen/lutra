@@ -1,5 +1,7 @@
+use lutra_compiler::{pr, SourceTree};
+
 #[track_caller]
-pub fn _run(lutra_source: &str) -> (String, String) {
+pub fn _run(source: &str) -> (String, String) {
     tracing_subscriber::fmt::Subscriber::builder()
         .without_time()
         .with_max_level(tracing::Level::DEBUG)
@@ -7,12 +9,13 @@ pub fn _run(lutra_source: &str) -> (String, String) {
         .ok();
 
     // compile
-    let program = lutra_compiler::_test_compile(lutra_source).unwrap_or_else(|e| panic!("{e}"));
-    tracing::debug!("ir:\n{}", lutra_ir::print(&program));
-    let output_ty = program.get_output_ty().clone();
+    let source = SourceTree::single("".into(), source.to_string());
+    let project =
+        lutra_compiler::compile(source, Default::default()).unwrap_or_else(|e| panic!("{e}"));
 
     // compile to sql
-    let query_sql = lutra_compiler::compile_to_sql(program);
+    let (program, query_sql) =
+        lutra_compiler::compile_to_sql(&project, &pr::Path::from_name("main"));
 
     // format sql
     let params = sqlformat::QueryParams::None;
@@ -45,11 +48,11 @@ pub fn _run(lutra_source: &str) -> (String, String) {
 
     let (rel_ty, rel_data) = rt.block_on(inner(&query_sql)).unwrap();
 
-    let output = lutra_db_driver::repack(&rel_ty, rel_data, &output_ty);
+    let output = lutra_db_driver::repack(&rel_ty, rel_data, program.get_output_ty());
     let output = output.flatten();
 
-    let output = lutra_bin::Value::decode(&output, &output_ty).unwrap();
-    let output = output.print_source(&output_ty).unwrap();
+    let output = lutra_bin::Value::decode(&output, program.get_output_ty()).unwrap();
+    let output = output.print_source(program.get_output_ty()).unwrap();
 
     (formatted_sql, output)
 }

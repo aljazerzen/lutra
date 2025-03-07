@@ -12,7 +12,7 @@ fn _test_run(source: &str) -> String {
     };
     let output_ty = program.get_output_ty();
 
-    lutra_ir::print_ty(output_ty)
+    lutra_bin::ir::print_ty(output_ty)
 }
 
 #[track_caller]

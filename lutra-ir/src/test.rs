@@ -2,9 +2,16 @@
 
 use insta::assert_snapshot;
 
+#[track_caller]
+pub fn _test_print(source: &str) -> String {
+    let program = crate::parser::_test_parse(source);
+
+    lutra_bin::ir::print(&program)
+}
+
 #[test]
 fn print_01() {
-    assert_snapshot!(super::_test_print(r#"
+    assert_snapshot!(_test_print(r#"
 
     let main =
       let 1 = (

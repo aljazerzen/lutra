@@ -11,7 +11,7 @@ fn _runtime(lutra_source: &str) -> String {
         .ok();
 
     let program = lutra_compiler::_test_compile(lutra_source).unwrap_or_else(|e| panic!("{e}"));
-    tracing::debug!("ir:\n{}", lutra_ir::print(&program));
+    tracing::debug!("ir:\n{}", lutra_bin::ir::print(&program));
 
     let output_ty = program.get_output_ty().clone();
     let bytecode = lutra_compiler::bytecode_program(program);

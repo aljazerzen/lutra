@@ -1,6 +1,6 @@
-mod test;
+#![cfg(feature = "std")]
 
-use lutra_bin::ir;
+use crate::ir;
 
 pub fn print(program: &ir::Program) -> String {
     let mut printer = Printer::default();
@@ -228,11 +228,4 @@ impl Printer {
             }
         }
     }
-}
-
-#[track_caller]
-pub fn _test_print(source: &str) -> String {
-    let program = super::_test_parse(source);
-
-    crate::print(&program)
 }

@@ -280,7 +280,7 @@ impl ValueDecl {
         let line = Line::from(vec![
             "let ".white(),
             decl.name_widget(),
-            format!(": {}", lutra_ir::print_ty(&self.ty)).white(),
+            format!(": {}", lutra_bin::ir::print_ty(&self.ty)).white(),
         ]);
         frame.render_widget(line, area);
 
@@ -307,7 +307,7 @@ impl TypeDecl {
         let line = Line::from(vec![
             "type ".white(),
             decl.name_widget(),
-            format!(" = {}", lutra_ir::print_ty(&self.ty)).white(),
+            format!(" = {}", lutra_bin::ir::print_ty(&self.ty)).white(),
         ]);
         frame.render_widget(line, area);
 

@@ -1,74 +1,21 @@
-pub use crate::generated::ir::*;
+#![cfg(feature = "std")]
 
-use crate::{boxed, vec};
+use crate::ir;
 
-impl Program {
-    pub fn get_output_ty(&self) -> &Ty {
-        let main_ty = self.main.ty.kind.as_function().unwrap();
-        &main_ty.body
-    }
-
-    pub fn get_input_tys(&self) -> &[Ty] {
-        let main_ty = self.main.ty.kind.as_function().unwrap();
-        main_ty.params.as_slice()
-    }
-}
-
-#[cfg(feature = "std")]
-impl std::fmt::Display for Literal {
+impl std::fmt::Display for ir::Literal {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Literal::Int(i) => write!(f, "{i}"),
-            Literal::Float(i) => write!(f, "{i}"),
-            Literal::Text(s) => {
+            ir::Literal::Int(i) => write!(f, "{i}"),
+            ir::Literal::Float(i) => write!(f, "{i}"),
+            ir::Literal::Text(s) => {
                 write!(f, "{}", quote_string(escape_all_except_quotes(s).as_str()))
             }
-            Literal::Bool(b) => f.write_str(if *b { "true" } else { "false" }),
+            ir::Literal::Bool(b) => f.write_str(if *b { "true" } else { "false" }),
         }
     }
 }
 
-impl PartialEq for Ty {
-    fn eq(&self, other: &Self) -> bool {
-        self.kind == other.kind
-    }
-}
-
-impl Eq for Ty {}
-
-impl Ty {
-    pub fn new(kind: impl Into<TyKind>) -> Self {
-        Ty {
-            kind: kind.into(),
-            layout: None,
-            name: None,
-        }
-    }
-}
-
-impl From<PrimitiveSet> for TyKind {
-    fn from(value: PrimitiveSet) -> Self {
-        TyKind::Primitive(value)
-    }
-}
-impl From<vec::Vec<TyTupleField>> for TyKind {
-    fn from(value: vec::Vec<TyTupleField>) -> Self {
-        TyKind::Tuple(value)
-    }
-}
-impl From<TyFunction> for TyKind {
-    fn from(value: TyFunction) -> Self {
-        TyKind::Function(boxed::Box::new(value))
-    }
-}
-impl From<Path> for TyKind {
-    fn from(value: Path) -> Self {
-        TyKind::Ident(value)
-    }
-}
-
-#[cfg(feature = "std")]
-pub(crate) fn quote_string(s: &str) -> String {
+fn quote_string(s: &str) -> String {
     if !s.contains('"') {
         return format!(r#""{}""#, s);
     }
@@ -109,8 +56,7 @@ pub(crate) fn quote_string(s: &str) -> String {
     format!("{}{}{}", delim, s, delim)
 }
 
-#[cfg(feature = "std")]
-pub(crate) fn escape_all_except_quotes(s: &str) -> String {
+fn escape_all_except_quotes(s: &str) -> String {
     let mut result = String::new();
     for ch in s.chars() {
         if ch == '"' || ch == '\'' {
