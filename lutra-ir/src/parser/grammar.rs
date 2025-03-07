@@ -70,18 +70,18 @@ fn external_ptr() -> impl Parser<TokenKind, ExternalPtr, Error = PError> {
 fn ty() -> impl Parser<TokenKind, Ty, Error = PError> {
     let ty_expr = recursive(|ty_inner| {
         let primitive = choice((
-            ident_keyword("bool").to(PrimitiveSet::bool),
-            ident_keyword("int8").to(PrimitiveSet::int8),
-            ident_keyword("int16").to(PrimitiveSet::int16),
-            ident_keyword("int32").to(PrimitiveSet::int32),
-            ident_keyword("int64").to(PrimitiveSet::int64),
-            ident_keyword("uint8").to(PrimitiveSet::uint8),
-            ident_keyword("uint16").to(PrimitiveSet::uint16),
-            ident_keyword("uint32").to(PrimitiveSet::uint32),
-            ident_keyword("uint64").to(PrimitiveSet::uint64),
-            ident_keyword("float32").to(PrimitiveSet::float32),
-            ident_keyword("float64").to(PrimitiveSet::float64),
-            ident_keyword("text").to(PrimitiveSet::text),
+            ident_keyword("bool").to(TyPrimitive::bool),
+            ident_keyword("int8").to(TyPrimitive::int8),
+            ident_keyword("int16").to(TyPrimitive::int16),
+            ident_keyword("int32").to(TyPrimitive::int32),
+            ident_keyword("int64").to(TyPrimitive::int64),
+            ident_keyword("uint8").to(TyPrimitive::uint8),
+            ident_keyword("uint16").to(TyPrimitive::uint16),
+            ident_keyword("uint32").to(TyPrimitive::uint32),
+            ident_keyword("uint64").to(TyPrimitive::uint64),
+            ident_keyword("float32").to(TyPrimitive::float32),
+            ident_keyword("float64").to(TyPrimitive::float64),
+            ident_keyword("text").to(TyPrimitive::text),
         ))
         .map(TyKind::Primitive);
 

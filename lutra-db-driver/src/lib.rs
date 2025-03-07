@@ -72,7 +72,7 @@ pub fn repack(ty: &ir::Ty, data: Data, expected_ty: &ir::Ty) -> Data {
             output.finish()
         }
 
-        (ir::TyKind::Primitive(ir::PrimitiveSet::text), _) => {
+        (ir::TyKind::Primitive(ir::TyPrimitive::text), _) => {
             // TODO: this might be copying a lot of data, unnecessarily
             let data = data.flatten();
             let data = <String as lutra_bin::Decode>::decode(&data).unwrap();
@@ -120,18 +120,18 @@ fn repack_json(data: String, ty: &ir::Ty) -> Data {
 fn repack_json_re(value: tinyjson::JsonValue, ty: &ir::Ty) -> Data {
     match &ty.kind {
         ir::TyKind::Primitive(primitive) => match (primitive, value) {
-            (ir::PrimitiveSet::bool, tinyjson::JsonValue::Boolean(v)) => encode(&v),
-            (ir::PrimitiveSet::int8, tinyjson::JsonValue::Number(v)) => encode(&(v as i8)),
-            (ir::PrimitiveSet::int16, tinyjson::JsonValue::Number(v)) => encode(&(v as i16)),
-            (ir::PrimitiveSet::int32, tinyjson::JsonValue::Number(v)) => encode(&(v as i32)),
-            (ir::PrimitiveSet::int64, tinyjson::JsonValue::Number(v)) => encode(&(v as i64)),
-            (ir::PrimitiveSet::uint8, tinyjson::JsonValue::Number(v)) => encode(&(v as u8)),
-            (ir::PrimitiveSet::uint16, tinyjson::JsonValue::Number(v)) => encode(&(v as u16)),
-            (ir::PrimitiveSet::uint32, tinyjson::JsonValue::Number(v)) => encode(&(v as u32)),
-            (ir::PrimitiveSet::uint64, tinyjson::JsonValue::Number(v)) => encode(&(v as u64)),
-            (ir::PrimitiveSet::float32, tinyjson::JsonValue::Number(v)) => encode(&(v as f32)),
-            (ir::PrimitiveSet::float64, tinyjson::JsonValue::Number(v)) => encode(&(v as u64)),
-            (ir::PrimitiveSet::text, tinyjson::JsonValue::String(v)) => encode(&v),
+            (ir::TyPrimitive::bool, tinyjson::JsonValue::Boolean(v)) => encode(&v),
+            (ir::TyPrimitive::int8, tinyjson::JsonValue::Number(v)) => encode(&(v as i8)),
+            (ir::TyPrimitive::int16, tinyjson::JsonValue::Number(v)) => encode(&(v as i16)),
+            (ir::TyPrimitive::int32, tinyjson::JsonValue::Number(v)) => encode(&(v as i32)),
+            (ir::TyPrimitive::int64, tinyjson::JsonValue::Number(v)) => encode(&(v as i64)),
+            (ir::TyPrimitive::uint8, tinyjson::JsonValue::Number(v)) => encode(&(v as u8)),
+            (ir::TyPrimitive::uint16, tinyjson::JsonValue::Number(v)) => encode(&(v as u16)),
+            (ir::TyPrimitive::uint32, tinyjson::JsonValue::Number(v)) => encode(&(v as u32)),
+            (ir::TyPrimitive::uint64, tinyjson::JsonValue::Number(v)) => encode(&(v as u64)),
+            (ir::TyPrimitive::float32, tinyjson::JsonValue::Number(v)) => encode(&(v as f32)),
+            (ir::TyPrimitive::float64, tinyjson::JsonValue::Number(v)) => encode(&(v as u64)),
+            (ir::TyPrimitive::text, tinyjson::JsonValue::String(v)) => encode(&v),
             (_, v) => panic!(
                 "expected {primitive:?}, found JSON {}",
                 v.stringify().unwrap()
@@ -219,15 +219,15 @@ fn get_stmt_result_ty(stmt: &tokio_postgres::Statement) -> lutra_bin::ir::Ty {
 
 fn get_column_ty(ty: &tokio_postgres::types::Type) -> lutra_bin::ir::Ty {
     let kind = match ty.name() {
-        "bool" => ir::TyKind::Primitive(ir::PrimitiveSet::bool),
-        "int2" => ir::TyKind::Primitive(ir::PrimitiveSet::int16),
-        "int4" => ir::TyKind::Primitive(ir::PrimitiveSet::int32),
-        "int8" => ir::TyKind::Primitive(ir::PrimitiveSet::int64),
-        "float4" => ir::TyKind::Primitive(ir::PrimitiveSet::float32),
-        "float8" => ir::TyKind::Primitive(ir::PrimitiveSet::float64),
-        "text" => ir::TyKind::Primitive(ir::PrimitiveSet::text),
-        "jsonb" => ir::TyKind::Primitive(ir::PrimitiveSet::text),
-        "json" => ir::TyKind::Primitive(ir::PrimitiveSet::text),
+        "bool" => ir::TyKind::Primitive(ir::TyPrimitive::bool),
+        "int2" => ir::TyKind::Primitive(ir::TyPrimitive::int16),
+        "int4" => ir::TyKind::Primitive(ir::TyPrimitive::int32),
+        "int8" => ir::TyKind::Primitive(ir::TyPrimitive::int64),
+        "float4" => ir::TyKind::Primitive(ir::TyPrimitive::float32),
+        "float8" => ir::TyKind::Primitive(ir::TyPrimitive::float64),
+        "text" => ir::TyKind::Primitive(ir::TyPrimitive::text),
+        "jsonb" => ir::TyKind::Primitive(ir::TyPrimitive::text),
+        "json" => ir::TyKind::Primitive(ir::TyPrimitive::text),
         _ => todo!("pg type: {}", ty.name()),
     };
     let mut ty = lutra_bin::ir::Ty {
@@ -245,18 +245,18 @@ fn get_cell(row: &Row, idx: usize, ty: &ir::Ty) -> Data {
     };
 
     match prim_set {
-        ir::PrimitiveSet::bool => encode(&row.get::<_, bool>(idx)),
-        ir::PrimitiveSet::int8 => todo!(),
-        ir::PrimitiveSet::int16 => encode(&row.get::<_, i16>(idx)),
-        ir::PrimitiveSet::int32 => encode(&row.get::<_, i32>(idx)),
-        ir::PrimitiveSet::int64 => encode(&row.get::<_, i64>(idx)),
-        ir::PrimitiveSet::uint8 => todo!(),
-        ir::PrimitiveSet::uint16 => todo!(),
-        ir::PrimitiveSet::uint32 => todo!(),
-        ir::PrimitiveSet::uint64 => todo!(),
-        ir::PrimitiveSet::float32 => encode(&row.get::<_, f32>(idx)),
-        ir::PrimitiveSet::float64 => encode(&row.get::<_, f64>(idx)),
-        ir::PrimitiveSet::text => encode(row.get::<_, TextOrJson>(idx).0),
+        ir::TyPrimitive::bool => encode(&row.get::<_, bool>(idx)),
+        ir::TyPrimitive::int8 => todo!(),
+        ir::TyPrimitive::int16 => encode(&row.get::<_, i16>(idx)),
+        ir::TyPrimitive::int32 => encode(&row.get::<_, i32>(idx)),
+        ir::TyPrimitive::int64 => encode(&row.get::<_, i64>(idx)),
+        ir::TyPrimitive::uint8 => todo!(),
+        ir::TyPrimitive::uint16 => todo!(),
+        ir::TyPrimitive::uint32 => todo!(),
+        ir::TyPrimitive::uint64 => todo!(),
+        ir::TyPrimitive::float32 => encode(&row.get::<_, f32>(idx)),
+        ir::TyPrimitive::float64 => encode(&row.get::<_, f64>(idx)),
+        ir::TyPrimitive::text => encode(row.get::<_, TextOrJson>(idx).0),
     }
 }
 

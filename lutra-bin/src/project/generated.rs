@@ -736,7 +736,7 @@ pub mod ir {
     #[derive(Debug, Clone, PartialEq, enum_as_inner::EnumAsInner)]
     #[allow(non_camel_case_types)]
     pub enum TyKind {
-        Primitive(PrimitiveSet),
+        Primitive(TyPrimitive),
         Tuple(crate::vec::Vec<TyTupleField>),
         Array(crate::boxed::Box<Ty>),
         Enum(crate::vec::Vec<TyEnumVariant>),
@@ -746,7 +746,7 @@ pub mod ir {
 
     #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
     #[allow(non_camel_case_types)]
-    pub enum PrimitiveSet {
+    pub enum TyPrimitive {
         bool,
         int8,
         int16,
@@ -1618,7 +1618,7 @@ pub mod ir {
                 Ok(match tag {
                     0 => {
                         let offset = u32::from_le_bytes(buf.read_const::<4>());
-                        let inner = super::PrimitiveSet::decode(buf.skip(offset as usize))?;
+                        let inner = super::TyPrimitive::decode(buf.skip(offset as usize))?;
                         TyKind::Primitive(inner)
                     }
                     1 => {
@@ -1657,7 +1657,7 @@ pub mod ir {
 
         #[allow(unused_variables)]
         #[allow(clippy::all)]
-        impl crate::Encode for PrimitiveSet {
+        impl crate::Encode for TyPrimitive {
             type HeadPtr = ();
             fn encode_head(&self, w: &mut crate::bytes::BytesMut) -> () {
                 match self {
@@ -1701,30 +1701,30 @@ pub mod ir {
             }
             fn encode_body(&self, head: (), w: &mut crate::bytes::BytesMut) {}
         }
-        impl crate::Layout for PrimitiveSet {
+        impl crate::Layout for TyPrimitive {
             fn head_size() -> usize {
                 40
             }
         }
 
-        impl crate::Decode for PrimitiveSet {
+        impl crate::Decode for TyPrimitive {
             fn decode(buf: &[u8]) -> crate::Result<Self> {
                 let mut tag_bytes = buf.read_n(1).to_vec();
                 tag_bytes.resize(8, 0);
                 let tag = u64::from_le_bytes(tag_bytes.try_into().unwrap()) as usize;
                 Ok(match tag {
-                    0 => PrimitiveSet::bool,
-                    1 => PrimitiveSet::int8,
-                    2 => PrimitiveSet::int16,
-                    3 => PrimitiveSet::int32,
-                    4 => PrimitiveSet::int64,
-                    5 => PrimitiveSet::uint8,
-                    6 => PrimitiveSet::uint16,
-                    7 => PrimitiveSet::uint32,
-                    8 => PrimitiveSet::uint64,
-                    9 => PrimitiveSet::float32,
-                    10 => PrimitiveSet::float64,
-                    11 => PrimitiveSet::text,
+                    0 => TyPrimitive::bool,
+                    1 => TyPrimitive::int8,
+                    2 => TyPrimitive::int16,
+                    3 => TyPrimitive::int32,
+                    4 => TyPrimitive::int64,
+                    5 => TyPrimitive::uint8,
+                    6 => TyPrimitive::uint16,
+                    7 => TyPrimitive::uint32,
+                    8 => TyPrimitive::uint64,
+                    9 => TyPrimitive::float32,
+                    10 => TyPrimitive::float64,
+                    11 => TyPrimitive::text,
                     _ => return Err(crate::Error::InvalidData),
                 })
             }

@@ -40,7 +40,7 @@ pub enum TyKind {
     Ident(Path),
 
     /// Type of a built-in primitive type
-    Primitive(PrimitiveSet),
+    Primitive(TyPrimitive),
 
     /// Type of tuples (product)
     Tuple(Vec<TyTupleField>),
@@ -63,18 +63,18 @@ impl TyKind {
     pub fn get_layout_simple(&self) -> Option<TyLayout> {
         let head_size = match self {
             TyKind::Primitive(prim) => match prim {
-                PrimitiveSet::bool => 8,
-                PrimitiveSet::int8 => 8,
-                PrimitiveSet::int16 => 16,
-                PrimitiveSet::int32 => 32,
-                PrimitiveSet::int64 => 64,
-                PrimitiveSet::uint8 => 8,
-                PrimitiveSet::uint16 => 16,
-                PrimitiveSet::uint32 => 32,
-                PrimitiveSet::uint64 => 64,
-                PrimitiveSet::float32 => 32,
-                PrimitiveSet::float64 => 64,
-                PrimitiveSet::text => 64,
+                TyPrimitive::bool => 8,
+                TyPrimitive::int8 => 8,
+                TyPrimitive::int16 => 16,
+                TyPrimitive::int32 => 32,
+                TyPrimitive::int64 => 64,
+                TyPrimitive::uint8 => 8,
+                TyPrimitive::uint16 => 16,
+                TyPrimitive::uint32 => 32,
+                TyPrimitive::uint64 => 64,
+                TyPrimitive::float32 => 32,
+                TyPrimitive::float64 => 64,
+                TyPrimitive::text => 64,
             },
             TyKind::Array(_) => 64,
 
@@ -97,7 +97,7 @@ impl TyKind {
             _ => return None,
         };
         let body_ptrs: Vec<u32> = match self {
-            TyKind::Primitive(PrimitiveSet::text) => vec![0],
+            TyKind::Primitive(TyPrimitive::text) => vec![0],
             TyKind::Array(_) => vec![0],
             TyKind::Enum(_) => vec![1], // TODO: this is wrong (in some cases)
 
@@ -140,7 +140,7 @@ pub struct TyEnumVariant {
 /// Built-in sets.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, strum::Display)]
 #[allow(non_camel_case_types)]
-pub enum PrimitiveSet {
+pub enum TyPrimitive {
     int8,
     int16,
     int32,
@@ -179,7 +179,7 @@ pub enum TyParamDomain {
     Open,
 
     /// This param must be one of the following
-    OneOf(Vec<PrimitiveSet>),
+    OneOf(Vec<TyPrimitive>),
 
     /// This param must be a tuple with following fields
     // TODO: generalize and replace this with TyTupleField
@@ -189,7 +189,7 @@ pub enum TyParamDomain {
 #[derive(Debug, Clone)]
 pub struct TyDomainTupleField {
     pub name: Option<String>,
-    pub ty: PrimitiveSet,
+    pub ty: TyPrimitive,
 }
 
 impl Ty {
@@ -238,8 +238,8 @@ impl Ty {
     }
 }
 
-impl From<PrimitiveSet> for TyKind {
-    fn from(value: PrimitiveSet) -> Self {
+impl From<TyPrimitive> for TyKind {
+    fn from(value: TyPrimitive) -> Self {
         TyKind::Primitive(value)
     }
 }

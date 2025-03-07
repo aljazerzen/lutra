@@ -149,40 +149,40 @@ pub fn write_ty_ref(
     let lutra_bin = &ctx.options.lutra_bin_path;
 
     match &ty.kind {
-        ir::TyKind::Primitive(ir::PrimitiveSet::bool) => {
+        ir::TyKind::Primitive(ir::TyPrimitive::bool) => {
             write!(w, "bool")?;
         }
-        ir::TyKind::Primitive(ir::PrimitiveSet::int8) => {
+        ir::TyKind::Primitive(ir::TyPrimitive::int8) => {
             write!(w, "i8")?;
         }
-        ir::TyKind::Primitive(ir::PrimitiveSet::int16) => {
+        ir::TyKind::Primitive(ir::TyPrimitive::int16) => {
             write!(w, "i16")?;
         }
-        ir::TyKind::Primitive(ir::PrimitiveSet::int32) => {
+        ir::TyKind::Primitive(ir::TyPrimitive::int32) => {
             write!(w, "i32")?;
         }
-        ir::TyKind::Primitive(ir::PrimitiveSet::int64) => {
+        ir::TyKind::Primitive(ir::TyPrimitive::int64) => {
             write!(w, "i64")?;
         }
-        ir::TyKind::Primitive(ir::PrimitiveSet::uint8) => {
+        ir::TyKind::Primitive(ir::TyPrimitive::uint8) => {
             write!(w, "u8")?;
         }
-        ir::TyKind::Primitive(ir::PrimitiveSet::uint16) => {
+        ir::TyKind::Primitive(ir::TyPrimitive::uint16) => {
             write!(w, "u16")?;
         }
-        ir::TyKind::Primitive(ir::PrimitiveSet::uint32) => {
+        ir::TyKind::Primitive(ir::TyPrimitive::uint32) => {
             write!(w, "u32")?;
         }
-        ir::TyKind::Primitive(ir::PrimitiveSet::uint64) => {
+        ir::TyKind::Primitive(ir::TyPrimitive::uint64) => {
             write!(w, "u64")?;
         }
-        ir::TyKind::Primitive(ir::PrimitiveSet::float32) => {
+        ir::TyKind::Primitive(ir::TyPrimitive::float32) => {
             write!(w, "f32")?;
         }
-        ir::TyKind::Primitive(ir::PrimitiveSet::float64) => {
+        ir::TyKind::Primitive(ir::TyPrimitive::float64) => {
             write!(w, "f64")?;
         }
-        ir::TyKind::Primitive(ir::PrimitiveSet::text) => {
+        ir::TyKind::Primitive(ir::TyPrimitive::text) => {
             write!(w, "{lutra_bin}::string::String")?;
         }
         ir::TyKind::Ident(ident) => {

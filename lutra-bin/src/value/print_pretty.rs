@@ -204,20 +204,20 @@ fn try_tabular(items_ty: &ir::Ty) -> Option<tabular::Table> {
     }
 }
 
-fn column_spec_primitive(primitive: &ir::PrimitiveSet) -> &'static str {
+fn column_spec_primitive(primitive: &ir::TyPrimitive) -> &'static str {
     match primitive {
-        ir::PrimitiveSet::bool => "{:^}",
-        ir::PrimitiveSet::int8
-        | ir::PrimitiveSet::int16
-        | ir::PrimitiveSet::int32
-        | ir::PrimitiveSet::int64
-        | ir::PrimitiveSet::uint8
-        | ir::PrimitiveSet::uint16
-        | ir::PrimitiveSet::uint32
-        | ir::PrimitiveSet::uint64
-        | ir::PrimitiveSet::float32
-        | ir::PrimitiveSet::float64 => "{:>}",
-        ir::PrimitiveSet::text => "{:<}",
+        ir::TyPrimitive::bool => "{:^}",
+        ir::TyPrimitive::int8
+        | ir::TyPrimitive::int16
+        | ir::TyPrimitive::int32
+        | ir::TyPrimitive::int64
+        | ir::TyPrimitive::uint8
+        | ir::TyPrimitive::uint16
+        | ir::TyPrimitive::uint32
+        | ir::TyPrimitive::uint64
+        | ir::TyPrimitive::float32
+        | ir::TyPrimitive::float64 => "{:>}",
+        ir::TyPrimitive::text => "{:<}",
     }
 }
 

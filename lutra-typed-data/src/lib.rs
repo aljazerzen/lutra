@@ -35,18 +35,18 @@ fn type_to_ir(ty: &schema::Ty) -> ir::Ty {
     let kind = match &ty.kind {
         schema::TyKind::Primitive(primitive) => {
             let primitive = match primitive {
-                schema::PrimitiveSet::int8 => ir::PrimitiveSet::int8,
-                schema::PrimitiveSet::int16 => ir::PrimitiveSet::int16,
-                schema::PrimitiveSet::int32 => ir::PrimitiveSet::int32,
-                schema::PrimitiveSet::int64 => ir::PrimitiveSet::int64,
-                schema::PrimitiveSet::uint8 => ir::PrimitiveSet::uint8,
-                schema::PrimitiveSet::uint16 => ir::PrimitiveSet::uint16,
-                schema::PrimitiveSet::uint32 => ir::PrimitiveSet::uint32,
-                schema::PrimitiveSet::uint64 => ir::PrimitiveSet::uint64,
-                schema::PrimitiveSet::float32 => ir::PrimitiveSet::float32,
-                schema::PrimitiveSet::float64 => ir::PrimitiveSet::float64,
-                schema::PrimitiveSet::bool => ir::PrimitiveSet::bool,
-                schema::PrimitiveSet::text => ir::PrimitiveSet::text,
+                schema::PrimitiveSet::int8 => ir::TyPrimitive::int8,
+                schema::PrimitiveSet::int16 => ir::TyPrimitive::int16,
+                schema::PrimitiveSet::int32 => ir::TyPrimitive::int32,
+                schema::PrimitiveSet::int64 => ir::TyPrimitive::int64,
+                schema::PrimitiveSet::uint8 => ir::TyPrimitive::uint8,
+                schema::PrimitiveSet::uint16 => ir::TyPrimitive::uint16,
+                schema::PrimitiveSet::uint32 => ir::TyPrimitive::uint32,
+                schema::PrimitiveSet::uint64 => ir::TyPrimitive::uint64,
+                schema::PrimitiveSet::float32 => ir::TyPrimitive::float32,
+                schema::PrimitiveSet::float64 => ir::TyPrimitive::float64,
+                schema::PrimitiveSet::bool => ir::TyPrimitive::bool,
+                schema::PrimitiveSet::text => ir::TyPrimitive::text,
             };
             ir::TyKind::Primitive(primitive)
         }
@@ -91,18 +91,18 @@ fn type_from_pr(ty: &ir::Ty) -> schema::Ty {
     let kind = match &ty.kind {
         ir::TyKind::Primitive(primitive) => {
             let primitive = match primitive {
-                ir::PrimitiveSet::int8 => schema::PrimitiveSet::int8,
-                ir::PrimitiveSet::int16 => schema::PrimitiveSet::int16,
-                ir::PrimitiveSet::int32 => schema::PrimitiveSet::int32,
-                ir::PrimitiveSet::int64 => schema::PrimitiveSet::int64,
-                ir::PrimitiveSet::uint8 => schema::PrimitiveSet::uint8,
-                ir::PrimitiveSet::uint16 => schema::PrimitiveSet::uint16,
-                ir::PrimitiveSet::uint32 => schema::PrimitiveSet::uint32,
-                ir::PrimitiveSet::uint64 => schema::PrimitiveSet::uint64,
-                ir::PrimitiveSet::float32 => schema::PrimitiveSet::float32,
-                ir::PrimitiveSet::float64 => schema::PrimitiveSet::float64,
-                ir::PrimitiveSet::bool => schema::PrimitiveSet::bool,
-                ir::PrimitiveSet::text => schema::PrimitiveSet::text,
+                ir::TyPrimitive::int8 => schema::PrimitiveSet::int8,
+                ir::TyPrimitive::int16 => schema::PrimitiveSet::int16,
+                ir::TyPrimitive::int32 => schema::PrimitiveSet::int32,
+                ir::TyPrimitive::int64 => schema::PrimitiveSet::int64,
+                ir::TyPrimitive::uint8 => schema::PrimitiveSet::uint8,
+                ir::TyPrimitive::uint16 => schema::PrimitiveSet::uint16,
+                ir::TyPrimitive::uint32 => schema::PrimitiveSet::uint32,
+                ir::TyPrimitive::uint64 => schema::PrimitiveSet::uint64,
+                ir::TyPrimitive::float32 => schema::PrimitiveSet::float32,
+                ir::TyPrimitive::float64 => schema::PrimitiveSet::float64,
+                ir::TyPrimitive::bool => schema::PrimitiveSet::bool,
+                ir::TyPrimitive::text => schema::PrimitiveSet::text,
             };
             schema::TyKind::Primitive(primitive)
         }

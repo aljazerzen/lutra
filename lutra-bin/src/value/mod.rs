@@ -38,7 +38,7 @@ where
     })
 }
 
-fn expect_ty_primitive(ty: &ir::Ty, expected: ir::PrimitiveSet) -> Result<()> {
+fn expect_ty_primitive(ty: &ir::Ty, expected: ir::TyPrimitive) -> Result<()> {
     let ir::TyKind::Primitive(found) = &ty.kind else {
         return Err(Error::TypeMismatch {
             expected: primitive_set_name(&expected),
@@ -55,20 +55,20 @@ fn expect_ty_primitive(ty: &ir::Ty, expected: ir::PrimitiveSet) -> Result<()> {
     Ok(())
 }
 
-fn primitive_set_name(expected: &ir::PrimitiveSet) -> &'static str {
+fn primitive_set_name(expected: &ir::TyPrimitive) -> &'static str {
     match expected {
-        ir::PrimitiveSet::bool => "bool",
-        ir::PrimitiveSet::int8 => "int8",
-        ir::PrimitiveSet::int16 => "int16",
-        ir::PrimitiveSet::int32 => "int32",
-        ir::PrimitiveSet::int64 => "int64",
-        ir::PrimitiveSet::uint8 => "uint8",
-        ir::PrimitiveSet::uint16 => "uint16",
-        ir::PrimitiveSet::uint32 => "uint32",
-        ir::PrimitiveSet::uint64 => "uint64",
-        ir::PrimitiveSet::float32 => "float32",
-        ir::PrimitiveSet::float64 => "float64",
-        ir::PrimitiveSet::text => "text",
+        ir::TyPrimitive::bool => "bool",
+        ir::TyPrimitive::int8 => "int8",
+        ir::TyPrimitive::int16 => "int16",
+        ir::TyPrimitive::int32 => "int32",
+        ir::TyPrimitive::int64 => "int64",
+        ir::TyPrimitive::uint8 => "uint8",
+        ir::TyPrimitive::uint16 => "uint16",
+        ir::TyPrimitive::uint32 => "uint32",
+        ir::TyPrimitive::uint64 => "uint64",
+        ir::TyPrimitive::float32 => "float32",
+        ir::TyPrimitive::float64 => "float64",
+        ir::TyPrimitive::text => "text",
     }
 }
 

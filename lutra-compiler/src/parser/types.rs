@@ -122,22 +122,22 @@ pub(crate) fn type_expr() -> impl Parser<TokenKind, Ty, Error = PError> + Clone 
     .labelled("type expression")
 }
 
-fn primitive_set() -> impl Parser<TokenKind, PrimitiveSet, Error = PError> {
+fn primitive_set() -> impl Parser<TokenKind, TyPrimitive, Error = PError> {
     select! {
-        TokenKind::Ident(i) if i == "int8" => PrimitiveSet::int8,
-        TokenKind::Ident(i) if i == "int16" => PrimitiveSet::int16,
-        TokenKind::Ident(i) if i == "int32" => PrimitiveSet::int32,
-        TokenKind::Ident(i) if i == "int64" => PrimitiveSet::int64,
-        TokenKind::Ident(i) if i == "int" => PrimitiveSet::int64,
-        TokenKind::Ident(i) if i == "uint8" => PrimitiveSet::uint8,
-        TokenKind::Ident(i) if i == "uint16" => PrimitiveSet::uint16,
-        TokenKind::Ident(i) if i == "uint32" => PrimitiveSet::uint32,
-        TokenKind::Ident(i) if i == "uint64" => PrimitiveSet::uint64,
-        TokenKind::Ident(i) if i == "float32" => PrimitiveSet::float32,
-        TokenKind::Ident(i) if i == "float64" => PrimitiveSet::float64,
-        TokenKind::Ident(i) if i == "float" => PrimitiveSet::float64,
-        TokenKind::Ident(i) if i == "bool"=> PrimitiveSet::bool,
-        TokenKind::Ident(i) if i == "text"=> PrimitiveSet::text,
+        TokenKind::Ident(i) if i == "int8" => TyPrimitive::int8,
+        TokenKind::Ident(i) if i == "int16" => TyPrimitive::int16,
+        TokenKind::Ident(i) if i == "int32" => TyPrimitive::int32,
+        TokenKind::Ident(i) if i == "int64" => TyPrimitive::int64,
+        TokenKind::Ident(i) if i == "int" => TyPrimitive::int64,
+        TokenKind::Ident(i) if i == "uint8" => TyPrimitive::uint8,
+        TokenKind::Ident(i) if i == "uint16" => TyPrimitive::uint16,
+        TokenKind::Ident(i) if i == "uint32" => TyPrimitive::uint32,
+        TokenKind::Ident(i) if i == "uint64" => TyPrimitive::uint64,
+        TokenKind::Ident(i) if i == "float32" => TyPrimitive::float32,
+        TokenKind::Ident(i) if i == "float64" => TyPrimitive::float64,
+        TokenKind::Ident(i) if i == "float" => TyPrimitive::float64,
+        TokenKind::Ident(i) if i == "bool"=> TyPrimitive::bool,
+        TokenKind::Ident(i) if i == "text"=> TyPrimitive::text,
     }
 }
 

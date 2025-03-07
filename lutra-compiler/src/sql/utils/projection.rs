@@ -134,7 +134,7 @@ mod rel_repr {
     // helpers
 
     fn prim() -> ir::Ty {
-        ir::Ty::new(ir::PrimitiveSet::int32)
+        ir::Ty::new(ir::TyPrimitive::int32)
     }
 
     fn tuple_0() -> ir::Ty {

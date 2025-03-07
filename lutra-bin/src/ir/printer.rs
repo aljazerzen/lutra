@@ -167,18 +167,18 @@ impl Printer {
     #[allow(clippy::only_used_in_recursion)]
     fn print_ty(&self, ty: &ir::Ty) -> String {
         match &ty.kind {
-            ir::TyKind::Primitive(ir::PrimitiveSet::bool) => "bool".to_string(),
-            ir::TyKind::Primitive(ir::PrimitiveSet::int8) => "int8".to_string(),
-            ir::TyKind::Primitive(ir::PrimitiveSet::int16) => "int16".to_string(),
-            ir::TyKind::Primitive(ir::PrimitiveSet::int32) => "int32".to_string(),
-            ir::TyKind::Primitive(ir::PrimitiveSet::int64) => "int64".to_string(),
-            ir::TyKind::Primitive(ir::PrimitiveSet::uint8) => "uint8".to_string(),
-            ir::TyKind::Primitive(ir::PrimitiveSet::uint16) => "uint16".to_string(),
-            ir::TyKind::Primitive(ir::PrimitiveSet::uint32) => "uint32".to_string(),
-            ir::TyKind::Primitive(ir::PrimitiveSet::uint64) => "uint64".to_string(),
-            ir::TyKind::Primitive(ir::PrimitiveSet::float32) => "float32".to_string(),
-            ir::TyKind::Primitive(ir::PrimitiveSet::float64) => "float64".to_string(),
-            ir::TyKind::Primitive(ir::PrimitiveSet::text) => "text".to_string(),
+            ir::TyKind::Primitive(ir::TyPrimitive::bool) => "bool".to_string(),
+            ir::TyKind::Primitive(ir::TyPrimitive::int8) => "int8".to_string(),
+            ir::TyKind::Primitive(ir::TyPrimitive::int16) => "int16".to_string(),
+            ir::TyKind::Primitive(ir::TyPrimitive::int32) => "int32".to_string(),
+            ir::TyKind::Primitive(ir::TyPrimitive::int64) => "int64".to_string(),
+            ir::TyKind::Primitive(ir::TyPrimitive::uint8) => "uint8".to_string(),
+            ir::TyKind::Primitive(ir::TyPrimitive::uint16) => "uint16".to_string(),
+            ir::TyKind::Primitive(ir::TyPrimitive::uint32) => "uint32".to_string(),
+            ir::TyKind::Primitive(ir::TyPrimitive::uint64) => "uint64".to_string(),
+            ir::TyKind::Primitive(ir::TyPrimitive::float32) => "float32".to_string(),
+            ir::TyKind::Primitive(ir::TyPrimitive::float64) => "float64".to_string(),
+            ir::TyKind::Primitive(ir::TyPrimitive::text) => "text".to_string(),
             ir::TyKind::Tuple(fields) => {
                 let mut r = "{".to_string();
                 for (index, field) in fields.iter().enumerate() {

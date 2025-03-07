@@ -9,51 +9,51 @@ pub trait ValueVisitor {
     fn visit_value(&mut self, value: &Value, ty: &ir::Ty) -> Result<Self::Res, crate::Error> {
         match value {
             Value::Bool(v) => {
-                super::expect_ty_primitive(ty, ir::PrimitiveSet::bool)?;
+                super::expect_ty_primitive(ty, ir::TyPrimitive::bool)?;
                 self.visit_bool(*v)
             }
             Value::Int8(v) => {
-                super::expect_ty_primitive(ty, ir::PrimitiveSet::int8)?;
+                super::expect_ty_primitive(ty, ir::TyPrimitive::int8)?;
                 self.visit_int8(*v)
             }
             Value::Int16(v) => {
-                super::expect_ty_primitive(ty, ir::PrimitiveSet::int16)?;
+                super::expect_ty_primitive(ty, ir::TyPrimitive::int16)?;
                 self.visit_int16(*v)
             }
             Value::Int32(v) => {
-                super::expect_ty_primitive(ty, ir::PrimitiveSet::int32)?;
+                super::expect_ty_primitive(ty, ir::TyPrimitive::int32)?;
                 self.visit_int32(*v)
             }
             Value::Int64(v) => {
-                super::expect_ty_primitive(ty, ir::PrimitiveSet::int64)?;
+                super::expect_ty_primitive(ty, ir::TyPrimitive::int64)?;
                 self.visit_int64(*v)
             }
             Value::Uint8(v) => {
-                super::expect_ty_primitive(ty, ir::PrimitiveSet::uint8)?;
+                super::expect_ty_primitive(ty, ir::TyPrimitive::uint8)?;
                 self.visit_uint8(*v)
             }
             Value::Uint16(v) => {
-                super::expect_ty_primitive(ty, ir::PrimitiveSet::uint16)?;
+                super::expect_ty_primitive(ty, ir::TyPrimitive::uint16)?;
                 self.visit_uint16(*v)
             }
             Value::Uint32(v) => {
-                super::expect_ty_primitive(ty, ir::PrimitiveSet::uint32)?;
+                super::expect_ty_primitive(ty, ir::TyPrimitive::uint32)?;
                 self.visit_uint32(*v)
             }
             Value::Uint64(v) => {
-                super::expect_ty_primitive(ty, ir::PrimitiveSet::uint64)?;
+                super::expect_ty_primitive(ty, ir::TyPrimitive::uint64)?;
                 self.visit_uint64(*v)
             }
             Value::Float32(v) => {
-                super::expect_ty_primitive(ty, ir::PrimitiveSet::float32)?;
+                super::expect_ty_primitive(ty, ir::TyPrimitive::float32)?;
                 self.visit_float32(*v)
             }
             Value::Float64(v) => {
-                super::expect_ty_primitive(ty, ir::PrimitiveSet::float64)?;
+                super::expect_ty_primitive(ty, ir::TyPrimitive::float64)?;
                 self.visit_float64(*v)
             }
             Value::Text(v) => {
-                super::expect_ty_primitive(ty, ir::PrimitiveSet::text)?;
+                super::expect_ty_primitive(ty, ir::TyPrimitive::text)?;
                 self.visit_text(v)
             }
             Value::Tuple(fields) => {

@@ -5,18 +5,18 @@ impl From<ir::Ty> for super::Ty {
         let kind = match ty.kind {
             ir::TyKind::Primitive(primitive) => {
                 let primitive = match primitive {
-                    ir::PrimitiveSet::bool => super::PrimitiveSet::bool,
-                    ir::PrimitiveSet::int8 => super::PrimitiveSet::int8,
-                    ir::PrimitiveSet::int16 => super::PrimitiveSet::int16,
-                    ir::PrimitiveSet::int32 => super::PrimitiveSet::int32,
-                    ir::PrimitiveSet::int64 => super::PrimitiveSet::int64,
-                    ir::PrimitiveSet::uint8 => super::PrimitiveSet::uint8,
-                    ir::PrimitiveSet::uint16 => super::PrimitiveSet::uint16,
-                    ir::PrimitiveSet::uint32 => super::PrimitiveSet::uint32,
-                    ir::PrimitiveSet::uint64 => super::PrimitiveSet::uint64,
-                    ir::PrimitiveSet::float32 => super::PrimitiveSet::float32,
-                    ir::PrimitiveSet::float64 => super::PrimitiveSet::float64,
-                    ir::PrimitiveSet::text => super::PrimitiveSet::text,
+                    ir::TyPrimitive::bool => super::TyPrimitive::bool,
+                    ir::TyPrimitive::int8 => super::TyPrimitive::int8,
+                    ir::TyPrimitive::int16 => super::TyPrimitive::int16,
+                    ir::TyPrimitive::int32 => super::TyPrimitive::int32,
+                    ir::TyPrimitive::int64 => super::TyPrimitive::int64,
+                    ir::TyPrimitive::uint8 => super::TyPrimitive::uint8,
+                    ir::TyPrimitive::uint16 => super::TyPrimitive::uint16,
+                    ir::TyPrimitive::uint32 => super::TyPrimitive::uint32,
+                    ir::TyPrimitive::uint64 => super::TyPrimitive::uint64,
+                    ir::TyPrimitive::float32 => super::TyPrimitive::float32,
+                    ir::TyPrimitive::float64 => super::TyPrimitive::float64,
+                    ir::TyPrimitive::text => super::TyPrimitive::text,
                 };
                 super::TyKind::Primitive(primitive)
             }
@@ -75,18 +75,18 @@ impl From<super::Ty> for ir::Ty {
         let kind = match ty.kind {
             super::TyKind::Primitive(primitive) => {
                 let primitive = match primitive {
-                    super::PrimitiveSet::int8 => ir::PrimitiveSet::int8,
-                    super::PrimitiveSet::int16 => ir::PrimitiveSet::int16,
-                    super::PrimitiveSet::int32 => ir::PrimitiveSet::int32,
-                    super::PrimitiveSet::int64 => ir::PrimitiveSet::int64,
-                    super::PrimitiveSet::uint8 => ir::PrimitiveSet::uint8,
-                    super::PrimitiveSet::uint16 => ir::PrimitiveSet::uint16,
-                    super::PrimitiveSet::uint32 => ir::PrimitiveSet::uint32,
-                    super::PrimitiveSet::uint64 => ir::PrimitiveSet::uint64,
-                    super::PrimitiveSet::float32 => ir::PrimitiveSet::float32,
-                    super::PrimitiveSet::float64 => ir::PrimitiveSet::float64,
-                    super::PrimitiveSet::bool => ir::PrimitiveSet::bool,
-                    super::PrimitiveSet::text => ir::PrimitiveSet::text,
+                    super::TyPrimitive::int8 => ir::TyPrimitive::int8,
+                    super::TyPrimitive::int16 => ir::TyPrimitive::int16,
+                    super::TyPrimitive::int32 => ir::TyPrimitive::int32,
+                    super::TyPrimitive::int64 => ir::TyPrimitive::int64,
+                    super::TyPrimitive::uint8 => ir::TyPrimitive::uint8,
+                    super::TyPrimitive::uint16 => ir::TyPrimitive::uint16,
+                    super::TyPrimitive::uint32 => ir::TyPrimitive::uint32,
+                    super::TyPrimitive::uint64 => ir::TyPrimitive::uint64,
+                    super::TyPrimitive::float32 => ir::TyPrimitive::float32,
+                    super::TyPrimitive::float64 => ir::TyPrimitive::float64,
+                    super::TyPrimitive::bool => ir::TyPrimitive::bool,
+                    super::TyPrimitive::text => ir::TyPrimitive::text,
                 };
                 ir::TyKind::Primitive(primitive)
             }

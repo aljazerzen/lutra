@@ -96,18 +96,18 @@ impl<I: Layout> Layout for Option<I> {
 pub fn get_layout_simple(ty: &ir::Ty) -> Option<ir::TyLayout> {
     let head_size = match &ty.kind {
         ir::TyKind::Primitive(prim) => match prim {
-            ir::PrimitiveSet::int8 => 8,
-            ir::PrimitiveSet::int16 => 16,
-            ir::PrimitiveSet::int32 => 32,
-            ir::PrimitiveSet::int64 => 64,
-            ir::PrimitiveSet::uint8 => 8,
-            ir::PrimitiveSet::uint16 => 16,
-            ir::PrimitiveSet::uint32 => 32,
-            ir::PrimitiveSet::uint64 => 64,
-            ir::PrimitiveSet::float32 => 32,
-            ir::PrimitiveSet::float64 => 64,
-            ir::PrimitiveSet::bool => 8,
-            ir::PrimitiveSet::text => 64,
+            ir::TyPrimitive::int8 => 8,
+            ir::TyPrimitive::int16 => 16,
+            ir::TyPrimitive::int32 => 32,
+            ir::TyPrimitive::int64 => 64,
+            ir::TyPrimitive::uint8 => 8,
+            ir::TyPrimitive::uint16 => 16,
+            ir::TyPrimitive::uint32 => 32,
+            ir::TyPrimitive::uint64 => 64,
+            ir::TyPrimitive::float32 => 32,
+            ir::TyPrimitive::float64 => 64,
+            ir::TyPrimitive::bool => 8,
+            ir::TyPrimitive::text => 64,
         },
         ir::TyKind::Array(_) => 64,
 
@@ -130,7 +130,7 @@ pub fn get_layout_simple(ty: &ir::Ty) -> Option<ir::TyLayout> {
         _ => return None,
     };
     let body_ptrs: vec::Vec<u32> = match &ty.kind {
-        ir::TyKind::Primitive(ir::PrimitiveSet::text) => vec![0],
+        ir::TyKind::Primitive(ir::TyPrimitive::text) => vec![0],
         ir::TyKind::Primitive(_) => vec![],
 
         ir::TyKind::Array(_) => vec![0],
@@ -158,7 +158,7 @@ pub fn get_layout_simple(ty: &ir::Ty) -> Option<ir::TyLayout> {
 
 pub fn tuple_field_offsets(ty: &ir::Ty) -> vec::Vec<u32> {
     let ir::TyKind::Tuple(ty_fields) = &ty.kind else {
-        panic!()
+        panic!("got: {:?}", ty.kind)
     };
 
     let mut field_offsets = vec::Vec::with_capacity(ty_fields.len());

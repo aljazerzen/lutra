@@ -294,7 +294,7 @@ fn compile_func_call(
         "std::mul" => utils::new_bin_op("*", args),
         "std::div" => utils::new_bin_op("/", args),
         "std::mod" => match ty.kind.as_primitive().unwrap() {
-            ir::PrimitiveSet::float32 | ir::PrimitiveSet::float64 => {
+            ir::TyPrimitive::float32 | ir::TyPrimitive::float64 => {
                 let mut args = args.into_iter();
                 ExprOrSource::Source(format!(
                     "MOD({}::numeric, {}::numeric)::float8",
@@ -385,18 +385,18 @@ fn compile_ty_name(ty: &ir::Ty) -> sql_ast::DataType {
     match ty.kind {
         ir::TyKind::Primitive(prim) => {
             let name = match prim {
-                ir::PrimitiveSet::bool => "bool",
-                ir::PrimitiveSet::int8 => "int1",
-                ir::PrimitiveSet::int16 => "int2",
-                ir::PrimitiveSet::int32 => "int4",
-                ir::PrimitiveSet::int64 => "int8",
-                ir::PrimitiveSet::uint8 => todo!(),
-                ir::PrimitiveSet::uint16 => todo!(),
-                ir::PrimitiveSet::uint32 => todo!(),
-                ir::PrimitiveSet::uint64 => todo!(),
-                ir::PrimitiveSet::float32 => "float4",
-                ir::PrimitiveSet::float64 => "float8",
-                ir::PrimitiveSet::text => "text",
+                ir::TyPrimitive::bool => "bool",
+                ir::TyPrimitive::int8 => "int1",
+                ir::TyPrimitive::int16 => "int2",
+                ir::TyPrimitive::int32 => "int4",
+                ir::TyPrimitive::int64 => "int8",
+                ir::TyPrimitive::uint8 => todo!(),
+                ir::TyPrimitive::uint16 => todo!(),
+                ir::TyPrimitive::uint32 => todo!(),
+                ir::TyPrimitive::uint64 => todo!(),
+                ir::TyPrimitive::float32 => "float4",
+                ir::TyPrimitive::float64 => "float8",
+                ir::TyPrimitive::text => "text",
             };
             sql_ast::DataType::Custom(sql_ast::ObjectName(vec![sql_ast::Ident::new(name)]), vec![])
         }

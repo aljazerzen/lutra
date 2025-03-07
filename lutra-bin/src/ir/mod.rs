@@ -37,8 +37,8 @@ impl Ty {
     }
 }
 
-impl From<PrimitiveSet> for TyKind {
-    fn from(value: PrimitiveSet) -> Self {
+impl From<TyPrimitive> for TyKind {
+    fn from(value: TyPrimitive) -> Self {
         TyKind::Primitive(value)
     }
 }

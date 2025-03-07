@@ -74,7 +74,7 @@ type Ty = {
 
 @derive(["Debug", "Clone", "PartialEq", "enum_as_inner::EnumAsInner"])
 type TyKind = enum {
-  Primitive = PrimitiveSet,
+  Primitive = TyPrimitive,
 
   Tuple = [TyTupleField],
 
@@ -88,7 +88,7 @@ type TyKind = enum {
 }
 
 @derive(["Debug", "Clone", "Copy", "PartialEq", "Eq", "Hash"])
-type PrimitiveSet = enum {
+type TyPrimitive = enum {
   bool,
   int8,
   int16,

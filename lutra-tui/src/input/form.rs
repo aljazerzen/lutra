@@ -38,11 +38,11 @@ pub enum FormKind {
 impl Form {
     pub fn new(ty: &ir::Ty, name: FormName) -> Self {
         let kind: FormKind = match &ty.kind {
-            ir::TyKind::Primitive(ir::PrimitiveSet::text) => {
+            ir::TyKind::Primitive(ir::TyPrimitive::text) => {
                 FormKind::Text(TextForm::new(String::new()))
             }
-            ir::TyKind::Primitive(ir::PrimitiveSet::int64) => FormKind::Int(IntForm::new(0)),
-            ir::TyKind::Primitive(ir::PrimitiveSet::bool) => FormKind::Bool(BoolForm::new(false)),
+            ir::TyKind::Primitive(ir::TyPrimitive::int64) => FormKind::Int(IntForm::new(0)),
+            ir::TyKind::Primitive(ir::TyPrimitive::bool) => FormKind::Bool(BoolForm::new(false)),
             ir::TyKind::Primitive(_) => todo!(),
 
             ir::TyKind::Enum(variants) => FormKind::Enum(EnumForm::new(variants)),

@@ -43,7 +43,7 @@ impl Context {
                     .map(|(index, x)| {
                         let mut cols = vec![cr::Expr {
                             kind: cr::ExprKind::Literal(ir::Literal::Int(index as i64)),
-                            ty: ir::Ty::new(ir::PrimitiveSet::int64),
+                            ty: ir::Ty::new(ir::TyPrimitive::int64),
                         }];
                         cols.extend(self.compile_cols(x));
                         cols
@@ -152,7 +152,7 @@ impl Context {
 
                 cr::RelExprKind::Limit(
                     Box::new(offset),
-                    new_bin_op(end, "std::sub", start, ir::PrimitiveSet::int64),
+                    new_bin_op(end, "std::sub", start, ir::TyPrimitive::int64),
                 )
             }
             "std::index" => {
@@ -179,7 +179,7 @@ impl Context {
                 let mut row = vec![new_column_of(
                     array.ty.clone(),
                     0,
-                    ir::Ty::new(ir::PrimitiveSet::int64),
+                    ir::Ty::new(ir::TyPrimitive::int64),
                 )];
 
                 self.functions.insert(func.id, "does_not_matter".into());
@@ -261,7 +261,7 @@ impl Context {
                         new_column_of(
                             call.args[0].ty.clone(),
                             0,
-                            ir::Ty::new(ir::PrimitiveSet::int64),
+                            ir::Ty::new(ir::TyPrimitive::int64),
                         ),
                         cr::Expr {
                             kind: cr::ExprKind::FuncCall(ptr.id.clone(), args),
@@ -349,7 +349,7 @@ impl Context {
     }
 }
 
-fn new_bin_op(left: cr::Expr, op: &str, right: cr::Expr, ty: ir::PrimitiveSet) -> cr::Expr {
+fn new_bin_op(left: cr::Expr, op: &str, right: cr::Expr, ty: ir::TyPrimitive) -> cr::Expr {
     let kind = cr::ExprKind::FuncCall(op.to_string(), vec![left, right]);
     cr::Expr {
         kind,
@@ -366,7 +366,7 @@ fn new_int(int: i64) -> cr::Expr {
     cr::Expr {
         kind,
         ty: ir::Ty {
-            kind: ir::TyKind::Primitive(ir::PrimitiveSet::int64),
+            kind: ir::TyKind::Primitive(ir::TyPrimitive::int64),
             name: None,
             layout: None,
         },

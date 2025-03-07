@@ -15,14 +15,14 @@ impl TypeResolver<'_> {
 
         let kind = match &expr.kind {
             ExprKind::Literal(ref literal) => match literal {
-                Literal::Integer(_) => TyKind::Primitive(PrimitiveSet::int64),
-                Literal::Float(_) => TyKind::Primitive(PrimitiveSet::float64),
-                Literal::Boolean(_) => TyKind::Primitive(PrimitiveSet::bool),
-                Literal::Text(_) => TyKind::Primitive(PrimitiveSet::text),
+                Literal::Integer(_) => TyKind::Primitive(TyPrimitive::int64),
+                Literal::Float(_) => TyKind::Primitive(TyPrimitive::float64),
+                Literal::Boolean(_) => TyKind::Primitive(TyPrimitive::bool),
+                Literal::Text(_) => TyKind::Primitive(TyPrimitive::text),
                 _ => panic!(),
             },
 
-            ExprKind::FString(_) => TyKind::Primitive(PrimitiveSet::text),
+            ExprKind::FString(_) => TyKind::Primitive(TyPrimitive::text),
 
             ExprKind::Tuple(fields) => {
                 let mut ty_fields: Vec<TyTupleField> = Vec::with_capacity(fields.len());
@@ -49,7 +49,7 @@ impl TypeResolver<'_> {
                     0 => {
                         // no items, so we must infer the type
                         // TODO
-                        let mut ty = Ty::new(PrimitiveSet::int64);
+                        let mut ty = Ty::new(TyPrimitive::int64);
                         ty.layout = ty.kind.get_layout_simple();
                         ty
                     }

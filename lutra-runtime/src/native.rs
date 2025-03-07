@@ -104,19 +104,19 @@ pub mod std {
         ($name: ident, $op: tt) => {
             pub fn $name(_: &mut Interpreter, layout_args: &[u32], args: Vec<Cell>) -> Cell {
                 let prim_set = layout_args[0].to_be_bytes();
-                let prim_set = lutra_bin::ir::PrimitiveSet::decode(&prim_set).unwrap();
+                let prim_set = lutra_bin::ir::TyPrimitive::decode(&prim_set).unwrap();
 
                 match prim_set {
-                    lutra_bin::ir::PrimitiveSet::int8 => bin_op!(i8, args, $op),
-                    lutra_bin::ir::PrimitiveSet::int16 => bin_op!(i16, args, $op),
-                    lutra_bin::ir::PrimitiveSet::int32 => bin_op!(i32, args, $op),
-                    lutra_bin::ir::PrimitiveSet::int64 => bin_op!(i64, args, $op),
-                    lutra_bin::ir::PrimitiveSet::uint8 => bin_op!(u8, args, $op),
-                    lutra_bin::ir::PrimitiveSet::uint16 => bin_op!(u16, args, $op),
-                    lutra_bin::ir::PrimitiveSet::uint32 => bin_op!(u32, args, $op),
-                    lutra_bin::ir::PrimitiveSet::uint64 => bin_op!(u64, args, $op),
-                    lutra_bin::ir::PrimitiveSet::float32 => bin_op!(f32, args, $op),
-                    lutra_bin::ir::PrimitiveSet::float64 => bin_op!(f64, args, $op),
+                    lutra_bin::ir::TyPrimitive::int8 => bin_op!(i8, args, $op),
+                    lutra_bin::ir::TyPrimitive::int16 => bin_op!(i16, args, $op),
+                    lutra_bin::ir::TyPrimitive::int32 => bin_op!(i32, args, $op),
+                    lutra_bin::ir::TyPrimitive::int64 => bin_op!(i64, args, $op),
+                    lutra_bin::ir::TyPrimitive::uint8 => bin_op!(u8, args, $op),
+                    lutra_bin::ir::TyPrimitive::uint16 => bin_op!(u16, args, $op),
+                    lutra_bin::ir::TyPrimitive::uint32 => bin_op!(u32, args, $op),
+                    lutra_bin::ir::TyPrimitive::uint64 => bin_op!(u64, args, $op),
+                    lutra_bin::ir::TyPrimitive::float32 => bin_op!(f32, args, $op),
+                    lutra_bin::ir::TyPrimitive::float64 => bin_op!(f64, args, $op),
                     _ => panic!(),
                 }
             }
@@ -144,14 +144,14 @@ pub mod std {
 
         pub fn neg(_: &mut Interpreter, layout_args: &[u32], args: Vec<Cell>) -> Cell {
             let prim_set = layout_args[0].to_be_bytes();
-            let prim_set = lutra_bin::ir::PrimitiveSet::decode(&prim_set).unwrap();
+            let prim_set = lutra_bin::ir::TyPrimitive::decode(&prim_set).unwrap();
             match prim_set {
-                lutra_bin::ir::PrimitiveSet::int8 => neg_arg!(i8, args),
-                lutra_bin::ir::PrimitiveSet::int16 => neg_arg!(i16, args),
-                lutra_bin::ir::PrimitiveSet::int32 => neg_arg!(i32, args),
-                lutra_bin::ir::PrimitiveSet::int64 => neg_arg!(i64, args),
-                lutra_bin::ir::PrimitiveSet::float32 => neg_arg!(f32, args),
-                lutra_bin::ir::PrimitiveSet::float64 => neg_arg!(f64, args),
+                lutra_bin::ir::TyPrimitive::int8 => neg_arg!(i8, args),
+                lutra_bin::ir::TyPrimitive::int16 => neg_arg!(i16, args),
+                lutra_bin::ir::TyPrimitive::int32 => neg_arg!(i32, args),
+                lutra_bin::ir::TyPrimitive::int64 => neg_arg!(i64, args),
+                lutra_bin::ir::TyPrimitive::float32 => neg_arg!(f32, args),
+                lutra_bin::ir::TyPrimitive::float64 => neg_arg!(f64, args),
                 _ => panic!(),
             }
         }
