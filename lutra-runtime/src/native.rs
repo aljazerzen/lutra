@@ -574,7 +574,7 @@ pub mod interpreter {
 
     impl Module {
         fn version(_it: &mut Interpreter, _layout_args: &[u32], _args: Vec<Cell>) -> Cell {
-            Cell::Data(encode(&"lutra-runtime 0.0.1".to_string()))
+            Cell::Data(encode("lutra-runtime 0.0.1"))
         }
     }
 }
@@ -691,7 +691,7 @@ mod decode {
     }
 }
 
-pub fn encode<T: Encode + Layout>(value: &T) -> lutra_bin::Data {
+pub fn encode<T: Encode + Layout + ?Sized>(value: &T) -> lutra_bin::Data {
     let mut buf = bytes::BytesMut::with_capacity(T::head_size() / 8);
     value.encode(&mut buf);
     lutra_bin::Data::new(buf.to_vec())

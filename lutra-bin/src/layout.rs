@@ -65,6 +65,11 @@ impl Layout for f64 {
     }
 }
 
+impl Layout for str {
+    fn head_size() -> usize {
+        64
+    }
+}
 impl Layout for string::String {
     fn head_size() -> usize {
         64

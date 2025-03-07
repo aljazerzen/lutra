@@ -256,11 +256,11 @@ fn get_cell(row: &Row, idx: usize, ty: &ir::Ty) -> Data {
         ir::PrimitiveSet::uint64 => todo!(),
         ir::PrimitiveSet::float32 => encode(&row.get::<_, f32>(idx)),
         ir::PrimitiveSet::float64 => encode(&row.get::<_, f64>(idx)),
-        ir::PrimitiveSet::text => encode(&row.get::<_, TextOrJson>(idx).0.to_string()),
+        ir::PrimitiveSet::text => encode(row.get::<_, TextOrJson>(idx).0),
     }
 }
 
-fn encode<T: lutra_bin::Encode + lutra_bin::Layout>(value: &T) -> lutra_bin::Data {
+fn encode<T: lutra_bin::Encode + lutra_bin::Layout + ?Sized>(value: &T) -> lutra_bin::Data {
     let mut buf = bytes::BytesMut::with_capacity(T::head_size() / 8);
     value.encode(&mut buf);
     lutra_bin::Data::new(buf.to_vec())

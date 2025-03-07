@@ -3,4 +3,4 @@ mod inliner;
 mod lowering;
 
 pub use inliner::inline;
-pub use lowering::{lower_expr, lower};
+pub use lowering::{lower, lower_expr};

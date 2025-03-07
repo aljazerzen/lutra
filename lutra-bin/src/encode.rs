@@ -118,7 +118,7 @@ impl Encode for f64 {
     fn encode_body(&self, _head: Self::HeadPtr, _buf: &mut BytesMut) {}
 }
 
-impl Encode for string::String {
+impl Encode for str {
     type HeadPtr = ReversePointer;
 
     fn encode_head(&self, buf: &mut BytesMut) -> ReversePointer {
@@ -130,6 +130,17 @@ impl Encode for string::String {
     fn encode_body(&self, offset: Self::HeadPtr, buf: &mut BytesMut) {
         offset.write_cur_len(buf);
         buf.put_slice(self.as_bytes());
+    }
+}
+impl Encode for string::String {
+    type HeadPtr = ReversePointer;
+
+    fn encode_head(&self, buf: &mut BytesMut) -> ReversePointer {
+        (self as &str).encode_head(buf)
+    }
+
+    fn encode_body(&self, offset: Self::HeadPtr, buf: &mut BytesMut) {
+        (self as &str).encode_body(offset, buf)
     }
 }
 impl<E: Encode> Encode for vec::Vec<E> {
