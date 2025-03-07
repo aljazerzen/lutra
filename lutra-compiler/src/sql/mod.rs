@@ -8,8 +8,10 @@ use lutra_bin::ir;
 const COL_VALUE: &str = "value";
 const COL_ARRAY_INDEX: &str = "index";
 
-pub fn compile(program: &ir::Program) -> String {
-    let clause = clauses::compile(program);
+pub fn compile(program: ir::Program) -> String {
+    let program = crate::intermediate::inline(program).unwrap();
+
+    let clause = clauses::compile(&program);
 
     tracing::debug!("cr: {clause:#?}");
 

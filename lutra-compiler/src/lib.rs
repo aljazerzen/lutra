@@ -2,7 +2,7 @@ mod bytecoding;
 mod compile;
 mod diagnostic;
 mod discover;
-mod lowering;
+mod intermediate;
 mod parser;
 mod printer;
 mod project;
@@ -19,7 +19,7 @@ pub mod pr;
 pub use bytecoding::compile_program as bytecode_program;
 pub use compile::{compile, CompileParams};
 pub use discover::{discover, DiscoverParams};
-pub use lowering::lower;
+pub use intermediate::lower;
 pub use project::{Project, SourceTree};
 pub use span::Span;
 pub use sql::compile as compile_to_sql;
@@ -53,5 +53,5 @@ pub fn _test_compile(source: &str) -> Result<ir::Program, error::Error> {
     let project = compile(source, CompileParams {})?;
 
     let path = pr::Path::from_name("main");
-    Ok(lowering::lower(&project.root_module, &path))
+    Ok(lower(&project.root_module, &path))
 }

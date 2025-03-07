@@ -925,3 +925,33 @@ test_case!(
   false,
 }"#
 );
+
+test_case!(
+    functions_00,
+    r#"let add_one = func (x: int64) -> x + 1
+    func () -> {add_one(4), add_one(add_one(5))}
+    "#,
+    r#"{
+  5,
+  7,
+}"#
+);
+
+test_case!(
+    functions_01,
+    r#"
+    func () -> (4 | func (x: int64) -> x + 1 | func (x: int64) -> x * 2)
+    "#,
+    r#"10"#
+);
+
+test_case!(
+    functions_02,
+    r#"
+    let add_one = func (x: int64) -> x + 1
+    let add_two = func (x: int64) -> add_one(add_one(x))
+    let my_func = func (x: int64) -> add_two(x) + add_two(x)
+    func () -> my_func(1)
+    "#,
+    r#"6"#
+);

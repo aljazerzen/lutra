@@ -186,7 +186,7 @@ pub fn sql(cmd: SqlCommand) -> anyhow::Result<()> {
     let program = lutra_compiler::lower(&project.root_module, &path);
 
     tracing::debug!("ir: {}", lutra_ir::print(&program));
-    let sql = lutra_compiler::compile_to_sql(&program);
+    let sql = lutra_compiler::compile_to_sql(program);
 
     println!("{}", sql);
     Ok(())
@@ -215,9 +215,10 @@ pub async fn run_postgres(cmd: RunPostgresCommand) -> anyhow::Result<()> {
 
     let path = pr::Path::new(cmd.path.split("::"));
     let program = lutra_compiler::lower(&project.root_module, &path);
+    let output_ty = program.get_output_ty().clone();
 
     tracing::debug!("ir: {}", lutra_ir::print(&program));
-    let sql = lutra_compiler::compile_to_sql(&program);
+    let sql = lutra_compiler::compile_to_sql(program);
     tracing::debug!("sql: {sql}");
 
     let (client, connection) =
@@ -230,11 +231,11 @@ pub async fn run_postgres(cmd: RunPostgresCommand) -> anyhow::Result<()> {
     });
 
     let (db_ty, data) = lutra_db_driver::query(client, &sql).await?;
-    let data = lutra_db_driver::repack(&db_ty, data, program.get_output_ty());
+    let data = lutra_db_driver::repack(&db_ty, data, &output_ty);
     let data = data.flatten();
 
-    let value = lutra_bin::Value::decode(&data, program.get_output_ty())?;
+    let value = lutra_bin::Value::decode(&data, &output_ty)?;
 
-    println!("{}", value.print_source(program.get_output_ty())?);
+    println!("{}", value.print_source(&output_ty)?);
     Ok(())
 }

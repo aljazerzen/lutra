@@ -12,7 +12,7 @@ pub fn _run(lutra_source: &str) -> (String, String) {
     let output_ty = program.get_output_ty().clone();
 
     // compile to sql
-    let query_sql = lutra_compiler::compile_to_sql(&program);
+    let query_sql = lutra_compiler::compile_to_sql(program);
 
     // format sql
     let params = sqlformat::QueryParams::None;
