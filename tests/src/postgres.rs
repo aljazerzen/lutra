@@ -2,11 +2,7 @@ use lutra_compiler::{pr, SourceTree};
 
 #[track_caller]
 pub fn _run(source: &str) -> (String, String) {
-    tracing_subscriber::fmt::Subscriber::builder()
-        .without_time()
-        .with_max_level(tracing::Level::DEBUG)
-        .try_init()
-        .ok();
+    crate::init_logger();
 
     // compile
     let source = SourceTree::single("".into(), source.to_string());

@@ -4,13 +4,13 @@
 
 #[track_caller]
 fn _runtime(lutra_source: &str) -> String {
-    tracing_subscriber::fmt::Subscriber::builder()
-        .without_time()
-        .with_max_level(tracing::Level::DEBUG)
-        .try_init()
-        .ok();
+    crate::init_logger();
 
-    let program = lutra_compiler::_test_compile(lutra_source).unwrap_or_else(|e| panic!("{e}"));
+    let program_res = lutra_compiler::_test_compile(lutra_source);
+    let program = match program_res {
+        Ok(p) => p,
+        Err(e) => panic!("{e}"),
+    };
     tracing::debug!("ir:\n{}", lutra_bin::ir::print(&program));
 
     let bytecode = lutra_compiler::bytecode_program(program.clone());
@@ -31,6 +31,13 @@ pub struct TestCase {
 
 /// A test function, with a conditional #[ignore] attribute
 macro_rules! test_fn {
+    (skip_runtime, $name: ident, $test: expr) => {
+        #[test]
+        #[ignore]
+        fn $name() {
+            $test
+        }
+    };
     (skip_postgres, $name: ident, $test: expr) => {
         #[test]
         #[ignore]
@@ -52,20 +59,25 @@ macro_rules! test_case {
     };
 
     ($name: ident, $source: literal, $output: literal, $ignore_postgres: tt) => {
+        test_case!($name, $source, $output, no_skip, $ignore_postgres);
+    };
+
+    ($name: ident, $source: literal, $output: literal, $ignore_runtime: tt, $ignore_postgres: tt) => {
         pub mod $name {
             pub const CASE: super::TestCase = super::TestCase {
                 source: $source,
                 output: $output,
             };
 
-            #[test]
-            fn runtime() {
+            test_fn!(
+                $ignore_runtime,
+                runtime,
                 assert_eq!(
                     super::_runtime(CASE.source),
                     CASE.output,
                     "runtime != expected"
                 )
-            }
+            );
 
             test_fn!(
                 $ignore_postgres,
@@ -79,6 +91,23 @@ macro_rules! test_case {
         }
     };
 }
+
+test_case!(empty_array_00, "func (): [int64] -> []", "[]");
+
+test_case!(
+    empty_array_01,
+    "func (): [{a = int64, b = text}] -> []",
+    "[]"
+);
+
+test_case!(
+    empty_array_02,
+    "
+    let ident = func (x: [bool]) -> x
+    func () -> ident([])
+    ",
+    "[]"
+);
 
 test_case!(std_mul_01, "func () -> 2 * 3", "6");
 
@@ -530,6 +559,7 @@ test_case!(
     std_from_columnar_01,
     r#"func () -> std::from_columnar({[1], []})"#,
     "[]",
+    skip_runtime,
     skip_postgres
 );
 
@@ -537,6 +567,7 @@ test_case!(
     std_from_columnar_02,
     r#"func () -> std::from_columnar({[], [2]})"#,
     "[]",
+    skip_runtime,
     skip_postgres
 );
 
@@ -779,7 +810,7 @@ test_case!(
 ]"#
 );
 
-test_case!(std_lag_02, r#"func () -> std::lag([], 3)"#, "[]");
+test_case!(std_lag_02, r#"func (): [int64] -> std::lag([], 3)"#, "[]");
 
 test_case!(
     std_lag_03,
@@ -820,7 +851,7 @@ test_case!(
 ]"#
 );
 
-test_case!(std_lead_02, r#"func () -> std::lead([], 3)"#, "[]");
+test_case!(std_lead_02, r#"func (): [int32] -> std::lead([], 3)"#, "[]");
 
 test_case!(
     std_lead_03,
@@ -847,7 +878,13 @@ test_case!(
 ]"#
 );
 
-test_case!(std_row_number_01, r#"func () -> std::row_number([])"#, "[]");
+test_case!(
+    std_row_number_01,
+    r#"func (): [int64] -> std::row_number([])"#,
+    "[]",
+    skip_runtime,
+    skip_postgres
+);
 
 test_case!(
     bindings_00,

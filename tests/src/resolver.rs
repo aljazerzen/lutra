@@ -1,10 +1,6 @@
 #[track_caller]
 fn _test_run(source: &str) -> String {
-    // env_logger::Builder::new()
-    //     .filter_level(log::LevelFilter::Debug)
-    //     .format_timestamp(None)
-    //     .try_init()
-    //     .ok();
+    crate::init_logger();
 
     let program = match lutra_compiler::_test_compile(source) {
         Ok(program) => program,
@@ -19,11 +15,7 @@ fn _test_run(source: &str) -> String {
 fn _test_err(source: &str) -> String {
     use lutra_compiler::error::Error;
 
-    // env_logger::Builder::new()
-    //     .filter_level(log::LevelFilter::Debug)
-    //     .format_timestamp(None)
-    //     .try_init()
-    //     .ok();
+    crate::init_logger();
 
     let Error::Compile { diagnostics } = lutra_compiler::_test_compile(source).unwrap_err() else {
         unreachable!()
@@ -378,4 +370,50 @@ fn types_18() {
         let f = func <T: {a = int64, ..}> (x: T) -> x.a
         func () -> f({false, a = 4})
     "#), @"int64");
+}
+
+#[test]
+fn empty_array_00() {
+    insta::assert_snapshot!(
+        _test_err(
+            "func () -> []"
+        ),
+        @r#"
+    Error: 
+       ╭─[:1:12]
+       │
+     1 │ func () -> []
+       │            ─┬  
+       │             ╰── cannot infer type: 0.unnamed
+    ───╯
+    "#
+    );
+}
+
+#[test]
+fn empty_array_01() {
+    insta::assert_snapshot!(
+        _test_err(
+            "func () -> std::lag([], 1)"
+        ),
+        @r#"
+    Error: 
+       ╭─[:1:12]
+       │
+     1 │ func () -> std::lag([], 1)
+       │            ───────┬───────  
+       │                   ╰───────── cannot infer type: 0.T
+    ───╯
+    "#
+    );
+}
+
+#[test]
+fn empty_array_02() {
+    insta::assert_snapshot!(
+        _test_run(
+            "func (): [int64] -> std::lag([], 1)"
+        ),
+        @"[int64]"
+    );
 }

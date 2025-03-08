@@ -15,7 +15,7 @@ impl TypeResolver<'_> {
     #[tracing::instrument(name = "func", skip_all, fields(f = func.params.iter().map(|p| &p.name).join(",")))]
     pub fn resolve_func(&mut self, mut func: Box<Func>) -> Result<Box<Func>> {
         tracing::debug!(
-            "resolving func with params: {}",
+            "resolving func with params: ({})",
             func.params.iter().map(|p| &p.name).join(", ")
         );
         let mut scope = Scope::new();
@@ -35,6 +35,8 @@ impl TypeResolver<'_> {
 
         // validate that the body has correct type
         self.validate_expr_type(&mut func.body, func.return_ty.as_ref(), &|| None)?;
+
+        tracing::debug!("func done, popping scope");
 
         // pop the scope
         let scope = self.scopes.pop().unwrap();

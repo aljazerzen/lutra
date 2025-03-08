@@ -1,7 +1,7 @@
 use itertools::Itertools;
 
 use crate::diagnostic::{Diagnostic, WithErrorInfo};
-use crate::pr::*;
+use crate::pr::{self, *};
 use crate::printer;
 use crate::Result;
 
@@ -48,10 +48,7 @@ impl TypeResolver<'_> {
                 let items_ty = match variants.len() {
                     0 => {
                         // no items, so we must infer the type
-                        // TODO
-                        let mut ty = Ty::new(TyPrimitive::int64);
-                        ty.layout = ty.kind.get_layout_simple();
-                        ty
+                        self.introduce_ty_arg(pr::TyParamDomain::Open)
                     }
                     1 => {
                         // single item, use its type
@@ -63,7 +60,7 @@ impl TypeResolver<'_> {
                         // strategy for dealing with nullable types, which
                         // causes problems here.
                         // HACK: use only the first type
-                        variants.into_iter().next().unwrap()
+                        variants.into_iter().unique().next().unwrap()
                     }
                 };
                 TyKind::Array(Box::new(items_ty))

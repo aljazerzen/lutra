@@ -273,4 +273,24 @@ impl TypeResolver<'_> {
         };
         (utils::TypeReplacer::on_ty(ty, mapping), ty_args)
     }
+
+    pub fn introduce_ty_arg(&mut self, domain: pr::TyParamDomain) -> pr::Ty {
+        let scope = self.scopes.last_mut().unwrap();
+        let expr_id = self.id.gen();
+        let name = "unnamed";
+
+        let ty_arg = pr::Ty::new(Path::new(vec![
+            "scope".to_string(),
+            "type_args".to_string(),
+            expr_id.to_string(),
+            name.to_string(),
+        ]));
+
+        let type_arg_id = TyArgId {
+            expr_id,
+            name: name.to_string(),
+        };
+        scope.insert_generic_arg(type_arg_id, domain);
+        ty_arg
+    }
 }

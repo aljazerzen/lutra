@@ -9,5 +9,13 @@ mod lbin;
 mod lowering;
 mod native_functions;
 mod postgres;
+mod resolver;
 mod typed_data;
-mod types;
+
+fn init_logger() {
+    tracing_subscriber::fmt::Subscriber::builder()
+        .without_time()
+        .with_max_level(tracing::Level::DEBUG)
+        .try_init()
+        .ok();
+}
