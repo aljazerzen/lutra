@@ -11,4 +11,5 @@ bytes = { workspace = true }
 futures = { version = "0.3.31", default-features = false }
 lutra-bin = { version = "0.1.0", path = "../lutra-bin" }
 tokio-postgres = { version = "0.7.13", default-features = false }
+postgres-protocol = { version = "0.6.8", default-features = false }
 tinyjson = "2"

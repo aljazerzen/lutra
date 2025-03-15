@@ -3,80 +3,93 @@ use std::iter::zip;
 use lutra_bin::ir;
 use sqlparser::ast as sql_ast;
 
+use crate::sql::queries::Context;
 use crate::sql::{COL_ARRAY_INDEX, COL_VALUE};
 
-/// Generates the projection of a relation of type `ty`.
-pub fn projection(
-    ty: &ir::Ty,
-    values: impl IntoIterator<Item = sql_ast::Expr>,
-) -> Vec<sql_ast::SelectItem> {
-    zip(values, rel_cols(ty, true))
-        .map(|(expr, alias)| sql_ast::SelectItem::ExprWithAlias {
-            expr,
-            alias: sql_ast::Ident::new(alias),
-        })
-        .collect()
-}
+impl<'a> Context<'a> {
+    /// Generates the projection of a relation of type `ty`.
+    pub fn projection(
+        &self,
+        ty: &ir::Ty,
+        values: impl IntoIterator<Item = sql_ast::Expr>,
+    ) -> Vec<sql_ast::SelectItem> {
+        zip(values, self.rel_cols(ty, true))
+            .map(|(expr, alias)| sql_ast::SelectItem::ExprWithAlias {
+                expr,
+                alias: sql_ast::Ident::new(alias),
+            })
+            .collect()
+    }
 
-/// Generates an identity (no-op) projection of a relation of type `ty`, from relation variable `rel_var_name`.
-/// When `top_level` is set, the projection does not include array index.
-pub fn projection_noop(
-    rel_var_name: Option<&str>,
-    ty: &ir::Ty,
-    include_index: bool,
-) -> Vec<sql_ast::SelectItem> {
-    rel_cols(ty, include_index)
-        .map(|name| sql_ast::SelectItem::UnnamedExpr(super::ident(rel_var_name, name)))
-        .collect()
-}
+    /// Generates an identity (no-op) projection of a relation of type `ty`, from relation variable `rel_var_name`.
+    /// When `top_level` is set, the projection does not include array index.
+    pub fn projection_noop(
+        &self,
+        rel_var_name: Option<&str>,
+        ty: &ir::Ty,
+        include_index: bool,
+    ) -> Vec<sql_ast::SelectItem> {
+        self.rel_cols(ty, include_index)
+            .map(|name| sql_ast::SelectItem::UnnamedExpr(super::ident(rel_var_name, name)))
+            .collect()
+    }
 
-/// Names of relational columns for a given type
-/// If include_index is false, top-level arrays does not produce index column.
-pub fn rel_cols(ty: &ir::Ty, include_index: bool) -> impl Iterator<Item = String> + '_ {
-    rel_cols_re(ty, include_index, true, "f".to_string())
-}
+    /// Names of relational columns for a given type
+    /// If include_index is false, top-level arrays does not produce index column.
+    pub fn rel_cols(
+        &'a self,
+        ty: &'a ir::Ty,
+        include_index: bool,
+    ) -> impl Iterator<Item = String> + 'a {
+        self.rel_cols_re(ty, include_index, true, "f".to_string())
+    }
 
-fn rel_cols_re<'a>(
-    ty: &'a ir::Ty,
-    include_index: bool,
-    top_level: bool,
-    field_prefix: String,
-) -> Box<dyn Iterator<Item = String> + 'a> {
-    match &ty.kind {
-        ir::TyKind::Primitive(_) => Box::new(Some(COL_VALUE.to_string()).into_iter()),
+    fn rel_cols_re(
+        &'a self,
+        ty: &'a ir::Ty,
+        include_index: bool,
+        top_level: bool,
+        field_prefix: String,
+    ) -> Box<dyn Iterator<Item = String> + 'a> {
+        match &self.get_ty_mat(ty).kind {
+            ir::TyKind::Primitive(_) => Box::new(Some(COL_VALUE.to_string()).into_iter()),
 
-        ir::TyKind::Tuple(fields) => Box::new(fields.iter().enumerate().flat_map(
-            move |(i, field)| match &field.ty.kind {
-                ir::TyKind::Tuple(_) => {
-                    let field_prefix = format!("{field_prefix}_{i}");
-                    rel_cols_re(&field.ty, false, false, field_prefix)
-                }
-                ir::TyKind::Primitive(_) | ir::TyKind::Array(_) => {
-                    Box::new(Some(format!("{field_prefix}_{i}")).into_iter())
-                }
-                _ => todo!(),
-            },
-        )),
-
-        ir::TyKind::Array(item) => {
-            if top_level {
-                let mut index = None;
-                if include_index {
-                    index = Some(COL_ARRAY_INDEX.to_string());
-                }
-
-                Box::new(
-                    index
-                        .into_iter()
-                        .chain(rel_cols_re(item, false, false, field_prefix)),
-                )
-            } else {
-                Box::new(Some(COL_VALUE.to_string()).into_iter())
+            ir::TyKind::Tuple(fields) => {
+                Box::new(fields.iter().enumerate().flat_map(move |(i, field)| {
+                    match &self.get_ty_mat(&field.ty).kind {
+                        ir::TyKind::Tuple(_) => {
+                            let field_prefix = format!("{field_prefix}_{i}");
+                            self.rel_cols_re(&field.ty, false, false, field_prefix)
+                        }
+                        ir::TyKind::Primitive(_) | ir::TyKind::Array(_) => {
+                            Box::new(Some(format!("{field_prefix}_{i}")).into_iter())
+                        }
+                        _ => todo!(),
+                    }
+                }))
             }
+
+            ir::TyKind::Array(item) => {
+                if top_level {
+                    let mut index = None;
+                    if include_index {
+                        index = Some(COL_ARRAY_INDEX.to_string());
+                    }
+
+                    Box::new(index.into_iter().chain(self.rel_cols_re(
+                        item,
+                        false,
+                        false,
+                        field_prefix,
+                    )))
+                } else {
+                    Box::new(Some(COL_VALUE.to_string()).into_iter())
+                }
+            }
+            ir::TyKind::Enum(_) => todo!(),
+            ir::TyKind::Function(_) => todo!(),
+            ir::TyKind::Ident(_) => todo!(),
         }
-        ir::TyKind::Enum(_) => todo!(),
-        ir::TyKind::Function(_) => todo!(),
-        ir::TyKind::Ident(_) => todo!(),
     }
 }
 
@@ -86,7 +99,11 @@ mod rel_repr {
     use lutra_bin::ir;
 
     fn r(ty: &ir::Ty) -> String {
-        super::rel_cols(ty, true).join(", ")
+        let ctx = super::Context {
+            types: Default::default(),
+        };
+        let x = ctx.rel_cols(ty, true).join(", ");
+        x
     }
 
     #[test]

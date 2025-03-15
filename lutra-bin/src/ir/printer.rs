@@ -49,7 +49,7 @@ impl Printer {
             r += ";\n";
         }
 
-        r += "let main =";
+        r += "let main = ";
         r += &self.print_expr(&program.main);
         r
     }

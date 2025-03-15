@@ -1,7 +1,7 @@
 use lutra_compiler::{pr, SourceTree};
 
 #[track_caller]
-pub fn _run(source: &str) -> (String, String) {
+pub fn _run(source: &str, params: Vec<lutra_bin::Value>) -> (String, String) {
     crate::init_logger();
 
     // compile
@@ -14,14 +14,18 @@ pub fn _run(source: &str) -> (String, String) {
         lutra_compiler::compile_to_sql(&project, &pr::Path::from_name("main"));
 
     // format sql
-    let params = sqlformat::QueryParams::None;
     let options = sqlformat::FormatOptions::default();
-    let formatted_sql = sqlformat::format(&query_sql, &params, &options);
+    let formatted_sql = sqlformat::format(&query_sql, &sqlformat::QueryParams::None, &options);
     tracing::debug!("sql:\n{formatted_sql}");
+
+    let params: Vec<_> = std::iter::zip(params, program.get_input_tys())
+        .map(|(value, ty)| value.encode(ty, &program.types).unwrap())
+        .collect();
 
     // execute
     async fn inner(
         query_sql: &str,
+        params: &[Vec<u8>],
     ) -> Result<(lutra_bin::ir::Ty, lutra_bin::Data), tokio_postgres::Error> {
         const POSTGRES_URL: &str = "postgresql://postgres:pass@localhost:5416";
 
@@ -35,16 +39,23 @@ pub fn _run(source: &str) -> (String, String) {
             }
         });
 
-        lutra_db_driver::query(client, query_sql).await
+        lutra_db_driver::query(client, query_sql, params.iter().map(|p| p.as_slice())).await
     }
     let rt = tokio::runtime::Builder::new_current_thread()
         .enable_all()
         .build()
         .unwrap();
 
-    let (rel_ty, rel_data) = rt.block_on(inner(&query_sql)).unwrap();
+    let (rel_ty, rel_data) = rt.block_on(inner(&query_sql, &params)).unwrap();
 
-    let output = lutra_db_driver::repack(&rel_ty, rel_data, program.get_output_ty());
+    tracing::debug!(
+        "repack:\n- from: {}\n- to: {}",
+        lutra_bin::ir::print_ty(&rel_ty),
+        lutra_bin::ir::print_ty(program.get_output_ty())
+    );
+
+    let output =
+        lutra_db_driver::repack(&rel_ty, rel_data, program.get_output_ty(), &program.types);
     let output = output.flatten();
 
     let output =
@@ -58,7 +69,7 @@ pub fn _run(source: &str) -> (String, String) {
 
 #[track_caller]
 pub fn _run_to_str(lutra_source: &str) -> String {
-    let (sql, output) = _run(lutra_source);
+    let (sql, output) = _run(lutra_source, vec![]);
     format!("{sql}\n---\n{output}")
 }
 
@@ -319,6 +330,84 @@ fn array_tuple_prim() {
 }
 
 #[test]
+fn tuple_array_tuple_prim() {
+    insta::assert_snapshot!(_run_to_str(r#"
+        func () -> {
+            "hello",
+            [{3, false}, {6, true}, {12, false}],
+        }
+    "#), @r#"
+    SELECT
+      'hello' AS f_0,
+      (
+        SELECT
+          json_agg(
+            value
+            ORDER BY
+              index
+          )
+        FROM
+          (
+            SELECT
+              index,
+              jsonb_build_array(f_0, f_1) as value
+            FROM
+              (
+                SELECT
+                  0::int8 AS index,
+                  3::int8 AS f_0,
+                  false AS f_1
+                UNION
+                ALL
+                SELECT
+                  1::int8,
+                  6::int8,
+                  true
+                UNION
+                ALL
+                SELECT
+                  2::int8,
+                  12::int8,
+                  false
+              )
+          )
+      ) AS f_1
+    ---
+    {
+      "hello",
+      [
+        {
+          3,
+          false,
+        },
+        {
+          6,
+          true,
+        },
+        {
+          12,
+          false,
+        },
+      ],
+    }
+    "#);
+}
+
+#[test]
+fn param_00() {
+    insta::assert_snapshot!(_run(r#"
+    func (x: int64, y: text) -> {x, y}
+    "#, 
+    vec![lutra_bin::Value::Int64(3), lutra_bin::Value::Text("hello".into())]
+    ).1, @r#"
+    {
+      3,
+      "hello",
+    }
+    "#);
+}
+
+#[test]
 fn complex_00() {
     insta::assert_snapshot!(_run(r#"
         let x = [
@@ -337,7 +426,7 @@ fn complex_00() {
             | std::map(func (y: int) -> y % 3)
           )
         }
-    "#).1, @r#"
+    "#, vec![]).1, @r#"
     {
       a = 3,
       {
@@ -366,7 +455,10 @@ fn complex_01() {
     module chinook {
       type album = {id = int, title = text}
 
-      let get_albums: func (): [album]
+      let get_albums = func (): [album] -> [
+        {id = 3, title = "Hello world!"},
+        {id = 5, title = "Foo"},
+      ]
 
       let get_album_by_id = func (album_id: int): album -> (
         get_albums()
@@ -378,7 +470,11 @@ fn complex_01() {
     module box_office {
       type album_sale = {id = int, total = float}
 
-      let get_album_sales: func (): [album_sale]
+      let get_album_sales = func (): [album_sale] -> [
+        {id = 3, total = 3.6},
+        {id = 3, total = 3.1},
+        {id = 5, total = 5.2},
+      ]
 
       let get_album_sales_by_id = func (album_id: int): album_sale -> (
         get_album_sales()
@@ -392,7 +488,7 @@ fn complex_01() {
       chinook::get_album_by_id(album_id),
       box_office::get_album_sales_by_id(album_id),
     }
-    "#).1, @r#"
+    "#, vec![lutra_bin::Value::Int64(3)]).1, @r#"
     {
       a = 3,
       {

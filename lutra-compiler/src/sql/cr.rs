@@ -2,7 +2,7 @@ use lutra_bin::ir;
 
 /// A relational expression (something that can be used in `FROM (...)`).
 /// Its columns are dictated by its lutra type.
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct RelExpr {
     pub kind: RelExprKind,
     pub ty: ir::Ty,
@@ -56,6 +56,13 @@ pub enum ExprKind {
     FuncCall(String, Vec<Expr>),
     Subquery(Box<RelExpr>),
     JsonPack(Box<RelExpr>),
+    Param(u8),
+}
+
+impl std::fmt::Debug for RelExpr {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.kind.fmt(f)
+    }
 }
 
 impl std::fmt::Debug for Expr {

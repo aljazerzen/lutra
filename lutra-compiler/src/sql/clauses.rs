@@ -1,19 +1,33 @@
+use std::collections::HashMap;
+
 use crate::utils::IdGenerator;
 
 use super::cr;
-use indexmap::IndexMap;
 use lutra_bin::ir;
 
-struct Context {
-    bindings: IndexMap<u32, String>,
-    functions: IndexMap<u32, String>,
+struct Context<'t> {
+    bindings: HashMap<u32, String>,
+    functions: HashMap<u32, FuncProvider>,
+
+    types: HashMap<&'t ir::Path, &'t ir::Ty>,
+
     cte_alias_gen: IdGenerator<usize>,
 }
 
-pub fn compile(program: &ir::Program) -> cr::RelExpr {
+enum FuncProvider {
+    RelVar,
+    Params,
+}
+
+pub fn compile(program: &ir::Program) -> (cr::RelExpr, HashMap<&ir::Path, &ir::Ty>) {
     let mut ctx = Context {
         bindings: Default::default(),
         functions: Default::default(),
+        types: program
+            .types
+            .iter()
+            .map(|def| (&def.name, &def.ty))
+            .collect(),
         cte_alias_gen: Default::default(),
     };
 
@@ -21,11 +35,21 @@ pub fn compile(program: &ir::Program) -> cr::RelExpr {
     let ir::ExprKind::Function(func) = &program.main.kind else {
         todo!("top-level: {:?}", program.main)
     };
+    ctx.functions.insert(func.id, FuncProvider::Params);
 
-    ctx.compile_rel(&func.body)
+    let body = ctx.compile_rel(&func.body);
+
+    (body, ctx.types)
 }
 
-impl Context {
+impl<'a> Context<'a> {
+    fn get_ty_mat(&self, ty: &'a ir::Ty) -> &'a ir::Ty {
+        match &ty.kind {
+            ir::TyKind::Ident(path) => self.types.get(path).unwrap(),
+            _ => ty,
+        }
+    }
+
     fn compile_rel(&mut self, expr: &ir::Expr) -> cr::RelExpr {
         let kind = match &expr.kind {
             ir::ExprKind::Literal(lit) => cr::RelExprKind::Constructed(vec![vec![cr::Expr {
@@ -59,15 +83,10 @@ impl Context {
                     self.compile_rel_std(expr)
                 }
                 ir::ExprKind::Pointer(ir::Pointer::External(ptr)) => {
-                    let is_table = call.function.ty.kind.as_function().map_or(false, |f| {
-                        if !f.params.is_empty() {
-                            return false;
-                        }
-
-                        f.body.kind.as_array().map_or(false, |a| a.kind.is_tuple())
-                    });
+                    let is_table = self.ptr_is_table(&call.function);
 
                     if !is_table {
+                        tracing::debug!("expected a table getter: {:?}", call.function.ty);
                         todo!("only supported external refs are table functions (no params, return array of tuples)");
                     }
 
@@ -94,10 +113,20 @@ impl Context {
                 cr::RelExprKind::FromBinding(name.clone())
             }
             ir::ExprKind::Pointer(ir::Pointer::Parameter(ptr)) => {
-                let _ = self.functions.get(&ptr.function_id).unwrap();
-                assert_eq!(ptr.param_position, 0);
-
-                cr::RelExprKind::SelectRelVar
+                let provider = self.functions.get(&ptr.function_id).unwrap();
+                match provider {
+                    FuncProvider::RelVar => {
+                        assert_eq!(ptr.param_position, 0);
+                        cr::RelExprKind::SelectRelVar
+                    }
+                    FuncProvider::Params => {
+                        let expr = cr::Expr {
+                            kind: cr::ExprKind::Param(ptr.param_position),
+                            ty: expr.ty.clone(),
+                        };
+                        cr::RelExprKind::Constructed(vec![vec![expr]])
+                    }
+                }
             }
             ir::ExprKind::Pointer(ir::Pointer::External(_)) => todo!(),
 
@@ -120,7 +149,7 @@ impl Context {
                     // compile main with expr in ctx
                     let main = self.compile_rel(&binding.main);
 
-                    let alias = self.bindings.swap_remove(&binding.id).unwrap();
+                    let alias = self.bindings.remove(&binding.id).unwrap();
                     cr::RelExprKind::With(alias, Box::new(expr), Box::new(main))
                 }
             }
@@ -129,6 +158,21 @@ impl Context {
             kind,
             ty: expr.ty.clone(),
         }
+    }
+
+    fn ptr_is_table(&mut self, expr: &ir::Expr) -> bool {
+        let ir::TyKind::Function(ty_func) = &self.get_ty_mat(&expr.ty).kind else {
+            return false;
+        };
+
+        if !ty_func.params.is_empty() {
+            return false;
+        }
+        let ir::TyKind::Array(ty_item) = &self.get_ty_mat(&ty_func.body).kind else {
+            return false;
+        };
+
+        self.get_ty_mat(ty_item).kind.is_tuple()
     }
 
     fn compile_rel_std(&mut self, expr: &ir::Expr) -> cr::RelExprKind {
@@ -182,9 +226,9 @@ impl Context {
                     ir::Ty::new(ir::TyPrimitive::int64),
                 )];
 
-                self.functions.insert(func.id, "does_not_matter".into());
+                self.functions.insert(func.id, FuncProvider::RelVar);
                 row.extend(self.compile_cols(&func.body));
-                self.functions.swap_remove(&func.id);
+                self.functions.remove(&func.id);
 
                 cr::RelExprKind::ProjectReplace(Box::new(array), row)
             }
@@ -193,9 +237,9 @@ impl Context {
                 let func = &call.args[1];
                 let func = func.kind.as_function().unwrap();
 
-                self.functions.insert(func.id, "does_not_matter".into());
+                self.functions.insert(func.id, FuncProvider::RelVar);
                 let cond = self.compile_col(&func.body);
-                self.functions.swap_remove(&func.id);
+                self.functions.remove(&func.id);
 
                 cr::RelExprKind::Where(Box::new(array), cond)
             }
@@ -205,9 +249,9 @@ impl Context {
                 let func = &call.args[1];
                 let func = func.kind.as_function().unwrap();
 
-                self.functions.insert(func.id, "does_not_matter".into());
+                self.functions.insert(func.id, FuncProvider::RelVar);
                 let key = self.compile_col(&func.body);
-                self.functions.swap_remove(&func.id);
+                self.functions.remove(&func.id);
 
                 cr::RelExprKind::OrderBy(Box::new(array), key)
             }

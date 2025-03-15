@@ -83,7 +83,7 @@ macro_rules! test_case {
                 $ignore_postgres,
                 postgres,
                 assert_eq!(
-                    crate::postgres::_run(CASE.source).1,
+                    crate::postgres::_run(CASE.source, vec![]).1,
                     CASE.output,
                     "pg != expected"
                 )

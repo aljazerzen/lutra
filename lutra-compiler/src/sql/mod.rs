@@ -17,12 +17,12 @@ pub fn compile(project: &crate::Project, path: &pr::Path) -> (ir::Program, Strin
     tracing::debug!("ir (inlined): {}", lutra_bin::ir::print(&program));
 
     // compile to clauses
-    let clause = clauses::compile(&program);
+    let (clause, types) = clauses::compile(&program);
 
     tracing::debug!("cr: {clause:#?}");
 
     // compile to queries
-    let query = queries::compile(clause);
+    let query = queries::compile(clause, types);
 
     // serialize to SQL source
     let sql_source = query.to_string();

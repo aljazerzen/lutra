@@ -6,7 +6,6 @@ mod projection;
 
 pub use ast::*;
 pub use expr_or_source::*;
-pub use projection::*;
 
 pub fn retain_by_position<T>(vec: &mut Vec<T>, mut to_keep: Vec<usize>) {
     to_keep.sort();

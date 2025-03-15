@@ -4,6 +4,8 @@ use lutra_bin::ir;
 use sqlparser::ast as sql_ast;
 use sqlparser::ast::helpers::attached_token::AttachedToken;
 
+use crate::sql::queries::Context;
+
 pub fn new_table(
     name: sql_ast::ObjectName,
     alias: Option<sql_ast::TableAlias>,
@@ -90,35 +92,43 @@ pub fn query_select(select: sql_ast::Select) -> sql_ast::Query {
     query_new(sql_ast::SetExpr::Select(Box::new(select)))
 }
 
-pub fn query_wrap(inner: sql_ast::Query, rel_ty: &ir::Ty, include_index: bool) -> sql_ast::Query {
-    let mut select = select_empty();
-    select.from = from(subquery(inner, None));
-    select.projection = super::projection_noop(None, rel_ty, include_index);
+impl<'a> Context<'a> {
+    pub fn query_wrap(
+        &mut self,
+        inner: sql_ast::Query,
+        rel_ty: &ir::Ty,
+        include_index: bool,
+    ) -> sql_ast::Query {
+        let mut select = select_empty();
+        select.from = from(subquery(inner, None));
+        select.projection = self.projection_noop(None, rel_ty, include_index);
 
-    query_select(select)
-}
-
-pub fn query_as_mut_select<'q>(
-    query: &'q mut sql_ast::Query,
-    rel_ty: &ir::Ty,
-) -> &'q mut sql_ast::Select {
-    // if query is not a select
-    if !matches!(query.body.as_ref(), sql_ast::SetExpr::Select(_)) {
-        // take the query
-        let dummy = query_select(select_empty());
-        let original = std::mem::replace(query, dummy);
-
-        // wrap it into a select
-        let wrapped = query_wrap(original, rel_ty, true);
-
-        // place it back
-        let _dummy = std::mem::replace(query, wrapped);
+        query_select(select)
     }
 
-    let sql_ast::SetExpr::Select(select) = query.body.as_mut() else {
-        unreachable!()
-    };
-    select.as_mut()
+    pub fn query_as_mut_select<'q>(
+        &mut self,
+        query: &'q mut sql_ast::Query,
+        rel_ty: &ir::Ty,
+    ) -> &'q mut sql_ast::Select {
+        // if query is not a select
+        if !matches!(query.body.as_ref(), sql_ast::SetExpr::Select(_)) {
+            // take the query
+            let dummy = query_select(select_empty());
+            let original = std::mem::replace(query, dummy);
+
+            // wrap it into a select
+            let wrapped = self.query_wrap(original, rel_ty, true);
+
+            // place it back
+            let _dummy = std::mem::replace(query, wrapped);
+        }
+
+        let sql_ast::SetExpr::Select(select) = query.body.as_mut() else {
+            unreachable!()
+        };
+        select.as_mut()
+    }
 }
 
 pub fn new_expr(source: String) -> sql_ast::Expr {
