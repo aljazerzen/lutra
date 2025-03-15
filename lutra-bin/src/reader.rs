@@ -41,7 +41,7 @@ impl ArrayReader {
         };
         let item_head_size = items_ty.layout.as_ref().unwrap().head_size as usize;
 
-        Self::new(data, item_head_size / 8)
+        Self::new(data, item_head_size.div_ceil(8))
     }
 
     pub fn new(data: Data, item_head_bytes: usize) -> Self {

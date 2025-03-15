@@ -261,7 +261,7 @@ fn get_cell(row: &Row, idx: usize, ty: &ir::Ty) -> Data {
 }
 
 fn encode<T: lutra_bin::Encode + lutra_bin::Layout + ?Sized>(value: &T) -> lutra_bin::Data {
-    let mut buf = bytes::BytesMut::with_capacity(T::head_size() / 8);
+    let mut buf = bytes::BytesMut::with_capacity(T::head_size().div_ceil(8));
     value.encode(&mut buf);
     lutra_bin::Data::new(buf.to_vec())
 }

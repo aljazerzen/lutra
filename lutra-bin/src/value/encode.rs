@@ -127,7 +127,7 @@ fn encode_head<'t>(
 
             let (head, variant, tag, variant_ty) = enum_params_encode(*tag, variants)?;
 
-            let tag_bytes = &(tag as u64).to_le_bytes()[0..(head.s / 8)];
+            let tag_bytes = &(tag as u64).to_le_bytes()[0..head.s.div_ceil(8)];
 
             let r = if variant.is_inline {
                 buf.put_slice(tag_bytes);
@@ -297,7 +297,7 @@ fn decode_inner<'t>(
             let head = layout::enum_head_format(variants);
 
             let mut tag_bytes = vec![0; 8];
-            r.copy_to_slice(&mut tag_bytes[0..head.s / 8]);
+            r.copy_to_slice(&mut tag_bytes[0..head.s.div_ceil(8)]);
             tag_bytes.resize(8, 0);
             let tag = u64::from_le_bytes(tag_bytes.try_into().unwrap()) as usize;
 

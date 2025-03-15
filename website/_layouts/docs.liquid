@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html>
+  <head>
+{% include "head.liquid" %}
+  </head>
+  <body>
+    <header>
+{% include "header.liquid" %}
+    </header>
+
+    <h3>Documentation</h3>
+    <nav style="display: flex; flex-wrap: wrap; gap: 1em; align-items: end;">
+        <a href="{{ site.base_url }}/docs/language">Language</a>
+        <a href="{{ site.base_url }}/docs/encoding">Encoding</a>
+    </nav>
+    <hr>
+
+    <main>
+{{ page.content }}
+    </main>
+
+    <footer>
+{% include "footer.liquid" %}
+    </footer>
+  </body>
+</html>

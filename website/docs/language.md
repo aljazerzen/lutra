@@ -1,7 +1,7 @@
 ---
-permalink: /docs/reference
-layout: default.liquid
-title: Reference
+permalink: /docs/language
+layout: docs.liquid
+title: Language reference
 ---
 
 # Language reference
@@ -12,42 +12,29 @@ algebraic type system and some aspects of functional paradigm.
 
 ## Type system
 
-Primitives are the following set of types:
-
-```
-bool
-int8
-int16
-int32
-int64
-uint8
-uint16
-uint32
-uint64
-float32
-float64
-text
-```
+**Primitives** include following types:
 
 - `bool` holds one bit of information. Possible values are `false` and `true`.
-- `int{n}` types hold `n` bits of information. Possible values are first `2**(n-1)` non-negative integers and first `2**(n-1)` negative integers.
-- `uint{n}` types hold `n` bits of information. Possible values are first `2**n` non-negative integers.
-- `float32` and `float64` are IEEE 754 single and double precision floating point numbers, respectively.
+- `int8`, `int16`, `int32`, `int64` are signed integers. `int{n}` holds `n` bits of information.
+  Possible values are first `2**(n-1)` non-negative integers and first `2**(n-1)` negative integers
+- `uint8`, `uint16`, `uint32`, `uint64` are unsigned integers. `uint{n}` holds `n` bits of information.
+  Possible values are first `2**n` non-negative integers.
+- `float32`, `float64` are IEEE 754 single and double precision floating point numbers, respectively.
 - `text` is UTF8 encoded string of characters of length at most `2**32 - 1`.
 
-Tuples are a product of possibly many different types. Each field of the tuple might optionally be named.
+**Tuples** are a product of possibly many different types. Each field of the tuple can be named.
 
 ```
 type my_tuple = {float32, my_bool = bool, my_int = int32}
 ```
 
-Arrays are repetitions of one single type.
+**Arrays** are repetitions of one single type.
 
 ```
 type array_of_bytes = [uint8]
 ```
 
-Enums are a sum type of possibly many different types. Each variant must be named.
+**Enums** are a sum type of possibly many different types. Each variant must be named.
 
 ```
 type status = enum {
@@ -120,7 +107,7 @@ std::add(6, 2)
 ```
 
 Pipelines are alternative notation for function call which
-are more convenient for chaining. The notation consistes of
+are more convenient for chaining. The notation consists of
 parenthesis that contain expressions separated by pipe symbol `|`.
 Using a pipe symbol between two expressions is syntactically equivalent
 to using the first expression as the first argument to the call of the second
@@ -128,16 +115,14 @@ expression.
 All expressions apart from the first are therefore limited to function calls,
 names and inline functions.
 
-```
-# equivalent:
-my_func(5)
-5 | my_func()
-5 | my_func
+Each of the following notations are equivalent:
+- `my_func(5)`
+- `5 | my_func()`
+- `5 | my_func`
 
-# equivalent:
-another_func(my_func(5), false)
-5 | my_func | another_func(false)
-```
+The following notations are equivalent:
+- `another_func(my_func(5), false)`
+- `5 | my_func | another_func(false)`
 
 Following binary and unary operators use standard infix and prefix notation, respectively,
 and are equivalent to calls to corresponding standard library functions.
@@ -164,11 +149,9 @@ Unary:
 Ranges are syntactic sugar for constructing tuples of form
 `{start = _, end = _}` and use `..` infix notation.
 
-```
-# equivalent
-3..10
-{start = 3, end = 10}
-```
+The following notations are equivalent:
+- `3..10`
+- `{start = 3, end = 10}`
 
 Functions can be defined as follows:
 

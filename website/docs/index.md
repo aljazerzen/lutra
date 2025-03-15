@@ -1,7 +1,5 @@
 ---
 permalink: /docs
-layout: default.liquid
+layout: docs.liquid
 title: Documentation
 ---
-
-- [Reference](./reference/)

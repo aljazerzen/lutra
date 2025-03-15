@@ -163,7 +163,7 @@ fn write_ty_def_impl(
                 }
                 writeln!(w, " => {{")?;
 
-                let tag_bytes = &tag.to_le_bytes()[0..head.s / 8];
+                let tag_bytes = &tag.to_le_bytes()[0..head.s.div_ceil(8)];
                 writeln!(w, "                w.put_slice(&{tag_bytes:?});")?;
 
                 if !va_format.is_inline {
@@ -332,12 +332,12 @@ fn write_ty_def_impl(
             let head = layout::enum_head_format(variants);
 
             // tag
-            writeln!(w, "        let mut tag_bytes = buf.read_n({}).to_vec();", head.s / 8)?;
+            writeln!(w, "        let mut tag_bytes = buf.read_n({}).to_vec();", head.s.div_ceil(8))?;
             writeln!(w, "        tag_bytes.resize(8, 0);")?;
             writeln!(w, "        let tag = u64::from_le_bytes(tag_bytes.try_into().unwrap()) as usize;")?;
 
             if variants.iter().any(|v| !is_unit_variant(&v.ty)) {
-                writeln!(w, "        let buf = buf.skip({});", head.s / 8)?;
+                writeln!(w, "        let buf = buf.skip({});", head.s.div_ceil(8))?;
             }
 
             writeln!(w, "        Ok(match tag {{")?;
