@@ -1,4 +1,6 @@
-use crate::borrow;
+use bytes::Buf;
+
+use crate::{borrow, vec};
 
 use crate::ir;
 use crate::layout;
@@ -138,5 +140,55 @@ impl<'d, 't> TupleReader<'d, 't> {
         let mut r = self.data.clone();
         r.skip(self.field_offsets[index] as usize);
         r
+    }
+}
+
+pub struct EnumReader {
+    data: Data,
+    tag: u64,
+}
+
+impl EnumReader {
+    pub fn new(data: Data, tag_bytes: u32, variants_is_inline: &[bool]) -> Self {
+        let tag_bytes = tag_bytes as usize;
+
+        let mut tag = vec![0; 8];
+        data.slice(tag_bytes).copy_to_slice(&mut tag[0..tag_bytes]);
+        let tag = u64::from_le_bytes(tag.try_into().unwrap()) as u64;
+
+        let variant_is_inline = variants_is_inline[tag as usize];
+
+        let mut data = data;
+        data.skip(tag_bytes);
+
+        if variant_is_inline {
+            // inner is right after the tag
+        } else {
+            // read offset and skip to it
+            let offset = u32::from_le_bytes(data.slice(4).read_const::<4>());
+            data.skip(offset as usize);
+        }
+
+        EnumReader { data, tag }
+    }
+
+    pub fn new_for_ty(data: Data, ty: &ir::Ty) -> Self {
+        let ir::TyKind::Enum(variants) = &ty.kind else {
+            panic!()
+        };
+        let head = layout::enum_head_format(variants);
+        let variants_is_inline: vec::Vec<bool> = variants
+            .iter()
+            .map(|v| layout::enum_variant_format(&head, &v.ty).is_inline)
+            .collect();
+        Self::new(data, head.tag_bytes, &variants_is_inline)
+    }
+
+    pub fn get_tag(&self) -> u64 {
+        self.tag
+    }
+
+    pub fn get_inner(self) -> Data {
+        self.data
     }
 }

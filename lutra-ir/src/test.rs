@@ -46,7 +46,7 @@ fn print_01() {
       }: {[float64], [int64], int64}
       .1:[int64]
     "#), @r#"
-    let main =
+    let main = 
       let 1 = (
         func 2 -> [
           fn.2+0: float64,

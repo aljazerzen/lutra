@@ -1,11 +1,13 @@
 mod array;
+mod enum_;
 mod tuple;
+
+pub use array::ArrayWriter;
+pub use enum_::EnumWriter;
+pub use tuple::TupleWriter;
 
 use crate::vec;
 use core::iter::zip;
-
-pub use array::ArrayWriter;
-pub use tuple::TupleWriter;
 
 use crate::Data;
 use crate::ReaderExt;
@@ -90,6 +92,10 @@ fn write_head(
     head_bytes: u32,
     body_ptrs: &[u32],
 ) -> Option<SeveredBodies> {
+    if head_bytes == 0 {
+        return None;
+    }
+
     let (head, mut body) = extract_head_and_body(&data, head_bytes, body_ptrs);
 
     // offset body pointers to the out buffer

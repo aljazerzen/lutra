@@ -127,20 +127,19 @@ fn encode_head<'t>(
 
             let (head, variant, tag, variant_ty) = enum_params_encode(*tag, variants)?;
 
-            let tag_bytes = &(tag as u64).to_le_bytes()[0..head.s.div_ceil(8)];
+            let tag_bytes = &(tag as u64).to_le_bytes()[0..head.tag_bytes as usize];
+            buf.put_slice(tag_bytes);
 
             let r = if variant.is_inline {
-                buf.put_slice(tag_bytes);
                 encode_head(buf, inner, variant_ty, ctx)?
             } else {
-                buf.put_slice(tag_bytes);
                 let offset = ReversePointer::new(buf);
 
                 ValueHeadPtr::Offset(offset)
             };
 
             if variant.padding_bytes > 0 {
-                buf.put_bytes(0, variant.padding_bytes);
+                buf.put_bytes(0, variant.padding_bytes as usize);
             }
             Ok(r)
         }
@@ -297,7 +296,7 @@ fn decode_inner<'t>(
             let head = layout::enum_head_format(variants);
 
             let mut tag_bytes = vec![0; 8];
-            r.copy_to_slice(&mut tag_bytes[0..head.s.div_ceil(8)]);
+            r.copy_to_slice(&mut tag_bytes[0..head.tag_bytes as usize]);
             tag_bytes.resize(8, 0);
             let tag = u64::from_le_bytes(tag_bytes.try_into().unwrap()) as usize;
 
@@ -313,7 +312,7 @@ fn decode_inner<'t>(
                 decode_inner(&mut body, &variant.ty, ctx)?
             };
 
-            r.advance(variant_format.padding_bytes);
+            r.advance(variant_format.padding_bytes as usize);
             Value::Enum(tag, boxed::Box::new(inner))
         }
 

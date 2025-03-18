@@ -1,4 +1,4 @@
-use lutra_bin::ir;
+use lutra_bin::{ir, EnumWriter};
 use lutra_bin::{ArrayWriter, TupleWriter};
 use lutra_bin::{Data, Value};
 
@@ -34,8 +34,22 @@ pub(crate) fn _test_tuple_writer(fields: Vec<Data>, output_ty: &ir::Ty) -> Strin
         + &pretty_hex::pretty_hex(&output_buf)
 }
 
+#[track_caller]
+pub(crate) fn _test_enum_writer(tag: u64, inner: Data, output_ty: &ir::Ty) -> String {
+    let writer = EnumWriter::new_for_ty(output_ty);
+    let output = writer.write(tag, inner);
+
+    let output_buf = output.flatten();
+    let output_val = Value::decode(&output_buf, output_ty, &[]).unwrap();
+
+    String::new()
+        + &output_val.print_source(output_ty, &[]).unwrap()
+        + "\n"
+        + &pretty_hex::pretty_hex(&output_buf)
+}
+
 #[test]
-fn test_01() {
+fn array_01() {
     let items = vec![
         Data::new(vec![0, 0, 0, 0, 0, 0, 0, 0]),
         Data::new(vec![1, 0, 0, 0, 0, 0, 0, 0]),
@@ -63,7 +77,7 @@ fn test_01() {
 }
 
 #[test]
-fn test_02() {
+fn array_02() {
     let data1 = Data::new(vec![8, 0, 0, 0, 1, 0, 0, 0, 0x30]);
     let data2 = Data::new(vec![8, 0, 0, 0, 1, 0, 0, 0, 0x31]);
 
@@ -94,7 +108,7 @@ fn test_02() {
 }
 
 #[test]
-fn test_04() {
+fn tuple_01() {
     let fields = vec![
         Data::new(vec![42, 0, 0, 0, 0, 0, 0, 0]), // int
         Data::new(vec![
@@ -115,5 +129,98 @@ fn test_04() {
     Length: 28 (0x1c) bytes
     0000:   2a 00 00 00  00 00 00 00  10 00 00 00  04 00 00 00   *...............
     0010:   01 01 00 00  00 00 00 00  41 42 41 42                ........ABAB
+    "#);
+}
+
+#[test]
+fn enum_01() {
+    let output_ty =
+        lutra_compiler::_test_compile_ty("enum {Done, Pending = int16, Cancelled = text}");
+    let output_ty = ir::Ty::from(output_ty);
+
+    insta::assert_snapshot!(_test_enum_writer(0, Data::new(vec![]), &output_ty), @r#"
+    Done
+    Length: 5 (0x5) bytes
+    0000:   00 00 00 00  00                                      .....
+    "#);
+
+    // int
+    let inner = Data::new(vec![42, 0, 0, 0, 0, 0, 0, 0]);
+    insta::assert_snapshot!(_test_enum_writer(1, inner, &output_ty), @r#"
+    Pending(
+      42
+    )
+    Length: 5 (0x5) bytes
+    0000:   01 2a 00 00  00                                      .*...
+    "#);
+
+    // int (followed by the body of text)
+    let inner = Data::new(vec![1, 1, 0, 0, 0, 0, 0, 0, 65, 66, 65, 66]);
+    insta::assert_snapshot!(_test_enum_writer(1, inner, &output_ty), @r#"
+    Pending(
+      257
+    )
+    Length: 5 (0x5) bytes
+    0000:   01 01 01 00  00                                      .....
+    "#);
+
+    // text
+    let inner = Data::new(vec![8, 0, 0, 0, 4, 0, 0, 0, 65, 66, 65, 66]);
+    insta::assert_snapshot!(_test_enum_writer(2, inner, &output_ty), @r#"
+    Cancelled(
+      "ABAB"
+    )
+    Length: 17 (0x11) bytes
+    0000:   02 04 00 00  00 08 00 00  00 04 00 00  00 41 42 41   .............ABA
+    0010:   42                                                   B
+    "#);
+
+    // text (contains int between its head and body)
+    let inner = Data::new(vec![
+        0x10, 0, 0, 0, 4, 0, 0, 0, 42, 0, 0, 0, 0, 0, 0, 0, 65, 66, 65, 66,
+    ]);
+    insta::assert_snapshot!(_test_enum_writer(2, inner, &output_ty), @r#"
+    Cancelled(
+      "ABAB"
+    )
+    Length: 17 (0x11) bytes
+    0000:   02 04 00 00  00 08 00 00  00 04 00 00  00 41 42 41   .............ABA
+    0010:   42                                                   B
+    "#);
+}
+
+#[test]
+#[ignore] // enum body_ptr are not set correctly
+fn enum_02() {
+    // put an enum into an array, to test that body_ptrs are correct
+
+    let output_ty =
+        lutra_compiler::_test_compile_ty("[enum {Done, Pending = int16, Cancelled = text}]");
+    let output_ty = ir::Ty::from(output_ty);
+
+    // done
+    let item_0 = Data::new(vec![0, 0, 0, 0, 0]);
+
+    // int16
+    let item_1 = Data::new(vec![1, 42, 0, 0, 0]);
+
+    // int16 (followed by the body of text)
+    let item_2 = Data::new(vec![1, 1, 1, 0, 0, 65, 66, 65, 66]);
+
+    // text
+    let item_3 = Data::new(vec![2, 4, 0, 0, 0, 8, 0, 0, 0, 4, 0, 0, 0, 65, 66, 65, 66]);
+
+    // text (contains int between its head and body)
+    let item_4 = Data::new(vec![
+        2, 4, 0, 0, 0, 0x10, 0, 0, 0, 4, 0, 0, 0, 42, 0, 0, 0, 0, 0, 0, 0, 65, 66, 65, 66,
+    ]);
+
+    let items = vec![item_0, item_1, item_2, item_3, item_4];
+
+    insta::assert_snapshot!(_test_array_writer(items, &output_ty), @r#"
+    Length: 33 (0x21) bytes
+    0000:   08 00 00 00  05 00 00 00  00 00 00 00  00 01 2a 00   ..............*.
+    0010:   00 00 01 01  01 00 00 02  04 00 00 00  02 04 00 00   ................
+    0020:   00                                                   .
     "#);
 }

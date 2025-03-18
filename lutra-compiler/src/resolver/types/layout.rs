@@ -24,18 +24,29 @@ impl TypeResolver<'_> {
             }
 
             pr::TyKind::Enum(variants) => {
-                let mut layout = ty.kind.get_layout_simple().unwrap();
-
-                assert!(layout.variants_recursive.is_empty());
+                let mut variants_recursive = Vec::new();
                 for (index, variant) in variants.iter().enumerate() {
                     if variant.ty.layout.is_none() {
                         // unresolved - this type is (probably) recursive, save this info
                         // (I don't think this logic is 100% sound)
-                        layout.variants_recursive.push(index as u16);
+                        variants_recursive.push(index as u16);
                     }
                 }
 
-                ty.layout = Some(layout);
+                if !variants_recursive.is_empty() {
+                    // variants not yet resolved
+                    ty.variants_recursive = variants_recursive;
+
+                    // make up a layout that will
+                    // TODO: this will only be correct most of the time
+                    ty.layout = Some(pr::TyLayout {
+                        head_size: 5 * 8,
+                        body_ptrs: vec![1],
+                    });
+                    return Ok(false);
+                }
+
+                ty.layout = Some(ty.kind.get_layout_simple().unwrap());
                 return Ok(false);
             }
 
@@ -94,7 +105,6 @@ impl TypeResolver<'_> {
             pr::TyKind::Function(_) => pr::TyLayout {
                 head_size: 0,
                 body_ptrs: vec![],
-                variants_recursive: vec![],
             },
         };
         ty.layout = Some(layout);

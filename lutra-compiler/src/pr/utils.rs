@@ -36,10 +36,7 @@ impl From<ir::Ty> for super::Ty {
             ir::TyKind::Enum(variants) => super::TyKind::Enum(
                 variants
                     .into_iter()
-                    .map(|v| super::TyEnumVariant {
-                        name: v.name,
-                        ty: super::Ty::from(v.ty),
-                    })
+                    .map(super::TyEnumVariant::from)
                     .collect(),
             ),
             ir::TyKind::Function(func) => super::TyKind::Function(super::TyFunc {
@@ -55,9 +52,14 @@ impl From<ir::Ty> for super::Ty {
             ir::TyKind::Ident(path) => super::TyKind::Ident(super::Path::new(path.0)),
         };
 
+        let variants_recursive = ty
+            .layout
+            .as_ref()
+            .map(|l| l.variants_recursive.clone())
+            .unwrap_or_default();
+
         let layout = ty.layout.map(|layout| super::TyLayout {
             head_size: layout.head_size,
-            variants_recursive: layout.variants_recursive,
             body_ptrs: layout.body_ptrs,
         });
 
@@ -66,6 +68,16 @@ impl From<ir::Ty> for super::Ty {
             span: None,
             name: ty.name,
             layout,
+            variants_recursive,
+        }
+    }
+}
+
+impl From<ir::TyEnumVariant> for super::TyEnumVariant {
+    fn from(v: ir::TyEnumVariant) -> Self {
+        super::TyEnumVariant {
+            name: v.name,
+            ty: super::Ty::from(v.ty),
         }
     }
 }
@@ -101,15 +113,9 @@ impl From<super::Ty> for ir::Ty {
                     .collect(),
             ),
             super::TyKind::Array(items_ty) => ir::TyKind::Array(Box::new(ir::Ty::from(*items_ty))),
-            super::TyKind::Enum(variants) => ir::TyKind::Enum(
-                variants
-                    .into_iter()
-                    .map(|v| ir::TyEnumVariant {
-                        name: v.name,
-                        ty: ir::Ty::from(v.ty),
-                    })
-                    .collect(),
-            ),
+            super::TyKind::Enum(variants) => {
+                ir::TyKind::Enum(variants.into_iter().map(ir::TyEnumVariant::from).collect())
+            }
             super::TyKind::Ident(path) => ir::TyKind::Ident(ir::Path(path.into_iter().collect())),
             super::TyKind::Function(func) => ir::TyKind::Function(Box::new(ir::TyFunction {
                 params: func
@@ -123,7 +129,7 @@ impl From<super::Ty> for ir::Ty {
 
         let layout = ty.layout.map(|layout| ir::TyLayout {
             head_size: layout.head_size,
-            variants_recursive: layout.variants_recursive,
+            variants_recursive: ty.variants_recursive,
             body_ptrs: layout.body_ptrs,
         });
 
@@ -131,6 +137,15 @@ impl From<super::Ty> for ir::Ty {
             kind,
             layout,
             name: ty.name,
+        }
+    }
+}
+
+impl From<super::TyEnumVariant> for ir::TyEnumVariant {
+    fn from(v: super::TyEnumVariant) -> Self {
+        ir::TyEnumVariant {
+            name: v.name,
+            ty: ir::Ty::from(v.ty),
         }
     }
 }

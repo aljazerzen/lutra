@@ -19,9 +19,9 @@ pub use decode::Decode;
 pub use encode::{Encode, ReversePointer};
 pub use error::{Error, Result};
 pub use layout::Layout;
-pub use reader::{ArrayReader, ReaderExt, TupleReader};
+pub use reader::{ArrayReader, EnumReader, ReaderExt, TupleReader};
 pub use value::Value;
-pub use writer::{ArrayWriter, TupleWriter};
+pub use writer::{ArrayWriter, EnumWriter, TupleWriter};
 
 pub use bytes;
 

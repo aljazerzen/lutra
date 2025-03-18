@@ -123,9 +123,9 @@ pub fn get_layout_simple(ty: &ir::Ty) -> Option<ir::TyLayout> {
             size
         }
         ir::TyKind::Enum(variants) => {
-            let tag_size = enum_tag_size(variants.len());
+            let head = enum_head_format(variants);
 
-            tag_size + 32
+            (head.tag_bytes + head.inner_bytes) * 8
         }
         _ => return None,
     };
@@ -134,7 +134,19 @@ pub fn get_layout_simple(ty: &ir::Ty) -> Option<ir::TyLayout> {
         ir::TyKind::Primitive(_) => vec![],
 
         ir::TyKind::Array(_) => vec![0],
-        ir::TyKind::Enum(_) => vec![1], // TODO: this is wrong (in some cases)
+        ir::TyKind::Enum(_variants) => {
+            vec![]
+            // let head = enum_head_format(variants);
+            // if head.inner_bytes < 4 {
+            //     vec![]
+            // } else {
+            //     // TODO: this is not true for all variants
+            //     // There might be one variant that is inline
+            //     // and one that is not.
+            //     // TyLayout will have to be expaned to accomodate this.
+            //     vec![head.tag_bytes]
+            // }
+        }
 
         ir::TyKind::Tuple(fields) => {
             let mut r = vec::Vec::new();
@@ -182,37 +194,44 @@ pub fn does_enum_variant_contain_recursive(enum_ty: &ir::Ty, variant_index: u16)
 }
 
 pub struct EnumHeadFormat {
-    pub s: usize,
-    pub h: usize,
-    pub no_pointer: bool,
+    pub tag_bytes: u32,
+    pub inner_bytes: u32,
 }
 
 pub fn enum_head_format(variants: &[ir::TyEnumVariant]) -> EnumHeadFormat {
-    let s = enum_tag_size(variants.len()) as usize;
+    let t = enum_tag_size(variants.len());
 
-    let h = enum_max_variant_head_size(variants);
+    let max_head = enum_max_variant_head_size(variants);
+
+    let inner = if max_head > 32 {
+        // insert a pointer
+        32
+    } else {
+        max_head
+    };
 
     EnumHeadFormat {
-        s,
-        h: if h == 0 { 0 } else { 32 },
-        no_pointer: h == 0,
+        tag_bytes: t.div_ceil(8),
+        inner_bytes: inner.div_ceil(8),
     }
 }
+
+#[derive(Debug)]
 pub struct EnumVariantFormat {
-    pub padding_bytes: usize,
+    pub padding_bytes: u32,
     pub is_inline: bool,
 }
 
 pub fn enum_variant_format(head: &EnumHeadFormat, variant_ty: &ir::Ty) -> EnumVariantFormat {
-    let inner_head_size = variant_ty.layout.as_ref().unwrap().head_size as usize;
+    let inner_head_size = variant_ty.layout.as_ref().unwrap().head_size;
     let inner_head_bytes = inner_head_size.div_ceil(8);
 
     let is_inline = inner_head_bytes <= 4;
 
-    let padding_bytes = if head.no_pointer {
-        0
+    let padding_bytes = if is_inline {
+        head.inner_bytes.saturating_sub(inner_head_bytes)
     } else {
-        4_usize.saturating_sub(inner_head_bytes)
+        0
     };
 
     EnumVariantFormat {
@@ -221,18 +240,18 @@ pub fn enum_variant_format(head: &EnumHeadFormat, variant_ty: &ir::Ty) -> EnumVa
     }
 }
 
-fn enum_max_variant_head_size(variants: &[ir::TyEnumVariant]) -> usize {
-    let mut h = 0;
+fn enum_max_variant_head_size(variants: &[ir::TyEnumVariant]) -> u32 {
+    let mut i = 0;
     for variant in variants {
         let ty_layout = variant
             .ty
             .layout
             .as_ref()
             .unwrap_or_else(|| panic!("missing layout: {:?}", variant.ty));
-        let size = ty_layout.head_size as usize;
-        h = h.max(size);
+        let size = ty_layout.head_size;
+        i = i.max(size);
     }
-    h
+    i
 }
 
 fn enum_tag_size(variants_len: usize) -> u32 {

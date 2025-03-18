@@ -14,6 +14,11 @@ pub struct Ty {
     pub name: Option<String>,
 
     pub layout: Option<TyLayout>,
+
+    /// For enums, indexes of variants that contain recursive
+    /// (transitive) references to self. This is used to determine
+    /// if a variant needs a Box in Rust.
+    pub variants_recursive: Vec<u16>,
 }
 
 /// Memory layout of a type.
@@ -27,11 +32,6 @@ pub struct TyLayout {
     /// It is measured bytes from the start of the head.
     /// Pointer itself is relative to own position (and the start of the head).
     pub body_ptrs: Vec<u32>,
-
-    /// For enums, indexes of variants that contain recursive
-    /// (transitive) references to self. This is used to determine
-    /// if a variant needs a Box in Rust.
-    pub variants_recursive: Vec<u16>,
 }
 
 #[derive(Debug, Clone, PartialEq, Hash, EnumAsInner, AsRefStr)]
@@ -90,16 +90,38 @@ impl TyKind {
                 size
             }
             TyKind::Enum(variants) => {
-                let tag_size = enum_tag_size(variants.len());
+                let variants: Vec<_> = variants
+                    .iter()
+                    .cloned()
+                    .map(lutra_bin::ir::TyEnumVariant::from)
+                    .collect();
 
-                tag_size + 32
+                let head = lutra_bin::layout::enum_head_format(&variants);
+                (head.tag_bytes + head.inner_bytes) * 8
             }
             _ => return None,
         };
         let body_ptrs: Vec<u32> = match self {
             TyKind::Primitive(TyPrimitive::text) => vec![0],
             TyKind::Array(_) => vec![0],
-            TyKind::Enum(_) => vec![1], // TODO: this is wrong (in some cases)
+            TyKind::Enum(_) => {
+                vec![]
+                //let variants: Vec<_> = variants
+                //    .iter()
+                //    .cloned()
+                //    .map(lutra_bin::ir::TyEnumVariant::from)
+                //    .collect();
+                //let head = lutra_bin::layout::enum_head_format(&variants);
+                //if head.inner_bytes < 4 {
+                //    vec![]
+                //} else {
+                //    // TODO: this is not true for all variants
+                //    // There might be one variant that is inline
+                //    // and one that is not.
+                //    // TyLayout will have to be expaned to accomodate this.
+                //    vec![head.tag_bytes]
+                //}
+            }
 
             TyKind::Tuple(fields) => {
                 let mut r = Vec::new();
@@ -118,7 +140,6 @@ impl TyKind {
         Some(TyLayout {
             head_size,
             body_ptrs,
-            variants_recursive: vec![],
         })
     }
 }
@@ -199,6 +220,7 @@ impl Ty {
             span: None,
             name: None,
             layout: None,
+            variants_recursive: Vec::new(),
         }
     }
 
@@ -208,6 +230,7 @@ impl Ty {
             span: Some(span),
             name: None,
             layout: None,
+            variants_recursive: Vec::new(),
         }
     }
 
@@ -284,40 +307,4 @@ impl std::hash::Hash for TyParam {
         self.name.hash(state);
         // self.domain.hash(state);
     }
-}
-
-fn enum_tag_size(variants_len: usize) -> u32 {
-    // TODO: when bool-sub-byte packing is implemented, remove function in favor of enum_tag_size_used
-    enum_tag_size_used(variants_len).div_ceil(8) * 8
-}
-
-fn enum_tag_size_used(variants_len: usize) -> u32 {
-    f64::log2(variants_len as f64).ceil() as u32
-}
-
-#[test]
-fn test_enum_tag_size() {
-    assert_eq!(0, enum_tag_size_used(0));
-    assert_eq!(0, enum_tag_size_used(1));
-    assert_eq!(1, enum_tag_size_used(2));
-    assert_eq!(2, enum_tag_size_used(3));
-    assert_eq!(2, enum_tag_size_used(4));
-    assert_eq!(3, enum_tag_size_used(5));
-    assert_eq!(3, enum_tag_size_used(6));
-    assert_eq!(3, enum_tag_size_used(7));
-    assert_eq!(3, enum_tag_size_used(8));
-    assert_eq!(4, enum_tag_size_used(9));
-    assert_eq!(4, enum_tag_size_used(10));
-    assert_eq!(4, enum_tag_size_used(11));
-    assert_eq!(4, enum_tag_size_used(12));
-    assert_eq!(4, enum_tag_size_used(13));
-    assert_eq!(4, enum_tag_size_used(14));
-    assert_eq!(4, enum_tag_size_used(15));
-    assert_eq!(4, enum_tag_size_used(16));
-    assert_eq!(5, enum_tag_size_used(17));
-    assert_eq!(5, enum_tag_size_used(18));
-    assert_eq!(5, enum_tag_size_used(19));
-    assert_eq!(5, enum_tag_size_used(20));
-    assert_eq!(5, enum_tag_size_used(21));
-    assert_eq!(5, enum_tag_size_used(22));
 }

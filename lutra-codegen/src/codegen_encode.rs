@@ -163,7 +163,7 @@ fn write_ty_def_impl(
                 }
                 writeln!(w, " => {{")?;
 
-                let tag_bytes = &tag.to_le_bytes()[0..head.s.div_ceil(8)];
+                let tag_bytes = &tag.to_le_bytes()[0..head.tag_bytes as usize];
                 writeln!(w, "                w.put_slice(&{tag_bytes:?});")?;
 
                 if !va_format.is_inline {
@@ -171,7 +171,7 @@ fn write_ty_def_impl(
                     writeln!(w, "                let r = {head_ptr_name}::{}(head_ptr);", variant.name)?;
                 } else if !is_unit_variant(&variant.ty) {
                     writeln!(w, "                let inner_head_ptr = inner.encode_head(w);")?;
-                    writeln!(w, "                let r = {head_ptr_name}::{}(inner_head_ptr);", variant.name)?;
+                    writeln!(w, "                let r = {head_ptr_name}::{}({lutra_bin}::boxed::Box::new(inner_head_ptr));", variant.name)?;
                 } else if needs_head_ptr {
                     writeln!(w, "                let r = {head_ptr_name}::None;")?;
                 }
@@ -207,7 +207,7 @@ fn write_ty_def_impl(
                         writeln!(w, "                inner.encode_body(inner_head_ptr, w);")?;
                     } else if !is_unit_variant(&variant.ty) {
                         writeln!(w, "                let {head_ptr_name}::{}(inner_head_ptr) = head else {{ unreachable!() }};", variant.name)?;
-                        writeln!(w, "                inner.encode_body(inner_head_ptr, w);")?;
+                        writeln!(w, "                inner.encode_body(*inner_head_ptr, w);")?;
                     }
 
                     writeln!(w, "            }},")?;
@@ -234,10 +234,10 @@ fn write_ty_def_impl(
                     if !variant_format.is_inline {
                         write!(w, "({lutra_bin}::ReversePointer)")?;
                     } else {
-                        write!(w, "(<")?;
+                        write!(w, "({lutra_bin}::boxed::Box<<")?;
 
                         write_ty_ref(w, &variant.ty, false, ctx)?;
-                        write!(w, " as {lutra_bin}::Encode>::HeadPtr)")?;
+                        write!(w, " as {lutra_bin}::Encode>::HeadPtr>)")?;
                     }
 
                     writeln!(w, ",")?;
@@ -332,12 +332,12 @@ fn write_ty_def_impl(
             let head = layout::enum_head_format(variants);
 
             // tag
-            writeln!(w, "        let mut tag_bytes = buf.read_n({}).to_vec();", head.s.div_ceil(8))?;
+            writeln!(w, "        let mut tag_bytes = buf.read_n({}).to_vec();", head.tag_bytes)?;
             writeln!(w, "        tag_bytes.resize(8, 0);")?;
             writeln!(w, "        let tag = u64::from_le_bytes(tag_bytes.try_into().unwrap()) as usize;")?;
 
             if variants.iter().any(|v| !is_unit_variant(&v.ty)) {
-                writeln!(w, "        let buf = buf.skip({});", head.s.div_ceil(8))?;
+                writeln!(w, "        let buf = buf.skip({});", head.tag_bytes)?;
             }
 
             writeln!(w, "        Ok(match tag {{")?;

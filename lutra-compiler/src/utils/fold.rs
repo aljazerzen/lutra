@@ -263,6 +263,7 @@ pub fn fold_type<T: ?Sized + PrFold>(fold: &mut T, ty: Ty) -> Result<Ty> {
         span: ty.span,
         name: ty.name,
         layout: ty.layout,
+        variants_recursive: ty.variants_recursive,
     })
 }
 

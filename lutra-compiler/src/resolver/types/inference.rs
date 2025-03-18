@@ -110,12 +110,8 @@ impl TypeResolver<'_> {
             | ExprKind::Unary(_) // desugar-ed
             | ExprKind::Internal => unreachable!(),
         };
-        let mut ty = Ty {
-            kind,
-            name: None,
-            span: expr.span,
-            layout: None,
-        };
+        let mut ty = Ty::new(kind);
+        ty.span = expr.span;
         let missing_layout = self.compute_ty_layout(&mut ty)?;
         if missing_layout {
             return Err(Diagnostic::new_assert("missing type layout")

@@ -41,7 +41,7 @@ fn lower_01() {
     "#), @r#"
     type chinook::album = {id = int64, title = text};
     type box_office::album_sale = {id = int64, total = float64};
-    let main =(
+    let main = (
       func 1 -> 
         let 1 = (
           func 4 -> (

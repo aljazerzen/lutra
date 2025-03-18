@@ -32,7 +32,7 @@ fn _test_encode_decode<T: Encode + Decode + std::fmt::Debug>(value: Value, ty: &
     // native encode
     let mut buf2 = lutra_bin::bytes::BytesMut::new();
     native.encode(&mut buf2);
-    assert_eq!(buf, buf2);
+    assert_eq!(buf, buf2.to_vec());
 
     pretty_hex::pretty_hex(&buf)
 }
@@ -198,7 +198,7 @@ fn test_tree() {
 fn test_opt_01() {
     let ty = _test_get_type("opt");
     let value = Value::Enum(
-        0, // Node
+        0, // None
         Box::new(Value::Tuple(vec![])),
     );
     assert_snapshot!(_test_encode_decode::<types::opt>(value, &ty), @r#"
