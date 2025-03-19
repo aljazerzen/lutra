@@ -130,12 +130,17 @@ fn encode_head<'t>(
             let tag_bytes = &(tag as u64).to_le_bytes()[0..head.tag_bytes as usize];
             buf.put_slice(tag_bytes);
 
-            let r = if variant.is_inline {
-                encode_head(buf, inner, variant_ty, ctx)?
-            } else {
-                let offset = ReversePointer::new(buf);
+            let r = if head.has_ptr {
+                if variant.is_unit {
+                    // this is unit variant, no need to encode head
+                    ValueHeadPtr::None
+                } else {
+                    let offset = ReversePointer::new(buf);
 
-                ValueHeadPtr::Offset(offset)
+                    ValueHeadPtr::Offset(offset)
+                }
+            } else {
+                encode_head(buf, inner, variant_ty, ctx)?
             };
 
             if variant.padding_bytes > 0 {
@@ -213,17 +218,22 @@ fn encode_body<'t>(
         Value::Enum(tag, inner) => {
             let variants = expect_ty(ty, |k| k.as_enum(), "enum")?;
 
-            let (_, variant_format, _, variant_ty) = enum_params_encode(*tag, variants)?;
+            let (head_format, _, _, variant_ty) = enum_params_encode(*tag, variants)?;
 
-            if variant_format.is_inline {
-                encode_body(w, inner, head_ptr, variant_ty, ctx)?;
+            if head_format.has_ptr {
+                match head_ptr {
+                    ValueHeadPtr::None => {
+                        // unit variant, done
+                    }
+                    ValueHeadPtr::Offset(offset_ptr) => {
+                        offset_ptr.write_cur_len(w);
+
+                        let head_ptr = encode_head(w, inner, variant_ty, ctx)?;
+                        encode_body(w, inner, head_ptr, variant_ty, ctx)?;
+                    }
+                    ValueHeadPtr::Tuple(_) => unreachable!(),
+                }
             } else {
-                let ValueHeadPtr::Offset(offset_ptr) = head_ptr else {
-                    unreachable!()
-                };
-                offset_ptr.write_cur_len(w);
-
-                let head_ptr = encode_head(w, inner, variant_ty, ctx)?;
                 encode_body(w, inner, head_ptr, variant_ty, ctx)?;
             }
         }
@@ -304,12 +314,17 @@ fn decode_inner<'t>(
 
             let variant_format = layout::enum_variant_format(&head, &variant.ty);
 
-            let inner = if variant_format.is_inline {
-                decode_inner(r, &variant.ty, ctx)?
+            let inner = if head.has_ptr {
+                if variant_format.is_unit {
+                    // unit variant
+                    Value::Tuple(vec![])
+                } else {
+                    let mut body = r.clone();
+                    body.advance(r.get_u32_le() as usize);
+                    decode_inner(&mut body, &variant.ty, ctx)?
+                }
             } else {
-                let mut body = r.clone();
-                body.advance(r.get_u32_le() as usize);
-                decode_inner(&mut body, &variant.ty, ctx)?
+                decode_inner(r, &variant.ty, ctx)?
             };
 
             r.advance(variant_format.padding_bytes as usize);

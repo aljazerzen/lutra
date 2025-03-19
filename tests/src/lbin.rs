@@ -11,6 +11,8 @@ use lutra_compiler::{pr, Project};
 
 #[track_caller]
 fn _test_encode_decode<T: Encode + Decode + std::fmt::Debug>(value: Value, ty: &ir::Ty) -> String {
+    crate::init_logger();
+
     let mut ty_defs = Vec::new();
     if let Some(name) = &ty.name {
         ty_defs.push(ir::TyDef {
@@ -22,6 +24,8 @@ fn _test_encode_decode<T: Encode + Decode + std::fmt::Debug>(value: Value, ty: &
     // Value::encode
     let buf = value.encode(ty, &ty_defs).unwrap();
 
+    tracing::debug!("Value::encode -> {buf:?}");
+
     // Value::decode
     let value_decoded = Value::decode(&buf, ty, &ty_defs).unwrap();
     assert_eq!(value, value_decoded);
@@ -32,7 +36,7 @@ fn _test_encode_decode<T: Encode + Decode + std::fmt::Debug>(value: Value, ty: &
     // native encode
     let mut buf2 = lutra_bin::bytes::BytesMut::new();
     native.encode(&mut buf2);
-    assert_eq!(buf, buf2.to_vec());
+    assert_eq!(buf, buf2.to_vec(), "Value::encode == native::encode");
 
     pretty_hex::pretty_hex(&buf)
 }
@@ -104,8 +108,8 @@ fn test_u_01() {
     let value = Value::Enum(0, Box::new(Value::Bool(true)));
 
     assert_snapshot!(_test_encode_decode::<types::u>(value, &ty), @r#"
-    Length: 5 (0x5) bytes
-    0000:   00 01 00 00  00                                      .....
+    Length: 6 (0x6) bytes
+    0000:   00 04 00 00  00 01                                   ......
     "#
     );
 }
@@ -146,6 +150,30 @@ fn test_v() {
     assert_snapshot!(_test_encode_decode::<types::v>(value, &ty), @r#"
     Length: 1 (0x1) bytes
     0000:   01                                                   .
+    "#
+    );
+}
+
+#[test]
+fn test_t_01() {
+    let ty = _test_get_type("t");
+    let value = Value::Enum(0, Box::new(Value::Int8(2)));
+
+    assert_snapshot!(_test_encode_decode::<types::t>(value, &ty), @r#"
+    Length: 3 (0x3) bytes
+    0000:   00 02 00                                             ...
+    "#
+    );
+}
+
+#[test]
+fn test_t_02() {
+    let ty = _test_get_type("t");
+    let value = Value::Enum(1, Box::new(Value::Int16(2342)));
+
+    assert_snapshot!(_test_encode_decode::<types::t>(value, &ty), @r#"
+    Length: 3 (0x3) bytes
+    0000:   01 26 09                                             .&.
     "#
     );
 }

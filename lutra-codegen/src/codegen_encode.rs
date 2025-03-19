@@ -137,7 +137,7 @@ fn write_ty_def_impl(
         ir::TyKind::Enum(variants) => {
             let head = layout::enum_head_format(variants);
 
-            let needs_head_ptr = variants.iter().any(|variant| !is_unit_variant(&variant.ty));
+            let needs_head_ptr = head.has_ptr;
             let head_ptr_name = if needs_head_ptr {
                 format!("{name}HeadPtr")
             } else {
@@ -156,9 +156,10 @@ fn write_ty_def_impl(
 
                 write!(w, "            Self::{}", variant.name)?;
 
-                if !va_format.is_inline {
+                if is_unit_variant(&variant.ty) {
+                } else if head.inner_bytes == 0 {
                     write!(w, "(_)")?;
-                } else if !is_unit_variant(&variant.ty) {
+                } else {
                     write!(w, "(inner)")?;
                 }
                 writeln!(w, " => {{")?;
@@ -166,14 +167,18 @@ fn write_ty_def_impl(
                 let tag_bytes = &tag.to_le_bytes()[0..head.tag_bytes as usize];
                 writeln!(w, "                w.put_slice(&{tag_bytes:?});")?;
 
-                if !va_format.is_inline {
-                    writeln!(w, "                let head_ptr = {lutra_bin}::ReversePointer::new(w);")?;
-                    writeln!(w, "                let r = {head_ptr_name}::{}(head_ptr);", variant.name)?;
-                } else if !is_unit_variant(&variant.ty) {
-                    writeln!(w, "                let inner_head_ptr = inner.encode_head(w);")?;
-                    writeln!(w, "                let r = {head_ptr_name}::{}({lutra_bin}::boxed::Box::new(inner_head_ptr));", variant.name)?;
-                } else if needs_head_ptr {
-                    writeln!(w, "                let r = {head_ptr_name}::None;")?;
+                if needs_head_ptr {
+                    if is_unit_variant(&variant.ty) {
+                        writeln!(w, "                let r = {head_ptr_name}::None;")?;
+                    } else if head.has_ptr {
+                        writeln!(w, "                let head_ptr = {lutra_bin}::ReversePointer::new(w);")?;
+                        writeln!(w, "                let r = {head_ptr_name}::{}(head_ptr);", variant.name)?;
+                    } else {
+                        writeln!(w, "                let inner_head_ptr = inner.encode_head(w);")?;
+                        writeln!(w, "                let r = {head_ptr_name}::{}({lutra_bin}::boxed::Box::new(inner_head_ptr));", variant.name)?;
+                    }
+                } else if head.inner_bytes > 0 {
+                    writeln!(w, "                inner.encode_head(w);")?;
                 }
 
                 if va_format.padding_bytes > 0 {
@@ -198,14 +203,14 @@ fn write_ty_def_impl(
                     }
                     writeln!(w, " => {{")?;
 
-                    let variant_format = layout::enum_variant_format(&head, &variant.ty);
-
-                    if !variant_format.is_inline {
+                    if is_unit_variant(&variant.ty) {
+                        // unit does not have a body
+                    } else if head.has_ptr {
                         writeln!(w, "                let {head_ptr_name}::{}(offset_ptr) = head else {{ unreachable!() }};", variant.name)?;
                         writeln!(w, "                offset_ptr.write_cur_len(w);")?;
                         writeln!(w, "                let inner_head_ptr = inner.encode_head(w);")?;
                         writeln!(w, "                inner.encode_body(inner_head_ptr, w);")?;
-                    } else if !is_unit_variant(&variant.ty) {
+                    } else {
                         writeln!(w, "                let {head_ptr_name}::{}(inner_head_ptr) = head else {{ unreachable!() }};", variant.name)?;
                         writeln!(w, "                inner.encode_body(*inner_head_ptr, w);")?;
                     }
@@ -227,15 +232,12 @@ fn write_ty_def_impl(
                         continue;
                     }
 
-                    let variant_format = layout::enum_variant_format(&head, &variant.ty);
-
                     write!(w, "    {}", variant.name)?;
 
-                    if !variant_format.is_inline {
+                    if head.has_ptr {
                         write!(w, "({lutra_bin}::ReversePointer)")?;
                     } else {
                         write!(w, "({lutra_bin}::boxed::Box<<")?;
-
                         write_ty_ref(w, &variant.ty, false, ctx)?;
                         write!(w, " as {lutra_bin}::Encode>::HeadPtr>)")?;
                     }
@@ -344,20 +346,17 @@ fn write_ty_def_impl(
             for (index, variant) in variants.iter().enumerate() {
                 writeln!(w, "            {index} => {{")?;
 
-                let variant_format = layout::enum_variant_format(&head, &variant.ty);
-
-                if variant_format.is_inline {
-                    if !is_unit_variant(&variant.ty) {
-                        write!(w, "                let inner = ")?;
-                        write_ty_ref(w, &variant.ty, true, ctx)?;
-                        writeln!(w, "::decode(buf)?;")?;
-                    }
-                } else {
+                if is_unit_variant(&variant.ty) {
+                } else if head.has_ptr {
                     writeln!(w, "                let offset = u32::from_le_bytes(buf.read_const::<4>());")?;
 
                     write!(w, "                let inner = ")?;
                     write_ty_ref(w, &variant.ty, true, ctx)?;
                     writeln!(w, "::decode(buf.skip(offset as usize))?;")?;
+                } else {
+                    write!(w, "                let inner = ")?;
+                    write_ty_ref(w, &variant.ty, true, ctx)?;
+                    writeln!(w, "::decode(buf)?;")?;
                 }
 
                 let needs_box = layout::does_enum_variant_contain_recursive(ty, index as u16);

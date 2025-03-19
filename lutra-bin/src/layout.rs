@@ -193,9 +193,11 @@ pub fn does_enum_variant_contain_recursive(enum_ty: &ir::Ty, variant_index: u16)
     layout.variants_recursive.contains(&variant_index)
 }
 
+#[derive(Debug)]
 pub struct EnumHeadFormat {
     pub tag_bytes: u32,
     pub inner_bytes: u32,
+    pub has_ptr: bool,
 }
 
 pub fn enum_head_format(variants: &[ir::TyEnumVariant]) -> EnumHeadFormat {
@@ -203,8 +205,10 @@ pub fn enum_head_format(variants: &[ir::TyEnumVariant]) -> EnumHeadFormat {
 
     let max_head = enum_max_variant_head_size(variants);
 
+    let mut has_ptr = false;
     let inner = if max_head > 32 {
         // insert a pointer
+        has_ptr = true;
         32
     } else {
         max_head
@@ -213,30 +217,36 @@ pub fn enum_head_format(variants: &[ir::TyEnumVariant]) -> EnumHeadFormat {
     EnumHeadFormat {
         tag_bytes: t.div_ceil(8),
         inner_bytes: inner.div_ceil(8),
+        has_ptr,
     }
 }
 
 #[derive(Debug)]
 pub struct EnumVariantFormat {
+    pub is_unit: bool,
     pub padding_bytes: u32,
-    pub is_inline: bool,
 }
 
 pub fn enum_variant_format(head: &EnumHeadFormat, variant_ty: &ir::Ty) -> EnumVariantFormat {
     let inner_head_size = variant_ty.layout.as_ref().unwrap().head_size;
     let inner_head_bytes = inner_head_size.div_ceil(8);
 
-    let is_inline = inner_head_bytes <= 4;
+    let is_unit = inner_head_bytes == 0;
 
-    let padding_bytes = if is_inline {
-        head.inner_bytes.saturating_sub(inner_head_bytes)
+    let padding_bytes = if head.has_ptr {
+        if is_unit {
+            // unit variant does not have a pointer, it is all padding
+            4
+        } else {
+            0
+        }
     } else {
-        0
+        head.inner_bytes.saturating_sub(inner_head_bytes)
     };
 
     EnumVariantFormat {
-        is_inline,
         padding_bytes,
+        is_unit,
     }
 }
 

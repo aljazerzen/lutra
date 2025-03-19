@@ -149,24 +149,22 @@ pub struct EnumReader {
 }
 
 impl EnumReader {
-    pub fn new(data: Data, tag_bytes: u32, variants_is_inline: &[bool]) -> Self {
+    pub fn new(data: Data, tag_bytes: u32, has_ptr: bool) -> Self {
         let tag_bytes = tag_bytes as usize;
 
         let mut tag = vec![0; 8];
         data.slice(tag_bytes).copy_to_slice(&mut tag[0..tag_bytes]);
         let tag = u64::from_le_bytes(tag.try_into().unwrap()) as u64;
 
-        let variant_is_inline = variants_is_inline[tag as usize];
-
         let mut data = data;
         data.skip(tag_bytes);
 
-        if variant_is_inline {
-            // inner is right after the tag
-        } else {
-            // read offset and skip to it
+        if has_ptr {
+            // read ptr and dereference
             let offset = u32::from_le_bytes(data.slice(4).read_const::<4>());
             data.skip(offset as usize);
+        } else {
+            // inner is right after the tag
         }
 
         EnumReader { data, tag }
@@ -177,11 +175,7 @@ impl EnumReader {
             panic!()
         };
         let head = layout::enum_head_format(variants);
-        let variants_is_inline: vec::Vec<bool> = variants
-            .iter()
-            .map(|v| layout::enum_variant_format(&head, &v.ty).is_inline)
-            .collect();
-        Self::new(data, head.tag_bytes, &variants_is_inline)
+        Self::new(data, head.tag_bytes, head.has_ptr)
     }
 
     pub fn get_tag(&self) -> u64 {

@@ -11,6 +11,7 @@ pub struct EnumWriter<'t> {
     buf: vec::Vec<u8>,
 
     tag_bytes: u32,
+    has_ptr: bool,
     variants: vec::Vec<layout::EnumVariantFormat>,
     variants_inner_layouts: vec::Vec<(u32, &'t [u32])>,
 }
@@ -34,17 +35,24 @@ impl<'t> EnumWriter<'t> {
             })
             .collect();
 
-        Self::new(head.tag_bytes, variant_formats, variants_inner_layouts)
+        Self::new(
+            head.tag_bytes,
+            head.has_ptr,
+            variant_formats,
+            variants_inner_layouts,
+        )
     }
 
     pub fn new(
         tag_bytes: u32,
+        has_ptr: bool,
         variants: vec::Vec<layout::EnumVariantFormat>,
         variants_inner_layouts: vec::Vec<(u32, &'t [u32])>,
     ) -> Self {
         EnumWriter {
             buf: vec::Vec::new(),
             tag_bytes,
+            has_ptr,
             variants,
             variants_inner_layouts,
         }
@@ -62,7 +70,7 @@ impl<'t> EnumWriter<'t> {
             .extend(&tag.to_le_bytes()[0..self.tag_bytes as usize]);
 
         // pointer
-        if !variant.is_inline {
+        if self.has_ptr && !variant.is_unit {
             self.buf.extend(4_u32.to_le_bytes());
         }
 

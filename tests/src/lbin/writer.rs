@@ -150,8 +150,8 @@ fn enum_01() {
     Pending(
       42
     )
-    Length: 5 (0x5) bytes
-    0000:   01 2a 00 00  00                                      .*...
+    Length: 7 (0x7) bytes
+    0000:   01 04 00 00  00 2a 00                                .....*.
     "#);
 
     // int (followed by the body of text)
@@ -160,8 +160,8 @@ fn enum_01() {
     Pending(
       257
     )
-    Length: 5 (0x5) bytes
-    0000:   01 01 01 00  00                                      .....
+    Length: 7 (0x7) bytes
+    0000:   01 04 00 00  00 01 01                                .......
     "#);
 
     // text
