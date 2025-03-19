@@ -126,7 +126,7 @@ pub fn compile(cmd: CompileCommand) -> anyhow::Result<()> {
     let project = lutra_compiler::compile(project, cmd.compile)?;
 
     let path = pr::Path::new(cmd.path.split("::"));
-    let program = lutra_compiler::lower(&project.root_module, &path);
+    let program = lutra_compiler::lower_var(&project.root_module, &path);
 
     let program_source = lutra_bin::ir::print(&program);
     println!("------ IR ------");

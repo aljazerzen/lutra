@@ -11,7 +11,7 @@ const COL_ARRAY_INDEX: &str = "index";
 
 pub fn compile(project: &crate::Project, path: &pr::Path) -> (ir::Program, String) {
     // lower & inline
-    let program = crate::intermediate::lower(&project.root_module, path);
+    let program = crate::intermediate::lower_var(&project.root_module, path);
     tracing::debug!("ir: {}", lutra_bin::ir::print(&program));
     let program = crate::intermediate::inline(program).unwrap();
     tracing::debug!("ir (inlined): {}", lutra_bin::ir::print(&program));

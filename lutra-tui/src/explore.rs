@@ -222,9 +222,8 @@ struct ModuleDecl {
 }
 impl ModuleDecl {
     fn new(module: &lutra_compiler::decl::Module) -> Self {
-        let decls = module.get_decls();
-        let decls = decls
-            .into_iter()
+        let decls = module
+            .iter_decls()
             .filter(|(n, _)| *n != "std")
             .flat_map(|(n, d)| Decl::new(n, d))
             .collect();

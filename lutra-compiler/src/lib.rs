@@ -19,8 +19,7 @@ pub mod pr;
 pub use bytecoding::compile_program as bytecode_program;
 pub use compile::{compile, CompileParams};
 pub use discover::{discover, DiscoverParams};
-pub use intermediate::lower;
-use intermediate::lower_expr;
+pub use intermediate::{lower_expr, lower_type_defs, lower_var};
 pub use project::{Project, SourceTree};
 use resolver::resolve_post;
 pub use span::Span;
@@ -55,7 +54,7 @@ pub fn _test_compile(source: &str) -> Result<ir::Program, error::Error> {
     let project = compile(source, CompileParams {})?;
 
     let path = pr::Path::from_name("main");
-    Ok(lower(&project.root_module, &path))
+    Ok(lower_var(&project.root_module, &path))
 }
 
 pub fn _lower_expr(project: &Project, source: &str) -> Result<ir::Program, error::Error> {

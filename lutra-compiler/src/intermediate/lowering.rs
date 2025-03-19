@@ -22,7 +22,7 @@ pub fn lower_expr(root_module: &decl::RootModule, main: &pr::Expr) -> ir::Progra
     ir::Program { main, types }
 }
 
-pub fn lower(root_module: &decl::RootModule, path: &pr::Path) -> ir::Program {
+pub fn lower_var(root_module: &decl::RootModule, path: &pr::Path) -> ir::Program {
     let mut lowerer = Lowerer::new(root_module);
 
     let main = lowerer.lower_expr_decl(path, vec![]).unwrap();
@@ -332,4 +332,42 @@ impl fold::IrFold for IdentCollector {
         }
         fold::fold_ty(self, ty)
     }
+}
+
+pub fn lower_type_defs(root_module: &decl::RootModule) -> ir::Module {
+    let mut lowerer = Lowerer::new(root_module);
+
+    let mut module = ir::Module { decls: Vec::new() };
+
+    for (name, decl) in root_module.module.iter_decls_re() {
+        if name.starts_with_part("std") {
+            continue;
+        }
+
+        match &decl.kind {
+            decl::DeclKind::Module(_) => {
+                unreachable!("iter_decls_re does not return modules");
+            }
+
+            decl::DeclKind::Expr(expr) => {
+                let ty = lowerer.lower_ty(expr.ty.clone().unwrap());
+
+                module.insert(name.full_path(), ir::Decl::Var(ty));
+            }
+
+            decl::DeclKind::Ty(_) => {
+                lowerer.type_defs_needed.push_back(name);
+            }
+
+            decl::DeclKind::Import(_) => {}
+
+            decl::DeclKind::Unresolved(_) => panic!(),
+        }
+    }
+
+    let types = lowerer.lower_ty_defs();
+    for ty in types {
+        module.insert(&ty.name.0, ir::Decl::Type(ty.ty));
+    }
+    module
 }

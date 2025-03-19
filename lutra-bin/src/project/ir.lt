@@ -136,3 +136,13 @@ type TyFunction = {
 
 @derive(["Debug", "Clone", "PartialEq", "Eq", "PartialOrd", "Ord", "Hash"])
 type Path = [text]
+
+type Module = {
+  decls = [{name = text, decl = Decl}],
+}
+
+type Decl = enum {
+    Module = Module,
+    Type = Ty,
+    Var = Ty,
+}

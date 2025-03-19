@@ -1,4 +1,5 @@
 use indexmap::IndexMap;
+use itertools::Itertools;
 
 use crate::decl;
 use crate::pr;
@@ -50,8 +51,26 @@ impl decl::Module {
         Some(curr_mod)
     }
 
-    pub fn get_decls(&self) -> Vec<(&String, &decl::Decl)> {
-        self.names.iter().collect()
+    pub fn iter_decls(&self) -> impl Iterator<Item = (&String, &decl::Decl)> {
+        self.names.iter()
+    }
+
+    pub fn iter_decls_re(&self) -> impl Iterator<Item = (pr::Path, &decl::Decl)> {
+        let non_modules = (self.names.iter())
+            .filter(|(_, d)| !d.kind.is_module())
+            .map(|(name, d)| (pr::Path::from_name(name), d));
+
+        let sub_decls = (self.names.iter())
+            .filter(|(_, d)| d.kind.is_module())
+            .flat_map(|(name, d)| {
+                let sub_module = d.kind.as_module().unwrap();
+                sub_module
+                    .iter_decls_re()
+                    .map(|(p, d)| (p.prepend(vec![name.clone()]), d))
+                    .collect_vec()
+            });
+
+        non_modules.chain(sub_decls)
     }
 
     pub(super) fn take_unresolved(&mut self, ident: &pr::Path) -> (pr::StmtKind, Option<Span>) {
@@ -77,12 +96,10 @@ impl decl::Module {
                     decl::DeclKind::Unresolved(Some(kind))
                 }
             };
-            let built_in = name == "std";
             let decl = decl::Decl {
                 span: stmt.span,
                 kind,
                 annotations: stmt.annotations,
-                built_in,
             };
             self.names.insert(name, decl);
         }

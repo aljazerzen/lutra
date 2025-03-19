@@ -5,7 +5,7 @@ pub use crate::generated::ir::*;
 #[cfg(feature = "std")]
 pub use printer::{print, print_ty};
 
-use crate::{boxed, vec};
+use crate::{boxed, string, vec};
 
 impl Program {
     pub fn get_output_ty(&self) -> &Ty {
@@ -55,5 +55,51 @@ impl From<TyFunction> for TyKind {
 impl From<Path> for TyKind {
     fn from(value: Path) -> Self {
         TyKind::Ident(value)
+    }
+}
+
+impl Module {
+    pub fn insert(&mut self, path: &[string::String], decl: Decl) {
+        if path.is_empty() {
+            panic!();
+        }
+
+        if path.len() == 1 {
+            self.decls.push(ModuledeclsItems {
+                name: path[0].clone(),
+                decl,
+            });
+        } else {
+            let exists = self.decls.iter().any(|d| d.name == path[0]);
+            if !exists {
+                self.decls.push(ModuledeclsItems {
+                    name: path[0].clone(),
+                    decl: Decl::Module(boxed::Box::new(Module {
+                        decls: vec::Vec::new(),
+                    })),
+                });
+            }
+
+            let sub_module = self.decls.iter_mut().find(|d| d.name == path[0]);
+            let Decl::Module(sub_module) = &mut sub_module.unwrap().decl else {
+                panic!()
+            };
+            sub_module.insert(&path[1..], decl)
+        }
+    }
+
+    pub fn iter_decls_re(&self) -> impl Iterator<Item = (Path, &Decl)> {
+        self.decls.iter().flat_map(|item| match &item.decl {
+            Decl::Module(sub_module) => sub_module
+                .iter_decls_re()
+                .map(|(mut p, d)| {
+                    p.0.insert(0, item.name.clone());
+                    (p, d)
+                })
+                .collect::<vec::Vec<_>>(),
+            _ => {
+                vec![(Path(vec![item.name.clone()]), &item.decl)]
+            }
+        })
     }
 }

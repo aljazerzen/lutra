@@ -20,7 +20,7 @@ fn main() {
 }
 
 fn execute_function(project: &lutra_compiler::Project, path: pr::Path) {
-    let program = lutra_compiler::lower(&project.root_module, &path);
+    let program = lutra_compiler::lower_var(&project.root_module, &path);
 
     let input_tys = program.get_input_tys().to_vec();
     let input_ty = ir::Ty {
