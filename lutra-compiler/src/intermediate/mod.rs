@@ -1,5 +1,6 @@
 mod fold;
 mod inliner;
+pub mod layouter;
 mod lowering;
 
 pub use inliner::inline;

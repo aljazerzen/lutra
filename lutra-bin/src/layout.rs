@@ -93,6 +93,7 @@ impl<I: Layout> Layout for Option<I> {
 }
 
 // Keep in sync with [pr::TyKind::get_layout_simple]
+// Does not recurse.
 pub fn get_layout_simple(ty: &ir::Ty) -> Option<ir::TyLayout> {
     let head_size = match &ty.kind {
         ir::TyKind::Primitive(prim) => match prim {
@@ -164,7 +165,6 @@ pub fn get_layout_simple(ty: &ir::Ty) -> Option<ir::TyLayout> {
     Some(ir::TyLayout {
         head_size,
         body_ptrs,
-        variants_recursive: vec![],
     })
 }
 
@@ -189,8 +189,7 @@ pub fn tuple_field_offset(ty: &ir::Ty, position: u16) -> u32 {
 }
 
 pub fn does_enum_variant_contain_recursive(enum_ty: &ir::Ty, variant_index: u16) -> bool {
-    let layout = enum_ty.layout.as_ref().unwrap();
-    layout.variants_recursive.contains(&variant_index)
+    enum_ty.variants_recursive.contains(&variant_index)
 }
 
 #[derive(Debug)]

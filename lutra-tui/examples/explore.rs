@@ -23,19 +23,16 @@ fn execute_function(project: &lutra_compiler::Project, path: pr::Path) {
     let program = lutra_compiler::lower_var(&project.root_module, &path);
 
     let input_tys = program.get_input_tys().to_vec();
-    let input_ty = ir::Ty {
-        kind: ir::TyKind::Tuple(
-            input_tys
-                .iter()
-                .map(|p| ir::TyTupleField {
-                    name: None,
-                    ty: p.clone(),
-                })
-                .collect(),
-        ),
-        layout: None,
-        name: Some("input".into()),
-    };
+    let mut input_ty = ir::Ty::new(ir::TyKind::Tuple(
+        input_tys
+            .iter()
+            .map(|p| ir::TyTupleField {
+                name: None,
+                ty: p.clone(),
+            })
+            .collect(),
+    ));
+    input_ty.name = Some("input".into());
 
     let bytecode = lutra_compiler::bytecode_program(program.clone());
 

@@ -67,10 +67,10 @@ let main =
                                                         TyLayout {
                                                             head_size: 64,
                                                             body_ptrs: [],
-                                                            variants_recursive: [],
                                                         },
                                                     ),
                                                     name: None,
+                                                    variants_recursive: [],
                                                 },
                                             },
                                             Expr {
@@ -90,10 +90,10 @@ let main =
                                                         TyLayout {
                                                             head_size: 64,
                                                             body_ptrs: [],
-                                                            variants_recursive: [],
                                                         },
                                                     ),
                                                     name: None,
+                                                    variants_recursive: [],
                                                 },
                                             },
                                             Expr {
@@ -113,10 +113,10 @@ let main =
                                                         TyLayout {
                                                             head_size: 64,
                                                             body_ptrs: [],
-                                                            variants_recursive: [],
                                                         },
                                                     ),
                                                     name: None,
+                                                    variants_recursive: [],
                                                 },
                                             },
                                         ],
@@ -131,10 +131,10 @@ let main =
                                                     TyLayout {
                                                         head_size: 64,
                                                         body_ptrs: [],
-                                                        variants_recursive: [],
                                                     },
                                                 ),
                                                 name: None,
+                                                variants_recursive: [],
                                             },
                                         ),
                                         layout: Some(
@@ -143,10 +143,10 @@ let main =
                                                 body_ptrs: [
                                                     0,
                                                 ],
-                                                variants_recursive: [],
                                             },
                                         ),
                                         name: None,
+                                        variants_recursive: [],
                                     },
                                 },
                             },
@@ -163,10 +163,10 @@ let main =
                                                 TyLayout {
                                                     head_size: 64,
                                                     body_ptrs: [],
-                                                    variants_recursive: [],
                                                 },
                                             ),
                                             name: None,
+                                            variants_recursive: [],
                                         },
                                     ],
                                     body: Ty {
@@ -179,10 +179,10 @@ let main =
                                                     TyLayout {
                                                         head_size: 64,
                                                         body_ptrs: [],
-                                                        variants_recursive: [],
                                                     },
                                                 ),
                                                 name: None,
+                                                variants_recursive: [],
                                             },
                                         ),
                                         layout: Some(
@@ -191,15 +191,16 @@ let main =
                                                 body_ptrs: [
                                                     0,
                                                 ],
-                                                variants_recursive: [],
                                             },
                                         ),
                                         name: None,
+                                        variants_recursive: [],
                                     },
                                 },
                             ),
                             layout: None,
                             name: None,
+                            variants_recursive: [],
                         },
                     },
                     main: Expr {
@@ -224,10 +225,10 @@ let main =
                                                             TyLayout {
                                                                 head_size: 64,
                                                                 body_ptrs: [],
-                                                                variants_recursive: [],
                                                             },
                                                         ),
                                                         name: None,
+                                                        variants_recursive: [],
                                                     },
                                                 ],
                                                 body: Ty {
@@ -240,10 +241,10 @@ let main =
                                                                 TyLayout {
                                                                     head_size: 64,
                                                                     body_ptrs: [],
-                                                                    variants_recursive: [],
                                                                 },
                                                             ),
                                                             name: None,
+                                                            variants_recursive: [],
                                                         },
                                                     ),
                                                     layout: Some(
@@ -252,15 +253,16 @@ let main =
                                                             body_ptrs: [
                                                                 0,
                                                             ],
-                                                            variants_recursive: [],
                                                         },
                                                     ),
                                                     name: None,
+                                                    variants_recursive: [],
                                                 },
                                             },
                                         ),
                                         layout: None,
                                         name: None,
+                                        variants_recursive: [],
                                     },
                                 },
                                 main: Expr {
@@ -290,10 +292,10 @@ let main =
                                                                                                 TyLayout {
                                                                                                     head_size: 64,
                                                                                                     body_ptrs: [],
-                                                                                                    variants_recursive: [],
                                                                                                 },
                                                                                             ),
                                                                                             name: None,
+                                                                                            variants_recursive: [],
                                                                                         },
                                                                                     ],
                                                                                     body: Ty {
@@ -306,10 +308,10 @@ let main =
                                                                                                     TyLayout {
                                                                                                         head_size: 64,
                                                                                                         body_ptrs: [],
-                                                                                                        variants_recursive: [],
                                                                                                     },
                                                                                                 ),
                                                                                                 name: None,
+                                                                                                variants_recursive: [],
                                                                                             },
                                                                                         ),
                                                                                         layout: Some(
@@ -318,15 +320,16 @@ let main =
                                                                                                 body_ptrs: [
                                                                                                     0,
                                                                                                 ],
-                                                                                                variants_recursive: [],
                                                                                             },
                                                                                         ),
                                                                                         name: None,
+                                                                                        variants_recursive: [],
                                                                                     },
                                                                                 },
                                                                             ),
                                                                             layout: None,
                                                                             name: None,
+                                                                            variants_recursive: [],
                                                                         },
                                                                     },
                                                                     args: [
@@ -344,10 +347,10 @@ let main =
                                                                                     TyLayout {
                                                                                         head_size: 64,
                                                                                         body_ptrs: [],
-                                                                                        variants_recursive: [],
                                                                                     },
                                                                                 ),
                                                                                 name: None,
+                                                                                variants_recursive: [],
                                                                             },
                                                                         },
                                                                     ],
@@ -363,10 +366,10 @@ let main =
                                                                             TyLayout {
                                                                                 head_size: 64,
                                                                                 body_ptrs: [],
-                                                                                variants_recursive: [],
                                                                             },
                                                                         ),
                                                                         name: None,
+                                                                        variants_recursive: [],
                                                                     },
                                                                 ),
                                                                 layout: Some(
@@ -375,10 +378,10 @@ let main =
                                                                         body_ptrs: [
                                                                             0,
                                                                         ],
-                                                                        variants_recursive: [],
                                                                     },
                                                                 ),
                                                                 name: None,
+                                                                variants_recursive: [],
                                                             },
                                                         },
                                                         Expr {
@@ -408,10 +411,10 @@ let main =
                                                                                                         TyLayout {
                                                                                                             head_size: 64,
                                                                                                             body_ptrs: [],
-                                                                                                            variants_recursive: [],
                                                                                                         },
                                                                                                     ),
                                                                                                     name: None,
+                                                                                                    variants_recursive: [],
                                                                                                 },
                                                                                             },
                                                                                             Expr {
@@ -431,10 +434,10 @@ let main =
                                                                                                         TyLayout {
                                                                                                             head_size: 64,
                                                                                                             body_ptrs: [],
-                                                                                                            variants_recursive: [],
                                                                                                         },
                                                                                                     ),
                                                                                                     name: None,
+                                                                                                    variants_recursive: [],
                                                                                                 },
                                                                                             },
                                                                                         ],
@@ -449,10 +452,10 @@ let main =
                                                                                                     TyLayout {
                                                                                                         head_size: 64,
                                                                                                         body_ptrs: [],
-                                                                                                        variants_recursive: [],
                                                                                                     },
                                                                                                 ),
                                                                                                 name: None,
+                                                                                                variants_recursive: [],
                                                                                             },
                                                                                         ),
                                                                                         layout: Some(
@@ -461,10 +464,10 @@ let main =
                                                                                                 body_ptrs: [
                                                                                                     0,
                                                                                                 ],
-                                                                                                variants_recursive: [],
                                                                                             },
                                                                                         ),
                                                                                         name: None,
+                                                                                        variants_recursive: [],
                                                                                     },
                                                                                 },
                                                                             },
@@ -481,10 +484,10 @@ let main =
                                                                                                 TyLayout {
                                                                                                     head_size: 64,
                                                                                                     body_ptrs: [],
-                                                                                                    variants_recursive: [],
                                                                                                 },
                                                                                             ),
                                                                                             name: None,
+                                                                                            variants_recursive: [],
                                                                                         },
                                                                                         Ty {
                                                                                             kind: Primitive(
@@ -494,10 +497,10 @@ let main =
                                                                                                 TyLayout {
                                                                                                     head_size: 64,
                                                                                                     body_ptrs: [],
-                                                                                                    variants_recursive: [],
                                                                                                 },
                                                                                             ),
                                                                                             name: None,
+                                                                                            variants_recursive: [],
                                                                                         },
                                                                                     ],
                                                                                     body: Ty {
@@ -510,10 +513,10 @@ let main =
                                                                                                     TyLayout {
                                                                                                         head_size: 64,
                                                                                                         body_ptrs: [],
-                                                                                                        variants_recursive: [],
                                                                                                     },
                                                                                                 ),
                                                                                                 name: None,
+                                                                                                variants_recursive: [],
                                                                                             },
                                                                                         ),
                                                                                         layout: Some(
@@ -522,15 +525,16 @@ let main =
                                                                                                 body_ptrs: [
                                                                                                     0,
                                                                                                 ],
-                                                                                                variants_recursive: [],
                                                                                             },
                                                                                         ),
                                                                                         name: None,
+                                                                                        variants_recursive: [],
                                                                                     },
                                                                                 },
                                                                             ),
                                                                             layout: None,
                                                                             name: None,
+                                                                            variants_recursive: [],
                                                                         },
                                                                     },
                                                                     args: [
@@ -548,10 +552,10 @@ let main =
                                                                                     TyLayout {
                                                                                         head_size: 64,
                                                                                         body_ptrs: [],
-                                                                                        variants_recursive: [],
                                                                                     },
                                                                                 ),
                                                                                 name: None,
+                                                                                variants_recursive: [],
                                                                             },
                                                                         },
                                                                         Expr {
@@ -568,10 +572,10 @@ let main =
                                                                                     TyLayout {
                                                                                         head_size: 64,
                                                                                         body_ptrs: [],
-                                                                                        variants_recursive: [],
                                                                                     },
                                                                                 ),
                                                                                 name: None,
+                                                                                variants_recursive: [],
                                                                             },
                                                                         },
                                                                     ],
@@ -587,10 +591,10 @@ let main =
                                                                             TyLayout {
                                                                                 head_size: 64,
                                                                                 body_ptrs: [],
-                                                                                variants_recursive: [],
                                                                             },
                                                                         ),
                                                                         name: None,
+                                                                        variants_recursive: [],
                                                                     },
                                                                 ),
                                                                 layout: Some(
@@ -599,10 +603,10 @@ let main =
                                                                         body_ptrs: [
                                                                             0,
                                                                         ],
-                                                                        variants_recursive: [],
                                                                     },
                                                                 ),
                                                                 name: None,
+                                                                variants_recursive: [],
                                                             },
                                                         },
                                                         Expr {
@@ -628,10 +632,10 @@ let main =
                                                                                                 TyLayout {
                                                                                                     head_size: 64,
                                                                                                     body_ptrs: [],
-                                                                                                    variants_recursive: [],
                                                                                                 },
                                                                                             ),
                                                                                             name: None,
+                                                                                            variants_recursive: [],
                                                                                         },
                                                                                         Ty {
                                                                                             kind: Primitive(
@@ -641,10 +645,10 @@ let main =
                                                                                                 TyLayout {
                                                                                                     head_size: 64,
                                                                                                     body_ptrs: [],
-                                                                                                    variants_recursive: [],
                                                                                                 },
                                                                                             ),
                                                                                             name: None,
+                                                                                            variants_recursive: [],
                                                                                         },
                                                                                     ],
                                                                                     body: Ty {
@@ -655,15 +659,16 @@ let main =
                                                                                             TyLayout {
                                                                                                 head_size: 64,
                                                                                                 body_ptrs: [],
-                                                                                                variants_recursive: [],
                                                                                             },
                                                                                         ),
                                                                                         name: None,
+                                                                                        variants_recursive: [],
                                                                                     },
                                                                                 },
                                                                             ),
                                                                             layout: None,
                                                                             name: None,
+                                                                            variants_recursive: [],
                                                                         },
                                                                     },
                                                                     args: [
@@ -681,10 +686,10 @@ let main =
                                                                                     TyLayout {
                                                                                         head_size: 64,
                                                                                         body_ptrs: [],
-                                                                                        variants_recursive: [],
                                                                                     },
                                                                                 ),
                                                                                 name: None,
+                                                                                variants_recursive: [],
                                                                             },
                                                                         },
                                                                         Expr {
@@ -701,10 +706,10 @@ let main =
                                                                                     TyLayout {
                                                                                         head_size: 64,
                                                                                         body_ptrs: [],
-                                                                                        variants_recursive: [],
                                                                                     },
                                                                                 ),
                                                                                 name: None,
+                                                                                variants_recursive: [],
                                                                             },
                                                                         },
                                                                     ],
@@ -718,10 +723,10 @@ let main =
                                                                     TyLayout {
                                                                         head_size: 64,
                                                                         body_ptrs: [],
-                                                                        variants_recursive: [],
                                                                     },
                                                                 ),
                                                                 name: None,
+                                                                variants_recursive: [],
                                                             },
                                                         },
                                                     ],
@@ -741,10 +746,10 @@ let main =
                                                                                 TyLayout {
                                                                                     head_size: 64,
                                                                                     body_ptrs: [],
-                                                                                    variants_recursive: [],
                                                                                 },
                                                                             ),
                                                                             name: None,
+                                                                            variants_recursive: [],
                                                                         },
                                                                     ),
                                                                     layout: Some(
@@ -753,10 +758,10 @@ let main =
                                                                             body_ptrs: [
                                                                                 0,
                                                                             ],
-                                                                            variants_recursive: [],
                                                                         },
                                                                     ),
                                                                     name: None,
+                                                                    variants_recursive: [],
                                                                 },
                                                             },
                                                             TyTupleField {
@@ -771,10 +776,10 @@ let main =
                                                                                 TyLayout {
                                                                                     head_size: 64,
                                                                                     body_ptrs: [],
-                                                                                    variants_recursive: [],
                                                                                 },
                                                                             ),
                                                                             name: None,
+                                                                            variants_recursive: [],
                                                                         },
                                                                     ),
                                                                     layout: Some(
@@ -783,10 +788,10 @@ let main =
                                                                             body_ptrs: [
                                                                                 0,
                                                                             ],
-                                                                            variants_recursive: [],
                                                                         },
                                                                     ),
                                                                     name: None,
+                                                                    variants_recursive: [],
                                                                 },
                                                             },
                                                             TyTupleField {
@@ -799,10 +804,10 @@ let main =
                                                                         TyLayout {
                                                                             head_size: 64,
                                                                             body_ptrs: [],
-                                                                            variants_recursive: [],
                                                                         },
                                                                     ),
                                                                     name: None,
+                                                                    variants_recursive: [],
                                                                 },
                                                             },
                                                         ],
@@ -814,10 +819,10 @@ let main =
                                                                 0,
                                                                 8,
                                                             ],
-                                                            variants_recursive: [],
                                                         },
                                                     ),
                                                     name: None,
+                                                    variants_recursive: [],
                                                 },
                                             },
                                             position: 1,
@@ -833,10 +838,10 @@ let main =
                                                     TyLayout {
                                                         head_size: 64,
                                                         body_ptrs: [],
-                                                        variants_recursive: [],
                                                     },
                                                 ),
                                                 name: None,
+                                                variants_recursive: [],
                                             },
                                         ),
                                         layout: Some(
@@ -845,10 +850,10 @@ let main =
                                                 body_ptrs: [
                                                     0,
                                                 ],
-                                                variants_recursive: [],
                                             },
                                         ),
                                         name: None,
+                                        variants_recursive: [],
                                     },
                                 },
                             },
@@ -863,10 +868,10 @@ let main =
                                         TyLayout {
                                             head_size: 64,
                                             body_ptrs: [],
-                                            variants_recursive: [],
                                         },
                                     ),
                                     name: None,
+                                    variants_recursive: [],
                                 },
                             ),
                             layout: Some(
@@ -875,10 +880,10 @@ let main =
                                     body_ptrs: [
                                         0,
                                     ],
-                                    variants_recursive: [],
                                 },
                             ),
                             name: None,
+                            variants_recursive: [],
                         },
                     },
                 },
@@ -893,10 +898,10 @@ let main =
                             TyLayout {
                                 head_size: 64,
                                 body_ptrs: [],
-                                variants_recursive: [],
                             },
                         ),
                         name: None,
+                        variants_recursive: [],
                     },
                 ),
                 layout: Some(
@@ -905,10 +910,10 @@ let main =
                         body_ptrs: [
                             0,
                         ],
-                        variants_recursive: [],
                     },
                 ),
                 name: None,
+                variants_recursive: [],
             },
         },
         types: [
@@ -926,10 +931,10 @@ let main =
                         TyLayout {
                             head_size: 64,
                             body_ptrs: [],
-                            variants_recursive: [],
                         },
                     ),
                     name: None,
+                    variants_recursive: [],
                 },
             },
             TyDef {
@@ -949,10 +954,10 @@ let main =
                             body_ptrs: [
                                 0,
                             ],
-                            variants_recursive: [],
                         },
                     ),
                     name: None,
+                    variants_recursive: [],
                 },
             },
         ],

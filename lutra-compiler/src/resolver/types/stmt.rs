@@ -8,21 +8,8 @@ impl super::TypeResolver<'_> {
     /// Entry point to the resolver.
     pub fn resolve_decls(&mut self, order: &[Vec<pr::Path>]) -> Result<()> {
         for group in order {
-            self.strict_mode = false;
-            for _ in 0..5 {
-                self.strict_mode_needed = false;
-                for fq_ident in group {
-                    self.resolve_decl(fq_ident)?;
-                }
-                if !self.strict_mode_needed {
-                    break;
-                }
-            }
-            if self.strict_mode_needed {
-                self.strict_mode = true;
-                for fq_ident in group {
-                    self.resolve_decl(fq_ident)?;
-                }
+            for fq_ident in group {
+                self.resolve_decl(fq_ident)?;
             }
         }
         Ok(())
@@ -58,11 +45,6 @@ impl super::TypeResolver<'_> {
             DeclKind::Expr(_) => unreachable!(),
             DeclKind::Import(_) => unreachable!(),
         };
-
-        // never re-resolve exprs
-        if decl_kind.is_expr() {
-            self.strict_mode_needed = false;
-        }
 
         // put decl back in
         let decl = self.root_mod.module.get_mut(fq_ident).unwrap();

@@ -117,6 +117,7 @@ pub fn fold_ty<T: ?Sized + IrFold>(fold: &mut T, ty: Ty) -> Result<Ty> {
         },
         name: ty.name,
         layout: ty.layout,
+        variants_recursive: ty.variants_recursive,
     })
 }
 

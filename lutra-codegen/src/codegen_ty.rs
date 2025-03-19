@@ -186,10 +186,10 @@ pub fn write_ty_ref(
             write!(w, "{lutra_bin}::string::String")?;
         }
         ir::TyKind::Ident(ident) => {
-            let matching = zip(ident.0.iter(), ctx.current_module.iter())
+            let matching = zip(ident.0.iter(), ctx.current_rust_mod.iter())
                 .filter(|(a, b)| a == b)
                 .count();
-            let supers = ctx.current_module.len() - matching;
+            let supers = ctx.current_rust_mod.len() - matching;
             for _ in 0..supers {
                 w.write_str("super::")?;
             }

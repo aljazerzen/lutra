@@ -52,23 +52,10 @@ impl From<ir::Ty> for super::Ty {
             ir::TyKind::Ident(path) => super::TyKind::Ident(super::Path::new(path.0)),
         };
 
-        let variants_recursive = ty
-            .layout
-            .as_ref()
-            .map(|l| l.variants_recursive.clone())
-            .unwrap_or_default();
-
-        let layout = ty.layout.map(|layout| super::TyLayout {
-            head_size: layout.head_size,
-            body_ptrs: layout.body_ptrs,
-        });
-
         super::Ty {
             kind,
             span: None,
             name: ty.name,
-            layout,
-            variants_recursive,
         }
     }
 }
@@ -127,16 +114,11 @@ impl From<super::Ty> for ir::Ty {
             })),
         };
 
-        let layout = ty.layout.map(|layout| ir::TyLayout {
-            head_size: layout.head_size,
-            variants_recursive: ty.variants_recursive,
-            body_ptrs: layout.body_ptrs,
-        });
-
         ir::Ty {
             kind,
-            layout,
+            layout: None,
             name: ty.name,
+            variants_recursive: vec![],
         }
     }
 }

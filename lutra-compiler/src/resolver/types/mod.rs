@@ -1,7 +1,6 @@
 mod expr;
 mod functions;
 mod inference;
-mod layout;
 mod scope;
 mod stmt;
 mod tuple;
@@ -27,15 +26,6 @@ pub fn run(
 struct TypeResolver<'a> {
     root_mod: &'a mut RootModule,
 
-    /// For recursive stmt references (recursive types and functions),
-    /// we do two passes:
-    /// - non-strict mode, where we try to resolve as much types as possible and don't fail on
-    ///   unresolved references.
-    ///   After this pass, all top-level types should be resolved.
-    /// - strict mode, where we require all types to be resolved.
-    strict_mode: bool,
-    strict_mode_needed: bool,
-
     debug_current_decl: crate::pr::Path,
 
     id: IdGenerator<usize>,
@@ -50,8 +40,6 @@ impl TypeResolver<'_> {
             debug_current_decl: crate::pr::Path::from_name("?"),
             id: IdGenerator::new(),
             scopes: Vec::new(),
-            strict_mode: false,
-            strict_mode_needed: false,
         }
     }
 }

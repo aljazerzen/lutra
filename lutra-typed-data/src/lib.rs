@@ -76,7 +76,6 @@ fn type_to_ir(ty: &schema::Ty) -> ir::Ty {
 
     let layout = ty.layout.as_ref().map(|layout| ir::TyLayout {
         head_size: layout.head_size,
-        variants_recursive: layout.variants_recursive.clone(),
         body_ptrs: vec![], // TODO
     });
 
@@ -84,6 +83,7 @@ fn type_to_ir(ty: &schema::Ty) -> ir::Ty {
         kind,
         name: None,
         layout,
+        variants_recursive: vec![],
     }
 }
 
@@ -130,7 +130,7 @@ fn type_from_pr(ty: &ir::Ty) -> schema::Ty {
     };
     let layout = ty.layout.as_ref().map(|layout| schema::TyLayout {
         head_size: layout.head_size,
-        variants_recursive: layout.variants_recursive.clone(),
+        variants_recursive: ty.variants_recursive.clone(),
     });
 
     schema::Ty { kind, layout }

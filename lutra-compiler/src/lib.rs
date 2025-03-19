@@ -19,7 +19,7 @@ pub mod pr;
 pub use bytecoding::compile_program as bytecode_program;
 pub use compile::{compile, CompileParams};
 pub use discover::{discover, DiscoverParams};
-pub use intermediate::{lower_expr, lower_type_defs, lower_var};
+pub use intermediate::{layouter, lower_expr, lower_type_defs, lower_var};
 pub use project::{Project, SourceTree};
 use resolver::resolve_post;
 pub use span::Span;
@@ -35,7 +35,7 @@ pub mod _lexer {
 }
 
 #[track_caller]
-pub fn _test_compile_ty(ty_source: &str) -> pr::Ty {
+pub fn _test_compile_ty(ty_source: &str) -> ir::Ty {
     let source = format!("type t = {ty_source}");
 
     let source = SourceTree::single("".into(), source);
@@ -46,7 +46,8 @@ pub fn _test_compile_ty(ty_source: &str) -> pr::Ty {
 
     let mut ty = type_def.unwrap().kind.as_ty().unwrap().clone();
     ty.name = None;
-    ty
+
+    layouter::on_ty(ir::Ty::from(ty))
 }
 
 pub fn _test_compile(source: &str) -> Result<ir::Program, error::Error> {
@@ -54,7 +55,9 @@ pub fn _test_compile(source: &str) -> Result<ir::Program, error::Error> {
     let project = compile(source, CompileParams {})?;
 
     let path = pr::Path::from_name("main");
-    Ok(lower_var(&project.root_module, &path))
+
+    let program = lower_var(&project.root_module, &path);
+    Ok(layouter::on_program(program))
 }
 
 pub fn _lower_expr(project: &Project, source: &str) -> Result<ir::Program, error::Error> {

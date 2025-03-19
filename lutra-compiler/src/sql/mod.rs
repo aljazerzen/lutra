@@ -15,6 +15,7 @@ pub fn compile(project: &crate::Project, path: &pr::Path) -> (ir::Program, Strin
     tracing::debug!("ir: {}", lutra_bin::ir::print(&program));
     let program = crate::intermediate::inline(program).unwrap();
     tracing::debug!("ir (inlined): {}", lutra_bin::ir::print(&program));
+    let program = crate::intermediate::layouter::on_program(program);
 
     // compile to clauses
     let (clause, types) = clauses::compile(&program);

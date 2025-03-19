@@ -194,47 +194,47 @@ pub mod br {
                 match self {
                     Self::Pointer(inner) => {
                         w.put_slice(&[0]);
-                        let inner_head_ptr = inner.encode_head(w);
-                        let r = ExprKindHeadPtr::Pointer(crate::boxed::Box::new(inner_head_ptr));
+                        let head_ptr = crate::ReversePointer::new(w);
+                        let r = ExprKindHeadPtr::Pointer(head_ptr);
                         r
                     }
-                    Self::Literal(_) => {
+                    Self::Literal(inner) => {
                         w.put_slice(&[1]);
                         let head_ptr = crate::ReversePointer::new(w);
                         let r = ExprKindHeadPtr::Literal(head_ptr);
                         r
                     }
-                    Self::Call(_) => {
+                    Self::Call(inner) => {
                         w.put_slice(&[2]);
                         let head_ptr = crate::ReversePointer::new(w);
                         let r = ExprKindHeadPtr::Call(head_ptr);
                         r
                     }
-                    Self::Function(_) => {
+                    Self::Function(inner) => {
                         w.put_slice(&[3]);
                         let head_ptr = crate::ReversePointer::new(w);
                         let r = ExprKindHeadPtr::Function(head_ptr);
                         r
                     }
-                    Self::Tuple(_) => {
+                    Self::Tuple(inner) => {
                         w.put_slice(&[4]);
                         let head_ptr = crate::ReversePointer::new(w);
                         let r = ExprKindHeadPtr::Tuple(head_ptr);
                         r
                     }
-                    Self::Array(_) => {
+                    Self::Array(inner) => {
                         w.put_slice(&[5]);
                         let head_ptr = crate::ReversePointer::new(w);
                         let r = ExprKindHeadPtr::Array(head_ptr);
                         r
                     }
-                    Self::TupleLookup(_) => {
+                    Self::TupleLookup(inner) => {
                         w.put_slice(&[6]);
                         let head_ptr = crate::ReversePointer::new(w);
                         let r = ExprKindHeadPtr::TupleLookup(head_ptr);
                         r
                     }
-                    Self::Binding(_) => {
+                    Self::Binding(inner) => {
                         w.put_slice(&[7]);
                         let head_ptr = crate::ReversePointer::new(w);
                         let r = ExprKindHeadPtr::Binding(head_ptr);
@@ -245,10 +245,12 @@ pub mod br {
             fn encode_body(&self, head: ExprKindHeadPtr, w: &mut crate::bytes::BytesMut) {
                 match self {
                     Self::Pointer(inner) => {
-                        let ExprKindHeadPtr::Pointer(inner_head_ptr) = head else {
+                        let ExprKindHeadPtr::Pointer(offset_ptr) = head else {
                             unreachable!()
                         };
-                        inner.encode_body(*inner_head_ptr, w);
+                        offset_ptr.write_cur_len(w);
+                        let inner_head_ptr = inner.encode_head(w);
+                        inner.encode_body(inner_head_ptr, w);
                     }
                     Self::Literal(inner) => {
                         let ExprKindHeadPtr::Literal(offset_ptr) = head else {
@@ -312,7 +314,7 @@ pub mod br {
         #[allow(non_camel_case_types, dead_code)]
         pub enum ExprKindHeadPtr {
             None,
-            Pointer(crate::boxed::Box<<super::Sid as crate::Encode>::HeadPtr>),
+            Pointer(crate::ReversePointer),
             Literal(crate::ReversePointer),
             Call(crate::ReversePointer),
             Function(crate::ReversePointer),
@@ -335,7 +337,8 @@ pub mod br {
                 let buf = buf.skip(1);
                 Ok(match tag {
                     0 => {
-                        let inner = super::Sid::decode(buf)?;
+                        let offset = u32::from_le_bytes(buf.read_const::<4>());
+                        let inner = super::Sid::decode(buf.skip(offset as usize))?;
                         ExprKind::Pointer(inner)
                     }
                     1 => {
@@ -739,6 +742,7 @@ pub mod ir {
         pub kind: TyKind,
         pub layout: core::option::Option<TyLayout>,
         pub name: core::option::Option<crate::string::String>,
+        pub variants_recursive: crate::vec::Vec<u16>,
     }
 
     #[derive(Debug, Clone, PartialEq, enum_as_inner::EnumAsInner)]
@@ -788,7 +792,6 @@ pub mod ir {
     pub struct TyLayout {
         pub head_size: u32,
         pub body_ptrs: crate::vec::Vec<u32>,
-        pub variants_recursive: crate::vec::Vec<u16>,
     }
 
     #[derive(Debug, Clone, PartialEq)]
@@ -849,14 +852,14 @@ pub mod ir {
         }
         impl crate::Layout for Program {
             fn head_size() -> usize {
-                224
+                288
             }
         }
 
         impl crate::Decode for Program {
             fn decode(buf: &[u8]) -> crate::Result<Self> {
                 let main = super::Expr::decode(buf.skip(0))?;
-                let types = crate::vec::Vec::<super::TyDef>::decode(buf.skip(20))?;
+                let types = crate::vec::Vec::<super::TyDef>::decode(buf.skip(28))?;
                 Ok(Program { main, types })
             }
         }
@@ -881,7 +884,7 @@ pub mod ir {
         }
         impl crate::Layout for Expr {
             fn head_size() -> usize {
-                160
+                224
             }
         }
 
@@ -899,49 +902,49 @@ pub mod ir {
             type HeadPtr = ExprKindHeadPtr;
             fn encode_head(&self, w: &mut crate::bytes::BytesMut) -> ExprKindHeadPtr {
                 match self {
-                    Self::Pointer(_) => {
+                    Self::Pointer(inner) => {
                         w.put_slice(&[0]);
                         let head_ptr = crate::ReversePointer::new(w);
                         let r = ExprKindHeadPtr::Pointer(head_ptr);
                         r
                     }
-                    Self::Literal(_) => {
+                    Self::Literal(inner) => {
                         w.put_slice(&[1]);
                         let head_ptr = crate::ReversePointer::new(w);
                         let r = ExprKindHeadPtr::Literal(head_ptr);
                         r
                     }
-                    Self::Call(_) => {
+                    Self::Call(inner) => {
                         w.put_slice(&[2]);
                         let head_ptr = crate::ReversePointer::new(w);
                         let r = ExprKindHeadPtr::Call(head_ptr);
                         r
                     }
-                    Self::Function(_) => {
+                    Self::Function(inner) => {
                         w.put_slice(&[3]);
                         let head_ptr = crate::ReversePointer::new(w);
                         let r = ExprKindHeadPtr::Function(head_ptr);
                         r
                     }
-                    Self::Tuple(_) => {
+                    Self::Tuple(inner) => {
                         w.put_slice(&[4]);
                         let head_ptr = crate::ReversePointer::new(w);
                         let r = ExprKindHeadPtr::Tuple(head_ptr);
                         r
                     }
-                    Self::Array(_) => {
+                    Self::Array(inner) => {
                         w.put_slice(&[5]);
                         let head_ptr = crate::ReversePointer::new(w);
                         let r = ExprKindHeadPtr::Array(head_ptr);
                         r
                     }
-                    Self::TupleLookup(_) => {
+                    Self::TupleLookup(inner) => {
                         w.put_slice(&[6]);
                         let head_ptr = crate::ReversePointer::new(w);
                         let r = ExprKindHeadPtr::TupleLookup(head_ptr);
                         r
                     }
-                    Self::Binding(_) => {
+                    Self::Binding(inner) => {
                         w.put_slice(&[7]);
                         let head_ptr = crate::ReversePointer::new(w);
                         let r = ExprKindHeadPtr::Binding(head_ptr);
@@ -1096,7 +1099,7 @@ pub mod ir {
             type HeadPtr = PointerHeadPtr;
             fn encode_head(&self, w: &mut crate::bytes::BytesMut) -> PointerHeadPtr {
                 match self {
-                    Self::External(_) => {
+                    Self::External(inner) => {
                         w.put_slice(&[0]);
                         let head_ptr = crate::ReversePointer::new(w);
                         let r = PointerHeadPtr::External(head_ptr);
@@ -1104,11 +1107,11 @@ pub mod ir {
                     }
                     Self::Binding(inner) => {
                         w.put_slice(&[1]);
-                        let inner_head_ptr = inner.encode_head(w);
-                        let r = PointerHeadPtr::Binding(crate::boxed::Box::new(inner_head_ptr));
+                        let head_ptr = crate::ReversePointer::new(w);
+                        let r = PointerHeadPtr::Binding(head_ptr);
                         r
                     }
-                    Self::Parameter(_) => {
+                    Self::Parameter(inner) => {
                         w.put_slice(&[2]);
                         let head_ptr = crate::ReversePointer::new(w);
                         let r = PointerHeadPtr::Parameter(head_ptr);
@@ -1127,10 +1130,12 @@ pub mod ir {
                         inner.encode_body(inner_head_ptr, w);
                     }
                     Self::Binding(inner) => {
-                        let PointerHeadPtr::Binding(inner_head_ptr) = head else {
+                        let PointerHeadPtr::Binding(offset_ptr) = head else {
                             unreachable!()
                         };
-                        inner.encode_body(*inner_head_ptr, w);
+                        offset_ptr.write_cur_len(w);
+                        let inner_head_ptr = inner.encode_head(w);
+                        inner.encode_body(inner_head_ptr, w);
                     }
                     Self::Parameter(inner) => {
                         let PointerHeadPtr::Parameter(offset_ptr) = head else {
@@ -1147,7 +1152,7 @@ pub mod ir {
         pub enum PointerHeadPtr {
             None,
             External(crate::ReversePointer),
-            Binding(crate::boxed::Box<<u32 as crate::Encode>::HeadPtr>),
+            Binding(crate::ReversePointer),
             Parameter(crate::ReversePointer),
         }
         impl crate::Layout for Pointer {
@@ -1169,7 +1174,8 @@ pub mod ir {
                         Pointer::External(inner)
                     }
                     1 => {
-                        let inner = u32::decode(buf)?;
+                        let offset = u32::from_le_bytes(buf.read_const::<4>());
+                        let inner = u32::decode(buf.skip(offset as usize))?;
                         Pointer::Binding(inner)
                     }
                     2 => {
@@ -1254,13 +1260,13 @@ pub mod ir {
             type HeadPtr = LiteralHeadPtr;
             fn encode_head(&self, w: &mut crate::bytes::BytesMut) -> LiteralHeadPtr {
                 match self {
-                    Self::Int(_) => {
+                    Self::Int(inner) => {
                         w.put_slice(&[0]);
                         let head_ptr = crate::ReversePointer::new(w);
                         let r = LiteralHeadPtr::Int(head_ptr);
                         r
                     }
-                    Self::Float(_) => {
+                    Self::Float(inner) => {
                         w.put_slice(&[1]);
                         let head_ptr = crate::ReversePointer::new(w);
                         let r = LiteralHeadPtr::Float(head_ptr);
@@ -1268,12 +1274,11 @@ pub mod ir {
                     }
                     Self::Bool(inner) => {
                         w.put_slice(&[2]);
-                        let inner_head_ptr = inner.encode_head(w);
-                        let r = LiteralHeadPtr::Bool(crate::boxed::Box::new(inner_head_ptr));
-                        w.put_bytes(0, 3);
+                        let head_ptr = crate::ReversePointer::new(w);
+                        let r = LiteralHeadPtr::Bool(head_ptr);
                         r
                     }
-                    Self::Text(_) => {
+                    Self::Text(inner) => {
                         w.put_slice(&[3]);
                         let head_ptr = crate::ReversePointer::new(w);
                         let r = LiteralHeadPtr::Text(head_ptr);
@@ -1300,10 +1305,12 @@ pub mod ir {
                         inner.encode_body(inner_head_ptr, w);
                     }
                     Self::Bool(inner) => {
-                        let LiteralHeadPtr::Bool(inner_head_ptr) = head else {
+                        let LiteralHeadPtr::Bool(offset_ptr) = head else {
                             unreachable!()
                         };
-                        inner.encode_body(*inner_head_ptr, w);
+                        offset_ptr.write_cur_len(w);
+                        let inner_head_ptr = inner.encode_head(w);
+                        inner.encode_body(inner_head_ptr, w);
                     }
                     Self::Text(inner) => {
                         let LiteralHeadPtr::Text(offset_ptr) = head else {
@@ -1321,7 +1328,7 @@ pub mod ir {
             None,
             Int(crate::ReversePointer),
             Float(crate::ReversePointer),
-            Bool(crate::boxed::Box<<bool as crate::Encode>::HeadPtr>),
+            Bool(crate::ReversePointer),
             Text(crate::ReversePointer),
         }
         impl crate::Layout for Literal {
@@ -1348,7 +1355,8 @@ pub mod ir {
                         Literal::Float(inner)
                     }
                     2 => {
-                        let inner = bool::decode(buf)?;
+                        let offset = u32::from_le_bytes(buf.read_const::<4>());
+                        let inner = bool::decode(buf.skip(offset as usize))?;
                         Literal::Bool(inner)
                     }
                     3 => {
@@ -1381,14 +1389,14 @@ pub mod ir {
         }
         impl crate::Layout for Call {
             fn head_size() -> usize {
-                224
+                288
             }
         }
 
         impl crate::Decode for Call {
             fn decode(buf: &[u8]) -> crate::Result<Self> {
                 let function = super::Expr::decode(buf.skip(0))?;
-                let args = crate::vec::Vec::<super::Expr>::decode(buf.skip(20))?;
+                let args = crate::vec::Vec::<super::Expr>::decode(buf.skip(28))?;
                 Ok(Call { function, args })
             }
         }
@@ -1413,7 +1421,7 @@ pub mod ir {
         }
         impl crate::Layout for Function {
             fn head_size() -> usize {
-                192
+                256
             }
         }
 
@@ -1445,14 +1453,14 @@ pub mod ir {
         }
         impl crate::Layout for TupleLookup {
             fn head_size() -> usize {
-                176
+                240
             }
         }
 
         impl crate::Decode for TupleLookup {
             fn decode(buf: &[u8]) -> crate::Result<Self> {
                 let base = super::Expr::decode(buf.skip(0))?;
-                let position = u16::decode(buf.skip(20))?;
+                let position = u16::decode(buf.skip(28))?;
                 Ok(TupleLookup { base, position })
             }
         }
@@ -1480,7 +1488,7 @@ pub mod ir {
         }
         impl crate::Layout for Binding {
             fn head_size() -> usize {
-                352
+                480
             }
         }
 
@@ -1488,7 +1496,7 @@ pub mod ir {
             fn decode(buf: &[u8]) -> crate::Result<Self> {
                 let id = u32::decode(buf.skip(0))?;
                 let expr = super::Expr::decode(buf.skip(4))?;
-                let main = super::Expr::decode(buf.skip(24))?;
+                let main = super::Expr::decode(buf.skip(32))?;
                 Ok(Binding { id, expr, main })
             }
         }
@@ -1513,7 +1521,7 @@ pub mod ir {
         }
         impl crate::Layout for TyDef {
             fn head_size() -> usize {
-                184
+                248
             }
         }
 
@@ -1532,12 +1540,20 @@ pub mod ir {
                 let kind = self.kind.encode_head(buf);
                 let layout = self.layout.encode_head(buf);
                 let name = self.name.encode_head(buf);
-                TyHeadPtr { kind, layout, name }
+                let variants_recursive = self.variants_recursive.encode_head(buf);
+                TyHeadPtr {
+                    kind,
+                    layout,
+                    name,
+                    variants_recursive,
+                }
             }
             fn encode_body(&self, head: Self::HeadPtr, buf: &mut crate::bytes::BytesMut) {
                 self.kind.encode_body(head.kind, buf);
                 self.layout.encode_body(head.layout, buf);
                 self.name.encode_body(head.name, buf);
+                self.variants_recursive
+                    .encode_body(head.variants_recursive, buf);
             }
         }
         #[allow(non_camel_case_types)]
@@ -1545,10 +1561,11 @@ pub mod ir {
             kind: <super::TyKind as crate::Encode>::HeadPtr,
             layout: <core::option::Option<super::TyLayout> as crate::Encode>::HeadPtr,
             name: <core::option::Option<crate::string::String> as crate::Encode>::HeadPtr,
+            variants_recursive: <crate::vec::Vec<u16> as crate::Encode>::HeadPtr,
         }
         impl crate::Layout for Ty {
             fn head_size() -> usize {
-                120
+                184
             }
         }
 
@@ -1557,7 +1574,13 @@ pub mod ir {
                 let kind = super::TyKind::decode(buf.skip(0))?;
                 let layout = core::option::Option::<super::TyLayout>::decode(buf.skip(5))?;
                 let name = core::option::Option::<crate::string::String>::decode(buf.skip(10))?;
-                Ok(Ty { kind, layout, name })
+                let variants_recursive = crate::vec::Vec::<u16>::decode(buf.skip(15))?;
+                Ok(Ty {
+                    kind,
+                    layout,
+                    name,
+                    variants_recursive,
+                })
             }
         }
 
@@ -1569,36 +1592,35 @@ pub mod ir {
                 match self {
                     Self::Primitive(inner) => {
                         w.put_slice(&[0]);
-                        let inner_head_ptr = inner.encode_head(w);
-                        let r = TyKindHeadPtr::Primitive(crate::boxed::Box::new(inner_head_ptr));
-                        w.put_bytes(0, 3);
+                        let head_ptr = crate::ReversePointer::new(w);
+                        let r = TyKindHeadPtr::Primitive(head_ptr);
                         r
                     }
-                    Self::Tuple(_) => {
+                    Self::Tuple(inner) => {
                         w.put_slice(&[1]);
                         let head_ptr = crate::ReversePointer::new(w);
                         let r = TyKindHeadPtr::Tuple(head_ptr);
                         r
                     }
-                    Self::Array(_) => {
+                    Self::Array(inner) => {
                         w.put_slice(&[2]);
                         let head_ptr = crate::ReversePointer::new(w);
                         let r = TyKindHeadPtr::Array(head_ptr);
                         r
                     }
-                    Self::Enum(_) => {
+                    Self::Enum(inner) => {
                         w.put_slice(&[3]);
                         let head_ptr = crate::ReversePointer::new(w);
                         let r = TyKindHeadPtr::Enum(head_ptr);
                         r
                     }
-                    Self::Function(_) => {
+                    Self::Function(inner) => {
                         w.put_slice(&[4]);
                         let head_ptr = crate::ReversePointer::new(w);
                         let r = TyKindHeadPtr::Function(head_ptr);
                         r
                     }
-                    Self::Ident(_) => {
+                    Self::Ident(inner) => {
                         w.put_slice(&[5]);
                         let head_ptr = crate::ReversePointer::new(w);
                         let r = TyKindHeadPtr::Ident(head_ptr);
@@ -1609,10 +1631,12 @@ pub mod ir {
             fn encode_body(&self, head: TyKindHeadPtr, w: &mut crate::bytes::BytesMut) {
                 match self {
                     Self::Primitive(inner) => {
-                        let TyKindHeadPtr::Primitive(inner_head_ptr) = head else {
+                        let TyKindHeadPtr::Primitive(offset_ptr) = head else {
                             unreachable!()
                         };
-                        inner.encode_body(*inner_head_ptr, w);
+                        offset_ptr.write_cur_len(w);
+                        let inner_head_ptr = inner.encode_head(w);
+                        inner.encode_body(inner_head_ptr, w);
                     }
                     Self::Tuple(inner) => {
                         let TyKindHeadPtr::Tuple(offset_ptr) = head else {
@@ -1660,7 +1684,7 @@ pub mod ir {
         #[allow(non_camel_case_types, dead_code)]
         pub enum TyKindHeadPtr {
             None,
-            Primitive(crate::boxed::Box<<super::TyPrimitive as crate::Encode>::HeadPtr>),
+            Primitive(crate::ReversePointer),
             Tuple(crate::ReversePointer),
             Array(crate::ReversePointer),
             Enum(crate::ReversePointer),
@@ -1681,7 +1705,8 @@ pub mod ir {
                 let buf = buf.skip(1);
                 Ok(match tag {
                     0 => {
-                        let inner = super::TyPrimitive::decode(buf)?;
+                        let offset = u32::from_le_bytes(buf.read_const::<4>());
+                        let inner = super::TyPrimitive::decode(buf.skip(offset as usize))?;
                         TyKind::Primitive(inner)
                     }
                     1 => {
@@ -1813,7 +1838,7 @@ pub mod ir {
         }
         impl crate::Layout for TyTupleField {
             fn head_size() -> usize {
-                160
+                224
             }
         }
 
@@ -1845,7 +1870,7 @@ pub mod ir {
         }
         impl crate::Layout for TyEnumVariant {
             fn head_size() -> usize {
-                184
+                248
             }
         }
 
@@ -1863,29 +1888,24 @@ pub mod ir {
             fn encode_head(&self, buf: &mut crate::bytes::BytesMut) -> Self::HeadPtr {
                 let head_size = self.head_size.encode_head(buf);
                 let body_ptrs = self.body_ptrs.encode_head(buf);
-                let variants_recursive = self.variants_recursive.encode_head(buf);
                 TyLayoutHeadPtr {
                     head_size,
                     body_ptrs,
-                    variants_recursive,
                 }
             }
             fn encode_body(&self, head: Self::HeadPtr, buf: &mut crate::bytes::BytesMut) {
                 self.head_size.encode_body(head.head_size, buf);
                 self.body_ptrs.encode_body(head.body_ptrs, buf);
-                self.variants_recursive
-                    .encode_body(head.variants_recursive, buf);
             }
         }
         #[allow(non_camel_case_types)]
         pub struct TyLayoutHeadPtr {
             head_size: <u32 as crate::Encode>::HeadPtr,
             body_ptrs: <crate::vec::Vec<u32> as crate::Encode>::HeadPtr,
-            variants_recursive: <crate::vec::Vec<u16> as crate::Encode>::HeadPtr,
         }
         impl crate::Layout for TyLayout {
             fn head_size() -> usize {
-                160
+                96
             }
         }
 
@@ -1893,11 +1913,9 @@ pub mod ir {
             fn decode(buf: &[u8]) -> crate::Result<Self> {
                 let head_size = u32::decode(buf.skip(0))?;
                 let body_ptrs = crate::vec::Vec::<u32>::decode(buf.skip(4))?;
-                let variants_recursive = crate::vec::Vec::<u16>::decode(buf.skip(12))?;
                 Ok(TyLayout {
                     head_size,
                     body_ptrs,
-                    variants_recursive,
                 })
             }
         }
@@ -1922,7 +1940,7 @@ pub mod ir {
         }
         impl crate::Layout for TyFunction {
             fn head_size() -> usize {
-                184
+                248
             }
         }
 
@@ -2021,19 +2039,19 @@ pub mod ir {
             type HeadPtr = DeclHeadPtr;
             fn encode_head(&self, w: &mut crate::bytes::BytesMut) -> DeclHeadPtr {
                 match self {
-                    Self::Module(_) => {
+                    Self::Module(inner) => {
                         w.put_slice(&[0]);
                         let head_ptr = crate::ReversePointer::new(w);
                         let r = DeclHeadPtr::Module(head_ptr);
                         r
                     }
-                    Self::Type(_) => {
+                    Self::Type(inner) => {
                         w.put_slice(&[1]);
                         let head_ptr = crate::ReversePointer::new(w);
                         let r = DeclHeadPtr::Type(head_ptr);
                         r
                     }
-                    Self::Var(_) => {
+                    Self::Var(inner) => {
                         w.put_slice(&[2]);
                         let head_ptr = crate::ReversePointer::new(w);
                         let r = DeclHeadPtr::Var(head_ptr);

@@ -59,7 +59,6 @@ fn array_01() {
     ];
 
     let output_ty = lutra_compiler::_test_compile_ty("[int64]");
-    let output_ty = ir::Ty::from(output_ty);
 
     insta::assert_snapshot!(_test_array_writer(items, &output_ty), @r#"
     [
@@ -91,7 +90,6 @@ fn array_02() {
     let items = vec![data1, data2, data3, data4];
 
     let output_ty = lutra_compiler::_test_compile_ty("[text]");
-    let output_ty = ir::Ty::from(output_ty);
 
     insta::assert_snapshot!(_test_array_writer(items, &output_ty), @r#"
     [
@@ -118,7 +116,6 @@ fn tuple_01() {
     ];
 
     let output_ty = lutra_compiler::_test_compile_ty("{int64, text, int64}");
-    let output_ty = ir::Ty::from(output_ty);
 
     insta::assert_snapshot!(_test_tuple_writer(fields, &output_ty), @r#"
     {
@@ -136,7 +133,6 @@ fn tuple_01() {
 fn enum_01() {
     let output_ty =
         lutra_compiler::_test_compile_ty("enum {Done, Pending = int16, Cancelled = text}");
-    let output_ty = ir::Ty::from(output_ty);
 
     insta::assert_snapshot!(_test_enum_writer(0, Data::new(vec![]), &output_ty), @r#"
     Done
@@ -196,7 +192,6 @@ fn enum_02() {
 
     let output_ty =
         lutra_compiler::_test_compile_ty("[enum {Done, Pending = int16, Cancelled = text}]");
-    let output_ty = ir::Ty::from(output_ty);
 
     // done
     let item_0 = Data::new(vec![0, 0, 0, 0, 0]);

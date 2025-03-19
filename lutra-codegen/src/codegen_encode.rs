@@ -20,11 +20,11 @@ pub fn write_encode_impls(
     writeln!(w, "use {}::bytes::BufMut;", ctx.options.lutra_bin_path)?;
     writeln!(w, "use super::*;\n")?;
 
-    ctx.current_module.push("impls".into());
+    ctx.current_rust_mod.push("impls".into());
     for ty in tys {
         write_ty_def_impl(w, ty, ctx)?;
     }
-    ctx.current_module.pop();
+    ctx.current_rust_mod.pop();
 
     ctx.def_buffer.clear(); // all defs must have been already generated
 
@@ -254,7 +254,7 @@ fn write_ty_def_impl(
     let head_size = &ty
         .layout
         .as_ref()
-        .unwrap_or_else(|| panic!("ty is missing layout: {ty:?}"))
+        .unwrap_or_else(|| panic!("ty is missing layout: {}", lutra_bin::ir::print_ty(ty)))
         .head_size;
     writeln!(w, "impl {lutra_bin}::Layout for {name} {{")?;
     writeln!(w, "    fn head_size() -> usize {{")?;

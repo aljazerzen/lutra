@@ -1,8 +1,7 @@
 use itertools::Itertools;
 
-use crate::diagnostic::{Diagnostic, WithErrorInfo};
+use crate::diagnostic::Diagnostic;
 use crate::pr::{self, *};
-use crate::printer;
 use crate::Result;
 
 use super::TypeResolver;
@@ -112,12 +111,6 @@ impl TypeResolver<'_> {
         };
         let mut ty = Ty::new(kind);
         ty.span = expr.span;
-        let missing_layout = self.compute_ty_layout(&mut ty)?;
-        if missing_layout {
-            return Err(Diagnostic::new_assert("missing type layout")
-                .push_hint(format!("ty: {}", printer::print_ty(&ty)))
-                .with_span(ty.span));
-        }
         Ok(ty)
     }
 

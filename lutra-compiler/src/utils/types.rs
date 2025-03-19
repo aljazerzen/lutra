@@ -41,26 +41,3 @@ impl fold::PrFold for TypeReplacer {
         }
     }
 }
-pub struct TypeLayoutResolver {}
-
-impl TypeLayoutResolver {
-    #[tracing::instrument(name = "TypeLayoutResolverSimple", skip_all)]
-    pub fn on_expr(expr: pr::Expr) -> pr::Expr {
-        TypeLayoutResolver {}.fold_expr(expr).unwrap()
-    }
-
-    #[tracing::instrument(name = "TypeLayoutResolverSimple", skip_all)]
-    pub fn on_func(func: pr::Func) -> Result<pr::Func> {
-        TypeLayoutResolver {}.fold_func(func)
-    }
-}
-
-impl fold::PrFold for TypeLayoutResolver {
-    fn fold_type(&mut self, ty: pr::Ty) -> Result<pr::Ty> {
-        let mut ty = fold::fold_type(self, ty).unwrap();
-        if ty.layout.is_none() {
-            ty.layout = ty.kind.get_layout_simple();
-        }
-        Ok(ty)
-    }
-}

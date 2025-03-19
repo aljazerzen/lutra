@@ -5,4 +5,4 @@ mod types;
 
 pub use id_gen::IdGenerator;
 pub use toposort::toposort;
-pub use types::{TypeLayoutResolver, TypeReplacer};
+pub use types::TypeReplacer;

@@ -146,8 +146,8 @@ impl fold::PrFold for super::TypeResolver<'_> {
     }
 
     fn fold_type(&mut self, ty: Ty) -> Result<Ty> {
-        // fold inner containers
-        let mut ty = match ty.kind {
+        let ty = match ty.kind {
+            // open a new scope for functions
             pr::TyKind::Function(ty_func) if self.scopes.is_empty() => {
                 let mut scope = Scope::new();
                 scope.insert_generics_params(&ty_func.ty_params);
@@ -160,23 +160,10 @@ impl fold::PrFold for super::TypeResolver<'_> {
                     ..ty
                 }
             }
+
+            // normal fold
             _ => fold::fold_type(self, ty)?,
         };
-
-        // compute memory layout
-        let missing_layout = self.compute_ty_layout(&mut ty)?;
-        if missing_layout {
-            if self.strict_mode {
-                return Err(Diagnostic::new_custom(
-                    "type has an infinite size due to recursive type references".to_string(),
-                )
-                .push_hint("add an array or an enum onto the path of recursion")
-                .with_span(ty.span));
-            } else {
-                self.strict_mode_needed = true;
-            }
-        }
-
         Ok(ty)
     }
 }

@@ -45,10 +45,6 @@ impl TypeResolver<'_> {
         let mapping = scope.finalize_type_args().with_span(func.body.span)?;
         let func = utils::TypeReplacer::on_func(*func, mapping);
 
-        // fold again, but only for computing layouts
-        // (before type arg finalization, some layouts might have not been able to compute)
-        let func = utils::TypeLayoutResolver::on_func(func)?;
-
         Ok(Box::new(func))
     }
 

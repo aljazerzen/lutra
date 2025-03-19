@@ -397,11 +397,7 @@ fn new_bin_op(left: cr::Expr, op: &str, right: cr::Expr, ty: ir::TyPrimitive) ->
     let kind = cr::ExprKind::FuncCall(op.to_string(), vec![left, right]);
     cr::Expr {
         kind,
-        ty: ir::Ty {
-            kind: ir::TyKind::Primitive(ty),
-            name: None,
-            layout: None,
-        },
+        ty: ir::Ty::new(ty),
     }
 }
 
@@ -409,11 +405,7 @@ fn new_int(int: i64) -> cr::Expr {
     let kind = cr::ExprKind::Literal(ir::Literal::Int(int));
     cr::Expr {
         kind,
-        ty: ir::Ty {
-            kind: ir::TyKind::Primitive(ir::TyPrimitive::int64),
-            name: None,
-            layout: None,
-        },
+        ty: ir::Ty::new(ir::TyPrimitive::int64),
     }
 }
 

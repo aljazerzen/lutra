@@ -12,13 +12,6 @@ pub struct Ty {
 
     /// Name inferred from the type's declaration.
     pub name: Option<String>,
-
-    pub layout: Option<TyLayout>,
-
-    /// For enums, indexes of variants that contain recursive
-    /// (transitive) references to self. This is used to determine
-    /// if a variant needs a Box in Rust.
-    pub variants_recursive: Vec<u16>,
 }
 
 /// Memory layout of a type.
@@ -56,92 +49,6 @@ pub enum TyKind {
     // /// Tuples that have fields of `base` tuple, but don't have fields of `except` tuple.
     // /// Implies that `base` has all fields of `except`.
     // Exclude { base: Box<Ty>, except: Box<Ty> },
-}
-
-impl TyKind {
-    // Keep in sync with [lutra_bin::layout::get_layout_simple]
-    pub fn get_layout_simple(&self) -> Option<TyLayout> {
-        let head_size = match self {
-            TyKind::Primitive(prim) => match prim {
-                TyPrimitive::bool => 8,
-                TyPrimitive::int8 => 8,
-                TyPrimitive::int16 => 16,
-                TyPrimitive::int32 => 32,
-                TyPrimitive::int64 => 64,
-                TyPrimitive::uint8 => 8,
-                TyPrimitive::uint16 => 16,
-                TyPrimitive::uint32 => 32,
-                TyPrimitive::uint64 => 64,
-                TyPrimitive::float32 => 32,
-                TyPrimitive::float64 => 64,
-                TyPrimitive::text => 64,
-            },
-            TyKind::Array(_) => 64,
-
-            TyKind::Tuple(fields) => {
-                let mut size = 0;
-                for f in fields {
-                    if let Some(layout) = &f.ty.layout {
-                        size += layout.head_size;
-                    } else {
-                        return None;
-                    }
-                }
-                size
-            }
-            TyKind::Enum(variants) => {
-                let variants: Vec<_> = variants
-                    .iter()
-                    .cloned()
-                    .map(lutra_bin::ir::TyEnumVariant::from)
-                    .collect();
-
-                let head = lutra_bin::layout::enum_head_format(&variants);
-                (head.tag_bytes + head.inner_bytes) * 8
-            }
-            _ => return None,
-        };
-        let body_ptrs: Vec<u32> = match self {
-            TyKind::Primitive(TyPrimitive::text) => vec![0],
-            TyKind::Array(_) => vec![0],
-            TyKind::Enum(_) => {
-                vec![]
-                //let variants: Vec<_> = variants
-                //    .iter()
-                //    .cloned()
-                //    .map(lutra_bin::ir::TyEnumVariant::from)
-                //    .collect();
-                //let head = lutra_bin::layout::enum_head_format(&variants);
-                //if head.inner_bytes < 4 {
-                //    vec![]
-                //} else {
-                //    // TODO: this is not true for all variants
-                //    // There might be one variant that is inline
-                //    // and one that is not.
-                //    // TyLayout will have to be expaned to accomodate this.
-                //    vec![head.tag_bytes]
-                //}
-            }
-
-            TyKind::Tuple(fields) => {
-                let mut r = Vec::new();
-                let mut field_start = 0;
-                for f in fields {
-                    let layout = f.ty.layout.as_ref().unwrap();
-                    r.extend(layout.body_ptrs.iter().map(|p| p + field_start));
-                    field_start += layout.head_size.div_ceil(8);
-                }
-                r
-            }
-            TyKind::Primitive(_) => vec![],
-
-            _ => return None,
-        };
-        Some(TyLayout {
-            head_size,
-            body_ptrs,
-        })
-    }
 }
 
 #[derive(Debug, Clone, PartialEq, Hash)]
@@ -219,8 +126,6 @@ impl Ty {
             kind: kind.into(),
             span: None,
             name: None,
-            layout: None,
-            variants_recursive: Vec::new(),
         }
     }
 
@@ -229,8 +134,6 @@ impl Ty {
             kind: kind.into(),
             span: Some(span),
             name: None,
-            layout: None,
-            variants_recursive: Vec::new(),
         }
     }
 

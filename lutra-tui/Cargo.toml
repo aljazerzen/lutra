@@ -13,5 +13,4 @@ crossterm = "0.28.0"
 ratatui = "0.29.0"
 lutra-compiler = { path = "../lutra-compiler" }
 lutra-bin = { path = "../lutra-bin" }
-lutra-ir = { path = "../lutra-ir" }
 lutra-runtime = { path = "../lutra-runtime" }

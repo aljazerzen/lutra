@@ -33,6 +33,7 @@ impl Ty {
             kind: kind.into(),
             layout: None,
             name: None,
+            variants_recursive: vec![],
         }
     }
 }
@@ -65,6 +66,7 @@ impl Module {
         }
 
         if path.len() == 1 {
+            self.decls.retain(|d| d.name != path[0]);
             self.decls.push(ModuledeclsItems {
                 name: path[0].clone(),
                 decl,
@@ -99,6 +101,16 @@ impl Module {
                 .collect::<vec::Vec<_>>(),
             _ => {
                 vec![(Path(vec![item.name.clone()]), &item.decl)]
+            }
+        })
+    }
+
+    pub fn iter_types_re(&self) -> impl Iterator<Item = (Path, &Ty)> {
+        self.iter_decls_re().filter_map(|(p, d)| {
+            if let Decl::Type(ty) = d {
+                Some((p, ty))
+            } else {
+                None
             }
         })
     }

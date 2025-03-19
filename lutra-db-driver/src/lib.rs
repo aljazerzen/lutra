@@ -51,18 +51,10 @@ fn get_stmt_result_ty(stmt: &tokio_postgres::Statement) -> lutra_bin::ir::Ty {
         })
         .collect();
 
-    let mut tuple = ir::Ty {
-        kind: ir::TyKind::Tuple(fields),
-        name: None,
-        layout: None,
-    };
+    let mut tuple = ir::Ty::new(ir::TyKind::Tuple(fields));
     tuple.layout = lutra_bin::layout::get_layout_simple(&tuple);
 
-    let mut array = ir::Ty {
-        kind: ir::TyKind::Array(Box::new(tuple)),
-        name: None,
-        layout: None,
-    };
+    let mut array = ir::Ty::new(ir::TyKind::Array(Box::new(tuple)));
     array.layout = lutra_bin::layout::get_layout_simple(&array);
     array
 }
@@ -80,11 +72,7 @@ fn pg_ty_to_ir(ty: &pg_ty::Type) -> lutra_bin::ir::Ty {
         "json" => ir::TyKind::Primitive(ir::TyPrimitive::text),
         _ => todo!("pg type: {}", ty.name()),
     };
-    let mut ty = lutra_bin::ir::Ty {
-        kind,
-        layout: None,
-        name: None,
-    };
+    let mut ty = lutra_bin::ir::Ty::new(kind);
     ty.layout = lutra_bin::layout::get_layout_simple(&ty);
     ty
 }

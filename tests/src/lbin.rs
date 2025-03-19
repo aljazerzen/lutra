@@ -7,7 +7,6 @@ use std::sync::OnceLock;
 
 use insta::assert_snapshot;
 use lutra_bin::{ir, Decode, Encode, Value};
-use lutra_compiler::{pr, Project};
 
 #[track_caller]
 fn _test_encode_decode<T: Encode + Decode + std::fmt::Debug>(value: Value, ty: &ir::Ty) -> String {
@@ -41,7 +40,7 @@ fn _test_encode_decode<T: Encode + Decode + std::fmt::Debug>(value: Value, ty: &
     pretty_hex::pretty_hex(&buf)
 }
 
-static SCHEMA: OnceLock<Project> = OnceLock::new();
+static SCHEMA: OnceLock<ir::Module> = OnceLock::new();
 
 #[track_caller]
 fn _test_get_type(name: &'static str) -> ir::Ty {
@@ -49,14 +48,18 @@ fn _test_get_type(name: &'static str) -> ir::Ty {
         let source = include_str!("../lutra/bin.lt");
         let source = lutra_compiler::SourceTree::single("".into(), source.into());
 
-        lutra_compiler::compile(source, lutra_compiler::CompileParams {})
-            .unwrap_or_else(|e| panic!("{e}"))
+        let project = lutra_compiler::compile(source, lutra_compiler::CompileParams {})
+            .unwrap_or_else(|e| panic!("{e}"));
+
+        let module = lutra_compiler::lower_type_defs(&project.root_module);
+        lutra_compiler::layouter::on_root_module(module)
     });
 
-    let name = pr::Path::from_name(name);
-    let decl = project.root_module.module.get(&name).unwrap();
-    let ty = decl.kind.as_ty().unwrap();
-    lutra_bin::ir::Ty::from(ty.clone())
+    let decl = project.decls.iter().find(|d| d.name == name).unwrap();
+    let ir::Decl::Type(ty) = &decl.decl else {
+        panic!()
+    };
+    ty.clone()
 }
 
 #[test]

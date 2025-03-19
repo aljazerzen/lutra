@@ -15,7 +15,6 @@ test = false
 [dependencies]
 lutra-bin = { path = "../lutra-bin" }
 lutra-compiler = { path = "../lutra-compiler", features = ["clap"] }
-lutra-ir = { path = "../lutra-ir" }
 lutra-runtime = { path = "../lutra-runtime" }
 
 tracing = { workspace = true }

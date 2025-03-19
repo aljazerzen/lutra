@@ -18,6 +18,7 @@ pub fn lower_expr(root_module: &decl::RootModule, main: &pr::Expr) -> ir::Progra
     let main = lowerer.lower_var_bindings(main);
 
     let types = lowerer.lower_ty_defs();
+    let types = order_ty_defs(types, root_module);
 
     ir::Program { main, types }
 }
@@ -29,6 +30,7 @@ pub fn lower_var(root_module: &decl::RootModule, path: &pr::Path) -> ir::Program
     let main = lowerer.lower_var_bindings(main);
 
     let types = lowerer.lower_ty_defs();
+    let types = order_ty_defs(types, root_module);
 
     ir::Program { main, types }
 }
@@ -107,7 +109,6 @@ impl<'a> Lowerer<'a> {
                     mapping.insert(pr::Path::new(vec!["scope", param.name.as_str()]), arg);
                 }
                 expr = utils::TypeReplacer::on_expr(expr, mapping);
-                expr = utils::TypeLayoutResolver::on_expr(expr);
             }
         }
 
@@ -289,8 +290,8 @@ impl<'a> Lowerer<'a> {
         ty
     }
 
-    fn lower_ty_defs(&mut self) -> Vec<ir::TyDef> {
-        let mut defs = Vec::with_capacity(self.type_defs_needed.len());
+    fn lower_ty_defs(&mut self) -> HashMap<pr::Path, ir::Ty> {
+        let mut defs = HashMap::with_capacity(self.type_defs_needed.len());
         let mut names_done = HashSet::new();
 
         while let Some(path) = self.type_defs_needed.pop_front() {
@@ -303,10 +304,7 @@ impl<'a> Lowerer<'a> {
 
             let ty = self.lower_ty(ty);
 
-            defs.push(ir::TyDef {
-                name: ir::Path(path.clone().into_iter().collect()),
-                ty,
-            });
+            defs.insert(path.clone(), ty);
             names_done.insert(path);
         }
 
@@ -366,8 +364,27 @@ pub fn lower_type_defs(root_module: &decl::RootModule) -> ir::Module {
     }
 
     let types = lowerer.lower_ty_defs();
+    let types = order_ty_defs(types, root_module);
     for ty in types {
         module.insert(&ty.name.0, ir::Decl::Type(ty.ty));
     }
     module
+}
+
+fn order_ty_defs(
+    mut by_name: HashMap<pr::Path, ir::Ty>,
+    root_module: &decl::RootModule,
+) -> Vec<ir::TyDef> {
+    let mut r = Vec::with_capacity(by_name.len());
+    for group in &root_module.ordering {
+        for p in group {
+            if let Some(ty) = by_name.remove(p) {
+                r.push(ir::TyDef {
+                    name: ir::Path(p.clone().into_iter().collect()),
+                    ty,
+                });
+            }
+        }
+    }
+    r
 }
