@@ -1,6 +1,7 @@
 use crate::string::ToString;
 use crate::{boxed, string, vec};
 
+mod decode;
 mod encode;
 mod fold;
 mod print_pretty;

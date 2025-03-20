@@ -135,18 +135,17 @@ pub fn get_layout_simple(ty: &ir::Ty) -> Option<ir::TyLayout> {
         ir::TyKind::Primitive(_) => vec![],
 
         ir::TyKind::Array(_) => vec![0],
-        ir::TyKind::Enum(_variants) => {
-            vec![]
-            // let head = enum_head_format(variants);
-            // if head.inner_bytes < 4 {
-            //     vec![]
-            // } else {
-            //     // TODO: this is not true for all variants
-            //     // There might be one variant that is inline
-            //     // and one that is not.
-            //     // TyLayout will have to be expaned to accomodate this.
-            //     vec![head.tag_bytes]
-            // }
+        ir::TyKind::Enum(variants) => {
+            let head = enum_head_format(variants);
+            if head.inner_bytes < 4 {
+                // inline
+                // here we should include body_ptrs in the head of inner type,
+                // but no type with a ptr fits into 4 bytes, so we can just skip
+                // that and assume there are no body_ptrs
+                vec![]
+            } else {
+                vec![head.tag_bytes]
+            }
         }
 
         ir::TyKind::Tuple(fields) => {

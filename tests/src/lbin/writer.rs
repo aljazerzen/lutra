@@ -186,7 +186,6 @@ fn enum_01() {
 }
 
 #[test]
-#[ignore] // enum body_ptr are not set correctly
 fn enum_02() {
     // put an enum into an array, to test that body_ptrs are correct
 
@@ -197,25 +196,42 @@ fn enum_02() {
     let item_0 = Data::new(vec![0, 0, 0, 0, 0]);
 
     // int16
-    let item_1 = Data::new(vec![1, 42, 0, 0, 0]);
+    let item_1 = Data::new(vec![1, 4, 0, 0, 0, 42, 0, 0, 0]);
 
     // int16 (followed by the body of text)
-    let item_2 = Data::new(vec![1, 1, 1, 0, 0, 65, 66, 65, 66]);
+    let item_2 = Data::new(vec![1, 4, 0, 0, 0, 1, 1, 0, 0, 65, 66, 65, 66]);
 
     // text
     let item_3 = Data::new(vec![2, 4, 0, 0, 0, 8, 0, 0, 0, 4, 0, 0, 0, 65, 66, 65, 66]);
 
     // text (contains int between its head and body)
     let item_4 = Data::new(vec![
-        2, 4, 0, 0, 0, 0x10, 0, 0, 0, 4, 0, 0, 0, 42, 0, 0, 0, 0, 0, 0, 0, 65, 66, 65, 66,
+        2, 4, 0, 0, 0, 0x10, 0, 0, 0, 3, 0, 0, 0, 42, 0, 0, 0, 0, 0, 0, 0, 65, 66, 65,
     ]);
 
     let items = vec![item_0, item_1, item_2, item_3, item_4];
 
     insta::assert_snapshot!(_test_array_writer(items, &output_ty), @r#"
-    Length: 33 (0x21) bytes
-    0000:   08 00 00 00  05 00 00 00  00 00 00 00  00 01 2a 00   ..............*.
-    0010:   00 00 01 01  01 00 00 02  04 00 00 00  02 04 00 00   ................
-    0020:   00                                                   .
+    [
+      Done,
+      Pending(
+        42
+      ),
+      Pending(
+        257
+      ),
+      Cancelled(
+        "ABAB"
+      ),
+      Cancelled(
+        "ABA"
+      ),
+    ]
+    Length: 80 (0x50) bytes
+    0000:   08 00 00 00  05 00 00 00  00 18 00 00  00 01 17 00   ................
+    0010:   00 00 01 16  00 00 00 02  19 00 00 00  02 20 00 00   ............. ..
+    0020:   00 00 00 00  00 2a 00 00  00 01 01 00  00 41 42 41   .....*.......ABA
+    0030:   42 08 00 00  00 04 00 00  00 41 42 41  42 10 00 00   B........ABAB...
+    0040:   00 03 00 00  00 2a 00 00  00 00 00 00  00 41 42 41   .....*.......ABA
     "#);
 }
