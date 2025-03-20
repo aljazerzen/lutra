@@ -455,3 +455,57 @@ fn type_annotation_02() {
         @"[bool]"
     );
 }
+
+#[test]
+fn primitives() {
+    insta::assert_snapshot!(
+        _test_run(
+            "
+            let x: func (): {
+                bool,
+                int8,
+                int16,
+                int32,
+                int64,
+                uint8,
+                uint16,
+                uint32,
+                uint64,
+                float32,
+                float64,
+                text,   
+            }
+            let main = func () -> x()
+            "
+        ),
+        @"{bool, int8, int16, int32, int64, uint8, uint16, uint32, uint64, float32, float64, text}"
+    );
+}
+
+#[test]
+fn enums_00() {
+    insta::assert_snapshot!(
+        _test_run(
+            "
+            type Status = enum { Done, Pending = text }
+
+            let main = func () -> Status::Done
+            "
+        ),
+        @"[bool]"
+    );
+}
+
+#[test]
+fn enums_01() {
+    insta::assert_snapshot!(
+        _test_run(
+            r#"
+            type Status = enum { Done, Pending = text }
+
+            let main = func () -> Status::Pending("hello")
+            "#
+        ),
+        @"[bool]"
+    );
+}

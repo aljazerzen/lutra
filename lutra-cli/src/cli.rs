@@ -8,7 +8,7 @@ fn main() {
     if action.verbose {
         tracing_subscriber::fmt::Subscriber::builder()
             .without_time()
-            .with_max_level(tracing::Level::DEBUG)
+            .with_max_level(tracing::Level::TRACE)
             .with_writer(std::io::stderr)
             .init();
     }

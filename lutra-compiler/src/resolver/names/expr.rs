@@ -124,7 +124,7 @@ impl fold::PrFold for NameResolver<'_> {
 
 impl NameResolver<'_> {
     /// Returns resolved fully-qualified ident
-    fn resolve_ident(&mut self, mut ident: pr::Path) -> Result<pr::Path> {
+    fn resolve_ident(&mut self, ident: pr::Path) -> Result<pr::Path> {
         for (up, scope) in self.scopes.iter().rev().enumerate() {
             if let Some((position, scoped)) = scope.get(ident.first()) {
                 // match: this ident is a param ref
@@ -148,49 +148,91 @@ impl NameResolver<'_> {
             }
         }
 
-        // find module
-        let mod_fq_path = match ident.first() {
-            "project" => {
-                ident.pop_front();
-                vec![]
-            }
-            "module" => {
-                ident.pop_front();
-                self.decl_module_path.to_vec()
-            }
+        // find lookup base
+        let steps = ident.full_path();
+        let (base_path, steps) = match ident.first() {
+            "project" => (vec![], &steps[1..]),
+            "module" => (self.decl_module_path.to_vec(), &steps[1..]),
             "super" => {
-                ident.pop_front();
-
                 let mut path = self.decl_module_path.to_vec();
                 path.pop();
-                path
+                (path, &steps[1..])
             }
-
-            "int" | "float" | "text" | "bool" => vec![],
-
-            NS_STD => {
-                ident.pop_front();
-                vec![NS_STD.to_string()]
-            }
-
-            _ => self.decl_module_path.to_vec(),
+            NS_STD => (vec![NS_STD.to_string()], &steps[1..]),
+            _ => (self.decl_module_path.to_vec(), steps),
         };
-        let mod_decl = self.root.module.get_submodule_mut(&mod_fq_path);
+        let base_decl = self.root.module.get_submodule(&base_path);
 
-        let decl = mod_decl.and_then(|module| module.get(&ident));
-        if decl.is_none() {
+        let found = base_decl.map_or(false, |module| module_lookup_steps(module, steps));
+        if !found {
             tracing::debug!("scopes: {:?}", self.scopes);
             return Err(Diagnostic::new_custom(format!("unknown name {ident}")));
         }
 
         // prepend the ident with the module path
         // this will make this ident a fully-qualified ident
-        let mut fq_ident = mod_fq_path;
-        fq_ident.extend(ident);
-        let fq_ident = pr::Path::new(fq_ident);
+        let mut fq_ident = pr::Path::new(base_path);
+        for step in steps {
+            fq_ident.push(step.clone());
+        }
 
         self.refs.push(fq_ident.clone());
 
         Ok(fq_ident)
+    }
+}
+
+/// Returns true if ok
+fn module_lookup_steps(module: &decl::Module, steps: &[String]) -> bool {
+    if steps.is_empty() {
+        // references to modules do not mean anything
+        // TODO: a better err message
+        return false;
+    }
+
+    let Some(decl) = module.names.get(&steps[0]) else {
+        // name does not exist
+        return false;
+    };
+
+    match &decl.kind {
+        // recurse into submodules
+        decl::DeclKind::Module(sub_module) => module_lookup_steps(sub_module, &steps[1..]),
+
+        // resolve refs into types
+        decl::DeclKind::Unresolved(Some(stmt)) => stmt_lookup_steps(stmt, &steps[1..]),
+        decl::DeclKind::Unresolved(None) => {
+            // recursive lookup into self (we take node out of Unresolved during name resolution)
+
+            if steps.len() == 1 {
+                return true;
+            } else {
+                // ???
+                todo!()
+            }
+        }
+        _ => unreachable!(),
+    }
+}
+
+fn stmt_lookup_steps(stmt: &pr::StmtKind, steps: &[String]) -> bool {
+    if steps.is_empty() {
+        return true;
+    }
+
+    // a single step is allowed
+    if steps.len() > 1 {
+        return false;
+    }
+
+    // into type enum declarations (referring to variants)
+    match stmt {
+        pr::StmtKind::VarDef(_) => false,
+        pr::StmtKind::TypeDef(ty_def) => match &ty_def.ty.kind {
+            pr::TyKind::Enum(variants) => variants.iter().any(|v| v.name == steps[0]),
+            _ => false,
+        },
+        pr::StmtKind::ModuleDef(_) => unreachable!(),
+        pr::StmtKind::ImportDef(_) => false,
     }
 }
