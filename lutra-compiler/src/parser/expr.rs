@@ -1,5 +1,4 @@
 use chumsky::prelude::*;
-use itertools::Itertools;
 
 use crate::parser::interpolation;
 use crate::parser::lexer::TokenKind;
@@ -27,7 +26,7 @@ pub(crate) fn expr() -> impl Parser<TokenKind, Expr, Error = PError> + Clone {
 
         let tuple = tuple(expr.clone());
         let array = array(expr.clone());
-        let pipeline_expr = pipeline(expr.clone()).delimited_by(ctrl('('), ctrl(')'));
+        let pipeline_expr = pipeline(expr.clone());
         let interpolation = interpolation();
         let case = case(expr.clone());
 
@@ -40,12 +39,9 @@ pub(crate) fn expr() -> impl Parser<TokenKind, Expr, Error = PError> + Clone {
             call,
             ident_kind,
             case,
+            pipeline_expr,
         ))
         .map_with_span(Expr::new_with_span)
-        // No longer used given the TODO in `pipeline`; can remove if we
-        // don't resolve.
-        // .or(aliased(expr.clone()))
-        .or(pipeline_expr)
         .boxed();
 
         let term = field_lookup(term);
@@ -142,10 +138,9 @@ fn case<'a>(
         .map(ExprKind::Case)
 }
 
-fn unary<'a, E>(expr: E) -> impl Parser<TokenKind, Expr, Error = PError> + Clone + 'a
-where
-    E: Parser<TokenKind, Expr, Error = PError> + Clone + 'a,
-{
+fn unary<'a>(
+    expr: impl Parser<TokenKind, Expr, Error = PError> + Clone + 'a,
+) -> impl Parser<TokenKind, Expr, Error = PError> + Clone + 'a {
     expr.clone()
         .or(operator_unary()
             .then(expr.map(Box::new))
@@ -154,10 +149,9 @@ where
         .boxed()
 }
 
-fn field_lookup<'a, E>(expr: E) -> impl Parser<TokenKind, Expr, Error = PError> + Clone + 'a
-where
-    E: Parser<TokenKind, Expr, Error = PError> + Clone + 'a,
-{
+fn field_lookup<'a>(
+    expr: impl Parser<TokenKind, Expr, Error = PError> + Clone + 'a,
+) -> impl Parser<TokenKind, Expr, Error = PError> + Clone + 'a {
     expr.then(
         ctrl('.')
             .ignore_then(choice((
@@ -176,10 +170,9 @@ where
     })
 }
 
-fn range<'a, E>(expr: E) -> impl Parser<TokenKind, Expr, Error = PError> + Clone + 'a
-where
-    E: Parser<TokenKind, Expr, Error = PError> + Clone + 'a,
-{
+fn range<'a>(
+    expr: impl Parser<TokenKind, Expr, Error = PError> + Clone + 'a,
+) -> impl Parser<TokenKind, Expr, Error = PError> + Clone + 'a {
     let end_only = just(TokenKind::Range)
         .ignore_then(expr.clone())
         .map(|end| Range {
@@ -208,30 +201,23 @@ where
 }
 
 /// A pipeline of `expr`, separated by pipes. Doesn't require parentheses.
-pub(crate) fn pipeline<'a, E>(expr: E) -> impl Parser<TokenKind, Expr, Error = PError> + Clone + 'a
-where
-    E: Parser<TokenKind, Expr, Error = PError> + Clone + 'a,
-{
+fn pipeline<'a>(
+    expr: impl Parser<TokenKind, Expr, Error = PError> + Clone + 'a,
+) -> impl Parser<TokenKind, ExprKind, Error = PError> + Clone + 'a {
     // expr has to be a param, because it can be either a normal expr() or a
     // recursive expr called from within expr(), which causes a stack overflow
 
-    // TODO: do we need the `maybe_aliased` here rather than in `expr`? We had
-    // tried `with_doc_comment(expr)` in #4775 (and push an aliased expr into
-    // `expr`) but couldn't get it work.
     expr.separated_by(pipe())
         .at_least(1)
-        .map_with_span(|exprs, span| {
+        .map(|exprs| {
             // If there's only one expr, then we don't need to wrap it
             // in a pipeline — just return the lone expr. Otherwise,
             // wrap them in a pipeline.
-            exprs.into_iter().exactly_one().unwrap_or_else(|exprs| {
-                Expr::new_with_span(
-                    ExprKind::Pipeline(Pipeline {
-                        exprs: exprs.collect(),
-                    }),
-                    span,
-                )
-            })
+            if exprs.len() == 1 {
+                exprs.into_iter().next().unwrap().kind
+            } else {
+                ExprKind::Pipeline(Pipeline { exprs })
+            }
         })
         .recover_with(nested_delimiters(
             TokenKind::Control('('),
@@ -240,8 +226,9 @@ where
                 (TokenKind::Control('['), TokenKind::Control(']')),
                 (TokenKind::Control('('), TokenKind::Control(')')),
             ],
-            |_| Expr::new(ExprKind::Tuple(vec![])),
+            |_| ExprKind::Tuple(vec![]),
         ))
+        .delimited_by(ctrl('('), ctrl(')'))
         .labelled("pipeline")
 }
 
