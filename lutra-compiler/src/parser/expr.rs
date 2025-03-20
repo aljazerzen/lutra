@@ -44,6 +44,8 @@ pub(crate) fn expr() -> impl Parser<TokenKind, Expr, Error = PError> + Clone {
         .map_with_span(Expr::new_with_span)
         .boxed();
 
+        let term = type_annotation(term);
+
         let term = field_lookup(term);
         let term = unary(term);
 
@@ -430,4 +432,25 @@ fn operator_or() -> impl Parser<TokenKind, BinOp, Error = PError> + Clone {
 }
 fn operator_coalesce() -> impl Parser<TokenKind, BinOp, Error = PError> + Clone {
     just(TokenKind::Coalesce).to(BinOp::Coalesce)
+}
+fn type_annotation<'a>(
+    expr: impl Parser<TokenKind, Expr, Error = PError> + 'a,
+) -> impl Parser<TokenKind, Expr, Error = PError> + Clone + 'a {
+    expr.then(
+        ctrl(':')
+            .ignore_then(type_expr())
+            .labelled("type annotation")
+            .or_not(),
+    )
+    .map_with_span(|(expr, ty), span| {
+        if let Some(ty) = ty {
+            let expr = Box::new(expr);
+            let ty = Box::new(ty);
+            let kind = ExprKind::TypeAnnotation(TypeAnnotation { expr, ty });
+            Expr::new_with_span(kind, span)
+        } else {
+            expr
+        }
+    })
+    .boxed()
 }

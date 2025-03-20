@@ -23,6 +23,10 @@ impl TypeResolver<'_> {
 
             ExprKind::FString(_) => TyKind::Primitive(TyPrimitive::text),
 
+            ExprKind::TypeAnnotation(annotation) => {
+                annotation.ty.kind.clone()
+            }
+
             ExprKind::Tuple(fields) => {
                 let mut ty_fields: Vec<TyTupleField> = Vec::with_capacity(fields.len());
 

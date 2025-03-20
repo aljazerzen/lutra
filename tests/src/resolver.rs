@@ -417,3 +417,41 @@ fn empty_array_02() {
         @"[int64]"
     );
 }
+
+#[test]
+fn type_annotation_00() {
+    insta::assert_snapshot!(
+        _test_run(
+            "func () -> 5: int64"
+        ),
+        @"int64"
+    );
+}
+
+#[test]
+fn type_annotation_01() {
+    insta::assert_snapshot!(
+        _test_err(
+            "func () -> 5: text"
+        ),
+        @r#"
+    [E0004] Error: 
+       ╭─[:1:12]
+       │
+     1 │ func () -> 5: text
+       │            ┬  
+       │            ╰── expected type `text`, but found type `int64`
+    ───╯
+    "#
+    );
+}
+
+#[test]
+fn type_annotation_02() {
+    insta::assert_snapshot!(
+        _test_run(
+            "func () -> []: [bool]"
+        ),
+        @"[bool]"
+    );
+}

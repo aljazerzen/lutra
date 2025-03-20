@@ -119,7 +119,7 @@ pub(crate) fn type_expr() -> impl Parser<TokenKind, Ty, Error = PError> + Clone 
         //     })
         term
     })
-    .labelled("type expression")
+    .labelled("type")
 }
 
 fn primitive_set() -> impl Parser<TokenKind, TyPrimitive, Error = PError> {

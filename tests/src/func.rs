@@ -557,17 +557,15 @@ test_case!(
 
 test_case!(
     std_from_columnar_01,
-    r#"func () -> std::from_columnar({[1], []})"#,
+    r#"func () -> std::from_columnar({[1], []: [int64]})"#,
     "[]",
-    skip_runtime,
     skip_postgres
 );
 
 test_case!(
     std_from_columnar_02,
-    r#"func () -> std::from_columnar({[], [2]})"#,
+    r#"func () -> std::from_columnar({[]: [int64], [2]})"#,
     "[]",
-    skip_runtime,
     skip_postgres
 );
 
@@ -880,10 +878,8 @@ test_case!(
 
 test_case!(
     std_row_number_01,
-    r#"func (): [int64] -> std::row_number([])"#,
-    "[]",
-    skip_runtime,
-    skip_postgres
+    r#"func (): [int64] -> std::row_number([]: [text])"#,
+    "[]"
 );
 
 test_case!(

@@ -57,6 +57,7 @@ pub enum ExprKind {
     },
     Literal(Literal),
     Pipeline(Pipeline),
+    TypeAnnotation(TypeAnnotation),
 
     Tuple(Vec<TupleField>),
     Array(Vec<Expr>),
@@ -133,6 +134,11 @@ pub struct Pipeline {
     pub exprs: Vec<Expr>,
 }
 
+#[derive(Debug, PartialEq, Clone)]
+pub struct TypeAnnotation {
+    pub expr: Box<Expr>,
+    pub ty: Box<Ty>,
+}
 #[derive(Debug, PartialEq, Clone)]
 pub struct TupleField {
     pub name: Option<String>,

@@ -131,6 +131,16 @@ impl fold::PrFold for super::TypeResolver<'_> {
                 }
             }
 
+            pr::ExprKind::TypeAnnotation(ann) => {
+                let ty = self.fold_type(*ann.ty)?;
+                let mut expr = self.fold_expr(*ann.expr)?;
+
+                self.validate_expr_type(&mut expr, Some(&ty), &|| None)?;
+
+                // return inner expr directly (without type annotation)
+                return Ok(expr);
+            }
+
             item => pr::Expr {
                 kind: fold::fold_expr_kind(self, item)?,
                 ..node

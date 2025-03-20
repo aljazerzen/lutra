@@ -232,15 +232,15 @@ fn test_error_unicode_string() {
 
 #[test]
 fn test_error_unexpected() {
-    assert_debug_snapshot!(parse_source("Answer: T-H-A-T!").unwrap_err(), @r#"
+    assert_debug_snapshot!(parse_source("Answer? T-H-A-T!").unwrap_err(), @r#"
     [
         Diagnostic {
             code: DiagnosticCode(
                 "E0003",
             ),
-            message: "unexpected :",
+            message: "unexpected  ",
             span: Some(
-                0:6-7,
+                0:7-8,
             ),
             additional: [],
         },

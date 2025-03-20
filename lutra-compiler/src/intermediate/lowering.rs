@@ -207,14 +207,17 @@ impl<'a> Lowerer<'a> {
             pr::ExprKind::Case(_) => todo!(),
             pr::ExprKind::FString(_) => todo!(),
 
+            // consumed by type resolver
+            pr::ExprKind::TypeAnnotation(_) => unreachable!(),
+
             // caught in lower_var_decl
-            pr::ExprKind::Internal => todo!(),
+            pr::ExprKind::Internal => unreachable!(),
 
             // desugared away
-            pr::ExprKind::Pipeline(_) => todo!(),
-            pr::ExprKind::Binary(_) => todo!(),
-            pr::ExprKind::Unary(_) => todo!(),
-            pr::ExprKind::Range(_) => todo!(),
+            pr::ExprKind::Pipeline(_) => unreachable!(),
+            pr::ExprKind::Binary(_) => unreachable!(),
+            pr::ExprKind::Unary(_) => unreachable!(),
+            pr::ExprKind::Range(_) => unreachable!(),
         };
         Ok(ir::Expr {
             kind,

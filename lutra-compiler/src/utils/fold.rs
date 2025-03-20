@@ -68,6 +68,12 @@ pub trait PrFold {
     fn fold_type(&mut self, t: Ty) -> Result<Ty> {
         fold_type(self, t)
     }
+    fn fold_type_annotation(&mut self, a: TypeAnnotation) -> Result<TypeAnnotation> {
+        Ok(TypeAnnotation {
+            ty: Box::new(self.fold_type(*a.ty)?),
+            expr: Box::new(self.fold_expr(*a.expr)?),
+        })
+    }
 }
 
 pub fn fold_expr_kind<T: ?Sized + PrFold>(fold: &mut T, expr_kind: ExprKind) -> Result<ExprKind> {
@@ -124,6 +130,8 @@ pub fn fold_expr_kind<T: ?Sized + PrFold>(fold: &mut T, expr_kind: ExprKind) -> 
             op: e.op,
             expr: Box::new(fold.fold_expr(*e.expr)?),
         }),
+
+        TypeAnnotation(annotation) => TypeAnnotation(fold.fold_type_annotation(annotation)?),
 
         // None of these capture variables, so we don't need to fold them.
         Internal | Literal(_) => expr_kind,
