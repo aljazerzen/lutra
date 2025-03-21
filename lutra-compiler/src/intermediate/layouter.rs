@@ -134,7 +134,9 @@ impl Layouter {
 
     fn get_ty_mat<'t>(&'t self, ty: &'t ir::Ty) -> &'t ir::Ty {
         if let ir::TyKind::Ident(path) = &ty.kind {
-            self.ty_defs.get(path).unwrap()
+            self.ty_defs
+                .get(path)
+                .unwrap_or_else(|| panic!("cannot find {path:?}"))
         } else {
             ty
         }

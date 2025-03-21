@@ -66,5 +66,6 @@ pub fn _lower_expr(project: &Project, source: &str) -> Result<ir::Program, error
 
     let expr = resolve_post(&project.root_module, expr).unwrap();
 
-    Ok(lower_expr(&project.root_module, &expr))
+    let program = lower_expr(&project.root_module, &expr);
+    Ok(layouter::on_program(program))
 }

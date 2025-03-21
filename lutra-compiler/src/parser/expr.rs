@@ -352,12 +352,7 @@ where
 {
     let param = ident_part()
         .then(ctrl(':').ignore_then(type_expr()).or_not())
-        .map_with_span(|(name, ty), span| FuncParam {
-            name,
-            ty,
-            default_value: None,
-            span,
-        });
+        .map_with_span(|(name, ty), span| FuncParam { name, ty, span });
 
     let type_params = types::type_params();
 

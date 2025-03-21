@@ -7,6 +7,7 @@ pub struct IdGenerator<T: From<usize>> {
 }
 
 impl<T: From<usize>> IdGenerator<T> {
+    #[allow(dead_code)]
     pub fn new() -> Self {
         Self::default()
     }

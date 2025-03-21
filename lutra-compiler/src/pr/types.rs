@@ -4,6 +4,8 @@ use strum::AsRefStr;
 use crate::pr::path::Path;
 use crate::span::Span;
 
+use super::Ref;
+
 #[derive(Debug, Clone)]
 pub struct Ty {
     pub kind: TyKind,
@@ -12,6 +14,15 @@ pub struct Ty {
 
     /// Name inferred from the type's declaration.
     pub name: Option<String>,
+
+    /// When this expr is the root of a new scope, this holds the id of
+    /// that scope. This will always be set for [TyKind::Function], but
+    /// might be set for other nodes too.
+    pub scope_id: Option<usize>,
+
+    /// When this type expr is an ident, this holds information
+    /// what is being referecenced by the ident.
+    pub target: Option<Ref>,
 }
 
 /// Memory layout of a type.
@@ -45,7 +56,7 @@ pub enum TyKind {
     Enum(Vec<TyEnumVariant>),
 
     /// Type of functions with defined params and return types.
-    Function(TyFunc),
+    Func(TyFunc),
     // /// Tuples that have fields of `base` tuple, but don't have fields of `except` tuple.
     // /// Implies that `base` has all fields of `except`.
     // Exclude { base: Box<Ty>, except: Box<Ty> },
@@ -126,6 +137,8 @@ impl Ty {
             kind: kind.into(),
             span: None,
             name: None,
+            target: None,
+            scope_id: None,
         }
     }
 
@@ -134,6 +147,8 @@ impl Ty {
             kind: kind.into(),
             span: Some(span),
             name: None,
+            target: None,
+            scope_id: None,
         }
     }
 
@@ -172,7 +187,7 @@ impl From<TyPrimitive> for TyKind {
 
 impl From<TyFunc> for TyKind {
     fn from(value: TyFunc) -> Self {
-        TyKind::Function(value)
+        TyKind::Func(value)
     }
 }
 

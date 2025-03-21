@@ -94,7 +94,7 @@ impl TypeResolver<'_> {
                 return Ok(inferred_ty.clone());
             }
 
-            ExprKind::Func(func) => TyKind::Function(TyFunc {
+            ExprKind::Func(func) => TyKind::Func(TyFunc {
                 params: func.params.iter().map(|p| p.ty.clone()).collect_vec(),
                 body: func
                     .return_ty

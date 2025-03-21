@@ -233,7 +233,6 @@ pub fn fold_func_params<T: ?Sized + PrFold>(
             Ok(FuncParam {
                 name: param.name,
                 ty: fold_type_opt(fold, param.ty)?,
-                default_value: fold_optional_box(fold, param.default_value)?,
                 span: param.span,
             })
         })
@@ -250,7 +249,7 @@ pub fn fold_type<T: ?Sized + PrFold>(fold: &mut T, ty: Ty) -> Result<Ty> {
         kind: match ty.kind {
             TyKind::Tuple(fields) => TyKind::Tuple(fold_ty_tuple_fields(fold, fields)?),
             TyKind::Array(ty) => TyKind::Array(Box::new(fold.fold_type(*ty)?)),
-            TyKind::Function(func) => TyKind::Function(fold_ty_func(fold, func)?),
+            TyKind::Func(func) => TyKind::Func(fold_ty_func(fold, func)?),
             TyKind::Enum(variants) => TyKind::Enum(
                 variants
                     .into_iter()
@@ -270,6 +269,8 @@ pub fn fold_type<T: ?Sized + PrFold>(fold: &mut T, ty: Ty) -> Result<Ty> {
         },
         span: ty.span,
         name: ty.name,
+        scope_id: ty.scope_id,
+        target: ty.target,
     })
 }
 

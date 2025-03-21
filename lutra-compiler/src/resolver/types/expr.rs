@@ -25,7 +25,8 @@ impl fold::PrFold for super::TypeResolver<'_> {
             pr::ExprKind::Ident(ident) => {
                 tracing::debug!("resolving ident {ident:?}...");
 
-                let named = self.get_ident(&ident).unwrap();
+                let target = node.target.as_ref().unwrap();
+                let named = self.get_ident(target).unwrap();
 
                 tracing::debug!("... resolved to {}", named.as_ref());
 
@@ -59,9 +60,7 @@ impl fold::PrFold for super::TypeResolver<'_> {
                     },
                     Named::Scoped(scoped) => match scoped {
                         ScopedKind::Param { ty } => ty.clone(),
-                        ScopedKind::Type { .. }
-                        | ScopedKind::TypeParam { .. }
-                        | ScopedKind::TypeArg { .. } => {
+                        ScopedKind::TypeParam { .. } | ScopedKind::TypeArg { .. } => {
                             return Err(Diagnostic::new_custom(
                                 "expected a value, but found a type",
                             )
@@ -96,11 +95,14 @@ impl fold::PrFold for super::TypeResolver<'_> {
                         }
                     }
                     BaseKind::Array => {
-                        let std_index = pr::Expr::new(pr::Path::new(vec!["std", "index"]));
+                        let std_index = pr::Path::new(vec!["std", "index"]);
+                        let mut std_index_expr = pr::Expr::new(std_index.clone());
+                        std_index_expr.target = Some(pr::Ref::FullyQualified(std_index));
+
                         let position =
                             pr::Expr::new(pr::Literal::Integer(indirection.position as i64));
 
-                        let func = Box::new(self.fold_expr(std_index)?);
+                        let func = Box::new(self.fold_expr(std_index_expr)?);
 
                         self.resolve_func_call(func, vec![base, position], span)?
                     }
@@ -124,7 +126,9 @@ impl fold::PrFold for super::TypeResolver<'_> {
             }
 
             pr::ExprKind::Func(func) => {
-                let func = self.resolve_func(func).with_span_fallback(span)?;
+                let func = self
+                    .resolve_func(node.scope_id.unwrap(), func)
+                    .with_span_fallback(span)?;
                 pr::Expr {
                     kind: pr::ExprKind::Func(func),
                     ..node
@@ -152,21 +156,25 @@ impl fold::PrFold for super::TypeResolver<'_> {
         if r.ty.is_none() {
             r.ty = Some(self.infer_type(&r)?);
         }
+        if let Some(scope_id) = r.scope_id {
+            // make ty infer scope_id of expr
+            r.ty.as_mut().unwrap().scope_id = Some(scope_id);
+        }
         Ok(r)
     }
 
     fn fold_type(&mut self, ty: Ty) -> Result<Ty> {
         let ty = match ty.kind {
             // open a new scope for functions
-            pr::TyKind::Function(ty_func) if self.scopes.is_empty() => {
-                let mut scope = Scope::new();
+            pr::TyKind::Func(ty_func) if self.scopes.is_empty() => {
+                let mut scope = Scope::new(0);
                 scope.insert_generics_params(&ty_func.ty_params);
                 self.scopes.push(scope);
                 let ty_func = fold::fold_ty_func(self, ty_func)?;
                 self.scopes.pop();
 
                 Ty {
-                    kind: pr::TyKind::Function(ty_func),
+                    kind: pr::TyKind::Func(ty_func),
                     ..ty
                 }
             }

@@ -60,7 +60,7 @@ impl Printer {
                 r
             }
             pr::TyKind::Enum(_) => todo!(),
-            pr::TyKind::Function(func) => {
+            pr::TyKind::Func(func) => {
                 let mut r = String::new();
                 r += "func";
                 if !func.ty_params.is_empty() {

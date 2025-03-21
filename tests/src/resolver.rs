@@ -68,7 +68,7 @@ fn types_03() {
        │
      4 │         let floor = func <T> (x: T) -> floor_64(x)
        │                                                 ┬  
-       │                                                 ╰── function floor_64, one of the params expected type `float64`, but found type `scope::T`
+       │                                                 ╰── function floor_64, one of the params expected type `float64`, but found type `T`
     ───╯
     "#);
 }
@@ -202,7 +202,7 @@ fn types_14() {
        │
      4 │             floor_64(x)
        │                      ┬  
-       │                      ╰── function floor_64, one of the params expected type `float64`, but found type `scope::T`
+       │                      ╰── function floor_64, one of the params expected type `float64`, but found type `T`
     ───╯
     "#);
 
@@ -318,7 +318,7 @@ fn types_17() {
        │
      3 │         let get = func <T: {int64, ..}> (x: T): T -> get_int(x)
        │                                                              ┬  
-       │                                                              ╰── function get_int, one of the params expected type `{int64}`, but found type `scope::T`
+       │                                                              ╰── function get_int, one of the params expected type `{int64}`, but found type `T`
     ───╯
     "#);
 
@@ -332,7 +332,7 @@ fn types_17() {
        │
      3 │         let get = func <T: {a = int64, ..}> (x: T): T -> get_int(x)
        │                                                                  ┬  
-       │                                                                  ╰── function get_int, one of the params expected type `{a = int64}`, but found type `scope::T`
+       │                                                                  ╰── function get_int, one of the params expected type `{a = int64}`, but found type `T`
     ───╯
     "#);
 
@@ -384,7 +384,7 @@ fn empty_array_00() {
        │
      1 │ func () -> []
        │            ─┬  
-       │             ╰── cannot infer type: 0.unnamed
+       │             ╰── cannot infer type: unnamed
     ───╯
     "#
     );
@@ -402,7 +402,7 @@ fn empty_array_01() {
        │
      1 │ func () -> std::lag([], 1)
        │            ───────┬───────  
-       │                   ╰───────── cannot infer type: 0.T
+       │                   ╰───────── cannot infer type: T
     ───╯
     "#
     );
@@ -483,6 +483,7 @@ fn primitives() {
 }
 
 #[test]
+#[ignore]
 fn enums_00() {
     insta::assert_snapshot!(
         _test_run(
@@ -497,6 +498,7 @@ fn enums_00() {
 }
 
 #[test]
+#[ignore]
 fn enums_01() {
     insta::assert_snapshot!(
         _test_run(

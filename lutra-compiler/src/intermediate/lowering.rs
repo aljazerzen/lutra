@@ -1,5 +1,4 @@
 use std::collections::{HashMap, HashSet, VecDeque};
-use std::iter::zip;
 
 use indexmap::IndexMap;
 use itertools::Itertools;
@@ -8,8 +7,6 @@ use lutra_bin::ir::{self};
 use crate::utils::{self, IdGenerator};
 use crate::Result;
 use crate::{decl, pr};
-
-use super::fold::{self, IrFold};
 
 pub fn lower_expr(root_module: &decl::RootModule, main: &pr::Expr) -> ir::Program {
     let mut lowerer = Lowerer::new(root_module);
@@ -38,12 +35,18 @@ pub fn lower_var(root_module: &decl::RootModule, path: &pr::Path) -> ir::Program
 struct Lowerer<'a> {
     root_module: &'a decl::RootModule,
 
-    function_scopes: Vec<u32>,
+    function_scopes: Vec<FuncScope>,
     var_bindings: IndexMap<(pr::Path, Vec<pr::Ty>), u32>,
     type_defs_needed: VecDeque<pr::Path>,
 
     generator_function_scope: IdGenerator<usize>,
     generator_var_binding: IdGenerator<usize>,
+}
+
+struct FuncScope {
+    scope_id: usize,
+    start_of_params: usize,
+    func_id: u32,
 }
 
 impl<'a> Lowerer<'a> {
@@ -60,6 +63,7 @@ impl<'a> Lowerer<'a> {
         }
     }
 
+    #[tracing::instrument(name = "leed", skip_all)]
     fn lower_external_expr_decl(&mut self, path: &pr::Path) -> Result<Option<ir::ExprKind>> {
         let decl = self
             .root_module
@@ -82,6 +86,7 @@ impl<'a> Lowerer<'a> {
         ))))
     }
 
+    #[tracing::instrument(name = "led", skip_all, fields(p = path.to_string()))]
     fn lower_expr_decl(&mut self, path: &pr::Path, ty_args: Vec<pr::Ty>) -> Result<ir::Expr> {
         let decl = self
             .root_module
@@ -97,16 +102,22 @@ impl<'a> Lowerer<'a> {
 
         let mut expr = *expr.clone();
 
-        if let pr::TyKind::Function(ty_func) = &expr.ty.as_ref().unwrap().kind {
+        if let pr::TyKind::Func(ty_func) = &expr.ty.as_ref().unwrap().kind {
             if !ty_func.ty_params.is_empty() {
                 // replace refs to type params with inferred type args
                 // For example:
                 // - `let identity = func<T>(x: T) -> x` contains type param T,
                 // - `identity(false)` instantiates param into arg that is inferred to be bool,
                 // - when identify is lowered, we finalize the function into `func (x: bool): bool -> x`.
-                let mut mapping = HashMap::<pr::Path, pr::Ty>::new();
-                for (param, arg) in zip(&ty_func.ty_params, ty_args) {
-                    mapping.insert(pr::Path::new(vec!["scope", param.name.as_str()]), arg);
+                let mut mapping = HashMap::<pr::Ref, pr::Ty>::new();
+                for (gtp_index, arg) in ty_args.into_iter().enumerate() {
+                    mapping.insert(
+                        pr::Ref::Local {
+                            scope: expr.scope_id.unwrap(),
+                            offset: gtp_index,
+                        },
+                        arg,
+                    );
                 }
                 expr = utils::TypeReplacer::on_expr(expr, mapping);
             }
@@ -117,7 +128,9 @@ impl<'a> Lowerer<'a> {
         Ok(res)
     }
 
+    #[tracing::instrument(name = "le", skip_all)]
     fn lower_expr(&mut self, expr: &pr::Expr) -> Result<ir::Expr> {
+        tracing::trace!("lower_expr: {expr:?}");
         let kind = match &expr.kind {
             pr::ExprKind::Literal(lit) => {
                 let lit = match lit {
@@ -155,54 +168,53 @@ impl<'a> Lowerer<'a> {
                 args: self.lower_exprs(&call.args)?,
             })),
             pr::ExprKind::Func(func) => {
-                let function_id = self.generator_function_scope.gen() as u32;
+                let func_id = self.generator_function_scope.gen() as u32;
+                let scope = FuncScope {
+                    scope_id: expr.scope_id.unwrap(),
+                    func_id,
+                    start_of_params: func.ty_params.len(),
+                };
 
-                self.function_scopes.push(function_id);
+                self.function_scopes.push(scope);
                 let body = self.lower_expr(&func.body)?;
                 self.function_scopes.pop();
 
-                let func = ir::Function {
-                    id: function_id,
-                    body,
-                };
+                let func = ir::Function { id: func_id, body };
 
                 ir::ExprKind::Function(Box::new(func))
             }
 
-            pr::ExprKind::Ident(path) => {
-                if path.starts_with_part("scope") {
-                    let mut path = path.iter().peekable();
-                    path.next(); // func
+            pr::ExprKind::Ident(_) => match expr.target.as_ref().unwrap() {
+                pr::Ref::Local { scope, offset } => {
+                    let scope = (self.function_scopes.iter())
+                        .find(|s| s.scope_id == *scope)
+                        .unwrap();
+                    let param_position = (*offset - scope.start_of_params) as u8;
 
-                    // walk the scope stack for each `up` in ident
-                    let mut scope = self.function_scopes.iter().rev();
-                    while path.peek().map_or(false, |x| *x == "up") {
-                        path.next();
-                        scope.next();
-                    }
-
-                    let param_position = path.next().unwrap().parse::<u8>().unwrap();
-                    let function_id = *scope.next().unwrap();
                     ir::ExprKind::Pointer(ir::Pointer::Parameter(ir::ParameterPtr {
-                        function_id,
+                        function_id: scope.func_id,
                         param_position,
                     }))
-                } else if let Some(ptr) = self.lower_external_expr_decl(path)? {
-                    ptr
-                } else {
-                    let reference = (path.clone(), expr.ty_args.clone());
-                    let entry = self.var_bindings.entry(reference);
-                    let binding_id = match entry {
-                        indexmap::map::Entry::Occupied(e) => *e.get(),
-                        indexmap::map::Entry::Vacant(e) => {
-                            let id = self.generator_var_binding.gen() as u32;
-                            e.insert(id);
-                            id
-                        }
-                    };
-                    ir::ExprKind::Pointer(ir::Pointer::Binding(binding_id))
                 }
-            }
+
+                pr::Ref::FullyQualified(path) => {
+                    if let Some(ptr) = self.lower_external_expr_decl(path)? {
+                        ptr
+                    } else {
+                        let reference = (path.clone(), expr.ty_args.clone());
+                        let entry = self.var_bindings.entry(reference);
+                        let binding_id = match entry {
+                            indexmap::map::Entry::Occupied(e) => *e.get(),
+                            indexmap::map::Entry::Vacant(e) => {
+                                let id = self.generator_var_binding.gen() as u32;
+                                e.insert(id);
+                                id
+                            }
+                        };
+                        ir::ExprKind::Pointer(ir::Pointer::Binding(binding_id))
+                    }
+                }
+            },
 
             pr::ExprKind::Case(_) => todo!(),
             pr::ExprKind::FString(_) => todo!(),
@@ -285,12 +297,83 @@ impl<'a> Lowerer<'a> {
         }
     }
 
+    #[tracing::instrument(name = "lt", skip_all)]
     fn lower_ty(&mut self, ty: pr::Ty) -> ir::Ty {
-        // this function is direct no-op mapping, expect for idents
-        let ty = ir::Ty::from(ty);
-        let (ty, idents) = IdentCollector::run(ty);
-        self.type_defs_needed.extend(idents);
-        ty
+        log::trace!("lower ty: {}", crate::printer::print_ty(&ty));
+
+        if let Some(target) = ty.target {
+            if let pr::Ref::FullyQualified(ident) = target {
+                self.type_defs_needed.push_back(ident.clone());
+
+                log::debug!("lower ty ident: {ident}");
+
+                return ir::Ty {
+                    kind: ir::TyKind::Ident(ir::Path(ident.into_iter().collect_vec())),
+                    layout: None,
+                    name: ty.name,
+                    variants_recursive: vec![],
+                };
+            } else {
+                panic!("{:?} {target:?}", ty.kind)
+            }
+        }
+
+        // this part is direct no-op mapping
+        let kind = match ty.kind {
+            pr::TyKind::Primitive(primitive) => {
+                let primitive = match primitive {
+                    pr::TyPrimitive::int8 => ir::TyPrimitive::int8,
+                    pr::TyPrimitive::int16 => ir::TyPrimitive::int16,
+                    pr::TyPrimitive::int32 => ir::TyPrimitive::int32,
+                    pr::TyPrimitive::int64 => ir::TyPrimitive::int64,
+                    pr::TyPrimitive::uint8 => ir::TyPrimitive::uint8,
+                    pr::TyPrimitive::uint16 => ir::TyPrimitive::uint16,
+                    pr::TyPrimitive::uint32 => ir::TyPrimitive::uint32,
+                    pr::TyPrimitive::uint64 => ir::TyPrimitive::uint64,
+                    pr::TyPrimitive::float32 => ir::TyPrimitive::float32,
+                    pr::TyPrimitive::float64 => ir::TyPrimitive::float64,
+                    pr::TyPrimitive::bool => ir::TyPrimitive::bool,
+                    pr::TyPrimitive::text => ir::TyPrimitive::text,
+                };
+                ir::TyKind::Primitive(primitive)
+            }
+            pr::TyKind::Tuple(fields) => ir::TyKind::Tuple(
+                fields
+                    .into_iter()
+                    .map(|f| {
+                        let name = f.name.clone();
+                        let ty = self.lower_ty(f.ty);
+                        ir::TyTupleField { name, ty }
+                    })
+                    .collect(),
+            ),
+            pr::TyKind::Array(items_ty) => ir::TyKind::Array(Box::new(self.lower_ty(*items_ty))),
+            pr::TyKind::Enum(variants) => ir::TyKind::Enum(
+                variants
+                    .into_iter()
+                    .map(|v| ir::TyEnumVariant {
+                        name: v.name,
+                        ty: self.lower_ty(v.ty),
+                    })
+                    .collect(),
+            ),
+            pr::TyKind::Ident(_) => unreachable!(),
+            pr::TyKind::Func(func) => ir::TyKind::Function(Box::new(ir::TyFunction {
+                params: func
+                    .params
+                    .into_iter()
+                    .map(|p| self.lower_ty(p.unwrap()))
+                    .collect(),
+                body: self.lower_ty(*func.body.clone().unwrap()),
+            })),
+        };
+
+        ir::Ty {
+            kind,
+            name: ty.name,
+            layout: None,
+            variants_recursive: vec![],
+        }
     }
 
     fn lower_ty_defs(&mut self) -> HashMap<pr::Path, ir::Ty> {
@@ -312,26 +395,6 @@ impl<'a> Lowerer<'a> {
         }
 
         defs
-    }
-}
-
-#[derive(Default)]
-struct IdentCollector {
-    idents: Vec<pr::Path>,
-}
-impl IdentCollector {
-    fn run(ty: ir::Ty) -> (ir::Ty, Vec<pr::Path>) {
-        let mut c = IdentCollector::default();
-        let ty = c.fold_ty(ty).unwrap();
-        (ty, c.idents)
-    }
-}
-impl fold::IrFold for IdentCollector {
-    fn fold_ty(&mut self, ty: ir::Ty) -> Result<ir::Ty, ()> {
-        if let ir::TyKind::Ident(ident) = &ty.kind {
-            self.idents.push(pr::Path::new(&ident.0));
-        }
-        fold::fold_ty(self, ty)
     }
 }
 

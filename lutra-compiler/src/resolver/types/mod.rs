@@ -8,7 +8,6 @@ mod validation;
 
 use crate::decl::RootModule;
 use crate::pr;
-use crate::utils::IdGenerator;
 
 pub fn run(
     root_module: &mut RootModule,
@@ -28,8 +27,6 @@ struct TypeResolver<'a> {
 
     debug_current_decl: crate::pr::Path,
 
-    id: IdGenerator<usize>,
-
     scopes: Vec<scope::Scope>,
 }
 
@@ -38,7 +35,6 @@ impl TypeResolver<'_> {
         TypeResolver {
             root_mod,
             debug_current_decl: crate::pr::Path::from_name("?"),
-            id: IdGenerator::new(),
             scopes: Vec::new(),
         }
     }

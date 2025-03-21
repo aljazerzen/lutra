@@ -31,7 +31,7 @@ pub(crate) fn type_expr() -> impl Parser<TokenKind, Ty, Error = PError> + Clone 
                         ty_params: type_params,
                     }),
             )
-            .map(TyKind::Function);
+            .map(TyKind::Func);
 
         let tuple = sequence(choice((ident_part()
             .then_ignore(ctrl('='))

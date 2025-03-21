@@ -45,30 +45,30 @@ impl TypeResolver<'_> {
             printer::print_ty(found),
             printer::print_ty(expected)
         );
-        let found_ref = self.resolve_ty_ident(found.clone())?;
-        let expected_ref = self.resolve_ty_ident(expected.clone())?;
+        let found_ref = self.get_ty_mat(found)?;
+        let expected_ref = self.get_ty_mat(expected)?;
 
         let (found, expected) = match (found_ref, expected_ref) {
             // base case: neither found or expected are generic
             (TyRef::Ty(f), TyRef::Ty(e)) => (f.into_owned(), e.into_owned()),
 
             // type params
-            (TyRef::Param(_), TyRef::Ty(expected)) => {
+            (TyRef::Param(_, _), TyRef::Ty(expected)) => {
                 return Err(compose_type_error(found, &expected, who));
             }
-            (TyRef::Param(param_id), TyRef::Arg(arg_id)) => {
+            (TyRef::Param(param_id, param_name), TyRef::Arg(_, arg_id, arg_name)) => {
                 // validate
                 let scope = self.scopes.last().unwrap();
-                let ty_param = self.get_ty_param(&param_id);
+                let ty_param = self.get_ty_param(param_id);
                 let ty_arg = scope.get_ty_arg(&arg_id);
-                self.validate_type_domains(ty_param, &ty_arg.domain, &param_id, &arg_id.name)?;
+                self.validate_type_domains(ty_param, &ty_arg.domain, &param_name, &arg_name)?;
 
                 // infer
                 let scope = self.scopes.last_mut().unwrap();
                 scope.infer_type_arg(&arg_id, found.clone());
                 return Ok(());
             }
-            (TyRef::Param(found_id), TyRef::Param(expected_id)) => {
+            (TyRef::Param(found_id, _), TyRef::Param(expected_id, _)) => {
                 return if found_id == expected_id {
                     Ok(())
                 } else {
@@ -77,32 +77,35 @@ impl TypeResolver<'_> {
             }
 
             // I don't know how to construct a test case for this
-            (found, TyRef::Param(expected_id)) => todo!("found={found:?} expected={expected_id}"),
+            (found, TyRef::Param(expected_id, _)) => {
+                todo!("found={found:?} expected={expected_id}")
+            }
 
             // type args
-            (TyRef::Ty(ty), TyRef::Arg(ty_arg_id)) | (TyRef::Arg(ty_arg_id), TyRef::Ty(ty)) => {
+            (TyRef::Ty(ty), TyRef::Arg(_, ty_arg_id, ty_arg_name))
+            | (TyRef::Arg(_, ty_arg_id, ty_arg_name), TyRef::Ty(ty)) => {
                 let ty = ty.into_owned();
 
                 // validate
                 let scope = self.scopes.last().unwrap();
                 let ty_arg = scope.get_ty_arg(&ty_arg_id);
-                self.validate_type_domain(&ty, &ty_arg.domain, &ty_arg_id.name)?;
+                self.validate_type_domain(&ty, &ty_arg.domain, &ty_arg_name)?;
 
                 // infer
                 let scope = self.scopes.last_mut().unwrap();
                 scope.infer_type_arg(&ty_arg_id, ty);
                 return Ok(());
             }
-            (TyRef::Arg(a_id), TyRef::Arg(b_id)) => {
+            (TyRef::Arg(_, a_id, a_name), TyRef::Arg(_, b_id, b_name)) => {
                 // validate
                 let scope = self.scopes.last().unwrap();
                 let a = scope.get_ty_arg(&a_id);
                 let b = scope.get_ty_arg(&b_id);
                 if let Some(a_inferred) = a.inferred.get() {
-                    self.validate_type_domain(a_inferred, &b.domain, &a_id.name)?;
+                    self.validate_type_domain(a_inferred, &b.domain, &a_name)?;
                 }
                 if let Some(b_inferred) = b.inferred.get() {
-                    self.validate_type_domain(b_inferred, &a.domain, &b_id.name)?;
+                    self.validate_type_domain(b_inferred, &a.domain, &b_name)?;
                 }
 
                 // infer
@@ -165,7 +168,7 @@ impl TypeResolver<'_> {
 
                 Ok(())
             }
-            (TyKind::Function(f_func), TyKind::Function(e_func))
+            (TyKind::Func(f_func), TyKind::Func(e_func))
                 if f_func.params.len() == e_func.params.len() =>
             {
                 for (f_arg, e_arg) in itertools::zip_eq(&f_func.params, &e_func.params) {
@@ -397,7 +400,7 @@ where
         DiagnosticCode::TYPE,
     );
 
-    if found_ty.kind.is_function() && !expected.kind.is_function() {
+    if found_ty.kind.is_func() && !expected.kind.is_func() {
         let to_what = "in this function call?";
 
         e = e.push_hint(format!("Have you forgotten an argument {to_what}?"));

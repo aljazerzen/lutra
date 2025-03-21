@@ -12,6 +12,8 @@ impl Expr {
             span: None,
             ty: None,
             ty_args: Vec::new(),
+            target: None,
+            scope_id: None,
         }
     }
 
@@ -21,6 +23,8 @@ impl Expr {
             span: Some(span),
             ty: None,
             ty_args: Vec::new(),
+            target: None,
+            scope_id: None,
         }
     }
 }
@@ -43,6 +47,27 @@ pub struct Expr {
     /// these params are instantiated into these args and finalized when
     /// scope closes.
     pub ty_args: Vec<Ty>,
+
+    /// When this expr is the root of a new scope, this holds the id of
+    /// that scope. This will always be set for [ExprKind::Func], but
+    /// might be set for other nodes too.
+    pub scope_id: Option<usize>,
+
+    /// When this expression is an identifer, this holds information about
+    /// what is being referenced.
+    pub target: Option<Ref>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub enum Ref {
+    FullyQualified(Path),
+    Local {
+        /// scope id
+        scope: usize,
+
+        /// position of the name within the scope
+        offset: usize,
+    },
 }
 
 #[derive(Debug, EnumAsInner, PartialEq, Clone, strum::AsRefStr)]
@@ -122,8 +147,6 @@ pub struct FuncParam {
     pub name: String,
 
     pub ty: Option<Ty>,
-
-    pub default_value: Option<Box<Expr>>,
 
     pub span: Span,
 }

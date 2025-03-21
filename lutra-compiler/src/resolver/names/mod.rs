@@ -3,7 +3,7 @@ mod module;
 mod scope;
 
 use itertools::Itertools;
-use scope::{Scope, ScopedKind};
+use scope::Scope;
 
 use crate::decl;
 use crate::diagnostic::Diagnostic;
@@ -22,6 +22,7 @@ pub fn run(root: &mut decl::RootModule) -> Result<Vec<Vec<pr::Path>>> {
             refs_tys: Default::default(),
             refs_vars: Default::default(),
             current_path: Vec::new(),
+            scope_id_gen: Default::default(),
         };
         r.resolve_refs()?;
         (r.refs_tys, r.refs_vars)

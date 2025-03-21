@@ -39,7 +39,7 @@ impl From<ir::Ty> for super::Ty {
                     .map(super::TyEnumVariant::from)
                     .collect(),
             ),
-            ir::TyKind::Function(func) => super::TyKind::Function(super::TyFunc {
+            ir::TyKind::Function(func) => super::TyKind::Func(super::TyFunc {
                 params: func
                     .params
                     .into_iter()
@@ -56,6 +56,8 @@ impl From<ir::Ty> for super::Ty {
             kind,
             span: None,
             name: ty.name,
+            scope_id: None,
+            target: None,
         }
     }
 }
@@ -104,7 +106,7 @@ impl From<super::Ty> for ir::Ty {
                 ir::TyKind::Enum(variants.into_iter().map(ir::TyEnumVariant::from).collect())
             }
             super::TyKind::Ident(path) => ir::TyKind::Ident(ir::Path(path.into_iter().collect())),
-            super::TyKind::Function(func) => ir::TyKind::Function(Box::new(ir::TyFunction {
+            super::TyKind::Func(func) => ir::TyKind::Function(Box::new(ir::TyFunction {
                 params: func
                     .params
                     .into_iter()

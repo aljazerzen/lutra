@@ -78,6 +78,8 @@ fn parse_02() {
                     ),
                     ty: None,
                     ty_args: [],
+                    scope_id: None,
+                    target: None,
                 },
             ),
             end: Some(
@@ -92,6 +94,8 @@ fn parse_02() {
                     ),
                     ty: None,
                     ty_args: [],
+                    scope_id: None,
+                    target: None,
                 },
             ),
         },
@@ -113,6 +117,8 @@ fn parse_02() {
                     ),
                     ty: None,
                     ty_args: [],
+                    scope_id: None,
+                    target: None,
                 },
                 params: [],
                 ty_params: [
@@ -143,6 +149,8 @@ fn parse_02() {
         ),
         ty: None,
         ty_args: [],
+        scope_id: None,
+        target: None,
     }
     "#);
     assert_debug_snapshot!(parse_expr("func <T: {b = int64, ..}> () -> 1"), @r#"
@@ -161,6 +169,8 @@ fn parse_02() {
                     ),
                     ty: None,
                     ty_args: [],
+                    scope_id: None,
+                    target: None,
                 },
                 params: [],
                 ty_params: [
@@ -188,6 +198,8 @@ fn parse_02() {
         ),
         ty: None,
         ty_args: [],
+        scope_id: None,
+        target: None,
     }
     "#);
 }

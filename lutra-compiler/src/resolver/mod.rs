@@ -25,6 +25,8 @@ pub fn resolve(module_tree: pr::ModuleDef) -> Result<decl::RootModule, Vec<Diagn
     // resolve names
     let resolution_order = names::run(&mut root_module).map_err(|d| vec![d])?;
 
+    tracing::debug!("{:#?}", root_module);
+
     // resolve types
     types::run(&mut root_module, &resolution_order)?;
 

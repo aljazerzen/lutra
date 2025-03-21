@@ -11,7 +11,7 @@ fn main() {
     let decl = project.root_module.module.get(&path).unwrap();
     if let decl::DeclKind::Expr(expr) = &decl.kind {
         let ty = expr.ty.as_ref().unwrap();
-        if ty.kind.is_function() {
+        if ty.kind.is_func() {
             execute_function(&project, path);
         } else {
             todo!()

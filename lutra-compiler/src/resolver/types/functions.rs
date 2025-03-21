@@ -13,12 +13,12 @@ impl TypeResolver<'_> {
     /// Folds function types, so they are resolved to material types, ready for type checking.
     /// Requires id of the function call node, so it can be used to generic type arguments.
     #[tracing::instrument(name = "func", skip_all, fields(f = func.params.iter().map(|p| &p.name).join(",")))]
-    pub fn resolve_func(&mut self, mut func: Box<Func>) -> Result<Box<Func>> {
+    pub fn resolve_func(&mut self, scope_id: usize, mut func: Box<Func>) -> Result<Box<Func>> {
         tracing::debug!(
             "resolving func with params: ({})",
             func.params.iter().map(|p| &p.name).join(", ")
         );
-        let mut scope = Scope::new();
+        let mut scope = Scope::new(scope_id);
 
         // prepare generic arguments
         scope.insert_generics_params(&func.ty_params);
@@ -59,7 +59,7 @@ impl TypeResolver<'_> {
         let _enter = tspan.enter();
 
         let fn_ty = func.ty.as_ref().unwrap();
-        let fn_ty = fn_ty.kind.as_function().unwrap().clone();
+        let fn_ty = fn_ty.kind.as_func().unwrap().clone();
 
         let args_match_params = args.len() == fn_ty.params.len();
         if !args_match_params {

@@ -26,12 +26,12 @@ impl super::TypeResolver<'_> {
         base: &Ty,
         indirection: &pr::IndirectionKind,
     ) -> Result<Indirection> {
-        let base_ref = self.resolve_ty_ident(base.clone())?;
+        let base_ref = self.get_ty_mat(base)?;
 
         let base = match base_ref {
             scope::TyRef::Ty(b) => b,
-            scope::TyRef::Param(id) => {
-                let param = self.get_ty_param(&id);
+            scope::TyRef::Param(id, _) => {
+                let param = self.get_ty_param(id);
                 return match param {
                     pr::TyParamDomain::Open | pr::TyParamDomain::OneOf(_) => {
                         Err(Diagnostic::new_custom(format!(
@@ -49,8 +49,8 @@ impl super::TypeResolver<'_> {
                         }),
                 };
             }
-            scope::TyRef::Arg(id) => {
-                todo!("tuple indirection into generic type Arg: {id:?}")
+            scope::TyRef::Arg(s, o, _) => {
+                todo!("tuple indirection into generic type Arg: {s}.{o}")
             }
         };
 
@@ -77,7 +77,7 @@ impl super::TypeResolver<'_> {
                 pr::IndirectionKind::Star => todo!(),
             },
 
-            pr::TyKind::Primitive(_) | pr::TyKind::Enum(_) | pr::TyKind::Function(_) => {
+            pr::TyKind::Primitive(_) | pr::TyKind::Enum(_) | pr::TyKind::Func(_) => {
                 Err(Diagnostic::new_custom(format!(
                     "expected a tuple or an array, found {}",
                     base.kind.as_ref()

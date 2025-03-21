@@ -1,6 +1,7 @@
 use crate::decl;
 use crate::diagnostic::WithErrorInfo;
 use crate::pr;
+use crate::utils::IdGenerator;
 use crate::Result;
 
 /// Traverses module tree and runs name resolution on each of the declarations.
@@ -11,6 +12,8 @@ pub struct ModuleRefResolver<'a> {
 
     pub refs_tys: Vec<(pr::Path, Vec<pr::Path>)>,
     pub refs_vars: Vec<(pr::Path, Vec<pr::Path>)>,
+
+    pub scope_id_gen: IdGenerator<usize>,
 }
 
 impl ModuleRefResolver<'_> {
@@ -46,6 +49,7 @@ impl ModuleRefResolver<'_> {
                 decl_module_path: &path[0..(path.len() - 1)],
                 scopes: Vec::new(),
                 refs: Vec::new(),
+                scope_id_gen: &mut self.scope_id_gen,
             };
 
             let stmt = r.fold_stmt_kind(stmt).with_span_fallback(span)?;

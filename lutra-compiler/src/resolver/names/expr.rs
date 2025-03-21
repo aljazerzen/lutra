@@ -3,9 +3,10 @@ use crate::diagnostic::{Diagnostic, WithErrorInfo};
 use crate::pr;
 use crate::resolver::NS_STD;
 use crate::utils::fold::{self, PrFold};
+use crate::utils::IdGenerator;
 use crate::Result;
 
-use super::{Scope, ScopedKind};
+use super::Scope;
 
 /// Traverses AST and resolves identifiers.
 pub struct NameResolver<'a> {
@@ -13,6 +14,7 @@ pub struct NameResolver<'a> {
     pub decl_module_path: &'a [String],
     pub scopes: Vec<Scope>,
     pub refs: Vec<pr::Path>,
+    pub scope_id_gen: &'a mut IdGenerator<usize>,
 }
 
 impl NameResolver<'_> {
@@ -31,7 +33,10 @@ impl NameResolver<'_> {
         &mut self,
         import_def: pr::ImportDef,
     ) -> Result<pr::ImportDef, Diagnostic> {
-        let fq_ident = self.resolve_ident(import_def.name)?;
+        let target = self.resolve_ident(&import_def.name)?;
+        let pr::Ref::FullyQualified(fq_ident) = target else {
+            panic!()
+        };
         Ok(pr::ImportDef {
             name: fq_ident,
             alias: import_def.alias,
@@ -52,10 +57,14 @@ impl fold::PrFold for NameResolver<'_> {
             pr::ExprKind::Ident(ident) => {
                 // TODO: can this ident have length 0?
 
-                let ident = self.resolve_ident(ident).with_span(expr.span)?;
+                let target = Some(self.resolve_ident(&ident).with_span(expr.span)?);
 
                 let kind = pr::ExprKind::Ident(ident);
-                pr::Expr { kind, ..expr }
+                pr::Expr {
+                    kind,
+                    target,
+                    ..expr
+                }
             }
             pr::ExprKind::Indirection { .. } => {
                 // special case: indirection might be compiled to a call to std::index,
@@ -67,6 +76,21 @@ impl fold::PrFold for NameResolver<'_> {
                     ..expr
                 }
             }
+
+            pr::ExprKind::Func(func) => {
+                let scope_id = self.scope_id_gen.gen();
+                let scope = Scope::new_of_func(scope_id, &func)?;
+                self.scopes.push(scope);
+                let func = fold::fold_func(self, *func);
+                self.scopes.pop();
+
+                pr::Expr {
+                    kind: pr::ExprKind::Func(Box::new(func?)),
+                    scope_id: Some(scope_id),
+                    ..expr
+                }
+            }
+
             _ => pr::Expr {
                 kind: fold::fold_expr_kind(self, expr.kind)?,
                 ..expr
@@ -77,22 +101,25 @@ impl fold::PrFold for NameResolver<'_> {
     fn fold_type(&mut self, ty: pr::Ty) -> Result<pr::Ty> {
         Ok(match ty.kind {
             pr::TyKind::Ident(ident) => {
-                let ident = self.resolve_ident(ident).with_span(ty.span)?;
+                let target = Some(self.resolve_ident(&ident).with_span(ty.span)?);
 
                 pr::Ty {
                     kind: pr::TyKind::Ident(ident),
+                    target,
                     ..ty
                 }
             }
-            pr::TyKind::Function(ty_func) => {
+            pr::TyKind::Func(ty_func) => {
                 if self.scopes.is_empty() {
-                    let scope = Scope::new_of_ty_func(&ty_func)?;
+                    let scope_id = self.scope_id_gen.gen();
+                    let scope = Scope::new_of_ty_func(scope_id, &ty_func)?;
                     self.scopes.push(scope);
                     let r = fold::fold_ty_func(self, ty_func);
                     self.scopes.pop();
 
                     pr::Ty {
-                        kind: pr::TyKind::Function(r?),
+                        kind: pr::TyKind::Func(r?),
+                        scope_id: Some(scope_id),
                         ..ty
                     }
                 } else {
@@ -103,7 +130,7 @@ impl fold::PrFold for NameResolver<'_> {
                         .with_span(param.span));
                     }
                     let ty = pr::Ty {
-                        kind: pr::TyKind::Function(ty_func),
+                        kind: pr::TyKind::Func(ty_func),
                         ..ty
                     };
                     fold::fold_type(self, ty)?
@@ -112,22 +139,14 @@ impl fold::PrFold for NameResolver<'_> {
             _ => fold::fold_type(self, ty)?,
         })
     }
-
-    fn fold_func(&mut self, func: pr::Func) -> Result<pr::Func> {
-        let scope = Scope::new_of_func(&func)?;
-        self.scopes.push(scope);
-        let r = fold::fold_func(self, func);
-        self.scopes.pop();
-        r
-    }
 }
 
 impl NameResolver<'_> {
     /// Returns resolved fully-qualified ident
-    fn resolve_ident(&mut self, ident: pr::Path) -> Result<pr::Path> {
-        for (up, scope) in self.scopes.iter().rev().enumerate() {
-            if let Some((position, scoped)) = scope.get(ident.first()) {
-                // match: this ident is a param ref
+    fn resolve_ident(&mut self, ident: &pr::Path) -> Result<pr::Ref> {
+        for scope in self.scopes.iter().rev() {
+            if let Some((scope, offset, _)) = scope.get(ident.first()) {
+                // match: this ident references a locally-scoped name
 
                 if ident.len() != 1 {
                     return Err(Diagnostic::new_custom(format!(
@@ -135,16 +154,7 @@ impl NameResolver<'_> {
                         ident.first()
                     )));
                 }
-
-                let mut fq_ident = pr::Path::new(vec!["scope"]);
-                for _ in 0..up {
-                    fq_ident.push("up".to_string())
-                }
-                fq_ident.push(match &scoped {
-                    ScopedKind::Param => position.to_string(),
-                    ScopedKind::Generic => ident.first().to_string(),
-                });
-                return Ok(fq_ident);
+                return Ok(pr::Ref::Local { scope, offset });
             }
         }
 
@@ -178,7 +188,7 @@ impl NameResolver<'_> {
 
         self.refs.push(fq_ident.clone());
 
-        Ok(fq_ident)
+        Ok(pr::Ref::FullyQualified(fq_ident))
     }
 }
 
@@ -201,17 +211,16 @@ fn module_lookup_steps(module: &decl::Module, steps: &[String]) -> bool {
 
         // resolve refs into types
         decl::DeclKind::Unresolved(Some(stmt)) => stmt_lookup_steps(stmt, &steps[1..]),
-        decl::DeclKind::Unresolved(None) => {
+        _ => {
             // recursive lookup into self (we take node out of Unresolved during name resolution)
 
             if steps.len() == 1 {
-                return true;
+                true
             } else {
                 // ???
                 todo!()
             }
         }
-        _ => unreachable!(),
     }
 }
 

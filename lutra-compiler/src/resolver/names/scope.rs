@@ -4,6 +4,7 @@ use crate::pr;
 
 #[derive(Debug)]
 pub struct Scope {
+    id: usize,
     names: IndexMap<String, ScopedKind>,
 }
 
@@ -14,17 +15,19 @@ pub enum ScopedKind {
 }
 
 impl Scope {
-    pub fn new_of_func(func: &pr::Func) -> crate::Result<Self> {
+    pub fn new_of_func(id: usize, func: &pr::Func) -> crate::Result<Self> {
         let mut scope = Self {
+            id,
             names: IndexMap::new(),
         };
-        scope.insert_params(func)?;
         scope.insert_generics(&func.ty_params)?;
+        scope.insert_params(func)?;
         Ok(scope)
     }
 
-    pub fn new_of_ty_func(func: &pr::TyFunc) -> crate::Result<Self> {
+    pub fn new_of_ty_func(id: usize, func: &pr::TyFunc) -> crate::Result<Self> {
         let mut scope = Self {
+            id,
             names: IndexMap::new(),
         };
         scope.insert_generics(&func.ty_params)?;
@@ -46,8 +49,8 @@ impl Scope {
         Ok(())
     }
 
-    pub fn get(&self, name: &str) -> Option<(usize, &ScopedKind)> {
+    pub fn get(&self, name: &str) -> Option<(usize, usize, &ScopedKind)> {
         let (position, _, scoped) = self.names.get_full(name)?;
-        Some((position, scoped))
+        Some((self.id, position, scoped))
     }
 }
