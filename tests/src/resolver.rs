@@ -488,7 +488,7 @@ fn enums_00() {
     insta::assert_snapshot!(
         _test_run(
             "
-            type Status = enum { Done, Pending = text }
+            type Status = enum { Open, Done, Pending = text }
 
             let main = func () -> Status::Done
             "
@@ -503,7 +503,7 @@ fn enums_01() {
     insta::assert_snapshot!(
         _test_run(
             r#"
-            type Status = enum { Done, Pending = text }
+            type Status = enum { Open, Done, Pending = text }
 
             let main = func () -> Status::Pending("hello")
             "#

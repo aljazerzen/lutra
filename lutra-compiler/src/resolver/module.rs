@@ -27,6 +27,23 @@ impl decl::Module {
         module.names.get(ident.name())
     }
 
+    /// Get declaration by fully qualified ident and return remaining steps into the decl.
+    pub fn try_get<'a, 's>(
+        &'a self,
+        steps: &'s [String],
+    ) -> Option<(&'a decl::Decl, &'s [String])> {
+        let mut curr_mod = self;
+        for (index, step) in steps.iter().enumerate() {
+            let decl = curr_mod.names.get(step)?;
+            if let decl::DeclKind::Module(sub_module) = &decl.kind {
+                curr_mod = sub_module;
+            } else {
+                return Some((decl, &steps[(index + 1)..]));
+            }
+        }
+        None
+    }
+
     /// Get an exclusive reference to declaration by fully qualified ident.
     pub fn get_mut(&mut self, ident: &pr::Path) -> Option<&mut decl::Decl> {
         let module = self.get_submodule_mut(ident.path())?;

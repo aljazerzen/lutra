@@ -86,6 +86,8 @@ pub enum ExprKind {
 
     Tuple(Vec<TupleField>),
     Array(Vec<Expr>),
+    EnumVariant(usize),
+
     Range(Range),
     Binary(BinaryExpr),
     Unary(UnaryExpr),

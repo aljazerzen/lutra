@@ -152,6 +152,7 @@ impl<'a> Lowerer<'a> {
                     .try_collect()?,
             ),
             pr::ExprKind::Array(items) => ir::ExprKind::Array(self.lower_exprs(items)?),
+            pr::ExprKind::EnumVariant(tag) => todo!("tag = {tag}"),
             pr::ExprKind::Indirection { base, field } => {
                 ir::ExprKind::TupleLookup(Box::new(ir::TupleLookup {
                     base: self.lower_expr(base)?,

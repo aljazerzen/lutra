@@ -105,6 +105,7 @@ impl TypeResolver<'_> {
             }),
 
             ExprKind::Ident(_)
+            | ExprKind::EnumVariant(_) // constructed only in type resolver
             | ExprKind::FuncCall(_)
             | ExprKind::Indirection { .. }
             | ExprKind::Pipeline(_) // desugar-ed

@@ -67,6 +67,12 @@ impl fold::PrFold for super::TypeResolver<'_> {
                             .with_span(span))
                         }
                     },
+                    Named::EnumVariant(ty, variant) => {
+                        let mut r = pr::Expr::new(pr::ExprKind::EnumVariant(variant));
+                        r.span = span;
+                        r.ty = Some(ty.clone());
+                        return Ok(r);
+                    }
                 };
                 let (ty, ty_args) = self.introduce_ty_into_scope(ty);
                 pr::Expr {

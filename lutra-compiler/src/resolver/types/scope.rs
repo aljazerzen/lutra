@@ -3,6 +3,8 @@ use std::cell::OnceCell;
 use std::collections::HashMap;
 use std::rc::Rc;
 
+use itertools::Itertools;
+
 use crate::diagnostic::{Diagnostic, WithErrorInfo};
 use crate::pr::{self, Path, TyParamDomain};
 use crate::{decl, printer, utils, Result};
@@ -35,6 +37,7 @@ pub type TyArgId = usize;
 pub enum Named<'a> {
     Decl(&'a decl::Decl),
     Scoped(&'a ScopedKind),
+    EnumVariant(&'a pr::Ty, usize),
 }
 
 #[derive(Debug, Clone)]
@@ -166,7 +169,33 @@ impl TypeResolver<'_> {
         tracing::trace!("get_ident: {target:?}");
 
         match target {
-            pr::Ref::FullyQualified(path) => self.root_mod.module.get(path).map(Named::Decl),
+            pr::Ref::FullyQualified(path) => {
+                let (decl, steps) = self.root_mod.module.try_get(path.full_path())?;
+                if steps.is_empty() {
+                    Some(Named::Decl(decl))
+                } else if steps.len() == 1 {
+                    // path into decls
+
+                    if let decl::DeclKind::Ty(ty) = &decl.kind {
+                        // path into type
+
+                        if let pr::TyKind::Enum(variants) = &ty.kind {
+                            // path into enum
+
+                            let (position, _) =
+                                variants.iter().find_position(|v| v.name == steps[0])?;
+
+                            Some(Named::EnumVariant(ty, position))
+                        } else {
+                            None
+                        }
+                    } else {
+                        None
+                    }
+                } else {
+                    unreachable!()
+                }
+            }
 
             pr::Ref::Local { scope, offset } => {
                 let scope = self.scopes.iter().find(|s| s.id == *scope).unwrap();
@@ -239,6 +268,11 @@ impl TypeResolver<'_> {
                         }
                     }
                 }
+            }
+            Named::EnumVariant(_, _) => {
+                Err(Diagnostic::new_assert("expected a type, found a value")
+                    .push_hint(format!("{ident} is an enum variant"))
+                    .with_span(ty.span))
             }
         }
     }
