@@ -94,13 +94,13 @@ impl<E: Decode> Decode for Option<E> {
         } else {
             let buf = buf.skip(1);
             let inner_head_size = E::head_size();
-            let is_inline = inner_head_size <= 4;
+            let has_ptr = inner_head_size > 32;
 
-            Ok(Some(if is_inline {
-                E::decode(buf)?
-            } else {
+            Ok(Some(if has_ptr {
                 let offset = u32::from_le_bytes(buf.read_const::<4>()) as usize;
                 E::decode(buf.skip(offset))?
+            } else {
+                E::decode(buf)?
             }))
         }
     }

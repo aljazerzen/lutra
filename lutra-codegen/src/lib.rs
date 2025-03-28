@@ -6,8 +6,8 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 use std::{collections::VecDeque, fs};
 
-use lutra_bin::ir;
-use lutra_compiler::{decl, CompileParams, DiscoverParams};
+use lutra_bin::{ir, Encode};
+use lutra_compiler::{decl, pr, CompileParams, DiscoverParams};
 
 #[track_caller]
 pub fn generate(
@@ -38,6 +38,33 @@ pub fn generate(
 
     // return vec of input files
     project.source.get_sources().map(|s| s.0.clone()).collect()
+}
+
+#[track_caller]
+pub fn generate_program(
+    project_dir: &std::path::Path,
+    expr_path: &[&str],
+    out_file: &std::path::Path,
+) {
+    // discover the project
+    let source = lutra_compiler::discover(DiscoverParams {
+        project_path: project_dir.into(),
+    })
+    .unwrap();
+
+    // compile
+    let project =
+        lutra_compiler::compile(source, CompileParams {}).unwrap_or_else(|e| panic!("{e}"));
+
+    // lower & bytecode
+    let program = lutra_compiler::lower_var(&project.root_module, &pr::Path::new(expr_path));
+    let program = lutra_compiler::layouter::on_program(program);
+    let program = lutra_compiler::bytecode_program(program);
+
+    let mut buf = bytes::BytesMut::new();
+    program.encode(&mut buf);
+
+    std::fs::write(out_file, buf).unwrap();
 }
 
 #[derive(Debug, Clone)]
@@ -204,6 +231,7 @@ fn codegen_module(
     }
 
     // write type impls
+    ctx.current_rust_mod = module_path.clone();
     if ctx.options.generate_encode_decode {
         codegen_encode::write_encode_impls(w, &all_tys, ctx)?;
     }

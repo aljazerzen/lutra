@@ -24,3 +24,5 @@ type Tree = enum {
 }
 
 type opt = enum { None, Some = text }
+
+type opt2 = enum { None, Some = int16 }

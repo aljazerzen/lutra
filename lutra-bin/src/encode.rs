@@ -168,28 +168,30 @@ impl<E: Encode> Encode for vec::Vec<E> {
 impl<E: Encode + Layout> Encode for Option<E> {
     type HeadPtr = Option<Result<E::HeadPtr, ReversePointer>>;
 
+    #[allow(clippy::collapsible_else_if)]
     fn encode_head(&self, buf: &mut BytesMut) -> Self::HeadPtr {
         let tag: u8 = if self.is_none() { 0 } else { 1 };
         buf.put_u8(tag);
 
         let inner_head_size = E::head_size();
-        let is_inline = inner_head_size <= 4;
+        let has_ptr = inner_head_size > 32;
 
-        if let Some(inner) = self {
-            if is_inline {
-                let ptr = inner.encode_head(buf);
-                if inner_head_size < 4 {
-                    buf.put_bytes(0, 4 - inner_head_size);
-                }
-                Some(Ok(ptr))
-            } else {
+        if has_ptr {
+            if self.is_some() {
                 let offset = ReversePointer::new(buf);
-
                 Some(Err(offset))
+            } else {
+                buf.put_bytes(0, 4);
+                None
             }
         } else {
-            buf.put_bytes(0, 4);
-            None
+            if let Some(inner) = self {
+                let inner_head_ptr = inner.encode_head(buf);
+                Some(Ok(inner_head_ptr))
+            } else {
+                buf.put_bytes(0, inner_head_size.div_ceil(8));
+                None
+            }
         }
     }
 
@@ -197,14 +199,11 @@ impl<E: Encode + Layout> Encode for Option<E> {
         let Some(inner) = self else { return };
 
         let inner_head_size = E::head_size();
-        let is_inline = inner_head_size <= 4;
+        let has_ptr = inner_head_size > 32;
 
         let head = head.unwrap();
 
-        if is_inline {
-            let Ok(head) = head else { unreachable!() };
-            inner.encode_body(head, buf)
-        } else {
+        if has_ptr {
             let Err(offset_ptr) = head else {
                 unreachable!()
             };
@@ -212,6 +211,9 @@ impl<E: Encode + Layout> Encode for Option<E> {
 
             let head_ptr = inner.encode_head(buf);
             inner.encode_body(head_ptr, buf)
+        } else {
+            let Ok(head) = head else { unreachable!() };
+            inner.encode_body(head, buf)
         }
     }
 }

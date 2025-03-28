@@ -243,13 +243,41 @@ fn test_opt_01() {
 fn test_opt_02() {
     let ty = _test_get_type("opt");
     let value = Value::Enum(
-        1, // Node
+        1, // Some
         Box::new(Value::Text("text".into())),
     );
     assert_snapshot!(_test_encode_decode::<types::opt>(value, &ty), @r#"
     Length: 17 (0x11) bytes
     0000:   01 04 00 00  00 08 00 00  00 04 00 00  00 74 65 78   .............tex
     0010:   74                                                   t
+    "#
+    );
+}
+
+#[test]
+fn test_opt2_01() {
+    let ty = _test_get_type("opt2");
+    let value = Value::Enum(
+        0, // None
+        Box::new(Value::Tuple(vec![])),
+    );
+    assert_snapshot!(_test_encode_decode::<types::opt2>(value, &ty), @r#"
+    Length: 3 (0x3) bytes
+    0000:   00 00 00                                             ...
+    "#
+    );
+}
+
+#[test]
+fn test_opt2_02() {
+    let ty = _test_get_type("opt2");
+    let value = Value::Enum(
+        1, // Some
+        Box::new(Value::Int16(65)),
+    );
+    assert_snapshot!(_test_encode_decode::<types::opt2>(value, &ty), @r#"
+    Length: 3 (0x3) bytes
+    0000:   01 41 00                                             .A.
     "#
     );
 }
