@@ -44,6 +44,9 @@ impl ByteCoder {
             ir::ExprKind::Function(v) => ExprKind::Function(Box::new(self.compile_function(*v))),
             ir::ExprKind::Tuple(v) => ExprKind::Tuple(Box::new(self.compile_tuple(v))),
             ir::ExprKind::Array(v) => ExprKind::Array(Box::new(self.compile_array(expr.ty, v))),
+            ir::ExprKind::EnumVariant(v) => {
+                ExprKind::EnumVariant(Box::new(self.compile_enum_variant(expr.ty, *v)))
+            }
             ir::ExprKind::TupleLookup(v) => {
                 ExprKind::TupleLookup(Box::new(self.compile_tuple_lookup(*v)))
             }
@@ -112,6 +115,22 @@ impl ByteCoder {
         Array {
             items: items.into_iter().map(|x| self.compile_expr(x)).collect(),
             item_layout: self.compile_ty_layout(ty.kind.into_array().unwrap().layout.unwrap()),
+        }
+    }
+
+    fn compile_enum_variant(&mut self, ty: Ty, v: ir::EnumVariant) -> EnumVariant {
+        let ir::TyKind::Enum(ty_variants) = &ty.kind else {
+            panic!()
+        };
+        let ty_variant = ty_variants.get(v.tag as usize).unwrap();
+        let head_format = lutra_bin::layout::enum_head_format(ty_variants);
+        let variant_format = lutra_bin::layout::enum_variant_format(&head_format, &ty_variant.ty);
+
+        EnumVariant {
+            tag: v.tag.to_le_bytes()[0..head_format.tag_bytes as usize].to_vec(),
+            has_ptr: head_format.has_ptr,
+            padding_bytes: variant_format.padding_bytes,
+            inner: self.compile_expr(v.inner),
         }
     }
 

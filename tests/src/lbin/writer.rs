@@ -137,11 +137,11 @@ fn enum_01() {
     insta::assert_snapshot!(_test_enum_writer(0, Data::new(vec![]), &output_ty), @r#"
     Done
     Length: 5 (0x5) bytes
-    0000:   00 00 00 00  00                                      .....
+    0000:   00 04 00 00  00                                      .....
     "#);
 
     // int
-    let inner = Data::new(vec![42, 0, 0, 0, 0, 0, 0, 0]);
+    let inner = Data::new(vec![42, 0]);
     insta::assert_snapshot!(_test_enum_writer(1, inner, &output_ty), @r#"
     Pending(
       42
@@ -151,13 +151,13 @@ fn enum_01() {
     "#);
 
     // int (followed by the body of text)
-    let inner = Data::new(vec![1, 1, 0, 0, 0, 0, 0, 0, 65, 66, 65, 66]);
+    let inner = Data::new(vec![1, 1, 65, 66, 65, 66]);
     insta::assert_snapshot!(_test_enum_writer(1, inner, &output_ty), @r#"
     Pending(
       257
     )
-    Length: 7 (0x7) bytes
-    0000:   01 04 00 00  00 01 01                                .......
+    Length: 11 (0xb) bytes
+    0000:   01 04 00 00  00 01 01 41  42 41 42                   .......ABAB
     "#);
 
     // text
@@ -179,9 +179,9 @@ fn enum_01() {
     Cancelled(
       "ABAB"
     )
-    Length: 17 (0x11) bytes
-    0000:   02 04 00 00  00 08 00 00  00 04 00 00  00 41 42 41   .............ABA
-    0010:   42                                                   B
+    Length: 25 (0x19) bytes
+    0000:   02 04 00 00  00 10 00 00  00 04 00 00  00 2a 00 00   .............*..
+    0010:   00 00 00 00  00 41 42 41  42                         .....ABAB
     "#);
 }
 
@@ -233,5 +233,39 @@ fn enum_02() {
     0020:   00 00 00 00  00 2a 00 00  00 01 01 00  00 41 42 41   .....*.......ABA
     0030:   42 08 00 00  00 04 00 00  00 41 42 41  42 10 00 00   B........ABAB...
     0040:   00 03 00 00  00 2a 00 00  00 00 00 00  00 41 42 41   .....*.......ABA
+    "#);
+}
+
+#[test]
+fn enum_03() {
+    // put an enum into an array, to test that body_ptrs are correct
+
+    let output_ty =
+        lutra_compiler::_test_compile_ty("enum {Done, Pending = int16, Cancelled = bool}");
+
+    // done
+    let inner = Data::new(vec![]);
+    insta::assert_snapshot!(_test_enum_writer(0, inner, &output_ty), @r#"
+    Done
+    Length: 3 (0x3) bytes
+    0000:   00 00 00                                             ...
+    "#);
+
+    let inner = Data::new(vec![1, 2]);
+    insta::assert_snapshot!(_test_enum_writer(1, inner, &output_ty), @r#"
+    Pending(
+      513
+    )
+    Length: 3 (0x3) bytes
+    0000:   01 01 02                                             ...
+    "#);
+
+    let inner = Data::new(vec![1, 2, 3, 4, 5, 6, 7, 8, 9]);
+    insta::assert_snapshot!(_test_enum_writer(2, inner, &output_ty), @r#"
+    Cancelled(
+      true
+    )
+    Length: 10 (0xa) bytes
+    0000:   02 01 02 03  04 05 06 07  08 09                      ..........
     "#);
 }

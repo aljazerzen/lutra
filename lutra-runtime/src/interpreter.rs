@@ -209,6 +209,17 @@ impl Interpreter {
 
                 Cell::Data(writer.finish())
             }
+            br::ExprKind::EnumVariant(variant) => {
+                let inner = self.evaluate_expr(&variant.inner);
+                let inner = inner.into_data().unwrap_or_else(|_| panic!());
+
+                Cell::Data(lutra_bin::EnumWriter::write_variant(
+                    &variant.tag,
+                    variant.has_ptr,
+                    variant.padding_bytes,
+                    inner,
+                ))
+            }
             br::ExprKind::TupleLookup(lookup) => {
                 let br::TupleLookup { base, offset } = lookup.as_ref();
 

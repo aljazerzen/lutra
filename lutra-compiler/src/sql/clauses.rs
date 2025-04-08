@@ -103,7 +103,10 @@ impl<'a> Context<'a> {
                 ir::ExprKind::TupleLookup(_) => todo!(),
                 ir::ExprKind::Binding(_) => todo!(),
 
-                ir::ExprKind::Literal(_) | ir::ExprKind::Tuple(_) | ir::ExprKind::Array(_) => {
+                ir::ExprKind::Literal(_)
+                | ir::ExprKind::Tuple(_)
+                | ir::ExprKind::Array(_)
+                | ir::ExprKind::EnumVariant(_) => {
                     unreachable!()
                 }
             },
@@ -131,6 +134,8 @@ impl<'a> Context<'a> {
             ir::ExprKind::Pointer(ir::Pointer::External(_)) => todo!(),
 
             ir::ExprKind::Function(_) => todo!(),
+
+            ir::ExprKind::EnumVariant(_) => todo!(),
 
             ir::ExprKind::TupleLookup(lookup) => {
                 let base = self.compile_rel(&lookup.base);

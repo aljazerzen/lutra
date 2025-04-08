@@ -128,6 +128,9 @@ impl Printer {
                 r += "]";
                 r
             }
+            ir::ExprKind::EnumVariant(variant) => {
+                format!("@{}", variant.tag)
+            }
             ir::ExprKind::TupleLookup(lookup) => {
                 let mut r = self.print_expr(&lookup.base);
                 r += &self.new_line();

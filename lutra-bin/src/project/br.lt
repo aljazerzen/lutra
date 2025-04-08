@@ -21,6 +21,7 @@ type ExprKind = enum {
   Function = Function,
   `Tuple` = `Tuple`,
   Array = Array,
+  EnumVariant = EnumVariant,
   TupleLookup = TupleLookup,
   Binding = Binding,
 }
@@ -53,6 +54,13 @@ type `Tuple` = {
 type Array = {
     item_layout = TyLayout,
     items = [Expr],
+}
+
+type EnumVariant = {
+    tag = [uint8],
+    has_ptr = bool,
+    padding_bytes = uint32,
+    inner = Expr,
 }
 
 type TupleLookup = {

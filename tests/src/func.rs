@@ -990,3 +990,69 @@ test_case!(
     "#,
     r#"6"#
 );
+
+test_case!(
+    enum_construction_00,
+    r#"
+    type Status = enum {Done, Pending = int16, Cancelled = text}
+    func () -> Status::Done
+    "#,
+    r#"Done"#,
+    skip_postgres
+);
+
+test_case!(
+    enum_construction_01,
+    r#"
+    type Status = enum {Done, Pending = int16, Cancelled = text}
+    func () -> Status::Pending(513)
+    "#,
+    r#"Pending(
+  513
+)"#,
+    skip_postgres
+);
+
+test_case!(
+    enum_construction_02,
+    r#"
+    type Status = enum {Done, Pending = int16, Cancelled = text}
+    func () -> Status::Cancelled("I don't like it")
+    "#,
+    r#"Cancelled(
+  "I don't like it"
+)"#,
+    skip_postgres
+);
+
+test_case!(
+    enum_construction_03,
+    r#"
+    type Color = enum {Red, Green = int16, Blue = bool}
+    func () -> Color::Red
+    "#,
+    r#"Red"#,
+    skip_postgres
+);
+test_case!(
+    enum_construction_04,
+    r#"
+    type Color = enum {Red, Green = int16, Blue = bool}
+    func () -> Color::Green(10)
+    "#,
+    r#"Green(
+  10
+)"#,
+    skip_postgres
+);
+test_case!(
+    enum_construction_05,
+    r#"
+    type Color = enum {Red, Green = int16, Blue = bool}
+    func () -> Color::Blue(false)
+    "#,
+    r#"Blue(
+  false
+)"#,
+    skip_postgres
+);

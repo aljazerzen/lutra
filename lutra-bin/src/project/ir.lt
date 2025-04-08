@@ -16,6 +16,7 @@ type ExprKind = enum {
   Function = Function,
   `Tuple` = [Expr],
   Array = [Expr],
+  EnumVariant = EnumVariant,
   TupleLookup = TupleLookup,
   Binding = Binding,
 }
@@ -53,6 +54,11 @@ type Call = {
 type Function = {
   id = uint32,
   body = Expr,
+}
+
+type EnumVariant = {
+  tag = uint64,
+  inner = Expr,
 }
 
 type TupleLookup = {

@@ -152,7 +152,20 @@ impl<'a> Lowerer<'a> {
                     .try_collect()?,
             ),
             pr::ExprKind::Array(items) => ir::ExprKind::Array(self.lower_exprs(items)?),
-            pr::ExprKind::EnumVariant(tag) => todo!("tag = {tag}"),
+            pr::ExprKind::EnumVariant(variant) => {
+                ir::ExprKind::EnumVariant(Box::new(ir::EnumVariant {
+                    tag: variant.tag as u64,
+                    inner: variant
+                        .inner
+                        .as_ref()
+                        .map(|x| self.lower_expr(x))
+                        .transpose()?
+                        .unwrap_or_else(|| ir::Expr {
+                            kind: ir::ExprKind::Tuple(vec![]),
+                            ty: ir::Ty::new(ir::TyKind::Tuple(vec![])),
+                        }),
+                }))
+            }
             pr::ExprKind::Indirection { base, field } => {
                 ir::ExprKind::TupleLookup(Box::new(ir::TupleLookup {
                     base: self.lower_expr(base)?,

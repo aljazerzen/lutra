@@ -86,7 +86,7 @@ pub enum ExprKind {
 
     Tuple(Vec<TupleField>),
     Array(Vec<Expr>),
-    EnumVariant(usize),
+    EnumVariant(EnumVariant),
 
     Range(Range),
     Binary(BinaryExpr),
@@ -168,6 +168,12 @@ pub struct TypeAnnotation {
 pub struct TupleField {
     pub name: Option<String>,
     pub expr: Expr,
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub struct EnumVariant {
+    pub tag: usize,
+    pub inner: Option<Box<Expr>>,
 }
 
 /// Inclusive-inclusive range.

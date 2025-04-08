@@ -483,7 +483,6 @@ fn primitives() {
 }
 
 #[test]
-#[ignore]
 fn enums_00() {
     insta::assert_snapshot!(
         _test_run(
@@ -493,12 +492,11 @@ fn enums_00() {
             let main = func () -> Status::Done
             "
         ),
-        @"[bool]"
+        @"enum {Open = {}, Done = {}, Pending = text}"
     );
 }
 
 #[test]
-#[ignore]
 fn enums_01() {
     insta::assert_snapshot!(
         _test_run(
@@ -508,6 +506,6 @@ fn enums_01() {
             let main = func () -> Status::Pending("hello")
             "#
         ),
-        @"[bool]"
+        @"enum {Open = {}, Done = {}, Pending = text}"
     );
 }

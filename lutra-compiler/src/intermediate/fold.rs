@@ -45,6 +45,7 @@ pub fn fold_expr_kind<T: ?Sized + IrFold>(fold: &mut T, kind: ExprKind, ty: Ty) 
         Function(func) => return fold.fold_func(*func, ty),
         Tuple(fields) => Tuple(fold_exprs(fold, fields)?),
         Array(items) => Array(fold_exprs(fold, items)?),
+        EnumVariant(variant) => EnumVariant(Box::new(fold_enum_variant(fold, *variant)?)),
         TupleLookup(lookup) => return fold.fold_lookup(*lookup, ty),
         Binding(binding) => return fold.fold_binding(*binding, ty),
     };
@@ -72,6 +73,16 @@ pub fn fold_func<T: ?Sized + IrFold>(fold: &mut T, func: Function, ty: Ty) -> Re
             body: fold.fold_expr(func.body)?,
         })),
         ty,
+    })
+}
+
+pub fn fold_enum_variant<T: ?Sized + IrFold>(
+    fold: &mut T,
+    variant: EnumVariant,
+) -> Result<EnumVariant> {
+    Ok(EnumVariant {
+        tag: variant.tag,
+        inner: fold.fold_expr(variant.inner)?,
     })
 }
 

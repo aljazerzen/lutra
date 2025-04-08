@@ -67,8 +67,11 @@ impl fold::PrFold for super::TypeResolver<'_> {
                             .with_span(span))
                         }
                     },
-                    Named::EnumVariant(ty, variant) => {
-                        let mut r = pr::Expr::new(pr::ExprKind::EnumVariant(variant));
+                    Named::EnumVariant(ty, tag) => {
+                        let mut r = pr::Expr::new(pr::ExprKind::EnumVariant(pr::EnumVariant {
+                            tag,
+                            inner: None,
+                        }));
                         r.span = span;
                         r.ty = Some(ty.clone());
                         return Ok(r);
@@ -124,11 +127,24 @@ impl fold::PrFold for super::TypeResolver<'_> {
                 self.resolve_column_exclusion(arg)?
             }
 
-            pr::ExprKind::FuncCall(pr::FuncCall { func: name, args }) => {
+            pr::ExprKind::FuncCall(pr::FuncCall { func, args }) => {
                 // fold function name
-                let func = Box::new(self.fold_expr(*name)?);
+                let func = Box::new(self.fold_expr(*func)?);
 
-                self.resolve_func_call(func, args, span)?
+                if let pr::ExprKind::EnumVariant(mut variant) = func.kind {
+                    // special case: enum variant construction
+                    let inner = args.into_iter().exactly_one().unwrap();
+                    let inner = self.fold_expr(inner)?;
+                    variant.inner = Some(Box::new(inner));
+
+                    pr::Expr {
+                        kind: pr::ExprKind::EnumVariant(variant),
+                        ..*func
+                    }
+                } else {
+                    // general case
+                    self.resolve_func_call(func, args, span)?
+                }
             }
 
             pr::ExprKind::Func(func) => {
