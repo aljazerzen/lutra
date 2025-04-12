@@ -16,7 +16,6 @@ fn main() {
     let res = match action.command {
         Action::Discover(cmd) => discover(cmd),
         Action::Check(cmd) => check(cmd),
-        Action::Compile(cmd) => compile(cmd),
         Action::Run(cmd) => run(cmd),
         Action::Sql(cmd) => sql(cmd),
         Action::RunPostgres(cmd) => run_postgres(cmd),
@@ -48,16 +47,13 @@ pub enum Action {
     /// Compile the project
     Check(CheckCommand),
 
-    /// Compile the project to IR
-    Compile(CompileCommand),
-
-    /// Compile the project and run a program
-    Run(RunCommand),
-
     /// Compile the project to SQL
     Sql(SqlCommand),
 
-    /// Compile the project and run against PostgreSQL
+    /// Compile the project to bytecode and run it
+    Run(RunCommand),
+
+    /// Compile the project to SQL and run it against PostgreSQL
     RunPostgres(RunPostgresCommand),
 }
 
@@ -82,13 +78,17 @@ pub struct CheckCommand {
     #[clap(flatten)]
     compile: CompileParams,
 
-    #[arg(long = "print", value_enum)]
-    print: Option<CheckPrint>,
-}
+    /// Lutra program expression to be compiled
+    #[clap(long, default_value = "main")]
+    program: String,
 
-#[derive(clap::ValueEnum, Clone)]
-enum CheckPrint {
-    Debug,
+    /// Prints debug information about compiled project
+    #[clap(long, default_value = "false")]
+    print_project: bool,
+
+    /// Prints the Intermediate Representation
+    #[clap(long, default_value = "false")]
+    print_ir: bool,
 }
 
 pub fn check(cmd: CheckCommand) -> anyhow::Result<()> {
@@ -96,44 +96,28 @@ pub fn check(cmd: CheckCommand) -> anyhow::Result<()> {
 
     let project = lutra_compiler::compile(project, cmd.compile)?;
 
-    match cmd.print {
-        Some(CheckPrint::Debug) => {
-            println!("{project:#?}");
-        }
-        None => {
-            println!("All good.")
+    if cmd.print_project {
+        println!("------ PROJECT ------");
+        println!("{project:#?}");
+        println!("---------------------");
+    }
+
+    if cmd.print_ir {
+        let program = lutra_compiler::_lower_expr(&project, &cmd.program)?;
+        let program = lutra_compiler::layouter::on_program(program);
+
+        if cmd.print_project {
+            let program_source = lutra_bin::ir::print(&program);
+            println!("------ IR ------");
+            println!("{program_source}");
+            println!("----------------");
         }
     }
 
-    Ok(())
-}
+    if !cmd.print_project && !cmd.print_ir {
+        println!("All good.")
+    }
 
-#[derive(clap::Parser)]
-pub struct CompileCommand {
-    #[clap(flatten)]
-    discover: DiscoverParams,
-
-    #[clap(flatten)]
-    compile: CompileParams,
-
-    #[clap(default_value = "main")]
-    path: String,
-}
-
-pub fn compile(cmd: CompileCommand) -> anyhow::Result<()> {
-    let project = lutra_compiler::discover(cmd.discover)?;
-
-    let project = lutra_compiler::compile(project, cmd.compile)?;
-
-    let path = pr::Path::new(cmd.path.split("::"));
-    let program = lutra_compiler::lower_var(&project.root_module, &path);
-
-    let program = lutra_compiler::layouter::on_program(program);
-
-    let program_source = lutra_bin::ir::print(&program);
-    println!("------ IR ------");
-    println!("{program_source}");
-    println!("----------------");
     Ok(())
 }
 
