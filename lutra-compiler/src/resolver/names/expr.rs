@@ -173,10 +173,11 @@ impl NameResolver<'_> {
         };
         let base_decl = self.root.module.get_submodule(&base_path);
 
-        let found = base_decl.map_or(false, |module| module_lookup_steps(module, steps));
-        if !found {
+        let res = base_decl.map_or(Err(None), |module| module_lookup_steps(module, steps));
+        if let Err(err) = res {
             tracing::debug!("scopes: {:?}", self.scopes);
-            return Err(Diagnostic::new_custom(format!("unknown name {ident}")));
+            let message = err.unwrap_or_else(|| format!("unknown name {ident}"));
+            return Err(Diagnostic::new_custom(message));
         }
 
         // prepend the ident with the module path
@@ -193,16 +194,14 @@ impl NameResolver<'_> {
 }
 
 /// Returns true if ok
-fn module_lookup_steps(module: &decl::Module, steps: &[String]) -> bool {
+fn module_lookup_steps(module: &decl::Module, steps: &[String]) -> Result<(), Option<String>> {
     if steps.is_empty() {
         // references to modules do not mean anything
-        // TODO: a better err message
-        return false;
+        return Err(Some("cannot refer to modules".to_string()));
     }
 
     let Some(decl) = module.names.get(&steps[0]) else {
-        // name does not exist
-        return false;
+        return Err(Some("name does not exist".to_string()));
     };
 
     match &decl.kind {
@@ -215,7 +214,7 @@ fn module_lookup_steps(module: &decl::Module, steps: &[String]) -> bool {
             // recursive lookup into self (we take node out of Unresolved during name resolution)
 
             if steps.len() == 1 {
-                true
+                Ok(())
             } else {
                 // ???
                 todo!()
@@ -224,24 +223,37 @@ fn module_lookup_steps(module: &decl::Module, steps: &[String]) -> bool {
     }
 }
 
-fn stmt_lookup_steps(stmt: &pr::StmtKind, steps: &[String]) -> bool {
+fn stmt_lookup_steps(stmt: &pr::StmtKind, steps: &[String]) -> Result<(), Option<String>> {
     if steps.is_empty() {
-        return true;
-    }
-
-    // a single step is allowed
-    if steps.len() > 1 {
-        return false;
+        return Ok(());
     }
 
     // into type enum declarations (referring to variants)
     match stmt {
-        pr::StmtKind::VarDef(_) => false,
-        pr::StmtKind::TypeDef(ty_def) => match &ty_def.ty.kind {
-            pr::TyKind::Enum(variants) => variants.iter().any(|v| v.name == steps[0]),
-            _ => false,
-        },
+        pr::StmtKind::VarDef(_) | pr::StmtKind::ImportDef(_) => {
+            Err(Some("cannot lookup into expressions".to_string()))
+        }
+        pr::StmtKind::TypeDef(ty_def) => ty_lookup_steps(&ty_def.ty, steps),
         pr::StmtKind::ModuleDef(_) => unreachable!(),
-        pr::StmtKind::ImportDef(_) => false,
+    }
+}
+
+fn ty_lookup_steps(ty: &pr::Ty, steps: &[String]) -> Result<(), Option<String>> {
+    if steps.is_empty() {
+        return Ok(());
+    }
+    match &ty.kind {
+        pr::TyKind::Enum(variants) => {
+            let variant = variants.iter().find(|v| v.name == steps[0]).ok_or(None)?;
+            ty_lookup_steps(&variant.ty, &steps[1..])
+        }
+        pr::TyKind::Tuple(fields) => {
+            let field = fields
+                .iter()
+                .find(|f| f.name.as_ref().map_or(false, |n| n == &steps[0]))
+                .ok_or(None)?;
+            ty_lookup_steps(&field.ty, &steps[1..])
+        }
+        _ => Err(None),
     }
 }

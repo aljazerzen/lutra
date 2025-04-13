@@ -1034,6 +1034,7 @@ test_case!(
     r#"Red"#,
     skip_postgres
 );
+
 test_case!(
     enum_construction_04,
     r#"
@@ -1045,6 +1046,7 @@ test_case!(
 )"#,
     skip_postgres
 );
+
 test_case!(
     enum_construction_05,
     r#"
@@ -1053,6 +1055,21 @@ test_case!(
     "#,
     r#"Blue(
   false
+)"#,
+    skip_postgres
+);
+
+test_case!(
+    enum_construction_06,
+    r#"
+    type Item = {
+      id = int64,
+      color = enum {Red, Green = int16, Blue = bool},
+    }
+    func () -> Item::color::Green(3)
+    "#,
+    r#"Green(
+  3
 )"#,
     skip_postgres
 );

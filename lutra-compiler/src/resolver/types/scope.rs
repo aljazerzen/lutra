@@ -35,7 +35,8 @@ pub type TyArgId = usize;
 
 #[derive(Debug, strum::AsRefStr)]
 pub enum Named<'a> {
-    Decl(&'a decl::Decl),
+    Expr(&'a pr::Expr),
+    Ty(&'a pr::Ty),
     Scoped(&'a ScopedKind),
     EnumVariant(&'a pr::Ty, usize),
 }
@@ -165,41 +166,38 @@ impl TypeResolver<'_> {
     /// Get declaration from within the current scope.
     ///
     /// Does not mutate the current scope or module structure.
-    pub(super) fn get_ident<'a>(&'a self, target: &pr::Ref) -> Option<Named<'a>> {
+    pub(super) fn get_ident<'a>(&'a self, target: &pr::Ref) -> Result<Named<'a>> {
         tracing::trace!("get_ident: {target:?}");
 
         match target {
             pr::Ref::FullyQualified(path) => {
-                let (decl, steps) = self.root_mod.module.try_get(path.full_path())?;
-                if steps.is_empty() {
-                    Some(Named::Decl(decl))
-                } else if steps.len() == 1 {
-                    // path into decls
-
-                    if let decl::DeclKind::Ty(ty) = &decl.kind {
-                        // path into type
-
-                        if let pr::TyKind::Enum(variants) = &ty.kind {
-                            // path into enum
-
-                            let (position, _) =
-                                variants.iter().find_position(|v| v.name == steps[0])?;
-
-                            Some(Named::EnumVariant(ty, position))
-                        } else {
-                            None
+                let (decl, steps) = self.root_mod.module.try_get(path.full_path()).unwrap();
+                match &decl.kind {
+                    decl::DeclKind::Expr(expr) => {
+                        if !steps.is_empty() {
+                            unreachable!()
                         }
-                    } else {
-                        None
+                        Ok(Named::Expr(expr))
                     }
-                } else {
-                    unreachable!()
+
+                    decl::DeclKind::Ty(ty) => lookup_into_ty(ty, steps)
+                        .ok_or_else(|| Diagnostic::new_custom("unknown name")),
+
+                    decl::DeclKind::Unresolved(_) => Err(Diagnostic::new_assert(format!(
+                        "bad resolution order: unresolved {target:?} while resolving {}",
+                        self.debug_current_decl
+                    ))),
+
+                    decl::DeclKind::Module(_) | decl::DeclKind::Import(_) => {
+                        // handled during name resolution
+                        unreachable!()
+                    }
                 }
             }
 
             pr::Ref::Local { scope, offset } => {
                 let scope = self.scopes.iter().find(|s| s.id == *scope).unwrap();
-                scope.names.get(*offset).map(Named::Scoped)
+                Ok(scope.names.get(*offset).map(Named::Scoped).unwrap())
             }
         }
     }
@@ -219,30 +217,20 @@ impl TypeResolver<'_> {
         };
 
         let target = ty.target.as_ref().unwrap();
-        let named = self.get_ident(target).ok_or_else(|| {
-            tracing::debug!("scope: {:#?}", self.scopes.last().unwrap());
-            Diagnostic::new_assert("cannot find type ident")
-                .push_hint(format!("ident={ident}"))
-                .push_hint(format!("target={target:?}"))
-                .with_span(ty.span)
-        })?;
+        let named = self.get_ident(target).with_span(ty.span)?;
+        // Diagnostic::new_assert("cannot find type ident")
+        //     .push_hint(format!("ident={ident}"))
+        //     .push_hint(format!("target={target:?}"))
+        //     .with_span(ty.span)
 
         match named {
-            Named::Decl(decl) => match &decl.kind {
-                decl::DeclKind::Ty(ty) => {
-                    // reference to a type: all ok
+            Named::Ty(ty) => {
+                // reference to a type: all ok
 
-                    // but refed ty might be an ident too: recurse!
-                    self.get_ty_mat(ty)
-                }
-                decl::DeclKind::Unresolved(_) => Err(Diagnostic::new_assert(format!(
-                    "Unresolved ident at {:?}: (during eval of {})",
-                    ty.span, self.debug_current_decl
-                ))),
-                _ => Err(Diagnostic::new_assert("expected a type")
-                    .push_hint(format!("got {:?}", &decl.kind))
-                    .with_span(ty.span)),
-            },
+                // but refed ty might be an ident too: recurse!
+                self.get_ty_mat(ty)
+            }
+            Named::Expr(_) => Err(Diagnostic::new_assert("expected a type").with_span(ty.span)),
             Named::Scoped(scoped) => {
                 let pr::Ref::Local { scope, offset } = target else {
                     panic!()
@@ -346,5 +334,36 @@ impl TypeResolver<'_> {
 
         scope.insert_generic_arg(name.to_string(), domain);
         ty_arg
+    }
+}
+
+fn lookup_into_ty<'t>(ty: &'t pr::Ty, steps: &[String]) -> Option<Named<'t>> {
+    assert!(!steps.is_empty());
+    match &ty.kind {
+        pr::TyKind::Enum(variants) => {
+            // path into enum
+
+            let (position, variant) = variants.iter().find_position(|v| v.name == steps[0])?;
+
+            if steps.len() == 1 {
+                Some(Named::EnumVariant(ty, position))
+            } else {
+                lookup_into_ty(&variant.ty, &steps[1..])
+            }
+        }
+        pr::TyKind::Tuple(fields) => {
+            // path into tuple
+
+            let field = fields
+                .iter()
+                .find(|f| f.name.as_ref().map_or(false, |n| n == &steps[0]))?;
+
+            if steps.len() == 1 {
+                Some(Named::Ty(&field.ty))
+            } else {
+                lookup_into_ty(&field.ty, &steps[1..])
+            }
+        }
+        _ => None,
     }
 }

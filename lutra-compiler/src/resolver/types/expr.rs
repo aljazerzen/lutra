@@ -1,6 +1,5 @@
 use itertools::Itertools;
 
-use crate::decl::DeclKind;
 use crate::diagnostic::{Diagnostic, WithErrorInfo};
 use crate::pr;
 use crate::pr::Ty;
@@ -26,38 +25,22 @@ impl fold::PrFold for super::TypeResolver<'_> {
                 tracing::debug!("resolving ident {ident:?}...");
 
                 let target = node.target.as_ref().unwrap();
-                let named = self.get_ident(target).unwrap();
+                let named = self.get_ident(target).with_span(span)?;
 
                 tracing::debug!("... resolved to {}", named.as_ref());
 
                 let ty = match named {
-                    Named::Decl(decl) => match &decl.kind {
-                        DeclKind::Expr(expr) => {
-                            // if the type contains generics, we need to instantiate those
-                            // generics into current function scope
-                            // let ty = self.instantiate_type(ty, id);
-                            expr.ty.clone().unwrap()
-                        }
+                    Named::Expr(expr) => {
+                        // if the type contains generics, we need to instantiate those
+                        // generics into current function scope
+                        // let ty = self.instantiate_type(ty, id);
+                        expr.ty.clone().unwrap()
+                    }
 
-                        DeclKind::Ty(_) => {
-                            return Err(Diagnostic::new_custom(
-                                "expected a value, but found a type",
-                            )
+                    Named::Ty(_) => {
+                        return Err(Diagnostic::new_custom("expected a value, but found a type")
                             .with_span(span))
-                        }
-
-                        DeclKind::Unresolved(_) => {
-                            return Err(Diagnostic::new_assert(format!(
-                                "bad resolution order: unresolved {ident} while resolving {}",
-                                self.debug_current_decl
-                            )))
-                        }
-
-                        DeclKind::Module(_) | DeclKind::Import(_) => {
-                            // handled during name resolution
-                            unreachable!()
-                        }
-                    },
+                    }
                     Named::Scoped(scoped) => match scoped {
                         ScopedKind::Param { ty } => ty.clone(),
                         ScopedKind::TypeParam { .. } | ScopedKind::TypeArg { .. } => {
