@@ -47,13 +47,11 @@ impl ByteCoder {
             ir::ExprKind::EnumVariant(v) => {
                 ExprKind::EnumVariant(Box::new(self.compile_enum_variant(expr.ty, *v)))
             }
-            ir::ExprKind::EnumEq(_v) => todo!(),
+            ir::ExprKind::EnumEq(v) => ExprKind::EnumEq(Box::new(self.compile_enum_eq(*v))),
             ir::ExprKind::EnumUnwrap(_v) => todo!(),
-            ir::ExprKind::TupleLookup(v) => {
-                ExprKind::TupleLookup(Box::new(self.compile_tuple_lookup(*v)))
-            }
+            ir::ExprKind::TupleLookup(v) => return self.compile_tuple_lookup(*v),
             ir::ExprKind::Binding(v) => ExprKind::Binding(Box::new(self.compile_binding(*v))),
-            ir::ExprKind::Switch(_v) => todo!(),
+            ir::ExprKind::Switch(v) => ExprKind::Switch(self.compile_switch(v)),
         };
 
         Expr { kind }
@@ -137,14 +135,26 @@ impl ByteCoder {
         }
     }
 
-    fn compile_tuple_lookup(&mut self, value: ir::TupleLookup) -> TupleLookup {
+    fn compile_enum_eq(&mut self, v: ir::EnumEq) -> EnumEq {
+        let ty_variants = v.expr.ty.kind.as_enum().unwrap();
+        let head_format = lutra_bin::layout::enum_head_format(ty_variants);
+
+        let tag = v.tag.to_le_bytes()[0..head_format.tag_bytes as usize].to_vec();
+        EnumEq {
+            tag,
+            expr: self.compile_expr(v.expr),
+        }
+    }
+
+    fn compile_tuple_lookup(&mut self, value: ir::TupleLookup) -> Expr {
         let base_ty = self.get_ty_mat(&value.base.ty);
         let offset = lutra_bin::layout::tuple_field_offset(base_ty, value.position);
 
-        TupleLookup {
+        let kind = ExprKind::Offset(Box::new(Offset {
             base: self.compile_expr(value.base),
             offset,
-        }
+        }));
+        Expr { kind }
     }
 
     fn compile_binding(&mut self, value: ir::Binding) -> Binding {
@@ -153,6 +163,16 @@ impl ByteCoder {
             expr: self.compile_expr(value.expr),
             main: self.compile_expr(value.main),
         }
+    }
+
+    fn compile_switch(&mut self, branches: Vec<ir::SwitchBranch>) -> Vec<SwitchBranch> {
+        branches
+            .into_iter()
+            .map(|b| SwitchBranch {
+                condition: self.compile_expr(b.condition),
+                value: self.compile_expr(b.value),
+            })
+            .collect()
     }
 
     fn compile_ty_layout(&mut self, value: ir::TyLayout) -> TyLayout {

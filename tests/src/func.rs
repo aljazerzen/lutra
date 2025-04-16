@@ -1089,3 +1089,17 @@ test_case!(
 }"#,
     skip_postgres
 );
+
+test_case!(
+    match_00,
+    r#"
+    type Status = enum {Done, Pending = int16, Cancelled = text}
+    func () -> match Status::Pending(4) {
+        Status::Done => "done",
+        Status::Pending => "pending",
+        Status::Cancelled => "cancelled",
+    }
+    "#,
+    r#""pending""#,
+    skip_postgres
+);

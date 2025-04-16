@@ -5,7 +5,7 @@ use std::rc::Rc;
 
 use lutra_bin::br;
 use lutra_bin::bytes;
-use lutra_bin::{Data, Encode};
+use lutra_bin::{Data, Decode, Encode};
 
 use crate::NativeModule;
 
@@ -220,13 +220,29 @@ impl Interpreter {
                     inner,
                 ))
             }
-            br::ExprKind::TupleLookup(lookup) => {
-                let br::TupleLookup { base, offset } = lookup.as_ref();
+            br::ExprKind::EnumEq(enum_eq) => {
+                let expr = self.evaluate_expr(&enum_eq.expr);
+                let expr = expr.into_data().unwrap_or_else(|_| panic!());
 
-                let base = self.evaluate_expr(base);
+                let expr_tag = expr.slice(enum_eq.tag.len());
+                let eq = expr_tag == enum_eq.tag;
+
+                Cell::Data(Data::new(vec![if eq { 1_u8 } else { 0_u8 }]))
+            }
+            br::ExprKind::Offset(lookup) => {
+                let base = self.evaluate_expr(&lookup.base);
 
                 let mut data = base.into_data().unwrap_or_else(|_| panic!());
-                data.skip(*offset as usize);
+                data.skip(lookup.offset as usize);
+                Cell::Data(data)
+            }
+            br::ExprKind::Deref(deref) => {
+                let data = self.evaluate_expr(&deref.ptr);
+
+                let mut data = data.into_data().unwrap_or_else(|_| panic!());
+                let offset = u32::from_le_bytes(data.slice(4).try_into().unwrap());
+                data.skip(offset as usize);
+
                 Cell::Data(data)
             }
             br::ExprKind::Call(call) => {
@@ -251,6 +267,24 @@ impl Interpreter {
                 let main = self.evaluate_expr(main);
                 self.drop_binding(*symbol);
                 main
+            }
+            br::ExprKind::Switch(branches) => {
+                // At least one branch are guaranteed to match the condition.
+                // This means that there will be at least one branch.
+                // And that we don't have to check condition of the last branch.
+
+                let (last, to_check) = branches.split_last().unwrap();
+
+                for branch in to_check {
+                    let condition = self.evaluate_expr(&branch.condition);
+                    let condition = condition.into_data().unwrap_or_else(|_| panic!());
+                    let condition = bool::decode(condition.slice(1)).unwrap();
+
+                    if condition {
+                        return self.evaluate_expr(&branch.value);
+                    }
+                }
+                self.evaluate_expr(&last.value)
             }
         }
     }

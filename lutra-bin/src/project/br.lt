@@ -22,8 +22,11 @@ type ExprKind = enum {
   `Tuple` = `Tuple`,
   Array = Array,
   EnumVariant = EnumVariant,
-  TupleLookup = TupleLookup,
+  EnumEq = EnumEq,
+  Offset = Offset,
+  Deref = Deref,
   Binding = Binding,
+  Switch = [SwitchBranch],
 }
 
 ## Symbol id.
@@ -63,15 +66,29 @@ type EnumVariant = {
     inner = Expr,
 }
 
-type TupleLookup = {
+type EnumEq = {
+    tag = [uint8],
+    expr = Expr,
+}
+
+type Offset = {
   base = Expr,
   offset = uint32,
+}
+
+type Deref = {
+  ptr = Expr,
 }
 
 type Binding = {
   symbol = Sid,
   expr = Expr,
   main = Expr,
+}
+
+type SwitchBranch = {
+    condition = Expr,
+    value = Expr,
 }
 
 @derive(["Debug", "Clone", "PartialEq", "Default"])

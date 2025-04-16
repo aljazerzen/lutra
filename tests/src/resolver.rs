@@ -550,7 +550,7 @@ fn enums_03() {
 }
 
 #[test]
-#[ignore]
+#[ignore] // TODO
 fn recursive_00() {
     // This test is skipped, because it fails in layouter, where we cannot throw a proper error.
     // That's because we don't have span in IR and I don't want to add it.
@@ -571,4 +571,49 @@ fn recursive_00() {
     Tree has infinite size.
     "#
     );
+}
+
+#[test]
+fn match_00() {
+    insta::assert_snapshot!(_test_run(r#"
+        type Status = enum {Done, Pending = int16, Cancelled = text}
+
+        let main = func () -> match Status::Done {
+          Status::Done => "done",
+          Status::Pending => "pending",
+          Status::Cancelled => "cancelled",
+        }
+    "#), @"text");
+}
+
+#[test]
+#[ignore] // TODO
+fn match_01() {
+    insta::assert_snapshot!(_test_err(r#"
+        type Status = enum {Done, Pending = int16, Cancelled = text}
+
+        let main = func () -> match Status::Done {
+          Status::Done => "done",
+          Status::Cancelled => "cancelled",
+        }
+    "#), @r#"
+        Variant Status::Pending not covered.
+    "#);
+}
+
+#[test]
+#[ignore] // TODO
+fn match_02() {
+    insta::assert_snapshot!(_test_err(r#"
+        type Status = enum {Done, Pending = int16, Cancelled = text}
+        type Color = enum {Red, Green, Blue}
+
+        let main = func () -> match Status::Done {
+          Color::Red => "red",
+          Color::Green => "green",
+          Color::Blue => "blue",
+        }
+    "#), @r#"
+        Expected pattern to match against Status, not Color
+    "#);
 }
