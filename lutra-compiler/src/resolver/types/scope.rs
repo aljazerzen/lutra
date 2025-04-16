@@ -7,7 +7,8 @@ use itertools::Itertools;
 
 use crate::diagnostic::{Diagnostic, WithErrorInfo};
 use crate::pr::{self, Path, TyParamDomain};
-use crate::{decl, printer, utils, Result};
+use crate::resolver::module::ExprOrTy;
+use crate::{printer, utils, Result};
 
 use super::TypeResolver;
 
@@ -36,7 +37,7 @@ pub type TyArgId = usize;
 #[derive(Debug, strum::AsRefStr)]
 pub enum Named<'a> {
     Expr(&'a pr::Expr),
-    Ty(&'a pr::Ty),
+    Ty(&'a pr::Ty, bool),
     Scoped(&'a ScopedKind),
     EnumVariant(&'a pr::Ty, usize),
 }
@@ -170,33 +171,34 @@ impl TypeResolver<'_> {
         tracing::trace!("get_ident: {target:?}");
 
         match target {
-            pr::Ref::FullyQualified(path) => {
-                let (decl, steps) = self.root_mod.module.try_get(path.full_path()).unwrap();
-                match &decl.kind {
-                    decl::DeclKind::Expr(expr) => {
-                        if !steps.is_empty() {
+            pr::Ref::FullyQualified {
+                to_decl: path,
+                within,
+            } => {
+                let decl = self
+                    .root_mod
+                    .module
+                    .get(path)
+                    .unwrap_or_else(|| panic!("cannot find {path}"));
+                match decl {
+                    ExprOrTy::Expr(expr) => {
+                        if !within.is_empty() {
                             unreachable!()
                         }
                         Ok(Named::Expr(expr))
                     }
 
-                    decl::DeclKind::Ty(ty) => lookup_into_ty(ty, steps)
+                    ExprOrTy::Ty(ty) => lookup_into_ty(ty, within.full_path(), true)
                         .ok_or_else(|| Diagnostic::new_custom("unknown name")),
-
-                    decl::DeclKind::Unresolved(_) => Err(Diagnostic::new_assert(format!(
-                        "bad resolution order: unresolved {target:?} while resolving {}",
-                        self.debug_current_decl
-                    ))),
-
-                    decl::DeclKind::Module(_) | decl::DeclKind::Import(_) => {
-                        // handled during name resolution
-                        unreachable!()
-                    }
                 }
             }
 
             pr::Ref::Local { scope, offset } => {
-                let scope = self.scopes.iter().find(|s| s.id == *scope).unwrap();
+                let scope = self
+                    .scopes
+                    .iter()
+                    .find(|s| s.id == *scope)
+                    .ok_or_else(|| Diagnostic::new_assert("cannot find scope by id"))?;
                 Ok(scope.names.get(*offset).map(Named::Scoped).unwrap())
             }
         }
@@ -224,7 +226,7 @@ impl TypeResolver<'_> {
         //     .with_span(ty.span)
 
         match named {
-            Named::Ty(ty) => {
+            Named::Ty(ty, _is_top_level) => {
                 // reference to a type: all ok
 
                 // but refed ty might be an ident too: recurse!
@@ -337,8 +339,10 @@ impl TypeResolver<'_> {
     }
 }
 
-fn lookup_into_ty<'t>(ty: &'t pr::Ty, steps: &[String]) -> Option<Named<'t>> {
-    assert!(!steps.is_empty());
+fn lookup_into_ty<'t>(ty: &'t pr::Ty, steps: &[String], top_level: bool) -> Option<Named<'t>> {
+    if steps.is_empty() {
+        return Some(Named::Ty(ty, top_level));
+    }
     match &ty.kind {
         pr::TyKind::Enum(variants) => {
             // path into enum
@@ -348,7 +352,7 @@ fn lookup_into_ty<'t>(ty: &'t pr::Ty, steps: &[String]) -> Option<Named<'t>> {
             if steps.len() == 1 {
                 Some(Named::EnumVariant(ty, position))
             } else {
-                lookup_into_ty(&variant.ty, &steps[1..])
+                lookup_into_ty(&variant.ty, &steps[1..], false)
             }
         }
         pr::TyKind::Tuple(fields) => {
@@ -358,11 +362,7 @@ fn lookup_into_ty<'t>(ty: &'t pr::Ty, steps: &[String]) -> Option<Named<'t>> {
                 .iter()
                 .find(|f| f.name.as_ref().map_or(false, |n| n == &steps[0]))?;
 
-            if steps.len() == 1 {
-                Some(Named::Ty(&field.ty))
-            } else {
-                lookup_into_ty(&field.ty, &steps[1..])
-            }
+            lookup_into_ty(&field.ty, &steps[1..], false)
         }
         _ => None,
     }

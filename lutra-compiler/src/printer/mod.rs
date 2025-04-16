@@ -59,7 +59,23 @@ impl Printer {
                 r += "]";
                 r
             }
-            pr::TyKind::Enum(_) => todo!(),
+            pr::TyKind::Enum(variants) => {
+                let mut r = String::new();
+                r += "enum {";
+                for (i, variant) in variants.iter().enumerate() {
+                    if i > 0 {
+                        r += ", ";
+                    }
+                    r += &pr::display_ident_part(&variant.name);
+                    let is_unit = variant.ty.kind.as_tuple().map_or(false, |f| f.is_empty());
+                    if !is_unit {
+                        r += " = ";
+                        r += &self.print_ty(&variant.ty);
+                    }
+                }
+                r += "}";
+                r
+            }
             pr::TyKind::Func(func) => {
                 let mut r = String::new();
                 r += "func";

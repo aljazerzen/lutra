@@ -34,11 +34,14 @@ impl NameResolver<'_> {
         import_def: pr::ImportDef,
     ) -> Result<pr::ImportDef, Diagnostic> {
         let target = self.resolve_ident(&import_def.name)?;
-        let pr::Ref::FullyQualified(fq_ident) = target else {
+        let pr::Ref::FullyQualified { to_decl, within } = target else {
             panic!()
         };
+        if !within.is_empty() {
+            panic!();
+        }
         Ok(pr::ImportDef {
-            name: fq_ident,
+            name: to_decl,
             alias: import_def.alias,
         })
     }
@@ -174,27 +177,34 @@ impl NameResolver<'_> {
         let base_decl = self.root.module.get_submodule(&base_path);
 
         let res = base_decl.map_or(Err(None), |module| module_lookup_steps(module, steps));
-        if let Err(err) = res {
-            tracing::debug!("scopes: {:?}", self.scopes);
-            let message = err.unwrap_or_else(|| format!("unknown name {ident}"));
-            return Err(Diagnostic::new_custom(message));
-        }
+        let steps_within = match res {
+            Err(err) => {
+                tracing::debug!("scopes: {:?}", self.scopes);
+                let message = err.unwrap_or_else(|| format!("unknown name {ident}"));
+                return Err(Diagnostic::new_custom(message));
+            }
+            Ok(within) => within,
+        };
+        let (to_decl, within) = steps.split_at(steps.len() - steps_within);
 
         // prepend the ident with the module path
         // this will make this ident a fully-qualified ident
         let mut fq_ident = pr::Path::new(base_path);
-        for step in steps {
+        for step in to_decl {
             fq_ident.push(step.clone());
         }
 
         self.refs.push(fq_ident.clone());
 
-        Ok(pr::Ref::FullyQualified(fq_ident))
+        Ok(pr::Ref::FullyQualified {
+            to_decl: fq_ident,
+            within: pr::Path::new(within),
+        })
     }
 }
 
 /// Returns true if ok
-fn module_lookup_steps(module: &decl::Module, steps: &[String]) -> Result<(), Option<String>> {
+fn module_lookup_steps(module: &decl::Module, steps: &[String]) -> Result<usize, Option<String>> {
     if steps.is_empty() {
         // references to modules do not mean anything
         return Err(Some("cannot refer to modules".to_string()));
@@ -214,18 +224,20 @@ fn module_lookup_steps(module: &decl::Module, steps: &[String]) -> Result<(), Op
             // recursive lookup into self (we take node out of Unresolved during name resolution)
 
             if steps.len() == 1 {
-                Ok(())
-            } else {
-                // ???
-                todo!()
+                return Ok(0);
             }
+
+            // We do not support this, because we want to
+            // inline any lookups into types, to keep IR simpler.
+
+            Err(Some("paths into self type are not allowed".into()))
         }
     }
 }
 
-fn stmt_lookup_steps(stmt: &pr::StmtKind, steps: &[String]) -> Result<(), Option<String>> {
+fn stmt_lookup_steps(stmt: &pr::StmtKind, steps: &[String]) -> Result<usize, Option<String>> {
     if steps.is_empty() {
-        return Ok(());
+        return Ok(0);
     }
 
     // into type enum declarations (referring to variants)
@@ -233,27 +245,30 @@ fn stmt_lookup_steps(stmt: &pr::StmtKind, steps: &[String]) -> Result<(), Option
         pr::StmtKind::VarDef(_) | pr::StmtKind::ImportDef(_) => {
             Err(Some("cannot lookup into expressions".to_string()))
         }
-        pr::StmtKind::TypeDef(ty_def) => ty_lookup_steps(&ty_def.ty, steps),
+        pr::StmtKind::TypeDef(ty_def) => {
+            ty_lookup_steps(&ty_def.ty, steps).map_err(|_| None)?;
+            Ok(steps.len())
+        }
         pr::StmtKind::ModuleDef(_) => unreachable!(),
     }
 }
 
-fn ty_lookup_steps(ty: &pr::Ty, steps: &[String]) -> Result<(), Option<String>> {
+pub fn ty_lookup_steps<'t>(ty: &'t pr::Ty, steps: &[String]) -> Result<&'t pr::Ty, ()> {
     if steps.is_empty() {
-        return Ok(());
+        return Ok(ty);
     }
     match &ty.kind {
         pr::TyKind::Enum(variants) => {
-            let variant = variants.iter().find(|v| v.name == steps[0]).ok_or(None)?;
+            let variant = variants.iter().find(|v| v.name == steps[0]).ok_or(())?;
             ty_lookup_steps(&variant.ty, &steps[1..])
         }
         pr::TyKind::Tuple(fields) => {
             let field = fields
                 .iter()
                 .find(|f| f.name.as_ref().map_or(false, |n| n == &steps[0]))
-                .ok_or(None)?;
+                .ok_or(())?;
             ty_lookup_steps(&field.ty, &steps[1..])
         }
-        _ => Err(None),
+        _ => Err(()),
     }
 }

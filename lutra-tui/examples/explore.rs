@@ -1,6 +1,6 @@
 use itertools::Itertools;
 use lutra_bin::ir;
-use lutra_compiler::{decl, pr};
+use lutra_compiler::pr;
 
 fn main() {
     let project = get_project();
@@ -9,7 +9,7 @@ fn main() {
     let path = pr::Path::new(path.0);
 
     let decl = project.root_module.module.get(&path).unwrap();
-    if let decl::DeclKind::Expr(expr) = &decl.kind {
+    if let Ok(expr) = decl.into_expr() {
         let ty = expr.ty.as_ref().unwrap();
         if ty.kind.is_func() {
             execute_function(&project, path);

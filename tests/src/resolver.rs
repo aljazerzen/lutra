@@ -17,8 +17,15 @@ fn _test_err(source: &str) -> String {
 
     crate::init_logger();
 
-    let Error::Compile { diagnostics } = lutra_compiler::_test_compile(source).unwrap_err() else {
-        unreachable!()
+    let res = lutra_compiler::_test_compile(source);
+
+    let diagnostics = match res {
+        Ok(program) => {
+            tracing::error!("ir: {program:#?}");
+            panic!("expected compilation to fail, but it succedded");
+        }
+        Err(Error::Compile { diagnostics }) => diagnostics,
+        Err(_) => unreachable!(),
     };
     let diagnostic = diagnostics.into_iter().next().unwrap();
     diagnostic.display().to_string()
@@ -507,5 +514,61 @@ fn enums_01() {
             "#
         ),
         @"enum {Open = {}, Done = {}, Pending = text}"
+    );
+}
+#[test]
+fn enums_02() {
+    insta::assert_snapshot!(
+        _test_run(
+            r#"
+            type X = { a = int64 }
+
+            let main = func (): X::a -> 5
+            "#
+        ),
+        @"int64"
+    );
+}
+#[test]
+fn enums_03() {
+    insta::assert_snapshot!(
+        _test_err(
+            r#"
+            type X = { a = int, b = X::a }
+            "#
+        ),
+        @r#"
+    Error: 
+       ╭─[:2:37]
+       │
+     2 │             type X = { a = int, b = X::a }
+       │                                     ──┬─  
+       │                                       ╰─── paths into self type are not allowed
+    ───╯
+    "#
+    );
+}
+
+#[test]
+#[ignore]
+fn recursive_00() {
+    // This test is skipped, because it fails in layouter, where we cannot throw a proper error.
+    // That's because we don't have span in IR and I don't want to add it.
+    // IR is supposed to be a valid program, we should error out earlier.
+    insta::assert_snapshot!(
+        _test_err(
+            r#"
+            type Tree = {left = Tree, right = Tree}
+
+            type OptionalTree = enum {
+                None,
+                Some = Tree,
+            }
+            let main = func (): OptionalTree -> OptionalTree::None
+            "#
+        ),
+        @r#"
+    Tree has infinite size.
+    "#
     );
 }

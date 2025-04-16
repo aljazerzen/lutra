@@ -60,7 +60,10 @@ pub struct Expr {
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Ref {
-    FullyQualified(Path),
+    FullyQualified {
+        to_decl: Path,
+        within: Path,
+    },
     Local {
         /// scope id
         scope: usize,

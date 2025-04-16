@@ -3,6 +3,7 @@ use itertools::Itertools;
 use crate::diagnostic::{Diagnostic, WithErrorInfo};
 use crate::pr;
 use crate::pr::Ty;
+use crate::resolver::names;
 use crate::resolver::types::scope::{Named, ScopedKind};
 use crate::resolver::types::tuple::BaseKind;
 use crate::utils::fold;
@@ -37,7 +38,7 @@ impl fold::PrFold for super::TypeResolver<'_> {
                         expr.ty.clone().unwrap()
                     }
 
-                    Named::Ty(_) => {
+                    Named::Ty(_, _) => {
                         return Err(Diagnostic::new_custom("expected a value, but found a type")
                             .with_span(span))
                     }
@@ -89,7 +90,10 @@ impl fold::PrFold for super::TypeResolver<'_> {
                     BaseKind::Array => {
                         let std_index = pr::Path::new(vec!["std", "index"]);
                         let mut std_index_expr = pr::Expr::new(std_index.clone());
-                        std_index_expr.target = Some(pr::Ref::FullyQualified(std_index));
+                        std_index_expr.target = Some(pr::Ref::FullyQualified {
+                            to_decl: std_index,
+                            within: pr::Path::empty(),
+                        });
 
                         let position =
                             pr::Expr::new(pr::Literal::Integer(indirection.position as i64));
@@ -182,6 +186,30 @@ impl fold::PrFold for super::TypeResolver<'_> {
                     kind: pr::TyKind::Func(ty_func),
                     ..ty
                 }
+            }
+
+            // inline idents into types
+            pr::TyKind::Ident(_) => {
+                if let Some(pr::Ref::FullyQualified { to_decl, within }) = &ty.target {
+                    if !within.is_empty() {
+                        // Things like `my_tuple::field` are "references into types".
+                        // They are needed for constructing enums and are useful in general.
+                        // But they are inconvenient to work with in IR, because in addition
+                        // to the code that finds the decl, we need code to look into the decl
+                        // as well/
+                        // So instead, we inline these references during resolving.
+                        // This is possible, because they are restricted to be non-recursive.
+                        tracing::debug!("inlining a 'path into type' for: {to_decl:?}.{within:?}");
+
+                        let decl = self.root_mod.module.get(to_decl).unwrap();
+                        let referenced = decl.into_ty().unwrap();
+                        let referenced =
+                            names::ty_lookup_steps(referenced, within.full_path()).unwrap();
+
+                        return self.fold_type(referenced.clone());
+                    }
+                }
+                ty
             }
 
             // normal fold

@@ -45,6 +45,11 @@ impl TypeResolver<'_> {
             printer::print_ty(found),
             printer::print_ty(expected)
         );
+
+        if found.target.is_some() && found.target == expected.target {
+            return Ok(());
+        }
+
         let found_ref = self.get_ty_mat(found)?;
         let expected_ref = self.get_ty_mat(expected)?;
 
@@ -187,6 +192,17 @@ impl TypeResolver<'_> {
                 }
                 Ok(())
             }
+
+            (TyKind::Enum(f_variants), TyKind::Enum(e_variants))
+                if f_variants.len() == e_variants.len() =>
+            {
+                for (f_variant, e_variant) in itertools::zip_eq(f_variants, e_variants) {
+                    // co-variant contained types
+                    self.validate_type(&f_variant.ty, &e_variant.ty, who)?;
+                }
+                Ok(())
+            }
+
             _ => Err(compose_type_error(&found, &expected, who)),
         }
     }

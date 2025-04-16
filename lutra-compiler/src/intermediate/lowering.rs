@@ -70,9 +70,7 @@ impl<'a> Lowerer<'a> {
             .module
             .get(path)
             .unwrap_or_else(|| panic!("{path} does not exist"));
-        let decl::DeclKind::Expr(expr) = &decl.kind else {
-            panic!();
-        };
+        let expr = decl.into_expr().unwrap();
 
         if !matches!(expr.kind, pr::ExprKind::Internal) {
             return Ok(None);
@@ -93,14 +91,12 @@ impl<'a> Lowerer<'a> {
             .module
             .get(path)
             .unwrap_or_else(|| panic!("{path} does not exist"));
-        let decl::DeclKind::Expr(expr) = &decl.kind else {
-            panic!();
-        };
+        let expr = decl.into_expr().unwrap().clone();
 
         // should have been lowered earlier
         assert!(!matches!(expr.kind, pr::ExprKind::Internal));
 
-        let mut expr = *expr.clone();
+        let mut expr = expr;
 
         if let pr::TyKind::Func(ty_func) = &expr.ty.as_ref().unwrap().kind {
             if !ty_func.ty_params.is_empty() {
@@ -211,11 +207,14 @@ impl<'a> Lowerer<'a> {
                     }))
                 }
 
-                pr::Ref::FullyQualified(path) => {
-                    if let Some(ptr) = self.lower_external_expr_decl(path)? {
+                pr::Ref::FullyQualified {
+                    to_decl,
+                    within: _within,
+                } => {
+                    if let Some(ptr) = self.lower_external_expr_decl(to_decl)? {
                         ptr
                     } else {
-                        let reference = (path.clone(), expr.ty_args.clone());
+                        let reference = (to_decl.clone(), expr.ty_args.clone());
                         let entry = self.var_bindings.entry(reference);
                         let binding_id = match entry {
                             indexmap::map::Entry::Occupied(e) => *e.get(),
@@ -316,13 +315,13 @@ impl<'a> Lowerer<'a> {
         log::trace!("lower ty: {}", crate::printer::print_ty(&ty));
 
         if let Some(target) = ty.target {
-            if let pr::Ref::FullyQualified(ident) = target {
-                self.type_defs_needed.push_back(ident.clone());
+            if let pr::Ref::FullyQualified { to_decl, .. } = target {
+                self.type_defs_needed.push_back(to_decl.clone());
 
-                log::debug!("lower ty ident: {ident}");
+                log::debug!("lower ty ident: {to_decl}");
 
                 return ir::Ty {
-                    kind: ir::TyKind::Ident(ir::Path(ident.into_iter().collect_vec())),
+                    kind: ir::TyKind::Ident(ir::Path(to_decl.into_iter().collect_vec())),
                     layout: None,
                     name: ty.name,
                     variants_recursive: vec![],
@@ -400,7 +399,7 @@ impl<'a> Lowerer<'a> {
             }
 
             let decl = self.root_module.module.get(&path).unwrap();
-            let ty = decl.kind.as_ty().unwrap().clone();
+            let ty = decl.into_ty().unwrap().clone();
 
             let ty = self.lower_ty(ty);
 

@@ -121,13 +121,13 @@ impl Layouter {
             }
         }
 
-        assert!(
-            todo.is_empty(),
-            "cannot compute layout for: {:?}",
-            todo.iter()
-                .map(|i| self.ty_defs.get_index(*i).unwrap().0)
-                .collect_vec()
-        );
+        if !todo.is_empty() {
+            let paths = todo
+                .iter()
+                .map(|i| self.ty_defs.get_index(*i).unwrap().0 .0.join("::"))
+                .join(", ");
+            panic!("Cannot layout: {paths}")
+        }
 
         Ok(())
     }

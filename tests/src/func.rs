@@ -1073,3 +1073,19 @@ test_case!(
 )"#,
     skip_postgres
 );
+
+test_case!(
+    enum_construction_07,
+    r#"
+    type X = {
+      a = int,
+      b = {c = bool, d = text},
+    }
+    func (): X::b -> {c = true, d = "d"}
+    "#,
+    r#"{
+  c = true,
+  d = "d",
+}"#,
+    skip_postgres
+);

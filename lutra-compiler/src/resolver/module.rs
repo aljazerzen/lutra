@@ -1,3 +1,4 @@
+use enum_as_inner::EnumAsInner;
 use indexmap::IndexMap;
 use itertools::Itertools;
 
@@ -20,11 +21,25 @@ pub fn init_root(root_module_def: pr::ModuleDef) -> decl::RootModule {
     }
 }
 
+#[derive(Debug, EnumAsInner)]
+pub enum ExprOrTy<'a> {
+    Expr(&'a pr::Expr),
+    Ty(&'a pr::Ty),
+}
+
 impl decl::Module {
     /// Get declaration by fully qualified ident.
-    pub fn get(&self, ident: &pr::Path) -> Option<&decl::Decl> {
-        let module = self.get_submodule(ident.path())?;
-        module.names.get(ident.name())
+    pub fn get(&self, fq_ident: &pr::Path) -> Option<ExprOrTy> {
+        let sub_module = self.get_submodule(fq_ident.path())?;
+        let decl = sub_module.names.get(fq_ident.name())?;
+        match &decl.kind {
+            decl::DeclKind::Expr(expr) => Some(ExprOrTy::Expr(expr)),
+            decl::DeclKind::Ty(ty) => Some(ExprOrTy::Ty(ty)),
+            decl::DeclKind::Unresolved(_) => {
+                panic!("unresolved")
+            }
+            decl::DeclKind::Module(_) | decl::DeclKind::Import(_) => None,
+        }
     }
 
     /// Get declaration by fully qualified ident and return remaining steps into the decl.

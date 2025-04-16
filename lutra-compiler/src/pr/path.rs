@@ -12,6 +12,9 @@ impl Path {
             path: path.into_iter().map(|x| x.to_string()).collect(),
         }
     }
+    pub fn empty() -> Self {
+        Path { path: vec![] }
+    }
 
     pub fn from_name<S: ToString>(name: S) -> Self {
         Path {

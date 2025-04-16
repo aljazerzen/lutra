@@ -2,6 +2,8 @@ mod expr;
 mod module;
 mod scope;
 
+pub use expr::ty_lookup_steps;
+
 use itertools::Itertools;
 use scope::Scope;
 
