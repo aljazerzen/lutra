@@ -72,9 +72,9 @@ impl super::TypeResolver<'_> {
                         // var value is provided
 
                         // validate type
-                        if expected_ty.is_some() {
+                        if let Some(expected_ty) = &expected_ty {
                             let who = || Some(fq_ident.name().to_string());
-                            self.validate_expr_type(&mut def_value, expected_ty.as_ref(), &who)?;
+                            self.validate_expr_type(&mut def_value, expected_ty, &who)?;
                         }
 
                         // finalize global generics

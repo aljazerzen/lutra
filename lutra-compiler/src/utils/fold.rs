@@ -107,7 +107,7 @@ pub fn fold_expr_kind<T: ?Sized + PrFold>(fold: &mut T, expr_kind: ExprKind) -> 
                 .map(|x| fold.fold_interpolate_item(x))
                 .try_collect()?,
         ),
-        Case(cases) => Case(fold_cases(fold, cases)?),
+        Match(match_) => Match(fold_match(fold, match_)?),
 
         FuncCall(func_call) => FuncCall(fold.fold_func_call(func_call)?),
         Func(func) => Func(Box::new(fold.fold_func(*func)?)),
@@ -194,16 +194,23 @@ pub fn fold_interpolate_item<F: ?Sized + PrFold>(
     })
 }
 
-fn fold_cases<F: ?Sized + PrFold>(fold: &mut F, cases: Vec<SwitchCase>) -> Result<Vec<SwitchCase>> {
-    cases
-        .into_iter()
-        .map(|c| fold_switch_case(fold, c))
-        .try_collect()
+fn fold_match<F: ?Sized + PrFold>(fold: &mut F, match_: Match) -> Result<Match> {
+    Ok(Match {
+        subject: Box::new(fold.fold_expr(*match_.subject)?),
+        branches: match_
+            .branches
+            .into_iter()
+            .map(|c| fold_match_branch(fold, c))
+            .try_collect()?,
+    })
 }
 
-pub fn fold_switch_case<F: ?Sized + PrFold>(fold: &mut F, case: SwitchCase) -> Result<SwitchCase> {
-    Ok(SwitchCase {
-        condition: Box::new(fold.fold_expr(*case.condition)?),
+pub fn fold_match_branch<F: ?Sized + PrFold>(
+    fold: &mut F,
+    case: MatchBranch,
+) -> Result<MatchBranch> {
+    Ok(MatchBranch {
+        pattern: case.pattern,
         value: Box::new(fold.fold_expr(*case.value)?),
     })
 }

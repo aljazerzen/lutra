@@ -1,6 +1,6 @@
 use chumsky::prelude::*;
 
-use super::expr::{expr, expr_call, ident};
+use super::expr::{expr, ident};
 use super::{ctrl, ident_part, keyword};
 use crate::parser::lexer::TokenKind;
 use crate::parser::perror::PError;
@@ -67,9 +67,8 @@ fn doc_comment() -> impl Parser<TokenKind, String, Error = PError> + Clone {
 /// A variable definition could be any of:
 /// - `let foo = 5`
 /// - `from artists` — captured as a "main"
-/// - `from artists | into x` — captured as an "into"`
 fn var_def() -> impl Parser<TokenKind, StmtKind, Error = PError> + Clone {
-    let expr = expr_call();
+    let expr = expr();
 
     let let_ = keyword("let")
         .ignore_then(ident_part())
@@ -77,20 +76,17 @@ fn var_def() -> impl Parser<TokenKind, StmtKind, Error = PError> + Clone {
         .then(ctrl('=').ignore_then(expr.clone()).map(Box::new).or_not())
         .map(|((name, ty), value)| StmtKind::VarDef(VarDef { name, value, ty }));
 
-    let main_or_into = expr
-        .map(Box::new)
-        .then(keyword("into").ignore_then(ident_part()).or_not())
-        .map(|(value, name)| {
-            let name = name.unwrap_or_else(|| "main".to_string());
+    let main = expr.map(Box::new).map(|value| {
+        let name = "main".to_string();
 
-            StmtKind::VarDef(VarDef {
-                name,
-                value: Some(value),
-                ty: None,
-            })
-        });
+        StmtKind::VarDef(VarDef {
+            name,
+            value: Some(value),
+            ty: None,
+        })
+    });
 
-    let_.or(main_or_into).labelled("variable definition")
+    let_.or(main).labelled("variable definition")
 }
 
 fn type_def() -> impl Parser<TokenKind, StmtKind, Error = PError> + Clone {

@@ -14,17 +14,12 @@ impl TypeResolver<'_> {
     pub fn validate_expr_type<F>(
         &mut self,
         found: &mut pr::Expr,
-        expected: Option<&Ty>,
+        expected: &Ty,
         who: &F,
     ) -> Result<(), Diagnostic>
     where
         F: Fn() -> Option<String>,
     {
-        let Some(expected) = expected else {
-            // expected is none: there is no validation to be done and no generic to be inferred
-            return Ok(());
-        };
-
         let Some(found_ty) = &mut found.ty else {
             // found is none: infer from expected
             found.ty = Some(expected.clone());

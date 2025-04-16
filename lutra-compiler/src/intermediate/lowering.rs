@@ -229,7 +229,7 @@ impl<'a> Lowerer<'a> {
                 }
             },
 
-            pr::ExprKind::Case(_) => todo!(),
+            pr::ExprKind::Match(_) => todo!(),
             pr::ExprKind::FString(_) => todo!(),
 
             // consumed by type resolver

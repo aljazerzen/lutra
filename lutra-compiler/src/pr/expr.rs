@@ -97,7 +97,7 @@ pub enum ExprKind {
     FuncCall(FuncCall),
     Func(Box<Func>),
     FString(Vec<InterpolateItem>),
-    Case(Vec<SwitchCase>),
+    Match(Match),
 
     Internal,
 }
@@ -206,8 +206,16 @@ pub enum InterpolateItem {
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct SwitchCase {
-    pub condition: Box<Expr>,
+pub struct Match {
+    pub subject: Box<Expr>,
+
+    // contract: there will be at least one branch
+    pub branches: Vec<MatchBranch>,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct MatchBranch {
+    pub pattern: Path,
     pub value: Box<Expr>,
 }
 

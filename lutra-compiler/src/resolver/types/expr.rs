@@ -148,7 +148,7 @@ impl fold::PrFold for super::TypeResolver<'_> {
                 let ty = self.fold_type(*ann.ty)?;
                 let mut expr = self.fold_expr(*ann.expr)?;
 
-                self.validate_expr_type(&mut expr, Some(&ty), &|| None)?;
+                self.validate_expr_type(&mut expr, &ty, &|| None)?;
 
                 // return inner expr directly (without type annotation)
                 return Ok(expr);
@@ -163,7 +163,7 @@ impl fold::PrFold for super::TypeResolver<'_> {
         let mut r = r;
         r.span = r.span.or(span);
         if r.ty.is_none() {
-            r.ty = Some(self.infer_type(&r)?);
+            r.ty = Some(self.infer_type(&mut r)?);
         }
         if let Some(scope_id) = r.scope_id {
             // make ty infer scope_id of expr

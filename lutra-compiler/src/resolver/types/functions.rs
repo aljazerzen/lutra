@@ -34,7 +34,9 @@ impl TypeResolver<'_> {
         func.body = Box::new(self.fold_expr(*func.body)?);
 
         // validate that the body has correct type
-        self.validate_expr_type(&mut func.body, func.return_ty.as_ref(), &|| None)?;
+        if let Some(return_ty) = &func.return_ty {
+            self.validate_expr_type(&mut func.body, return_ty, &|| None)?;
+        }
 
         tracing::debug!("func done, popping scope");
 
@@ -87,7 +89,9 @@ impl TypeResolver<'_> {
                     .as_ref()
                     .map(|n| format!("function {n}, one of the params")) // TODO: param name
             };
-            self.validate_expr_type(&mut arg, param.as_ref(), &who)?;
+            if let Some(param_ty) = param {
+                self.validate_expr_type(&mut arg, param_ty, &who)?;
+            }
 
             args_resolved.push(arg);
         }

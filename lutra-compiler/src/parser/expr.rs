@@ -11,10 +11,6 @@ use crate::span::Span;
 use super::pipe;
 use super::types;
 
-pub(crate) fn expr_call() -> impl Parser<TokenKind, Expr, Error = PError> + Clone {
-    expr()
-}
-
 pub(crate) fn expr() -> impl Parser<TokenKind, Expr, Error = PError> + Clone {
     recursive(|expr| {
         let literal = select! { TokenKind::Literal(lit) => ExprKind::Literal(lit) };
@@ -28,7 +24,7 @@ pub(crate) fn expr() -> impl Parser<TokenKind, Expr, Error = PError> + Clone {
         let array = array(expr.clone());
         let pipeline_expr = pipeline(expr.clone());
         let interpolation = interpolation();
-        let case = case(expr.clone());
+        let match_ = match_(expr.clone());
 
         let term = choice((
             literal,
@@ -38,7 +34,7 @@ pub(crate) fn expr() -> impl Parser<TokenKind, Expr, Error = PError> + Clone {
             interpolation,
             call,
             ident_kind,
-            case,
+            match_,
             pipeline_expr,
         ))
         .map_with_span(Expr::new_with_span)
@@ -126,18 +122,24 @@ fn interpolation() -> impl Parser<TokenKind, ExprKind, Error = PError> + Clone {
     .labelled("interpolated string")
 }
 
-fn case<'a>(
-    expr: impl Parser<TokenKind, Expr, Error = PError> + Clone + 'a,
-) -> impl Parser<TokenKind, ExprKind, Error = PError> + Clone + 'a {
-    // The `nickname != null => nickname,` part
-    let mapping = (expr.clone().map(Box::new))
+fn match_(
+    expr: impl Parser<TokenKind, Expr, Error = PError> + Clone,
+) -> impl Parser<TokenKind, ExprKind, Error = PError> + Clone {
+    let branch = ident()
         .then_ignore(just(TokenKind::ArrowFat))
-        .then(expr.map(Box::new))
-        .map(|(condition, value)| SwitchCase { condition, value });
+        .then(expr.clone().map(Box::new))
+        .map(|(pattern, value)| MatchBranch { pattern, value });
 
-    keyword("case")
-        .ignore_then(sequence(mapping).delimited_by(ctrl('['), ctrl(']')))
-        .map(ExprKind::Case)
+    keyword("match")
+        .ignore_then(expr.map(Box::new))
+        .then(
+            branch
+                .separated_by(ctrl(','))
+                .allow_trailing()
+                .at_least(1)
+                .delimited_by(ctrl('{'), ctrl('}')),
+        )
+        .map(|(subject, branches)| ExprKind::Match(Match { subject, branches }))
 }
 
 fn unary<'a>(

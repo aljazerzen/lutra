@@ -101,6 +101,9 @@ fn parse_02() {
         },
     )
     "#);
+}
+#[test]
+fn parse_03() {
     assert_debug_snapshot!(parse_expr("func <A, B: int8 | int16> () -> 1"), @r#"
     Expr {
         kind: Func(
@@ -153,6 +156,9 @@ fn parse_02() {
         target: None,
     }
     "#);
+}
+#[test]
+fn parse_04() {
     assert_debug_snapshot!(parse_expr("func <T: {b = int64, ..}> () -> 1"), @r#"
     Expr {
         kind: Func(
@@ -201,6 +207,119 @@ fn parse_02() {
         scope_id: None,
         target: None,
     }
+    "#);
+}
+
+#[test]
+fn parse_05() {
+    assert_debug_snapshot!(parse_expr(r#"
+        match item.status {
+            Status::Open => 5,
+            Status::Closed => 6 + 7,
+        }
+    "#).kind, @r#"
+    Match(
+        Match {
+            subject: Expr {
+                kind: Indirection {
+                    base: Expr {
+                        kind: Ident(
+                            [
+                                "item",
+                            ],
+                        ),
+                        span: Some(
+                            0:15-19,
+                        ),
+                        ty: None,
+                        ty_args: [],
+                        scope_id: None,
+                        target: None,
+                    },
+                    field: Name(
+                        "status",
+                    ),
+                },
+                span: Some(
+                    0:19-26,
+                ),
+                ty: None,
+                ty_args: [],
+                scope_id: None,
+                target: None,
+            },
+            branches: [
+                MatchBranch {
+                    pattern: [
+                        "Status",
+                        "Open",
+                    ],
+                    value: Expr {
+                        kind: Literal(
+                            Integer(
+                                5,
+                            ),
+                        ),
+                        span: Some(
+                            0:57-58,
+                        ),
+                        ty: None,
+                        ty_args: [],
+                        scope_id: None,
+                        target: None,
+                    },
+                },
+                MatchBranch {
+                    pattern: [
+                        "Status",
+                        "Closed",
+                    ],
+                    value: Expr {
+                        kind: Binary(
+                            BinaryExpr {
+                                left: Expr {
+                                    kind: Literal(
+                                        Integer(
+                                            6,
+                                        ),
+                                    ),
+                                    span: Some(
+                                        0:90-91,
+                                    ),
+                                    ty: None,
+                                    ty_args: [],
+                                    scope_id: None,
+                                    target: None,
+                                },
+                                op: Add,
+                                right: Expr {
+                                    kind: Literal(
+                                        Integer(
+                                            7,
+                                        ),
+                                    ),
+                                    span: Some(
+                                        0:94-95,
+                                    ),
+                                    ty: None,
+                                    ty_args: [],
+                                    scope_id: None,
+                                    target: None,
+                                },
+                            },
+                        ),
+                        span: Some(
+                            0:90-95,
+                        ),
+                        ty: None,
+                        ty_args: [],
+                        scope_id: None,
+                        target: None,
+                    },
+                },
+            ],
+        },
+    )
     "#);
 }
 
