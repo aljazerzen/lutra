@@ -217,4 +217,32 @@ impl fold::PrFold for super::TypeResolver<'_> {
         };
         Ok(ty)
     }
+
+    fn fold_pattern(&mut self, pattern: pr::Pattern) -> Result<pr::Pattern> {
+        match pattern.kind {
+            pr::PatternKind::Ident(_) => {
+                let target = pattern.target.unwrap();
+                let named = self.get_ident(&target)?;
+
+                let tag = match named {
+                    Named::EnumVariant(_, tag) => tag,
+                    _ => {
+                        return Err(Diagnostic::new_custom("expected an enum variant")
+                            .with_span(Some(pattern.span)))
+                    }
+                };
+
+                // TODO: validate that we are matching expression of the correct type
+
+                Ok(pr::Pattern {
+                    kind: pr::PatternKind::EnumEq(tag),
+                    target: None,
+                    ..pattern
+                })
+            }
+
+            // unparsable
+            pr::PatternKind::EnumEq(_) => unreachable!(),
+        }
+    }
 }

@@ -74,6 +74,9 @@ pub trait PrFold {
             expr: Box::new(self.fold_expr(*a.expr)?),
         })
     }
+    fn fold_pattern(&mut self, pattern: Pattern) -> Result<Pattern> {
+        Ok(pattern)
+    }
 }
 
 pub fn fold_expr_kind<T: ?Sized + PrFold>(fold: &mut T, expr_kind: ExprKind) -> Result<ExprKind> {
@@ -210,7 +213,7 @@ pub fn fold_match_branch<F: ?Sized + PrFold>(
     case: MatchBranch,
 ) -> Result<MatchBranch> {
     Ok(MatchBranch {
-        pattern: case.pattern,
+        pattern: fold.fold_pattern(case.pattern)?,
         value: Box::new(fold.fold_expr(*case.value)?),
     })
 }

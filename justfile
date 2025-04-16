@@ -19,8 +19,8 @@ test-fast filterset='all()' nextest_args='':
 
 generate:
     # For when current code does not compile
-    ./target/debug/lutra-codegen lutra-bin/src/project lutra-bin/src/project/generated.rs
-    cargo fmt -p lutra-bin
-
-    # cargo run -p lutra-codegen -- lutra-bin/src/project lutra-bin/src/project/generated.rs
+    # ./target/debug/lutra-codegen lutra-bin/src/project lutra-bin/src/project/generated.rs
     # cargo fmt -p lutra-bin
+
+    cargo run -p lutra-codegen -- lutra-bin/src/project lutra-bin/src/project/generated.rs
+    cargo fmt -p lutra-bin

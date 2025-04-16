@@ -104,3 +104,38 @@ fn lower_01() {
     ): func (int64) -> {[chinook::album], chinook::album, box_office::album_sale}
     "#)
 }
+
+#[test]
+fn lower_02() {
+    assert_snapshot!(_test_compile_and_print(r#"
+    type Status = enum {
+        Open,
+        Closed = text,
+    }
+ 
+    func () -> match Status::Closed {
+        Status::Open => "open",
+        Status::Closed => "closed",
+    }
+    "#), @r#"
+    let main = (
+      func 0 -> 
+        let 0 = @1: enum {Open, Closed = text};
+        (
+          switch,
+          (
+            (
+              var.0: enum {Open, Closed = text}
+            ) == @0: bool,
+            "open": text,
+          ),
+          (
+            (
+              var.0: enum {Open, Closed = text}
+            ) == @1: bool,
+            "closed": text,
+          ),
+        ): text
+    ): func () -> text
+    "#)
+}

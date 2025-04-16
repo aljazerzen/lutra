@@ -30,6 +30,7 @@ impl Printer {
         self.indent -= INDENT;
     }
 
+    #[must_use]
     fn new_line(&self) -> String {
         let mut r = "\n".to_string();
         r += &" ".repeat(self.indent);
@@ -129,7 +130,42 @@ impl Printer {
                 r
             }
             ir::ExprKind::EnumVariant(variant) => {
-                format!("@{}", variant.tag)
+                let mut r = format!("@{}", variant.tag);
+
+                if !is_expr_unit(&variant.inner) {
+                    r += "(";
+                    self.indent();
+                    r += &self.new_line();
+                    r += &self.print_expr(&variant.inner);
+                    self.dedent();
+                    r += &self.new_line();
+                    r += ")";
+                }
+                r
+            }
+            ir::ExprKind::EnumEq(eq) => {
+                let mut r = "(".to_string();
+                self.indent();
+                r += &self.new_line();
+
+                r += &self.print_expr(&eq.expr);
+
+                self.dedent();
+                r += &self.new_line();
+                r += &format!(") == @{}", eq.tag);
+                r
+            }
+            ir::ExprKind::EnumUnwrap(unwrap) => {
+                let mut r = "(".to_string();
+                self.indent();
+                r += &self.new_line();
+
+                r += &self.print_expr(&unwrap.expr);
+
+                self.dedent();
+                r += &self.new_line();
+                r += &format!(")@{}", unwrap.tag);
+                r
             }
             ir::ExprKind::TupleLookup(lookup) => {
                 let mut r = self.print_expr(&lookup.base);
@@ -163,6 +199,36 @@ impl Printer {
 
                 r += &self.print_expr(&binding.main);
                 self.dedent();
+                r
+            }
+            ir::ExprKind::Switch(switch_branches) => {
+                let mut r = "(".to_string();
+                self.indent();
+
+                r += &self.new_line();
+                r += "switch,";
+
+                for branch in switch_branches {
+                    r += &self.new_line();
+                    r += "(";
+                    self.indent();
+
+                    r += &self.new_line();
+                    r += &self.print_expr(&branch.condition);
+                    r += ",";
+
+                    r += &self.new_line();
+                    r += &self.print_expr(&branch.value);
+                    r += ",";
+
+                    self.dedent();
+                    r += &self.new_line();
+                    r += "),";
+                }
+
+                self.dedent();
+                r += &self.new_line();
+                r += ")";
                 r
             }
         };
@@ -215,8 +281,10 @@ impl Printer {
                         r += ", ";
                     }
                     r += &variant.name;
-                    r += " = ";
-                    r += &self.print_ty(&variant.ty);
+                    if !is_ty_unit(&variant.ty) {
+                        r += " = ";
+                        r += &self.print_ty(&variant.ty);
+                    }
                 }
                 r += "}";
                 r
@@ -242,4 +310,15 @@ impl Printer {
         // TODO: quote
         path.0.join("::")
     }
+}
+
+fn is_expr_unit(expr: &ir::Expr) -> bool {
+    if !is_ty_unit(&expr.ty) {
+        return false;
+    }
+    expr.kind.as_tuple().map_or(false, |f| f.is_empty())
+}
+
+fn is_ty_unit(ty: &ir::Ty) -> bool {
+    ty.kind.as_tuple().map_or(false, |f| f.is_empty())
 }

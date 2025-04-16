@@ -2,7 +2,7 @@ use std::collections::{HashMap, HashSet, VecDeque};
 
 use indexmap::IndexMap;
 use itertools::Itertools;
-use lutra_bin::ir::{self};
+use lutra_bin::ir;
 
 use crate::utils::{self, IdGenerator};
 use crate::Result;
@@ -229,7 +229,36 @@ impl<'a> Lowerer<'a> {
                 }
             },
 
-            pr::ExprKind::Match(_) => todo!(),
+            pr::ExprKind::Match(match_) => {
+                let subject = self.lower_expr(&match_.subject)?;
+                let subject_id = self.generator_var_binding.gen() as u32;
+                let subject_ref = ir::Expr {
+                    kind: ir::ExprKind::Pointer(ir::Pointer::Binding(subject_id)),
+                    ty: subject.ty.clone(),
+                };
+
+                let mut switch_branches = Vec::new();
+
+                for branch in &match_.branches {
+                    switch_branches.push(ir::SwitchBranch {
+                        condition: self.lower_pattern_match(&subject_ref, &branch.pattern)?,
+                        value: self.lower_expr(&branch.value)?,
+                    })
+                }
+
+                let ty = self.lower_ty(expr.ty.clone().unwrap());
+                let switch = ir::Expr {
+                    kind: ir::ExprKind::Switch(switch_branches),
+                    ty: ty.clone(),
+                };
+
+                let kind = ir::ExprKind::Binding(Box::new(ir::Binding {
+                    id: subject_id,
+                    expr: subject,
+                    main: switch,
+                }));
+                return Ok(ir::Expr { kind, ty });
+            }
             pr::ExprKind::FString(_) => todo!(),
 
             // consumed by type resolver
@@ -247,6 +276,26 @@ impl<'a> Lowerer<'a> {
         Ok(ir::Expr {
             kind,
             ty: self.lower_ty(expr.ty.clone().unwrap()),
+        })
+    }
+
+    fn lower_pattern_match(
+        &mut self,
+        subject: &ir::Expr,
+        pattern: &pr::Pattern,
+    ) -> Result<ir::Expr> {
+        let kind = match &pattern.kind {
+            // consumed by resolver
+            pr::PatternKind::Ident(_) => unreachable!(),
+
+            pr::PatternKind::EnumEq(tag) => ir::ExprKind::EnumEq(Box::new(ir::EnumEq {
+                expr: subject.clone(),
+                tag: *tag as u64,
+            })),
+        };
+        Ok(ir::Expr {
+            kind,
+            ty: ir::Ty::new(ir::TyPrimitive::bool),
         })
     }
 

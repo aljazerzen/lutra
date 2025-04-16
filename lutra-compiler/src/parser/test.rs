@@ -250,10 +250,16 @@ fn parse_05() {
             },
             branches: [
                 MatchBranch {
-                    pattern: [
-                        "Status",
-                        "Open",
-                    ],
+                    pattern: Pattern {
+                        kind: Ident(
+                            [
+                                "Status",
+                                "Open",
+                            ],
+                        ),
+                        span: 0:41-53,
+                        target: None,
+                    },
                     value: Expr {
                         kind: Literal(
                             Integer(
@@ -270,10 +276,16 @@ fn parse_05() {
                     },
                 },
                 MatchBranch {
-                    pattern: [
-                        "Status",
-                        "Closed",
-                    ],
+                    pattern: Pattern {
+                        kind: Ident(
+                            [
+                                "Status",
+                                "Closed",
+                            ],
+                        ),
+                        span: 0:72-86,
+                        target: None,
+                    },
                     value: Expr {
                         kind: Binary(
                             BinaryExpr {

@@ -58,13 +58,10 @@ impl fold::PrFold for NameResolver<'_> {
     fn fold_expr(&mut self, expr: pr::Expr) -> Result<pr::Expr> {
         Ok(match expr.kind {
             pr::ExprKind::Ident(ident) => {
-                // TODO: can this ident have length 0?
-
                 let target = Some(self.resolve_ident(&ident).with_span(expr.span)?);
 
-                let kind = pr::ExprKind::Ident(ident);
                 pr::Expr {
-                    kind,
+                    kind: pr::ExprKind::Ident(ident),
                     target,
                     ..expr
                 }
@@ -99,6 +96,21 @@ impl fold::PrFold for NameResolver<'_> {
                 ..expr
             },
         })
+    }
+
+    fn fold_pattern(&mut self, pattern: pr::Pattern) -> Result<pr::Pattern> {
+        match pattern.kind {
+            pr::PatternKind::Ident(ident) => {
+                let target = Some(self.resolve_ident(&ident).with_span(Some(pattern.span))?);
+
+                Ok(pr::Pattern {
+                    kind: pr::PatternKind::Ident(ident),
+                    target,
+                    ..pattern
+                })
+            }
+            _ => Ok(pattern),
+        }
     }
 
     fn fold_type(&mut self, ty: pr::Ty) -> Result<pr::Ty> {

@@ -747,8 +747,11 @@ pub mod ir {
         Tuple(crate::vec::Vec<Expr>),
         Array(crate::vec::Vec<Expr>),
         EnumVariant(crate::boxed::Box<EnumVariant>),
+        EnumEq(crate::boxed::Box<EnumEq>),
+        EnumUnwrap(crate::boxed::Box<EnumUnwrap>),
         TupleLookup(crate::boxed::Box<TupleLookup>),
         Binding(crate::boxed::Box<Binding>),
+        Switch(crate::vec::Vec<SwitchBranch>),
     }
 
     #[derive(Debug, Clone, enum_as_inner::EnumAsInner)]
@@ -804,6 +807,20 @@ pub mod ir {
 
     #[derive(Debug, Clone)]
     #[allow(non_camel_case_types)]
+    pub struct EnumEq {
+        pub expr: Expr,
+        pub tag: u64,
+    }
+
+    #[derive(Debug, Clone)]
+    #[allow(non_camel_case_types)]
+    pub struct EnumUnwrap {
+        pub expr: Expr,
+        pub tag: u64,
+    }
+
+    #[derive(Debug, Clone)]
+    #[allow(non_camel_case_types)]
     pub struct TupleLookup {
         pub base: Expr,
         pub position: u16,
@@ -815,6 +832,13 @@ pub mod ir {
         pub id: u32,
         pub expr: Expr,
         pub main: Expr,
+    }
+
+    #[derive(Debug, Clone)]
+    #[allow(non_camel_case_types)]
+    pub struct SwitchBranch {
+        pub condition: Expr,
+        pub value: Expr,
     }
 
     #[derive(Debug, Clone)]
@@ -1032,16 +1056,34 @@ pub mod ir {
                         let r = ExprKindHeadPtr::EnumVariant(head_ptr);
                         r
                     }
-                    Self::TupleLookup(inner) => {
+                    Self::EnumEq(inner) => {
                         w.put_slice(&[7]);
+                        let head_ptr = crate::ReversePointer::new(w);
+                        let r = ExprKindHeadPtr::EnumEq(head_ptr);
+                        r
+                    }
+                    Self::EnumUnwrap(inner) => {
+                        w.put_slice(&[8]);
+                        let head_ptr = crate::ReversePointer::new(w);
+                        let r = ExprKindHeadPtr::EnumUnwrap(head_ptr);
+                        r
+                    }
+                    Self::TupleLookup(inner) => {
+                        w.put_slice(&[9]);
                         let head_ptr = crate::ReversePointer::new(w);
                         let r = ExprKindHeadPtr::TupleLookup(head_ptr);
                         r
                     }
                     Self::Binding(inner) => {
-                        w.put_slice(&[8]);
+                        w.put_slice(&[10]);
                         let head_ptr = crate::ReversePointer::new(w);
                         let r = ExprKindHeadPtr::Binding(head_ptr);
+                        r
+                    }
+                    Self::Switch(inner) => {
+                        w.put_slice(&[11]);
+                        let head_ptr = crate::ReversePointer::new(w);
+                        let r = ExprKindHeadPtr::Switch(head_ptr);
                         r
                     }
                 }
@@ -1104,6 +1146,22 @@ pub mod ir {
                         let inner_head_ptr = inner.encode_head(w);
                         inner.encode_body(inner_head_ptr, w);
                     }
+                    Self::EnumEq(inner) => {
+                        let ExprKindHeadPtr::EnumEq(offset_ptr) = head else {
+                            unreachable!()
+                        };
+                        offset_ptr.write_cur_len(w);
+                        let inner_head_ptr = inner.encode_head(w);
+                        inner.encode_body(inner_head_ptr, w);
+                    }
+                    Self::EnumUnwrap(inner) => {
+                        let ExprKindHeadPtr::EnumUnwrap(offset_ptr) = head else {
+                            unreachable!()
+                        };
+                        offset_ptr.write_cur_len(w);
+                        let inner_head_ptr = inner.encode_head(w);
+                        inner.encode_body(inner_head_ptr, w);
+                    }
                     Self::TupleLookup(inner) => {
                         let ExprKindHeadPtr::TupleLookup(offset_ptr) = head else {
                             unreachable!()
@@ -1114,6 +1172,14 @@ pub mod ir {
                     }
                     Self::Binding(inner) => {
                         let ExprKindHeadPtr::Binding(offset_ptr) = head else {
+                            unreachable!()
+                        };
+                        offset_ptr.write_cur_len(w);
+                        let inner_head_ptr = inner.encode_head(w);
+                        inner.encode_body(inner_head_ptr, w);
+                    }
+                    Self::Switch(inner) => {
+                        let ExprKindHeadPtr::Switch(offset_ptr) = head else {
                             unreachable!()
                         };
                         offset_ptr.write_cur_len(w);
@@ -1133,8 +1199,11 @@ pub mod ir {
             Tuple(crate::ReversePointer),
             Array(crate::ReversePointer),
             EnumVariant(crate::ReversePointer),
+            EnumEq(crate::ReversePointer),
+            EnumUnwrap(crate::ReversePointer),
             TupleLookup(crate::ReversePointer),
             Binding(crate::ReversePointer),
+            Switch(crate::ReversePointer),
         }
         impl crate::Layout for ExprKind {
             fn head_size() -> usize {
@@ -1188,13 +1257,30 @@ pub mod ir {
                     }
                     7 => {
                         let offset = u32::from_le_bytes(buf.read_const::<4>());
-                        let inner = super::TupleLookup::decode(buf.skip(offset as usize))?;
-                        ExprKind::TupleLookup(crate::boxed::Box::new(inner))
+                        let inner = super::EnumEq::decode(buf.skip(offset as usize))?;
+                        ExprKind::EnumEq(crate::boxed::Box::new(inner))
                     }
                     8 => {
                         let offset = u32::from_le_bytes(buf.read_const::<4>());
+                        let inner = super::EnumUnwrap::decode(buf.skip(offset as usize))?;
+                        ExprKind::EnumUnwrap(crate::boxed::Box::new(inner))
+                    }
+                    9 => {
+                        let offset = u32::from_le_bytes(buf.read_const::<4>());
+                        let inner = super::TupleLookup::decode(buf.skip(offset as usize))?;
+                        ExprKind::TupleLookup(crate::boxed::Box::new(inner))
+                    }
+                    10 => {
+                        let offset = u32::from_le_bytes(buf.read_const::<4>());
                         let inner = super::Binding::decode(buf.skip(offset as usize))?;
                         ExprKind::Binding(crate::boxed::Box::new(inner))
+                    }
+                    11 => {
+                        let offset = u32::from_le_bytes(buf.read_const::<4>());
+                        let inner = crate::vec::Vec::<super::SwitchBranch>::decode(
+                            buf.skip(offset as usize),
+                        )?;
+                        ExprKind::Switch(inner)
                     }
                     _ => return Err(crate::Error::InvalidData),
                 })
@@ -1574,6 +1660,70 @@ pub mod ir {
         }
 
         #[allow(clippy::all, unused_variables)]
+        impl crate::Encode for EnumEq {
+            type HeadPtr = EnumEqHeadPtr;
+            fn encode_head(&self, buf: &mut crate::bytes::BytesMut) -> Self::HeadPtr {
+                let expr = self.expr.encode_head(buf);
+                let tag = self.tag.encode_head(buf);
+                EnumEqHeadPtr { expr, tag }
+            }
+            fn encode_body(&self, head: Self::HeadPtr, buf: &mut crate::bytes::BytesMut) {
+                self.expr.encode_body(head.expr, buf);
+                self.tag.encode_body(head.tag, buf);
+            }
+        }
+        #[allow(non_camel_case_types)]
+        pub struct EnumEqHeadPtr {
+            expr: <super::Expr as crate::Encode>::HeadPtr,
+            tag: <u64 as crate::Encode>::HeadPtr,
+        }
+        impl crate::Layout for EnumEq {
+            fn head_size() -> usize {
+                288
+            }
+        }
+
+        impl crate::Decode for EnumEq {
+            fn decode(buf: &[u8]) -> crate::Result<Self> {
+                let expr = super::Expr::decode(buf.skip(0))?;
+                let tag = u64::decode(buf.skip(28))?;
+                Ok(EnumEq { expr, tag })
+            }
+        }
+
+        #[allow(clippy::all, unused_variables)]
+        impl crate::Encode for EnumUnwrap {
+            type HeadPtr = EnumUnwrapHeadPtr;
+            fn encode_head(&self, buf: &mut crate::bytes::BytesMut) -> Self::HeadPtr {
+                let expr = self.expr.encode_head(buf);
+                let tag = self.tag.encode_head(buf);
+                EnumUnwrapHeadPtr { expr, tag }
+            }
+            fn encode_body(&self, head: Self::HeadPtr, buf: &mut crate::bytes::BytesMut) {
+                self.expr.encode_body(head.expr, buf);
+                self.tag.encode_body(head.tag, buf);
+            }
+        }
+        #[allow(non_camel_case_types)]
+        pub struct EnumUnwrapHeadPtr {
+            expr: <super::Expr as crate::Encode>::HeadPtr,
+            tag: <u64 as crate::Encode>::HeadPtr,
+        }
+        impl crate::Layout for EnumUnwrap {
+            fn head_size() -> usize {
+                288
+            }
+        }
+
+        impl crate::Decode for EnumUnwrap {
+            fn decode(buf: &[u8]) -> crate::Result<Self> {
+                let expr = super::Expr::decode(buf.skip(0))?;
+                let tag = u64::decode(buf.skip(28))?;
+                Ok(EnumUnwrap { expr, tag })
+            }
+        }
+
+        #[allow(clippy::all, unused_variables)]
         impl crate::Encode for TupleLookup {
             type HeadPtr = TupleLookupHeadPtr;
             fn encode_head(&self, buf: &mut crate::bytes::BytesMut) -> Self::HeadPtr {
@@ -1638,6 +1788,38 @@ pub mod ir {
                 let expr = super::Expr::decode(buf.skip(4))?;
                 let main = super::Expr::decode(buf.skip(32))?;
                 Ok(Binding { id, expr, main })
+            }
+        }
+
+        #[allow(clippy::all, unused_variables)]
+        impl crate::Encode for SwitchBranch {
+            type HeadPtr = SwitchBranchHeadPtr;
+            fn encode_head(&self, buf: &mut crate::bytes::BytesMut) -> Self::HeadPtr {
+                let condition = self.condition.encode_head(buf);
+                let value = self.value.encode_head(buf);
+                SwitchBranchHeadPtr { condition, value }
+            }
+            fn encode_body(&self, head: Self::HeadPtr, buf: &mut crate::bytes::BytesMut) {
+                self.condition.encode_body(head.condition, buf);
+                self.value.encode_body(head.value, buf);
+            }
+        }
+        #[allow(non_camel_case_types)]
+        pub struct SwitchBranchHeadPtr {
+            condition: <super::Expr as crate::Encode>::HeadPtr,
+            value: <super::Expr as crate::Encode>::HeadPtr,
+        }
+        impl crate::Layout for SwitchBranch {
+            fn head_size() -> usize {
+                448
+            }
+        }
+
+        impl crate::Decode for SwitchBranch {
+            fn decode(buf: &[u8]) -> crate::Result<Self> {
+                let condition = super::Expr::decode(buf.skip(0))?;
+                let value = super::Expr::decode(buf.skip(28))?;
+                Ok(SwitchBranch { condition, value })
             }
         }
 

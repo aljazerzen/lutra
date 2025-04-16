@@ -106,7 +106,10 @@ impl<'a> Context<'a> {
                 ir::ExprKind::Literal(_)
                 | ir::ExprKind::Tuple(_)
                 | ir::ExprKind::Array(_)
-                | ir::ExprKind::EnumVariant(_) => {
+                | ir::ExprKind::EnumVariant(_)
+                | ir::ExprKind::EnumEq(_)
+                | ir::ExprKind::EnumUnwrap(_)
+                | ir::ExprKind::Switch(_) => {
                     unreachable!()
                 }
             },
@@ -136,6 +139,8 @@ impl<'a> Context<'a> {
             ir::ExprKind::Function(_) => todo!(),
 
             ir::ExprKind::EnumVariant(_) => todo!(),
+            ir::ExprKind::EnumEq(_) => todo!(),
+            ir::ExprKind::EnumUnwrap(_) => todo!(),
 
             ir::ExprKind::TupleLookup(lookup) => {
                 let base = self.compile_rel(&lookup.base);
@@ -158,6 +163,8 @@ impl<'a> Context<'a> {
                     cr::RelExprKind::With(alias, Box::new(expr), Box::new(main))
                 }
             }
+
+            ir::ExprKind::Switch(_) => todo!(),
         };
         cr::RelExpr {
             kind,

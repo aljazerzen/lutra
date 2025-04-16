@@ -215,8 +215,35 @@ pub struct Match {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct MatchBranch {
-    pub pattern: Path,
+    pub pattern: Pattern,
     pub value: Box<Expr>,
+}
+
+/// A pattern that can be matched against an expression.
+#[derive(Debug, Clone, PartialEq)]
+pub struct Pattern {
+    pub kind: PatternKind,
+    pub span: Span,
+    pub target: Option<Ref>,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum PatternKind {
+    /// Identifier (eg. reference to an enum variant)
+    Ident(Path),
+
+    /// Comparison to a enum variant
+    EnumEq(usize),
+}
+
+impl Pattern {
+    pub fn new_with_span(kind: PatternKind, span: Span) -> Self {
+        Self {
+            kind,
+            span,
+            target: None,
+        }
+    }
 }
 
 impl From<Literal> for ExprKind {

@@ -46,8 +46,11 @@ pub fn fold_expr_kind<T: ?Sized + IrFold>(fold: &mut T, kind: ExprKind, ty: Ty) 
         Tuple(fields) => Tuple(fold_exprs(fold, fields)?),
         Array(items) => Array(fold_exprs(fold, items)?),
         EnumVariant(variant) => EnumVariant(Box::new(fold_enum_variant(fold, *variant)?)),
+        EnumEq(eq) => EnumEq(Box::new(fold_enum_eq(fold, *eq)?)),
+        EnumUnwrap(unwrap) => EnumUnwrap(Box::new(fold_enum_unwrap(fold, *unwrap)?)),
         TupleLookup(lookup) => return fold.fold_lookup(*lookup, ty),
         Binding(binding) => return fold.fold_binding(*binding, ty),
+        Switch(branches) => return fold_switch(fold, branches, ty),
     };
     Ok(Expr { kind, ty })
 }
@@ -86,6 +89,23 @@ pub fn fold_enum_variant<T: ?Sized + IrFold>(
     })
 }
 
+pub fn fold_enum_eq<T: ?Sized + IrFold>(fold: &mut T, variant: EnumEq) -> Result<EnumEq> {
+    Ok(EnumEq {
+        tag: variant.tag,
+        expr: fold.fold_expr(variant.expr)?,
+    })
+}
+
+pub fn fold_enum_unwrap<T: ?Sized + IrFold>(
+    fold: &mut T,
+    unwrap: EnumUnwrap,
+) -> Result<EnumUnwrap> {
+    Ok(EnumUnwrap {
+        tag: unwrap.tag,
+        expr: fold.fold_expr(unwrap.expr)?,
+    })
+}
+
 pub fn fold_lookup<T: ?Sized + IrFold>(fold: &mut T, lookup: TupleLookup, ty: Ty) -> Result<Expr> {
     Ok(ir::Expr {
         kind: ExprKind::TupleLookup(Box::new(ir::TupleLookup {
@@ -103,6 +123,27 @@ pub fn fold_binding<T: ?Sized + IrFold>(fold: &mut T, binding: Binding, ty: Ty) 
             expr: fold.fold_expr(binding.expr)?,
             main: fold.fold_expr(binding.main)?,
         })),
+        ty,
+    })
+}
+
+pub fn fold_switch<T: ?Sized + IrFold>(
+    fold: &mut T,
+    branches: Vec<SwitchBranch>,
+    ty: Ty,
+) -> Result<Expr> {
+    Ok(ir::Expr {
+        kind: ExprKind::Switch(
+            branches
+                .into_iter()
+                .map(|branch| {
+                    Ok(SwitchBranch {
+                        condition: fold.fold_expr(branch.condition)?,
+                        value: fold.fold_expr(branch.value)?,
+                    })
+                })
+                .collect::<Result<Vec<_>>>()?,
+        ),
         ty,
     })
 }

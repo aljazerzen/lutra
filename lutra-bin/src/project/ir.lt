@@ -17,8 +17,11 @@ type ExprKind = enum {
   `Tuple` = [Expr],
   Array = [Expr],
   EnumVariant = EnumVariant,
+  EnumEq = EnumEq,
+  EnumUnwrap = EnumUnwrap,
   TupleLookup = TupleLookup,
   Binding = Binding,
+  Switch = [SwitchBranch],
 }
 
 @derive(["Debug", "Clone", "enum_as_inner::EnumAsInner"])
@@ -61,6 +64,16 @@ type EnumVariant = {
   inner = Expr,
 }
 
+type EnumEq = {
+  expr = Expr,
+  tag = uint64,
+}
+
+type EnumUnwrap = {
+  expr = Expr,
+  tag = uint64,
+}
+
 type TupleLookup = {
   base = Expr,
   position = uint16,
@@ -70,6 +83,12 @@ type Binding = {
   id = uint32,
   expr = Expr,
   main = Expr,
+}
+
+# Contract: switch is guaranteed to match at least one branch
+type SwitchBranch = {
+  condition = Expr,
+  value = Expr,
 }
 
 type TyDef = {

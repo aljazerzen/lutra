@@ -125,7 +125,11 @@ fn interpolation() -> impl Parser<TokenKind, ExprKind, Error = PError> + Clone {
 fn match_(
     expr: impl Parser<TokenKind, Expr, Error = PError> + Clone,
 ) -> impl Parser<TokenKind, ExprKind, Error = PError> + Clone {
-    let branch = ident()
+    let pattern = ident()
+        .map(PatternKind::Ident)
+        .map_with_span(Pattern::new_with_span);
+
+    let branch = pattern
         .then_ignore(just(TokenKind::ArrowFat))
         .then(expr.clone().map(Box::new))
         .map(|(pattern, value)| MatchBranch { pattern, value });

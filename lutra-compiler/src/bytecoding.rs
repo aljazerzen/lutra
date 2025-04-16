@@ -47,10 +47,13 @@ impl ByteCoder {
             ir::ExprKind::EnumVariant(v) => {
                 ExprKind::EnumVariant(Box::new(self.compile_enum_variant(expr.ty, *v)))
             }
+            ir::ExprKind::EnumEq(_v) => todo!(),
+            ir::ExprKind::EnumUnwrap(_v) => todo!(),
             ir::ExprKind::TupleLookup(v) => {
                 ExprKind::TupleLookup(Box::new(self.compile_tuple_lookup(*v)))
             }
             ir::ExprKind::Binding(v) => ExprKind::Binding(Box::new(self.compile_binding(*v))),
+            ir::ExprKind::Switch(_v) => todo!(),
         };
 
         Expr { kind }
