@@ -125,9 +125,24 @@ fn interpolation() -> impl Parser<TokenKind, ExprKind, Error = PError> + Clone {
 fn match_(
     expr: impl Parser<TokenKind, Expr, Error = PError> + Clone,
 ) -> impl Parser<TokenKind, ExprKind, Error = PError> + Clone {
-    let pattern = ident()
-        .map(PatternKind::Ident)
-        .map_with_span(Pattern::new_with_span);
+    let pattern = recursive(|pattern| {
+        // enum
+        ident()
+            .then(
+                pattern
+                    .delimited_by(ctrl('('), ctrl(')'))
+                    .map(Box::new)
+                    .or_not(),
+            )
+            .map(|(path, inner)| {
+                if path.len() == 1 && inner.is_none() {
+                    PatternKind::Bind(path.into_iter().next().unwrap())
+                } else {
+                    PatternKind::Enum(path, inner)
+                }
+            })
+            .map_with_span(Pattern::new_with_span)
+    });
 
     let branch = pattern
         .then_ignore(just(TokenKind::ArrowFat))

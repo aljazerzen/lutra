@@ -12,24 +12,26 @@ pub struct Scope {
 pub enum ScopedKind {
     Param,
     Generic,
+    Local,
 }
 
 impl Scope {
-    pub fn new_of_func(id: usize, func: &pr::Func) -> crate::Result<Self> {
-        let mut scope = Self {
+    pub fn new_empty(id: usize) -> Self {
+        Self {
             id,
             names: IndexMap::new(),
-        };
+        }
+    }
+
+    pub fn new_of_func(id: usize, func: &pr::Func) -> crate::Result<Self> {
+        let mut scope = Self::new_empty(id);
         scope.insert_generics(&func.ty_params)?;
         scope.insert_params(func)?;
         Ok(scope)
     }
 
     pub fn new_of_ty_func(id: usize, func: &pr::TyFunc) -> crate::Result<Self> {
-        let mut scope = Self {
-            id,
-            names: IndexMap::new(),
-        };
+        let mut scope = Self::new_empty(id);
         scope.insert_generics(&func.ty_params)?;
         Ok(scope)
     }
@@ -47,6 +49,10 @@ impl Scope {
             self.names.insert(param.name.clone(), ScopedKind::Param);
         }
         Ok(())
+    }
+
+    pub fn insert_local(&mut self, name: &str) {
+        self.names.insert(name.to_string(), ScopedKind::Local);
     }
 
     pub fn get(&self, name: &str) -> Option<(usize, usize, &ScopedKind)> {

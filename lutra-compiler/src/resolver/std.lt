@@ -92,13 +92,13 @@ let aggregate = func <A, B> ( # <I: {i1 = I1}, O>
 #   side: text,
 #   tbl: [A],
 # ): [{A, B}]
-# 
+#
 # let group = func <I, B, PO> (
 #   by: B,
 #   pipeline: func [I - B] -> [PO],
 #   tbl: [I],
 # ): [{B, ..PO}]
-# 
+#
 # let append = func (bottom, top)
 
 # Aggregation functions
@@ -152,6 +152,8 @@ module math {
 
 ## Text functions
 module text_ops {
+  let concat: func (left: text, right: text): text
+
   let lower: func (value: text): text
   let upper: func (value: text): text
 

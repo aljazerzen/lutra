@@ -48,7 +48,7 @@ impl ByteCoder {
                 ExprKind::EnumVariant(Box::new(self.compile_enum_variant(expr.ty, *v)))
             }
             ir::ExprKind::EnumEq(v) => ExprKind::EnumEq(Box::new(self.compile_enum_eq(*v))),
-            ir::ExprKind::EnumUnwrap(_v) => todo!(),
+            ir::ExprKind::EnumUnwrap(v) => return self.compile_enum_unwrap(*v),
             ir::ExprKind::TupleLookup(v) => return self.compile_tuple_lookup(*v),
             ir::ExprKind::Binding(v) => ExprKind::Binding(Box::new(self.compile_binding(*v))),
             ir::ExprKind::Switch(v) => ExprKind::Switch(self.compile_switch(v)),
@@ -136,7 +136,7 @@ impl ByteCoder {
     }
 
     fn compile_enum_eq(&mut self, v: ir::EnumEq) -> EnumEq {
-        let ty_variants = v.expr.ty.kind.as_enum().unwrap();
+        let ty_variants = self.get_ty_mat(&v.expr.ty).kind.as_enum().unwrap();
         let head_format = lutra_bin::layout::enum_head_format(ty_variants);
 
         let tag = v.tag.to_le_bytes()[0..head_format.tag_bytes as usize].to_vec();
@@ -144,6 +144,30 @@ impl ByteCoder {
             tag,
             expr: self.compile_expr(v.expr),
         }
+    }
+
+    fn compile_enum_unwrap(&mut self, v: ir::EnumUnwrap) -> Expr {
+        let ty_variants = self.get_ty_mat(&v.expr.ty).kind.as_enum().unwrap();
+        let head_format = lutra_bin::layout::enum_head_format(ty_variants);
+
+        let mut expr = self.compile_expr(v.expr);
+
+        // offset tag
+        expr = Expr {
+            kind: ExprKind::Offset(Box::new(Offset {
+                base: expr,
+                offset: head_format.tag_bytes,
+            })),
+        };
+
+        // dereference pointer (if there is a pointer)
+        if head_format.has_ptr {
+            expr = Expr {
+                kind: ExprKind::Deref(Box::new(Deref { ptr: expr })),
+            };
+        }
+
+        expr
     }
 
     fn compile_tuple_lookup(&mut self, value: ir::TupleLookup) -> Expr {

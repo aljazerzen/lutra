@@ -91,6 +91,32 @@ impl fold::PrFold for NameResolver<'_> {
                 }
             }
 
+            pr::ExprKind::Match(match_) => {
+                // subject
+                let subject = Box::new(self.fold_expr(*match_.subject)?);
+
+                // branches
+                let mut branches = Vec::with_capacity(match_.branches.len());
+                for branch in match_.branches {
+                    let scope_id = self.scope_id_gen.gen();
+                    let scope = Scope::new_empty(scope_id);
+                    self.scopes.push(scope);
+
+                    let pattern = self.fold_pattern(branch.pattern)?;
+                    let mut value = Box::new(self.fold_expr(*branch.value)?);
+
+                    self.scopes.pop();
+                    value.scope_id = Some(scope_id);
+
+                    branches.push(pr::MatchBranch { pattern, value })
+                }
+
+                pr::Expr {
+                    kind: pr::ExprKind::Match(pr::Match { subject, branches }),
+                    ..expr
+                }
+            }
+
             _ => pr::Expr {
                 kind: fold::fold_expr_kind(self, expr.kind)?,
                 ..expr
@@ -98,19 +124,26 @@ impl fold::PrFold for NameResolver<'_> {
         })
     }
 
-    fn fold_pattern(&mut self, pattern: pr::Pattern) -> Result<pr::Pattern> {
+    fn fold_pattern(&mut self, mut pattern: pr::Pattern) -> Result<pr::Pattern> {
         match pattern.kind {
-            pr::PatternKind::Ident(ident) => {
-                let target = Some(self.resolve_ident(&ident).with_span(Some(pattern.span))?);
+            pr::PatternKind::Enum(ident, inner) => {
+                pattern.target = Some(self.resolve_ident(&ident).with_span(Some(pattern.span))?);
 
-                Ok(pr::Pattern {
-                    kind: pr::PatternKind::Ident(ident),
-                    target,
-                    ..pattern
-                })
+                // inner
+                let inner = if let Some(inner) = inner {
+                    Some(Box::new(self.fold_pattern(*inner)?))
+                } else {
+                    None
+                };
+
+                pattern.kind = pr::PatternKind::Enum(ident, inner);
             }
-            _ => Ok(pattern),
+            pr::PatternKind::Bind(ref name) => {
+                let scope = self.scopes.last_mut().unwrap();
+                scope.insert_local(name);
+            }
         }
+        Ok(pattern)
     }
 
     fn fold_type(&mut self, ty: pr::Ty) -> Result<pr::Ty> {

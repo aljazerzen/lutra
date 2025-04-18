@@ -611,7 +611,7 @@ func () -> std::from_columnar({})
 test_case!(
     std_map_columnar_00,
     r#"func () -> std::map_columnar(
-        [{5,3},{65,1},{3, 2}], 
+        [{5,3},{65,1},{3, 2}],
         func (x: {[int], [int]}) -> {
             std::lag(x.0, 1),
             std::lead(x.1, 1)
@@ -638,7 +638,7 @@ test_case!(
 test_case!(
     std_map_columnar_01,
     r#"func () -> std::map_columnar(
-        [{false,"hello"},{false,"world"},{true, "!"}], 
+        [{false,"hello"},{false,"world"},{true, "!"}],
         func (x: {[bool], [text]}) -> {
             std::lead(x.0, 1),
             std::lag(x.1, 1),
@@ -1101,5 +1101,49 @@ test_case!(
     }
     "#,
     r#""pending""#,
+    skip_postgres
+);
+
+test_case!(
+    match_01,
+    r#"
+    type Status = enum {Done, Pending = int64, Cancelled = text}
+    func () -> match Status::Pending(4) {
+        Status::Done => 0,
+        Status::Pending(x) => x,
+        Status::Cancelled => 0,
+    }
+    "#,
+    r#"4"#,
+    skip_postgres
+);
+
+test_case!(
+    match_02,
+    r#"
+    type Animal = enum {
+        Cat = text,
+        Dog = enum {Generic, Collie = text},
+    }
+
+    let hello = func (animal: Animal) -> match animal {
+        Animal::Cat(name) => f"Hello {name}",
+        Animal::Dog(Animal::Dog::Generic) => "Who's a good boy?",
+        Animal::Dog(Animal::Dog::Collie(name)) => f"Come here {name}",
+    }
+
+    func () -> (
+        [
+            Animal::Cat("Whiskers"),
+            Animal::Dog(Animal::Dog::Collie("Belie")),
+            Animal::Dog(Animal::Dog::Generic),
+        ] | std::map(hello)
+    )
+    "#,
+    r#"[
+  "Hello Whiskers",
+  "Come here Belie",
+  "Who's a good boy?",
+]"#,
     skip_postgres
 );

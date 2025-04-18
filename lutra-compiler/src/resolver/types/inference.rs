@@ -6,12 +6,12 @@ use crate::Result;
 use super::TypeResolver;
 
 impl TypeResolver<'_> {
-    pub fn infer_type(&mut self, expr: &mut Expr) -> Result<Ty> {
+    pub fn infer_type(&mut self, expr: &Expr) -> Result<Ty> {
         if let Some(ty) = &expr.ty {
             return Ok(ty.clone());
         }
 
-        let kind = match &mut expr.kind {
+        let kind = match &expr.kind {
             ExprKind::Literal(ref literal) => match literal {
                 Literal::Integer(_) => TyKind::Primitive(TyPrimitive::int64),
                 Literal::Float(_) => TyKind::Primitive(TyPrimitive::float64),
@@ -30,7 +30,7 @@ impl TypeResolver<'_> {
                 let mut ty_fields: Vec<TyTupleField> = Vec::with_capacity(fields.len());
 
                 for field in fields {
-                    let ty = self.infer_type(&mut field.expr)?;
+                    let ty = self.infer_type(&field.expr)?;
 
                     let name = field
                         .name
@@ -77,20 +77,7 @@ impl TypeResolver<'_> {
             //     };
             //     self.ty_tuple_exclusion(within_ty, except_ty)?
             // }
-            ExprKind::Match(match_) => {
-                // infer type of the first branch
-                let Some(first_branch) = match_.branches.first_mut() else {
-                    panic!("match without any branches")
-                };
-                let ty = self.infer_type(&mut first_branch.value)?;
-
-                // validate it matches all following branches
-                for branch in &mut match_.branches[1..] {
-                    self.validate_expr_type(&mut branch.value, &ty, &|| Some("match".into()))?;
-                }
-
-                return Ok(ty);
-            }
+            ExprKind::Match(_) => unreachable!(), // type computed in the main pass
 
             ExprKind::Func(func) => TyKind::Func(TyFunc {
                 params: func.params.iter().map(|p| p.ty.clone()).collect_vec(),

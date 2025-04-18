@@ -225,15 +225,16 @@ pub struct Pattern {
     pub kind: PatternKind,
     pub span: Span,
     pub target: Option<Ref>,
+    pub variant_tag: Option<usize>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum PatternKind {
-    /// Identifier (eg. reference to an enum variant)
-    Ident(Path),
+    /// Match an enum variant, recurse into matching inner
+    Enum(Path, Option<Box<Pattern>>),
 
-    /// Comparison to a enum variant
-    EnumEq(usize),
+    /// Match anything, bind it to a name
+    Bind(String),
 }
 
 impl Pattern {
@@ -242,6 +243,7 @@ impl Pattern {
             kind,
             span,
             target: None,
+            variant_tag: None,
         }
     }
 }

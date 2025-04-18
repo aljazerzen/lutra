@@ -536,6 +536,7 @@ pub mod std_text_ops {
     impl NativeModule for Module {
         fn lookup_native_symbol(&self, id: &str) -> crate::interpreter::NativeFunction {
             match id {
+                "concat" => &Self::concat,
                 "length" => &Self::length,
 
                 _ => panic!(),
@@ -544,6 +545,30 @@ pub mod std_text_ops {
     }
 
     impl Module {
+        pub fn concat(_it: &mut Interpreter, _layout_args: &[u32], args: Vec<Cell>) -> Cell {
+            let [left, right] = assume::exactly_n(args);
+
+            // TODO: string reader
+            let mut left = assume::into_value(left);
+            let left_offset = u32::from_le_bytes(left.slice(4).read_const());
+            let left_length = u32::from_le_bytes((&left.slice(8)[4..8]).read_const());
+            left.skip(left_offset as usize);
+
+            let mut right = assume::into_value(right);
+            let right_offset = u32::from_le_bytes(right.slice(4).read_const());
+            let right_length = u32::from_le_bytes((&right.slice(8)[4..8]).read_const());
+            right.skip(right_offset as usize);
+
+            // TODO: string writer
+            let mut buf = Vec::with_capacity(8 + left_length as usize + right_length as usize);
+            buf.extend(&[8, 0, 0, 0]);
+            buf.extend((left_length + right_length).to_le_bytes());
+            buf.extend(left.slice(left_length as usize));
+            buf.extend(right.slice(right_length as usize));
+
+            Cell::Data(lutra_bin::Data::new(buf))
+        }
+
         pub fn length(_it: &mut Interpreter, _layout_args: &[u32], args: Vec<Cell>) -> Cell {
             let [text] = assume::exactly_n(args);
 

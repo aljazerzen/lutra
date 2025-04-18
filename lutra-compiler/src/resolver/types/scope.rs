@@ -14,13 +14,14 @@ use super::TypeResolver;
 
 #[derive(Debug)]
 pub struct Scope {
-    id: usize,
+    pub id: usize,
     names: Vec<ScopedKind>,
 }
 
 #[derive(Debug, Clone, enum_as_inner::EnumAsInner)]
 pub enum ScopedKind {
     Param { ty: pr::Ty },
+    Local { ty: pr::Ty },
     TypeParam { name: String, domain: TyParamDomain },
     TypeArg(TyArg),
 }
@@ -101,6 +102,12 @@ impl Scope {
         };
 
         self.names.push(ScopedKind::TypeArg(type_arg));
+    }
+
+    pub fn insert_local(&mut self, ty: pr::Ty) {
+        let local = ScopedKind::Local { ty };
+
+        self.names.push(local);
     }
 
     pub fn get_ty_arg<'a>(&'a self, id: &TyArgId) -> &'a TyArg {
@@ -241,6 +248,11 @@ impl TypeResolver<'_> {
                     ScopedKind::Param { ty, .. } => {
                         Err(Diagnostic::new_assert("expected a type, found a value")
                             .push_hint(format!("got param of type `{}`", printer::print_ty(ty)))
+                            .with_span(ty.span))
+                    }
+                    ScopedKind::Local { ty, .. } => {
+                        Err(Diagnostic::new_assert("expected a type, found a value")
+                            .push_hint(format!("got local var of type `{}`", printer::print_ty(ty)))
                             .with_span(ty.span))
                     }
                     ScopedKind::TypeParam { name, .. } => {

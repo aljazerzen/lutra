@@ -44,6 +44,7 @@ impl fold::PrFold for super::TypeResolver<'_> {
                     }
                     Named::Scoped(scoped) => match scoped {
                         ScopedKind::Param { ty } => ty.clone(),
+                        ScopedKind::Local { ty } => ty.clone(),
                         ScopedKind::TypeParam { .. } | ScopedKind::TypeArg { .. } => {
                             return Err(Diagnostic::new_custom(
                                 "expected a value, but found a type",
@@ -154,6 +155,8 @@ impl fold::PrFold for super::TypeResolver<'_> {
                 return Ok(expr);
             }
 
+            pr::ExprKind::Match(_) => self.resolve_match(node)?,
+
             item => pr::Expr {
                 kind: fold::fold_expr_kind(self, item)?,
                 ..node
@@ -163,7 +166,7 @@ impl fold::PrFold for super::TypeResolver<'_> {
         let mut r = r;
         r.span = r.span.or(span);
         if r.ty.is_none() {
-            r.ty = Some(self.infer_type(&mut r)?);
+            r.ty = Some(self.infer_type(&r)?);
         }
         if let Some(scope_id) = r.scope_id {
             // make ty infer scope_id of expr
@@ -176,7 +179,7 @@ impl fold::PrFold for super::TypeResolver<'_> {
         let ty = match ty.kind {
             // open a new scope for functions
             pr::TyKind::Func(ty_func) if self.scopes.is_empty() => {
-                let mut scope = Scope::new(0);
+                let mut scope = Scope::new(ty.scope_id.unwrap());
                 scope.insert_generics_params(&ty_func.ty_params);
                 self.scopes.push(scope);
                 let ty_func = fold::fold_ty_func(self, ty_func)?;
@@ -218,31 +221,7 @@ impl fold::PrFold for super::TypeResolver<'_> {
         Ok(ty)
     }
 
-    fn fold_pattern(&mut self, pattern: pr::Pattern) -> Result<pr::Pattern> {
-        match pattern.kind {
-            pr::PatternKind::Ident(_) => {
-                let target = pattern.target.unwrap();
-                let named = self.get_ident(&target)?;
-
-                let tag = match named {
-                    Named::EnumVariant(_, tag) => tag,
-                    _ => {
-                        return Err(Diagnostic::new_custom("expected an enum variant")
-                            .with_span(Some(pattern.span)))
-                    }
-                };
-
-                // TODO: validate that we are matching expression of the correct type
-
-                Ok(pr::Pattern {
-                    kind: pr::PatternKind::EnumEq(tag),
-                    target: None,
-                    ..pattern
-                })
-            }
-
-            // unparsable
-            pr::PatternKind::EnumEq(_) => unreachable!(),
-        }
+    fn fold_pattern(&mut self, _pattern: pr::Pattern) -> Result<pr::Pattern> {
+        unreachable!() // use
     }
 }

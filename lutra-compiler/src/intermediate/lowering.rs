@@ -1,4 +1,4 @@
-use std::collections::{HashMap, HashSet, VecDeque};
+use std::collections::{HashMap, VecDeque};
 
 use indexmap::IndexMap;
 use itertools::Itertools;
@@ -14,8 +14,8 @@ pub fn lower_expr(root_module: &decl::RootModule, main: &pr::Expr) -> ir::Progra
     let main = lowerer.lower_expr(main).unwrap();
     let main = lowerer.lower_var_bindings(main);
 
-    let types = lowerer.lower_ty_defs();
-    let types = order_ty_defs(types, root_module);
+    lowerer.lower_ty_defs_queue();
+    let types = order_ty_defs(lowerer.type_defs, root_module);
 
     ir::Program { main, types }
 }
@@ -26,8 +26,8 @@ pub fn lower_var(root_module: &decl::RootModule, path: &pr::Path) -> ir::Program
     let main = lowerer.lower_expr_decl(path, vec![]).unwrap();
     let main = lowerer.lower_var_bindings(main);
 
-    let types = lowerer.lower_ty_defs();
-    let types = order_ty_defs(types, root_module);
+    lowerer.lower_ty_defs_queue();
+    let types = order_ty_defs(lowerer.type_defs, root_module);
 
     ir::Program { main, types }
 }
@@ -35,18 +35,30 @@ pub fn lower_var(root_module: &decl::RootModule, path: &pr::Path) -> ir::Program
 struct Lowerer<'a> {
     root_module: &'a decl::RootModule,
 
-    function_scopes: Vec<FuncScope>,
+    scopes: Vec<Scope>,
     var_bindings: IndexMap<(pr::Path, Vec<pr::Ty>), u32>,
-    type_defs_needed: VecDeque<pr::Path>,
+
+    type_defs_queue: VecDeque<pr::Path>,
+    type_defs: HashMap<pr::Path, ir::Ty>,
 
     generator_function_scope: IdGenerator<usize>,
     generator_var_binding: IdGenerator<usize>,
 }
 
-struct FuncScope {
-    scope_id: usize,
-    start_of_params: usize,
-    func_id: u32,
+struct Scope {
+    id: usize,
+    kind: ScopeKind,
+}
+
+enum ScopeKind {
+    Function {
+        start_of_params: usize,
+        function_id: u32,
+    },
+    Local {
+        /// A pre-compiled node that can be used for each scope entry
+        entries: Vec<ir::Expr>,
+    },
 }
 
 impl<'a> Lowerer<'a> {
@@ -54,9 +66,10 @@ impl<'a> Lowerer<'a> {
         Self {
             root_module,
 
-            function_scopes: vec![],
+            scopes: vec![],
             var_bindings: Default::default(),
-            type_defs_needed: Default::default(),
+            type_defs: Default::default(),
+            type_defs_queue: Default::default(),
 
             generator_function_scope: Default::default(),
             generator_var_binding: Default::default(),
@@ -178,33 +191,47 @@ impl<'a> Lowerer<'a> {
                 args: self.lower_exprs(&call.args)?,
             })),
             pr::ExprKind::Func(func) => {
-                let func_id = self.generator_function_scope.gen() as u32;
-                let scope = FuncScope {
-                    scope_id: expr.scope_id.unwrap(),
-                    func_id,
-                    start_of_params: func.ty_params.len(),
+                let function_id = self.generator_function_scope.gen() as u32;
+                let scope = Scope {
+                    id: expr.scope_id.unwrap(),
+                    kind: ScopeKind::Function {
+                        function_id,
+                        start_of_params: func.ty_params.len(),
+                    },
                 };
 
-                self.function_scopes.push(scope);
+                self.scopes.push(scope);
                 let body = self.lower_expr(&func.body)?;
-                self.function_scopes.pop();
+                self.scopes.pop();
 
-                let func = ir::Function { id: func_id, body };
+                let func = ir::Function {
+                    id: function_id,
+                    body,
+                };
 
                 ir::ExprKind::Function(Box::new(func))
             }
 
             pr::ExprKind::Ident(_) => match expr.target.as_ref().unwrap() {
                 pr::Ref::Local { scope, offset } => {
-                    let scope = (self.function_scopes.iter())
-                        .find(|s| s.scope_id == *scope)
-                        .unwrap();
-                    let param_position = (*offset - scope.start_of_params) as u8;
+                    let scope = self.scopes.iter().find(|s| s.id == *scope).unwrap();
 
-                    ir::ExprKind::Pointer(ir::Pointer::Parameter(ir::ParameterPtr {
-                        function_id: scope.func_id,
-                        param_position,
-                    }))
+                    match &scope.kind {
+                        ScopeKind::Function {
+                            start_of_params,
+                            function_id,
+                        } => {
+                            let param_position = (*offset - start_of_params) as u8;
+
+                            ir::ExprKind::Pointer(ir::Pointer::Parameter(ir::ParameterPtr {
+                                function_id: *function_id,
+                                param_position,
+                            }))
+                        }
+                        ScopeKind::Local { entries } => {
+                            entries.get(*offset).map(|e| e.kind.clone()).unwrap()
+                        }
+                    }
                 }
 
                 pr::Ref::FullyQualified {
@@ -240,10 +267,28 @@ impl<'a> Lowerer<'a> {
                 let mut switch_branches = Vec::new();
 
                 for branch in &match_.branches {
-                    switch_branches.push(ir::SwitchBranch {
-                        condition: self.lower_pattern_match(&subject_ref, &branch.pattern)?,
-                        value: self.lower_expr(&branch.value)?,
-                    })
+                    // compile the condition
+                    let condition =
+                        self.lower_pattern_to_condition(&subject_ref, &branch.pattern)?;
+                    let condition = condition.unwrap_or_else(|| ir::Expr {
+                        kind: ir::ExprKind::Literal(ir::Literal::Bool(true)),
+                        ty: ir::Ty::new(ir::TyPrimitive::bool),
+                    });
+
+                    // collect pattern scope
+                    let mut entries = Vec::new();
+                    self.collect_pattern_scope(&branch.pattern, subject_ref.clone(), &mut entries);
+                    self.scopes.push(Scope {
+                        id: branch.value.scope_id.unwrap(),
+                        kind: ScopeKind::Local { entries },
+                    });
+
+                    // compile value
+                    let value = self.lower_expr(&branch.value)?;
+
+                    self.scopes.pop();
+
+                    switch_branches.push(ir::SwitchBranch { condition, value })
                 }
 
                 let ty = self.lower_ty(expr.ty.clone().unwrap());
@@ -279,24 +324,69 @@ impl<'a> Lowerer<'a> {
         })
     }
 
-    fn lower_pattern_match(
+    fn lower_pattern_to_condition(
         &mut self,
         subject: &ir::Expr,
         pattern: &pr::Pattern,
-    ) -> Result<ir::Expr> {
-        let kind = match &pattern.kind {
-            // consumed by resolver
-            pr::PatternKind::Ident(_) => unreachable!(),
+    ) -> Result<Option<ir::Expr>> {
+        match &pattern.kind {
+            // match a enum variant
+            pr::PatternKind::Enum(_, inner) => {
+                let tag = pattern.variant_tag.unwrap();
 
-            pr::PatternKind::EnumEq(tag) => ir::ExprKind::EnumEq(Box::new(ir::EnumEq {
-                expr: subject.clone(),
-                tag: *tag as u64,
-            })),
-        };
-        Ok(ir::Expr {
-            kind,
-            ty: ir::Ty::new(ir::TyPrimitive::bool),
-        })
+                let mut expr = ir::Expr {
+                    kind: ir::ExprKind::EnumEq(Box::new(ir::EnumEq {
+                        expr: subject.clone(),
+                        tag: pattern.variant_tag.unwrap() as u64,
+                    })),
+                    ty: ir::Ty::new(ir::TyPrimitive::bool),
+                };
+
+                if let Some(inner) = inner {
+                    let subject_ty = self.get_ty_mat(subject.ty.clone());
+
+                    let subject_variants = subject_ty.kind.into_enum().unwrap();
+                    let inner_ty = subject_variants.into_iter().nth(tag).unwrap().ty;
+                    let inner_ref = ir::Expr {
+                        kind: ir::ExprKind::EnumUnwrap(Box::new(ir::EnumUnwrap {
+                            expr: subject.clone(),
+                            tag: tag as u64,
+                        })),
+                        ty: inner_ty,
+                    };
+
+                    let inner_cond = self.lower_pattern_to_condition(&inner_ref, inner)?;
+
+                    if let Some(inner_cond) = inner_cond {
+                        // new_bin_op(expr, "std::and", inner_cond)
+                        expr = ir::Expr {
+                            kind: ir::ExprKind::Call(Box::new(ir::Call {
+                                function: ir::Expr {
+                                    kind: ir::ExprKind::Pointer(ir::Pointer::External(
+                                        ir::ExternalPtr {
+                                            id: "std::and".to_string(),
+                                        },
+                                    )),
+                                    ty: ir::Ty::new(ir::TyFunction {
+                                        params: vec![
+                                            ir::Ty::new(ir::TyPrimitive::bool),
+                                            ir::Ty::new(ir::TyPrimitive::bool),
+                                        ],
+                                        body: ir::Ty::new(ir::TyPrimitive::bool),
+                                    }),
+                                },
+                                args: vec![expr, inner_cond],
+                            })),
+                            ty: ir::Ty::new(ir::TyPrimitive::bool),
+                        }
+                    }
+                }
+                Ok(Some(expr))
+            }
+
+            // bind always matches
+            pr::PatternKind::Bind(_) => Ok(None),
+        }
     }
 
     fn lower_exprs(&mut self, exprs: &[pr::Expr]) -> Result<Vec<ir::Expr>> {
@@ -365,7 +455,7 @@ impl<'a> Lowerer<'a> {
 
         if let Some(target) = ty.target {
             if let pr::Ref::FullyQualified { to_decl, .. } = target {
-                self.type_defs_needed.push_back(to_decl.clone());
+                self.type_defs_queue.push_back(to_decl.clone());
 
                 log::debug!("lower ty ident: {to_decl}");
 
@@ -438,25 +528,77 @@ impl<'a> Lowerer<'a> {
         }
     }
 
-    fn lower_ty_defs(&mut self) -> HashMap<pr::Path, ir::Ty> {
-        let mut defs = HashMap::with_capacity(self.type_defs_needed.len());
-        let mut names_done = HashSet::new();
+    fn get_ty_mat(&mut self, ty: ir::Ty) -> ir::Ty {
+        if let ir::TyKind::Ident(fq_path) = &ty.kind {
+            let path = pr::Path::new(fq_path.0.clone());
 
-        while let Some(path) = self.type_defs_needed.pop_front() {
-            if names_done.contains(&path) {
-                continue;
-            }
+            // ensure it is lowered
+            self.lower_ty_def(path.clone());
 
-            let decl = self.root_module.module.get(&path).unwrap();
-            let ty = decl.into_ty().unwrap().clone();
+            // fetch it
+            let ty = self.type_defs.get(&path).unwrap().clone();
 
-            let ty = self.lower_ty(ty);
+            // re-run get_ty_mat
+            self.get_ty_mat(ty)
+        } else {
+            ty
+        }
+    }
 
-            defs.insert(path.clone(), ty);
-            names_done.insert(path);
+    /// Lowers a type definition
+    fn lower_ty_def(&mut self, path: pr::Path) {
+        if self.type_defs.contains_key(&path) {
+            return;
         }
 
-        defs
+        let decl = self.root_module.module.get(&path).unwrap();
+        let ty = decl.into_ty().unwrap().clone();
+
+        let ty = self.lower_ty(ty);
+
+        self.type_defs.insert(path, ty);
+    }
+
+    fn lower_ty_defs_queue(&mut self) {
+        while let Some(path) = self.type_defs_queue.pop_front() {
+            self.lower_ty_def(path)
+        }
+    }
+
+    /// For a given pattern, this function collects all scope entries (variable bindings)
+    /// and returns ir nodes that can be used as a reference to this entry.
+    fn collect_pattern_scope(
+        &mut self,
+        pattern: &pr::Pattern,
+        subject_ref: ir::Expr,
+        entries: &mut Vec<ir::Expr>,
+    ) {
+        match &pattern.kind {
+            // bind always matches
+            pr::PatternKind::Bind(_) => {
+                entries.push(subject_ref);
+            }
+
+            pr::PatternKind::Enum(_, inner) => {
+                let tag = pattern.variant_tag.unwrap();
+
+                if let Some(inner) = inner {
+                    let subject_ty = self.get_ty_mat(subject_ref.ty.clone());
+
+                    let subject_variants = subject_ty.kind.into_enum().unwrap();
+                    let inner_ty = subject_variants.into_iter().nth(tag).unwrap().ty;
+                    let inner_ref = ir::Expr {
+                        kind: ir::ExprKind::EnumUnwrap(Box::new(ir::EnumUnwrap {
+                            expr: subject_ref,
+                            tag: tag as u64,
+                        })),
+                        ty: inner_ty,
+                    };
+
+                    self.collect_pattern_scope(inner, inner_ref, entries)
+                }
+            }
+        }
     }
 }
 
@@ -482,7 +624,7 @@ pub fn lower_type_defs(root_module: &decl::RootModule) -> ir::Module {
             }
 
             decl::DeclKind::Ty(_) => {
-                lowerer.type_defs_needed.push_back(name);
+                lowerer.type_defs_queue.push_back(name);
             }
 
             decl::DeclKind::Import(_) => {}
@@ -491,8 +633,8 @@ pub fn lower_type_defs(root_module: &decl::RootModule) -> ir::Module {
         }
     }
 
-    let types = lowerer.lower_ty_defs();
-    let types = order_ty_defs(types, root_module);
+    lowerer.lower_ty_defs_queue();
+    let types = order_ty_defs(lowerer.type_defs, root_module);
     for ty in types {
         module.insert(&ty.name.0, ir::Decl::Type(ty.ty));
     }

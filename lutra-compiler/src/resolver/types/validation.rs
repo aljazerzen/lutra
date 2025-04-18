@@ -191,6 +191,13 @@ impl TypeResolver<'_> {
             (TyKind::Enum(f_variants), TyKind::Enum(e_variants))
                 if f_variants.len() == e_variants.len() =>
             {
+                // require same variant names
+                let names_match =
+                    itertools::zip_eq(f_variants, e_variants).all(|(f, e)| f.name == e.name);
+                if !names_match {
+                    return Err(compose_type_error(&found, &expected, who));
+                }
+
                 for (f_variant, e_variant) in itertools::zip_eq(f_variants, e_variants) {
                     // co-variant contained types
                     self.validate_type(&f_variant.ty, &e_variant.ty, who)?;
@@ -387,12 +394,16 @@ impl TypeResolver<'_> {
     }
 }
 
-fn compose_type_error<F>(found_ty: &Ty, expected: &Ty, who: &F) -> Diagnostic
+fn compose_type_error<F>(found: &Ty, expected: &Ty, who: &F) -> Diagnostic
 where
     F: Fn() -> Option<String>,
 {
     fn display_ty(ty: &Ty) -> String {
-        format!("type `{}`", printer::print_ty(ty))
+        if let Some(name) = &ty.name {
+            format!("type `{name}`")
+        } else {
+            format!("type `{}`", printer::print_ty(ty))
+        }
     }
 
     let who = who();
@@ -406,25 +417,31 @@ where
         format!(
             "{who}expected {}, but found {}",
             display_ty(expected),
-            display_ty(found_ty)
+            display_ty(found)
         ),
         DiagnosticCode::TYPE,
     );
 
-    if found_ty.kind.is_func() && !expected.kind.is_func() {
+    if found.kind.is_func() && !expected.kind.is_func() {
         let to_what = "in this function call?";
 
         e = e.push_hint(format!("Have you forgotten an argument {to_what}?"));
     }
 
-    if is_join && found_ty.kind.is_tuple() && !expected.kind.is_tuple() {
+    if is_join && found.kind.is_tuple() && !expected.kind.is_tuple() {
         e = e.push_hint("Try using `(...)` instead of `{...}`");
     }
 
     if let Some(expected_name) = &expected.name {
         e = e.push_hint(format!(
-            "Type `{expected_name}` expands to `{}`",
+            "type `{expected_name}` expands to `{}`",
             printer::print_ty(expected)
+        ));
+    }
+    if let Some(found_name) = &found.name {
+        e = e.push_hint(format!(
+            "type `{found_name}` expands to `{}`",
+            printer::print_ty(found)
         ));
     }
     e

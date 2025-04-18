@@ -251,14 +251,16 @@ fn parse_05() {
             branches: [
                 MatchBranch {
                     pattern: Pattern {
-                        kind: Ident(
+                        kind: Enum(
                             [
                                 "Status",
                                 "Open",
                             ],
+                            None,
                         ),
                         span: 0:41-53,
                         target: None,
+                        variant_tag: None,
                     },
                     value: Expr {
                         kind: Literal(
@@ -277,14 +279,16 @@ fn parse_05() {
                 },
                 MatchBranch {
                     pattern: Pattern {
-                        kind: Ident(
+                        kind: Enum(
                             [
                                 "Status",
                                 "Closed",
                             ],
+                            None,
                         ),
                         span: 0:72-86,
                         target: None,
+                        variant_tag: None,
                     },
                     value: Expr {
                         kind: Binary(
@@ -322,6 +326,124 @@ fn parse_05() {
                         ),
                         span: Some(
                             0:90-95,
+                        ),
+                        ty: None,
+                        ty_args: [],
+                        scope_id: None,
+                        target: None,
+                    },
+                },
+            ],
+        },
+    )
+    "#);
+}
+
+#[test]
+fn parse_06() {
+    assert_debug_snapshot!(parse_expr(r#"
+        match 1 {
+            Status::Open(timestamp) => 1,
+            Status::Closed(Reason::Other(inner)) => 1,
+        }
+    "#).kind, @r#"
+    Match(
+        Match {
+            subject: Expr {
+                kind: Literal(
+                    Integer(
+                        1,
+                    ),
+                ),
+                span: Some(
+                    0:15-16,
+                ),
+                ty: None,
+                ty_args: [],
+                scope_id: None,
+                target: None,
+            },
+            branches: [
+                MatchBranch {
+                    pattern: Pattern {
+                        kind: Enum(
+                            [
+                                "Status",
+                                "Open",
+                            ],
+                            Some(
+                                Pattern {
+                                    kind: Bind(
+                                        "timestamp",
+                                    ),
+                                    span: 0:44-53,
+                                    target: None,
+                                    variant_tag: None,
+                                },
+                            ),
+                        ),
+                        span: 0:31-54,
+                        target: None,
+                        variant_tag: None,
+                    },
+                    value: Expr {
+                        kind: Literal(
+                            Integer(
+                                1,
+                            ),
+                        ),
+                        span: Some(
+                            0:58-59,
+                        ),
+                        ty: None,
+                        ty_args: [],
+                        scope_id: None,
+                        target: None,
+                    },
+                },
+                MatchBranch {
+                    pattern: Pattern {
+                        kind: Enum(
+                            [
+                                "Status",
+                                "Closed",
+                            ],
+                            Some(
+                                Pattern {
+                                    kind: Enum(
+                                        [
+                                            "Reason",
+                                            "Other",
+                                        ],
+                                        Some(
+                                            Pattern {
+                                                kind: Bind(
+                                                    "inner",
+                                                ),
+                                                span: 0:102-107,
+                                                target: None,
+                                                variant_tag: None,
+                                            },
+                                        ),
+                                    ),
+                                    span: 0:88-108,
+                                    target: None,
+                                    variant_tag: None,
+                                },
+                            ),
+                        ),
+                        span: 0:73-109,
+                        target: None,
+                        variant_tag: None,
+                    },
+                    value: Expr {
+                        kind: Literal(
+                            Integer(
+                                1,
+                            ),
+                        ),
+                        span: Some(
+                            0:113-114,
                         ),
                         ty: None,
                         ty_args: [],

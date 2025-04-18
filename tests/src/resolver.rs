@@ -480,7 +480,7 @@ fn primitives() {
                 uint64,
                 float32,
                 float64,
-                text,   
+                text,
             }
             let main = func () -> x()
             "
@@ -602,7 +602,6 @@ fn match_01() {
 }
 
 #[test]
-#[ignore] // TODO
 fn match_02() {
     insta::assert_snapshot!(_test_err(r#"
         type Status = enum {Done, Pending = int16, Cancelled = text}
@@ -614,6 +613,48 @@ fn match_02() {
           Color::Blue => "blue",
         }
     "#), @r#"
-        Expected pattern to match against Status, not Color
+    [E0004] Error: 
+       ╭─[:6:11]
+       │
+     6 │           Color::Red => "red",
+       │           ─────┬────  
+       │                ╰────── pattern expected type `Status`, but found type `Color`
+       │ 
+       │ Note: 
+       │ type `Status` expands to `enum {Done, Pending = int16, Cancelled = text}`
+       │ type `Color` expands to `enum {Red, Green, Blue}`
+    ───╯
     "#);
+}
+
+#[test]
+fn match_03() {
+    insta::assert_snapshot!(_test_err(r#"
+        type Color = enum {Red, Green, Blue}
+
+        let main = func () -> match Color::Green {
+          Color::Red => "red",
+          Color::Green => 1,
+          Color::Blue => false,
+        }
+    "#), @r#"
+    [E0004] Error: 
+       ╭─[:6:27]
+       │
+     6 │           Color::Green => 1,
+       │                           ┬  
+       │                           ╰── match expected type `text`, but found type `int64`
+    ───╯
+    "#);
+}
+
+#[test]
+fn match_04() {
+    insta::assert_snapshot!(_test_run(r#"
+        type Status = enum {Pending = int16}
+
+        let main = func () -> match Status::Pending(4) {
+          Status::Pending(x) => x,
+        }
+    "#), @"int16");
 }

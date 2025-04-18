@@ -1,5 +1,5 @@
 use crate::diagnostic::Diagnostic;
-use crate::pr;
+use crate::pr::{self, Expr};
 use crate::utils::fold;
 use crate::utils::fold::PrFold;
 use crate::Result;
@@ -23,6 +23,7 @@ impl PrFold for Desugarator {
             pr::ExprKind::Range(r) => self.desugar_range(r)?,
             pr::ExprKind::Unary(unary) => self.desugar_unary(unary)?,
             pr::ExprKind::Binary(binary) => self.desugar_binary(binary)?,
+            pr::ExprKind::FString(items) => self.desugar_f_string(items)?,
             k => fold::fold_expr_kind(self, k)?,
         };
         Ok(expr)
@@ -147,6 +148,28 @@ impl Desugarator {
             _ => (left, right),
         };
         Ok(new_binop(left, &func_name, right).kind)
+    }
+
+    /// Desugar f-string into function calls to std::concat
+    fn desugar_f_string(&mut self, items: Vec<pr::InterpolateItem>) -> Result<pr::ExprKind> {
+        let mut items = items.into_iter().map(|item| match item {
+            pr::InterpolateItem::String(string) => Expr::new(pr::Literal::Text(string)),
+            pr::InterpolateItem::Expr {
+                expr,
+                format: _format,
+            } => *expr,
+        });
+
+        // take first
+        let Some(mut expr) = items.next() else {
+            return Ok(pr::ExprKind::Literal(pr::Literal::Text("".to_string())));
+        };
+
+        // concat with the following
+        for item in items {
+            expr = new_binop(expr, &["std", "text_ops", "concat"], item);
+        }
+        Ok(expr.kind)
     }
 }
 

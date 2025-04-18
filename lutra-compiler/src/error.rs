@@ -139,8 +139,8 @@ fn compose_display(
             let span = std::ops::Range::from(span);
             report.add_label(Label::new((source_path, span)).with_message(&diagnostic.message))
         } else {
+            notes += "\n   │ ";
             notes += &additional.message;
-            notes += "\n";
         }
     }
     if !notes.is_empty() {

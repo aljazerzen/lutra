@@ -1,6 +1,7 @@
 mod expr;
 mod functions;
 mod inference;
+mod pattern;
 mod scope;
 mod stmt;
 mod tuple;
