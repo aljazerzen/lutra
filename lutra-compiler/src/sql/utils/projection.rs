@@ -40,53 +40,68 @@ impl<'a> Context<'a> {
         &'a self,
         ty: &'a ir::Ty,
         include_index: bool,
-    ) -> impl Iterator<Item = String> + 'a {
-        self.rel_cols_re(ty, include_index, true, "f".to_string())
+    ) -> Box<dyn Iterator<Item = String> + 'a> {
+        let ty_mat = self.get_ty_mat(ty);
+        match &ty_mat.kind {
+            ir::TyKind::Primitive(_) => Box::new(Some(COL_VALUE.to_string()).into_iter()),
+            ir::TyKind::Array(item) => {
+                let mut index = None;
+                if include_index {
+                    index = Some(COL_ARRAY_INDEX.to_string());
+                }
+
+                Box::new(
+                    index
+                        .into_iter()
+                        .chain(self.rel_cols_re(item, "".to_string())),
+                )
+            }
+
+            ir::TyKind::Tuple(_) | ir::TyKind::Enum(_) => self.rel_cols_re(ty_mat, "".to_string()),
+
+            ir::TyKind::Function(_) => todo!(),
+            ir::TyKind::Ident(_) => todo!(),
+        }
+        // self.rel_cols_re(ty, include_index, true, "".to_string())
     }
 
     fn rel_cols_re(
         &'a self,
         ty: &'a ir::Ty,
-        include_index: bool,
-        top_level: bool,
-        field_prefix: String,
+        name_prefix: String,
     ) -> Box<dyn Iterator<Item = String> + 'a> {
         match &self.get_ty_mat(ty).kind {
-            ir::TyKind::Primitive(_) => Box::new(Some(COL_VALUE.to_string()).into_iter()),
+            ir::TyKind::Primitive(_) | ir::TyKind::Array(_) => {
+                let name = if name_prefix.is_empty() {
+                    COL_VALUE.to_string()
+                } else {
+                    name_prefix
+                };
+                Box::new(Some(name).into_iter())
+            }
 
             ir::TyKind::Tuple(fields) => {
                 Box::new(fields.iter().enumerate().flat_map(move |(i, field)| {
-                    match &self.get_ty_mat(&field.ty).kind {
-                        ir::TyKind::Tuple(_) => {
-                            let field_prefix = format!("{field_prefix}_{i}");
-                            self.rel_cols_re(&field.ty, false, false, field_prefix)
-                        }
-                        ir::TyKind::Primitive(_) | ir::TyKind::Array(_) => {
-                            Box::new(Some(format!("{field_prefix}_{i}")).into_iter())
-                        }
-                        _ => todo!(),
-                    }
+                    let prefix = format!("{name_prefix}_{i}");
+                    self.rel_cols_re(&field.ty, prefix)
                 }))
             }
 
-            ir::TyKind::Array(item) => {
-                if top_level {
-                    let mut index = None;
-                    if include_index {
-                        index = Some(COL_ARRAY_INDEX.to_string());
-                    }
-
-                    Box::new(index.into_iter().chain(self.rel_cols_re(
-                        item,
-                        false,
-                        false,
-                        field_prefix,
-                    )))
-                } else {
-                    Box::new(Some(COL_VALUE.to_string()).into_iter())
-                }
-            }
-            ir::TyKind::Enum(_) => todo!(),
+            ir::TyKind::Enum(variants) => Box::new(
+                Some(
+                    format!("{name_prefix}_t"), // tag
+                )
+                .into_iter()
+                .chain(
+                    variants // non-unit fields
+                        .iter()
+                        .enumerate()
+                        .flat_map(move |(i, variant)| {
+                            let name_prefix = format!("{name_prefix}_{i}");
+                            self.rel_cols_re(&variant.ty, name_prefix)
+                        }),
+                ),
+            ),
             ir::TyKind::Function(_) => todo!(),
             ir::TyKind::Ident(_) => todo!(),
         }
@@ -98,6 +113,7 @@ mod rel_repr {
     use itertools::Itertools;
     use lutra_bin::ir;
 
+    /// return list of relation columns for a given type
     fn r(ty: &ir::Ty) -> String {
         let ctx = super::Context {
             types: Default::default(),
@@ -108,32 +124,49 @@ mod rel_repr {
 
     #[test]
     fn rel_cols_brute_force() {
-        // depth 1
+        // test column names of relations that represent certain types
+
+        // depth 1 (no nested types)
         assert_eq!(r(&prim()), "value");
         assert_eq!(r(&tuple_0()), "");
+        assert_eq!(r(&enum_(vec![])), "_t");
 
         // depth 2
-        assert_eq!(r(&tuple_1(prim())), "f_0");
+        assert_eq!(r(&tuple_1(prim())), "_0");
         assert_eq!(r(&tuple_1(tuple_0())), "");
         assert_eq!(r(&array(prim())), "index, value");
         assert_eq!(r(&array(tuple_0())), "index");
+        assert_eq!(r(&enum_(vec![tuple_0(), tuple_0(), tuple_0()])), "_t");
+        assert_eq!(r(&enum_(vec![tuple_0(), prim()])), "_t, _1");
 
         // depth 3
-        assert_eq!(r(&tuple_1(tuple_1(prim()))), "f_0_0");
+        assert_eq!(r(&tuple_1(tuple_1(prim()))), "_0_0");
         assert_eq!(r(&tuple_1(tuple_1(tuple_0()))), "");
-        assert_eq!(r(&tuple_1(array(prim()))), "f_0");
-        assert_eq!(r(&tuple_1(array(tuple_0()))), "f_0");
-        assert_eq!(r(&array(tuple_1(prim()))), "index, f_0");
+        assert_eq!(r(&tuple_1(array(prim()))), "_0");
+        assert_eq!(r(&tuple_1(array(tuple_0()))), "_0");
+        assert_eq!(r(&tuple_1(enum_(vec![prim(), prim()]))), "_0_t, _0_0, _0_1");
+        assert_eq!(r(&tuple_1(enum_(vec![tuple_0(), tuple_0()]))), "_0_t");
+
+        assert_eq!(r(&array(tuple_1(prim()))), "index, _0");
         assert_eq!(r(&array(tuple_1(tuple_0()))), "index");
         assert_eq!(r(&array(array(prim()))), "index, value");
         assert_eq!(r(&array(array(tuple_0()))), "index, value");
+        assert_eq!(r(&array(enum_1(prim()))), "index, _t, _0");
+        assert_eq!(r(&array(enum_1(tuple_0()))), "index, _t");
+
+        assert_eq!(r(&enum_1(tuple_1(prim()))), "_t, _0_0");
+        assert_eq!(r(&enum_1(tuple_1(tuple_0()))), "_t");
+        assert_eq!(r(&enum_1(array(prim()))), "_t, _0");
+        assert_eq!(r(&enum_1(array(tuple_0()))), "_t, _0");
+        assert_eq!(r(&enum_1(enum_1(prim()))), "_t, _0_t, _0_0");
+        assert_eq!(r(&enum_1(enum_1(tuple_0()))), "_t, _0_t");
     }
 
     #[test]
     fn rel_cols_special() {
         assert_eq!(
             r(&tuple_3(prim(), tuple_2(prim(), tuple_0()), prim())),
-            "f_0, f_1_0, f_2"
+            "_0, _1_0, _2"
         );
         assert_eq!(
             r(&tuple_3(
@@ -141,11 +174,21 @@ mod rel_repr {
                 tuple_0(),
                 tuple_2(tuple_0(), tuple_0())
             )),
-            "f_0_0"
+            "_0_0"
         );
-        assert_eq!(r(&tuple_3(prim(), array(prim()), prim())), "f_0, f_1, f_2");
+        assert_eq!(r(&tuple_3(prim(), array(prim()), prim())), "_0, _1, _2");
 
-        assert_eq!(r(&tuple_3(prim(), tuple_0(), prim())), "f_0, f_2");
+        assert_eq!(r(&tuple_3(prim(), tuple_0(), prim())), "_0, _2");
+
+        assert_eq!(
+            r(&enum_(vec![
+                enum_(vec![prim(), prim()]),
+                tuple_2(prim(), prim()),
+                tuple_0(),
+                tuple_1(prim()),
+            ])),
+            "_t, _0_t, _0_0, _0_1, _1_0, _1_1, _3_0"
+        );
     }
 
     // helpers
@@ -179,5 +222,22 @@ mod rel_repr {
 
     fn array(item: ir::Ty) -> ir::Ty {
         ir::Ty::new(ir::TyKind::Array(Box::new(item)))
+    }
+
+    fn enum_1(variant: ir::Ty) -> ir::Ty {
+        enum_(vec![variant])
+    }
+
+    fn enum_(variants: Vec<ir::Ty>) -> ir::Ty {
+        ir::Ty::new(ir::TyKind::Enum(
+            variants
+                .into_iter()
+                .enumerate()
+                .map(|(tag, ty)| ir::TyEnumVariant {
+                    name: format!("variant{tag}"),
+                    ty,
+                })
+                .collect_vec(),
+        ))
     }
 }

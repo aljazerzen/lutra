@@ -651,10 +651,10 @@ fn match_03() {
 #[test]
 fn match_04() {
     insta::assert_snapshot!(_test_run(r#"
-        type Status = enum {Pending = int16}
+        type Status = enum {Pending = int64}
 
         let main = func () -> match Status::Pending(4) {
           Status::Pending(x) => x,
         }
-    "#), @"int16");
+    "#), @"int64");
 }

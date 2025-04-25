@@ -6,8 +6,10 @@ pub fn _run(source: &str, params: Vec<lutra_bin::Value>) -> (String, String) {
 
     // compile
     let source = SourceTree::single("".into(), source.to_string());
-    let project =
-        lutra_compiler::compile(source, Default::default()).unwrap_or_else(|e| panic!("{e}"));
+    let project = match lutra_compiler::compile(source, Default::default()) {
+        Ok(p) => p,
+        Err(e) => panic!("{e}"),
+    };
 
     // compile to sql
     let (program, query_sql) =
@@ -26,7 +28,8 @@ pub fn _run(source: &str, params: Vec<lutra_bin::Value>) -> (String, String) {
     async fn inner(
         query_sql: &str,
         params: &[Vec<u8>],
-    ) -> Result<(lutra_bin::ir::Ty, lutra_bin::Data), tokio_postgres::Error> {
+        expected_ty: &lutra_bin::ir::Ty,
+    ) -> Result<lutra_bin::bytes::Bytes, tokio_postgres::Error> {
         const POSTGRES_URL: &str = "postgresql://postgres:pass@localhost:5416";
 
         let (client, connection) = tokio_postgres::connect(POSTGRES_URL, tokio_postgres::NoTls)
@@ -39,27 +42,20 @@ pub fn _run(source: &str, params: Vec<lutra_bin::Value>) -> (String, String) {
             }
         });
 
-        lutra_db_driver::query(client, query_sql, params.iter().map(|p| p.as_slice())).await
+        let params = params.iter().map(|p| p.as_slice());
+        lutra_db_driver::query(client, query_sql, params, expected_ty).await
     }
     let rt = tokio::runtime::Builder::new_current_thread()
         .enable_all()
         .build()
         .unwrap();
 
-    let (rel_ty, rel_data) = rt.block_on(inner(&query_sql, &params)).unwrap();
-
-    tracing::debug!(
-        "repack:\n- from: {}\n- to: {}",
-        lutra_bin::ir::print_ty(&rel_ty),
-        lutra_bin::ir::print_ty(program.get_output_ty())
-    );
+    let rel_data = rt
+        .block_on(inner(&query_sql, &params, program.get_output_ty()))
+        .unwrap();
 
     let output =
-        lutra_db_driver::repack(&rel_ty, rel_data, program.get_output_ty(), &program.types);
-    let output = output.flatten();
-
-    let output =
-        lutra_bin::Value::decode(&output, program.get_output_ty(), &program.types).unwrap();
+        lutra_bin::Value::decode(&rel_data, program.get_output_ty(), &program.types).unwrap();
     let output = output
         .print_source(program.get_output_ty(), &program.types)
         .unwrap();
@@ -91,8 +87,8 @@ fn tuple_prim() {
         func () -> {3, false}
     "#), @r#"
     SELECT
-      3::int8 AS f_0,
-      false AS f_1
+      3::int8 AS _0,
+      FALSE AS _1
     ---
     {
       3,
@@ -141,11 +137,11 @@ fn tuple_tuple_prim() {
         func () -> {3, {false, true, {"hello"}, 4}}
     "#), @r#"
     SELECT
-      3::int8 AS f_0,
-      false AS f_1_0,
-      true AS f_1_1,
-      'hello' AS f_1_2_0,
-      4::int8 AS f_1_3
+      3::int8 AS _0,
+      FALSE AS _1_0,
+      TRUE AS _1_1,
+      'hello' AS _1_2_0,
+      4::int8 AS _1_3
     ---
     {
       3,
@@ -167,7 +163,7 @@ fn tuple_array_prim() {
         func () -> {true, [1, 2, 3], false}
     "#), @r#"
     SELECT
-      true AS f_0,
+      TRUE AS _0,
       (
         SELECT
           json_agg(
@@ -191,8 +187,8 @@ fn tuple_array_prim() {
               2::int8,
               3::int8
           )
-      ) AS f_1,
-      false AS f_2
+      ) AS _1,
+      FALSE AS _2
     ---
     {
       true,
@@ -288,26 +284,26 @@ fn array_tuple_prim() {
         func () -> [{3, false}, {6, true}, {12, false}]
     "#), @r#"
     SELECT
-      f_0,
-      f_1
+      _0,
+      _1
     FROM
       (
         SELECT
           0::int8 AS index,
-          3::int8 AS f_0,
-          false AS f_1
+          3::int8 AS _0,
+          FALSE AS _1
         UNION
         ALL
         SELECT
           1::int8,
           6::int8,
-          true
+          TRUE
         UNION
         ALL
         SELECT
           2::int8,
           12::int8,
-          false
+          FALSE
       )
     ORDER BY
       index
@@ -338,7 +334,7 @@ fn tuple_array_tuple_prim() {
         }
     "#), @r#"
     SELECT
-      'hello' AS f_0,
+      'hello' AS _0,
       (
         SELECT
           json_agg(
@@ -350,28 +346,28 @@ fn tuple_array_tuple_prim() {
           (
             SELECT
               index,
-              jsonb_build_array(f_0, f_1) as value
+              jsonb_build_array(_0, _1) as value
             FROM
               (
                 SELECT
                   0::int8 AS index,
-                  3::int8 AS f_0,
-                  false AS f_1
+                  3::int8 AS _0,
+                  FALSE AS _1
                 UNION
                 ALL
                 SELECT
                   1::int8,
                   6::int8,
-                  true
+                  TRUE
                 UNION
                 ALL
                 SELECT
                   2::int8,
                   12::int8,
-                  false
+                  FALSE
               )
           )
-      ) AS f_1
+      ) AS _1
     ---
     {
       "hello",
@@ -397,7 +393,7 @@ fn tuple_array_tuple_prim() {
 fn param_00() {
     insta::assert_snapshot!(_run(r#"
     func (x: int64, y: text) -> {x, y}
-    "#, 
+    "#,
     vec![lutra_bin::Value::Int64(3), lutra_bin::Value::Text("hello".into())]
     ).1, @r#"
     {
@@ -482,7 +478,7 @@ fn complex_01() {
         | std::index(0)
       )
     }
- 
+
     func (album_id: int) -> {
       chinook::get_albums(),
       chinook::get_album_by_id(album_id),

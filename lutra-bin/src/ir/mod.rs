@@ -36,6 +36,10 @@ impl Ty {
             variants_recursive: vec![],
         }
     }
+
+    pub fn is_unit(&self) -> bool {
+        self.kind.as_tuple().map_or(false, |f| f.is_empty())
+    }
 }
 
 impl From<TyPrimitive> for TyKind {

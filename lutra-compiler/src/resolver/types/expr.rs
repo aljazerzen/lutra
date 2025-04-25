@@ -122,7 +122,15 @@ impl fold::PrFold for super::TypeResolver<'_> {
                 if let pr::ExprKind::EnumVariant(mut variant) = func.kind {
                     // special case: enum variant construction
                     let inner = args.into_iter().exactly_one().unwrap();
-                    let inner = self.fold_expr(inner)?;
+                    let mut inner = self.fold_expr(inner)?;
+
+                    // validate type of inner
+                    let ty_variants = func.ty.as_ref().unwrap().kind.as_enum().unwrap();
+                    let ty_variant = ty_variants.get(variant.tag).unwrap();
+                    self.validate_expr_type(&mut inner, &ty_variant.ty, &|| {
+                        Some(ty_variant.name.clone())
+                    })?;
+
                     variant.inner = Some(Box::new(inner));
 
                     pr::Expr {

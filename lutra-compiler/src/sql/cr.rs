@@ -52,6 +52,7 @@ pub struct Expr {
 
 #[derive(Debug, Clone)]
 pub enum ExprKind {
+    Null,
     Literal(ir::Literal),
     FuncCall(String, Vec<Expr>),
     Subquery(Box<RelExpr>),

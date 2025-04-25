@@ -138,12 +138,51 @@ impl<'a> Context<'a> {
 
             ir::ExprKind::Function(_) => todo!(),
 
-            ir::ExprKind::EnumVariant(_) => todo!(),
+            ir::ExprKind::EnumVariant(variant) => {
+                let ty_variants = expr.ty.kind.as_enum().unwrap();
+
+                let mut row = Vec::with_capacity(ty_variants.len() + 1);
+
+                // tag
+                row.push(cr::Expr {
+                    kind: cr::ExprKind::Literal(ir::Literal::Int(variant.tag as i64)),
+                    ty: ir::Ty::new(ir::TyPrimitive::int8),
+                });
+
+                // spacing
+                for ty_variant in &ty_variants[0..(variant.tag as usize)] {
+                    if ty_variant.ty.is_unit() {
+                        continue;
+                    }
+                    row.push(cr::Expr {
+                        kind: cr::ExprKind::Null,
+                        ty: ty_variant.ty.clone(),
+                    });
+                }
+
+                // inner
+                row.push(self.compile_col(&variant.inner));
+
+                // spacing
+                for ty_variant in &ty_variants[((variant.tag as usize) + 1)..] {
+                    if ty_variant.ty.is_unit() {
+                        continue;
+                    }
+                    row.push(cr::Expr {
+                        kind: cr::ExprKind::Null,
+                        ty: ty_variant.ty.clone(),
+                    });
+                }
+
+                cr::RelExprKind::Constructed(vec![row])
+            }
             ir::ExprKind::EnumEq(_) => todo!(),
             ir::ExprKind::EnumUnwrap(_) => todo!(),
 
             ir::ExprKind::TupleLookup(lookup) => {
                 let base = self.compile_rel(&lookup.base);
+
+                // TODO: this does not take nested tuples or enums into account
                 cr::RelExprKind::ProjectRetain(Box::new(base), vec![lookup.position as usize])
             }
             ir::ExprKind::Binding(binding) => {
@@ -225,6 +264,7 @@ impl<'a> Context<'a> {
                     kind: cr::RelExprKind::Limit(Box::new(offset), new_int(1)),
                 };
 
+                // drop index column
                 cr::RelExprKind::ProjectDrop(Box::new(limit), vec![0])
             }
             "std::map" => {
@@ -232,7 +272,7 @@ impl<'a> Context<'a> {
                 let func = &call.args[1];
                 let func = func.kind.as_function().unwrap();
 
-                let mut row = vec![new_column_of(
+                let mut row = vec![new_column_of_rel(
                     array.ty.clone(),
                     0,
                     ir::Ty::new(ir::TyPrimitive::int64),
@@ -314,7 +354,7 @@ impl<'a> Context<'a> {
                 cr::RelExprKind::ProjectReplace(
                     Box::new(array),
                     vec![
-                        new_column_of(
+                        new_column_of_rel(
                             call.args[0].ty.clone(),
                             0,
                             ir::Ty::new(ir::TyPrimitive::int64),
@@ -421,14 +461,14 @@ fn new_int(int: i64) -> cr::Expr {
     }
 }
 
-fn new_column_of(ty: ir::Ty, col_index: usize, col_ty: ir::Ty) -> cr::Expr {
+fn new_column_of_rel(ty: ir::Ty, col_position: usize, col_ty: ir::Ty) -> cr::Expr {
     let kind = cr::ExprKind::Subquery(Box::new(cr::RelExpr {
         kind: cr::RelExprKind::ProjectRetain(
             Box::new(cr::RelExpr {
                 kind: cr::RelExprKind::SelectRelVar,
                 ty,
             }),
-            vec![col_index],
+            vec![col_position],
         ),
         ty: col_ty.clone(),
     }));

@@ -269,7 +269,8 @@ impl<'a> Context<'a> {
 
     fn compile_expr(&mut self, expr: cr::Expr) -> ExprOrSource {
         match expr.kind {
-            cr::ExprKind::Literal(literal) => ExprOrSource::Expr(compile_literal(literal)),
+            cr::ExprKind::Null => ExprOrSource::Expr(self.null(&expr.ty)),
+            cr::ExprKind::Literal(literal) => self.compile_literal(literal, &expr.ty),
             cr::ExprKind::FuncCall(func_name, args) => {
                 let args: Vec<_> = args.into_iter().map(|x| self.compile_expr(x)).collect();
                 self.compile_func_call(&func_name, expr.ty, args)
@@ -375,7 +376,11 @@ impl<'a> Context<'a> {
             "std::or" => utils::new_bin_op("OR", args),
             "std::not" => utils::new_un_op("NOT", args),
 
-            "std::text_ops::length" => utils::new_func_call("LENGTH", args),
+            "std::text_ops::length" => {
+                let mut args = args.into_iter();
+                let text = args.next().unwrap();
+                ExprOrSource::Source(format!("LENGTH({text})::int8"))
+            }
 
             "std::min" => utils::new_func_call("MIN", args),
             "std::max" => utils::new_func_call("MAX", args),
@@ -436,12 +441,12 @@ impl<'a> Context<'a> {
         }
     }
 
-    fn compile_ty_name(&mut self, ty: &ir::Ty) -> sql_ast::DataType {
+    fn compile_ty_name(&self, ty: &ir::Ty) -> sql_ast::DataType {
         match self.get_ty_mat(ty).kind {
             ir::TyKind::Primitive(prim) => {
                 let name = match prim {
                     ir::TyPrimitive::bool => "bool",
-                    ir::TyPrimitive::int8 => "int1",
+                    ir::TyPrimitive::int8 => "\"char\"",
                     ir::TyPrimitive::int16 => "int2",
                     ir::TyPrimitive::int32 => "int4",
                     ir::TyPrimitive::int64 => "int8",
@@ -458,6 +463,11 @@ impl<'a> Context<'a> {
                     vec![],
                 )
             }
+            ir::TyKind::Tuple(ref fields) if fields.is_empty() => {
+                // unit type (holds no data) does not exist in sql so we use a type with
+                // the least amount of data
+                sql_ast::DataType::Boolean
+            }
             ir::TyKind::Tuple(_) => todo!(),
             ir::TyKind::Array(_) => todo!(),
             ir::TyKind::Enum(_) => todo!(),
@@ -465,13 +475,22 @@ impl<'a> Context<'a> {
             ir::TyKind::Ident(_) => todo!(),
         }
     }
-}
 
-fn compile_literal(lit: ir::Literal) -> sql_ast::Expr {
-    sql_ast::Expr::Value(match lit {
-        ir::Literal::Bool(b) => sql_ast::Value::Boolean(b),
-        ir::Literal::Int(i) => sql_ast::Value::Number(format!("{i}::int8"), false),
-        ir::Literal::Float(f) => sql_ast::Value::Number(format!("{f:?}::float8"), false),
-        ir::Literal::Text(s) => sql_ast::Value::SingleQuotedString(s),
-    })
+    fn compile_literal(&self, lit: ir::Literal, ty: &ir::Ty) -> ExprOrSource {
+        match lit {
+            ir::Literal::Bool(b) if b => ExprOrSource::Source("TRUE".into()),
+            ir::Literal::Bool(_) => ExprOrSource::Source("FALSE".into()),
+
+            ir::Literal::Int(i) => {
+                ExprOrSource::Source(format!("{i}::{}", self.compile_ty_name(ty)))
+            }
+            ir::Literal::Float(f) => {
+                ExprOrSource::Source(format!("{f}::{}", self.compile_ty_name(ty)))
+            }
+
+            ir::Literal::Text(s) => {
+                ExprOrSource::Expr(sql_ast::Expr::Value(sql_ast::Value::SingleQuotedString(s)))
+            }
+        }
+    }
 }

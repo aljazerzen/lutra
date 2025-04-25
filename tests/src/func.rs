@@ -994,69 +994,64 @@ test_case!(
 test_case!(
     enum_construction_00,
     r#"
-    type Status = enum {Done, Pending = int16, Cancelled = text}
+    type Status = enum {Done, Pending = int64, Cancelled = text}
     func () -> Status::Done
     "#,
-    r#"Done"#,
-    skip_postgres
+    r#"Done"#
 );
 
 test_case!(
     enum_construction_01,
     r#"
-    type Status = enum {Done, Pending = int16, Cancelled = text}
+    type Status = enum {Done, Pending = int64, Cancelled = text}
     func () -> Status::Pending(513)
     "#,
     r#"Pending(
   513
-)"#,
-    skip_postgres
+)"#
 );
 
 test_case!(
     enum_construction_02,
     r#"
-    type Status = enum {Done, Pending = int16, Cancelled = text}
+    type Status = enum {Done, Pending = int64, Cancelled = text}
     func () -> Status::Cancelled("I don't like it")
     "#,
     r#"Cancelled(
   "I don't like it"
-)"#,
-    skip_postgres
+)"#
 );
 
 test_case!(
     enum_construction_03,
     r#"
-    type Color = enum {Red, Green = int16, Blue = bool}
+    type Color = enum {Red, Green = bool, Blue = bool}
     func () -> Color::Red
     "#,
-    r#"Red"#,
-    skip_postgres
+    r#"Red"#
 );
 
+// TODO make `Green: int16` when support i16 literals
 test_case!(
     enum_construction_04,
     r#"
-    type Color = enum {Red, Green = int16, Blue = bool}
-    func () -> Color::Green(10)
+    type Color = enum {Red, Green = bool, Blue = bool}
+    func () -> Color::Green(true)
     "#,
     r#"Green(
-  10
-)"#,
-    skip_postgres
+  true
+)"#
 );
 
 test_case!(
     enum_construction_05,
     r#"
-    type Color = enum {Red, Green = int16, Blue = bool}
+    type Color = enum {Red, Green = bool, Blue = bool}
     func () -> Color::Blue(false)
     "#,
     r#"Blue(
   false
-)"#,
-    skip_postgres
+)"#
 );
 
 test_case!(
@@ -1064,12 +1059,12 @@ test_case!(
     r#"
     type Item = {
       id = int64,
-      color = enum {Red, Green = int16, Blue = bool},
+      color = enum {Red, Green = bool, Blue = bool},
     }
-    func () -> Item::color::Green(3)
+    func () -> Item::color::Green(true)
     "#,
     r#"Green(
-  3
+  true
 )"#,
     skip_postgres
 );
@@ -1093,7 +1088,7 @@ test_case!(
 test_case!(
     match_00,
     r#"
-    type Status = enum {Done, Pending = int16, Cancelled = text}
+    type Status = enum {Done, Pending = int64, Cancelled = text}
     func () -> match Status::Pending(4) {
         Status::Done => "done",
         Status::Pending => "pending",
