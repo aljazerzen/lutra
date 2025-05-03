@@ -10,6 +10,7 @@ pub async fn query(
     query: &str,
     params: impl IntoIterator<Item = &[u8]>,
     expected_ty: &ir::Ty,
+    ty_defs: &[ir::TyDef],
 ) -> Result<Bytes, tokio_postgres::Error> {
     // parse
     let stmt = client.prepare(query).await?;
@@ -25,7 +26,9 @@ pub async fn query(
     // write rows to buffer
     let mut buf = bytes::BytesMut::new();
 
-    let encoder = construct_rows_encoder(expected_ty);
+    let ctx = Context::new(ty_defs);
+
+    let encoder = ctx.construct_rows_encoder(expected_ty);
     encoder.encode(&mut buf, &rows);
 
     Ok(buf.freeze())
@@ -51,84 +54,98 @@ impl<'a> Context<'a> {
             _ => ty,
         }
     }
-}
 
-/// Constructs an encoder that takes a slice of rows and produces the given type
-fn construct_rows_encoder(ty: &ir::Ty) -> Box<dyn EncodeRows> {
-    if let ir::TyKind::Array(item_ty) = &ty.kind {
-        Box::new(ArrayEncoder {
-            inner: construct_row_encoder(item_ty),
-        })
-    } else {
-        Box::new(SingleRowEncoder {
-            inner: construct_row_encoder(ty),
-        })
+    /// Constructs an encoder that takes a slice of rows and produces the given type
+    #[tracing::instrument(name = "rows", skip_all)]
+    fn construct_rows_encoder(&self, ty: &ir::Ty) -> Box<dyn EncodeRows> {
+        tracing::debug!("rows for: {}", lutra_bin::ir::print_ty(ty));
+
+        if let ir::TyKind::Array(item_ty) = &ty.kind {
+            Box::new(ArrayEncoder {
+                inner: self.construct_row_encoder(item_ty),
+            })
+        } else {
+            Box::new(SingleRowEncoder {
+                inner: self.construct_row_encoder(ty),
+            })
+        }
     }
-}
 
-/// Constructs an encoder that takes a row and produces the given type
-fn construct_row_encoder(ty: &ir::Ty) -> Box<dyn EncodeRow> {
-    match &ty.kind {
-        // we expected X but {X}: just take the first row
-        ir::TyKind::Primitive(_) | ir::TyKind::Array(_) => Box::new(RowCellEncoder {
-            inner: construct_cell_encoder(ty),
-        }),
+    /// Constructs an encoder that takes a row and produces the given type
+    #[tracing::instrument(name = "row", skip_all)]
+    fn construct_row_encoder(&self, ty: &ir::Ty) -> Box<dyn EncodeRow> {
+        tracing::debug!("row for: {}", lutra_bin::ir::print_ty(ty));
 
-        ir::TyKind::Tuple(fields) => Box::new(TupleEncoder {
-            inner: fields
-                .iter()
-                .map(|f| construct_row_encoder(&f.ty))
-                .collect(),
-        }),
+        match &self.get_ty_mat(ty).kind {
+            // we expected X but got {X}: just take the first row
+            ir::TyKind::Primitive(_) | ir::TyKind::Array(_) => Box::new(RowCellEncoder {
+                inner: self.construct_cell_encoder(ty),
+            }),
 
-        ir::TyKind::Enum(variants) => Box::new(EnumEncoder {
-            ty: variants.clone(),
-            inner: variants
-                .iter()
-                .map(|f| construct_row_encoder(&f.ty))
-                .collect(),
-        }),
-        ir::TyKind::Function(_) => todo!(),
-        ir::TyKind::Ident(_) => todo!(),
+            ir::TyKind::Tuple(fields) => Box::new(TupleEncoder {
+                inner: fields
+                    .iter()
+                    .map(|f| self.construct_row_encoder(&f.ty))
+                    .collect(),
+            }),
+
+            ir::TyKind::Enum(variants) => Box::new(EnumEncoder {
+                ty: variants.clone(),
+                inner: variants
+                    .iter()
+                    .map(|f| self.construct_row_encoder(&f.ty))
+                    .collect(),
+            }),
+            ir::TyKind::Function(_) => todo!(),
+            ir::TyKind::Ident(_) => todo!(),
+        }
     }
-}
 
-/// Constructs an encoder that takes cell within a row and produces the given type
-fn construct_cell_encoder(ty: &ir::Ty) -> Box<dyn EncodeCell> {
-    match &ty.kind {
-        ir::TyKind::Primitive(prim) if *prim == ir::TyPrimitive::text => Box::new(TextEncoder),
-        ir::TyKind::Primitive(prim) => Box::new(PrimEncoder { prim: *prim }),
+    /// Constructs an encoder that takes cell within a row and produces the given type
+    #[tracing::instrument(name = "cell", skip_all)]
+    fn construct_cell_encoder(&self, ty: &ir::Ty) -> Box<dyn EncodeCell> {
+        tracing::debug!("cell for: {}", lutra_bin::ir::print_ty(ty));
 
-        ir::TyKind::Tuple(_) => unreachable!(),
+        match &self.get_ty_mat(ty).kind {
+            ir::TyKind::Primitive(prim) if *prim == ir::TyPrimitive::text => Box::new(TextEncoder),
+            ir::TyKind::Primitive(prim) => Box::new(PrimEncoder { prim: *prim }),
 
-        ir::TyKind::Array(_) => Box::new(JsonCellEncoder {
-            inner: construct_json_encoder(ty),
-        }),
-        ir::TyKind::Enum(_) => todo!(),
-        ir::TyKind::Function(_) => todo!(),
-        ir::TyKind::Ident(_) => todo!(),
+            ir::TyKind::Tuple(_) => unreachable!(),
+
+            ir::TyKind::Array(_) => Box::new(JsonCellEncoder {
+                inner: self.construct_json_encoder(ty),
+            }),
+            ir::TyKind::Enum(_) => todo!(),
+            ir::TyKind::Function(_) => todo!(),
+            ir::TyKind::Ident(_) => todo!(),
+        }
     }
-}
 
-/// Constructs an encoder that takes JSON and produces the given type
-fn construct_json_encoder(ty: &ir::Ty) -> Box<dyn EncodeJson> {
-    match &ty.kind {
-        ir::TyKind::Primitive(prim) if *prim == ir::TyPrimitive::text => Box::new(JsonTextEncoder),
-        ir::TyKind::Primitive(prim) => Box::new(JsonPrimEncoder { prim: *prim }),
+    /// Constructs an encoder that takes JSON and produces the given type
+    #[tracing::instrument(name = "json", skip_all)]
+    fn construct_json_encoder(&self, ty: &ir::Ty) -> Box<dyn EncodeJson> {
+        tracing::debug!("json");
 
-        ir::TyKind::Tuple(fields) => Box::new(JsonTupleEncoder {
-            inner: fields
-                .iter()
-                .map(|f| construct_json_encoder(&f.ty))
-                .collect(),
-        }),
+        match &self.get_ty_mat(ty).kind {
+            ir::TyKind::Primitive(prim) if *prim == ir::TyPrimitive::text => {
+                Box::new(JsonTextEncoder)
+            }
+            ir::TyKind::Primitive(prim) => Box::new(JsonPrimEncoder { prim: *prim }),
 
-        ir::TyKind::Array(item) => Box::new(JsonArrayEncoder {
-            inner: construct_json_encoder(item),
-        }),
-        ir::TyKind::Enum(_) => todo!(),
-        ir::TyKind::Function(_) => todo!(),
-        ir::TyKind::Ident(_) => todo!(),
+            ir::TyKind::Tuple(fields) => Box::new(JsonTupleEncoder {
+                inner: fields
+                    .iter()
+                    .map(|f| self.construct_json_encoder(&f.ty))
+                    .collect(),
+            }),
+
+            ir::TyKind::Array(item) => Box::new(JsonArrayEncoder {
+                inner: self.construct_json_encoder(item),
+            }),
+            ir::TyKind::Enum(_) => todo!(),
+            ir::TyKind::Function(_) => todo!(),
+            ir::TyKind::Ident(_) => todo!(),
+        }
     }
 }
 

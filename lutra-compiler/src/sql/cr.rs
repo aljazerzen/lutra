@@ -1,3 +1,5 @@
+use std::rc::Rc;
+
 use lutra_bin::ir;
 
 /// A relational expression (something that can be used in `FROM (...)`).
@@ -18,8 +20,11 @@ pub enum RelExprKind {
     FromTable(String),
     /// Read from a common table table
     FromBinding(String),
-    /// Select all columns of a relational variable
-    SelectRelVar,
+    /// Select all columns of a relational variable.
+    /// Contains the name of the rel var. If none, it implies
+    /// that there is only one rel var in scope so rel var name can
+    /// be omitted.
+    SelectRelVar(Option<String>),
 
     Limit(Box<RelExpr>, Expr),
     Offset(Box<RelExpr>, Expr),
@@ -56,8 +61,22 @@ pub enum ExprKind {
     Literal(ir::Literal),
     FuncCall(String, Vec<Expr>),
     Subquery(Box<RelExpr>),
+
+    /// Converts a relation into its JSON encoding.
     JsonPack(Box<RelExpr>),
+
+    /// Expr in the scope of a rel var.
+    Scoped(Rc<RelVar>, Box<Expr>),
+
+    /// SQL query parameter. Contains 0-based index.
     Param(u8),
+}
+
+/// Relational variable, bound to a name.
+#[derive(Debug, Clone)]
+pub struct RelVar {
+    pub rel: Box<RelExpr>,
+    pub alias: String,
 }
 
 impl std::fmt::Debug for RelExpr {

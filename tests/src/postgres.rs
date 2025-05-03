@@ -29,6 +29,7 @@ pub fn _run(source: &str, params: Vec<lutra_bin::Value>) -> (String, String) {
         query_sql: &str,
         params: &[Vec<u8>],
         expected_ty: &lutra_bin::ir::Ty,
+        ty_defs: &[lutra_bin::ir::TyDef],
     ) -> Result<lutra_bin::bytes::Bytes, tokio_postgres::Error> {
         const POSTGRES_URL: &str = "postgresql://postgres:pass@localhost:5416";
 
@@ -43,7 +44,7 @@ pub fn _run(source: &str, params: Vec<lutra_bin::Value>) -> (String, String) {
         });
 
         let params = params.iter().map(|p| p.as_slice());
-        lutra_db_driver::query(client, query_sql, params, expected_ty).await
+        lutra_db_driver::query(client, query_sql, params, expected_ty, ty_defs).await
     }
     let rt = tokio::runtime::Builder::new_current_thread()
         .enable_all()
@@ -51,7 +52,12 @@ pub fn _run(source: &str, params: Vec<lutra_bin::Value>) -> (String, String) {
         .unwrap();
 
     let rel_data = rt
-        .block_on(inner(&query_sql, &params, program.get_output_ty()))
+        .block_on(inner(
+            &query_sql,
+            &params,
+            program.get_output_ty(),
+            &program.types,
+        ))
         .unwrap();
 
     let output =
@@ -445,7 +451,6 @@ fn complex_00() {
 }
 
 #[test]
-#[ignore]
 fn complex_01() {
     insta::assert_snapshot!(_run(r#"
     module chinook {
@@ -486,22 +491,81 @@ fn complex_01() {
     }
     "#, vec![lutra_bin::Value::Int64(3)]).1, @r#"
     {
-      a = 3,
-      {
-        3,
-        4,
-      },
-      {
-        2,
-        3,
-      },
-      hello = [
-        2,
-        2,
-        0,
-        0,
-        0,
+      [
+        {
+          id = 3,
+          title = "Hello world!",
+        },
+        {
+          id = 5,
+          title = "Foo",
+        },
       ],
+      {
+        id = 3,
+        title = "Hello world!",
+      },
+      {
+        id = 3,
+        total = 3.6,
+      },
+    }
+    "#);
+}
+
+#[test]
+fn complex_02() {
+    insta::assert_snapshot!(_run(r#"
+    module chinook {
+      type album = {id = int, title = text}
+
+      let get_album = func (): album -> (
+        {id = 3, title = "Hello world!"}
+      )
+    }
+
+    func () -> {
+      5,
+      chinook::get_album()
+    }
+    "#, vec![]).1, @r#"
+    {
+      5,
+      {
+        id = 3,
+        title = "Hello world!",
+      },
+    }
+    "#);
+}
+
+#[test]
+fn complex_03() {
+    insta::assert_snapshot!(_run(r#"
+    module chinook {
+      type album = {id = int, title = text}
+
+      let get_albums = func (): [album] -> [
+        {id = 3, title = "Hello world!"},
+        {id = 5, title = "Foo"},
+      ]
+
+      let get_album_by_id = func (album_id: int): album -> (
+        get_albums()
+        | std::filter(func (this: album) -> this.id == album_id)
+        | std::index(0)
+      )
+    }
+
+    func (album_id: int) -> {
+      chinook::get_album_by_id(album_id),
+    }
+    "#, vec![lutra_bin::Value::Int64(3)]).1, @r#"
+    {
+      {
+        id = 3,
+        title = "Hello world!",
+      },
     }
     "#);
 }
