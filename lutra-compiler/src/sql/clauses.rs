@@ -188,7 +188,19 @@ impl<'a> Context<'a> {
                 let base = self.compile_rel(&lookup.base);
 
                 // TODO: this does not take nested tuples or enums into account
-                cr::RelExprKind::ProjectRetain(Box::new(base), vec![lookup.position as usize])
+                let mut inner =
+                    cr::RelExprKind::ProjectRetain(Box::new(base), vec![lookup.position as usize]);
+
+                // In a tuple lookup the repr of the field might change.
+                // Currently this only happens for arrays, which change from JSON to SQL repr.
+                if expr.ty.kind.is_array() {
+                    inner = cr::RelExprKind::JsonUnpack(Box::new(cr::RelExpr {
+                        kind: inner,
+                        ty: expr.ty.clone(),
+                    }));
+                }
+
+                inner
             }
             ir::ExprKind::Binding(binding) => {
                 if let ir::TyKind::Function(_) = &binding.expr.ty.kind {

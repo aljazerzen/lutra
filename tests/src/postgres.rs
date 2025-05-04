@@ -569,3 +569,51 @@ fn complex_03() {
     }
     "#);
 }
+
+#[test]
+fn complex_04() {
+    insta::assert_snapshot!(_run(r#"
+    let get_data = func () -> {a = [2, 5, 4, 3, 1, 2]}
+
+    func () -> (
+      get_data().a 
+      | std::map(func (y: int64) -> -y)
+    )
+    "#, vec![]).1, @r#"
+    [
+      -2,
+      -5,
+      -4,
+      -3,
+      -1,
+      -2,
+    ]
+    "#);
+}
+
+#[test]
+fn complex_05() {
+    insta::assert_snapshot!(_run(r#"
+    let get_data = func () -> {a = [{2, false}, {5, true}, {4, false}]}
+
+    func () -> (
+      get_data().a 
+      | std::map(func (y: {int64, bool}) -> {-y.0, !y.1})
+    )
+    "#, vec![]).1, @r#"
+    [
+      {
+        -2,
+        true,
+      },
+      {
+        -5,
+        false,
+      },
+      {
+        -4,
+        true,
+      },
+    ]
+    "#);
+}

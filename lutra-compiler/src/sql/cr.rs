@@ -47,6 +47,9 @@ pub enum RelExprKind {
 
     /// Bind a common table expression to a name
     With(String, Box<RelExpr>, Box<RelExpr>),
+
+    /// Converts a JSON-encoded value into a relation
+    JsonUnpack(Box<RelExpr>),
 }
 
 #[derive(Clone)]

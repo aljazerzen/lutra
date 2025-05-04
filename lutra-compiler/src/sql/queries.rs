@@ -197,6 +197,7 @@ impl<'a> Context<'a> {
 
                 main
             }
+            cr::RelExprKind::JsonUnpack(inner) => self.compile_json_unpack(*inner),
         }
     }
 
@@ -384,7 +385,64 @@ impl<'a> Context<'a> {
             _ => unreachable!("{:?}", expr.ty),
         }
     }
+    fn compile_json_unpack(&mut self, inner: cr::RelExpr) -> sql_ast::Query {
+        let inner_ty = inner.ty.clone();
+        let inner_query = self.compile_re(inner);
 
+        match &self.get_ty_mat(&inner_ty).kind {
+            ir::TyKind::Array(ty_item) => {
+                let mut query = utils::select_empty();
+
+                /*
+                FROM json_array_elements(...inner...)
+                SELECT ROW_NUMBER(), value
+                */
+
+                query.from = utils::from(utils::rel_func(
+                    sql_ast::Ident::new("json_array_elements"),
+                    vec![sql_ast::Expr::Subquery(Box::new(inner_query))],
+                    None,
+                ));
+
+                query.projection = vec![sql_ast::SelectItem::ExprWithAlias {
+                    expr: ExprOrSource::Source("(ROW_NUMBER() OVER ())::int4".into()).into_expr(),
+                    alias: sql_ast::Ident::new("index"),
+                }];
+
+                let item_ty = self.get_ty_mat(ty_item);
+                match &item_ty.kind {
+                    ir::TyKind::Primitive(_) => {
+                        let value = ExprOrSource::Source(format!(
+                            "value::text::{}",
+                            self.compile_ty_name(item_ty)
+                        ))
+                        .into_expr();
+                        query
+                            .projection
+                            .push(sql_ast::SelectItem::UnnamedExpr(value));
+                    }
+                    ir::TyKind::Tuple(fields) => {
+                        for (index, field) in fields.iter().enumerate() {
+                            let value = ExprOrSource::Source(format!(
+                                "(value->>{index})::{}",
+                                self.compile_ty_name(&field.ty)
+                            ))
+                            .into_expr();
+                            query.projection.push(sql_ast::SelectItem::ExprWithAlias {
+                                expr: value,
+                                alias: sql_ast::Ident::new(format!("_{index}")),
+                            });
+                        }
+                    }
+                    ir::TyKind::Array(_) => todo!(),
+                    _ => todo!(),
+                }
+                utils::query_select(query)
+            }
+            ir::TyKind::Tuple(_) => todo!(),
+            _ => unreachable!("{:?}", inner_ty),
+        }
+    }
     fn compile_func_call(
         &mut self,
         id: &str,

@@ -31,6 +31,23 @@ pub fn subquery(query: sql_ast::Query, alias: Option<sql_ast::TableAlias>) -> sq
     }
 }
 
+pub fn rel_func(
+    name: sql_ast::Ident,
+    args: Vec<sql_ast::Expr>,
+    alias: Option<sql_ast::TableAlias>,
+) -> sql_ast::TableFactor {
+    sql_ast::TableFactor::Function {
+        lateral: false,
+        name: sql_ast::ObjectName(vec![name]),
+        args: args
+            .into_iter()
+            .map(sql_ast::FunctionArgExpr::Expr)
+            .map(sql_ast::FunctionArg::Unnamed)
+            .collect(),
+        alias,
+    }
+}
+
 pub fn from(relation: sql_ast::TableFactor) -> Vec<sql_ast::TableWithJoins> {
     vec![sql_ast::TableWithJoins {
         relation,
