@@ -15,7 +15,7 @@ pub fn compile(rel: cr::RelExpr, types: HashMap<&ir::Path, &ir::Ty>) -> sql_ast:
 
     if rel_ty.kind.is_array() {
         // wrap into a top-level projection to remove array indexes
-        let mut query = ctx.query_wrap(query, &rel_ty, false);
+        let mut query = ctx.query_wrap(utils::subquery(query, None), &rel_ty, false);
         query.order_by = Some(utils::order_by_one(utils::ident(
             None::<&str>,
             COL_ARRAY_INDEX,
@@ -78,6 +78,26 @@ impl<'a> Context<'a> {
                 select.projection = self.projection_noop(None, &rel.ty, true);
                 utils::query_select(select)
             }
+            cr::RelExprKind::ForEach {
+                iter_name,
+                iterator,
+                body,
+            } => {
+                let correlated_ty = body.ty.clone();
+
+                let mut select = utils::select_empty();
+                select.from.push(utils::from(utils::subquery(
+                    self.compile_re(*iterator),
+                    Some(iter_name),
+                )));
+                select.from.push(utils::from(utils::subquery_lateral(
+                    self.compile_re(*body),
+                    Some("b".into()),
+                )));
+
+                select.projection = self.projection_noop(Some("b"), &correlated_ty, true);
+                utils::query_select(select)
+            }
             cr::RelExprKind::SelectRelVar(rel_var_name) => {
                 let mut select = utils::select_empty();
                 select.projection = self.projection_noop(rel_var_name.as_deref(), &rel.ty, true);
@@ -86,7 +106,7 @@ impl<'a> Context<'a> {
             cr::RelExprKind::Limit(inner, limit) => {
                 let mut inner = self.compile_re(*inner);
                 if inner.limit.is_some() {
-                    inner = self.query_wrap(inner, &rel.ty, true);
+                    inner = self.query_wrap(utils::subquery(inner, None), &rel.ty, true);
                 }
 
                 inner.limit = Some(self.compile_expr(limit).unwrap_inner().into_expr());
@@ -102,7 +122,7 @@ impl<'a> Context<'a> {
                 let mut inner = self.compile_re(*inner);
 
                 if inner.limit.is_some() | inner.offset.is_some() {
-                    inner = self.query_wrap(inner, &rel.ty, true);
+                    inner = self.query_wrap(utils::subquery(inner, None), &rel.ty, true);
                 }
 
                 inner.offset = Some(sql_ast::Offset {
@@ -134,11 +154,13 @@ impl<'a> Context<'a> {
                 utils::drop_by_position(&mut select.projection, cols);
                 inner
             }
-            cr::RelExprKind::ProjectReplace(inner, columns) => {
+            cr::RelExprKind::ProjectReplace(inner_name, inner, columns) => {
                 let inner = self.compile_re(*inner);
 
                 let mut select = utils::select_empty();
-                select.from = utils::from(utils::subquery(inner, None));
+                select
+                    .from
+                    .push(utils::from(utils::subquery(inner, Some(inner_name))));
 
                 let (column_exprs, rvars) = self.compile_columns(columns);
                 select.from.extend(self.compile_rvars(rvars));
@@ -150,7 +172,7 @@ impl<'a> Context<'a> {
                 let inner = self.compile_re(*inner);
 
                 let mut select = utils::select_empty();
-                select.from = utils::from(utils::subquery(inner, None));
+                select.from.push(utils::from(utils::subquery(inner, None)));
 
                 let columns: Vec<_> = columns
                     .into_iter()
@@ -161,19 +183,22 @@ impl<'a> Context<'a> {
 
                 utils::query_select(select)
             }
-            cr::RelExprKind::Where(inner, cond) => {
+            cr::RelExprKind::Where(inner_name, inner, cond) => {
                 let inner = self.compile_re(*inner);
-                let mut query = self.query_wrap(inner, &rel.ty, true);
+                let mut query =
+                    self.query_wrap(utils::subquery(inner, Some(inner_name)), &rel.ty, true);
                 let select = self.query_as_mut_select(&mut query, &rel.ty);
                 select.selection = Some(self.compile_expr(cond).unwrap_inner().into_expr());
                 query
             }
-            cr::RelExprKind::OrderBy(inner, key) => {
+            cr::RelExprKind::OrderBy(inner_name, inner, key) => {
                 let inner = self.compile_re(*inner);
 
                 // wrap into a new query
                 let mut select = utils::select_empty();
-                select.from = utils::from(utils::subquery(inner, None));
+                select
+                    .from
+                    .push(utils::from(utils::subquery(inner, Some(inner_name))));
                 select.projection = self.projection_noop(None, &rel.ty, true);
 
                 // overwrite array index
@@ -385,9 +410,9 @@ impl<'a> Context<'a> {
             _ => unreachable!("{:?}", expr.ty),
         }
     }
-    fn compile_json_unpack(&mut self, inner: cr::RelExpr) -> sql_ast::Query {
+    fn compile_json_unpack(&mut self, inner: cr::Expr) -> sql_ast::Query {
         let inner_ty = inner.ty.clone();
-        let inner_query = self.compile_re(inner);
+        let inner_query = self.compile_expr(inner).unwrap_inner();
 
         match &self.get_ty_mat(&inner_ty).kind {
             ir::TyKind::Array(ty_item) => {
@@ -398,11 +423,11 @@ impl<'a> Context<'a> {
                 SELECT ROW_NUMBER(), value
                 */
 
-                query.from = utils::from(utils::rel_func(
+                query.from.push(utils::from(utils::rel_func(
                     sql_ast::Ident::new("json_array_elements"),
-                    vec![sql_ast::Expr::Subquery(Box::new(inner_query))],
+                    vec![inner_query.into_expr()],
                     None,
-                ));
+                )));
 
                 query.projection = vec![sql_ast::SelectItem::ExprWithAlias {
                     expr: ExprOrSource::Source("(ROW_NUMBER() OVER ())::int4".into()).into_expr(),
@@ -415,16 +440,23 @@ impl<'a> Context<'a> {
                         let value = ExprOrSource::Source(format!(
                             "value::text::{}",
                             self.compile_ty_name(item_ty)
-                        ))
-                        .into_expr();
+                        ));
                         query
                             .projection
-                            .push(sql_ast::SelectItem::UnnamedExpr(value));
+                            .push(sql_ast::SelectItem::UnnamedExpr(value.into_expr()));
+                    }
+                    ir::TyKind::Array(_) => {
+                        query
+                            .projection
+                            .push(sql_ast::SelectItem::UnnamedExpr(utils::ident(
+                                None::<&str>,
+                                "value",
+                            )));
                     }
                     ir::TyKind::Tuple(fields) => {
                         for (index, field) in fields.iter().enumerate() {
                             let value = ExprOrSource::Source(format!(
-                                "(value->>{index})::{}",
+                                "(value->{index})::text::{}",
                                 self.compile_ty_name(&field.ty)
                             ))
                             .into_expr();
@@ -434,7 +466,7 @@ impl<'a> Context<'a> {
                             });
                         }
                     }
-                    ir::TyKind::Array(_) => todo!(),
+
                     _ => todo!(),
                 }
                 utils::query_select(query)

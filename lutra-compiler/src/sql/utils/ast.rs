@@ -23,11 +23,25 @@ pub fn new_table(
     }
 }
 
-pub fn subquery(query: sql_ast::Query, alias: Option<sql_ast::TableAlias>) -> sql_ast::TableFactor {
+pub fn subquery(query: sql_ast::Query, alias: Option<String>) -> sql_ast::TableFactor {
     sql_ast::TableFactor::Derived {
         lateral: false,
         subquery: Box::new(query),
-        alias,
+        alias: alias.map(|a| sql_ast::TableAlias {
+            name: sql_ast::Ident::new(a),
+            columns: vec![],
+        }),
+    }
+}
+
+pub fn subquery_lateral(query: sql_ast::Query, alias: Option<String>) -> sql_ast::TableFactor {
+    sql_ast::TableFactor::Derived {
+        lateral: true,
+        subquery: Box::new(query),
+        alias: alias.map(|a| sql_ast::TableAlias {
+            name: sql_ast::Ident::new(a),
+            columns: vec![],
+        }),
     }
 }
 
@@ -48,11 +62,11 @@ pub fn rel_func(
     }
 }
 
-pub fn from(relation: sql_ast::TableFactor) -> Vec<sql_ast::TableWithJoins> {
-    vec![sql_ast::TableWithJoins {
+pub fn from(relation: sql_ast::TableFactor) -> sql_ast::TableWithJoins {
+    sql_ast::TableWithJoins {
         relation,
         joins: Vec::new(),
-    }]
+    }
 }
 
 pub fn select_empty() -> sql_ast::Select {
@@ -112,12 +126,12 @@ pub fn query_select(select: sql_ast::Select) -> sql_ast::Query {
 impl<'a> Context<'a> {
     pub fn query_wrap(
         &mut self,
-        inner: sql_ast::Query,
+        inner: sql_ast::TableFactor,
         rel_ty: &ir::Ty,
         include_index: bool,
     ) -> sql_ast::Query {
         let mut select = select_empty();
-        select.from = from(subquery(inner, None));
+        select.from.push(from(inner));
         select.projection = self.projection_noop(None, rel_ty, include_index);
 
         query_select(select)
@@ -135,7 +149,7 @@ impl<'a> Context<'a> {
             let original = std::mem::replace(query, dummy);
 
             // wrap it into a select
-            let wrapped = self.query_wrap(original, rel_ty, true);
+            let wrapped = self.query_wrap(subquery(original, None), rel_ty, true);
 
             // place it back
             let _dummy = std::mem::replace(query, wrapped);

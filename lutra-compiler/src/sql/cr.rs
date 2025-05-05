@@ -20,6 +20,13 @@ pub enum RelExprKind {
     FromTable(String),
     /// Read from a common table table
     FromBinding(String),
+    /// Evaluate body for each row in iterator. Return union of rows of each iteration.
+    ForEach {
+        iter_name: String,
+        iterator: Box<RelExpr>,
+        body: Box<RelExpr>,
+    },
+
     /// Select all columns of a relational variable.
     /// Contains the name of the rel var. If none, it implies
     /// that there is only one rel var in scope so rel var name can
@@ -35,21 +42,21 @@ pub enum RelExprKind {
     ProjectDrop(Box<RelExpr>, Vec<usize>),
 
     /// Projection that replaces all columns (but not the index)
-    ProjectReplace(Box<RelExpr>, Vec<Expr>),
+    ProjectReplace(String, Box<RelExpr>, Vec<Expr>),
 
     Aggregate(Box<RelExpr>, Vec<Expr>),
 
     /// Filtering (also known as selection)
-    Where(Box<RelExpr>, Expr),
+    Where(String, Box<RelExpr>, Expr),
 
     /// Sorting
-    OrderBy(Box<RelExpr>, Expr),
+    OrderBy(String, Box<RelExpr>, Expr),
 
     /// Bind a common table expression to a name
     With(String, Box<RelExpr>, Box<RelExpr>),
 
     /// Converts a JSON-encoded value into a relation
-    JsonUnpack(Box<RelExpr>),
+    JsonUnpack(Box<Expr>),
 }
 
 #[derive(Clone)]
@@ -91,5 +98,33 @@ impl std::fmt::Debug for RelExpr {
 impl std::fmt::Debug for Expr {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         self.kind.fmt(f)
+    }
+}
+
+impl RelExpr {
+    pub fn new_json_unpack(inner: Expr) -> Self {
+        RelExpr {
+            ty: inner.ty.clone(),
+            kind: RelExprKind::JsonUnpack(Box::new(inner)),
+        }
+    }
+    pub fn new_for_each(iter_name: String, iterator: RelExpr, body: RelExpr) -> Self {
+        RelExpr {
+            ty: body.ty.clone(),
+            kind: RelExprKind::ForEach {
+                iter_name,
+                iterator: Box::new(iterator),
+                body: Box::new(body),
+            },
+        }
+    }
+}
+
+impl Expr {
+    pub fn new_subquery(inner: RelExpr) -> Self {
+        Expr {
+            ty: inner.ty.clone(),
+            kind: ExprKind::Subquery(Box::new(inner)),
+        }
     }
 }

@@ -571,12 +571,15 @@ fn complex_03() {
 }
 
 #[test]
-fn complex_04() {
+fn json_pack_00() {
+    // Having array in a tuple forces it to be packed to JSON.
+    // Applying an operation of that array then forces it to unpack.
+
     insta::assert_snapshot!(_run(r#"
     let get_data = func () -> {a = [2, 5, 4, 3, 1, 2]}
 
     func () -> (
-      get_data().a 
+      get_data().a
       | std::map(func (y: int64) -> -y)
     )
     "#, vec![]).1, @r#"
@@ -592,12 +595,15 @@ fn complex_04() {
 }
 
 #[test]
-fn complex_05() {
+fn json_pack_01() {
+    // Having array in a tuple forces it to be packed to JSON.
+    // Applying an operation of that array then forces it to unpack.
+
     insta::assert_snapshot!(_run(r#"
     let get_data = func () -> {a = [{2, false}, {5, true}, {4, false}]}
 
     func () -> (
-      get_data().a 
+      get_data().a
       | std::map(func (y: {int64, bool}) -> {-y.0, !y.1})
     )
     "#, vec![]).1, @r#"
@@ -614,6 +620,50 @@ fn complex_05() {
         -4,
         true,
       },
+    ]
+    "#);
+}
+
+#[test]
+fn json_pack_02() {
+    insta::assert_snapshot!(_run(r#"
+    let get_data = func () -> [[1, 2, 3], [4, 5, 6]]
+
+    func () -> (
+      get_data() | std::map(func (y: [int64]) -> (
+        std::index(y, 1)
+      ))
+    )
+    "#, vec![]).1, @r#"
+    [
+      2,
+      5,
+    ]
+    "#);
+}
+
+#[test]
+fn json_pack_03() {
+    insta::assert_snapshot!(_run(r#"
+    let get_data = func () -> [[1, 2, 3], [4, 5, 6]]
+
+    func () -> (
+      get_data() | std::map(func (y: [int64]) -> (
+        y | std::map(func (z: int64) -> 6-z)
+      ))
+    )
+    "#, vec![]).1, @r#"
+    [
+      [
+        5,
+        4,
+        3,
+      ],
+      [
+        2,
+        1,
+        0,
+      ],
     ]
     "#);
 }

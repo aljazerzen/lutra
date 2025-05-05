@@ -16,7 +16,7 @@ struct Context<'t> {
 }
 
 enum FuncProvider {
-    RelVar,
+    RelExpr(cr::RelExprKind),
     Params,
 }
 
@@ -126,9 +126,9 @@ impl<'a> Context<'a> {
             ir::ExprKind::Pointer(ir::Pointer::Parameter(ptr)) => {
                 let provider = self.functions.get(&ptr.function_id).unwrap();
                 match provider {
-                    FuncProvider::RelVar => {
+                    FuncProvider::RelExpr(r_expr) => {
                         assert_eq!(ptr.param_position, 0);
-                        cr::RelExprKind::SelectRelVar(None)
+                        r_expr.clone()
                     }
                     FuncProvider::Params => {
                         let expr = cr::Expr {
@@ -194,10 +194,12 @@ impl<'a> Context<'a> {
                 // In a tuple lookup the repr of the field might change.
                 // Currently this only happens for arrays, which change from JSON to SQL repr.
                 if expr.ty.kind.is_array() {
-                    inner = cr::RelExprKind::JsonUnpack(Box::new(cr::RelExpr {
-                        kind: inner,
-                        ty: expr.ty.clone(),
-                    }));
+                    inner = cr::RelExprKind::JsonUnpack(Box::new(cr::Expr::new_subquery(
+                        cr::RelExpr {
+                            kind: inner,
+                            ty: expr.ty.clone(),
+                        },
+                    )));
                 }
 
                 inner
@@ -287,30 +289,82 @@ impl<'a> Context<'a> {
             "std::map" => {
                 let array = self.compile_rel(&call.args[0]);
                 let func = &call.args[1];
-                let func = func.kind.as_function().unwrap();
+                let array_ty = array.ty.clone();
+                let item_ty = array_ty.kind.as_array().unwrap();
 
-                let mut row = vec![new_column_of_rel(
-                    array.ty.clone(),
-                    0,
-                    ir::Ty::new(ir::TyPrimitive::int64),
-                )];
+                let needs_unpack = item_ty.kind.is_array();
+                if needs_unpack {
+                    let iter_name = format!("r{}", self.rvar_alias_gen.gen());
 
-                self.functions.insert(func.id, FuncProvider::RelVar);
-                row.extend(self.compile_column_list(&func.body));
-                self.functions.remove(&func.id);
+                    // index
+                    let mut row = Vec::with_capacity(1);
+                    row.push(new_column_of_rel(
+                        Some(iter_name.clone()),
+                        array_ty.clone(),
+                        0,
+                        ir::Ty::new(ir::TyPrimitive::int64),
+                    ));
 
-                cr::RelExprKind::ProjectReplace(Box::new(array), row)
+                    let unpacked = cr::RelExpr::new_json_unpack(new_column_of_rel(
+                        Some(iter_name.clone()),
+                        array_ty.clone(),
+                        1,
+                        *item_ty.clone(),
+                    ));
+
+                    // compile func body
+                    let func = func.kind.as_function().unwrap();
+                    self.functions
+                        .insert(func.id, FuncProvider::RelExpr(unpacked.kind));
+                    row.extend(self.compile_column_list(&func.body));
+                    self.functions.remove(&func.id);
+
+                    let body = cr::RelExpr {
+                        kind: cr::RelExprKind::Constructed(vec![row]),
+                        ty: expr.ty.clone(),
+                    };
+
+                    cr::RelExpr::new_for_each(iter_name, array, body).kind
+                } else {
+                    let iter_name = format!("r{}", self.rvar_alias_gen.gen());
+
+                    // index
+                    let mut row = Vec::with_capacity(1);
+                    row.push(new_column_of_rel(
+                        Some(iter_name.clone()),
+                        array_ty.clone(),
+                        0,
+                        ir::Ty::new(ir::TyPrimitive::int64),
+                    ));
+
+                    // compile func body
+                    let func = func.kind.as_function().unwrap();
+                    self.functions.insert(
+                        func.id,
+                        FuncProvider::RelExpr(cr::RelExprKind::SelectRelVar(Some(
+                            iter_name.clone(),
+                        ))),
+                    );
+                    row.extend(self.compile_column_list(&func.body));
+                    self.functions.remove(&func.id);
+
+                    cr::RelExprKind::ProjectReplace(iter_name, Box::new(array), row)
+                }
             }
             "std::filter" => {
                 let array = self.compile_rel(&call.args[0]);
                 let func = &call.args[1];
                 let func = func.kind.as_function().unwrap();
 
-                self.functions.insert(func.id, FuncProvider::RelVar);
+                let iter_name = format!("r{}", self.rvar_alias_gen.gen());
+
+                let item_ref = cr::RelExprKind::SelectRelVar(Some(iter_name.clone()));
+                self.functions
+                    .insert(func.id, FuncProvider::RelExpr(item_ref));
                 let cond = self.compile_column(&func.body);
                 self.functions.remove(&func.id);
 
-                cr::RelExprKind::Where(Box::new(array), cond)
+                cr::RelExprKind::Where(iter_name, Box::new(array), cond)
             }
             "std::sort" => {
                 let array = self.compile_rel(&call.args[0]);
@@ -318,11 +372,15 @@ impl<'a> Context<'a> {
                 let func = &call.args[1];
                 let func = func.kind.as_function().unwrap();
 
-                self.functions.insert(func.id, FuncProvider::RelVar);
+                let iter_name = format!("r{}", self.rvar_alias_gen.gen());
+
+                let item_ref = cr::RelExprKind::SelectRelVar(Some(iter_name.clone()));
+                self.functions
+                    .insert(func.id, FuncProvider::RelExpr(item_ref));
                 let key = self.compile_column(&func.body);
                 self.functions.remove(&func.id);
 
-                cr::RelExprKind::OrderBy(Box::new(array), key)
+                cr::RelExprKind::OrderBy(iter_name, Box::new(array), key)
             }
 
             // aggregation functions
@@ -357,9 +415,11 @@ impl<'a> Context<'a> {
 
                 let item_ty = expr.ty.kind.as_array().unwrap();
 
+                let rvar_name = format!("r{}", self.rvar_alias_gen.gen());
+
                 let item = cr::Expr {
                     kind: cr::ExprKind::Subquery(Box::new(cr::RelExpr {
-                        kind: cr::RelExprKind::SelectRelVar(None),
+                        kind: cr::RelExprKind::SelectRelVar(Some(rvar_name.clone())),
                         ty: *item_ty.clone(),
                     })),
                     ty: *item_ty.clone(),
@@ -369,9 +429,11 @@ impl<'a> Context<'a> {
                 args.extend(call.args[1..].iter().map(|a| self.compile_column(a)));
 
                 cr::RelExprKind::ProjectReplace(
+                    rvar_name,
                     Box::new(array),
                     vec![
                         new_column_of_rel(
+                            None,
                             call.args[0].ty.clone(),
                             0,
                             ir::Ty::new(ir::TyPrimitive::int64),
@@ -491,12 +553,17 @@ fn new_int(int: i64) -> cr::Expr {
     }
 }
 
-fn new_column_of_rel(ty: ir::Ty, col_position: usize, col_ty: ir::Ty) -> cr::Expr {
+fn new_column_of_rel(
+    rvar_name: Option<String>,
+    rel_ty: ir::Ty,
+    col_position: usize,
+    col_ty: ir::Ty,
+) -> cr::Expr {
     let kind = cr::ExprKind::Subquery(Box::new(cr::RelExpr {
         kind: cr::RelExprKind::ProjectRetain(
             Box::new(cr::RelExpr {
-                kind: cr::RelExprKind::SelectRelVar(None),
-                ty,
+                kind: cr::RelExprKind::SelectRelVar(rvar_name),
+                ty: rel_ty,
             }),
             vec![col_position],
         ),
