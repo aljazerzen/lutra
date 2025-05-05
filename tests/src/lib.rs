@@ -19,3 +19,22 @@ fn init_logger() {
         .try_init()
         .ok();
 }
+
+fn normalize_expected(text: &str) -> std::borrow::Cow<'_, str> {
+    let text = text.trim_start_matches('\n').trim_end_matches(['\n', ' ']);
+
+    let min_indent = text
+        .lines()
+        .map(|line| line.chars().position(|c| c != ' ').unwrap_or(line.len()))
+        .min()
+        .unwrap_or_default();
+    if min_indent == 0 {
+        return std::borrow::Cow::Borrowed(text);
+    }
+
+    let unindented: Vec<String> = text
+        .lines()
+        .map(|l| l.chars().skip(min_indent).collect::<String>())
+        .collect();
+    std::borrow::Cow::Owned(unindented.join("\n"))
+}

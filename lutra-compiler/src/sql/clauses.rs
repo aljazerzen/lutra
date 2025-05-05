@@ -260,13 +260,36 @@ impl<'a> Context<'a> {
                 let end = self.compile_column(&call.args[2]);
 
                 let offset = cr::RelExpr {
-                    kind: cr::RelExprKind::Offset(Box::new(array), start.clone()),
+                    kind: cr::RelExprKind::Offset(
+                        Box::new(array),
+                        new_bin_op(
+                            start.clone(),
+                            "std::greatest",
+                            new_int(0),
+                            ir::TyPrimitive::int64,
+                        ),
+                    ),
                     ty: expr.ty.clone(),
                 };
 
                 cr::RelExprKind::Limit(
                     Box::new(offset),
-                    new_bin_op(end, "std::sub", start, ir::TyPrimitive::int64),
+                    new_bin_op(
+                        new_bin_op(
+                            end,
+                            "std::sub",
+                            new_bin_op(
+                                start.clone(),
+                                "std::greatest",
+                                new_int(0),
+                                ir::TyPrimitive::int64,
+                            ),
+                            ir::TyPrimitive::int64,
+                        ),
+                        "std::greatest",
+                        new_int(0),
+                        ir::TyPrimitive::int64,
+                    ),
                 )
             }
             "std::index" => {

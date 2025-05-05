@@ -563,6 +563,15 @@ impl<'a> Context<'a> {
                 ))
             }
 
+            "std::greatest" => {
+                let mut args = args.into_iter();
+                ExprOrSource::Source(format!(
+                    "GREATEST({}, {})::int8",
+                    args.next().unwrap(),
+                    args.next().unwrap(),
+                ))
+            }
+
             _ => todo!("sql impl for {id}"),
         }
     }

@@ -74,7 +74,7 @@ macro_rules! test_case {
                 runtime,
                 assert_eq!(
                     super::_runtime(CASE.source),
-                    CASE.output,
+                    crate::normalize_expected(CASE.output),
                     "runtime != expected"
                 )
             );
@@ -84,7 +84,7 @@ macro_rules! test_case {
                 postgres,
                 assert_eq!(
                     crate::postgres::_run(CASE.source, vec![]).1,
-                    CASE.output,
+                    crate::normalize_expected(CASE.output),
                     "pg != expected"
                 )
             );
@@ -408,14 +408,13 @@ test_case!(
   65,
   3,
 ]"#,
-    skip_postgres
+    skip_postgres // OFFSET 1 LIMIT (COUNT(*) + (-1)) - 1
 );
 
 test_case!(
     std_slice_02,
     r#"func () -> std::slice([5,3,65,3,2], 4, 2)"#,
-    "[]",
-    skip_postgres
+    "[]"
 );
 
 test_case!(
@@ -427,8 +426,7 @@ test_case!(
 test_case!(
     std_slice_04,
     r#"func () -> std::slice([5,3,65,3,2], -7, 0)"#,
-    "[]",
-    skip_postgres
+    "[]"
 );
 
 test_case!(
@@ -1135,10 +1133,231 @@ test_case!(
         ] | std::map(hello)
     )
     "#,
-    r#"[
-  "Hello Whiskers",
-  "Come here Belie",
-  "Who's a good boy?",
-]"#,
+    r#"
+    [
+      "Hello Whiskers",
+      "Come here Belie",
+      "Who's a good boy?",
+    ]
+    "#,
     skip_postgres
+);
+
+test_case!(
+    complex_00,
+    r#"
+        let x = [
+          1, 4, 2, 3, 2, 3, 4, 5, 1, 2
+        ]
+
+        func () -> {
+          a = 1 + 2,
+          {3, 3 + 1},
+          {2, 2 + 1},
+          hello = (
+            x
+            | std::map(func (y: int) -> y + 1)
+            | std::filter(func (y: int) -> !(y > 3))
+            | std::sort(func (x: int) -> x)
+            | std::map(func (y: int) -> y % 3)
+          )
+        }
+    "#,
+    r#"
+    {
+      a = 3,
+      {
+        3,
+        4,
+      },
+      {
+        2,
+        3,
+      },
+      hello = [
+        2,
+        2,
+        0,
+        0,
+        0,
+      ],
+    }
+    "#
+);
+
+test_case!(
+    complex_01,
+    r#"
+    module chinook {
+      type album = {id = int, title = text}
+
+      let get_albums = func (): [album] -> [
+        {id = 3, title = "Hello world!"},
+        {id = 5, title = "Foo"},
+      ]
+
+      let get_album_by_id = func (album_id: int): album -> (
+        get_albums()
+        | std::filter(func (this: album) -> this.id == album_id)
+        | std::index(0)
+      )
+    }
+
+    module box_office {
+      type album_sale = {id = int, total = float}
+
+      let get_album_sales = func (): [album_sale] -> [
+        {id = 3, total = 3.6},
+        {id = 3, total = 3.1},
+        {id = 5, total = 5.2},
+      ]
+
+      let get_album_sales_by_id = func (album_id: int): album_sale -> (
+        get_album_sales()
+        | std::filter(func (this: album_sale) -> this.id == album_id)
+        | std::index(0)
+      )
+    }
+
+    func () -> {
+      chinook::get_albums(),
+      chinook::get_album_by_id(3),
+      box_office::get_album_sales_by_id(3),
+    }
+    "#,
+    r#"
+    {
+      [
+        {
+          id = 3,
+          title = "Hello world!",
+        },
+        {
+          id = 5,
+          title = "Foo",
+        },
+      ],
+      {
+        id = 3,
+        title = "Hello world!",
+      },
+      {
+        id = 3,
+        total = 3.6,
+      },
+    }
+    "#
+);
+
+test_case!(
+    complex_02,
+    r#"
+    module chinook {
+      type album = {id = int, title = text}
+
+      let get_album = func (): album -> (
+        {id = 3, title = "Hello world!"}
+      )
+    }
+
+    func () -> {
+      5,
+      chinook::get_album()
+    }
+    "#,
+    r#"
+    {
+      5,
+      {
+        id = 3,
+        title = "Hello world!",
+      },
+    }
+    "#
+);
+
+test_case!(
+    complex_03,
+    r#"
+    module chinook {
+      type album = {id = int, title = text}
+
+      let get_albums = func (): [album] -> [
+        {id = 3, title = "Hello world!"},
+        {id = 5, title = "Foo"},
+      ]
+
+      let get_album_by_id = func (album_id: int): album -> (
+        get_albums()
+        | std::filter(func (this: album) -> this.id == album_id)
+        | std::index(0)
+      )
+    }
+
+    func () -> {
+      chinook::get_album_by_id(3),
+    }
+    "#,
+    r#"
+    {
+      {
+        id = 3,
+        title = "Hello world!",
+      },
+    }
+    "#
+);
+
+test_case!(
+    complex_04,
+    r#"
+    module chinook {
+      type album = {title = text, genre_id = int}
+      type genre = {id = int, name = text}
+
+      let get_genres = func (): [genre] -> [
+        {id = 1, name = "Rock"},
+        {id = 2, name = "EDM"},
+      ]
+
+      let get_albums = func (): [album] -> [
+        {title = "Suck It and See", genre_id = 1},
+        {title = "Random Access Memories", genre_id = 2},
+        {title = "AM", genre_id = 1},
+      ]
+
+      let get_albums_by_genre = func (genre_id: int): [album] -> (
+        get_albums()
+        | std::filter(func (this: album) -> this.genre_id == genre_id)
+      )
+    }
+
+    func () -> (
+      chinook::get_genres()
+      | std::map(func (this: chinook::genre) -> {
+        name = this.name,
+        albums = (
+          chinook::get_albums_by_genre(this.id)
+          | std::map(func (this: chinook::album) -> this.title)
+        ),
+      })
+    )
+    "#,
+    r#"
+    [
+      {
+        name = "Rock",
+        albums = [
+          "Suck It and See",
+          "AM",
+        ],
+      },
+      {
+        name = "EDM",
+        albums = [
+          "Random Access Memories",
+        ],
+      },
+    ]
+    "#
 );
