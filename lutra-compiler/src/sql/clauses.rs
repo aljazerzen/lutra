@@ -366,80 +366,41 @@ impl<'a> Context<'a> {
                 let item_ty = array.ty.kind.as_array().unwrap().clone();
                 let func = &call.args[1];
 
-                if item_ty.kind.is_array() {
-                    // complex cases: ForEach
-
-                    let unpacked = cr::RelExprKind::Transform(
-                        Box::new(cr::RelExpr {
-                            kind: cr::RelExprKind::From(cr::From::ForIterator),
-                            ty: array.ty.clone(),
-                        }),
+                /// Constructs a transform that takes a reference to an array and produces an item
+                fn retrieve_item(item_ty: &ir::Ty) -> cr::Transform {
+                    if item_ty.kind.is_array() {
                         cr::Transform::JsonUnpack(Box::new(ColExpr::new_rel_col(
                             1,
-                            *item_ty.clone(),
-                        ))),
-                    );
-
-                    // index
-                    let mut row = Vec::with_capacity(1);
-                    row.push(cr::ColExpr::new_subquery(cr::RelExpr {
-                        kind: cr::RelExprKind::Transform(
-                            Box::new(cr::RelExpr {
-                                kind: cr::RelExprKind::From(cr::From::ForIterator),
-                                ty: array.ty.clone(),
-                            }),
-                            cr::Transform::ProjectRetain(vec![0]),
-                        ),
-                        ty: ir::Ty::new(ir::TyPrimitive::int64),
-                    }));
-
-                    // compile func body
-                    let func = func.kind.as_function().unwrap();
-                    self.functions
-                        .insert(func.id, FuncProvider::RelExpr(unpacked));
-                    row.extend(self.compile_column_list(&func.body).unwrap_columns());
-                    self.functions.remove(&func.id);
-
-                    cr::RelExprKind::ForEach(
-                        Box::new(array),
-                        Box::new(cr::RelExpr {
-                            kind: cr::RelExprKind::Transform(
-                                Box::new(cr::RelExpr {
-                                    kind: cr::RelExprKind::From(cr::From::ForIterator),
-                                    ty: *item_ty,
-                                }),
-                                cr::Transform::Project(row),
-                            ),
-                            ty: expr.ty.clone(),
-                        }),
-                    )
-                } else {
-                    // simple cases: Transform(Project)
-
-                    // index
-                    let mut row = Vec::with_capacity(1);
-                    row.push(cr::ColExpr::new_rel_col(
-                        0,
-                        ir::Ty::new(ir::TyPrimitive::int64),
-                    ));
-
-                    // compile func body
-                    let func = func.kind.as_function().unwrap();
-                    self.functions.insert(
-                        func.id,
-                        FuncProvider::RelExpr(cr::RelExprKind::Transform(
-                            Box::new(cr::RelExpr {
-                                kind: cr::RelExprKind::From(cr::From::TransformIterator),
-                                ty: array.ty.clone(),
-                            }),
-                            cr::Transform::ProjectDiscard(vec![0]), // discard index
-                        )),
-                    );
-                    row.extend(self.compile_column_list(&func.body).unwrap_columns());
-                    self.functions.remove(&func.id);
-
-                    cr::RelExprKind::Transform(Box::new(array), cr::Transform::Project(row))
+                            item_ty.clone(),
+                        )))
+                    } else {
+                        cr::Transform::ProjectDiscard(vec![0]) // discard index
+                    }
                 }
+
+                // index
+                let mut row = Vec::with_capacity(1);
+                row.push(cr::ColExpr::new_rel_col(
+                    0,
+                    ir::Ty::new(ir::TyPrimitive::int64),
+                ));
+
+                // compile func body
+                let func = func.kind.as_function().unwrap();
+                self.functions.insert(
+                    func.id,
+                    FuncProvider::RelExpr(cr::RelExprKind::Transform(
+                        Box::new(cr::RelExpr {
+                            kind: cr::RelExprKind::From(cr::From::Iterator),
+                            ty: array.ty.clone(),
+                        }),
+                        retrieve_item(&item_ty),
+                    )),
+                );
+                row.extend(self.compile_column_list(&func.body).unwrap_columns());
+                self.functions.remove(&func.id);
+
+                cr::RelExprKind::Transform(Box::new(array), cr::Transform::Project(row))
             }
             "std::filter" => {
                 let array = self.compile_rel(&call.args[0]);
@@ -450,7 +411,7 @@ impl<'a> Context<'a> {
                     func.id,
                     FuncProvider::RelExpr(cr::RelExprKind::Transform(
                         Box::new(cr::RelExpr {
-                            kind: cr::RelExprKind::From(cr::From::TransformIterator),
+                            kind: cr::RelExprKind::From(cr::From::Iterator),
                             ty: array.ty.clone(),
                         }),
                         cr::Transform::ProjectDiscard(vec![0]), // discard index
@@ -471,7 +432,7 @@ impl<'a> Context<'a> {
                     func.id,
                     FuncProvider::RelExpr(cr::RelExprKind::Transform(
                         Box::new(cr::RelExpr {
-                            kind: cr::RelExprKind::From(cr::From::TransformIterator),
+                            kind: cr::RelExprKind::From(cr::From::Iterator),
                             ty: array.ty.clone(),
                         }),
                         cr::Transform::ProjectDiscard(vec![0]), // discard index
@@ -639,7 +600,7 @@ fn new_int(int: i64) -> cr::ColExpr {
 
 fn try_simplify_input_rel_col(rel: &RelExpr) -> Option<usize> {
     match &rel.kind {
-        cr::RelExprKind::From(cr::From::TransformIterator) => Some(0),
+        cr::RelExprKind::From(cr::From::Iterator) => Some(0),
         cr::RelExprKind::From(_) => None,
 
         cr::RelExprKind::Transform(input, transform) => {

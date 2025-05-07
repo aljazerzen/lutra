@@ -31,8 +31,7 @@ pub(super) struct Context<'a> {
     types: HashMap<&'a ir::Path, &'a ir::Ty>,
 
     rel_name_generator: NameGenerator,
-    iterator_stack: Vec<String>,
-    transform_input_stack: Vec<String>,
+    scope_stack: Vec<String>,
 }
 
 impl<'a> Context<'a> {
@@ -40,8 +39,7 @@ impl<'a> Context<'a> {
         Self {
             types,
             rel_name_generator: NameGenerator::new("r"),
-            iterator_stack: Vec::new(),
-            transform_input_stack: Vec::new(),
+            scope_stack: Vec::new(),
         }
     }
 
@@ -113,35 +111,9 @@ impl<'a> Context<'a> {
 
                 utils::query_select(select)
             }
-            cr::RelExprKind::ForEach(iterator, body) => {
-                let body_ty = body.ty.clone();
-                let iterator_name = self.rel_name_generator.next();
-
+            cr::RelExprKind::From(cr::From::Iterator) => {
                 let mut select = utils::select_empty();
-                select.from.push(utils::from(utils::sub_rel(
-                    self.compile_re(*iterator),
-                    Some(iterator_name.clone()),
-                )));
-
-                self.iterator_stack.push(iterator_name);
-                select.from.push(utils::from(utils::lateral(utils::sub_rel(
-                    self.compile_re(*body),
-                    Some("b".into()),
-                ))));
-                self.iterator_stack.pop();
-
-                select.projection = self.projection_noop(Some("b"), &body_ty, true);
-                utils::query_select(select)
-            }
-            cr::RelExprKind::From(cr::From::ForIterator) => {
-                let mut select = utils::select_empty();
-                let cur_iter_name = self.iterator_stack.last().unwrap();
-                select.projection = self.projection_noop(Some(cur_iter_name), &rel.ty, true);
-                utils::query_select(select)
-            }
-            cr::RelExprKind::From(cr::From::TransformIterator) => {
-                let mut select = utils::select_empty();
-                let cur_iter_name = self.transform_input_stack.last().unwrap();
+                let cur_iter_name = self.scope_stack.last().unwrap();
                 select.projection = self.projection_noop(Some(cur_iter_name), &rel.ty, true);
                 utils::query_select(select)
             }
@@ -184,10 +156,10 @@ impl<'a> Context<'a> {
                     .from
                     .push(utils::from(utils::sub_rel(query, Some(input_name.clone()))));
 
-                self.transform_input_stack.push(input_name);
+                self.scope_stack.push(input_name);
                 let column_exprs = self.compile_columns(&input_ty, columns);
                 select.projection = self.projection(&ty, column_exprs);
-                self.transform_input_stack.pop();
+                self.scope_stack.pop();
 
                 utils::query_select(select)
             }
@@ -219,14 +191,14 @@ impl<'a> Context<'a> {
                     .from
                     .push(utils::from(utils::sub_rel(query, Some(input_name.clone()))));
 
-                self.transform_input_stack.push(input_name);
+                self.scope_stack.push(input_name);
                 let columns: Vec<_> = columns
                     .into_iter()
                     .map(|x| self.compile_expr(&input_ty, x))
                     .map(|e| e.into_expr())
                     .collect();
                 select.projection = self.projection(&ty, columns);
-                self.transform_input_stack.pop();
+                self.scope_stack.pop();
 
                 utils::query_select(select)
             }
@@ -235,10 +207,10 @@ impl<'a> Context<'a> {
                 let mut query =
                     self.query_wrap(utils::sub_rel(query, Some(input_name.clone())), &ty, true);
 
-                self.transform_input_stack.push(input_name);
+                self.scope_stack.push(input_name);
                 let select = self.query_as_mut_select(&mut query, &ty);
                 select.selection = Some(self.compile_expr(&input_ty, cond).into_expr());
-                self.transform_input_stack.pop();
+                self.scope_stack.pop();
 
                 query
             }
@@ -250,7 +222,7 @@ impl<'a> Context<'a> {
                 query.limit = Some(self.compile_expr(&input_ty, limit).into_expr());
                 if query.order_by.is_none() {
                     query.order_by = Some(utils::order_by_one(utils::ident(
-                        self.transform_input_stack.last(),
+                        self.scope_stack.last(),
                         COL_ARRAY_INDEX,
                     )));
                 }
@@ -267,7 +239,7 @@ impl<'a> Context<'a> {
                 });
                 if query.order_by.is_none() {
                     query.order_by = Some(utils::order_by_one(utils::ident(
-                        self.transform_input_stack.last(),
+                        self.scope_stack.last(),
                         COL_ARRAY_INDEX,
                     )));
                 }
@@ -285,12 +257,12 @@ impl<'a> Context<'a> {
                 select.projection = self.projection_noop(None, &ty, true);
 
                 // overwrite array index
-                self.transform_input_stack.push(input_name);
+                self.scope_stack.push(input_name);
                 select.projection[0] = sql_ast::SelectItem::ExprWithAlias {
                     expr: self.compile_expr(&input_ty, key).into_expr(),
                     alias: sql_ast::Ident::new(COL_ARRAY_INDEX),
                 };
-                self.transform_input_stack.pop();
+                self.scope_stack.pop();
 
                 utils::query_select(select)
             }
@@ -402,7 +374,7 @@ impl<'a> Context<'a> {
             }
             cr::ColExprKind::InputRelCol(col_position) => {
                 let col = self.rel_cols(rvar_ty, true).nth(col_position).unwrap();
-                ExprOrSource::Expr(utils::ident(self.transform_input_stack.last(), col))
+                ExprOrSource::Expr(utils::ident(self.scope_stack.last(), col))
             }
             cr::ColExprKind::Subquery(input) => {
                 // compile subquery
@@ -472,21 +444,34 @@ impl<'a> Context<'a> {
     ) -> sql_ast::Query {
         let col_ty = col.ty.clone();
 
-        let col_expr = self.compile_expr(input_ty, col);
-
         match &self.get_ty_mat(&col_ty).kind {
             ir::TyKind::Array(ty_item) => {
                 let mut query = utils::select_empty();
 
                 /*
-                FROM (...input...)
-                FROM json_array_elements(...col...) j
+                FROM json_array_elements((SELECT ...col... FROM (...input...)) j
                 SELECT ROW_NUMBER(), j.value
                 */
-                query.from.push(utils::from(utils::sub_rel(input, None)));
+
+                let subquery = {
+                    let mut subquery = utils::select_empty();
+                    let input_name = self.rel_name_generator.next();
+                    subquery
+                        .from
+                        .push(utils::from(utils::sub_rel(input, Some(input_name.clone()))));
+                    self.scope_stack.push(input_name);
+
+                    let col_expr = self.compile_expr(input_ty, col);
+                    subquery
+                        .projection
+                        .push(sql_ast::SelectItem::UnnamedExpr(col_expr.into_expr()));
+                    self.scope_stack.pop();
+                    utils::query_select(subquery)
+                };
+
                 query.from.push(utils::from(utils::lateral(utils::rel_func(
                     sql_ast::Ident::new("json_array_elements"),
-                    vec![col_expr.into_expr()],
+                    vec![sql_ast::Expr::Subquery(Box::new(subquery))],
                     Some("j".into()),
                 ))));
 

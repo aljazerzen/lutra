@@ -11,16 +11,13 @@ pub enum RelExprKind {
     /// Expression that produces a relation, without relational inputs.
     From(From),
 
+    /// Applies a relational transform.
+    /// Introduces iterator over input relation for the scope of this transform.
     Transform(Box<RelExpr>, Transform),
 
-    #[allow(dead_code)]
     Join(Box<RelExpr>, Box<RelExpr>),
 
-    /// Evaluate body for each row in iterator. Return union of rows of each iteration.
-    ForEach(Box<RelExpr>, Box<RelExpr>),
-
     /// Bind a common table expression to a name
-    // TODO: this should probably be RelExprKind
     Bind(String, Box<RelExpr>, Box<RelExpr>),
 }
 
@@ -36,11 +33,8 @@ pub enum From {
     /// Read from a CTE (in RelExpr representation)
     Binding(String),
 
-    /// Reference to iterator of [RelExprKind::ForEach]
-    ForIterator,
-
-    /// Reference to the input of the enclosing transform
-    TransformIterator,
+    /// Reference to an iterator of a scope.
+    Iterator,
 }
 
 #[derive(Debug, Clone)]

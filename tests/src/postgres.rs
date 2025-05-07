@@ -420,7 +420,7 @@ fn tuple_unpacking_00() {
     vec![]
     ).1, @r#"
     {
-      3,
+      4,
       {
         id = 3,
         title = "Hello world!",

@@ -8,7 +8,7 @@ use crate::sql::queries::Context;
 
 pub fn new_table(name: Vec<String>, alias: Option<String>) -> sql_ast::TableFactor {
     sql_ast::TableFactor::Table {
-        name: sql_ast::ObjectName(name.into_iter().map(|x| sql_ast::Ident::new(x)).collect()),
+        name: sql_ast::ObjectName(name.into_iter().map(sql_ast::Ident::new).collect()),
         alias: alias.map(|a| sql_ast::TableAlias {
             name: sql_ast::Ident::new(a),
             columns: vec![],
