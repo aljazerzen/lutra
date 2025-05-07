@@ -6,13 +6,13 @@ use sqlparser::ast::helpers::attached_token::AttachedToken;
 
 use crate::sql::queries::Context;
 
-pub fn new_table(
-    name: sql_ast::ObjectName,
-    alias: Option<sql_ast::TableAlias>,
-) -> sql_ast::TableFactor {
+pub fn new_table(name: Vec<String>, alias: Option<String>) -> sql_ast::TableFactor {
     sql_ast::TableFactor::Table {
-        name,
-        alias,
+        name: sql_ast::ObjectName(name.into_iter().map(|x| sql_ast::Ident::new(x)).collect()),
+        alias: alias.map(|a| sql_ast::TableAlias {
+            name: sql_ast::Ident::new(a),
+            columns: vec![],
+        }),
         args: Default::default(),
         with_hints: Default::default(),
         version: Default::default(),
@@ -23,7 +23,7 @@ pub fn new_table(
     }
 }
 
-pub fn subquery(query: sql_ast::Query, alias: Option<String>) -> sql_ast::TableFactor {
+pub fn sub_rel(query: sql_ast::Query, alias: Option<String>) -> sql_ast::TableFactor {
     sql_ast::TableFactor::Derived {
         lateral: false,
         subquery: Box::new(query),
@@ -160,14 +160,29 @@ impl<'a> Context<'a> {
         query: &'q mut sql_ast::Query,
         rel_ty: &ir::Ty,
     ) -> &'q mut sql_ast::Select {
-        // if query is not a select
-        if !matches!(query.body.as_ref(), sql_ast::SetExpr::Select(_)) {
+        self.query_as_mut_select_that(query, rel_ty, |_| true)
+    }
+
+    pub fn query_as_mut_select_that<'q>(
+        &mut self,
+        query: &'q mut sql_ast::Query,
+        rel_ty: &ir::Ty,
+        is_valid: impl Fn(&sql_ast::Select) -> bool,
+    ) -> &'q mut sql_ast::Select {
+        let is_valid = if let sql_ast::SetExpr::Select(select) = query.body.as_ref() {
+            is_valid(select)
+        } else {
+            false
+        };
+
+        // if query is not a valid select
+        if !is_valid {
             // take the query
             let dummy = query_select(select_empty());
             let original = std::mem::replace(query, dummy);
 
             // wrap it into a select
-            let wrapped = self.query_wrap(subquery(original, None), rel_ty, true);
+            let wrapped = self.query_wrap(sub_rel(original, None), rel_ty, true);
 
             // place it back
             let _dummy = std::mem::replace(query, wrapped);

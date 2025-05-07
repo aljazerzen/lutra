@@ -16,7 +16,7 @@ pub fn compile(rel: cr::RelExpr, types: HashMap<&ir::Path, &ir::Ty>) -> sql_ast:
 
     if rel_ty.kind.is_array() {
         // wrap into a top-level projection to remove array indexes
-        let mut query = ctx.query_wrap(utils::subquery(query, None), &rel_ty, false);
+        let mut query = ctx.query_wrap(utils::sub_rel(query, None), &rel_ty, false);
         query.order_by = Some(utils::order_by_one(utils::ident(
             None::<&str>,
             COL_ARRAY_INDEX,
@@ -61,11 +61,9 @@ impl<'a> Context<'a> {
             cr::RelExprKind::From(cr::From::Table(table_name)) => {
                 let mut select = utils::select_empty();
 
-                let name = sql_ast::ObjectName(vec![sql_ast::Ident::new(table_name)]);
-                select.from = vec![sql_ast::TableWithJoins {
-                    relation: utils::new_table(name, None),
-                    joins: vec![],
-                }];
+                select
+                    .from
+                    .push(utils::from(utils::new_table(vec![table_name], None)));
 
                 let ty_tuple = self.get_ty_mat(&rel.ty).kind.as_array().unwrap();
                 let ty_fields = self.get_ty_mat(ty_tuple).kind.as_tuple().unwrap();
@@ -82,33 +80,51 @@ impl<'a> Context<'a> {
 
                 utils::query_select(select)
             }
-            cr::RelExprKind::From(cr::From::Binding(alias)) => {
+            cr::RelExprKind::From(cr::From::Binding(name)) => {
                 let mut select = utils::select_empty();
 
-                let name = sql_ast::ObjectName(vec![sql_ast::Ident::new(alias)]);
-
-                select.from = vec![sql_ast::TableWithJoins {
-                    relation: utils::new_table(name, None),
-                    joins: vec![],
-                }];
+                select
+                    .from
+                    .push(utils::from(utils::new_table(vec![name], None)));
                 select.projection = self.projection_noop(None, &rel.ty, true);
                 utils::query_select(select)
             }
-            cr::RelExprKind::Join(_, _) => {
-                todo!()
+            cr::RelExprKind::Join(left, right) => {
+                let mut select = utils::select_empty();
+
+                let left_ty = left.ty.clone();
+                let left = self.compile_re(*left);
+
+                select
+                    .from
+                    .push(utils::from(utils::sub_rel(left, Some("l".into()))));
+                select
+                    .projection
+                    .extend(self.projection_noop(Some("l"), &left_ty, true));
+
+                let right_ty = right.ty.clone();
+                let right = self.compile_re(*right);
+                select
+                    .from
+                    .push(utils::from(utils::sub_rel(right, Some("r".into()))));
+                select
+                    .projection
+                    .extend(self.projection_noop(Some("r"), &right_ty, true));
+
+                utils::query_select(select)
             }
             cr::RelExprKind::ForEach(iterator, body) => {
                 let body_ty = body.ty.clone();
                 let iterator_name = self.rel_name_generator.next();
 
                 let mut select = utils::select_empty();
-                select.from.push(utils::from(utils::subquery(
+                select.from.push(utils::from(utils::sub_rel(
                     self.compile_re(*iterator),
                     Some(iterator_name.clone()),
                 )));
 
                 self.iterator_stack.push(iterator_name);
-                select.from.push(utils::from(utils::lateral(utils::subquery(
+                select.from.push(utils::from(utils::lateral(utils::sub_rel(
                     self.compile_re(*body),
                     Some("b".into()),
                 ))));
@@ -164,10 +180,9 @@ impl<'a> Context<'a> {
                 let mut select = utils::select_empty();
 
                 let input_name = self.rel_name_generator.next();
-                select.from.push(utils::from(utils::subquery(
-                    query,
-                    Some(input_name.clone()),
-                )));
+                select
+                    .from
+                    .push(utils::from(utils::sub_rel(query, Some(input_name.clone()))));
 
                 self.transform_input_stack.push(input_name);
                 let column_exprs = self.compile_columns(&input_ty, columns);
@@ -177,13 +192,21 @@ impl<'a> Context<'a> {
                 utils::query_select(select)
             }
             cr::Transform::ProjectRetain(cols) => {
+                if query.order_by.is_some() {
+                    query = self.query_wrap(utils::sub_rel(query, None), &input_ty, true);
+                }
                 let select = self.query_as_mut_select(&mut query, &input_ty);
+
                 utils::retain_by_position(&mut select.projection, cols);
 
                 query
             }
             cr::Transform::ProjectDiscard(cols) => {
+                if query.order_by.is_some() {
+                    query = self.query_wrap(utils::sub_rel(query, None), &input_ty, true);
+                }
                 let select = self.query_as_mut_select(&mut query, &input_ty);
+
                 utils::drop_by_position(&mut select.projection, cols);
                 query
             }
@@ -192,10 +215,9 @@ impl<'a> Context<'a> {
                 let mut select = utils::select_empty();
 
                 let input_name = self.rel_name_generator.next();
-                select.from.push(utils::from(utils::subquery(
-                    query,
-                    Some(input_name.clone()),
-                )));
+                select
+                    .from
+                    .push(utils::from(utils::sub_rel(query, Some(input_name.clone()))));
 
                 self.transform_input_stack.push(input_name);
                 let columns: Vec<_> = columns
@@ -211,7 +233,7 @@ impl<'a> Context<'a> {
             cr::Transform::Where(cond) => {
                 let input_name = self.rel_name_generator.next();
                 let mut query =
-                    self.query_wrap(utils::subquery(query, Some(input_name.clone())), &ty, true);
+                    self.query_wrap(utils::sub_rel(query, Some(input_name.clone())), &ty, true);
 
                 self.transform_input_stack.push(input_name);
                 let select = self.query_as_mut_select(&mut query, &ty);
@@ -222,7 +244,7 @@ impl<'a> Context<'a> {
             }
             cr::Transform::Limit(limit) => {
                 if query.limit.is_some() {
-                    query = self.query_wrap(utils::subquery(query, None), &ty, true);
+                    query = self.query_wrap(utils::sub_rel(query, None), &ty, true);
                 }
 
                 query.limit = Some(self.compile_expr(&input_ty, limit).into_expr());
@@ -236,7 +258,7 @@ impl<'a> Context<'a> {
             }
             cr::Transform::Offset(offset) => {
                 if query.limit.is_some() | query.offset.is_some() {
-                    query = self.query_wrap(utils::subquery(query, None), &ty, true);
+                    query = self.query_wrap(utils::sub_rel(query, None), &ty, true);
                 }
 
                 query.offset = Some(sql_ast::Offset {
@@ -257,10 +279,9 @@ impl<'a> Context<'a> {
                 let mut select = utils::select_empty();
 
                 let input_name = self.rel_name_generator.next();
-                select.from.push(utils::from(utils::subquery(
-                    query,
-                    Some(input_name.clone()),
-                )));
+                select
+                    .from
+                    .push(utils::from(utils::sub_rel(query, Some(input_name.clone()))));
                 select.projection = self.projection_noop(None, &ty, true);
 
                 // overwrite array index
@@ -462,7 +483,7 @@ impl<'a> Context<'a> {
                 FROM json_array_elements(...col...) j
                 SELECT ROW_NUMBER(), j.value
                 */
-                query.from.push(utils::from(utils::subquery(input, None)));
+                query.from.push(utils::from(utils::sub_rel(input, None)));
                 query.from.push(utils::from(utils::lateral(utils::rel_func(
                     sql_ast::Ident::new("json_array_elements"),
                     vec![col_expr.into_expr()],

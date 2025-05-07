@@ -59,11 +59,62 @@ impl<'a> Context<'a> {
                 }]]))
             }
             ir::ExprKind::Tuple(fields) => {
-                let row = fields
-                    .iter()
-                    .flat_map(|x| self.compile_column_list(x))
-                    .collect();
-                cr::RelExprKind::From(cr::From::Construction(vec![row]))
+                let ty_fields = expr.ty.kind.as_tuple().unwrap();
+
+                let mut res_rels = Vec::new();
+
+                let mut res_cols = Vec::new();
+                let mut res_ty_fields = Vec::new();
+                for (field, ty_field) in std::iter::zip(fields, ty_fields) {
+                    match self.compile_column_list(field) {
+                        ColumnsOrUnpack::Columns(cols) => {
+                            res_cols.extend(cols);
+                            res_ty_fields.push(ty_field.clone());
+                        }
+                        ColumnsOrUnpack::Unpack(rel) => {
+                            // finish prev rel
+                            if !res_cols.is_empty() {
+                                res_rels.push(cr::RelExpr {
+                                    kind: cr::RelExprKind::From(cr::From::Construction(vec![
+                                        res_cols,
+                                    ])),
+                                    ty: ir::Ty::new(ir::TyKind::Tuple(res_ty_fields)),
+                                });
+                                res_cols = Vec::new();
+                                res_ty_fields = Vec::new();
+                            }
+
+                            // push this rel
+                            res_rels.push(rel);
+                        }
+                    }
+                }
+
+                if res_rels.is_empty() {
+                    // simple case: only simple columns, just From::Construction
+
+                    cr::RelExprKind::From(cr::From::Construction(vec![res_cols]))
+                } else {
+                    // there are rels, Join needed
+
+                    // finish last rel
+                    if !res_cols.is_empty() {
+                        res_rels.push(cr::RelExpr {
+                            kind: cr::RelExprKind::From(cr::From::Construction(vec![res_cols])),
+                            ty: ir::Ty::new(ir::TyKind::Tuple(res_ty_fields)),
+                        });
+                    }
+
+                    let mut res_rels = res_rels.into_iter();
+                    let mut result = res_rels.next().unwrap();
+                    for r in res_rels {
+                        result = cr::RelExpr {
+                            ty: ty_concat_tuples(result.ty.clone(), r.ty.clone()),
+                            kind: cr::RelExprKind::Join(Box::new(result), Box::new(r)),
+                        };
+                    }
+                    result.kind
+                }
             }
             ir::ExprKind::Array(items) => {
                 let rows = items
@@ -74,7 +125,7 @@ impl<'a> Context<'a> {
                             kind: cr::ColExprKind::Literal(ir::Literal::Int(index as i64)),
                             ty: ir::Ty::new(ir::TyPrimitive::int64),
                         }];
-                        cols.extend(self.compile_column_list(x));
+                        cols.extend(self.compile_column_list(x).unwrap_columns());
                         cols
                     })
                     .collect();
@@ -166,7 +217,7 @@ impl<'a> Context<'a> {
                 }
 
                 // inner
-                row.extend(self.compile_column_list(&variant.inner));
+                row.extend(self.compile_column_list(&variant.inner).unwrap_columns());
 
                 // spacing
                 for ty_variant in &ty_variants[((variant.tag as usize) + 1)..] {
@@ -346,7 +397,7 @@ impl<'a> Context<'a> {
                     let func = func.kind.as_function().unwrap();
                     self.functions
                         .insert(func.id, FuncProvider::RelExpr(unpacked));
-                    row.extend(self.compile_column_list(&func.body));
+                    row.extend(self.compile_column_list(&func.body).unwrap_columns());
                     self.functions.remove(&func.id);
 
                     cr::RelExprKind::ForEach(
@@ -384,7 +435,7 @@ impl<'a> Context<'a> {
                             cr::Transform::ProjectDiscard(vec![0]), // discard index
                         )),
                     );
-                    row.extend(self.compile_column_list(&func.body));
+                    row.extend(self.compile_column_list(&func.body).unwrap_columns());
                     self.functions.remove(&func.id);
 
                     cr::RelExprKind::Transform(Box::new(array), cr::Transform::Project(row))
@@ -488,12 +539,15 @@ impl<'a> Context<'a> {
     /// Compiles an expression into a column
     fn compile_column(&mut self, expr: &ir::Expr) -> cr::ColExpr {
         let cols = self.compile_column_list(expr);
+        let ColumnsOrUnpack::Columns(cols) = cols else {
+            panic!("expected columns, found: {cols:?}");
+        };
         assert!(cols.len() == 1, "expected a single column, found: {cols:?}");
         cols.into_iter().next().unwrap()
     }
 
     /// Compiles an expression into a list of columns
-    fn compile_column_list(&mut self, expr: &ir::Expr) -> Vec<cr::ColExpr> {
+    fn compile_column_list(&mut self, expr: &ir::Expr) -> ColumnsOrUnpack {
         // compile as if this was a rel, which can sink complex operations
         // into the relational expression
         let rel = self.compile_rel(expr);
@@ -503,26 +557,28 @@ impl<'a> Context<'a> {
             tracing::debug!(
                 "simplifying:\n{rel:#?} .. to ColExprKind::InputRelCol({col_position})"
             );
-            return vec![cr::ColExpr::new_rel_col(col_position, rel.ty)];
+            return ColumnsOrUnpack::Columns(vec![cr::ColExpr::new_rel_col(col_position, rel.ty)]);
         }
 
         match rel.kind {
             // it is just one constructed row: unwrap
             cr::RelExprKind::From(cr::From::Construction(mut rows)) if rows.len() == 1 => {
-                rows.remove(0)
+                ColumnsOrUnpack::Columns(rows.remove(0))
             }
 
             // it is actually complex: subquery
             _ => {
                 match &self.get_ty_mat(&expr.ty).kind {
-                    ir::TyKind::Primitive(_) => vec![cr::ColExpr::new_subquery(rel)],
-                    ir::TyKind::Array(_) => {
-                        // to place an array into columns, it needs to be packed to JSON
-                        vec![cr::ColExpr::new_subquery(rel)]
+                    ir::TyKind::Primitive(_) | ir::TyKind::Array(_) => {
+                        // return as a subquery
+
+                        // for arrays, using a subquery will trigger JSON packing in queries.rs
+                        ColumnsOrUnpack::Columns(vec![cr::ColExpr::new_subquery(rel)])
                     }
                     ir::TyKind::Tuple(_) => {
                         // non-constructed tuples need to be declared as a rel var and unpacked
-                        todo!("{rel:#?}")
+
+                        ColumnsOrUnpack::Unpack(rel)
                     }
                     _ => todo!(),
                 }
@@ -543,6 +599,24 @@ impl<'a> Context<'a> {
         cr::ColExpr {
             kind: cr::ColExprKind::FuncCall(ptr.id.clone(), args),
             ty: expr.ty.clone(),
+        }
+    }
+}
+
+#[derive(Debug)]
+enum ColumnsOrUnpack {
+    Columns(Vec<cr::ColExpr>),
+
+    // A relation whose columns should be unpacked
+    Unpack(cr::RelExpr),
+}
+
+impl ColumnsOrUnpack {
+    #[track_caller]
+    fn unwrap_columns(self) -> Vec<cr::ColExpr> {
+        match self {
+            ColumnsOrUnpack::Columns(cols) => cols,
+            ColumnsOrUnpack::Unpack(rel) => panic!("{rel:?}"),
         }
     }
 }
@@ -583,4 +657,12 @@ fn try_simplify_input_rel_col(rel: &RelExpr) -> Option<usize> {
 
         _ => None,
     }
+}
+
+fn ty_concat_tuples(a: ir::Ty, b: ir::Ty) -> ir::Ty {
+    let a = a.kind.into_tuple().unwrap();
+    let b = b.kind.into_tuple().unwrap();
+    let mut concat = a;
+    concat.extend(b);
+    ir::Ty::new(ir::TyKind::Tuple(concat))
 }
