@@ -13,7 +13,7 @@ pub enum RelExprKind {
 
     /// Applies a relational transform.
     /// Introduces iterator over input relation for the scope of this transform.
-    Transform(Box<RelExpr>, Transform),
+    Transform(Box<RelExpr>, usize, Transform),
 
     Join(Box<RelExpr>, Box<RelExpr>),
 
@@ -34,7 +34,7 @@ pub enum From {
     Binding(String),
 
     /// Reference to an iterator of a scope.
-    Iterator,
+    Iterator(usize),
 }
 
 #[derive(Debug, Clone)]
@@ -84,7 +84,7 @@ pub enum ColExprKind {
     Param(u8),
 
     /// A column of the input of the enclosing transform
-    InputRelCol(usize),
+    InputRelCol(usize, usize),
 
     /// Call a function by its lutra name
     FuncCall(String, Vec<ColExpr>),
@@ -106,10 +106,14 @@ impl std::fmt::Debug for ColExpr {
 }
 
 impl RelExpr {
-    pub fn new_transform_preserve_ty(input: RelExpr, transform: Transform) -> Self {
+    pub fn new_transform_preserve_ty(
+        input: RelExpr,
+        scope_id: usize,
+        transform: Transform,
+    ) -> Self {
         RelExpr {
             ty: input.ty.clone(),
-            kind: RelExprKind::Transform(Box::new(input), transform),
+            kind: RelExprKind::Transform(Box::new(input), scope_id, transform),
         }
     }
 }
@@ -121,9 +125,9 @@ impl ColExpr {
             kind: ColExprKind::Subquery(Box::new(subquery)),
         }
     }
-    pub fn new_rel_col(col_position: usize, col_ty: ir::Ty) -> ColExpr {
+    pub fn new_rel_col(scope_id: usize, col_position: usize, col_ty: ir::Ty) -> ColExpr {
         ColExpr {
-            kind: ColExprKind::InputRelCol(col_position),
+            kind: ColExprKind::InputRelCol(scope_id, col_position),
             ty: col_ty,
         }
     }
