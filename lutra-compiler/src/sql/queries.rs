@@ -1,14 +1,15 @@
 use std::collections::HashMap;
-use std::rc::Rc;
 
-use super::utils::{ExprOrSource, ExprScoped};
+use crate::utils::NameGenerator;
+
+use super::utils::ExprOrSource;
 use super::COL_ARRAY_INDEX;
 use super::{cr, utils};
 use lutra_bin::ir;
 use sqlparser::ast as sql_ast;
 
 pub fn compile(rel: cr::RelExpr, types: HashMap<&ir::Path, &ir::Ty>) -> sql_ast::Query {
-    let mut ctx = Context { types };
+    let mut ctx = Context::new(types);
 
     let rel_ty = rel.ty.clone();
     let query = ctx.compile_re(rel);
@@ -27,10 +28,23 @@ pub fn compile(rel: cr::RelExpr, types: HashMap<&ir::Path, &ir::Ty>) -> sql_ast:
 }
 
 pub(super) struct Context<'a> {
-    pub(super) types: HashMap<&'a ir::Path, &'a ir::Ty>,
+    types: HashMap<&'a ir::Path, &'a ir::Ty>,
+
+    rel_name_generator: NameGenerator,
+    iterator_stack: Vec<String>,
+    transform_input_stack: Vec<String>,
 }
 
 impl<'a> Context<'a> {
+    pub(super) fn new(types: HashMap<&'a ir::Path, &'a ir::Ty>) -> Self {
+        Self {
+            types,
+            rel_name_generator: NameGenerator::new("r"),
+            iterator_stack: Vec::new(),
+            transform_input_stack: Vec::new(),
+        }
+    }
+
     pub(super) fn get_ty_mat(&self, ty: &'a ir::Ty) -> &'a ir::Ty {
         match &ty.kind {
             ir::TyKind::Ident(path) => self.types.get(path).unwrap(),
@@ -40,9 +54,11 @@ impl<'a> Context<'a> {
 
     fn compile_re(&mut self, rel: cr::RelExpr) -> sql_ast::Query {
         match rel.kind {
-            cr::RelExprKind::Constructed(rows) => self.compile_rel_constructed(rows, &rel.ty),
+            cr::RelExprKind::From(cr::From::Construction(rows)) => {
+                self.compile_rel_constructed(rows, &rel.ty)
+            }
 
-            cr::RelExprKind::FromTable(table_name) => {
+            cr::RelExprKind::From(cr::From::Table(table_name)) => {
                 let mut select = utils::select_empty();
 
                 let name = sql_ast::ObjectName(vec![sql_ast::Ident::new(table_name)]);
@@ -66,7 +82,7 @@ impl<'a> Context<'a> {
 
                 utils::query_select(select)
             }
-            cr::RelExprKind::FromBinding(alias) => {
+            cr::RelExprKind::From(cr::From::Binding(alias)) => {
                 let mut select = utils::select_empty();
 
                 let name = sql_ast::ObjectName(vec![sql_ast::Ident::new(alias)]);
@@ -78,138 +94,47 @@ impl<'a> Context<'a> {
                 select.projection = self.projection_noop(None, &rel.ty, true);
                 utils::query_select(select)
             }
-            cr::RelExprKind::ForEach {
-                iter_name,
-                iterator,
-                body,
-            } => {
-                let correlated_ty = body.ty.clone();
+            cr::RelExprKind::Join(_, _) => {
+                todo!()
+            }
+            cr::RelExprKind::ForEach(iterator, body) => {
+                let body_ty = body.ty.clone();
+                let iterator_name = self.rel_name_generator.next();
 
                 let mut select = utils::select_empty();
                 select.from.push(utils::from(utils::subquery(
                     self.compile_re(*iterator),
-                    Some(iter_name),
+                    Some(iterator_name.clone()),
                 )));
-                select.from.push(utils::from(utils::subquery_lateral(
+
+                self.iterator_stack.push(iterator_name);
+                select.from.push(utils::from(utils::lateral(utils::subquery(
                     self.compile_re(*body),
                     Some("b".into()),
-                )));
+                ))));
+                self.iterator_stack.pop();
 
-                select.projection = self.projection_noop(Some("b"), &correlated_ty, true);
+                select.projection = self.projection_noop(Some("b"), &body_ty, true);
                 utils::query_select(select)
             }
-            cr::RelExprKind::SelectRelVar(rel_var_name) => {
+            cr::RelExprKind::From(cr::From::ForIterator) => {
                 let mut select = utils::select_empty();
-                select.projection = self.projection_noop(rel_var_name.as_deref(), &rel.ty, true);
+                let cur_iter_name = self.iterator_stack.last().unwrap();
+                select.projection = self.projection_noop(Some(cur_iter_name), &rel.ty, true);
                 utils::query_select(select)
             }
-            cr::RelExprKind::Limit(inner, limit) => {
-                let mut inner = self.compile_re(*inner);
-                if inner.limit.is_some() {
-                    inner = self.query_wrap(utils::subquery(inner, None), &rel.ty, true);
-                }
-
-                inner.limit = Some(self.compile_expr(limit).unwrap_inner().into_expr());
-                if inner.order_by.is_none() {
-                    inner.order_by = Some(utils::order_by_one(utils::ident(
-                        None::<&str>,
-                        COL_ARRAY_INDEX,
-                    )));
-                }
-                inner
-            }
-            cr::RelExprKind::Offset(inner, offset) => {
-                let mut inner = self.compile_re(*inner);
-
-                if inner.limit.is_some() | inner.offset.is_some() {
-                    inner = self.query_wrap(utils::subquery(inner, None), &rel.ty, true);
-                }
-
-                inner.offset = Some(sql_ast::Offset {
-                    value: self.compile_expr(offset).unwrap_inner().into_expr(),
-                    rows: sql_ast::OffsetRows::None,
-                });
-                if inner.order_by.is_none() {
-                    inner.order_by = Some(utils::order_by_one(utils::ident(
-                        None::<&str>,
-                        COL_ARRAY_INDEX,
-                    )));
-                }
-
-                inner
-            }
-            cr::RelExprKind::ProjectRetain(inner, cols) => {
-                let inner_ty = inner.ty.clone();
-                let mut inner = self.compile_re(*inner);
-
-                let select = self.query_as_mut_select(&mut inner, &inner_ty);
-                utils::retain_by_position(&mut select.projection, cols);
-                inner
-            }
-            cr::RelExprKind::ProjectDrop(inner, cols) => {
-                let inner_ty = inner.ty.clone();
-                let mut inner = self.compile_re(*inner);
-
-                let select = self.query_as_mut_select(&mut inner, &inner_ty);
-                utils::drop_by_position(&mut select.projection, cols);
-                inner
-            }
-            cr::RelExprKind::ProjectReplace(inner_name, inner, columns) => {
-                let inner = self.compile_re(*inner);
-
+            cr::RelExprKind::From(cr::From::TransformIterator) => {
                 let mut select = utils::select_empty();
-                select
-                    .from
-                    .push(utils::from(utils::subquery(inner, Some(inner_name))));
-
-                let (column_exprs, rvars) = self.compile_columns(columns);
-                select.from.extend(self.compile_rvars(rvars));
-                select.projection = self.projection(&rel.ty, column_exprs);
-
+                let cur_iter_name = self.transform_input_stack.last().unwrap();
+                select.projection = self.projection_noop(Some(cur_iter_name), &rel.ty, true);
                 utils::query_select(select)
             }
-            cr::RelExprKind::Aggregate(inner, columns) => {
-                let inner = self.compile_re(*inner);
 
-                let mut select = utils::select_empty();
-                select.from.push(utils::from(utils::subquery(inner, None)));
-
-                let columns: Vec<_> = columns
-                    .into_iter()
-                    .map(|x| self.compile_expr(x))
-                    .map(|e| e.unwrap_inner().into_expr())
-                    .collect();
-                select.projection = self.projection(&rel.ty, columns);
-
-                utils::query_select(select)
+            cr::RelExprKind::Transform(input, transform) => {
+                self.compile_rel_transform(*input, transform, rel.ty)
             }
-            cr::RelExprKind::Where(inner_name, inner, cond) => {
-                let inner = self.compile_re(*inner);
-                let mut query =
-                    self.query_wrap(utils::subquery(inner, Some(inner_name)), &rel.ty, true);
-                let select = self.query_as_mut_select(&mut query, &rel.ty);
-                select.selection = Some(self.compile_expr(cond).unwrap_inner().into_expr());
-                query
-            }
-            cr::RelExprKind::OrderBy(inner_name, inner, key) => {
-                let inner = self.compile_re(*inner);
 
-                // wrap into a new query
-                let mut select = utils::select_empty();
-                select
-                    .from
-                    .push(utils::from(utils::subquery(inner, Some(inner_name))));
-                select.projection = self.projection_noop(None, &rel.ty, true);
-
-                // overwrite array index
-                select.projection[0] = sql_ast::SelectItem::ExprWithAlias {
-                    expr: self.compile_expr(key).unwrap_inner().into_expr(),
-                    alias: sql_ast::Ident::new(COL_ARRAY_INDEX),
-                };
-
-                utils::query_select(select)
-            }
-            cr::RelExprKind::With(name, val, main) => {
+            cr::RelExprKind::Bind(name, val, main) => {
                 let val = self.compile_re(*val);
 
                 let mut main = self.compile_re(*main);
@@ -222,26 +147,150 @@ impl<'a> Context<'a> {
 
                 main
             }
-            cr::RelExprKind::JsonUnpack(inner) => self.compile_json_unpack(*inner),
         }
     }
 
-    fn compile_rvars(&mut self, rvars: Vec<cr::RelVar>) -> Vec<sql_ast::TableWithJoins> {
-        rvars
-            .into_iter()
-            .map(|rvar| self.compile_rvar(rvar))
-            .collect()
+    fn compile_rel_transform(
+        &mut self,
+        input: cr::RelExpr,
+        transform: cr::Transform,
+        ty: ir::Ty,
+    ) -> sql_ast::Query {
+        let input_ty = input.ty.clone();
+        let mut query = self.compile_re(input);
+
+        match transform {
+            cr::Transform::Project(columns) => {
+                let mut select = utils::select_empty();
+
+                let input_name = self.rel_name_generator.next();
+                select.from.push(utils::from(utils::subquery(
+                    query,
+                    Some(input_name.clone()),
+                )));
+
+                self.transform_input_stack.push(input_name);
+                let column_exprs = self.compile_columns(&input_ty, columns);
+                select.projection = self.projection(&ty, column_exprs);
+                self.transform_input_stack.pop();
+
+                utils::query_select(select)
+            }
+            cr::Transform::ProjectRetain(cols) => {
+                let select = self.query_as_mut_select(&mut query, &input_ty);
+                utils::retain_by_position(&mut select.projection, cols);
+
+                query
+            }
+            cr::Transform::ProjectDiscard(cols) => {
+                let select = self.query_as_mut_select(&mut query, &input_ty);
+                utils::drop_by_position(&mut select.projection, cols);
+                query
+            }
+
+            cr::Transform::Aggregate(columns) => {
+                let mut select = utils::select_empty();
+
+                let input_name = self.rel_name_generator.next();
+                select.from.push(utils::from(utils::subquery(
+                    query,
+                    Some(input_name.clone()),
+                )));
+
+                self.transform_input_stack.push(input_name);
+                let columns: Vec<_> = columns
+                    .into_iter()
+                    .map(|x| self.compile_expr(&input_ty, x))
+                    .map(|e| e.into_expr())
+                    .collect();
+                select.projection = self.projection(&ty, columns);
+                self.transform_input_stack.pop();
+
+                utils::query_select(select)
+            }
+            cr::Transform::Where(cond) => {
+                let input_name = self.rel_name_generator.next();
+                let mut query =
+                    self.query_wrap(utils::subquery(query, Some(input_name.clone())), &ty, true);
+
+                self.transform_input_stack.push(input_name);
+                let select = self.query_as_mut_select(&mut query, &ty);
+                select.selection = Some(self.compile_expr(&input_ty, cond).into_expr());
+                self.transform_input_stack.pop();
+
+                query
+            }
+            cr::Transform::Limit(limit) => {
+                if query.limit.is_some() {
+                    query = self.query_wrap(utils::subquery(query, None), &ty, true);
+                }
+
+                query.limit = Some(self.compile_expr(&input_ty, limit).into_expr());
+                if query.order_by.is_none() {
+                    query.order_by = Some(utils::order_by_one(utils::ident(
+                        self.transform_input_stack.last(),
+                        COL_ARRAY_INDEX,
+                    )));
+                }
+                query
+            }
+            cr::Transform::Offset(offset) => {
+                if query.limit.is_some() | query.offset.is_some() {
+                    query = self.query_wrap(utils::subquery(query, None), &ty, true);
+                }
+
+                query.offset = Some(sql_ast::Offset {
+                    value: self.compile_expr(&input_ty, offset).into_expr(),
+                    rows: sql_ast::OffsetRows::None,
+                });
+                if query.order_by.is_none() {
+                    query.order_by = Some(utils::order_by_one(utils::ident(
+                        self.transform_input_stack.last(),
+                        COL_ARRAY_INDEX,
+                    )));
+                }
+
+                query
+            }
+            cr::Transform::OrderBy(key) => {
+                // wrap into a new query
+                let mut select = utils::select_empty();
+
+                let input_name = self.rel_name_generator.next();
+                select.from.push(utils::from(utils::subquery(
+                    query,
+                    Some(input_name.clone()),
+                )));
+                select.projection = self.projection_noop(None, &ty, true);
+
+                // overwrite array index
+                self.transform_input_stack.push(input_name);
+                select.projection[0] = sql_ast::SelectItem::ExprWithAlias {
+                    expr: self.compile_expr(&input_ty, key).into_expr(),
+                    alias: sql_ast::Ident::new(COL_ARRAY_INDEX),
+                };
+                self.transform_input_stack.pop();
+
+                utils::query_select(select)
+            }
+            cr::Transform::JsonUnpack(col) => self.compile_json_unpack(query, &input_ty, *col),
+        }
     }
 
-    fn compile_rel_constructed(&mut self, rows: Vec<Vec<cr::Expr>>, ty: &ir::Ty) -> sql_ast::Query {
+    fn compile_rel_constructed(
+        &mut self,
+        rows: Vec<Vec<cr::ColExpr>>,
+        ty: &ir::Ty,
+    ) -> sql_ast::Query {
         let mut res = None;
         let mut rows = rows.into_iter();
+
+        let input_ty = ir::Ty::new(ir::TyKind::Tuple(vec![]));
 
         // first row with aliases
         if let Some(row) = rows.next() {
             let mut select = utils::select_empty();
-            let (columns, rvars) = self.compile_columns(row);
-            select.from.extend(self.compile_rvars(rvars));
+            let columns = self.compile_columns(&input_ty, row);
             select.projection = self.projection(ty, columns);
             res = Some(sql_ast::SetExpr::Select(Box::new(select)));
         }
@@ -250,8 +299,7 @@ impl<'a> Context<'a> {
         for row in rows {
             let mut select = utils::select_empty();
 
-            let (columns, rvars) = self.compile_columns(row);
-            select.from.extend(self.compile_rvars(rvars));
+            let columns = self.compile_columns(&input_ty, row);
             select.projection = columns
                 .into_iter()
                 .map(sql_ast::SelectItem::UnnamedExpr)
@@ -292,103 +340,89 @@ impl<'a> Context<'a> {
         }))
     }
 
-    fn compile_columns(&mut self, columns: Vec<cr::Expr>) -> (Vec<sql_ast::Expr>, Vec<cr::RelVar>) {
+    fn compile_columns(
+        &mut self,
+        rvar_ty: &ir::Ty,
+        columns: Vec<cr::ColExpr>,
+    ) -> Vec<sql_ast::Expr> {
         let mut column_exprs = Vec::with_capacity(columns.len());
-        let mut rvars: Vec<std::rc::Rc<cr::RelVar>> = Vec::new();
         for col in columns {
-            let scoped = self.compile_expr(col);
-            column_exprs.push(scoped.inner.into_expr());
-            if let Some(rvar) = scoped.rvar {
-                if !rvars.iter().any(|r| Rc::ptr_eq(r, &rvar)) {
-                    rvars.push(rvar);
-                }
-            }
+            column_exprs.push(self.compile_expr(rvar_ty, col).into_expr());
         }
-        let rvars = rvars
-            .into_iter()
-            .map(|r| Rc::try_unwrap(r).unwrap())
-            .collect();
-        (column_exprs, rvars)
+        column_exprs
     }
 
-    fn compile_rvar(&mut self, rel_var: cr::RelVar) -> sql_ast::TableWithJoins {
-        let subquery = self.compile_re(*rel_var.rel);
-        let relation = sql_ast::TableFactor::Derived {
-            lateral: false,
-            subquery: Box::new(subquery),
-            alias: Some(sql_ast::TableAlias {
-                name: sql_ast::Ident::new(rel_var.alias),
-                columns: Vec::new(),
-            }),
-        };
-        sql_ast::TableWithJoins {
-            relation,
-            joins: Vec::new(),
-        }
-    }
+    // fn compile_rvar(&mut self, rel_var: cr::RelVar) -> sql_ast::TableWithJoins {
+    //     let subquery = self.compile_re(*rel_var.rel);
+    //     let relation = sql_ast::TableFactor::Derived {
+    //         lateral: false,
+    //         subquery: Box::new(subquery),
+    //         alias: Some(sql_ast::TableAlias {
+    //             name: sql_ast::Ident::new(rel_var.alias),
+    //             columns: Vec::new(),
+    //         }),
+    //     };
+    //     sql_ast::TableWithJoins {
+    //         relation,
+    //         joins: Vec::new(),
+    //     }
+    // }
 
-    fn compile_expr(&mut self, expr: cr::Expr) -> ExprScoped {
+    fn compile_expr(&mut self, rvar_ty: &ir::Ty, expr: cr::ColExpr) -> ExprOrSource {
         match expr.kind {
-            cr::ExprKind::Null => ExprOrSource::Expr(self.null(&expr.ty)),
-            cr::ExprKind::Literal(literal) => self.compile_literal(literal, &expr.ty),
-            cr::ExprKind::FuncCall(func_name, args) => {
+            cr::ColExprKind::Null => ExprOrSource::Expr(self.null(&expr.ty)),
+            cr::ColExprKind::Literal(literal) => self.compile_literal(literal, &expr.ty),
+            cr::ColExprKind::FuncCall(func_name, args) => {
                 let args: Vec<_> = args
                     .into_iter()
-                    .map(|x| self.compile_expr(x).unwrap_inner())
+                    .map(|x| self.compile_expr(rvar_ty, x))
                     .collect();
                 self.compile_func_call(&func_name, expr.ty, args)
             }
-            cr::ExprKind::Subquery(sub) => {
-                // optimization: unwrap simple sub-queries
-                if let cr::RelExprKind::ProjectRetain(inner, cols) = &sub.kind {
-                    if let cr::RelExprKind::SelectRelVar(rvar_name) = &inner.kind {
-                        if cols.len() == 1 {
-                            let col = self.rel_cols(&inner.ty, true).nth(cols[0]).unwrap();
-                            return ExprOrSource::Expr(utils::ident(rvar_name.as_deref(), col))
-                                .into();
-                        }
-                    }
-                }
-                if let cr::RelExprKind::SelectRelVar(rvar_name) = &sub.kind {
-                    if let ir::TyKind::Primitive(_) = sub.ty.kind {
-                        let col = self.rel_cols(&sub.ty, true).next().unwrap();
-                        return ExprOrSource::Expr(utils::ident(rvar_name.as_deref(), col)).into();
-                    }
+            cr::ColExprKind::InputRelCol(col_position) => {
+                let col = self.rel_cols(rvar_ty, true).nth(col_position).unwrap();
+                ExprOrSource::Expr(utils::ident(self.transform_input_stack.last(), col))
+            }
+            cr::ColExprKind::Subquery(input) => {
+                // compile subquery
+                let query = self.compile_re(*input);
+                let mut query = ExprOrSource::Expr(sql_ast::Expr::Subquery(Box::new(query)));
+
+                // pack to JSON if needed
+                if expr.ty.kind.is_array() {
+                    query = self.compile_json_pack(query, &expr.ty);
                 }
 
-                ExprOrSource::Expr(sql_ast::Expr::Subquery(Box::new(self.compile_re(*sub))))
+                query
             }
-            cr::ExprKind::JsonPack(sub) => self.compile_json_pack(*sub, &expr.ty),
-            cr::ExprKind::Scoped(rvar, inner) => {
-                return ExprScoped {
-                    inner: self.compile_expr(*inner).unwrap_inner(), // TODO: double nested Scoped?
-                    rvar: Some(rvar),
-                };
-            }
-            cr::ExprKind::Param(param_index) => ExprOrSource::Source(format!(
+
+            // cr::ColExprKind::Scoped(rvar, inner) => {
+            //     return ExprScoped {
+            //         inner: self.compile_expr(*inner), // TODO: double nested Scoped?
+            //         rvar: Some(rvar),
+            //     };
+            // }
+            cr::ColExprKind::Param(param_index) => ExprOrSource::Source(format!(
                 "${}::{}",
                 param_index + 1,
                 self.compile_ty_name(&expr.ty)
             )),
         }
-        .into()
     }
 
-    fn compile_json_pack(&mut self, expr: cr::RelExpr, ty: &ir::Ty) -> ExprOrSource {
-        match &self.get_ty_mat(&expr.ty).kind {
+    fn compile_json_pack(&mut self, subquery: ExprOrSource, ty: &ir::Ty) -> ExprOrSource {
+        match &self.get_ty_mat(ty).kind {
             ir::TyKind::Array(ty_item) => match &self.get_ty_mat(ty_item).kind {
                 ir::TyKind::Primitive(_) => ExprOrSource::Source(format!(
-                    "(SELECT json_agg(value ORDER BY index) FROM ({}))",
-                    self.compile_re(expr)
+                    "(SELECT json_agg(value ORDER BY index) FROM {subquery})",
                 )),
                 ir::TyKind::Tuple(_) => {
-                    let rel = self.compile_re(expr);
-
                     let fields: Vec<_> = self.rel_cols(ty, false).collect();
                     let fields = fields.join(", ");
 
-                    let objects =
-                        format!("SELECT index, jsonb_build_array({fields}) as value FROM ({rel})",);
+                    let objects = format!(
+                        "SELECT index, jsonb_build_array({fields}) as value FROM {subquery}",
+                    );
 
                     ExprOrSource::Source(format!(
                         "(SELECT json_agg(value ORDER BY index) FROM ({objects}))"
@@ -398,36 +432,42 @@ impl<'a> Context<'a> {
                 _ => todo!(),
             },
             ir::TyKind::Tuple(_) => {
-                let rel = self.compile_re(expr);
-
                 let fields: Vec<_> = self.rel_cols(ty, false).collect();
                 let fields = fields.join(", ");
 
                 ExprOrSource::Source(format!(
-                    "(SELECT jsonb_build_array({fields}) as value FROM ({rel}))"
+                    "(SELECT jsonb_build_array({fields}) as value FROM {subquery})"
                 ))
             }
-            _ => unreachable!("{:?}", expr.ty),
+            _ => unreachable!("{:?}", ty),
         }
     }
-    fn compile_json_unpack(&mut self, inner: cr::Expr) -> sql_ast::Query {
-        let inner_ty = inner.ty.clone();
-        let inner_query = self.compile_expr(inner).unwrap_inner();
 
-        match &self.get_ty_mat(&inner_ty).kind {
+    fn compile_json_unpack(
+        &mut self,
+        input: sql_ast::Query,
+        input_ty: &ir::Ty,
+        col: cr::ColExpr,
+    ) -> sql_ast::Query {
+        let col_ty = col.ty.clone();
+
+        let col_expr = self.compile_expr(input_ty, col);
+
+        match &self.get_ty_mat(&col_ty).kind {
             ir::TyKind::Array(ty_item) => {
                 let mut query = utils::select_empty();
 
                 /*
-                FROM json_array_elements(...inner...)
-                SELECT ROW_NUMBER(), value
+                FROM (...input...)
+                FROM json_array_elements(...col...) j
+                SELECT ROW_NUMBER(), j.value
                 */
-
-                query.from.push(utils::from(utils::rel_func(
+                query.from.push(utils::from(utils::subquery(input, None)));
+                query.from.push(utils::from(utils::lateral(utils::rel_func(
                     sql_ast::Ident::new("json_array_elements"),
-                    vec![inner_query.into_expr()],
-                    None,
-                )));
+                    vec![col_expr.into_expr()],
+                    Some("j".into()),
+                ))));
 
                 query.projection = vec![sql_ast::SelectItem::ExprWithAlias {
                     expr: ExprOrSource::Source("(ROW_NUMBER() OVER ())::int4".into()).into_expr(),
@@ -438,7 +478,7 @@ impl<'a> Context<'a> {
                 match &item_ty.kind {
                     ir::TyKind::Primitive(_) => {
                         let value = ExprOrSource::Source(format!(
-                            "value::text::{}",
+                            "j.value::text::{}",
                             self.compile_ty_name(item_ty)
                         ));
                         query
@@ -450,13 +490,13 @@ impl<'a> Context<'a> {
                             .projection
                             .push(sql_ast::SelectItem::UnnamedExpr(utils::ident(
                                 None::<&str>,
-                                "value",
+                                "j.value",
                             )));
                     }
                     ir::TyKind::Tuple(fields) => {
                         for (index, field) in fields.iter().enumerate() {
                             let value = ExprOrSource::Source(format!(
-                                "(value->{index})::text::{}",
+                                "(j.value->{index})::text::{}",
                                 self.compile_ty_name(&field.ty)
                             ))
                             .into_expr();
@@ -472,9 +512,10 @@ impl<'a> Context<'a> {
                 utils::query_select(query)
             }
             ir::TyKind::Tuple(_) => todo!(),
-            _ => unreachable!("{:?}", inner_ty),
+            _ => unreachable!("{:?}", col_ty),
         }
     }
+
     fn compile_func_call(
         &mut self,
         id: &str,

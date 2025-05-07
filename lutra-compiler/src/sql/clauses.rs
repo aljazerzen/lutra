@@ -1,8 +1,8 @@
-use std::{collections::HashMap, rc::Rc};
+use std::collections::HashMap;
 
-use crate::utils::IdGenerator;
+use crate::utils::NameGenerator;
 
-use super::cr;
+use super::cr::{self, ColExpr, RelExpr};
 use lutra_bin::ir;
 
 struct Context<'t> {
@@ -11,8 +11,7 @@ struct Context<'t> {
 
     types: HashMap<&'t ir::Path, &'t ir::Ty>,
 
-    cte_alias_gen: IdGenerator<usize>,
-    rvar_alias_gen: IdGenerator<usize>,
+    cte_alias_gen: NameGenerator,
 }
 
 enum FuncProvider {
@@ -29,8 +28,7 @@ pub fn compile(program: &ir::Program) -> (cr::RelExpr, HashMap<&ir::Path, &ir::T
             .iter()
             .map(|def| (&def.name, &def.ty))
             .collect(),
-        cte_alias_gen: Default::default(),
-        rvar_alias_gen: Default::default(),
+        cte_alias_gen: NameGenerator::new("t"),
     };
 
     // find the top-level function
@@ -54,38 +52,40 @@ impl<'a> Context<'a> {
 
     fn compile_rel(&mut self, expr: &ir::Expr) -> cr::RelExpr {
         let kind = match &expr.kind {
-            ir::ExprKind::Literal(lit) => cr::RelExprKind::Constructed(vec![vec![cr::Expr {
-                kind: cr::ExprKind::Literal(lit.clone()),
-                ty: expr.ty.clone(),
-            }]]),
+            ir::ExprKind::Literal(lit) => {
+                cr::RelExprKind::From(cr::From::Construction(vec![vec![cr::ColExpr {
+                    kind: cr::ColExprKind::Literal(lit.clone()),
+                    ty: expr.ty.clone(),
+                }]]))
+            }
             ir::ExprKind::Tuple(fields) => {
                 let row = fields
                     .iter()
                     .flat_map(|x| self.compile_column_list(x))
                     .collect();
-                cr::RelExprKind::Constructed(vec![row])
+                cr::RelExprKind::From(cr::From::Construction(vec![row]))
             }
             ir::ExprKind::Array(items) => {
                 let rows = items
                     .iter()
                     .enumerate()
                     .map(|(index, x)| {
-                        let mut cols = vec![cr::Expr {
-                            kind: cr::ExprKind::Literal(ir::Literal::Int(index as i64)),
+                        let mut cols = vec![cr::ColExpr {
+                            kind: cr::ColExprKind::Literal(ir::Literal::Int(index as i64)),
                             ty: ir::Ty::new(ir::TyPrimitive::int64),
                         }];
                         cols.extend(self.compile_column_list(x));
                         cols
                     })
                     .collect();
-                cr::RelExprKind::Constructed(rows)
+                cr::RelExprKind::From(cr::From::Construction(rows))
             }
 
             ir::ExprKind::Call(call) => match &call.function.kind {
                 ir::ExprKind::Pointer(ir::Pointer::External(ptr))
                     if ptr.id.starts_with("std::") =>
                 {
-                    self.compile_rel_std(expr)
+                    return self.compile_rel_std(expr);
                 }
                 ir::ExprKind::Pointer(ir::Pointer::External(ptr)) => {
                     let is_table = self.ptr_is_table(&call.function);
@@ -95,7 +95,7 @@ impl<'a> Context<'a> {
                         todo!("only supported external refs are table functions (no params, return array of tuples)");
                     }
 
-                    cr::RelExprKind::FromTable(ptr.id.clone())
+                    cr::RelExprKind::From(cr::From::Table(ptr.id.clone()))
                 }
                 ir::ExprKind::Pointer(_) => todo!(),
                 ir::ExprKind::Call(_) => todo!(),
@@ -121,7 +121,7 @@ impl<'a> Context<'a> {
 
             ir::ExprKind::Pointer(ir::Pointer::Binding(ptr)) => {
                 let name = self.bindings.get(ptr).unwrap();
-                cr::RelExprKind::FromBinding(name.clone())
+                cr::RelExprKind::From(cr::From::Binding(name.clone()))
             }
             ir::ExprKind::Pointer(ir::Pointer::Parameter(ptr)) => {
                 let provider = self.functions.get(&ptr.function_id).unwrap();
@@ -131,11 +131,11 @@ impl<'a> Context<'a> {
                         r_expr.clone()
                     }
                     FuncProvider::Params => {
-                        let expr = cr::Expr {
-                            kind: cr::ExprKind::Param(ptr.param_position),
+                        let expr = cr::ColExpr {
+                            kind: cr::ColExprKind::Param(ptr.param_position),
                             ty: expr.ty.clone(),
                         };
-                        cr::RelExprKind::Constructed(vec![vec![expr]])
+                        cr::RelExprKind::From(cr::From::Construction(vec![vec![expr]]))
                     }
                 }
             }
@@ -149,8 +149,8 @@ impl<'a> Context<'a> {
                 let mut row = Vec::with_capacity(ty_variants.len() + 1);
 
                 // tag
-                row.push(cr::Expr {
-                    kind: cr::ExprKind::Literal(ir::Literal::Int(variant.tag as i64)),
+                row.push(cr::ColExpr {
+                    kind: cr::ColExprKind::Literal(ir::Literal::Int(variant.tag as i64)),
                     ty: ir::Ty::new(ir::TyPrimitive::int8),
                 });
 
@@ -159,8 +159,8 @@ impl<'a> Context<'a> {
                     if ty_variant.ty.is_unit() {
                         continue;
                     }
-                    row.push(cr::Expr {
-                        kind: cr::ExprKind::Null,
+                    row.push(cr::ColExpr {
+                        kind: cr::ColExprKind::Null,
                         ty: ty_variant.ty.clone(),
                     });
                 }
@@ -173,13 +173,13 @@ impl<'a> Context<'a> {
                     if ty_variant.ty.is_unit() {
                         continue;
                     }
-                    row.push(cr::Expr {
-                        kind: cr::ExprKind::Null,
+                    row.push(cr::ColExpr {
+                        kind: cr::ColExprKind::Null,
                         ty: ty_variant.ty.clone(),
                     });
                 }
 
-                cr::RelExprKind::Constructed(vec![row])
+                cr::RelExprKind::From(cr::From::Construction(vec![row]))
             }
             ir::ExprKind::EnumEq(_) => todo!(),
             ir::ExprKind::EnumUnwrap(_) => todo!(),
@@ -188,37 +188,43 @@ impl<'a> Context<'a> {
                 let base = self.compile_rel(&lookup.base);
 
                 // TODO: this does not take nested tuples or enums into account
-                let mut inner =
-                    cr::RelExprKind::ProjectRetain(Box::new(base), vec![lookup.position as usize]);
+                let mut rel = cr::RelExprKind::Transform(
+                    Box::new(base),
+                    cr::Transform::ProjectRetain(vec![lookup.position as usize]),
+                );
 
                 // In a tuple lookup the repr of the field might change.
                 // Currently this only happens for arrays, which change from JSON to SQL repr.
                 if expr.ty.kind.is_array() {
-                    inner = cr::RelExprKind::JsonUnpack(Box::new(cr::Expr::new_subquery(
-                        cr::RelExpr {
-                            kind: inner,
-                            ty: expr.ty.clone(),
-                        },
-                    )));
+                    rel = cr::RelExprKind::Transform(
+                        Box::new(cr::RelExpr {
+                            kind: rel,
+                            ty: lookup.base.ty.clone(),
+                        }),
+                        cr::Transform::JsonUnpack(Box::new(cr::ColExpr::new_rel_col(
+                            0,
+                            expr.ty.clone(),
+                        ))),
+                    )
                 }
 
-                inner
+                rel
             }
             ir::ExprKind::Binding(binding) => {
                 if let ir::TyKind::Function(_) = &binding.expr.ty.kind {
                     todo!()
                 } else {
-                    let alias = format!("t{}", self.cte_alias_gen.gen());
+                    let name = self.cte_alias_gen.next();
 
                     // compile expr
                     let expr = self.compile_rel(&binding.expr);
-                    self.bindings.insert(binding.id, alias);
+                    self.bindings.insert(binding.id, name);
 
                     // compile main with expr in ctx
                     let main = self.compile_rel(&binding.main);
 
                     let alias = self.bindings.remove(&binding.id).unwrap();
-                    cr::RelExprKind::With(alias, Box::new(expr), Box::new(main))
+                    cr::RelExprKind::Bind(alias, Box::new(expr), Box::new(main))
                 }
             }
 
@@ -245,7 +251,7 @@ impl<'a> Context<'a> {
         self.get_ty_mat(ty_item).kind.is_tuple()
     }
 
-    fn compile_rel_std(&mut self, expr: &ir::Expr) -> cr::RelExprKind {
+    fn compile_rel_std(&mut self, expr: &ir::Expr) -> cr::RelExpr {
         let ir::ExprKind::Call(call) = &expr.kind else {
             unreachable!()
         };
@@ -253,109 +259,115 @@ impl<'a> Context<'a> {
             unreachable!()
         };
 
-        match ptr.id.as_str() {
+        let kind = match ptr.id.as_str() {
             "std::slice" => {
                 let array = self.compile_rel(&call.args[0]);
                 let start = self.compile_column(&call.args[1]);
                 let end = self.compile_column(&call.args[2]);
 
-                let offset = cr::RelExpr {
-                    kind: cr::RelExprKind::Offset(
-                        Box::new(array),
-                        new_bin_op(
-                            start.clone(),
-                            "std::greatest",
-                            new_int(0),
-                            ir::TyPrimitive::int64,
-                        ),
-                    ),
-                    ty: expr.ty.clone(),
-                };
+                let start_clamped = new_bin_op(
+                    start.clone(),
+                    "std::greatest",
+                    new_int(0),
+                    ir::TyPrimitive::int64,
+                );
+                let length = new_bin_op(
+                    end,
+                    "std::sub",
+                    start_clamped.clone(),
+                    ir::TyPrimitive::int64,
+                );
+                let length_clamped =
+                    new_bin_op(length, "std::greatest", new_int(0), ir::TyPrimitive::int64);
 
-                cr::RelExprKind::Limit(
-                    Box::new(offset),
-                    new_bin_op(
-                        new_bin_op(
-                            end,
-                            "std::sub",
-                            new_bin_op(
-                                start.clone(),
-                                "std::greatest",
-                                new_int(0),
-                                ir::TyPrimitive::int64,
-                            ),
-                            ir::TyPrimitive::int64,
-                        ),
-                        "std::greatest",
-                        new_int(0),
-                        ir::TyPrimitive::int64,
-                    ),
+                let rel_offset = cr::RelExpr::new_transform_preserve_ty(
+                    array,
+                    cr::Transform::Offset(start_clamped),
+                );
+
+                cr::RelExprKind::Transform(
+                    Box::new(rel_offset),
+                    cr::Transform::Limit(length_clamped),
                 )
             }
             "std::index" => {
                 let array = self.compile_rel(&call.args[0]);
                 let index = self.compile_column(&call.args[1]);
 
-                let offset = cr::RelExpr {
-                    ty: array.ty.clone(),
-                    kind: cr::RelExprKind::Offset(Box::new(array), index.clone()),
-                };
+                let rel_offset = cr::RelExpr::new_transform_preserve_ty(
+                    array,
+                    cr::Transform::Offset(index.clone()),
+                );
 
-                let limit = cr::RelExpr {
-                    ty: offset.ty.clone(),
-                    kind: cr::RelExprKind::Limit(Box::new(offset), new_int(1)),
-                };
+                let rel_limit = cr::RelExpr::new_transform_preserve_ty(
+                    rel_offset,
+                    cr::Transform::Limit(new_int(1)),
+                );
 
                 // drop index column
-                cr::RelExprKind::ProjectDrop(Box::new(limit), vec![0])
+                cr::RelExprKind::Transform(
+                    Box::new(rel_limit),
+                    cr::Transform::ProjectDiscard(vec![0]),
+                )
             }
             "std::map" => {
                 let array = self.compile_rel(&call.args[0]);
+                let item_ty = array.ty.kind.as_array().unwrap().clone();
                 let func = &call.args[1];
-                let array_ty = array.ty.clone();
-                let item_ty = array_ty.kind.as_array().unwrap();
 
-                let needs_unpack = item_ty.kind.is_array();
-                if needs_unpack {
-                    let iter_name = format!("r{}", self.rvar_alias_gen.gen());
+                if item_ty.kind.is_array() {
+                    // complex cases: ForEach
+
+                    let unpacked = cr::RelExprKind::Transform(
+                        Box::new(cr::RelExpr {
+                            kind: cr::RelExprKind::From(cr::From::ForIterator),
+                            ty: array.ty.clone(),
+                        }),
+                        cr::Transform::JsonUnpack(Box::new(ColExpr::new_rel_col(
+                            1,
+                            *item_ty.clone(),
+                        ))),
+                    );
 
                     // index
                     let mut row = Vec::with_capacity(1);
-                    row.push(new_column_of_rel(
-                        Some(iter_name.clone()),
-                        array_ty.clone(),
-                        0,
-                        ir::Ty::new(ir::TyPrimitive::int64),
-                    ));
-
-                    let unpacked = cr::RelExpr::new_json_unpack(new_column_of_rel(
-                        Some(iter_name.clone()),
-                        array_ty.clone(),
-                        1,
-                        *item_ty.clone(),
-                    ));
+                    row.push(cr::ColExpr::new_subquery(cr::RelExpr {
+                        kind: cr::RelExprKind::Transform(
+                            Box::new(cr::RelExpr {
+                                kind: cr::RelExprKind::From(cr::From::ForIterator),
+                                ty: array.ty.clone(),
+                            }),
+                            cr::Transform::ProjectRetain(vec![0]),
+                        ),
+                        ty: ir::Ty::new(ir::TyPrimitive::int64),
+                    }));
 
                     // compile func body
                     let func = func.kind.as_function().unwrap();
                     self.functions
-                        .insert(func.id, FuncProvider::RelExpr(unpacked.kind));
+                        .insert(func.id, FuncProvider::RelExpr(unpacked));
                     row.extend(self.compile_column_list(&func.body));
                     self.functions.remove(&func.id);
 
-                    let body = cr::RelExpr {
-                        kind: cr::RelExprKind::Constructed(vec![row]),
-                        ty: expr.ty.clone(),
-                    };
-
-                    cr::RelExpr::new_for_each(iter_name, array, body).kind
+                    cr::RelExprKind::ForEach(
+                        Box::new(array),
+                        Box::new(cr::RelExpr {
+                            kind: cr::RelExprKind::Transform(
+                                Box::new(cr::RelExpr {
+                                    kind: cr::RelExprKind::From(cr::From::ForIterator),
+                                    ty: *item_ty,
+                                }),
+                                cr::Transform::Project(row),
+                            ),
+                            ty: expr.ty.clone(),
+                        }),
+                    )
                 } else {
-                    let iter_name = format!("r{}", self.rvar_alias_gen.gen());
+                    // simple cases: Transform(Project)
 
                     // index
                     let mut row = Vec::with_capacity(1);
-                    row.push(new_column_of_rel(
-                        Some(iter_name.clone()),
-                        array_ty.clone(),
+                    row.push(cr::ColExpr::new_rel_col(
                         0,
                         ir::Ty::new(ir::TyPrimitive::int64),
                     ));
@@ -364,14 +376,18 @@ impl<'a> Context<'a> {
                     let func = func.kind.as_function().unwrap();
                     self.functions.insert(
                         func.id,
-                        FuncProvider::RelExpr(cr::RelExprKind::SelectRelVar(Some(
-                            iter_name.clone(),
-                        ))),
+                        FuncProvider::RelExpr(cr::RelExprKind::Transform(
+                            Box::new(cr::RelExpr {
+                                kind: cr::RelExprKind::From(cr::From::TransformIterator),
+                                ty: array.ty.clone(),
+                            }),
+                            cr::Transform::ProjectDiscard(vec![0]), // discard index
+                        )),
                     );
                     row.extend(self.compile_column_list(&func.body));
                     self.functions.remove(&func.id);
 
-                    cr::RelExprKind::ProjectReplace(iter_name, Box::new(array), row)
+                    cr::RelExprKind::Transform(Box::new(array), cr::Transform::Project(row))
                 }
             }
             "std::filter" => {
@@ -379,15 +395,20 @@ impl<'a> Context<'a> {
                 let func = &call.args[1];
                 let func = func.kind.as_function().unwrap();
 
-                let iter_name = format!("r{}", self.rvar_alias_gen.gen());
-
-                let item_ref = cr::RelExprKind::SelectRelVar(Some(iter_name.clone()));
-                self.functions
-                    .insert(func.id, FuncProvider::RelExpr(item_ref));
+                self.functions.insert(
+                    func.id,
+                    FuncProvider::RelExpr(cr::RelExprKind::Transform(
+                        Box::new(cr::RelExpr {
+                            kind: cr::RelExprKind::From(cr::From::TransformIterator),
+                            ty: array.ty.clone(),
+                        }),
+                        cr::Transform::ProjectDiscard(vec![0]), // discard index
+                    )),
+                );
                 let cond = self.compile_column(&func.body);
                 self.functions.remove(&func.id);
 
-                cr::RelExprKind::Where(iter_name, Box::new(array), cond)
+                cr::RelExprKind::Transform(Box::new(array), cr::Transform::Where(cond))
             }
             "std::sort" => {
                 let array = self.compile_rel(&call.args[0]);
@@ -395,15 +416,20 @@ impl<'a> Context<'a> {
                 let func = &call.args[1];
                 let func = func.kind.as_function().unwrap();
 
-                let iter_name = format!("r{}", self.rvar_alias_gen.gen());
-
-                let item_ref = cr::RelExprKind::SelectRelVar(Some(iter_name.clone()));
-                self.functions
-                    .insert(func.id, FuncProvider::RelExpr(item_ref));
+                self.functions.insert(
+                    func.id,
+                    FuncProvider::RelExpr(cr::RelExprKind::Transform(
+                        Box::new(cr::RelExpr {
+                            kind: cr::RelExprKind::From(cr::From::TransformIterator),
+                            ty: array.ty.clone(),
+                        }),
+                        cr::Transform::ProjectDiscard(vec![0]), // discard index
+                    )),
+                );
                 let key = self.compile_column(&func.body);
                 self.functions.remove(&func.id);
 
-                cr::RelExprKind::OrderBy(iter_name, Box::new(array), key)
+                cr::RelExprKind::Transform(Box::new(array), cr::Transform::OrderBy(key))
             }
 
             // aggregation functions
@@ -412,23 +438,17 @@ impl<'a> Context<'a> {
                 let array = self.compile_rel(&call.args[0]);
                 let item_ty = call.args[0].ty.kind.as_array().unwrap();
 
-                let item = cr::Expr {
-                    kind: cr::ExprKind::Subquery(Box::new(cr::RelExpr {
-                        kind: cr::RelExprKind::SelectRelVar(None),
-                        ty: *item_ty.clone(),
-                    })),
-                    ty: *item_ty.clone(),
-                };
+                let item = cr::ColExpr::new_rel_col(1, *item_ty.clone());
 
                 let mut args = vec![item];
                 args.extend(call.args[1..].iter().map(|a| self.compile_column(a)));
 
-                cr::RelExprKind::Aggregate(
+                cr::RelExprKind::Transform(
                     Box::new(array),
-                    vec![cr::Expr {
-                        kind: cr::ExprKind::FuncCall(ptr.id.clone(), args),
+                    cr::Transform::Aggregate(vec![cr::ColExpr {
+                        kind: cr::ColExprKind::FuncCall(ptr.id.clone(), args),
                         ty: expr.ty.clone(),
-                    }],
+                    }]),
                 )
             }
 
@@ -437,113 +457,80 @@ impl<'a> Context<'a> {
                 let array = self.compile_rel(&call.args[0]);
 
                 let item_ty = expr.ty.kind.as_array().unwrap();
-
-                let rvar_name = format!("r{}", self.rvar_alias_gen.gen());
-
-                let item = cr::Expr {
-                    kind: cr::ExprKind::Subquery(Box::new(cr::RelExpr {
-                        kind: cr::RelExprKind::SelectRelVar(Some(rvar_name.clone())),
-                        ty: *item_ty.clone(),
-                    })),
-                    ty: *item_ty.clone(),
-                };
+                let item = cr::ColExpr::new_rel_col(1, *item_ty.clone());
 
                 let mut args = vec![item];
                 args.extend(call.args[1..].iter().map(|a| self.compile_column(a)));
 
-                cr::RelExprKind::ProjectReplace(
-                    rvar_name,
+                cr::RelExprKind::Transform(
                     Box::new(array),
-                    vec![
-                        new_column_of_rel(
-                            None,
-                            call.args[0].ty.clone(),
-                            0,
-                            ir::Ty::new(ir::TyPrimitive::int64),
-                        ),
-                        cr::Expr {
-                            kind: cr::ExprKind::FuncCall(ptr.id.clone(), args),
+                    cr::Transform::Project(vec![
+                        cr::ColExpr::new_rel_col(0, ir::Ty::new(ir::TyPrimitive::int64)),
+                        cr::ColExpr {
+                            kind: cr::ColExprKind::FuncCall(ptr.id.clone(), args),
                             ty: expr.ty.clone(),
                         },
-                    ],
+                    ]),
                 )
             }
 
             _ => {
                 let expr = self.compile_expr_std(expr);
-                cr::RelExprKind::Constructed(vec![vec![expr]])
+                cr::RelExprKind::From(cr::From::Construction(vec![vec![expr]]))
             }
+        };
+        cr::RelExpr {
+            kind,
+            ty: expr.ty.clone(),
         }
     }
 
-    /// Compiles an expression into a list of columns
-    fn compile_column_list(&mut self, expr: &ir::Expr) -> Vec<cr::Expr> {
-        // compile as if this was a rel, which can sink complex operations
-        // into the relational expression
-        let rel = self.compile_rel(expr);
-
-        match rel.kind {
-            // it is just one value: unwrap
-            cr::RelExprKind::Constructed(mut rows) if rows.len() == 1 => rows.remove(0),
-
-            // it is actually complex: subquery
-            _ => {
-                let kind = match &self.get_ty_mat(&expr.ty).kind {
-                    ir::TyKind::Primitive(_) => cr::ExprKind::Subquery(Box::new(rel)),
-                    ir::TyKind::Array(_) => {
-                        // to place an array into columns, it needs to be packed to JSON
-                        cr::ExprKind::JsonPack(Box::new(rel))
-                    }
-                    ir::TyKind::Tuple(fields) => {
-                        // non-constructed tuples need to be declared as a rel var and unpacked
-                        let rvar_alias = format!("r{}", self.rvar_alias_gen.gen());
-                        let rvar = Rc::new(cr::RelVar {
-                            rel: Box::new(rel),
-                            alias: rvar_alias.clone(),
-                        });
-                        return fields
-                            .iter()
-                            .enumerate()
-                            .map(|(index, field)| {
-                                let rvar_ref = cr::RelExpr {
-                                    kind: cr::RelExprKind::SelectRelVar(Some(rvar_alias.clone())),
-                                    ty: expr.ty.clone(),
-                                };
-                                let retain = cr::RelExpr {
-                                    kind: cr::RelExprKind::ProjectRetain(
-                                        Box::new(rvar_ref),
-                                        vec![index],
-                                    ),
-                                    ty: field.ty.clone(),
-                                };
-                                let subquery = cr::Expr {
-                                    kind: cr::ExprKind::Subquery(Box::new(retain)),
-                                    ty: field.ty.clone(),
-                                };
-                                cr::Expr {
-                                    kind: cr::ExprKind::Scoped(rvar.clone(), Box::new(subquery)),
-                                    ty: field.ty.clone(),
-                                }
-                            })
-                            .collect();
-                    }
-                    _ => todo!(),
-                };
-                vec![cr::Expr {
-                    kind,
-                    ty: expr.ty.clone(),
-                }]
-            }
-        }
-    }
-
-    fn compile_column(&mut self, expr: &ir::Expr) -> cr::Expr {
+    /// Compiles an expression into a column
+    fn compile_column(&mut self, expr: &ir::Expr) -> cr::ColExpr {
         let cols = self.compile_column_list(expr);
         assert!(cols.len() == 1, "expected a single column, found: {cols:?}");
         cols.into_iter().next().unwrap()
     }
 
-    fn compile_expr_std(&mut self, expr: &ir::Expr) -> cr::Expr {
+    /// Compiles an expression into a list of columns
+    fn compile_column_list(&mut self, expr: &ir::Expr) -> Vec<cr::ColExpr> {
+        // compile as if this was a rel, which can sink complex operations
+        // into the relational expression
+        let rel = self.compile_rel(expr);
+
+        // optimization: simplify `ProjectRetain` and `ProjectDiscard` to InputRelCol(x)
+        if let Some(col_position) = try_simplify_input_rel_col(&rel) {
+            tracing::debug!(
+                "simplifying:\n{rel:#?} .. to ColExprKind::InputRelCol({col_position})"
+            );
+            return vec![cr::ColExpr::new_rel_col(col_position, rel.ty)];
+        }
+
+        match rel.kind {
+            // it is just one constructed row: unwrap
+            cr::RelExprKind::From(cr::From::Construction(mut rows)) if rows.len() == 1 => {
+                rows.remove(0)
+            }
+
+            // it is actually complex: subquery
+            _ => {
+                match &self.get_ty_mat(&expr.ty).kind {
+                    ir::TyKind::Primitive(_) => vec![cr::ColExpr::new_subquery(rel)],
+                    ir::TyKind::Array(_) => {
+                        // to place an array into columns, it needs to be packed to JSON
+                        vec![cr::ColExpr::new_subquery(rel)]
+                    }
+                    ir::TyKind::Tuple(_) => {
+                        // non-constructed tuples need to be declared as a rel var and unpacked
+                        todo!("{rel:#?}")
+                    }
+                    _ => todo!(),
+                }
+            }
+        }
+    }
+
+    fn compile_expr_std(&mut self, expr: &ir::Expr) -> cr::ColExpr {
         let ir::ExprKind::Call(call) = &expr.kind else {
             unreachable!()
         };
@@ -553,44 +540,47 @@ impl<'a> Context<'a> {
         };
 
         let args = call.args.iter().map(|x| self.compile_column(x)).collect();
-        cr::Expr {
-            kind: cr::ExprKind::FuncCall(ptr.id.clone(), args),
+        cr::ColExpr {
+            kind: cr::ColExprKind::FuncCall(ptr.id.clone(), args),
             ty: expr.ty.clone(),
         }
     }
 }
 
-fn new_bin_op(left: cr::Expr, op: &str, right: cr::Expr, ty: ir::TyPrimitive) -> cr::Expr {
-    let kind = cr::ExprKind::FuncCall(op.to_string(), vec![left, right]);
-    cr::Expr {
+fn new_bin_op(left: cr::ColExpr, op: &str, right: cr::ColExpr, ty: ir::TyPrimitive) -> cr::ColExpr {
+    let kind = cr::ColExprKind::FuncCall(op.to_string(), vec![left, right]);
+    cr::ColExpr {
         kind,
         ty: ir::Ty::new(ty),
     }
 }
 
-fn new_int(int: i64) -> cr::Expr {
-    let kind = cr::ExprKind::Literal(ir::Literal::Int(int));
-    cr::Expr {
+fn new_int(int: i64) -> cr::ColExpr {
+    let kind = cr::ColExprKind::Literal(ir::Literal::Int(int));
+    cr::ColExpr {
         kind,
         ty: ir::Ty::new(ir::TyPrimitive::int64),
     }
 }
 
-fn new_column_of_rel(
-    rvar_name: Option<String>,
-    rel_ty: ir::Ty,
-    col_position: usize,
-    col_ty: ir::Ty,
-) -> cr::Expr {
-    let kind = cr::ExprKind::Subquery(Box::new(cr::RelExpr {
-        kind: cr::RelExprKind::ProjectRetain(
-            Box::new(cr::RelExpr {
-                kind: cr::RelExprKind::SelectRelVar(rvar_name),
-                ty: rel_ty,
-            }),
-            vec![col_position],
-        ),
-        ty: col_ty.clone(),
-    }));
-    cr::Expr { kind, ty: col_ty }
+fn try_simplify_input_rel_col(rel: &RelExpr) -> Option<usize> {
+    match &rel.kind {
+        cr::RelExprKind::From(cr::From::TransformIterator) => Some(0),
+        cr::RelExprKind::From(_) => None,
+
+        cr::RelExprKind::Transform(input, transform) => {
+            let offset = try_simplify_input_rel_col(input)?;
+
+            match transform {
+                cr::Transform::ProjectRetain(retain) if retain.len() == 1 => {
+                    Some(offset + retain[0])
+                }
+                cr::Transform::ProjectDiscard(discards) if discards == &[0] => Some(offset + 1),
+
+                _ => None,
+            }
+        }
+
+        _ => None,
+    }
 }

@@ -2,12 +2,10 @@
 
 mod ast;
 mod expr_or_source;
-mod expr_scoped;
 mod projection;
 
 pub use ast::*;
 pub use expr_or_source::*;
-pub use expr_scoped::*;
 
 pub fn retain_by_position<T>(vec: &mut Vec<T>, mut to_keep: Vec<usize>) {
     to_keep.sort();

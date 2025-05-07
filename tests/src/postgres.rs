@@ -410,6 +410,26 @@ fn param_00() {
 }
 
 #[test]
+fn tuple_unpacking_00() {
+    insta::assert_snapshot!(_run(r#"
+    func () -> {
+      4,
+      ([{id = 3, title = "Hello world!"}] | std::index(0)),
+    }
+    "#,
+    vec![]
+    ).1, @r#"
+    {
+      3,
+      {
+        id = 3,
+        title = "Hello world!",
+      },
+    }
+    "#);
+}
+
+#[test]
 fn json_pack_00() {
     // Having array in a tuple forces it to be packed to JSON.
     // Applying an operation of that array then forces it to unpack.

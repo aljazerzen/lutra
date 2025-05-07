@@ -34,21 +34,36 @@ pub fn subquery(query: sql_ast::Query, alias: Option<String>) -> sql_ast::TableF
     }
 }
 
-pub fn subquery_lateral(query: sql_ast::Query, alias: Option<String>) -> sql_ast::TableFactor {
-    sql_ast::TableFactor::Derived {
-        lateral: true,
-        subquery: Box::new(query),
-        alias: alias.map(|a| sql_ast::TableAlias {
-            name: sql_ast::Ident::new(a),
-            columns: vec![],
-        }),
+pub fn lateral(factor: sql_ast::TableFactor) -> sql_ast::TableFactor {
+    match factor {
+        sql_ast::TableFactor::Derived {
+            lateral: _,
+            subquery,
+            alias,
+        } => sql_ast::TableFactor::Derived {
+            lateral: true,
+            subquery,
+            alias,
+        },
+        sql_ast::TableFactor::Function {
+            lateral: _,
+            name,
+            args,
+            alias,
+        } => sql_ast::TableFactor::Function {
+            lateral: true,
+            name,
+            args,
+            alias,
+        },
+        _ => panic!(),
     }
 }
 
 pub fn rel_func(
     name: sql_ast::Ident,
     args: Vec<sql_ast::Expr>,
-    alias: Option<sql_ast::TableAlias>,
+    alias: Option<String>,
 ) -> sql_ast::TableFactor {
     sql_ast::TableFactor::Function {
         lateral: false,
@@ -58,7 +73,10 @@ pub fn rel_func(
             .map(sql_ast::FunctionArgExpr::Expr)
             .map(sql_ast::FunctionArg::Unnamed)
             .collect(),
-        alias,
+        alias: alias.map(|a| sql_ast::TableAlias {
+            name: sql_ast::Ident::new(a),
+            columns: vec![],
+        }),
     }
 }
 

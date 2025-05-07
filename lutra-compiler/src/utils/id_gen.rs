@@ -1,7 +1,7 @@
 use std::marker::PhantomData;
 
 #[derive(Debug, Clone)]
-pub struct IdGenerator<T: From<usize>> {
+pub struct IdGenerator<T: From<usize> = usize> {
     next_id: usize,
     phantom: PhantomData<T>,
 }
@@ -30,5 +30,24 @@ impl<T: From<usize>> Default for IdGenerator<T> {
             next_id: 0,
             phantom: PhantomData,
         }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct NameGenerator {
+    id_generator: IdGenerator,
+    prefix: &'static str,
+}
+
+impl NameGenerator {
+    pub fn new(prefix: &'static str) -> Self {
+        Self {
+            id_generator: IdGenerator::new(),
+            prefix,
+        }
+    }
+
+    pub fn next(&mut self) -> String {
+        format!("{}{}", self.prefix, self.id_generator.gen())
     }
 }

@@ -1,9 +1,5 @@
-use std::rc::Rc;
-
 use lutra_bin::ir;
 
-/// A relational expression (something that can be used in `FROM (...)`).
-/// Its columns are dictated by its lutra type.
 #[derive(Clone)]
 pub struct RelExpr {
     pub kind: RelExprKind,
@@ -12,81 +8,95 @@ pub struct RelExpr {
 
 #[derive(Debug, Clone)]
 pub enum RelExprKind {
-    /// Relation with many rows and many columns, where each cell can have
-    /// a different expression.
-    Constructed(Vec<Vec<Expr>>),
+    /// Expression that produces a relation, without relational inputs.
+    From(From),
 
-    /// Read from a table
-    FromTable(String),
-    /// Read from a common table table
-    FromBinding(String),
+    Transform(Box<RelExpr>, Transform),
+
+    #[allow(dead_code)]
+    Join(Box<RelExpr>, Box<RelExpr>),
+
     /// Evaluate body for each row in iterator. Return union of rows of each iteration.
-    ForEach {
-        iter_name: String,
-        iterator: Box<RelExpr>,
-        body: Box<RelExpr>,
-    },
-
-    /// Select all columns of a relational variable.
-    /// Contains the name of the rel var. If none, it implies
-    /// that there is only one rel var in scope so rel var name can
-    /// be omitted.
-    SelectRelVar(Option<String>),
-
-    Limit(Box<RelExpr>, Expr),
-    Offset(Box<RelExpr>, Expr),
-
-    /// Projection that retains columns by position
-    ProjectRetain(Box<RelExpr>, Vec<usize>),
-    /// Projection that discards columns by position
-    ProjectDrop(Box<RelExpr>, Vec<usize>),
-
-    /// Projection that replaces all columns (but not the index)
-    ProjectReplace(String, Box<RelExpr>, Vec<Expr>),
-
-    Aggregate(Box<RelExpr>, Vec<Expr>),
-
-    /// Filtering (also known as selection)
-    Where(String, Box<RelExpr>, Expr),
-
-    /// Sorting
-    OrderBy(String, Box<RelExpr>, Expr),
+    ForEach(Box<RelExpr>, Box<RelExpr>),
 
     /// Bind a common table expression to a name
-    With(String, Box<RelExpr>, Box<RelExpr>),
+    // TODO: this should probably be RelExprKind
+    Bind(String, Box<RelExpr>, Box<RelExpr>),
+}
+
+#[derive(Debug, Clone)]
+pub enum From {
+    /// Relation with many rows and many columns, where each cell can have
+    /// a different expression.
+    Construction(Vec<Vec<ColExpr>>),
+
+    /// Read from a table (in Table representation)
+    Table(String),
+
+    /// Read from a CTE (in RelExpr representation)
+    Binding(String),
+
+    /// Reference to iterator of [RelExprKind::ForEach]
+    ForIterator,
+
+    /// Reference to the input of the enclosing transform
+    TransformIterator,
+}
+
+#[derive(Debug, Clone)]
+pub enum Transform {
+    /// Projection that replaces all columns (but not the index)
+    /// Each column expression is evaluated for each row of the input.
+    Project(Vec<ColExpr>),
+
+    /// Projection that retains columns by position
+    ProjectRetain(Vec<usize>),
+
+    /// Projection that discards columns by position
+    ProjectDiscard(Vec<usize>),
+
+    Aggregate(Vec<ColExpr>),
+
+    /// Filters by retaining only first N rows
+    Limit(ColExpr),
+
+    /// Filters by discarding first N rows
+    Offset(ColExpr),
+
+    /// Filtering (also known as selection)
+    Where(ColExpr),
+
+    /// Sorting or rows
+    OrderBy(ColExpr),
 
     /// Converts a JSON-encoded value into a relation
-    JsonUnpack(Box<Expr>),
+    JsonUnpack(Box<ColExpr>),
 }
 
 #[derive(Clone)]
-pub struct Expr {
-    pub kind: ExprKind,
+pub struct ColExpr {
+    pub kind: ColExprKind,
     pub ty: ir::Ty,
 }
 
 #[derive(Debug, Clone)]
-pub enum ExprKind {
+pub enum ColExprKind {
     Null,
+
+    // A literal value
     Literal(ir::Literal),
-    FuncCall(String, Vec<Expr>),
-    Subquery(Box<RelExpr>),
 
-    /// Converts a relation into its JSON encoding.
-    JsonPack(Box<RelExpr>),
-
-    /// Expr in the scope of a rel var.
-    Scoped(Rc<RelVar>, Box<Expr>),
-
-    /// SQL query parameter. Contains 0-based index.
+    /// SQL query parameter. Contains 0-based index
     Param(u8),
-}
 
-/// Relational variable, bound to a name.
-#[derive(Debug, Clone)]
-pub struct RelVar {
-    pub rel: Box<RelExpr>,
-    pub alias: String,
+    /// A column of the input of the enclosing transform
+    InputRelCol(usize),
+
+    /// Call a function by its lutra name
+    FuncCall(String, Vec<ColExpr>),
+
+    /// A relational subquery
+    Subquery(Box<RelExpr>),
 }
 
 impl std::fmt::Debug for RelExpr {
@@ -95,36 +105,32 @@ impl std::fmt::Debug for RelExpr {
     }
 }
 
-impl std::fmt::Debug for Expr {
+impl std::fmt::Debug for ColExpr {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         self.kind.fmt(f)
     }
 }
 
 impl RelExpr {
-    pub fn new_json_unpack(inner: Expr) -> Self {
+    pub fn new_transform_preserve_ty(input: RelExpr, transform: Transform) -> Self {
         RelExpr {
-            ty: inner.ty.clone(),
-            kind: RelExprKind::JsonUnpack(Box::new(inner)),
-        }
-    }
-    pub fn new_for_each(iter_name: String, iterator: RelExpr, body: RelExpr) -> Self {
-        RelExpr {
-            ty: body.ty.clone(),
-            kind: RelExprKind::ForEach {
-                iter_name,
-                iterator: Box::new(iterator),
-                body: Box::new(body),
-            },
+            ty: input.ty.clone(),
+            kind: RelExprKind::Transform(Box::new(input), transform),
         }
     }
 }
 
-impl Expr {
-    pub fn new_subquery(inner: RelExpr) -> Self {
-        Expr {
-            ty: inner.ty.clone(),
-            kind: ExprKind::Subquery(Box::new(inner)),
+impl ColExpr {
+    pub fn new_subquery(subquery: RelExpr) -> Self {
+        ColExpr {
+            ty: subquery.ty.clone(),
+            kind: ColExprKind::Subquery(Box::new(subquery)),
+        }
+    }
+    pub fn new_rel_col(col_position: usize, col_ty: ir::Ty) -> ColExpr {
+        ColExpr {
+            kind: ColExprKind::InputRelCol(col_position),
+            ty: col_ty,
         }
     }
 }
