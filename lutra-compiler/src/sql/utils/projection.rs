@@ -1,5 +1,3 @@
-use std::iter::zip;
-
 use lutra_bin::ir;
 use sqlparser::ast as sql_ast;
 
@@ -13,7 +11,7 @@ impl<'a> Context<'a> {
         ty: &ir::Ty,
         values: impl IntoIterator<Item = sql_ast::Expr>,
     ) -> Vec<sql_ast::SelectItem> {
-        zip(values, self.rel_cols(ty, true))
+        itertools::zip_eq(values, self.rel_cols(ty, true))
             .map(|(expr, alias)| sql_ast::SelectItem::ExprWithAlias {
                 expr,
                 alias: sql_ast::Ident::new(alias),

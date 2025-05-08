@@ -2,6 +2,7 @@ use lutra_bin::ir;
 
 #[derive(Clone)]
 pub struct RelExpr {
+    pub id: usize,
     pub kind: RelExprKind,
     pub ty: ir::Ty,
 }
@@ -13,15 +14,15 @@ pub enum RelExprKind {
 
     /// Applies a relational transform.
     /// Introduces iterator over input relation for the scope of this transform.
-    Transform(Box<RelExpr>, usize, Transform),
+    Transform(Box<RelExpr>, Transform),
 
     Join(Box<RelExpr>, Box<RelExpr>),
 
-    /// Bind a common table expression to a name
-    Bind(String, Box<RelExpr>, Box<RelExpr>),
+    /// Bind a relation and evaluate an unrelated expression
+    Bind(Box<RelExpr>, Box<RelExpr>),
 
-    /// Bind two correlated relational expressions.
-    BindCorrelated(Box<RelExpr>, usize, Box<RelExpr>),
+    /// Bind a relation and evaluate an correlated expression
+    BindCorrelated(Box<RelExpr>, Box<RelExpr>),
 }
 
 #[derive(Debug, Clone)]
@@ -34,7 +35,7 @@ pub enum From {
     Table(String),
 
     /// Read from a CTE (in RelExpr representation)
-    Binding(String),
+    Binding(usize),
 
     /// Reference to an iterator of a scope.
     Iterator(usize),
@@ -98,6 +99,8 @@ pub enum ColExprKind {
 
 impl std::fmt::Debug for RelExpr {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.id.fmt(f)?;
+        f.write_str(": ")?;
         self.kind.fmt(f)
     }
 }
@@ -109,15 +112,22 @@ impl std::fmt::Debug for ColExpr {
 }
 
 impl RelExpr {
-    pub fn new_transform_preserve_ty(
-        input: RelExpr,
-        scope_id: usize,
-        transform: Transform,
-    ) -> Self {
+    pub fn new_transform_preserve_ty(input: RelExpr, transform: Transform, id: usize) -> Self {
         RelExpr {
             ty: input.ty.clone(),
-            kind: RelExprKind::Transform(Box::new(input), scope_id, transform),
+            id,
+            kind: RelExprKind::Transform(Box::new(input), transform),
         }
+    }
+}
+
+impl RelExprKind {
+    pub fn new_transform(
+        input: RelExpr,
+        get_transform: impl FnOnce(usize) -> Transform,
+    ) -> RelExprKind {
+        let transform = get_transform(input.id);
+        RelExprKind::Transform(Box::new(input), transform)
     }
 }
 

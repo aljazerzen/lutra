@@ -1,11 +1,13 @@
+use itertools::Itertools;
 use std::collections::HashMap;
 
-use super::utils::ExprOrSource;
-use super::COL_ARRAY_INDEX;
-use super::{cr, utils};
-use itertools::Itertools;
 use lutra_bin::ir;
 use sqlparser::ast as sql_ast;
+
+use crate::sql::utils::{ExprOrSource, ExprScoped, RelScoped};
+use crate::sql::{cr, utils};
+use crate::sql::{COL_ARRAY_INDEX, COL_VALUE};
+use crate::utils::NameGenerator;
 
 pub fn compile(rel: cr::RelExpr, types: HashMap<&ir::Path, &ir::Ty>) -> sql_ast::Query {
     let mut ctx = Context::new(types);
@@ -15,28 +17,33 @@ pub fn compile(rel: cr::RelExpr, types: HashMap<&ir::Path, &ir::Ty>) -> sql_ast:
 
     if rel_ty.kind.is_array() {
         // wrap into a top-level projection to remove array indexes
-        let mut query = ctx.query_wrap(utils::sub_rel(query, None), &rel_ty, false);
+        let mut query = ctx.scope_into_query_without_index(query, &rel_ty);
         query.order_by = Some(utils::order_by_one(utils::ident(
             None::<&str>,
             COL_ARRAY_INDEX,
         )));
         query
     } else {
-        query
+        match query.into_sub_rel() {
+            Ok(sub_rel) => sub_rel,
+            Err(query) => ctx.scope_into_query(query, &rel_ty),
+        }
     }
 }
 
 pub(super) struct Context<'a> {
     types: HashMap<&'a ir::Path, &'a ir::Ty>,
 
-    scope_stack: Vec<(usize, String, ir::Ty)>,
+    pub(super) rel_name_gen: NameGenerator,
+    pub(super) rvars: HashMap<usize, (String, ir::Ty)>,
 }
 
 impl<'a> Context<'a> {
     pub(super) fn new(types: HashMap<&'a ir::Path, &'a ir::Ty>) -> Self {
         Self {
             types,
-            scope_stack: Vec::new(),
+            rel_name_gen: NameGenerator::new("r"),
+            rvars: Default::default(),
         }
     }
 
@@ -47,37 +54,15 @@ impl<'a> Context<'a> {
         }
     }
 
-    fn find_scope_name(&self, scope_id: usize) -> &str {
-        (self.scope_stack.iter().rev())
-            .find(|(id, _, _)| *id == scope_id)
-            .map(|(_, name, _)| name)
-            .unwrap()
-    }
-
-    fn find_scope(&self, scope_id: usize) -> (&str, &ir::Ty) {
-        (self.scope_stack.iter().rev())
-            .find(|(id, _, _)| *id == scope_id)
-            .map(|(_, name, ty)| (name.as_str(), ty))
-            .unwrap()
-    }
-
-    fn inherit_scope_iterator(&mut self, input_name: &mut Option<String>) -> bool {
-        if self.scope_stack.len() < 2 {
-            return false;
+    fn find_rvar(&self, id: usize) -> &(String, ir::Ty) {
+        match self.rvars.get(&id) {
+            Some(x) => x,
+            None => panic!("cannot find scope id: {id}"),
         }
-        input_name.take();
-
-        let (_, prev_name, _) = self.scope_stack.get(self.scope_stack.len() - 2).unwrap();
-        let prev_name = prev_name.clone();
-
-        let (_, last_name, _) = self.scope_stack.last_mut().unwrap();
-        *last_name = prev_name;
-
-        true
     }
 
-    fn compile_re(&mut self, rel: cr::RelExpr) -> sql_ast::Query {
-        match rel.kind {
+    fn compile_re(&mut self, rel: cr::RelExpr) -> RelScoped {
+        let r = match rel.kind {
             cr::RelExprKind::From(cr::From::Construction(rows)) => {
                 self.compile_rel_constructed(rows, &rel.ty)
             }
@@ -102,221 +87,224 @@ impl<'a> Context<'a> {
 
                 select.projection = self.projection(&rel.ty, values);
 
-                utils::query_select(select)
+                RelScoped::new(utils::sub_rel(
+                    utils::query_select(select),
+                    Some(self.rel_name_gen.next()),
+                ))
             }
-            cr::RelExprKind::From(cr::From::Binding(name)) => {
-                let mut select = utils::select_empty();
 
-                select
-                    .from
-                    .push(utils::from(utils::new_table(vec![name], None)));
-                select.projection = self.projection_noop(None, &rel.ty, true);
-                utils::query_select(select)
+            cr::RelExprKind::From(cr::From::Iterator(scope_id)) => {
+                let (rel_name, _) = self.find_rvar(scope_id);
+
+                RelScoped {
+                    rel_name: rel_name.clone(),
+                    rel_vars: Vec::new(),
+                }
             }
+
             cr::RelExprKind::Join(left, right) => {
-                let mut select = utils::select_empty();
-
                 let left_ty = left.ty.clone();
                 let left = self.compile_re(*left);
-
-                select
-                    .from
-                    .push(utils::from(utils::sub_rel(left, Some("l".into()))));
+                let left_name = left.get_name().to_string();
 
                 let right_ty = right.ty.clone();
                 let right = self.compile_re(*right);
-                select
-                    .from
-                    .push(utils::from(utils::sub_rel(right, Some("r".into()))));
+                let right_name = right.get_name().to_string();
+
+                let mut scope = left;
+                scope.extend(right);
+
+                let mut scope = self.wrap_scoped_rel(scope, &rel.ty);
+                let select = self.rel_as_mut_select(&mut scope, &rel.ty);
+                select.projection.clear();
 
                 select.projection.extend(
                     self.projection(
                         &rel.ty,
                         Iterator::chain(
                             self.rel_cols(&left_ty, true)
-                                .map(|col| utils::ident(Some("l"), col)),
+                                .map(|col| utils::ident(Some(&left_name), col)),
                             self.rel_cols(&right_ty, true)
-                                .map(|col| utils::ident(Some("r"), col)),
+                                .map(|col| utils::ident(Some(&right_name), col)),
                         ),
                     ),
                 );
 
-                utils::query_select(select)
-            }
-            cr::RelExprKind::From(cr::From::Iterator(scope_id)) => {
-                let mut select = utils::select_empty();
-                let rel_name = self.find_scope_name(scope_id).to_string();
-                select.projection = self.projection_noop(Some(&rel_name), &rel.ty, true);
-                utils::query_select(select)
+                scope
             }
 
-            cr::RelExprKind::Transform(input, scope_id, transform) => {
-                self.compile_rel_transform(*input, scope_id, transform, rel.ty)
+            cr::RelExprKind::BindCorrelated(bound, main) => {
+                let mut scope = self.compile_re(*bound);
+                scope.extend_lateral(self.compile_re(*main));
+
+                scope
             }
 
-            cr::RelExprKind::Bind(name, val, main) => {
+            cr::RelExprKind::Transform(input, transform) => {
+                self.compile_rel_transform(*input, transform, &rel.ty)
+            }
+
+            cr::RelExprKind::Bind(val, main) => {
+                let name = format!("t{}", val.id);
+
+                let val_ty = val.ty.clone();
                 let val = self.compile_re(*val);
+                let val = self.scope_into_query(val, &val_ty);
 
-                let mut main = self.compile_re(*main);
+                let main_ty = main.ty.clone();
+                let main = self.compile_re(*main);
+                let mut main = self.scope_into_query(main, &main_ty);
 
-                if main.with.is_none() {
-                    main.with = Some(utils::with());
-                }
+                main.with = Some(utils::with());
                 let ctes = &mut main.with.as_mut().unwrap().cte_tables;
                 ctes.insert(0, utils::cte(name, val));
 
-                main
+                RelScoped::new(utils::sub_rel(main, Some(self.rel_name_gen.next())))
             }
-        }
+            cr::RelExprKind::From(cr::From::Binding(id)) => {
+                let name = format!("t{}", id);
+
+                RelScoped::new(utils::new_table(vec![name], Some(self.rel_name_gen.next())))
+            }
+        };
+        let r_name = r.get_name().to_string();
+        self.rvars.insert(rel.id, (r_name, rel.ty.clone()));
+        r
     }
 
     fn compile_rel_transform(
         &mut self,
         input: cr::RelExpr,
-        scope_id: usize,
         transform: cr::Transform,
-        ty: ir::Ty,
-    ) -> sql_ast::Query {
+        ty: &ir::Ty,
+    ) -> RelScoped {
         let input_ty = input.ty.clone();
-        let mut query = self.compile_re(input);
+        let mut scope = self.compile_re(input);
 
-        let input_name = format!("r{scope_id}");
-        self.scope_stack
-            .push((scope_id, input_name.clone(), input_ty.clone()));
-        let mut input_name = Some(input_name);
-
-        let r = match transform {
+        match transform {
             cr::Transform::Project(columns) => {
-                let mut select = utils::select_empty();
+                scope = self.wrap_scoped_rel(scope, &input_ty);
 
-                select
-                    .from
-                    .push(utils::from(utils::sub_rel(query, input_name.take())));
+                let select = self.rel_as_mut_select(&mut scope, &input_ty);
 
                 let column_exprs = self.compile_columns(columns);
-                select.projection = self.projection(&ty, column_exprs);
+                select.projection = self.projection(ty, column_exprs);
 
-                utils::query_select(select)
+                // scope.rel_vars.extend(rels);
             }
             cr::Transform::ProjectRetain(cols) => {
-                input_name.take();
-
-                if query.order_by.is_some() {
-                    query = self.query_wrap(utils::sub_rel(query, None), &input_ty, true);
+                let must_wrap = scope.as_sub_rel().is_none_or(|q| q.order_by.is_some());
+                if must_wrap {
+                    scope = self.wrap_scoped_rel(scope, &input_ty);
                 }
-                let select = self.query_as_mut_select(&mut query, &input_ty);
+
+                let select = self.rel_as_mut_select(&mut scope, &input_ty);
 
                 utils::retain_by_position(&mut select.projection, cols);
 
-                query
+                // apply new column names
+                let old_values = select.projection.drain(..).map(utils::unwrap_select_item);
+                select.projection = self.projection(ty, old_values);
             }
 
             cr::Transform::ProjectDiscard(cols) => {
-                input_name.take();
-
-                if query.order_by.is_some() {
-                    query = self.query_wrap(utils::sub_rel(query, None), &input_ty, true);
+                let must_wrap = scope.as_sub_rel().is_none_or(|q| q.order_by.is_some());
+                if must_wrap {
+                    scope = self.wrap_scoped_rel(scope, &input_ty);
                 }
-                let select = self.query_as_mut_select(&mut query, &input_ty);
+
+                let select = self.rel_as_mut_select(&mut scope, &input_ty);
 
                 utils::drop_by_position(&mut select.projection, cols);
-                query
+
+                // apply new column names
+                let old_values = select.projection.drain(..).map(utils::unwrap_select_item);
+                select.projection = self.projection(ty, old_values);
             }
 
             cr::Transform::Aggregate(columns) => {
-                let mut select = utils::select_empty();
+                scope = self.wrap_scoped_rel(scope, &input_ty);
 
-                select
-                    .from
-                    .push(utils::from(utils::sub_rel(query, input_name.take())));
+                let select = self.rel_as_mut_select(&mut scope, &input_ty);
 
-                let column_exprs = self.compile_columns(columns);
-                select.projection = self.projection(&ty, column_exprs);
+                let (column_exprs, rels) = self.compile_columns_scoped(columns);
+                select.projection = self.projection(ty, column_exprs);
 
-                utils::query_select(select)
+                scope.rel_vars.extend(rels);
             }
             cr::Transform::Where(cond) => {
-                let mut query =
-                    self.query_wrap(utils::sub_rel(query, input_name.take()), &ty, true);
+                scope = self.wrap_scoped_rel(scope, &input_ty);
 
-                let select = self.query_as_mut_select(&mut query, &ty);
-                select.selection = Some(self.compile_expr(cond).into_expr());
+                let select = self.rel_as_mut_select(&mut scope, &input_ty);
 
-                query
+                let cond = self.compile_expr(cond);
+                select.selection = Some(cond.expr.into_expr());
+
+                scope.rel_vars.extend(cond.rel_vars);
             }
             cr::Transform::Limit(limit) => {
-                if query.limit.is_some()
-                    || query.offset.is_some()
-                    || !self.inherit_scope_iterator(&mut input_name)
-                {
-                    query = self.query_wrap(utils::sub_rel(query, input_name.take()), &ty, true);
+                let must_wrap = scope
+                    .as_sub_rel()
+                    .is_none_or(|q| q.limit.is_some() || q.offset.is_some());
+                if must_wrap {
+                    scope = self.wrap_scoped_rel(scope, &input_ty);
                 }
 
-                query.limit = Some(self.compile_expr(limit).into_expr());
+                let query = scope.as_mut_sub_rel().unwrap();
+                let limit = self.compile_expr(limit);
+                query.limit = Some(limit.expr.into_expr());
                 if query.order_by.is_none() {
                     query.order_by = Some(utils::order_by_one(utils::ident(
-                        Some(self.find_scope_name(scope_id)),
+                        None::<&str>,
                         COL_ARRAY_INDEX,
                     )));
                 }
-                query
+
+                scope.rel_vars.extend(limit.rel_vars);
             }
             cr::Transform::Offset(offset) => {
-                if query.limit.is_some()
-                    || query.offset.is_some()
-                    || !self.inherit_scope_iterator(&mut input_name)
-                {
-                    query = self.query_wrap(utils::sub_rel(query, input_name.take()), &ty, true);
+                let must_wrap = scope
+                    .as_sub_rel()
+                    .is_none_or(|q| q.limit.is_some() || q.offset.is_some());
+                if must_wrap {
+                    scope = self.wrap_scoped_rel(scope, &input_ty);
                 }
 
+                let query = scope.as_mut_sub_rel().unwrap();
+                let offset = self.compile_expr(offset);
                 query.offset = Some(sql_ast::Offset {
-                    value: self.compile_expr(offset).into_expr(),
+                    value: offset.expr.into_expr(),
                     rows: sql_ast::OffsetRows::None,
                 });
                 if query.order_by.is_none() {
                     query.order_by = Some(utils::order_by_one(utils::ident(
-                        Some(self.find_scope_name(scope_id)),
+                        None::<&str>,
                         COL_ARRAY_INDEX,
                     )));
                 }
 
-                query
+                scope.rel_vars.extend(offset.rel_vars);
             }
             cr::Transform::OrderBy(key) => {
                 // wrap into a new query
-                let mut select = utils::select_empty();
-
-                select
-                    .from
-                    .push(utils::from(utils::sub_rel(query, input_name.take())));
-                select.projection = self.projection_noop(None, &ty, true);
+                scope = self.wrap_scoped_rel(scope, &input_ty);
 
                 // overwrite array index
+                let select = self.rel_as_mut_select(&mut scope, &input_ty);
+                let key = self.compile_expr(key);
                 select.projection[0] = sql_ast::SelectItem::ExprWithAlias {
-                    expr: self.compile_expr(key).into_expr(),
+                    expr: key.expr.into_expr(),
                     alias: sql_ast::Ident::new(COL_ARRAY_INDEX),
                 };
 
-                utils::query_select(select)
+                scope.rel_vars.extend(key.rel_vars);
             }
-            cr::Transform::JsonUnpack(col) => {
-                self.compile_json_unpack(query, input_name.take().unwrap(), *col)
-            }
-        };
-        self.scope_stack.pop();
-
-        // assert we have either used the name of the transform input
-        // or overwritten it with previous input
-        assert!(input_name.is_none(), "input {input_name:?} not used");
-
-        r
+            cr::Transform::JsonUnpack(col) => scope = self.compile_json_unpack(scope, *col),
+        }
+        scope
     }
 
-    fn compile_rel_constructed(
-        &mut self,
-        rows: Vec<Vec<cr::ColExpr>>,
-        ty: &ir::Ty,
-    ) -> sql_ast::Query {
+    fn compile_rel_constructed(&mut self, rows: Vec<Vec<cr::ColExpr>>, ty: &ir::Ty) -> RelScoped {
         let mut res = None;
         let mut rows = rows.into_iter();
 
@@ -344,7 +332,7 @@ impl<'a> Context<'a> {
             ))
         }
 
-        utils::query_new(res.unwrap_or_else(|| {
+        let query = utils::query_new(res.unwrap_or_else(|| {
             // construct a rel without rows
             let mut values = Vec::new();
 
@@ -370,42 +358,75 @@ impl<'a> Context<'a> {
             select.projection = self.projection(ty, values);
             select.selection = Some(utils::bool(false));
             sql_ast::SetExpr::Select(Box::new(select))
-        }))
+        }));
+
+        let name = self.rel_name_gen.next();
+        let rel = utils::sub_rel(query, Some(name.clone()));
+        RelScoped::new(rel)
+    }
+
+    fn compile_columns_scoped(
+        &mut self,
+        columns: Vec<cr::ColExpr>,
+    ) -> (Vec<sql_ast::Expr>, Vec<sql_ast::TableFactor>) {
+        let mut column_exprs = Vec::with_capacity(columns.len());
+        let mut rels = Vec::new();
+        for col in columns {
+            let expr = self.compile_expr(col);
+            column_exprs.push(expr.expr.into_expr());
+            rels.extend(expr.rel_vars);
+        }
+        (column_exprs, rels)
     }
 
     fn compile_columns(&mut self, columns: Vec<cr::ColExpr>) -> Vec<sql_ast::Expr> {
         let mut column_exprs = Vec::with_capacity(columns.len());
         for col in columns {
-            column_exprs.push(self.compile_expr(col).into_expr());
+            column_exprs.push(self.compile_expr(col).into_subquery());
         }
         column_exprs
     }
 
-    fn compile_expr(&mut self, expr: cr::ColExpr) -> ExprOrSource {
-        match expr.kind {
+    fn compile_expr(&mut self, expr: cr::ColExpr) -> ExprScoped {
+        ExprScoped::new(match expr.kind {
             cr::ColExprKind::Null => ExprOrSource::Expr(self.null(&expr.ty)),
             cr::ColExprKind::Literal(literal) => self.compile_literal(literal, &expr.ty),
             cr::ColExprKind::FuncCall(func_name, args) => {
-                let args: Vec<_> = args.into_iter().map(|x| self.compile_expr(x)).collect();
-                self.compile_func_call(&func_name, expr.ty, args)
+                let mut rels = Vec::new();
+                let args: Vec<_> = args
+                    .into_iter()
+                    .map(|e| {
+                        let expr = self.compile_expr(e);
+                        rels.extend(expr.rel_vars);
+                        expr.expr
+                    })
+                    .collect();
+                let mut expr = ExprScoped::new(self.compile_func_call(&func_name, expr.ty, args));
+                expr.rel_vars.extend(rels);
+                return expr;
             }
             cr::ColExprKind::InputRelCol(scope_id, col_position) => {
-                let (scope_name, scope_ty) = self.find_scope(scope_id);
+                let (scope_name, scope_ty) = self.find_rvar(scope_id);
                 let col = self.rel_cols(scope_ty, true).nth(col_position).unwrap();
                 ExprOrSource::Expr(utils::ident(Some(scope_name), col))
             }
             cr::ColExprKind::Subquery(input) => {
                 // compile subquery
-                let query = self.compile_re(*input);
-                let mut query = ExprOrSource::Expr(sql_ast::Expr::Subquery(Box::new(query)));
+                let scope = self.compile_re(*input);
 
                 // pack to JSON if needed
                 if expr.ty.kind.is_array() {
-                    let json_pack = self.compile_json_pack("jp", &expr.ty);
-                    query = ExprOrSource::Source(format!("(SELECT {json_pack} FROM {query} jp)"));
+                    let mut scoped =
+                        ExprScoped::new(self.compile_json_pack(&scope.rel_name, &expr.ty));
+                    scoped.requires(scope);
+                    return scoped;
+                } else if scope.rel_vars.is_empty() {
+                    let col = self.rel_cols(&expr.ty, true).next().unwrap();
+                    ExprOrSource::Expr(utils::ident(Some(scope.rel_name), col))
+                } else {
+                    let query = self.scope_into_query(scope, &expr.ty);
+                    ExprOrSource::Expr(sql_ast::Expr::Subquery(Box::new(query)))
                 }
-
-                query
             }
 
             cr::ColExprKind::Param(param_index) => ExprOrSource::Source(format!(
@@ -413,7 +434,7 @@ impl<'a> Context<'a> {
                 param_index + 1,
                 self.compile_ty_name(&expr.ty)
             )),
-        }
+        })
     }
 
     fn compile_json_pack(&mut self, input: &str, ty: &ir::Ty) -> ExprOrSource {
@@ -421,12 +442,12 @@ impl<'a> Context<'a> {
 
         match &self.get_ty_mat(ty).kind {
             ir::TyKind::Array(ty_item) => {
-                let index = format!("{input}.index");
+                let index = format!("{input}.{COL_ARRAY_INDEX}");
 
                 match &self.get_ty_mat(ty_item).kind {
-                    ir::TyKind::Primitive(_) => {
-                        ExprOrSource::Source(format!("json_agg({input}.value ORDER BY {index})",))
-                    }
+                    ir::TyKind::Primitive(_) => ExprOrSource::Source(format!(
+                        "json_agg({input}.{COL_VALUE} ORDER BY {index})",
+                    )),
                     ir::TyKind::Tuple(_) => {
                         let fields = cols.map(|c| format!("{input}.{c}")).join(", ");
                         ExprOrSource::Source(format!(
@@ -446,12 +467,7 @@ impl<'a> Context<'a> {
         }
     }
 
-    fn compile_json_unpack(
-        &mut self,
-        input: sql_ast::Query,
-        input_name: String,
-        col: cr::ColExpr,
-    ) -> sql_ast::Query {
+    fn compile_json_unpack(&mut self, mut scope: RelScoped, col: cr::ColExpr) -> RelScoped {
         let col_ty = col.ty.clone();
 
         match &self.get_ty_mat(&col_ty).kind {
@@ -459,27 +475,15 @@ impl<'a> Context<'a> {
                 let mut query = utils::select_empty();
 
                 /*
-                FROM json_array_elements((SELECT ...col... FROM (...input...)) j
+                FROM json_array_elements(...col...) j
                 SELECT ROW_NUMBER(), j.value
                 */
 
-                let subquery = {
-                    let mut subquery = utils::select_empty();
-                    subquery
-                        .from
-                        .push(utils::from(utils::sub_rel(input, Some(input_name))));
-
-                    let col_expr = self.compile_expr(col);
-                    subquery
-                        .projection
-                        .push(sql_ast::SelectItem::UnnamedExpr(col_expr.into_expr()));
-
-                    utils::query_select(subquery)
-                };
+                let col = scope.put_expr(self.compile_expr(col));
 
                 query.from.push(utils::from(utils::lateral(utils::rel_func(
                     sql_ast::Ident::new("json_array_elements"),
-                    vec![sql_ast::Expr::Subquery(Box::new(subquery))],
+                    vec![col.into_expr()],
                     Some("j".into()),
                 ))));
 
@@ -495,39 +499,41 @@ impl<'a> Context<'a> {
                             "j.value::text::{}",
                             self.compile_ty_name(item_ty)
                         ));
-                        query
-                            .projection
-                            .push(sql_ast::SelectItem::UnnamedExpr(value.into_expr()));
+                        query.projection.push(sql_ast::SelectItem::ExprWithAlias {
+                            expr: value.into_expr(),
+                            alias: sql_ast::Ident::new(COL_VALUE),
+                        });
                     }
                     ir::TyKind::Array(_) => {
-                        query
-                            .projection
-                            .push(sql_ast::SelectItem::UnnamedExpr(utils::ident(
-                                None::<&str>,
-                                "j.value",
-                            )));
+                        query.projection.push(sql_ast::SelectItem::ExprWithAlias {
+                            expr: utils::ident(None::<&str>, "j.value"),
+                            alias: sql_ast::Ident::new(COL_VALUE),
+                        });
                     }
                     ir::TyKind::Tuple(fields) => {
-                        for (index, field) in fields.iter().enumerate() {
+                        for (position, field) in fields.iter().enumerate() {
                             let value = ExprOrSource::Source(format!(
-                                "(j.value->{index})::text::{}",
+                                "(j.value->{position})::text::{}",
                                 self.compile_ty_name(&field.ty)
                             ))
                             .into_expr();
                             query.projection.push(sql_ast::SelectItem::ExprWithAlias {
                                 expr: value,
-                                alias: sql_ast::Ident::new(format!("_{index}")),
+                                alias: sql_ast::Ident::new(format!("_{position}")),
                             });
                         }
                     }
 
                     _ => todo!(),
                 }
-                utils::query_select(query)
+                let factor =
+                    utils::sub_rel(utils::query_select(query), Some(self.rel_name_gen.next()));
+                scope.push(utils::lateral(factor));
             }
             ir::TyKind::Tuple(_) => todo!(),
             _ => unreachable!("{:?}", col_ty),
         }
+        scope
     }
 
     fn compile_func_call(

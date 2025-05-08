@@ -109,7 +109,7 @@ fn array_prim() {
         func () -> [3, 6, 12]
     "#), @r#"
     SELECT
-      value
+      r0.value
     FROM
       (
         SELECT
@@ -125,7 +125,7 @@ fn array_prim() {
         SELECT
           2::int8,
           12::int8
-      )
+      ) AS r0
     ORDER BY
       index
     ---
@@ -173,9 +173,9 @@ fn tuple_array_prim() {
       (
         SELECT
           json_agg(
-            jp.value
+            r0.value
             ORDER BY
-              jp.index
+              r0.index
           )
         FROM
           (
@@ -192,7 +192,7 @@ fn tuple_array_prim() {
             SELECT
               2::int8,
               3::int8
-          ) jp
+          ) AS r0
       ) AS _1,
       FALSE AS _2
     ---
@@ -214,7 +214,7 @@ fn array_array_prim() {
         func () -> [[1, 2, 3], [4, 5]]
     "#), @r#"
     SELECT
-      value
+      r2.value
     FROM
       (
         SELECT
@@ -222,9 +222,9 @@ fn array_array_prim() {
           (
             SELECT
               json_agg(
-                jp.value
+                r0.value
                 ORDER BY
-                  jp.index
+                  r0.index
               )
             FROM
               (
@@ -241,7 +241,7 @@ fn array_array_prim() {
                 SELECT
                   2::int8,
                   3::int8
-              ) jp
+              ) AS r0
           ) AS value
         UNION
         ALL
@@ -250,9 +250,9 @@ fn array_array_prim() {
           (
             SELECT
               json_agg(
-                jp.value
+                r1.value
                 ORDER BY
-                  jp.index
+                  r1.index
               )
             FROM
               (
@@ -264,9 +264,9 @@ fn array_array_prim() {
                 SELECT
                   1::int8,
                   5::int8
-              ) jp
+              ) AS r1
           )
-      )
+      ) AS r2
     ORDER BY
       index
     ---
@@ -290,8 +290,8 @@ fn array_tuple_prim() {
         func () -> [{3, false}, {6, true}, {12, false}]
     "#), @r#"
     SELECT
-      _0,
-      _1
+      r0._0,
+      r0._1
     FROM
       (
         SELECT
@@ -310,7 +310,7 @@ fn array_tuple_prim() {
           2::int8,
           12::int8,
           FALSE
-      )
+      ) AS r0
     ORDER BY
       index
     ---
@@ -344,9 +344,9 @@ fn tuple_array_tuple_prim() {
       (
         SELECT
           json_agg(
-            jsonb_build_array(jp._0, jp._1)
+            jsonb_build_array(r0._0, r0._1)
             ORDER BY
-              jp.index
+              r0.index
           )
         FROM
           (
@@ -366,7 +366,7 @@ fn tuple_array_tuple_prim() {
               2::int8,
               12::int8,
               FALSE
-          ) jp
+          ) AS r0
       ) AS _1
     ---
     {

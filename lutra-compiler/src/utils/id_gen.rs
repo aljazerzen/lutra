@@ -34,12 +34,14 @@ impl<T: From<usize>> Default for IdGenerator<T> {
 }
 
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 pub struct NameGenerator {
     id_generator: IdGenerator,
     prefix: &'static str,
 }
 
 impl NameGenerator {
+    #[allow(dead_code)]
     pub fn new(prefix: &'static str) -> Self {
         Self {
             id_generator: IdGenerator::new(),
@@ -47,7 +49,11 @@ impl NameGenerator {
         }
     }
 
+    #[allow(dead_code)]
     pub fn next(&mut self) -> String {
+        // if self.prefix == "r" && self.id_generator.next_id == 3 {
+        // panic!();
+        // }
         format!("{}{}", self.prefix, self.id_generator.gen())
     }
 }

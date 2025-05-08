@@ -6,6 +6,37 @@ use sqlparser::ast::helpers::attached_token::AttachedToken;
 
 use crate::sql::queries::Context;
 
+#[track_caller]
+pub fn get_rel_alias(rel: &sqlparser::ast::TableFactor) -> &str {
+    match rel {
+        sql_ast::TableFactor::Table { alias, .. } => &alias.as_ref().unwrap().name.value,
+        sql_ast::TableFactor::Derived { alias, .. } => &alias.as_ref().unwrap().name.value,
+        sql_ast::TableFactor::TableFunction { alias, .. } => &alias.as_ref().unwrap().name.value,
+        sql_ast::TableFactor::Function { alias, .. } => &alias.as_ref().unwrap().name.value,
+        sql_ast::TableFactor::UNNEST { alias, .. } => &alias.as_ref().unwrap().name.value,
+        sql_ast::TableFactor::JsonTable { alias, .. } => &alias.as_ref().unwrap().name.value,
+        sql_ast::TableFactor::OpenJsonTable { alias, .. } => &alias.as_ref().unwrap().name.value,
+        sql_ast::TableFactor::NestedJoin { alias, .. } => &alias.as_ref().unwrap().name.value,
+        sql_ast::TableFactor::Pivot { alias, .. } => &alias.as_ref().unwrap().name.value,
+        sql_ast::TableFactor::Unpivot { alias, .. } => &alias.as_ref().unwrap().name.value,
+        sql_ast::TableFactor::MatchRecognize { alias, .. } => &alias.as_ref().unwrap().name.value,
+    }
+}
+
+pub fn as_sub_rel(rel: &sqlparser::ast::TableFactor) -> Option<&sql_ast::Query> {
+    match rel {
+        sql_ast::TableFactor::Derived { subquery, .. } => Some(subquery),
+        _ => None,
+    }
+}
+
+pub fn as_mut_sub_rel(rel: &mut sqlparser::ast::TableFactor) -> Option<&mut sql_ast::Query> {
+    match rel {
+        sql_ast::TableFactor::Derived { subquery, .. } => Some(subquery),
+        _ => None,
+    }
+}
+
 pub fn new_table(name: Vec<String>, alias: Option<String>) -> sql_ast::TableFactor {
     sql_ast::TableFactor::Table {
         name: sql_ast::ObjectName(name.into_iter().map(sql_ast::Ident::new).collect()),
@@ -34,8 +65,8 @@ pub fn sub_rel(query: sql_ast::Query, alias: Option<String>) -> sql_ast::TableFa
     }
 }
 
-pub fn lateral(factor: sql_ast::TableFactor) -> sql_ast::TableFactor {
-    match factor {
+pub fn lateral(relation: sql_ast::TableFactor) -> sql_ast::TableFactor {
+    match relation {
         sql_ast::TableFactor::Derived {
             lateral: _,
             subquery,
@@ -143,14 +174,15 @@ pub fn query_select(select: sql_ast::Select) -> sql_ast::Query {
 
 impl<'a> Context<'a> {
     pub fn query_wrap(
-        &mut self,
-        inner: sql_ast::TableFactor,
+        &self,
+        rel: sql_ast::TableFactor,
         rel_ty: &ir::Ty,
         include_index: bool,
     ) -> sql_ast::Query {
         let mut select = select_empty();
-        select.from.push(from(inner));
-        select.projection = self.projection_noop(None, rel_ty, include_index);
+        let rel_name = get_rel_alias(&rel);
+        select.projection = self.projection_noop(Some(rel_name), rel_ty, include_index);
+        select.from.push(from(rel));
 
         query_select(select)
     }
@@ -182,7 +214,8 @@ impl<'a> Context<'a> {
             let original = std::mem::replace(query, dummy);
 
             // wrap it into a select
-            let wrapped = self.query_wrap(sub_rel(original, None), rel_ty, true);
+            let rel = sub_rel(original, Some(self.rel_name_gen.next()));
+            let wrapped = self.query_wrap(rel, rel_ty, true);
 
             // place it back
             let _dummy = std::mem::replace(query, wrapped);
@@ -192,6 +225,16 @@ impl<'a> Context<'a> {
             unreachable!()
         };
         select.as_mut()
+    }
+}
+
+#[track_caller]
+pub fn unwrap_select_item(item: sql_ast::SelectItem) -> sql_ast::Expr {
+    match item {
+        sql_ast::SelectItem::UnnamedExpr(e) => e,
+        sql_ast::SelectItem::ExprWithAlias { expr, .. } => expr,
+        sql_ast::SelectItem::QualifiedWildcard(_, _) => panic!(),
+        sql_ast::SelectItem::Wildcard(_) => panic!(),
     }
 }
 

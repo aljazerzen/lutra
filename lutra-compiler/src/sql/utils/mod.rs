@@ -3,9 +3,11 @@
 mod ast;
 mod expr_or_source;
 mod projection;
+mod scoped;
 
 pub use ast::*;
 pub use expr_or_source::*;
+pub use scoped::*;
 
 pub fn retain_by_position<T>(vec: &mut Vec<T>, mut to_keep: Vec<usize>) {
     to_keep.sort();
