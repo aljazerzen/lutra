@@ -173,9 +173,9 @@ fn tuple_array_prim() {
       (
         SELECT
           json_agg(
-            value
+            jp.value
             ORDER BY
-              index
+              jp.index
           )
         FROM
           (
@@ -192,7 +192,7 @@ fn tuple_array_prim() {
             SELECT
               2::int8,
               3::int8
-          )
+          ) jp
       ) AS _1,
       FALSE AS _2
     ---
@@ -222,9 +222,9 @@ fn array_array_prim() {
           (
             SELECT
               json_agg(
-                value
+                jp.value
                 ORDER BY
-                  index
+                  jp.index
               )
             FROM
               (
@@ -241,7 +241,7 @@ fn array_array_prim() {
                 SELECT
                   2::int8,
                   3::int8
-              )
+              ) jp
           ) AS value
         UNION
         ALL
@@ -250,9 +250,9 @@ fn array_array_prim() {
           (
             SELECT
               json_agg(
-                value
+                jp.value
                 ORDER BY
-                  index
+                  jp.index
               )
             FROM
               (
@@ -264,7 +264,7 @@ fn array_array_prim() {
                 SELECT
                   1::int8,
                   5::int8
-              )
+              ) jp
           )
       )
     ORDER BY
@@ -344,35 +344,29 @@ fn tuple_array_tuple_prim() {
       (
         SELECT
           json_agg(
-            value
+            jsonb_build_array(jp._0, jp._1)
             ORDER BY
-              index
+              jp.index
           )
         FROM
           (
             SELECT
-              index,
-              jsonb_build_array(_0, _1) as value
-            FROM
-              (
-                SELECT
-                  0::int8 AS index,
-                  3::int8 AS _0,
-                  FALSE AS _1
-                UNION
-                ALL
-                SELECT
-                  1::int8,
-                  6::int8,
-                  TRUE
-                UNION
-                ALL
-                SELECT
-                  2::int8,
-                  12::int8,
-                  FALSE
-              )
-          )
+              0::int8 AS index,
+              3::int8 AS _0,
+              FALSE AS _1
+            UNION
+            ALL
+            SELECT
+              1::int8,
+              6::int8,
+              TRUE
+            UNION
+            ALL
+            SELECT
+              2::int8,
+              12::int8,
+              FALSE
+          ) jp
       ) AS _1
     ---
     {

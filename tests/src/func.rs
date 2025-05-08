@@ -511,8 +511,7 @@ test_case!(
     1,
     2,
   ],
-}"#,
-    skip_postgres
+}"#
 );
 
 test_case!(
@@ -529,8 +528,7 @@ test_case!(
     "one",
     "two",
   ],
-}"#,
-    skip_postgres
+}"#
 );
 
 test_case!(

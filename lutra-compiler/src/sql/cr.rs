@@ -19,6 +19,9 @@ pub enum RelExprKind {
 
     /// Bind a common table expression to a name
     Bind(String, Box<RelExpr>, Box<RelExpr>),
+
+    /// Bind two correlated relational expressions.
+    BindCorrelated(Box<RelExpr>, usize, Box<RelExpr>),
 }
 
 #[derive(Debug, Clone)]

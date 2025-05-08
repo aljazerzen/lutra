@@ -518,6 +518,83 @@ impl<'a> Context<'a> {
                 )
             }
 
+            "std::to_columnar" => {
+                let array = self.compile_rel(&call.args[0]);
+                let array_alias = self.cte_alias_gen.next();
+
+                let ty_in_item = array.ty.kind.as_array().unwrap().clone();
+                let ty_in_fields = ty_in_item.kind.as_tuple().unwrap();
+
+                let ty_out_fields = expr.ty.kind.as_tuple().unwrap();
+
+                let field0 = cr::ColExpr::new_subquery(cr::RelExpr {
+                    kind: self.new_transform(
+                        cr::RelExpr {
+                            kind: cr::RelExprKind::From(cr::From::Binding(
+                                array_alias.clone(),
+                            )),
+                            ty: array.ty.clone(),
+                        },
+                        |scope_id| {
+                            cr::Transform::Project(vec![
+                                // index
+                                cr::ColExpr::new_rel_col(
+                                    scope_id,
+                                    0,
+                                    ir::Ty::new(ir::TyPrimitive::int64),
+                                ),
+                                // first tuple field
+                                cr::ColExpr::new_rel_col(
+                                    scope_id,
+                                    1,
+                                    ty_in_fields[0].ty.clone(),
+                                ),
+                            ])
+                        },
+                    ),
+                    ty: ty_out_fields[0].ty.clone(),
+                });
+                let field1 = cr::ColExpr::new_subquery(cr::RelExpr {
+                    kind: self.new_transform(
+                        cr::RelExpr {
+                            kind: cr::RelExprKind::From(cr::From::Binding(
+                                array_alias.clone(),
+                            )),
+                            ty: array.ty.clone(),
+                        },
+                        |scope_id| {
+                            cr::Transform::Project(vec![
+                                // index
+                                cr::ColExpr::new_rel_col(
+                                    scope_id,
+                                    0,
+                                    ir::Ty::new(ir::TyPrimitive::int64),
+                                ),
+                                // second tuple field
+                                cr::ColExpr::new_rel_col(
+                                    scope_id,
+                                    2,
+                                    ty_in_fields[1].ty.clone(),
+                                ),
+                            ])
+                        },
+                    ),
+                    ty: ty_out_fields[1].ty.clone(),
+                });
+
+                cr::RelExprKind::Bind(
+                    array_alias.clone(),
+                    Box::new(array),
+                    Box::new(cr::RelExpr {
+                        kind: cr::RelExprKind::From(cr::From::Construction(vec![vec![
+                            field0,
+                            field1,
+                        ]])),
+                        ty: expr.ty.clone(),
+                    }),
+                )
+            }
+
             _ => {
                 let expr = self.compile_expr_std(expr);
                 cr::RelExprKind::From(cr::From::Construction(vec![vec![expr]]))

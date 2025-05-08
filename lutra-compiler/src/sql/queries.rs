@@ -3,6 +3,7 @@ use std::collections::HashMap;
 use super::utils::ExprOrSource;
 use super::COL_ARRAY_INDEX;
 use super::{cr, utils};
+use itertools::Itertools;
 use lutra_bin::ir;
 use sqlparser::ast as sql_ast;
 
@@ -229,12 +230,8 @@ impl<'a> Context<'a> {
                     .from
                     .push(utils::from(utils::sub_rel(query, input_name.take())));
 
-                let columns: Vec<_> = columns
-                    .into_iter()
-                    .map(|x| self.compile_expr(x))
-                    .map(|e| e.into_expr())
-                    .collect();
-                select.projection = self.projection(&ty, columns);
+                let column_exprs = self.compile_columns(columns);
+                select.projection = self.projection(&ty, column_exprs);
 
                 utils::query_select(select)
             }
@@ -404,7 +401,8 @@ impl<'a> Context<'a> {
 
                 // pack to JSON if needed
                 if expr.ty.kind.is_array() {
-                    query = self.compile_json_pack(query, &expr.ty);
+                    let json_pack = self.compile_json_pack("jp", &expr.ty);
+                    query = ExprOrSource::Source(format!("(SELECT {json_pack} FROM {query} jp)"));
                 }
 
                 query
@@ -418,34 +416,31 @@ impl<'a> Context<'a> {
         }
     }
 
-    fn compile_json_pack(&mut self, subquery: ExprOrSource, ty: &ir::Ty) -> ExprOrSource {
+    fn compile_json_pack(&mut self, input: &str, ty: &ir::Ty) -> ExprOrSource {
+        let cols = self.rel_cols(ty, false);
+
         match &self.get_ty_mat(ty).kind {
-            ir::TyKind::Array(ty_item) => match &self.get_ty_mat(ty_item).kind {
-                ir::TyKind::Primitive(_) => ExprOrSource::Source(format!(
-                    "(SELECT json_agg(value ORDER BY index) FROM {subquery})",
-                )),
-                ir::TyKind::Tuple(_) => {
-                    let fields: Vec<_> = self.rel_cols(ty, false).collect();
-                    let fields = fields.join(", ");
+            ir::TyKind::Array(ty_item) => {
+                let index = format!("{input}.index");
 
-                    let objects = format!(
-                        "SELECT index, jsonb_build_array({fields}) as value FROM {subquery}",
-                    );
-
-                    ExprOrSource::Source(format!(
-                        "(SELECT json_agg(value ORDER BY index) FROM ({objects}))"
-                    ))
+                match &self.get_ty_mat(ty_item).kind {
+                    ir::TyKind::Primitive(_) => {
+                        ExprOrSource::Source(format!("json_agg({input}.value ORDER BY {index})",))
+                    }
+                    ir::TyKind::Tuple(_) => {
+                        let fields = cols.map(|c| format!("{input}.{c}")).join(", ");
+                        ExprOrSource::Source(format!(
+                            "json_agg(jsonb_build_array({fields}) ORDER BY {index})"
+                        ))
+                    }
+                    ir::TyKind::Array(_) => todo!(),
+                    _ => todo!(),
                 }
-                ir::TyKind::Array(_) => todo!(),
-                _ => todo!(),
-            },
+            }
             ir::TyKind::Tuple(_) => {
-                let fields: Vec<_> = self.rel_cols(ty, false).collect();
-                let fields = fields.join(", ");
+                let fields = cols.map(|c| format!("{input}.{c}")).join(", ");
 
-                ExprOrSource::Source(format!(
-                    "(SELECT jsonb_build_array({fields}) as value FROM {subquery})"
-                ))
+                ExprOrSource::Source(format!("jsonb_build_array({fields})"))
             }
             _ => unreachable!("{:?}", ty),
         }
