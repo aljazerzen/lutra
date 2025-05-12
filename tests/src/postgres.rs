@@ -138,6 +138,28 @@ fn array_prim() {
 }
 
 #[test]
+fn array_empty() {
+    insta::assert_snapshot!(_run_to_str(r#"
+        func () -> []: [bool]
+    "#), @r#"
+    SELECT
+      r0.value
+    FROM
+      (
+        SELECT
+          0 AS index,
+          NULL::bool AS value
+        WHERE
+          false
+      ) AS r0
+    ORDER BY
+      index
+    ---
+    []
+    "#);
+}
+
+#[test]
 fn tuple_tuple_prim() {
     insta::assert_snapshot!(_run_to_str(r#"
         func () -> {3, {false, true, {"hello"}, 4}}
@@ -166,16 +188,19 @@ fn tuple_tuple_prim() {
 #[test]
 fn tuple_array_prim() {
     insta::assert_snapshot!(_run_to_str(r#"
-        func () -> {true, [1, 2, 3], false}
+        func () -> {true, [1, 2, 3], [4], false}
     "#), @r#"
     SELECT
       TRUE AS _0,
       (
         SELECT
-          json_agg(
-            r0.value
-            ORDER BY
-              r0.index
+          COALESCE(
+            jsonb_agg(
+              r0.value
+              ORDER BY
+                r0.index
+            ),
+            '[]'::jsonb
           )
         FROM
           (
@@ -194,7 +219,24 @@ fn tuple_array_prim() {
               3::int8
           ) AS r0
       ) AS _1,
-      FALSE AS _2
+      (
+        SELECT
+          COALESCE(
+            jsonb_agg(
+              r1.value
+              ORDER BY
+                r1.index
+            ),
+            '[]'::jsonb
+          )
+        FROM
+          (
+            SELECT
+              0::int8 AS index,
+              4::int8 AS value
+          ) AS r1
+      ) AS _2,
+      FALSE AS _3
     ---
     {
       true,
@@ -203,6 +245,45 @@ fn tuple_array_prim() {
         2,
         3,
       ],
+      [
+        4,
+      ],
+      false,
+    }
+    "#);
+}
+
+#[test]
+fn tuple_array_empty() {
+    insta::assert_snapshot!(_run_to_str(r#"
+        func () -> {true, []: [int64], false}
+    "#), @r#"
+    SELECT
+      TRUE AS _0,
+      (
+        SELECT
+          COALESCE(
+            jsonb_agg(
+              r0.value
+              ORDER BY
+                r0.index
+            ),
+            '[]'::jsonb
+          )
+        FROM
+          (
+            SELECT
+              0 AS index,
+              NULL::int8 AS value
+            WHERE
+              false
+          ) AS r0
+      ) AS _1,
+      FALSE AS _2
+    ---
+    {
+      true,
+      [],
       false,
     }
     "#);
@@ -221,10 +302,13 @@ fn array_array_prim() {
           0::int8 AS index,
           (
             SELECT
-              json_agg(
-                r0.value
-                ORDER BY
-                  r0.index
+              COALESCE(
+                jsonb_agg(
+                  r0.value
+                  ORDER BY
+                    r0.index
+                ),
+                '[]'::jsonb
               )
             FROM
               (
@@ -249,10 +333,13 @@ fn array_array_prim() {
           1::int8,
           (
             SELECT
-              json_agg(
-                r1.value
-                ORDER BY
-                  r1.index
+              COALESCE(
+                jsonb_agg(
+                  r1.value
+                  ORDER BY
+                    r1.index
+                ),
+                '[]'::jsonb
               )
             FROM
               (
@@ -343,10 +430,13 @@ fn tuple_array_tuple_prim() {
       'hello' AS _0,
       (
         SELECT
-          json_agg(
-            jsonb_build_array(r0._0, r0._1)
-            ORDER BY
-              r0.index
+          COALESCE(
+            jsonb_agg(
+              jsonb_build_array(r0._0, r0._1)
+              ORDER BY
+                r0.index
+            ),
+            '[]'::jsonb
           )
         FROM
           (
@@ -518,6 +608,42 @@ fn json_pack_03() {
         1,
         0,
       ],
+    ]
+    "#);
+}
+
+#[test]
+fn json_pack_04() {
+    insta::assert_snapshot!(_run(r#"
+    let get_data = func () -> {a = [false, true, true]}
+
+    func () -> (
+      get_data().a
+      | std::map(func (y: bool) -> !y)
+    )
+    "#, vec![]).1, @r#"
+    [
+      true,
+      false,
+      false,
+    ]
+    "#);
+}
+
+#[test]
+fn json_pack_05() {
+    insta::assert_snapshot!(_run(r#"
+    let get_data = func () -> {a = ["no", "yes", "neither"]}
+
+    func () -> (
+      get_data().a
+      | std::map(func (y: text) -> y)
+    )
+    "#, vec![]).1, @r#"
+    [
+      "no",
+      "yes",
+      "neither",
     ]
     "#);
 }

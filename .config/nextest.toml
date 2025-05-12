@@ -1,2 +1,6 @@
 [profile.default]
 status-level = "slow"
+
+[profile.overview]
+status-level = "pass"
+failure-output = "never"

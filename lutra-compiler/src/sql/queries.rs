@@ -102,7 +102,7 @@ impl<'a> Context<'a> {
                 }
             }
 
-            cr::RelExprKind::Join(left, right) => {
+            cr::RelExprKind::Join(left, right, condition) => {
                 let left_ty = left.ty.clone();
                 let left = self.compile_re(*left);
                 let left_name = left.get_name().to_string();
@@ -118,6 +118,10 @@ impl<'a> Context<'a> {
                 let select = self.rel_as_mut_select(&mut scope, &rel.ty);
                 select.projection.clear();
 
+                dbg!(self.rel_cols(&rel.ty, true).collect_vec());
+                dbg!(self.rel_cols(&left_ty, true).collect_vec());
+                dbg!(self.rel_cols(&right_ty, true).collect_vec());
+
                 select.projection.extend(
                     self.projection(
                         &rel.ty,
@@ -129,6 +133,12 @@ impl<'a> Context<'a> {
                         ),
                     ),
                 );
+
+                if let Some(condition) = condition {
+                    let expr = self.compile_expr(*condition);
+                    select.selection = Some(expr.expr.into_expr());
+                    scope.rel_vars.extend(expr.rel_vars);
+                }
 
                 scope
             }
@@ -203,7 +213,9 @@ impl<'a> Context<'a> {
                 utils::retain_by_position(&mut select.projection, cols);
 
                 // apply new column names
+                dbg!(&select.projection);
                 let old_values = select.projection.drain(..).map(utils::unwrap_select_item);
+                dbg!(self.rel_cols(ty, true).collect_vec());
                 select.projection = self.projection(ty, old_values);
             }
 
@@ -446,12 +458,12 @@ impl<'a> Context<'a> {
 
                 match &self.get_ty_mat(ty_item).kind {
                     ir::TyKind::Primitive(_) => ExprOrSource::Source(format!(
-                        "json_agg({input}.{COL_VALUE} ORDER BY {index})",
+                        "COALESCE(jsonb_agg({input}.{COL_VALUE} ORDER BY {index}), '[]'::jsonb)",
                     )),
                     ir::TyKind::Tuple(_) => {
                         let fields = cols.map(|c| format!("{input}.{c}")).join(", ");
                         ExprOrSource::Source(format!(
-                            "json_agg(jsonb_build_array({fields}) ORDER BY {index})"
+                            "COALESCE(jsonb_agg(jsonb_build_array({fields}) ORDER BY {index}), '[]'::jsonb)"
                         ))
                     }
                     ir::TyKind::Array(_) => todo!(),
@@ -482,7 +494,7 @@ impl<'a> Context<'a> {
                 let col = scope.put_expr(self.compile_expr(col));
 
                 query.from.push(utils::from(utils::lateral(utils::rel_func(
-                    sql_ast::Ident::new("json_array_elements"),
+                    sql_ast::Ident::new("jsonb_array_elements"),
                     vec![col.into_expr()],
                     Some("j".into()),
                 ))));
@@ -495,10 +507,8 @@ impl<'a> Context<'a> {
                 let item_ty = self.get_ty_mat(ty_item);
                 match &item_ty.kind {
                     ir::TyKind::Primitive(_) => {
-                        let value = ExprOrSource::Source(format!(
-                            "j.value::text::{}",
-                            self.compile_ty_name(item_ty)
-                        ));
+                        let value =
+                            ExprOrSource::Source(self.compile_json_item_cast("j.value", item_ty));
                         query.projection.push(sql_ast::SelectItem::ExprWithAlias {
                             expr: value.into_expr(),
                             alias: sql_ast::Ident::new(COL_VALUE),
@@ -512,9 +522,9 @@ impl<'a> Context<'a> {
                     }
                     ir::TyKind::Tuple(fields) => {
                         for (position, field) in fields.iter().enumerate() {
-                            let value = ExprOrSource::Source(format!(
-                                "(j.value->{position})::text::{}",
-                                self.compile_ty_name(&field.ty)
+                            let value = ExprOrSource::Source(self.compile_json_item_cast(
+                                &format!("(j.value->{position})"),
+                                self.get_ty_mat(&field.ty),
                             ))
                             .into_expr();
                             query.projection.push(sql_ast::SelectItem::ExprWithAlias {
@@ -536,8 +546,18 @@ impl<'a> Context<'a> {
         scope
     }
 
+    fn compile_json_item_cast(&self, item_ref: &str, ty: &ir::Ty) -> String {
+        if let ir::TyKind::Primitive(ir::TyPrimitive::text) = &ty.kind {
+            // we could use `ref #>> '{}'` here instead, but formatter breaks for the operator
+            // for now, let's use this much more verbose way
+            format!("jsonb_build_array({item_ref}) ->> 0")
+        } else {
+            format!("{item_ref}::text::{}", self.compile_ty_name(ty))
+        }
+    }
+
     fn compile_func_call(
-        &mut self,
+        &self,
         id: &str,
         ty: ir::Ty,
         args: impl IntoIterator<Item = ExprOrSource>,
@@ -611,16 +631,21 @@ impl<'a> Context<'a> {
                 let mut args = args.into_iter();
                 let arg = args.next().unwrap();
                 let offset = args.next().unwrap();
+
+                let filler = get_lead_lag_filler(&ty);
                 ExprOrSource::Source(format!(
-                    "COALESCE(LEAD({arg}, {offset}::int4) OVER (ORDER BY index), 0)"
+                    "COALESCE(LEAD({arg}, {offset}::int4) OVER (ORDER BY index), {filler})"
                 ))
             }
             "std::lag" => {
                 let mut args = args.into_iter();
                 let arg = args.next().unwrap();
                 let offset = args.next().unwrap();
+
+                let filler = get_lead_lag_filler(&ty);
+
                 ExprOrSource::Source(format!(
-                    "COALESCE(LAG({arg}, {offset}::int4) OVER (ORDER BY index), 0)"
+                    "COALESCE(LAG({arg}, {offset}::int4) OVER (ORDER BY index), {filler})"
                 ))
             }
 
@@ -697,5 +722,20 @@ impl<'a> Context<'a> {
                 ExprOrSource::Expr(sql_ast::Expr::Value(sql_ast::Value::SingleQuotedString(s)))
             }
         }
+    }
+}
+
+fn get_lead_lag_filler(ty: &ir::Ty) -> &str {
+    let item_ty = ty.kind.as_array().unwrap();
+    match &item_ty.kind {
+        ir::TyKind::Primitive(
+            ir::TyPrimitive::int8
+            | ir::TyPrimitive::int16
+            | ir::TyPrimitive::int32
+            | ir::TyPrimitive::int64,
+        ) => "0",
+        ir::TyKind::Primitive(ir::TyPrimitive::bool) => "FALSE",
+        ir::TyKind::Primitive(ir::TyPrimitive::text) => "''",
+        _ => todo!(),
     }
 }

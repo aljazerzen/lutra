@@ -16,7 +16,7 @@ pub enum RelExprKind {
     /// Introduces iterator over input relation for the scope of this transform.
     Transform(Box<RelExpr>, Transform),
 
-    Join(Box<RelExpr>, Box<RelExpr>),
+    Join(Box<RelExpr>, Box<RelExpr>, Option<Box<ColExpr>>),
 
     /// Bind a relation and evaluate an unrelated expression
     Bind(Box<RelExpr>, Box<RelExpr>),

@@ -547,22 +547,19 @@ test_case!(
     2,
     1,
   },
-]"#,
-    skip_postgres
+]"#
 );
 
 test_case!(
     std_from_columnar_01,
     r#"func () -> std::from_columnar({[1], []: [int64]})"#,
-    "[]",
-    skip_postgres
+    "[]"
 );
 
 test_case!(
     std_from_columnar_02,
     r#"func () -> std::from_columnar({[]: [int64], [2]})"#,
-    "[]",
-    skip_postgres
+    "[]"
 );
 
 test_case!(
@@ -577,24 +574,22 @@ test_case!(
     2,
     4,
   },
-]"#,
-    skip_postgres
+]"#
 );
 
 test_case!(
     std_from_columnar_04,
-    r#"func () -> std::from_columnar({[false, true], ["false", "true", "neither"]})"#,
+    r#"func () -> std::from_columnar({[false, true], ["no", "yes", "neither"]})"#,
     r#"[
   {
     false,
-    "false",
+    "no",
   },
   {
     true,
-    "true",
+    "yes",
   },
-]"#,
-    skip_postgres
+]"#
 );
 
 /*
@@ -627,8 +622,7 @@ test_case!(
     65,
     0,
   },
-]"#,
-    skip_postgres
+]"#
 );
 
 test_case!(
@@ -654,8 +648,7 @@ test_case!(
     false,
     "world",
   },
-]"#,
-    skip_postgres
+]"#
 );
 
 test_case!(
@@ -664,8 +657,7 @@ test_case!(
     r#"{
   3,
   1,
-}"#,
-    skip_postgres
+}"#
 );
 
 test_case!(
@@ -674,8 +666,7 @@ test_case!(
     r#"{
   false,
   "!",
-}"#,
-    skip_postgres
+}"#
 );
 
 test_case!(
@@ -1027,7 +1018,7 @@ test_case!(
     r#"Red"#
 );
 
-// TODO make `Green: int16` when support i16 literals
+// TODO make `Green: int16` when we support i16 literals
 test_case!(
     enum_construction_04,
     r#"
@@ -1061,8 +1052,7 @@ test_case!(
     "#,
     r#"Green(
   true
-)"#,
-    skip_postgres
+)"#
 );
 
 test_case!(
@@ -1077,8 +1067,7 @@ test_case!(
     r#"{
   c = true,
   d = "d",
-}"#,
-    skip_postgres
+}"#
 );
 
 test_case!(

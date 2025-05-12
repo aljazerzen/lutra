@@ -112,7 +112,7 @@ impl<'a> Context<'a> {
                     for r in res_rels {
                         result = cr::RelExpr {
                             ty: ty_concat_tuples(result.ty.clone(), r.ty.clone()),
-                            kind: cr::RelExprKind::Join(Box::new(result), Box::new(r)),
+                            kind: cr::RelExprKind::Join(Box::new(result), Box::new(r), None),
                             id: self.scope_id_gen.gen(),
                         };
                     }
@@ -253,7 +253,7 @@ impl<'a> Context<'a> {
                     rel = cr::RelExprKind::new_transform(
                         cr::RelExpr {
                             kind: rel,
-                            ty: lookup.base.ty.clone(),
+                            ty: ir::Ty::new(ir::TyPrimitive::text),
                             id,
                         },
                         |scope_id| {
@@ -586,6 +586,88 @@ impl<'a> Context<'a> {
                 )
             }
 
+            "std::from_columnar" => {
+                let tuple = self.compile_rel(&call.args[0]);
+
+                let ty_in_fields = tuple.ty.kind.as_tuple().unwrap();
+
+                let ty_out_item = expr.ty.kind.as_array().unwrap();
+                let ty_out_fields = ty_out_item.kind.as_tuple().unwrap();
+
+                let tuple_ref = cr::RelExpr {
+                    kind: cr::RelExprKind::From(cr::From::Iterator(tuple.id)),
+                    ty: tuple.ty.clone(),
+                    id: self.scope_id_gen.gen(),
+                };
+
+                // construct correlated subqueries
+                let field0 = cr::RelExpr {
+                    ty: ty_in_fields[0].ty.clone(),
+                    kind: cr::RelExprKind::new_transform(tuple_ref.clone(), |_| {
+                        cr::Transform::JsonUnpack(Box::new(cr::ColExpr::new_rel_col(
+                            tuple.id,
+                            0,
+                            ty_in_fields[0].ty.clone(),
+                        )))
+                    }),
+                    id: self.scope_id_gen.gen(),
+                };
+                let field1 = cr::RelExpr {
+                    ty: ty_in_fields[1].ty.clone(),
+                    kind: cr::RelExprKind::new_transform(tuple_ref, |_| {
+                        cr::Transform::JsonUnpack(Box::new(cr::ColExpr::new_rel_col(
+                            tuple.id,
+                            1,
+                            ty_in_fields[1].ty.clone(),
+                        )))
+                    }),
+                    id: self.scope_id_gen.gen(),
+                };
+
+                let ty_index = ir::Ty::new(ir::TyPrimitive::int64);
+                let join_cond = cr::ColExpr {
+                    ty: ir::Ty::new(ir::TyPrimitive::bool),
+                    kind: cr::ColExprKind::FuncCall(
+                        "std::eq".into(),
+                        vec![
+                            cr::ColExpr::new_rel_col(field0.id, 0, ty_index.clone()),
+                            cr::ColExpr::new_rel_col(field1.id, 0, ty_index.clone()),
+                        ],
+                    ),
+                };
+
+                let ty_index_field = ir::TyTupleField {
+                    ty: ty_index.clone(),
+                    name: None,
+                };
+                let joined_type = ir::Ty::new(ir::TyKind::Tuple(vec![
+                    ty_index_field.clone(),
+                    ty_out_fields[0].clone(),
+                    ty_index_field,
+                    ty_out_fields[1].clone(),
+                ]));
+
+                cr::RelExprKind::BindCorrelated(
+                    Box::new(tuple),
+                    Box::new(cr::RelExpr {
+                        kind: cr::RelExprKind::new_transform(
+                            cr::RelExpr {
+                                kind: cr::RelExprKind::Join(
+                                    Box::new(field0),
+                                    Box::new(field1),
+                                    Some(Box::new(join_cond)),
+                                ),
+                                ty: joined_type,
+                                id: self.scope_id_gen.gen(),
+                            },
+                            |_| cr::Transform::ProjectRetain(vec![0, 1, 3]),
+                        ),
+                        ty: expr.ty.clone(),
+                        id: self.scope_id_gen.gen(),
+                    }),
+                )
+            }
+
             _ => {
                 let expr = self.compile_expr_std(expr);
                 cr::RelExprKind::From(cr::From::Construction(vec![vec![expr]]))
@@ -628,7 +710,9 @@ impl<'a> Context<'a> {
 
         match rel.kind {
             // it is just one constructed row: unwrap
-            cr::RelExprKind::From(cr::From::Construction(mut rows)) if rows.len() == 1 => {
+            cr::RelExprKind::From(cr::From::Construction(mut rows))
+                if rows.len() == 1 && !self.get_ty_mat(&expr.ty).kind.is_array() =>
+            {
                 ColumnsOrUnpack::Columns(rows.remove(0))
             }
 
