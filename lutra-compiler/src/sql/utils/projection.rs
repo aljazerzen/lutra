@@ -60,7 +60,6 @@ impl<'a> Context<'a> {
             ir::TyKind::Function(_) => todo!(),
             ir::TyKind::Ident(_) => todo!(),
         }
-        // self.rel_cols_re(ty, include_index, true, "".to_string())
     }
 
     fn rel_cols_re(

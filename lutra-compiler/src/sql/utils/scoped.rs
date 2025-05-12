@@ -23,21 +23,13 @@ impl RelScoped {
         self.rel_name = utils::get_rel_alias(&rel_factor).to_string();
         self.rel_vars.push(rel_factor);
     }
-    pub fn extend_lateral(&mut self, other: RelScoped) {
-        self.rel_name = other.rel_name;
-        self.rel_vars
-            .extend(other.rel_vars.into_iter().map(utils::lateral));
-    }
-    pub fn extend(&mut self, other: RelScoped) {
-        self.rel_name = other.rel_name;
-        self.rel_vars.extend(other.rel_vars);
-    }
     pub fn get_name(&self) -> &str {
         &self.rel_name
     }
-    pub fn into_tables_with_joins(self) -> Vec<sql_ast::TableWithJoins> {
-        self.rel_vars.into_iter().map(utils::from).collect()
+    pub fn into_tables_with_joins(self) -> impl Iterator<Item = sql_ast::TableWithJoins> {
+        self.rel_vars.into_iter().map(utils::from)
     }
+
     pub fn as_sub_rel(&self) -> Option<&sql_ast::Query> {
         let last = self.rel_vars.last()?;
         if utils::get_rel_alias(last) != self.rel_name {
@@ -68,10 +60,6 @@ impl RelScoped {
         };
         Ok(*subquery)
     }
-    pub fn put_expr(&mut self, expr: ExprScoped) -> ExprOrSource {
-        self.rel_vars.extend(expr.rel_vars);
-        expr.expr
-    }
 }
 
 /// SQL column expression, in a scope of possibly many relational variables.
@@ -88,9 +76,6 @@ impl ExprScoped {
             rel_vars: vec![],
         }
     }
-    pub fn requires(&mut self, scope: RelScoped) {
-        self.rel_vars.extend(scope.rel_vars);
-    }
     pub fn into_subquery(self) -> sql_ast::Expr {
         if self.rel_vars.is_empty() {
             return self.expr.into_expr();
@@ -106,12 +91,31 @@ impl ExprScoped {
 }
 
 impl<'a> crate::sql::queries::Context<'a> {
-    pub fn wrap_scoped_rel(&mut self, rel: RelScoped, rel_ty: &ir::Ty) -> RelScoped {
+    pub fn wrap_rel(&mut self, rel: RelScoped, rel_ty: &ir::Ty) -> RelScoped {
         RelScoped::new(utils::sub_rel(
-            self.scope_into_query(rel, rel_ty),
+            self.wrap_rel_into_query(rel, rel_ty),
             Some(self.rel_name_gen.next()),
         ))
     }
+
+    pub fn wrap_rel_into_query(&self, scope: RelScoped, ty: &ir::Ty) -> sql_ast::Query {
+        let mut select = utils::select_empty();
+        select.projection = self.projection_noop(Some(scope.get_name()), ty, true);
+        select.from.extend(scope.into_tables_with_joins());
+        utils::query_select(select)
+    }
+
+    pub fn wrap_rel_into_query_without_index(
+        &self,
+        scope: RelScoped,
+        ty: &ir::Ty,
+    ) -> sql_ast::Query {
+        let mut select = utils::select_empty();
+        select.projection = self.projection_noop(Some(scope.get_name()), ty, false);
+        select.from.extend(scope.into_tables_with_joins());
+        utils::query_select(select)
+    }
+
     pub fn rel_as_mut_select<'q>(
         &mut self,
         rel: &'q mut RelScoped,
@@ -144,11 +148,7 @@ impl<'a> crate::sql::queries::Context<'a> {
             let original = std::mem::replace(rel, dummy);
 
             // wrap it as a subquery
-            let mut select = utils::select_empty();
-            select.projection = self.projection_noop(Some(original.get_name()), rel_ty, true);
-            select.from.extend(original.into_tables_with_joins());
-            let query = utils::query_select(select);
-            let wrapped = RelScoped::new(utils::sub_rel(query, Some(self.rel_name_gen.next())));
+            let wrapped = self.wrap_rel(original, rel_ty);
 
             // place it back
             let _dummy = std::mem::replace(rel, wrapped);
@@ -162,19 +162,5 @@ impl<'a> crate::sql::queries::Context<'a> {
             }
         };
         select.as_mut()
-    }
-
-    pub fn scope_into_query(&self, scope: RelScoped, ty: &ir::Ty) -> sql_ast::Query {
-        let mut select = utils::select_empty();
-        select.projection = self.projection_noop(Some(scope.get_name()), ty, true);
-        select.from.extend(scope.into_tables_with_joins());
-        utils::query_select(select)
-    }
-
-    pub fn scope_into_query_without_index(&self, scope: RelScoped, ty: &ir::Ty) -> sql_ast::Query {
-        let mut select = utils::select_empty();
-        select.projection = self.projection_noop(Some(scope.get_name()), ty, false);
-        select.from.extend(scope.into_tables_with_joins());
-        utils::query_select(select)
     }
 }

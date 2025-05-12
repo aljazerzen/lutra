@@ -1,10 +1,7 @@
 //! Utils for constructing SQL AST nodes
 
-use lutra_bin::ir;
 use sqlparser::ast as sql_ast;
 use sqlparser::ast::helpers::attached_token::AttachedToken;
-
-use crate::sql::queries::Context;
 
 #[track_caller]
 pub fn get_rel_alias(rel: &sqlparser::ast::TableFactor) -> &str {
@@ -170,62 +167,6 @@ pub fn query_new(set_expr: sql_ast::SetExpr) -> sql_ast::Query {
 
 pub fn query_select(select: sql_ast::Select) -> sql_ast::Query {
     query_new(sql_ast::SetExpr::Select(Box::new(select)))
-}
-
-impl<'a> Context<'a> {
-    pub fn query_wrap(
-        &self,
-        rel: sql_ast::TableFactor,
-        rel_ty: &ir::Ty,
-        include_index: bool,
-    ) -> sql_ast::Query {
-        let mut select = select_empty();
-        let rel_name = get_rel_alias(&rel);
-        select.projection = self.projection_noop(Some(rel_name), rel_ty, include_index);
-        select.from.push(from(rel));
-
-        query_select(select)
-    }
-
-    pub fn query_as_mut_select<'q>(
-        &mut self,
-        query: &'q mut sql_ast::Query,
-        rel_ty: &ir::Ty,
-    ) -> &'q mut sql_ast::Select {
-        self.query_as_mut_select_that(query, rel_ty, |_| true)
-    }
-
-    pub fn query_as_mut_select_that<'q>(
-        &mut self,
-        query: &'q mut sql_ast::Query,
-        rel_ty: &ir::Ty,
-        is_valid: impl Fn(&sql_ast::Select) -> bool,
-    ) -> &'q mut sql_ast::Select {
-        let is_valid = if let sql_ast::SetExpr::Select(select) = query.body.as_ref() {
-            is_valid(select)
-        } else {
-            false
-        };
-
-        // if query is not a valid select
-        if !is_valid {
-            // take the query
-            let dummy = query_select(select_empty());
-            let original = std::mem::replace(query, dummy);
-
-            // wrap it into a select
-            let rel = sub_rel(original, Some(self.rel_name_gen.next()));
-            let wrapped = self.query_wrap(rel, rel_ty, true);
-
-            // place it back
-            let _dummy = std::mem::replace(query, wrapped);
-        }
-
-        let sql_ast::SetExpr::Select(select) = query.body.as_mut() else {
-            unreachable!()
-        };
-        select.as_mut()
-    }
 }
 
 #[track_caller]

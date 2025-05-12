@@ -17,7 +17,7 @@ pub fn compile(rel: cr::RelExpr, types: HashMap<&ir::Path, &ir::Ty>) -> sql_ast:
 
     if rel_ty.kind.is_array() {
         // wrap into a top-level projection to remove array indexes
-        let mut query = ctx.scope_into_query_without_index(query, &rel_ty);
+        let mut query = ctx.wrap_rel_into_query_without_index(query, &rel_ty);
         query.order_by = Some(utils::order_by_one(utils::ident(
             None::<&str>,
             COL_ARRAY_INDEX,
@@ -26,7 +26,7 @@ pub fn compile(rel: cr::RelExpr, types: HashMap<&ir::Path, &ir::Ty>) -> sql_ast:
     } else {
         match query.into_sub_rel() {
             Ok(sub_rel) => sub_rel,
-            Err(query) => ctx.scope_into_query(query, &rel_ty),
+            Err(query) => ctx.wrap_rel_into_query(query, &rel_ty),
         }
     }
 }
@@ -112,15 +112,12 @@ impl<'a> Context<'a> {
                 let right_name = right.get_name().to_string();
 
                 let mut scope = left;
-                scope.extend(right);
+                scope.rel_name = right.rel_name;
+                scope.rel_vars.extend(right.rel_vars);
 
-                let mut scope = self.wrap_scoped_rel(scope, &rel.ty);
+                let mut scope = self.wrap_rel(scope, &rel.ty);
                 let select = self.rel_as_mut_select(&mut scope, &rel.ty);
                 select.projection.clear();
-
-                dbg!(self.rel_cols(&rel.ty, true).collect_vec());
-                dbg!(self.rel_cols(&left_ty, true).collect_vec());
-                dbg!(self.rel_cols(&right_ty, true).collect_vec());
 
                 select.projection.extend(
                     self.projection(
@@ -145,7 +142,12 @@ impl<'a> Context<'a> {
 
             cr::RelExprKind::BindCorrelated(bound, main) => {
                 let mut scope = self.compile_re(*bound);
-                scope.extend_lateral(self.compile_re(*main));
+
+                let main = self.compile_re(*main);
+                scope.rel_name = main.rel_name;
+                scope
+                    .rel_vars
+                    .extend(main.rel_vars.into_iter().map(utils::lateral));
 
                 scope
             }
@@ -159,11 +161,11 @@ impl<'a> Context<'a> {
 
                 let val_ty = val.ty.clone();
                 let val = self.compile_re(*val);
-                let val = self.scope_into_query(val, &val_ty);
+                let val = self.wrap_rel_into_query(val, &val_ty);
 
                 let main_ty = main.ty.clone();
                 let main = self.compile_re(*main);
-                let mut main = self.scope_into_query(main, &main_ty);
+                let mut main = self.wrap_rel_into_query(main, &main_ty);
 
                 main.with = Some(utils::with());
                 let ctes = &mut main.with.as_mut().unwrap().cte_tables;
@@ -193,19 +195,17 @@ impl<'a> Context<'a> {
 
         match transform {
             cr::Transform::Project(columns) => {
-                scope = self.wrap_scoped_rel(scope, &input_ty);
+                scope = self.wrap_rel(scope, &input_ty);
 
                 let select = self.rel_as_mut_select(&mut scope, &input_ty);
 
                 let column_exprs = self.compile_columns(columns);
                 select.projection = self.projection(ty, column_exprs);
-
-                // scope.rel_vars.extend(rels);
             }
             cr::Transform::ProjectRetain(cols) => {
                 let must_wrap = scope.as_sub_rel().is_none_or(|q| q.order_by.is_some());
                 if must_wrap {
-                    scope = self.wrap_scoped_rel(scope, &input_ty);
+                    scope = self.wrap_rel(scope, &input_ty);
                 }
 
                 let select = self.rel_as_mut_select(&mut scope, &input_ty);
@@ -213,16 +213,14 @@ impl<'a> Context<'a> {
                 utils::retain_by_position(&mut select.projection, cols);
 
                 // apply new column names
-                dbg!(&select.projection);
                 let old_values = select.projection.drain(..).map(utils::unwrap_select_item);
-                dbg!(self.rel_cols(ty, true).collect_vec());
                 select.projection = self.projection(ty, old_values);
             }
 
             cr::Transform::ProjectDiscard(cols) => {
                 let must_wrap = scope.as_sub_rel().is_none_or(|q| q.order_by.is_some());
                 if must_wrap {
-                    scope = self.wrap_scoped_rel(scope, &input_ty);
+                    scope = self.wrap_rel(scope, &input_ty);
                 }
 
                 let select = self.rel_as_mut_select(&mut scope, &input_ty);
@@ -235,7 +233,7 @@ impl<'a> Context<'a> {
             }
 
             cr::Transform::Aggregate(columns) => {
-                scope = self.wrap_scoped_rel(scope, &input_ty);
+                scope = self.wrap_rel(scope, &input_ty);
 
                 let select = self.rel_as_mut_select(&mut scope, &input_ty);
 
@@ -245,7 +243,7 @@ impl<'a> Context<'a> {
                 scope.rel_vars.extend(rels);
             }
             cr::Transform::Where(cond) => {
-                scope = self.wrap_scoped_rel(scope, &input_ty);
+                scope = self.wrap_rel(scope, &input_ty);
 
                 let select = self.rel_as_mut_select(&mut scope, &input_ty);
 
@@ -259,7 +257,7 @@ impl<'a> Context<'a> {
                     .as_sub_rel()
                     .is_none_or(|q| q.limit.is_some() || q.offset.is_some());
                 if must_wrap {
-                    scope = self.wrap_scoped_rel(scope, &input_ty);
+                    scope = self.wrap_rel(scope, &input_ty);
                 }
 
                 let query = scope.as_mut_sub_rel().unwrap();
@@ -279,7 +277,7 @@ impl<'a> Context<'a> {
                     .as_sub_rel()
                     .is_none_or(|q| q.limit.is_some() || q.offset.is_some());
                 if must_wrap {
-                    scope = self.wrap_scoped_rel(scope, &input_ty);
+                    scope = self.wrap_rel(scope, &input_ty);
                 }
 
                 let query = scope.as_mut_sub_rel().unwrap();
@@ -299,7 +297,7 @@ impl<'a> Context<'a> {
             }
             cr::Transform::OrderBy(key) => {
                 // wrap into a new query
-                scope = self.wrap_scoped_rel(scope, &input_ty);
+                scope = self.wrap_rel(scope, &input_ty);
 
                 // overwrite array index
                 let select = self.rel_as_mut_select(&mut scope, &input_ty);
@@ -430,13 +428,13 @@ impl<'a> Context<'a> {
                 if expr.ty.kind.is_array() {
                     let mut scoped =
                         ExprScoped::new(self.compile_json_pack(&scope.rel_name, &expr.ty));
-                    scoped.requires(scope);
+                    scoped.rel_vars.extend(scope.rel_vars);
                     return scoped;
                 } else if scope.rel_vars.is_empty() {
                     let col = self.rel_cols(&expr.ty, true).next().unwrap();
                     ExprOrSource::Expr(utils::ident(Some(scope.rel_name), col))
                 } else {
-                    let query = self.scope_into_query(scope, &expr.ty);
+                    let query = self.wrap_rel_into_query(scope, &expr.ty);
                     ExprOrSource::Expr(sql_ast::Expr::Subquery(Box::new(query)))
                 }
             }
@@ -491,13 +489,15 @@ impl<'a> Context<'a> {
                 SELECT ROW_NUMBER(), j.value
                 */
 
-                let col = scope.put_expr(self.compile_expr(col));
+                let col = self.compile_expr(col);
+                scope.rel_vars.extend(col.rel_vars);
+                let col = col.expr;
 
-                query.from.push(utils::from(utils::lateral(utils::rel_func(
+                query.from.push(utils::from(utils::rel_func(
                     sql_ast::Ident::new("jsonb_array_elements"),
                     vec![col.into_expr()],
                     Some("j".into()),
-                ))));
+                )));
 
                 query.projection = vec![sql_ast::SelectItem::ExprWithAlias {
                     expr: ExprOrSource::Source("(ROW_NUMBER() OVER ())::int4".into()).into_expr(),
@@ -538,7 +538,8 @@ impl<'a> Context<'a> {
                 }
                 let factor =
                     utils::sub_rel(utils::query_select(query), Some(self.rel_name_gen.next()));
-                scope.push(utils::lateral(factor));
+                scope.rel_name = utils::get_rel_alias(&factor).to_string();
+                scope.rel_vars.push(utils::lateral(factor));
             }
             ir::TyKind::Tuple(_) => todo!(),
             _ => unreachable!("{:?}", col_ty),
