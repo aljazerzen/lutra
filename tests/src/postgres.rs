@@ -81,7 +81,12 @@ fn prim() {
         func () -> 3
     "#), @r#"
     SELECT
-      3::int8 AS value
+      r0.value
+    FROM
+      (
+        SELECT
+          3::int8 AS value
+      ) AS r0
     ---
     3
     "#);
@@ -93,8 +98,14 @@ fn tuple_prim() {
         func () -> {3, false}
     "#), @r#"
     SELECT
-      3::int8 AS _0,
-      FALSE AS _1
+      r0._0,
+      r0._1
+    FROM
+      (
+        SELECT
+          3::int8 AS _0,
+          FALSE AS _1
+      ) AS r0
     ---
     {
       3,
@@ -165,11 +176,20 @@ fn tuple_tuple_prim() {
         func () -> {3, {false, true, {"hello"}, 4}}
     "#), @r#"
     SELECT
-      3::int8 AS _0,
-      FALSE AS _1_0,
-      TRUE AS _1_1,
-      'hello' AS _1_2_0,
-      4::int8 AS _1_3
+      r0._0,
+      r0._1_0,
+      r0._1_1,
+      r0._1_2_0,
+      r0._1_3
+    FROM
+      (
+        SELECT
+          3::int8 AS _0,
+          FALSE AS _1_0,
+          TRUE AS _1_1,
+          'hello' AS _1_2_0,
+          4::int8 AS _1_3
+      ) AS r0
     ---
     {
       3,
@@ -191,52 +211,60 @@ fn tuple_array_prim() {
         func () -> {true, [1, 2, 3], [4], false}
     "#), @r#"
     SELECT
-      TRUE AS _0,
+      r2._0,
+      r2._1,
+      r2._2,
+      r2._3
+    FROM
       (
         SELECT
-          COALESCE(
-            jsonb_agg(
-              r0.value
-              ORDER BY
-                r0.index
-            ),
-            '[]'::jsonb
-          )
-        FROM
+          TRUE AS _0,
           (
             SELECT
-              0::int8 AS index,
-              1::int8 AS value
-            UNION
-            ALL
-            SELECT
-              1::int8,
-              2::int8
-            UNION
-            ALL
-            SELECT
-              2::int8,
-              3::int8
-          ) AS r0
-      ) AS _1,
-      (
-        SELECT
-          COALESCE(
-            jsonb_agg(
-              r1.value
-              ORDER BY
-                r1.index
-            ),
-            '[]'::jsonb
-          )
-        FROM
+              COALESCE(
+                jsonb_agg(
+                  r0.value
+                  ORDER BY
+                    r0.index
+                ),
+                '[]'::jsonb
+              )
+            FROM
+              (
+                SELECT
+                  0::int8 AS index,
+                  1::int8 AS value
+                UNION
+                ALL
+                SELECT
+                  1::int8,
+                  2::int8
+                UNION
+                ALL
+                SELECT
+                  2::int8,
+                  3::int8
+              ) AS r0
+          ) AS _1,
           (
             SELECT
-              0::int8 AS index,
-              4::int8 AS value
-          ) AS r1
-      ) AS _2,
-      FALSE AS _3
+              COALESCE(
+                jsonb_agg(
+                  r1.value
+                  ORDER BY
+                    r1.index
+                ),
+                '[]'::jsonb
+              )
+            FROM
+              (
+                SELECT
+                  0::int8 AS index,
+                  4::int8 AS value
+              ) AS r1
+          ) AS _2,
+          FALSE AS _3
+      ) AS r2
     ---
     {
       true,
@@ -259,27 +287,34 @@ fn tuple_array_empty() {
         func () -> {true, []: [int64], false}
     "#), @r#"
     SELECT
-      TRUE AS _0,
+      r1._0,
+      r1._1,
+      r1._2
+    FROM
       (
         SELECT
-          COALESCE(
-            jsonb_agg(
-              r0.value
-              ORDER BY
-                r0.index
-            ),
-            '[]'::jsonb
-          )
-        FROM
+          TRUE AS _0,
           (
             SELECT
-              0 AS index,
-              NULL::int8 AS value
-            WHERE
-              false
-          ) AS r0
-      ) AS _1,
-      FALSE AS _2
+              COALESCE(
+                jsonb_agg(
+                  r0.value
+                  ORDER BY
+                    r0.index
+                ),
+                '[]'::jsonb
+              )
+            FROM
+              (
+                SELECT
+                  0 AS index,
+                  NULL::int8 AS value
+                WHERE
+                  false
+              ) AS r0
+          ) AS _1,
+          FALSE AS _2
+      ) AS r1
     ---
     {
       true,
@@ -427,37 +462,43 @@ fn tuple_array_tuple_prim() {
         }
     "#), @r#"
     SELECT
-      'hello' AS _0,
+      r1._0,
+      r1._1
+    FROM
       (
         SELECT
-          COALESCE(
-            jsonb_agg(
-              jsonb_build_array(r0._0, r0._1)
-              ORDER BY
-                r0.index
-            ),
-            '[]'::jsonb
-          )
-        FROM
+          'hello' AS _0,
           (
             SELECT
-              0::int8 AS index,
-              3::int8 AS _0,
-              FALSE AS _1
-            UNION
-            ALL
-            SELECT
-              1::int8,
-              6::int8,
-              TRUE
-            UNION
-            ALL
-            SELECT
-              2::int8,
-              12::int8,
-              FALSE
-          ) AS r0
-      ) AS _1
+              COALESCE(
+                jsonb_agg(
+                  jsonb_build_array(r0._0, r0._1)
+                  ORDER BY
+                    r0.index
+                ),
+                '[]'::jsonb
+              )
+            FROM
+              (
+                SELECT
+                  0::int8 AS index,
+                  3::int8 AS _0,
+                  FALSE AS _1
+                UNION
+                ALL
+                SELECT
+                  1::int8,
+                  6::int8,
+                  TRUE
+                UNION
+                ALL
+                SELECT
+                  2::int8,
+                  12::int8,
+                  FALSE
+              ) AS r0
+          ) AS _1
+      ) AS r1
     ---
     {
       "hello",

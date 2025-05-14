@@ -9,7 +9,8 @@ pub use ast::*;
 pub use expr_or_source::*;
 pub use scoped::*;
 
-pub fn retain_by_position<T>(vec: &mut Vec<T>, mut to_keep: Vec<usize>) {
+pub fn retain_by_position<T>(vec: &mut Vec<T>, to_keep: &[usize]) {
+    let mut to_keep = to_keep.to_vec();
     to_keep.sort();
     to_keep.dedup();
 
@@ -21,11 +22,12 @@ pub fn retain_by_position<T>(vec: &mut Vec<T>, mut to_keep: Vec<usize>) {
     vec.truncate(to_keep.len());
 }
 
-pub fn drop_by_position<T>(vec: &mut Vec<T>, mut to_drop: Vec<usize>) {
+pub fn drop_by_position<T>(vec: &mut Vec<T>, to_drop: &[usize]) {
     if to_drop.is_empty() {
         return;
     }
 
+    let mut to_drop = to_drop.to_vec();
     to_drop.sort();
     to_drop.dedup();
 
@@ -50,6 +52,6 @@ pub fn drop_by_position<T>(vec: &mut Vec<T>, mut to_drop: Vec<usize>) {
 #[test]
 fn drop_by_position_01() {
     let mut vec = vec!["a", "b", "c"];
-    drop_by_position(&mut vec, vec![0]);
+    drop_by_position(&mut vec, &[0]);
     assert_eq!(vec, ["b", "c"])
 }

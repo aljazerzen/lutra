@@ -501,9 +501,6 @@ impl<'a> Context<'a> {
             "std::to_columnar" => {
                 let array = self.compile_rel(&call.args[0]);
 
-                let ty_in_item = array.ty.kind.as_array().unwrap().clone();
-                let ty_in_fields = ty_in_item.kind.as_tuple().unwrap();
-
                 let ty_out_fields = expr.ty.kind.as_tuple().unwrap();
 
                 let field0 = cr::RelExpr {
@@ -513,16 +510,10 @@ impl<'a> Context<'a> {
                             ty: array.ty.clone(),
                             id: self.scope_id_gen.gen(),
                         },
-                        |scope_id| {
-                            cr::Transform::Project(vec![
-                                // index
-                                cr::ColExpr::new_rel_col(
-                                    scope_id,
-                                    0,
-                                    ir::Ty::new(ir::TyPrimitive::int64),
-                                ),
-                                // first tuple field
-                                cr::ColExpr::new_rel_col(scope_id, 1, ty_in_fields[0].ty.clone()),
+                        |_| {
+                            cr::Transform::ProjectRetain(vec![
+                                0, // index
+                                1, // first tuple field
                             ])
                         },
                     ),
@@ -536,16 +527,10 @@ impl<'a> Context<'a> {
                             ty: array.ty.clone(),
                             id: self.scope_id_gen.gen(),
                         },
-                        |scope_id| {
-                            cr::Transform::Project(vec![
-                                // index
-                                cr::ColExpr::new_rel_col(
-                                    scope_id,
-                                    0,
-                                    ir::Ty::new(ir::TyPrimitive::int64),
-                                ),
-                                // second tuple field
-                                cr::ColExpr::new_rel_col(scope_id, 2, ty_in_fields[1].ty.clone()),
+                        |_| {
+                            cr::Transform::ProjectRetain(vec![
+                                0, // index
+                                2, // second tuple field
                             ])
                         },
                     ),
@@ -553,35 +538,11 @@ impl<'a> Context<'a> {
                     id: self.scope_id_gen.gen(),
                 };
 
-                let field0_id = field0.id;
-                let field1_id = field1.id;
+                let field0_ref = cr::ColExpr::new_subquery(field0);
+                let field1_ref = cr::ColExpr::new_subquery(field1);
 
-                // construct correlated subqueries
-                let field0 = cr::RelExpr {
-                    ty: field0.ty.clone(),
-                    kind: cr::RelExprKind::BindCorrelated(Box::new(array), Box::new(field0)),
-                    id: 0,
-                };
-                let field1 = cr::RelExpr {
-                    ty: field1.ty.clone(),
-                    kind: cr::RelExprKind::BindCorrelated(Box::new(field0), Box::new(field1)),
-                    id: 0,
-                };
-
-                let field0_ref = cr::ColExpr::new_subquery(cr::RelExpr {
-                    kind: cr::RelExprKind::From(cr::From::Iterator(field0_id)),
-                    ty: ty_out_fields[0].ty.clone(),
-                    id: self.scope_id_gen.gen(),
-                });
-                let field1_ref = cr::ColExpr::new_subquery(cr::RelExpr {
-                    kind: cr::RelExprKind::From(cr::From::Iterator(field1_id)),
-                    ty: ty_out_fields[1].ty.clone(),
-                    id: self.scope_id_gen.gen(),
-                });
-
-                // construct final aggregation
                 cr::RelExprKind::Transform(
-                    Box::new(field1),
+                    Box::new(array),
                     cr::Transform::Aggregate(vec![field0_ref, field1_ref]),
                 )
             }
