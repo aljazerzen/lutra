@@ -32,7 +32,7 @@ pub(super) struct Context<'a> {
     types: HashMap<&'a ir::Path, &'a ir::Ty>,
 
     pub(super) rel_name_gen: NameGenerator,
-    pub(super) rvars: HashMap<usize, (String, ir::Ty)>,
+    pub(super) rel_vars: HashMap<usize, (String, ir::Ty)>,
 }
 
 impl<'a> Context<'a> {
@@ -40,7 +40,7 @@ impl<'a> Context<'a> {
         Self {
             types,
             rel_name_gen: NameGenerator::new("r"),
-            rvars: Default::default(),
+            rel_vars: Default::default(),
         }
     }
 
@@ -51,21 +51,21 @@ impl<'a> Context<'a> {
         }
     }
 
-    fn find_rvar(&self, id: usize) -> &(String, ir::Ty) {
-        match self.rvars.get(&id) {
+    fn find_rel_var(&self, id: usize) -> &(String, ir::Ty) {
+        match self.rel_vars.get(&id) {
             Some(x) => x,
             None => panic!("cannot find scope id: {id}"),
         }
     }
 
-    fn register_rvar(&mut self, input: &cr::RelExpr, output: &Scoped) {
+    fn register_rel_var(&mut self, input: &cr::RelExpr, output: &Scoped) {
         let name = output.expr.as_rel_var().unwrap();
-        self.rvars
+        self.rel_vars
             .insert(input.id, (name.to_string(), input.ty.clone()));
     }
 
-    fn unregister_rvar(&mut self, input: &cr::RelExpr) {
-        self.rvars.remove(&input.id);
+    fn unregister_rel_var(&mut self, input: &cr::RelExpr) {
+        self.rel_vars.remove(&input.id);
     }
 
     fn compile_rel(&mut self, rel: &cr::RelExpr) -> Scoped {
@@ -99,8 +99,8 @@ impl<'a> Context<'a> {
                 self.query_into_scoped(utils::query_select(select))
             }
 
-            cr::RelExprKind::From(cr::From::Iterator(scope_id)) => {
-                let (rel_name, _) = self.find_rvar(*scope_id);
+            cr::RelExprKind::From(cr::From::RelRef(scope_id)) => {
+                let (rel_name, _) = self.find_rel_var(*scope_id);
 
                 Scoped {
                     expr: ExprOrSource::RelVar(rel_name.clone()),
@@ -117,8 +117,8 @@ impl<'a> Context<'a> {
                 let right = self.compile_rel(right_in);
                 let right_name = right.expr.as_rel_var().unwrap().to_string();
 
-                self.register_rvar(left_in, &left);
-                self.register_rvar(right_in, &right);
+                self.register_rel_var(left_in, &left);
+                self.register_rel_var(right_in, &right);
 
                 let mut scope = left;
                 scope.expr = right.expr;
@@ -147,8 +147,8 @@ impl<'a> Context<'a> {
                     scope.rel_vars.extend(expr.rel_vars);
                 }
 
-                self.unregister_rvar(left_in);
-                self.unregister_rvar(right_in);
+                self.unregister_rel_var(left_in);
+                self.unregister_rel_var(right_in);
 
                 scope
             }
@@ -157,9 +157,9 @@ impl<'a> Context<'a> {
                 // compile inner-to-outer
                 let bound = self.compile_rel(bound_in);
 
-                self.register_rvar(bound_in, &bound);
+                self.register_rel_var(bound_in, &bound);
                 let main = self.compile_rel(main_in);
-                self.unregister_rvar(bound_in);
+                self.unregister_rel_var(bound_in);
 
                 Scoped {
                     expr: main.expr,
@@ -174,9 +174,9 @@ impl<'a> Context<'a> {
             cr::RelExprKind::Transform(input, transform) => {
                 let input_sql = self.compile_rel(input);
 
-                self.register_rvar(input, &input_sql);
+                self.register_rel_var(input, &input_sql);
                 let r = self.compile_rel_transform(input_sql, transform, &input.ty, &rel.ty);
-                self.unregister_rvar(input);
+                self.unregister_rel_var(input);
 
                 r
             }
@@ -187,10 +187,10 @@ impl<'a> Context<'a> {
                 let val_ty = val_in.ty.clone();
                 let val = self.compile_rel(val_in);
 
-                self.register_rvar(val_in, &val);
+                self.register_rel_var(val_in, &val);
                 let main_ty = main_in.ty.clone();
                 let main = self.compile_rel(main_in);
-                self.unregister_rvar(val_in);
+                self.unregister_rel_var(val_in);
 
                 let val = self.scoped_into_query(val, &val_ty);
                 let mut main = self.scoped_into_query(main, &main_ty);
@@ -207,6 +207,27 @@ impl<'a> Context<'a> {
                 let alias = self.rel_name_gen.next();
                 let rel_var = utils::new_table(vec![name], Some(alias.clone()));
                 Scoped::new(alias, vec![rel_var])
+            }
+
+            cr::RelExprKind::Union(parts) => {
+                let mut res = None;
+                for part_in in parts {
+                    let part = self.compile_rel(part_in);
+                    let part = self.scoped_into_query(part, &part_in.ty);
+
+                    if let Some(r) = res {
+                        res = Some(utils::union(r, utils::query_into_set_expr(part)))
+                    } else {
+                        res = Some(utils::query_into_set_expr(part))
+                    }
+                }
+
+                let query =
+                    utils::query_new(res.unwrap_or_else(|| self.construct_empty_rel(&rel.ty)));
+
+                let name = self.rel_name_gen.next();
+                let rel = utils::sub_rel(query, name.clone());
+                Scoped::new(name, vec![rel])
             }
         }
     }
@@ -377,33 +398,7 @@ impl<'a> Context<'a> {
             ))
         }
 
-        let query = utils::query_new(res.unwrap_or_else(|| {
-            // construct a rel without rows
-            let mut values = Vec::new();
-
-            if ty.kind.is_array() {
-                values.push(utils::number("0"));
-            }
-            let item_ty = match &ty.kind {
-                ir::TyKind::Primitive(_) | ir::TyKind::Tuple(_) => ty,
-                ir::TyKind::Array(item_ty) => item_ty,
-                ir::TyKind::Enum(_) | ir::TyKind::Function(_) | ir::TyKind::Ident(_) => todo!(),
-            };
-            match &self.get_ty_mat(item_ty).kind {
-                ir::TyKind::Primitive(_) => {
-                    values.push(self.null(item_ty));
-                }
-                ir::TyKind::Tuple(ty_fields) => {
-                    values.extend(ty_fields.iter().map(|ty_field| self.null(&ty_field.ty)));
-                }
-                _ => todo!(),
-            }
-
-            let mut select = utils::select_empty();
-            select.projection = self.projection(ty, values.into_iter().map(ExprOrSource::Expr));
-            select.selection = Some(utils::bool(false));
-            sql_ast::SetExpr::Select(Box::new(select))
-        }));
+        let query = utils::query_new(res.unwrap_or_else(|| self.construct_empty_rel(ty)));
 
         let name = self.rel_name_gen.next();
         let rel = utils::sub_rel(query, name.clone());
@@ -445,7 +440,7 @@ impl<'a> Context<'a> {
                 }
             }
             cr::ColExprKind::InputRelCol(scope_id, col_position) => {
-                let (scope_name, scope_ty) = self.find_rvar(*scope_id);
+                let (scope_name, scope_ty) = self.find_rel_var(*scope_id);
                 let col = self.rel_cols(scope_ty, true).nth(*col_position).unwrap();
                 Scoped::from(ExprOrSource::Expr(utils::ident(Some(scope_name), col)))
             }
@@ -695,7 +690,7 @@ impl<'a> Context<'a> {
         }
     }
 
-    fn null(&mut self, ty: &ir::Ty) -> sql_ast::Expr {
+    fn null(&self, ty: &ir::Ty) -> sql_ast::Expr {
         sql_ast::Expr::Cast {
             kind: sql_ast::CastKind::DoubleColon,
             expr: Box::new(utils::value(sql_ast::Value::Null)),
@@ -755,6 +750,36 @@ impl<'a> Context<'a> {
                 sql_ast::Value::SingleQuotedString(s.clone()),
             )),
         }
+    }
+
+    fn construct_empty_rel(&self, ty: &ir::Ty) -> sql_ast::SetExpr {
+        // construct a rel without rows
+        let mut values = Vec::new();
+
+        if ty.kind.is_array() {
+            values.push(utils::number("0"));
+        }
+        let item_ty = match &ty.kind {
+            ir::TyKind::Primitive(_) | ir::TyKind::Tuple(_) => ty,
+            ir::TyKind::Array(item_ty) => item_ty,
+            ir::TyKind::Enum(_) | ir::TyKind::Function(_) | ir::TyKind::Ident(_) => {
+                todo!()
+            }
+        };
+        match &self.get_ty_mat(item_ty).kind {
+            ir::TyKind::Primitive(_) => {
+                values.push(self.null(item_ty));
+            }
+            ir::TyKind::Tuple(ty_fields) => {
+                values.extend(ty_fields.iter().map(|ty_field| self.null(&ty_field.ty)));
+            }
+            _ => todo!(),
+        }
+
+        let mut select = utils::select_empty();
+        select.projection = self.projection(ty, values.into_iter().map(ExprOrSource::Expr));
+        select.selection = Some(utils::bool(false));
+        sql_ast::SetExpr::Select(Box::new(select))
     }
 }
 

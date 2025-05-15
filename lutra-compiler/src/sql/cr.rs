@@ -25,6 +25,10 @@ pub enum RelExprKind {
 
     /// Bind a relation and evaluate an correlated expression
     BindCorrelated(Box<RelExpr>, Box<RelExpr>),
+
+    /// Computes relations separately and concatenates them together
+    #[allow(dead_code)]
+    Union(Vec<RelExpr>),
 }
 
 #[derive(Debug, Clone)]
@@ -39,8 +43,8 @@ pub enum From {
     /// Read from a CTE (in RelExpr representation)
     Binding(usize),
 
-    /// Reference to an iterator of a scope.
-    Iterator(usize),
+    /// Reference to a relation variable in scope.
+    RelRef(usize),
 }
 
 #[derive(Debug, Clone)]
@@ -132,7 +136,7 @@ impl RelExpr {
         RelExpr {
             kind: RelExprKind::Transform(
                 Box::new(RelExpr {
-                    kind: RelExprKind::From(From::Iterator(rel_id)),
+                    kind: RelExprKind::From(From::RelRef(rel_id)),
                     ty: rel_ty,
                     id: id_gen.gen(),
                 }),

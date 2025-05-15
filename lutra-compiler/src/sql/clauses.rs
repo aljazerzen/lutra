@@ -380,7 +380,7 @@ impl<'a> Context<'a> {
                 let func = func.kind.as_function().unwrap();
                 let mut item_ref = cr::RelExprKind::Transform(
                     Box::new(cr::RelExpr {
-                        kind: cr::RelExprKind::From(cr::From::Iterator(array.id)),
+                        kind: cr::RelExprKind::From(cr::From::RelRef(array.id)),
                         ty: array.ty.clone(),
                         id: self.scope_id_gen.gen(),
                     }),
@@ -414,7 +414,7 @@ impl<'a> Context<'a> {
                     func.id,
                     FuncProvider::RelExpr(cr::RelExprKind::Transform(
                         Box::new(cr::RelExpr {
-                            kind: cr::RelExprKind::From(cr::From::Iterator(array.id)),
+                            kind: cr::RelExprKind::From(cr::From::RelRef(array.id)),
                             ty: array.ty.clone(),
                             id: self.scope_id_gen.gen(),
                         }),
@@ -436,7 +436,7 @@ impl<'a> Context<'a> {
                     func.id,
                     FuncProvider::RelExpr(cr::RelExprKind::Transform(
                         Box::new(cr::RelExpr {
-                            kind: cr::RelExprKind::From(cr::From::Iterator(array.id)),
+                            kind: cr::RelExprKind::From(cr::From::RelRef(array.id)),
                             ty: array.ty.clone(),
                             id: self.scope_id_gen.gen(),
                         }),
@@ -498,7 +498,7 @@ impl<'a> Context<'a> {
                 let field0 = cr::RelExpr {
                     kind: cr::RelExprKind::Transform(
                         Box::new(cr::RelExpr {
-                            kind: cr::RelExprKind::From(cr::From::Iterator(array.id)),
+                            kind: cr::RelExprKind::From(cr::From::RelRef(array.id)),
                             ty: array.ty.clone(),
                             id: self.scope_id_gen.gen(),
                         }),
@@ -513,7 +513,7 @@ impl<'a> Context<'a> {
                 let field1 = cr::RelExpr {
                     kind: cr::RelExprKind::Transform(
                         Box::new(cr::RelExpr {
-                            kind: cr::RelExprKind::From(cr::From::Iterator(array.id)),
+                            kind: cr::RelExprKind::From(cr::From::RelRef(array.id)),
                             ty: array.ty.clone(),
                             id: self.scope_id_gen.gen(),
                         }),
@@ -744,7 +744,7 @@ fn new_int(int: i64) -> cr::ColExpr {
 
 fn try_simplify_input_rel_col(rel: &cr::RelExpr) -> Option<(usize, usize)> {
     match &rel.kind {
-        cr::RelExprKind::From(cr::From::Iterator(scope_id)) => Some((*scope_id, 0)),
+        cr::RelExprKind::From(cr::From::RelRef(scope_id)) => Some((*scope_id, 0)),
         cr::RelExprKind::From(_) => None,
 
         cr::RelExprKind::Transform(input, transform) => {

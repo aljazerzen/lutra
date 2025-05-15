@@ -149,6 +149,21 @@ pub fn union(left: sql_ast::SetExpr, right: sql_ast::SetExpr) -> sql_ast::SetExp
     }
 }
 
+pub fn query_into_set_expr(query: sql_ast::Query) -> sql_ast::SetExpr {
+    if query.with.is_some()
+        || query.order_by.is_some()
+        || query.limit.is_some()
+        || !query.limit_by.is_empty()
+        || query.offset.is_some()
+        || query.fetch.is_some()
+        || !query.locks.is_empty()
+        || query.for_clause.is_some()
+    {
+        return sql_ast::SetExpr::Query(Box::new(query));
+    }
+    *query.body
+}
+
 pub fn query_new(set_expr: sql_ast::SetExpr) -> sql_ast::Query {
     sql_ast::Query {
         with: Default::default(),
