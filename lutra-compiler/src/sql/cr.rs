@@ -42,7 +42,7 @@ pub struct BoundRelExpr {
 pub enum From {
     /// Relation with many rows and many columns, where each cell can have
     /// a different expression.
-    Construction(Vec<Vec<ColExpr>>),
+    Row(Vec<ColExpr>),
 
     /// Read from a table (in Table representation)
     Table(String),

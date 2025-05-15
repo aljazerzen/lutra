@@ -95,8 +95,14 @@ impl<'a> Context<'a> {
 
     fn compile_rel(&mut self, rel: &cr::RelExpr) -> Scoped {
         match &rel.kind {
-            cr::RelExprKind::From(cr::From::Construction(rows)) => {
-                self.compile_rel_constructed(rows, &rel.ty)
+            cr::RelExprKind::From(cr::From::Row(row)) => {
+                let mut select = utils::select_empty();
+                let columns = self.compile_columns(row);
+                select.projection = self.projection(&rel.ty, columns);
+
+                let name = self.rel_name_gen.next();
+                let rel_var = utils::sub_rel(utils::query_select(select), name.clone());
+                Scoped::new(name, vec![rel_var])
             }
 
             cr::RelExprKind::From(cr::From::Table(table_name)) => {
@@ -234,7 +240,12 @@ impl<'a> Context<'a> {
                 let mut res = None;
                 for part_in in parts {
                     let part = self.compile_rel(part_in);
-                    let part = self.scoped_into_query(part, &part_in.ty);
+
+                    let part = if let Some(query) = part.as_query() {
+                        query.clone()
+                    } else {
+                        self.scoped_into_query(part, &part_in.ty)
+                    };
 
                     if let Some(r) = res {
                         res = Some(utils::union(r, utils::query_into_set_expr(part)))
@@ -270,7 +281,7 @@ impl<'a> Context<'a> {
                 select.projection = self.projection(ty, column_exprs);
             }
             cr::Transform::ProjectRetain(cols) => {
-                let must_wrap = scoped.as_sub_rel().is_none_or(|q| q.order_by.is_some());
+                let must_wrap = scoped.as_query().is_none_or(|q| q.order_by.is_some());
                 if must_wrap {
                     scoped = self.wrap_scoped(scoped, input_ty);
                 }
@@ -289,7 +300,7 @@ impl<'a> Context<'a> {
             }
 
             cr::Transform::ProjectDiscard(cols) => {
-                let must_wrap = scoped.as_sub_rel().is_none_or(|q| q.order_by.is_some());
+                let must_wrap = scoped.as_query().is_none_or(|q| q.order_by.is_some());
                 if must_wrap {
                     scoped = self.wrap_scoped(scoped, input_ty);
                 }
@@ -330,13 +341,13 @@ impl<'a> Context<'a> {
             }
             cr::Transform::Limit(limit) => {
                 let must_wrap = scoped
-                    .as_sub_rel()
+                    .as_query()
                     .is_none_or(|q| q.limit.is_some() || q.offset.is_some());
                 if must_wrap {
                     scoped = self.wrap_scoped(scoped, input_ty);
                 }
 
-                let query = scoped.as_mut_sub_rel().unwrap();
+                let query = scoped.as_mut_query().unwrap();
                 let limit = self.compile_expr(limit);
                 query.limit = Some(limit.expr.into_expr());
                 if query.order_by.is_none() {
@@ -350,13 +361,13 @@ impl<'a> Context<'a> {
             }
             cr::Transform::Offset(offset) => {
                 let must_wrap = scoped
-                    .as_sub_rel()
+                    .as_query()
                     .is_none_or(|q| q.limit.is_some() || q.offset.is_some());
                 if must_wrap {
                     scoped = self.wrap_scoped(scoped, input_ty);
                 }
 
-                let query = scoped.as_mut_sub_rel().unwrap();
+                let query = scoped.as_mut_query().unwrap();
                 let offset = self.compile_expr(offset);
                 query.offset = Some(sql_ast::Offset {
                     value: offset.expr.into_expr(),
@@ -388,42 +399,6 @@ impl<'a> Context<'a> {
             cr::Transform::JsonUnpack => scoped = self.compile_json_unpack(scoped, ty),
         }
         scoped
-    }
-
-    fn compile_rel_constructed(&mut self, rows: &[Vec<cr::ColExpr>], ty: &ir::Ty) -> Scoped {
-        let mut res = None;
-        let mut rows = rows.iter();
-
-        // first row with aliases
-        if let Some(row) = rows.next() {
-            let mut select = utils::select_empty();
-            let columns = self.compile_columns(row);
-            select.projection = self.projection(ty, columns);
-            res = Some(sql_ast::SetExpr::Select(Box::new(select)));
-        }
-
-        // all following rows
-        for row in rows {
-            let mut select = utils::select_empty();
-
-            let columns = self.compile_columns(row);
-            select.projection = columns
-                .into_iter()
-                .map(ExprOrSource::into_expr)
-                .map(sql_ast::SelectItem::UnnamedExpr)
-                .collect();
-
-            res = Some(utils::union(
-                res.unwrap(),
-                sql_ast::SetExpr::Select(Box::new(select)),
-            ))
-        }
-
-        let query = utils::query_new(res.unwrap_or_else(|| self.construct_empty_rel(ty)));
-
-        let name = self.rel_name_gen.next();
-        let rel = utils::sub_rel(query, name.clone());
-        Scoped::new(name, vec![rel])
     }
 
     fn compile_columns_scoped(
@@ -544,8 +519,6 @@ impl<'a> Context<'a> {
 
     fn compile_json_unpack(&mut self, mut scoped: Scoped, ty: &ir::Ty) -> Scoped {
         if let Some(simplified) = scoped.as_simplified() {
-            dbg!(scoped);
-            dbg!(&simplified);
             scoped = simplified;
         }
 

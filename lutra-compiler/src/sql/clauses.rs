@@ -59,12 +59,10 @@ impl<'a> Context<'a> {
 
     fn compile_rel(&mut self, expr: &ir::Expr) -> cr::RelExpr {
         let kind = match &expr.kind {
-            ir::ExprKind::Literal(lit) => {
-                cr::RelExprKind::From(cr::From::Construction(vec![vec![cr::ColExpr {
-                    kind: cr::ColExprKind::Literal(lit.clone()),
-                    ty: expr.ty.clone(),
-                }]]))
-            }
+            ir::ExprKind::Literal(lit) => cr::RelExprKind::From(cr::From::Row(vec![cr::ColExpr {
+                kind: cr::ColExprKind::Literal(lit.clone()),
+                ty: expr.ty.clone(),
+            }])),
             ir::ExprKind::Tuple(fields) => {
                 let ty_fields = expr.ty.kind.as_tuple().unwrap();
 
@@ -82,9 +80,7 @@ impl<'a> Context<'a> {
                             // finish prev rel
                             if !res_cols.is_empty() {
                                 res_rels.push(cr::RelExpr {
-                                    kind: cr::RelExprKind::From(cr::From::Construction(vec![
-                                        res_cols,
-                                    ])),
+                                    kind: cr::RelExprKind::From(cr::From::Row(res_cols)),
                                     ty: ir::Ty::new(ir::TyKind::Tuple(res_ty_fields)),
                                 });
                                 res_cols = Vec::new();
@@ -100,14 +96,14 @@ impl<'a> Context<'a> {
                 if res_rels.is_empty() {
                     // simple case: only simple columns, just From::Construction
 
-                    cr::RelExprKind::From(cr::From::Construction(vec![res_cols]))
+                    cr::RelExprKind::From(cr::From::Row(res_cols))
                 } else {
                     // there are rels, Join needed
 
                     // finish last rel
                     if !res_cols.is_empty() {
                         res_rels.push(cr::RelExpr {
-                            kind: cr::RelExprKind::From(cr::From::Construction(vec![res_cols])),
+                            kind: cr::RelExprKind::From(cr::From::Row(res_cols)),
                             ty: ir::Ty::new(ir::TyKind::Tuple(res_ty_fields)),
                         });
                     }
@@ -137,10 +133,15 @@ impl<'a> Context<'a> {
                             ty: ir::Ty::new(ir::TyPrimitive::int64),
                         }];
                         cols.extend(self.compile_column_list(x).unwrap_columns());
-                        cols
+
+                        cr::RelExpr {
+                            kind: cr::RelExprKind::From(cr::From::Row(cols)),
+                            ty: expr.ty.clone(),
+                        }
                     })
                     .collect();
-                cr::RelExprKind::From(cr::From::Construction(rows))
+
+                cr::RelExprKind::Union(rows)
             }
 
             ir::ExprKind::Call(call) => match &call.function.kind {
@@ -197,7 +198,7 @@ impl<'a> Context<'a> {
                             kind: cr::ColExprKind::Param(ptr.param_position),
                             ty: expr.ty.clone(),
                         };
-                        cr::RelExprKind::From(cr::From::Construction(vec![vec![expr]]))
+                        cr::RelExprKind::From(cr::From::Row(vec![expr]))
                     }
                 }
             }
@@ -241,7 +242,7 @@ impl<'a> Context<'a> {
                     });
                 }
 
-                cr::RelExprKind::From(cr::From::Construction(vec![row]))
+                cr::RelExprKind::From(cr::From::Row(row))
             }
             ir::ExprKind::EnumEq(_) => todo!(),
             ir::ExprKind::EnumUnwrap(_) => todo!(),
@@ -635,7 +636,7 @@ impl<'a> Context<'a> {
 
             _ => {
                 let expr = self.compile_expr_std(expr);
-                cr::RelExprKind::From(cr::From::Construction(vec![vec![expr]]))
+                cr::RelExprKind::From(cr::From::Row(vec![expr]))
             }
         };
         cr::RelExpr {
@@ -674,10 +675,10 @@ impl<'a> Context<'a> {
 
         match rel.kind {
             // it is just one constructed row: unwrap
-            cr::RelExprKind::From(cr::From::Construction(mut rows))
-                if rows.len() == 1 && !self.get_ty_mat(&expr.ty).kind.is_array() =>
+            cr::RelExprKind::From(cr::From::Row(row))
+                if !self.get_ty_mat(&expr.ty).kind.is_array() =>
             {
-                ColumnsOrUnpack::Columns(rows.remove(0))
+                ColumnsOrUnpack::Columns(row)
             }
 
             // it is actually complex: subquery

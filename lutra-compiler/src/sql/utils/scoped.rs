@@ -21,11 +21,8 @@ impl Scoped {
             rel_vars,
         }
     }
-    pub fn into_tables_with_joins(self) -> impl Iterator<Item = sql_ast::TableWithJoins> {
-        self.rel_vars.into_iter().map(utils::from)
-    }
 
-    pub fn as_sub_rel(&self) -> Option<&sql_ast::Query> {
+    pub fn as_query(&self) -> Option<&sql_ast::Query> {
         let name = self.expr.as_rel_var()?;
         let rel_var = self
             .rel_vars
@@ -34,7 +31,7 @@ impl Scoped {
             .find(|r| utils::get_rel_alias(r) == name)?;
         utils::as_sub_rel(rel_var)
     }
-    pub fn as_mut_sub_rel(&mut self) -> Option<&mut sql_ast::Query> {
+    pub fn as_mut_query(&mut self) -> Option<&mut sql_ast::Query> {
         let name = self.expr.as_rel_var()?;
         let rel_var = self
             .rel_vars
@@ -48,7 +45,7 @@ impl Scoped {
         if self.rel_vars.len() != 1 {
             return None;
         }
-        let query = self.as_sub_rel()?;
+        let query = self.as_query()?;
 
         if query.limit.is_some() || query.order_by.is_some() {
             return None;
@@ -138,7 +135,7 @@ impl<'a> crate::sql::queries::Context<'a> {
         rel_ty: &ir::Ty,
         is_valid: impl Fn(&sql_ast::Select) -> bool,
     ) -> &'q mut sql_ast::Select {
-        let is_valid = rel.as_sub_rel().is_some_and(|query| {
+        let is_valid = rel.as_query().is_some_and(|query| {
             if let sql_ast::SetExpr::Select(select) = query.body.as_ref() {
                 is_valid(select)
             } else {
@@ -162,7 +159,7 @@ impl<'a> crate::sql::queries::Context<'a> {
             let _dummy = std::mem::replace(rel, wrapped);
         }
 
-        let query = rel.as_mut_sub_rel().unwrap();
+        let query = rel.as_mut_query().unwrap();
         let select = match query.body.as_mut() {
             sql_ast::SetExpr::Select(select) => select,
             set_expr => {
