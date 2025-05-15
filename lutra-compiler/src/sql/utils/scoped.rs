@@ -41,7 +41,7 @@ impl Scoped {
         utils::as_mut_sub_rel(rel_var)
     }
 
-    pub fn as_simplified(&self) -> Option<Scoped> {
+    pub fn as_row(&self) -> Option<&[sql_ast::SelectItem]> {
         if self.rel_vars.len() != 1 {
             return None;
         }
@@ -53,13 +53,25 @@ impl Scoped {
         let sql_ast::SetExpr::Select(select) = query.body.as_ref() else {
             return None;
         };
-        if select.selection.is_some() || !select.from.is_empty() || select.projection.len() != 1 {
+        if select.selection.is_some() || !select.from.is_empty() {
             return None;
         }
+        Some(&select.projection)
+    }
+    pub fn as_simplified_expr(&self) -> Option<Scoped> {
+        let row = self.as_row()?;
         Some(Scoped {
-            expr: ExprOrSource::Expr(utils::unwrap_select_item(select.projection[0].clone())),
+            expr: ExprOrSource::Expr(utils::unwrap_select_item(row[0].clone())),
             rel_vars: vec![],
         })
+    }
+
+    pub fn merge_input(mut self, mut input: Scoped) -> Self {
+        input
+            .rel_vars
+            .extend(self.rel_vars.into_iter().map(utils::lateral));
+        self.rel_vars = input.rel_vars;
+        self
     }
 }
 

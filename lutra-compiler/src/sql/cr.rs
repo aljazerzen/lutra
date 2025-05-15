@@ -53,10 +53,6 @@ pub enum From {
 
 #[derive(Debug, Clone)]
 pub enum Transform {
-    /// Projection that replaces all columns (but not the index)
-    /// Each column expression is evaluated for each row of the input.
-    Project(Vec<ColExpr>),
-
     /// Projection that retains columns by position
     ProjectRetain(Vec<usize>),
 

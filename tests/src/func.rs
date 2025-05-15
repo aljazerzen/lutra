@@ -653,7 +653,9 @@ test_case!(
 
 test_case!(
     std_aggregate_00,
-    r#"func () -> std::aggregate([{5,3},{65,1},{3, 2}], func (x: {[int], [int]}) -> {std::min(x.0), std::min(x.1)})"#,
+    r#"
+    let my_rel = [{5,3},{65,1},{3, 2}]
+    func () -> std::aggregate(my_rel, func (x: {[int], [int]}) -> {std::min(x.0), std::min(x.1)})"#,
     r#"{
   3,
   1,

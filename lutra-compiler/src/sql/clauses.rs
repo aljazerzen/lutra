@@ -418,7 +418,13 @@ impl<'a> Context<'a> {
                 row.extend(self.compile_column_list(&func.body).unwrap_columns());
                 self.functions.remove(&func.id);
 
-                cr::RelExprKind::Transform(array, cr::Transform::Project(row))
+                cr::RelExprKind::BindCorrelated(
+                    array,
+                    Box::new(cr::RelExpr {
+                        kind: cr::RelExprKind::From(cr::From::Row(row)),
+                        ty: expr.ty.clone(),
+                    }),
+                )
             }
             "std::filter" => {
                 let array = self.compile_rel(&call.args[0]);
@@ -495,14 +501,14 @@ impl<'a> Context<'a> {
                 let mut args = vec![item];
                 args.extend(call.args[1..].iter().map(|a| self.compile_column(a)));
 
-                let transform = cr::Transform::Project(vec![
+                let row = vec![
                     cr::ColExpr::new_rel_col(array.id, 0, ir::Ty::new(ir::TyPrimitive::int64)),
                     cr::ColExpr {
                         kind: cr::ColExprKind::FuncCall(ptr.id.clone(), args),
                         ty: expr.ty.clone(),
                     },
-                ]);
-                cr::RelExprKind::Transform(array, transform)
+                ];
+                cr::RelExprKind::Transform(array, cr::Transform::Aggregate(row))
             }
 
             "std::to_columnar" => {

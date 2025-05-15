@@ -17,9 +17,10 @@ pub fn compile(rel: cr::RelExpr, types: HashMap<&ir::Path, &ir::Ty>) -> sql_ast:
 
     if rel_ty.kind.is_array() {
         // wrap into a top-level projection to remove array indexes
+        let rel_name = query.expr.as_rel_var().unwrap().to_string();
         let mut query = ctx.scoped_into_query_ext(query, &rel_ty, false);
         query.order_by = Some(utils::order_by_one(utils::ident(
-            None::<&str>,
+            Some(rel_name),
             COL_ARRAY_INDEX,
         )));
         query
@@ -197,13 +198,16 @@ impl<'a> Context<'a> {
                 let main = self.compile_rel(main_in);
                 self.unregister_rel_var(bound_in);
 
-                Scoped {
-                    expr: main.expr,
-                    rel_vars: std::iter::Iterator::chain(
-                        bound.rel_vars.into_iter(),
-                        main.rel_vars.into_iter().map(utils::lateral),
-                    )
-                    .collect(),
+                if let Some(row) = main.as_row() {
+                    // optimization: if main is a simple projection, place bound into FROM clause and
+                    // produce a single query
+                    let mut bound = self.wrap_scoped(bound, &bound_in.rel.ty);
+                    let select = self.scoped_as_mut_select(&mut bound, &bound_in.rel.ty);
+                    select.projection = row.to_vec();
+                    bound
+                } else {
+                    // lateral
+                    main.merge_input(bound)
                 }
             }
 
@@ -272,14 +276,6 @@ impl<'a> Context<'a> {
         ty: &ir::Ty,
     ) -> Scoped {
         match transform {
-            cr::Transform::Project(columns) => {
-                scoped = self.wrap_scoped(scoped, input_ty);
-
-                let select = self.scoped_as_mut_select(&mut scoped, input_ty);
-
-                let column_exprs = self.compile_columns(columns);
-                select.projection = self.projection(ty, column_exprs);
-            }
             cr::Transform::ProjectRetain(cols) => {
                 let must_wrap = scoped.as_query().is_none_or(|q| q.order_by.is_some());
                 if must_wrap {
@@ -518,7 +514,7 @@ impl<'a> Context<'a> {
     }
 
     fn compile_json_unpack(&mut self, mut scoped: Scoped, ty: &ir::Ty) -> Scoped {
-        if let Some(simplified) = scoped.as_simplified() {
+        if let Some(simplified) = scoped.as_simplified_expr() {
             scoped = simplified;
         }
 

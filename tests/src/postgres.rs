@@ -138,7 +138,7 @@ fn array_prim() {
           12::int8 AS value
       ) AS r3
     ORDER BY
-      index
+      r3.index
     ---
     [
       3,
@@ -164,7 +164,7 @@ fn array_empty() {
           false
       ) AS r0
     ORDER BY
-      index
+      r0.index
     ---
     []
     "#);
@@ -390,7 +390,7 @@ fn array_array_prim() {
           ) AS value
       ) AS r9
     ORDER BY
-      index
+      r9.index
     ---
     [
       [
@@ -434,7 +434,7 @@ fn array_tuple_prim() {
           FALSE AS _1
       ) AS r3
     ORDER BY
-      index
+      r3.index
     ---
     [
       {
