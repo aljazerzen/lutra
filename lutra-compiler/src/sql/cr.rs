@@ -1,54 +1,66 @@
 use lutra_bin::ir;
 
-use crate::utils::IdGenerator;
-
 #[derive(Clone)]
-pub struct RelExpr {
-    pub kind: RelExprKind,
+pub struct Expr {
+    pub kind: ExprKind,
     pub ty: ir::Ty,
 }
 
 #[derive(Debug, Clone)]
-pub enum RelExprKind {
-    /// Expression that produces a relation, without relational inputs.
+pub enum ExprKind {
+    /// Expression without relational inputs.
     From(From),
 
     /// Applies a relational transform.
-    /// Introduces iterator over input relation for the scope of this transform.
-    Transform(Box<BoundRelExpr>, Transform),
+    Transform(Box<BoundExpr>, Transform),
 
-    Join(Box<BoundRelExpr>, Box<BoundRelExpr>, Option<Box<ColExpr>>),
+    Join(Box<BoundExpr>, Box<BoundExpr>, Option<Box<Expr>>),
 
     /// Bind a relation and evaluate an unrelated expression
-    Bind(Box<BoundRelExpr>, Box<RelExpr>),
+    Bind(Box<BoundExpr>, Box<Expr>),
 
     /// Bind a relation and evaluate an correlated expression
-    BindCorrelated(Box<BoundRelExpr>, Box<RelExpr>),
+    BindCorrelated(Box<BoundExpr>, Box<Expr>),
 
     /// Computes relations separately and concatenates them together
     #[allow(dead_code)]
-    Union(Vec<RelExpr>),
+    Union(Vec<Expr>),
 }
 
 /// An expression, bound to an identifier.
 /// Such relations can be referred to by From::RelRef.
 #[derive(Clone)]
-pub struct BoundRelExpr {
+pub struct BoundExpr {
     pub id: usize,
-    pub rel: RelExpr,
+    pub rel: Expr,
 }
 
 #[derive(Debug, Clone)]
 pub enum From {
-    /// Relation with many rows and many columns, where each cell can have
+    /// Relation with one row and many columns, where each cell can have
     /// a different expression.
-    Row(Vec<ColExpr>),
+    Row(Vec<Expr>),
 
     /// Read from a table (in Table representation)
     Table(String),
 
     /// Reference to a relation variable in scope.
     RelRef(usize),
+
+    /// NULL
+    Null,
+
+    // A literal value
+    Literal(ir::Literal),
+
+    /// SQL query parameter. Contains 0-based index
+    Param(u8),
+
+    /// Call a function by its lutra name
+    FuncCall(String, Vec<Expr>),
+
+    /// Converts a JSON-encoded value into a relation
+    JsonUnpack(Box<Expr>),
 }
 
 #[derive(Debug, Clone)]
@@ -59,57 +71,33 @@ pub enum Transform {
     /// Projection that discards columns by position
     ProjectDiscard(Vec<usize>),
 
-    Aggregate(Vec<ColExpr>),
+    Aggregate(Vec<Expr>),
+
+    Window(Vec<Expr>),
 
     /// Filters by retaining only first N rows
-    Limit(ColExpr),
+    Limit(Box<Expr>),
 
     /// Filters by discarding first N rows
-    Offset(ColExpr),
+    Offset(Box<Expr>),
 
     /// Filtering (also known as selection)
-    Where(ColExpr),
+    Where(Box<Expr>),
 
-    /// Sorting or rows
-    OrderBy(ColExpr),
-
-    /// Converts a JSON-encoded value into a relation
-    JsonUnpack,
+    /// Sorting of rows
+    OrderBy(Box<Expr>),
 }
 
-#[derive(Clone)]
-pub struct ColExpr {
-    pub kind: ColExprKind,
-    pub ty: ir::Ty,
-}
-
-#[derive(Debug, Clone)]
-pub enum ColExprKind {
-    Null,
-
-    // A literal value
-    Literal(ir::Literal),
-
-    /// SQL query parameter. Contains 0-based index
-    Param(u8),
-
-    /// Equivalent to `Subquery(Transform(From(RelRef(_))), ProjectRetain(vec![_]))`
-    InputRelCol(usize, usize),
-
-    /// Call a function by its lutra name
-    FuncCall(String, Vec<ColExpr>),
-
-    /// A relational subquery
-    Subquery(Box<RelExpr>),
-}
-
-impl std::fmt::Debug for RelExpr {
+impl std::fmt::Debug for Expr {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        self.kind.fmt(f)
+        self.kind.fmt(f)?;
+        // f.write_str(": ")?;
+        // self.ty.fmt(f)
+        Ok(())
     }
 }
 
-impl std::fmt::Debug for BoundRelExpr {
+impl std::fmt::Debug for BoundExpr {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         self.id.fmt(f)?;
         f.write_str(": ")?;
@@ -117,54 +105,11 @@ impl std::fmt::Debug for BoundRelExpr {
     }
 }
 
-impl std::fmt::Debug for ColExpr {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        self.kind.fmt(f)
-    }
-}
-
-impl RelExpr {
-    pub fn new_transform_preserve_ty(input: RelExpr, transform: Transform, id: usize) -> Self {
-        RelExpr {
+impl Expr {
+    pub fn new_transform_preserve_ty(input: Expr, transform: Transform, id: usize) -> Self {
+        Expr {
             ty: input.ty.clone(),
-            kind: RelExprKind::Transform(Box::new(BoundRelExpr { rel: input, id }), transform),
-        }
-    }
-
-    pub fn new_rel_col(
-        rel_id: usize,
-        rel_ty: ir::Ty,
-        col_position: usize,
-        col_ty: ir::Ty,
-        id_gen: &mut IdGenerator<usize>,
-    ) -> Self {
-        RelExpr {
-            kind: RelExprKind::Transform(
-                Box::new(BoundRelExpr {
-                    rel: RelExpr {
-                        kind: RelExprKind::From(From::RelRef(rel_id)),
-                        ty: rel_ty,
-                    },
-                    id: id_gen.gen(),
-                }),
-                Transform::ProjectRetain(vec![col_position]),
-            ),
-            ty: col_ty,
-        }
-    }
-}
-
-impl ColExpr {
-    pub fn new_subquery(subquery: RelExpr) -> Self {
-        ColExpr {
-            ty: subquery.ty.clone(),
-            kind: ColExprKind::Subquery(Box::new(subquery)),
-        }
-    }
-    pub fn new_rel_col(rel_id: usize, col_position: usize, col_ty: ir::Ty) -> ColExpr {
-        ColExpr {
-            kind: ColExprKind::InputRelCol(rel_id, col_position),
-            ty: col_ty,
+            kind: ExprKind::Transform(Box::new(BoundExpr { rel: input, id }), transform),
         }
     }
 }

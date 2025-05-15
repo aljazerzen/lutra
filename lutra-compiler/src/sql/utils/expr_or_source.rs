@@ -68,7 +68,10 @@ impl std::fmt::Display for ExprOrSource {
         match self {
             ExprOrSource::Expr(e) => e.fmt(f),
             ExprOrSource::Source(s) => f.write_str(s),
-            ExprOrSource::RelVar(s) => f.write_str(s),
+            ExprOrSource::RelVar(s) => {
+                f.write_str(s)?;
+                f.write_str(".value")
+            }
         }
     }
 }

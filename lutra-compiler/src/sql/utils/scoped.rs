@@ -60,6 +60,9 @@ impl Scoped {
     }
     pub fn as_simplified_expr(&self) -> Option<Scoped> {
         let row = self.as_row()?;
+        if row.len() != 1 {
+            return None;
+        }
         Some(Scoped {
             expr: ExprOrSource::Expr(utils::unwrap_select_item(row[0].clone())),
             rel_vars: vec![],
