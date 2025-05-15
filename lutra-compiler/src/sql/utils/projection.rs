@@ -4,16 +4,18 @@ use sqlparser::ast as sql_ast;
 use crate::sql::queries::Context;
 use crate::sql::{COL_ARRAY_INDEX, COL_VALUE};
 
+use super::ExprOrSource;
+
 impl<'a> Context<'a> {
     /// Generates the projection of a relation of type `ty`.
     pub fn projection(
         &self,
         ty: &ir::Ty,
-        values: impl IntoIterator<Item = sql_ast::Expr>,
+        values: impl IntoIterator<Item = ExprOrSource>,
     ) -> Vec<sql_ast::SelectItem> {
         itertools::zip_eq(values, self.rel_cols(ty, true))
             .map(|(expr, alias)| sql_ast::SelectItem::ExprWithAlias {
-                expr,
+                expr: expr.into_expr(),
                 alias: sql_ast::Ident::new(alias),
             })
             .collect()

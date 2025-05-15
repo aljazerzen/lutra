@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use crate::utils::IdGenerator;
 
-use super::cr;
+use super::cr::{self, RelExpr};
 use lutra_bin::ir;
 
 struct Context<'t> {
@@ -249,20 +249,13 @@ impl<'a> Context<'a> {
                 // In a tuple lookup the repr of the field might change.
                 // Currently this only happens for arrays, which change from JSON to SQL repr.
                 if expr.ty.kind.is_array() {
-                    let id = self.scope_id_gen.gen();
-                    rel = cr::RelExprKind::new_transform(
-                        cr::RelExpr {
+                    rel = cr::RelExprKind::Transform(
+                        Box::new(RelExpr {
                             kind: rel,
                             ty: ir::Ty::new(ir::TyPrimitive::text),
-                            id,
-                        },
-                        |scope_id| {
-                            cr::Transform::JsonUnpack(Box::new(cr::ColExpr::new_rel_col(
-                                scope_id,
-                                0,
-                                expr.ty.clone(),
-                            )))
-                        },
+                            id: self.scope_id_gen.gen(),
+                        }),
+                        cr::Transform::JsonUnpack,
                     );
                 }
 
@@ -375,19 +368,6 @@ impl<'a> Context<'a> {
                 let item_ty = array.ty.kind.as_array().unwrap().clone();
                 let func = &call.args[1];
 
-                /// Constructs a transform that takes a reference to an array and produces an item
-                fn retrieve_item(scope_id: usize, item_ty: &ir::Ty) -> cr::Transform {
-                    if item_ty.kind.is_array() {
-                        cr::Transform::JsonUnpack(Box::new(cr::ColExpr::new_rel_col(
-                            scope_id,
-                            1,
-                            item_ty.clone(),
-                        )))
-                    } else {
-                        cr::Transform::ProjectDiscard(vec![0]) // discard index
-                    }
-                }
-
                 // index
                 let mut row = Vec::with_capacity(1);
                 row.push(cr::ColExpr::new_rel_col(
@@ -398,14 +378,26 @@ impl<'a> Context<'a> {
 
                 // compile func body
                 let func = func.kind.as_function().unwrap();
-                let item_ref = cr::RelExprKind::new_transform(
-                    cr::RelExpr {
+                let mut item_ref = cr::RelExprKind::Transform(
+                    Box::new(cr::RelExpr {
                         kind: cr::RelExprKind::From(cr::From::Iterator(array.id)),
                         ty: array.ty.clone(),
                         id: self.scope_id_gen.gen(),
-                    },
-                    |scope_id| retrieve_item(scope_id, &item_ty),
+                    }),
+                    cr::Transform::ProjectDiscard(vec![0]), // discard index
                 );
+
+                if item_ty.kind.is_array() {
+                    item_ref = cr::RelExprKind::Transform(
+                        Box::new(RelExpr {
+                            kind: item_ref,
+                            ty: ir::Ty::new(ir::TyPrimitive::text),
+                            id: self.scope_id_gen.gen(),
+                        }),
+                        cr::Transform::JsonUnpack,
+                    );
+                }
+
                 self.functions
                     .insert(func.id, FuncProvider::RelExpr(item_ref));
                 row.extend(self.compile_column_list(&func.body).unwrap_columns());
@@ -504,37 +496,33 @@ impl<'a> Context<'a> {
                 let ty_out_fields = expr.ty.kind.as_tuple().unwrap();
 
                 let field0 = cr::RelExpr {
-                    kind: cr::RelExprKind::new_transform(
-                        cr::RelExpr {
+                    kind: cr::RelExprKind::Transform(
+                        Box::new(cr::RelExpr {
                             kind: cr::RelExprKind::From(cr::From::Iterator(array.id)),
                             ty: array.ty.clone(),
                             id: self.scope_id_gen.gen(),
-                        },
-                        |_| {
-                            cr::Transform::ProjectRetain(vec![
-                                0, // index
-                                1, // first tuple field
-                            ])
-                        },
+                        }),
+                        cr::Transform::ProjectRetain(vec![
+                            0, // index
+                            1, // first tuple field
+                        ]),
                     ),
                     ty: ty_out_fields[0].ty.clone(),
                     id: self.scope_id_gen.gen(),
                 };
                 let field1 = cr::RelExpr {
-                    kind: cr::RelExprKind::new_transform(
-                        cr::RelExpr {
+                    kind: cr::RelExprKind::Transform(
+                        Box::new(cr::RelExpr {
                             kind: cr::RelExprKind::From(cr::From::Iterator(array.id)),
                             ty: array.ty.clone(),
                             id: self.scope_id_gen.gen(),
-                        },
-                        |_| {
-                            cr::Transform::ProjectRetain(vec![
-                                0, // index
-                                2, // second tuple field
-                            ])
-                        },
+                        }),
+                        cr::Transform::ProjectRetain(vec![
+                            0, // index
+                            2, // second tuple field
+                        ]),
                     ),
-                    ty: ty_out_fields[1].ty.clone(),
+                    ty: ty_out_fields[0].ty.clone(),
                     id: self.scope_id_gen.gen(),
                 };
 
@@ -555,34 +543,40 @@ impl<'a> Context<'a> {
                 let ty_out_item = expr.ty.kind.as_array().unwrap();
                 let ty_out_fields = ty_out_item.kind.as_tuple().unwrap();
 
-                let tuple_ref = cr::RelExpr {
-                    kind: cr::RelExprKind::From(cr::From::Iterator(tuple.id)),
-                    ty: tuple.ty.clone(),
-                    id: self.scope_id_gen.gen(),
-                };
-
                 // construct correlated subqueries
-                let field0 = cr::RelExpr {
-                    ty: ty_in_fields[0].ty.clone(),
-                    kind: cr::RelExprKind::new_transform(tuple_ref.clone(), |_| {
-                        cr::Transform::JsonUnpack(Box::new(cr::ColExpr::new_rel_col(
-                            tuple.id,
-                            0,
-                            ty_in_fields[0].ty.clone(),
-                        )))
-                    }),
-                    id: self.scope_id_gen.gen(),
+                let field0 = {
+                    let input = cr::RelExpr::new_rel_col(
+                        tuple.id,
+                        tuple.ty.clone(),
+                        0,
+                        ir::Ty::new(ir::TyPrimitive::text),
+                        &mut self.scope_id_gen,
+                    );
+                    RelExpr {
+                        id: self.scope_id_gen.gen(),
+                        ty: ty_in_fields[0].ty.clone(),
+                        kind: cr::RelExprKind::Transform(
+                            Box::new(input),
+                            cr::Transform::JsonUnpack,
+                        ),
+                    }
                 };
-                let field1 = cr::RelExpr {
-                    ty: ty_in_fields[1].ty.clone(),
-                    kind: cr::RelExprKind::new_transform(tuple_ref, |_| {
-                        cr::Transform::JsonUnpack(Box::new(cr::ColExpr::new_rel_col(
-                            tuple.id,
-                            1,
-                            ty_in_fields[1].ty.clone(),
-                        )))
-                    }),
-                    id: self.scope_id_gen.gen(),
+                let field1 = {
+                    let input = cr::RelExpr::new_rel_col(
+                        tuple.id,
+                        tuple.ty.clone(),
+                        1,
+                        ir::Ty::new(ir::TyPrimitive::text),
+                        &mut self.scope_id_gen,
+                    );
+                    RelExpr {
+                        id: self.scope_id_gen.gen(),
+                        ty: ty_in_fields[1].ty.clone(),
+                        kind: cr::RelExprKind::Transform(
+                            Box::new(input),
+                            cr::Transform::JsonUnpack,
+                        ),
+                    }
                 };
 
                 let ty_index = ir::Ty::new(ir::TyPrimitive::int64);

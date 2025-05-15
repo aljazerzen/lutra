@@ -51,12 +51,12 @@ pub fn new_table(name: Vec<String>, alias: Option<String>) -> sql_ast::TableFact
     }
 }
 
-pub fn sub_rel(query: sql_ast::Query, alias: Option<String>) -> sql_ast::TableFactor {
+pub fn sub_rel(query: sql_ast::Query, alias: String) -> sql_ast::TableFactor {
     sql_ast::TableFactor::Derived {
         lateral: false,
         subquery: Box::new(query),
-        alias: alias.map(|a| sql_ast::TableAlias {
-            name: sql_ast::Ident::new(a),
+        alias: Some(sql_ast::TableAlias {
+            name: sql_ast::Ident::new(alias),
             columns: vec![],
         }),
     }

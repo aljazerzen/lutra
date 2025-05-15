@@ -1,5 +1,7 @@
 use lutra_bin::ir;
 
+use crate::utils::IdGenerator;
+
 #[derive(Clone)]
 pub struct RelExpr {
     pub id: usize,
@@ -68,7 +70,7 @@ pub enum Transform {
     OrderBy(ColExpr),
 
     /// Converts a JSON-encoded value into a relation
-    JsonUnpack(Box<ColExpr>),
+    JsonUnpack,
 }
 
 #[derive(Clone)]
@@ -119,6 +121,27 @@ impl RelExpr {
             kind: RelExprKind::Transform(Box::new(input), transform),
         }
     }
+
+    pub fn new_rel_col(
+        rel_id: usize,
+        rel_ty: ir::Ty,
+        col_position: usize,
+        col_ty: ir::Ty,
+        id_gen: &mut IdGenerator<usize>,
+    ) -> Self {
+        RelExpr {
+            kind: RelExprKind::Transform(
+                Box::new(RelExpr {
+                    kind: RelExprKind::From(From::Iterator(rel_id)),
+                    ty: rel_ty,
+                    id: id_gen.gen(),
+                }),
+                Transform::ProjectRetain(vec![col_position]),
+            ),
+            ty: col_ty,
+            id: id_gen.gen(),
+        }
+    }
 }
 
 impl RelExprKind {
@@ -138,9 +161,9 @@ impl ColExpr {
             kind: ColExprKind::Subquery(Box::new(subquery)),
         }
     }
-    pub fn new_rel_col(scope_id: usize, col_position: usize, col_ty: ir::Ty) -> ColExpr {
+    pub fn new_rel_col(rel_id: usize, col_position: usize, col_ty: ir::Ty) -> ColExpr {
         ColExpr {
-            kind: ColExprKind::InputRelCol(scope_id, col_position),
+            kind: ColExprKind::InputRelCol(rel_id, col_position),
             ty: col_ty,
         }
     }
