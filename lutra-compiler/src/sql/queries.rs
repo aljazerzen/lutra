@@ -70,26 +70,26 @@ impl<'a> Context<'a> {
         }
     }
 
-    fn register_rel_var(&mut self, input: &cr::RelExpr, output: &Scoped) {
+    fn register_rel_var(&mut self, input: &cr::BoundRelExpr, output: &Scoped) {
         let name = output.expr.as_rel_var().unwrap().to_string();
         let r = RelRef {
             name,
             is_cte: false,
-            ty: input.ty.clone(),
+            ty: input.rel.ty.clone(),
         };
         self.rel_vars.insert(input.id, r);
     }
 
-    fn register_cte(&mut self, input: &cr::RelExpr, name: String) {
+    fn register_cte(&mut self, input: &cr::BoundRelExpr, name: String) {
         let r = RelRef {
             name,
             is_cte: true,
-            ty: input.ty.clone(),
+            ty: input.rel.ty.clone(),
         };
         self.rel_vars.insert(input.id, r);
     }
 
-    fn unregister_rel_var(&mut self, input: &cr::RelExpr) {
+    fn unregister_rel_var(&mut self, input: &cr::BoundRelExpr) {
         self.rel_vars.remove(&input.id);
     }
 
@@ -141,12 +141,10 @@ impl<'a> Context<'a> {
             }
 
             cr::RelExprKind::Join(left_in, right_in, condition) => {
-                let left_ty = left_in.ty.clone();
-                let left = self.compile_rel(left_in);
+                let left = self.compile_rel(&left_in.rel);
                 let left_name = left.expr.as_rel_var().unwrap().to_string();
 
-                let right_ty = right_in.ty.clone();
-                let right = self.compile_rel(right_in);
+                let right = self.compile_rel(&right_in.rel);
                 let right_name = right.expr.as_rel_var().unwrap().to_string();
 
                 self.register_rel_var(left_in, &left);
@@ -164,9 +162,9 @@ impl<'a> Context<'a> {
                     self.projection(
                         &rel.ty,
                         Iterator::chain(
-                            self.rel_cols(&left_ty, true)
+                            self.rel_cols(&left_in.rel.ty, true)
                                 .map(|col| utils::ident(Some(&left_name), col)),
-                            self.rel_cols(&right_ty, true)
+                            self.rel_cols(&right_in.rel.ty, true)
                                 .map(|col| utils::ident(Some(&right_name), col)),
                         )
                         .map(ExprOrSource::Expr),
@@ -187,7 +185,7 @@ impl<'a> Context<'a> {
 
             cr::RelExprKind::BindCorrelated(bound_in, main_in) => {
                 // compile inner-to-outer
-                let bound = self.compile_rel(bound_in);
+                let bound = self.compile_rel(&bound_in.rel);
 
                 self.register_rel_var(bound_in, &bound);
                 let main = self.compile_rel(main_in);
@@ -204,10 +202,10 @@ impl<'a> Context<'a> {
             }
 
             cr::RelExprKind::Transform(input, transform) => {
-                let input_sql = self.compile_rel(input);
+                let input_sql = self.compile_rel(&input.rel);
 
                 self.register_rel_var(input, &input_sql);
-                let r = self.compile_rel_transform(input_sql, transform, &input.ty, &rel.ty);
+                let r = self.compile_rel_transform(input_sql, transform, &input.rel.ty, &rel.ty);
                 self.unregister_rel_var(input);
 
                 r
@@ -216,16 +214,14 @@ impl<'a> Context<'a> {
             cr::RelExprKind::Bind(val_in, main_in) => {
                 let name = self.rel_name_gen.next();
 
-                let val_ty = val_in.ty.clone();
-                let val = self.compile_rel(val_in);
+                let val = self.compile_rel(&val_in.rel);
 
                 self.register_cte(val_in, name.clone());
-                let main_ty = main_in.ty.clone();
                 let main = self.compile_rel(main_in);
                 self.unregister_rel_var(val_in);
 
-                let val = self.scoped_into_query(val, &val_ty);
-                let mut main = self.scoped_into_query(main, &main_ty);
+                let val = self.scoped_into_query(val, &val_in.rel.ty);
+                let mut main = self.scoped_into_query(main, &main_in.ty);
 
                 main.with = Some(utils::with());
                 let ctes = &mut main.with.as_mut().unwrap().cte_tables;

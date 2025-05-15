@@ -4,7 +4,6 @@ use crate::utils::IdGenerator;
 
 #[derive(Clone)]
 pub struct RelExpr {
-    pub id: usize,
     pub kind: RelExprKind,
     pub ty: ir::Ty,
 }
@@ -16,19 +15,27 @@ pub enum RelExprKind {
 
     /// Applies a relational transform.
     /// Introduces iterator over input relation for the scope of this transform.
-    Transform(Box<RelExpr>, Transform),
+    Transform(Box<BoundRelExpr>, Transform),
 
-    Join(Box<RelExpr>, Box<RelExpr>, Option<Box<ColExpr>>),
+    Join(Box<BoundRelExpr>, Box<BoundRelExpr>, Option<Box<ColExpr>>),
 
     /// Bind a relation and evaluate an unrelated expression
-    Bind(Box<RelExpr>, Box<RelExpr>),
+    Bind(Box<BoundRelExpr>, Box<RelExpr>),
 
     /// Bind a relation and evaluate an correlated expression
-    BindCorrelated(Box<RelExpr>, Box<RelExpr>),
+    BindCorrelated(Box<BoundRelExpr>, Box<RelExpr>),
 
     /// Computes relations separately and concatenates them together
     #[allow(dead_code)]
     Union(Vec<RelExpr>),
+}
+
+/// An expression, bound to an identifier.
+/// Such relations can be referred to by From::RelRef.
+#[derive(Clone)]
+pub struct BoundRelExpr {
+    pub id: usize,
+    pub rel: RelExpr,
 }
 
 #[derive(Debug, Clone)]
@@ -90,7 +97,7 @@ pub enum ColExprKind {
     /// SQL query parameter. Contains 0-based index
     Param(u8),
 
-    /// A column of the input of the enclosing transform
+    /// Equivalent to `Subquery(Transform(From(RelRef(_))), ProjectRetain(vec![_]))`
     InputRelCol(usize, usize),
 
     /// Call a function by its lutra name
@@ -102,9 +109,15 @@ pub enum ColExprKind {
 
 impl std::fmt::Debug for RelExpr {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.kind.fmt(f)
+    }
+}
+
+impl std::fmt::Debug for BoundRelExpr {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         self.id.fmt(f)?;
         f.write_str(": ")?;
-        self.kind.fmt(f)
+        self.rel.fmt(f)
     }
 }
 
@@ -118,8 +131,7 @@ impl RelExpr {
     pub fn new_transform_preserve_ty(input: RelExpr, transform: Transform, id: usize) -> Self {
         RelExpr {
             ty: input.ty.clone(),
-            id,
-            kind: RelExprKind::Transform(Box::new(input), transform),
+            kind: RelExprKind::Transform(Box::new(BoundRelExpr { rel: input, id }), transform),
         }
     }
 
@@ -132,26 +144,17 @@ impl RelExpr {
     ) -> Self {
         RelExpr {
             kind: RelExprKind::Transform(
-                Box::new(RelExpr {
-                    kind: RelExprKind::From(From::RelRef(rel_id)),
-                    ty: rel_ty,
+                Box::new(BoundRelExpr {
+                    rel: RelExpr {
+                        kind: RelExprKind::From(From::RelRef(rel_id)),
+                        ty: rel_ty,
+                    },
                     id: id_gen.gen(),
                 }),
                 Transform::ProjectRetain(vec![col_position]),
             ),
             ty: col_ty,
-            id: id_gen.gen(),
         }
-    }
-}
-
-impl RelExprKind {
-    pub fn new_transform(
-        input: RelExpr,
-        get_transform: impl FnOnce(usize) -> Transform,
-    ) -> RelExprKind {
-        let transform = get_transform(input.id);
-        RelExprKind::Transform(Box::new(input), transform)
     }
 }
 

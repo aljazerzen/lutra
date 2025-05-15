@@ -15,7 +15,7 @@ struct Context<'t> {
 }
 
 enum FuncProvider {
-    RelExpr(cr::RelExprKind),
+    Expr(cr::RelExprKind),
     Params,
 }
 
@@ -50,6 +50,13 @@ impl<'a> Context<'a> {
         }
     }
 
+    fn new_binding(&mut self, rel: cr::RelExpr) -> Box<cr::BoundRelExpr> {
+        Box::new(cr::BoundRelExpr {
+            rel,
+            id: self.scope_id_gen.gen(),
+        })
+    }
+
     fn compile_rel(&mut self, expr: &ir::Expr) -> cr::RelExpr {
         let kind = match &expr.kind {
             ir::ExprKind::Literal(lit) => {
@@ -79,7 +86,6 @@ impl<'a> Context<'a> {
                                         res_cols,
                                     ])),
                                     ty: ir::Ty::new(ir::TyKind::Tuple(res_ty_fields)),
-                                    id: self.scope_id_gen.gen(),
                                 });
                                 res_cols = Vec::new();
                                 res_ty_fields = Vec::new();
@@ -103,7 +109,6 @@ impl<'a> Context<'a> {
                         res_rels.push(cr::RelExpr {
                             kind: cr::RelExprKind::From(cr::From::Construction(vec![res_cols])),
                             ty: ir::Ty::new(ir::TyKind::Tuple(res_ty_fields)),
-                            id: self.scope_id_gen.gen(),
                         });
                     }
 
@@ -112,8 +117,11 @@ impl<'a> Context<'a> {
                     for r in res_rels {
                         result = cr::RelExpr {
                             ty: ty_concat_tuples(result.ty.clone(), r.ty.clone()),
-                            kind: cr::RelExprKind::Join(Box::new(result), Box::new(r), None),
-                            id: self.scope_id_gen.gen(),
+                            kind: cr::RelExprKind::Join(
+                                self.new_binding(result),
+                                self.new_binding(r),
+                                None,
+                            ),
                         };
                     }
                     result.kind
@@ -180,7 +188,7 @@ impl<'a> Context<'a> {
             ir::ExprKind::Pointer(ir::Pointer::Parameter(ptr)) => {
                 let provider = self.functions.get(&ptr.function_id).unwrap();
                 match provider {
-                    FuncProvider::RelExpr(r_expr) => {
+                    FuncProvider::Expr(r_expr) => {
                         assert_eq!(ptr.param_position, 0);
                         r_expr.clone()
                     }
@@ -242,18 +250,18 @@ impl<'a> Context<'a> {
                 let base = self.compile_rel(&lookup.base);
 
                 // TODO: this does not take nested tuples or enums into account
-                let mut rel = cr::RelExprKind::new_transform(base, |_| {
-                    cr::Transform::ProjectRetain(vec![lookup.position as usize])
-                });
+                let mut rel = cr::RelExprKind::Transform(
+                    self.new_binding(base),
+                    cr::Transform::ProjectRetain(vec![lookup.position as usize]),
+                );
 
                 // In a tuple lookup the repr of the field might change.
                 // Currently this only happens for arrays, which change from JSON to SQL repr.
                 if expr.ty.kind.is_array() {
                     rel = cr::RelExprKind::Transform(
-                        Box::new(RelExpr {
+                        self.new_binding(RelExpr {
                             kind: rel,
                             ty: ir::Ty::new(ir::TyPrimitive::text),
-                            id: self.scope_id_gen.gen(),
                         }),
                         cr::Transform::JsonUnpack,
                     );
@@ -267,6 +275,7 @@ impl<'a> Context<'a> {
                 } else {
                     // compile expr
                     let expr = self.compile_rel(&binding.expr);
+                    let expr = self.new_binding(expr);
                     self.bindings.insert(binding.id, expr.id);
 
                     // compile main with expr in ctx
@@ -274,12 +283,13 @@ impl<'a> Context<'a> {
 
                     self.bindings.remove(&binding.id).unwrap();
 
-                    let is_exactly_one_row = expr.ty.kind.is_primitive() || expr.ty.kind.is_tuple();
+                    let is_exactly_one_row =
+                        expr.rel.ty.kind.is_primitive() || expr.rel.ty.kind.is_tuple();
                     if is_exactly_one_row {
                         // if possible, use BindCorrelated, because it is easier for optimizers to work with
-                        cr::RelExprKind::BindCorrelated(Box::new(expr), Box::new(main))
+                        cr::RelExprKind::BindCorrelated(expr, Box::new(main))
                     } else {
-                        cr::RelExprKind::Bind(Box::new(expr), Box::new(main))
+                        cr::RelExprKind::Bind(expr, Box::new(main))
                     }
                 }
             }
@@ -289,7 +299,6 @@ impl<'a> Context<'a> {
         cr::RelExpr {
             kind,
             ty: expr.ty.clone(),
-            id: self.scope_id_gen.gen(),
         }
     }
 
@@ -344,7 +353,7 @@ impl<'a> Context<'a> {
                 );
 
                 cr::RelExprKind::Transform(
-                    Box::new(rel_offset),
+                    self.new_binding(rel_offset),
                     cr::Transform::Limit(length_clamped),
                 )
             }
@@ -366,13 +375,14 @@ impl<'a> Context<'a> {
 
                 // drop index column
                 cr::RelExprKind::Transform(
-                    Box::new(rel_limit),
+                    self.new_binding(rel_limit),
                     cr::Transform::ProjectDiscard(vec![0]),
                 )
             }
             "std::map" => {
                 let array = self.compile_rel(&call.args[0]);
-                let item_ty = array.ty.kind.as_array().unwrap().clone();
+                let array = self.new_binding(array);
+                let item_ty = array.rel.ty.kind.as_array().unwrap().clone();
                 let func = &call.args[1];
 
                 // index
@@ -386,80 +396,76 @@ impl<'a> Context<'a> {
                 // compile func body
                 let func = func.kind.as_function().unwrap();
                 let mut item_ref = cr::RelExprKind::Transform(
-                    Box::new(cr::RelExpr {
+                    self.new_binding(cr::RelExpr {
                         kind: cr::RelExprKind::From(cr::From::RelRef(array.id)),
-                        ty: array.ty.clone(),
-                        id: self.scope_id_gen.gen(),
+                        ty: array.rel.ty.clone(),
                     }),
                     cr::Transform::ProjectDiscard(vec![0]), // discard index
                 );
 
                 if item_ty.kind.is_array() {
                     item_ref = cr::RelExprKind::Transform(
-                        Box::new(RelExpr {
+                        self.new_binding(RelExpr {
                             kind: item_ref,
                             ty: ir::Ty::new(ir::TyPrimitive::text),
-                            id: self.scope_id_gen.gen(),
                         }),
                         cr::Transform::JsonUnpack,
                     );
                 }
 
-                self.functions
-                    .insert(func.id, FuncProvider::RelExpr(item_ref));
+                self.functions.insert(func.id, FuncProvider::Expr(item_ref));
                 row.extend(self.compile_column_list(&func.body).unwrap_columns());
                 self.functions.remove(&func.id);
 
-                cr::RelExprKind::Transform(Box::new(array), cr::Transform::Project(row))
+                cr::RelExprKind::Transform(array, cr::Transform::Project(row))
             }
             "std::filter" => {
                 let array = self.compile_rel(&call.args[0]);
+                let array = self.new_binding(array);
                 let func = &call.args[1];
                 let func = func.kind.as_function().unwrap();
 
-                self.functions.insert(
-                    func.id,
-                    FuncProvider::RelExpr(cr::RelExprKind::Transform(
-                        Box::new(cr::RelExpr {
-                            kind: cr::RelExprKind::From(cr::From::RelRef(array.id)),
-                            ty: array.ty.clone(),
-                            id: self.scope_id_gen.gen(),
-                        }),
-                        cr::Transform::ProjectDiscard(vec![0]), // discard index
-                    )),
+                let item_ref = cr::RelExprKind::Transform(
+                    self.new_binding(cr::RelExpr {
+                        kind: cr::RelExprKind::From(cr::From::RelRef(array.id)),
+                        ty: array.rel.ty.clone(),
+                    }),
+                    cr::Transform::ProjectDiscard(vec![0]), // discard index
                 );
+
+                self.functions.insert(func.id, FuncProvider::Expr(item_ref));
                 let cond = self.compile_column(&func.body);
                 self.functions.remove(&func.id);
 
-                cr::RelExprKind::Transform(Box::new(array), cr::Transform::Where(cond))
+                cr::RelExprKind::Transform(array, cr::Transform::Where(cond))
             }
             "std::sort" => {
                 let array = self.compile_rel(&call.args[0]);
+                let array = self.new_binding(array);
 
                 let func = &call.args[1];
                 let func = func.kind.as_function().unwrap();
 
-                self.functions.insert(
-                    func.id,
-                    FuncProvider::RelExpr(cr::RelExprKind::Transform(
-                        Box::new(cr::RelExpr {
-                            kind: cr::RelExprKind::From(cr::From::RelRef(array.id)),
-                            ty: array.ty.clone(),
-                            id: self.scope_id_gen.gen(),
-                        }),
-                        cr::Transform::ProjectDiscard(vec![0]), // discard index
-                    )),
+                let item_ref = cr::RelExprKind::Transform(
+                    self.new_binding(cr::RelExpr {
+                        kind: cr::RelExprKind::From(cr::From::RelRef(array.id)),
+                        ty: array.rel.ty.clone(),
+                    }),
+                    cr::Transform::ProjectDiscard(vec![0]), // discard index
                 );
+
+                self.functions.insert(func.id, FuncProvider::Expr(item_ref));
                 let key = self.compile_column(&func.body);
                 self.functions.remove(&func.id);
 
-                cr::RelExprKind::Transform(Box::new(array), cr::Transform::OrderBy(key))
+                cr::RelExprKind::Transform(array, cr::Transform::OrderBy(key))
             }
 
             // aggregation functions
             "std::min" | "std::max" | "std::sum" | "std::average" | "std::count" | "std::any"
             | "std::all" | "std::contains" => {
                 let array = self.compile_rel(&call.args[0]);
+                let array = self.new_binding(array);
 
                 let item_ty = call.args[0].ty.kind.as_array().unwrap();
 
@@ -469,7 +475,7 @@ impl<'a> Context<'a> {
                 args.extend(call.args[1..].iter().map(|a| self.compile_column(a)));
 
                 cr::RelExprKind::Transform(
-                    Box::new(array),
+                    array,
                     cr::Transform::Aggregate(vec![cr::ColExpr {
                         kind: cr::ColExprKind::FuncCall(ptr.id.clone(), args),
                         ty: expr.ty.clone(),
@@ -480,6 +486,7 @@ impl<'a> Context<'a> {
             // window functions
             "std::row_number" | "std::lead" | "std::lag" => {
                 let array = self.compile_rel(&call.args[0]);
+                let array = self.new_binding(array);
 
                 let item_ty = expr.ty.kind.as_array().unwrap();
                 let item = cr::ColExpr::new_rel_col(array.id, 1, *item_ty.clone());
@@ -494,20 +501,20 @@ impl<'a> Context<'a> {
                         ty: expr.ty.clone(),
                     },
                 ]);
-                cr::RelExprKind::Transform(Box::new(array), transform)
+                cr::RelExprKind::Transform(array, transform)
             }
 
             "std::to_columnar" => {
                 let array = self.compile_rel(&call.args[0]);
+                let array = self.new_binding(array);
 
                 let ty_out_fields = expr.ty.kind.as_tuple().unwrap();
 
                 let field0 = cr::RelExpr {
                     kind: cr::RelExprKind::Transform(
-                        Box::new(cr::RelExpr {
+                        self.new_binding(cr::RelExpr {
                             kind: cr::RelExprKind::From(cr::From::RelRef(array.id)),
-                            ty: array.ty.clone(),
-                            id: self.scope_id_gen.gen(),
+                            ty: array.rel.ty.clone(),
                         }),
                         cr::Transform::ProjectRetain(vec![
                             0, // index
@@ -515,14 +522,12 @@ impl<'a> Context<'a> {
                         ]),
                     ),
                     ty: ty_out_fields[0].ty.clone(),
-                    id: self.scope_id_gen.gen(),
                 };
                 let field1 = cr::RelExpr {
                     kind: cr::RelExprKind::Transform(
-                        Box::new(cr::RelExpr {
+                        self.new_binding(cr::RelExpr {
                             kind: cr::RelExprKind::From(cr::From::RelRef(array.id)),
-                            ty: array.ty.clone(),
-                            id: self.scope_id_gen.gen(),
+                            ty: array.rel.ty.clone(),
                         }),
                         cr::Transform::ProjectRetain(vec![
                             0, // index
@@ -530,22 +535,22 @@ impl<'a> Context<'a> {
                         ]),
                     ),
                     ty: ty_out_fields[0].ty.clone(),
-                    id: self.scope_id_gen.gen(),
                 };
 
                 let field0_ref = cr::ColExpr::new_subquery(field0);
                 let field1_ref = cr::ColExpr::new_subquery(field1);
 
                 cr::RelExprKind::Transform(
-                    Box::new(array),
+                    array,
                     cr::Transform::Aggregate(vec![field0_ref, field1_ref]),
                 )
             }
 
             "std::from_columnar" => {
                 let tuple = self.compile_rel(&call.args[0]);
+                let tuple = self.new_binding(tuple);
 
-                let ty_in_fields = tuple.ty.kind.as_tuple().unwrap();
+                let ty_in_fields = tuple.rel.ty.kind.as_tuple().unwrap();
 
                 let ty_out_item = expr.ty.kind.as_array().unwrap();
                 let ty_out_fields = ty_out_item.kind.as_tuple().unwrap();
@@ -554,37 +559,37 @@ impl<'a> Context<'a> {
                 let field0 = {
                     let input = cr::RelExpr::new_rel_col(
                         tuple.id,
-                        tuple.ty.clone(),
+                        tuple.rel.ty.clone(),
                         0,
                         ir::Ty::new(ir::TyPrimitive::text),
                         &mut self.scope_id_gen,
                     );
                     RelExpr {
-                        id: self.scope_id_gen.gen(),
                         ty: ty_in_fields[0].ty.clone(),
                         kind: cr::RelExprKind::Transform(
-                            Box::new(input),
+                            self.new_binding(input),
                             cr::Transform::JsonUnpack,
                         ),
                     }
                 };
+                let field0 = self.new_binding(field0);
                 let field1 = {
                     let input = cr::RelExpr::new_rel_col(
                         tuple.id,
-                        tuple.ty.clone(),
+                        tuple.rel.ty.clone(),
                         1,
                         ir::Ty::new(ir::TyPrimitive::text),
                         &mut self.scope_id_gen,
                     );
                     RelExpr {
-                        id: self.scope_id_gen.gen(),
                         ty: ty_in_fields[1].ty.clone(),
                         kind: cr::RelExprKind::Transform(
-                            Box::new(input),
+                            self.new_binding(input),
                             cr::Transform::JsonUnpack,
                         ),
                     }
                 };
+                let field1 = self.new_binding(field1);
 
                 let ty_index = ir::Ty::new(ir::TyPrimitive::int64);
                 let join_cond = cr::ColExpr {
@@ -610,22 +615,20 @@ impl<'a> Context<'a> {
                 ]));
 
                 cr::RelExprKind::BindCorrelated(
-                    Box::new(tuple),
+                    tuple,
                     Box::new(cr::RelExpr {
-                        kind: cr::RelExprKind::new_transform(
-                            cr::RelExpr {
+                        kind: cr::RelExprKind::Transform(
+                            self.new_binding(cr::RelExpr {
                                 kind: cr::RelExprKind::Join(
-                                    Box::new(field0),
-                                    Box::new(field1),
+                                    field0,
+                                    field1,
                                     Some(Box::new(join_cond)),
                                 ),
                                 ty: joined_type,
-                                id: self.scope_id_gen.gen(),
-                            },
-                            |_| cr::Transform::ProjectRetain(vec![0, 1, 3]),
+                            }),
+                            cr::Transform::ProjectRetain(vec![0, 1, 3]),
                         ),
                         ty: expr.ty.clone(),
-                        id: self.scope_id_gen.gen(),
                     }),
                 )
             }
@@ -638,7 +641,6 @@ impl<'a> Context<'a> {
         cr::RelExpr {
             kind,
             ty: expr.ty.clone(),
-            id: self.scope_id_gen.gen(),
         }
     }
 
@@ -755,7 +757,7 @@ fn try_simplify_input_rel_col(rel: &cr::RelExpr) -> Option<(usize, usize)> {
         cr::RelExprKind::From(_) => None,
 
         cr::RelExprKind::Transform(input, transform) => {
-            let (scope_id, offset) = try_simplify_input_rel_col(input)?;
+            let (scope_id, offset) = try_simplify_input_rel_col(&input.rel)?;
 
             match transform {
                 cr::Transform::ProjectRetain(retain) if retain.len() == 1 => {
