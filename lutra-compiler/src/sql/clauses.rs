@@ -175,7 +175,7 @@ impl<'a> Context<'a> {
 
             ir::ExprKind::Pointer(ir::Pointer::Binding(ptr)) => {
                 let name = self.bindings.get(ptr).unwrap();
-                cr::RelExprKind::From(cr::From::Binding(*name))
+                cr::RelExprKind::From(cr::From::RelRef(*name))
             }
             ir::ExprKind::Pointer(ir::Pointer::Parameter(ptr)) => {
                 let provider = self.functions.get(&ptr.function_id).unwrap();
@@ -273,7 +273,14 @@ impl<'a> Context<'a> {
                     let main = self.compile_rel(&binding.main);
 
                     self.bindings.remove(&binding.id).unwrap();
-                    cr::RelExprKind::Bind(Box::new(expr), Box::new(main))
+
+                    let is_exactly_one_row = expr.ty.kind.is_primitive() || expr.ty.kind.is_tuple();
+                    if is_exactly_one_row {
+                        // if possible, use BindCorrelated, because it is easier for optimizers to work with
+                        cr::RelExprKind::BindCorrelated(Box::new(expr), Box::new(main))
+                    } else {
+                        cr::RelExprKind::Bind(Box::new(expr), Box::new(main))
+                    }
                 }
             }
 

@@ -32,7 +32,19 @@ pub(super) struct Context<'a> {
     types: HashMap<&'a ir::Path, &'a ir::Ty>,
 
     pub(super) rel_name_gen: NameGenerator,
-    pub(super) rel_vars: HashMap<usize, (String, ir::Ty)>,
+
+    rel_vars: HashMap<usize, RelRef>,
+}
+
+struct RelRef {
+    /// Name that can be used to refer to the relation
+    name: String,
+
+    /// True iff reference requires a FROM clause
+    is_cte: bool,
+
+    /// Type of the relation
+    ty: ir::Ty,
 }
 
 impl<'a> Context<'a> {
@@ -51,7 +63,7 @@ impl<'a> Context<'a> {
         }
     }
 
-    fn find_rel_var(&self, id: usize) -> &(String, ir::Ty) {
+    fn find_rel_var(&self, id: usize) -> &RelRef {
         match self.rel_vars.get(&id) {
             Some(x) => x,
             None => panic!("cannot find scope id: {id}"),
@@ -59,9 +71,22 @@ impl<'a> Context<'a> {
     }
 
     fn register_rel_var(&mut self, input: &cr::RelExpr, output: &Scoped) {
-        let name = output.expr.as_rel_var().unwrap();
-        self.rel_vars
-            .insert(input.id, (name.to_string(), input.ty.clone()));
+        let name = output.expr.as_rel_var().unwrap().to_string();
+        let r = RelRef {
+            name,
+            is_cte: false,
+            ty: input.ty.clone(),
+        };
+        self.rel_vars.insert(input.id, r);
+    }
+
+    fn register_cte(&mut self, input: &cr::RelExpr, name: String) {
+        let r = RelRef {
+            name,
+            is_cte: true,
+            ty: input.ty.clone(),
+        };
+        self.rel_vars.insert(input.id, r);
     }
 
     fn unregister_rel_var(&mut self, input: &cr::RelExpr) {
@@ -100,11 +125,18 @@ impl<'a> Context<'a> {
             }
 
             cr::RelExprKind::From(cr::From::RelRef(scope_id)) => {
-                let (rel_name, _) = self.find_rel_var(*scope_id);
+                let rel_ref = self.find_rel_var(*scope_id);
+                let rel_name = rel_ref.name.clone();
 
-                Scoped {
-                    expr: ExprOrSource::RelVar(rel_name.clone()),
-                    rel_vars: Vec::new(),
+                if rel_ref.is_cte {
+                    let alias = self.rel_name_gen.next();
+                    let rel_var = utils::new_table(vec![rel_name], Some(alias.clone()));
+                    Scoped::new(alias, vec![rel_var])
+                } else {
+                    Scoped {
+                        expr: ExprOrSource::RelVar(rel_name),
+                        rel_vars: Vec::new(),
+                    }
                 }
             }
 
@@ -182,12 +214,12 @@ impl<'a> Context<'a> {
             }
 
             cr::RelExprKind::Bind(val_in, main_in) => {
-                let name = format!("t{}", val_in.id);
+                let name = self.rel_name_gen.next();
 
                 let val_ty = val_in.ty.clone();
                 let val = self.compile_rel(val_in);
 
-                self.register_rel_var(val_in, &val);
+                self.register_cte(val_in, name.clone());
                 let main_ty = main_in.ty.clone();
                 let main = self.compile_rel(main_in);
                 self.unregister_rel_var(val_in);
@@ -200,13 +232,6 @@ impl<'a> Context<'a> {
                 ctes.insert(0, utils::cte(name, val));
 
                 self.query_into_scoped(main)
-            }
-            cr::RelExprKind::From(cr::From::Binding(id)) => {
-                let name = format!("t{}", id);
-
-                let alias = self.rel_name_gen.next();
-                let rel_var = utils::new_table(vec![name], Some(alias.clone()));
-                Scoped::new(alias, vec![rel_var])
             }
 
             cr::RelExprKind::Union(parts) => {
@@ -440,9 +465,26 @@ impl<'a> Context<'a> {
                 }
             }
             cr::ColExprKind::InputRelCol(scope_id, col_position) => {
-                let (scope_name, scope_ty) = self.find_rel_var(*scope_id);
-                let col = self.rel_cols(scope_ty, true).nth(*col_position).unwrap();
-                Scoped::from(ExprOrSource::Expr(utils::ident(Some(scope_name), col)))
+                let rel_ref = self.find_rel_var(*scope_id);
+
+                // find the name of the column
+                let col = self.rel_cols(&rel_ref.ty, true).nth(*col_position).unwrap();
+
+                // if we are pulling from a CTE, add a FROM clause
+                let mut rel_name = rel_ref.name.clone();
+                let rel_vars = if rel_ref.is_cte {
+                    let alias = self.rel_name_gen.next();
+                    let rel_var = utils::new_table(vec![rel_name], Some(alias.clone()));
+                    rel_name = alias;
+                    vec![rel_var]
+                } else {
+                    vec![]
+                };
+
+                Scoped {
+                    expr: ExprOrSource::Expr(utils::ident(Some(rel_name), col)),
+                    rel_vars,
+                }
             }
             cr::ColExprKind::Subquery(input) => {
                 // compile subquery

@@ -40,9 +40,6 @@ pub enum From {
     /// Read from a table (in Table representation)
     Table(String),
 
-    /// Read from a CTE (in RelExpr representation)
-    Binding(usize),
-
     /// Reference to a relation variable in scope.
     RelRef(usize),
 }
