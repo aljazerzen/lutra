@@ -2628,3 +2628,71 @@ pub mod ir {
         }
     }
 }
+
+pub mod sr {
+    #[derive(Debug, Clone)]
+    #[allow(non_camel_case_types)]
+    pub struct Program {
+        pub sql: crate::string::String,
+        pub input_tys: crate::vec::Vec<super::ir::Ty>,
+        pub output_ty: super::ir::Ty,
+        pub types: crate::vec::Vec<super::ir::TyDef>,
+    }
+
+    mod impls {
+        #![allow(unused_imports)]
+        use super::*;
+        use crate::bytes::BufMut;
+        use crate::ReaderExt;
+
+        #[allow(clippy::all, unused_variables)]
+        impl crate::Encode for Program {
+            type HeadPtr = ProgramHeadPtr;
+            fn encode_head(&self, buf: &mut crate::bytes::BytesMut) -> Self::HeadPtr {
+                let sql = self.sql.encode_head(buf);
+                let input_tys = self.input_tys.encode_head(buf);
+                let output_ty = self.output_ty.encode_head(buf);
+                let types = self.types.encode_head(buf);
+                ProgramHeadPtr {
+                    sql,
+                    input_tys,
+                    output_ty,
+                    types,
+                }
+            }
+            fn encode_body(&self, head: Self::HeadPtr, buf: &mut crate::bytes::BytesMut) {
+                self.sql.encode_body(head.sql, buf);
+                self.input_tys.encode_body(head.input_tys, buf);
+                self.output_ty.encode_body(head.output_ty, buf);
+                self.types.encode_body(head.types, buf);
+            }
+        }
+        #[allow(non_camel_case_types)]
+        pub struct ProgramHeadPtr {
+            sql: <crate::string::String as crate::Encode>::HeadPtr,
+            input_tys: <crate::vec::Vec<super::super::ir::Ty> as crate::Encode>::HeadPtr,
+            output_ty: <super::super::ir::Ty as crate::Encode>::HeadPtr,
+            types: <crate::vec::Vec<super::super::ir::TyDef> as crate::Encode>::HeadPtr,
+        }
+        impl crate::Layout for Program {
+            fn head_size() -> usize {
+                376
+            }
+        }
+
+        impl crate::Decode for Program {
+            fn decode(buf: &[u8]) -> crate::Result<Self> {
+                let sql = crate::string::String::decode(buf.skip(0))?;
+                let input_tys = crate::vec::Vec::<super::super::ir::Ty>::decode(buf.skip(8))?;
+                let output_ty = super::super::ir::Ty::decode(buf.skip(16))?;
+                let types = crate::vec::Vec::<super::super::ir::TyDef>::decode(buf.skip(39))?;
+                Ok(Program {
+                    sql,
+                    input_tys,
+                    output_ty,
+                    types,
+                })
+            }
+        }
+    }
+}

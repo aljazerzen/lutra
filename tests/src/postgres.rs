@@ -1,3 +1,4 @@
+use lutra_bin::sr;
 use lutra_compiler::{pr, SourceTree};
 
 #[track_caller]
@@ -12,24 +13,21 @@ pub fn _run(source: &str, params: Vec<lutra_bin::Value>) -> (String, String) {
     };
 
     // compile to sql
-    let (program, query_sql) =
-        lutra_compiler::compile_to_sql(&project, &pr::Path::from_name("main"));
+    let program = lutra_compiler::compile_to_sql(&project, &pr::Path::from_name("main"));
 
     // format sql
     let options = sqlformat::FormatOptions::default();
-    let formatted_sql = sqlformat::format(&query_sql, &sqlformat::QueryParams::None, &options);
+    let formatted_sql = sqlformat::format(&program.sql, &sqlformat::QueryParams::None, &options);
     tracing::debug!("sql:\n{formatted_sql}");
 
-    let params: Vec<_> = std::iter::zip(params, program.get_input_tys())
+    let params: Vec<_> = std::iter::zip(params, &program.input_tys)
         .map(|(value, ty)| value.encode(ty, &program.types).unwrap())
         .collect();
 
     // execute
     async fn inner(
-        query_sql: &str,
+        program: &sr::Program,
         params: &[Vec<u8>],
-        expected_ty: &lutra_bin::ir::Ty,
-        ty_defs: &[lutra_bin::ir::TyDef],
     ) -> Result<lutra_bin::bytes::Bytes, tokio_postgres::Error> {
         const POSTGRES_URL: &str = "postgresql://postgres:pass@localhost:5416";
 
@@ -44,26 +42,18 @@ pub fn _run(source: &str, params: Vec<lutra_bin::Value>) -> (String, String) {
         });
 
         let params = params.iter().map(|p| p.as_slice());
-        lutra_db_driver::query(client, query_sql, params, expected_ty, ty_defs).await
+        lutra_db_driver::query(&client, program, params).await
     }
     let rt = tokio::runtime::Builder::new_current_thread()
         .enable_all()
         .build()
         .unwrap();
 
-    let rel_data = rt
-        .block_on(inner(
-            &query_sql,
-            &params,
-            program.get_output_ty(),
-            &program.types,
-        ))
-        .unwrap();
+    let rel_data = rt.block_on(inner(&program, &params)).unwrap();
 
-    let output =
-        lutra_bin::Value::decode(&rel_data, program.get_output_ty(), &program.types).unwrap();
+    let output = lutra_bin::Value::decode(&rel_data, &program.output_ty, &program.types).unwrap();
     let output = output
-        .print_source(program.get_output_ty(), &program.types)
+        .print_source(&program.output_ty, &program.types)
         .unwrap();
 
     (formatted_sql, output)

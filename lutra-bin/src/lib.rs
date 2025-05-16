@@ -8,6 +8,7 @@ mod error;
 pub mod ir;
 pub mod layout;
 pub mod reader;
+pub mod sr;
 mod value;
 mod writer;
 

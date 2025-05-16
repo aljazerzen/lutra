@@ -4,12 +4,12 @@ mod queries;
 mod utils;
 
 use crate::pr;
-use lutra_bin::ir;
+use lutra_bin::sr;
 
 const COL_VALUE: &str = "value";
 const COL_ARRAY_INDEX: &str = "index";
 
-pub fn compile(project: &crate::Project, path: &pr::Path) -> (ir::Program, String) {
+pub fn compile(project: &crate::Project, path: &pr::Path) -> sr::Program {
     // lower & inline
     let program = crate::intermediate::lower_var(&project.root_module, path);
     tracing::debug!("ir: {}", lutra_bin::ir::print(&program));
@@ -28,5 +28,10 @@ pub fn compile(project: &crate::Project, path: &pr::Path) -> (ir::Program, Strin
     // serialize to SQL source
     let sql_source = query.to_string();
 
-    (program, sql_source)
+    sr::Program {
+        sql: sql_source,
+        input_tys: program.get_input_tys().to_owned(),
+        output_ty: program.get_output_ty().clone(),
+        types: program.types,
+    }
 }

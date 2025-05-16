@@ -1,19 +1,17 @@
 use bytes::{BufMut, Bytes, BytesMut};
 use core::str;
-use lutra_bin::{ir, Decode, Encode, ReversePointer};
+use lutra_bin::{ir, sr, Decode, Encode, ReversePointer};
 use std::collections::HashMap;
 use tokio_postgres::types as pg_ty;
 use tokio_postgres::{Client, Row};
 
 pub async fn query(
-    client: Client,
-    query: &str,
+    client: &Client,
+    program: &sr::Program,
     params: impl IntoIterator<Item = &[u8]>,
-    expected_ty: &ir::Ty,
-    ty_defs: &[ir::TyDef],
 ) -> Result<Bytes, tokio_postgres::Error> {
     // parse
-    let stmt = client.prepare(query).await?;
+    let stmt = client.prepare(&program.sql).await?;
 
     // execute
     let params: Vec<_> = params.into_iter().map(|data| Param { data }).collect();
@@ -26,9 +24,9 @@ pub async fn query(
     // write rows to buffer
     let mut buf = bytes::BytesMut::new();
 
-    let ctx = Context::new(ty_defs);
+    let ctx = Context::new(&program.types);
 
-    let encoder = ctx.construct_rows_encoder(expected_ty);
+    let encoder = ctx.construct_rows_encoder(&program.output_ty);
     encoder.encode(&mut buf, &rows);
 
     Ok(buf.freeze())
