@@ -178,7 +178,9 @@ impl<'a> Context<'a> {
                         todo!("only supported external refs are table functions (no params, return array of tuples)");
                     }
 
-                    cr::ExprKind::From(cr::From::Table(ptr.id.clone()))
+                    let parts = ptr.id.split("::");
+                    let table_name = parts.last().unwrap().to_string();
+                    cr::ExprKind::From(cr::From::Table(table_name))
                 }
                 ir::ExprKind::Pointer(_) => todo!(),
                 ir::ExprKind::Call(_) => todo!(),

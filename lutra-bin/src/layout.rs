@@ -92,6 +92,12 @@ impl<I: Layout> Layout for Option<I> {
     }
 }
 
+impl Layout for () {
+    fn head_size() -> usize {
+        0
+    }
+}
+
 // Keep in sync with [pr::TyKind::get_layout_simple]
 // Does not recurse.
 pub fn get_layout_simple(ty: &ir::Ty) -> Option<ir::TyLayout> {

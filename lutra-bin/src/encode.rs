@@ -218,6 +218,14 @@ impl<E: Encode + Layout> Encode for Option<E> {
     }
 }
 
+impl Encode for () {
+    type HeadPtr = ();
+
+    fn encode_head(&self, _buf: &mut BytesMut) {}
+
+    fn encode_body(&self, _: (), _buf: &mut BytesMut) {}
+}
+
 /// Pointer to a location where an offset should be written to.
 #[derive(Debug, Clone, Copy)]
 pub struct ReversePointer {

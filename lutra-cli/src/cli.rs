@@ -214,7 +214,7 @@ pub async fn run_postgres(cmd: RunPostgresCommand) -> anyhow::Result<()> {
         }
     });
 
-    let data = lutra_db_driver::query(&client, &program, vec![]).await?;
+    let data = lutra_db_driver::query_async(&client, &program, &[]).await?;
 
     let value = lutra_bin::Value::decode(&data, &program.output_ty, &program.types)?;
 

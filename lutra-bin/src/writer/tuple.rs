@@ -17,13 +17,16 @@ pub struct TupleWriter<'t> {
 
 impl<'t> TupleWriter<'t> {
     pub fn new_for_ty(ty: &'t ir::Ty) -> Self {
-        let ir::TyKind::Tuple(fields_ty) = &ty.kind else {
+        let ir::TyKind::Tuple(field_tys) = &ty.kind else {
             panic!()
         };
-        let fields_layouts = fields_ty
-            .iter()
+        Self::new_for_tys(field_tys.iter().map(|f| &f.ty))
+    }
+
+    pub fn new_for_tys(field_tys: impl Iterator<Item = &'t ir::Ty>) -> Self {
+        let fields_layouts = field_tys
             .map(|f| {
-                let layout = f.ty.layout.as_ref().unwrap();
+                let layout = f.layout.as_ref().unwrap();
 
                 (layout.head_size.div_ceil(8), layout.body_ptrs.as_slice())
             })

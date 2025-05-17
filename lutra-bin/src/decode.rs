@@ -105,3 +105,8 @@ impl<E: Decode> Decode for Option<E> {
         }
     }
 }
+impl Decode for () {
+    fn decode(_buf: &[u8]) -> Result<Self> {
+        Ok(())
+    }
+}

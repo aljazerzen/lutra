@@ -118,26 +118,30 @@ impl TypeResolver<'_> {
         };
 
         let ty = base.ty.as_ref()?;
-        self.apply_ty_tuple_indirection(ty, *pos as usize)
+        self.get_ty_tuple_field_name(ty, *pos as usize)
     }
 
-    fn apply_ty_tuple_indirection(&self, ty: &Ty, pos: usize) -> Option<String> {
-        match &ty.kind {
-            TyKind::Tuple(fields) => {
-                // this tuple might contain Unpacks (which affect positions of fields after them)
-                // so we need to resolve this type full first.
+    fn get_ty_tuple_field_name(&self, ty: &Ty, pos: usize) -> Option<String> {
+        // SAFETY: get_my_ty will not error, because it has been resolved earlier already
+        let mat_ty = self.get_ty_mat(ty).unwrap();
 
-                // unpacks don't interfere with preceding fields
-                let field = fields.get(pos)?;
+        match mat_ty {
+            super::scope::TyRef::Ty(ty) => match &ty.kind {
+                TyKind::Tuple(fields) => {
+                    // this tuple might contain Unpacks (which affect positions of fields after them)
+                    // so we need to resolve this type full first.
 
-                field.name.clone()
-            }
+                    // unpacks don't interfere with preceding fields
+                    let field = fields.get(pos)?;
 
-            TyKind::Ident(_fq_ident) => {
-                todo!()
-            }
+                    field.name.clone()
+                }
 
-            _ => None,
+                TyKind::Ident(_fq_ident) => unreachable!(),
+                _ => None,
+            },
+            super::scope::TyRef::Param(_, _) => None,
+            super::scope::TyRef::Arg(_, _, _) => None,
         }
     }
 }

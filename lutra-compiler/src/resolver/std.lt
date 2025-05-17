@@ -79,10 +79,10 @@ let map_columnar = func <A, B> ( # <I: {i1 = I1}, O: {o1 = O1}>
   x | to_columnar | mapper | from_columnar
 )
 
-let aggregate = func <A, B> ( # <I: {i1 = I1}, O>
+let aggregate = func <A, B, O> ( # <I: {i1 = I1}, O>
   x: [{A, B}],
-  mapper: func ({[A], [B]}): {A, B},
-): {A, B} -> (
+  mapper: func ({[A], [B]}): O,
+): O -> (
   x | to_columnar | mapper
 )
 

@@ -1,8 +1,7 @@
-use lutra_bin::sr;
 use lutra_compiler::{pr, SourceTree};
 
 #[track_caller]
-pub fn _run(source: &str, params: Vec<lutra_bin::Value>) -> (String, String) {
+pub fn _run(source: &str, args: Vec<lutra_bin::Value>) -> (String, String) {
     crate::init_logger();
 
     // compile
@@ -20,37 +19,20 @@ pub fn _run(source: &str, params: Vec<lutra_bin::Value>) -> (String, String) {
     let formatted_sql = sqlformat::format(&program.sql, &sqlformat::QueryParams::None, &options);
     tracing::debug!("sql:\n{formatted_sql}");
 
-    let params: Vec<_> = std::iter::zip(params, &program.input_tys)
-        .map(|(value, ty)| value.encode(ty, &program.types).unwrap())
-        .collect();
+    let mut input_writer = lutra_bin::TupleWriter::new_for_tys(program.input_tys.iter());
+    for (arg, ty) in std::iter::zip(args, &program.input_tys) {
+        input_writer.write_field(lutra_bin::Data::new(
+            arg.encode(ty, &program.types).unwrap(),
+        ));
+    }
+    let input = input_writer.finish().flatten();
 
     // execute
-    async fn inner(
-        program: &sr::Program,
-        params: &[Vec<u8>],
-    ) -> Result<lutra_bin::bytes::Bytes, tokio_postgres::Error> {
-        const POSTGRES_URL: &str = "postgresql://postgres:pass@localhost:5416";
+    const POSTGRES_URL: &str = "postgresql://postgres:pass@localhost:5416";
+    let mut client = postgres::Client::connect(POSTGRES_URL, postgres::NoTls).unwrap();
+    let rel_data = lutra_db_driver::query_sync(&mut client, &program, &input).unwrap();
 
-        let (client, connection) = tokio_postgres::connect(POSTGRES_URL, tokio_postgres::NoTls)
-            .await
-            .unwrap();
-
-        tokio::spawn(async move {
-            if let Err(e) = connection.await {
-                eprintln!("connection error: {}", e);
-            }
-        });
-
-        let params = params.iter().map(|p| p.as_slice());
-        lutra_db_driver::query(&client, program, params).await
-    }
-    let rt = tokio::runtime::Builder::new_current_thread()
-        .enable_all()
-        .build()
-        .unwrap();
-
-    let rel_data = rt.block_on(inner(&program, &params)).unwrap();
-
+    // decode and print source
     let output = lutra_bin::Value::decode(&rel_data, &program.output_ty, &program.types).unwrap();
     let output = output
         .print_source(&program.output_ty, &program.types)
