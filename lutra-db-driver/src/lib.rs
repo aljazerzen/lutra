@@ -3,6 +3,9 @@ compile_error!("At least one of 'postgres' or 'tokio-postgres' features needs to
 
 mod params;
 mod result;
+mod schema;
+
+pub use schema::{table_get, table_list};
 
 use bytes::Bytes;
 use lutra_bin::sr;
@@ -12,7 +15,7 @@ pub fn query_sync(
     client: &mut postgres::Client,
     program: &sr::Program,
     input: &[u8],
-) -> Result<Bytes, tokio_postgres::Error> {
+) -> Result<Bytes, postgres::Error> {
     // prepare
     let stmt = client.prepare(&program.sql)?;
 

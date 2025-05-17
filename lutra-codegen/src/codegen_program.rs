@@ -22,7 +22,7 @@ pub fn write_sr_programs(
         fq_path.push((*name).clone());
 
         // compile
-        let program = lutra_compiler::compile_to_sql(&ctx.project, &fq_path);
+        let program = lutra_compiler::compile_to_sql(ctx.project, &fq_path);
 
         // encode and write to file
         let out_file = ctx.out_dir.join(format!("{fq_path}.sr.lb"));
