@@ -2,6 +2,9 @@ mod codegen_encode;
 mod codegen_fn;
 mod codegen_program;
 mod codegen_ty;
+mod python;
+
+pub use python::generate as generate_python;
 
 use std::collections::HashMap;
 use std::path::PathBuf;
@@ -66,29 +69,6 @@ pub fn generate_program(
     let mut buf = bytes::BytesMut::new();
     program.encode(&mut buf);
 
-    std::fs::write(out_file, buf).unwrap();
-}
-
-#[track_caller]
-pub fn generate_sql_program(
-    project_dir: &std::path::Path,
-    expr_path: &[&str],
-    out_file: &std::path::Path,
-) {
-    // discover the project
-    let source = lutra_compiler::discover(DiscoverParams {
-        project_path: project_dir.into(),
-    })
-    .unwrap();
-
-    // compile
-    let project =
-        lutra_compiler::compile(source, CompileParams {}).unwrap_or_else(|e| panic!("{e}"));
-    let program = lutra_compiler::compile_to_sql(&project, &pr::Path::new(expr_path));
-
-    // encode and write to file
-    let mut buf = bytes::BytesMut::new();
-    program.encode(&mut buf);
     std::fs::write(out_file, buf).unwrap();
 }
 

@@ -34,10 +34,23 @@
             pkgs.cargo-depgraph
             pkgs.graphviz
 
+            # python
+            pkgs.python312Packages.python
+            pkgs.python312Packages.venvShellHook
+            pkgs.uv
+            pkgs.maturin
+            pkgs.ruff
+            pkgs.mypy
+
+            pkgs.python312Packages.python-lsp-server
+            pkgs.python312Packages.python-lsp-ruff
+
+            # website
             pkgs.cobalt
           ];
 
           RUSTFLAGS = "-Clink-arg=-fuse-ld=${pkgs.mold}/bin/mold";
+          venvDir = "./target/python";
         };
       });
 }

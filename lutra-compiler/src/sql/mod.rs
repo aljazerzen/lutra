@@ -25,8 +25,12 @@ pub fn compile(project: &crate::Project, path: &pr::Path) -> sr::Program {
     // compile to queries
     let query = queries::compile(clause, types);
 
+    tracing::debug!("sql ast: {query:?}");
+
     // serialize to SQL source
     let sql_source = query.to_string();
+
+    tracing::debug!("sql: {sql_source}");
 
     sr::Program {
         sql: sql_source,

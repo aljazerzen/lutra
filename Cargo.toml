@@ -2,16 +2,17 @@
 members = [
     "tests",
     "lutra-bin",
+    "lutra-bin/python",
+    "lutra-cli",
     "lutra-codegen",
-    "lutra-tui",
-    "lutra-runtime",
-    "lutra-typed-data",
     "lutra-compiler",
+    "lutra-db-driver",
     "lutra-ir",
     "lutra-protocol",
-    "lutra-cli",
     "lutra-rpc-embedded",
-    "lutra-db-driver",
+    "lutra-runtime",
+    "lutra-typed-data",
+    "lutra-tui",
 ]
 exclude = ["examples"]
 resolver = "2"

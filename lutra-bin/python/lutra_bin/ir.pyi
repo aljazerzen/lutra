@@ -1,0 +1,6 @@
+import typing
+
+class Ty:
+    @staticmethod
+    def decode(buf: bytes) -> typing.Self: ...
+    def encode(self) -> bytes: ...

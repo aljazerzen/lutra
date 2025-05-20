@@ -1,0 +1,15 @@
+
+build:
+    maturin build
+
+develop:
+    maturin develop
+
+release:
+    maturin release
+
+test:
+    just develop
+    cargo run -p lutra-codegen -- tests/types.lt tests/types_generated.py
+    mypy --enable-incomplete-feature=NewGenericSyntax tests
+    python -m unittest tests/main.py
