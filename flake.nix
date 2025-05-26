@@ -47,6 +47,7 @@
 
             # website
             pkgs.cobalt
+            pkgs.doctave
           ];
 
           RUSTFLAGS = "-Clink-arg=-fuse-ld=${pkgs.mold}/bin/mold";

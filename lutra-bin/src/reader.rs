@@ -11,6 +11,7 @@ pub trait ReaderExt {
 
     fn read_const<const N: usize>(&self) -> [u8; N];
 
+    #[must_use]
     fn skip(self, bytes: usize) -> Self;
 }
 
@@ -23,7 +24,6 @@ impl<'a> ReaderExt for &'a [u8] {
         self[0..N].try_into().unwrap()
     }
 
-    #[must_use]
     fn skip(self, bytes: usize) -> Self {
         &self[bytes..]
     }

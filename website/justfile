@@ -1,0 +1,12 @@
+_default:
+    just --list
+
+build:
+    just clean
+
+    cobalt build
+    doctave build --release
+    mv site _site/docs
+
+clean:
+    rm -rf _site site

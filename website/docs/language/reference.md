@@ -1,7 +1,5 @@
 ---
-permalink: /docs/language
-layout: docs.liquid
-title: Language reference
+title: Reference
 ---
 
 # Language reference
@@ -76,7 +74,7 @@ can contain arbitrary expressions of different types:
 Each of tuple fields may be prefixed by a name:
 
 ```
-{a = true, 10, b = 5.4} 
+{a = true, 10, b = 5.4}
 ```
 
 Arrays can be constructed using square brackets and
@@ -174,7 +172,7 @@ Lutra source files are a sequences of declarations of variables,
 types and modules.
 
 Variable declarations use keyword `let`, followed by the name,
-the type and the expression of the assigned value. 
+the type and the expression of the assigned value.
 
 ```
 let my_variable: int64 = 5
@@ -183,17 +181,17 @@ let my_variable: int64 = 5
 Type may be omitted it can be inferred from the value expression.
 
 Type declarations are use keyword `type` followed by the name and the type.
-  
+
 ```
 let my_type = int64
 ```
-  
+
 Module declarations use keyword `module`. Modules are a namespace for
 other declarations.
 
 ```
 module my_module {
-  let my_variable = 3 
+  let my_variable = 3
 }
 ```
 

@@ -7,9 +7,15 @@ site:
 
 syntax_highlight:
   theme: "base16-ocean.dark"
-  enabled: false
+  enabled: true
 
 pages:
   default:
     layout: default.liquid
     permalink: /{{name}}/
+
+ignore:
+- doctave.yaml
+- docs
+- site
+- justfile

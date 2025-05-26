@@ -1,3 +1,5 @@
+use std::io::Write;
+
 use clap::{Parser, Subcommand};
 
 use lutra_compiler::{pr, CompileParams, DiscoverParams};

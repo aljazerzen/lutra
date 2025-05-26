@@ -1,10 +1,8 @@
 ---
-permalink: /docs/encoding
-layout: docs.liquid
-title: Encoding
+title: Specification
 ---
 
-# Encoding
+# Binary format specification
 
 Each type has a defined encoding with head and an optional body.
 
@@ -39,7 +37,7 @@ Head contains offset of the body (32 bit le)
 and length of the array (32 bit le).
 
 Body contains consecutive heads of each of the items
-of the array. 
+of the array.
 
 ## Enum
 
@@ -55,7 +53,7 @@ the tag followed by the head of the inner value
 of the selected variant.
 The head of the inner value is padded, such that its
 total length is `H`.
-The size of the head is `S + H`.  
+The size of the head is `S + H`.
 
 If `H > 32 bits`, head of the enum contains
 the tag followed by the pointer to the body.

@@ -4,7 +4,7 @@ layout: default.liquid
 title: Lutra
 ---
 
-<div style="margin-top: 2em">
+<div style="height: 2em"></div>
 <span class="muted">Lutra is a ...</span><br>
 <h2 style="margin-top: 0">Binary format</h2>
 </div>
@@ -20,27 +20,9 @@ type album = {id = int64, title = text}
 type invoice = {id = int64, customer = text, total = float64}
 ```
 
-<div style="height: 1em"></div>
-
 <div style="margin-top: 2em">
 <span class="muted">Lutra is a ...</span><br>
-<h2 style="margin-top: 0">RPC / API framework</h2>
-</div>
-
-
-The Lutra language specify an API in term of function declarations, which
-can be implemented in your language of choice.
-These functions can then be invoked by Lutra _programs_.
-
-```
-let get_albums: func (): [album]
-
-let get_invoices: func (): [invoice]
-```
-
-<div style="margin-top: 2em">
-<span class="muted">Lutra is a ...</span><br>
-<h2 style="margin-top: 0">Query language</h2>
+<h2 style="margin-top: 0">Language</h2>
 </div>
 
 Lutra programs are a high-level, statically typed language,
@@ -58,4 +40,22 @@ let get_album_by_id = func (album_id: int64): album -> (
   | std::filter(func (this: album) -> this.id == album_id)
   | std::index(0)
 )
+```
+
+<div style="height: 2em"></div>
+<span class="muted">Lutra is a ...</span><br>
+<h2 style="margin-top: 0">Database driver</h2>
+</div>
+
+Can execute Lutra programs on relational databases, while preserving typing information of query parameters and results.
+
+```rust
+// main.rs
+
+let client = lutra_db_driver::RunnerSync(...);
+
+let result = client.run(&lutra::my_program(), &4).unwrap();
+
+// result is a Rust struct
+println!("id={}, title={}", result.id, result.title);
 ```
