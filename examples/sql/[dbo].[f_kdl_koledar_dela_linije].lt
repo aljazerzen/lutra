@@ -1,0 +1,136 @@
+﻿module db {
+    let d_dat_dates: func (): [{
+        `DAT Date` = int,
+        `DAT DayName` = text,
+    }]
+
+    let f_cae_calendar_entry: func (): [{
+        `CAE Date` = int,
+        `CAE No_` = text,
+        `CAE Capacity (Effective)` = int,
+    }]
+
+    let d_sch_shop_calendar_holiday: func (): [{
+        `SCH Shop Calendar Code` = int,
+        `SCH Date` = int,
+    }]
+}
+
+let dates_for_cae = func (cae_no: text, linija: text) -> (
+    # FROM d_dat_dates D
+    db::d_dat_dates()
+
+    # LEFT JOIN f_cae_calendar_entry F
+    #     ON CAST(F.[CAE Date] AS DATE) = CAST(D.[DAT Date] AS DATE)
+    #     AND [CAE No_] = 'OB4-ALIP
+    | std::flat_map(func (d) -> (
+        db::f_cae_calendar_entry()
+        | std::filter(func (f) -> (
+            f.`CAE Date` == d.`DAT Date` && f.`CAE No_` == cae_no
+        ))
+        # TODO: LEFT JOIN | at_least_one_or_empty()
+        | std::map(func (f) -> {d = d, f = f})
+    ))
+
+    # LEFT JOIN d_sch_shop_calendar_holiday H
+    #     ON D.[DAT Date] = H.[SCH Date]
+    | std::flat_map(func (df) -> (
+        db::d_sch_shop_calendar_holiday()
+        | std::filter(func (h) -> (
+           df.d.`DAT Date` == h.`SCH Date`
+        ))
+        # TODO: LEFT JOIN | at_least_one_or_empty()
+        | std::map(func (h) -> {d = df.d, f = df.f, h = h})
+    ))
+
+    | std::group(
+        func (this) -> {
+            this.d.`DAT Date`,
+            this.f.`CAE Work Center Group Code`,
+            this.h.`SCH Shop Calendar Code`,
+            this.d.`DAT DayName`,
+        },
+        func (key, part) -> (
+            part
+            | std::aggregate(func (part) -> {
+                capacity_effective = std::sum(part.f.`CAE Capacity (Effective)`),
+            })
+            | func (agg) -> {..key, ..agg},
+        )
+    )
+    | std::map(func (this) -> {
+        datum = this.`DAT Date`,
+        linija = this.`CAE Work Center Group Code` ?? linija,
+        ure = if this.`SCH Shop Calendar Code` != null (
+            0
+        ) else (
+            this.capacity_effective ?? 0
+        ),
+        tip_dneva = if this.`SCH Shop Calendar Code` != null then (
+            "Dela prost dan"
+        ) else if this.`DAT DayName` == "Sunday" then (
+            "Nedelja"
+        ) else if this.SCH Shop Calendar Code == null
+            && this.`DAT DayName` != "Sunday"
+            && this.capacity_effective < 6 then (
+            "Menjava/remont"
+        ) else if this.capacity_effective >= 6 then (
+            match this.`DAT DayName` {
+                "Monday" => "Ponedeljek",
+                "Tuesday" => "Torek",
+                "Wednesday" => "Sreda",
+                "Thursday" => "Četrtek",
+                "Friday" => "Petek",
+                "Saturday" => "Sobota",
+                _ => null,
+            }
+        ) else (
+            null
+        )
+    })
+)
+
+let f_kdl_koledar_dela_linije = func () -> (
+    []
+    | std::concat(dates_for_cae('OB4-ALIP', 'ALI'))
+    | std::concat(dates_for_cae('BARS1-OPREMA', 'BARSI1'))
+    | std::concat(dates_for_cae('BARS2- PRELIV SISTEM', 'BARSI2'))
+    | std::concat(dates_for_cae('PAK-OSN', 'PAKIRNICA'))
+    | std::concat(dates_for_cae('POLO-OPREMA', 'POLO'))
+    | std::concat(dates_for_cae('RAF-LINIJA-1', 'RAF 1'))
+    | std::concat(dates_for_cae('RAF-LINIJA-2', 'RAF 2'))
+    | std::concat(dates_for_cae('RAF-LINIJA-3', 'RAF 3'))
+    | std::concat(dates_for_cae('RAF-LINIJA-4', 'RAF 4'))
+    | std::concat(dates_for_cae('RAF-LINIJA-5', 'RAF 5'))
+    | std::concat(dates_for_cae('OB4-ROC', 'ROC'))
+    | std::concat(dates_for_cae('POSKUS-TF1', 'TF1'))
+    | std::concat(dates_for_cae('POSKUS-TF2', 'TF2'))
+    | std::concat(dates_for_cae('POSKUS-TF3', 'TF3'))
+    | std::concat(dates_for_cae('REMONT TF4', 'TF4'))
+    | std::concat(dates_for_cae('OB2-TEHNOHOY', 'THOY'))
+    | std::concat(dates_for_cae('POSKUS-TL2', 'TL2'))
+    | std::concat(dates_for_cae('POSKUS-TL3', 'TL3'))
+    | std::concat(dates_for_cae('POSKUS-TL4', 'TL4'))
+    | std::concat(dates_for_cae('POSKUS-TL5', 'TL5'))
+    | std::concat(dates_for_cae('POSKUS-TL6', 'TL6'))
+    | std::concat(dates_for_cae('POSKUS-TL7', 'TL7'))
+    | std::concat(dates_for_cae('OB4-WMF1', 'WMF1'))
+    | std::concat(dates_for_cae('OB4-WMF2', 'WMF2'))
+    | std::concat(dates_for_cae('DOD-DELO-COK-'KAL, 'KAL'))
+    | std::concat(dates_for_cae('MAT-DO-OPREMA', 'MATURACIJA'))
+    | std::concat(dates_for_cae('CEPI', 'PASTER'))
+    | std::concat(dates_for_cae('PIL-BARSI', 'PILOTNA'))
+    | std::concat(dates_for_cae('BUFFER MIZE', 'PROI-SPL'))
+    | std::concat(dates_for_cae('RAF-BAZENI', 'RAFINACIJA'))
+    | std::concat(dates_for_cae('RAZ-DEL', 'RAZ-DEL'))
+
+    | std::filter(func (this) -> (
+        std::date::year(this.datum) == 2025
+    ))
+    | std::map(func (this) -> {
+        `KDL Datum` = datum,
+        `KDL Linija` = linija,
+        `KDL Ur na dan` = ure,
+        `KDL Tip dnev` = tip_dneva,
+    })
+)
