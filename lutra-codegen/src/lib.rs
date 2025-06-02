@@ -19,12 +19,6 @@ pub fn generate(
     out_file: &std::path::Path,
     options: GenerateOptions,
 ) -> Vec<PathBuf> {
-    // tracing_subscriber::fmt::Subscriber::builder()
-    //     .without_time()
-    //     .with_max_level(tracing::Level::DEBUG)
-    //     .try_init()
-    //     .ok();
-
     // discover the project
     let source = lutra_compiler::discover(DiscoverParams {
         project_path: project_dir.into(),
@@ -42,7 +36,11 @@ pub fn generate(
     std::io::Write::write_all(&mut file, generated.as_bytes()).unwrap();
 
     // return vec of input files
-    project.source.get_sources().map(|s| s.0.clone()).collect()
+    project
+        .source
+        .get_sources()
+        .map(|s| project.source.root.join(s.0))
+        .collect()
 }
 
 #[track_caller]

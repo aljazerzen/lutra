@@ -1,5 +1,3 @@
-use std::io::Write;
-
 use clap::{Parser, Subcommand};
 
 use lutra_compiler::{pr, CompileParams, DiscoverParams};
@@ -22,6 +20,7 @@ fn main() {
         Action::Sql(cmd) => sql(cmd),
         Action::RunPostgres(cmd) => run_postgres(cmd),
         Action::PullSchemaPostgres(cmd) => pull_schema_postgres(cmd),
+        Action::Codegen(cmd) => codegen(cmd),
     };
 
     match res {
@@ -61,6 +60,9 @@ pub enum Action {
 
     /// Pull schema from PostgreSQL
     PullSchemaPostgres(PullSchemaPostgresCommand),
+
+    /// Compile the project and generate bindings code
+    Codegen(CodegenCommand),
 }
 
 #[derive(clap::Parser)]
@@ -247,5 +249,61 @@ pub fn pull_schema_postgres(cmd: PullSchemaPostgresCommand) -> anyhow::Result<()
         println!("type {ty_name} = {}", lutra_bin::ir::print_ty(&table_ty));
         println!("let {table}: func (): [{ty_name}]");
     }
+    Ok(())
+}
+
+#[derive(clap::Parser)]
+pub struct CodegenCommand {
+    project_dir: std::path::PathBuf,
+    output_file: std::path::PathBuf,
+
+    #[arg(long)]
+    no_types: bool,
+
+    #[arg(long)]
+    no_encode_decode: bool,
+
+    #[arg(long)]
+    no_function_traits: bool,
+
+    #[arg(long)]
+    sr_modules: Vec<String>,
+
+    #[arg(long)]
+    lutra_bin_path: Option<String>,
+}
+
+pub fn codegen(cmd: CodegenCommand) -> anyhow::Result<()> {
+    let mut opts = lutra_codegen::GenerateOptions::default();
+
+    if cmd.no_types {
+        opts = opts.no_generate_types();
+    }
+    if cmd.no_encode_decode {
+        opts = opts.no_generate_encode_decode();
+    }
+    if cmd.no_function_traits {
+        opts = opts.no_generate_function_traits();
+    }
+    for mod_name in cmd.sr_modules {
+        opts = opts.generate_sr_in_module(mod_name);
+    }
+    if let Some(lutra_bin_path) = cmd.lutra_bin_path {
+        opts = opts.with_lutra_bin_path(lutra_bin_path);
+    }
+
+    let input_files = if cmd.output_file.extension().is_some_and(|x| x == "py") {
+        lutra_codegen::generate_python(&cmd.project_dir, &cmd.output_file, opts)
+    } else {
+        lutra_codegen::generate(&cmd.project_dir, &cmd.output_file, opts)
+    };
+
+    println!("Used files:");
+    for input_file in input_files {
+        println!("- {}", input_file.display());
+    }
+    println!("Output written to {}", cmd.output_file.display());
+    println!("Done.");
+
     Ok(())
 }

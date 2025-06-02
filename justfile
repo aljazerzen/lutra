@@ -17,10 +17,12 @@ test-fast FILTER_SET='all()' *NEXTEST_ARGS='':
     cargo clippy --all-targets
     cargo check -p lutra-bin --no-default-features
 
+[working-directory: 'lutra-bin/src/project']
 generate:
-    # For when current code does not compile
-    # ./target/debug/lutra-codegen lutra-bin/src/project lutra-bin/src/project/generated.rs
+    # For when current code does not compile,
+    # but we still have an old cli binary
+    # ../../../target/debug/lutra codegen --lutra-bin-path="crate" . ./generated.rs
     # cargo fmt -p lutra-bin
 
-    cargo run -p lutra-codegen -- lutra-bin/src/project lutra-bin/src/project/generated.rs
+    cargo run -p lutra-cli -- codegen --lutra-bin-path="crate" . ./generated.rs
     cargo fmt -p lutra-bin
