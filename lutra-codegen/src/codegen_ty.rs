@@ -54,7 +54,7 @@ pub fn write_ty_def(
             .kind
             .as_func_call()
             .and_then(|c| c.func.kind.as_ident())
-            .map_or(false, |i| i.name() == "derive")
+            .is_some_and(|i| i.name() == "derive")
     });
     if let Some(derive_annotation) = derive_annotation {
         let c = derive_annotation.expr.kind.as_func_call().unwrap();
@@ -239,7 +239,7 @@ pub fn write_ty_ref(
 }
 
 pub fn is_unit_variant(variant_ty: &ir::Ty) -> bool {
-    variant_ty.kind.as_tuple().map_or(false, |f| f.is_empty())
+    variant_ty.kind.as_tuple().is_some_and(|f| f.is_empty())
 }
 
 pub fn is_option_enum(variants: &[ir::TyEnumVariant]) -> bool {

@@ -154,7 +154,7 @@ impl<'t> ValueVisitor<'t> for Printer<'t> {
 
         let mut r = variant.name.to_string();
 
-        let is_unit = variant.ty.kind.as_tuple().map_or(false, |x| x.is_empty());
+        let is_unit = variant.ty.kind.as_tuple().is_some_and(|x| x.is_empty());
         if !is_unit {
             r += "(";
             self.indent();

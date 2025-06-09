@@ -4,6 +4,7 @@ use std::borrow::Cow;
 
 use pyo3::buffer::PyBuffer;
 use pyo3::exceptions::PyValueError;
+use pyo3::ffi::c_str;
 use pyo3::prelude::*;
 use pyo3::types::{PyList, PySlice};
 
@@ -167,12 +168,12 @@ impl ArrayCodec {
 
     fn decode(&self, py: Python, buf: Bound<PyAny>) -> PyResult<Vec<Py<PyAny>>> {
         // decode head
-        let py_buf = PyBuffer::<u8>::get_bound(&buf)?;
+        let py_buf = PyBuffer::<u8>::get(&buf)?;
         let buf_slice = buffer_as_slice(&py_buf)?;
         let (offset, len) = lutra_bin::ArrayReader::read_head(buf_slice);
 
         // prepare memoryview of buf
-        let buf = py.eval_bound("memoryview", None, None)?.call1((buf,))?;
+        let buf = py.eval(c_str!("memoryview"), None, None)?.call1((buf,))?;
 
         let item_head_bytes = self.item_codec.call_method0(py, "head_bytes")?;
         let item_head_bytes: usize = item_head_bytes.extract(py)?;
@@ -183,7 +184,7 @@ impl ArrayCodec {
             let end = buf.len()?;
 
             // compute buf[start:]
-            let slice = PySlice::new_bound(py, start as isize, end as isize, 1);
+            let slice = PySlice::new(py, start as isize, end as isize, 1);
             let item_buf = buf.get_item(slice)?;
 
             // call item_type.decode(item_buf)
@@ -239,7 +240,7 @@ mod ir {
     use pyo3::{prelude::*, types::PyType};
 
     pub fn register(p: &Bound<'_, PyModule>) -> PyResult<()> {
-        let m = PyModule::new_bound(p.py(), "ir")?;
+        let m = PyModule::new(p.py(), "ir")?;
         m.add_class::<IrTy>()?;
         p.add_submodule(&m)
     }
@@ -250,15 +251,15 @@ mod ir {
     #[pymethods]
     impl IrTy {
         #[classmethod]
-        fn decode(_cls: &Bound<'_, PyType>, bytes: &[u8]) -> PyResult<IrTy> {
+        fn decode(_cls: &Bound<'_, PyType>, bytes: &[u8]) -> IrTy {
             let ty = lutra_bin::ir::Ty::decode(bytes).unwrap();
-            Ok(IrTy(ty))
+            IrTy(ty)
         }
 
-        fn encode(&self) -> PyResult<Cow<'static, [u8]>> {
+        fn encode(&self) -> Cow<'static, [u8]> {
             let mut bytes = lutra_bin::bytes::BytesMut::new();
             self.0.encode(&mut bytes);
-            Ok(bytes.to_vec().into())
+            bytes.to_vec().into()
         }
     }
 }
@@ -270,7 +271,7 @@ mod sr {
     use pyo3::{prelude::*, types::PyType};
 
     pub fn register(p: &Bound<'_, PyModule>) -> PyResult<()> {
-        let m = PyModule::new_bound(p.py(), "sr")?;
+        let m = PyModule::new(p.py(), "sr")?;
         m.add_class::<Program>()?;
         p.add_submodule(&m)
     }
@@ -281,15 +282,15 @@ mod sr {
     #[pymethods]
     impl Program {
         #[classmethod]
-        fn decode(_cls: &Bound<'_, PyType>, bytes: &[u8]) -> PyResult<Program> {
+        fn decode(_cls: &Bound<'_, PyType>, bytes: &[u8]) -> Program {
             let ty = lutra_bin::sr::Program::decode(bytes).unwrap();
-            Ok(Program(ty))
+            Program(ty)
         }
 
-        fn encode(&self) -> PyResult<Cow<'static, [u8]>> {
+        fn encode(&self) -> Cow<'static, [u8]> {
             let mut bytes = lutra_bin::bytes::BytesMut::new();
             self.0.encode(&mut bytes);
-            Ok(bytes.to_vec().into())
+            bytes.to_vec().into()
         }
     }
 }

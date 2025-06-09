@@ -310,7 +310,7 @@ pub fn ty_lookup_steps<'t>(ty: &'t pr::Ty, steps: &[String]) -> Result<&'t pr::T
         pr::TyKind::Tuple(fields) => {
             let field = fields
                 .iter()
-                .find(|f| f.name.as_ref().map_or(false, |n| n == &steps[0]))
+                .find(|f| f.name.as_ref().is_some_and(|n| n == &steps[0]))
                 .ok_or(())?;
             ty_lookup_steps(&field.ty, &steps[1..])
         }

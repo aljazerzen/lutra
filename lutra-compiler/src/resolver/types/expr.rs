@@ -108,7 +108,7 @@ impl fold::PrFold for super::TypeResolver<'_> {
 
             pr::ExprKind::FuncCall(pr::FuncCall {
                 func: name, args, ..
-            }) if (name.kind.as_ident()).map_or(false, |i| i.to_string() == "std.not")
+            }) if (name.kind.as_ident()).is_some_and(|i| i.to_string() == "std.not")
                 && matches!(args[0].kind, pr::ExprKind::Tuple(_)) =>
             {
                 let arg = args.into_iter().exactly_one().unwrap();

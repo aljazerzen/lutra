@@ -13,4 +13,4 @@ lutra-bin = { version = "0.1.0", path = "..", default-features = false, features
     "std",
 ] }
 postgres = "0.19.10"
-pyo3 = "0.22.0"
+pyo3 = "0.25.0"

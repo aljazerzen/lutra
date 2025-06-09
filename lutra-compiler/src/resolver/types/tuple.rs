@@ -112,7 +112,7 @@ fn lookup_position_in_tuple(fields: &[pr::TyTupleField], position: usize) -> Opt
 
 fn lookup_name_in_tuple(fields: &[pr::TyTupleField], name: &str) -> Option<Indirection> {
     for (position, field) in fields.iter().enumerate() {
-        if field.name.as_ref().map_or(false, |n| n == name) {
+        if field.name.as_ref().is_some_and(|n| n == name) {
             return Some(Indirection {
                 base: BaseKind::Tuple,
                 position,
@@ -151,7 +151,7 @@ fn lookup_position_in_domain(
 
 fn lookup_name_in_domain(fields: &[pr::TyDomainTupleField], name: &str) -> Option<Indirection> {
     for (position, field) in fields.iter().enumerate() {
-        if field.name.as_ref().map_or(false, |n| n == name) {
+        if field.name.as_ref().is_some_and(|n| n == name) {
             return Some(Indirection {
                 base: BaseKind::Tuple,
                 position,

@@ -2,7 +2,7 @@ use sqlparser::ast as sql_ast;
 
 #[derive(Debug)]
 pub enum ExprOrSource {
-    Expr(sql_ast::Expr),
+    Expr(Box<sql_ast::Expr>),
     Source(String),
 
     // Represents `rel_var.*`
@@ -40,6 +40,10 @@ pub fn new_func_call(
 }
 
 impl ExprOrSource {
+    pub fn new_expr(expr: sql_ast::Expr) -> Self {
+        Self::Expr(Box::new(expr))
+    }
+
     pub fn as_rel_var(&self) -> Option<&str> {
         match self {
             ExprOrSource::Expr(_) => None,
@@ -50,7 +54,7 @@ impl ExprOrSource {
 
     pub fn into_expr(self) -> sql_ast::Expr {
         match self {
-            ExprOrSource::Expr(expr) => expr,
+            ExprOrSource::Expr(expr) => *expr,
 
             // hack to get SQL source into sql_ast::Expr, without too much overhead
             ExprOrSource::Source(source) => sql_ast::Expr::Identifier(sql_ast::Ident::new(source)),

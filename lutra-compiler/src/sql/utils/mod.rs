@@ -36,7 +36,7 @@ pub fn drop_by_position<T>(vec: &mut Vec<T>, to_drop: &[usize]) {
     let mut to_drop = to_drop.iter().peekable();
     let mut next_keep = 0;
     for i in 0..n_to_keep {
-        while to_drop.peek().map_or(false, |d| **d == next_keep) {
+        while to_drop.peek().is_some_and(|d| **d == next_keep) {
             next_keep += 1;
             to_drop.next();
         }

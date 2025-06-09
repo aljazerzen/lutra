@@ -223,7 +223,7 @@ impl TypeResolver<'_> {
                 let is_match = ty
                     .kind
                     .as_primitive()
-                    .map_or(false, |t| possible_tys.iter().any(|p| t == p));
+                    .is_some_and(|t| possible_tys.iter().any(|p| t == p));
 
                 if !is_match {
                     let possible_tys = possible_tys.iter().map(|t| t.to_string()).join(", ");
@@ -255,7 +255,7 @@ impl TypeResolver<'_> {
                     .iter()
                     .enumerate()
                     .filter(|(_, f)| f.name.is_none())
-                    .last()
+                    .next_back()
                     .map(|(p, _)| p + 1)
                     .unwrap_or_default();
 
@@ -349,7 +349,7 @@ impl TypeResolver<'_> {
                     .iter()
                     .enumerate()
                     .filter(|(_, f)| f.name.is_none())
-                    .last()
+                    .next_back()
                     .map(|(p, _)| p + 1)
                     .unwrap_or_default();
 

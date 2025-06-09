@@ -372,7 +372,7 @@ fn lookup_into_ty<'t>(ty: &'t pr::Ty, steps: &[String], top_level: bool) -> Opti
 
             let field = fields
                 .iter()
-                .find(|f| f.name.as_ref().map_or(false, |n| n == &steps[0]))?;
+                .find(|f| f.name.as_ref().is_some_and(|n| n == &steps[0]))?;
 
             lookup_into_ty(&field.ty, &steps[1..], false)
         }

@@ -15,7 +15,7 @@ pub trait ReaderExt {
     fn skip(self, bytes: usize) -> Self;
 }
 
-impl<'a> ReaderExt for &'a [u8] {
+impl ReaderExt for &[u8] {
     fn read_n(&self, n: usize) -> &[u8] {
         &self[..n]
     }

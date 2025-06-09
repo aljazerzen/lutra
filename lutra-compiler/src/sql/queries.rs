@@ -117,7 +117,7 @@ impl<'a> Context<'a> {
                             self.rel_cols(&right_in.rel.ty, true)
                                 .map(|col| utils::ident(Some(&right_name), col)),
                         )
-                        .map(ExprOrSource::Expr),
+                        .map(ExprOrSource::new_expr),
                     ),
                 );
 
@@ -260,14 +260,14 @@ impl<'a> Context<'a> {
                             .iter()
                             .map(|field| utils::ident(None::<&str>, field.name.as_ref().unwrap())),
                     )
-                    .map(ExprOrSource::Expr);
+                    .map(ExprOrSource::new_expr);
 
                 select.projection = self.projection(ty, values);
 
                 self.query_into_scoped(utils::query_select(select))
             }
 
-            cr::From::Null => ExprOrSource::Expr(self.null(ty)).into(),
+            cr::From::Null => ExprOrSource::new_expr(self.null(ty)).into(),
             cr::From::Literal(literal) => self.compile_literal(literal, ty).into(),
             cr::From::FuncCall(func_name, args) => {
                 let (args, rel_vars) = self.compile_columns_scoped(args);
@@ -312,7 +312,7 @@ impl<'a> Context<'a> {
                     .projection
                     .drain(..)
                     .map(utils::unwrap_select_item)
-                    .map(ExprOrSource::Expr);
+                    .map(ExprOrSource::new_expr);
                 select.projection = self.projection(ty, old_values);
             }
 
@@ -331,7 +331,7 @@ impl<'a> Context<'a> {
                     .projection
                     .drain(..)
                     .map(utils::unwrap_select_item)
-                    .map(ExprOrSource::Expr);
+                    .map(ExprOrSource::new_expr);
                 select.projection = self.projection(ty, old_values);
             }
 
@@ -765,7 +765,7 @@ impl<'a> Context<'a> {
                 ExprOrSource::Source(format!("{f}::{}", self.compile_ty_name(ty)))
             }
 
-            ir::Literal::Text(s) => ExprOrSource::Expr(sql_ast::Expr::Value(
+            ir::Literal::Text(s) => ExprOrSource::new_expr(sql_ast::Expr::Value(
                 sql_ast::Value::SingleQuotedString(s.clone()),
             )),
         }
@@ -796,7 +796,7 @@ impl<'a> Context<'a> {
         }
 
         let mut select = utils::select_empty();
-        select.projection = self.projection(ty, values.into_iter().map(ExprOrSource::Expr));
+        select.projection = self.projection(ty, values.into_iter().map(ExprOrSource::new_expr));
         select.selection = Some(utils::bool(false));
         sql_ast::SetExpr::Select(Box::new(select))
     }

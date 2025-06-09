@@ -64,7 +64,7 @@ impl Scoped {
             return None;
         }
         Some(Scoped {
-            expr: ExprOrSource::Expr(utils::unwrap_select_item(row[0].clone())),
+            expr: ExprOrSource::new_expr(utils::unwrap_select_item(row[0].clone())),
             rel_vars: vec![],
         })
     }
@@ -95,7 +95,7 @@ impl<'a> crate::sql::queries::Context<'a> {
             return expr.expr;
         }
 
-        ExprOrSource::Expr(sql_ast::Expr::Subquery(Box::new(
+        ExprOrSource::new_expr(sql_ast::Expr::Subquery(Box::new(
             self.scoped_into_query(expr, ty),
         )))
     }

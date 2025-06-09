@@ -38,7 +38,7 @@ impl Ty {
     }
 
     pub fn is_unit(&self) -> bool {
-        self.kind.as_tuple().map_or(false, |f| f.is_empty())
+        self.kind.as_tuple().is_some_and(|f| f.is_empty())
     }
 }
 

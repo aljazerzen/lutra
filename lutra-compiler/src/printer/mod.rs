@@ -67,7 +67,7 @@ impl Printer {
                         r += ", ";
                     }
                     r += &pr::display_ident_part(&variant.name);
-                    let is_unit = variant.ty.kind.as_tuple().map_or(false, |f| f.is_empty());
+                    let is_unit = variant.ty.kind.as_tuple().is_some_and(|f| f.is_empty());
                     if !is_unit {
                         r += " = ";
                         r += &self.print_ty(&variant.ty);

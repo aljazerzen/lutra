@@ -316,9 +316,9 @@ fn is_expr_unit(expr: &ir::Expr) -> bool {
     if !is_ty_unit(&expr.ty) {
         return false;
     }
-    expr.kind.as_tuple().map_or(false, |f| f.is_empty())
+    expr.kind.as_tuple().is_some_and(|f| f.is_empty())
 }
 
 fn is_ty_unit(ty: &ir::Ty) -> bool {
-    ty.kind.as_tuple().map_or(false, |f| f.is_empty())
+    ty.kind.as_tuple().is_some_and(|f| f.is_empty())
 }

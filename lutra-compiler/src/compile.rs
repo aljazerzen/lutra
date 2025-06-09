@@ -181,7 +181,7 @@ mod linearize {
     }
 
     pub fn is_mod_def_for(stmt: &pr::Stmt, name: &str) -> bool {
-        stmt.kind.as_module_def().map_or(false, |x| x.name == name)
+        stmt.kind.as_module_def().is_some_and(|x| x.name == name)
     }
 
     fn path_starts_with_uppercase(p: &&PathBuf) -> bool {
@@ -189,7 +189,7 @@ mod linearize {
             .next()
             .and_then(|x| x.as_os_str().to_str())
             .and_then(|x| x.chars().next())
-            .map_or(false, |x| x.is_uppercase())
+            .is_some_and(|x| x.is_uppercase())
     }
 
     pub fn os_path_to_prql_path(path: &Path) -> Result<Vec<String>, error::Error> {
