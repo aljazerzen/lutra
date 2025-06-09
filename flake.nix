@@ -1,6 +1,6 @@
 {
   inputs = {
-    nixpkgs.url = "github:nixos/nixpkgs";
+    nixpkgs.url = "github:nixos/nixpkgs/25.05";
     flake-utils.url = "github:numtide/flake-utils";
     fenix = {
       url = "github:nix-community/fenix";
@@ -8,8 +8,15 @@
     };
   };
 
-  outputs = { self, nixpkgs, flake-utils, fenix }:
-    flake-utils.lib.eachDefaultSystem (system:
+  outputs =
+    {
+      self,
+      nixpkgs,
+      flake-utils,
+      fenix,
+    }:
+    flake-utils.lib.eachDefaultSystem (
+      system:
       let
         pkgs = nixpkgs.legacyPackages.${system};
         fenix_pkgs = fenix.packages.${system};
@@ -53,5 +60,6 @@
           RUSTFLAGS = "-Clink-arg=-fuse-ld=${pkgs.mold}/bin/mold";
           venvDir = "./target/python";
         };
-      });
+      }
+    );
 }
