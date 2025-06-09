@@ -20,12 +20,11 @@ pub use bytecoding::compile_program as bytecode_program;
 pub use compile::{compile, CompileParams};
 pub use discover::{discover, DiscoverParams};
 pub use intermediate::{layouter, lower_expr, lower_type_defs, lower_var};
+pub use lutra_bin::ir;
 pub use project::{Project, SourceTree};
 use resolver::resolve_post;
 pub use span::Span;
 pub use sql::compile as compile_to_sql;
-
-use lutra_bin::ir;
 
 pub mod _lexer {
     pub use crate::diagnostic::Diagnostic;

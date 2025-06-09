@@ -150,7 +150,7 @@ pub fn run(cmd: RunCommand) -> anyhow::Result<()> {
     tracing::debug!("ir:\n{}", lutra_bin::ir::print(&program));
     let bytecode = lutra_compiler::bytecode_program(program.clone());
 
-    let res = lutra_runtime::evaluate(&bytecode, vec![], lutra_runtime::BUILTIN_MODULES);
+    let res = lutra_runtime::evaluate(&bytecode, vec![], lutra_runtime::BUILTIN_MODULES).unwrap();
     let value = lutra_bin::Value::decode(&res, program.get_output_ty(), &program.types)?;
 
     println!(

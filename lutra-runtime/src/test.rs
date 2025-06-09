@@ -7,7 +7,7 @@ fn _test_interpret(program: &str) -> String {
     let program = lutra_ir::_test_parse(program);
     let bytecode = lutra_compiler::bytecode_program(program.clone());
 
-    let output = crate::interpreter::evaluate(&bytecode, vec![], crate::BUILTIN_MODULES);
+    let output = crate::interpreter::evaluate(&bytecode, vec![], crate::BUILTIN_MODULES).unwrap();
 
     let output =
         lutra_bin::Value::decode(&output, program.get_output_ty(), &program.types).unwrap();
@@ -106,8 +106,8 @@ fn interpret_03() {
     assert_snapshot!(_test_interpret(r#"
     let main = (func 0 ->
         let 1 = [
-            {1:int64, 3:int64}: {int64, int64}, 
-            {5:int64, 4:int64}: {int64, int64}, 
+            {1:int64, 3:int64}: {int64, int64},
+            {5:int64, 4:int64}: {int64, int64},
             {2:int64, 3:int64}: {int64, int64},
         ]: [{int64, int64}];
         let 2 = (

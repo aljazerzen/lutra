@@ -38,7 +38,7 @@ pub fn write_functions(
         writeln!(w, "        interpreter: &mut ::lutra_runtime::Interpreter,")?;
         writeln!(w, "        layout_args: &[u32],")?;
         writeln!(w, "        args: Vec<::lutra_runtime::Cell>,")?;
-        writeln!(w, "    ) -> ::lutra_runtime::Cell;")?;
+        writeln!(w, "    ) -> Result<::lutra_runtime::Cell, ::lutra_runtime::EvalError>;")?;
     }
     writeln!(w, "}}\n")?;
 
@@ -54,7 +54,7 @@ pub fn write_functions(
         writeln!(w, "        _interpreter: &mut ::lutra_runtime::Interpreter,")?;
         writeln!(w, "        _layout_args: &[u32],")?;
         writeln!(w, "        {args}: Vec<::lutra_runtime::Cell>,")?;
-        writeln!(w, "    ) -> ::lutra_runtime::Cell {{")?;
+        writeln!(w, "    ) -> Result<::lutra_runtime::Cell, ::lutra_runtime::EvalError> {{")?;
 
         if !func.params.is_empty() {
             writeln!(w, "        use {lutra_bin}::Decode;", )?;
@@ -84,7 +84,7 @@ pub fn write_functions(
         // encode result
         writeln!(w, "        let mut buf = {lutra_bin}::bytes::BytesMut::new();")?;
         writeln!(w, "        {lutra_bin}::Encode::encode(&res, &mut buf);")?;
-        writeln!(w, "        ::lutra_runtime::Cell::Data({lutra_bin}::Data::new(buf.to_vec()))")?;
+        writeln!(w, "        Ok(::lutra_runtime::Cell::Data({lutra_bin}::Data::new(buf.to_vec())))")?;
         writeln!(w, "    }}")?;
     }
     writeln!(w, "}}\n")?;
@@ -92,12 +92,12 @@ pub fn write_functions(
     writeln!(w, "pub struct Wrapper<T>(pub T);\n")?;
 
     writeln!(w, "impl <T: NativeFunctions + 'static + Sync> ::lutra_runtime::NativeModule for Wrapper<T> {{")?;
-    writeln!(w, "    fn lookup_native_symbol(&self, id: &str) -> ::lutra_runtime::NativeFunction {{")?;
+    writeln!(w, "    fn lookup_native_symbol(&self, id: &str) -> Option<::lutra_runtime::NativeFunction> {{")?;
     writeln!(w, "        match id {{")?;
     for (name, _func) in functions {
-        writeln!(w, "          \"{name}\" => &T::{name},")?;
+        writeln!(w, "          \"{name}\" => Some(&T::{name}),")?;
     }
-    writeln!(w, "          _ => panic!(),")?;
+    writeln!(w, "          _ => None,")?;
     writeln!(w, "        }}")?;
     writeln!(w, "    }}")?;
     writeln!(w, "}}\n")?;

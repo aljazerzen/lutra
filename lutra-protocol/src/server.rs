@@ -52,7 +52,8 @@ where
                 let program = self.prepared_programs.get(&execute.program_id).unwrap();
                 log::trace!("execute");
 
-                let result = lutra_runtime::evaluate(program, execute.inputs, &self.modules);
+                let result =
+                    lutra_runtime::evaluate(program, execute.inputs, &self.modules).unwrap();
 
                 let response = messages::ServerMessage::Response(messages::Response {
                     request_id: execute.request_id,

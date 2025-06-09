@@ -2,10 +2,10 @@ mod interpreter;
 mod native;
 mod test;
 
-pub use interpreter::{evaluate, Cell, Interpreter, NativeFunction};
+pub use interpreter::{evaluate, Cell, EvalError, Interpreter, NativeFunction};
 
 pub trait NativeModule: Sync {
-    fn lookup_native_symbol(&self, id: &str) -> interpreter::NativeFunction;
+    fn lookup_native_symbol(&self, id: &str) -> Option<interpreter::NativeFunction>;
 }
 
 pub static BUILTIN_MODULES: &[(&str, &dyn NativeModule)] = &[

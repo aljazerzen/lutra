@@ -26,13 +26,23 @@ pub enum Cell {
     Vacant,
 }
 
-pub type NativeFunction = &'static dyn Fn(&mut Interpreter, &[u32], Vec<Cell>) -> Cell;
+pub type NativeFunction =
+    &'static dyn Fn(&mut Interpreter, &[u32], Vec<Cell>) -> Result<Cell, EvalError>;
+
+#[derive(Debug, Clone)]
+pub enum EvalError {
+    BadInputs,
+    BadProgram,
+    MissingFuncImpl,
+    WorkInProgress,
+    Bug,
+}
 
 pub fn evaluate(
     program: &br::Program,
     inputs: Vec<Vec<u8>>,
     native_modules: &[(&str, &dyn NativeModule)],
-) -> Vec<u8> {
+) -> Result<Vec<u8>, EvalError> {
     let mut interpreter = Interpreter {
         memory: Vec::<Cell>::new(),
         bindings: HashMap::new(),
@@ -50,7 +60,9 @@ pub fn evaluate(
         let module = native_modules
             .get(mod_id)
             .unwrap_or_else(|| panic!("cannot find native module {mod_id}"));
-        let function = module.lookup_native_symbol(decl_name);
+        let Some(function) = module.lookup_native_symbol(decl_name) else {
+            return Err(EvalError::BadInputs);
+        };
         interpreter.allocate(Cell::FunctionNative(Box::new((
             function,
             Rc::from(external.layout_args.clone()),
@@ -58,23 +70,27 @@ pub fn evaluate(
     }
 
     // the main function call
-    let main = interpreter.evaluate_expr(&program.main);
+    let main = interpreter.evaluate_expr(&program.main)?;
     let args = inputs
         .into_iter()
         .map(|a| Cell::Data(Data::new(a)))
         .collect();
 
-    let res = interpreter.evaluate_func_call(&main, args);
+    let res = interpreter.evaluate_func_call(&main, args)?;
 
     // extract result
     drop(interpreter);
-    let Cell::Data(value) = res else { panic!() };
-    value.flatten()
+    let Cell::Data(value) = res else {
+        return Err(EvalError::BadProgram);
+    };
+    Ok(value.flatten())
 }
 
 impl Interpreter {
-    fn get_cell(&self, sid: br::Sid) -> &Cell {
-        self.memory.get(self.resolve_sid_addr(sid)).unwrap()
+    fn get_cell(&self, sid: br::Sid) -> Result<&Cell, EvalError> {
+        self.memory
+            .get(self.resolve_sid_addr(sid))
+            .ok_or(EvalError::BadProgram)
     }
 
     fn allocate(&mut self, symbol: Cell) -> Addr {
@@ -156,16 +172,16 @@ impl Interpreter {
     /// Contract:
     /// - expressions of types int, float, bool, text, tuple & array are evaluated to Symbol::Value,
     /// - expressions of func type are evaluated to Symbol::Function or Symbol::External(Function)
-    fn evaluate_expr(&mut self, expr: &br::Expr) -> Cell {
-        match &expr.kind {
+    fn evaluate_expr(&mut self, expr: &br::Expr) -> Result<Cell, EvalError> {
+        Ok(match &expr.kind {
             br::ExprKind::Pointer(sid) => {
-                let mem_cell = self.get_cell(*sid);
+                let mem_cell = self.get_cell(*sid)?;
                 match mem_cell {
                     Cell::Data(..) | Cell::Function(..) | Cell::FunctionNative(..) => {
                         mem_cell.clone()
                     }
 
-                    Cell::Vacant => panic!(),
+                    Cell::Vacant => return Err(EvalError::Bug),
                 }
             }
 
@@ -188,8 +204,8 @@ impl Interpreter {
                     .collect();
                 let mut writer = lutra_bin::TupleWriter::new(field_layouts);
                 for field in &tuple.fields {
-                    let cell = self.evaluate_expr(field);
-                    let data = cell.into_data().unwrap_or_else(|_| panic!());
+                    let cell = self.evaluate_expr(field)?;
+                    let data = cell.into_data().map_err(|_| EvalError::BadProgram)?;
 
                     writer.write_field(data);
                 }
@@ -202,16 +218,16 @@ impl Interpreter {
                     &array.item_layout.body_ptrs,
                 );
                 for item in &array.items {
-                    let cell = self.evaluate_expr(item);
+                    let cell = self.evaluate_expr(item)?;
 
-                    writer.write_item(cell.into_data().unwrap_or_else(|_| panic!()));
+                    writer.write_item(cell.into_data().map_err(|_| EvalError::BadProgram)?);
                 }
 
                 Cell::Data(writer.finish())
             }
             br::ExprKind::EnumVariant(variant) => {
-                let inner = self.evaluate_expr(&variant.inner);
-                let inner = inner.into_data().unwrap_or_else(|_| panic!());
+                let inner = self.evaluate_expr(&variant.inner)?;
+                let inner = inner.into_data().map_err(|_| EvalError::BadProgram)?;
 
                 Cell::Data(lutra_bin::EnumWriter::write_variant(
                     &variant.tag,
@@ -221,8 +237,8 @@ impl Interpreter {
                 ))
             }
             br::ExprKind::EnumEq(enum_eq) => {
-                let expr = self.evaluate_expr(&enum_eq.expr);
-                let expr = expr.into_data().unwrap_or_else(|_| panic!());
+                let expr = self.evaluate_expr(&enum_eq.expr)?;
+                let expr = expr.into_data().map_err(|_| EvalError::BadProgram)?;
 
                 let expr_tag = expr.slice(enum_eq.tag.len());
                 let eq = expr_tag == enum_eq.tag;
@@ -230,16 +246,16 @@ impl Interpreter {
                 Cell::Data(Data::new(vec![if eq { 1_u8 } else { 0_u8 }]))
             }
             br::ExprKind::Offset(lookup) => {
-                let base = self.evaluate_expr(&lookup.base);
+                let base = self.evaluate_expr(&lookup.base)?;
 
-                let mut data = base.into_data().unwrap_or_else(|_| panic!());
+                let mut data = base.into_data().map_err(|_| EvalError::BadProgram)?;
                 data.skip(lookup.offset as usize);
                 Cell::Data(data)
             }
             br::ExprKind::Deref(deref) => {
-                let data = self.evaluate_expr(&deref.ptr);
+                let data = self.evaluate_expr(&deref.ptr)?;
 
-                let mut data = data.into_data().unwrap_or_else(|_| panic!());
+                let mut data = data.into_data().map_err(|_| EvalError::BadProgram)?;
                 let offset = u32::from_le_bytes(data.slice(4).try_into().unwrap());
                 data.skip(offset as usize);
 
@@ -248,23 +264,23 @@ impl Interpreter {
             br::ExprKind::Call(call) => {
                 let br::Call { function, args, .. } = call.as_ref();
 
-                let function = self.evaluate_expr(function);
+                let function = self.evaluate_expr(function)?;
 
                 let mut arg_cells = Vec::with_capacity(args.len());
                 for arg in args {
-                    let value = self.evaluate_expr(arg);
+                    let value = self.evaluate_expr(arg)?;
                     arg_cells.push(value);
                 }
-                self.evaluate_func_call(&function, arg_cells)
+                self.evaluate_func_call(&function, arg_cells)?
             }
             br::ExprKind::Function(func) => Cell::Function(func.clone()),
             br::ExprKind::Binding(binding) => {
                 let br::Binding { symbol, expr, main } = binding.as_ref();
 
-                let expr = self.evaluate_expr(expr);
+                let expr = self.evaluate_expr(expr)?;
                 self.allocate_binding(*symbol, expr);
 
-                let main = self.evaluate_expr(main);
+                let main = self.evaluate_expr(main)?;
                 self.drop_binding(*symbol);
                 main
             }
@@ -276,33 +292,37 @@ impl Interpreter {
                 let (last, to_check) = branches.split_last().unwrap();
 
                 for branch in to_check {
-                    let condition = self.evaluate_expr(&branch.condition);
-                    let condition = condition.into_data().unwrap_or_else(|_| panic!());
+                    let condition = self.evaluate_expr(&branch.condition)?;
+                    let condition = condition.into_data().map_err(|_| EvalError::BadProgram)?;
                     let condition = bool::decode(condition.slice(1)).unwrap();
 
                     if condition {
                         return self.evaluate_expr(&branch.value);
                     }
                 }
-                self.evaluate_expr(&last.value)
+                self.evaluate_expr(&last.value)?
             }
-        }
+        })
     }
 
-    pub fn evaluate_func_call(&mut self, function: &Cell, args: Vec<Cell>) -> Cell {
+    pub fn evaluate_func_call(
+        &mut self,
+        function: &Cell,
+        args: Vec<Cell>,
+    ) -> Result<Cell, EvalError> {
         match function {
             Cell::Function(func) => {
                 let scope_size = args.len();
                 self.allocate_scope(func.symbol_ns, args);
 
-                let res = self.evaluate_expr(&func.body);
+                let res = self.evaluate_expr(&func.body)?;
 
                 self.drop_scope(func.symbol_ns, scope_size);
-                res
+                Ok(res)
             }
             Cell::FunctionNative(func) => func.0(self, &func.1, args),
-            Cell::Data(_) => panic!(),
-            Cell::Vacant => panic!(),
+            Cell::Data(_) => Err(EvalError::BadProgram),
+            Cell::Vacant => Err(EvalError::Bug),
         }
     }
 }

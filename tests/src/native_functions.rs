@@ -19,7 +19,7 @@ fn test_01() {
 
     let program = ::lutra_ir::_test_parse(
         "
-    let main = (func 0 -> 
+    let main = (func 0 ->
         (call
             external.world::hello: func (float64, uint32) -> int64,
             1.0: float64,
@@ -31,7 +31,7 @@ fn test_01() {
     let output_ty = program.get_output_ty().clone();
     let bytecode = lutra_compiler::bytecode_program(program);
 
-    let value = lutra_runtime::evaluate(&bytecode, vec![], &modules);
+    let value = lutra_runtime::evaluate(&bytecode, vec![], &modules).unwrap();
 
     let value = Value::decode(&value, &output_ty, &[]).unwrap();
 

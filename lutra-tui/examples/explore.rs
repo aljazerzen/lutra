@@ -44,7 +44,8 @@ fn execute_function(project: &lutra_compiler::Project, path: pr::Path) {
         .map(|(a, t)| a.encode(t, &program.types).unwrap())
         .collect_vec();
 
-    let result = lutra_runtime::evaluate(&bytecode, inputs, lutra_runtime::BUILTIN_MODULES);
+    let result =
+        lutra_runtime::evaluate(&bytecode, inputs, lutra_runtime::BUILTIN_MODULES).unwrap();
     let result =
         lutra_bin::Value::decode(&result, program.get_output_ty(), &program.types).unwrap();
 

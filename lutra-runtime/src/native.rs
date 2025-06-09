@@ -7,7 +7,7 @@ use crate::NativeModule;
 pub mod std {
     use ::std::borrow::Cow;
 
-    use crate::native::*;
+    use crate::{native::*, EvalError};
     use assume::LayoutArgsReader;
     use lutra_bin::{ArrayReader, ArrayWriter, Decode, TupleReader, TupleWriter};
 
@@ -16,8 +16,8 @@ pub mod std {
     pub struct Module;
 
     impl NativeModule for Module {
-        fn lookup_native_symbol(&self, id: &str) -> crate::interpreter::NativeFunction {
-            match id {
+        fn lookup_native_symbol(&self, id: &str) -> Option<crate::interpreter::NativeFunction> {
+            Some(match id {
                 "mul" => &Self::mul,
                 "div" => &Self::div,
                 "mod" => &Self::r#mod,
@@ -56,26 +56,30 @@ pub mod std {
                 "lead" => &Self::lead,
                 "row_number" => &Self::row_number,
 
-                _ => panic!(),
-            }
+                _ => return None,
+            })
         }
     }
 
     macro_rules! bin_func {
         ($name: ident, $left_assume: path, $right_assume: path, $op: tt) => {
-            pub fn $name(_: &mut Interpreter, _layout_args: &[u32], args: Vec<Cell>) -> Cell {
+            pub fn $name(_: &mut Interpreter, _layout_args: &[u32], args: Vec<Cell>) -> Result<Cell, EvalError> {
                 let left = $left_assume(&args[0]);
                 let right = $right_assume(&args[1]);
 
                 let res = left $op right;
-                Cell::Data(encode(&res))
+                Ok(Cell::Data(encode(&res)))
             }
         };
     }
 
     macro_rules! reduce_func {
         ($name: ident, $item_decode: path, $reduce: expr, $default: literal) => {
-            pub fn $name(_: &mut Interpreter, layout_args: &[u32], args: Vec<Cell>) -> Cell {
+            pub fn $name(
+                _: &mut Interpreter,
+                layout_args: &[u32],
+                args: Vec<Cell>,
+            ) -> Result<Cell, EvalError> {
                 let [array] = assume::exactly_n(args);
                 let array = assume::array(array, layout_args[0]);
 
@@ -84,7 +88,7 @@ pub mod std {
                     .reduce($reduce)
                     .unwrap_or($default);
 
-                Cell::Data(encode(&res))
+                Ok(Cell::Data(encode(&res)))
             }
         };
     }
@@ -102,11 +106,15 @@ pub mod std {
 
     macro_rules! bin_num_func {
         ($name: ident, $op: tt) => {
-            pub fn $name(_: &mut Interpreter, layout_args: &[u32], args: Vec<Cell>) -> Cell {
+            pub fn $name(
+                _: &mut Interpreter,
+                layout_args: &[u32],
+                args: Vec<Cell>,
+            ) -> Result<Cell, EvalError> {
                 let prim_set = layout_args[0].to_be_bytes();
                 let prim_set = lutra_bin::ir::TyPrimitive::decode(&prim_set).unwrap();
 
-                match prim_set {
+                Ok(match prim_set {
                     lutra_bin::ir::TyPrimitive::int8 => bin_op!(i8, args, $op),
                     lutra_bin::ir::TyPrimitive::int16 => bin_op!(i16, args, $op),
                     lutra_bin::ir::TyPrimitive::int32 => bin_op!(i32, args, $op),
@@ -118,7 +126,7 @@ pub mod std {
                     lutra_bin::ir::TyPrimitive::float32 => bin_op!(f32, args, $op),
                     lutra_bin::ir::TyPrimitive::float64 => bin_op!(f64, args, $op),
                     _ => panic!(),
-                }
+                })
             }
         };
     }
@@ -142,10 +150,14 @@ pub mod std {
 
         bin_num_func!(sub, -);
 
-        pub fn neg(_: &mut Interpreter, layout_args: &[u32], args: Vec<Cell>) -> Cell {
+        pub fn neg(
+            _: &mut Interpreter,
+            layout_args: &[u32],
+            args: Vec<Cell>,
+        ) -> Result<Cell, EvalError> {
             let prim_set = layout_args[0].to_be_bytes();
             let prim_set = lutra_bin::ir::TyPrimitive::decode(&prim_set).unwrap();
-            match prim_set {
+            Ok(match prim_set {
                 lutra_bin::ir::TyPrimitive::int8 => neg_arg!(i8, args),
                 lutra_bin::ir::TyPrimitive::int16 => neg_arg!(i16, args),
                 lutra_bin::ir::TyPrimitive::int32 => neg_arg!(i32, args),
@@ -153,7 +165,7 @@ pub mod std {
                 lutra_bin::ir::TyPrimitive::float32 => neg_arg!(f32, args),
                 lutra_bin::ir::TyPrimitive::float64 => neg_arg!(f64, args),
                 _ => panic!(),
-            }
+            })
         }
 
         bin_func!(eq, assume::int, assume::int, ==);
@@ -172,13 +184,21 @@ pub mod std {
 
         bin_func!(or, assume::bool, assume::bool, ||);
 
-        pub fn not(_it: &mut Interpreter, _layout_args: &[u32], args: Vec<Cell>) -> Cell {
+        pub fn not(
+            _it: &mut Interpreter,
+            _layout_args: &[u32],
+            args: Vec<Cell>,
+        ) -> Result<Cell, EvalError> {
             let operand = assume::bool(&args[0]);
             let res = !operand;
-            Cell::Data(encode(&res))
+            Ok(Cell::Data(encode(&res)))
         }
 
-        pub fn index(_it: &mut Interpreter, layout_args: &[u32], args: Vec<Cell>) -> Cell {
+        pub fn index(
+            _it: &mut Interpreter,
+            layout_args: &[u32],
+            args: Vec<Cell>,
+        ) -> Result<Cell, EvalError> {
             let input_item_head_bytes = layout_args[0];
 
             let [array, position] = assume::exactly_n(args);
@@ -187,10 +207,14 @@ pub mod std {
             let position = assume::int(&position);
 
             let item = array.get(position as usize).unwrap();
-            Cell::Data(item)
+            Ok(Cell::Data(item))
         }
 
-        pub fn map(it: &mut Interpreter, layout_args: &[u32], args: Vec<Cell>) -> Cell {
+        pub fn map(
+            it: &mut Interpreter,
+            layout_args: &[u32],
+            args: Vec<Cell>,
+        ) -> Result<Cell, EvalError> {
             let mut layout_args = LayoutArgsReader::new(layout_args);
             let input_item_head_bytes = layout_args.next_u32();
             let output_item_head_bytes = layout_args.next_u32();
@@ -202,15 +226,19 @@ pub mod std {
             for item in assume::array(array, input_item_head_bytes) {
                 let cell = Cell::Data(item);
 
-                let value = it.evaluate_func_call(&func, vec![cell]);
+                let value = it.evaluate_func_call(&func, vec![cell])?;
 
                 output.write_item(assume::into_value(value));
             }
 
-            Cell::Data(output.finish())
+            Ok(Cell::Data(output.finish()))
         }
 
-        pub fn filter(it: &mut Interpreter, layout_args: &[u32], args: Vec<Cell>) -> Cell {
+        pub fn filter(
+            it: &mut Interpreter,
+            layout_args: &[u32],
+            args: Vec<Cell>,
+        ) -> Result<Cell, EvalError> {
             let mut layout_args = LayoutArgsReader::new(layout_args);
             let item_head_bytes = layout_args.next_u32();
             let item_body_ptrs = layout_args.next_slice();
@@ -222,7 +250,7 @@ pub mod std {
             for item in input {
                 let item_c = Cell::Data(item.clone());
 
-                let condition = it.evaluate_func_call(&func, vec![item_c]);
+                let condition = it.evaluate_func_call(&func, vec![item_c])?;
                 let condition = assume::bool(&condition);
 
                 if condition {
@@ -230,10 +258,14 @@ pub mod std {
                 }
             }
 
-            Cell::Data(output.finish())
+            Ok(Cell::Data(output.finish()))
         }
 
-        pub fn slice(_it: &mut Interpreter, layout_args: &[u32], args: Vec<Cell>) -> Cell {
+        pub fn slice(
+            _it: &mut Interpreter,
+            layout_args: &[u32],
+            args: Vec<Cell>,
+        ) -> Result<Cell, EvalError> {
             let mut layout_args = LayoutArgsReader::new(layout_args);
             let item_head_bytes = layout_args.next_u32();
             let item_body_ptrs = layout_args.next_slice();
@@ -258,10 +290,14 @@ pub mod std {
             for item in input.skip(start).take(take) {
                 output.write_item(item);
             }
-            Cell::Data(output.finish())
+            Ok(Cell::Data(output.finish()))
         }
 
-        pub fn sort(it: &mut Interpreter, layout_args: &[u32], args: Vec<Cell>) -> Cell {
+        pub fn sort(
+            it: &mut Interpreter,
+            layout_args: &[u32],
+            args: Vec<Cell>,
+        ) -> Result<Cell, EvalError> {
             let mut layout_args = LayoutArgsReader::new(layout_args);
             let item_head_bytes = layout_args.next_u32();
             let item_body_ptrs = layout_args.next_slice();
@@ -274,7 +310,7 @@ pub mod std {
             for (index, item) in input.clone().enumerate() {
                 let cell = Cell::Data(item);
 
-                let key = it.evaluate_func_call(&func, vec![cell]);
+                let key = it.evaluate_func_call(&func, vec![cell])?;
                 let key = assume::int(&key);
 
                 keys.push((key, index));
@@ -286,10 +322,14 @@ pub mod std {
                 let item = input.get(index).unwrap();
                 output.write_item(item);
             }
-            Cell::Data(output.finish())
+            Ok(Cell::Data(output.finish()))
         }
 
-        pub fn to_columnar(_it: &mut Interpreter, layout_args: &[u32], args: Vec<Cell>) -> Cell {
+        pub fn to_columnar(
+            _it: &mut Interpreter,
+            layout_args: &[u32],
+            args: Vec<Cell>,
+        ) -> Result<Cell, EvalError> {
             let mut layout_args = LayoutArgsReader::new(layout_args);
             let input_item_head_bytes = layout_args.next_u32();
             let fields_offsets = layout_args.next_slice();
@@ -331,10 +371,14 @@ pub mod std {
                 let array = output_array.finish();
                 output.write_field(array);
             }
-            Cell::Data(output.finish())
+            Ok(Cell::Data(output.finish()))
         }
 
-        pub fn from_columnar(_it: &mut Interpreter, layout_args: &[u32], args: Vec<Cell>) -> Cell {
+        pub fn from_columnar(
+            _it: &mut Interpreter,
+            layout_args: &[u32],
+            args: Vec<Cell>,
+        ) -> Result<Cell, EvalError> {
             let mut layout_args = LayoutArgsReader::new(layout_args);
             let output_head_bytes = layout_args.next_u32();
             let output_body_ptrs = layout_args.next_slice();
@@ -367,7 +411,7 @@ pub mod std {
 
             // short-circuit empty tuples
             if output_head_bytes == 0 {
-                return Cell::Data(output.finish());
+                return Ok(Cell::Data(output.finish()));
             }
             'output: loop {
                 let mut tuple = TupleWriter::new(Cow::from(&output_fields_layouts));
@@ -380,7 +424,7 @@ pub mod std {
                 }
                 output.write_item(tuple.finish());
             }
-            Cell::Data(output.finish())
+            Ok(Cell::Data(output.finish()))
         }
 
         reduce_func!(min, decode::int, |a, b| if a < b { a } else { b }, 0);
@@ -389,17 +433,25 @@ pub mod std {
 
         reduce_func!(sum, decode::int, |a, b| a + b, 0);
 
-        pub fn count(_it: &mut Interpreter, _layout_args: &[u32], args: Vec<Cell>) -> Cell {
+        pub fn count(
+            _it: &mut Interpreter,
+            _layout_args: &[u32],
+            args: Vec<Cell>,
+        ) -> Result<Cell, EvalError> {
             let [array] = assume::exactly_n(args);
             let array = assume::into_value(array);
 
             let (_offset, len) = lutra_bin::ArrayReader::read_head(array.slice(8));
 
             let res = len as i64;
-            Cell::Data(encode(&res))
+            Ok(Cell::Data(encode(&res)))
         }
 
-        pub fn average(_it: &mut Interpreter, layout_args: &[u32], args: Vec<Cell>) -> Cell {
+        pub fn average(
+            _it: &mut Interpreter,
+            layout_args: &[u32],
+            args: Vec<Cell>,
+        ) -> Result<Cell, EvalError> {
             let [array] = assume::exactly_n(args);
             let array = assume::array(array, layout_args[0]);
 
@@ -412,35 +464,51 @@ pub mod std {
             } else {
                 sum as f64 / count as f64
             };
-            Cell::Data(encode(&res))
+            Ok(Cell::Data(encode(&res)))
         }
 
-        pub fn all(_it: &mut Interpreter, _layout_args: &[u32], args: Vec<Cell>) -> Cell {
+        pub fn all(
+            _it: &mut Interpreter,
+            _layout_args: &[u32],
+            args: Vec<Cell>,
+        ) -> Result<Cell, EvalError> {
             let [array] = assume::exactly_n(args);
             let mut array = assume::array(array, 1);
 
             let res = array.all(|x| decode::bool(&x));
-            Cell::Data(encode(&res))
+            Ok(Cell::Data(encode(&res)))
         }
 
-        pub fn any(_it: &mut Interpreter, _layout_args: &[u32], args: Vec<Cell>) -> Cell {
+        pub fn any(
+            _it: &mut Interpreter,
+            _layout_args: &[u32],
+            args: Vec<Cell>,
+        ) -> Result<Cell, EvalError> {
             let [array] = assume::exactly_n(args);
             let mut array = assume::array(array, 1);
 
             let res = array.any(|x| decode::bool(&x));
-            Cell::Data(encode(&res))
+            Ok(Cell::Data(encode(&res)))
         }
 
-        pub fn contains(_it: &mut Interpreter, layout_args: &[u32], args: Vec<Cell>) -> Cell {
+        pub fn contains(
+            _it: &mut Interpreter,
+            layout_args: &[u32],
+            args: Vec<Cell>,
+        ) -> Result<Cell, EvalError> {
             let [array, item] = assume::exactly_n(args);
             let array = assume::array(array, layout_args[0]);
             let item = assume::int(&item);
 
             let res = array.into_iter().any(|x| decode::int(&x) == item);
-            Cell::Data(encode(&res))
+            Ok(Cell::Data(encode(&res)))
         }
 
-        pub fn concat_array(_it: &mut Interpreter, _layout_args: &[u32], args: Vec<Cell>) -> Cell {
+        pub fn concat_array(
+            _it: &mut Interpreter,
+            _layout_args: &[u32],
+            args: Vec<Cell>,
+        ) -> Result<Cell, EvalError> {
             let [array, separator] = assume::exactly_n(args);
 
             let array = assume::array(array, 8); // text head = 8
@@ -448,10 +516,14 @@ pub mod std {
 
             let array: Vec<_> = array.map(|x| decode::text(&x)).collect();
             let res = array.join(&separator);
-            Cell::Data(encode(&res))
+            Ok(Cell::Data(encode(&res)))
         }
 
-        pub fn lag(_it: &mut Interpreter, layout_args: &[u32], args: Vec<Cell>) -> Cell {
+        pub fn lag(
+            _it: &mut Interpreter,
+            layout_args: &[u32],
+            args: Vec<Cell>,
+        ) -> Result<Cell, EvalError> {
             let mut layout_args = LayoutArgsReader::new(layout_args);
             let head_bytes = layout_args.next_u32();
             let body_ptrs = layout_args.next_slice();
@@ -464,7 +536,11 @@ pub mod std {
             Self::shift(array, offset, head_bytes, body_ptrs)
         }
 
-        pub fn lead(_it: &mut Interpreter, layout_args: &[u32], args: Vec<Cell>) -> Cell {
+        pub fn lead(
+            _it: &mut Interpreter,
+            layout_args: &[u32],
+            args: Vec<Cell>,
+        ) -> Result<Cell, EvalError> {
             let mut layout_args = LayoutArgsReader::new(layout_args);
             let head_bytes = layout_args.next_u32();
             let body_ptrs = layout_args.next_slice();
@@ -477,7 +553,12 @@ pub mod std {
             Self::shift(array, offset, head_bytes, body_ptrs)
         }
 
-        fn shift(array: ArrayReader, offset: isize, head_bytes: u32, body_ptrs: &[u32]) -> Cell {
+        fn shift(
+            array: ArrayReader,
+            offset: isize,
+            head_bytes: u32,
+            body_ptrs: &[u32],
+        ) -> Result<Cell, EvalError> {
             let array_len = array.remaining();
 
             let n_blanks_before = (offset.max(0) as usize).min(array_len);
@@ -499,10 +580,14 @@ pub mod std {
                 out.write_item(lutra_bin::Data::new(vec![0; head_bytes as usize]));
             }
 
-            Cell::Data(out.finish())
+            Ok(Cell::Data(out.finish()))
         }
 
-        pub fn row_number(_it: &mut Interpreter, _layout_args: &[u32], args: Vec<Cell>) -> Cell {
+        pub fn row_number(
+            _it: &mut Interpreter,
+            _layout_args: &[u32],
+            args: Vec<Cell>,
+        ) -> Result<Cell, EvalError> {
             let [array] = assume::exactly_n(args);
             let array = assume::into_value(array);
 
@@ -512,7 +597,7 @@ pub mod std {
             for index in 0..len {
                 out.write_item(encode(&(index as u64)));
             }
-            Cell::Data(out.finish())
+            Ok(Cell::Data(out.finish()))
         }
     }
 
@@ -526,7 +611,7 @@ pub mod std {
 }
 
 pub mod std_text_ops {
-    use crate::native::*;
+    use crate::{native::*, EvalError};
     use lutra_bin::ReaderExt;
 
     pub const MODULE: Module = Module;
@@ -534,18 +619,22 @@ pub mod std_text_ops {
     pub struct Module;
 
     impl NativeModule for Module {
-        fn lookup_native_symbol(&self, id: &str) -> crate::interpreter::NativeFunction {
-            match id {
+        fn lookup_native_symbol(&self, id: &str) -> Option<crate::interpreter::NativeFunction> {
+            Some(match id {
                 "concat" => &Self::concat,
                 "length" => &Self::length,
 
-                _ => panic!(),
-            }
+                _ => return None,
+            })
         }
     }
 
     impl Module {
-        pub fn concat(_it: &mut Interpreter, _layout_args: &[u32], args: Vec<Cell>) -> Cell {
+        pub fn concat(
+            _it: &mut Interpreter,
+            _layout_args: &[u32],
+            args: Vec<Cell>,
+        ) -> Result<Cell, EvalError> {
             let [left, right] = assume::exactly_n(args);
 
             // TODO: string reader
@@ -566,10 +655,14 @@ pub mod std_text_ops {
             buf.extend(left.slice(left_length as usize));
             buf.extend(right.slice(right_length as usize));
 
-            Cell::Data(lutra_bin::Data::new(buf))
+            Ok(Cell::Data(lutra_bin::Data::new(buf)))
         }
 
-        pub fn length(_it: &mut Interpreter, _layout_args: &[u32], args: Vec<Cell>) -> Cell {
+        pub fn length(
+            _it: &mut Interpreter,
+            _layout_args: &[u32],
+            args: Vec<Cell>,
+        ) -> Result<Cell, EvalError> {
             let [text] = assume::exactly_n(args);
 
             // TODO: string reader
@@ -577,29 +670,33 @@ pub mod std_text_ops {
             let text = assume::as_value(&text).slice(8).skip(4);
             let length = u32::from_le_bytes(text.read_const());
 
-            Cell::Data(encode(&length))
+            Ok(Cell::Data(encode(&length)))
         }
     }
 }
 
 pub mod interpreter {
-    use crate::native::*;
+    use crate::{native::*, EvalError};
 
     pub const MODULE: Module = Module;
     pub struct Module;
 
     impl NativeModule for Module {
-        fn lookup_native_symbol(&self, id: &str) -> crate::interpreter::NativeFunction {
-            match id {
+        fn lookup_native_symbol(&self, id: &str) -> Option<crate::interpreter::NativeFunction> {
+            Some(match id {
                 "version" => &Self::version,
-                _ => panic!(),
-            }
+                _ => return None,
+            })
         }
     }
 
     impl Module {
-        fn version(_it: &mut Interpreter, _layout_args: &[u32], _args: Vec<Cell>) -> Cell {
-            Cell::Data(encode("lutra-runtime 0.0.1"))
+        fn version(
+            _it: &mut Interpreter,
+            _layout_args: &[u32],
+            _args: Vec<Cell>,
+        ) -> Result<Cell, EvalError> {
+            Ok(Cell::Data(encode("lutra-runtime 0.0.1")))
         }
     }
 }
