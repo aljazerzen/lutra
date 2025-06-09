@@ -1,6 +1,7 @@
 type Program = {
   externals = [ExternalSymbol],
   main = Expr,
+  input_count = uint8,
 }
 
 @derive(["Debug", "Clone", "PartialEq", "Eq", "Hash"])

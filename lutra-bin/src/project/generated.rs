@@ -6,6 +6,7 @@ pub mod br {
     pub struct Program {
         pub externals: crate::vec::Vec<ExternalSymbol>,
         pub main: Expr,
+        pub input_count: u8,
     }
 
     #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -133,21 +134,28 @@ pub mod br {
             fn encode_head(&self, buf: &mut crate::bytes::BytesMut) -> Self::HeadPtr {
                 let externals = self.externals.encode_head(buf);
                 let main = self.main.encode_head(buf);
-                ProgramHeadPtr { externals, main }
+                let input_count = self.input_count.encode_head(buf);
+                ProgramHeadPtr {
+                    externals,
+                    main,
+                    input_count,
+                }
             }
             fn encode_body(&self, head: Self::HeadPtr, buf: &mut crate::bytes::BytesMut) {
                 self.externals.encode_body(head.externals, buf);
                 self.main.encode_body(head.main, buf);
+                self.input_count.encode_body(head.input_count, buf);
             }
         }
         #[allow(non_camel_case_types)]
         pub struct ProgramHeadPtr {
             externals: <crate::vec::Vec<super::ExternalSymbol> as crate::Encode>::HeadPtr,
             main: <super::Expr as crate::Encode>::HeadPtr,
+            input_count: <u8 as crate::Encode>::HeadPtr,
         }
         impl crate::Layout for Program {
             fn head_size() -> usize {
-                104
+                112
             }
         }
 
@@ -155,7 +163,12 @@ pub mod br {
             fn decode(buf: &[u8]) -> crate::Result<Self> {
                 let externals = crate::vec::Vec::<super::ExternalSymbol>::decode(buf.skip(0))?;
                 let main = super::Expr::decode(buf.skip(8))?;
-                Ok(Program { externals, main })
+                let input_count = u8::decode(buf.skip(13))?;
+                Ok(Program {
+                    externals,
+                    main,
+                    input_count,
+                })
             }
         }
 

@@ -1,6 +1,8 @@
 #![cfg(test)]
 
-use insta::assert_snapshot;
+use insta::{assert_debug_snapshot, assert_snapshot};
+
+use crate::EvalError;
 
 #[track_caller]
 fn _test_interpret(program: &str) -> String {
@@ -14,6 +16,14 @@ fn _test_interpret(program: &str) -> String {
     output
         .print_source(program.get_output_ty(), &program.types)
         .unwrap()
+}
+
+#[track_caller]
+fn _test_err(program: &str) -> EvalError {
+    let program = lutra_ir::_test_parse(program);
+    let bytecode = lutra_compiler::bytecode_program(program.clone());
+
+    crate::interpreter::evaluate(&bytecode, vec![], crate::BUILTIN_MODULES).unwrap_err()
 }
 
 #[test]
@@ -131,5 +141,25 @@ fn interpret_03() {
       6,
     ]
     "#
+    );
+}
+
+#[test]
+fn eval_error_00() {
+    assert_debug_snapshot!(_test_err(r#"
+        let main = (func 0 ->
+            var.1: int64
+        ): func () -> int64
+        "#), @"BadProgram",
+    );
+}
+
+#[test]
+fn eval_error_01() {
+    assert_debug_snapshot!(_test_err(r#"
+        let main = (func 0 ->
+            fn.0+0: int64
+        ): func (int64) -> int64
+        "#), @"BadInputs",
     );
 }

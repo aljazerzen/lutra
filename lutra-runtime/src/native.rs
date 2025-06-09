@@ -64,8 +64,8 @@ pub mod std {
     macro_rules! bin_func {
         ($name: ident, $left_assume: path, $right_assume: path, $op: tt) => {
             pub fn $name(_: &mut Interpreter, _layout_args: &[u32], args: Vec<Cell>) -> Result<Cell, EvalError> {
-                let left = $left_assume(&args[0]);
-                let right = $right_assume(&args[1]);
+                let left = $left_assume(&args[0])?;
+                let right = $right_assume(&args[1])?;
 
                 let res = left $op right;
                 Ok(Cell::Data(encode(&res)))
@@ -96,8 +96,8 @@ pub mod std {
     macro_rules! bin_op {
         ($prim: ty, $args: ident, $op: tt) => {
             {
-                let left = assume::primitive::<$prim>(&$args[0]);
-                let right = assume::primitive::<$prim>(&$args[1]);
+                let left = assume::primitive::<$prim>(&$args[0])?;
+                let right = assume::primitive::<$prim>(&$args[1])?;
                 let res = left $op right;
                 Cell::Data(encode::<$prim>(&res))
             }
@@ -133,7 +133,7 @@ pub mod std {
 
     macro_rules! neg_arg {
         ($prim: ty, $args: ident) => {{
-            let operand = assume::primitive::<$prim>(&$args[0]);
+            let operand = assume::primitive::<$prim>(&$args[0])?;
             let res = -operand;
             Cell::Data(encode::<$prim>(&res))
         }};
@@ -189,7 +189,7 @@ pub mod std {
             _layout_args: &[u32],
             args: Vec<Cell>,
         ) -> Result<Cell, EvalError> {
-            let operand = assume::bool(&args[0]);
+            let operand = assume::bool(&args[0])?;
             let res = !operand;
             Ok(Cell::Data(encode(&res)))
         }
@@ -204,7 +204,7 @@ pub mod std {
             let [array, position] = assume::exactly_n(args);
 
             let array = assume::array(array, input_item_head_bytes);
-            let position = assume::int(&position);
+            let position = assume::int(&position)?;
 
             let item = array.get(position as usize).unwrap();
             Ok(Cell::Data(item))
@@ -251,7 +251,7 @@ pub mod std {
                 let item_c = Cell::Data(item.clone());
 
                 let condition = it.evaluate_func_call(&func, vec![item_c])?;
-                let condition = assume::bool(&condition);
+                let condition = assume::bool(&condition)?;
 
                 if condition {
                     output.write_item(item);
@@ -275,8 +275,8 @@ pub mod std {
             let input = assume::array(array, item_head_bytes);
 
             // unpack
-            let start = assume::int(&start);
-            let end = assume::int(&end);
+            let start = assume::int(&start)?;
+            let end = assume::int(&end)?;
 
             // convert to absolute
             let start = index_rel_to_abs(start, input.remaining());
@@ -311,7 +311,7 @@ pub mod std {
                 let cell = Cell::Data(item);
 
                 let key = it.evaluate_func_call(&func, vec![cell])?;
-                let key = assume::int(&key);
+                let key = assume::int(&key)?;
 
                 keys.push((key, index));
             }
@@ -397,7 +397,7 @@ pub mod std {
                 field_offsets.push(8_u32 * i as u32); // array head has 8 bytes
             }
 
-            let input = TupleReader::new(assume::as_value(&columnar), field_offsets.into());
+            let input = TupleReader::new(assume::as_value(&columnar)?, field_offsets.into());
 
             // init input array readers
             let mut input_arrays: Vec<ArrayReader> = fields_item_head_bytes
@@ -498,7 +498,7 @@ pub mod std {
         ) -> Result<Cell, EvalError> {
             let [array, item] = assume::exactly_n(args);
             let array = assume::array(array, layout_args[0]);
-            let item = assume::int(&item);
+            let item = assume::int(&item)?;
 
             let res = array.into_iter().any(|x| decode::int(&x) == item);
             Ok(Cell::Data(encode(&res)))
@@ -512,7 +512,7 @@ pub mod std {
             let [array, separator] = assume::exactly_n(args);
 
             let array = assume::array(array, 8); // text head = 8
-            let separator = assume::text(&separator);
+            let separator = assume::text(&separator)?;
 
             let array: Vec<_> = array.map(|x| decode::text(&x)).collect();
             let res = array.join(&separator);
@@ -531,7 +531,7 @@ pub mod std {
             let [array, offset] = assume::exactly_n(args);
 
             let array = assume::array(array, head_bytes);
-            let offset = assume::int(&offset) as isize;
+            let offset = assume::int(&offset)? as isize;
 
             Self::shift(array, offset, head_bytes, body_ptrs)
         }
@@ -548,7 +548,7 @@ pub mod std {
             let [array, offset] = assume::exactly_n(args);
 
             let array = assume::array(array, head_bytes);
-            let offset = (assume::int(&offset) as isize).saturating_neg();
+            let offset = (assume::int(&offset)? as isize).saturating_neg();
 
             Self::shift(array, offset, head_bytes, body_ptrs)
         }
@@ -667,7 +667,7 @@ pub mod std_text_ops {
 
             // TODO: string reader
             // TODO: report length in chars, not bytes (length of ž should be 1)
-            let text = assume::as_value(&text).slice(8).skip(4);
+            let text = assume::as_value(&text)?.slice(8).skip(4);
             let length = u32::from_le_bytes(text.read_const());
 
             Ok(Cell::Data(encode(&length)))
@@ -703,7 +703,7 @@ pub mod interpreter {
 
 mod assume {
     use super::decode;
-    use crate::interpreter::Cell;
+    use crate::{interpreter::Cell, EvalError};
     use lutra_bin::{ArrayReader, Decode};
 
     pub fn into_value(cell: Cell) -> lutra_bin::Data {
@@ -715,12 +715,12 @@ mod assume {
         }
     }
 
-    pub fn as_value(cell: &Cell) -> &lutra_bin::Data {
+    pub fn as_value(cell: &Cell) -> Result<&lutra_bin::Data, EvalError> {
         match cell {
-            Cell::Data(val) => val,
-            Cell::Function(..) => panic!(),
-            Cell::FunctionNative(..) => panic!(),
-            Cell::Vacant => panic!(),
+            Cell::Data(val) => Ok(val),
+            Cell::Function(..) => Err(EvalError::BadProgram),
+            Cell::FunctionNative(..) => Err(EvalError::BadProgram),
+            Cell::Vacant => Err(EvalError::Bug),
         }
     }
 
@@ -733,20 +733,20 @@ mod assume {
         res
     }
 
-    pub fn primitive<T: Decode>(cell: &Cell) -> T {
-        decode::primitive::<T>(as_value(cell))
+    pub fn primitive<T: Decode>(cell: &Cell) -> Result<T, EvalError> {
+        Ok(decode::primitive::<T>(as_value(cell)?))
     }
 
-    pub fn int(cell: &Cell) -> i64 {
-        decode::primitive(as_value(cell))
+    pub fn int(cell: &Cell) -> Result<i64, EvalError> {
+        Ok(decode::primitive(as_value(cell)?))
     }
 
-    pub fn bool(cell: &Cell) -> bool {
-        decode::primitive(as_value(cell))
+    pub fn bool(cell: &Cell) -> Result<bool, EvalError> {
+        Ok(decode::primitive(as_value(cell)?))
     }
 
-    pub fn text(cell: &Cell) -> String {
-        decode::text(as_value(cell))
+    pub fn text(cell: &Cell) -> Result<String, EvalError> {
+        Ok(decode::text(as_value(cell)?))
     }
 
     pub fn array(cell: Cell, item_head_bytes: u32) -> ArrayReader {

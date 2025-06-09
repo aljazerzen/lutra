@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::{borrow::Cow, collections::HashMap, u32};
 
 use crate::utils::IdGenerator;
 
@@ -31,9 +31,16 @@ pub fn compile(program: &ir::Program) -> (cr::Expr, HashMap<&ir::Path, &ir::Ty>)
         scope_id_gen: Default::default(),
     };
 
+    assert!(
+        program.main.ty.kind.is_function(),
+        "expected program.main to be a function, got: {:?}",
+        program.main.ty
+    );
+
     // find the top-level function
-    let ir::ExprKind::Function(func) = &program.main.kind else {
-        todo!("top-level: {:?}", program.main)
+    let func = match &program.main.kind {
+        ir::ExprKind::Function(func) => Cow::Borrowed(func.as_ref()),
+        _ => Cow::Owned(wrap_into_func_call(&program.main)),
     };
     ctx.functions.insert(func.id, FuncProvider::Params);
 
@@ -738,4 +745,33 @@ fn ty_concat_tuples(a: ir::Ty, b: ir::Ty) -> ir::Ty {
     let mut concat = a;
     concat.extend(b);
     ir::Ty::new(ir::TyKind::Tuple(concat))
+}
+
+/// Wraps an expr of func type into a call to this function
+///
+/// Example: p: func(a, b) -> c` is wrapped into `func (x: a, y: b) -> p(a, b)`
+fn wrap_into_func_call(expr: &ir::Expr) -> ir::Function {
+    let ty_function = expr.ty.kind.as_function().unwrap();
+    let func = ir::Function {
+        id: u32::MAX,
+        body: ir::Expr {
+            ty: ty_function.body.clone(),
+            kind: ir::ExprKind::Call(Box::new(ir::Call {
+                function: expr.clone(),
+                args: ty_function
+                    .params
+                    .iter()
+                    .enumerate()
+                    .map(|(position, ty_p)| ir::Expr {
+                        kind: ir::ExprKind::Pointer(ir::Pointer::Parameter(ir::ParameterPtr {
+                            function_id: u32::MAX,
+                            param_position: position as u8,
+                        })),
+                        ty: ty_p.clone(),
+                    })
+                    .collect(),
+            })),
+        },
+    };
+    func
 }

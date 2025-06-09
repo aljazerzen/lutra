@@ -11,7 +11,12 @@ use crate::{decl, pr};
 pub fn lower_expr(root_module: &decl::RootModule, main: &pr::Expr) -> ir::Program {
     let mut lowerer = Lowerer::new(root_module);
 
-    let main = lowerer.lower_expr(main).unwrap();
+    let mut main = lowerer.lower_expr(main).unwrap();
+
+    if !main.ty.kind.is_function() {
+        main = lowerer.wrap_into_func(main);
+    }
+
     let main = lowerer.lower_var_bindings(main);
 
     lowerer.lower_ty_defs_queue();
@@ -21,15 +26,21 @@ pub fn lower_expr(root_module: &decl::RootModule, main: &pr::Expr) -> ir::Progra
 }
 
 pub fn lower_var(root_module: &decl::RootModule, path: &pr::Path) -> ir::Program {
-    let mut lowerer = Lowerer::new(root_module);
+    // lookup path
+    let decl = root_module.module.get(path).unwrap();
+    let expr = decl.into_expr().unwrap();
+    let ty = expr.ty.clone();
 
-    let main = lowerer.lower_expr_decl(path, vec![]).unwrap();
-    let main = lowerer.lower_var_bindings(main);
+    // construct ref to the path
+    let mut expr = pr::Expr::new(path.clone());
+    expr.ty = ty;
+    expr.target = Some(pr::Ref::FullyQualified {
+        to_decl: path.clone(),
+        within: pr::Path::empty(),
+    });
 
-    lowerer.lower_ty_defs_queue();
-    let types = order_ty_defs(lowerer.type_defs, root_module);
-
-    ir::Program { main, types }
+    // lower ref
+    lower_expr(root_module, &expr)
 }
 
 struct Lowerer<'a> {
@@ -598,6 +609,19 @@ impl<'a> Lowerer<'a> {
                     self.collect_pattern_scope(inner, inner_ref, entries)
                 }
             }
+        }
+    }
+
+    fn wrap_into_func(&mut self, body: ir::Expr) -> ir::Expr {
+        ir::Expr {
+            ty: ir::Ty::new(ir::TyFunction {
+                body: body.ty.clone(),
+                params: vec![],
+            }),
+            kind: ir::ExprKind::Function(Box::new(ir::Function {
+                id: self.generator_function_scope.gen() as u32,
+                body,
+            })),
         }
     }
 }

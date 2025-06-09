@@ -8,6 +8,8 @@ use lutra_bin::ir;
 use lutra_bin::Encode;
 
 pub fn compile_program(value: ir::Program) -> Program {
+    let input_count = value.get_input_tys().len() as u8;
+
     let mut b = ByteCoder {
         externals: Default::default(),
         types: value
@@ -20,6 +22,7 @@ pub fn compile_program(value: ir::Program) -> Program {
     Program {
         main: b.compile_expr(value.main),
         externals: b.externals.into_iter().collect(),
+        input_count,
     }
 }
 

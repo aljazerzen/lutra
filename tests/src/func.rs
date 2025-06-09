@@ -1351,3 +1351,20 @@ test_case!(
     ]
     "#
 );
+
+test_case!(
+    constant_00,
+    r#"
+    {1, [false, true], "hello"}
+    "#,
+    r#"
+    {
+      1,
+      [
+        false,
+        true,
+      ],
+      "hello",
+    }
+    "#
+);

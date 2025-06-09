@@ -33,7 +33,7 @@ pub type NativeFunction =
 pub enum EvalError {
     BadInputs,
     BadProgram,
-    MissingFuncImpl,
+    MissingFuncImpl { external_id: String },
     WorkInProgress,
     Bug,
 }
@@ -49,19 +49,17 @@ pub fn evaluate(
         scopes: HashMap::new(),
     };
 
+    if inputs.len() != program.input_count as usize {
+        return Err(EvalError::BadInputs);
+    }
+
     // load external symbols
     let native_modules: HashMap<&str, _> = native_modules.iter().map(|a| (a.0, a.1)).collect();
     for external in &program.externals {
-        let (mod_id, decl_name) = external
-            .id
-            .rsplit_once("::")
-            .unwrap_or_else(|| panic!("bad external id: {}", external.id));
-
-        let module = native_modules
-            .get(mod_id)
-            .unwrap_or_else(|| panic!("cannot find native module {mod_id}"));
-        let Some(function) = module.lookup_native_symbol(decl_name) else {
-            return Err(EvalError::BadInputs);
+        let Some(function) = find_external_func(external, &native_modules) else {
+            return Err(EvalError::MissingFuncImpl {
+                external_id: external.id.clone(),
+            });
         };
         interpreter.allocate(Cell::FunctionNative(Box::new((
             function,
@@ -86,11 +84,19 @@ pub fn evaluate(
     Ok(value.flatten())
 }
 
+fn find_external_func(
+    external: &br::ExternalSymbol,
+    native_modules: &HashMap<&str, &dyn NativeModule>,
+) -> Option<NativeFunction> {
+    let (mod_id, decl_name) = external.id.rsplit_once("::")?;
+    let module = native_modules.get(mod_id)?;
+    module.lookup_native_symbol(decl_name)
+}
+
 impl Interpreter {
     fn get_cell(&self, sid: br::Sid) -> Result<&Cell, EvalError> {
-        self.memory
-            .get(self.resolve_sid_addr(sid))
-            .ok_or(EvalError::BadProgram)
+        let addr = self.resolve_sid_addr(sid)?;
+        self.memory.get(addr).ok_or(EvalError::BadProgram)
     }
 
     fn allocate(&mut self, symbol: Cell) -> Addr {
@@ -111,15 +117,15 @@ impl Interpreter {
         }
     }
 
-    fn resolve_sid_addr(&self, sid: br::Sid) -> Addr {
-        match sid.kind() {
+    fn resolve_sid_addr(&self, sid: br::Sid) -> Result<Addr, EvalError> {
+        Ok(match sid.kind() {
             br::SidKind::External => {
                 // externals: laid out at the start of memory
                 sid.0 as Addr
             }
             br::SidKind::Var => {
                 // bindings
-                *self.bindings.get(&sid).unwrap()
+                *self.bindings.get(&sid).ok_or(EvalError::BadProgram)?
             }
             br::SidKind::FunctionScope => {
                 // function scopes
@@ -128,7 +134,7 @@ impl Interpreter {
 
                 *start + (sid.0.bitand(0x000000ff_u32) as usize)
             }
-        }
+        })
     }
 
     fn allocate_binding(&mut self, binding_id: br::Sid, symbol: Cell) -> Addr {
