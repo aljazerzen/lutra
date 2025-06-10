@@ -675,6 +675,62 @@ pub mod std_text_ops {
     }
 }
 
+pub mod std_fs {
+    use ::std::{fs, path};
+
+    use arrow::array::RecordBatchReader;
+    use lutra_bin::{ir, Decode};
+    use parquet::arrow::arrow_reader::ParquetRecordBatchReaderBuilder;
+
+    use crate::{native::*, EvalError};
+
+    pub const MODULE: Module = Module;
+
+    pub struct Module;
+
+    impl NativeModule for Module {
+        fn lookup_native_symbol(&self, id: &str) -> Option<crate::interpreter::NativeFunction> {
+            Some(match id {
+                "read_parquet" => &Self::read_parquet,
+
+                _ => return None,
+            })
+        }
+    }
+
+    impl Module {
+        pub fn read_parquet(
+            _it: &mut Interpreter,
+            layout_args: &[u32],
+            args: Vec<Cell>,
+        ) -> Result<Cell, EvalError> {
+            // unpack args
+            let [file_path] = assume::exactly_n(args);
+            let file_path = assume::text(&file_path)?;
+            let file_path = path::PathBuf::from(file_path);
+
+            // decode item ty from layout args
+            let ty_item = assume::layout_args_to_bytes(layout_args);
+            let ty_item = ir::Ty::decode(&ty_item).map_err(|_| EvalError::BadProgram)?;
+
+            // init parquet reader
+            let Ok(file) = fs::File::open(&file_path) else {
+                panic!("read_parquet: file open error")
+            };
+            let builder = ParquetRecordBatchReaderBuilder::try_new(file).unwrap();
+
+            let reader = builder.build().unwrap();
+
+            crate::arrow::validate_schema(&reader.schema(), &ty_item).unwrap();
+
+            let data = crate::arrow::arrow_to_lutra(reader, &ty_item)
+                .map_err(|_| EvalError::BadProgram)?;
+
+            Ok(Cell::Data(data))
+        }
+    }
+}
+
 pub mod interpreter {
     use crate::{native::*, EvalError};
 
@@ -784,6 +840,14 @@ mod assume {
             self.layout_args = &self.layout_args[len + 1..];
             r
         }
+    }
+
+    pub fn layout_args_to_bytes(args: &[u32]) -> Vec<u8> {
+        let mut r = Vec::with_capacity(args.len() * (u32::BITS / u8::BITS) as usize);
+        for arg in args {
+            r.extend(arg.to_le_bytes());
+        }
+        r
     }
 }
 

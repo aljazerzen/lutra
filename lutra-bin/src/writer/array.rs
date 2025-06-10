@@ -20,6 +20,10 @@ impl<'t> ArrayWriter<'t> {
         let ir::TyKind::Array(item_ty) = &ty.kind else {
             panic!()
         };
+        Self::new_for_item_ty(item_ty)
+    }
+
+    pub fn new_for_item_ty(item_ty: &'t ir::Ty) -> Self {
         let layout = item_ty.layout.as_ref().unwrap();
 
         let head_bytes = layout.head_size.div_ceil(8);

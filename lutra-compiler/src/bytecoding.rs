@@ -307,6 +307,29 @@ fn compile_external_symbol(id: String, ty: &ir::Ty) -> ExternalSymbol {
             r
         }
 
+        "std::fs::read_parquet" => {
+            let ty_func = ty.kind.as_function().unwrap();
+
+            let output_item = ty_func.body.kind.as_array().unwrap();
+
+            // encode output item ty as lutra-bin
+            let mut output_item_buf = lutra_bin::bytes::BytesMut::new();
+            output_item.encode(&mut output_item_buf);
+
+            // pad
+            if output_item_buf.len() % 4 != 0 {
+                output_item_buf.put_bytes(0, 4 - output_item_buf.len() % 4);
+            }
+
+            // cast to Vec<u32> as le bytes
+            let mut r = Vec::with_capacity(output_item_buf.len() / 4);
+            for chunk in output_item_buf.freeze().chunks_exact(4) {
+                r.push(u32::from_le_bytes(chunk.try_into().unwrap()));
+            }
+
+            r
+        }
+
         _ => vec![],
     };
     ExternalSymbol { id, layout_args }

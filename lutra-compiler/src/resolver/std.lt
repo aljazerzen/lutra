@@ -170,3 +170,7 @@ module text_ops {
   let contains: func (value: text, substr: text): bool
   let ends_with: func (value: text, suffix: text): bool
 }
+
+module fs {
+    let read_parquet: func <R> (file_name: text): [R]
+}
