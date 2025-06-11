@@ -212,7 +212,8 @@ impl ByteCoder {
 
 fn compile_external_symbol(id: String, ty: &ir::Ty) -> ExternalSymbol {
     let layout_args: Vec<u32> = match id.as_str() {
-        "std::mul" | "std::div" | "std::mod" | "std::add" | "std::sub" | "std::neg" => {
+        "std::mul" | "std::div" | "std::mod" | "std::add" | "std::sub" | "std::neg" | "std::eq"
+        | "std::ne" | "std::gt" | "std::lt" | "std::gte" | "std::lte" => {
             let param_ty = as_ty_of_param(ty);
             let primitive = param_ty.kind.as_primitive().unwrap();
 

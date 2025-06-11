@@ -159,6 +159,8 @@ test_case!(std_add_01, "func () -> 30.2 + 2.30", "32.5");
 
 test_case!(std_add_02, "func () -> 2.30 + 30.2", "32.5");
 
+test_case!(std_add_03, "func () -> 1.4 + 0.2", "1.5999999999999999");
+
 test_case!(
     std_sub_00,
     "func () -> {30 - 2, 2 - 30}",
@@ -191,7 +193,7 @@ test_case!(
 );
 
 test_case!(
-    std_eq,
+    std_eq_00,
     "func () -> {30 == 2, 30 == 30}",
     r#"{
   false,
@@ -200,8 +202,35 @@ test_case!(
 );
 
 test_case!(
-    std_ne,
-    "func () -> {30 != 2, 30 != 30}",
+    std_eq_01,
+    "func () -> {30.3 == 2.2, 30.3 == 30.3}",
+    r#"{
+  false,
+  true,
+}"#
+);
+
+test_case!(
+    std_eq_02,
+    "func () -> {false == true, false == false}",
+    r#"{
+  false,
+  true,
+}"#
+);
+
+test_case!(
+    std_eq_03,
+    r#"func () -> {"aa" == "b", "aa" == "aa"}"#,
+    r#"{
+  false,
+  true,
+}"#
+);
+
+test_case!(
+    std_ne_00,
+    "func () -> {30.3 != 2.2, 30.3 != 30.3}",
     r#"{
   true,
   false,
@@ -209,7 +238,33 @@ test_case!(
 );
 
 test_case!(
-    std_gt,
+    std_ne_01,
+    "func () -> {30.3 != 2.2, 30.3 != 30.3}",
+    r#"{
+  true,
+  false,
+}"#
+);
+
+test_case!(
+    std_ne_02,
+    "func () -> {false != true, false != false}",
+    r#"{
+  true,
+  false,
+}"#
+);
+test_case!(
+    std_ne_03,
+    r#"func () -> {"aa" != "b", "aa" != "aa"}"#,
+    r#"{
+  true,
+  false,
+}"#
+);
+
+test_case!(
+    std_gt_00,
     "func () -> {3 > 2, 2 > 3, 2 > 2}",
     r#"{
   true,
@@ -217,9 +272,18 @@ test_case!(
   false,
 }"#
 );
+test_case!(
+    std_gt_01,
+    "func () -> {3.3 > 2.2, 2.2 > 3.3, 2.2 > 2.2}",
+    r#"{
+  true,
+  false,
+  false,
+}"#
+);
 
 test_case!(
-    std_lt,
+    std_lt_00,
     "func () -> {3 < 2, 2 < 3, 2 < 2}",
     r#"{
   false,
@@ -227,10 +291,28 @@ test_case!(
   false,
 }"#
 );
+test_case!(
+    std_lt_01,
+    "func () -> {3.3 < 2.2, 2.2 < 3.3, 2.2 < 2.2}",
+    r#"{
+  false,
+  true,
+  false,
+}"#
+);
 
 test_case!(
-    std_gte,
+    std_gte_00,
     "func () -> {3 >= 2, 2 >= 3, 2 >= 2}",
+    r#"{
+  true,
+  false,
+  true,
+}"#
+);
+test_case!(
+    std_gte_01,
+    "func () -> {3.3 >= 2.2, 2.2 >= 3.3, 2.2 >= 2.2}",
     r#"{
   true,
   false,
@@ -239,8 +321,17 @@ test_case!(
 );
 
 test_case!(
-    std_lte,
+    std_lte_00,
     "func () -> {3 <= 2, 2 <= 3, 2 <= 2}",
+    r#"{
+  false,
+  true,
+  true,
+}"#
+);
+test_case!(
+    std_lte_01,
+    "func () -> {3.3 <= 2.2, 2.2 <= 3.3, 2.2 <= 2.2}",
     r#"{
   false,
   true,

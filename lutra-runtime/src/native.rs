@@ -61,18 +61,6 @@ pub mod std {
         }
     }
 
-    macro_rules! bin_func {
-        ($name: ident, $left_assume: path, $right_assume: path, $op: tt) => {
-            pub fn $name(_: &mut Interpreter, _layout_args: &[u32], args: Vec<Cell>) -> Result<Cell, EvalError> {
-                let left = $left_assume(&args[0])?;
-                let right = $right_assume(&args[1])?;
-
-                let res = left $op right;
-                Ok(Cell::Data(encode(&res)))
-            }
-        };
-    }
-
     macro_rules! reduce_func {
         ($name: ident, $item_decode: path, $reduce: expr, $default: literal) => {
             pub fn $name(
@@ -94,18 +82,34 @@ pub mod std {
     }
 
     macro_rules! bin_op {
-        ($prim: ty, $args: ident, $op: tt) => {
+        ($args: ident, $prim: ident, $op: tt, unchanged) => {
+            bin_op!($args, $prim, $op, $prim)
+        };
+
+        ($args: ident, $prim: ty, $op: tt, $res_ty: ty) => {
             {
                 let left = assume::primitive::<$prim>(&$args[0])?;
                 let right = assume::primitive::<$prim>(&$args[1])?;
                 let res = left $op right;
-                Cell::Data(encode::<$prim>(&res))
+                Cell::Data(encode::<$res_ty>(&res))
+            }
+        };
+    }
+
+    macro_rules! bin_func {
+        ($name: ident, $args_ty: ty, $op: tt, $res_ty: ty) => {
+            pub fn $name(
+                _: &mut Interpreter,
+                _layout_args: &[u32],
+                args: Vec<Cell>,
+            ) -> Result<Cell, EvalError> {
+                Ok(bin_op!(args, $args_ty, $op, $res_ty))
             }
         };
     }
 
     macro_rules! bin_num_func {
-        ($name: ident, $op: tt) => {
+        ($name: ident, $op: tt, $res_ty: ident) => {
             pub fn $name(
                 _: &mut Interpreter,
                 layout_args: &[u32],
@@ -115,17 +119,50 @@ pub mod std {
                 let prim_set = lutra_bin::ir::TyPrimitive::decode(&prim_set).unwrap();
 
                 Ok(match prim_set {
-                    lutra_bin::ir::TyPrimitive::int8 => bin_op!(i8, args, $op),
-                    lutra_bin::ir::TyPrimitive::int16 => bin_op!(i16, args, $op),
-                    lutra_bin::ir::TyPrimitive::int32 => bin_op!(i32, args, $op),
-                    lutra_bin::ir::TyPrimitive::int64 => bin_op!(i64, args, $op),
-                    lutra_bin::ir::TyPrimitive::uint8 => bin_op!(u8, args, $op),
-                    lutra_bin::ir::TyPrimitive::uint16 => bin_op!(u16, args, $op),
-                    lutra_bin::ir::TyPrimitive::uint32 => bin_op!(u32, args, $op),
-                    lutra_bin::ir::TyPrimitive::uint64 => bin_op!(u64, args, $op),
-                    lutra_bin::ir::TyPrimitive::float32 => bin_op!(f32, args, $op),
-                    lutra_bin::ir::TyPrimitive::float64 => bin_op!(f64, args, $op),
+                    lutra_bin::ir::TyPrimitive::int8 => bin_op!(args, i8, $op, $res_ty),
+                    lutra_bin::ir::TyPrimitive::int16 => bin_op!(args, i16, $op, $res_ty),
+                    lutra_bin::ir::TyPrimitive::int32 => bin_op!(args, i32, $op, $res_ty),
+                    lutra_bin::ir::TyPrimitive::int64 => bin_op!(args, i64, $op, $res_ty),
+                    lutra_bin::ir::TyPrimitive::uint8 => bin_op!(args, u8, $op, $res_ty),
+                    lutra_bin::ir::TyPrimitive::uint16 => bin_op!(args, u16, $op, $res_ty),
+                    lutra_bin::ir::TyPrimitive::uint32 => bin_op!(args, u32, $op, $res_ty),
+                    lutra_bin::ir::TyPrimitive::uint64 => bin_op!(args, u64, $op, $res_ty),
+                    lutra_bin::ir::TyPrimitive::float32 => bin_op!(args, f32, $op, $res_ty),
+                    lutra_bin::ir::TyPrimitive::float64 => bin_op!(args, f64, $op, $res_ty),
                     _ => panic!(),
+                })
+            }
+        };
+    }
+
+    macro_rules! bin_prim_func {
+        ($name: ident, $op: tt, $res_ty: ident) => {
+            pub fn $name(
+                _: &mut Interpreter,
+                layout_args: &[u32],
+                args: Vec<Cell>,
+            ) -> Result<Cell, EvalError> {
+                let prim_set = layout_args[0].to_be_bytes();
+                let prim_set = lutra_bin::ir::TyPrimitive::decode(&prim_set).unwrap();
+
+                Ok(match prim_set {
+                    lutra_bin::ir::TyPrimitive::bool => bin_op!(args, bool, $op, $res_ty),
+                    lutra_bin::ir::TyPrimitive::int8 => bin_op!(args, i8, $op, $res_ty),
+                    lutra_bin::ir::TyPrimitive::int16 => bin_op!(args, i16, $op, $res_ty),
+                    lutra_bin::ir::TyPrimitive::int32 => bin_op!(args, i32, $op, $res_ty),
+                    lutra_bin::ir::TyPrimitive::int64 => bin_op!(args, i64, $op, $res_ty),
+                    lutra_bin::ir::TyPrimitive::uint8 => bin_op!(args, u8, $op, $res_ty),
+                    lutra_bin::ir::TyPrimitive::uint16 => bin_op!(args, u16, $op, $res_ty),
+                    lutra_bin::ir::TyPrimitive::uint32 => bin_op!(args, u32, $op, $res_ty),
+                    lutra_bin::ir::TyPrimitive::uint64 => bin_op!(args, u64, $op, $res_ty),
+                    lutra_bin::ir::TyPrimitive::float32 => bin_op!(args, f32, $op, $res_ty),
+                    lutra_bin::ir::TyPrimitive::float64 => bin_op!(args, f64, $op, $res_ty),
+                    lutra_bin::ir::TyPrimitive::text => {
+                        let left = assume::text(&args[0])?;
+                        let right = assume::text(&args[1])?;
+                        let res = left $op right;
+                        Cell::Data(encode::<$res_ty>(&res))
+                    },
                 })
             }
         };
@@ -140,15 +177,15 @@ pub mod std {
     }
 
     impl Module {
-        bin_num_func!(mul, *);
+        bin_num_func!(mul, *, unchanged);
 
-        bin_num_func!(div, /);
+        bin_num_func!(div, /, unchanged);
 
-        bin_num_func!(r#mod, %);
+        bin_num_func!(r#mod, %, unchanged);
 
-        bin_num_func!(add, +);
+        bin_num_func!(add, +, unchanged);
 
-        bin_num_func!(sub, -);
+        bin_num_func!(sub, -, unchanged);
 
         pub fn neg(
             _: &mut Interpreter,
@@ -168,21 +205,21 @@ pub mod std {
             })
         }
 
-        bin_func!(eq, assume::int, assume::int, ==);
+        bin_prim_func!(eq, ==, bool);
 
-        bin_func!(ne, assume::int, assume::int, !=);
+        bin_prim_func!(ne, !=, bool);
 
-        bin_func!(gt, assume::int, assume::int, >);
+        bin_num_func!(gt, >, bool);
 
-        bin_func!(lt, assume::int, assume::int, <);
+        bin_num_func!(lt, <, bool);
 
-        bin_func!(gte, assume::int, assume::int, >=);
+        bin_num_func!(gte, >=, bool);
 
-        bin_func!(lte, assume::int, assume::int, <=);
+        bin_num_func!(lte, <=, bool);
 
-        bin_func!(and, assume::bool, assume::bool, &&);
+        bin_func!(and, bool, &&, bool);
 
-        bin_func!(or, assume::bool, assume::bool, ||);
+        bin_func!(or, bool, ||, bool);
 
         pub fn not(
             _it: &mut Interpreter,
@@ -204,7 +241,7 @@ pub mod std {
             let [array, position] = assume::exactly_n(args);
 
             let array = assume::array(array, input_item_head_bytes);
-            let position = assume::int(&position)?;
+            let position = assume::int64(&position)?;
 
             let item = array.get(position as usize).unwrap();
             Ok(Cell::Data(item))
@@ -275,8 +312,8 @@ pub mod std {
             let input = assume::array(array, item_head_bytes);
 
             // unpack
-            let start = assume::int(&start)?;
-            let end = assume::int(&end)?;
+            let start = assume::int64(&start)?;
+            let end = assume::int64(&end)?;
 
             // convert to absolute
             let start = index_rel_to_abs(start, input.remaining());
@@ -311,7 +348,7 @@ pub mod std {
                 let cell = Cell::Data(item);
 
                 let key = it.evaluate_func_call(&func, vec![cell])?;
-                let key = assume::int(&key)?;
+                let key = assume::int64(&key)?;
 
                 keys.push((key, index));
             }
@@ -498,7 +535,7 @@ pub mod std {
         ) -> Result<Cell, EvalError> {
             let [array, item] = assume::exactly_n(args);
             let array = assume::array(array, layout_args[0]);
-            let item = assume::int(&item)?;
+            let item = assume::int64(&item)?;
 
             let res = array.into_iter().any(|x| decode::int(&x) == item);
             Ok(Cell::Data(encode(&res)))
@@ -531,7 +568,7 @@ pub mod std {
             let [array, offset] = assume::exactly_n(args);
 
             let array = assume::array(array, head_bytes);
-            let offset = assume::int(&offset)? as isize;
+            let offset = assume::int64(&offset)? as isize;
 
             Self::shift(array, offset, head_bytes, body_ptrs)
         }
@@ -548,7 +585,7 @@ pub mod std {
             let [array, offset] = assume::exactly_n(args);
 
             let array = assume::array(array, head_bytes);
-            let offset = (assume::int(&offset)? as isize).saturating_neg();
+            let offset = (assume::int64(&offset)? as isize).saturating_neg();
 
             Self::shift(array, offset, head_bytes, body_ptrs)
         }
@@ -793,7 +830,7 @@ mod assume {
         Ok(decode::primitive::<T>(as_value(cell)?))
     }
 
-    pub fn int(cell: &Cell) -> Result<i64, EvalError> {
+    pub fn int64(cell: &Cell) -> Result<i64, EvalError> {
         Ok(decode::primitive(as_value(cell)?))
     }
 

@@ -28,7 +28,7 @@ pub fn validate_schema(schema: &arrow_datatypes::Schema, item_ty: &ir::Ty) -> Re
                     ir::TyPrimitive::float64 => arrow_datatypes::DataType::Float64,
                     ir::TyPrimitive::text => arrow_datatypes::DataType::Utf8,
                 };
-                validate_field(expected, &f).map_err(|m| format!("{field_name}: {m}"))?;
+                validate_field(expected, f).map_err(|m| format!("{field_name}: {m}"))?;
             }
 
             ir::TyKind::Tuple(_) => unimplemented!(),
