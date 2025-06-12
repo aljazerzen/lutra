@@ -1,7 +1,7 @@
 use crate::diagnostic::{Diagnostic, WithErrorInfo};
-use crate::pr;
+use crate::{pr, utils};
 
-use crate::resolver::types::scope::Named;
+use crate::resolver::types::scope::{Named, ScopeKind};
 use crate::utils::fold::PrFold;
 use crate::Result;
 
@@ -22,14 +22,19 @@ impl<'a> super::TypeResolver<'a> {
         // type that will be inferred from the first branch and then validated against the following
         let mut ty = None;
         for branch in match_.branches {
-            self.scopes.push(Scope::new(branch.value.scope_id.unwrap()));
+            self.scopes.push(Scope::new(
+                branch.value.scope_id.unwrap(),
+                ScopeKind::Nested,
+            ));
 
             // fold pattern (this will populate the scope)
             let pattern = self.resolve_pattern(subject_ty, branch.pattern)?;
 
             // fold value
-            let mut value = Box::new(self.fold_expr(*branch.value)?);
+            let value = self.fold_expr(*branch.value)?;
 
+            let mapping = self.finalize_type_vars()?;
+            let mut value = utils::TypeReplacer::on_expr(value, mapping);
             let scope = self.scopes.pop().unwrap();
             value.scope_id = Some(scope.id);
 
@@ -44,6 +49,7 @@ impl<'a> super::TypeResolver<'a> {
                 }
             }
 
+            let value = Box::new(value);
             branches.push(pr::MatchBranch { pattern, value })
         }
 

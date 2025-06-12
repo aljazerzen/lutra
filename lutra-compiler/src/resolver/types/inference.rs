@@ -13,10 +13,24 @@ impl TypeResolver<'_> {
 
         let kind = match &expr.kind {
             ExprKind::Literal(ref literal) => match literal {
-                Literal::Integer(_) => TyKind::Primitive(TyPrimitive::int64),
-                Literal::Float(_) => TyKind::Primitive(TyPrimitive::float64),
                 Literal::Boolean(_) => TyKind::Primitive(TyPrimitive::bool),
                 Literal::Text(_) => TyKind::Primitive(TyPrimitive::text),
+                Literal::Integer(_) => {
+                    // int literal (e.g. `4`) can be of type `int64` or `u8` or any other
+                    // integer type. So we have leave the type to be figured out later.
+                    // This is done with a new type param, constraint to integer types.
+                    return Ok(self.introduce_ty_var(pr::TyParamDomain::OneOf(vec![
+                        pr::TyPrimitive::int8,
+                        pr::TyPrimitive::int16,
+                        pr::TyPrimitive::int32,
+                        pr::TyPrimitive::int64,
+                        pr::TyPrimitive::uint8,
+                        pr::TyPrimitive::uint16,
+                        pr::TyPrimitive::uint32,
+                        pr::TyPrimitive::uint64,
+                    ]), expr.span));
+                },
+                Literal::Float(_) => TyKind::Primitive(TyPrimitive::float64),
                 _ => panic!(),
             },
 
@@ -42,28 +56,20 @@ impl TypeResolver<'_> {
                 ty_tuple_kind(ty_fields)
             }
             ExprKind::Array(items) => {
-                let mut variants = Vec::with_capacity(items.len());
+                let mut items_ty = None;
                 for item in items {
                     let item_ty = self.infer_type(item)?;
-                    variants.push(item_ty);
+                    if let Some(items_ty) = &items_ty {
+                        self.validate_type(&item_ty, items_ty, &|| None)?;
+                    } else {
+                        items_ty = Some(item_ty);
+                    }
                 }
-                let items_ty = match variants.len() {
-                    0 => {
-                        // no items, so we must infer the type
-                        self.introduce_ty_var(pr::TyParamDomain::Open, expr.span)
-                    }
-                    1 => {
-                        // single item, use its type
-                        variants.into_iter().exactly_one().unwrap()
-                    }
-                    2.. => {
-                        // ideally, we would enforce that all of items have
-                        // the same type, but currently we don't have a good
-                        // strategy for dealing with nullable types, which
-                        // causes problems here.
-                        // HACK: use only the first type
-                        variants.into_iter().unique().next().unwrap()
-                    }
+                let items_ty  = if let Some(t) = items_ty {
+                    t
+                } else {
+                    // no items, so we must infer the type
+                    self.introduce_ty_var(pr::TyParamDomain::Open, expr.span)
                 };
                 TyKind::Array(Box::new(items_ty))
             }

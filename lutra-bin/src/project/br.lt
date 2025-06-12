@@ -17,7 +17,7 @@ type Expr = {
 @derive(["Debug", "Clone", "enum_as_inner::EnumAsInner"])
 type ExprKind = enum {
   Pointer = Sid,
-  Literal = project::ir::Literal,
+  Literal = [uint8],
   Call = Call,
   Function = Function,
   `Tuple` = `Tuple`,

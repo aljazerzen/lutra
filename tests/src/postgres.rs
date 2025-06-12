@@ -50,32 +50,32 @@ pub fn _run_to_str(lutra_source: &str) -> String {
 #[test]
 fn prim() {
     insta::assert_snapshot!(_run_to_str(r#"
-        func () -> 3
-    "#), @r#"
+        func () -> 3: int16
+    "#), @r"
     SELECT
       r0.value
     FROM
       (
         SELECT
-          3::int8 AS value
+          3::int2 AS value
       ) AS r0
     ---
     3
-    "#);
+    ");
 }
 
 #[test]
 fn tuple_prim() {
     insta::assert_snapshot!(_run_to_str(r#"
-        func () -> {3, false}
-    "#), @r#"
+        func () -> {3: int16, false}
+    "#), @r"
     SELECT
       r0._0,
       r0._1
     FROM
       (
         SELECT
-          3::int8 AS _0,
+          3::int2 AS _0,
           FALSE AS _1
       ) AS r0
     ---
@@ -83,31 +83,31 @@ fn tuple_prim() {
       3,
       false,
     }
-    "#);
+    ");
 }
 
 #[test]
 fn array_prim() {
     insta::assert_snapshot!(_run_to_str(r#"
-        func () -> [3, 6, 12]
-    "#), @r#"
+        func () -> [3, 6, 12]: [int16]
+    "#), @r"
     SELECT
       r3.value
     FROM
       (
         SELECT
           0::int8 AS index,
-          3::int8 AS value
+          3::int2 AS value
         UNION
         ALL
         SELECT
           1::int8 AS index,
-          6::int8 AS value
+          6::int2 AS value
         UNION
         ALL
         SELECT
           2::int8 AS index,
-          12::int8 AS value
+          12::int2 AS value
       ) AS r3
     ORDER BY
       r3.index
@@ -117,7 +117,7 @@ fn array_prim() {
       6,
       12,
     ]
-    "#);
+    ");
 }
 
 #[test]
@@ -145,7 +145,7 @@ fn array_empty() {
 #[test]
 fn tuple_tuple_prim() {
     insta::assert_snapshot!(_run_to_str(r#"
-        func () -> {3, {false, true, {"hello"}, 4}}
+        func () -> {3: int16, {false, true, {"hello"}, 4: int32}}
     "#), @r#"
     SELECT
       r0._0,
@@ -156,11 +156,11 @@ fn tuple_tuple_prim() {
     FROM
       (
         SELECT
-          3::int8 AS _0,
+          3::int2 AS _0,
           FALSE AS _1_0,
           TRUE AS _1_1,
           'hello' AS _1_2_0,
-          4::int8 AS _1_3
+          4::int4 AS _1_3
       ) AS r0
     ---
     {
@@ -180,8 +180,8 @@ fn tuple_tuple_prim() {
 #[test]
 fn tuple_array_prim() {
     insta::assert_snapshot!(_run_to_str(r#"
-        func () -> {true, [1, 2, 3], [4], false}
-    "#), @r#"
+        func () -> {true, [1, 2, 3]: [int64], [4]: [int32], false}
+    "#), @r"
     SELECT
       r6._0,
       r6._1,
@@ -232,7 +232,7 @@ fn tuple_array_prim() {
               (
                 SELECT
                   0::int8 AS index,
-                  4::int8 AS value
+                  4::int4 AS value
               ) AS r5
           ) AS _2,
           FALSE AS _3
@@ -250,7 +250,7 @@ fn tuple_array_prim() {
       ],
       false,
     }
-    "#);
+    ");
 }
 
 #[test]
@@ -299,7 +299,7 @@ fn tuple_array_empty() {
 #[test]
 fn array_array_prim() {
     insta::assert_snapshot!(_run_to_str(r#"
-        func () -> [[1, 2, 3], [4, 5]]
+        func () -> [[1, 2, 3], [4, 5]]: [[int64]]
     "#), @r#"
     SELECT
       r9.value
@@ -381,7 +381,7 @@ fn array_array_prim() {
 #[test]
 fn array_tuple_prim() {
     insta::assert_snapshot!(_run_to_str(r#"
-        func () -> [{3, false}, {6, true}, {12, false}]
+        func () -> [{3: int64, false}, {6, true}, {12, false}]
     "#), @r#"
     SELECT
       r3._0,
@@ -430,7 +430,7 @@ fn tuple_array_tuple_prim() {
     insta::assert_snapshot!(_run_to_str(r#"
         func () -> {
             "hello",
-            [{3, false}, {6, true}, {12, false}],
+            [{3: int16, false}, {6, true}, {12, false}],
         }
     "#), @r#"
     SELECT
@@ -454,19 +454,19 @@ fn tuple_array_tuple_prim() {
               (
                 SELECT
                   0::int8 AS index,
-                  3::int8 AS _0,
+                  3::int2 AS _0,
                   FALSE AS _1
                 UNION
                 ALL
                 SELECT
                   1::int8 AS index,
-                  6::int8 AS _0,
+                  6::int2 AS _0,
                   TRUE AS _1
                 UNION
                 ALL
                 SELECT
                   2::int8 AS index,
-                  12::int8 AS _0,
+                  12::int2 AS _0,
                   FALSE AS _1
               ) AS r3
           ) AS _1
@@ -510,8 +510,8 @@ fn param_00() {
 fn tuple_unpacking_00() {
     insta::assert_snapshot!(_run(r#"
     func () -> {
-      4,
-      ([{id = 3, title = "Hello world!"}] | std::index(0)),
+      4: int16,
+      ([{id = 3: int32, title = "Hello world!"}] | std::index(0)),
     }
     "#,
     vec![]
@@ -532,11 +532,11 @@ fn json_pack_00() {
     // Applying an operation of that array then forces it to unpack.
 
     insta::assert_snapshot!(_run(r#"
-    let get_data = func () -> {a = [2, 5, 4, 3, 1, 2]}
+    let get_data = func () -> {a = [2, 5, 4, 3, 1, 2]: [int32]}
 
     func () -> (
       get_data().a
-      | std::map(func (y: int64) -> -y)
+      | std::map(func (y: int32) -> -y)
     )
     "#, vec![]).1, @r#"
     [
@@ -556,11 +556,11 @@ fn json_pack_01() {
     // Applying an operation of that array then forces it to unpack.
 
     insta::assert_snapshot!(_run(r#"
-    let get_data = func () -> {a = [{2, false}, {5, true}, {4, false}]}
+    let get_data = func () -> {a = [{2: int32, false}, {5, true}, {4, false}]}
 
     func () -> (
       get_data().a
-      | std::map(func (y: {int64, bool}) -> {-y.0, !y.1})
+      | std::map(func (y: {int32, bool}) -> {-y.0, !y.1})
     )
     "#, vec![]).1, @r#"
     [
@@ -583,10 +583,10 @@ fn json_pack_01() {
 #[test]
 fn json_pack_02() {
     insta::assert_snapshot!(_run(r#"
-    let get_data = func () -> [[1, 2, 3], [4, 5, 6]]
+    let get_data = func () -> [[1: int16, 2, 3], [4, 5, 6]]
 
     func () -> (
-      get_data() | std::map(func (y: [int64]) -> (
+      get_data() | std::map(func (y: [int16]) -> (
         std::index(y, 1)
       ))
     )
@@ -601,7 +601,7 @@ fn json_pack_02() {
 #[test]
 fn json_pack_03() {
     insta::assert_snapshot!(_run(r#"
-    let get_data = func () -> [[1, 2, 3], [4, 5, 6]]
+    let get_data = func () -> [[1: int64, 2, 3], [4, 5, 6]]
 
     func () -> (
       get_data()

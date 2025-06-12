@@ -110,73 +110,102 @@ test_case!(
     "[]"
 );
 
-test_case!(std_mul_01, "func () -> 2 * 3", "6");
+test_case!(std_mul_01, "(2 * 3): int64", "6");
 
-test_case!(std_mul_02, "func () -> 2.1 * 3.5", "7.3500000000000005");
+test_case!(std_mul_02, "(2.1 * 3.5): float64", "7.3500000000000005");
 
-test_case!(std_div_00, "func () -> 10 / 6", "1");
+test_case!(std_div_00, "(10 / 6): int64", "1");
 
-test_case!(std_div_01, "func () -> -10 / 6", "-1");
+test_case!(std_div_01, "(-10 / 6): int64", "-1");
 
-test_case!(std_div_02, "func () -> 10 / -6", "-1");
+test_case!(std_div_02, "(10 / -6): int64", "-1");
 
-test_case!(std_div_03, "func () -> -10 / -6", "1");
+test_case!(std_div_03, "(-10 / -6): int64", "1");
 
-test_case!(std_div_04, "func () -> 10.0 / 6.0", "1.6666666666666667");
+test_case!(std_div_04, "(10.0 / 6.0): float64", "1.6666666666666667");
 
-test_case!(std_div_05, "func () -> -10.0 / 6.0", "-1.6666666666666667");
+test_case!(std_div_05, "(-10.0 / 6.0): float64", "-1.6666666666666667");
 
-test_case!(std_div_06, "func () -> 10.0 / -6.0", "-1.6666666666666667");
+test_case!(std_div_06, "(10.0 / -6.0): float64", "-1.6666666666666667");
 
-test_case!(std_div_07, "func () -> -10.0 / -6.0", "1.6666666666666667");
+test_case!(std_div_07, "(-10.0 / -6.0): float64", "1.6666666666666667");
 
-test_case!(std_mod_00, "func () -> 10 % 6", "4");
+test_case!(std_mod_00, "(10 % 6): int64", "4");
 
-test_case!(std_mod_01, "func () -> -10 % 6", "-4");
+test_case!(std_mod_01, "(-10 % 6): int64", "-4");
 
-test_case!(std_mod_02, "func () -> 10 % -6", "4");
+test_case!(std_mod_02, "(10 % -6): int64", "4");
 
-test_case!(std_mod_03, "func () -> -10 % -6", "-4");
+test_case!(std_mod_03, "(-10 % -6): int64", "-4");
 
-test_case!(std_mod_04, "func () -> 10.0 % 6.0", "4");
+test_case!(std_mod_04, "(10.0 % 6.0): float64", "4");
 
-test_case!(std_mod_05, "func () -> -10.0 % 6.0", "-4");
+test_case!(std_mod_05, "(-10.0 % 6.0): float64", "-4");
 
-test_case!(std_mod_06, "func () -> 10.0 % -6.0", "4");
+test_case!(std_mod_06, "(10.0 % -6.0): float64", "4");
 
-test_case!(std_mod_07, "func () -> -10.0 % -6.0", "-4");
+test_case!(std_mod_07, "(-10.0 % -6.0): float64", "-4");
+
+test_case!(std_add_int8_00, "(30 + 2): int8", r#"32"#, skip_postgres);
+
+test_case!(std_add_int8_01, "(-2 + 30): int8", r#"28"#, skip_postgres);
+
+test_case!(std_add_int16_00, "(30 + 2): int16", r#"32"#);
+
+test_case!(std_add_int16_01, "(-2 + 30): int16", r#"28"#);
+
+test_case!(std_add_int32_00, "(30 + 2): int32", r#"32"#);
+
+test_case!(std_add_int32_01, "(-2 + 30): int32", r#"28"#);
+
+test_case!(std_add_int64_00, "(30 + 2): int64", r#"32"#);
+
+test_case!(std_add_int64_01, "(-2 + 30): int64", r#"28"#);
+
+test_case!(std_add_uint8_00, "(30 + 2): uint8", r#"32"#, skip_postgres);
 
 test_case!(
-    std_add_00,
-    "func () -> {30 + 2, 2 + 30}",
-    r#"{
-  32,
-  32,
-}"#
+    std_add_uint16_00,
+    "(30 + 2): uint16",
+    r#"32"#,
+    skip_postgres
 );
-
-test_case!(std_add_01, "func () -> 30.2 + 2.30", "32.5");
-
-test_case!(std_add_02, "func () -> 2.30 + 30.2", "32.5");
-
-test_case!(std_add_03, "func () -> 1.4 + 0.2", "1.5999999999999999");
 
 test_case!(
-    std_sub_00,
-    "func () -> {30 - 2, 2 - 30}",
-    r#"{
-  28,
-  -28,
-}"#
+    std_add_uint32_00,
+    "(30 + 2): uint32",
+    r#"32"#,
+    skip_postgres
 );
 
-test_case!(std_sub_01, "func () -> 30.2 - 2.30", "27.9");
+test_case!(
+    std_add_uint64_00,
+    "(30 + 2): uint64",
+    r#"32"#,
+    skip_postgres
+);
 
-test_case!(std_sub_02, "func () -> 2.30 - 30.2", "-27.9");
+test_case!(std_add_float64_00, "(30.2 + 2.30): float64", "32.5");
+
+test_case!(std_add_float64_01, "(2.30 + 30.2): float64", "32.5");
+
+test_case!(
+    std_add_float64_02,
+    "(1.4 + 0.2): float64",
+    "1.5999999999999999"
+);
+
+test_case!(std_sub_00, "(30 - 2): int64", r#"28"#);
+
+test_case!(std_sub_01, "(2 - 30): int64", r#"-28"#);
+
+test_case!(std_sub_02, "(30.2 - 2.30): float64", "27.9");
+
+test_case!(std_sub_03, "(2.30 - 30.2): float64", "-27.9");
 
 test_case!(
     std_neg_00,
-    "func () -> {-2, - (-3)}",
+    "{-2: int64, - (-3: int64)}",
     r#"{
   -2,
   3,
@@ -185,7 +214,7 @@ test_case!(
 
 test_case!(
     std_neg_01,
-    "func () -> {-2.1, - (-3.1)}",
+    "{-2.1: float64, - (-3.1: float64)}",
     r#"{
   -2.1,
   3.1,
@@ -194,7 +223,7 @@ test_case!(
 
 test_case!(
     std_eq_00,
-    "func () -> {30 == 2, 30 == 30}",
+    "{30: int64 == 2, 30: int64 == 30}",
     r#"{
   false,
   true,
@@ -203,7 +232,7 @@ test_case!(
 
 test_case!(
     std_eq_01,
-    "func () -> {30.3 == 2.2, 30.3 == 30.3}",
+    "{30.3: float64 == 2.2, 30.3: float64 == 30.3}",
     r#"{
   false,
   true,
@@ -212,7 +241,7 @@ test_case!(
 
 test_case!(
     std_eq_02,
-    "func () -> {false == true, false == false}",
+    "{false == true, false == false}",
     r#"{
   false,
   true,
@@ -221,7 +250,7 @@ test_case!(
 
 test_case!(
     std_eq_03,
-    r#"func () -> {"aa" == "b", "aa" == "aa"}"#,
+    r#"{"aa" == "b", "aa" == "aa"}"#,
     r#"{
   false,
   true,
@@ -230,7 +259,10 @@ test_case!(
 
 test_case!(
     std_ne_00,
-    "func () -> {30.3 != 2.2, 30.3 != 30.3}",
+    "{
+  30.3: float64 != 2.2,
+  30.3: float64 != 30.3
+}",
     r#"{
   true,
   false,
@@ -239,7 +271,10 @@ test_case!(
 
 test_case!(
     std_ne_01,
-    "func () -> {30.3 != 2.2, 30.3 != 30.3}",
+    "{
+  30.3: float64 != 2.2,
+  30.3: float64 != 30.3
+}",
     r#"{
   true,
   false,
@@ -248,7 +283,7 @@ test_case!(
 
 test_case!(
     std_ne_02,
-    "func () -> {false != true, false != false}",
+    "{false != true, false != false}",
     r#"{
   true,
   false,
@@ -256,7 +291,7 @@ test_case!(
 );
 test_case!(
     std_ne_03,
-    r#"func () -> {"aa" != "b", "aa" != "aa"}"#,
+    r#"{"aa" != "b", "aa" != "aa"}"#,
     r#"{
   true,
   false,
@@ -265,7 +300,7 @@ test_case!(
 
 test_case!(
     std_gt_00,
-    "func () -> {3 > 2, 2 > 3, 2 > 2}",
+    "{3 > 2: int64, 2 > 3: int64, 2 > 2: int64}",
     r#"{
   true,
   false,
@@ -274,7 +309,7 @@ test_case!(
 );
 test_case!(
     std_gt_01,
-    "func () -> {3.3 > 2.2, 2.2 > 3.3, 2.2 > 2.2}",
+    "{3.3 > 2.2: float64, 2.2 > 3.3: float64, 2.2 > 2.2: float64}",
     r#"{
   true,
   false,
@@ -284,7 +319,7 @@ test_case!(
 
 test_case!(
     std_lt_00,
-    "func () -> {3 < 2, 2 < 3, 2 < 2}",
+    "{3 < 2: int64, 2 < 3: int64, 2 < 2: int64}",
     r#"{
   false,
   true,
@@ -293,7 +328,7 @@ test_case!(
 );
 test_case!(
     std_lt_01,
-    "func () -> {3.3 < 2.2, 2.2 < 3.3, 2.2 < 2.2}",
+    "{3.3 < 2.2: float64, 2.2 < 3.3: float64, 2.2 < 2.2: float64}",
     r#"{
   false,
   true,
@@ -303,7 +338,7 @@ test_case!(
 
 test_case!(
     std_gte_00,
-    "func () -> {3 >= 2, 2 >= 3, 2 >= 2}",
+    "{3 >= 2: int64, 2 >= 3: int64, 2 >= 2: int64}",
     r#"{
   true,
   false,
@@ -312,7 +347,7 @@ test_case!(
 );
 test_case!(
     std_gte_01,
-    "func () -> {3.3 >= 2.2, 2.2 >= 3.3, 2.2 >= 2.2}",
+    "{3.3 >= 2.2: float64, 2.2 >= 3.3: float64, 2.2 >= 2.2: float64}",
     r#"{
   true,
   false,
@@ -322,7 +357,7 @@ test_case!(
 
 test_case!(
     std_lte_00,
-    "func () -> {3 <= 2, 2 <= 3, 2 <= 2}",
+    "{3 <= 2: int64, 2 <= 3: int64, 2 <= 2: int64}",
     r#"{
   false,
   true,
@@ -331,7 +366,7 @@ test_case!(
 );
 test_case!(
     std_lte_01,
-    "func () -> {3.3 <= 2.2, 2.2 <= 3.3, 2.2 <= 2.2}",
+    "{3.3 <= 2.2: float64, 2.2 <= 3.3: float64, 2.2 <= 2.2: float64}",
     r#"{
   false,
   true,
@@ -341,7 +376,7 @@ test_case!(
 
 test_case!(
     std_and,
-    "func () -> {false && false, false && true, true && false, true && true}",
+    "{false && false, false && true, true && false, true && true}",
     r#"{
   false,
   false,
@@ -352,7 +387,7 @@ test_case!(
 
 test_case!(
     std_or,
-    "func () -> {false || false, false || true, true || false, true || true}",
+    "{false || false, false || true, true || false, true || true}",
     r#"{
   false,
   true,
@@ -363,42 +398,38 @@ test_case!(
 
 test_case!(
     std_not,
-    "func () -> {!false, !true}",
+    "{!false, !true}",
     r#"{
   true,
   false,
 }"#
 );
 
-test_case!(std_index_00, "func () -> std::index([5,3,65,3,2], 3)", "3");
+test_case!(std_index_00, "std::index([5,3,65,3,2]: [int64], 3)", "3");
 
-test_case!(std_index_01, "func () -> [1, 2, 3].2", "3");
+test_case!(std_index_01, "([1, 2, 3].2): int64", "3");
 
 test_case!(
     std_index_02,
-    "func () -> std::index([5.3,3.2,65.4,3.1,2.0], 3)",
+    "std::index([5.3,3.2,65.4,3.1,2.0], 3): float64",
     "3.1"
 );
 
-test_case!(std_index_03, "func () -> [1.1, 2.2, 3.3].2", "3.3");
+test_case!(std_index_03, "([1.1, 2.2, 3.3].2): float64", "3.3");
 
 test_case!(
     std_index_04,
-    "func () -> std::index([false, false, false, true, false], 3)",
+    "std::index([false, false, false, true, false], 3)",
     "true"
 );
 
-test_case!(std_index_05, "func () -> [true, true, false].2", "false");
+test_case!(std_index_05, "[true, true, false].2", "false");
 
-test_case!(
-    std_index_06,
-    r#"func () -> ["hello", "world", "!"].2"#,
-    r#""!""#
-);
+test_case!(std_index_06, r#"["hello", "world", "!"].2"#, r#""!""#);
 
 test_case!(
     std_map_00,
-    "func () -> std::map([5,3,65,3,2], func (x: int) -> x + 1)",
+    "std::map([5,3,65,3,2], func (x: int) -> x + 1)",
     r#"[
   6,
   4,
@@ -408,15 +439,11 @@ test_case!(
 ]"#
 );
 
-test_case!(
-    std_map_01,
-    "func () -> std::map([], func (x: int) -> x + 1)",
-    "[]"
-);
+test_case!(std_map_01, "std::map([], func (x: int) -> x + 1)", "[]");
 
 test_case!(
     std_map_02,
-    "func () -> std::map([false, true, false], func (x: bool) -> !x)",
+    "std::map([false, true, false], func (x: bool) -> !x)",
     r#"[
   true,
   false,
@@ -426,7 +453,7 @@ test_case!(
 
 test_case!(
     std_map_03,
-    r#"func () -> std::map(["hello", "world", "!"], func (x: text) -> std::text_ops::length(x))"#,
+    r#"std::map(["hello", "world", "!"], func (x: text) -> std::text_ops::length(x))"#,
     r#"[
   5,
   5,
@@ -436,7 +463,7 @@ test_case!(
 
 test_case!(
     std_filter_00,
-    r#"func () -> std::filter([5,3,65,3,2], func (x: int) -> x > 3)"#,
+    r#"std::filter([5,3,65,3,2]: [int64], func (x: int) -> x > 3)"#,
     r#"[
   5,
   65,
@@ -445,19 +472,19 @@ test_case!(
 
 test_case!(
     std_filter_01,
-    r#"func () -> std::filter([5,3,65,3,2], func (x: int) -> x < 1)"#,
+    r#"std::filter([5,3,65,3,2]: [int64], func (x: int) -> x < 1)"#,
     "[]"
 );
 
 test_case!(
     std_filter_02,
-    r#"func () -> std::filter([], func (x: int) -> x > 3)"#,
+    r#"std::filter([], func (x: int) -> x > 3)"#,
     "[]"
 );
 
 test_case!(
     std_filter_03,
-    r#"func () -> std::filter([false,true,true,false,true], func (x: bool) -> !x)"#,
+    r#"std::filter([false,true,true,false,true], func (x: bool) -> !x)"#,
     r#"[
   false,
   false,
@@ -466,7 +493,7 @@ test_case!(
 
 test_case!(
     std_filter_04,
-    r#"func () -> std::filter([{false, "one"},{true, "two"},{true, "three"},{false, "four"},{true, "five"}], func (x: {bool, text}) -> x.0)"#,
+    r#"std::filter([{false, "one"},{true, "two"},{true, "three"},{false, "four"},{true, "five"}], func (x: {bool, text}) -> x.0)"#,
     r#"[
   {
     true,
@@ -485,7 +512,7 @@ test_case!(
 
 test_case!(
     std_slice_00,
-    r#"func () -> std::slice([5,3,65,3,2], 1, 3)"#,
+    r#"std::slice([5,3,65,3,2]: [int64], 1, 3)"#,
     r#"[
   3,
   65,
@@ -494,7 +521,7 @@ test_case!(
 
 test_case!(
     std_slice_01,
-    r#"func () -> std::slice([5,3,65,3,2], 1, -1)"#,
+    r#"std::slice([5,3,65,3,2]: [int64], 1, -1)"#,
     r#"[
   3,
   65,
@@ -505,25 +532,25 @@ test_case!(
 
 test_case!(
     std_slice_02,
-    r#"func () -> std::slice([5,3,65,3,2], 4, 2)"#,
+    r#"std::slice([5,3,65,3,2]: [int64], 4, 2)"#,
     "[]"
 );
 
 test_case!(
     std_slice_03,
-    r#"func () -> std::slice([5,3,65,3,2], 6, 7)"#,
+    r#"std::slice([5,3,65,3,2]: [int64], 6, 7)"#,
     "[]"
 );
 
 test_case!(
     std_slice_04,
-    r#"func () -> std::slice([5,3,65,3,2], -7, 0)"#,
+    r#"std::slice([5,3,65,3,2]: [int64], -7, 0)"#,
     "[]"
 );
 
 test_case!(
     std_slice_05,
-    r#"func () -> std::slice([false,true,false,false,true], 1, 4)"#,
+    r#"std::slice([false,true,false,false,true], 1, 4)"#,
     r#"[
   true,
   false,
@@ -533,7 +560,7 @@ test_case!(
 
 test_case!(
     std_slice_06,
-    r#"func () -> std::slice([{false,"hello"}, {false,"world"},{true, "!"},{false,"foo"},{true, "bar"}], 1, 4)"#,
+    r#"std::slice([{false,"hello"}, {false,"world"},{true, "!"},{false,"foo"},{true, "bar"}], 1, 4)"#,
     r#"[
   {
     false,
@@ -552,7 +579,7 @@ test_case!(
 
 test_case!(
     std_sort_00,
-    r#"func () -> std::sort([5,3,65,3,2], func (x: int) -> -x)"#,
+    r#"func () -> std::sort([5,3,65,3,2]: [int64], func (x: int64) -> -x)"#,
     r#"[
   65,
   5,
@@ -564,7 +591,10 @@ test_case!(
 
 test_case!(
     std_sort_01,
-    r#"func () -> std::sort([{5,"hello"}, {3,"world"},{65, "!"},{3,"foo"},{2, "bar"}], func (x: {int, text}) -> x.0)"#,
+    r#"std::sort(
+      [{5: int64, "hello"}, {3: int64, "world"}, {65: int64, "!"}, {3: int64, "foo"}, {2: int64, "bar"}],
+      func (x: {int64, text}) -> x.0
+    )"#,
     r#"[
   {
     2,
@@ -591,7 +621,7 @@ test_case!(
 
 test_case!(
     std_to_columnar_00,
-    r#"func () -> std::to_columnar([{5,3},{65,1},{3, 2}])"#,
+    r#"std::to_columnar([{5,3},{65,1},{3, 2}]: [{int64, int64}])"#,
     r#"{
   [
     5,
@@ -608,7 +638,7 @@ test_case!(
 
 test_case!(
     std_to_columnar_01,
-    r#"func () -> std::to_columnar([{false,"three"},{true,"one"},{false, "two"}])"#,
+    r#"std::to_columnar([{false,"three"},{true,"one"},{false, "two"}])"#,
     r#"{
   [
     false,
@@ -625,7 +655,7 @@ test_case!(
 
 test_case!(
     std_from_columnar_00,
-    r#"func () -> std::from_columnar({[4, 3, 2], [5, 4, 1]})"#,
+    r#"std::from_columnar({[4: int16, 3, 2], [5: int32, 4, 1]})"#,
     r#"[
   {
     4,
@@ -644,19 +674,19 @@ test_case!(
 
 test_case!(
     std_from_columnar_01,
-    r#"func () -> std::from_columnar({[1], []: [int64]})"#,
+    r#"std::from_columnar({[1]: [int32], []: [int64]})"#,
     "[]"
 );
 
 test_case!(
     std_from_columnar_02,
-    r#"func () -> std::from_columnar({[]: [int64], [2]})"#,
+    r#"std::from_columnar({[]: [int8], [2]: [int16]})"#,
     "[]"
 );
 
 test_case!(
     std_from_columnar_03,
-    r#"func () -> std::from_columnar({[1, 2], [3, 4, 5]})"#,
+    r#"std::from_columnar({[1: int16, 2], [3: int16, 4, 5]})"#,
     r#"[
   {
     1,
@@ -671,7 +701,7 @@ test_case!(
 
 test_case!(
     std_from_columnar_04,
-    r#"func () -> std::from_columnar({[false, true], ["no", "yes", "neither"]})"#,
+    r#"std::from_columnar({[false, true], ["no", "yes", "neither"]})"#,
     r#"[
   {
     false,
@@ -693,9 +723,9 @@ func () -> std::from_columnar({})
 
 test_case!(
     std_map_columnar_00,
-    r#"func () -> std::map_columnar(
-        [{5,3},{65,1},{3, 2}],
-        func (x: {[int], [int]}) -> {
+    r#"std::map_columnar(
+        [{5: int16, 3: int16}, {65, 1}, {3, 2}],
+        func (x: {[int16], [int16]}) -> {
             std::lag(x.0, 1),
             std::lead(x.1, 1)
         }
@@ -719,7 +749,7 @@ test_case!(
 
 test_case!(
     std_map_columnar_01,
-    r#"func () -> std::map_columnar(
+    r#"std::map_columnar(
         [{false,"hello"},{false,"world"},{true, "!"}],
         func (x: {[bool], [text]}) -> {
             std::lead(x.0, 1),
@@ -746,8 +776,8 @@ test_case!(
 test_case!(
     std_aggregate_00,
     r#"
-    let my_rel = [{5,3},{65,1},{3, 2}]
-    func () -> std::aggregate(my_rel, func (x: {[int], [int]}) -> {std::min(x.0), std::min(x.1)})"#,
+    let my_rel: [{int64, int64}] = [{5,3},{65,1},{3, 2}]
+    func () -> std::aggregate(my_rel, func (x: {[int64], [int64]}) -> {std::min(x.0), std::min(x.1)})"#,
     r#"{
   3,
   1,
@@ -756,114 +786,78 @@ test_case!(
 
 test_case!(
     std_aggregate_01,
-    r#"func () -> std::aggregate([{false,"hello"},{false,"world"},{true, "!"}], func (x: {[bool], [text]}) -> {x.0 .0, x.1 .2})"#,
+    r#"std::aggregate([{false,"hello"},{false,"world"},{true, "!"}], func (x: {[bool], [text]}) -> {x.0 .0, x.1 .2})"#,
     r#"{
   false,
   "!",
 }"#
 );
 
-test_case!(
-    std_min_00,
-    r#"func () -> std::min([5,3,65,3,2,56,67])"#,
-    "2"
-);
+test_case!(std_min_00, r#"std::min([5,3,65,3,2,56,67])"#, "2");
 
-// test_case!(std_min_01, r#"func () -> std::min([])"#, "0");
+// test_case!(std_min_01, r#"std::min([])"#, "0");
 
-test_case!(
-    std_max_00,
-    r#"func () -> std::max([5,3,65,3,2,56,67])"#,
-    "67"
-);
+test_case!(std_max_00, r#"std::max([5,3,65,3,2,56,67])"#, "67");
 
-// test_case!(std_max_01, r#"func () -> std::max([])"#, "0");
+// test_case!(std_max_01, r#"std::max([])"#, "0");
 
-test_case!(
-    std_sum_00,
-    r#"func () -> std::sum([5,3,65,3,2,56,67])"#,
-    "201"
-);
+test_case!(std_sum_00, r#"std::sum([5,3,65,3,2,56,67])"#, "201");
 
-test_case!(std_sum_01, r#"func () -> std::sum([])"#, "0");
+test_case!(std_sum_01, r#"std::sum([])"#, "0");
 
-test_case!(
-    std_count_00,
-    r#"func () -> std::count([5,3,65,3,2,56,67])"#,
-    "7"
-);
+test_case!(std_count_00, r#"std::count([5,3,65,3,2,56,67])"#, "7");
 
-test_case!(std_count_01, r#"func () -> std::count([])"#, "0");
+test_case!(std_count_01, r#"std::count([])"#, "0");
 
 test_case!(
     std_average_00,
-    r#"func () -> std::average([5,3,65,3,2,56,67])"#,
+    r#"std::average([5,3,65,3,2,56,67])"#,
     "28.714285714285715"
 );
 
-// test_case!(std_average_01, r#"func () -> std::average([])"#, "0");
+// test_case!(std_average_01, r#"std::average([])"#, "0");
 
 test_case!(
     std_all_00,
-    r#"func () -> std::all([true, false, false, true])"#,
+    r#"std::all([true, false, false, true])"#,
     "false"
 );
 
-test_case!(
-    std_all_01,
-    r#"func () -> std::all([false, false])"#,
-    "false"
-);
+test_case!(std_all_01, r#"std::all([false, false])"#, "false");
 
-test_case!(
-    std_all_02,
-    r#"func () -> std::all([true, true, true])"#,
-    "true"
-);
+test_case!(std_all_02, r#"std::all([true, true, true])"#, "true");
 
-// test_case!(std_all_03, r#"func () -> std::all([])"#, "true");
+// test_case!(std_all_03, r#"std::all([])"#, "true");
 
 test_case!(
     std_any_00,
-    r#"func () -> std::any([true, false, false, true])"#,
+    r#"std::any([true, false, false, true])"#,
     "true"
 );
 
-test_case!(
-    std_any_01,
-    r#"func () -> std::any([false, false])"#,
-    "false"
-);
+test_case!(std_any_01, r#"std::any([false, false])"#, "false");
 
-test_case!(
-    std_any_02,
-    r#"func () -> std::any([true, true, true])"#,
-    "true"
-);
+test_case!(std_any_02, r#"std::any([true, true, true])"#, "true");
 
-// test_case!(std_any_03, r#"func () -> std::any([])"#, "false");
+// test_case!(std_any_03, r#"std::any([])"#, "false");
 
 test_case!(
     std_contains_00,
-    r#"func () -> std::contains([5,3,65,3,2,56,67], 3)"#,
+    r#"std::contains([5,3,65,3,2,56,67], 3)"#,
     "true"
 );
 
 test_case!(
     std_contains_01,
-    r#"func () -> std::contains([5,3,65,3,2,56,67], 7)"#,
+    r#"std::contains([5,3,65,3,2,56,67], 7)"#,
     "false"
 );
 
-test_case!(
-    std_contains_02,
-    r#"func () -> std::contains([], 2)"#,
-    "false"
-);
+test_case!(std_contains_02, r#"std::contains([], 2)"#, "false");
 
 test_case!(
     std_lag_00,
-    r#"func () -> std::lag([5,3,65,3,2,56,67], 2)"#,
+    r#"std::lag([5,3,65,3,2,56,67]: [int8], 2)"#,
     r#"[
   0,
   0,
@@ -877,7 +871,7 @@ test_case!(
 
 test_case!(
     std_lag_01,
-    r#"func () -> std::lag([5,3,65,3,2,56,67], 12)"#,
+    r#"std::lag([5,3,65,3,2,56,67]: [int16], 12)"#,
     r#"[
   0,
   0,
@@ -893,7 +887,7 @@ test_case!(std_lag_02, r#"func (): [int64] -> std::lag([], 3)"#, "[]");
 
 test_case!(
     std_lag_03,
-    r#"func () -> std::lag([5,3,65,4], -2)"#,
+    r#"std::lag([5,3,65,4], -2): [int8]"#,
     r#"[
   65,
   4,
@@ -904,7 +898,7 @@ test_case!(
 
 test_case!(
     std_lead_00,
-    r#"func () -> std::lead([5,3,65,3,2,56,67], 2)"#,
+    r#"std::lead([5,3,65,3,2,56,67], 2): [int8]"#,
     r#"[
   65,
   3,
@@ -918,7 +912,7 @@ test_case!(
 
 test_case!(
     std_lead_01,
-    r#"func () -> std::lead([5,3,65,3,2,56,67], 12)"#,
+    r#"std::lead([5,3,65,3,2,56,67], 12): [int64]"#,
     r#"[
   0,
   0,
@@ -934,7 +928,7 @@ test_case!(std_lead_02, r#"func (): [int32] -> std::lead([], 3)"#, "[]");
 
 test_case!(
     std_lead_03,
-    r#"func () -> std::lead([5,3,65,4], -2)"#,
+    r#"std::lead([5,3,65,4], -2): [int64]"#,
     r#"[
   0,
   0,
@@ -945,7 +939,7 @@ test_case!(
 
 test_case!(
     std_row_number_00,
-    r#"func () -> std::row_number([5,3,65,3,2,56,67])"#,
+    r#"func () -> std::row_number([5,3,65,3,2,56,67]: [int64])"#,
     r#"[
   0,
   1,
@@ -959,13 +953,13 @@ test_case!(
 
 test_case!(
     std_row_number_01,
-    r#"func (): [int64] -> std::row_number([]: [text])"#,
+    r#"func () -> std::row_number([]: [text])"#,
     "[]"
 );
 
 test_case!(
     bindings_00,
-    r#"let a = 4
+    r#"let a: int32 = 4
     func () -> [{a, a + 1}, {a + 2, a + 3}]
     "#,
     r#"[
@@ -982,7 +976,7 @@ test_case!(
 
 test_case!(
     bindings_01,
-    r#"let a = {3, false}
+    r#"let a = {3: int32, false}
     func () -> [{a.0, a.1}, {a.0 + 1, !a.1}]
     "#,
     r#"[
@@ -999,7 +993,7 @@ test_case!(
 
 test_case!(
     bindings_02,
-    r#"let a = [1, 2]
+    r#"let a: [int16] = [1, 2]
     func () -> [{a.0, a.1}, {a.0 + 1, a.1 + 1}]
     "#,
     r#"[
@@ -1016,8 +1010,8 @@ test_case!(
 
 test_case!(
     bindings_03,
-    r#"let a = [1, 2, 3]
-    func () -> {true, std::map(a, func (x: int64) -> x * 2), false}
+    r#"let a: [int16] = [1, 2, 3]
+    func () -> {true, std::map(a, func (x: int16) -> x * 2), false}
     "#,
     r#"{
   true,
@@ -1032,8 +1026,8 @@ test_case!(
 
 test_case!(
     bindings_04,
-    r#"let a = [1, 2, 3]
-    func () -> {true, std::map(a, func (x: int64) -> x * 2).1, false}
+    r#"let a: [int32] = [1, 2, 3]
+    func () -> {true, std::map(a, func (x: int32) -> x * 2).1, false}
     "#,
     r#"{
   true,
@@ -1181,8 +1175,8 @@ test_case!(
 test_case!(
     match_01,
     r#"
-    type Status = enum {Done, Pending = int64, Cancelled = text}
-    func () -> match Status::Pending(4) {
+    type Status = enum {Done, Pending = int32, Cancelled = text}
+    func (): int32 -> match Status::Pending(4) {
         Status::Done => 0,
         Status::Pending(x) => x,
         Status::Cancelled => 0,
@@ -1227,20 +1221,20 @@ test_case!(
 test_case!(
     complex_00,
     r#"
-        let x = [
+        let x: [int16] = [
           1, 4, 2, 3, 2, 3, 4, 5, 1, 2
         ]
 
         func () -> {
-          a = 1 + 2,
-          {3, 3 + 1},
-          {2, 2 + 1},
+          a = 1: int32 + 2,
+          {3: int64, 3 + 1: int16},
+          {2: int32, 2 + 1: int16},
           hello = (
             x
-            | std::map(func (y: int) -> y + 1)
-            | std::filter(func (y: int) -> !(y > 3))
-            | std::sort(func (x: int) -> x)
-            | std::map(func (y: int) -> y % 3)
+            | std::map(func (y: int16) -> y + 1)
+            | std::filter(func (y: int16) -> !(y > 3))
+            # | std::sort(func (x: int16) -> x)
+            | std::map(func (y: int16) -> y % 3)
           )
         }
     "#,
@@ -1257,9 +1251,9 @@ test_case!(
       },
       hello = [
         2,
+        0,
+        0,
         2,
-        0,
-        0,
         0,
       ],
     }
@@ -1270,14 +1264,14 @@ test_case!(
     complex_01,
     r#"
     module chinook {
-      type album = {id = int, title = text}
+      type album = {id = int64, title = text}
 
       let get_albums = func (): [album] -> [
         {id = 3, title = "Hello world!"},
         {id = 5, title = "Foo"},
       ]
 
-      let get_album_by_id = func (album_id: int): album -> (
+      let get_album_by_id = func (album_id: int64): album -> (
         get_albums()
         | std::filter(func (this: album) -> this.id == album_id)
         | std::index(0)
@@ -1285,7 +1279,7 @@ test_case!(
     }
 
     module box_office {
-      type album_sale = {id = int, total = float}
+      type album_sale = {id = int64, total = float}
 
       let get_album_sales = func (): [album_sale] -> [
         {id = 3, total = 3.6},
@@ -1293,7 +1287,7 @@ test_case!(
         {id = 5, total = 5.2},
       ]
 
-      let get_album_sales_by_id = func (album_id: int): album_sale -> (
+      let get_album_sales_by_id = func (album_id: int64): album_sale -> (
         get_album_sales()
         | std::filter(func (this: album_sale) -> this.id == album_id)
         | std::index(0)
@@ -1342,7 +1336,7 @@ test_case!(
     }
 
     func () -> {
-      5,
+      5: int16,
       chinook::get_album()
     }
     "#,
@@ -1361,14 +1355,14 @@ test_case!(
     complex_03,
     r#"
     module chinook {
-      type album = {id = int, title = text}
+      type album = {id = int64, title = text}
 
       let get_albums = func (): [album] -> [
         {id = 3, title = "Hello world!"},
         {id = 5, title = "Foo"},
       ]
 
-      let get_album_by_id = func (album_id: int): album -> (
+      let get_album_by_id = func (album_id: int64): album -> (
         get_albums()
         | std::filter(func (this: album) -> this.id == album_id)
         | std::index(0)
@@ -1446,7 +1440,7 @@ test_case!(
 test_case!(
     constant_00,
     r#"
-    {1, [false, true], "hello"}
+    {1: int32, [false, true], "hello"}
     "#,
     r#"
     {

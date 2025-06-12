@@ -335,7 +335,7 @@ let main =
                                                                     args: [
                                                                         Expr {
                                                                             kind: Literal(
-                                                                                Float(
+                                                                                float64(
                                                                                     3.5,
                                                                                 ),
                                                                             ),
@@ -540,7 +540,7 @@ let main =
                                                                     args: [
                                                                         Expr {
                                                                             kind: Literal(
-                                                                                Int(
+                                                                                int64(
                                                                                     6,
                                                                                 ),
                                                                             ),
@@ -560,7 +560,7 @@ let main =
                                                                         },
                                                                         Expr {
                                                                             kind: Literal(
-                                                                                Int(
+                                                                                int64(
                                                                                     7,
                                                                                 ),
                                                                             ),
@@ -674,7 +674,7 @@ let main =
                                                                     args: [
                                                                         Expr {
                                                                             kind: Literal(
-                                                                                Int(
+                                                                                int64(
                                                                                     6,
                                                                                 ),
                                                                             ),
@@ -694,7 +694,7 @@ let main =
                                                                         },
                                                                         Expr {
                                                                             kind: Literal(
-                                                                                Int(
+                                                                                int64(
                                                                                     2,
                                                                                 ),
                                                                             ),

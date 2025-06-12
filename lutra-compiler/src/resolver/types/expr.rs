@@ -9,7 +9,7 @@ use crate::resolver::types::tuple::BaseKind;
 use crate::utils::fold;
 use crate::Result;
 
-use super::scope::Scope;
+use super::scope::{Scope, ScopeKind};
 
 impl fold::PrFold for super::TypeResolver<'_> {
     fn fold_stmts(&mut self, _: Vec<pr::Stmt>) -> Result<Vec<pr::Stmt>> {
@@ -187,11 +187,11 @@ impl fold::PrFold for super::TypeResolver<'_> {
         let ty = match ty.kind {
             // open a new scope for functions
             pr::TyKind::Func(ty_func) if self.scopes.is_empty() => {
-                let mut scope = Scope::new(ty.scope_id.unwrap());
+                let mut scope = Scope::new(ty.scope_id.unwrap(), ScopeKind::Nested);
                 scope.insert_type_params(&ty_func.ty_params);
                 self.scopes.push(scope);
                 let ty_func = fold::fold_ty_func(self, ty_func)?;
-                self.scopes.pop();
+                self.scopes.pop().unwrap();
 
                 Ty {
                     kind: pr::TyKind::Func(ty_func),

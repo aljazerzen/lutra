@@ -1,12 +1,11 @@
 use itertools::Itertools;
 
-use crate::diagnostic::{Diagnostic, WithErrorInfo};
+use crate::diagnostic::Diagnostic;
 use crate::pr::{self, *};
-use crate::utils;
 use crate::utils::fold::{self, PrFold};
-use crate::{Result, Span};
+use crate::{utils, Result, Span};
 
-use super::scope::Scope;
+use super::scope::{Scope, ScopeKind};
 use super::TypeResolver;
 
 impl TypeResolver<'_> {
@@ -18,7 +17,14 @@ impl TypeResolver<'_> {
             "resolving func with params: ({})",
             func.params.iter().map(|p| &p.name).join(", ")
         );
-        let mut scope = Scope::new(scope_id);
+        let mut scope = Scope::new(
+            scope_id,
+            if func.ty_params.is_empty() {
+                ScopeKind::Nested
+            } else {
+                ScopeKind::Isolated
+            },
+        );
 
         // prepare generic arguments
         scope.insert_type_params(&func.ty_params);
@@ -38,18 +44,11 @@ impl TypeResolver<'_> {
             self.validate_expr_type(&mut func.body, return_ty, &|| None)?;
         }
 
-        tracing::debug!("func done, popping scope");
-
-        // finalize generic type args
-        let mapping = self
-            .finalize_type_vars()
-            .with_span_fallback(func.body.span)?;
-        let func = utils::TypeReplacer::on_func(*func, mapping);
-
         // pop the scope
+        tracing::debug!("func done, popping scope");
+        let mapping = self.finalize_type_vars()?;
+        let func = utils::TypeReplacer::on_func(*func, mapping);
         self.scopes.pop().unwrap();
-
-        tracing::debug!("scope finalized");
 
         Ok(Box::new(func))
     }

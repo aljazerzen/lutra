@@ -28,10 +28,10 @@ pub fn program() -> impl Parser<TokenKind, Program, Error = PError> {
 fn expr() -> impl Parser<TokenKind, Expr, Error = PError> + Clone {
     recursive(|expr| {
         let literal = select! {
-            TokenKind::Literal(pr::Literal::Integer(i)) => ExprKind::Literal(Literal::Int(i)),
-            TokenKind::Literal(pr::Literal::Float(i)) => ExprKind::Literal(Literal::Float(i)),
-            TokenKind::Literal(pr::Literal::Boolean(i)) => ExprKind::Literal(Literal::Bool(i)),
-            TokenKind::Literal(pr::Literal::Text(i)) => ExprKind::Literal(Literal::Text(i)),
+            TokenKind::Literal(pr::Literal::Integer(i)) => ExprKind::Literal(Literal::int64(i)),
+            TokenKind::Literal(pr::Literal::Float(i)) => ExprKind::Literal(Literal::float64(i)),
+            TokenKind::Literal(pr::Literal::Boolean(i)) => ExprKind::Literal(Literal::bool(i)),
+            TokenKind::Literal(pr::Literal::Text(i)) => ExprKind::Literal(Literal::text(i)),
         };
 
         let pointer_external = ident_keyword("external")

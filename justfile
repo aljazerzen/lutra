@@ -10,7 +10,8 @@ test-fast FILTER_SET='all()' *NEXTEST_ARGS='':
     cargo fmt
     cargo check --all-targets --profile=test
 
-    RUST_LOG=debug RUST_BACKTRACE=1 INSTA_FORCE_PASS=1 \
+    # RUST_BACKTRACE=1
+    RUST_LOG=debug INSTA_FORCE_PASS=1 \
     cargo nextest run --no-fail-fast -E '{{FILTER_SET}}' {{NEXTEST_ARGS}}
     cargo insta review
 

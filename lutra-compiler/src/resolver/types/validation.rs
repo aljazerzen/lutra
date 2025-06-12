@@ -80,11 +80,11 @@ impl TypeResolver<'_> {
 
             // type vars
             (TyRef::Ty(ty), TyRef::Var(_, var_id)) | (TyRef::Var(_, var_id), TyRef::Ty(ty)) => {
-                let scope = self.scopes.last().unwrap();
+                let scope = self.get_ty_var_scope();
                 scope.infer_type_var(var_id, ty.into_owned());
             }
             (TyRef::Var(_, a_id), TyRef::Var(_, b_id)) => {
-                let scope = self.scopes.last().unwrap();
+                let scope = self.get_ty_var_scope();
                 scope.infer_type_vars_equal(a_id, b_id);
             }
             (TyRef::Param(..), TyRef::Var(_, var_id)) => {
@@ -92,7 +92,7 @@ impl TypeResolver<'_> {
                 //     func <T> (x: T) -> twice(x)
                 // (twice will create a type var for its arg)
 
-                let scope = self.scopes.last().unwrap();
+                let scope = self.get_ty_var_scope();
                 scope.infer_type_var(var_id, found.clone());
             }
             (TyRef::Var(_, var_id), TyRef::Param(..)) => {
@@ -100,7 +100,7 @@ impl TypeResolver<'_> {
                 //     func <T> () -> []: [T]
                 // (empty array creates a type var and type annotations triggers validation against the param)
 
-                let scope = self.scopes.last().unwrap();
+                let scope = self.get_ty_var_scope();
                 scope.infer_type_var(var_id, expected.clone());
             }
         };
@@ -205,31 +205,6 @@ impl TypeResolver<'_> {
     }
 
     pub fn finalize_type_vars(&mut self) -> crate::Result<HashMap<pr::Ref, pr::Ty>> {
-        fn finalize_var(
-            known: &mut HashMap<usize, pr::Ty>,
-            id: usize,
-            ty: pr::Ty,
-        ) -> crate::Result<()> {
-            use std::collections::hash_map::Entry;
-
-            let entry = known.entry(id);
-            match entry {
-                Entry::Occupied(existing) => {
-                    if existing.get() != &ty {
-                        return Err(Diagnostic::new_custom(format!(
-                            "incompatible types: {} and {}",
-                            printer::print_ty(existing.get()),
-                            printer::print_ty(&ty)
-                        )));
-                    }
-                }
-                Entry::Vacant(entry) => {
-                    entry.insert(ty);
-                }
-            }
-            Ok(())
-        }
-
         let mut known_types = HashMap::new();
         let mut constraints = {
             let scope = self.scopes.last_mut().unwrap();
@@ -238,17 +213,22 @@ impl TypeResolver<'_> {
         while !constraints.is_empty() {
             let mut remaining_constraints = Vec::with_capacity(constraints.len());
 
+            constraints.extend({
+                let scope = self.scopes.last_mut().unwrap();
+                scope.ty_var_constraints.take()
+            });
+
             let len = constraints.len();
             for constraint in constraints {
                 match constraint {
                     scope::TyVarConstraint::IsTy(id, ty) => {
-                        finalize_var(&mut known_types, id, ty)?;
+                        self.finalize_var(&mut known_types, id, ty)?;
                     }
                     scope::TyVarConstraint::Equals(a, b) => {
                         if let Some(ty) = known_types.get(&a).cloned() {
-                            finalize_var(&mut known_types, b, ty)?;
+                            self.finalize_var(&mut known_types, b, ty)?;
                         } else if let Some(ty) = known_types.get(&b).cloned() {
-                            finalize_var(&mut known_types, a, ty)?;
+                            self.finalize_var(&mut known_types, a, ty)?;
                         } else {
                             remaining_constraints.push(constraint);
                         }
@@ -256,7 +236,8 @@ impl TypeResolver<'_> {
                     scope::TyVarConstraint::InDomain(ref id, ref domain) => {
                         if let Some(ty) = known_types.get(id) {
                             let var = self.get_ty_var(*id);
-                            self.validate_type_domain(ty, domain, var.name_hint.as_deref())?;
+                            self.validate_type_domain(ty, domain, var.name_hint.as_deref())
+                                .with_span_fallback(var.span)?;
                         } else {
                             remaining_constraints.push(constraint);
                         }
@@ -321,9 +302,29 @@ impl TypeResolver<'_> {
         }
 
         if !mapping.is_empty() {
-            tracing::debug!("finalized scope: {mapping:#?}");
+            tracing::debug!("finalized scope {}: {mapping:#?}", scope.id);
         }
         Ok(mapping)
+    }
+
+    fn finalize_var(
+        &self,
+        known: &mut HashMap<usize, pr::Ty>,
+        id: usize,
+        ty: pr::Ty,
+    ) -> crate::Result<()> {
+        use std::collections::hash_map::Entry;
+
+        let entry = known.entry(id);
+        match entry {
+            Entry::Occupied(existing) => {
+                self.validate_type(&ty, existing.get(), &|| None)?;
+            }
+            Entry::Vacant(entry) => {
+                entry.insert(ty);
+            }
+        }
+        Ok(())
     }
 
     /// Validates that a type is an a domain of a type param.

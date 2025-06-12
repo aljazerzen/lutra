@@ -4,6 +4,7 @@ use indexmap::IndexMap;
 use itertools::Itertools;
 use lutra_bin::ir;
 
+use crate::_lexer::Diagnostic;
 use crate::utils::{self, IdGenerator};
 use crate::Result;
 use crate::{decl, pr};
@@ -17,7 +18,7 @@ pub fn lower_expr(root_module: &decl::RootModule, main: &pr::Expr) -> ir::Progra
         main = lowerer.wrap_into_func(main);
     }
 
-    let main = lowerer.lower_var_bindings(main);
+    let main = lowerer.lower_var_bindings(main).unwrap();
 
     lowerer.lower_ty_defs_queue();
     let types = order_ty_defs(lowerer.type_defs, root_module);
@@ -151,19 +152,10 @@ impl<'a> Lowerer<'a> {
     #[tracing::instrument(name = "le", skip_all)]
     fn lower_expr(&mut self, expr: &pr::Expr) -> Result<ir::Expr> {
         tracing::trace!("lower_expr: {expr:?}");
+        let ty = expr.ty.as_ref().unwrap();
+
         let kind = match &expr.kind {
-            pr::ExprKind::Literal(lit) => {
-                let lit = match lit {
-                    pr::Literal::Integer(v) => ir::Literal::Int(*v),
-                    pr::Literal::Float(v) => ir::Literal::Float(*v),
-                    pr::Literal::Boolean(v) => ir::Literal::Bool(*v),
-                    pr::Literal::Text(v) => ir::Literal::Text(v.clone()),
-                    pr::Literal::Date(_) => todo!(),
-                    pr::Literal::Time(_) => todo!(),
-                    pr::Literal::Timestamp(_) => todo!(),
-                };
-                ir::ExprKind::Literal(lit)
-            }
+            pr::ExprKind::Literal(lit) => ir::ExprKind::Literal(self.lower_literal(lit, ty)?),
 
             pr::ExprKind::Tuple(fields) => ir::ExprKind::Tuple(
                 fields
@@ -282,7 +274,7 @@ impl<'a> Lowerer<'a> {
                     let condition =
                         self.lower_pattern_to_condition(&subject_ref, &branch.pattern)?;
                     let condition = condition.unwrap_or_else(|| ir::Expr {
-                        kind: ir::ExprKind::Literal(ir::Literal::Bool(true)),
+                        kind: ir::ExprKind::Literal(ir::Literal::bool(true)),
                         ty: ir::Ty::new(ir::TyPrimitive::bool),
                     });
 
@@ -302,7 +294,7 @@ impl<'a> Lowerer<'a> {
                     switch_branches.push(ir::SwitchBranch { condition, value })
                 }
 
-                let ty = self.lower_ty(expr.ty.clone().unwrap());
+                let ty = self.lower_ty(ty.clone());
                 let switch = ir::Expr {
                     kind: ir::ExprKind::Switch(switch_branches),
                     ty: ty.clone(),
@@ -332,6 +324,32 @@ impl<'a> Lowerer<'a> {
         Ok(ir::Expr {
             kind,
             ty: self.lower_ty(expr.ty.clone().unwrap()),
+        })
+    }
+
+    fn lower_literal(&mut self, literal: &pr::Literal, ty: &pr::Ty) -> Result<ir::Literal> {
+        let prim = ty.kind.as_primitive();
+        let prim =
+            prim.ok_or_else(|| Diagnostic::new_assert("expected literal to be of primitive type"))?;
+
+        Ok(match literal {
+            pr::Literal::Integer(v) => match prim {
+                pr::TyPrimitive::int8 => ir::Literal::int8(*v as i8),
+                pr::TyPrimitive::int16 => ir::Literal::int16(*v as i16),
+                pr::TyPrimitive::int32 => ir::Literal::int32(*v as i32),
+                pr::TyPrimitive::int64 => ir::Literal::int64(*v),
+                pr::TyPrimitive::uint8 => ir::Literal::uint8(*v as u8),
+                pr::TyPrimitive::uint16 => ir::Literal::uint16(*v as u16),
+                pr::TyPrimitive::uint32 => ir::Literal::uint32(*v as u32),
+                pr::TyPrimitive::uint64 => ir::Literal::uint64(*v as u64),
+                _ => return Err(Diagnostic::new_assert("int literal is not of int type?")),
+            },
+            pr::Literal::Float(v) => ir::Literal::float64(*v),
+            pr::Literal::Boolean(v) => ir::Literal::bool(*v),
+            pr::Literal::Text(v) => ir::Literal::text(v.clone()),
+            pr::Literal::Date(_) => todo!(),
+            pr::Literal::Time(_) => todo!(),
+            pr::Literal::Timestamp(_) => todo!(),
         })
     }
 
@@ -404,9 +422,9 @@ impl<'a> Lowerer<'a> {
         exprs.iter().map(|e| self.lower_expr(e)).collect()
     }
 
-    fn lower_var_bindings(&mut self, main: ir::Expr) -> ir::Expr {
+    fn lower_var_bindings(&mut self, main: ir::Expr) -> Result<ir::Expr> {
         if self.var_bindings.is_empty() {
-            return main;
+            return Ok(main);
         }
 
         let main_ty = main.ty.clone();
@@ -443,7 +461,7 @@ impl<'a> Lowerer<'a> {
             let reference = reference.clone();
             let id = *id;
 
-            let expr = self.lower_expr_decl(&reference.0, reference.1).unwrap();
+            let expr = self.lower_expr_decl(&reference.0, reference.1)?;
             main = ir::Expr {
                 ty: main.ty.clone(),
                 kind: ir::ExprKind::Binding(Box::new(ir::Binding { id, expr, main })),
@@ -451,13 +469,13 @@ impl<'a> Lowerer<'a> {
         }
 
         // place bindings into function body
-        ir::Expr {
+        Ok(ir::Expr {
             kind: ir::ExprKind::Function(Box::new(ir::Function {
                 id: f_id,
                 body: main,
             })),
             ty: main_ty,
-        }
+        })
     }
 
     #[tracing::instrument(name = "lt", skip_all)]

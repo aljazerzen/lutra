@@ -65,12 +65,14 @@ impl super::TypeResolver<'_> {
             }
             pr::StmtKind::VarDef(var_def) => {
                 // push a top-level scope for exprs that need inference type args but are not wrapped into a function
-                let scope = scope::Scope::new(usize::MAX);
+                let scope = scope::Scope::new(usize::MAX, scope::ScopeKind::Isolated);
                 self.scopes.push(scope);
 
                 // resolve
                 let def = self.fold_var_def(var_def)?;
                 let expected_ty = def.ty;
+
+                tracing::debug!("variable done");
 
                 let decl = match def.value {
                     Some(mut def_value) => {
@@ -89,6 +91,9 @@ impl super::TypeResolver<'_> {
                         DeclKind::Expr(Box::new(def_value))
                     }
                     None => {
+                        // finalize scope
+                        self.finalize_type_vars()?;
+
                         // var value is not provided: treat this var as value provided by the runtime
                         let mut expr = Box::new(pr::Expr::new(pr::ExprKind::Internal));
                         expr.ty = expected_ty;

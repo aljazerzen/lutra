@@ -754,21 +754,25 @@ impl<'a> Context<'a> {
     }
 
     fn compile_literal(&self, lit: &ir::Literal, ty: &ir::Ty) -> ExprOrSource {
-        match lit {
-            ir::Literal::Bool(b) if *b => ExprOrSource::Source("TRUE".into()),
-            ir::Literal::Bool(_) => ExprOrSource::Source("FALSE".into()),
-
-            ir::Literal::Int(i) => {
-                ExprOrSource::Source(format!("{i}::{}", self.compile_ty_name(ty)))
+        ExprOrSource::Source(match lit {
+            ir::Literal::bool(true) => "TRUE".to_string(),
+            ir::Literal::bool(false) => "FALSE".to_string(),
+            ir::Literal::int8(v) => format!("{v}::{}", self.compile_ty_name(ty)),
+            ir::Literal::int16(v) => format!("{v}::{}", self.compile_ty_name(ty)),
+            ir::Literal::int32(v) => format!("{v}::{}", self.compile_ty_name(ty)),
+            ir::Literal::int64(v) => format!("{v}::{}", self.compile_ty_name(ty)),
+            ir::Literal::uint8(v) => format!("{v}::{}", self.compile_ty_name(ty)),
+            ir::Literal::uint16(v) => format!("{v}::{}", self.compile_ty_name(ty)),
+            ir::Literal::uint32(v) => format!("{v}::{}", self.compile_ty_name(ty)),
+            ir::Literal::uint64(v) => format!("{v}::{}", self.compile_ty_name(ty)),
+            ir::Literal::float32(v) => format!("{v}::{}", self.compile_ty_name(ty)),
+            ir::Literal::float64(v) => format!("{v}::{}", self.compile_ty_name(ty)),
+            ir::Literal::text(s) => {
+                return ExprOrSource::new_expr(sql_ast::Expr::Value(
+                    sql_ast::Value::SingleQuotedString(s.clone()),
+                ))
             }
-            ir::Literal::Float(f) => {
-                ExprOrSource::Source(format!("{f}::{}", self.compile_ty_name(ty)))
-            }
-
-            ir::Literal::Text(s) => ExprOrSource::new_expr(sql_ast::Expr::Value(
-                sql_ast::Value::SingleQuotedString(s.clone()),
-            )),
-        }
+        })
     }
 
     fn construct_empty_rel(&self, ty: &ir::Ty) -> sql_ast::SetExpr {
@@ -805,12 +809,10 @@ impl<'a> Context<'a> {
 fn get_lead_lag_filler(ty: &ir::Ty) -> &str {
     let item_ty = ty.kind.as_array().unwrap();
     match &item_ty.kind {
-        ir::TyKind::Primitive(
-            ir::TyPrimitive::int8
-            | ir::TyPrimitive::int16
-            | ir::TyPrimitive::int32
-            | ir::TyPrimitive::int64,
-        ) => "0",
+        ir::TyKind::Primitive(ir::TyPrimitive::int8) => "0::\"char\"",
+        ir::TyKind::Primitive(ir::TyPrimitive::int16) => "0::int2",
+        ir::TyKind::Primitive(ir::TyPrimitive::int32) => "0::int4",
+        ir::TyKind::Primitive(ir::TyPrimitive::int64) => "0::int8",
         ir::TyKind::Primitive(ir::TyPrimitive::bool) => "FALSE",
         ir::TyKind::Primitive(ir::TyPrimitive::text) => "''",
         _ => todo!(),

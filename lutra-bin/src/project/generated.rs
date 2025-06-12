@@ -26,7 +26,7 @@ pub mod br {
     #[allow(non_camel_case_types)]
     pub enum ExprKind {
         Pointer(Sid),
-        Literal(super::ir::Literal),
+        Literal(crate::vec::Vec<u8>),
         Call(crate::boxed::Box<Call>),
         Function(crate::boxed::Box<Function>),
         Tuple(crate::boxed::Box<Tuple>),
@@ -449,7 +449,7 @@ pub mod br {
                     }
                     1 => {
                         let offset = u32::from_le_bytes(buf.read_const::<4>());
-                        let inner = super::super::ir::Literal::decode(buf.skip(offset as usize))?;
+                        let inner = crate::vec::Vec::<u8>::decode(buf.skip(offset as usize))?;
                         ExprKind::Literal(inner)
                     }
                     2 => {
@@ -968,10 +968,18 @@ pub mod ir {
     #[derive(Debug, Clone, PartialEq, enum_as_inner::EnumAsInner)]
     #[allow(non_camel_case_types)]
     pub enum Literal {
-        Int(i64),
-        Float(f64),
-        Bool(bool),
-        Text(crate::string::String),
+        bool(bool),
+        int8(i8),
+        int16(i16),
+        int32(i32),
+        int64(i64),
+        uint8(u8),
+        uint16(u16),
+        uint32(u32),
+        uint64(u64),
+        float32(f32),
+        float64(f64),
+        text(crate::string::String),
     }
 
     #[derive(Debug, Clone)]
@@ -1644,60 +1652,172 @@ pub mod ir {
             type HeadPtr = LiteralHeadPtr;
             fn encode_head(&self, w: &mut crate::bytes::BytesMut) -> LiteralHeadPtr {
                 match self {
-                    Self::Int(inner) => {
+                    Self::bool(inner) => {
                         w.put_slice(&[0]);
                         let head_ptr = crate::ReversePointer::new(w);
-                        let r = LiteralHeadPtr::Int(head_ptr);
+                        let r = LiteralHeadPtr::bool(head_ptr);
                         r
                     }
-                    Self::Float(inner) => {
+                    Self::int8(inner) => {
                         w.put_slice(&[1]);
                         let head_ptr = crate::ReversePointer::new(w);
-                        let r = LiteralHeadPtr::Float(head_ptr);
+                        let r = LiteralHeadPtr::int8(head_ptr);
                         r
                     }
-                    Self::Bool(inner) => {
+                    Self::int16(inner) => {
                         w.put_slice(&[2]);
                         let head_ptr = crate::ReversePointer::new(w);
-                        let r = LiteralHeadPtr::Bool(head_ptr);
+                        let r = LiteralHeadPtr::int16(head_ptr);
                         r
                     }
-                    Self::Text(inner) => {
+                    Self::int32(inner) => {
                         w.put_slice(&[3]);
                         let head_ptr = crate::ReversePointer::new(w);
-                        let r = LiteralHeadPtr::Text(head_ptr);
+                        let r = LiteralHeadPtr::int32(head_ptr);
+                        r
+                    }
+                    Self::int64(inner) => {
+                        w.put_slice(&[4]);
+                        let head_ptr = crate::ReversePointer::new(w);
+                        let r = LiteralHeadPtr::int64(head_ptr);
+                        r
+                    }
+                    Self::uint8(inner) => {
+                        w.put_slice(&[5]);
+                        let head_ptr = crate::ReversePointer::new(w);
+                        let r = LiteralHeadPtr::uint8(head_ptr);
+                        r
+                    }
+                    Self::uint16(inner) => {
+                        w.put_slice(&[6]);
+                        let head_ptr = crate::ReversePointer::new(w);
+                        let r = LiteralHeadPtr::uint16(head_ptr);
+                        r
+                    }
+                    Self::uint32(inner) => {
+                        w.put_slice(&[7]);
+                        let head_ptr = crate::ReversePointer::new(w);
+                        let r = LiteralHeadPtr::uint32(head_ptr);
+                        r
+                    }
+                    Self::uint64(inner) => {
+                        w.put_slice(&[8]);
+                        let head_ptr = crate::ReversePointer::new(w);
+                        let r = LiteralHeadPtr::uint64(head_ptr);
+                        r
+                    }
+                    Self::float32(inner) => {
+                        w.put_slice(&[9]);
+                        let head_ptr = crate::ReversePointer::new(w);
+                        let r = LiteralHeadPtr::float32(head_ptr);
+                        r
+                    }
+                    Self::float64(inner) => {
+                        w.put_slice(&[10]);
+                        let head_ptr = crate::ReversePointer::new(w);
+                        let r = LiteralHeadPtr::float64(head_ptr);
+                        r
+                    }
+                    Self::text(inner) => {
+                        w.put_slice(&[11]);
+                        let head_ptr = crate::ReversePointer::new(w);
+                        let r = LiteralHeadPtr::text(head_ptr);
                         r
                     }
                 }
             }
             fn encode_body(&self, head: LiteralHeadPtr, w: &mut crate::bytes::BytesMut) {
                 match self {
-                    Self::Int(inner) => {
-                        let LiteralHeadPtr::Int(offset_ptr) = head else {
+                    Self::bool(inner) => {
+                        let LiteralHeadPtr::bool(offset_ptr) = head else {
                             unreachable!()
                         };
                         offset_ptr.write_cur_len(w);
                         let inner_head_ptr = inner.encode_head(w);
                         inner.encode_body(inner_head_ptr, w);
                     }
-                    Self::Float(inner) => {
-                        let LiteralHeadPtr::Float(offset_ptr) = head else {
+                    Self::int8(inner) => {
+                        let LiteralHeadPtr::int8(offset_ptr) = head else {
                             unreachable!()
                         };
                         offset_ptr.write_cur_len(w);
                         let inner_head_ptr = inner.encode_head(w);
                         inner.encode_body(inner_head_ptr, w);
                     }
-                    Self::Bool(inner) => {
-                        let LiteralHeadPtr::Bool(offset_ptr) = head else {
+                    Self::int16(inner) => {
+                        let LiteralHeadPtr::int16(offset_ptr) = head else {
                             unreachable!()
                         };
                         offset_ptr.write_cur_len(w);
                         let inner_head_ptr = inner.encode_head(w);
                         inner.encode_body(inner_head_ptr, w);
                     }
-                    Self::Text(inner) => {
-                        let LiteralHeadPtr::Text(offset_ptr) = head else {
+                    Self::int32(inner) => {
+                        let LiteralHeadPtr::int32(offset_ptr) = head else {
+                            unreachable!()
+                        };
+                        offset_ptr.write_cur_len(w);
+                        let inner_head_ptr = inner.encode_head(w);
+                        inner.encode_body(inner_head_ptr, w);
+                    }
+                    Self::int64(inner) => {
+                        let LiteralHeadPtr::int64(offset_ptr) = head else {
+                            unreachable!()
+                        };
+                        offset_ptr.write_cur_len(w);
+                        let inner_head_ptr = inner.encode_head(w);
+                        inner.encode_body(inner_head_ptr, w);
+                    }
+                    Self::uint8(inner) => {
+                        let LiteralHeadPtr::uint8(offset_ptr) = head else {
+                            unreachable!()
+                        };
+                        offset_ptr.write_cur_len(w);
+                        let inner_head_ptr = inner.encode_head(w);
+                        inner.encode_body(inner_head_ptr, w);
+                    }
+                    Self::uint16(inner) => {
+                        let LiteralHeadPtr::uint16(offset_ptr) = head else {
+                            unreachable!()
+                        };
+                        offset_ptr.write_cur_len(w);
+                        let inner_head_ptr = inner.encode_head(w);
+                        inner.encode_body(inner_head_ptr, w);
+                    }
+                    Self::uint32(inner) => {
+                        let LiteralHeadPtr::uint32(offset_ptr) = head else {
+                            unreachable!()
+                        };
+                        offset_ptr.write_cur_len(w);
+                        let inner_head_ptr = inner.encode_head(w);
+                        inner.encode_body(inner_head_ptr, w);
+                    }
+                    Self::uint64(inner) => {
+                        let LiteralHeadPtr::uint64(offset_ptr) = head else {
+                            unreachable!()
+                        };
+                        offset_ptr.write_cur_len(w);
+                        let inner_head_ptr = inner.encode_head(w);
+                        inner.encode_body(inner_head_ptr, w);
+                    }
+                    Self::float32(inner) => {
+                        let LiteralHeadPtr::float32(offset_ptr) = head else {
+                            unreachable!()
+                        };
+                        offset_ptr.write_cur_len(w);
+                        let inner_head_ptr = inner.encode_head(w);
+                        inner.encode_body(inner_head_ptr, w);
+                    }
+                    Self::float64(inner) => {
+                        let LiteralHeadPtr::float64(offset_ptr) = head else {
+                            unreachable!()
+                        };
+                        offset_ptr.write_cur_len(w);
+                        let inner_head_ptr = inner.encode_head(w);
+                        inner.encode_body(inner_head_ptr, w);
+                    }
+                    Self::text(inner) => {
+                        let LiteralHeadPtr::text(offset_ptr) = head else {
                             unreachable!()
                         };
                         offset_ptr.write_cur_len(w);
@@ -1710,10 +1830,18 @@ pub mod ir {
         #[allow(non_camel_case_types, dead_code)]
         pub enum LiteralHeadPtr {
             None,
-            Int(crate::ReversePointer),
-            Float(crate::ReversePointer),
-            Bool(crate::ReversePointer),
-            Text(crate::ReversePointer),
+            bool(crate::ReversePointer),
+            int8(crate::ReversePointer),
+            int16(crate::ReversePointer),
+            int32(crate::ReversePointer),
+            int64(crate::ReversePointer),
+            uint8(crate::ReversePointer),
+            uint16(crate::ReversePointer),
+            uint32(crate::ReversePointer),
+            uint64(crate::ReversePointer),
+            float32(crate::ReversePointer),
+            float64(crate::ReversePointer),
+            text(crate::ReversePointer),
         }
         impl crate::Layout for Literal {
             fn head_size() -> usize {
@@ -1730,23 +1858,63 @@ pub mod ir {
                 Ok(match tag {
                     0 => {
                         let offset = u32::from_le_bytes(buf.read_const::<4>());
-                        let inner = i64::decode(buf.skip(offset as usize))?;
-                        Literal::Int(inner)
+                        let inner = bool::decode(buf.skip(offset as usize))?;
+                        Literal::bool(inner)
                     }
                     1 => {
                         let offset = u32::from_le_bytes(buf.read_const::<4>());
-                        let inner = f64::decode(buf.skip(offset as usize))?;
-                        Literal::Float(inner)
+                        let inner = i8::decode(buf.skip(offset as usize))?;
+                        Literal::int8(inner)
                     }
                     2 => {
                         let offset = u32::from_le_bytes(buf.read_const::<4>());
-                        let inner = bool::decode(buf.skip(offset as usize))?;
-                        Literal::Bool(inner)
+                        let inner = i16::decode(buf.skip(offset as usize))?;
+                        Literal::int16(inner)
                     }
                     3 => {
                         let offset = u32::from_le_bytes(buf.read_const::<4>());
+                        let inner = i32::decode(buf.skip(offset as usize))?;
+                        Literal::int32(inner)
+                    }
+                    4 => {
+                        let offset = u32::from_le_bytes(buf.read_const::<4>());
+                        let inner = i64::decode(buf.skip(offset as usize))?;
+                        Literal::int64(inner)
+                    }
+                    5 => {
+                        let offset = u32::from_le_bytes(buf.read_const::<4>());
+                        let inner = u8::decode(buf.skip(offset as usize))?;
+                        Literal::uint8(inner)
+                    }
+                    6 => {
+                        let offset = u32::from_le_bytes(buf.read_const::<4>());
+                        let inner = u16::decode(buf.skip(offset as usize))?;
+                        Literal::uint16(inner)
+                    }
+                    7 => {
+                        let offset = u32::from_le_bytes(buf.read_const::<4>());
+                        let inner = u32::decode(buf.skip(offset as usize))?;
+                        Literal::uint32(inner)
+                    }
+                    8 => {
+                        let offset = u32::from_le_bytes(buf.read_const::<4>());
+                        let inner = u64::decode(buf.skip(offset as usize))?;
+                        Literal::uint64(inner)
+                    }
+                    9 => {
+                        let offset = u32::from_le_bytes(buf.read_const::<4>());
+                        let inner = f32::decode(buf.skip(offset as usize))?;
+                        Literal::float32(inner)
+                    }
+                    10 => {
+                        let offset = u32::from_le_bytes(buf.read_const::<4>());
+                        let inner = f64::decode(buf.skip(offset as usize))?;
+                        Literal::float64(inner)
+                    }
+                    11 => {
+                        let offset = u32::from_le_bytes(buf.read_const::<4>());
                         let inner = crate::string::String::decode(buf.skip(offset as usize))?;
-                        Literal::Text(inner)
+                        Literal::text(inner)
                     }
                     _ => return Err(crate::Error::InvalidData),
                 })

@@ -2,6 +2,8 @@ use std::collections::HashMap;
 use std::fmt::{self, Write};
 use std::path::{Path, PathBuf};
 
+use itertools::Itertools;
+
 use crate::diagnostic::{Diagnostic, DiagnosticCode};
 
 #[derive(thiserror::Error, Debug)]
@@ -149,7 +151,8 @@ fn compose_display(
 
     let mut out = Vec::new();
     report.finish().write(cache, &mut out).unwrap();
-    String::from_utf8(out).unwrap()
+    let out = String::from_utf8(out).unwrap();
+    out.lines().map(|l| l.trim_end()).join("\n")
 }
 
 fn compose_location(diagnostic: &Diagnostic, source: &ariadne::Source) -> Option<SourceLocation> {

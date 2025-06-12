@@ -2,6 +2,7 @@ use std::collections::HashMap;
 
 use indexmap::IndexSet;
 use lutra_bin::br::*;
+use lutra_bin::bytes;
 use lutra_bin::bytes::Buf;
 use lutra_bin::bytes::BufMut;
 use lutra_bin::ir;
@@ -81,8 +82,23 @@ impl ByteCoder {
         }
     }
 
-    fn compile_literal(&mut self, value: ir::Literal) -> ir::Literal {
-        value
+    fn compile_literal(&mut self, value: ir::Literal) -> Vec<u8> {
+        let mut buf = bytes::BytesMut::with_capacity(8);
+        match value {
+            ir::Literal::bool(v) => v.encode(&mut buf),
+            ir::Literal::int8(v) => v.encode(&mut buf),
+            ir::Literal::int16(v) => v.encode(&mut buf),
+            ir::Literal::int32(v) => v.encode(&mut buf),
+            ir::Literal::int64(v) => v.encode(&mut buf),
+            ir::Literal::uint8(v) => v.encode(&mut buf),
+            ir::Literal::uint16(v) => v.encode(&mut buf),
+            ir::Literal::uint32(v) => v.encode(&mut buf),
+            ir::Literal::uint64(v) => v.encode(&mut buf),
+            ir::Literal::float32(v) => v.encode(&mut buf),
+            ir::Literal::float64(v) => v.encode(&mut buf),
+            ir::Literal::text(v) => v.encode(&mut buf),
+        };
+        buf.to_vec()
     }
 
     fn compile_call(&mut self, value: ir::Call) -> Call {

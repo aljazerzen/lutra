@@ -103,7 +103,10 @@ pub fn fold_expr_kind<T: ?Sized + PrFold>(fold: &mut T, expr_kind: ExprKind) -> 
                 .try_collect()?,
         ),
         Array(items) => Array(fold.fold_exprs(items)?),
-        EnumVariant(variant) => EnumVariant(variant),
+        EnumVariant(variant) => EnumVariant(pr::EnumVariant {
+            tag: variant.tag,
+            inner: fold_optional_box(fold, variant.inner)?,
+        }),
         FString(items) => FString(
             items
                 .into_iter()

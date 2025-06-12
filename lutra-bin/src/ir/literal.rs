@@ -5,12 +5,21 @@ use crate::ir;
 impl std::fmt::Display for ir::Literal {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            ir::Literal::Int(i) => write!(f, "{i}"),
-            ir::Literal::Float(i) => write!(f, "{i}"),
-            ir::Literal::Text(s) => {
+            ir::Literal::bool(b) => f.write_str(if *b { "true" } else { "false" }),
+            ir::Literal::int8(v) => write!(f, "{v}"),
+            ir::Literal::int16(v) => write!(f, "{v}"),
+            ir::Literal::int32(v) => write!(f, "{v}"),
+            ir::Literal::int64(v) => write!(f, "{v}"),
+            ir::Literal::uint8(v) => write!(f, "{v}"),
+            ir::Literal::uint16(v) => write!(f, "{v}"),
+            ir::Literal::uint32(v) => write!(f, "{v}"),
+            ir::Literal::uint64(v) => write!(f, "{v}"),
+            ir::Literal::float32(v) => write!(f, "{v}"),
+            ir::Literal::float64(v) => write!(f, "{v}"),
+
+            ir::Literal::text(s) => {
                 write!(f, "{}", quote_string(escape_all_except_quotes(s).as_str()))
             }
-            ir::Literal::Bool(b) => f.write_str(if *b { "true" } else { "false" }),
         }
     }
 }

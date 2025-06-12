@@ -15,9 +15,24 @@ use super::TypeResolver;
 #[derive(Debug)]
 pub struct Scope {
     pub(super) id: usize,
+
+    #[allow(dead_code)]
+    pub(super) kind: ScopeKind,
     pub(super) names: Vec<ScopedKind>,
 
     pub(super) ty_var_constraints: RefCell<Vec<TyVarConstraint>>,
+}
+
+#[derive(Debug)]
+pub enum ScopeKind {
+    /// Scope that does not allow references to parent scopes.
+    /// When closed, all type must be inferred.
+    /// Used for variable stmts and functions with generic params.
+    Isolated,
+
+    /// Scope that allows references to parent scopes.
+    /// Used for function bodies, match case blocks.
+    Nested,
 }
 
 #[derive(Debug, Clone, enum_as_inner::EnumAsInner)]
@@ -101,12 +116,19 @@ impl<'a> TyRef<'a> {
 }
 
 impl Scope {
-    pub fn new(id: usize) -> Self {
+    pub fn new(id: usize, kind: ScopeKind) -> Self {
         Self {
             id,
+            kind,
             names: Vec::new(),
             ty_var_constraints: RefCell::new(Vec::new()),
         }
+    }
+
+    /// Returns true for scopes that should store type variables.
+    /// Location of where ty vars are store determines when they will be finalized.
+    pub fn for_ty_vars(&self) -> bool {
+        matches!(self.kind, ScopeKind::Isolated)
     }
 
     pub fn insert_type_params(&mut self, type_params: &[pr::TyParam]) {
@@ -177,6 +199,15 @@ impl Scope {
 }
 
 impl TypeResolver<'_> {
+    pub fn get_ty_var_scope(&self) -> &Scope {
+        let mut stack = self.scopes.iter().rev();
+        stack.find(|s| s.for_ty_vars()).unwrap()
+    }
+    pub fn get_ty_var_scope_mut(&mut self) -> &mut Scope {
+        let mut stack = self.scopes.iter_mut().rev();
+        stack.find(|s| s.for_ty_vars()).unwrap()
+    }
+
     /// Get declaration from within the current scope.
     ///
     /// Does not mutate the current scope or module structure.
@@ -211,7 +242,8 @@ impl TypeResolver<'_> {
                     .scopes
                     .iter()
                     .find(|s| s.id == *scope)
-                    .ok_or_else(|| Diagnostic::new_assert("cannot find scope by id"))?;
+                    .ok_or_else(|| panic!("cannot find scope by id"))
+                    .unwrap();
                 Ok(scope.names.get(*offset).map(Named::Scoped).unwrap())
             }
         }
@@ -224,8 +256,7 @@ impl TypeResolver<'_> {
     }
 
     pub fn get_ty_var(&self, id: TyVarId) -> &TyVar {
-        let scope = self.scopes.last().unwrap();
-        let scoped = scope.names.get(id).unwrap();
+        let scoped = self.get_ty_var_scope().names.get(id).unwrap();
         scoped.as_ty_var().unwrap()
     }
 
@@ -267,7 +298,7 @@ impl TypeResolver<'_> {
                     }
                     ScopedKind::TyParam { .. } => Ok(TyRef::Param(*offset)),
                     ScopedKind::TyVar(_) => {
-                        // return type arg
+                        // return type var
                         Ok(TyRef::Var(*scope, *offset))
                     }
                 }
@@ -302,15 +333,15 @@ impl TypeResolver<'_> {
             );
         }
 
-        tracing::debug!(
-            "introducing generics for ty_func={}",
-            crate::printer::print_ty(&pr::Ty::new(ty_func.clone()))
-        );
-
         let mut mapping = HashMap::new();
         let mut ty_args = Vec::with_capacity(ty_func.ty_params.len());
 
-        let scope = self.scopes.last_mut().unwrap();
+        let scope = self.get_ty_var_scope_mut();
+        tracing::debug!(
+            "introducing generics for ty_func={} into scope {}",
+            crate::printer::print_ty(&pr::Ty::new(ty_func.clone())),
+            scope.id,
+        );
         for (gtp_position, gtp) in ty_func.ty_params.drain(..).enumerate() {
             let gtp_ref = pr::Ref::Local {
                 scope: ty.scope_id.unwrap(), // original scope of the type
@@ -341,7 +372,7 @@ impl TypeResolver<'_> {
     }
 
     pub fn introduce_ty_var(&mut self, domain: pr::TyParamDomain, span: Option<Span>) -> pr::Ty {
-        let scope = self.scopes.last_mut().unwrap();
+        let scope = self.get_ty_var_scope_mut();
 
         let mut ty_arg = pr::Ty::new(pr::TyKind::Ident(pr::Path::empty()));
         ty_arg.target = Some(pr::Ref::Local {

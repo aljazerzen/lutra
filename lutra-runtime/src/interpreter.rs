@@ -4,8 +4,7 @@ use std::ops::{BitAnd, Shr};
 use std::rc::Rc;
 
 use lutra_bin::br;
-use lutra_bin::bytes;
-use lutra_bin::{Data, Decode, Encode};
+use lutra_bin::{Data, Decode};
 
 use crate::NativeModule;
 
@@ -191,16 +190,7 @@ impl Interpreter {
                 }
             }
 
-            br::ExprKind::Literal(l) => {
-                let mut buf = bytes::BytesMut::with_capacity(8);
-                match l {
-                    br::Literal::Int(i) => i.encode(&mut buf),
-                    br::Literal::Float(i) => i.encode(&mut buf),
-                    br::Literal::Bool(i) => i.encode(&mut buf),
-                    br::Literal::Text(i) => i.encode(&mut buf),
-                };
-                Cell::Data(Data::new(buf.to_vec()))
-            }
+            br::ExprKind::Literal(data) => Cell::Data(Data::new(data.clone())),
 
             br::ExprKind::Tuple(tuple) => {
                 let field_layouts: Cow<_> = tuple

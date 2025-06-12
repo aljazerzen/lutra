@@ -154,7 +154,7 @@ impl<'a> Context<'a> {
                     .enumerate()
                     .map(|(index, x)| {
                         let mut cols = vec![cr::Expr {
-                            kind: cr::ExprKind::From(cr::From::Literal(ir::Literal::Int(
+                            kind: cr::ExprKind::From(cr::From::Literal(ir::Literal::int64(
                                 index as i64,
                             ))),
                             ty: ir::Ty::new(ir::TyPrimitive::int64),
@@ -242,7 +242,7 @@ impl<'a> Context<'a> {
 
                 // tag
                 row.push(cr::Expr {
-                    kind: cr::ExprKind::From(cr::From::Literal(ir::Literal::Int(
+                    kind: cr::ExprKind::From(cr::From::Literal(ir::Literal::int64(
                         variant.tag as i64,
                     ))),
                     ty: ir::Ty::new(ir::TyPrimitive::int8),
@@ -732,7 +732,7 @@ fn new_bin_op(left: cr::Expr, op: &str, right: cr::Expr, ty: ir::TyPrimitive) ->
 }
 
 fn new_int(int: i64) -> cr::Expr {
-    let kind = cr::ExprKind::From(cr::From::Literal(ir::Literal::Int(int)));
+    let kind = cr::ExprKind::From(cr::From::Literal(ir::Literal::int64(int)));
     cr::Expr {
         kind,
         ty: ir::Ty::new(ir::TyPrimitive::int64),

@@ -484,6 +484,31 @@ fn parse_06() {
 }
 
 #[test]
+fn parse_07() {
+    assert_debug_snapshot!(parse_expr(r"-1").kind, @r"
+    Unary(
+        UnaryExpr {
+            op: Neg,
+            expr: Expr {
+                kind: Literal(
+                    Integer(
+                        1,
+                    ),
+                ),
+                span: Some(
+                    0:1-2,
+                ),
+                ty: None,
+                ty_args: [],
+                scope_id: None,
+                target: None,
+            },
+        },
+    )
+    ");
+}
+
+#[test]
 fn test_error_unicode_string() {
     // Test various unicode strings successfully parse errors. We were
     // getting loops in the lexer before.
