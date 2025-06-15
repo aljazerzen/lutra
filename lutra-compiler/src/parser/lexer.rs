@@ -73,7 +73,7 @@ fn lexer() -> impl Parser<char, Vec<Token>, Error = Cheap<char>> {
 
     let control = one_of("></%=+-*[]().,:|!{};@").map(TokenKind::Control);
 
-    let ident = ident_part().map(TokenKind::Ident);
+    let literal = literal().map(TokenKind::Literal);
 
     let keyword = choice((
         just("enum"),
@@ -89,7 +89,7 @@ fn lexer() -> impl Parser<char, Vec<Token>, Error = Cheap<char>> {
     .map(|x| x.to_string())
     .map(TokenKind::Keyword);
 
-    let literal = literal().map(TokenKind::Literal);
+    let ident = ident_part().map(TokenKind::Ident);
 
     let interpolation = one_of("sf")
         .then(quoted_string(true))
@@ -385,8 +385,10 @@ fn digits(count: usize) -> impl Parser<char, Vec<char>, Error = Cheap<char>> {
         .exactly(count)
 }
 
-fn non_ident() -> impl Parser<char, char, Error = Cheap<char>> {
+fn non_ident() -> impl Parser<char, (), Error = Cheap<char>> {
     filter(|c: &char| c.is_alphanumeric() || *c == '_')
         .not()
+        .ignored()
+        .or(end())
         .rewind()
 }

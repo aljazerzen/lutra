@@ -4,7 +4,6 @@ mod diagnostic;
 mod discover;
 mod intermediate;
 mod parser;
-mod printer;
 mod project;
 mod resolver;
 mod span;
@@ -16,6 +15,7 @@ type Result<T, E = diagnostic::Diagnostic> = core::result::Result<T, E>;
 pub mod decl;
 pub mod error;
 pub mod pr;
+pub mod printer;
 pub use bytecoding::compile_program as bytecode_program;
 pub use compile::{compile, CompileParams};
 pub use discover::{discover, DiscoverParams};
@@ -66,5 +66,6 @@ pub fn _lower_expr(project: &Project, source: &str) -> Result<ir::Program, error
     let expr = resolve_post(&project.root_module, expr).unwrap();
 
     let program = lower_expr(&project.root_module, &expr);
-    Ok(layouter::on_program(program))
+    let program = layouter::on_program(program);
+    Ok(program)
 }

@@ -57,6 +57,22 @@ fn parse_expr(source: &str) -> pr::Expr {
 fn parse_01() {
     assert!(parse_expr("func () -> 4").kind.is_func());
     assert!(parse_expr("func() -> 4").kind.is_func());
+    assert_debug_snapshot!(parse_expr("func() -> false").kind.as_func().unwrap().body, @r"
+    Expr {
+        kind: Literal(
+            Boolean(
+                false,
+            ),
+        ),
+        span: Some(
+            0:10-15,
+        ),
+        ty: None,
+        ty_args: [],
+        scope_id: None,
+        target: None,
+    }
+    ");
 }
 
 #[test]
