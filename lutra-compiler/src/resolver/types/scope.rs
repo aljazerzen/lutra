@@ -28,7 +28,7 @@ pub enum ScopedKind {
 
 #[derive(Debug, Clone)]
 pub struct TyArg {
-    pub param_name: String,
+    pub name_hint: Option<String>,
     pub domain: TyParamDomain,
     pub inferred: Rc<OnceCell<pr::Ty>>,
 }
@@ -47,7 +47,7 @@ pub enum Named<'a> {
 pub enum TyRef<'a> {
     Ty(Cow<'a, pr::Ty>),
     Param(usize, Cow<'a, str>),
-    Arg(usize, usize, Cow<'a, str>),
+    Arg(usize, usize, Option<Cow<'a, str>>),
 }
 
 impl<'a> TyRef<'a> {
@@ -56,7 +56,7 @@ impl<'a> TyRef<'a> {
         match self {
             TyRef::Ty(v) => TyRef::Ty(Cow::Owned(v.as_ref().clone())),
             TyRef::Param(v, n) => TyRef::Param(v, Cow::Owned(n.as_ref().to_string())),
-            TyRef::Arg(s, o, n) => TyRef::Arg(s, o, Cow::Owned(n.as_ref().to_string())),
+            TyRef::Arg(s, o, n) => TyRef::Arg(s, o, n.map(|n| Cow::Owned(n.as_ref().to_string()))),
         }
     }
 }
@@ -92,11 +92,11 @@ impl Scope {
         Ok(())
     }
 
-    pub fn insert_generic_arg(&mut self, param_name: String, domain: TyParamDomain) {
+    pub fn insert_generic_arg(&mut self, name_hint: Option<String>, domain: TyParamDomain) {
         let empty = Rc::new(OnceCell::new());
 
         let type_arg = TyArg {
-            param_name,
+            name_hint,
             domain,
             inferred: empty,
         };
@@ -149,10 +149,13 @@ impl Scope {
             };
 
             let Some(ty) = arg.inferred.get() else {
-                return Err(Diagnostic::new_custom(format!(
-                    "cannot infer type: {}",
-                    arg.param_name,
-                )));
+                return Err(Diagnostic::new_custom(
+                    if let Some(name_hint) = &arg.name_hint {
+                        format!("cannot infer type of {name_hint}")
+                    } else {
+                        "cannot infer type".into()
+                    },
+                ));
             };
 
             mapping.insert(
@@ -266,7 +269,11 @@ impl TypeResolver<'_> {
                             self.get_ty_mat(ty)
                         } else {
                             // return type arg
-                            Ok(TyRef::Arg(*scope, *offset, Cow::Borrowed(&arg.param_name)))
+                            Ok(TyRef::Arg(
+                                *scope,
+                                *offset,
+                                arg.name_hint.as_ref().map(|n| Cow::Borrowed(n.as_str())),
+                            ))
                         }
                     }
                 }
@@ -325,7 +332,7 @@ impl TypeResolver<'_> {
             mapping.insert(gtp_ref, ty_arg_ident.clone());
             ty_args.push(ty_arg_ident);
 
-            scope.insert_generic_arg(gtp.name, gtp.domain);
+            scope.insert_generic_arg(Some(gtp.name), gtp.domain);
         }
 
         let ty = pr::Ty {
@@ -338,15 +345,13 @@ impl TypeResolver<'_> {
     pub fn introduce_ty_arg(&mut self, domain: pr::TyParamDomain) -> pr::Ty {
         let scope = self.scopes.last_mut().unwrap();
 
-        let name = "unnamed";
-
-        let mut ty_arg = pr::Ty::new(Path::new(vec![name.to_string()]));
+        let mut ty_arg = pr::Ty::new(pr::TyKind::Ident(pr::Path::empty()));
         ty_arg.target = Some(pr::Ref::Local {
             scope: scope.id, // current scope
             offset: scope.names.len(),
         });
 
-        scope.insert_generic_arg(name.to_string(), domain);
+        scope.insert_generic_arg(None, domain);
         ty_arg
     }
 }

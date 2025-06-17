@@ -385,15 +385,15 @@ fn empty_array_00() {
         _test_err(
             "func () -> []"
         ),
-        @r#"
+        @r"
     Error: 
        ╭─[:1:12]
        │
      1 │ func () -> []
        │            ─┬  
-       │             ╰── cannot infer type: unnamed
+       │             ╰── cannot infer type
     ───╯
-    "#
+    "
     );
 }
 
@@ -403,15 +403,15 @@ fn empty_array_01() {
         _test_err(
             "func () -> std::lag([], 1)"
         ),
-        @r#"
+        @r"
     Error: 
        ╭─[:1:12]
        │
      1 │ func () -> std::lag([], 1)
        │            ───────┬───────  
-       │                   ╰───────── cannot infer type: T
+       │                   ╰───────── cannot infer type of T
     ───╯
-    "#
+    "
     );
 }
 

@@ -61,7 +61,12 @@ impl TypeResolver<'_> {
                 let scope = self.scopes.last().unwrap();
                 let ty_param = self.get_ty_param(param_id);
                 let ty_arg = scope.get_ty_arg(&arg_id);
-                self.validate_type_domains(ty_param, &ty_arg.domain, &param_name, &arg_name)?;
+                self.validate_type_domains(
+                    ty_param,
+                    &ty_arg.domain,
+                    &param_name,
+                    arg_name.as_deref(),
+                )?;
 
                 // infer
                 let scope = self.scopes.last_mut().unwrap();
@@ -89,7 +94,7 @@ impl TypeResolver<'_> {
                 // validate
                 let scope = self.scopes.last().unwrap();
                 let ty_arg = scope.get_ty_arg(&ty_arg_id);
-                self.validate_type_domain(&ty, &ty_arg.domain, &ty_arg_name)?;
+                self.validate_type_domain(&ty, &ty_arg.domain, ty_arg_name.as_deref())?;
 
                 // infer
                 let scope = self.scopes.last_mut().unwrap();
@@ -102,10 +107,10 @@ impl TypeResolver<'_> {
                 let a = scope.get_ty_arg(&a_id);
                 let b = scope.get_ty_arg(&b_id);
                 if let Some(a_inferred) = a.inferred.get() {
-                    self.validate_type_domain(a_inferred, &b.domain, &a_name)?;
+                    self.validate_type_domain(a_inferred, &b.domain, a_name.as_deref())?;
                 }
                 if let Some(b_inferred) = b.inferred.get() {
-                    self.validate_type_domain(b_inferred, &a.domain, &b_name)?;
+                    self.validate_type_domain(b_inferred, &a.domain, b_name.as_deref())?;
                 }
 
                 // infer
@@ -214,7 +219,7 @@ impl TypeResolver<'_> {
         &self,
         ty: &Ty,
         domain: &TyParamDomain,
-        arg_name: &str,
+        arg_name: Option<&str>,
     ) -> Result<(), Diagnostic> {
         match domain {
             TyParamDomain::Open => Ok(()),
@@ -230,7 +235,8 @@ impl TypeResolver<'_> {
 
                     return Err(Diagnostic::new(
                         format!(
-                            "{arg_name} is restricted to one of {possible_tys}, found {}",
+                            "{} one of {possible_tys}, found {}",
+                            msg_restricted_to(arg_name, None),
                             printer::print_ty(ty)
                         ),
                         DiagnosticCode::TYPE_DOMAIN,
@@ -244,7 +250,8 @@ impl TypeResolver<'_> {
                 let TyKind::Tuple(ty_fields) = &ty.kind else {
                     return Err(Diagnostic::new(
                         format!(
-                            "{arg_name} is restricted to tuples, found {}",
+                            "{} to tuples, found {}",
+                            msg_restricted_to(arg_name, None),
                             printer::print_ty(ty)
                         ),
                         DiagnosticCode::TYPE_DOMAIN,
@@ -264,25 +271,40 @@ impl TypeResolver<'_> {
                         // named
                         let res = ty_fields.iter().find(|f| f.name.as_ref() == Some(name));
 
-                        (name.clone(), res.ok_or_else(|| {
-                            Diagnostic::new(
-                                format!("{arg_name} is restricted to tuples with a field named `{name}`"),
-                                DiagnosticCode::TYPE_DOMAIN,
-                            )
-                        })?)
+                        (
+                            name.clone(),
+                            res.ok_or_else(|| {
+                                Diagnostic::new(
+                                    format!(
+                                        "{} tuples with a field named `{name}`",
+                                        msg_restricted_to(arg_name, None)
+                                    ),
+                                    DiagnosticCode::TYPE_DOMAIN,
+                                )
+                            })?,
+                        )
                     } else {
                         // positional
-                        (position.to_string(), ty_fields.get(position).ok_or_else(|| {
-                            Diagnostic::new(
-                                format!("{arg_name} is restricted to tuples with at least {num_positional} fields"),
-                                DiagnosticCode::TYPE_DOMAIN,
-                            )
-                        })?)
+                        (
+                            position.to_string(),
+                            ty_fields.get(position).ok_or_else(|| {
+                                Diagnostic::new(
+                                    format!(
+                                        "{} tuples with at least {num_positional} fields",
+                                        msg_restricted_to(arg_name, None)
+                                    ),
+                                    DiagnosticCode::TYPE_DOMAIN,
+                                )
+                            })?,
+                        )
                     };
 
                     let TyKind::Primitive(ty_field_ty) = &ty_field.ty.kind else {
                         return Err(Diagnostic::new(
-                            format!("{arg_name}.{ind_display} is restricted to primitive types"),
+                            format!(
+                                "{} primitive types",
+                                msg_restricted_to(arg_name, Some(&ind_display))
+                            ),
                             DiagnosticCode::TYPE_DOMAIN,
                         )
                         .push_hint("This is a temporary restriction. Work in progress."))
@@ -292,7 +314,8 @@ impl TypeResolver<'_> {
                     if ty_field_ty != &domain_field.ty {
                         return Err(Diagnostic::new(
                             format!(
-                                "{arg_name}.{ind_display} is restricted to {}",
+                                "{} {}",
+                                msg_restricted_to(arg_name, Some(&ind_display)),
                                 domain_field.ty
                             ),
                             DiagnosticCode::TYPE_DOMAIN,
@@ -315,7 +338,7 @@ impl TypeResolver<'_> {
         found: &TyParamDomain,
         expected: &TyParamDomain,
         found_name: &str,
-        expected_name: &str,
+        expected_name: Option<&str>,
     ) -> Result<(), Diagnostic> {
         match (found, expected) {
             // if expected is open, any found domain is ok
@@ -323,7 +346,11 @@ impl TypeResolver<'_> {
 
             // if found is open, expected must be open too (but that was matched above)
             (TyParamDomain::Open, _) => Err(Diagnostic::new(
-                format!("{found_name} can be any type, but {expected_name} has restrictions"),
+                if let Some(expected_name) = expected_name {
+                    format!("{found_name} can be any type, but {expected_name} has restrictions")
+                } else {
+                    format!("{found_name} can be any type, but there are restrictions")
+                },
                 DiagnosticCode::TYPE_DOMAIN,
             )),
 
@@ -331,18 +358,24 @@ impl TypeResolver<'_> {
             (TyParamDomain::OneOf(found_tys), expected_domain) => {
                 for found_ty in found_tys {
                     let ty = Ty::new(found_ty.clone());
-                    self.validate_type_domain(&ty, expected_domain, found_name)?;
+                    self.validate_type_domain(&ty, expected_domain, Some(found_name))?;
                 }
                 Ok(())
             }
 
             (TyParamDomain::TupleFields(_), TyParamDomain::OneOf(_)) => Err(Diagnostic::new(
                 // TODO: bad error message
-                format!("{expected_name} is restricted to concrete types, but {found_name} is a tuple with possibly unknown fields"),
+                format!(
+                    "{} concrete types, but {found_name} is a tuple with possibly unknown fields",
+                    msg_restricted_to(expected_name, None)
+                ),
                 DiagnosticCode::TYPE_DOMAIN,
             )),
 
-            (TyParamDomain::TupleFields(found_fields), TyParamDomain::TupleFields(expected_fields)) => {
+            (
+                TyParamDomain::TupleFields(found_fields),
+                TyParamDomain::TupleFields(expected_fields),
+            ) => {
                 // TODO: maybe reuse the code from [validate_type_domain]?
 
                 let num_positional = expected_fields
@@ -358,26 +391,39 @@ impl TypeResolver<'_> {
                         // named
                         let res = found_fields.iter().find(|f| f.name.as_ref() == Some(name));
 
-                        (name.clone(), res.ok_or_else(|| {
-                            Diagnostic::new(
-                                format!("{expected_name} is restricted to tuples with a field named `{name}`"),
-                                DiagnosticCode::TYPE_DOMAIN,
-                            )
-                        })?)
+                        (
+                            name.clone(),
+                            res.ok_or_else(|| {
+                                Diagnostic::new(
+                                    format!(
+                                        "{} tuples with a field named `{name}`",
+                                        msg_restricted_to(expected_name, None)
+                                    ),
+                                    DiagnosticCode::TYPE_DOMAIN,
+                                )
+                            })?,
+                        )
                     } else {
                         // positional
-                        (position.to_string(), found_fields.get(position).ok_or_else(|| {
-                            Diagnostic::new(
-                                format!("{expected_name} is restricted to tuples with at least {num_positional} fields"),
-                                DiagnosticCode::TYPE_DOMAIN,
-                            )
-                        })?)
+                        (
+                            position.to_string(),
+                            found_fields.get(position).ok_or_else(|| {
+                                Diagnostic::new(
+                                    format!(
+                                        "{} tuples with at least {num_positional} fields",
+                                        msg_restricted_to(expected_name, None)
+                                    ),
+                                    DiagnosticCode::TYPE_DOMAIN,
+                                )
+                            })?,
+                        )
                     };
 
                     if ty_field.ty != expected_field.ty {
                         return Err(Diagnostic::new(
                             format!(
-                                "{expected_name}.{ind_display} is restricted to {}",
+                                "{} {}",
+                                msg_restricted_to(expected_name, Some(&ind_display)),
                                 expected_field.ty
                             ),
                             DiagnosticCode::TYPE_DOMAIN,
@@ -389,9 +435,19 @@ impl TypeResolver<'_> {
 
                 // all ok
                 Ok(())
-            },
+            }
         }
     }
+}
+
+fn msg_restricted_to(arg_name: Option<&str>, suffix: Option<&str>) -> String {
+    let Some(arg_name) = arg_name else {
+        return "restricted to".to_string();
+    };
+    if let Some(suffix) = suffix {
+        return format!("{arg_name}.{suffix} is restricted to");
+    }
+    format!("{arg_name} is restricted to")
 }
 
 fn compose_type_error<F>(found: &Ty, expected: &Ty, who: &F) -> Diagnostic
