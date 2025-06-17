@@ -204,7 +204,17 @@ fn parse_04() {
                                     name: Some(
                                         "b",
                                     ),
-                                    ty: int64,
+                                    ty: Ty {
+                                        kind: Primitive(
+                                            int64,
+                                        ),
+                                        span: Some(
+                                            0:14-19,
+                                        ),
+                                        name: None,
+                                        scope_id: None,
+                                        target: None,
+                                    },
                                 },
                             ],
                         ),

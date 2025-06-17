@@ -251,12 +251,12 @@ fn types_15() {
         let get_b: func <T: {b = int64, ..}> (x: T): T
         func () -> get_b({a = false, b = 4.6})
     "#), @r"
-    [E0005] Error: 
+    [E0004] Error: 
        ╭─[:3:42]
        │
      3 │         func () -> get_b({a = false, b = 4.6})
        │                                          ─┬─  
-       │                                           ╰─── T.b is restricted to int64
+       │                                           ╰─── expected type `int64`, but found type `float64`
     ───╯
     ");
     insta::assert_snapshot!(_test_err(r#"
@@ -284,12 +284,12 @@ fn types_16() {
         let get_b: func <T: {bool, int64, ..}> (x: T): T
         func () -> get_b({a = 7, 4, c = 5.7})
     "#), @r"
-    [E0005] Error: 
+    [E0004] Error: 
        ╭─[:3:31]
        │
      3 │         func () -> get_b({a = 7, 4, c = 5.7})
        │                               ┬  
-       │                               ╰── T.0 is restricted to bool
+       │                               ╰── expected type `bool`, but found type `int64`
     ───╯
     ");
 

@@ -34,7 +34,7 @@ impl TypeResolver<'_> {
 
     /// Validates that a type of a found node has an expected type.
     /// Might infer type variable constraints, that need to be finalized later.
-    pub fn validate_type<F>(&mut self, found: &Ty, expected: &Ty, who: &F) -> Result<(), Diagnostic>
+    pub fn validate_type<F>(&self, found: &Ty, expected: &Ty, who: &F) -> Result<(), Diagnostic>
     where
         F: Fn() -> Option<String>,
     {
@@ -107,7 +107,7 @@ impl TypeResolver<'_> {
         Ok(())
     }
 
-    fn validate_type_material<F>(&mut self, found: Ty, expected: Ty, who: &F) -> crate::Result<()>
+    fn validate_type_material<F>(&self, found: Ty, expected: Ty, who: &F) -> crate::Result<()>
     where
         F: Fn() -> Option<String>,
     {
@@ -390,7 +390,7 @@ impl TypeResolver<'_> {
                     .unwrap_or_default();
 
                 for (position, domain_field) in domain_fields.iter().enumerate() {
-                    let (ind_display, ty_field) = if let Some(name) = &domain_field.name {
+                    let (_ind_display, ty_field) = if let Some(name) = &domain_field.name {
                         // named
                         let res = ty_fields.iter().find(|f| f.name.as_ref() == Some(name));
 
@@ -422,30 +422,8 @@ impl TypeResolver<'_> {
                         )
                     };
 
-                    let TyKind::Primitive(ty_field_ty) = &ty_field.ty.kind else {
-                        return Err(Diagnostic::new(
-                            format!(
-                                "{} primitive types",
-                                msg_restricted_to(var_name, Some(&ind_display))
-                            ),
-                            DiagnosticCode::TYPE_DOMAIN,
-                        )
-                        .push_hint("This is a temporary restriction. Work in progress."))
-                        .with_span(ty_field.ty.span);
-                    };
-
-                    if ty_field_ty != &domain_field.ty {
-                        return Err(Diagnostic::new(
-                            format!(
-                                "{} {}",
-                                msg_restricted_to(var_name, Some(&ind_display)),
-                                domain_field.ty
-                            ),
-                            DiagnosticCode::TYPE_DOMAIN,
-                        )
-                        .with_span(ty_field.ty.span));
-                    }
-
+                    self.validate_type(&ty_field.ty, &domain_field.ty, &|| None)
+                        .with_span_fallback(ty_field.ty.span)?;
                     // ok
                 }
 
@@ -547,7 +525,7 @@ impl TypeResolver<'_> {
                             format!(
                                 "{} {}",
                                 msg_restricted_to(expected_name, Some(&ind_display)),
-                                expected_field.ty
+                                printer::print_ty(&expected_field.ty)
                             ),
                             DiagnosticCode::TYPE_DOMAIN,
                         ));

@@ -1,8 +1,9 @@
 use crate::decl::DeclKind;
-use crate::pr;
+use crate::resolver::types::scope;
 use crate::resolver::NS_STD;
 use crate::utils::fold::PrFold;
 use crate::Result;
+use crate::{pr, utils};
 
 impl super::TypeResolver<'_> {
     /// Entry point to the resolver.
@@ -57,17 +58,21 @@ impl super::TypeResolver<'_> {
         fq_ident: &pr::Path,
         stmt: pr::StmtKind,
     ) -> Result<DeclKind> {
-        // resolve
         Ok(match stmt {
             pr::StmtKind::ModuleDef(_) => {
                 unreachable!("module def cannot be unresolved at this point")
                 // it should have been converted into Module in resolve_decls::init_module_tree
             }
             pr::StmtKind::VarDef(var_def) => {
+                // push a top-level scope for exprs that need inference type args but are not wrapped into a function
+                let scope = scope::Scope::new(usize::MAX);
+                self.scopes.push(scope);
+
+                // resolve
                 let def = self.fold_var_def(var_def)?;
                 let expected_ty = def.ty;
 
-                match def.value {
+                let decl = match def.value {
                     Some(mut def_value) => {
                         // var value is provided
 
@@ -77,13 +82,11 @@ impl super::TypeResolver<'_> {
                             self.validate_expr_type(&mut def_value, expected_ty, &who)?;
                         }
 
-                        // finalize global generics
-                        // if let Some(mapping) = self.finalize_global_generics() {
-                        //     let ty = def_value.ty.unwrap();
-                        //     def_value.ty = Some(TypeReplacer::on_ty(ty, mapping));
-                        // }
+                        // finalize scope
+                        let mapping = self.finalize_type_vars()?;
+                        let def_value = utils::TypeReplacer::on_expr(*def_value, mapping);
 
-                        DeclKind::Expr(def_value)
+                        DeclKind::Expr(Box::new(def_value))
                     }
                     None => {
                         // var value is not provided: treat this var as value provided by the runtime
@@ -91,7 +94,9 @@ impl super::TypeResolver<'_> {
                         expr.ty = expected_ty;
                         DeclKind::Expr(expr)
                     }
-                }
+                };
+                self.scopes.pop().unwrap();
+                decl
             }
             pr::StmtKind::TypeDef(ty_def) => {
                 let mut ty = self.fold_type(ty_def.ty)?;

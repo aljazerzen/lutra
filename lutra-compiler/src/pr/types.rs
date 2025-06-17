@@ -128,7 +128,7 @@ pub enum TyParamDomain {
 #[derive(Debug, Clone)]
 pub struct TyDomainTupleField {
     pub name: Option<String>,
-    pub ty: TyPrimitive,
+    pub ty: Ty,
 }
 
 impl Ty {

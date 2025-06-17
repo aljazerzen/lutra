@@ -107,7 +107,7 @@ impl Printer {
                                         r += &pr::display_ident_part(name);
                                         r += " = ";
                                     }
-                                    r += &field.ty.to_string();
+                                    r += &self.print_ty(&field.ty);
                                 }
                                 r += "}";
                             }

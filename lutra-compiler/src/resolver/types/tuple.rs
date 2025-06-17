@@ -142,7 +142,7 @@ fn lookup_position_in_domain(
         fields.get(position).map(|f| Indirection {
             base: BaseKind::Tuple,
             position,
-            target_ty: Ty::new(f.ty.clone()),
+            target_ty: f.ty.clone(),
         })
     } else {
         None
@@ -155,7 +155,7 @@ fn lookup_name_in_domain(fields: &[pr::TyDomainTupleField], name: &str) -> Optio
             return Some(Indirection {
                 base: BaseKind::Tuple,
                 position,
-                target_ty: Ty::new(field.ty.clone()),
+                target_ty: field.ty.clone(),
             });
         }
     }

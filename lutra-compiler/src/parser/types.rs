@@ -21,7 +21,7 @@ pub(crate) fn type_expr() -> impl Parser<TokenKind, Ty, Error = PError> + Clone 
 
         let func = keyword("func")
             .ignore_then(
-                type_params()
+                type_params(nested_type_expr.clone())
                     .then(func_params)
                     .then_ignore(ctrl(':'))
                     .then(nested_type_expr.clone().map(Box::new).map(Some))
@@ -141,11 +141,13 @@ fn primitive_set() -> impl Parser<TokenKind, TyPrimitive, Error = PError> {
     }
 }
 
-pub fn type_params() -> impl Parser<TokenKind, Vec<TyParam>, Error = PError> + Clone {
+pub fn type_params<'a>(
+    ty: impl Parser<TokenKind, Ty, Error = PError> + 'a,
+) -> impl Parser<TokenKind, Vec<TyParam>, Error = PError> + Clone + 'a {
     let tuple = ident_part()
         .then_ignore(ctrl('='))
         .or_not()
-        .then(primitive_set())
+        .then(ty)
         .map(|(name, ty)| TyDomainTupleField { name, ty })
         .separated_by(ctrl(','))
         .then_ignore(ctrl(',').then(just(TokenKind::Range)))
