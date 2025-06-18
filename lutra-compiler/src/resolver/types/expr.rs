@@ -45,7 +45,7 @@ impl fold::PrFold for super::TypeResolver<'_> {
                     Named::Scoped(scoped) => match scoped {
                         ScopedKind::Param { ty } => ty.clone(),
                         ScopedKind::Local { ty } => ty.clone(),
-                        ScopedKind::TypeParam { .. } | ScopedKind::TypeArg { .. } => {
+                        ScopedKind::TyParam { .. } | ScopedKind::TyVar { .. } => {
                             return Err(Diagnostic::new_custom(
                                 "expected a value, but found a type",
                             )
@@ -62,7 +62,7 @@ impl fold::PrFold for super::TypeResolver<'_> {
                         return Ok(r);
                     }
                 };
-                let (ty, ty_args) = self.introduce_ty_into_scope(ty);
+                let (ty, ty_args) = self.introduce_ty_into_scope(ty, span);
                 pr::Expr {
                     kind: pr::ExprKind::Ident(ident),
                     ty: Some(ty),
@@ -188,7 +188,7 @@ impl fold::PrFold for super::TypeResolver<'_> {
             // open a new scope for functions
             pr::TyKind::Func(ty_func) if self.scopes.is_empty() => {
                 let mut scope = Scope::new(ty.scope_id.unwrap());
-                scope.insert_generics_params(&ty_func.ty_params);
+                scope.insert_type_params(&ty_func.ty_params);
                 self.scopes.push(scope);
                 let ty_func = fold::fold_ty_func(self, ty_func)?;
                 self.scopes.pop();

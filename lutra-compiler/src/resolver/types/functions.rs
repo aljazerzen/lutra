@@ -21,7 +21,7 @@ impl TypeResolver<'_> {
         let mut scope = Scope::new(scope_id);
 
         // prepare generic arguments
-        scope.insert_generics_params(&func.ty_params);
+        scope.insert_type_params(&func.ty_params);
         self.scopes.push(scope);
 
         // fold types
@@ -40,12 +40,16 @@ impl TypeResolver<'_> {
 
         tracing::debug!("func done, popping scope");
 
-        // pop the scope
-        let scope = self.scopes.pop().unwrap();
-
         // finalize generic type args
-        let mapping = scope.finalize_type_args().with_span(func.body.span)?;
+        let mapping = self
+            .finalize_type_vars()
+            .with_span_fallback(func.body.span)?;
         let func = utils::TypeReplacer::on_func(*func, mapping);
+
+        // pop the scope
+        self.scopes.pop().unwrap();
+
+        tracing::debug!("scope finalized");
 
         Ok(Box::new(func))
     }

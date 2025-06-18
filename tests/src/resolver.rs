@@ -69,7 +69,7 @@ fn types_03() {
         let floor = func <T> (x: T) -> floor_64(x)
 
         func () -> floor(4.4)
-    "#), @r#"
+    "#), @r"
     [E0004] Error: 
        ╭─[:4:49]
        │
@@ -77,7 +77,7 @@ fn types_03() {
        │                                                 ┬  
        │                                                 ╰── function floor_64, one of the params expected type `float64`, but found type `T`
     ───╯
-    "#);
+    ");
 }
 #[test]
 fn types_05() {
@@ -132,7 +132,7 @@ fn types_08() {
 fn types_09() {
     insta::assert_snapshot!(_test_err(r#"
         let peek: func <T> (array: [T], condition: func <R> (T): R): [T]
-    "#), @r#"
+    "#), @r"
     Error: 
        ╭─[:2:58]
        │
@@ -140,7 +140,7 @@ fn types_09() {
        │                                                          ┬  
        │                                                          ╰── generic type parameters are not allowed here
     ───╯
-    "#);
+    ");
 }
 #[test]
 fn types_10() {
@@ -183,15 +183,15 @@ fn types_13() {
     insta::assert_snapshot!(_test_err(r#"
         let floor: func <T: float32 | float64> (x: T): T
         func () -> floor(false)
-    "#), @r#"
+    "#), @r"
     [E0005] Error: 
-       ╭─[:3:26]
+       ╭─[:3:20]
        │
      3 │         func () -> floor(false)
-       │                          ──┬──  
-       │                            ╰──── T is restricted to one of float32, float64, found bool
+       │                    ──────┬─────  
+       │                          ╰─────── T is restricted to one of float32, float64, found bool
     ───╯
-    "#);
+    ");
 }
 #[test]
 fn types_14() {
@@ -203,7 +203,7 @@ fn types_14() {
             floor_64(x)
         )
         func () -> floor(2.3)
-    "#), @r#"
+    "#), @r"
     [E0004] Error: 
        ╭─[:4:22]
        │
@@ -211,7 +211,7 @@ fn types_14() {
        │                      ┬  
        │                      ╰── function floor_64, one of the params expected type `float64`, but found type `T`
     ───╯
-    "#);
+    ");
 
     insta::assert_snapshot!(_test_run(r#"
         let floor: func <F: float32 | float64> (x: F): F
@@ -229,15 +229,15 @@ fn types_14() {
         let floor: func <F: float32 | float64> (x: F): F
         let twice_floored = func <T: float64 | bool> (x: T) -> {floor(x), floor(x)}
         func () -> twice_floored(2.3)
-    "#), @r#"
+    "#), @r"
     [E0005] Error: 
-       ╭─[:3:71]
+       ╭─[:3:64]
        │
      3 │         let twice_floored = func <T: float64 | bool> (x: T) -> {floor(x), floor(x)}
-       │                                                                       ┬  
-       │                                                                       ╰── T is restricted to one of float32, float64, found bool
+       │                                                                ──────────┬─────────  
+       │                                                                          ╰─────────── T is restricted to one of float32, float64, found bool
     ───╯
-    "#);
+    ");
 }
 #[test]
 fn types_15() {
@@ -250,7 +250,7 @@ fn types_15() {
     insta::assert_snapshot!(_test_err(r#"
         let get_b: func <T: {b = int64, ..}> (x: T): T
         func () -> get_b({a = false, b = 4.6})
-    "#), @r#"
+    "#), @r"
     [E0005] Error: 
        ╭─[:3:42]
        │
@@ -258,19 +258,19 @@ fn types_15() {
        │                                          ─┬─  
        │                                           ╰─── T.b is restricted to int64
     ───╯
-    "#);
+    ");
     insta::assert_snapshot!(_test_err(r#"
         let get_b: func <T: {b = int64, ..}> (x: T): T
         func () -> get_b({a = false, c = 4})
-    "#), @r#"
+    "#), @r"
     [E0005] Error: 
-       ╭─[:3:26]
+       ╭─[:3:20]
        │
      3 │         func () -> get_b({a = false, c = 4})
-       │                          ─────────┬────────  
-       │                                   ╰────────── T is restricted to tuples with a field named `b`
+       │                    ────────────┬────────────  
+       │                                ╰────────────── T is restricted to tuples with a field named `b`
     ───╯
-    "#);
+    ");
 }
 #[test]
 fn types_16() {
@@ -283,7 +283,7 @@ fn types_16() {
     insta::assert_snapshot!(_test_err(r#"
         let get_b: func <T: {bool, int64, ..}> (x: T): T
         func () -> get_b({a = 7, 4, c = 5.7})
-    "#), @r#"
+    "#), @r"
     [E0005] Error: 
        ╭─[:3:31]
        │
@@ -291,20 +291,20 @@ fn types_16() {
        │                               ┬  
        │                               ╰── T.0 is restricted to bool
     ───╯
-    "#);
+    ");
 
     insta::assert_snapshot!(_test_err(r#"
         let get_b: func <T: {bool, int64, a = bool, ..}> (x: T): T
         func () -> get_b({a = false})
-    "#), @r#"
+    "#), @r"
     [E0005] Error: 
-       ╭─[:3:26]
+       ╭─[:3:20]
        │
      3 │         func () -> get_b({a = false})
-       │                          ─────┬─────  
-       │                               ╰─────── T is restricted to tuples with at least 2 fields
+       │                    ─────────┬────────  
+       │                             ╰────────── T is restricted to tuples with at least 2 fields
     ───╯
-    "#);
+    ");
     insta::assert_snapshot!(_test_run(r#"
         let get_b: func <T: {bool, int64, a = bool, ..}> (x: T): T
         func () -> get_b({a = false, 4})
@@ -319,7 +319,7 @@ fn types_17() {
         let get_int: func (x: {int64}): int64
         let get = func <T: {int64, ..}> (x: T): T -> get_int(x)
         func () -> get({4})
-    "#), @r#"
+    "#), @r"
     [E0004] Error: 
        ╭─[:3:62]
        │
@@ -327,13 +327,13 @@ fn types_17() {
        │                                                              ┬  
        │                                                              ╰── function get_int, one of the params expected type `{int64}`, but found type `T`
     ───╯
-    "#);
+    ");
 
     insta::assert_snapshot!(_test_err(r#"
         let get_int: func (x: {a = int64}): int64
         let get = func <T: {a = int64, ..}> (x: T): T -> get_int(x)
         func () -> get({4})
-    "#), @r#"
+    "#), @r"
     [E0004] Error: 
        ╭─[:3:66]
        │
@@ -341,21 +341,21 @@ fn types_17() {
        │                                                                  ┬  
        │                                                                  ╰── function get_int, one of the params expected type `{a = int64}`, but found type `T`
     ───╯
-    "#);
+    ");
 
     insta::assert_snapshot!(_test_err(r#"
         let needs_two: func <I: {int64, bool, ..}> (x: I): int64
-        let needs_one = func <T: {int64, ..}> (x: T): T -> needs_two(x)
+        let needs_one = func <T: {int64, ..}> (x: T): int64 -> needs_two(x)
         func () -> needs_one({4})
-    "#), @r#"
+    "#), @r"
     [E0005] Error: 
-       ╭─[:3:70]
+       ╭─[:3:64]
        │
-     3 │         let needs_one = func <T: {int64, ..}> (x: T): T -> needs_two(x)
-       │                                                                      ┬  
-       │                                                                      ╰── I is restricted to tuples with at least 2 fields
+     3 │         let needs_one = func <T: {int64, ..}> (x: T): int64 -> needs_two(x)
+       │                                                                ──────┬─────  
+       │                                                                      ╰─────── I is restricted to tuples with at least 2 fields
     ───╯
-    "#);
+    ");
 
     insta::assert_snapshot!(_test_run(r#"
         let needs_one: func <I: {int64, ..}> (x: I): I
@@ -408,8 +408,8 @@ fn empty_array_01() {
        ╭─[:1:12]
        │
      1 │ func () -> std::lag([], 1)
-       │            ───────┬───────  
-       │                   ╰───────── cannot infer type of T
+       │            ────┬───  
+       │                ╰───── cannot infer type of T
     ───╯
     "
     );
@@ -422,6 +422,24 @@ fn empty_array_02() {
             "func (): [int64] -> std::lag([], 1)"
         ),
         @"[int64]"
+    );
+}
+
+#[test]
+fn empty_array_03() {
+    insta::assert_snapshot!(
+        _test_err(
+            "func () -> {false, [], true}"
+        ),
+        @r"
+    Error: 
+       ╭─[:1:20]
+       │
+     1 │ func () -> {false, [], true}
+       │                    ─┬  
+       │                     ╰── cannot infer type
+    ───╯
+    "
     );
 }
 
@@ -441,7 +459,7 @@ fn type_annotation_01() {
         _test_err(
             "func () -> 5: text"
         ),
-        @r#"
+        @r"
     [E0004] Error: 
        ╭─[:1:12]
        │
@@ -449,7 +467,7 @@ fn type_annotation_01() {
        │            ┬  
        │            ╰── expected type `text`, but found type `int64`
     ───╯
-    "#
+    "
     );
 }
 
@@ -537,7 +555,7 @@ fn enums_03() {
             type X = { a = int, b = X::a }
             "#
         ),
-        @r#"
+        @r"
     Error: 
        ╭─[:2:37]
        │
@@ -545,7 +563,7 @@ fn enums_03() {
        │                                     ──┬─  
        │                                       ╰─── paths into self type are not allowed
     ───╯
-    "#
+    "
     );
 }
 
@@ -637,7 +655,7 @@ fn match_03() {
           Color::Green => 1,
           Color::Blue => false,
         }
-    "#), @r#"
+    "#), @r"
     [E0004] Error: 
        ╭─[:6:27]
        │
@@ -645,7 +663,7 @@ fn match_03() {
        │                           ┬  
        │                           ╰── match expected type `text`, but found type `int64`
     ───╯
-    "#);
+    ");
 }
 
 #[test]

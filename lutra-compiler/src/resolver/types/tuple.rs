@@ -30,8 +30,8 @@ impl super::TypeResolver<'_> {
 
         let base = match base_ref {
             scope::TyRef::Ty(b) => b,
-            scope::TyRef::Param(id, _) => {
-                let param = self.get_ty_param(id);
+            scope::TyRef::Param(id) => {
+                let (_, param) = self.get_ty_param(id);
                 return match param {
                     pr::TyParamDomain::Open | pr::TyParamDomain::OneOf(_) => {
                         Err(Diagnostic::new_custom(format!(
@@ -49,7 +49,7 @@ impl super::TypeResolver<'_> {
                         }),
                 };
             }
-            scope::TyRef::Arg(s, o, _) => {
+            scope::TyRef::Var(s, o) => {
                 todo!("tuple indirection into generic type Arg: {s}.{o}")
             }
         };

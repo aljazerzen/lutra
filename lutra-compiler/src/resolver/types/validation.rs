@@ -4,13 +4,15 @@ use std::collections::HashMap;
 use crate::diagnostic::{Diagnostic, DiagnosticCode, WithErrorInfo};
 use crate::pr::{self, *};
 use crate::printer;
+use crate::resolver::types::scope;
 use crate::Result;
 
 use super::scope::TyRef;
 use super::TypeResolver;
 
 impl TypeResolver<'_> {
-    /// Validates that found node has expected type. Returns assumed type of the node.
+    /// Validates that a found expr has an expected type.
+    /// Might infer type variable constraints, that need to be finalized later.
     pub fn validate_expr_type<F>(
         &mut self,
         found: &mut pr::Expr,
@@ -30,7 +32,8 @@ impl TypeResolver<'_> {
             .with_span_fallback(found.span)
     }
 
-    /// Validates that found node has expected type. Returns assumed type of the node.
+    /// Validates that a type of a found node has an expected type.
+    /// Might infer type variable constraints, that need to be finalized later.
     pub fn validate_type<F>(&mut self, found: &Ty, expected: &Ty, who: &F) -> Result<(), Diagnostic>
     where
         F: Fn() -> Option<String>,
@@ -48,79 +51,66 @@ impl TypeResolver<'_> {
         let found_ref = self.get_ty_mat(found)?;
         let expected_ref = self.get_ty_mat(expected)?;
 
-        let (found, expected) = match (found_ref, expected_ref) {
-            // base case: neither found or expected are generic
-            (TyRef::Ty(f), TyRef::Ty(e)) => (f.into_owned(), e.into_owned()),
+        match (found_ref, expected_ref) {
+            // base case: both types are concrete types, check for compatibility
+            (TyRef::Ty(f), TyRef::Ty(e)) => {
+                self.validate_type_material(f.into_owned(), e.into_owned(), who)?
+            }
 
             // type params
-            (TyRef::Param(_, _), TyRef::Ty(expected)) => {
+            (TyRef::Ty(..), TyRef::Param(..)) => {
+                // validate that a found concrete type is a type parameter - which is never true.
+                // example:
+                //     func <T> () -> (false: T)
+                // This *could* be true, if `T` would have domain of `OneOf(bool)`, but such domains
+                // don't make sense and we don't need to add special cases for them.
+                return Err(compose_type_error(found, expected, who));
+            }
+            (TyRef::Param(..), TyRef::Ty(expected)) => {
+                // validate that a type parameter is an concrete type - which is never true.
+                // example:
+                //     func <T> (x: T) -> (x: int64)
                 return Err(compose_type_error(found, &expected, who));
             }
-            (TyRef::Param(param_id, param_name), TyRef::Arg(_, arg_id, arg_name)) => {
-                // validate
-                let scope = self.scopes.last().unwrap();
-                let ty_param = self.get_ty_param(param_id);
-                let ty_arg = scope.get_ty_arg(&arg_id);
-                self.validate_type_domains(
-                    ty_param,
-                    &ty_arg.domain,
-                    &param_name,
-                    arg_name.as_deref(),
-                )?;
-
-                // infer
-                let scope = self.scopes.last_mut().unwrap();
-                scope.infer_type_arg(&arg_id, found.clone());
-                return Ok(());
-            }
-            (TyRef::Param(found_id, _), TyRef::Param(expected_id, _)) => {
-                return if found_id == expected_id {
-                    Ok(())
-                } else {
-                    Err(compose_type_error(found, expected, who))
-                };
-            }
-
-            // I don't know how to construct a test case for this
-            (found, TyRef::Param(expected_id, _)) => {
-                todo!("found={found:?} expected={expected_id}")
-            }
-
-            // type args
-            (TyRef::Ty(ty), TyRef::Arg(_, ty_arg_id, ty_arg_name))
-            | (TyRef::Arg(_, ty_arg_id, ty_arg_name), TyRef::Ty(ty)) => {
-                let ty = ty.into_owned();
-
-                // validate
-                let scope = self.scopes.last().unwrap();
-                let ty_arg = scope.get_ty_arg(&ty_arg_id);
-                self.validate_type_domain(&ty, &ty_arg.domain, ty_arg_name.as_deref())?;
-
-                // infer
-                let scope = self.scopes.last_mut().unwrap();
-                scope.infer_type_arg(&ty_arg_id, ty);
-                return Ok(());
-            }
-            (TyRef::Arg(_, a_id, a_name), TyRef::Arg(_, b_id, b_name)) => {
-                // validate
-                let scope = self.scopes.last().unwrap();
-                let a = scope.get_ty_arg(&a_id);
-                let b = scope.get_ty_arg(&b_id);
-                if let Some(a_inferred) = a.inferred.get() {
-                    self.validate_type_domain(a_inferred, &b.domain, a_name.as_deref())?;
+            (TyRef::Param(found_id), TyRef::Param(expected_id)) => {
+                if found_id != expected_id {
+                    return Err(compose_type_error(found, expected, who));
                 }
-                if let Some(b_inferred) = b.inferred.get() {
-                    self.validate_type_domain(b_inferred, &a.domain, b_name.as_deref())?;
-                }
+            }
 
-                // infer
-                let scope = self.scopes.last_mut().unwrap();
-                scope.infer_type_args_equal(a_id, b_id);
+            // type vars
+            (TyRef::Ty(ty), TyRef::Var(_, var_id)) | (TyRef::Var(_, var_id), TyRef::Ty(ty)) => {
+                let scope = self.scopes.last().unwrap();
+                scope.infer_type_var(var_id, ty.into_owned());
+            }
+            (TyRef::Var(_, a_id), TyRef::Var(_, b_id)) => {
+                let scope = self.scopes.last().unwrap();
+                scope.infer_type_vars_equal(a_id, b_id);
+            }
+            (TyRef::Param(..), TyRef::Var(_, var_id)) => {
+                // example:
+                //     func <T> (x: T) -> twice(x)
+                // (twice will create a type var for its arg)
 
-                return Ok(());
+                let scope = self.scopes.last().unwrap();
+                scope.infer_type_var(var_id, found.clone());
+            }
+            (TyRef::Var(_, var_id), TyRef::Param(..)) => {
+                // example:
+                //     func <T> () -> []: [T]
+                // (empty array creates a type var and type annotations triggers validation against the param)
+
+                let scope = self.scopes.last().unwrap();
+                scope.infer_type_var(var_id, expected.clone());
             }
         };
+        Ok(())
+    }
 
+    fn validate_type_material<F>(&mut self, found: Ty, expected: Ty, who: &F) -> crate::Result<()>
+    where
+        F: Fn() -> Option<String>,
+    {
         match (&found.kind, &expected.kind) {
             (TyKind::Ident(_), _) | (_, TyKind::Ident(_)) => unreachable!(),
 
@@ -214,13 +204,146 @@ impl TypeResolver<'_> {
         }
     }
 
+    pub fn finalize_type_vars(&mut self) -> crate::Result<HashMap<pr::Ref, pr::Ty>> {
+        fn finalize_var(
+            known: &mut HashMap<usize, pr::Ty>,
+            id: usize,
+            ty: pr::Ty,
+        ) -> crate::Result<()> {
+            use std::collections::hash_map::Entry;
+
+            let entry = known.entry(id);
+            match entry {
+                Entry::Occupied(existing) => {
+                    if existing.get() != &ty {
+                        return Err(Diagnostic::new_custom(format!(
+                            "incompatible types: {} and {}",
+                            printer::print_ty(existing.get()),
+                            printer::print_ty(&ty)
+                        )));
+                    }
+                }
+                Entry::Vacant(entry) => {
+                    entry.insert(ty);
+                }
+            }
+            Ok(())
+        }
+
+        let mut known_types = HashMap::new();
+        let mut constraints = {
+            let scope = self.scopes.last_mut().unwrap();
+            scope.ty_var_constraints.take()
+        };
+        while !constraints.is_empty() {
+            let mut remaining_constraints = Vec::with_capacity(constraints.len());
+
+            let len = constraints.len();
+            for constraint in constraints {
+                match constraint {
+                    scope::TyVarConstraint::IsTy(id, ty) => {
+                        finalize_var(&mut known_types, id, ty)?;
+                    }
+                    scope::TyVarConstraint::Equals(a, b) => {
+                        if let Some(ty) = known_types.get(&a).cloned() {
+                            finalize_var(&mut known_types, b, ty)?;
+                        } else if let Some(ty) = known_types.get(&b).cloned() {
+                            finalize_var(&mut known_types, a, ty)?;
+                        } else {
+                            remaining_constraints.push(constraint);
+                        }
+                    }
+                    scope::TyVarConstraint::InDomain(ref id, ref domain) => {
+                        if let Some(ty) = known_types.get(id) {
+                            let var = self.get_ty_var(*id);
+                            self.validate_type_domain(ty, domain, var.name_hint.as_deref())?;
+                        } else {
+                            remaining_constraints.push(constraint);
+                        }
+                    }
+                }
+            }
+            constraints = remaining_constraints;
+
+            if len == constraints.len() {
+                // no constraints were enforced in this loop, error out
+                break;
+            }
+        }
+
+        let mut mapping = HashMap::new();
+        let mut errors = Vec::new();
+
+        let scope = self.scopes.last().unwrap();
+        for (offset, scoped) in scope.names.iter().enumerate() {
+            let scope::ScopedKind::TyVar(var) = scoped else {
+                continue;
+            };
+
+            let Some(ty) = known_types.get(&offset) else {
+                errors.push(
+                    Diagnostic::new_custom(if let Some(name_hint) = &var.name_hint {
+                        format!("cannot infer type of {name_hint}")
+                    } else {
+                        "cannot infer type".into()
+                    })
+                    .with_span(var.span),
+                );
+                continue;
+            };
+
+            mapping.insert(
+                pr::Ref::Local {
+                    scope: scope.id,
+                    offset,
+                },
+                ty.clone(),
+            );
+        }
+
+        if !constraints.is_empty() {
+            for c in constraints {
+                tracing::debug!("cannot enforce ty var constraint: {c:?}");
+            }
+            if errors.is_empty() {
+                errors.push(
+                    Diagnostic::new_custom("cannot infer types")
+                        .push_hint("this is a bad error message, it should be improved"),
+                );
+            }
+        }
+
+        if !errors.is_empty() {
+            for e in &errors[1..] {
+                tracing::error!("hidden diagnostic: {e:?}");
+            }
+            return Err(errors.into_iter().next().unwrap());
+        }
+
+        if !mapping.is_empty() {
+            tracing::debug!("finalized scope: {mapping:#?}");
+        }
+        Ok(mapping)
+    }
+
     /// Validates that a type is an a domain of a type param.
     pub fn validate_type_domain(
         &self,
         ty: &Ty,
         domain: &TyParamDomain,
-        arg_name: Option<&str>,
+        var_name: Option<&str>,
     ) -> Result<(), Diagnostic> {
+        let ty_ref = self.get_ty_mat(ty)?;
+        let ty = match ty_ref {
+            TyRef::Ty(cow) => cow,
+            TyRef::Param(param_id) => {
+                let (found_name, found) = self.get_ty_param(param_id);
+                self.validate_type_domains(found, domain, found_name, var_name)?;
+                return Ok(());
+            }
+            TyRef::Var(_, _) => unreachable!(""),
+        };
+
         match domain {
             TyParamDomain::Open => Ok(()),
 
@@ -236,8 +359,8 @@ impl TypeResolver<'_> {
                     return Err(Diagnostic::new(
                         format!(
                             "{} one of {possible_tys}, found {}",
-                            msg_restricted_to(arg_name, None),
-                            printer::print_ty(ty)
+                            msg_restricted_to(var_name, None),
+                            printer::print_ty(&ty)
                         ),
                         DiagnosticCode::TYPE_DOMAIN,
                     ));
@@ -251,8 +374,8 @@ impl TypeResolver<'_> {
                     return Err(Diagnostic::new(
                         format!(
                             "{} to tuples, found {}",
-                            msg_restricted_to(arg_name, None),
-                            printer::print_ty(ty)
+                            msg_restricted_to(var_name, None),
+                            printer::print_ty(&ty)
                         ),
                         DiagnosticCode::TYPE_DOMAIN,
                     ));
@@ -277,7 +400,7 @@ impl TypeResolver<'_> {
                                 Diagnostic::new(
                                     format!(
                                         "{} tuples with a field named `{name}`",
-                                        msg_restricted_to(arg_name, None)
+                                        msg_restricted_to(var_name, None)
                                     ),
                                     DiagnosticCode::TYPE_DOMAIN,
                                 )
@@ -291,7 +414,7 @@ impl TypeResolver<'_> {
                                 Diagnostic::new(
                                     format!(
                                         "{} tuples with at least {num_positional} fields",
-                                        msg_restricted_to(arg_name, None)
+                                        msg_restricted_to(var_name, None)
                                     ),
                                     DiagnosticCode::TYPE_DOMAIN,
                                 )
@@ -303,7 +426,7 @@ impl TypeResolver<'_> {
                         return Err(Diagnostic::new(
                             format!(
                                 "{} primitive types",
-                                msg_restricted_to(arg_name, Some(&ind_display))
+                                msg_restricted_to(var_name, Some(&ind_display))
                             ),
                             DiagnosticCode::TYPE_DOMAIN,
                         )
@@ -315,7 +438,7 @@ impl TypeResolver<'_> {
                         return Err(Diagnostic::new(
                             format!(
                                 "{} {}",
-                                msg_restricted_to(arg_name, Some(&ind_display)),
+                                msg_restricted_to(var_name, Some(&ind_display)),
                                 domain_field.ty
                             ),
                             DiagnosticCode::TYPE_DOMAIN,

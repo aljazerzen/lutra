@@ -1,39 +1,72 @@
 use std::borrow::Cow;
-use std::cell::OnceCell;
+use std::cell::RefCell;
 use std::collections::HashMap;
-use std::rc::Rc;
 
 use itertools::Itertools;
 
 use crate::diagnostic::{Diagnostic, WithErrorInfo};
-use crate::pr::{self, Path, TyParamDomain};
+use crate::pr;
 use crate::resolver::module::ExprOrTy;
-use crate::{printer, utils, Result};
+use crate::{printer, utils};
+use crate::{Result, Span};
 
 use super::TypeResolver;
 
 #[derive(Debug)]
 pub struct Scope {
-    pub id: usize,
-    names: Vec<ScopedKind>,
+    pub(super) id: usize,
+    pub(super) names: Vec<ScopedKind>,
+
+    pub(super) ty_var_constraints: RefCell<Vec<TyVarConstraint>>,
 }
 
 #[derive(Debug, Clone, enum_as_inner::EnumAsInner)]
 pub enum ScopedKind {
-    Param { ty: pr::Ty },
-    Local { ty: pr::Ty },
-    TypeParam { name: String, domain: TyParamDomain },
-    TypeArg(TyArg),
+    Param {
+        ty: pr::Ty,
+    },
+    Local {
+        ty: pr::Ty,
+    },
+
+    /// Type parameter to a function.
+    ///
+    /// For example, `T` is a type param:
+    /// ```lt
+    /// let twice = func <T> (x: T): {T, T} -> {x: T, x}
+    /// ```
+    TyParam {
+        name: String,
+        domain: pr::TyParamDomain,
+    },
+
+    /// Type variable - something that we don't yet know the type of,
+    /// but we will (probably) be able to infer it later on.
+    ///
+    /// For example, here:
+    /// ```lt
+    /// let x: int32 = 5
+    /// ```
+    /// ... `5` is initially assigned a type variable. Later on, when validating
+    /// the type annotation, it infer that it must be `int32`.
+    TyVar(TyVar),
 }
+
+pub type TyVarId = usize;
 
 #[derive(Debug, Clone)]
-pub struct TyArg {
+pub struct TyVar {
     pub name_hint: Option<String>,
-    pub domain: TyParamDomain,
-    pub inferred: Rc<OnceCell<pr::Ty>>,
+
+    pub span: Option<Span>,
 }
 
-pub type TyArgId = usize;
+#[derive(Debug)]
+pub enum TyVarConstraint {
+    IsTy(TyVarId, pr::Ty),
+    Equals(TyVarId, TyVarId),
+    InDomain(TyVarId, pr::TyParamDomain),
+}
 
 #[derive(Debug, strum::AsRefStr)]
 pub enum Named<'a> {
@@ -43,11 +76,17 @@ pub enum Named<'a> {
     EnumVariant(&'a pr::Ty, usize),
 }
 
+/// A reference to a type-like objects
 #[derive(Debug, Clone)]
 pub enum TyRef<'a> {
+    /// Concrete type
     Ty(Cow<'a, pr::Ty>),
-    Param(usize, Cow<'a, str>),
-    Arg(usize, usize, Option<Cow<'a, str>>),
+
+    /// Reference to type param. Contains offset in scope and name.
+    Param(usize),
+
+    /// Reference to type variable. Contains scope id, offset in scope and name hint.
+    Var(usize, usize),
 }
 
 impl<'a> TyRef<'a> {
@@ -55,8 +94,8 @@ impl<'a> TyRef<'a> {
     fn into_owned(self) -> TyRef<'static> {
         match self {
             TyRef::Ty(v) => TyRef::Ty(Cow::Owned(v.as_ref().clone())),
-            TyRef::Param(v, n) => TyRef::Param(v, Cow::Owned(n.as_ref().to_string())),
-            TyRef::Arg(s, o, n) => TyRef::Arg(s, o, n.map(|n| Cow::Owned(n.as_ref().to_string()))),
+            TyRef::Param(v) => TyRef::Param(v),
+            TyRef::Var(s, o) => TyRef::Var(s, o),
         }
     }
 }
@@ -66,12 +105,13 @@ impl Scope {
         Self {
             id,
             names: Vec::new(),
+            ty_var_constraints: RefCell::new(Vec::new()),
         }
     }
 
-    pub fn insert_generics_params(&mut self, type_params: &[pr::TyParam]) {
+    pub fn insert_type_params(&mut self, type_params: &[pr::TyParam]) {
         for gtp in type_params {
-            let scoped = ScopedKind::TypeParam {
+            let scoped = ScopedKind::TyParam {
                 name: gtp.name.clone(),
                 domain: gtp.domain.clone(),
             };
@@ -92,16 +132,19 @@ impl Scope {
         Ok(())
     }
 
-    pub fn insert_generic_arg(&mut self, name_hint: Option<String>, domain: TyParamDomain) {
-        let empty = Rc::new(OnceCell::new());
+    pub fn insert_type_var(
+        &mut self,
+        name_hint: Option<String>,
+        span: Option<Span>,
+        domain: pr::TyParamDomain,
+    ) {
+        let var_id = self.names.len();
+        let type_arg = TyVar { name_hint, span };
 
-        let type_arg = TyArg {
-            name_hint,
-            domain,
-            inferred: empty,
-        };
-
-        self.names.push(ScopedKind::TypeArg(type_arg));
+        self.names.push(ScopedKind::TyVar(type_arg));
+        self.ty_var_constraints
+            .borrow_mut()
+            .push(TyVarConstraint::InDomain(var_id, domain))
     }
 
     pub fn insert_local(&mut self, ty: pr::Ty) {
@@ -110,66 +153,26 @@ impl Scope {
         self.names.push(local);
     }
 
-    pub fn get_ty_arg<'a>(&'a self, id: &TyArgId) -> &'a TyArg {
-        let ScopedKind::TypeArg(arg) = self.names.get(*id).unwrap() else {
-            panic!()
-        };
-        arg
-    }
-
-    fn get_ty_arg_mut<'a>(&'a mut self, id: &TyArgId) -> &'a mut TyArg {
-        let ScopedKind::TypeArg(arg) = self.names.get_mut(*id).unwrap() else {
-            panic!()
-        };
-        arg
-    }
-
-    pub fn infer_type_arg(&mut self, id: &TyArgId, ty: pr::Ty) {
+    pub fn infer_type_var(&self, id: TyVarId, ty: pr::Ty) {
         tracing::debug!("inferring {id:?} is {ty:?}");
-        let type_arg = self.get_ty_arg(id);
-        type_arg.inferred.set(ty).unwrap();
+
+        let mut constraints = self.ty_var_constraints.borrow_mut();
+        constraints.push(TyVarConstraint::IsTy(id, ty));
     }
 
-    pub fn infer_type_args_equal(&mut self, a: TyArgId, b: TyArgId) {
+    #[allow(dead_code)]
+    pub fn infer_type_var_in_domain(&self, id: TyVarId, domain: pr::TyParamDomain) {
+        tracing::debug!("inferring {id:?} in domain {domain:?}");
+
+        let mut constraints = self.ty_var_constraints.borrow_mut();
+        constraints.push(TyVarConstraint::InDomain(id, domain));
+    }
+
+    pub fn infer_type_vars_equal(&self, a: TyVarId, b: TyVarId) {
         tracing::debug!("inferring equality between {a:?} and {b:?}");
-        let a_arg = self.get_ty_arg(&a);
-        let a_cell = Rc::clone(&a_arg.inferred);
 
-        let b_arg = self.get_ty_arg_mut(&b);
-        assert!(b_arg.inferred.get().is_none());
-        b_arg.inferred = a_cell;
-    }
-
-    pub fn finalize_type_args(self) -> crate::Result<HashMap<pr::Ref, pr::Ty>> {
-        let mut mapping = HashMap::new();
-
-        for (offset, scoped) in self.names.iter().enumerate() {
-            let ScopedKind::TypeArg(arg) = scoped else {
-                continue;
-            };
-
-            let Some(ty) = arg.inferred.get() else {
-                return Err(Diagnostic::new_custom(
-                    if let Some(name_hint) = &arg.name_hint {
-                        format!("cannot infer type of {name_hint}")
-                    } else {
-                        "cannot infer type".into()
-                    },
-                ));
-            };
-
-            mapping.insert(
-                pr::Ref::Local {
-                    scope: self.id,
-                    offset,
-                },
-                ty.clone(),
-            );
-        }
-        if !mapping.is_empty() {
-            tracing::debug!("finalized scope: {mapping:#?}");
-        }
-        Ok(mapping)
+        let mut constraints = self.ty_var_constraints.borrow_mut();
+        constraints.push(TyVarConstraint::Equals(a, b));
     }
 }
 
@@ -214,12 +217,16 @@ impl TypeResolver<'_> {
         }
     }
 
-    pub fn get_ty_param(&self, param_id: usize) -> &TyParamDomain {
+    pub fn get_ty_param(&self, param_id: usize) -> (&String, &pr::TyParamDomain) {
         let scope = self.scopes.last().unwrap();
         let scoped = scope.names.get(param_id).unwrap();
-        let (_, domain) = scoped.as_type_param().unwrap();
+        scoped.as_ty_param().unwrap()
+    }
 
-        domain
+    pub fn get_ty_var(&self, id: TyVarId) -> &TyVar {
+        let scope = self.scopes.last().unwrap();
+        let scoped = scope.names.get(id).unwrap();
+        scoped.as_ty_var().unwrap()
     }
 
     /// Resolves if type is an ident. Does not recurse.
@@ -258,23 +265,10 @@ impl TypeResolver<'_> {
                             .push_hint(format!("got local var of type `{}`", printer::print_ty(ty)))
                             .with_span(ty.span))
                     }
-                    ScopedKind::TypeParam { name, .. } => {
-                        Ok(TyRef::Param(*offset, Cow::Borrowed(name)))
-                    }
-                    ScopedKind::TypeArg(arg) => {
-                        if let Some(ty) = arg.inferred.get() {
-                            // type arg already inferred a type: use that
-
-                            // but first, recurse!
-                            self.get_ty_mat(ty)
-                        } else {
-                            // return type arg
-                            Ok(TyRef::Arg(
-                                *scope,
-                                *offset,
-                                arg.name_hint.as_ref().map(|n| Cow::Borrowed(n.as_str())),
-                            ))
-                        }
+                    ScopedKind::TyParam { .. } => Ok(TyRef::Param(*offset)),
+                    ScopedKind::TyVar(_) => {
+                        // return type arg
+                        Ok(TyRef::Var(*scope, *offset))
                     }
                 }
             }
@@ -287,7 +281,11 @@ impl TypeResolver<'_> {
     }
 
     /// Add type's params into scope as type arguments.
-    pub fn introduce_ty_into_scope(&mut self, ty: pr::Ty) -> (pr::Ty, Vec<pr::Ty>) {
+    pub fn introduce_ty_into_scope(
+        &mut self,
+        ty: pr::Ty,
+        span: Option<Span>,
+    ) -> (pr::Ty, Vec<pr::Ty>) {
         let pr::TyKind::Func(mut ty_func) = ty.kind else {
             return (ty, Vec::new());
         };
@@ -321,7 +319,7 @@ impl TypeResolver<'_> {
 
             let mut ty_arg_ident = pr::Ty::new(
                 // path does matter here, it is just for error messages
-                Path::new(vec![gtp.name.clone()]),
+                pr::Path::new(vec![gtp.name.clone()]),
             );
             let offset = scope.names.len();
             ty_arg_ident.target = Some(pr::Ref::Local {
@@ -332,7 +330,7 @@ impl TypeResolver<'_> {
             mapping.insert(gtp_ref, ty_arg_ident.clone());
             ty_args.push(ty_arg_ident);
 
-            scope.insert_generic_arg(Some(gtp.name), gtp.domain);
+            scope.insert_type_var(Some(gtp.name), span, gtp.domain);
         }
 
         let ty = pr::Ty {
@@ -342,7 +340,7 @@ impl TypeResolver<'_> {
         (utils::TypeReplacer::on_ty(ty, mapping), ty_args)
     }
 
-    pub fn introduce_ty_arg(&mut self, domain: pr::TyParamDomain) -> pr::Ty {
+    pub fn introduce_ty_var(&mut self, domain: pr::TyParamDomain, span: Option<Span>) -> pr::Ty {
         let scope = self.scopes.last_mut().unwrap();
 
         let mut ty_arg = pr::Ty::new(pr::TyKind::Ident(pr::Path::empty()));
@@ -351,7 +349,7 @@ impl TypeResolver<'_> {
             offset: scope.names.len(),
         });
 
-        scope.insert_generic_arg(None, domain);
+        scope.insert_type_var(None, span, domain);
         ty_arg
     }
 }

@@ -50,7 +50,7 @@ impl TypeResolver<'_> {
                 let items_ty = match variants.len() {
                     0 => {
                         // no items, so we must infer the type
-                        self.introduce_ty_arg(pr::TyParamDomain::Open)
+                        self.introduce_ty_var(pr::TyParamDomain::Open, expr.span)
                     }
                     1 => {
                         // single item, use its type
@@ -140,8 +140,8 @@ impl TypeResolver<'_> {
                 TyKind::Ident(_fq_ident) => unreachable!(),
                 _ => None,
             },
-            super::scope::TyRef::Param(_, _) => None,
-            super::scope::TyRef::Arg(_, _, _) => None,
+            super::scope::TyRef::Param(..) => None,
+            super::scope::TyRef::Var(..) => None,
         }
     }
 }
