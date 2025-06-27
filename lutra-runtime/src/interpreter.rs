@@ -28,12 +28,17 @@ pub enum Cell {
 pub type NativeFunction =
     &'static dyn Fn(&mut Interpreter, &[u32], Vec<Cell>) -> Result<Cell, EvalError>;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, thiserror::Error)]
 pub enum EvalError {
-    BadInputs,
+    #[error("bad program")]
     BadProgram,
+    #[error("bad inputs")]
+    BadInputs,
+    #[error("missing function implementation: {external_id}")]
     MissingFuncImpl { external_id: String },
+    #[error("work in progress")]
     WorkInProgress,
+    #[error("bug")]
     Bug,
 }
 

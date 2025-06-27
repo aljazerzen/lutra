@@ -5,11 +5,11 @@ use crate::NativeModule;
 use crate::interpreter::{Cell, Interpreter};
 
 pub mod std {
-    use ::std::borrow::Cow;
+    use ::std::{borrow::Cow, collections::HashMap};
 
     use crate::{EvalError, native::*};
     use assume::LayoutArgsReader;
-    use lutra_bin::{ArrayReader, ArrayWriter, Decode, TupleReader, TupleWriter};
+    use lutra_bin::{ArrayReader, ArrayWriter, Data, Decode, TupleReader, TupleWriter};
 
     pub const MODULE: Module = Module;
 
@@ -41,6 +41,7 @@ pub mod std {
                 "sort" => &Self::sort,
                 "to_columnar" => &Self::to_columnar,
                 "from_columnar" => &Self::from_columnar,
+                "group" => &Self::group,
 
                 "min" => &Self::min,
                 "max" => &Self::max,
@@ -459,6 +460,54 @@ pub mod std {
                         break 'output;
                     }
                 }
+                output.write_item(tuple.finish());
+            }
+            Ok(Cell::Data(output.finish()))
+        }
+
+        pub fn group(
+            it: &mut Interpreter,
+            layout_args: &[u32],
+            args: Vec<Cell>,
+        ) -> Result<Cell, EvalError> {
+            let mut layout_args = LayoutArgsReader::new(layout_args);
+            let input_head_bytes = layout_args.next_u32();
+            let input_body_ptrs = layout_args.next_slice();
+            let output_head_bytes = layout_args.next_u32();
+            let output_body_ptrs = layout_args.next_slice();
+
+            let output_field_head_bytes = layout_args.next_slice();
+            let mut output_fields_layouts = Vec::new();
+            for field_head_bytes in output_field_head_bytes {
+                output_fields_layouts.push((*field_head_bytes, layout_args.next_slice()));
+            }
+
+            let [input, key_getter] = assume::exactly_n(args);
+            let input = ArrayReader::new(assume::into_value(input), input_head_bytes as usize);
+
+            let mut partitions: HashMap<Vec<u8>, Vec<lutra_bin::Data>> = HashMap::new();
+            for item in input {
+                let item_cell = Cell::Data(item.clone());
+
+                let key = it.evaluate_func_call(&key_getter, vec![item_cell])?;
+                let key = assume::into_value(key).slice(output_fields_layouts[0].0 as usize).to_vec();
+
+                let partition = partitions.entry(key).or_default();
+                partition.push(item);
+            }
+
+            // init output array
+            let mut output = ArrayWriter::new(output_head_bytes, output_body_ptrs);
+            for (key, values) in partitions {
+                let mut tuple = TupleWriter::new(Cow::from(&output_fields_layouts));
+                tuple.write_field(Data::new(key));
+
+                let mut partition = ArrayWriter::new(input_head_bytes, input_body_ptrs);
+                for value in values {
+                    partition.write_item(value);
+                }
+                tuple.write_field(partition.finish());
+
                 output.write_item(tuple.finish());
             }
             Ok(Cell::Data(output.finish()))

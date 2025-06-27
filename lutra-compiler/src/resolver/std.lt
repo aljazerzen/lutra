@@ -110,13 +110,12 @@ let aggregate = func <A, B, O> ( # <I: {i1 = I1}, O>
 #   side: text,
 #   tbl: [A],
 # ): [{A, B}]
-#
-# let group = func <I, B, PO> (
-#   by: B,
-#   pipeline: func [I - B] -> [PO],
-#   tbl: [I],
-# ): [{B, ..PO}]
-#
+
+let group: func <I, K> (
+  input: [I],
+  key: func (I): K,
+): [{key = K, partition = [I]}]
+
 # let append = func (bottom, top)
 
 # Aggregation functions

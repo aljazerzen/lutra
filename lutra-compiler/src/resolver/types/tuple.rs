@@ -57,6 +57,7 @@ impl super::TypeResolver<'_> {
                 let domain = pr::TyParamDomain::TupleFields(vec![pr::TyDomainTupleField {
                     name: match indirection {
                         pr::IndirectionKind::Name(n) => Some(n.to_string()),
+                        pr::IndirectionKind::Position(0) => None,
                         pr::IndirectionKind::Position(_) => todo!(),
                         pr::IndirectionKind::Star => todo!(),
                     },
