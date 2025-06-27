@@ -1,7 +1,7 @@
 use itertools::Itertools;
 
-use crate::pr::{self, *};
 use crate::Result;
+use crate::pr::{self, *};
 
 use super::TypeResolver;
 

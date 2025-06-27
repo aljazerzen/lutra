@@ -4,9 +4,9 @@ mod test;
 
 pub use perror::{Error, Span};
 
-use chumsky::{prelude::*, Stream};
+use chumsky::{Stream, prelude::*};
 use lutra_bin::ir;
-use lutra_compiler::_lexer::{lex, Token, TokenKind};
+use lutra_compiler::_lexer::{Token, TokenKind, lex};
 
 pub fn parse(source: &str) -> (Option<ir::Program>, Vec<Error>) {
     let (tokens, errors) = lex(source, 0);

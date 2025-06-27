@@ -2,8 +2,8 @@ use indexmap::IndexMap;
 use itertools::Itertools;
 
 use super::fold::IrFold;
-use crate::diagnostic::Diagnostic;
 use crate::Result;
+use crate::diagnostic::Diagnostic;
 use lutra_bin::ir;
 
 #[tracing::instrument(skip_all, name = "layouter")]
@@ -124,7 +124,7 @@ impl Layouter {
         if !todo.is_empty() {
             let paths = todo
                 .iter()
-                .map(|i| self.ty_defs.get_index(*i).unwrap().0 .0.join("::"))
+                .map(|i| self.ty_defs.get_index(*i).unwrap().0.0.join("::"))
                 .join(", ");
             panic!("Cannot layout: {paths}")
         }

@@ -11,7 +11,7 @@ use hyper::service::Service;
 use hyper::{Request, Response};
 use hyper_util::rt::TokioIo;
 use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt, DuplexStream};
-use tokio::sync::{oneshot, Mutex};
+use tokio::sync::{Mutex, oneshot};
 
 pub fn server(
     tcp_io: impl AsyncRead + AsyncWrite + Unpin,

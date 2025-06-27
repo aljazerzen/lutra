@@ -1,6 +1,6 @@
-use lutra_bin::{ir, EnumWriter};
 use lutra_bin::{ArrayWriter, TupleWriter};
 use lutra_bin::{Data, Value};
+use lutra_bin::{EnumWriter, ir};
 
 #[track_caller]
 pub(crate) fn _test_array_writer(items: Vec<Data>, output_ty: &ir::Ty) -> String {

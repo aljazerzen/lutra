@@ -60,7 +60,7 @@ impl<'a> Context<'a> {
     fn new_binding(&mut self, rel: cr::Expr) -> Box<cr::BoundExpr> {
         Box::new(cr::BoundExpr {
             rel,
-            id: self.scope_id_gen.gen(),
+            id: self.scope_id_gen.next(),
         })
     }
 
@@ -182,7 +182,9 @@ impl<'a> Context<'a> {
 
                     if !is_table {
                         tracing::debug!("expected a table getter: {:?}", call.function.ty);
-                        todo!("only supported external refs are table functions (no params, return array of tuples)");
+                        todo!(
+                            "only supported external refs are table functions (no params, return array of tuples)"
+                        );
                     }
 
                     let parts = ptr.id.split("::");
@@ -378,7 +380,7 @@ impl<'a> Context<'a> {
                 let rel_offset = cr::Expr::new_transform_preserve_ty(
                     array,
                     cr::Transform::Offset(Box::new(start_clamped)),
-                    self.scope_id_gen.gen(),
+                    self.scope_id_gen.next(),
                 );
 
                 cr::ExprKind::Transform(
@@ -393,13 +395,13 @@ impl<'a> Context<'a> {
                 let rel_offset = cr::Expr::new_transform_preserve_ty(
                     array,
                     cr::Transform::Offset(Box::new(index)),
-                    self.scope_id_gen.gen(),
+                    self.scope_id_gen.next(),
                 );
 
                 let rel_limit = cr::Expr::new_transform_preserve_ty(
                     rel_offset,
                     cr::Transform::Limit(Box::new(new_int(1))),
-                    self.scope_id_gen.gen(),
+                    self.scope_id_gen.next(),
                 );
 
                 // drop index column
@@ -752,7 +754,8 @@ fn ty_concat_tuples(a: ir::Ty, b: ir::Ty) -> ir::Ty {
 /// Example: p: func(a, b) -> c` is wrapped into `func (x: a, y: b) -> p(a, b)`
 fn wrap_into_func_call(expr: &ir::Expr) -> ir::Function {
     let ty_function = expr.ty.kind.as_function().unwrap();
-    let func = ir::Function {
+    
+    ir::Function {
         id: u32::MAX,
         body: ir::Expr {
             ty: ty_function.body.clone(),
@@ -772,6 +775,5 @@ fn wrap_into_func_call(expr: &ir::Expr) -> ir::Function {
                     .collect(),
             })),
         },
-    };
-    func
+    }
 }

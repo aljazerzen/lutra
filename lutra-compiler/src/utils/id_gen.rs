@@ -17,7 +17,7 @@ impl<T: From<usize>> IdGenerator<T> {
         self.next_id = self.next_id.max(id + 1);
     }
 
-    pub fn gen(&mut self) -> T {
+    pub fn next(&mut self) -> T {
         let id = self.next_id;
         self.next_id += 1;
         T::from(id)
@@ -54,6 +54,6 @@ impl NameGenerator {
         // if self.prefix == "r" && self.id_generator.next_id == 3 {
         // panic!();
         // }
-        format!("{}{}", self.prefix, self.id_generator.gen())
+        format!("{}{}", self.prefix, self.id_generator.next())
     }
 }

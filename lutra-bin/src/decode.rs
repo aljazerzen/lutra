@@ -1,6 +1,6 @@
 use crate::{string, vec};
 
-use crate::{reader, Layout, ReaderExt, Result};
+use crate::{Layout, ReaderExt, Result, reader};
 
 pub trait Decode: Sized + Layout {
     fn decode(buffer: &[u8]) -> Result<Self>;

@@ -2,7 +2,7 @@ use std::fmt::Write;
 
 use lutra_bin::ir;
 
-use crate::{codegen_ty, Context};
+use crate::{Context, codegen_ty};
 
 #[rustfmt::skip::macros(writeln)]
 #[rustfmt::skip::macros(write)]

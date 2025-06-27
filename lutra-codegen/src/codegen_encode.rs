@@ -2,8 +2,8 @@ use std::fmt::Write;
 
 use lutra_bin::{ir, layout};
 
-use crate::codegen_ty::{is_option_enum, is_unit_variant, tuple_field_name, write_ty_ref};
 use crate::Context;
+use crate::codegen_ty::{is_option_enum, is_unit_variant, tuple_field_name, write_ty_ref};
 
 pub fn write_encode_impls(
     w: &mut impl Write,
@@ -95,7 +95,7 @@ fn write_ty_def_impl(
             for (index, field) in fields.iter().enumerate() {
                 let field_name = tuple_field_name(&field.name, index);
 
-                writeln!(w, "        let {0} = self.{0}.encode_head(buf);", field_name)?;
+                writeln!(w, "        let {field_name} = self.{field_name}.encode_head(buf);")?;
             }
             writeln!(w, "        {name}HeadPtr {{")?;
             for (index, field) in fields.iter().enumerate() {
@@ -112,7 +112,7 @@ fn write_ty_def_impl(
             for (index, field) in fields.iter().enumerate() {
                 let field_name = tuple_field_name(&field.name, index);
 
-                writeln!(w, "        self.{0}.encode_body(head.{0}, buf);", field_name)?;
+                writeln!(w, "        self.{field_name}.encode_body(head.{field_name}, buf);")?;
             }
 
             writeln!(w, "    }}")?;
@@ -310,7 +310,7 @@ fn write_ty_def_impl(
 
                 write_ty_ref(w, field_ty, true, ctx)?;
 
-                writeln!(w, "::decode(buf.skip({}))?;", offset)?;
+                writeln!(w, "::decode(buf.skip({offset}))?;")?;
             }
 
             writeln!(w, "        Ok({name} {{")?;

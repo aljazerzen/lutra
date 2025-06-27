@@ -3,10 +3,10 @@ use itertools::Itertools;
 use crate::diagnostic::Diagnostic;
 use crate::pr::{self, *};
 use crate::utils::fold::{self, PrFold};
-use crate::{utils, Result, Span};
+use crate::{Result, Span, utils};
 
-use super::scope::{Scope, ScopeKind};
 use super::TypeResolver;
+use super::scope::{Scope, ScopeKind};
 
 impl TypeResolver<'_> {
     /// Folds function types, so they are resolved to material types, ready for type checking.

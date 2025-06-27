@@ -1,11 +1,11 @@
 use std::collections::HashMap;
 
+use crate::SourceTree;
 use crate::diagnostic::Diagnostic;
 use crate::error;
 use crate::error::Error;
 use crate::pr;
 use crate::project;
-use crate::SourceTree;
 
 #[cfg_attr(feature = "clap", derive(clap::Parser))]
 #[derive(Default)]

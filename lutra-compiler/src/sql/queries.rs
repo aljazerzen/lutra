@@ -5,8 +5,8 @@ use lutra_bin::ir;
 use sqlparser::ast as sql_ast;
 
 use crate::sql::utils::{ExprOrSource, Scoped};
-use crate::sql::{cr, utils};
 use crate::sql::{COL_ARRAY_INDEX, COL_VALUE};
+use crate::sql::{cr, utils};
 use crate::utils::NameGenerator;
 
 pub fn compile(rel: cr::Expr, types: HashMap<&ir::Path, &ir::Ty>) -> sql_ast::Query {
@@ -770,7 +770,7 @@ impl<'a> Context<'a> {
             ir::Literal::text(s) => {
                 return ExprOrSource::new_expr(sql_ast::Expr::Value(
                     sql_ast::Value::SingleQuotedString(s.clone()),
-                ))
+                ));
             }
         })
     }

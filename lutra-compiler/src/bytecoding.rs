@@ -1,12 +1,12 @@
 use std::collections::HashMap;
 
 use indexmap::IndexSet;
+use lutra_bin::Encode;
 use lutra_bin::br::*;
 use lutra_bin::bytes;
 use lutra_bin::bytes::Buf;
 use lutra_bin::bytes::BufMut;
 use lutra_bin::ir;
-use lutra_bin::Encode;
 
 pub fn compile_program(value: ir::Program) -> Program {
     let input_count = value.get_input_tys().len() as u8;
@@ -361,15 +361,15 @@ fn as_len_and_items(items: &[u32]) -> impl Iterator<Item = u32> + '_ {
 fn as_layout_of_param_array(ty: &Ty) -> &ir::TyLayout {
     let ty_func = ty.kind.as_function().unwrap();
     let ty_array = ty_func.params[0].kind.as_array().unwrap();
-    let ty_layout = ty_array.layout.as_ref().unwrap();
-    ty_layout
+    
+    (ty_array.layout.as_ref().unwrap()) as _
 }
 
 fn as_layout_of_return_array(ty: &Ty) -> &ir::TyLayout {
     let ty_func = ty.kind.as_function().unwrap();
     let ty_array = ty_func.body.kind.as_array().unwrap();
-    let ty_layout = ty_array.layout.as_ref().unwrap();
-    ty_layout
+    
+    (ty_array.layout.as_ref().unwrap()) as _
 }
 
 fn as_ty_of_param(ty: &Ty) -> &ir::Ty {

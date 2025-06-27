@@ -1,7 +1,7 @@
 use crate::vec;
 
-use crate::ir;
 use crate::Data;
+use crate::ir;
 
 use super::SeveredBodies;
 

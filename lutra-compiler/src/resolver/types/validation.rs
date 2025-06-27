@@ -1,14 +1,14 @@
 use itertools::Itertools;
 use std::collections::HashMap;
 
+use crate::Result;
 use crate::diagnostic::{Diagnostic, DiagnosticCode, WithErrorInfo};
 use crate::pr::{self, *};
 use crate::printer;
 use crate::resolver::types::scope;
-use crate::Result;
 
-use super::scope::TyRef;
 use super::TypeResolver;
+use super::scope::TyRef;
 
 impl TypeResolver<'_> {
     /// Validates that a found expr has an expected type.

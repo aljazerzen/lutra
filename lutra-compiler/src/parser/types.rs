@@ -95,9 +95,7 @@ pub(crate) fn type_expr() -> impl Parser<TokenKind, Ty, Error = PError> + Clone 
             .map(TyKind::Array)
             .labelled("array");
 
-        let term = choice((primitive, ident, func, tuple, array, enum_))
-            .map_with_span(Ty::new_with_span)
-            .boxed();
+        
 
         // exclude
         // term.clone()
@@ -117,7 +115,9 @@ pub(crate) fn type_expr() -> impl Parser<TokenKind, Ty, Error = PError> + Clone 
         //         };
         //         TyKind::into_ty(kind, span)
         //     })
-        term
+        choice((primitive, ident, func, tuple, array, enum_))
+            .map_with_span(Ty::new_with_span)
+            .boxed()
     })
     .labelled("type")
 }

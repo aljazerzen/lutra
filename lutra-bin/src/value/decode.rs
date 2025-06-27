@@ -2,8 +2,8 @@ use crate::{boxed, string, vec};
 
 use bytes::Buf;
 
-use super::encode::Context;
 use super::Value;
+use super::encode::Context;
 
 use crate::ir;
 use crate::layout::{self, Layout};

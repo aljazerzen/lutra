@@ -1,13 +1,13 @@
 use lutra_bin::bytes;
 use lutra_bin::{Encode, Layout};
 
-use crate::interpreter::{Cell, Interpreter};
 use crate::NativeModule;
+use crate::interpreter::{Cell, Interpreter};
 
 pub mod std {
     use ::std::borrow::Cow;
 
-    use crate::{native::*, EvalError};
+    use crate::{EvalError, native::*};
     use assume::LayoutArgsReader;
     use lutra_bin::{ArrayReader, ArrayWriter, Decode, TupleReader, TupleWriter};
 
@@ -648,7 +648,7 @@ pub mod std {
 }
 
 pub mod std_text_ops {
-    use crate::{native::*, EvalError};
+    use crate::{EvalError, native::*};
     use lutra_bin::ReaderExt;
 
     pub const MODULE: Module = Module;
@@ -716,10 +716,10 @@ pub mod std_fs {
     use ::std::{fs, path};
 
     use arrow::array::RecordBatchReader;
-    use lutra_bin::{ir, Decode};
+    use lutra_bin::{Decode, ir};
     use parquet::arrow::arrow_reader::ParquetRecordBatchReaderBuilder;
 
-    use crate::{native::*, EvalError};
+    use crate::{EvalError, native::*};
 
     pub const MODULE: Module = Module;
 
@@ -769,7 +769,7 @@ pub mod std_fs {
 }
 
 pub mod interpreter {
-    use crate::{native::*, EvalError};
+    use crate::{EvalError, native::*};
 
     pub const MODULE: Module = Module;
     pub struct Module;
@@ -796,7 +796,7 @@ pub mod interpreter {
 
 mod assume {
     use super::decode;
-    use crate::{interpreter::Cell, EvalError};
+    use crate::{EvalError, interpreter::Cell};
     use lutra_bin::{ArrayReader, Decode};
 
     pub fn into_value(cell: Cell) -> lutra_bin::Data {

@@ -1,7 +1,7 @@
 use std::marker::Unpin;
 
-use lutra_bin::br;
 use lutra_bin::Encode;
+use lutra_bin::br;
 use tokio::io::{AsyncRead, AsyncWrite, AsyncWriteExt};
 
 use crate::messages;

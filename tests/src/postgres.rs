@@ -1,4 +1,4 @@
-use lutra_compiler::{pr, SourceTree};
+use lutra_compiler::{SourceTree, pr};
 
 #[track_caller]
 pub fn _run(source: &str, args: Vec<lutra_bin::Value>) -> (String, String) {

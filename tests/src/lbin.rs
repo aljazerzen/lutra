@@ -6,7 +6,7 @@ use crate::lutra::bin as types;
 use std::sync::OnceLock;
 
 use insta::assert_snapshot;
-use lutra_bin::{ir, Decode, Encode, Value};
+use lutra_bin::{Decode, Encode, Value, ir};
 
 #[track_caller]
 fn _test_encode_decode<T: Encode + Decode + std::fmt::Debug>(value: Value, ty: &ir::Ty) -> String {

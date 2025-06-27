@@ -1,10 +1,10 @@
+use crate::Result;
 use crate::decl;
 use crate::diagnostic::{Diagnostic, WithErrorInfo};
 use crate::pr;
 use crate::resolver::NS_STD;
-use crate::utils::fold::{self, PrFold};
 use crate::utils::IdGenerator;
-use crate::Result;
+use crate::utils::fold::{self, PrFold};
 
 use super::Scope;
 
@@ -78,7 +78,7 @@ impl fold::PrFold for NameResolver<'_> {
             }
 
             pr::ExprKind::Func(func) => {
-                let scope_id = self.scope_id_gen.gen();
+                let scope_id = self.scope_id_gen.next();
                 let scope = Scope::new_of_func(scope_id, &func)?;
                 self.scopes.push(scope);
                 let func = fold::fold_func(self, *func);
@@ -98,7 +98,7 @@ impl fold::PrFold for NameResolver<'_> {
                 // branches
                 let mut branches = Vec::with_capacity(match_.branches.len());
                 for branch in match_.branches {
-                    let scope_id = self.scope_id_gen.gen();
+                    let scope_id = self.scope_id_gen.next();
                     let scope = Scope::new_empty(scope_id);
                     self.scopes.push(scope);
 
@@ -159,7 +159,7 @@ impl fold::PrFold for NameResolver<'_> {
             }
             pr::TyKind::Func(ty_func) => {
                 if self.scopes.is_empty() {
-                    let scope_id = self.scope_id_gen.gen();
+                    let scope_id = self.scope_id_gen.next();
                     let scope = Scope::new_of_ty_func(scope_id, &ty_func)?;
                     self.scopes.push(scope);
                     let r = fold::fold_ty_func(self, ty_func);

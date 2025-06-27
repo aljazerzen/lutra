@@ -10,8 +10,8 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 use std::{collections::VecDeque, fs};
 
-use lutra_bin::{ir, Encode};
-use lutra_compiler::{pr, CompileParams, DiscoverParams, Project};
+use lutra_bin::{Encode, ir};
+use lutra_compiler::{CompileParams, DiscoverParams, Project, pr};
 
 #[track_caller]
 pub fn generate(

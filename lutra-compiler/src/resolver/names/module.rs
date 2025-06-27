@@ -1,8 +1,8 @@
+use crate::Result;
 use crate::decl;
 use crate::diagnostic::WithErrorInfo;
 use crate::pr;
 use crate::utils::IdGenerator;
-use crate::Result;
 
 /// Traverses module tree and runs name resolution on each of the declarations.
 /// Collects references of each declaration.

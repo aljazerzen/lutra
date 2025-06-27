@@ -1,6 +1,6 @@
 use std::{collections::HashMap, marker::Unpin};
 
-use lutra_bin::{br, Decode};
+use lutra_bin::{Decode, br};
 use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
 
 use crate::messages;

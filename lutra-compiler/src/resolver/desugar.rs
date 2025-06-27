@@ -83,7 +83,7 @@ impl Desugarator {
                     return Err(Diagnostic::new_custom(
                         "pipeline can only contain function calls or functions",
                     )
-                    .with_span(span))
+                    .with_span(span));
                 }
             };
         }

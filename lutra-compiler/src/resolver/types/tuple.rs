@@ -1,7 +1,7 @@
 use crate::diagnostic::Diagnostic;
 use crate::pr::{self, Ty};
 use crate::utils::fold::PrFold;
-use crate::{printer, Result};
+use crate::{Result, printer};
 
 use super::scope;
 

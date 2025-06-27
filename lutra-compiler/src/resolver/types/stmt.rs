@@ -1,8 +1,8 @@
-use crate::decl::DeclKind;
-use crate::resolver::types::scope;
-use crate::resolver::NS_STD;
-use crate::utils::fold::PrFold;
 use crate::Result;
+use crate::decl::DeclKind;
+use crate::resolver::NS_STD;
+use crate::resolver::types::scope;
+use crate::utils::fold::PrFold;
 use crate::{pr, utils};
 
 impl super::TypeResolver<'_> {

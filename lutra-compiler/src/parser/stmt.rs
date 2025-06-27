@@ -2,11 +2,11 @@ use chumsky::prelude::*;
 
 use super::expr::{expr, ident};
 use super::{ctrl, ident_part, keyword};
+use crate::Span;
 use crate::parser::lexer::TokenKind;
 use crate::parser::perror::PError;
 use crate::parser::types::type_expr;
 use crate::pr::*;
-use crate::Span;
 
 /// The top-level parser
 pub fn source() -> impl Parser<TokenKind, Vec<Stmt>, Error = PError> {

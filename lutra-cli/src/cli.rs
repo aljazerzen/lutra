@@ -1,6 +1,6 @@
 use clap::{Parser, Subcommand};
 
-use lutra_compiler::{pr, CompileParams, DiscoverParams};
+use lutra_compiler::{CompileParams, DiscoverParams, pr};
 
 fn main() {
     let action = Command::parse();

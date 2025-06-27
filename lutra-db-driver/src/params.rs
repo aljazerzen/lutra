@@ -1,5 +1,5 @@
 use bytes::BufMut;
-use lutra_bin::{sr, Decode};
+use lutra_bin::{Decode, sr};
 use postgres_types as pg_ty;
 
 pub fn to_sql<'d>(program: &sr::Program, input: &'d [u8]) -> Args<'d> {

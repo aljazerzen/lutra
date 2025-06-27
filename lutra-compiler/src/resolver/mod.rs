@@ -7,10 +7,10 @@ mod types;
 
 use std::str::FromStr;
 
+use crate::Result;
 use crate::decl;
 use crate::diagnostic::Diagnostic;
 use crate::pr;
-use crate::Result;
 
 pub const NS_STD: &str = "std";
 

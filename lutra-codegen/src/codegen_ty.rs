@@ -73,20 +73,20 @@ pub fn write_ty_def(
     match &ty.kind {
         ir::TyKind::Primitive(_) | ir::TyKind::Array(_) => {
             // generate a wrapper new-type struct
-            write!(w, "pub struct {}(pub ", name)?;
+            write!(w, "pub struct {name}(pub ")?;
             write_ty_ref(w, ty, false, ctx)?;
             writeln!(w, ");\n")?;
         }
 
         ir::TyKind::Enum(variants) if is_option_enum(variants) => {
             // generate a wrapper new-type struct
-            write!(w, "pub struct {}(pub ", name)?;
+            write!(w, "pub struct {name}(pub ")?;
             write_ty_ref(w, ty, false, ctx)?;
             writeln!(w, ");\n")?;
         }
 
         ir::TyKind::Tuple(fields) => {
-            writeln!(w, "pub struct {} {{", name)?;
+            writeln!(w, "pub struct {name} {{")?;
 
             for (index, field) in fields.iter().enumerate() {
                 let name = tuple_field_name(&field.name, index);
@@ -101,7 +101,7 @@ pub fn write_ty_def(
         }
 
         ir::TyKind::Enum(variants) => {
-            writeln!(w, "pub enum {} {{", name)?;
+            writeln!(w, "pub enum {name} {{")?;
 
             for (index, variant) in variants.iter().enumerate() {
                 write!(w, "    {}", variant.name)?;

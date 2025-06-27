@@ -3,7 +3,7 @@ mod interpreter;
 mod native;
 mod test;
 
-pub use interpreter::{evaluate, Cell, EvalError, Interpreter, NativeFunction};
+pub use interpreter::{Cell, EvalError, Interpreter, NativeFunction, evaluate};
 
 pub trait NativeModule: Sync {
     fn lookup_native_symbol(&self, id: &str) -> Option<interpreter::NativeFunction>;

@@ -1,8 +1,8 @@
 use lutra_bin::ir;
 use ratatui::{
+    Frame,
     layout::{Offset, Rect},
     style::Stylize,
-    Frame,
 };
 
 use crate::input::Action;

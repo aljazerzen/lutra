@@ -7,7 +7,7 @@ use std::collections::HashMap as Map;
 
 use bytes::{BufMut, BytesMut};
 
-use super::{expect_ty, expect_ty_primitive, Value};
+use super::{Value, expect_ty, expect_ty_primitive};
 use crate::encode::ReversePointer;
 use crate::ir;
 use crate::layout::{self, EnumHeadFormat, EnumVariantFormat};

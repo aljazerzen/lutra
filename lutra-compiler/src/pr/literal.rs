@@ -35,7 +35,7 @@ impl std::fmt::Display for Literal {
 
 fn quote_string(s: &str) -> String {
     if !s.contains('"') {
-        return format!(r#""{}""#, s);
+        return format!(r#""{s}""#);
     }
 
     // When string contains quotes find the longest sequence of consecutive quotes,
@@ -54,7 +54,7 @@ fn quote_string(s: &str) -> String {
     let next_odd = max_consecutive.div_ceil(2) * 2 + 1;
     let delim = '"'.to_string().repeat(next_odd);
 
-    format!("{}{}{}", delim, s, delim)
+    format!("{delim}{s}{delim}")
 }
 
 fn escape_all_except_quotes(s: &str) -> String {

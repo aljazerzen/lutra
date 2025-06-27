@@ -1,8 +1,8 @@
 use crate::vec;
 
+use crate::Data;
 use crate::ir;
 use crate::layout;
-use crate::Data;
 
 #[derive(Debug)]
 pub struct EnumWriter {

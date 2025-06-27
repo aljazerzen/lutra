@@ -1,9 +1,9 @@
 use crate::diagnostic::{Diagnostic, WithErrorInfo};
 use crate::{pr, utils};
 
+use crate::Result;
 use crate::resolver::types::scope::{Named, ScopeKind};
 use crate::utils::fold::PrFold;
-use crate::Result;
 
 use super::scope::{Scope, TyRef};
 

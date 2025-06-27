@@ -2,9 +2,9 @@ use bytes::Buf;
 
 use crate::{borrow, vec};
 
+use crate::Data;
 use crate::ir;
 use crate::layout;
-use crate::Data;
 
 pub trait ReaderExt {
     fn read_n(&self, n: usize) -> &[u8];

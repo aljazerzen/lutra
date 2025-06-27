@@ -1,5 +1,6 @@
 use itertools::Itertools;
 
+use crate::Result;
 use crate::diagnostic::{Diagnostic, WithErrorInfo};
 use crate::pr;
 use crate::pr::Ty;
@@ -7,7 +8,6 @@ use crate::resolver::names;
 use crate::resolver::types::scope::{Named, ScopedKind};
 use crate::resolver::types::tuple::BaseKind;
 use crate::utils::fold;
-use crate::Result;
 
 use super::scope::{Scope, ScopeKind};
 
@@ -40,7 +40,7 @@ impl fold::PrFold for super::TypeResolver<'_> {
 
                     Named::Ty(_, _) => {
                         return Err(Diagnostic::new_custom("expected a value, but found a type")
-                            .with_span(span))
+                            .with_span(span));
                     }
                     Named::Scoped(scoped) => match scoped {
                         ScopedKind::Param { ty } => ty.clone(),
@@ -49,7 +49,7 @@ impl fold::PrFold for super::TypeResolver<'_> {
                             return Err(Diagnostic::new_custom(
                                 "expected a value, but found a type",
                             )
-                            .with_span(span))
+                            .with_span(span));
                         }
                     },
                     Named::EnumVariant(ty, tag) => {

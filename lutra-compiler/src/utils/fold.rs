@@ -4,9 +4,9 @@
 /// a whole tree by just defining how we want to handle each type.
 use itertools::Itertools;
 
+use crate::Result;
 use crate::pr;
 use crate::pr::*;
-use crate::Result;
 
 // Fold pattern:
 // - https://rust-unofficial.github.io/patterns/patterns/creational/fold.html

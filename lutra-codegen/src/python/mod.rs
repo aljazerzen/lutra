@@ -3,8 +3,8 @@ use std::fs;
 use std::path::PathBuf;
 use std::{borrow::Cow, fmt::Write};
 
-use lutra_bin::{ir, layout, Encode};
-use lutra_compiler::{pr, CompileParams, DiscoverParams, Project};
+use lutra_bin::{Encode, ir, layout};
+use lutra_compiler::{CompileParams, DiscoverParams, Project, pr};
 
 #[track_caller]
 pub fn generate(
@@ -237,7 +237,7 @@ pub fn write_ty_def(
 
         ir::TyKind::Tuple(fields) => {
             writeln!(w, "@dataclasses.dataclass")?;
-            writeln!(w, "class {}:", name)?;
+            writeln!(w, "class {name}:")?;
 
             // fields definitions
             for (index, field) in fields.iter().enumerate() {

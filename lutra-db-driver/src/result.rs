@@ -1,6 +1,6 @@
 use bytes::{BufMut, BytesMut};
 use core::str;
-use lutra_bin::{ir, sr, Encode, ReversePointer};
+use lutra_bin::{Encode, ReversePointer, ir, sr};
 use postgres_types as pg_ty;
 use std::collections::HashMap;
 

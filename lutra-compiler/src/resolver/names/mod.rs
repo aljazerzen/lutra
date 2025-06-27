@@ -7,9 +7,9 @@ pub use expr::ty_lookup_steps;
 use itertools::Itertools;
 use scope::Scope;
 
+use crate::Result;
 use crate::decl;
 use crate::diagnostic::Diagnostic;
-use crate::Result;
 use crate::{pr, utils};
 
 /// Runs name resolution for global names - names that refer to declarations.

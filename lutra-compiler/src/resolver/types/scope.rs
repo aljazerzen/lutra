@@ -7,8 +7,8 @@ use itertools::Itertools;
 use crate::diagnostic::{Diagnostic, WithErrorInfo};
 use crate::pr;
 use crate::resolver::module::ExprOrTy;
-use crate::{printer, utils};
 use crate::{Result, Span};
+use crate::{printer, utils};
 
 use super::TypeResolver;
 

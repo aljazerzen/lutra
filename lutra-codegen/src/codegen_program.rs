@@ -1,9 +1,9 @@
 use std::fmt::Write;
 
-use lutra_bin::{ir, Encode};
+use lutra_bin::{Encode, ir};
 use lutra_compiler::pr;
 
-use crate::{codegen_ty, Context};
+use crate::{Context, codegen_ty};
 
 #[rustfmt::skip::macros(writeln)]
 #[rustfmt::skip::macros(write)]

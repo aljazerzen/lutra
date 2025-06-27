@@ -125,8 +125,8 @@ pub mod br {
     mod impls {
         #![allow(unused_imports)]
         use super::*;
-        use crate::bytes::BufMut;
         use crate::ReaderExt;
+        use crate::bytes::BufMut;
 
         #[allow(clippy::all, unused_variables)]
         impl crate::Encode for Program {
@@ -1139,8 +1139,8 @@ pub mod ir {
     mod impls {
         #![allow(unused_imports)]
         use super::*;
-        use crate::bytes::BufMut;
         use crate::ReaderExt;
+        use crate::bytes::BufMut;
 
         #[allow(clippy::all, unused_variables)]
         impl crate::Encode for Program {
@@ -2823,8 +2823,8 @@ pub mod sr {
     mod impls {
         #![allow(unused_imports)]
         use super::*;
-        use crate::bytes::BufMut;
         use crate::ReaderExt;
+        use crate::bytes::BufMut;
 
         #[allow(clippy::all, unused_variables)]
         impl crate::Encode for Program {

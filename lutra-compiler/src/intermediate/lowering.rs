@@ -5,8 +5,8 @@ use itertools::Itertools;
 use lutra_bin::ir;
 
 use crate::_lexer::Diagnostic;
-use crate::utils::{self, IdGenerator};
 use crate::Result;
+use crate::utils::{self, IdGenerator};
 use crate::{decl, pr};
 
 pub fn lower_expr(root_module: &decl::RootModule, main: &pr::Expr) -> ir::Program {
@@ -194,7 +194,7 @@ impl<'a> Lowerer<'a> {
                 args: self.lower_exprs(&call.args)?,
             })),
             pr::ExprKind::Func(func) => {
-                let function_id = self.generator_function_scope.gen() as u32;
+                let function_id = self.generator_function_scope.next() as u32;
                 let scope = Scope {
                     id: expr.scope_id.unwrap(),
                     kind: ScopeKind::Function {
@@ -249,7 +249,7 @@ impl<'a> Lowerer<'a> {
                         let binding_id = match entry {
                             indexmap::map::Entry::Occupied(e) => *e.get(),
                             indexmap::map::Entry::Vacant(e) => {
-                                let id = self.generator_var_binding.gen() as u32;
+                                let id = self.generator_var_binding.next() as u32;
                                 e.insert(id);
                                 id
                             }
@@ -261,7 +261,7 @@ impl<'a> Lowerer<'a> {
 
             pr::ExprKind::Match(match_) => {
                 let subject = self.lower_expr(&match_.subject)?;
-                let subject_id = self.generator_var_binding.gen() as u32;
+                let subject_id = self.generator_var_binding.next() as u32;
                 let subject_ref = ir::Expr {
                     kind: ir::ExprKind::Pointer(ir::Pointer::Binding(subject_id)),
                     ty: subject.ty.clone(),
@@ -431,7 +431,7 @@ impl<'a> Lowerer<'a> {
         let main_func_ty = main.ty.kind.as_function().unwrap().clone();
 
         // construct a new main function
-        let f_id = self.generator_function_scope.gen() as u32;
+        let f_id = self.generator_function_scope.next() as u32;
         let mut main = ir::Expr {
             kind: ir::ExprKind::Call(Box::new(ir::Call {
                 function: main,
@@ -637,7 +637,7 @@ impl<'a> Lowerer<'a> {
                 params: vec![],
             }),
             kind: ir::ExprKind::Function(Box::new(ir::Function {
-                id: self.generator_function_scope.gen() as u32,
+                id: self.generator_function_scope.next() as u32,
                 body,
             })),
         }

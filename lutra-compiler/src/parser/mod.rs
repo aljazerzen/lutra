@@ -6,7 +6,7 @@ pub(crate) mod stmt;
 mod test;
 mod types;
 
-use chumsky::{prelude::*, Stream};
+use chumsky::{Stream, prelude::*};
 
 use self::lexer::TokenKind;
 use self::perror::PError;

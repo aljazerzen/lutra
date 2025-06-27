@@ -2,7 +2,7 @@ mod schema {
     include!(concat!(env!("OUT_DIR"), "/project.rs"));
 }
 
-use lutra_bin::{ir, Decode, Encode, Result, Value};
+use lutra_bin::{Decode, Encode, Result, Value, ir};
 
 pub fn decode_typed_data(buffer: &[u8]) -> Result<(Value, ir::Ty)> {
     let typed_data = schema::TypedData::decode(buffer)?;

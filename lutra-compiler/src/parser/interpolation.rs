@@ -4,7 +4,7 @@ use itertools::Itertools;
 use crate::parser::lexer::TokenKind;
 use crate::parser::perror::{ChumError, PError};
 use crate::pr::*;
-use crate::span::{string_stream, Span};
+use crate::span::{Span, string_stream};
 
 /// Parses interpolated strings
 pub(crate) fn parse(string: String, span_base: Span) -> Result<Vec<InterpolateItem>, Vec<PError>> {

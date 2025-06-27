@@ -2,9 +2,9 @@ use enum_as_inner::EnumAsInner;
 use indexmap::IndexMap;
 use itertools::Itertools;
 
+use crate::Span;
 use crate::decl;
 use crate::pr;
-use crate::Span;
 
 use super::NS_STD;
 

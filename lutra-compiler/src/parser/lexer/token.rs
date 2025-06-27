@@ -64,7 +64,7 @@ impl std::fmt::Display for TokenKind {
                 }
             }
             TokenKind::Keyword(s) => write!(f, "keyword {s}"),
-            TokenKind::Literal(lit) => write!(f, "{}", lit),
+            TokenKind::Literal(lit) => write!(f, "{lit}"),
             TokenKind::Control(c) => write!(f, "{c}"),
 
             TokenKind::ArrowThin => f.write_str("->"),
@@ -83,7 +83,7 @@ impl std::fmt::Display for TokenKind {
             TokenKind::Range => f.write_str(".."),
 
             TokenKind::Interpolation(c, s) => {
-                write!(f, "{c}\"{}\"", s)
+                write!(f, "{c}\"{s}\"")
             }
             TokenKind::DocComment(text) => writeln!(f, "##{text}"),
             TokenKind::DocCommentSelf(text) => writeln!(f, "#!{text}"),

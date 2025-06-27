@@ -1,9 +1,9 @@
 use std::collections::HashMap;
 
+use crate::Result;
 use crate::pr;
 use crate::utils::fold;
 use crate::utils::fold::PrFold;
-use crate::Result;
 
 pub struct TypeReplacer {
     mapping: HashMap<pr::Ref, pr::Ty>,

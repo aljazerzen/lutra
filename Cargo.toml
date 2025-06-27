@@ -18,10 +18,10 @@ exclude = ["examples"]
 resolver = "2"
 
 [workspace.package]
-edition = "2021"
+edition = "2024"
 license = "MIT or Apache 2.0"
 repository = "https://code.murerzen.eu/lutra-data"
-rust-version = "1.82"
+rust-version = "1.88"
 version = "0.1.0"
 
 [workspace.dependencies]

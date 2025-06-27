@@ -84,11 +84,7 @@ impl<I> Layout for vec::Vec<I> {
 
 impl<I: Layout> Layout for Option<I> {
     fn head_size() -> usize {
-        if I::head_size() == 0 {
-            8
-        } else {
-            40
-        }
+        if I::head_size() == 0 { 8 } else { 40 }
     }
 }
 
