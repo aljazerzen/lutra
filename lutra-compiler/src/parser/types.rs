@@ -95,8 +95,6 @@ pub(crate) fn type_expr() -> impl Parser<TokenKind, Ty, Error = PError> + Clone 
             .map(TyKind::Array)
             .labelled("array");
 
-        
-
         // exclude
         // term.clone()
         //     .then(ctrl('-').ignore_then(term).repeated())

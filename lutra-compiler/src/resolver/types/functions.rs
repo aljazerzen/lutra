@@ -10,7 +10,6 @@ use super::scope::{Scope, ScopeKind};
 
 impl TypeResolver<'_> {
     /// Folds function types, so they are resolved to material types, ready for type checking.
-    /// Requires id of the function call node, so it can be used to generic type arguments.
     #[tracing::instrument(name = "func", skip_all, fields(f = func.params.iter().map(|p| &p.name).join(",")))]
     pub fn resolve_func(&mut self, scope_id: usize, mut func: Box<Func>) -> Result<Box<Func>> {
         tracing::debug!(
@@ -33,9 +32,14 @@ impl TypeResolver<'_> {
         // fold types
         func.params = fold::fold_func_params(self, func.params)?;
         func.return_ty = fold::fold_type_opt(self, func.return_ty)?;
+        for param in func.params.iter_mut() {
+            if param.ty.is_none() {
+                param.ty = Some(self.introduce_ty_var(pr::TyParamDomain::Open, Some(param.span)));
+            }
+        }
 
         // put params into scope
-        self.scopes.last_mut().unwrap().insert_params(&func)?;
+        self.scopes.last_mut().unwrap().insert_params(&func);
 
         func.body = Box::new(self.fold_expr(*func.body)?);
 

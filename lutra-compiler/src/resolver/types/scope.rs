@@ -141,17 +141,15 @@ impl Scope {
         }
     }
 
-    pub fn insert_params(&mut self, func: &pr::Func) -> crate::Result<()> {
+    pub fn insert_params(&mut self, func: &pr::Func) {
         for param in &func.params {
-            let ty = param
-                .ty
-                .clone()
-                .ok_or_else(|| Diagnostic::new_custom("missing type annotations"))?;
+            let ty = param.ty.clone().unwrap_or_else(|| {
+                panic!("func missing param ty: should have been replaced by a ty var")
+            });
 
             let scoped = ScopedKind::Param { ty };
             self.names.push(scoped);
         }
-        Ok(())
     }
 
     pub fn insert_type_var(
@@ -311,7 +309,7 @@ impl TypeResolver<'_> {
         }
     }
 
-    /// Add type's params into scope as type arguments.
+    /// Add type's params into scope as type variables.
     pub fn introduce_ty_into_scope(
         &mut self,
         ty: pr::Ty,

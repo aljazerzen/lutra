@@ -754,7 +754,7 @@ fn ty_concat_tuples(a: ir::Ty, b: ir::Ty) -> ir::Ty {
 /// Example: p: func(a, b) -> c` is wrapped into `func (x: a, y: b) -> p(a, b)`
 fn wrap_into_func_call(expr: &ir::Expr) -> ir::Function {
     let ty_function = expr.ty.kind.as_function().unwrap();
-    
+
     ir::Function {
         id: u32::MAX,
         body: ir::Expr {

@@ -80,7 +80,11 @@ impl fold::PrFold for super::TypeResolver<'_> {
                     BaseKind::Tuple => {
                         let kind = pr::ExprKind::Indirection {
                             base: Box::new(base),
-                            field: pr::IndirectionKind::Position(indirection.position as i64),
+                            field: if let Some(p) = indirection.position {
+                                pr::IndirectionKind::Position(p as i64)
+                            } else {
+                                field
+                            },
                         };
                         pr::Expr {
                             ty: Some(indirection.target_ty),
@@ -96,8 +100,8 @@ impl fold::PrFold for super::TypeResolver<'_> {
                             within: pr::Path::empty(),
                         });
 
-                        let position =
-                            pr::Expr::new(pr::Literal::Integer(indirection.position as i64));
+                        let position = indirection.position.unwrap();
+                        let position = pr::Expr::new(pr::Literal::Integer(position as i64));
 
                         let func = Box::new(self.fold_expr(std_index_expr)?);
 

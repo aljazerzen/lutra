@@ -115,7 +115,7 @@ mod rel_repr {
     /// return list of relation columns for a given type
     fn r(ty: &ir::Ty) -> String {
         let ctx = super::Context::new(Default::default());
-        
+
         ctx.rel_cols(ty, true).join(", ")
     }
 

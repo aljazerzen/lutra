@@ -707,3 +707,40 @@ fn match_05() {
         }
     "#), @"int32");
 }
+
+#[test]
+fn func_param_00() {
+    insta::assert_snapshot!(_test_ty(r#"
+        func () -> (
+            false | func (a) -> !a
+        )
+    "#), @"bool");
+}
+
+#[test]
+fn func_param_01() {
+    insta::assert_snapshot!(_test_ty(r#"
+        func (): int16 -> (
+            3 | func (x) -> x * x
+        )
+    "#), @"int16");
+}
+
+#[test]
+fn func_param_02() {
+    insta::assert_snapshot!(_test_ty(r#"
+        func (): [int16] -> (
+            [3, 2, 4, 1, 5, -3, 1]
+            | std::map(func (x) -> -x)
+        )
+    "#), @"[int16]");
+}
+
+#[test]
+fn func_param_03() {
+    insta::assert_snapshot!(_test_ty(r#"
+        func () -> (
+            {a = 3, b = 5: int16} | func (x) -> x.a + x.b
+        )
+    "#), @"int16");
+}

@@ -104,7 +104,7 @@ pub struct TyFunc {
 
 #[derive(Debug, Clone)]
 pub struct TyParam {
-    /// Assigned name of this generic type argument.
+    /// Assigned name of this generic type param
     pub name: String,
 
     pub domain: TyParamDomain,

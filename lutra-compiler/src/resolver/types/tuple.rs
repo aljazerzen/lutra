@@ -22,7 +22,7 @@ impl super::TypeResolver<'_> {
     ///
     /// Returns a positional indirection into the base.
     pub fn resolve_indirection(
-        &self,
+        &mut self,
         base: &Ty,
         indirection: &pr::IndirectionKind,
     ) -> Result<Indirection> {
@@ -49,8 +49,27 @@ impl super::TypeResolver<'_> {
                         }),
                 };
             }
-            scope::TyRef::Var(s, o) => {
-                todo!("tuple indirection into generic type Arg: {s}.{o}")
+            scope::TyRef::Var(_, o) => {
+                // introduce a new type var for the field
+                let field_ty = self.introduce_ty_var(pr::TyParamDomain::Open, None);
+
+                // restrict existing ty var to tuples with this field
+                let domain = pr::TyParamDomain::TupleFields(vec![pr::TyDomainTupleField {
+                    name: match indirection {
+                        pr::IndirectionKind::Name(n) => Some(n.to_string()),
+                        pr::IndirectionKind::Position(_) => todo!(),
+                        pr::IndirectionKind::Star => todo!(),
+                    },
+                    ty: field_ty.clone(),
+                }]);
+                let scope = self.get_ty_var_scope();
+                scope.infer_type_var_in_domain(o, domain);
+
+                return Ok(Indirection {
+                    base: BaseKind::Tuple,
+                    position: None,
+                    target_ty: field_ty,
+                });
             }
         };
 
@@ -71,7 +90,7 @@ impl super::TypeResolver<'_> {
                 }
                 pr::IndirectionKind::Position(pos) => Ok(Indirection {
                     base: BaseKind::Array,
-                    position: *pos as usize,
+                    position: Some(*pos as usize),
                     target_ty: *items_ty.clone(),
                 }),
                 pr::IndirectionKind::Star => todo!(),
@@ -99,28 +118,24 @@ pub fn lookup_in_tuple(
 }
 
 fn lookup_position_in_tuple(fields: &[pr::TyTupleField], position: usize) -> Option<Indirection> {
-    if position < fields.len() {
-        fields.get(position).map(|f| Indirection {
-            base: BaseKind::Tuple,
-            position,
-            target_ty: f.ty.clone(),
-        })
-    } else {
-        None
-    }
+    let field = fields.get(position)?;
+    Some(Indirection {
+        base: BaseKind::Tuple,
+        position: Some(position),
+        target_ty: field.ty.clone(),
+    })
 }
 
 fn lookup_name_in_tuple(fields: &[pr::TyTupleField], name: &str) -> Option<Indirection> {
-    for (position, field) in fields.iter().enumerate() {
-        if field.name.as_ref().is_some_and(|n| n == name) {
-            return Some(Indirection {
-                base: BaseKind::Tuple,
-                position,
-                target_ty: field.ty.clone(),
-            });
-        }
-    }
-    None
+    let (position, field) = fields
+        .iter()
+        .enumerate()
+        .find(|(_, f)| f.name.as_ref().is_some_and(|n| n == name))?;
+    Some(Indirection {
+        base: BaseKind::Tuple,
+        position: Some(position),
+        target_ty: field.ty.clone(),
+    })
 }
 
 pub fn lookup_in_domain(
@@ -138,34 +153,33 @@ fn lookup_position_in_domain(
     fields: &[pr::TyDomainTupleField],
     position: usize,
 ) -> Option<Indirection> {
-    if position < fields.len() {
-        fields.get(position).map(|f| Indirection {
-            base: BaseKind::Tuple,
-            position,
-            target_ty: f.ty.clone(),
-        })
-    } else {
-        None
-    }
+    let f = fields.get(position)?;
+    Some(Indirection {
+        base: BaseKind::Tuple,
+        position: Some(position),
+        target_ty: f.ty.clone(),
+    })
 }
 
 fn lookup_name_in_domain(fields: &[pr::TyDomainTupleField], name: &str) -> Option<Indirection> {
-    for (position, field) in fields.iter().enumerate() {
-        if field.name.as_ref().is_some_and(|n| n == name) {
-            return Some(Indirection {
-                base: BaseKind::Tuple,
-                position,
-                target_ty: field.ty.clone(),
-            });
-        }
-    }
-    None
+    let field = fields
+        .iter()
+        .find(|f| f.name.as_ref().is_some_and(|n| n == name))?;
+    Some(Indirection {
+        base: BaseKind::Tuple,
+        position: None,
+        target_ty: field.ty.clone(),
+    })
 }
 
 #[derive(Debug, Clone)]
 pub struct Indirection {
     pub base: BaseKind,
-    pub position: usize,
+
+    // When base is a type var or type param, we cannot determine the
+    // final position of a named field in the tuple.
+    pub position: Option<usize>,
+
     pub target_ty: pr::Ty,
 }
 

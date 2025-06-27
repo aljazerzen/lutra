@@ -182,8 +182,27 @@ impl<'a> Lowerer<'a> {
                 ir::ExprKind::TupleLookup(Box::new(ir::TupleLookup {
                     base: self.lower_expr(base)?,
                     position: match field {
-                        pr::IndirectionKind::Name(_) => todo!(),
+                        // most of the cases
                         pr::IndirectionKind::Position(position) => *position as u16,
+
+                        pr::IndirectionKind::Name(name) => {
+                            // This happens when base is a tuple ty var or ty param
+                            // At this stage, that should have all been compiled away and we can expect
+                            // the base to be a plain tuple, that does contain the field name we need.
+                            // TODO: base might be an ident, we need to do a lookup here
+                            let pr::TyKind::Tuple(ty_fields) = &base.ty.as_ref().unwrap().kind
+                            else {
+                                panic!("expected a tuple: {:?}", base.ty)
+                            };
+
+                            let (position, _) = ty_fields
+                                .iter()
+                                .enumerate()
+                                .find(|(_, f)| f.name.as_ref().is_some_and(|n| n == name))
+                                .unwrap();
+                            position as u16
+                        }
+
                         pr::IndirectionKind::Star => todo!(),
                     },
                 }))

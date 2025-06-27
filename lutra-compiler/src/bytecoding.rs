@@ -361,14 +361,14 @@ fn as_len_and_items(items: &[u32]) -> impl Iterator<Item = u32> + '_ {
 fn as_layout_of_param_array(ty: &Ty) -> &ir::TyLayout {
     let ty_func = ty.kind.as_function().unwrap();
     let ty_array = ty_func.params[0].kind.as_array().unwrap();
-    
+
     (ty_array.layout.as_ref().unwrap()) as _
 }
 
 fn as_layout_of_return_array(ty: &Ty) -> &ir::TyLayout {
     let ty_func = ty.kind.as_function().unwrap();
     let ty_array = ty_func.body.kind.as_array().unwrap();
-    
+
     (ty_array.layout.as_ref().unwrap()) as _
 }
 
