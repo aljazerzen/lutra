@@ -12,10 +12,12 @@ impl TypeResolver<'_> {
         }
 
         let kind = match &expr.kind {
-            ExprKind::Literal(ref literal) => match literal {
-                Literal::Boolean(_) => TyKind::Primitive(TyPrimitive::bool),
-                Literal::Text(_) => TyKind::Primitive(TyPrimitive::text),
-                Literal::Integer(_) => {
+            ExprKind::Literal(Literal::Boolean(_)) => TyKind::Primitive(TyPrimitive::bool),
+
+            ExprKind::Literal(Literal::Text(_)) => TyKind::Primitive(TyPrimitive::text),
+                ExprKind::FString(_) => TyKind::Primitive(TyPrimitive::text),
+
+            ExprKind::Literal(Literal::Integer(_)) => {
                     // int literal (e.g. `4`) can be of type `int64` or `u8` or any other
                     // integer type. So we have leave the type to be figured out later.
                     // This is done with a new type param, constraint to integer types.
@@ -30,11 +32,14 @@ impl TypeResolver<'_> {
                         pr::TyPrimitive::uint64,
                     ]), expr.span));
                 },
-                Literal::Float(_) => TyKind::Primitive(TyPrimitive::float64),
-                _ => panic!(),
+            ExprKind::Literal(Literal::Float(_)) => {
+                // similar as integers
+                return Ok(self.introduce_ty_var(pr::TyParamDomain::OneOf(vec![
+                    pr::TyPrimitive::float32,
+                    pr::TyPrimitive::float64
+                ]), expr.span));
             },
-
-            ExprKind::FString(_) => TyKind::Primitive(TyPrimitive::text),
+            ExprKind::Literal(_) => todo!(),
 
             ExprKind::TypeAnnotation(annotation) => {
                 annotation.ty.kind.clone()

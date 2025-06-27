@@ -98,7 +98,7 @@ impl Printer {
                                 }
                             }
                             pr::TyParamDomain::TupleFields(fields) => {
-                                r += "{";
+                                r += ": {";
                                 for (i, field) in fields.iter().enumerate() {
                                     if i > 0 {
                                         r += ", ";
@@ -109,7 +109,7 @@ impl Printer {
                                     }
                                     r += &self.print_ty(&field.ty);
                                 }
-                                r += "}";
+                                r += ", ..}";
                             }
                         }
                     }

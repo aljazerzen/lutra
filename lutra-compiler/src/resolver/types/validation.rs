@@ -213,11 +213,6 @@ impl TypeResolver<'_> {
         while !constraints.is_empty() {
             let mut remaining_constraints = Vec::with_capacity(constraints.len());
 
-            constraints.extend({
-                let scope = self.scopes.last_mut().unwrap();
-                scope.ty_var_constraints.take()
-            });
-
             let len = constraints.len();
             for constraint in constraints {
                 match constraint {
@@ -250,6 +245,11 @@ impl TypeResolver<'_> {
                 // no constraints were enforced in this loop, error out
                 break;
             }
+
+            constraints.extend({
+                let scope = self.scopes.last_mut().unwrap();
+                scope.ty_var_constraints.take()
+            });
         }
 
         let mut mapping = HashMap::new();
@@ -318,7 +318,10 @@ impl TypeResolver<'_> {
         let entry = known.entry(id);
         match entry {
             Entry::Occupied(existing) => {
-                self.validate_type(&ty, existing.get(), &|| None)?;
+                let ty_var = self.get_ty_var(id);
+
+                self.validate_type(existing.get(), &ty, &|| None)
+                    .with_span_fallback(ty_var.span)?;
             }
             Entry::Vacant(entry) => {
                 entry.insert(ty);

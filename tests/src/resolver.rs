@@ -177,8 +177,8 @@ fn types_12() {
 fn types_13() {
     insta::assert_snapshot!(_test_ty(r#"
         let floor: func <T: float32 | float64> (x: T): T
-        func () -> floor(2.4)
-    "#), @"float64");
+        func () -> floor(2.4: float32)
+    "#), @"float32");
 
     insta::assert_snapshot!(_test_err(r#"
         let floor: func <T: float32 | float64> (x: T): T
@@ -215,14 +215,14 @@ fn types_14() {
 
     insta::assert_snapshot!(_test_ty(r#"
         let floor: func <F: float32 | float64> (x: F): F
-        let twice_floored = func <T: float32 | float64> (x: T) -> {floor(4.5), floor(x)}
+        let twice_floored = func <T: float32 | float64> (x: T) -> {floor(4.5: float64), floor(x)}
         func (f: float32) -> twice_floored(f)
     "#), @"{float64, float32}");
 
     insta::assert_snapshot!(_test_ty(r#"
         let floor: func <F: float32 | float64> (x: F): F
         let twice_floored = func <T: float64> (x: T) -> {floor(x), floor(x)}
-        func () -> twice_floored(2.3)
+        func () -> twice_floored(2.3: float64)
     "#), @"{float64, float64}");
 
     insta::assert_snapshot!(_test_err(r#"
@@ -277,8 +277,8 @@ fn types_16() {
     // type param: tuple domain with positional arg
     insta::assert_snapshot!(_test_ty(r#"
         let get_b: func <T: {bool, int64, ..}> (x: T): T
-        func () -> get_b({a = false, 4, c = 5.7})
-    "#), @"{a = bool, int64, c = float64}");
+        func () -> get_b({a = false, 4, c = 5.7: float32})
+    "#), @"{a = bool, int64, c = float32}");
 
     insta::assert_snapshot!(_test_err(r#"
         let get_b: func <T: {bool, int64, ..}> (x: T): T

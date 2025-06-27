@@ -2,7 +2,7 @@ use crate::diagnostic::Diagnostic;
 use crate::pr::{self, Expr};
 use crate::utils::fold;
 use crate::utils::fold::PrFold;
-use crate::Result;
+use crate::{Result, Span};
 
 pub fn run(module_def: pr::ModuleDef) -> Result<pr::ModuleDef> {
     Desugarator.fold_module_def(module_def)
@@ -22,7 +22,7 @@ impl PrFold for Desugarator {
             }
             pr::ExprKind::Range(r) => self.desugar_range(r)?,
             pr::ExprKind::Unary(unary) => self.desugar_unary(unary)?,
-            pr::ExprKind::Binary(binary) => self.desugar_binary(binary)?,
+            pr::ExprKind::Binary(binary) => self.desugar_binary(binary, expr.span)?,
             pr::ExprKind::FString(items) => self.desugar_f_string(items)?,
             k => fold::fold_expr_kind(self, k)?,
         };
@@ -112,6 +112,7 @@ impl Desugarator {
     fn desugar_binary(
         &mut self,
         pr::BinaryExpr { op, left, right }: pr::BinaryExpr,
+        span: Option<Span>,
     ) -> Result<pr::ExprKind> {
         let left = self.fold_expr(*left)?;
         let right = self.fold_expr(*right)?;
@@ -147,7 +148,7 @@ impl Desugarator {
             pr::BinOp::Pow => (right, left),
             _ => (left, right),
         };
-        Ok(new_binop(left, &func_name, right).kind)
+        Ok(new_binop(left, &func_name, right, span).kind)
     }
 
     /// Desugar f-string into function calls to std::concat
@@ -167,15 +168,19 @@ impl Desugarator {
 
         // concat with the following
         for item in items {
-            expr = new_binop(expr, &["std", "text_ops", "concat"], item);
+            let op_span = item.span;
+            expr = new_binop(expr, &["std", "text_ops", "concat"], item, op_span);
         }
         Ok(expr.kind)
     }
 }
 
-fn new_binop(left: pr::Expr, op_name: &[&str], right: pr::Expr) -> pr::Expr {
+fn new_binop(left: pr::Expr, op_name: &[&str], right: pr::Expr, op_span: Option<Span>) -> pr::Expr {
+    let mut op = pr::Expr::new(pr::Path::new(op_name.to_vec()));
+    op.span = op_span;
+
     pr::Expr::new(pr::ExprKind::FuncCall(pr::FuncCall {
-        func: Box::new(pr::Expr::new(pr::Path::new(op_name.to_vec()))),
+        func: Box::new(op),
         args: vec![left, right],
     }))
 }

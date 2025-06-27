@@ -176,7 +176,7 @@ impl Scope {
     }
 
     pub fn infer_type_var(&self, id: TyVarId, ty: pr::Ty) {
-        tracing::debug!("inferring {id:?} is {ty:?}");
+        tracing::debug!("inferring {id:?} is {}", crate::printer::print_ty(&ty));
 
         let mut constraints = self.ty_var_constraints.borrow_mut();
         constraints.push(TyVarConstraint::IsTy(id, ty));
