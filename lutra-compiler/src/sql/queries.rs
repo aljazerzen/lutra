@@ -181,9 +181,6 @@ impl<'a> Context<'a> {
                 let val = self.scoped_into_query(val, &val_in.rel.ty);
                 let mut main = self.scoped_into_query(main, &main_in.ty);
 
-                tracing::debug!("val = {val}");
-                tracing::debug!("main = {main}");
-
                 main.with = Some(utils::with());
                 let ctes = &mut main.with.as_mut().unwrap().cte_tables;
                 ctes.insert(0, utils::cte(name, val));

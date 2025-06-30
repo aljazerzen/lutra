@@ -42,14 +42,19 @@ pub fn _run(source: &str, args: Vec<lutra_bin::Value>) -> (String, String) {
 }
 
 #[track_caller]
-pub fn _run_to_str(lutra_source: &str) -> String {
+pub fn _run_output(lutra_source: &str) -> String {
+    _run(lutra_source, vec![]).1
+}
+
+#[track_caller]
+pub fn _run_sql_output(lutra_source: &str) -> String {
     let (sql, output) = _run(lutra_source, vec![]);
     format!("{sql}\n---\n{output}")
 }
 
 #[test]
 fn prim() {
-    insta::assert_snapshot!(_run_to_str(r#"
+    insta::assert_snapshot!(_run_sql_output(r#"
         func () -> 3: int16
     "#), @r"
     SELECT
@@ -66,7 +71,7 @@ fn prim() {
 
 #[test]
 fn tuple_prim() {
-    insta::assert_snapshot!(_run_to_str(r#"
+    insta::assert_snapshot!(_run_sql_output(r#"
         func () -> {3: int16, false}
     "#), @r"
     SELECT
@@ -88,7 +93,7 @@ fn tuple_prim() {
 
 #[test]
 fn array_prim() {
-    insta::assert_snapshot!(_run_to_str(r#"
+    insta::assert_snapshot!(_run_sql_output(r#"
         func () -> [3, 6, 12]: [int16]
     "#), @r"
     SELECT
@@ -122,7 +127,7 @@ fn array_prim() {
 
 #[test]
 fn array_empty() {
-    insta::assert_snapshot!(_run_to_str(r#"
+    insta::assert_snapshot!(_run_sql_output(r#"
         func () -> []: [bool]
     "#), @r#"
     SELECT
@@ -144,7 +149,7 @@ fn array_empty() {
 
 #[test]
 fn tuple_tuple_prim() {
-    insta::assert_snapshot!(_run_to_str(r#"
+    insta::assert_snapshot!(_run_sql_output(r#"
         func () -> {3: int16, {false, true, {"hello"}, 4: int32}}
     "#), @r#"
     SELECT
@@ -179,7 +184,7 @@ fn tuple_tuple_prim() {
 
 #[test]
 fn tuple_array_prim() {
-    insta::assert_snapshot!(_run_to_str(r#"
+    insta::assert_snapshot!(_run_sql_output(r#"
         func () -> {true, [1, 2, 3]: [int64], [4]: [int32], false}
     "#), @r"
     SELECT
@@ -255,7 +260,7 @@ fn tuple_array_prim() {
 
 #[test]
 fn tuple_array_empty() {
-    insta::assert_snapshot!(_run_to_str(r#"
+    insta::assert_snapshot!(_run_sql_output(r#"
         func () -> {true, []: [int64], false}
     "#), @r"
     SELECT
@@ -298,7 +303,7 @@ fn tuple_array_empty() {
 
 #[test]
 fn array_array_prim() {
-    insta::assert_snapshot!(_run_to_str(r#"
+    insta::assert_snapshot!(_run_sql_output(r#"
         func () -> [[1, 2, 3], [4, 5]]: [[int64]]
     "#), @r"
     SELECT
@@ -380,7 +385,7 @@ fn array_array_prim() {
 
 #[test]
 fn array_tuple_prim() {
-    insta::assert_snapshot!(_run_to_str(r#"
+    insta::assert_snapshot!(_run_sql_output(r#"
         func () -> [{3: int64, false}, {6, true}, {12, false}]
     "#), @r#"
     SELECT
@@ -427,7 +432,7 @@ fn array_tuple_prim() {
 
 #[test]
 fn tuple_array_tuple_prim() {
-    insta::assert_snapshot!(_run_to_str(r#"
+    insta::assert_snapshot!(_run_sql_output(r#"
         func () -> {
             "hello",
             [{3: int16, false}, {6, true}, {12, false}],
@@ -657,6 +662,166 @@ fn json_pack_05() {
       "no",
       "yes",
       "neither",
+    ]
+    "#);
+}
+
+#[test]
+fn match_04() {
+    insta::assert_snapshot!(_run_sql_output(r#"
+    type Animal = enum {
+      Cat = text,
+      Dog = enum {Generic, Collie = text},
+    }
+
+    func () -> (
+      [
+        Animal::Cat("Whiskers"),
+        Animal::Dog(Animal::Dog::Collie("Belie")),
+        Animal::Dog(Animal::Dog::Generic),
+      ]
+      | std::map(func (animal: Animal) -> match animal {
+        Animal::Cat(name) => f"Hello {name}",
+        Animal::Dog(Animal::Dog::Generic) => "Who's a good boy?",
+        Animal::Dog(Animal::Dog::Collie(name)) => f"Come here {name}",
+      })
+    )
+    "#), @r#"
+    SELECT
+      r23.value
+    FROM
+      (
+        SELECT
+          r3.index AS index,
+          (
+            SELECT
+              r21.value
+            FROM
+              (
+                WITH r5 AS (
+                  SELECT
+                    r6._t,
+                    r6._0,
+                    r6._1_t,
+                    r6._1_1
+                  FROM
+                    (
+                      SELECT
+                        r3._t AS _t,
+                        r3._0 AS _0,
+                        r3._1_t AS _1_t,
+                        r3._1_1 AS _1_1
+                    ) AS r6
+                )
+                SELECT
+                  CASE
+                    WHEN (
+                      SELECT
+                        (r8.value = 0::"char") AS value
+                      FROM
+                        (
+                          SELECT
+                            r7._t AS value
+                          FROM
+                            r5 AS r7
+                        ) AS r8
+                    ) THEN (
+                      SELECT
+                        ('Hello ' || r10.value) AS value
+                      FROM
+                        (
+                          SELECT
+                            r9._0 AS value
+                          FROM
+                            r5 AS r9
+                        ) AS r10
+                    )
+                    WHEN (
+                      SELECT
+                        (
+                          (r12.value = 1::"char")
+                          AND (r14.value = 0::"char")
+                        ) AS value
+                      FROM
+                        (
+                          SELECT
+                            r11._t AS value
+                          FROM
+                            r5 AS r11
+                        ) AS r12,
+                        (
+                          SELECT
+                            r13._1_t AS value
+                          FROM
+                            r5 AS r13
+                        ) AS r14
+                    ) THEN 'Who''s a good boy?'
+                    WHEN (
+                      SELECT
+                        (
+                          (r16.value = 1::"char")
+                          AND (r18.value = 1::"char")
+                        ) AS value
+                      FROM
+                        (
+                          SELECT
+                            r15._t AS value
+                          FROM
+                            r5 AS r15
+                        ) AS r16,
+                        (
+                          SELECT
+                            r17._1_t AS value
+                          FROM
+                            r5 AS r17
+                        ) AS r18
+                    ) THEN (
+                      SELECT
+                        ('Come here ' || r20.value) AS value
+                      FROM
+                        (
+                          SELECT
+                            r19._1_1 AS value
+                          FROM
+                            r5 AS r19
+                        ) AS r20
+                    )
+                  END AS value
+              ) AS r21
+          ) AS value
+        FROM
+          (
+            SELECT
+              0::int8 AS index,
+              0::"char" AS _t,
+              'Whiskers' AS _0,
+              NULL::"char" AS _1_t,
+              NULL::text AS _1_1
+            UNION
+            ALL
+            SELECT
+              1::int8 AS index,
+              1::"char" AS _t,
+              NULL::text AS _0,
+              1::"char" AS _1_t,
+              'Belie' AS _1_1
+            UNION
+            ALL
+            SELECT
+              2::int8 AS index,
+              1::"char" AS _t,
+              NULL::text AS _0,
+              0::"char" AS _1_t,
+              NULL::text AS _1_1
+          ) AS r3
+      ) AS r23
+    ORDER BY
+      r23.index
+    ---
+    [
+      "Hello Whiskers",
+      "Come here Belie",
+      "Who's a good boy?",
     ]
     "#);
 }

@@ -87,6 +87,18 @@ impl From<ExprOrSource> for Scoped {
     }
 }
 
+impl std::fmt::Display for Scoped {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        for rvar in &self.rel_vars {
+            f.write_str("WITH {")?;
+            rvar.fmt(f)?;
+            f.write_str("} ")?;
+        }
+        self.expr.fmt(f)?;
+        Ok(())
+    }
+}
+
 impl<'a> crate::sql::queries::Context<'a> {
     pub fn scoped_into_expr(&self, expr: Scoped, ty: &ir::Ty) -> ExprOrSource {
         if expr.rel_vars.is_empty()
