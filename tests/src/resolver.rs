@@ -380,6 +380,21 @@ fn types_18() {
 }
 
 #[test]
+fn types_19() {
+    insta::assert_snapshot!(_test_err(r#"
+        func <T> (x) -> x + 1
+    "#), @r"
+    Error:
+       ╭─[:2:19]
+       │
+     2 │         func <T> (x) -> x + 1
+       │                   ┬
+       │                   ╰── missing type annotations
+    ───╯
+    ");
+}
+
+#[test]
 fn array_00() {
     insta::assert_snapshot!(
         _test_err(

@@ -49,6 +49,7 @@ impl fold::PrFold for super::TypeResolver<'_> {
                             return Err(Diagnostic::new_custom(
                                 "expected a value, but found a type",
                             )
+                            .push_hint(format!("scoped = {scoped:?}"))
                             .with_span(span));
                         }
                     },

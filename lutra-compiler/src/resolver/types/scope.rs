@@ -141,15 +141,22 @@ impl Scope {
         }
     }
 
-    pub fn insert_params(&mut self, func: &pr::Func) {
+    pub fn insert_params(&mut self, func: &pr::Func) -> Result<(), Vec<Diagnostic>> {
+        let mut d = Vec::new();
+
         for param in &func.params {
-            let ty = param.ty.clone().unwrap_or_else(|| {
-                panic!("func missing param ty: should have been replaced by a ty var")
-            });
+            let Some(ty) = param.ty.clone() else {
+                d.push(
+                    Diagnostic::new_custom("missing type annotations").with_span(Some(param.span)),
+                );
+                continue;
+            };
 
             let scoped = ScopedKind::Param { ty };
             self.names.push(scoped);
         }
+
+        if d.is_empty() { Ok(()) } else { Err(d) }
     }
 
     pub fn insert_type_var(

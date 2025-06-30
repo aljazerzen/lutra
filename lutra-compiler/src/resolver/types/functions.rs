@@ -32,14 +32,20 @@ impl TypeResolver<'_> {
         // fold types
         func.params = fold::fold_func_params(self, func.params)?;
         func.return_ty = fold::fold_type_opt(self, func.return_ty)?;
-        for param in func.params.iter_mut() {
-            if param.ty.is_none() {
-                param.ty = Some(self.introduce_ty_var(pr::TyParamDomain::Open, Some(param.span)));
+        if func.ty_params.is_empty() {
+            // only allow ty param inference for functions without type params
+
+            for param in func.params.iter_mut() {
+                if param.ty.is_none() {
+                    param.ty =
+                        Some(self.introduce_ty_var(pr::TyParamDomain::Open, Some(param.span)));
+                }
             }
         }
 
         // put params into scope
-        self.scopes.last_mut().unwrap().insert_params(&func);
+        let res = self.scopes.last_mut().unwrap().insert_params(&func);
+        res.map_err(|mut d| d.remove(0))?;
 
         func.body = Box::new(self.fold_expr(*func.body)?);
 
