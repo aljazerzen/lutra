@@ -112,7 +112,8 @@ pub fn check(cmd: CheckCommand) -> anyhow::Result<()> {
     }
 
     if cmd.print_ir {
-        let program = lutra_compiler::_lower_expr(&project, &cmd.program)?;
+        let expr = lutra_compiler::compile_overlay(&project, &cmd.program, Some("--program"))?;
+        let program = lutra_compiler::lower_expr(&project.root_module, &expr);
         let program = lutra_compiler::layouter::on_program(program);
 
         let program_source = lutra_bin::ir::print(&program);
@@ -137,7 +138,7 @@ pub struct RunCommand {
     compile: CompileParams,
 
     #[clap(default_value = "main")]
-    main: String,
+    program: String,
 }
 
 pub fn run(cmd: RunCommand) -> anyhow::Result<()> {
@@ -145,7 +146,10 @@ pub fn run(cmd: RunCommand) -> anyhow::Result<()> {
 
     let project = lutra_compiler::compile(project, cmd.compile)?;
 
-    let program = lutra_compiler::_lower_expr(&project, &cmd.main)?;
+    let expr = lutra_compiler::compile_overlay(&project, &cmd.program, Some("--program"))?;
+    let program = lutra_compiler::lower_expr(&project.root_module, &expr);
+    let program = lutra_compiler::layouter::on_program(program);
+
     tracing::debug!("ir:\n{}", lutra_bin::ir::print(&program));
     let bytecode = lutra_compiler::bytecode_program(program.clone());
 
@@ -170,7 +174,7 @@ pub struct SqlCommand {
     compile: CompileParams,
 
     #[clap(default_value = "main")]
-    path: String,
+    program: String,
 }
 
 pub fn sql(cmd: SqlCommand) -> anyhow::Result<()> {
@@ -178,7 +182,7 @@ pub fn sql(cmd: SqlCommand) -> anyhow::Result<()> {
 
     let project = lutra_compiler::compile(project, cmd.compile)?;
 
-    let path = pr::Path::new(cmd.path.split("::"));
+    let path = pr::Path::new(cmd.program.split("::"));
 
     let program = lutra_compiler::compile_to_sql(&project, &path);
 

@@ -6,6 +6,8 @@ use crate::error;
 use crate::error::Error;
 use crate::pr;
 use crate::project;
+use crate::project::SourceOverlay;
+use crate::project::SourceProvider;
 
 #[cfg_attr(feature = "clap", derive(clap::Parser))]
 #[derive(Default)]
@@ -64,6 +66,28 @@ fn parse(
     }
     if diagnostics.is_empty() {
         Ok(root)
+    } else {
+        Err(diagnostics)
+    }
+}
+
+pub fn compile_overlay(
+    project: &project::Project,
+    overlay: &str,
+    overlay_name: Option<&str>,
+) -> Result<pr::Expr, error::Error> {
+    let source = crate::project::SourceOverlay::new(&project.source, overlay, overlay_name);
+
+    parse_overlay(&source)
+        .and_then(|expr| crate::resolver::resolve_overlay_expr(&project.root_module, expr))
+        .map_err(|e| Error::from_diagnostics(e, &source))
+}
+
+fn parse_overlay(overlay: &SourceOverlay) -> Result<pr::Expr, Vec<Diagnostic>> {
+    let snippet = overlay.get_source(overlay.get_path(0).unwrap()).unwrap();
+    let (ast, diagnostics) = crate::parser::parse_expr(snippet, 0);
+    if diagnostics.is_empty() {
+        Ok(ast.unwrap())
     } else {
         Err(diagnostics)
     }

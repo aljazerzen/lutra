@@ -35,7 +35,7 @@ pub fn resolve(module_tree: pr::ModuleDef) -> Result<decl::RootModule, Vec<Diagn
 }
 
 /// Runs semantic analysis of an expression within an already resolved project.
-pub fn resolve_post(
+pub fn resolve_overlay_expr(
     root_module: &decl::RootModule,
     expr: pr::Expr,
 ) -> Result<pr::Expr, Vec<Diagnostic>> {
@@ -73,6 +73,8 @@ pub fn resolve_post(
 
 /// Preferred way of injecting std module.
 pub fn load_std_lib(source: &mut crate::SourceTree) {
+    use crate::project::SourceProvider;
+
     let path = std::path::PathBuf::from_str("std.lt").unwrap();
     if source.get_source(&path).is_none() {
         source.insert(path, include_str!("std.lt").to_string());

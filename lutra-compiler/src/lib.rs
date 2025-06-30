@@ -17,12 +17,11 @@ pub mod error;
 pub mod pr;
 pub mod printer;
 pub use bytecoding::compile_program as bytecode_program;
-pub use compile::{CompileParams, compile};
+pub use compile::{CompileParams, compile, compile_overlay};
 pub use discover::{DiscoverParams, discover};
 pub use intermediate::{layouter, lower_expr, lower_type_defs, lower_var};
 pub use lutra_bin::ir;
 pub use project::{Project, SourceTree};
-use resolver::resolve_post;
 pub use span::Span;
 pub use sql::compile as compile_to_sql;
 
@@ -59,11 +58,9 @@ pub fn _test_compile(source: &str) -> Result<ir::Program, error::Error> {
     Ok(layouter::on_program(program))
 }
 
-pub fn _lower_expr(project: &Project, source: &str) -> Result<ir::Program, error::Error> {
-    let (expr, _diagnostics) = parser::parse_expr(source, 0);
-    let expr = expr.unwrap();
-
-    let expr = resolve_post(&project.root_module, expr).unwrap();
+fn _lower_expr(project: &Project, overlay: &str) -> Result<ir::Program, error::Error> {
+    let expr = compile::compile_overlay(project, overlay, Some("<inline>"))
+        .unwrap_or_else(|e| panic!("{e}"));
 
     let program = lower_expr(&project.root_module, &expr);
     let program = layouter::on_program(program);

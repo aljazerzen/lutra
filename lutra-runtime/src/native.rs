@@ -490,7 +490,9 @@ pub mod std {
                 let item_cell = Cell::Data(item.clone());
 
                 let key = it.evaluate_func_call(&key_getter, vec![item_cell])?;
-                let key = assume::into_value(key).slice(output_fields_layouts[0].0 as usize).to_vec();
+                let key = assume::into_value(key)
+                    .slice(output_fields_layouts[0].0 as usize)
+                    .to_vec();
 
                 let partition = partitions.entry(key).or_default();
                 partition.push(item);

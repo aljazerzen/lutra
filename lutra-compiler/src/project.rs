@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 use std::path::PathBuf;
+use std::str::FromStr;
 
 use itertools::Itertools;
 
@@ -15,6 +16,7 @@ pub struct Project {
     pub root_module: RootModule,
 }
 
+/// Sources used to resolve the project.
 /// All paths are relative to the project root.
 // We use `SourceTree` to represent both a single file (including a "file" piped
 // from stdin), and a collection of files. (Possibly this could be implemented
@@ -66,16 +68,8 @@ impl SourceTree {
         self.source_ids.insert(last_id + 1, path);
     }
 
-    pub fn get_path(&self, source_id: u16) -> Option<&PathBuf> {
-        self.source_ids.get(&source_id)
-    }
-
     pub fn get_sources(&self) -> impl Iterator<Item = (&PathBuf, &String)> {
         self.sources.iter()
-    }
-
-    pub fn get_source(&self, path: &std::path::Path) -> Option<&String> {
-        self.sources.get(path)
     }
 }
 
@@ -90,5 +84,59 @@ impl std::fmt::Display for SourceTree {
         }
 
         f.write_str(&r)
+    }
+}
+
+/// Contains a SourceTree and a snippet without a path
+pub struct SourceOverlay<'a> {
+    tree: &'a SourceTree,
+
+    snippet_path: std::path::PathBuf,
+    snippet: &'a str,
+}
+
+impl<'a> SourceOverlay<'a> {
+    pub fn new(tree: &'a SourceTree, snippet: &'a str, snippet_path: Option<&str>) -> Self {
+        Self {
+            tree,
+            snippet,
+            snippet_path: snippet_path
+                .map(|s| std::path::PathBuf::from_str(s).unwrap())
+                .unwrap_or_default(),
+        }
+    }
+}
+
+pub trait SourceProvider {
+    fn get_path(&self, id: u16) -> Option<&std::path::Path>;
+
+    fn get_source(&self, path: &std::path::Path) -> Option<&str>;
+}
+
+impl SourceProvider for SourceTree {
+    fn get_path(&self, id: u16) -> Option<&std::path::Path> {
+        self.source_ids.get(&id).map(|x| x.as_path())
+    }
+
+    fn get_source(&self, path: &std::path::Path) -> Option<&str> {
+        self.sources.get(path).map(|x| x.as_str())
+    }
+}
+
+impl<'a> SourceProvider for SourceOverlay<'a> {
+    fn get_path(&self, id: u16) -> Option<&std::path::Path> {
+        if id == 0 {
+            Some(self.snippet_path.as_path())
+        } else {
+            self.tree.get_path(id)
+        }
+    }
+
+    fn get_source(&self, path: &std::path::Path) -> Option<&str> {
+        if path == self.snippet_path {
+            Some(self.snippet)
+        } else {
+            self.tree.get_source(path)
+        }
     }
 }

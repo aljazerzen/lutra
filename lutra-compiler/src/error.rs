@@ -24,9 +24,9 @@ pub enum Error {
 impl Error {
     pub(crate) fn from_diagnostics(
         diagnostics: Vec<Diagnostic>,
-        source: &crate::SourceTree,
+        sources: &impl crate::project::SourceProvider,
     ) -> Self {
-        let diagnostics = compose_diagnostic_messages(diagnostics, source);
+        let diagnostics = compose_diagnostic_messages(diagnostics, sources);
         Error::Compile { diagnostics }
     }
 }
@@ -75,7 +75,7 @@ pub struct SourceLocation {
 
 fn compose_diagnostic_messages(
     diagnostics: Vec<Diagnostic>,
-    sources: &crate::SourceTree,
+    sources: &impl crate::project::SourceProvider,
 ) -> Vec<DiagnosticMessage> {
     use ariadne::Cache;
 
@@ -84,7 +84,7 @@ fn compose_diagnostic_messages(
     let mut messages = Vec::with_capacity(diagnostics.len());
     for diagnostic in diagnostics {
         if let Some(span) = diagnostic.span {
-            let source_path = sources.source_ids.get(&span.source_id).unwrap().as_path();
+            let source_path = sources.get_path(span.source_id).unwrap();
 
             let source = cache.fetch(&source_path).unwrap();
             let Some(location) = compose_location(&diagnostic, source) else {
@@ -111,11 +111,14 @@ fn compose_diagnostic_messages(
     messages
 }
 
-fn compose_display(
+fn compose_display<S>(
     diagnostic: &Diagnostic,
     source_path: &Path,
-    cache: &mut FileTreeCache,
-) -> String {
+    cache: &mut FileTreeCache<S>,
+) -> String
+where
+    S: crate::project::SourceProvider,
+{
     use ariadne::{Config, Label, Report, ReportKind};
 
     let config = Config::default().with_color(false);
@@ -166,30 +169,30 @@ fn compose_location(diagnostic: &Diagnostic, source: &ariadne::Source) -> Option
     })
 }
 
-struct FileTreeCache<'a> {
-    file_tree: &'a crate::SourceTree,
+struct FileTreeCache<'a, S: crate::project::SourceProvider> {
+    provider: &'a S,
     cache: HashMap<PathBuf, ariadne::Source>,
 }
-impl<'a> FileTreeCache<'a> {
-    fn new(file_tree: &'a crate::SourceTree) -> Self {
+impl<'a, S: crate::project::SourceProvider> FileTreeCache<'a, S> {
+    fn new(file_tree: &'a S) -> Self {
         FileTreeCache {
-            file_tree,
+            provider: file_tree,
             cache: HashMap::new(),
         }
     }
 }
 
-impl<'a> ariadne::Cache<&Path> for FileTreeCache<'a> {
+impl<'a, S: crate::project::SourceProvider> ariadne::Cache<&Path> for FileTreeCache<'a, S> {
     type Storage = String;
-    fn fetch(&mut self, id: &&Path) -> Result<&ariadne::Source, Box<dyn fmt::Debug + '_>> {
-        let file_contents = match self.file_tree.sources.get(*id) {
+    fn fetch(&mut self, path: &&Path) -> Result<&ariadne::Source, Box<dyn fmt::Debug + '_>> {
+        let file_contents = match self.provider.get_source(path) {
             Some(v) => v,
-            None => return Err(Box::new(format!("Unknown file `{id:?}`"))),
+            None => return Err(Box::new(format!("Unknown file `{path:?}`"))),
         };
 
         Ok(self
             .cache
-            .entry((*id).to_owned())
+            .entry((*path).to_owned())
             .or_insert_with(|| ariadne::Source::from(file_contents.to_string())))
     }
 
