@@ -200,7 +200,7 @@ fn tuple_array_prim() {
                     r3.index
                 ),
                 '[]'::jsonb
-              )
+              ) AS value
             FROM
               (
                 SELECT
@@ -227,7 +227,7 @@ fn tuple_array_prim() {
                     r5.index
                 ),
                 '[]'::jsonb
-              )
+              ) AS value
             FROM
               (
                 SELECT
@@ -257,7 +257,7 @@ fn tuple_array_prim() {
 fn tuple_array_empty() {
     insta::assert_snapshot!(_run_to_str(r#"
         func () -> {true, []: [int64], false}
-    "#), @r#"
+    "#), @r"
     SELECT
       r1._0,
       r1._1,
@@ -275,7 +275,7 @@ fn tuple_array_empty() {
                     r0.index
                 ),
                 '[]'::jsonb
-              )
+              ) AS value
             FROM
               (
                 SELECT
@@ -293,14 +293,14 @@ fn tuple_array_empty() {
       [],
       false,
     }
-    "#);
+    ");
 }
 
 #[test]
 fn array_array_prim() {
     insta::assert_snapshot!(_run_to_str(r#"
         func () -> [[1, 2, 3], [4, 5]]: [[int64]]
-    "#), @r#"
+    "#), @r"
     SELECT
       r9.value
     FROM
@@ -316,7 +316,7 @@ fn array_array_prim() {
                     r3.index
                 ),
                 '[]'::jsonb
-              )
+              ) AS value
             FROM
               (
                 SELECT
@@ -347,7 +347,7 @@ fn array_array_prim() {
                     r7.index
                 ),
                 '[]'::jsonb
-              )
+              ) AS value
             FROM
               (
                 SELECT
@@ -375,7 +375,7 @@ fn array_array_prim() {
         5,
       ],
     ]
-    "#);
+    ");
 }
 
 #[test]
@@ -449,7 +449,7 @@ fn tuple_array_tuple_prim() {
                     r3.index
                 ),
                 '[]'::jsonb
-              )
+              ) AS value
             FROM
               (
                 SELECT

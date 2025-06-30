@@ -47,7 +47,7 @@ impl Scoped {
         }
         let query = self.as_query()?;
 
-        if query.limit.is_some() || query.order_by.is_some() {
+        if query.limit.is_some() || query.order_by.is_some() || query.with.is_some() {
             return None;
         }
         let sql_ast::SetExpr::Select(select) = query.body.as_ref() else {
@@ -123,7 +123,10 @@ impl<'a> crate::sql::queries::Context<'a> {
 
         match scoped.expr {
             ExprOrSource::Expr(_) | ExprOrSource::Source(_) => {
-                select.projection = vec![sql_ast::SelectItem::UnnamedExpr(scoped.expr.into_expr())];
+                select.projection = vec![sql_ast::SelectItem::ExprWithAlias {
+                    expr: scoped.expr.into_expr(),
+                    alias: sql_ast::Ident::new("value"),
+                }];
             }
             ExprOrSource::RelVar(rvar_name) => {
                 select.projection = self.projection_noop(Some(&rvar_name), ty, include_index);

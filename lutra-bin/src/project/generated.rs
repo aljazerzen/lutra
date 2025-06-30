@@ -1006,14 +1006,14 @@ pub mod ir {
     #[derive(Debug, Clone)]
     #[allow(non_camel_case_types)]
     pub struct EnumEq {
-        pub expr: Expr,
+        pub subject: Expr,
         pub tag: u64,
     }
 
     #[derive(Debug, Clone)]
     #[allow(non_camel_case_types)]
     pub struct EnumUnwrap {
-        pub expr: Expr,
+        pub subject: Expr,
         pub tag: u64,
     }
 
@@ -2021,18 +2021,18 @@ pub mod ir {
         impl crate::Encode for EnumEq {
             type HeadPtr = EnumEqHeadPtr;
             fn encode_head(&self, buf: &mut crate::bytes::BytesMut) -> Self::HeadPtr {
-                let expr = self.expr.encode_head(buf);
+                let subject = self.subject.encode_head(buf);
                 let tag = self.tag.encode_head(buf);
-                EnumEqHeadPtr { expr, tag }
+                EnumEqHeadPtr { subject, tag }
             }
             fn encode_body(&self, head: Self::HeadPtr, buf: &mut crate::bytes::BytesMut) {
-                self.expr.encode_body(head.expr, buf);
+                self.subject.encode_body(head.subject, buf);
                 self.tag.encode_body(head.tag, buf);
             }
         }
         #[allow(non_camel_case_types)]
         pub struct EnumEqHeadPtr {
-            expr: <super::Expr as crate::Encode>::HeadPtr,
+            subject: <super::Expr as crate::Encode>::HeadPtr,
             tag: <u64 as crate::Encode>::HeadPtr,
         }
         impl crate::Layout for EnumEq {
@@ -2043,9 +2043,9 @@ pub mod ir {
 
         impl crate::Decode for EnumEq {
             fn decode(buf: &[u8]) -> crate::Result<Self> {
-                let expr = super::Expr::decode(buf.skip(0))?;
+                let subject = super::Expr::decode(buf.skip(0))?;
                 let tag = u64::decode(buf.skip(28))?;
-                Ok(EnumEq { expr, tag })
+                Ok(EnumEq { subject, tag })
             }
         }
 
@@ -2053,18 +2053,18 @@ pub mod ir {
         impl crate::Encode for EnumUnwrap {
             type HeadPtr = EnumUnwrapHeadPtr;
             fn encode_head(&self, buf: &mut crate::bytes::BytesMut) -> Self::HeadPtr {
-                let expr = self.expr.encode_head(buf);
+                let subject = self.subject.encode_head(buf);
                 let tag = self.tag.encode_head(buf);
-                EnumUnwrapHeadPtr { expr, tag }
+                EnumUnwrapHeadPtr { subject, tag }
             }
             fn encode_body(&self, head: Self::HeadPtr, buf: &mut crate::bytes::BytesMut) {
-                self.expr.encode_body(head.expr, buf);
+                self.subject.encode_body(head.subject, buf);
                 self.tag.encode_body(head.tag, buf);
             }
         }
         #[allow(non_camel_case_types)]
         pub struct EnumUnwrapHeadPtr {
-            expr: <super::Expr as crate::Encode>::HeadPtr,
+            subject: <super::Expr as crate::Encode>::HeadPtr,
             tag: <u64 as crate::Encode>::HeadPtr,
         }
         impl crate::Layout for EnumUnwrap {
@@ -2075,9 +2075,9 @@ pub mod ir {
 
         impl crate::Decode for EnumUnwrap {
             fn decode(buf: &[u8]) -> crate::Result<Self> {
-                let expr = super::Expr::decode(buf.skip(0))?;
+                let subject = super::Expr::decode(buf.skip(0))?;
                 let tag = u64::decode(buf.skip(28))?;
-                Ok(EnumUnwrap { expr, tag })
+                Ok(EnumUnwrap { subject, tag })
             }
         }
 

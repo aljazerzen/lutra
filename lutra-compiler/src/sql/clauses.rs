@@ -244,41 +244,70 @@ impl<'a> Context<'a> {
 
                 // tag
                 row.push(cr::Expr {
-                    kind: cr::ExprKind::From(cr::From::Literal(ir::Literal::int64(
-                        variant.tag as i64,
+                    kind: cr::ExprKind::From(cr::From::Literal(ir::Literal::int8(
+                        variant.tag as i8,
                     ))),
                     ty: ir::Ty::new(ir::TyPrimitive::int8),
                 });
 
                 // spacing
-                for ty_variant in &ty_variants[0..(variant.tag as usize)] {
-                    if ty_variant.ty.is_unit() {
-                        continue;
-                    }
-                    row.push(cr::Expr {
+                let selected = variant.tag as usize;
+                row.extend(ty_variants.iter().take(selected).flat_map(|v| {
+                    self.rel_cols_ty_nested(&v.ty).map(|ty| cr::Expr {
                         kind: cr::ExprKind::From(cr::From::Null),
-                        ty: ty_variant.ty.clone(),
-                    });
-                }
+                        ty: ty.into_owned(),
+                    })
+                }));
 
                 // inner
                 row.extend(self.compile_column_list(&variant.inner).unwrap_columns());
 
                 // spacing
-                for ty_variant in &ty_variants[((variant.tag as usize) + 1)..] {
-                    if ty_variant.ty.is_unit() {
-                        continue;
-                    }
-                    row.push(cr::Expr {
+                row.extend(ty_variants.iter().skip(selected + 1).flat_map(|v| {
+                    self.rel_cols_ty_nested(&v.ty).map(|ty| cr::Expr {
                         kind: cr::ExprKind::From(cr::From::Null),
-                        ty: ty_variant.ty.clone(),
-                    });
-                }
+                        ty: ty.into_owned(),
+                    })
+                }));
 
                 cr::ExprKind::From(cr::From::Row(row))
             }
-            ir::ExprKind::EnumEq(_) => todo!(),
-            ir::ExprKind::EnumUnwrap(_) => todo!(),
+            ir::ExprKind::EnumEq(enum_eq) => {
+                let base = self.compile_rel(&enum_eq.subject);
+                let base = self.new_binding(base);
+
+                let tag = cr::Expr {
+                    kind: cr::ExprKind::Transform(base, cr::Transform::ProjectRetain(vec![0])),
+                    ty: ir::Ty::new(ir::TyPrimitive::int8),
+                };
+
+                let args = vec![tag, new_int8(enum_eq.tag as i8)];
+                cr::ExprKind::From(cr::From::FuncCall("std::eq".to_string(), args))
+            }
+            ir::ExprKind::EnumUnwrap(enum_unwrap) => {
+                let base = self.compile_rel(&enum_unwrap.subject);
+                let base = self.new_binding(base);
+
+                let ir::TyKind::Enum(variants) = &self.get_ty_mat(&enum_unwrap.subject.ty).kind
+                else {
+                    panic!("invalid program");
+                };
+
+                // count number of columns in front of selected variant and the first tag
+                let start = 1 + variants
+                    .iter()
+                    .take(enum_unwrap.tag as usize)
+                    .map(|v| self.rel_cols_nested(&v.ty, String::new()).count())
+                    .sum::<usize>();
+
+                // count number of columns of the selected variant
+                let end = start
+                    + self
+                        .rel_cols_nested(&variants[enum_unwrap.tag as usize].ty, String::new())
+                        .count();
+
+                cr::ExprKind::Transform(base, cr::Transform::ProjectRetain((start..end).collect()))
+            }
 
             ir::ExprKind::TupleLookup(lookup) => {
                 let base = self.compile_rel(&lookup.base);
@@ -300,7 +329,7 @@ impl<'a> Context<'a> {
                 let start: usize = fields
                     .iter()
                     .take(position)
-                    .map(|f| self.rel_cols_nested(&f.ty, String::new()).count())
+                    .map(|f| self.rel_cols_ty_nested(&f.ty).count())
                     .sum();
 
                 // Also, target of lookup might not contain a single column
@@ -309,8 +338,7 @@ impl<'a> Context<'a> {
                     + if unpack {
                         1
                     } else {
-                        self.rel_cols_nested(&fields[position].ty, String::new())
-                            .count()
+                        self.rel_cols_ty_nested(&fields[position].ty).count()
                     };
 
                 let mut rel = cr::ExprKind::Transform(
@@ -352,7 +380,16 @@ impl<'a> Context<'a> {
                 }
             }
 
-            ir::ExprKind::Switch(_) => todo!(),
+            ir::ExprKind::Switch(switch) => {
+                let mut cases = Vec::new();
+                for branch in switch {
+                    let condition = self.compile_column(&branch.condition);
+                    let value = self.compile_column(&branch.value);
+
+                    cases.push((condition, value));
+                }
+                cr::ExprKind::From(cr::From::Case(cases))
+            }
         };
         cr::Expr {
             kind,
@@ -789,6 +826,14 @@ fn new_int(int: i64) -> cr::Expr {
     cr::Expr {
         kind,
         ty: ir::Ty::new(ir::TyPrimitive::int64),
+    }
+}
+
+fn new_int8(int: i8) -> cr::Expr {
+    let kind = cr::ExprKind::From(cr::From::Literal(ir::Literal::int8(int)));
+    cr::Expr {
+        kind,
+        ty: ir::Ty::new(ir::TyPrimitive::int8),
     }
 }
 

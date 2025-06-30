@@ -54,9 +54,7 @@ pub(crate) fn expr() -> impl Parser<TokenKind, Expr, Error = PError> + Clone {
         let expr = binary_op_parser(expr, operator_coalesce());
         let expr = binary_op_parser(expr, operator_and());
         let expr = binary_op_parser(expr, operator_or());
-        let expr = range(expr);
-
-        expr.labelled("expression")
+        range(expr)
     })
 }
 
@@ -452,21 +450,16 @@ fn operator_coalesce() -> impl Parser<TokenKind, BinOp, Error = PError> + Clone 
 fn type_annotation<'a>(
     expr: impl Parser<TokenKind, Expr, Error = PError> + 'a,
 ) -> impl Parser<TokenKind, Expr, Error = PError> + Clone + 'a {
-    expr.then(
-        ctrl(':')
-            .ignore_then(type_expr())
-            .labelled("type annotation")
-            .or_not(),
-    )
-    .map_with_span(|(expr, ty), span| {
-        if let Some(ty) = ty {
-            let expr = Box::new(expr);
-            let ty = Box::new(ty);
-            let kind = ExprKind::TypeAnnotation(TypeAnnotation { expr, ty });
-            Expr::new_with_span(kind, span)
-        } else {
-            expr
-        }
-    })
-    .boxed()
+    expr.then(ctrl(':').ignore_then(type_expr()).or_not())
+        .map_with_span(|(expr, ty), span| {
+            if let Some(ty) = ty {
+                let expr = Box::new(expr);
+                let ty = Box::new(ty);
+                let kind = ExprKind::TypeAnnotation(TypeAnnotation { expr, ty });
+                Expr::new_with_span(kind, span)
+            } else {
+                expr
+            }
+        })
+        .boxed()
 }

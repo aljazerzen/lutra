@@ -148,7 +148,7 @@ impl Printer {
                 self.indent();
                 r += &self.new_line();
 
-                r += &self.print_expr(&eq.expr);
+                r += &self.print_expr(&eq.subject);
 
                 self.dedent();
                 r += &self.new_line();
@@ -160,7 +160,7 @@ impl Printer {
                 self.indent();
                 r += &self.new_line();
 
-                r += &self.print_expr(&unwrap.expr);
+                r += &self.print_expr(&unwrap.subject);
 
                 self.dedent();
                 r += &self.new_line();

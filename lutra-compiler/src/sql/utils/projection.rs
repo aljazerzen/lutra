@@ -1,3 +1,5 @@
+use std::borrow::Cow;
+
 use lutra_bin::ir;
 use sqlparser::ast as sql_ast;
 
@@ -13,7 +15,7 @@ use super::ExprOrSource;
 pub trait RelCols<'a> {
     fn get_ty_mat(&self, ty: &'a ir::Ty) -> &'a ir::Ty;
 
-    /// Names of relational columns for a given type
+    /// Names of relational columns for a given type.
     /// If include_index is false, top-level arrays does not produce index column.
     fn rel_cols(
         &'a self,
@@ -45,6 +47,8 @@ pub trait RelCols<'a> {
         }
     }
 
+    /// Names of relational columns for a given type, where this type is not the top-level
+    /// type of a relation.
     fn rel_cols_nested(
         &'a self,
         ty: &'a ir::Ty,
@@ -82,6 +86,32 @@ pub trait RelCols<'a> {
                         }),
                 ),
             ),
+            ir::TyKind::Function(_) => todo!(),
+            ir::TyKind::Ident(_) => todo!(),
+        }
+    }
+
+    /// Types of relational columns for a given type.
+    fn rel_cols_ty_nested(
+        &'a self,
+        ty: &'a ir::Ty,
+    ) -> Box<dyn Iterator<Item = Cow<'a, ir::Ty>> + 'a> {
+        let ty_mat = self.get_ty_mat(ty);
+        match &ty_mat.kind {
+            ir::TyKind::Primitive(_) | ir::TyKind::Array(_) => {
+                Box::new(Some(Cow::Borrowed(ty_mat)).into_iter())
+            }
+
+            ir::TyKind::Tuple(fields) => {
+                Box::new(fields.iter().flat_map(|f| self.rel_cols_ty_nested(&f.ty)))
+            }
+
+            ir::TyKind::Enum(variants) => Box::new(itertools::chain(
+                // tag
+                Some(Cow::Owned(ir::Ty::new(ir::TyPrimitive::int8))),
+                // variants
+                variants.iter().flat_map(|v| self.rel_cols_ty_nested(&v.ty)),
+            )),
             ir::TyKind::Function(_) => todo!(),
             ir::TyKind::Ident(_) => todo!(),
         }

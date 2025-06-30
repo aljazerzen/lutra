@@ -155,21 +155,21 @@ impl ByteCoder {
     }
 
     fn compile_enum_eq(&mut self, v: ir::EnumEq) -> EnumEq {
-        let ty_variants = self.get_ty_mat(&v.expr.ty).kind.as_enum().unwrap();
+        let ty_variants = self.get_ty_mat(&v.subject.ty).kind.as_enum().unwrap();
         let head_format = lutra_bin::layout::enum_head_format(ty_variants);
 
         let tag = v.tag.to_le_bytes()[0..head_format.tag_bytes as usize].to_vec();
         EnumEq {
             tag,
-            expr: self.compile_expr(v.expr),
+            expr: self.compile_expr(v.subject),
         }
     }
 
     fn compile_enum_unwrap(&mut self, v: ir::EnumUnwrap) -> Expr {
-        let ty_variants = self.get_ty_mat(&v.expr.ty).kind.as_enum().unwrap();
+        let ty_variants = self.get_ty_mat(&v.subject.ty).kind.as_enum().unwrap();
         let head_format = lutra_bin::layout::enum_head_format(ty_variants);
 
-        let mut expr = self.compile_expr(v.expr);
+        let mut expr = self.compile_expr(v.subject);
 
         // offset tag
         expr = Expr {

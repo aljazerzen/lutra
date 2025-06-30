@@ -181,6 +181,9 @@ impl<'a> Context<'a> {
                 let val = self.scoped_into_query(val, &val_in.rel.ty);
                 let mut main = self.scoped_into_query(main, &main_in.ty);
 
+                tracing::debug!("val = {val}");
+                tracing::debug!("main = {main}");
+
                 main.with = Some(utils::with());
                 let ctes = &mut main.with.as_mut().unwrap().cte_tables;
                 ctes.insert(0, utils::cte(name, val));
@@ -285,6 +288,26 @@ impl<'a> Context<'a> {
             cr::From::JsonUnpack(input) => {
                 let input = self.compile_rel(input);
                 self.compile_json_unpack(input, ty)
+            }
+
+            cr::From::Case(cases) => {
+                let mut conditions = Vec::new();
+                let mut results = Vec::new();
+                for (cond, value) in cases {
+                    let cond_s = self.compile_column(cond);
+                    let cond = self.scoped_into_expr(cond_s, &cond.ty);
+                    conditions.push(cond.into_expr());
+
+                    let value_s = self.compile_column(value);
+                    let value = self.scoped_into_expr(value_s, &value.ty);
+                    results.push(value.into_expr());
+                }
+                Scoped::from(ExprOrSource::Expr(Box::new(sql_ast::Expr::Case {
+                    operand: None,
+                    conditions,
+                    results,
+                    else_result: None,
+                })))
             }
         }
     }
@@ -457,14 +480,6 @@ impl<'a> Context<'a> {
                     key.into_iter().map(ExprOrSource::into_expr).collect(),
                     vec![],
                 );
-
-                // select.from.extend(
-                //     values
-                //         .rel_vars
-                //         .into_iter()
-                //         .map(utils::lateral)
-                //         .map(utils::from),
-                // );
             }
         }
         scoped
@@ -736,6 +751,8 @@ impl<'a> Context<'a> {
                 ))
             }
 
+            "std::text_ops::concat" => utils::new_bin_op("||", args),
+
             _ => todo!("sql impl for {id}"),
         }
     }
@@ -750,38 +767,36 @@ impl<'a> Context<'a> {
     }
 
     fn compile_ty_name(&self, ty: &ir::Ty) -> sql_ast::DataType {
-        match self.get_ty_mat(ty).kind {
-            ir::TyKind::Primitive(prim) => {
-                let name = match prim {
-                    ir::TyPrimitive::bool => "bool",
-                    ir::TyPrimitive::int8 => "\"char\"",
-                    ir::TyPrimitive::int16 => "int2",
-                    ir::TyPrimitive::int32 => "int4",
-                    ir::TyPrimitive::int64 => "int8",
-                    ir::TyPrimitive::uint8 => todo!(),
-                    ir::TyPrimitive::uint16 => todo!(),
-                    ir::TyPrimitive::uint32 => todo!(),
-                    ir::TyPrimitive::uint64 => todo!(),
-                    ir::TyPrimitive::float32 => "float4",
-                    ir::TyPrimitive::float64 => "float8",
-                    ir::TyPrimitive::text => "text",
-                };
-                sql_ast::DataType::Custom(
-                    sql_ast::ObjectName(vec![sql_ast::Ident::new(name)]),
-                    vec![],
-                )
-            }
+        let type_name = match self.get_ty_mat(ty).kind {
+            ir::TyKind::Primitive(prim) => match prim {
+                ir::TyPrimitive::bool => "bool",
+                ir::TyPrimitive::int8 => "\"char\"",
+                ir::TyPrimitive::int16 => "int2",
+                ir::TyPrimitive::int32 => "int4",
+                ir::TyPrimitive::int64 => "int8",
+                ir::TyPrimitive::uint8 => todo!(),
+                ir::TyPrimitive::uint16 => todo!(),
+                ir::TyPrimitive::uint32 => todo!(),
+                ir::TyPrimitive::uint64 => todo!(),
+                ir::TyPrimitive::float32 => "float4",
+                ir::TyPrimitive::float64 => "float8",
+                ir::TyPrimitive::text => "text",
+            },
             ir::TyKind::Tuple(ref fields) if fields.is_empty() => {
                 // unit type (holds no data) does not exist in sql so we use a type with
                 // the least amount of data
-                sql_ast::DataType::Boolean
+                "bool"
             }
             ir::TyKind::Tuple(_) => todo!(),
-            ir::TyKind::Array(_) => todo!(),
-            ir::TyKind::Enum(_) => todo!(),
+            ir::TyKind::Array(_) => "text",
+            ir::TyKind::Enum(_) => panic!("null value for enum does not make sense"),
             ir::TyKind::Function(_) => todo!(),
             ir::TyKind::Ident(_) => todo!(),
-        }
+        };
+        sql_ast::DataType::Custom(
+            sql_ast::ObjectName(vec![sql_ast::Ident::new(type_name)]),
+            vec![],
+        )
     }
 
     fn compile_literal(&self, lit: &ir::Literal, ty: &ir::Ty) -> ExprOrSource {

@@ -73,12 +73,12 @@ type EnumVariant = {
 }
 
 type EnumEq = {
-  expr = Expr,
+  subject = Expr,
   tag = uint64,
 }
 
 type EnumUnwrap = {
-  expr = Expr,
+  subject = Expr,
   tag = uint64,
 }
 

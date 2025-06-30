@@ -384,7 +384,7 @@ impl<'a> Lowerer<'a> {
 
                 let mut expr = ir::Expr {
                     kind: ir::ExprKind::EnumEq(Box::new(ir::EnumEq {
-                        expr: subject.clone(),
+                        subject: subject.clone(),
                         tag: pattern.variant_tag.unwrap() as u64,
                     })),
                     ty: ir::Ty::new(ir::TyPrimitive::bool),
@@ -397,7 +397,7 @@ impl<'a> Lowerer<'a> {
                     let inner_ty = subject_variants.into_iter().nth(tag).unwrap().ty;
                     let inner_ref = ir::Expr {
                         kind: ir::ExprKind::EnumUnwrap(Box::new(ir::EnumUnwrap {
-                            expr: subject.clone(),
+                            subject: subject.clone(),
                             tag: tag as u64,
                         })),
                         ty: inner_ty,
@@ -637,7 +637,7 @@ impl<'a> Lowerer<'a> {
                     let inner_ty = subject_variants.into_iter().nth(tag).unwrap().ty;
                     let inner_ref = ir::Expr {
                         kind: ir::ExprKind::EnumUnwrap(Box::new(ir::EnumUnwrap {
-                            expr: subject_ref,
+                            subject: subject_ref,
                             tag: tag as u64,
                         })),
                         ty: inner_ty,

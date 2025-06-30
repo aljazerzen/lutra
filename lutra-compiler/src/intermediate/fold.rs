@@ -92,7 +92,7 @@ pub fn fold_enum_variant<T: ?Sized + IrFold>(
 pub fn fold_enum_eq<T: ?Sized + IrFold>(fold: &mut T, variant: EnumEq) -> Result<EnumEq> {
     Ok(EnumEq {
         tag: variant.tag,
-        expr: fold.fold_expr(variant.expr)?,
+        subject: fold.fold_expr(variant.subject)?,
     })
 }
 
@@ -102,7 +102,7 @@ pub fn fold_enum_unwrap<T: ?Sized + IrFold>(
 ) -> Result<EnumUnwrap> {
     Ok(EnumUnwrap {
         tag: unwrap.tag,
-        expr: fold.fold_expr(unwrap.expr)?,
+        subject: fold.fold_expr(unwrap.subject)?,
     })
 }
 

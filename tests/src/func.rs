@@ -1285,6 +1285,35 @@ test_case!(
 );
 
 test_case!(
+    enum_construction_08,
+    r#"
+    type Animal = enum {
+        Cat = text,
+        Dog = enum {Generic, Collie = text},
+    }
+
+    func () -> [
+      Animal::Cat("Whiskers"),
+      Animal::Dog(Animal::Dog::Collie("Belie")),
+      Animal::Dog(Animal::Dog::Generic),
+    ]
+    "#,
+    r#"[
+  Cat(
+    "Whiskers"
+  ),
+  Dog(
+    Collie(
+      "Belie"
+    )
+  ),
+  Dog(
+    Generic
+  ),
+]"#
+);
+
+test_case!(
     match_00,
     r#"
     type Status = enum {Done, Pending = int64, Cancelled = text}
@@ -1294,8 +1323,7 @@ test_case!(
         Status::Cancelled => "cancelled",
     }
     "#,
-    r#""pending""#,
-    skip_postgres
+    r#""pending""#
 );
 
 test_case!(
@@ -1308,8 +1336,7 @@ test_case!(
         Status::Cancelled => 0,
     }
     "#,
-    r#"4"#,
-    skip_postgres
+    r#"4"#
 );
 
 test_case!(
@@ -1320,18 +1347,64 @@ test_case!(
         Dog = enum {Generic, Collie = text},
     }
 
-    let hello = func (animal: Animal) -> match animal {
+    func () -> (
+      Animal::Dog(Animal::Dog::Collie("Belie"))
+      | func (animal: Animal) -> match animal {
         Animal::Cat(name) => f"Hello {name}",
         Animal::Dog(Animal::Dog::Generic) => "Who's a good boy?",
         Animal::Dog(Animal::Dog::Collie(name)) => f"Come here {name}",
+      }
+    )
+    "#,
+    r#""Come here Belie""#
+);
+
+test_case!(
+    match_03,
+    r#"
+    type Animal = enum {
+        Cat = text,
+        Dog = text,
     }
 
     func () -> (
-        [
-            Animal::Cat("Whiskers"),
-            Animal::Dog(Animal::Dog::Collie("Belie")),
-            Animal::Dog(Animal::Dog::Generic),
-        ] | std::map(hello)
+      [
+        Animal::Cat("Whiskers"),
+        Animal::Dog("Belie"),
+      ]
+      | std::map(func (animal: Animal) -> match animal {
+        Animal::Cat(name) => f"Hello {name}",
+        Animal::Dog(name) => "Who's a good boy?",
+      })
+    )
+    "#,
+    r#"
+    [
+      "Hello Whiskers",
+      "Who's a good boy?",
+    ]
+    "#
+);
+
+test_case!(
+    match_04,
+    r#"
+    type Animal = enum {
+        Cat = text,
+        Dog = enum {Generic, Collie = text},
+    }
+
+    func () -> (
+      [
+          Animal::Cat("Whiskers"),
+          Animal::Dog(Animal::Dog::Collie("Belie")),
+          Animal::Dog(Animal::Dog::Generic),
+      ]
+      | std::map(func (animal: Animal) -> match animal {
+        Animal::Cat(name) => f"Hello {name}",
+        Animal::Dog(Animal::Dog::Generic) => "Who's a good boy?",
+        Animal::Dog(Animal::Dog::Collie(name)) => f"Come here {name}",
+      })
     )
     "#,
     r#"
@@ -1340,8 +1413,7 @@ test_case!(
       "Come here Belie",
       "Who's a good boy?",
     ]
-    "#,
-    skip_postgres
+    "#
 );
 
 test_case!(
