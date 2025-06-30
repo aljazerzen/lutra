@@ -5,7 +5,7 @@ use crate::sql::utils;
 use crate::sql::utils::ExprOrSource;
 
 /// SQL expression and dependent relational variables
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Scoped {
     /// SQL expression that represents input CR node
     pub expr: ExprOrSource,

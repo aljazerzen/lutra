@@ -7,14 +7,13 @@ show-deps-workspace:
     xdg-open ./target/graph.svg 2> /dev/null
 
 test-fast FILTER_SET='all()' *NEXTEST_ARGS='':
-    cargo fmt
-    cargo check --all-targets --profile=test
-
     # RUST_BACKTRACE=1
     RUST_LOG=debug INSTA_FORCE_PASS=1 \
     cargo nextest run --no-fail-fast -E '{{FILTER_SET}}' {{NEXTEST_ARGS}}
     cargo insta review
 
+    cargo fmt
+    cargo check --all-targets --profile=test
     cargo clippy --all-targets
     cargo check -p lutra-bin --no-default-features
 

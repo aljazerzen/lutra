@@ -1,19 +1,125 @@
 use lutra_bin::ir;
 use sqlparser::ast as sql_ast;
 
-use crate::sql::queries::Context;
 use crate::sql::{COL_ARRAY_INDEX, COL_VALUE};
+use crate::sql::{clauses, queries};
 
 use super::ExprOrSource;
 
-impl<'a> Context<'a> {
+/// Compute relational columns of a type.
+/// Basically, mapping of IR types to SQL relations.
+///
+/// This is a trait, so it can work for both "clauses" and "queries" stage.
+pub trait RelCols<'a> {
+    fn get_ty_mat(&self, ty: &'a ir::Ty) -> &'a ir::Ty;
+
+    /// Names of relational columns for a given type
+    /// If include_index is false, top-level arrays does not produce index column.
+    fn rel_cols(
+        &'a self,
+        ty: &'a ir::Ty,
+        include_index: bool,
+    ) -> Box<dyn Iterator<Item = String> + 'a> {
+        let ty_mat = self.get_ty_mat(ty);
+        match &ty_mat.kind {
+            ir::TyKind::Primitive(_) => Box::new(Some(COL_VALUE.to_string()).into_iter()),
+            ir::TyKind::Array(item) => {
+                let mut index = None;
+                if include_index {
+                    index = Some(COL_ARRAY_INDEX.to_string());
+                }
+
+                Box::new(
+                    index
+                        .into_iter()
+                        .chain(self.rel_cols_nested(item, "".to_string())),
+                )
+            }
+
+            ir::TyKind::Tuple(_) | ir::TyKind::Enum(_) => {
+                self.rel_cols_nested(ty_mat, "".to_string())
+            }
+
+            ir::TyKind::Function(_) => todo!(),
+            ir::TyKind::Ident(_) => todo!(),
+        }
+    }
+
+    fn rel_cols_nested(
+        &'a self,
+        ty: &'a ir::Ty,
+        name_prefix: String,
+    ) -> Box<dyn Iterator<Item = String> + 'a> {
+        match &self.get_ty_mat(ty).kind {
+            ir::TyKind::Primitive(_) | ir::TyKind::Array(_) => {
+                let name = if name_prefix.is_empty() {
+                    COL_VALUE.to_string()
+                } else {
+                    name_prefix
+                };
+                Box::new(Some(name).into_iter())
+            }
+
+            ir::TyKind::Tuple(fields) => {
+                Box::new(fields.iter().enumerate().flat_map(move |(i, field)| {
+                    let prefix = format!("{name_prefix}_{i}");
+                    self.rel_cols_nested(&field.ty, prefix)
+                }))
+            }
+
+            ir::TyKind::Enum(variants) => Box::new(
+                Some(
+                    format!("{name_prefix}_t"), // tag
+                )
+                .into_iter()
+                .chain(
+                    variants // non-unit fields
+                        .iter()
+                        .enumerate()
+                        .flat_map(move |(i, variant)| {
+                            let name_prefix = format!("{name_prefix}_{i}");
+                            self.rel_cols_nested(&variant.ty, name_prefix)
+                        }),
+                ),
+            ),
+            ir::TyKind::Function(_) => todo!(),
+            ir::TyKind::Ident(_) => todo!(),
+        }
+    }
+}
+
+impl<'a> RelCols<'a> for queries::Context<'a> {
+    fn get_ty_mat(&self, ty: &'a ir::Ty) -> &'a ir::Ty {
+        queries::Context::get_ty_mat(self, ty)
+    }
+}
+
+impl<'a> queries::Context<'a> {
     /// Generates the projection of a relation of type `ty`.
+    #[track_caller]
     pub fn projection(
         &self,
         ty: &ir::Ty,
         values: impl IntoIterator<Item = ExprOrSource>,
     ) -> Vec<sql_ast::SelectItem> {
-        itertools::zip_eq(values, self.rel_cols(ty, true))
+        let rel_cols = self.rel_cols(ty, true);
+
+        // asserts eq values and rel cols
+        #[cfg(debug_assertions)]
+        let (values, rel_cols) = {
+            let values: Vec<_> = values.into_iter().collect();
+            let rel_cols: Vec<_> = rel_cols.collect();
+
+            assert_eq!(
+                values.len(),
+                rel_cols.len(),
+                "expected columns: {rel_cols:?}, got: {values:#?}, ty: {}",
+                ir::print_ty(ty)
+            );
+            (values, rel_cols)
+        };
+
+        std::iter::zip(values, rel_cols)
             .map(|(expr, alias)| sql_ast::SelectItem::ExprWithAlias {
                 expr: expr.into_expr(),
                 alias: sql_ast::Ident::new(alias),
@@ -33,77 +139,11 @@ impl<'a> Context<'a> {
             .map(|name| sql_ast::SelectItem::UnnamedExpr(super::ident(rel_var_name, name)))
             .collect()
     }
+}
 
-    /// Names of relational columns for a given type
-    /// If include_index is false, top-level arrays does not produce index column.
-    pub fn rel_cols(
-        &'a self,
-        ty: &'a ir::Ty,
-        include_index: bool,
-    ) -> Box<dyn Iterator<Item = String> + 'a> {
-        let ty_mat = self.get_ty_mat(ty);
-        match &ty_mat.kind {
-            ir::TyKind::Primitive(_) => Box::new(Some(COL_VALUE.to_string()).into_iter()),
-            ir::TyKind::Array(item) => {
-                let mut index = None;
-                if include_index {
-                    index = Some(COL_ARRAY_INDEX.to_string());
-                }
-
-                Box::new(
-                    index
-                        .into_iter()
-                        .chain(self.rel_cols_re(item, "".to_string())),
-                )
-            }
-
-            ir::TyKind::Tuple(_) | ir::TyKind::Enum(_) => self.rel_cols_re(ty_mat, "".to_string()),
-
-            ir::TyKind::Function(_) => todo!(),
-            ir::TyKind::Ident(_) => todo!(),
-        }
-    }
-
-    fn rel_cols_re(
-        &'a self,
-        ty: &'a ir::Ty,
-        name_prefix: String,
-    ) -> Box<dyn Iterator<Item = String> + 'a> {
-        match &self.get_ty_mat(ty).kind {
-            ir::TyKind::Primitive(_) | ir::TyKind::Array(_) => {
-                let name = if name_prefix.is_empty() {
-                    COL_VALUE.to_string()
-                } else {
-                    name_prefix
-                };
-                Box::new(Some(name).into_iter())
-            }
-
-            ir::TyKind::Tuple(fields) => {
-                Box::new(fields.iter().enumerate().flat_map(move |(i, field)| {
-                    let prefix = format!("{name_prefix}_{i}");
-                    self.rel_cols_re(&field.ty, prefix)
-                }))
-            }
-
-            ir::TyKind::Enum(variants) => Box::new(
-                Some(
-                    format!("{name_prefix}_t"), // tag
-                )
-                .into_iter()
-                .chain(
-                    variants // non-unit fields
-                        .iter()
-                        .enumerate()
-                        .flat_map(move |(i, variant)| {
-                            let name_prefix = format!("{name_prefix}_{i}");
-                            self.rel_cols_re(&variant.ty, name_prefix)
-                        }),
-                ),
-            ),
-            ir::TyKind::Function(_) => todo!(),
-            ir::TyKind::Ident(_) => todo!(),
-        }
+impl<'a> RelCols<'a> for clauses::Context<'a> {
+    fn get_ty_mat(&self, ty: &'a ir::Ty) -> &'a ir::Ty {
+        clauses::Context::get_ty_mat(self, ty)
     }
 }
 
@@ -112,9 +152,12 @@ mod rel_repr {
     use itertools::Itertools;
     use lutra_bin::ir;
 
+    use crate::sql::queries;
+    use crate::sql::utils::RelCols;
+
     /// return list of relation columns for a given type
     fn r(ty: &ir::Ty) -> String {
-        let ctx = super::Context::new(Default::default());
+        let ctx = queries::Context::new(Default::default());
 
         ctx.rel_cols(ty, true).join(", ")
     }

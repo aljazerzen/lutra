@@ -86,13 +86,16 @@ pub enum Transform {
 
     /// Sorting of rows
     OrderBy(Box<Expr>),
+
+    /// Groups rows into partitions by a given key
+    Group(Vec<Expr>),
 }
 
 impl std::fmt::Debug for Expr {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         self.kind.fmt(f)?;
-        // f.write_str(": ")?;
-        // self.ty.fmt(f)
+        f.write_str(": ")?;
+        f.write_str(&ir::print_ty(&self.ty))?;
         Ok(())
     }
 }

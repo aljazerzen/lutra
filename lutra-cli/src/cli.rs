@@ -213,7 +213,10 @@ pub fn run_postgres(cmd: RunPostgresCommand) -> anyhow::Result<()> {
     let path = pr::Path::new(cmd.path.split("::"));
 
     let program = lutra_compiler::compile_to_sql(&project, &path);
-    tracing::debug!("sql: {}", program.sql);
+
+    let options = sqlformat::FormatOptions::default();
+    let formatted_sql = sqlformat::format(&program.sql, &sqlformat::QueryParams::None, &options);
+    tracing::debug!("sql:\n{formatted_sql}");
 
     let mut client = postgres::Client::connect(&cmd.postgres_url, postgres::NoTls)?;
 

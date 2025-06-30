@@ -1,6 +1,6 @@
 use sqlparser::ast as sql_ast;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum ExprOrSource {
     Expr(Box<sql_ast::Expr>),
     Source(String),

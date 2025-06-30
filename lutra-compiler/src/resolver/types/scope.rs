@@ -379,7 +379,7 @@ impl TypeResolver<'_> {
     pub fn introduce_ty_var(&mut self, domain: pr::TyParamDomain, span: Option<Span>) -> pr::Ty {
         let scope = self.get_ty_var_scope_mut();
 
-        let mut ty_arg = pr::Ty::new(pr::TyKind::Ident(pr::Path::empty()));
+        let mut ty_arg = pr::Ty::new(pr::TyKind::Ident(pr::Path::from_name("_")));
         ty_arg.target = Some(pr::Ref::Local {
             scope: scope.id, // current scope
             offset: scope.names.len(),

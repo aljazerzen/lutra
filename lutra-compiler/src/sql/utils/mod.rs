@@ -7,6 +7,7 @@ mod scoped;
 
 pub use ast::*;
 pub use expr_or_source::*;
+pub use projection::RelCols;
 pub use scoped::*;
 
 pub fn retain_by_position<T>(vec: &mut Vec<T>, to_keep: &[usize]) {

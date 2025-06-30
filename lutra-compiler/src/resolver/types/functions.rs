@@ -91,7 +91,7 @@ impl TypeResolver<'_> {
         }
 
         let mut args_resolved = Vec::with_capacity(args.len());
-        for (param, arg) in itertools::zip_eq(&fn_ty.params, args) {
+        for (param, arg) in std::iter::zip(&fn_ty.params, args) {
             // fold
             let mut arg = self.fold_expr(arg)?;
 

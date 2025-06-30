@@ -1,11 +1,11 @@
 use std::{borrow::Cow, collections::HashMap};
 
+use crate::sql::cr::{self, Expr};
+use crate::sql::utils::RelCols;
 use crate::utils::IdGenerator;
-
-use super::cr::{self, Expr};
 use lutra_bin::ir;
 
-struct Context<'t> {
+pub(super) struct Context<'t> {
     bindings: HashMap<u32, usize>,
     functions: HashMap<u32, FuncProvider>,
 
@@ -50,7 +50,7 @@ pub fn compile(program: &ir::Program) -> (cr::Expr, HashMap<&ir::Path, &ir::Ty>)
 }
 
 impl<'a> Context<'a> {
-    fn get_ty_mat(&self, ty: &'a ir::Ty) -> &'a ir::Ty {
+    pub(super) fn get_ty_mat(&self, ty: &'a ir::Ty) -> &'a ir::Ty {
         match &ty.kind {
             ir::TyKind::Ident(path) => self.types.get(path).unwrap(),
             _ => ty,
@@ -282,16 +282,43 @@ impl<'a> Context<'a> {
 
             ir::ExprKind::TupleLookup(lookup) => {
                 let base = self.compile_rel(&lookup.base);
+                let position = lookup.position as usize;
 
-                // TODO: this does not take nested tuples or enums into account
+                let ir::TyKind::Tuple(fields) = &self.get_ty_mat(&lookup.base.ty).kind else {
+                    panic!("invalid program");
+                };
+
+                // The target might be packed. Performing a tuple lookup of such target must
+                // change the repr into normal SQL repr.
+                // Currently this only happens for arrays, which change from JSON to SQL repr.
+                let unpack = expr.ty.kind.is_array();
+
+                // In simple case start == lookup.position. But this tuple might contains fields
+                // before lookup.position which are represented with multiple columns.
+                // So we must iterate over all preceding fields and count how many columns do they
+                // produce.
+                let start: usize = fields
+                    .iter()
+                    .take(position)
+                    .map(|f| self.rel_cols_nested(&f.ty, String::new()).count())
+                    .sum();
+
+                // Also, target of lookup might not contain a single column
+                // (e.g. it might be a nested tuple with two fields).
+                let end = start
+                    + if unpack {
+                        1
+                    } else {
+                        self.rel_cols_nested(&fields[position].ty, String::new())
+                            .count()
+                    };
+
                 let mut rel = cr::ExprKind::Transform(
                     self.new_binding(base),
-                    cr::Transform::ProjectRetain(vec![lookup.position as usize]),
+                    cr::Transform::ProjectRetain((start..end).collect()),
                 );
 
-                // In a tuple lookup the repr of the field might change.
-                // Currently this only happens for arrays, which change from JSON to SQL repr.
-                if expr.ty.kind.is_array() {
+                if unpack {
                     rel = cr::ExprKind::From(cr::From::JsonUnpack(Box::new(Expr {
                         kind: rel,
                         ty: ir::Ty::new(ir::TyPrimitive::text),
@@ -635,6 +662,28 @@ impl<'a> Context<'a> {
                 )
             }
 
+            "std::group" => {
+                let array = self.compile_rel(&call.args[0]);
+                let array = self.new_binding(array);
+
+                let func = &call.args[1];
+                let func = func.kind.as_function().unwrap();
+
+                let item_ref = cr::ExprKind::Transform(
+                    self.new_binding(cr::Expr {
+                        kind: cr::ExprKind::From(cr::From::RelRef(array.id)),
+                        ty: array.rel.ty.clone(),
+                    }),
+                    cr::Transform::ProjectDiscard(vec![0]), // discard index
+                );
+
+                self.functions.insert(func.id, FuncProvider::Expr(item_ref));
+                let key = self.compile_column_list(&func.body).unwrap_columns();
+                self.functions.remove(&func.id);
+
+                cr::ExprKind::Transform(array, cr::Transform::Group(key))
+            }
+
             _ => {
                 let expr = self.compile_expr_std(expr);
                 cr::ExprKind::From(cr::From::Row(vec![expr]))
@@ -647,6 +696,7 @@ impl<'a> Context<'a> {
     }
 
     /// Compiles an expression into a column
+    #[track_caller]
     fn compile_column(&mut self, expr: &ir::Expr) -> cr::Expr {
         let cols = self.compile_column_list(expr);
         let ColumnsOrUnpack::Columns(cols) = cols else {
@@ -690,6 +740,7 @@ impl<'a> Context<'a> {
         }
     }
 
+    /// Compiles `ir::Call { function: Pointer(External), args }` to cr::From(FuncCall { .. })
     fn compile_expr_std(&mut self, expr: &ir::Expr) -> cr::Expr {
         let ir::ExprKind::Call(call) = &expr.kind else {
             unreachable!()

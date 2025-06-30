@@ -166,7 +166,7 @@ impl TypeResolver<'_> {
             (TyKind::Func(f_func), TyKind::Func(e_func))
                 if f_func.params.len() == e_func.params.len() =>
             {
-                for (f_arg, e_arg) in itertools::zip_eq(&f_func.params, &e_func.params) {
+                for (f_arg, e_arg) in std::iter::zip(&f_func.params, &e_func.params) {
                     if let Some((f_arg, e_arg)) = Option::zip(f_arg.as_ref(), e_arg.as_ref()) {
                         // contra-variant contained types
                         self.validate_type(e_arg, f_arg, who)?;
@@ -188,12 +188,12 @@ impl TypeResolver<'_> {
             {
                 // require same variant names
                 let names_match =
-                    itertools::zip_eq(f_variants, e_variants).all(|(f, e)| f.name == e.name);
+                    std::iter::zip(f_variants, e_variants).all(|(f, e)| f.name == e.name);
                 if !names_match {
                     return Err(compose_type_error(&found, &expected, who));
                 }
 
-                for (f_variant, e_variant) in itertools::zip_eq(f_variants, e_variants) {
+                for (f_variant, e_variant) in std::iter::zip(f_variants, e_variants) {
                     // co-variant contained types
                     self.validate_type(&f_variant.ty, &e_variant.ty, who)?;
                 }

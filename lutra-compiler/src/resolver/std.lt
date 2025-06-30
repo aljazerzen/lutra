@@ -114,7 +114,7 @@ let aggregate = func <A, B, O> ( # <I: {i1 = I1}, O>
 let group: func <I, K> (
   input: [I],
   key: func (I): K,
-): [{key = K, partition = [I]}]
+): [{key = K, values = [I]}]
 
 # let append = func (bottom, top)
 

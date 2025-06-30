@@ -793,6 +793,137 @@ test_case!(
 }"#
 );
 
+test_case!(
+    std_group_00,
+    r#"(
+      std::group([1, 2, 5, 1, 2, 4, 6, 12]: [int64], func (x) -> x % 2)
+      | std::sort(func (x) -> x.key)
+    )"#,
+    r#"[
+  {
+    key = 0,
+    values = [
+      2,
+      2,
+      4,
+      6,
+      12,
+    ],
+  },
+  {
+    key = 1,
+    values = [
+      1,
+      5,
+      1,
+    ],
+  },
+]"#
+);
+
+test_case!(
+    std_group_01,
+    r#"func () -> (
+      [
+        {1, false, 10},
+        {2, false, 21},
+        {2, false, 22},
+        {1, true, 10}
+      ]: [{int64, bool, int64}]
+      | std::group(func (x: {int64, bool, int64}) -> {x.0, x.2})
+      | std::sort(func (x: {key = {int64, int64}, values = [{int64, bool, int64}]}) -> x.key.0 + x.key.1)
+    )
+"#,
+    r#"[
+  {
+    key = {
+      1,
+      10,
+    },
+    values = [
+      {
+        1,
+        false,
+        10,
+      },
+      {
+        1,
+        true,
+        10,
+      },
+    ],
+  },
+  {
+    key = {
+      2,
+      21,
+    },
+    values = [
+      {
+        2,
+        false,
+        21,
+      },
+    ],
+  },
+  {
+    key = {
+      2,
+      22,
+    },
+    values = [
+      {
+        2,
+        false,
+        22,
+      },
+    ],
+  },
+]"#
+);
+
+test_case!(
+    std_group_02,
+    r#"func () -> (
+      [
+        {1, false, 10},
+        {2, false, 21},
+        {2, false, 22},
+        {1, true, 10}
+      ]: [{int64, bool, int64}]
+      | std::group(
+        func (x: {int64, bool, int64}) -> {x.0, x.2}
+      )
+      | std::sort(
+        func (x: {key = {int64, int64}, values = [{int64, bool, int64}]}) -> (
+            x.key.0 + x.key.1
+        )
+      )
+      | std::map(func (partition) -> {
+        k = partition.key.0,
+        v = std::sum(std::map(
+          partition.values,
+          func (x: {int64, bool, int64}) -> x.2
+        )),
+      })
+    )
+"#,
+    r#"[
+  {
+    k = 1,
+    v = 20,
+  },
+  {
+    k = 2,
+    v = 21,
+  },
+  {
+    k = 2,
+    v = 22,
+  },
+]"#
+);
+
 test_case!(std_min_00, r#"std::min([5,3,65,3,2,56,67])"#, "2");
 
 // test_case!(std_min_01, r#"std::min([])"#, "0");
@@ -827,7 +958,7 @@ test_case!(std_all_01, r#"std::all([false, false])"#, "false");
 
 test_case!(std_all_02, r#"std::all([true, true, true])"#, "true");
 
-// test_case!(std_all_03, r#"std::all([])"#, "true");
+test_case!(std_all_03, r#"std::all([])"#, "true");
 
 test_case!(
     std_any_00,
@@ -839,7 +970,7 @@ test_case!(std_any_01, r#"std::any([false, false])"#, "false");
 
 test_case!(std_any_02, r#"std::any([true, true, true])"#, "true");
 
-// test_case!(std_any_03, r#"std::any([])"#, "false");
+test_case!(std_any_03, r#"std::any([])"#, "false");
 
 test_case!(
     std_contains_00,
@@ -1106,15 +1237,14 @@ test_case!(
     r#"Red"#
 );
 
-// TODO make `Green: int16` when we support i16 literals
 test_case!(
     enum_construction_04,
     r#"
-    type Color = enum {Red, Green = bool, Blue = bool}
-    func () -> Color::Green(true)
+    type Color = enum {Red, Green = int16, Blue = bool}
+    func () -> Color::Green(12312)
     "#,
     r#"Green(
-  true
+  12312
 )"#
 );
 
@@ -1452,4 +1582,12 @@ test_case!(
       "hello",
     }
     "#
+);
+
+test_case!(
+    tuple_00,
+    r#"
+    func () -> {key = {"code 1", false}, value = 5: int64}.key.1
+    "#,
+    r#"false"#
 );

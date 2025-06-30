@@ -4,7 +4,7 @@ use std::collections::HashMap;
 use lutra_bin::ir;
 use sqlparser::ast as sql_ast;
 
-use crate::sql::utils::{ExprOrSource, Scoped};
+use crate::sql::utils::{ExprOrSource, RelCols, Scoped};
 use crate::sql::{COL_ARRAY_INDEX, COL_VALUE};
 use crate::sql::{cr, utils};
 use crate::utils::NameGenerator;
@@ -337,7 +337,6 @@ impl<'a> Context<'a> {
 
             cr::Transform::Aggregate(columns) => {
                 scoped = self.wrap_scoped(scoped, input_ty);
-
                 let select = self.scoped_as_mut_select(&mut scoped, input_ty);
 
                 let (values, rels) = self.compile_columns_scoped(columns);
@@ -348,7 +347,6 @@ impl<'a> Context<'a> {
             }
             cr::Transform::Window(columns) => {
                 scoped = self.wrap_scoped(scoped, input_ty);
-
                 let select = self.scoped_as_mut_select(&mut scoped, input_ty);
 
                 let (values, rels) = self.compile_rels_scoped(columns);
@@ -360,7 +358,6 @@ impl<'a> Context<'a> {
 
             cr::Transform::Where(cond) => {
                 scoped = self.wrap_scoped(scoped, input_ty);
-
                 let select = self.scoped_as_mut_select(&mut scoped, input_ty);
 
                 let cond = self.compile_column(cond);
@@ -434,6 +431,40 @@ impl<'a> Context<'a> {
                         .map(utils::lateral)
                         .map(utils::from),
                 );
+            }
+
+            cr::Transform::Group(key) => {
+                let input = scoped.clone();
+
+                // wrap into a new query
+                scoped = self.wrap_scoped(scoped, input_ty);
+                let select = self.scoped_as_mut_select(&mut scoped, input_ty);
+
+                let key = self.compile_columns(key);
+
+                let mut projection = vec![
+                    // index
+                    ExprOrSource::Source("(ROW_NUMBER() OVER ())::int4".into()),
+                ];
+                // key
+                projection.extend(key.clone());
+                // values (JSON packed)
+                let values = self.compile_json_pack(input, input_ty);
+                projection.push(values.expr);
+                select.projection = self.projection(ty, projection);
+
+                select.group_by = sql_ast::GroupByExpr::Expressions(
+                    key.into_iter().map(ExprOrSource::into_expr).collect(),
+                    vec![],
+                );
+
+                // select.from.extend(
+                //     values
+                //         .rel_vars
+                //         .into_iter()
+                //         .map(utils::lateral)
+                //         .map(utils::from),
+                // );
             }
         }
         scoped
