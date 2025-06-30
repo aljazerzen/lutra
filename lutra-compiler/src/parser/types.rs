@@ -146,7 +146,6 @@ pub fn type_params<'a>(
         .then_ignore(ctrl('='))
         .or_not()
         .then(ty)
-        .map(|(name, ty)| TyDomainTupleField { name, ty })
         .separated_by(ctrl(','))
         .then_ignore(ctrl(',').then(just(TokenKind::Range)))
         .delimited_by(ctrl('{'), ctrl('}'))
@@ -160,7 +159,39 @@ pub fn type_params<'a>(
             ],
             |_| vec![],
         ))
-        .map(TyParamDomain::TupleFields)
+        .try_map(|mut positional, span| {
+            let first_named = positional
+                .iter()
+                .position(|p| p.0.is_some())
+                .unwrap_or(positional.len());
+
+            let named = positional.split_off(first_named);
+
+            let mut fields = Vec::new();
+
+            // positional
+            for (i, (_, ty)) in positional.into_iter().enumerate() {
+                fields.push(TyDomainTupleField {
+                    location: IndirectionKind::Position(i as i64),
+                    ty,
+                });
+            }
+
+            // named
+            for (name, ty) in named {
+                let Some(name) = name else {
+                    return Err(PError::custom(
+                        span,
+                        "named field cannot be followed by a positional field",
+                    ));
+                };
+                fields.push(TyDomainTupleField {
+                    location: IndirectionKind::Name(name),
+                    ty,
+                });
+            }
+            Ok(TyParamDomain::TupleFields(fields))
+        })
         .labelled("tuple domain");
 
     // domain

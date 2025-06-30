@@ -44,7 +44,7 @@ impl Printer {
                         r += ", ";
                     }
                     if let Some(name) = &field.name {
-                        r += &pr::display_ident_part(name);
+                        r += &pr::display_ident(name);
                         r += " = ";
                     }
                     r += &self.print_ty(&field.ty);
@@ -66,7 +66,7 @@ impl Printer {
                     if i > 0 {
                         r += ", ";
                     }
-                    r += &pr::display_ident_part(&variant.name);
+                    r += &pr::display_ident(&variant.name);
                     let is_unit = variant.ty.kind.as_tuple().is_some_and(|f| f.is_empty());
                     if !is_unit {
                         r += " = ";
@@ -103,9 +103,17 @@ impl Printer {
                                     if i > 0 {
                                         r += ", ";
                                     }
-                                    if let Some(name) = &field.name {
-                                        r += &pr::display_ident_part(name);
-                                        r += " = ";
+                                    match &field.location {
+                                        pr::IndirectionKind::Name(name) => {
+                                            r += &pr::display_ident(name);
+                                            r += " = ";
+                                        }
+                                        pr::IndirectionKind::Position(p) => {
+                                            assert_eq!(i, *p as usize); // TODO: print these fields when they are out of order
+                                        }
+                                        pr::IndirectionKind::Star => {
+                                            unreachable!()
+                                        }
                                     }
                                     r += &self.print_ty(&field.ty);
                                 }

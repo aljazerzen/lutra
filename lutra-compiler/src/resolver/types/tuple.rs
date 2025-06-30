@@ -39,14 +39,7 @@ impl super::TypeResolver<'_> {
                             base.kind.as_ref()
                         )))
                     }
-                    pr::TyParamDomain::TupleFields(fields) => lookup_in_domain(fields, indirection)
-                        .ok_or_else(|| {
-                            Diagnostic::new_custom(format!(
-                                "Field {} does not exist in type {}",
-                                print_indirection_kind(indirection),
-                                printer::print_ty(base)
-                            ))
-                        }),
+                    pr::TyParamDomain::TupleFields(fields) => lookup_in_domain(fields, indirection),
                 };
             }
             scope::TyRef::Var(_, o) => {
@@ -55,12 +48,7 @@ impl super::TypeResolver<'_> {
 
                 // restrict existing ty var to tuples with this field
                 let domain = pr::TyParamDomain::TupleFields(vec![pr::TyDomainTupleField {
-                    name: match indirection {
-                        pr::IndirectionKind::Name(n) => Some(n.to_string()),
-                        pr::IndirectionKind::Position(0) => None,
-                        pr::IndirectionKind::Position(_) => todo!(),
-                        pr::IndirectionKind::Star => todo!(),
-                    },
+                    location: indirection.clone(),
                     ty: field_ty.clone(),
                 }]);
                 let scope = self.get_ty_var_scope();
@@ -77,13 +65,7 @@ impl super::TypeResolver<'_> {
         match &base.kind {
             pr::TyKind::Ident(_) => unreachable!(),
 
-            pr::TyKind::Tuple(fields) => lookup_in_tuple(fields, indirection).ok_or_else(|| {
-                Diagnostic::new_custom(format!(
-                    "Field {} does not exist in type {}",
-                    print_indirection_kind(indirection),
-                    printer::print_ty(&base)
-                ))
-            }),
+            pr::TyKind::Tuple(fields) => lookup_in_tuple(&base, fields, indirection),
 
             pr::TyKind::Array(items_ty) => match indirection {
                 pr::IndirectionKind::Name(_) => {
@@ -108,14 +90,23 @@ impl super::TypeResolver<'_> {
 }
 
 pub fn lookup_in_tuple(
+    base: &pr::Ty,
     fields: &[pr::TyTupleField],
     indirection: &pr::IndirectionKind,
-) -> Option<Indirection> {
-    match indirection {
+) -> Result<Indirection> {
+    let r = match indirection {
         pr::IndirectionKind::Name(name) => lookup_name_in_tuple(fields, name),
         pr::IndirectionKind::Position(pos) => lookup_position_in_tuple(fields, *pos as usize),
         pr::IndirectionKind::Star => todo!(),
-    }
+    };
+    let Some(r) = r else {
+        return Err(Diagnostic::new_custom(format!(
+            "field {} does not exist in type {}",
+            print_indirection_kind(indirection),
+            printer::print_ty(base)
+        )));
+    };
+    Ok(r)
 }
 
 fn lookup_position_in_tuple(fields: &[pr::TyTupleField], position: usize) -> Option<Indirection> {
@@ -142,33 +133,20 @@ fn lookup_name_in_tuple(fields: &[pr::TyTupleField], name: &str) -> Option<Indir
 pub fn lookup_in_domain(
     fields: &[pr::TyDomainTupleField],
     indirection: &pr::IndirectionKind,
-) -> Option<Indirection> {
-    match indirection {
-        pr::IndirectionKind::Name(name) => lookup_name_in_domain(fields, name),
-        pr::IndirectionKind::Position(pos) => lookup_position_in_domain(fields, *pos as usize),
-        pr::IndirectionKind::Star => todo!(),
-    }
-}
-
-fn lookup_position_in_domain(
-    fields: &[pr::TyDomainTupleField],
-    position: usize,
-) -> Option<Indirection> {
-    let f = fields.get(position)?;
-    Some(Indirection {
+) -> Result<Indirection> {
+    let Some(field) = fields.iter().find(|f| &f.location == indirection) else {
+        return Err(Diagnostic::new_custom(format!(
+            "field {} does not exist",
+            print_indirection_kind(indirection),
+        )));
+    };
+    Ok(Indirection {
         base: BaseKind::Tuple,
-        position: Some(position),
-        target_ty: f.ty.clone(),
-    })
-}
-
-fn lookup_name_in_domain(fields: &[pr::TyDomainTupleField], name: &str) -> Option<Indirection> {
-    let field = fields
-        .iter()
-        .find(|f| f.name.as_ref().is_some_and(|n| n == name))?;
-    Some(Indirection {
-        base: BaseKind::Tuple,
-        position: None,
+        position: match indirection {
+            pr::IndirectionKind::Name(_) => None,
+            pr::IndirectionKind::Position(pos) => Some(*pos as usize),
+            pr::IndirectionKind::Star => todo!(),
+        },
         target_ty: field.ty.clone(),
     })
 }
@@ -192,8 +170,8 @@ pub enum BaseKind {
 
 pub fn print_indirection_kind(indirection: &pr::IndirectionKind) -> String {
     match indirection {
-        pr::IndirectionKind::Name(n) => format!("`{n}`"),
-        pr::IndirectionKind::Position(p) => p.to_string(),
+        pr::IndirectionKind::Name(n) => format!(".{}", pr::display_ident(n)),
+        pr::IndirectionKind::Position(p) => format!(".{p}"),
         pr::IndirectionKind::Star => "*".to_string(),
     }
 }

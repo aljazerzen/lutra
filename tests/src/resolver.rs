@@ -263,12 +263,12 @@ fn types_15() {
         let get_b: func <T: {b = int64, ..}> (x: T): T
         func () -> get_b({a = false, c = 4})
     "#), @r"
-    [E0005] Error:
+    Error:
        ╭─[:3:20]
        │
      3 │         func () -> get_b({a = false, c = 4})
        │                    ──┬──
-       │                      ╰──── T is restricted to tuples with a field named `b`
+       │                      ╰──── field .b does not exist in type {a = bool, c = _}
     ───╯
     ");
 }
@@ -297,12 +297,12 @@ fn types_16() {
         let get_b: func <T: {bool, int64, a = bool, ..}> (x: T): T
         func () -> get_b({a = false})
     "#), @r"
-    [E0005] Error:
+    Error:
        ╭─[:3:20]
        │
      3 │         func () -> get_b({a = false})
        │                    ──┬──
-       │                      ╰──── T is restricted to tuples with at least 2 fields
+       │                      ╰──── field .1 does not exist in type {a = bool}
     ───╯
     ");
     insta::assert_snapshot!(_test_ty(r#"
@@ -348,12 +348,12 @@ fn types_17() {
         let needs_one = func <T: {int64, ..}> (x: T): int64 -> needs_two(x)
         func () -> needs_one({4})
     "#), @r"
-    [E0005] Error:
+    Error:
        ╭─[:3:64]
        │
      3 │         let needs_one = func <T: {int64, ..}> (x: T): int64 -> needs_two(x)
        │                                                                ────┬────
-       │                                                                    ╰────── I is restricted to tuples with at least 2 fields
+       │                                                                    ╰────── field .1 does not exist
     ───╯
     ");
 

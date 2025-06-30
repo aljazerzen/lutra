@@ -142,12 +142,12 @@ fn display_path(ident: &Path) -> String {
         if index > 0 {
             r += "::";
         }
-        r += display_ident_part(part).as_ref();
+        r += display_ident(part).as_ref();
     }
     r
 }
 
-pub fn display_ident_part(s: &str) -> std::borrow::Cow<'_, str> {
+pub fn display_ident(s: &str) -> std::borrow::Cow<'_, str> {
     fn forbidden_start(c: char) -> bool {
         !(c.is_ascii() || matches!(c, '_' | '$'))
     }

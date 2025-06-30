@@ -831,7 +831,7 @@ test_case!(
         {1, true, 10}
       ]: [{int64, bool, int64}]
       | std::group(func (x: {int64, bool, int64}) -> {x.0, x.2})
-      | std::sort(func (x: {key = {int64, int64}, values = [{int64, bool, int64}]}) -> x.key.0 + x.key.1)
+      | std::sort(func (x) -> x.key.0 + x.key.1)
     )
 "#,
     r#"[
@@ -894,11 +894,7 @@ test_case!(
       | std::group(
         func (x: {int64, bool, int64}) -> {x.0, x.2}
       )
-      | std::sort(
-        func (x: {key = {int64, int64}, values = [{int64, bool, int64}]}) -> (
-            x.key.0 + x.key.1
-        )
-      )
+      | std::sort(func (x) -> x.key.0 + x.key.1)
       | std::map(func (partition) -> {
         k = partition.key.0,
         v = std::sum(std::map(

@@ -385,49 +385,12 @@ impl TypeResolver<'_> {
                     ));
                 };
 
-                let num_positional = domain_fields
-                    .iter()
-                    .enumerate()
-                    .filter(|(_, f)| f.name.is_none())
-                    .next_back()
-                    .map(|(p, _)| p + 1)
-                    .unwrap_or_default();
+                for domain_field in domain_fields {
+                    let indirection =
+                        super::tuple::lookup_in_tuple(&ty, ty_fields, &domain_field.location)?;
 
-                for (position, domain_field) in domain_fields.iter().enumerate() {
-                    let (_ind_display, ty_field) = if let Some(name) = &domain_field.name {
-                        // named
-                        let res = ty_fields.iter().find(|f| f.name.as_ref() == Some(name));
-
-                        (
-                            name.clone(),
-                            res.ok_or_else(|| {
-                                Diagnostic::new(
-                                    format!(
-                                        "{} tuples with a field named `{name}`",
-                                        msg_restricted_to(var_name, None)
-                                    ),
-                                    DiagnosticCode::TYPE_DOMAIN,
-                                )
-                            })?,
-                        )
-                    } else {
-                        // positional
-                        (
-                            position.to_string(),
-                            ty_fields.get(position).ok_or_else(|| {
-                                Diagnostic::new(
-                                    format!(
-                                        "{} tuples with at least {num_positional} fields",
-                                        msg_restricted_to(var_name, None)
-                                    ),
-                                    DiagnosticCode::TYPE_DOMAIN,
-                                )
-                            })?,
-                        )
-                    };
-
-                    self.validate_type(&ty_field.ty, &domain_field.ty, &|| None)
-                        .with_span_fallback(ty_field.ty.span)?;
+                    self.validate_type(&indirection.target_ty, &domain_field.ty, &|| None)
+                        .with_span_fallback(indirection.target_ty.span)?;
                     // ok
                 }
 
@@ -481,61 +444,12 @@ impl TypeResolver<'_> {
                 TyParamDomain::TupleFields(found_fields),
                 TyParamDomain::TupleFields(expected_fields),
             ) => {
-                // TODO: maybe reuse the code from [validate_type_domain]?
+                for expected_field in expected_fields {
+                    let indirection =
+                        super::tuple::lookup_in_domain(found_fields, &expected_field.location)?;
 
-                let num_positional = expected_fields
-                    .iter()
-                    .enumerate()
-                    .filter(|(_, f)| f.name.is_none())
-                    .next_back()
-                    .map(|(p, _)| p + 1)
-                    .unwrap_or_default();
-
-                for (position, expected_field) in expected_fields.iter().enumerate() {
-                    let (ind_display, ty_field) = if let Some(name) = &expected_field.name {
-                        // named
-                        let res = found_fields.iter().find(|f| f.name.as_ref() == Some(name));
-
-                        (
-                            name.clone(),
-                            res.ok_or_else(|| {
-                                Diagnostic::new(
-                                    format!(
-                                        "{} tuples with a field named `{name}`",
-                                        msg_restricted_to(expected_name, None)
-                                    ),
-                                    DiagnosticCode::TYPE_DOMAIN,
-                                )
-                            })?,
-                        )
-                    } else {
-                        // positional
-                        (
-                            position.to_string(),
-                            found_fields.get(position).ok_or_else(|| {
-                                Diagnostic::new(
-                                    format!(
-                                        "{} tuples with at least {num_positional} fields",
-                                        msg_restricted_to(expected_name, None)
-                                    ),
-                                    DiagnosticCode::TYPE_DOMAIN,
-                                )
-                            })?,
-                        )
-                    };
-
-                    if ty_field.ty != expected_field.ty {
-                        return Err(Diagnostic::new(
-                            format!(
-                                "{} {}",
-                                msg_restricted_to(expected_name, Some(&ind_display)),
-                                printer::print_ty(&expected_field.ty)
-                            ),
-                            DiagnosticCode::TYPE_DOMAIN,
-                        ));
-                    }
-
-                    // ok
+                    self.validate_type(&indirection.target_ty, &expected_field.ty, &|| None)
+                        .with_span_fallback(indirection.target_ty.span)?;
                 }
 
                 // all ok

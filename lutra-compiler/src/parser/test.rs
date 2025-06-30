@@ -201,7 +201,7 @@ fn parse_04() {
                         domain: TupleFields(
                             [
                                 TyDomainTupleField {
-                                    name: Some(
+                                    location: Name(
                                         "b",
                                     ),
                                     ty: Ty {

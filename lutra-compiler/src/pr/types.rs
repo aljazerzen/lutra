@@ -121,13 +121,12 @@ pub enum TyParamDomain {
     OneOf(Vec<TyPrimitive>),
 
     /// This param must be a tuple with following fields
-    // TODO: generalize and replace this with TyTupleField
     TupleFields(Vec<TyDomainTupleField>),
 }
 
 #[derive(Debug, Clone)]
 pub struct TyDomainTupleField {
-    pub name: Option<String>,
+    pub location: super::IndirectionKind,
     pub ty: Ty,
 }
 
