@@ -54,18 +54,31 @@ fn expr() -> impl Parser<TokenKind, Expr, Error = PError> + Clone {
             .map(Pointer::Parameter);
         let pointer = choice((pointer_external, pointer_var, pointer_param)).map(ExprKind::Pointer);
 
-        // let binding = binding(expr.clone());
         let tuple = tuple(expr.clone());
         let array = array(expr.clone());
+
+        let tuple_lookup = tuple_lookup(expr.clone());
         let function = function(expr.clone());
         let call = func_call(expr.clone());
+        let wrapped = choice((tuple_lookup, function, call))
+            .delimited_by(ctrl('('), ctrl(')'))
+            .recover_with(nested_delimiters(
+                TokenKind::Control('('),
+                TokenKind::Control(')'),
+                [
+                    (TokenKind::Control('{'), TokenKind::Control('}')),
+                    (TokenKind::Control('('), TokenKind::Control(')')),
+                    (TokenKind::Control('['), TokenKind::Control(']')),
+                ],
+                |_| ExprKind::Tuple(vec![]),
+            ));
 
-        let term = choice((pointer, literal, tuple, array, function, call))
+        let term = choice((pointer, literal, tuple, array, wrapped))
             .then(ctrl(':').ignore_then(ty()))
             .map(|(kind, ty)| Expr { kind, ty })
             .boxed();
 
-        binding(tuple_lookup(term).boxed())
+        binding(term.boxed())
     })
 }
 
@@ -194,23 +207,17 @@ fn array<'a>(
         .labelled("array")
 }
 
-fn tuple_lookup<'a, E>(expr: E) -> impl Parser<TokenKind, Expr, Error = PError> + 'a
+fn tuple_lookup<'a, E>(expr: E) -> impl Parser<TokenKind, ExprKind, Error = PError> + 'a
 where
     E: Parser<TokenKind, Expr, Error = PError> + 'a,
 {
-    expr.then(
-        ctrl('.')
-            .ignore_then(select! {
-                TokenKind::Literal(pr::Literal::Integer(i)) => i as u16
-            })
-            .then_ignore(ctrl(':'))
-            .then(ty())
-            .repeated(),
-    )
-    .foldl(|base, (position, ty)| Expr {
-        kind: ExprKind::TupleLookup(Box::new(TupleLookup { base, position })),
-        ty,
-    })
+    ident_keyword("tuple_lookup")
+        .ignore_then(expr)
+        .then(select! {
+            TokenKind::Literal(pr::Literal::Integer(i)) => i as u16
+        })
+        .map(|(base, position)| ExprKind::TupleLookup(Box::new(TupleLookup { base, position })))
+        .labelled("tuple lookup")
 }
 
 fn func_call<'a, E>(expr: E) -> impl Parser<TokenKind, ExprKind, Error = PError> + Clone + 'a
@@ -222,17 +229,6 @@ where
         .then(ctrl(',').ignore_then(expr).repeated())
         .then_ignore(ctrl(',').or_not())
         .map(|(function, args)| ExprKind::Call(Box::new(Call { function, args })))
-        .delimited_by(ctrl('('), ctrl(')'))
-        .recover_with(nested_delimiters(
-            TokenKind::Control('('),
-            TokenKind::Control(')'),
-            [
-                (TokenKind::Control('{'), TokenKind::Control('}')),
-                (TokenKind::Control('('), TokenKind::Control(')')),
-                (TokenKind::Control('['), TokenKind::Control(']')),
-            ],
-            |_| ExprKind::Tuple(vec![]),
-        ))
         .labelled("function call")
 }
 
@@ -247,7 +243,6 @@ where
         .then_ignore(just(TokenKind::ArrowThin))
         // body
         .then(expr)
-        .delimited_by(ctrl('('), ctrl(')'))
         .map(|(id, body)| ExprKind::Function(Box::new(Function { id, body })))
         .labelled("function")
 }

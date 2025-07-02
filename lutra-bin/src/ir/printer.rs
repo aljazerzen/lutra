@@ -71,10 +71,9 @@ impl Printer {
                 format!("{literal}")
             }
             ir::ExprKind::Call(call) => {
-                let mut r = "(".to_string();
+                let mut r = "(call".to_string();
                 self.indent();
                 r += &self.new_line();
-                r += "call ";
                 r += &self.print_expr(&call.function);
                 r += ",";
                 for arg in &call.args {
@@ -88,13 +87,13 @@ impl Printer {
                 r
             }
             ir::ExprKind::Function(func) => {
-                let mut r = "(".to_string();
+                let mut r = "(func ".to_string();
+                r += &func.id.to_string();
+                r += " ->";
+
                 self.indent();
                 r += &self.new_line();
 
-                r += "func ";
-                r += &func.id.to_string();
-                r += " -> ";
                 r += &self.print_expr(&func.body);
 
                 self.dedent();
@@ -130,53 +129,58 @@ impl Printer {
                 r
             }
             ir::ExprKind::EnumVariant(variant) => {
-                let mut r = format!("@{}", variant.tag);
+                let mut r = format!("(enum_variant {}", variant.tag);
 
                 if !is_expr_unit(&variant.inner) {
-                    r += "(";
                     self.indent();
                     r += &self.new_line();
                     r += &self.print_expr(&variant.inner);
                     self.dedent();
                     r += &self.new_line();
-                    r += ")";
                 }
+                r += ")";
                 r
             }
             ir::ExprKind::EnumEq(eq) => {
-                let mut r = "(".to_string();
+                let mut r = "(enum_eq".to_string();
                 self.indent();
                 r += &self.new_line();
 
                 r += &self.print_expr(&eq.subject);
 
+                r += &format!("{}", eq.tag);
                 self.dedent();
                 r += &self.new_line();
-                r += &format!(") == @{}", eq.tag);
+                r += ")";
                 r
             }
             ir::ExprKind::EnumUnwrap(unwrap) => {
-                let mut r = "(".to_string();
+                let mut r = "(enum_unwrap".to_string();
                 self.indent();
                 r += &self.new_line();
 
                 r += &self.print_expr(&unwrap.subject);
 
+                r += &format!("{}", unwrap.tag);
                 self.dedent();
                 r += &self.new_line();
-                r += &format!(")@{}", unwrap.tag);
+                r += ")";
                 r
             }
             ir::ExprKind::TupleLookup(lookup) => {
-                let mut r = self.print_expr(&lookup.base);
+                let mut r = "(tuple_lookup".to_string();
+                self.indent();
                 r += &self.new_line();
-                r += ".";
+                r += &self.print_expr(&lookup.base);
+                r += &self.new_line();
                 r += &lookup.position.to_string();
+                self.dedent();
+                r += &self.new_line();
+                r += ")";
                 r
             }
             ir::ExprKind::Binding(binding) => {
-                self.indent();
-                let mut r = self.new_line();
+                let mut r = String::new();
 
                 let mut binding = binding.as_ref();
 
@@ -198,7 +202,6 @@ impl Printer {
                 }
 
                 r += &self.print_expr(&binding.main);
-                self.dedent();
                 r
             }
             ir::ExprKind::Switch(switch_branches) => {
