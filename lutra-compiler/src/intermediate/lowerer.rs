@@ -48,6 +48,10 @@ struct Lowerer<'a> {
     root_module: &'a decl::RootModule,
 
     scopes: Vec<Scope>,
+
+    /// Depended expressions that are referenced from generated IR.
+    /// Contain FQ path and list of type arguments, pointing to id the should
+    /// be accessible at.
     var_bindings: IndexMap<(pr::Path, Vec<pr::Ty>), u32>,
 
     type_defs_queue: VecDeque<pr::Path>,
@@ -90,11 +94,13 @@ impl<'a> Lowerer<'a> {
 
     #[tracing::instrument(name = "leed", skip_all)]
     fn lower_external_expr_decl(&mut self, path: &pr::Path) -> Result<Option<ir::ExprKind>> {
-        let decl = self
-            .root_module
-            .module
-            .get(path)
-            .unwrap_or_else(|| panic!("{path} does not exist"));
+        if path.as_slice() == ["std", "default"] {
+            // special case: evaluate std::default in lowerer
+            return Ok(None);
+        }
+
+        let decl = self.root_module.module.get(path);
+        let decl = decl.unwrap_or_else(|| panic!("{path} does not exist"));
         let expr = decl.into_expr().unwrap();
 
         if !matches!(expr.kind, pr::ExprKind::Internal) {
@@ -111,12 +117,13 @@ impl<'a> Lowerer<'a> {
 
     #[tracing::instrument(name = "led", skip_all, fields(p = path.to_string()))]
     fn lower_expr_decl(&mut self, path: &pr::Path, ty_args: Vec<pr::Ty>) -> Result<ir::Expr> {
-        let decl = self
-            .root_module
-            .module
-            .get(path)
-            .unwrap_or_else(|| panic!("{path} does not exist"));
+        let decl = self.root_module.module.get(path);
+        let decl = decl.unwrap_or_else(|| panic!("{path} does not exist"));
         let expr = decl.into_expr().unwrap().clone();
+
+        if path.as_slice() == ["std", "default"] {
+            return Ok(self.impl_std_default(ty_args.into_iter().next().unwrap()));
+        }
 
         // should have been lowered earlier
         assert!(!matches!(expr.kind, pr::ExprKind::Internal));
@@ -660,6 +667,63 @@ impl<'a> Lowerer<'a> {
                 body,
             })),
         }
+    }
+
+    fn impl_std_default(&mut self, ty: pr::Ty) -> ir::Expr {
+        let ty = self.lower_ty(ty);
+        let body = self.construct_default_for_ty(ty.clone());
+
+        ir::Expr {
+            kind: ir::ExprKind::Function(Box::new(ir::Function {
+                id: self.generator_function_scope.next() as u32,
+                body,
+            })),
+            ty: ir::Ty::new(ir::TyFunction {
+                body: ty,
+                params: vec![],
+            }),
+        }
+    }
+
+    fn construct_default_for_ty(&mut self, ty: ir::Ty) -> ir::Expr {
+        let kind = match self.get_ty_mat(ty.clone()).kind {
+            ir::TyKind::Primitive(prim) => ir::ExprKind::Literal(match prim {
+                ir::TyPrimitive::bool => ir::Literal::bool(false),
+                ir::TyPrimitive::int8 => ir::Literal::int8(0),
+                ir::TyPrimitive::int16 => ir::Literal::int16(0),
+                ir::TyPrimitive::int32 => ir::Literal::int32(0),
+                ir::TyPrimitive::int64 => ir::Literal::int64(0),
+                ir::TyPrimitive::uint8 => ir::Literal::uint8(0),
+                ir::TyPrimitive::uint16 => ir::Literal::uint16(0),
+                ir::TyPrimitive::uint32 => ir::Literal::uint32(0),
+                ir::TyPrimitive::uint64 => ir::Literal::uint64(0),
+                ir::TyPrimitive::float32 => ir::Literal::float32(0.0),
+                ir::TyPrimitive::float64 => ir::Literal::float64(0.0),
+                ir::TyPrimitive::text => ir::Literal::text("".into()),
+            }),
+            ir::TyKind::Array(_) => ir::ExprKind::Array(vec![]),
+            ir::TyKind::Tuple(ty_fields) => ir::ExprKind::Tuple(
+                ty_fields
+                    .into_iter()
+                    .map(|f| self.construct_default_for_ty(f.ty))
+                    .collect(),
+            ),
+            ir::TyKind::Enum(ty_enum_variants) => {
+                // TODO: ensure that enums have at least one variant
+                // TODO: ensure that enums are not recursive in the first field
+
+                let variant = ty_enum_variants.into_iter().next().unwrap();
+                ir::ExprKind::EnumVariant(Box::new(ir::EnumVariant {
+                    tag: 0,
+                    inner: self.construct_default_for_ty(variant.ty),
+                }))
+            }
+
+            ir::TyKind::Function(_) => panic!(),
+            ir::TyKind::Ident(_) => unreachable!(),
+        };
+
+        ir::Expr { kind, ty }
     }
 }
 

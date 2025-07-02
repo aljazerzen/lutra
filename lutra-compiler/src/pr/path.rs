@@ -78,6 +78,10 @@ impl Path {
         self.path.iter()
     }
 
+    pub fn as_slice(&self) -> &[String] {
+        self.path.as_slice()
+    }
+
     pub fn starts_with(&self, prefix: &Path) -> bool {
         if prefix.len() > self.len() {
             return false;

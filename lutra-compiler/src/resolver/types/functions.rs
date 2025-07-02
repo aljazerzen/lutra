@@ -133,23 +133,6 @@ impl TypeResolver<'_> {
 
         res
     }
-
-    /// Wraps non-tuple Exprs into a singleton Tuple.
-    pub(super) fn coerce_into_tuple(&mut self, expr: Expr) -> Result<Expr> {
-        let is_tuple_ty = expr.ty.as_ref().unwrap().kind.is_tuple(); // && !expr.kind.is_all();
-        Ok(if is_tuple_ty {
-            expr
-        } else {
-            let span = expr.span;
-            let mut expr = pr::Expr::new(pr::ExprKind::Tuple(vec![pr::TupleField {
-                name: None,
-                expr,
-            }]));
-            expr.span = span;
-
-            self.fold_expr(expr)?
-        })
-    }
 }
 
 #[derive(Debug, PartialEq, Clone, Default)]

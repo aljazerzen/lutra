@@ -111,15 +111,6 @@ impl fold::PrFold for super::TypeResolver<'_> {
                 }
             }
 
-            pr::ExprKind::FuncCall(pr::FuncCall {
-                func: name, args, ..
-            }) if (name.kind.as_ident()).is_some_and(|i| i.to_string() == "std.not")
-                && matches!(args[0].kind, pr::ExprKind::Tuple(_)) =>
-            {
-                let arg = args.into_iter().exactly_one().unwrap();
-                self.resolve_column_exclusion(arg)?
-            }
-
             pr::ExprKind::FuncCall(pr::FuncCall { func, args }) => {
                 // fold function name
                 let func = Box::new(self.fold_expr(*func)?);

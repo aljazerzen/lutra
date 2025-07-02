@@ -1,7 +1,7 @@
 mod fold;
 mod inliner;
 pub mod layouter;
-mod lowering;
+mod lowerer;
 
 pub use inliner::inline;
-pub use lowering::{lower_expr, lower_type_defs, lower_var};
+pub use lowerer::{lower_expr, lower_type_defs, lower_var};

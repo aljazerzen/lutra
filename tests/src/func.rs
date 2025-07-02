@@ -1312,6 +1312,26 @@ test_case!(
   ),
 ]"#
 );
+test_case!(
+    enum_construction_09,
+    r#"
+    type Status = enum {
+      Open = int16,
+      Closed = bool,
+    }
+    func (): [Status] -> [Status::Open(0), Status::Open(0)]
+    "#,
+    r#"[
+  Open(
+    0
+  ),
+  Open(
+    0
+  ),
+]"#,
+    skip_runtime,
+    no_skip
+);
 
 test_case!(
     match_00,
@@ -1658,4 +1678,163 @@ test_case!(
     func () -> {key = {"code 1", false}, value = 5: int64}.key.1
     "#,
     r#"false"#
+);
+
+test_case!(
+    default_00,
+    r#"
+    func (): bool -> std::default()
+    "#,
+    r#"false"#
+);
+test_case!(
+    default_01,
+    r#"
+    func (): int32 -> std::default()
+    "#,
+    r#"0"#
+);
+
+test_case!(
+    default_02,
+    r#"
+    func (): float32 -> std::default()
+    "#,
+    r#"0"#
+);
+
+test_case!(
+    default_03,
+    r#"
+    func (): text -> std::default()
+    "#,
+    r#""""#
+);
+
+test_case!(
+    default_04,
+    r#"
+    func (): [int64] -> std::default()
+    "#,
+    r#"[]"#
+);
+
+test_case!(
+    default_05,
+    r#"
+    func (): {int8, text, [bool]} -> std::default()
+    "#,
+    r#"{
+  0,
+  "",
+  [],
+}"#
+);
+
+test_case!(
+    default_06,
+    r#"
+    type Status = enum {
+      Open = int16,
+      Closed = bool,
+    }
+    func (): Status -> std::default()
+    "#,
+    r#"Open(
+  0
+)"#
+);
+test_case!(
+    default_10,
+    r#"
+    func (): [bool] -> std::lag([std::default(), std::default()], 1)
+    "#,
+    r#"[
+  false,
+  false,
+]"#
+);
+test_case!(
+    default_11,
+    r#"
+    func (): [int32] -> std::lag([std::default(), std::default()], 1)
+    "#,
+    r#"[
+  0,
+  0,
+]"#
+);
+
+test_case!(
+    default_12,
+    r#"
+    func (): [float32] -> std::lag([std::default(), std::default()], 1)
+    "#,
+    r#"[
+  0,
+  0,
+]"#
+);
+
+test_case!(
+    default_13,
+    r#"
+    func (): [text] -> std::lag([std::default(), std::default()], 1)
+    "#,
+    r#"[
+  "",
+  "",
+]"#
+);
+
+test_case!(
+    default_14,
+    r#"
+    func (): [[int64]] -> std::lag([std::default(), std::default()], 1)
+    "#,
+    r#"[
+  [],
+  [],
+]"#,
+    skip_postgres
+);
+
+test_case!(
+    default_15,
+    r#"
+    func (): [{int8, text, [bool]}] -> std::lag([std::default(), std::default()], 1)
+    "#,
+    r#"[
+  {
+    0,
+    "",
+    [],
+  },
+  {
+    0,
+    "",
+    [],
+  },
+]"#,
+    skip_postgres
+);
+
+test_case!(
+    default_16,
+    r#"
+    type Status = enum {
+      Open = int64,
+      Closed = bool,
+    }
+    func (): [Status] -> std::lag([std::default(), std::default()], 1)
+    "#,
+    r#"[
+  Open(
+    0
+  ),
+  Open(
+    0
+  ),
+]"#,
+    skip_postgres
 );

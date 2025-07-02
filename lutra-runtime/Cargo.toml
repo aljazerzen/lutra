@@ -13,6 +13,7 @@ lutra-compiler = { path = "../lutra-compiler" }
 lutra-ir = { path = "../lutra-ir" }
 parquet = { version = "55.1.0" }
 thiserror.workspace = true
+tracing.workspace = true
 
 [dev-dependencies]
 insta = { workspace = true }

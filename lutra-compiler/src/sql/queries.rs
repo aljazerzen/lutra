@@ -722,7 +722,7 @@ impl<'a> Context<'a> {
                 let arg = args.next().unwrap();
                 let offset = args.next().unwrap();
 
-                let filler = get_lead_lag_filler(ty);
+                let filler = get_default_value_for_ty(ty);
                 ExprOrSource::Source(format!(
                     "COALESCE(LEAD({arg}, {offset}::int4) OVER (ORDER BY index), {filler})"
                 ))
@@ -732,7 +732,7 @@ impl<'a> Context<'a> {
                 let arg = args.next().unwrap();
                 let offset = args.next().unwrap();
 
-                let filler = get_lead_lag_filler(ty);
+                let filler = get_default_value_for_ty(ty);
 
                 ExprOrSource::Source(format!(
                     "COALESCE(LAG({arg}, {offset}::int4) OVER (ORDER BY index), {filler})"
@@ -849,13 +849,15 @@ impl<'a> Context<'a> {
     }
 }
 
-fn get_lead_lag_filler(ty: &ir::Ty) -> &str {
+fn get_default_value_for_ty(ty: &ir::Ty) -> &str {
     let item_ty = ty.kind.as_array().unwrap();
     match &item_ty.kind {
         ir::TyKind::Primitive(ir::TyPrimitive::int8) => "0::\"char\"",
         ir::TyKind::Primitive(ir::TyPrimitive::int16) => "0::int2",
         ir::TyKind::Primitive(ir::TyPrimitive::int32) => "0::int4",
         ir::TyKind::Primitive(ir::TyPrimitive::int64) => "0::int8",
+        ir::TyKind::Primitive(ir::TyPrimitive::float32) => "0.0::float4",
+        ir::TyKind::Primitive(ir::TyPrimitive::float64) => "0.0::float8",
         ir::TyKind::Primitive(ir::TyPrimitive::bool) => "FALSE",
         ir::TyKind::Primitive(ir::TyPrimitive::text) => "''",
         _ => todo!(),

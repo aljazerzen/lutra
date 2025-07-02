@@ -615,13 +615,14 @@ pub mod std {
             let mut layout_args = LayoutArgsReader::new(layout_args);
             let head_bytes = layout_args.next_u32();
             let body_ptrs = layout_args.next_slice();
+            let default_val = assume::bytes(layout_args.next_slice());
 
             let [array, offset] = assume::exactly_n(args);
 
             let array = assume::array(array, head_bytes);
             let offset = assume::int64(&offset)? as isize;
 
-            Self::shift(array, offset, head_bytes, body_ptrs)
+            Self::shift(array, offset, head_bytes, body_ptrs, default_val)
         }
 
         pub fn lead(
@@ -632,13 +633,14 @@ pub mod std {
             let mut layout_args = LayoutArgsReader::new(layout_args);
             let head_bytes = layout_args.next_u32();
             let body_ptrs = layout_args.next_slice();
+            let default_val = assume::bytes(layout_args.next_slice());
 
             let [array, offset] = assume::exactly_n(args);
 
             let array = assume::array(array, head_bytes);
             let offset = (assume::int64(&offset)? as isize).saturating_neg();
 
-            Self::shift(array, offset, head_bytes, body_ptrs)
+            Self::shift(array, offset, head_bytes, body_ptrs, default_val)
         }
 
         fn shift(
@@ -646,7 +648,11 @@ pub mod std {
             offset: isize,
             head_bytes: u32,
             body_ptrs: &[u32],
+            default_val: Vec<u8>,
         ) -> Result<Cell, EvalError> {
+            tracing::debug!("default val = {default_val:?}");
+            let default_val = lutra_bin::Data::new(default_val);
+
             let array_len = array.remaining();
 
             let n_blanks_before = (offset.max(0) as usize).min(array_len);
@@ -654,8 +660,7 @@ pub mod std {
 
             let mut out = ArrayWriter::new(head_bytes, body_ptrs);
             for _ in 0..n_blanks_before {
-                // TODO: write something else than just zeros
-                out.write_item(lutra_bin::Data::new(vec![0; head_bytes as usize]));
+                out.write_item(default_val.clone());
             }
 
             let n_copies = array_len.saturating_sub(n_blanks_before + n_blanks_after);
@@ -664,8 +669,7 @@ pub mod std {
             }
 
             for _ in 0..n_blanks_after {
-                // TODO: write something else than just zeros
-                out.write_item(lutra_bin::Data::new(vec![0; head_bytes as usize]));
+                out.write_item(default_val.clone());
             }
 
             Ok(Cell::Data(out.finish()))
@@ -798,7 +802,8 @@ pub mod std_fs {
             let file_path = path::PathBuf::from(file_path);
 
             // decode item ty from layout args
-            let ty_item = assume::layout_args_to_bytes(layout_args);
+            let mut layout_args = assume::LayoutArgsReader::new(layout_args);
+            let ty_item = assume::bytes(layout_args.next_slice());
             let ty_item = ir::Ty::decode(&ty_item).map_err(|_| EvalError::BadProgram)?;
 
             // init parquet reader
@@ -930,11 +935,13 @@ mod assume {
         }
     }
 
-    pub fn layout_args_to_bytes(args: &[u32]) -> Vec<u8> {
+    pub fn bytes(args: &[u32]) -> Vec<u8> {
+        let len = args[0] as usize;
         let mut r = Vec::with_capacity(args.len() * (u32::BITS / u8::BITS) as usize);
-        for arg in args {
+        for arg in &args[1..] {
             r.extend(arg.to_le_bytes());
         }
+        r.truncate(len);
         r
     }
 }

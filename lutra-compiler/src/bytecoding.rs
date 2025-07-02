@@ -65,7 +65,7 @@ impl ByteCoder {
         match ptr {
             ir::Pointer::External(e_ptr) => {
                 let ty = self.get_ty_mat(ty);
-                let e_symbol = compile_external_symbol(e_ptr.id, ty);
+                let e_symbol = self.compile_external_symbol(e_ptr.id, ty);
                 let (index, _) = self.externals.insert_full(e_symbol);
 
                 Sid(index as u32).with_tag(SidKind::External)
@@ -224,165 +224,211 @@ impl ByteCoder {
             body_ptrs: value.body_ptrs,
         }
     }
-}
 
-fn compile_external_symbol(id: String, ty: &ir::Ty) -> ExternalSymbol {
-    let layout_args: Vec<u32> = match id.as_str() {
-        "std::mul" | "std::div" | "std::mod" | "std::add" | "std::sub" | "std::neg" | "std::eq"
-        | "std::ne" | "std::gt" | "std::lt" | "std::gte" | "std::lte" => {
-            let param_ty = as_ty_of_param(ty);
-            let primitive = param_ty.kind.as_primitive().unwrap();
+    fn compile_external_symbol(&self, id: String, ty_mat: &ir::Ty) -> ExternalSymbol {
+        let layout_args: Vec<u32> = match id.as_str() {
+            "std::mul" | "std::div" | "std::mod" | "std::add" | "std::sub" | "std::neg"
+            | "std::eq" | "std::ne" | "std::gt" | "std::lt" | "std::gte" | "std::lte" => {
+                let param_ty = as_ty_of_param(ty_mat);
+                let primitive = param_ty.kind.as_primitive().unwrap();
 
-            let mut buf = lutra_bin::bytes::BytesMut::with_capacity(1);
-            primitive.encode(&mut buf);
-            buf.put_bytes(0, 3); // padding
-            vec![buf.get_u32()]
-        }
-
-        "std::count" => vec![],
-
-        "std::index" | "std::min" | "std::max" | "std::sum" | "std::average" | "std::contains" => {
-            let item_layout = as_layout_of_param_array(ty);
-            vec![
-                item_layout.head_size.div_ceil(8), // item_head_size
-            ]
-        }
-
-        "std::filter" | "std::slice" | "std::sort" | "std::lag" | "std::lead" => {
-            let item_layout = as_layout_of_param_array(ty);
-
-            let mut r = Vec::with_capacity(1 + 1 + item_layout.body_ptrs.len());
-            r.push(item_layout.head_size.div_ceil(8)); // item_head_size
-            r.extend(as_len_and_items(&item_layout.body_ptrs)); // item_body_ptrs
-            r
-        }
-
-        "std::map" => {
-            let input_layout = as_layout_of_param_array(ty);
-            let output_layout = as_layout_of_return_array(ty);
-
-            let mut r = Vec::with_capacity(2 + 1 + output_layout.body_ptrs.len());
-            r.push(input_layout.head_size.div_ceil(8)); // input_item_head
-            r.push(output_layout.head_size.div_ceil(8)); // output_item_head
-            r.extend(as_len_and_items(&output_layout.body_ptrs)); // output_item_body_ptrs
-            r
-        }
-
-        "std::to_columnar" => {
-            let ty_func = ty.kind.as_function().unwrap();
-
-            let input_item = ty_func.params[0].kind.as_array().unwrap();
-            let input_layout = input_item.layout.as_ref().unwrap();
-
-            let mut r = Vec::new();
-            r.push(input_layout.head_size.div_ceil(8)); // item_head_size
-
-            let input_field_offsets = lutra_bin::layout::tuple_field_offsets(input_item);
-            r.extend(as_len_and_items(&input_field_offsets)); // field_offsets
-
-            // fields_head_bytes
-            let fields = input_item.kind.as_tuple().unwrap();
-            r.push(fields.len() as u32);
-            for field in fields {
-                let field_layout = field.ty.layout.as_ref().unwrap();
-                r.push(field_layout.head_size.div_ceil(8));
+                let mut buf = lutra_bin::bytes::BytesMut::with_capacity(1);
+                primitive.encode(&mut buf);
+                buf.put_bytes(0, 3); // padding
+                vec![buf.get_u32()]
             }
 
-            // fields_body_ptrs
-            for field in fields {
-                let field_layout = field.ty.layout.as_ref().unwrap();
-                r.extend(as_len_and_items(&field_layout.body_ptrs));
+            "std::count" => vec![],
+
+            "std::index" | "std::min" | "std::max" | "std::sum" | "std::average"
+            | "std::contains" => {
+                let item_layout = as_layout_of_param_array(ty_mat);
+                vec![
+                    item_layout.head_size.div_ceil(8), // item_head_size
+                ]
             }
 
-            r
+            "std::filter" | "std::slice" | "std::sort" => {
+                let item_layout = as_layout_of_param_array(ty_mat);
+
+                let mut r = Vec::with_capacity(1 + 1 + item_layout.body_ptrs.len());
+                r.push(item_layout.head_size.div_ceil(8)); // item_head_size
+                r.extend(as_len_and_items(&item_layout.body_ptrs)); // item_body_ptrs
+                r
+            }
+
+            "std::lag" | "std::lead" => {
+                let item_layout = as_layout_of_param_array(ty_mat);
+
+                let mut r = Vec::with_capacity(1 + 1 + item_layout.body_ptrs.len());
+                r.push(item_layout.head_size.div_ceil(8)); // item_head_size
+                r.extend(as_len_and_items(&item_layout.body_ptrs)); // item_body_ptrs
+
+                // also encode default value
+                let ty_func = ty_mat.kind.as_function().unwrap();
+                let ty_item = ty_func.body.kind.as_array().unwrap();
+                let default_val = self.construct_default_for_ty(ty_item);
+                log::debug!(
+                    "default value: {}",
+                    default_val.print_source(ty_item, &[]).unwrap()
+                );
+                let default_val = default_val.encode(ty_item, &[]).unwrap(); // TODO: ty_defs
+                log::debug!("default value: {default_val:?}",);
+                pack_bytes_to_u32(default_val, &mut r);
+
+                r
+            }
+
+            "std::map" => {
+                let input_layout = as_layout_of_param_array(ty_mat);
+                let output_layout = as_layout_of_return_array(ty_mat);
+
+                let mut r = Vec::with_capacity(2 + 1 + output_layout.body_ptrs.len());
+                r.push(input_layout.head_size.div_ceil(8)); // input_item_head
+                r.push(output_layout.head_size.div_ceil(8)); // output_item_head
+                r.extend(as_len_and_items(&output_layout.body_ptrs)); // output_item_body_ptrs
+                r
+            }
+
+            "std::to_columnar" => {
+                let ty_func = ty_mat.kind.as_function().unwrap();
+
+                let input_item = ty_func.params[0].kind.as_array().unwrap();
+                let input_layout = input_item.layout.as_ref().unwrap();
+
+                let mut r = Vec::new();
+                r.push(input_layout.head_size.div_ceil(8)); // item_head_size
+
+                let input_field_offsets = lutra_bin::layout::tuple_field_offsets(input_item);
+                r.extend(as_len_and_items(&input_field_offsets)); // field_offsets
+
+                // fields_head_bytes
+                let fields = input_item.kind.as_tuple().unwrap();
+                r.push(fields.len() as u32);
+                for field in fields {
+                    let field_layout = field.ty.layout.as_ref().unwrap();
+                    r.push(field_layout.head_size.div_ceil(8));
+                }
+
+                // fields_body_ptrs
+                for field in fields {
+                    let field_layout = field.ty.layout.as_ref().unwrap();
+                    r.extend(as_len_and_items(&field_layout.body_ptrs));
+                }
+
+                r
+            }
+            "std::from_columnar" => {
+                let ty_func = ty_mat.kind.as_function().unwrap();
+
+                let output_item = ty_func.body.kind.as_array().unwrap();
+                let output_layout = output_item.layout.as_ref().unwrap();
+
+                let mut r = Vec::new();
+                r.push(output_layout.head_size.div_ceil(8)); // output_head_bytes
+
+                r.extend(as_len_and_items(&output_layout.body_ptrs)); // output_body_ptrs
+
+                // fields_item_head_bytes
+                let fields = output_item.kind.as_tuple().unwrap();
+                r.push(fields.len() as u32);
+                for field in fields {
+                    let field_layout = field.ty.layout.as_ref().unwrap();
+                    r.push(field_layout.head_size.div_ceil(8));
+                }
+
+                // fields_body_ptrs
+                for field in fields {
+                    let field_layout = field.ty.layout.as_ref().unwrap();
+                    r.extend(as_len_and_items(&field_layout.body_ptrs));
+                }
+
+                r
+            }
+
+            "std::group" => {
+                let ty_func = ty_mat.kind.as_function().unwrap();
+
+                let input_item = &ty_func.params[0].kind.as_array().unwrap();
+                let input_layout = input_item.layout.as_ref().unwrap();
+
+                let output_item = ty_func.body.kind.as_array().unwrap();
+                let output_layout = output_item.layout.as_ref().unwrap();
+
+                let mut r = Vec::new();
+                r.push(input_layout.head_size.div_ceil(8)); // input_head_bytes
+                r.extend(as_len_and_items(&input_layout.body_ptrs)); // input_body_ptrs
+
+                r.push(output_layout.head_size.div_ceil(8)); // output_head_bytes
+                r.extend(as_len_and_items(&output_layout.body_ptrs)); // output_body_ptrs
+
+                // output_field_head_bytes
+                let fields = output_item.kind.as_tuple().unwrap();
+                r.push(fields.len() as u32);
+                for field in fields {
+                    let field_layout = field.ty.layout.as_ref().unwrap();
+                    r.push(field_layout.head_size.div_ceil(8));
+                }
+
+                // output_fields_body_ptrs
+                for field in fields {
+                    let field_layout = field.ty.layout.as_ref().unwrap();
+                    r.extend(as_len_and_items(&field_layout.body_ptrs));
+                }
+
+                r
+            }
+
+            "std::fs::read_parquet" => {
+                let ty_func = ty_mat.kind.as_function().unwrap();
+
+                let output_item = ty_func.body.kind.as_array().unwrap();
+
+                let mut output_item_buf = lutra_bin::bytes::BytesMut::new();
+                output_item.encode(&mut output_item_buf);
+
+                let mut r = Vec::new();
+                pack_bytes_to_u32(output_item_buf.to_vec(), &mut r);
+                r
+            }
+
+            _ => vec![],
+        };
+        ExternalSymbol { id, layout_args }
+    }
+
+    fn construct_default_for_ty(&self, ty: &ir::Ty) -> lutra_bin::Value {
+        match &self.get_ty_mat(ty).kind {
+            ir::TyKind::Primitive(prim) => match prim {
+                ir::TyPrimitive::bool => lutra_bin::Value::Bool(false),
+                ir::TyPrimitive::int8 => lutra_bin::Value::Int8(0),
+                ir::TyPrimitive::int16 => lutra_bin::Value::Int16(0),
+                ir::TyPrimitive::int32 => lutra_bin::Value::Int32(0),
+                ir::TyPrimitive::int64 => lutra_bin::Value::Int64(0),
+                ir::TyPrimitive::uint8 => lutra_bin::Value::Uint8(0),
+                ir::TyPrimitive::uint16 => lutra_bin::Value::Uint16(0),
+                ir::TyPrimitive::uint32 => lutra_bin::Value::Uint32(0),
+                ir::TyPrimitive::uint64 => lutra_bin::Value::Uint64(0),
+                ir::TyPrimitive::float32 => lutra_bin::Value::Float32(0.0),
+                ir::TyPrimitive::float64 => lutra_bin::Value::Float64(0.0),
+                ir::TyPrimitive::text => lutra_bin::Value::Text("".into()),
+            },
+            ir::TyKind::Array(_) => lutra_bin::Value::Array(vec![]),
+            ir::TyKind::Tuple(ty_fields) => lutra_bin::Value::Tuple(
+                ty_fields
+                    .iter()
+                    .map(|f| self.construct_default_for_ty(&f.ty))
+                    .collect(),
+            ),
+            ir::TyKind::Enum(ty_enum_variants) => {
+                let variant = ty_enum_variants.iter().next().unwrap();
+                lutra_bin::Value::Enum(0, Box::new(self.construct_default_for_ty(&variant.ty)))
+            }
+
+            ir::TyKind::Function(_) => panic!(),
+            ir::TyKind::Ident(_) => unreachable!(),
         }
-        "std::from_columnar" => {
-            let ty_func = ty.kind.as_function().unwrap();
-
-            let output_item = ty_func.body.kind.as_array().unwrap();
-            let output_layout = output_item.layout.as_ref().unwrap();
-
-            let mut r = Vec::new();
-            r.push(output_layout.head_size.div_ceil(8)); // output_head_bytes
-
-            r.extend(as_len_and_items(&output_layout.body_ptrs)); // output_body_ptrs
-
-            // fields_item_head_bytes
-            let fields = output_item.kind.as_tuple().unwrap();
-            r.push(fields.len() as u32);
-            for field in fields {
-                let field_layout = field.ty.layout.as_ref().unwrap();
-                r.push(field_layout.head_size.div_ceil(8));
-            }
-
-            // fields_body_ptrs
-            for field in fields {
-                let field_layout = field.ty.layout.as_ref().unwrap();
-                r.extend(as_len_and_items(&field_layout.body_ptrs));
-            }
-
-            r
-        }
-
-        "std::group" => {
-            let ty_func = ty.kind.as_function().unwrap();
-
-            let input_item = &ty_func.params[0].kind.as_array().unwrap();
-            let input_layout = input_item.layout.as_ref().unwrap();
-
-            let output_item = ty_func.body.kind.as_array().unwrap();
-            let output_layout = output_item.layout.as_ref().unwrap();
-
-            let mut r = Vec::new();
-            r.push(input_layout.head_size.div_ceil(8)); // input_head_bytes
-            r.extend(as_len_and_items(&input_layout.body_ptrs)); // input_body_ptrs
-
-            r.push(output_layout.head_size.div_ceil(8)); // output_head_bytes
-            r.extend(as_len_and_items(&output_layout.body_ptrs)); // output_body_ptrs
-
-            // output_field_head_bytes
-            let fields = output_item.kind.as_tuple().unwrap();
-            r.push(fields.len() as u32);
-            for field in fields {
-                let field_layout = field.ty.layout.as_ref().unwrap();
-                r.push(field_layout.head_size.div_ceil(8));
-            }
-
-            // output_fields_body_ptrs
-            for field in fields {
-                let field_layout = field.ty.layout.as_ref().unwrap();
-                r.extend(as_len_and_items(&field_layout.body_ptrs));
-            }
-
-            r
-        }
-
-        "std::fs::read_parquet" => {
-            let ty_func = ty.kind.as_function().unwrap();
-
-            let output_item = ty_func.body.kind.as_array().unwrap();
-
-            // encode output item ty as lutra-bin
-            let mut output_item_buf = lutra_bin::bytes::BytesMut::new();
-            output_item.encode(&mut output_item_buf);
-
-            // pad
-            if output_item_buf.len() % 4 != 0 {
-                output_item_buf.put_bytes(0, 4 - output_item_buf.len() % 4);
-            }
-
-            // cast to Vec<u32> as le bytes
-            let mut r = Vec::with_capacity(output_item_buf.len() / 4);
-            for chunk in output_item_buf.freeze().chunks_exact(4) {
-                r.push(u32::from_le_bytes(chunk.try_into().unwrap()));
-            }
-
-            r
-        }
-
-        _ => vec![],
-    };
-    ExternalSymbol { id, layout_args }
+    }
 }
 
 fn as_len_and_items(items: &[u32]) -> impl Iterator<Item = u32> + '_ {
@@ -408,4 +454,21 @@ fn as_layout_of_return_array(ty: &Ty) -> &ir::TyLayout {
 fn as_ty_of_param(ty: &Ty) -> &ir::Ty {
     let ty_func = ty.kind.as_function().unwrap();
     &ty_func.params[0]
+}
+
+fn pack_bytes_to_u32(mut input: Vec<u8>, output: &mut Vec<u32>) {
+    let input_len = input.len();
+
+    // pad
+    if input.len() % 4 != 0 {
+        input.put_bytes(0, 4 - input.len() % 4);
+    }
+
+    // cast to Vec<u32> as le bytes
+    output.reserve(2 + input.len() / 4);
+    output.push((input.len() / 4) as u32 + 1);
+    output.push(input_len as u32);
+    for chunk in input.chunks_exact(4) {
+        output.push(u32::from_le_bytes(chunk.try_into().unwrap()));
+    }
 }

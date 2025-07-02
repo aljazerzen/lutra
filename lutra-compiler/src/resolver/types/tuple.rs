@@ -1,22 +1,10 @@
 use crate::diagnostic::Diagnostic;
 use crate::pr::{self, Ty};
-use crate::utils::fold::PrFold;
 use crate::{Result, printer};
 
 use super::scope;
 
 impl super::TypeResolver<'_> {
-    pub fn resolve_column_exclusion(&mut self, expr: pr::Expr) -> Result<pr::Expr> {
-        let expr = self.fold_expr(expr)?;
-        let _except = self.coerce_into_tuple(expr)?;
-
-        todo!()
-        // self.fold_expr(pr::Expr::new(pr::ExprKind::All {
-        //     within: Box::new(pr::Expr::new(pr::Path::from_path(vec![NS_THIS]))),
-        //     except: Box::new(except),
-        // }))
-    }
-
     /// Resolve indirections (lookups).
     /// For example, `base.indirection` where `base` either has a tuple or array type.
     ///
