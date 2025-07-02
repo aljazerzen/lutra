@@ -13,7 +13,7 @@ pub fn compile(project: &crate::Project, path: &pr::Path) -> sr::Program {
     // lower & inline
     let program = crate::intermediate::lower_var(&project.root_module, path);
     tracing::debug!("ir: {}", lutra_bin::ir::print(&program));
-    let program = crate::intermediate::inline(program).unwrap();
+    let program = crate::intermediate::inline(program);
     tracing::debug!("ir (inlined): {}", lutra_bin::ir::print(&program));
     let program = crate::intermediate::layouter::on_program(program);
 

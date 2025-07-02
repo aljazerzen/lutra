@@ -9,15 +9,27 @@ use lutra_bin::ir::{self, *};
 type Result<T> = std::result::Result<T, ()>;
 
 pub trait IrFold {
+    fn fold_program(&mut self, program: Program) -> Result<Program> {
+        Ok(Program {
+            main: self.fold_expr(program.main)?,
+            types: program
+                .types
+                .into_iter()
+                .map(|t| -> Result<TyDef> {
+                    Ok(TyDef {
+                        name: t.name,
+                        ty: self.fold_ty(t.ty)?,
+                    })
+                })
+                .collect::<Result<Vec<_>>>()?,
+        })
+    }
     fn fold_expr(&mut self, expr: Expr) -> Result<Expr> {
         let ty = self.fold_ty(expr.ty)?;
         fold_expr_kind(self, expr.kind, ty)
     }
     fn fold_ptr(&mut self, ptr: Pointer, ty: Ty) -> Result<Expr> {
-        Ok(Expr {
-            kind: ExprKind::Pointer(ptr),
-            ty,
-        })
+        fold_ptr(ptr, ty)
     }
     fn fold_call(&mut self, call: Call, ty: Ty) -> Result<Expr> {
         fold_call(self, call, ty)
@@ -65,6 +77,13 @@ pub fn fold_call<T: ?Sized + IrFold>(fold: &mut T, call: Call, ty: Ty) -> Result
             function: fold.fold_expr(call.function)?,
             args: fold_exprs(fold, call.args)?,
         })),
+        ty,
+    })
+}
+
+pub fn fold_ptr(ptr: Pointer, ty: Ty) -> Result<Expr> {
+    Ok(Expr {
+        kind: ExprKind::Pointer(ptr),
         ty,
     })
 }

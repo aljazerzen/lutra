@@ -32,7 +32,7 @@ fn lower_01() {
         | std::index(0)
       )
     }
- 
+
     func (album_id: int) -> {
       chinook::get_albums(),
       chinook::get_album_by_id(album_id),
@@ -45,62 +45,62 @@ fn lower_01() {
       func 0 -> 
         let 2 = (
           func 4 -> (
-            call external.std::index: func ([{id = int64, total = float64}], int64) -> {id = int64, total = float64}, 
+            call external.std::index: func ([{id = int64, total = float64}], int64) -> {id = int64, total = float64},
             (
-              call external.std::filter: func ([{id = int64, total = float64}], func ({id = int64, total = float64}) -> bool) -> [{id = int64, total = float64}], 
+              call external.std::filter: func ([{id = int64, total = float64}], func ({id = int64, total = float64}) -> bool) -> [{id = int64, total = float64}],
               (
-                call external.box_office::get_album_sales: func () -> [box_office::album_sale], 
-              ): [box_office::album_sale], 
+                call external.box_office::get_album_sales: func () -> [box_office::album_sale],
+              ): [box_office::album_sale],
               (
                 func 5 -> (
-                  call external.std::eq: func (int64, int64) -> bool, 
+                  call external.std::eq: func (int64, int64) -> bool,
                   fn.5+0: box_office::album_sale
-                  .0: int64, 
-                  fn.4+0: int64, 
+                  .0: int64,
+                  fn.4+0: int64,
                 ): bool
-              ): func (box_office::album_sale) -> bool, 
-            ): [{id = int64, total = float64}], 
-            0: int64, 
+              ): func (box_office::album_sale) -> bool,
+            ): [{id = int64, total = float64}],
+            0: int64,
           ): {id = int64, total = float64}
         ): func (int64) -> box_office::album_sale;
         let 1 = (
           func 2 -> (
-            call external.std::index: func ([{id = int64, title = text}], int64) -> {id = int64, title = text}, 
+            call external.std::index: func ([{id = int64, title = text}], int64) -> {id = int64, title = text},
             (
-              call external.std::filter: func ([{id = int64, title = text}], func ({id = int64, title = text}) -> bool) -> [{id = int64, title = text}], 
+              call external.std::filter: func ([{id = int64, title = text}], func ({id = int64, title = text}) -> bool) -> [{id = int64, title = text}],
               (
-                call external.chinook::get_albums: func () -> [chinook::album], 
-              ): [chinook::album], 
+                call external.chinook::get_albums: func () -> [chinook::album],
+              ): [chinook::album],
               (
                 func 3 -> (
-                  call external.std::eq: func (int64, int64) -> bool, 
+                  call external.std::eq: func (int64, int64) -> bool,
                   fn.3+0: chinook::album
-                  .0: int64, 
-                  fn.2+0: int64, 
+                  .0: int64,
+                  fn.2+0: int64,
                 ): bool
-              ): func (chinook::album) -> bool, 
-            ): [{id = int64, title = text}], 
-            0: int64, 
+              ): func (chinook::album) -> bool,
+            ): [{id = int64, title = text}],
+            0: int64,
           ): {id = int64, title = text}
         ): func (int64) -> chinook::album;
         let 0 = (
           func 1 -> {
             (
-              call external.chinook::get_albums: func () -> [chinook::album], 
+              call external.chinook::get_albums: func () -> [chinook::album],
             ): [chinook::album],
             (
-              call var.1: func (int64) -> chinook::album, 
-              fn.1+0: int64, 
+              call var.1: func (int64) -> chinook::album,
+              fn.1+0: int64,
             ): chinook::album,
             (
-              call var.2: func (int64) -> box_office::album_sale, 
-              fn.1+0: int64, 
+              call var.2: func (int64) -> box_office::album_sale,
+              fn.1+0: int64,
             ): box_office::album_sale,
           }: {[chinook::album], chinook::album, box_office::album_sale}
         ): func (int64) -> {[chinook::album], chinook::album, box_office::album_sale};
         (
-          call var.0: func (int64) -> {[chinook::album], chinook::album, box_office::album_sale}, 
-          fn.0+0: int64, 
+          call var.0: func (int64) -> {[chinook::album], chinook::album, box_office::album_sale},
+          fn.0+0: int64,
         ): {[chinook::album], chinook::album, box_office::album_sale}
     ): func (int64) -> {[chinook::album], chinook::album, box_office::album_sale}
     ")
@@ -113,7 +113,7 @@ fn lower_02() {
         Open,
         Closed = text,
     }
- 
+
     func () -> match Status::Closed {
         Status::Open => "open",
         Status::Closed => "closed",
@@ -141,8 +141,40 @@ fn lower_02() {
             ): text
         ): func () -> text;
         (
-          call var.0: func () -> text, 
+          call var.0: func () -> text,
         ): text
     ): func () -> text
     "#)
+}
+
+#[test]
+fn lower_03() {
+    assert_snapshot!(_test_compile_and_print(r#"
+    let twice = func <T> (x: T) -> {x, x}
+
+    func () -> twice([true, true, false])
+    "#), @r"
+    let main = (
+      func 0 -> 
+        let 1 = (
+          func 2 -> {
+            fn.2+0: [bool],
+            fn.2+0: [bool],
+          }: {[bool], [bool]}
+        ): func ([bool]) -> {[bool], [bool]};
+        let 0 = (
+          func 1 -> (
+            call var.1: func ([bool]) -> {[bool], [bool]},
+            [
+              true: bool,
+              true: bool,
+              false: bool,
+            ]: [bool],
+          ): {[bool], [bool]}
+        ): func () -> {[bool], [bool]};
+        (
+          call var.0: func () -> {[bool], [bool]},
+        ): {[bool], [bool]}
+    ): func () -> {[bool], [bool]}
+    ")
 }

@@ -19,7 +19,7 @@ pub mod printer;
 pub use bytecoding::compile_program as bytecode_program;
 pub use compile::{CompileParams, compile, compile_overlay};
 pub use discover::{DiscoverParams, discover};
-pub use intermediate::{layouter, lower_expr, lower_type_defs, lower_var};
+pub use intermediate::{inline, layouter, lower_expr, lower_type_defs, lower_var};
 pub use lutra_bin::ir;
 pub use project::{Project, SourceTree};
 pub use span::Span;

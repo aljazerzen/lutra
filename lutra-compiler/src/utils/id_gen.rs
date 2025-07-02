@@ -13,6 +13,14 @@ impl<T: From<usize>> IdGenerator<T> {
     }
 
     #[allow(dead_code)]
+    pub fn new_at(x: usize) -> Self {
+        IdGenerator {
+            next_id: x + 1,
+            phantom: PhantomData,
+        }
+    }
+
+    #[allow(dead_code)]
     pub fn skip(&mut self, id: usize) {
         self.next_id = self.next_id.max(id + 1);
     }

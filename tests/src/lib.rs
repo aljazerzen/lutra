@@ -5,8 +5,9 @@ mod lutra {
 }
 
 mod func;
+mod inliner;
 mod lbin;
-mod lowering;
+mod lowerer;
 mod native_functions;
 mod postgres;
 mod resolver;

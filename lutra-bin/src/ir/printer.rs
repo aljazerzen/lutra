@@ -76,11 +76,11 @@ impl Printer {
                 r += &self.new_line();
                 r += "call ";
                 r += &self.print_expr(&call.function);
-                r += ", ";
+                r += ",";
                 for arg in &call.args {
                     r += &self.new_line();
                     r += &self.print_expr(arg);
-                    r += ", ";
+                    r += ",";
                 }
                 self.dedent();
                 r += &self.new_line();
