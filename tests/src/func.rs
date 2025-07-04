@@ -425,7 +425,7 @@ test_case!(std_index_06, r#"["hello", "world", "!"].2"#, r#""!""#);
 
 test_case!(
     std_map_00,
-    "std::map([5,3,65,3,2], func (x: int) -> x + 1)",
+    "func () -> std::map([5,3,65,3,2], func (x: int) -> x + 1)",
     r#"[
   6,
   4,
@@ -435,11 +435,15 @@ test_case!(
 ]"#
 );
 
-test_case!(std_map_01, "std::map([], func (x: int) -> x + 1)", "[]");
+test_case!(
+    std_map_01,
+    "func () -> std::map([], func (x: int) -> x + 1)",
+    "[]"
+);
 
 test_case!(
     std_map_02,
-    "std::map([false, true, false], func (x: bool) -> !x)",
+    "func () -> std::map([false, true, false], func (x: bool) -> !x)",
     r#"[
   true,
   false,
@@ -449,11 +453,50 @@ test_case!(
 
 test_case!(
     std_map_03,
-    r#"std::map(["hello", "world", "!"], func (x: text) -> std::text_ops::length(x))"#,
+    r#"func () -> std::map(["hello", "world", "!"], func (x: text) -> std::text_ops::length(x))"#,
     r#"[
   5,
   5,
   1,
+]"#
+);
+
+test_case!(
+    std_flat_map_00,
+    r#"func () -> std::flat_map([1, 2, 3]: [int64], func (x) -> [x, x])"#,
+    r#"[
+  1,
+  1,
+  2,
+  2,
+  3,
+  3,
+]"#
+);
+
+test_case!(
+    std_flat_map_01,
+    r#"func () -> (
+      [{1: int64, false}, {2, true}]
+      | std::flat_map(func (x) -> [x, x])
+    )"#,
+    r#"[
+  {
+    1,
+    false,
+  },
+  {
+    1,
+    false,
+  },
+  {
+    2,
+    true,
+  },
+  {
+    2,
+    true,
+  },
 ]"#
 );
 

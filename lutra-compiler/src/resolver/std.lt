@@ -71,6 +71,11 @@ let map: func <I, O> (
   mapper: func (I): O,
 ): [O]
 
+let flat_map: func <I, O> (
+  array: [I],
+  mapper: func (I): [O],
+): [O]
+
 let filter: func <T> (
   array: [T],
   condition: func (T): bool,

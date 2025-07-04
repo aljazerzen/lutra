@@ -134,16 +134,19 @@ impl<'a> queries::Context<'a> {
     ) -> Vec<sql_ast::SelectItem> {
         let rel_cols = self.rel_cols(ty, true);
 
+        let values = values.into_iter();
+
         // asserts eq values and rel cols
         #[cfg(debug_assertions)]
         let (values, rel_cols) = {
-            let values: Vec<_> = values.into_iter().collect();
+            let values: Vec<_> = values.collect();
             let rel_cols: Vec<_> = rel_cols.collect();
 
             assert_eq!(
                 values.len(),
                 rel_cols.len(),
-                "expected columns: {rel_cols:?}, got: {values:#?}, ty: {}",
+                "expected columns: {rel_cols:?}, got: {}, ty: {}",
+                super::expr_or_source::ExprOrSourceDisplay { exprs: &values },
                 ir::print_ty(ty)
             );
             (values, rel_cols)

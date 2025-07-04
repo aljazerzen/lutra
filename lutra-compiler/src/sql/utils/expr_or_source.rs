@@ -1,3 +1,5 @@
+use std::fmt::Write;
+
 use sqlparser::ast as sql_ast;
 
 #[derive(Debug, Clone)]
@@ -77,5 +79,22 @@ impl std::fmt::Display for ExprOrSource {
                 f.write_str(".value")
             }
         }
+    }
+}
+
+pub struct ExprOrSourceDisplay<'a> {
+    pub exprs: &'a [ExprOrSource],
+}
+
+impl<'a> std::fmt::Display for ExprOrSourceDisplay<'a> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("[\n")?;
+        for e in self.exprs {
+            f.write_str("  ")?;
+            e.fmt(f)?;
+            f.write_str(",\n")?;
+        }
+        f.write_char(']')?;
+        Ok(())
     }
 }

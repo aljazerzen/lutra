@@ -72,10 +72,7 @@ impl<'a> Context<'a> {
     ) -> cr::Expr {
         Expr {
             kind: cr::ExprKind::Transform(
-                self.new_binding(Expr {
-                    kind: cr::ExprKind::From(cr::From::RelRef(rel.id)),
-                    ty: rel.rel.ty.clone(),
-                }),
+                self.new_binding(Expr::new_rel_ref(rel)),
                 cr::Transform::ProjectRetain(vec![col_position]),
             ),
             ty: col_ty,
@@ -153,16 +150,17 @@ impl<'a> Context<'a> {
                     .iter()
                     .enumerate()
                     .map(|(index, x)| {
-                        let mut cols = vec![cr::Expr {
+                        let row = vec![cr::Expr {
                             kind: cr::ExprKind::From(cr::From::Literal(ir::Literal::int64(
                                 index as i64,
                             ))),
                             ty: ir::Ty::new(ir::TyPrimitive::int64),
                         }];
-                        cols.extend(self.compile_column_list(x).unwrap_columns());
+
+                        let x = self.compile_column_list(x);
 
                         cr::Expr {
-                            kind: cr::ExprKind::From(cr::From::Row(cols)),
+                            kind: self.row_or_join(row, x),
                             ty: expr.ty.clone(),
                         }
                     })
@@ -397,6 +395,23 @@ impl<'a> Context<'a> {
         }
     }
 
+    fn row_or_join(&mut self, mut row: Vec<Expr>, expr: ColumnsOrUnpack) -> cr::ExprKind {
+        match expr {
+            ColumnsOrUnpack::Columns(cols) => {
+                row.extend(cols);
+                cr::ExprKind::From(cr::From::Row(row))
+            }
+            ColumnsOrUnpack::Unpack(e) => cr::ExprKind::Join(
+                self.new_binding(cr::Expr {
+                    kind: cr::ExprKind::From(cr::From::Row(row)),
+                    ty: ir::Ty::new(ir::TyPrimitive::int64),
+                }),
+                self.new_binding(e),
+                None,
+            ),
+        }
+    }
+
     fn ptr_is_table(&mut self, expr: &ir::Expr) -> bool {
         let ir::TyKind::Function(ty_func) = &self.get_ty_mat(&expr.ty).kind else {
             return false;
@@ -487,10 +502,7 @@ impl<'a> Context<'a> {
                 // compile func body
                 let func = func.kind.as_function().unwrap();
                 let mut item_ref = cr::ExprKind::Transform(
-                    self.new_binding(cr::Expr {
-                        kind: cr::ExprKind::From(cr::From::RelRef(array.id)),
-                        ty: array.rel.ty.clone(),
-                    }),
+                    self.new_binding(cr::Expr::new_rel_ref(&array)),
                     cr::Transform::ProjectDiscard(vec![0]), // discard index
                 );
 
@@ -513,6 +525,62 @@ impl<'a> Context<'a> {
                     }),
                 )
             }
+            "std::flat_map" => {
+                let array = self.compile_rel(&call.args[0]);
+                let array = self.new_binding(array);
+                let item_ty = array.rel.ty.kind.as_array().unwrap().clone();
+                let func = &call.args[1];
+
+                let output_item_ty = *expr.ty.kind.clone().into_array().unwrap();
+
+                // index
+                let output_row =
+                    vec![self.new_rel_col(&array, 0, ir::Ty::new(ir::TyPrimitive::int64))];
+
+                // compile func body
+                let func = func.kind.as_function().unwrap();
+                let mut item_ref = cr::ExprKind::Transform(
+                    self.new_binding(cr::Expr::new_rel_ref(&array)),
+                    cr::Transform::ProjectDiscard(vec![0]), // discard index
+                );
+
+                if item_ty.kind.is_array() {
+                    item_ref = cr::ExprKind::From(cr::From::JsonUnpack(Box::new(Expr {
+                        kind: item_ref,
+                        ty: ir::Ty::new(ir::TyPrimitive::text),
+                    })));
+                }
+
+                self.functions.insert(func.id, FuncProvider::Expr(item_ref));
+                let mapped_items = self.compile_rel(&func.body);
+                self.functions.remove(&func.id);
+
+                let mapped_items = self.new_binding(mapped_items);
+
+                let mapped_items_ref = self.new_binding(Expr::new_rel_ref(&mapped_items));
+                // remove unneeded index of mapped_items
+                let mapped_items_ref = self.to_column_list(Expr {
+                    kind: cr::ExprKind::Transform(
+                        mapped_items_ref,
+                        cr::Transform::ProjectDiscard(vec![0]),
+                    ),
+                    ty: output_item_ty,
+                });
+
+                cr::ExprKind::BindCorrelated(
+                    array,
+                    Box::new(cr::Expr {
+                        kind: cr::ExprKind::BindCorrelated(
+                            mapped_items,
+                            Box::new(Expr {
+                                kind: self.row_or_join(output_row, mapped_items_ref),
+                                ty: expr.ty.clone(),
+                            }),
+                        ),
+                        ty: expr.ty.clone(),
+                    }),
+                )
+            }
             "std::filter" => {
                 let array = self.compile_rel(&call.args[0]);
                 let array = self.new_binding(array);
@@ -520,10 +588,7 @@ impl<'a> Context<'a> {
                 let func = func.kind.as_function().unwrap();
 
                 let item_ref = cr::ExprKind::Transform(
-                    self.new_binding(cr::Expr {
-                        kind: cr::ExprKind::From(cr::From::RelRef(array.id)),
-                        ty: array.rel.ty.clone(),
-                    }),
+                    self.new_binding(cr::Expr::new_rel_ref(&array)),
                     cr::Transform::ProjectDiscard(vec![0]), // discard index
                 );
 
@@ -541,10 +606,7 @@ impl<'a> Context<'a> {
                 let func = func.kind.as_function().unwrap();
 
                 let item_ref = cr::ExprKind::Transform(
-                    self.new_binding(cr::Expr {
-                        kind: cr::ExprKind::From(cr::From::RelRef(array.id)),
-                        ty: array.rel.ty.clone(),
-                    }),
+                    self.new_binding(cr::Expr::new_rel_ref(&array)),
                     cr::Transform::ProjectDiscard(vec![0]), // discard index
                 );
 
@@ -606,10 +668,7 @@ impl<'a> Context<'a> {
 
                 let field0 = cr::Expr {
                     kind: cr::ExprKind::Transform(
-                        self.new_binding(cr::Expr {
-                            kind: cr::ExprKind::From(cr::From::RelRef(array.id)),
-                            ty: array.rel.ty.clone(),
-                        }),
+                        self.new_binding(cr::Expr::new_rel_ref(&array)),
                         cr::Transform::ProjectRetain(vec![
                             0, // index
                             1, // first tuple field
@@ -619,10 +678,7 @@ impl<'a> Context<'a> {
                 };
                 let field1 = cr::Expr {
                     kind: cr::ExprKind::Transform(
-                        self.new_binding(cr::Expr {
-                            kind: cr::ExprKind::From(cr::From::RelRef(array.id)),
-                            ty: array.rel.ty.clone(),
-                        }),
+                        self.new_binding(cr::Expr::new_rel_ref(&array)),
                         cr::Transform::ProjectRetain(vec![
                             0, // index
                             2, // second tuple field
@@ -707,10 +763,7 @@ impl<'a> Context<'a> {
                 let func = func.kind.as_function().unwrap();
 
                 let item_ref = cr::ExprKind::Transform(
-                    self.new_binding(cr::Expr {
-                        kind: cr::ExprKind::From(cr::From::RelRef(array.id)),
-                        ty: array.rel.ty.clone(),
-                    }),
+                    self.new_binding(cr::Expr::new_rel_ref(&array)),
                     cr::Transform::ProjectDiscard(vec![0]), // discard index
                 );
 
@@ -749,17 +802,21 @@ impl<'a> Context<'a> {
         // into the relational expression
         let rel = self.compile_rel(expr);
 
+        self.to_column_list(rel)
+    }
+
+    fn to_column_list(&self, rel: Expr) -> ColumnsOrUnpack {
+        let ty_mat = self.get_ty_mat(&rel.ty);
+
         match rel.kind {
             // it is just one constructed row: unwrap
-            cr::ExprKind::From(cr::From::Row(row))
-                if !self.get_ty_mat(&expr.ty).kind.is_array() =>
-            {
+            cr::ExprKind::From(cr::From::Row(row)) if !ty_mat.kind.is_array() => {
                 ColumnsOrUnpack::Columns(row)
             }
 
             // it is actually complex: subquery
             _ => {
-                match &self.get_ty_mat(&expr.ty).kind {
+                match &ty_mat.kind {
                     ir::TyKind::Primitive(_) | ir::TyKind::Array(_) => {
                         // return as a subquery
 

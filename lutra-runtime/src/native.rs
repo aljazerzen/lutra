@@ -36,6 +36,7 @@ pub mod std {
 
                 "index" => &Self::index,
                 "map" => &Self::map,
+                "flat_map" => &Self::flat_map,
                 "filter" => &Self::filter,
                 "slice" => &Self::slice,
                 "sort" => &Self::sort,
@@ -266,7 +267,33 @@ pub mod std {
 
                 let value = it.evaluate_func_call(&func, vec![cell])?;
 
-                output.write_item(assume::into_value(value));
+                output.write_item(assume::into_data(value));
+            }
+
+            Ok(Cell::Data(output.finish()))
+        }
+
+        pub fn flat_map(
+            it: &mut Interpreter,
+            layout_args: &[u32],
+            args: Vec<Cell>,
+        ) -> Result<Cell, EvalError> {
+            let mut layout_args = LayoutArgsReader::new(layout_args);
+            let input_item_head_bytes = layout_args.next_u32();
+            let output_item_head_bytes = layout_args.next_u32();
+            let output_item_body_ptrs = layout_args.next_slice();
+
+            let [array, func] = assume::exactly_n(args);
+
+            let mut output = ArrayWriter::new(output_item_head_bytes, output_item_body_ptrs);
+            for item in assume::array(array, input_item_head_bytes) {
+                let cell = Cell::Data(item);
+
+                let value = it.evaluate_func_call(&func, vec![cell])?;
+
+                for i in assume::array(value, output_item_head_bytes) {
+                    output.write_item(i);
+                }
             }
 
             Ok(Cell::Data(output.finish()))
@@ -435,7 +462,7 @@ pub mod std {
                 field_offsets.push(8_u32 * i as u32); // array head has 8 bytes
             }
 
-            let input = TupleReader::new(assume::as_value(&columnar)?, field_offsets.into());
+            let input = TupleReader::new(assume::as_data(&columnar)?, field_offsets.into());
 
             // init input array readers
             let mut input_arrays: Vec<ArrayReader> = fields_item_head_bytes
@@ -483,14 +510,14 @@ pub mod std {
             }
 
             let [input, key_getter] = assume::exactly_n(args);
-            let input = ArrayReader::new(assume::into_value(input), input_head_bytes as usize);
+            let input = ArrayReader::new(assume::into_data(input), input_head_bytes as usize);
 
             let mut partitions: HashMap<Vec<u8>, Vec<lutra_bin::Data>> = HashMap::new();
             for item in input {
                 let item_cell = Cell::Data(item.clone());
 
                 let key = it.evaluate_func_call(&key_getter, vec![item_cell])?;
-                let key = assume::into_value(key)
+                let key = assume::into_data(key)
                     .slice(output_fields_layouts[0].0 as usize)
                     .to_vec();
 
@@ -527,7 +554,7 @@ pub mod std {
             args: Vec<Cell>,
         ) -> Result<Cell, EvalError> {
             let [array] = assume::exactly_n(args);
-            let array = assume::into_value(array);
+            let array = assume::into_data(array);
 
             let (_offset, len) = lutra_bin::ArrayReader::read_head(array.slice(8));
 
@@ -681,7 +708,7 @@ pub mod std {
             args: Vec<Cell>,
         ) -> Result<Cell, EvalError> {
             let [array] = assume::exactly_n(args);
-            let array = assume::into_value(array);
+            let array = assume::into_data(array);
 
             let (_offset, len) = lutra_bin::ArrayReader::read_head(array.slice(8));
 
@@ -730,12 +757,12 @@ pub mod std_text_ops {
             let [left, right] = assume::exactly_n(args);
 
             // TODO: string reader
-            let mut left = assume::into_value(left);
+            let mut left = assume::into_data(left);
             let left_offset = u32::from_le_bytes(left.slice(4).read_const());
             let left_length = u32::from_le_bytes((&left.slice(8)[4..8]).read_const());
             left.skip(left_offset as usize);
 
-            let mut right = assume::into_value(right);
+            let mut right = assume::into_data(right);
             let right_offset = u32::from_le_bytes(right.slice(4).read_const());
             let right_length = u32::from_le_bytes((&right.slice(8)[4..8]).read_const());
             right.skip(right_offset as usize);
@@ -759,7 +786,7 @@ pub mod std_text_ops {
 
             // TODO: string reader
             // TODO: report length in chars, not bytes (length of ž should be 1)
-            let text = assume::as_value(&text)?.slice(8).skip(4);
+            let text = assume::as_data(&text)?.slice(8).skip(4);
             let length = u32::from_le_bytes(text.read_const());
 
             Ok(Cell::Data(encode(&length)))
@@ -855,7 +882,7 @@ mod assume {
     use crate::{EvalError, interpreter::Cell};
     use lutra_bin::{ArrayReader, Decode};
 
-    pub fn into_value(cell: Cell) -> lutra_bin::Data {
+    pub fn into_data(cell: Cell) -> lutra_bin::Data {
         match cell {
             Cell::Data(val) => val,
             Cell::Function(..) => panic!(),
@@ -864,7 +891,7 @@ mod assume {
         }
     }
 
-    pub fn as_value(cell: &Cell) -> Result<&lutra_bin::Data, EvalError> {
+    pub fn as_data(cell: &Cell) -> Result<&lutra_bin::Data, EvalError> {
         match cell {
             Cell::Data(val) => Ok(val),
             Cell::Function(..) => Err(EvalError::BadProgram),
@@ -883,28 +910,28 @@ mod assume {
     }
 
     pub fn primitive<T: Decode>(cell: &Cell) -> Result<T, EvalError> {
-        Ok(decode::primitive::<T>(as_value(cell)?))
+        Ok(decode::primitive::<T>(as_data(cell)?))
     }
 
     pub fn int64(cell: &Cell) -> Result<i64, EvalError> {
-        Ok(decode::primitive(as_value(cell)?))
+        Ok(decode::primitive(as_data(cell)?))
     }
 
     pub fn bool(cell: &Cell) -> Result<bool, EvalError> {
-        Ok(decode::primitive(as_value(cell)?))
+        Ok(decode::primitive(as_data(cell)?))
     }
 
     pub fn text(cell: &Cell) -> Result<String, EvalError> {
-        Ok(decode::text(as_value(cell)?))
+        Ok(decode::text(as_data(cell)?))
     }
 
     pub fn array(cell: Cell, item_head_bytes: u32) -> ArrayReader {
-        ArrayReader::new(into_value(cell), item_head_bytes as usize)
+        ArrayReader::new(into_data(cell), item_head_bytes as usize)
     }
 
     #[allow(dead_code)]
     pub fn uint32(cell: Cell) -> u32 {
-        decode::uint32(&into_value(cell))
+        decode::uint32(&into_data(cell))
     }
 
     #[allow(dead_code)]

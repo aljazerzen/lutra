@@ -121,4 +121,11 @@ impl Expr {
             kind: ExprKind::Transform(Box::new(BoundExpr { rel: input, id }), transform),
         }
     }
+
+    pub fn new_rel_ref(rel: &BoundExpr) -> Self {
+        Expr {
+            ty: rel.rel.ty.clone(),
+            kind: ExprKind::From(From::RelRef(rel.id)),
+        }
+    }
 }

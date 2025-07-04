@@ -279,7 +279,7 @@ impl ByteCoder {
                 r
             }
 
-            "std::map" => {
+            "std::map" | "std::flat_map" => {
                 let input_layout = as_layout_of_param_array(ty_mat);
                 let output_layout = as_layout_of_return_array(ty_mat);
 
