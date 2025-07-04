@@ -1,28 +1,28 @@
-type x = {int64, a = text, b = [bool]}
+type x = {int64, a: text, b: [bool]}
 
 type y = [int64]
 
 type z = bool
 
 type u = enum {
-  f = bool,
+  f: bool,
   g,
-  h = {a = int64, b = float64}
+  h: {a: int64, b: float64}
 }
 
 type v = enum { Yes, No, Maybe }
 
-type t = enum { single = int8, double = int16 }
+type t = enum { single: int8, double: int16 }
 
 type p = {[int64], [int64]}
 
 type i = {v, z}
 
 type Tree = enum {
-    Leaf = int64,
-    Node = {left = Tree, right = Tree},
+    Leaf: int64,
+    Node: {left: Tree, right: Tree},
 }
 
-type opt = enum { None, Some = text }
+type opt = enum { None, Some: text }
 
-type opt2 = enum { None, Some = int16 }
+type opt2 = enum { None, Some: int16 }

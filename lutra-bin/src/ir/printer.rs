@@ -267,7 +267,7 @@ impl Printer {
                     }
                     if let Some(name) = &field.name {
                         r += name;
-                        r += " = ";
+                        r += ": ";
                     }
                     r += &self.print_ty(&field.ty);
                 }
@@ -285,7 +285,7 @@ impl Printer {
                     }
                     r += &variant.name;
                     if !is_ty_unit(&variant.ty) {
-                        r += " = ";
+                        r += ": ";
                         r += &self.print_ty(&variant.ty);
                     }
                 }

@@ -132,7 +132,7 @@ fn tuple_01() {
 #[test]
 fn enum_01() {
     let output_ty =
-        lutra_compiler::_test_compile_ty("enum {Done, Pending = int16, Cancelled = text}");
+        lutra_compiler::_test_compile_ty("enum {Done, Pending: int16, Cancelled: text}");
 
     insta::assert_snapshot!(_test_enum_writer(0, Data::new(vec![]), &output_ty), @r#"
     Done
@@ -190,7 +190,7 @@ fn enum_02() {
     // put an enum into an array, to test that body_ptrs are correct
 
     let output_ty =
-        lutra_compiler::_test_compile_ty("[enum {Done, Pending = int16, Cancelled = text}]");
+        lutra_compiler::_test_compile_ty("[enum {Done, Pending: int16, Cancelled: text}]");
 
     // done
     let item_0 = Data::new(vec![0, 0, 0, 0, 0]);
@@ -241,7 +241,7 @@ fn enum_03() {
     // put an enum into an array, to test that body_ptrs are correct
 
     let output_ty =
-        lutra_compiler::_test_compile_ty("enum {Done, Pending = int16, Cancelled = bool}");
+        lutra_compiler::_test_compile_ty("enum {Done, Pending: int16, Cancelled: bool}");
 
     // done
     let inner = Data::new(vec![]);

@@ -34,7 +34,7 @@ pub(crate) fn type_expr() -> impl Parser<TokenKind, Ty, Error = PError> + Clone 
             .map(TyKind::Func);
 
         let tuple = sequence(choice((ident_part()
-            .then_ignore(ctrl('='))
+            .then_ignore(ctrl(':'))
             .or_not()
             .then(nested_type_expr.clone())
             .map(|(name, ty)| TyTupleField { name, ty }),)))
@@ -57,7 +57,7 @@ pub(crate) fn type_expr() -> impl Parser<TokenKind, Ty, Error = PError> + Clone 
                 sequence(
                     ident_part()
                         .then(
-                            ctrl('=')
+                            ctrl(':')
                                 .ignore_then(nested_type_expr.clone())
                                 .or_not()
                                 .map(|ty| ty.unwrap_or_else(|| Ty::new(TyKind::Tuple(vec![])))),
@@ -143,7 +143,7 @@ pub fn type_params<'a>(
     ty: impl Parser<TokenKind, Ty, Error = PError> + 'a,
 ) -> impl Parser<TokenKind, Vec<TyParam>, Error = PError> + Clone + 'a {
     let tuple = ident_part()
-        .then_ignore(ctrl('='))
+        .then_ignore(ctrl(':'))
         .or_not()
         .then(ty)
         .separated_by(ctrl(','))

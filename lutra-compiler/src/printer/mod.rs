@@ -45,7 +45,7 @@ impl Printer {
                     }
                     if let Some(name) = &field.name {
                         r += &pr::display_ident(name);
-                        r += " = ";
+                        r += ": ";
                     }
                     r += &self.print_ty(&field.ty);
                 }
@@ -69,7 +69,7 @@ impl Printer {
                     r += &pr::display_ident(&variant.name);
                     let is_unit = variant.ty.kind.as_tuple().is_some_and(|f| f.is_empty());
                     if !is_unit {
-                        r += " = ";
+                        r += ": ";
                         r += &self.print_ty(&variant.ty);
                     }
                 }
@@ -106,7 +106,7 @@ impl Printer {
                                     match &field.location {
                                         pr::IndirectionKind::Name(name) => {
                                             r += &pr::display_ident(name);
-                                            r += " = ";
+                                            r += ": ";
                                         }
                                         pr::IndirectionKind::Position(p) => {
                                             assert_eq!(i, *p as usize); // TODO: print these fields when they are out of order

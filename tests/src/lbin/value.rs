@@ -5,16 +5,16 @@ use lutra_bin::Value;
 fn test_print_01() {
     let ty = lutra_compiler::_test_compile_ty(
         "{
-        n_rows = int64,
-        page = [{
-          id = int64,
-          name = text,
-          address = {
-            city = text,
-            street = text
+        n_rows: int64,
+        page: [{
+          id: int64,
+          name: text,
+          address: {
+            city: text,
+            street: text
           },
           int64,
-          is_admin = bool
+          is_admin: bool
         }]
       }
     ",

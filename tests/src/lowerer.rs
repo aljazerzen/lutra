@@ -10,7 +10,7 @@ fn _test_compile_and_print(source: &str) -> String {
 fn lower_01() {
     assert_snapshot!(_test_compile_and_print(r#"
     module chinook {
-      type album = {id = int, title = text}
+      type album = {id: int, title: text}
 
       let get_albums: func (): [album]
 
@@ -22,7 +22,7 @@ fn lower_01() {
     }
 
     module box_office {
-      type album_sale = {id = int, total = float}
+      type album_sale = {id: int, total: float}
 
       let get_album_sales: func (): [album_sale]
 
@@ -39,14 +39,14 @@ fn lower_01() {
       box_office::get_album_sales_by_id(album_id),
     }
     "#), @r"
-    type chinook::album = {id = int64, title = text};
-    type box_office::album_sale = {id = int64, total = float64};
+    type chinook::album = {id: int64, title: text};
+    type box_office::album_sale = {id: int64, total: float64};
     let main = (func 0 ->
       let 2 = (func 4 ->
         (call
-          external.std::index: func ([{id = int64, total = float64}], int64) -> {id = int64, total = float64},
+          external.std::index: func ([{id: int64, total: float64}], int64) -> {id: int64, total: float64},
           (call
-            external.std::filter: func ([{id = int64, total = float64}], func ({id = int64, total = float64}) -> bool) -> [{id = int64, total = float64}],
+            external.std::filter: func ([{id: int64, total: float64}], func ({id: int64, total: float64}) -> bool) -> [{id: int64, total: float64}],
             (call
               external.box_office::get_album_sales: func () -> [box_office::album_sale],
             ): [box_office::album_sale],
@@ -60,15 +60,15 @@ fn lower_01() {
                 fn.4+0: int64,
               ): bool
             ): func (box_office::album_sale) -> bool,
-          ): [{id = int64, total = float64}],
+          ): [{id: int64, total: float64}],
           0: int64,
-        ): {id = int64, total = float64}
+        ): {id: int64, total: float64}
       ): func (int64) -> box_office::album_sale;
       let 1 = (func 2 ->
         (call
-          external.std::index: func ([{id = int64, title = text}], int64) -> {id = int64, title = text},
+          external.std::index: func ([{id: int64, title: text}], int64) -> {id: int64, title: text},
           (call
-            external.std::filter: func ([{id = int64, title = text}], func ({id = int64, title = text}) -> bool) -> [{id = int64, title = text}],
+            external.std::filter: func ([{id: int64, title: text}], func ({id: int64, title: text}) -> bool) -> [{id: int64, title: text}],
             (call
               external.chinook::get_albums: func () -> [chinook::album],
             ): [chinook::album],
@@ -82,9 +82,9 @@ fn lower_01() {
                 fn.2+0: int64,
               ): bool
             ): func (chinook::album) -> bool,
-          ): [{id = int64, title = text}],
+          ): [{id: int64, title: text}],
           0: int64,
-        ): {id = int64, title = text}
+        ): {id: int64, title: text}
       ): func (int64) -> chinook::album;
       let 0 = (func 1 ->
         {
@@ -114,7 +114,7 @@ fn lower_02() {
     assert_snapshot!(_test_compile_and_print(r#"
     type Status = enum {
         Open,
-        Closed = text,
+        Closed: text,
     }
 
     func () -> match Status::Closed {
@@ -124,18 +124,18 @@ fn lower_02() {
     "#), @r#"
     let main = (func 0 ->
       let 0 = (func 1 ->
-        let 1 = (enum_variant 1): enum {Open, Closed = text};
+        let 1 = (enum_variant 1): enum {Open, Closed: text};
         (
           switch,
           (
             (enum_eq
-              var.1: enum {Open, Closed = text}0
+              var.1: enum {Open, Closed: text}0
             ): bool,
             "open": text,
           ),
           (
             (enum_eq
-              var.1: enum {Open, Closed = text}1
+              var.1: enum {Open, Closed: text}1
             ): bool,
             "closed": text,
           ),

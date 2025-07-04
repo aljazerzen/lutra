@@ -670,8 +670,8 @@ fn json_pack_05() {
 fn match_04() {
     insta::assert_snapshot!(_run_sql_output(r#"
     type Animal = enum {
-      Cat = text,
-      Dog = enum {Generic, Collie = text},
+      Cat: text,
+      Dog: enum {Generic, Collie: text},
     }
 
     func () -> (

@@ -1,26 +1,26 @@
 type TypedData = {
-  ty = Ty,
-  data = [uint8]
+  ty: Ty,
+  data: [uint8]
 }
 
 type Ty = {
-  kind = TyKind,
-  layout = enum {None, Some = TyLayout},
+  kind: TyKind,
+  layout: enum {None, Some: TyLayout},
 }
 
 type TyKind = enum {
-  Primitive = PrimitiveSet,
+  Primitive: PrimitiveSet,
 
-  Tuple = [{name = OptText, ty = Ty}],
+  Tuple: [{name: OptText, ty: Ty}],
 
-  Array = Ty,
+  Array: Ty,
 
-  Enum = [{name = text, ty = Ty}],
+  Enum: [{name: text, ty: Ty}],
 }
 
 type TyLayout = {
-  head_size = uint32,
-  variants_recursive = [uint16]
+  head_size: uint32,
+  variants_recursive: [uint16]
 }
 
 type PrimitiveSet = enum {
@@ -40,5 +40,5 @@ type PrimitiveSet = enum {
 
 type OptText = enum {
   None,
-  Some = text
+  Some: text
 }

@@ -175,7 +175,7 @@ fn parse_03() {
 }
 #[test]
 fn parse_04() {
-    assert_debug_snapshot!(parse_expr("func <T: {b = int64, ..}> () -> 1"), @r#"
+    assert_debug_snapshot!(parse_expr("func <T: {b: int64, ..}> () -> 1"), @r#"
     Expr {
         kind: Func(
             Func {
@@ -187,7 +187,7 @@ fn parse_04() {
                         ),
                     ),
                     span: Some(
-                        0:32-33,
+                        0:31-32,
                     ),
                     ty: None,
                     ty_args: [],
@@ -209,7 +209,7 @@ fn parse_04() {
                                             int64,
                                         ),
                                         span: Some(
-                                            0:14-19,
+                                            0:13-18,
                                         ),
                                         name: None,
                                         scope_id: None,
@@ -219,14 +219,14 @@ fn parse_04() {
                             ],
                         ),
                         span: Some(
-                            0:6-24,
+                            0:6-23,
                         ),
                     },
                 ],
             },
         ),
         span: Some(
-            0:0-33,
+            0:0-32,
         ),
         ty: None,
         ty_args: [],

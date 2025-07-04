@@ -148,12 +148,12 @@ fn types_10() {
 
     insta::assert_snapshot!(_test_ty(r#"
         func () -> (3: int64)..(5: int64)
-    "#), @"{start = int64, end = int64}");
+    "#), @"{start: int64, end: int64}");
 }
 #[test]
 fn types_11() {
     insta::assert_snapshot!(_test_ty(r#"
-        type album_sale = {id = int, total = float}
+        type album_sale = {id: int, total: float}
         let get_album_sales: func (): [album_sale]
 
         let filter: func <T> (array: [T], condition: func (T): bool): [T]
@@ -243,12 +243,12 @@ fn types_14() {
 fn types_15() {
     // type param: tuple domain with named arg
     insta::assert_snapshot!(_test_ty(r#"
-        let get_b: func <T: {b = int64, ..}> (x: T): T
+        let get_b: func <T: {b: int64, ..}> (x: T): T
         func () -> get_b({a = false, b = 4: int64})
-    "#), @"{a = bool, b = int64}");
+    "#), @"{a: bool, b: int64}");
 
     insta::assert_snapshot!(_test_err(r#"
-        let get_b: func <T: {b = int64, ..}> (x: T): T
+        let get_b: func <T: {b: int64, ..}> (x: T): T
         func () -> get_b({a = false, b = 4.6: float64})
     "#), @r"
     [E0004] Error:
@@ -260,7 +260,7 @@ fn types_15() {
     ───╯
     ");
     insta::assert_snapshot!(_test_err(r#"
-        let get_b: func <T: {b = int64, ..}> (x: T): T
+        let get_b: func <T: {b: int64, ..}> (x: T): T
         func () -> get_b({a = false, c = 4})
     "#), @r"
     Error:
@@ -268,7 +268,7 @@ fn types_15() {
        │
      3 │         func () -> get_b({a = false, c = 4})
        │                    ──┬──
-       │                      ╰──── field .b does not exist in type {a = bool, c = _}
+       │                      ╰──── field .b does not exist in type {a: bool, c: _}
     ───╯
     ");
 }
@@ -278,7 +278,7 @@ fn types_16() {
     insta::assert_snapshot!(_test_ty(r#"
         let get_b: func <T: {bool, int64, ..}> (x: T): T
         func () -> get_b({a = false, 4, c = 5.7: float32})
-    "#), @"{a = bool, int64, c = float32}");
+    "#), @"{a: bool, int64, c: float32}");
 
     insta::assert_snapshot!(_test_err(r#"
         let get_b: func <T: {bool, int64, ..}> (x: T): T
@@ -294,7 +294,7 @@ fn types_16() {
     "#);
 
     insta::assert_snapshot!(_test_err(r#"
-        let get_b: func <T: {bool, int64, a = bool, ..}> (x: T): T
+        let get_b: func <T: {bool, int64, a: bool, ..}> (x: T): T
         func () -> get_b({a = false})
     "#), @r"
     Error:
@@ -302,13 +302,13 @@ fn types_16() {
        │
      3 │         func () -> get_b({a = false})
        │                    ──┬──
-       │                      ╰──── field .1 does not exist in type {a = bool}
+       │                      ╰──── field .1 does not exist in type {a: bool}
     ───╯
     ");
     insta::assert_snapshot!(_test_ty(r#"
-        let get_b: func <T: {bool, int64, a = bool, ..}> (x: T): T
+        let get_b: func <T: {bool, int64, a: bool, ..}> (x: T): T
         func () -> get_b({a = false, 4})
-    "#), @"{a = bool, int64}");
+    "#), @"{a: bool, int64}");
 }
 
 #[test]
@@ -330,16 +330,16 @@ fn types_17() {
     ");
 
     insta::assert_snapshot!(_test_err(r#"
-        let get_int: func (x: {a = int64}): int64
-        let get = func <T: {a = int64, ..}> (x: T): T -> get_int(x)
+        let get_int: func (x: {a: int64}): int64
+        let get = func <T: {a: int64, ..}> (x: T): T -> get_int(x)
         func () -> get({4})
     "#), @r"
     [E0004] Error:
-       ╭─[:3:66]
+       ╭─[:3:65]
        │
-     3 │         let get = func <T: {a = int64, ..}> (x: T): T -> get_int(x)
-       │                                                                  ┬
-       │                                                                  ╰── function get_int, one of the params expected type `{a = int64}`, but found type `T`
+     3 │         let get = func <T: {a: int64, ..}> (x: T): T -> get_int(x)
+       │                                                                 ┬
+       │                                                                 ╰── function get_int, one of the params expected type `{a: int64}`, but found type `T`
     ───╯
     ");
 
@@ -374,7 +374,7 @@ fn types_18() {
     "#), @"int64");
 
     insta::assert_snapshot!(_test_ty(r#"
-        let f = func <T: {a = int64, ..}> (x: T) -> x.a
+        let f = func <T: {a: int64, ..}> (x: T) -> x.a
         func () -> f({false, a = 4: int64})
     "#), @"int64");
 }
@@ -547,12 +547,12 @@ fn enums_00() {
     insta::assert_snapshot!(
         _test_ty(
             "
-            type Status = enum { Open, Done, Pending = text }
+            type Status = enum { Open, Done, Pending: text }
 
             let main = func () -> Status::Done
             "
         ),
-        @"enum {Open, Done, Pending = text}"
+        @"enum {Open, Done, Pending: text}"
     );
 }
 
@@ -561,12 +561,12 @@ fn enums_01() {
     insta::assert_snapshot!(
         _test_ty(
             r#"
-            type Status = enum { Open, Done, Pending = text }
+            type Status = enum { Open, Done, Pending: text }
 
             let main = func () -> Status::Pending("hello")
             "#
         ),
-        @"enum {Open, Done, Pending = text}"
+        @"enum {Open, Done, Pending: text}"
     );
 }
 #[test]
@@ -574,7 +574,7 @@ fn enums_02() {
     insta::assert_snapshot!(
         _test_ty(
             r#"
-            type X = { a = int64 }
+            type X = { a: int64 }
 
             let main = func (): X::a -> 5
             "#
@@ -587,16 +587,16 @@ fn enums_03() {
     insta::assert_snapshot!(
         _test_err(
             r#"
-            type X = { a = int, b = X::a }
+            type X = { a: int, b: X::a }
             "#
         ),
         @r"
     Error:
-       ╭─[:2:37]
+       ╭─[:2:35]
        │
-     2 │             type X = { a = int, b = X::a }
-       │                                     ──┬─
-       │                                       ╰─── paths into self type are not allowed
+     2 │             type X = { a: int, b: X::a }
+       │                                   ──┬─
+       │                                     ╰─── paths into self type are not allowed
     ───╯
     "
     );
@@ -611,7 +611,7 @@ fn recursive_00() {
     insta::assert_snapshot!(
         _test_err(
             r#"
-            type Tree = {left = Tree, right = Tree}
+            type Tree = {left: Tree, right: Tree}
 
             type OptionalTree = enum {
                 None,
@@ -629,7 +629,7 @@ fn recursive_00() {
 #[test]
 fn match_00() {
     insta::assert_snapshot!(_test_ty(r#"
-        type Status = enum {Done, Pending = int16, Cancelled = text}
+        type Status = enum {Done, Pending: int16, Cancelled: text}
 
         let main = func () -> match Status::Done {
           Status::Done => "done",
@@ -643,7 +643,7 @@ fn match_00() {
 #[ignore] // TODO
 fn match_01() {
     insta::assert_snapshot!(_test_err(r#"
-        type Status = enum {Done, Pending = int16, Cancelled = text}
+        type Status = enum {Done, Pending: int16, Cancelled: text}
 
         let main = func () -> match Status::Done {
           Status::Done => "done",
@@ -657,7 +657,7 @@ fn match_01() {
 #[test]
 fn match_02() {
     insta::assert_snapshot!(_test_err(r#"
-        type Status = enum {Done, Pending = int16, Cancelled = text}
+        type Status = enum {Done, Pending: int16, Cancelled: text}
         type Color = enum {Red, Green, Blue}
 
         let main = func () -> match Status::Done {
@@ -674,7 +674,7 @@ fn match_02() {
        │                ╰────── pattern expected type `Status`, but found type `Color`
        │
        │ Note:
-       │ type `Status` expands to `enum {Done, Pending = int16, Cancelled = text}`
+       │ type `Status` expands to `enum {Done, Pending: int16, Cancelled: text}`
        │ type `Color` expands to `enum {Red, Green, Blue}`
     ───╯
     "#);
@@ -704,7 +704,7 @@ fn match_03() {
 #[test]
 fn match_04() {
     insta::assert_snapshot!(_test_ty(r#"
-        type Status = enum {Pending = bool}
+        type Status = enum {Pending: bool}
 
         let main = func () -> match Status::Pending(false) {
           Status::Pending(x) => x,
@@ -715,7 +715,7 @@ fn match_04() {
 #[test]
 fn match_05() {
     insta::assert_snapshot!(_test_ty(r#"
-        type Status = enum {Pending = int32}
+        type Status = enum {Pending: int32}
 
         let main = func () -> match Status::Pending(4) {
           Status::Pending(x) => x,
