@@ -106,7 +106,6 @@ pub enum ExprKind {
 pub enum IndirectionKind {
     Name(String),
     Position(i64),
-    Star,
 }
 
 /// Expression with two operands and an operator, such as `1 + 2`.

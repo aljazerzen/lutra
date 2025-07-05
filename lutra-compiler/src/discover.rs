@@ -21,6 +21,12 @@ pub fn discover(params: DiscoverParams) -> Result<project::SourceTree, std::io::
         ..Default::default()
     };
 
+    if project.root.is_file() {
+        let file_contents = fs::read_to_string(&project.root)?;
+        project.insert(project.root.clone(), file_contents);
+        return Ok(project);
+    }
+
     for entry in WalkDir::new(&project.root) {
         let entry = entry?;
         let path = entry.path();

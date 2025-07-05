@@ -61,6 +61,7 @@ let not: func (expr: bool): bool
 
 let regex_search: func (text: text, pattern: text): bool
 
+let coalesce: func <T> (a: T, b: T): T
 
 # Array functions
 
@@ -126,7 +127,7 @@ let group: func <I, K> (
   key: func (I): K,
 ): [{key: K, values: [I]}]
 
-# let append = func (bottom, top)
+let append: func <T> (top: [T], bottom: [T]): [T]
 
 # Aggregation functions
 

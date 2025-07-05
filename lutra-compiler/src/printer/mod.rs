@@ -111,9 +111,6 @@ impl Printer {
                                         pr::IndirectionKind::Position(p) => {
                                             assert_eq!(i, *p as usize); // TODO: print these fields when they are out of order
                                         }
-                                        pr::IndirectionKind::Star => {
-                                            unreachable!()
-                                        }
                                     }
                                     r += &self.print_ty(&field.ty);
                                 }

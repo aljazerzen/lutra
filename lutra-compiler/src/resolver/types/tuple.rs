@@ -64,7 +64,6 @@ impl super::TypeResolver<'_> {
                     position: Some(*pos as usize),
                     target_ty: *items_ty.clone(),
                 }),
-                pr::IndirectionKind::Star => todo!(),
             },
 
             pr::TyKind::Primitive(_) | pr::TyKind::Enum(_) | pr::TyKind::Func(_) => {
@@ -85,7 +84,6 @@ pub fn lookup_in_tuple(
     let r = match indirection {
         pr::IndirectionKind::Name(name) => lookup_name_in_tuple(fields, name),
         pr::IndirectionKind::Position(pos) => lookup_position_in_tuple(fields, *pos as usize),
-        pr::IndirectionKind::Star => todo!(),
     };
     let Some(r) = r else {
         return Err(Diagnostic::new_custom(format!(
@@ -133,7 +131,6 @@ pub fn lookup_in_domain(
         position: match indirection {
             pr::IndirectionKind::Name(_) => None,
             pr::IndirectionKind::Position(pos) => Some(*pos as usize),
-            pr::IndirectionKind::Star => todo!(),
         },
         target_ty: field.ty.clone(),
     })
@@ -160,6 +157,5 @@ pub fn print_indirection_kind(indirection: &pr::IndirectionKind) -> String {
     match indirection {
         pr::IndirectionKind::Name(n) => format!(".{}", pr::display_ident(n)),
         pr::IndirectionKind::Position(p) => format!(".{p}"),
-        pr::IndirectionKind::Star => "*".to_string(),
     }
 }

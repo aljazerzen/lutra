@@ -209,8 +209,6 @@ impl<'a> Lowerer<'a> {
                                 .unwrap();
                             position as u16
                         }
-
-                        pr::IndirectionKind::Star => todo!(),
                     },
                 }))
             }
