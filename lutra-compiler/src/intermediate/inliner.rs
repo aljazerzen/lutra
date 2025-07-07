@@ -92,6 +92,7 @@ impl fold::IrFold for FuncInliner {
                     }
 
                     // substitute
+                    tracing::debug!("inlining call to function {} with {arg_var_ids:?}", func.id);
                     let mut expr = Substituter::run(func.body.clone(), func.id, arg_pointers);
 
                     // wrap in Bindings

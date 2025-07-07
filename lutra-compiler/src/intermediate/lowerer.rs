@@ -12,7 +12,14 @@ use crate::{decl, pr};
 pub fn lower_expr(root_module: &decl::RootModule, main_pr: &pr::Expr) -> ir::Program {
     let mut lowerer = Lowerer::new(root_module);
 
+    let input_ty = get_entry_point_input(main_pr);
+    lowerer.program_input_ty = Some(lowerer.lower_ty(input_ty));
+    tracing::debug!(
+        "program_input_ty = {}",
+        ir::print_ty(lowerer.program_input_ty.as_ref().unwrap())
+    );
     lowerer.is_main_func = main_pr.ty.as_ref().unwrap().kind.is_func();
+
     let main = lowerer.lower_expr(main_pr).unwrap();
     let main = lowerer.prepare_entry_point(main);
 
@@ -46,7 +53,9 @@ struct Lowerer<'a> {
     root_module: &'a decl::RootModule,
 
     scopes: Vec<Scope>,
+
     is_main_func: bool,
+    program_input_ty: Option<ir::Ty>,
 
     /// Depended expressions that are referenced from generated IR.
     /// Contain FQ path and list of type arguments, pointing to id the should
@@ -82,8 +91,10 @@ impl<'a> Lowerer<'a> {
         Self {
             root_module,
 
-            scopes: vec![],
             is_main_func: false,
+            program_input_ty: None,
+
+            scopes: vec![],
             var_bindings: Default::default(),
             type_defs: Default::default(),
             type_defs_queue: Default::default(),
@@ -271,10 +282,7 @@ impl<'a> Lowerer<'a> {
                                                 param_position: 0,
                                             },
                                         )),
-
-                                        // TODO: this is incorrect, it should the type of whole input,
-                                        // not just this param
-                                        ty: self.lower_ty(expr.ty.clone().unwrap()),
+                                        ty: self.program_input_ty.clone().unwrap(),
                                     },
                                     position: param_position as u16,
                                 }))
@@ -819,4 +827,23 @@ fn order_ty_defs(
         }
     }
     r
+}
+
+/// Get the entry point's input type.
+fn get_entry_point_input(expr: &pr::Expr) -> pr::Ty {
+    let ty = expr.ty.as_ref().unwrap();
+    let Some(ty_func) = ty.kind.as_func() else {
+        return pr::Ty::new(pr::TyKind::Tuple(vec![]));
+    };
+
+    pr::Ty::new(pr::TyKind::Tuple(
+        ty_func
+            .params
+            .iter()
+            .map(|ty| pr::TyTupleField {
+                ty: ty.clone().unwrap(),
+                name: None,
+            })
+            .collect(),
+    ))
 }

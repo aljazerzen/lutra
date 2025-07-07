@@ -94,14 +94,14 @@ fn lower_01() {
           (call
             var.1: func (int64) -> chinook::album,
             (tuple_lookup
-              fn.1+0: int64
+              fn.1+0: {int64}
               0
             ): int64,
           ): chinook::album,
           (call
             var.2: func (int64) -> box_office::album_sale,
             (tuple_lookup
-              fn.1+0: int64
+              fn.1+0: {int64}
               0
             ): int64,
           ): box_office::album_sale,
