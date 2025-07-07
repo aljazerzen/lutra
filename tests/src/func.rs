@@ -1377,9 +1377,9 @@ test_case!(
     r#"
     type Status = enum {Done, Pending: int64, Cancelled: text}
     func () -> match Status::Pending(4) {
-        Status::Done => "done",
-        Status::Pending => "pending",
-        Status::Cancelled => "cancelled",
+        .Done => "done",
+        .Pending => "pending",
+        .Cancelled => "cancelled",
     }
     "#,
     r#""pending""#
@@ -1390,9 +1390,9 @@ test_case!(
     r#"
     type Status = enum {Done, Pending: int32, Cancelled: text}
     func (): int32 -> match Status::Pending(4) {
-        Status::Done => 0,
-        Status::Pending(x) => x,
-        Status::Cancelled => 0,
+        .Done => 0,
+        .Pending(x) => x,
+        .Cancelled => 0,
     }
     "#,
     r#"4"#
@@ -1409,9 +1409,9 @@ test_case!(
     func () -> (
       Animal::Dog(Animal::Dog::Collie("Belie"))
       | func (animal: Animal) -> match animal {
-        Animal::Cat(name) => f"Hello {name}",
-        Animal::Dog(Animal::Dog::Generic) => "Who's a good boy?",
-        Animal::Dog(Animal::Dog::Collie(name)) => f"Come here {name}",
+        .Cat(name) => f"Hello {name}",
+        .Dog(.Generic) => "Who's a good boy?",
+        .Dog(.Collie(name)) => f"Come here {name}",
       }
     )
     "#,
@@ -1432,8 +1432,8 @@ test_case!(
         Animal::Dog("Belie"),
       ]
       | std::map(func (animal: Animal) -> match animal {
-        Animal::Cat(name) => f"Hello {name}",
-        Animal::Dog(name) => "Who's a good boy?",
+        .Cat(name) => f"Hello {name}",
+        .Dog(name) => "Who's a good boy?",
       })
     )
     "#,
@@ -1460,9 +1460,9 @@ test_case!(
           Animal::Dog(Animal::Dog::Generic),
       ]
       | std::map(func (animal: Animal) -> match animal {
-        Animal::Cat(name) => f"Hello {name}",
-        Animal::Dog(Animal::Dog::Generic) => "Who's a good boy?",
-        Animal::Dog(Animal::Dog::Collie(name)) => f"Come here {name}",
+        .Cat(name) => f"Hello {name}",
+        .Dog(.Generic) => "Who's a good boy?",
+        .Dog(.Collie(name)) => f"Come here {name}",
       })
     )
     "#,
@@ -1876,4 +1876,42 @@ test_case!(
   ),
 ]"#,
     skip_postgres
+);
+
+test_case!(
+    or_else_00,
+    r#"
+    type OptText = enum {
+      None,
+      Some: text
+    }
+
+    func () -> (OptText::Some("hello") | std::or_else("world"))
+    "#,
+    r#""hello""#
+);
+
+test_case!(
+    or_else_01,
+    r#"
+    type OptText = enum {
+      None,
+      Some: text
+    }
+
+    func () -> (OptText::None | std::or_else("fallback"))
+    "#,
+    r#""fallback""#
+);
+test_case!(
+    or_else_02,
+    r#"
+    type OptText = enum {
+      None,
+      Some: text
+    }
+
+    func () -> (OptText::None | std::or_default())
+    "#,
+    r#""""#
 );

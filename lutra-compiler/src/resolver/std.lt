@@ -61,7 +61,24 @@ let not: func (expr: bool): bool
 
 let regex_search: func (text: text, pattern: text): bool
 
-let coalesce: func <T> (a: T, b: T): T
+let or_else = func <T> (
+    value: enum { None, Some: T },
+    fallback: T
+): T -> (
+    match value {
+        .Some(x) => x,
+        .None => fallback,
+    }
+)
+
+let or_default = func <T> (
+    value: enum { None, Some: T }
+): T -> (
+    match value {
+        .Some(x) => x,
+        .None => std::default(),
+    }
+)
 
 # Array functions
 

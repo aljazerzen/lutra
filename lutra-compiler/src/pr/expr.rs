@@ -223,14 +223,13 @@ pub struct MatchBranch {
 pub struct Pattern {
     pub kind: PatternKind,
     pub span: Span,
-    pub target: Option<Ref>,
     pub variant_tag: Option<usize>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum PatternKind {
     /// Match an enum variant, recurse into matching inner
-    Enum(Path, Option<Box<Pattern>>),
+    Enum(String, Option<Box<Pattern>>),
 
     /// Match anything, bind it to a name
     Bind(String),
@@ -241,7 +240,6 @@ impl Pattern {
         Self {
             kind,
             span,
-            target: None,
             variant_tag: None,
         }
     }

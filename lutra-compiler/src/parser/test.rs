@@ -240,8 +240,9 @@ fn parse_04() {
 fn parse_05() {
     assert_debug_snapshot!(parse_expr(r#"
         match item.status {
-            Status::Open => 5,
-            Status::Closed => 6 + 7,
+            .Open => 5,
+            .Closed(reason) => 6 + 7,
+            anything_else => 0,
         }
     "#).kind, @r#"
     Match(
@@ -278,14 +279,10 @@ fn parse_05() {
                 MatchBranch {
                     pattern: Pattern {
                         kind: Enum(
-                            [
-                                "Status",
-                                "Open",
-                            ],
+                            "Open",
                             None,
                         ),
-                        span: 0:41-53,
-                        target: None,
+                        span: 0:41-46,
                         variant_tag: None,
                     },
                     value: Expr {
@@ -295,7 +292,7 @@ fn parse_05() {
                             ),
                         ),
                         span: Some(
-                            0:57-58,
+                            0:50-51,
                         ),
                         ty: None,
                         ty_args: [],
@@ -306,14 +303,18 @@ fn parse_05() {
                 MatchBranch {
                     pattern: Pattern {
                         kind: Enum(
-                            [
-                                "Status",
-                                "Closed",
-                            ],
-                            None,
+                            "Closed",
+                            Some(
+                                Pattern {
+                                    kind: Bind(
+                                        "reason",
+                                    ),
+                                    span: 0:73-79,
+                                    variant_tag: None,
+                                },
+                            ),
                         ),
-                        span: 0:72-86,
-                        target: None,
+                        span: 0:65-80,
                         variant_tag: None,
                     },
                     value: Expr {
@@ -326,7 +327,7 @@ fn parse_05() {
                                         ),
                                     ),
                                     span: Some(
-                                        0:90-91,
+                                        0:84-85,
                                     ),
                                     ty: None,
                                     ty_args: [],
@@ -341,7 +342,7 @@ fn parse_05() {
                                         ),
                                     ),
                                     span: Some(
-                                        0:94-95,
+                                        0:88-89,
                                     ),
                                     ty: None,
                                     ty_args: [],
@@ -351,7 +352,30 @@ fn parse_05() {
                             },
                         ),
                         span: Some(
-                            0:90-95,
+                            0:84-89,
+                        ),
+                        ty: None,
+                        ty_args: [],
+                        scope_id: None,
+                        target: None,
+                    },
+                },
+                MatchBranch {
+                    pattern: Pattern {
+                        kind: Bind(
+                            "anything_else",
+                        ),
+                        span: 0:103-116,
+                        variant_tag: None,
+                    },
+                    value: Expr {
+                        kind: Literal(
+                            Integer(
+                                0,
+                            ),
+                        ),
+                        span: Some(
+                            0:120-121,
                         ),
                         ty: None,
                         ty_args: [],
@@ -369,8 +393,8 @@ fn parse_05() {
 fn parse_06() {
     assert_debug_snapshot!(parse_expr(r#"
         match 1 {
-            Status::Open(timestamp) => 1,
-            Status::Closed(Reason::Other(inner)) => 1,
+            .Open(timestamp) => 1,
+            .Closed(.Other(inner)) => 1,
         }
     "#).kind, @r#"
     Match(
@@ -393,23 +417,18 @@ fn parse_06() {
                 MatchBranch {
                     pattern: Pattern {
                         kind: Enum(
-                            [
-                                "Status",
-                                "Open",
-                            ],
+                            "Open",
                             Some(
                                 Pattern {
                                     kind: Bind(
                                         "timestamp",
                                     ),
-                                    span: 0:44-53,
-                                    target: None,
+                                    span: 0:37-46,
                                     variant_tag: None,
                                 },
                             ),
                         ),
-                        span: 0:31-54,
-                        target: None,
+                        span: 0:31-47,
                         variant_tag: None,
                     },
                     value: Expr {
@@ -419,7 +438,7 @@ fn parse_06() {
                             ),
                         ),
                         span: Some(
-                            0:58-59,
+                            0:51-52,
                         ),
                         ty: None,
                         ty_args: [],
@@ -430,36 +449,27 @@ fn parse_06() {
                 MatchBranch {
                     pattern: Pattern {
                         kind: Enum(
-                            [
-                                "Status",
-                                "Closed",
-                            ],
+                            "Closed",
                             Some(
                                 Pattern {
                                     kind: Enum(
-                                        [
-                                            "Reason",
-                                            "Other",
-                                        ],
+                                        "Other",
                                         Some(
                                             Pattern {
                                                 kind: Bind(
                                                     "inner",
                                                 ),
-                                                span: 0:102-107,
-                                                target: None,
+                                                span: 0:81-86,
                                                 variant_tag: None,
                                             },
                                         ),
                                     ),
-                                    span: 0:88-108,
-                                    target: None,
+                                    span: 0:74-87,
                                     variant_tag: None,
                                 },
                             ),
                         ),
-                        span: 0:73-109,
-                        target: None,
+                        span: 0:66-88,
                         variant_tag: None,
                     },
                     value: Expr {
@@ -469,7 +479,7 @@ fn parse_06() {
                             ),
                         ),
                         span: Some(
-                            0:113-114,
+                            0:92-93,
                         ),
                         ty: None,
                         ty_args: [],

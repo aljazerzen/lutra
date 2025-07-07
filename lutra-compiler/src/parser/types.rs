@@ -54,27 +54,29 @@ pub(crate) fn type_expr() -> impl Parser<TokenKind, Ty, Error = PError> + Clone 
 
         let enum_ = keyword("enum")
             .ignore_then(
-                sequence(
-                    ident_part()
-                        .then(
-                            ctrl(':')
-                                .ignore_then(nested_type_expr.clone())
-                                .or_not()
-                                .map(|ty| ty.unwrap_or_else(|| Ty::new(TyKind::Tuple(vec![])))),
-                        )
-                        .map(|(name, ty)| TyEnumVariant { name, ty }),
-                )
-                .delimited_by(ctrl('{'), ctrl('}'))
-                .recover_with(nested_delimiters(
-                    TokenKind::Control('{'),
-                    TokenKind::Control('}'),
-                    [
-                        (TokenKind::Control('{'), TokenKind::Control('}')),
-                        (TokenKind::Control('('), TokenKind::Control(')')),
-                        (TokenKind::Control('['), TokenKind::Control(']')),
-                    ],
-                    |_| vec![],
-                )),
+                // variant name
+                ident_part()
+                    .then(
+                        // inner type
+                        ctrl(':')
+                            .ignore_then(nested_type_expr.clone())
+                            .or_not()
+                            .map(|ty| ty.unwrap_or_else(|| Ty::new(TyKind::Tuple(vec![])))),
+                    )
+                    .map(|(name, ty)| TyEnumVariant { name, ty })
+                    .separated_by(ctrl(','))
+                    .allow_trailing()
+                    .delimited_by(ctrl('{'), ctrl('}'))
+                    .recover_with(nested_delimiters(
+                        TokenKind::Control('{'),
+                        TokenKind::Control('}'),
+                        [
+                            (TokenKind::Control('{'), TokenKind::Control('}')),
+                            (TokenKind::Control('('), TokenKind::Control(')')),
+                            (TokenKind::Control('['), TokenKind::Control(']')),
+                        ],
+                        |_| vec![],
+                    )),
             )
             .map(TyKind::Enum)
             .labelled("enum");

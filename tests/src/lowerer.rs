@@ -118,8 +118,8 @@ fn lower_02() {
     }
 
     func () -> match Status::Closed {
-        Status::Open => "open",
-        Status::Closed => "closed",
+        .Open => "open",
+        .Closed => "closed",
     }
     "#), @r#"
     let main = (func 0 ->

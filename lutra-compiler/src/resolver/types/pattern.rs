@@ -1,8 +1,8 @@
-use crate::diagnostic::{Diagnostic, WithErrorInfo};
+use crate::diagnostic::Diagnostic;
 use crate::{pr, utils};
 
 use crate::Result;
-use crate::resolver::types::scope::{Named, ScopeKind};
+use crate::resolver::types::scope::ScopeKind;
 use crate::utils::fold::PrFold;
 
 use super::scope::{Scope, TyRef};
@@ -69,24 +69,25 @@ impl<'a> super::TypeResolver<'a> {
         pattern: pr::Pattern,
     ) -> Result<pr::Pattern> {
         match pattern.kind {
-            pr::PatternKind::Enum(ident, inner) => {
-                let target = pattern.target.unwrap();
-                let named = self.get_ident(&target)?;
-
-                let Named::EnumVariant(pattern_ty, tag) = named else {
-                    return Err(Diagnostic::new_custom("expected an enum variant")
-                        .with_span(Some(pattern.span)));
-                };
-
-                let pattern_ty = pattern_ty.clone();
-                self.validate_type(&pattern_ty, subject_ty, &|| Some("pattern".into()))
-                    .with_span(Some(pattern.span))?;
-
+            pr::PatternKind::Enum(variant_name, inner) => {
                 let TyRef::Ty(subject_ty) = self.get_ty_mat(subject_ty)? else {
                     todo!();
                 };
-                let variants = subject_ty.kind.as_enum().unwrap();
-                let variant_ty = variants.get(tag).unwrap().ty.clone();
+                let pr::TyKind::Enum(variants) = &subject_ty.kind else {
+                    return Err(
+                        Diagnostic::new_custom("expected an enum").with_span(Some(pattern.span))
+                    );
+                };
+
+                let Some((tag, variant)) = variants
+                    .iter()
+                    .enumerate()
+                    .find(|(_, v)| v.name == variant_name)
+                else {
+                    return Err(Diagnostic::new_custom("variant does not exist")
+                        .with_span(Some(pattern.span)));
+                };
+                let variant_ty = variant.ty.clone();
 
                 // inner
                 let inner = if let Some(inner) = inner {
@@ -97,8 +98,7 @@ impl<'a> super::TypeResolver<'a> {
                 };
 
                 Ok(pr::Pattern {
-                    kind: pr::PatternKind::Enum(ident, inner),
-                    target: None,
+                    kind: pr::PatternKind::Enum(variant_name, inner),
                     variant_tag: Some(tag),
                     ..pattern
                 })

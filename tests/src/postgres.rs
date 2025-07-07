@@ -681,9 +681,9 @@ fn match_04() {
         Animal::Dog(Animal::Dog::Generic),
       ]
       | std::map(func (animal: Animal) -> match animal {
-        Animal::Cat(name) => f"Hello {name}",
-        Animal::Dog(Animal::Dog::Generic) => "Who's a good boy?",
-        Animal::Dog(Animal::Dog::Collie(name)) => f"Come here {name}",
+        .Cat(name) => f"Hello {name}",
+        .Dog(.Generic) => "Who's a good boy?",
+        .Dog(.Collie(name)) => f"Come here {name}",
       })
     )
     "#), @r#"

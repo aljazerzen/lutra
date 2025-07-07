@@ -126,9 +126,7 @@ impl fold::PrFold for NameResolver<'_> {
 
     fn fold_pattern(&mut self, mut pattern: pr::Pattern) -> Result<pr::Pattern> {
         match pattern.kind {
-            pr::PatternKind::Enum(ident, inner) => {
-                pattern.target = Some(self.resolve_ident(&ident).with_span(Some(pattern.span))?);
-
+            pr::PatternKind::Enum(variant, inner) => {
                 // inner
                 let inner = if let Some(inner) = inner {
                     Some(Box::new(self.fold_pattern(*inner)?))
@@ -136,7 +134,7 @@ impl fold::PrFold for NameResolver<'_> {
                     None
                 };
 
-                pattern.kind = pr::PatternKind::Enum(ident, inner);
+                pattern.kind = pr::PatternKind::Enum(variant, inner);
             }
             pr::PatternKind::Bind(ref name) => {
                 let scope = self.scopes.last_mut().unwrap();

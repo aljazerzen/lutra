@@ -632,9 +632,9 @@ fn match_00() {
         type Status = enum {Done, Pending: int16, Cancelled: text}
 
         let main = func () -> match Status::Done {
-          Status::Done => "done",
-          Status::Pending => "pending",
-          Status::Cancelled => "cancelled",
+          .Done => "done",
+          .Pending => "pending",
+          .Cancelled => "cancelled",
         }
     "#), @"text");
 }
@@ -646,8 +646,8 @@ fn match_01() {
         type Status = enum {Done, Pending: int16, Cancelled: text}
 
         let main = func () -> match Status::Done {
-          Status::Done => "done",
-          Status::Cancelled => "cancelled",
+          .Done => "done",
+          .Cancelled => "cancelled",
         }
     "#), @r#"
         Variant Status::Pending not covered.
@@ -661,21 +661,17 @@ fn match_02() {
         type Color = enum {Red, Green, Blue}
 
         let main = func () -> match Status::Done {
-          Color::Red => "red",
-          Color::Green => "green",
-          Color::Blue => "blue",
+          .Red => "red",
+          .Green => "green",
+          .Blue => "blue",
         }
     "#), @r#"
-    [E0004] Error:
+    Error:
        ╭─[:6:11]
        │
-     6 │           Color::Red => "red",
-       │           ─────┬────
-       │                ╰────── pattern expected type `Status`, but found type `Color`
-       │
-       │ Note:
-       │ type `Status` expands to `enum {Done, Pending: int16, Cancelled: text}`
-       │ type `Color` expands to `enum {Red, Green, Blue}`
+     6 │           .Red => "red",
+       │           ──┬─
+       │             ╰─── variant does not exist
     ───╯
     "#);
 }
@@ -686,17 +682,17 @@ fn match_03() {
         type Color = enum {Red, Green, Blue}
 
         let main = func () -> match Color::Green {
-          Color::Red => "red",
-          Color::Green => 1,
-          Color::Blue => false,
+          .Red => "red",
+          .Green => 1,
+          .Blue => false,
         }
     "#), @r"
     [E0004] Error:
-       ╭─[:7:26]
+       ╭─[:7:20]
        │
-     7 │           Color::Blue => false,
-       │                          ──┬──
-       │                            ╰──── match expected type `text`, but found type `bool`
+     7 │           .Blue => false,
+       │                    ──┬──
+       │                      ╰──── match expected type `text`, but found type `bool`
     ───╯
     ");
 }
@@ -707,7 +703,7 @@ fn match_04() {
         type Status = enum {Pending: bool}
 
         let main = func () -> match Status::Pending(false) {
-          Status::Pending(x) => x,
+          .Pending(x) => x,
         }
     "#), @"bool");
 }
@@ -718,7 +714,7 @@ fn match_05() {
         type Status = enum {Pending: int32}
 
         let main = func () -> match Status::Pending(4) {
-          Status::Pending(x) => x,
+          .Pending(x) => x,
         }
     "#), @"int32");
 }
