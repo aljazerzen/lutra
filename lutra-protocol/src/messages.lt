@@ -15,7 +15,7 @@ type Prepare: {
 
 type Execute: {
     program_id: uint32,
-    inputs: [[uint8]],
+    input: [uint8],
     request_id: uint32,
 }
 

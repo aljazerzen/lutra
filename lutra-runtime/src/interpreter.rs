@@ -44,7 +44,7 @@ pub enum EvalError {
 
 pub fn evaluate(
     program: &br::Program,
-    inputs: Vec<Vec<u8>>,
+    input: Vec<u8>,
     native_modules: &[(&str, &dyn NativeModule)],
 ) -> Result<Vec<u8>, EvalError> {
     let mut interpreter = Interpreter {
@@ -52,10 +52,6 @@ pub fn evaluate(
         bindings: HashMap::new(),
         scopes: HashMap::new(),
     };
-
-    if inputs.len() != program.input_count as usize {
-        return Err(EvalError::BadInputs);
-    }
 
     // load external symbols
     let native_modules: HashMap<&str, _> = native_modules.iter().map(|a| (a.0, a.1)).collect();
@@ -73,12 +69,9 @@ pub fn evaluate(
 
     // the main function call
     let main = interpreter.evaluate_expr(&program.main)?;
-    let args = inputs
-        .into_iter()
-        .map(|a| Cell::Data(Data::new(a)))
-        .collect();
+    let args = Cell::Data(Data::new(input));
 
-    let res = interpreter.evaluate_func_call(&main, args)?;
+    let res = interpreter.evaluate_func_call(&main, vec![args])?;
 
     // extract result
     drop(interpreter);

@@ -223,11 +223,17 @@ impl<'a> Context<'a> {
                         r_expr.clone()
                     }
                     FuncProvider::Params => {
-                        let expr = cr::Expr {
-                            kind: cr::ExprKind::From(cr::From::Param(ptr.param_position)),
-                            ty: expr.ty.clone(),
-                        };
-                        cr::ExprKind::From(cr::From::Row(vec![expr]))
+                        assert_eq!(ptr.param_position, 0);
+                        let columns = expr
+                            .ty
+                            .iter_fields() // TODO: do proper args unpacking
+                            .enumerate()
+                            .map(|(p, field_ty)| cr::Expr {
+                                kind: cr::ExprKind::From(cr::From::Param(p as u8)),
+                                ty: field_ty.clone(),
+                            })
+                            .collect();
+                        cr::ExprKind::From(cr::From::Row(columns))
                     }
                 }
             }

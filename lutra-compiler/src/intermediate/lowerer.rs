@@ -9,14 +9,12 @@ use crate::Result;
 use crate::utils::{self, IdGenerator};
 use crate::{decl, pr};
 
-pub fn lower_expr(root_module: &decl::RootModule, main: &pr::Expr) -> ir::Program {
+pub fn lower_expr(root_module: &decl::RootModule, main_pr: &pr::Expr) -> ir::Program {
     let mut lowerer = Lowerer::new(root_module);
 
-    let mut main = lowerer.lower_expr(main).unwrap();
-
-    if !main.ty.kind.is_function() {
-        main = lowerer.wrap_into_func(main);
-    }
+    lowerer.is_main_func = main_pr.ty.as_ref().unwrap().kind.is_func();
+    let main = lowerer.lower_expr(main_pr).unwrap();
+    let main = lowerer.prepare_entry_point(main);
 
     let main = lowerer.lower_var_bindings(main).unwrap();
 
@@ -48,6 +46,7 @@ struct Lowerer<'a> {
     root_module: &'a decl::RootModule,
 
     scopes: Vec<Scope>,
+    is_main_func: bool,
 
     /// Depended expressions that are referenced from generated IR.
     /// Contain FQ path and list of type arguments, pointing to id the should
@@ -70,6 +69,7 @@ enum ScopeKind {
     Function {
         start_of_params: usize,
         function_id: u32,
+        is_main: bool,
     },
     Local {
         /// A pre-compiled node that can be used for each scope entry
@@ -83,6 +83,7 @@ impl<'a> Lowerer<'a> {
             root_module,
 
             scopes: vec![],
+            is_main_func: false,
             var_bindings: Default::default(),
             type_defs: Default::default(),
             type_defs_queue: Default::default(),
@@ -224,10 +225,12 @@ impl<'a> Lowerer<'a> {
                     kind: ScopeKind::Function {
                         function_id,
                         start_of_params: func.ty_params.len(),
+                        is_main: self.is_main_func,
                     },
                 };
 
                 self.scopes.push(scope);
+                self.is_main_func = false;
                 let body = self.lower_expr(&func.body)?;
                 self.scopes.pop();
 
@@ -247,13 +250,35 @@ impl<'a> Lowerer<'a> {
                         ScopeKind::Function {
                             start_of_params,
                             function_id,
+                            is_main,
                         } => {
                             let param_position = (*offset - start_of_params) as u8;
 
-                            ir::ExprKind::Pointer(ir::Pointer::Parameter(ir::ParameterPtr {
-                                function_id: *function_id,
-                                param_position,
-                            }))
+                            if !*is_main {
+                                ir::ExprKind::Pointer(ir::Pointer::Parameter(ir::ParameterPtr {
+                                    function_id: *function_id,
+                                    param_position,
+                                }))
+                            } else {
+                                // special case: this is reference to param of the main func,
+                                // which is translated into func with exactly one tuple param.
+                                // So we need to also inject tuple lookup
+                                ir::ExprKind::TupleLookup(Box::new(ir::TupleLookup {
+                                    base: ir::Expr {
+                                        kind: ir::ExprKind::Pointer(ir::Pointer::Parameter(
+                                            ir::ParameterPtr {
+                                                function_id: *function_id,
+                                                param_position: 0,
+                                            },
+                                        )),
+
+                                        // TODO: this is incorrect, it should the type of whole input,
+                                        // not just this param
+                                        ty: self.lower_ty(expr.ty.clone().unwrap()),
+                                    },
+                                    position: param_position as u16,
+                                }))
+                            }
                         }
                         ScopeKind::Local { entries } => {
                             entries.get(*offset).map(|e| e.kind.clone()).unwrap()
@@ -331,7 +356,6 @@ impl<'a> Lowerer<'a> {
                 }));
                 return Ok(ir::Expr { kind, ty });
             }
-            pr::ExprKind::FString(_) => todo!(),
 
             // consumed by type resolver
             pr::ExprKind::TypeAnnotation(_) => unreachable!(),
@@ -344,6 +368,7 @@ impl<'a> Lowerer<'a> {
             pr::ExprKind::Binary(_) => unreachable!(),
             pr::ExprKind::Unary(_) => unreachable!(),
             pr::ExprKind::Range(_) => unreachable!(),
+            pr::ExprKind::FString(_) => unreachable!(),
         };
         Ok(ir::Expr {
             kind,
@@ -459,18 +484,13 @@ impl<'a> Lowerer<'a> {
         let mut main = ir::Expr {
             kind: ir::ExprKind::Call(Box::new(ir::Call {
                 function: main,
-                args: main_func_ty
-                    .params
-                    .iter()
-                    .enumerate()
-                    .map(|(p_pos, p)| ir::Expr {
-                        kind: ir::ExprKind::Pointer(ir::Pointer::Parameter(ir::ParameterPtr {
-                            function_id: f_id,
-                            param_position: p_pos as u8,
-                        })),
-                        ty: p.clone(),
-                    })
-                    .collect(),
+                args: vec![ir::Expr {
+                    kind: ir::ExprKind::Pointer(ir::Pointer::Parameter(ir::ParameterPtr {
+                        function_id: f_id,
+                        param_position: 0_u8,
+                    })),
+                    ty: main_func_ty.params[0].clone(),
+                }],
             })),
             ty: main_func_ty.body.clone(),
         };
@@ -654,11 +674,30 @@ impl<'a> Lowerer<'a> {
         }
     }
 
-    fn wrap_into_func(&mut self, body: ir::Expr) -> ir::Expr {
+    /// Massages an expression for being the entry-point of a program.
+    /// In particular, this makes sure that it is:
+    /// - a function,
+    /// - with exactly one param (named input).
+    fn prepare_entry_point(&mut self, mut main: ir::Expr) -> ir::Expr {
+        if let ir::TyKind::Function(func) = &mut main.ty.kind {
+            // change type from `func (a, b, c): d` into `func ({a, b, c}): d`
+            let fields = func
+                .params
+                .drain(..)
+                .map(|ty| ir::TyTupleField { ty, name: None })
+                .collect();
+            func.params = vec![ir::Ty::new(ir::TyKind::Tuple(fields))];
+            main
+        } else {
+            self.wrap_into_main_func(main)
+        }
+    }
+
+    fn wrap_into_main_func(&mut self, body: ir::Expr) -> ir::Expr {
         ir::Expr {
             ty: ir::Ty::new(ir::TyFunction {
                 body: body.ty.clone(),
-                params: vec![],
+                params: vec![ir::Ty::new_unit()],
             }),
             kind: ir::ExprKind::Function(Box::new(ir::Function {
                 id: self.generator_function_scope.next() as u32,

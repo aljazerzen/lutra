@@ -19,8 +19,8 @@ pub fn _run(source: &str, args: Vec<lutra_bin::Value>) -> (String, String) {
     let formatted_sql = sqlformat::format(&program.sql, &sqlformat::QueryParams::None, &options);
     tracing::debug!("sql:\n{formatted_sql}");
 
-    let mut input_writer = lutra_bin::TupleWriter::new_for_tys(program.input_tys.iter());
-    for (arg, ty) in std::iter::zip(args, &program.input_tys) {
+    let mut input_writer = lutra_bin::TupleWriter::new_for_ty(&program.input_ty);
+    for (arg, ty) in std::iter::zip(args, program.input_ty.iter_fields()) {
         input_writer.write_field(lutra_bin::Data::new(
             arg.encode(ty, &program.types).unwrap(),
         ));

@@ -24,12 +24,12 @@ async fn main() {
         let program_id = client.prepare(&program).await;
 
         let res = client
-            .run_once(&program, vec![vec![1, 0, 0, 0, 0, 0, 0, 0]])
+            .run_once(&program, vec![1, 0, 0, 0, 0, 0, 0, 0])
             .await;
         print_res(res, &output_ty);
 
         let request_id = client
-            .execute(program_id, vec![vec![5, 0, 0, 0, 0, 0, 0, 0]])
+            .execute(program_id, vec![5, 0, 0, 0, 0, 0, 0, 0])
             .await;
         let res = client.recv_response(request_id).await;
         print_res(res, &output_ty);

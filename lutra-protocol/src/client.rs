@@ -33,13 +33,9 @@ where
     }
 
     /// Prepare, execute and release.
-    pub async fn run_once(
-        &mut self,
-        program: &br::Program,
-        inputs: Vec<Vec<u8>>,
-    ) -> messages::Result {
+    pub async fn run_once(&mut self, program: &br::Program, input: Vec<u8>) -> messages::Result {
         let program_id = self.prepare(program).await;
-        let request_id = self.execute(program_id, inputs).await;
+        let request_id = self.execute(program_id, input).await;
         self.release(program_id).await;
 
         self.recv_response(request_id).await
@@ -61,13 +57,13 @@ where
         program_id
     }
 
-    pub async fn execute(&mut self, program_id: u32, inputs: Vec<Vec<u8>>) -> u32 {
+    pub async fn execute(&mut self, program_id: u32, input: Vec<u8>) -> u32 {
         let request_id = self.next_request_id;
         self.next_request_id += 1;
 
         let execute = messages::ClientMessage::Execute(messages::Execute {
             program_id,
-            inputs,
+            input,
             request_id,
         });
 

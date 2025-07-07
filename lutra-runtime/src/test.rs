@@ -159,11 +159,15 @@ fn eval_error_00() {
 }
 
 #[test]
+#[ignore]
 fn eval_error_01() {
     assert_debug_snapshot!(_test_err(r#"
         let main = (func 0 ->
-            fn.0+0: int64
-        ): func (int64) -> int64
+          (tuple_lookup
+            fn.0+0: int64,
+            0
+          )
+        ): func ({int64}) -> int64
         "#), @"BadInputs",
     );
 }

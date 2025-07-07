@@ -34,7 +34,7 @@ pub fn compile(project: &crate::Project, path: &pr::Path) -> sr::Program {
 
     sr::Program {
         sql: sql_source,
-        input_tys: program.get_input_tys().to_owned(),
+        input_ty: program.get_input_ty().clone(),
         output_ty: program.get_output_ty().clone(),
         types: program.types,
     }

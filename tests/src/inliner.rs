@@ -15,16 +15,16 @@ fn inline_00() {
     func () -> twice([true, true, false])
     "#), @r"
     let main = (func 0 ->
-      let 2 = [
+      let 3 = [
         true: bool,
         true: bool,
         false: bool,
       ]: [bool];
       {
-        var.2: [bool],
-        var.2: [bool],
+        var.3: [bool],
+        var.3: [bool],
       }: {[bool], [bool]}
-    ): func () -> {[bool], [bool]}
+    ): func ({}) -> {[bool], [bool]}
     ")
 }
 
@@ -43,7 +43,7 @@ fn inline_01() {
           false: bool,
         ]: [bool],
       }: {[bool]}
-    ): func () -> {[bool]}
+    ): func ({}) -> {[bool]}
     ")
 }
 
@@ -68,27 +68,27 @@ fn inline_02() {
           2: int64,
         }: {int64, int64},
       ]: [{int64, int64}];
-      let 3 = var.2: [{int64, int64}];
-      let 5 = (call
+      let 4 = var.2: [{int64, int64}];
+      let 6 = (call
         external.std::to_columnar: func ([{int64, int64}]) -> {[int64], [int64]},
-        var.3: [{int64, int64}],
+        var.4: [{int64, int64}],
       ): {[int64], [int64]};
       {
         (call
           external.std::min: func ([int64]) -> int64,
           (tuple_lookup
-            var.5: {[int64], [int64]}
+            var.6: {[int64], [int64]}
             0
           ): [int64],
         ): int64,
         (call
           external.std::min: func ([int64]) -> int64,
           (tuple_lookup
-            var.5: {[int64], [int64]}
+            var.6: {[int64], [int64]}
             1
           ): [int64],
         ): int64,
       }: {int64, int64}
-    ): func () -> {int64, int64}
+    ): func ({}) -> {int64, int64}
     ")
 }

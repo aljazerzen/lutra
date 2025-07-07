@@ -93,19 +93,25 @@ fn lower_01() {
           ): [chinook::album],
           (call
             var.1: func (int64) -> chinook::album,
-            fn.1+0: int64,
+            (tuple_lookup
+              fn.1+0: int64
+              0
+            ): int64,
           ): chinook::album,
           (call
             var.2: func (int64) -> box_office::album_sale,
-            fn.1+0: int64,
+            (tuple_lookup
+              fn.1+0: int64
+              0
+            ): int64,
           ): box_office::album_sale,
         }: {[chinook::album], chinook::album, box_office::album_sale}
       ): func (int64) -> {[chinook::album], chinook::album, box_office::album_sale};
       (call
-        var.0: func (int64) -> {[chinook::album], chinook::album, box_office::album_sale},
-        fn.0+0: int64,
+        var.0: func ({int64}) -> {[chinook::album], chinook::album, box_office::album_sale},
+        fn.0+0: {int64},
       ): {[chinook::album], chinook::album, box_office::album_sale}
-    ): func (int64) -> {[chinook::album], chinook::album, box_office::album_sale}
+    ): func ({int64}) -> {[chinook::album], chinook::album, box_office::album_sale}
     ")
 }
 
@@ -142,9 +148,10 @@ fn lower_02() {
         ): text
       ): func () -> text;
       (call
-        var.0: func () -> text,
+        var.0: func ({}) -> text,
+        fn.0+0: {},
       ): text
-    ): func () -> text
+    ): func ({}) -> text
     "#)
 }
 
@@ -173,8 +180,9 @@ fn lower_03() {
         ): {[bool], [bool]}
       ): func () -> {[bool], [bool]};
       (call
-        var.0: func () -> {[bool], [bool]},
+        var.0: func ({}) -> {[bool], [bool]},
+        fn.0+0: {},
       ): {[bool], [bool]}
-    ): func () -> {[bool], [bool]}
+    ): func ({}) -> {[bool], [bool]}
     ")
 }

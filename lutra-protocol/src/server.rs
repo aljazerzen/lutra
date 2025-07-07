@@ -53,7 +53,7 @@ where
                 log::trace!("execute");
 
                 let result =
-                    lutra_runtime::evaluate(program, execute.inputs, &self.modules).unwrap();
+                    lutra_runtime::evaluate(program, execute.input, &self.modules).unwrap();
 
                 let response = messages::ServerMessage::Response(messages::Response {
                     request_id: execute.request_id,

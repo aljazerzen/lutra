@@ -20,6 +20,8 @@ pub fn inline(program: ir::Program) -> ir::Program {
     };
     program.main = inliner.fold_expr(program.main).unwrap();
 
+    log::debug!("binding_usage = {:?}", inliner.binding_usage);
+
     // inline vars
     let mut inliner = VarInliner::new(inliner.binding_usage);
     program.main = inliner.fold_expr(program.main).unwrap();

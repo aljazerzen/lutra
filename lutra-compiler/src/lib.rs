@@ -55,6 +55,7 @@ pub fn _test_compile(source: &str) -> Result<ir::Program, error::Error> {
     let path = pr::Path::from_name("main");
 
     let program = lower_var(&project.root_module, &path);
+    assert!(program.get_input_ty().kind.is_tuple());
     Ok(layouter::on_program(program))
 }
 

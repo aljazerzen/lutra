@@ -13,9 +13,10 @@ impl Program {
         &main_ty.body
     }
 
-    pub fn get_input_tys(&self) -> &[Ty] {
+    pub fn get_input_ty(&self) -> &Ty {
         let main_ty = self.main.ty.kind.as_function().unwrap();
-        main_ty.params.as_slice()
+        assert_eq!(main_ty.params.len(), 1);
+        &main_ty.params[0]
     }
 }
 
@@ -36,9 +37,26 @@ impl Ty {
             variants_recursive: vec![],
         }
     }
-
+    pub fn new_unit() -> Self {
+        Ty {
+            kind: TyKind::Tuple(vec![]),
+            layout: Some(TyLayout {
+                head_size: 0,
+                body_ptrs: vec![],
+            }),
+            name: None,
+            variants_recursive: vec![],
+        }
+    }
     pub fn is_unit(&self) -> bool {
         self.kind.as_tuple().is_some_and(|f| f.is_empty())
+    }
+
+    pub fn iter_fields<'a>(&'a self) -> boxed::Box<dyn Iterator<Item = &'a Ty> + 'a> {
+        match &self.kind {
+            TyKind::Tuple(fields) => boxed::Box::new(fields.iter().map(|f| &f.ty)),
+            _ => boxed::Box::new(Some(self).into_iter()),
+        }
     }
 }
 

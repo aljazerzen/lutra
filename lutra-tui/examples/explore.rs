@@ -1,5 +1,3 @@
-use itertools::Itertools;
-use lutra_bin::ir;
 use lutra_compiler::pr;
 
 fn main() {
@@ -22,30 +20,15 @@ fn main() {
 fn execute_function(project: &lutra_compiler::Project, path: pr::Path) {
     let program = lutra_compiler::lower_var(&project.root_module, &path);
 
-    let input_tys = program.get_input_tys().to_vec();
-    let mut input_ty = ir::Ty::new(ir::TyKind::Tuple(
-        input_tys
-            .iter()
-            .map(|p| ir::TyTupleField {
-                name: None,
-                ty: p.clone(),
-            })
-            .collect(),
-    ));
+    let mut input_ty = program.get_input_ty().clone();
     input_ty.name = Some("input".into());
 
     let bytecode = lutra_compiler::bytecode_program(program.clone());
 
     let input_val = lutra_tui::prompt_for_ty(&input_ty, None).unwrap();
-    let lutra_bin::Value::Tuple(input_args) = input_val else {
-        panic!();
-    };
-    let inputs = std::iter::zip(input_args, &input_tys)
-        .map(|(a, t)| a.encode(t, &program.types).unwrap())
-        .collect_vec();
+    let input = input_val.encode(&input_ty, &program.types).unwrap();
 
-    let result =
-        lutra_runtime::evaluate(&bytecode, inputs, lutra_runtime::BUILTIN_MODULES).unwrap();
+    let result = lutra_runtime::evaluate(&bytecode, input, lutra_runtime::BUILTIN_MODULES).unwrap();
     let result =
         lutra_bin::Value::decode(&result, program.get_output_ty(), &program.types).unwrap();
 

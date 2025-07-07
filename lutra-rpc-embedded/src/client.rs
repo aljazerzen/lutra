@@ -32,10 +32,10 @@ where
     pub async fn run_once(
         &mut self,
         program: &[u8],
-        inputs: vec::Vec<vec::Vec<u8>>,
+        input: vec::Vec<u8>,
     ) -> Result<messages::Result, C::Error> {
         let program_id = self.prepare(program).await?;
-        let request_id = self.execute(program_id, inputs).await?;
+        let request_id = self.execute(program_id, input).await?;
         self.release(program_id).await?;
 
         self.recv_response(request_id).await
@@ -54,17 +54,13 @@ where
         Ok(program_id)
     }
 
-    pub async fn execute(
-        &mut self,
-        program_id: u32,
-        inputs: vec::Vec<vec::Vec<u8>>,
-    ) -> Result<u32, C::Error> {
+    pub async fn execute(&mut self, program_id: u32, input: vec::Vec<u8>) -> Result<u32, C::Error> {
         let request_id = self.next_request_id;
         self.next_request_id += 1;
 
         let execute = messages::ClientMessage::Execute(messages::Execute {
             program_id,
-            inputs,
+            input,
             request_id,
         });
 

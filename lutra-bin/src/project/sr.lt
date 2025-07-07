@@ -2,7 +2,7 @@
 ## Compiled program, executable with lutra-db-driver
 type Program: {
   sql: text,
-  input_tys: [project::ir::Ty],
+  input_ty: project::ir::Ty,
   output_ty: project::ir::Ty,
   types: [project::ir::TyDef],
 }

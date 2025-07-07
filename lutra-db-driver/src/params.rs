@@ -3,9 +3,11 @@ use lutra_bin::{Decode, sr};
 use postgres_types as pg_ty;
 
 pub fn to_sql<'d>(program: &sr::Program, input: &'d [u8]) -> Args<'d> {
-    let mut args = Vec::with_capacity(program.input_tys.len());
+    let input_tys = program.input_ty.iter_fields();
+
+    let mut args = Vec::new();
     let mut offset = 0;
-    for input_ty in &program.input_tys {
+    for input_ty in input_tys {
         args.push(Arg {
             data: &input[offset..],
         });
