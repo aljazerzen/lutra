@@ -2,8 +2,6 @@
 title: Specification
 ---
 
-# Binary format specification
-
 Each type has a defined encoding with head and an optional body.
 
 Head has static size.

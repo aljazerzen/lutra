@@ -1,8 +1,7 @@
 ---
 title: Reference
+weight: 2
 ---
-
-# Language reference
 
 Lutra is a statically typed programming language with a minimal
 algebraic type system and some aspects of functional paradigm.

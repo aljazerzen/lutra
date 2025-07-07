@@ -1,8 +1,7 @@
 ---
 title: Database driver
+weight: 3
 ---
-
-# Lutra database driver
 
 Lutra projects can be compiled to SQL and executed on relational databases.
 

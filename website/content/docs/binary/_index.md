@@ -1,8 +1,7 @@
 ---
 title: Binary format
+weight: 1
 ---
-
-# Lutra binary format
 
 Lutra binary format is a method of serializing structured data. It can be used to transfer data between programming languages, processes or devices.
 

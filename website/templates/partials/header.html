@@ -1,20 +1,21 @@
 <header style="display: flex; flex-wrap: wrap; gap: 1em; align-items: center;">
-    <img src="{{ site.base_url }}/static/lutra.png" style="height: 10em;" alt="The otter mascot of Lutra">
+    <img src="{{ config.base_url }}/lutra.png" style="height: 7rem;" alt="The otter mascot of Lutra">
 
     <nav style="display: flex; flex-wrap: wrap; gap: 1em; align-items: end; flex-grow: 1">
 
         <div>
             <h1 style="margin: 0 0 -0.17em 0;">
-                <a href="{{ site.base_url }}">
-                    {{ site.title }}
+                <a href="{{ config.base_url }}">
+                    {{ config.title }}
                 </a>
             </h1>
-            <p style="margin: 0">{{ site.description }}</p>
+            <p style="margin: 0">{{ config.description }}</p>
         </div>
 
         <div style="flex-grow: 1"></div>
 
-        <a href="{{ site.base_url }}/docs/"><span>Docs</span></a>
+        <a href="{{ config.base_url }}/docs/"><span>Docs</span></a>
         <a href="https://code.murerzen.eu/aljaz/lutra-data"><span>Source code</span></a>
     </nav>
 </header>
+

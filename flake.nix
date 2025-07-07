@@ -53,8 +53,7 @@
             pkgs.python312Packages.python-lsp-ruff
 
             # website
-            pkgs.cobalt
-            pkgs.doctave
+            pkgs.zola
           ];
 
           RUSTFLAGS = "-Clink-arg=-fuse-ld=${pkgs.mold}/bin/mold";

@@ -1,0 +1,117 @@
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta charset="utf-8">
+{% if page.title %}
+<title>{{ page.title }} | {{config.title }}</title>
+{% endif %}
+{% if section.title %}
+<title>{{ section.title }} | {{config.title }}</title>
+{% endif %}
+<link rel="shortcut icon" href="{{ config.base_url }}/favicon.ico" />
+<link rel="stylesheet" href="{{ config.base_url }}/water.min.css">
+<style>
+    @font-face {
+        font-family: "Archivo Black";
+        src: url('{{ config.base_url | safe }}/ArchivoBlack-Regular.ttf');
+    }
+
+    h1,
+    h2,
+    h3,
+    h4 {
+        font-family: "Archivo Black", sans-serif;
+        font-weight: 500;
+    }
+
+    body {
+        margin: 0;
+        padding: 0;
+        max-width: unset;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+    }
+
+    .container {
+        width: 100%;
+        display: flex;
+        flex-direction: row;
+        justify-content: center;
+        flex-wrap: wrap;
+        padding: 10px 0;
+    }
+    .sidebar-start,.sidebar-end {
+        width: 250px;
+        max-width: 250px;
+        padding-bottom: 3rem;
+    }
+    .content {
+        flex: 800px 0 1;
+        max-width: calc(100% - 16px);
+        padding: 0 8px;
+    }
+    h1 {
+        margin-top: 0;
+    }
+
+    .underline::after {
+        display: block;
+        content: '';
+
+        position: relative;
+        top: -6px;
+        left: -0.25em;
+        height: 10px;
+        width: calc(100% + 0.5em);
+
+        border-radius: 1px;
+        background-color: var(--selection);
+    }
+
+    .toc {
+        position: fixed;
+        display: flex;
+        flex-direction: column;
+        gap: 0.5em;
+        padding: 0 1rem;
+        margin: 0;
+    }
+    .toc>li {
+        display: block;
+    }
+    .muted {
+        color: var(--text-muted);
+    }
+    .breadcrumbs {
+        display: flex;
+        flex-wrap: wrap;
+    }
+    .breadcrumbs a:not(:first-child)::before {
+        content: ">";
+        color: var(--text-muted);
+        margin: 0 0.5rem;
+    }
+
+    ul.navigation {
+        position: fixed;
+        display: flex;
+        flex-direction: column;
+        padding: 0;
+        margin: 0;
+        gap: 0.5rem;
+    }
+    ul.navigation li {
+        display: block;
+    }
+    ul.navigation a {
+        color: var(--text);
+    }
+    ul.navigation li.active>a {
+        color: var(--selection);
+    }
+    ul.navigation li.header:not(:first-child) {
+        padding-top: 1.5rem;
+    }
+    ul.navigation li.header>a {
+        font-weight: bold;
+    }
+</style>
