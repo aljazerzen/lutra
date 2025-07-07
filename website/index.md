@@ -15,9 +15,9 @@ It provides code generation tools for creating bindings in other programming lan
 (currently only Rust is supported).
 
 ```
-type album = {id = int64, title = text}
+type album: {id: int64, title: text}
 
-type invoice = {id = int64, customer = text, total = float64}
+type invoice: {id: int64, customer: text, total: float64}
 ```
 
 <div style="margin-top: 2em">
@@ -31,7 +31,7 @@ to SQL to be executed by relational databases
 (currently only PostgreSQL is supported).
 
 ```
-type album = {id = int64, title = text}
+type album: {id: int64, title: text}
 
 let get_albums: func (): [album]
 

@@ -19,10 +19,10 @@ Currently supported languages:
 
 ## Example
 
-```lt
-type Movie = {
-  id = int16,
-  title = text,
+```elm
+type Movie: {
+  id: int16,
+  title: text,
 }
 
 let value: Movie = {

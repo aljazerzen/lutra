@@ -17,9 +17,9 @@ Supported databases:
 
 We start with a Lutra project.
 
-```lt
+```elm
 module db {
-    type Movie = {id = int32, title = text}
+    type Movie: {id: int32, title: text}
 
     let movies: func (): [Movie]
 }
