@@ -16,6 +16,6 @@ pages:
 
 ignore:
 - doctave.yaml
-- docs
 - site
 - justfile
+- .gitignore
