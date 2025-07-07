@@ -10,7 +10,7 @@ fn _test_compile_and_print(source: &str) -> String {
 fn lower_01() {
     assert_snapshot!(_test_compile_and_print(r#"
     module chinook {
-      type album = {id: int, title: text}
+      type album: {id: int, title: text}
 
       let get_albums: func (): [album]
 
@@ -22,7 +22,7 @@ fn lower_01() {
     }
 
     module box_office {
-      type album_sale = {id: int, total: float}
+      type album_sale: {id: int, total: float}
 
       let get_album_sales: func (): [album_sale]
 
@@ -112,7 +112,7 @@ fn lower_01() {
 #[test]
 fn lower_02() {
     assert_snapshot!(_test_compile_and_print(r#"
-    type Status = enum {
+    type Status: enum {
         Open,
         Closed: text,
     }

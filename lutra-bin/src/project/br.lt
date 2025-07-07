@@ -1,33 +1,33 @@
-type Program = {
-  externals = [ExternalSymbol],
-  main = Expr,
-  input_count = uint8,
+type Program: {
+  externals: [ExternalSymbol],
+  main: Expr,
+  input_count: uint8,
 }
 
 @derive(["Debug", "Clone", "PartialEq", "Eq", "Hash"])
-type ExternalSymbol = {
-  id = text,
-  layout_args = [uint32],
+type ExternalSymbol: {
+  id: text,
+  layout_args: [uint32],
 }
 
-type Expr = {
-  kind = ExprKind,
+type Expr: {
+  kind: ExprKind,
 }
 
 @derive(["Debug", "Clone", "enum_as_inner::EnumAsInner"])
-type ExprKind = enum {
-  Pointer = Sid,
-  Literal = [uint8],
-  Call = Call,
-  Function = Function,
-  `Tuple` = `Tuple`,
-  Array = Array,
-  EnumVariant = EnumVariant,
-  EnumEq = EnumEq,
-  Offset = Offset,
-  Deref = Deref,
-  Binding = Binding,
-  Switch = [SwitchBranch],
+type ExprKind: enum {
+  Pointer: Sid,
+  Literal: [uint8],
+  Call: Call,
+  Function: Function,
+  `Tuple`: `Tuple`,
+  Array: Array,
+  EnumVariant: EnumVariant,
+  EnumEq: EnumEq,
+  Offset: Offset,
+  Deref: Deref,
+  Binding: Binding,
+  Switch: [SwitchBranch],
 }
 
 ## Symbol id.
@@ -36,64 +36,64 @@ type ExprKind = enum {
 ## - 0b10xxxxxx - function scopes
 ## - 0b11xxxxxx - unused
 @derive(["Debug", "Clone", "Copy", "PartialEq", "Eq", "Hash"])
-type Sid = uint32
+type Sid: uint32
 
-type Call = {
-  function = Expr,
-  args = [Expr],
+type Call: {
+  function: Expr,
+  args: [Expr],
 }
 
-type Function = {
-  symbol_ns = Sid,
+type Function: {
+  symbol_ns: Sid,
 
   # can contain function parameters prefixed with symbol_ns
-  body = Expr,
+  body: Expr,
 }
 
-type `Tuple` = {
-    fields = [Expr],
-    field_layouts = [TyLayout]
+type `Tuple`: {
+    fields: [Expr],
+    field_layouts: [TyLayout]
 }
 
-type Array = {
-    item_layout = TyLayout,
-    items = [Expr],
+type Array: {
+    item_layout: TyLayout,
+    items: [Expr],
 }
 
-type EnumVariant = {
-    tag = [uint8],
-    has_ptr = bool,
-    padding_bytes = uint32,
-    inner = Expr,
+type EnumVariant: {
+    tag: [uint8],
+    has_ptr: bool,
+    padding_bytes: uint32,
+    inner: Expr,
 }
 
-type EnumEq = {
-    tag = [uint8],
-    expr = Expr,
+type EnumEq: {
+    tag: [uint8],
+    expr: Expr,
 }
 
-type Offset = {
-  base = Expr,
-  offset = uint32,
+type Offset: {
+  base: Expr,
+  offset: uint32,
 }
 
-type Deref = {
-  ptr = Expr,
+type Deref: {
+  ptr: Expr,
 }
 
-type Binding = {
-  symbol = Sid,
-  expr = Expr,
-  main = Expr,
+type Binding: {
+  symbol: Sid,
+  expr: Expr,
+  main: Expr,
 }
 
-type SwitchBranch = {
-    condition = Expr,
-    value = Expr,
+type SwitchBranch: {
+    condition: Expr,
+    value: Expr,
 }
 
 @derive(["Debug", "Clone", "PartialEq", "Default"])
-type TyLayout = {
-  head_size = uint32,
-  body_ptrs = [uint32],
+type TyLayout: {
+  head_size: uint32,
+  body_ptrs: [uint32],
 }

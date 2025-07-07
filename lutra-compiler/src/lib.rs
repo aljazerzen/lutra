@@ -34,7 +34,7 @@ pub mod _lexer {
 
 #[track_caller]
 pub fn _test_compile_ty(ty_source: &str) -> ir::Ty {
-    let source = format!("type t = {ty_source}");
+    let source = format!("type t: {ty_source}");
 
     let source = SourceTree::single("".into(), source);
     let project = compile(source, CompileParams {}).unwrap_or_else(|e| panic!("{e}"));

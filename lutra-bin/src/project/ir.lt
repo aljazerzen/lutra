@@ -1,134 +1,134 @@
-type Program = {
-  main = Expr,
-  types = [TyDef]
+type Program: {
+  main: Expr,
+  types: [TyDef]
 }
 
-type Expr = {
-  kind = ExprKind,
-  ty = Ty,
-}
-
-@derive(["Debug", "Clone", "enum_as_inner::EnumAsInner"])
-type ExprKind = enum {
-  Pointer = Pointer,
-  Literal = Literal,
-  Call = Call,
-  Function = Function,
-  `Tuple` = [Expr],
-  Array = [Expr],
-  EnumVariant = EnumVariant,
-  EnumEq = EnumEq,
-  EnumUnwrap = EnumUnwrap,
-  TupleLookup = TupleLookup,
-  Binding = Binding,
-  Switch = [SwitchBranch],
+type Expr: {
+  kind: ExprKind,
+  ty: Ty,
 }
 
 @derive(["Debug", "Clone", "enum_as_inner::EnumAsInner"])
-type Pointer = enum {
-  External = ExternalPtr,
-  Binding = uint32,
-  Parameter = ParameterPtr,
+type ExprKind: enum {
+  Pointer: Pointer,
+  Literal: Literal,
+  Call: Call,
+  Function: Function,
+  `Tuple`: [Expr],
+  Array: [Expr],
+  EnumVariant: EnumVariant,
+  EnumEq: EnumEq,
+  EnumUnwrap: EnumUnwrap,
+  TupleLookup: TupleLookup,
+  Binding: Binding,
+  Switch: [SwitchBranch],
 }
 
-type ExternalPtr = {
-  id = text,
+@derive(["Debug", "Clone", "enum_as_inner::EnumAsInner"])
+type Pointer: enum {
+  External: ExternalPtr,
+  Binding: uint32,
+  Parameter: ParameterPtr,
+}
+
+type ExternalPtr: {
+  id: text,
 }
 
 @derive(["Debug", "Clone"])
-type ParameterPtr = {
-  function_id = uint32,
-  param_position = uint8
+type ParameterPtr: {
+  function_id: uint32,
+  param_position: uint8
 }
 
 @derive(["Debug", "Clone", "PartialEq", "enum_as_inner::EnumAsInner"])
-type Literal = enum {
-  bool = bool,
-  int8 = int8,
-  int16 = int16,
-  int32 = int32,
-  int64 = int64,
-  uint8 = uint8,
-  uint16 = uint16,
-  uint32 = uint32,
-  uint64 = uint64,
-  float32 = float32,
-  float64 = float64,
-  text = text,
+type Literal: enum {
+  bool: bool,
+  int8: int8,
+  int16: int16,
+  int32: int32,
+  int64: int64,
+  uint8: uint8,
+  uint16: uint16,
+  uint32: uint32,
+  uint64: uint64,
+  float32: float32,
+  float64: float64,
+  text: text,
 }
 
-type Call = {
-  function = Expr,
-  args = [Expr],
+type Call: {
+  function: Expr,
+  args: [Expr],
 }
 
-type Function = {
-  id = uint32,
-  body = Expr,
+type Function: {
+  id: uint32,
+  body: Expr,
 }
 
-type EnumVariant = {
-  tag = uint64,
-  inner = Expr,
+type EnumVariant: {
+  tag: uint64,
+  inner: Expr,
 }
 
-type EnumEq = {
-  subject = Expr,
-  tag = uint64,
+type EnumEq: {
+  subject: Expr,
+  tag: uint64,
 }
 
-type EnumUnwrap = {
-  subject = Expr,
-  tag = uint64,
+type EnumUnwrap: {
+  subject: Expr,
+  tag: uint64,
 }
 
-type TupleLookup = {
-  base = Expr,
-  position = uint16,
+type TupleLookup: {
+  base: Expr,
+  position: uint16,
 }
 
-type Binding = {
-  id = uint32,
-  expr = Expr,
-  main = Expr,
+type Binding: {
+  id: uint32,
+  expr: Expr,
+  main: Expr,
 }
 
 # Contract: switch is guaranteed to match at least one branch
-type SwitchBranch = {
-  condition = Expr,
-  value = Expr,
+type SwitchBranch: {
+  condition: Expr,
+  value: Expr,
 }
 
-type TyDef = {
-  name = Path,
-  ty = Ty,
+type TyDef: {
+  name: Path,
+  ty: Ty,
 }
 
 @derive(["Debug", "Clone"])
-type Ty = {
-  kind = TyKind,
-  layout = enum { None, Some = TyLayout },
-  name = enum { None, Some = text },
-  variants_recursive = [uint16]
+type Ty: {
+  kind: TyKind,
+  layout: enum { None, Some: TyLayout },
+  name: enum { None, Some: text },
+  variants_recursive: [uint16]
 }
 
 @derive(["Debug", "Clone", "PartialEq", "enum_as_inner::EnumAsInner"])
-type TyKind = enum {
-  Primitive = TyPrimitive,
+type TyKind: enum {
+  Primitive: TyPrimitive,
 
-  Tuple = [TyTupleField],
+  Tuple: [TyTupleField],
 
-  Array = Ty,
+  Array: Ty,
 
-  Enum = [TyEnumVariant],
+  Enum: [TyEnumVariant],
 
-  Function = TyFunction,
+  Function: TyFunction,
 
-  Ident = Path,
+  Ident: Path,
 }
 
 @derive(["Debug", "Clone", "Copy", "PartialEq", "Eq", "Hash"])
-type TyPrimitive = enum {
+type TyPrimitive: enum {
   bool,
   int8,
   int16,
@@ -144,38 +144,38 @@ type TyPrimitive = enum {
 }
 
 @derive(["Debug", "Clone", "PartialEq"])
-type TyTupleField = {
-  name = enum { None, Some = text},
-  ty = Ty,
+type TyTupleField: {
+  name: enum { None, Some: text},
+  ty: Ty,
 }
 
 @derive(["Debug", "Clone", "PartialEq"])
-type TyEnumVariant = {
-  name = text,
-  ty = Ty,
+type TyEnumVariant: {
+  name: text,
+  ty: Ty,
 }
 
 @derive(["Debug", "Clone", "PartialEq", "Default"])
-type TyLayout = {
-  head_size = uint32,
-  body_ptrs = [uint32],
+type TyLayout: {
+  head_size: uint32,
+  body_ptrs: [uint32],
 }
 
 @derive(["Debug", "Clone", "PartialEq"])
-type TyFunction = {
-  params = [Ty],
-  body = Ty
+type TyFunction: {
+  params: [Ty],
+  body: Ty
 }
 
 @derive(["Debug", "Clone", "PartialEq", "Eq", "PartialOrd", "Ord", "Hash"])
-type Path = [text]
+type Path: [text]
 
-type Module = {
-  decls = [{name = text, decl = Decl}],
+type Module: {
+  decls: [{name: text, decl: Decl}],
 }
 
-type Decl = enum {
-    Module = Module,
-    Type = Ty,
-    Var = Ty,
+type Decl: enum {
+    Module: Module,
+    Type: Ty,
+    Var: Ty,
 }

@@ -669,7 +669,7 @@ fn json_pack_05() {
 #[test]
 fn match_04() {
     insta::assert_snapshot!(_run_sql_output(r#"
-    type Animal = enum {
+    type Animal: enum {
       Cat: text,
       Dog: enum {Generic, Collie: text},
     }

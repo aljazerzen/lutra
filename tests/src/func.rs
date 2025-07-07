@@ -1266,7 +1266,7 @@ test_case!(
 test_case!(
     enum_construction_00,
     r#"
-    type Status = enum {Done, Pending: int64, Cancelled: text}
+    type Status: enum {Done, Pending: int64, Cancelled: text}
     func () -> Status::Done
     "#,
     r#"Done"#
@@ -1275,7 +1275,7 @@ test_case!(
 test_case!(
     enum_construction_01,
     r#"
-    type Status = enum {Done, Pending: int64, Cancelled: text}
+    type Status: enum {Done, Pending: int64, Cancelled: text}
     func () -> Status::Pending(513)
     "#,
     r#"Pending(
@@ -1286,7 +1286,7 @@ test_case!(
 test_case!(
     enum_construction_02,
     r#"
-    type Status = enum {Done, Pending: int64, Cancelled: text}
+    type Status: enum {Done, Pending: int64, Cancelled: text}
     func () -> Status::Cancelled("I don't like it")
     "#,
     r#"Cancelled(
@@ -1297,7 +1297,7 @@ test_case!(
 test_case!(
     enum_construction_03,
     r#"
-    type Color = enum {Red, Green: bool, Blue: bool}
+    type Color: enum {Red, Green: bool, Blue: bool}
     func () -> Color::Red
     "#,
     r#"Red"#
@@ -1306,7 +1306,7 @@ test_case!(
 test_case!(
     enum_construction_04,
     r#"
-    type Color = enum {Red, Green: int16, Blue: bool}
+    type Color: enum {Red, Green: int16, Blue: bool}
     func () -> Color::Green(12312)
     "#,
     r#"Green(
@@ -1317,7 +1317,7 @@ test_case!(
 test_case!(
     enum_construction_05,
     r#"
-    type Color = enum {Red, Green: bool, Blue: bool}
+    type Color: enum {Red, Green: bool, Blue: bool}
     func () -> Color::Blue(false)
     "#,
     r#"Blue(
@@ -1328,7 +1328,7 @@ test_case!(
 test_case!(
     enum_construction_06,
     r#"
-    type Item = {
+    type Item: {
       id: int64,
       color: enum {Red, Green: bool, Blue: bool},
     }
@@ -1342,7 +1342,7 @@ test_case!(
 test_case!(
     enum_construction_07,
     r#"
-    type X = {
+    type X: {
       a: int,
       b: {c: bool, d: text},
     }
@@ -1357,7 +1357,7 @@ test_case!(
 test_case!(
     enum_construction_08,
     r#"
-    type Animal = enum {
+    type Animal: enum {
         Cat: text,
         Dog: enum {Generic, Collie: text},
     }
@@ -1385,7 +1385,7 @@ test_case!(
 test_case!(
     enum_construction_09,
     r#"
-    type Status = enum {
+    type Status: enum {
       Open: int16,
       Closed: bool,
     }
@@ -1406,7 +1406,7 @@ test_case!(
 test_case!(
     match_00,
     r#"
-    type Status = enum {Done, Pending: int64, Cancelled: text}
+    type Status: enum {Done, Pending: int64, Cancelled: text}
     func () -> match Status::Pending(4) {
         .Done => "done",
         .Pending => "pending",
@@ -1419,7 +1419,7 @@ test_case!(
 test_case!(
     match_01,
     r#"
-    type Status = enum {Done, Pending: int32, Cancelled: text}
+    type Status: enum {Done, Pending: int32, Cancelled: text}
     func (): int32 -> match Status::Pending(4) {
         .Done => 0,
         .Pending(x) => x,
@@ -1432,7 +1432,7 @@ test_case!(
 test_case!(
     match_02,
     r#"
-    type Animal = enum {
+    type Animal: enum {
         Cat: text,
         Dog: enum {Generic, Collie: text},
     }
@@ -1452,7 +1452,7 @@ test_case!(
 test_case!(
     match_03,
     r#"
-    type Animal = enum {
+    type Animal: enum {
         Cat: text,
         Dog: text,
     }
@@ -1479,7 +1479,7 @@ test_case!(
 test_case!(
     match_04,
     r#"
-    type Animal = enum {
+    type Animal: enum {
         Cat: text,
         Dog: enum {Generic, Collie: text},
     }
@@ -1552,7 +1552,7 @@ test_case!(
     complex_01,
     r#"
     module chinook {
-      type album = {id: int64, title: text}
+      type album: {id: int64, title: text}
 
       let get_albums = func (): [album] -> [
         {id = 3, title = "Hello world!"},
@@ -1567,7 +1567,7 @@ test_case!(
     }
 
     module box_office {
-      type album_sale = {id: int64, total: float}
+      type album_sale: {id: int64, total: float}
 
       let get_album_sales = func (): [album_sale] -> [
         {id = 3, total = 3.6},
@@ -1616,7 +1616,7 @@ test_case!(
     complex_02,
     r#"
     module chinook {
-      type album = {id: int, title: text}
+      type album: {id: int, title: text}
 
       let get_album = func (): album -> (
         {id = 3, title = "Hello world!"}
@@ -1643,7 +1643,7 @@ test_case!(
     complex_03,
     r#"
     module chinook {
-      type album = {id: int64, title: text}
+      type album: {id: int64, title: text}
 
       let get_albums = func (): [album] -> [
         {id = 3, title = "Hello world!"},
@@ -1675,8 +1675,8 @@ test_case!(
     complex_04,
     r#"
     module chinook {
-      type album = {title: text, genre_id: int}
-      type genre = {id: int, name: text}
+      type album: {title: text, genre_id: int}
+      type genre: {id: int, name: text}
 
       let get_genres = func (): [genre] -> [
         {id = 1, name = "Rock"},
@@ -1804,7 +1804,7 @@ test_case!(
 test_case!(
     default_06,
     r#"
-    type Status = enum {
+    type Status: enum {
       Open: int16,
       Closed: bool,
     }
@@ -1892,7 +1892,7 @@ test_case!(
 test_case!(
     default_16,
     r#"
-    type Status = enum {
+    type Status: enum {
       Open: int64,
       Closed: bool,
     }
@@ -1912,7 +1912,7 @@ test_case!(
 test_case!(
     or_else_00,
     r#"
-    type OptText = enum {
+    type OptText: enum {
       None,
       Some: text
     }
@@ -1925,7 +1925,7 @@ test_case!(
 test_case!(
     or_else_01,
     r#"
-    type OptText = enum {
+    type OptText: enum {
       None,
       Some: text
     }
@@ -1937,7 +1937,7 @@ test_case!(
 test_case!(
     or_else_02,
     r#"
-    type OptText = enum {
+    type OptText: enum {
       None,
       Some: text
     }

@@ -153,7 +153,7 @@ fn types_10() {
 #[test]
 fn types_11() {
     insta::assert_snapshot!(_test_ty(r#"
-        type album_sale = {id: int, total: float}
+        type album_sale: {id: int, total: float}
         let get_album_sales: func (): [album_sale]
 
         let filter: func <T> (array: [T], condition: func (T): bool): [T]
@@ -547,7 +547,7 @@ fn enums_00() {
     insta::assert_snapshot!(
         _test_ty(
             "
-            type Status = enum { Open, Done, Pending: text }
+            type Status: enum { Open, Done, Pending: text }
 
             let main = func () -> Status::Done
             "
@@ -561,7 +561,7 @@ fn enums_01() {
     insta::assert_snapshot!(
         _test_ty(
             r#"
-            type Status = enum { Open, Done, Pending: text }
+            type Status: enum { Open, Done, Pending: text }
 
             let main = func () -> Status::Pending("hello")
             "#
@@ -574,7 +574,7 @@ fn enums_02() {
     insta::assert_snapshot!(
         _test_ty(
             r#"
-            type X = { a: int64 }
+            type X: { a: int64 }
 
             let main = func (): X::a -> 5
             "#
@@ -587,16 +587,16 @@ fn enums_03() {
     insta::assert_snapshot!(
         _test_err(
             r#"
-            type X = { a: int, b: X::a }
+            type X: { a: int, b: X::a }
             "#
         ),
         @r"
     Error:
-       ╭─[:2:35]
+       ╭─[:2:34]
        │
-     2 │             type X = { a: int, b: X::a }
-       │                                   ──┬─
-       │                                     ╰─── paths into self type are not allowed
+     2 │             type X: { a: int, b: X::a }
+       │                                  ──┬─
+       │                                    ╰─── paths into self type are not allowed
     ───╯
     "
     );
@@ -611,9 +611,9 @@ fn recursive_00() {
     insta::assert_snapshot!(
         _test_err(
             r#"
-            type Tree = {left: Tree, right: Tree}
+            type Tree: {left: Tree, right: Tree}
 
-            type OptionalTree = enum {
+            type OptionalTree: enum {
                 None,
                 Some = Tree,
             }
@@ -629,7 +629,7 @@ fn recursive_00() {
 #[test]
 fn match_00() {
     insta::assert_snapshot!(_test_ty(r#"
-        type Status = enum {Done, Pending: int16, Cancelled: text}
+        type Status: enum {Done, Pending: int16, Cancelled: text}
 
         let main = func () -> match Status::Done {
           .Done => "done",
@@ -643,7 +643,7 @@ fn match_00() {
 #[ignore] // TODO
 fn match_01() {
     insta::assert_snapshot!(_test_err(r#"
-        type Status = enum {Done, Pending: int16, Cancelled: text}
+        type Status: enum {Done, Pending: int16, Cancelled: text}
 
         let main = func () -> match Status::Done {
           .Done => "done",
@@ -657,8 +657,8 @@ fn match_01() {
 #[test]
 fn match_02() {
     insta::assert_snapshot!(_test_err(r#"
-        type Status = enum {Done, Pending: int16, Cancelled: text}
-        type Color = enum {Red, Green, Blue}
+        type Status: enum {Done, Pending: int16, Cancelled: text}
+        type Color: enum {Red, Green, Blue}
 
         let main = func () -> match Status::Done {
           .Red => "red",
@@ -679,7 +679,7 @@ fn match_02() {
 #[test]
 fn match_03() {
     insta::assert_snapshot!(_test_err(r#"
-        type Color = enum {Red, Green, Blue}
+        type Color: enum {Red, Green, Blue}
 
         let main = func () -> match Color::Green {
           .Red => "red",
@@ -700,7 +700,7 @@ fn match_03() {
 #[test]
 fn match_04() {
     insta::assert_snapshot!(_test_ty(r#"
-        type Status = enum {Pending: bool}
+        type Status: enum {Pending: bool}
 
         let main = func () -> match Status::Pending(false) {
           .Pending(x) => x,
@@ -711,7 +711,7 @@ fn match_04() {
 #[test]
 fn match_05() {
     insta::assert_snapshot!(_test_ty(r#"
-        type Status = enum {Pending: int32}
+        type Status: enum {Pending: int32}
 
         let main = func () -> match Status::Pending(4) {
           .Pending(x) => x,

@@ -1,34 +1,34 @@
-type ClientMessage = enum {
+type ClientMessage: enum {
     Prepare: Prepare,
     Execute: Execute,
     Release: Release,
 }
 
-type ServerMessage = enum {
+type ServerMessage: enum {
     Response: Response,
 }
 
-type Prepare = {
+type Prepare: {
     program_id: uint32,
     program: [uint8],
 }
 
-type Execute = {
+type Execute: {
     program_id: uint32,
     inputs: [[uint8]],
     request_id: uint32,
 }
 
-type Release = {
+type Release: {
     program_id: uint32,
 }
 
-type Response = {
+type Response: {
     request_id: uint32,
     result: Result,
 }
 
-type Result = enum {
+type Result: enum {
     Ok: [uint8],
     Err: Error,
 }
@@ -37,4 +37,4 @@ type Result = enum {
 ## - invalid program,
 ## - invalid inputs,
 ## - invalid responses from native functions.
-type Error = {}
+type Error: {}
