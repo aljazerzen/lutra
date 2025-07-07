@@ -1,6 +1,6 @@
 use std::{borrow::Cow, collections::HashMap};
 
-use crate::sql::cr::{self, Expr};
+use crate::sql::cr;
 use crate::sql::utils::RelCols;
 use crate::utils::IdGenerator;
 use lutra_bin::ir;
@@ -70,9 +70,9 @@ impl<'a> Context<'a> {
         col_position: usize,
         col_ty: ir::Ty,
     ) -> cr::Expr {
-        Expr {
+        cr::Expr {
             kind: cr::ExprKind::Transform(
-                self.new_binding(Expr::new_rel_ref(rel)),
+                self.new_binding(cr::Expr::new_rel_ref(rel)),
                 cr::Transform::ProjectRetain(vec![col_position]),
             ),
             ty: col_ty,
@@ -345,7 +345,7 @@ impl<'a> Context<'a> {
                 );
 
                 if unpack {
-                    rel = cr::ExprKind::From(cr::From::JsonUnpack(Box::new(Expr {
+                    rel = cr::ExprKind::From(cr::From::JsonUnpack(Box::new(cr::Expr {
                         kind: rel,
                         ty: ir::Ty::new(ir::TyPrimitive::text),
                     })));
@@ -395,7 +395,7 @@ impl<'a> Context<'a> {
         }
     }
 
-    fn row_or_join(&mut self, mut row: Vec<Expr>, expr: ColumnsOrUnpack) -> cr::ExprKind {
+    fn row_or_join(&mut self, mut row: Vec<cr::Expr>, expr: ColumnsOrUnpack) -> cr::ExprKind {
         match expr {
             ColumnsOrUnpack::Columns(cols) => {
                 row.extend(cols);
@@ -456,10 +456,9 @@ impl<'a> Context<'a> {
                 let length_clamped =
                     new_bin_op(length, "std::greatest", new_int(0), ir::TyPrimitive::int64);
 
-                let rel_offset = cr::Expr::new_transform_preserve_ty(
-                    array,
+                let rel_offset = cr::Expr::new_iso_transform(
+                    self.new_binding(array),
                     cr::Transform::Offset(Box::new(start_clamped)),
-                    self.scope_id_gen.next(),
                 );
 
                 cr::ExprKind::Transform(
@@ -471,16 +470,14 @@ impl<'a> Context<'a> {
                 let array = self.compile_rel(&call.args[0]);
                 let index = self.compile_column(&call.args[1]);
 
-                let rel_offset = cr::Expr::new_transform_preserve_ty(
-                    array,
+                let rel_offset = cr::Expr::new_iso_transform(
+                    self.new_binding(array),
                     cr::Transform::Offset(Box::new(index)),
-                    self.scope_id_gen.next(),
                 );
 
-                let rel_limit = cr::Expr::new_transform_preserve_ty(
-                    rel_offset,
+                let rel_limit = cr::Expr::new_iso_transform(
+                    self.new_binding(rel_offset),
                     cr::Transform::Limit(Box::new(new_int(1))),
-                    self.scope_id_gen.next(),
                 );
 
                 // drop index column
@@ -507,7 +504,7 @@ impl<'a> Context<'a> {
                 );
 
                 if item_ty.kind.is_array() {
-                    item_ref = cr::ExprKind::From(cr::From::JsonUnpack(Box::new(Expr {
+                    item_ref = cr::ExprKind::From(cr::From::JsonUnpack(Box::new(cr::Expr {
                         kind: item_ref,
                         ty: ir::Ty::new(ir::TyPrimitive::text),
                     })));
@@ -545,7 +542,7 @@ impl<'a> Context<'a> {
                 );
 
                 if item_ty.kind.is_array() {
-                    item_ref = cr::ExprKind::From(cr::From::JsonUnpack(Box::new(Expr {
+                    item_ref = cr::ExprKind::From(cr::From::JsonUnpack(Box::new(cr::Expr {
                         kind: item_ref,
                         ty: ir::Ty::new(ir::TyPrimitive::text),
                     })));
@@ -557,9 +554,9 @@ impl<'a> Context<'a> {
 
                 let mapped_items = self.new_binding(mapped_items);
 
-                let mapped_items_ref = self.new_binding(Expr::new_rel_ref(&mapped_items));
+                let mapped_items_ref = self.new_binding(cr::Expr::new_rel_ref(&mapped_items));
                 // remove unneeded index of mapped_items
-                let mapped_items_ref = self.to_column_list(Expr {
+                let mapped_items_ref = self.to_column_list(cr::Expr {
                     kind: cr::ExprKind::Transform(
                         mapped_items_ref,
                         cr::Transform::ProjectDiscard(vec![0]),
@@ -572,7 +569,7 @@ impl<'a> Context<'a> {
                     Box::new(cr::Expr {
                         kind: cr::ExprKind::BindCorrelated(
                             mapped_items,
-                            Box::new(Expr {
+                            Box::new(cr::Expr {
                                 kind: self.row_or_join(output_row, mapped_items_ref),
                                 ty: expr.ty.clone(),
                             }),
@@ -614,7 +611,7 @@ impl<'a> Context<'a> {
                 let key = self.compile_column(&func.body);
                 self.functions.remove(&func.id);
 
-                cr::ExprKind::Transform(array, cr::Transform::OrderBy(Box::new(key)))
+                cr::ExprKind::Transform(array, cr::Transform::IndexBy(Some(Box::new(key))))
             }
 
             // aggregation functions
@@ -702,7 +699,7 @@ impl<'a> Context<'a> {
                 // construct correlated subqueries
                 let field0 = {
                     let input = self.new_rel_col(&tuple, 0, ir::Ty::new(ir::TyPrimitive::text));
-                    Expr {
+                    cr::Expr {
                         ty: ty_in_fields[0].ty.clone(),
                         kind: cr::ExprKind::From(cr::From::JsonUnpack(Box::new(input))),
                     }
@@ -710,7 +707,7 @@ impl<'a> Context<'a> {
                 let field0 = self.new_binding(field0);
                 let field1 = {
                     let input = self.new_rel_col(&tuple, 1, ir::Ty::new(ir::TyPrimitive::text));
-                    Expr {
+                    cr::Expr {
                         ty: ty_in_fields[1].ty.clone(),
                         kind: cr::ExprKind::From(cr::From::JsonUnpack(Box::new(input))),
                     }
@@ -774,6 +771,26 @@ impl<'a> Context<'a> {
                 cr::ExprKind::Transform(array, cr::Transform::Group(key))
             }
 
+            "std::append" => {
+                // compute each rel and apply order to it
+                let first = self.compile_rel(&call.args[0]);
+                let first =
+                    cr::Expr::new_iso_transform(self.new_binding(first), cr::Transform::Order);
+
+                let second = self.compile_rel(&call.args[1]);
+                let second =
+                    cr::Expr::new_iso_transform(self.new_binding(second), cr::Transform::Order);
+
+                // union
+                let union = self.new_binding(cr::Expr {
+                    kind: cr::ExprKind::Union(vec![first, second]),
+                    ty: expr.ty.clone(),
+                });
+
+                // reindex
+                cr::ExprKind::Transform(union, cr::Transform::IndexBy(None))
+            }
+
             _ => {
                 let expr = self.compile_expr_std(expr);
                 cr::ExprKind::From(cr::From::Row(vec![expr]))
@@ -805,7 +822,7 @@ impl<'a> Context<'a> {
         self.to_column_list(rel)
     }
 
-    fn to_column_list(&self, rel: Expr) -> ColumnsOrUnpack {
+    fn to_column_list(&self, rel: cr::Expr) -> ColumnsOrUnpack {
         let ty_mat = self.get_ty_mat(&rel.ty);
 
         match rel.kind {

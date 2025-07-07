@@ -43,6 +43,7 @@ pub mod std {
                 "to_columnar" => &Self::to_columnar,
                 "from_columnar" => &Self::from_columnar,
                 "group" => &Self::group,
+                "append" => &Self::append,
 
                 "min" => &Self::min,
                 "max" => &Self::max,
@@ -538,6 +539,31 @@ pub mod std {
                 tuple.write_field(partition.finish());
 
                 output.write_item(tuple.finish());
+            }
+            Ok(Cell::Data(output.finish()))
+        }
+
+        pub fn append(
+            _it: &mut Interpreter,
+            layout_args: &[u32],
+            args: Vec<Cell>,
+        ) -> Result<Cell, EvalError> {
+            let mut layout_args = LayoutArgsReader::new(layout_args);
+            let input_head_bytes = layout_args.next_u32();
+            let input_body_ptrs = layout_args.next_slice();
+
+            let [first, second] = assume::exactly_n(args);
+
+            let mut output = ArrayWriter::new(input_head_bytes, input_body_ptrs);
+
+            let first = ArrayReader::new(assume::into_data(first), input_head_bytes as usize);
+            for item in first {
+                output.write_item(item);
+            }
+
+            let second = ArrayReader::new(assume::into_data(second), input_head_bytes as usize);
+            for item in second {
+                output.write_item(item);
             }
             Ok(Cell::Data(output.finish()))
         }

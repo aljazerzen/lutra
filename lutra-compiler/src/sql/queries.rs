@@ -433,13 +433,17 @@ impl<'a> Context<'a> {
 
                 scoped.rel_vars.extend(offset.rel_vars);
             }
-            cr::Transform::OrderBy(key) => {
+            cr::Transform::IndexBy(key) => {
                 // wrap into a new query
                 scoped = self.wrap_scoped(scoped, input_ty);
 
                 // overwrite array index
                 let select = self.scoped_as_mut_select(&mut scoped, input_ty);
-                let key = self.compile_column(key);
+                let key = if let Some(key) = key {
+                    self.compile_column(key)
+                } else {
+                    Scoped::from(ExprOrSource::Source("(ROW_NUMBER() OVER ())::int4".into()))
+                };
                 select.projection[0] = sql_ast::SelectItem::ExprWithAlias {
                     expr: key.expr.into_expr(),
                     alias: sql_ast::Ident::new(COL_ARRAY_INDEX),
@@ -451,6 +455,19 @@ impl<'a> Context<'a> {
                         .map(utils::lateral)
                         .map(utils::from),
                 );
+            }
+            cr::Transform::Order => {
+                let must_wrap = scoped.as_query().is_none();
+                if must_wrap {
+                    scoped = self.wrap_scoped(scoped, input_ty);
+                }
+
+                // overwrite ORDER BY
+                let query = scoped.as_mut_query().unwrap();
+                query.order_by = Some(utils::order_by_one(utils::ident(
+                    None::<&str>,
+                    COL_ARRAY_INDEX,
+                )));
             }
 
             cr::Transform::Group(key) => {

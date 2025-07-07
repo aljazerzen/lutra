@@ -144,7 +144,10 @@ let group: func <I, K> (
   key: func (I): K,
 ): [{key: K, values: [I]}]
 
-let append: func <T> (top: [T], bottom: [T]): [T]
+let append: func <T> (
+    top: [T],
+    bottom: [T],
+): [T]
 
 # Aggregation functions
 

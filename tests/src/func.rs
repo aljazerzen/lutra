@@ -958,6 +958,37 @@ test_case!(
   },
 ]"#
 );
+test_case!(
+    std_append_00,
+    r#"func (): [int64] -> std::append(
+      [1, 2, 3],
+      [4, 5],
+    )
+"#,
+    r#"[
+  1,
+  2,
+  3,
+  4,
+  5,
+]"#
+);
+
+test_case!(
+    std_append_01,
+    r#"func () -> std::append(
+      ["He", "ll", "o"],
+      ["Wo", "rld!"],
+    )
+"#,
+    r#"[
+  "He",
+  "ll",
+  "o",
+  "Wo",
+  "rld!",
+]"#
+);
 
 test_case!(std_min_00, r#"std::min([5,3,65,3,2,56,67])"#, "2");
 

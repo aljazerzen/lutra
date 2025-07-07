@@ -248,7 +248,7 @@ impl ByteCoder {
                 ]
             }
 
-            "std::filter" | "std::slice" | "std::sort" => {
+            "std::filter" | "std::slice" | "std::sort" | "std::append" => {
                 let item_layout = as_layout_of_param_array(ty_mat);
 
                 let mut r = Vec::with_capacity(1 + 1 + item_layout.body_ptrs.len());

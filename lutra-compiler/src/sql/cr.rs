@@ -90,8 +90,13 @@ pub enum Transform {
     /// Filtering (also known as selection)
     Where(Box<Expr>),
 
-    /// Sorting of rows
-    OrderBy(Box<Expr>),
+    /// Replaces first column (which is index for array ty).
+    /// None implies to use the current order of rows in relation
+    /// (which is implemented by ROW_NUMBER())
+    IndexBy(Option<Box<Expr>>),
+
+    /// Applies the order from index column to rows of relation.
+    Order,
 
     /// Groups rows into partitions by a given key
     Group(Vec<Expr>),
@@ -115,10 +120,11 @@ impl std::fmt::Debug for BoundExpr {
 }
 
 impl Expr {
-    pub fn new_transform_preserve_ty(input: Expr, transform: Transform, id: usize) -> Self {
+    /// Helper for creating transforms that do not modify type of the expr
+    pub fn new_iso_transform(rel: Box<BoundExpr>, transform: Transform) -> Self {
         Expr {
-            ty: input.ty.clone(),
-            kind: ExprKind::Transform(Box::new(BoundExpr { rel: input, id }), transform),
+            ty: rel.rel.ty.clone(),
+            kind: ExprKind::Transform(rel, transform),
         }
     }
 
