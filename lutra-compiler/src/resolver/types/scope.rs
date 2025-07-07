@@ -162,11 +162,14 @@ impl Scope {
     pub fn insert_type_var(
         &mut self,
         name_hint: Option<String>,
-        span: Option<Span>,
+        span: Span,
         domain: pr::TyParamDomain,
     ) {
         let var_id = self.names.len();
-        let type_arg = TyVar { name_hint, span };
+        let type_arg = TyVar {
+            name_hint,
+            span: Some(span),
+        };
 
         self.names.push(ScopedKind::TyVar(type_arg));
         self.ty_var_constraints
@@ -317,11 +320,7 @@ impl TypeResolver<'_> {
     }
 
     /// Add type's params into scope as type variables.
-    pub fn introduce_ty_into_scope(
-        &mut self,
-        ty: pr::Ty,
-        span: Option<Span>,
-    ) -> (pr::Ty, Vec<pr::Ty>) {
+    pub fn introduce_ty_into_scope(&mut self, ty: pr::Ty, span: Span) -> (pr::Ty, Vec<pr::Ty>) {
         let pr::TyKind::Func(mut ty_func) = ty.kind else {
             return (ty, Vec::new());
         };
@@ -376,7 +375,7 @@ impl TypeResolver<'_> {
         (utils::TypeReplacer::on_ty(ty, mapping), ty_args)
     }
 
-    pub fn introduce_ty_var(&mut self, domain: pr::TyParamDomain, span: Option<Span>) -> pr::Ty {
+    pub fn introduce_ty_var(&mut self, domain: pr::TyParamDomain, span: Span) -> pr::Ty {
         let scope = self.get_ty_var_scope_mut();
 
         let mut ty_arg = pr::Ty::new(pr::TyKind::Ident(pr::Path::from_name("_")));

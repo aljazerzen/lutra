@@ -1,6 +1,6 @@
 use crate::diagnostic::Diagnostic;
 use crate::pr::{self, Ty};
-use crate::{Result, printer};
+use crate::{Result, Span, printer};
 
 use super::scope;
 
@@ -13,6 +13,7 @@ impl super::TypeResolver<'_> {
         &mut self,
         base: &Ty,
         indirection: &pr::IndirectionKind,
+        span: Span,
     ) -> Result<Indirection> {
         let base_ref = self.get_ty_mat(base)?;
 
@@ -32,7 +33,7 @@ impl super::TypeResolver<'_> {
             }
             scope::TyRef::Var(_, o) => {
                 // introduce a new type var for the field
-                let field_ty = self.introduce_ty_var(pr::TyParamDomain::Open, None);
+                let field_ty = self.introduce_ty_var(pr::TyParamDomain::Open, span);
 
                 // restrict existing ty var to tuples with this field
                 let domain = pr::TyParamDomain::TupleFields(vec![pr::TyDomainTupleField {

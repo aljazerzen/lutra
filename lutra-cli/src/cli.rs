@@ -111,11 +111,11 @@ pub fn check(cmd: CheckCommand) -> anyhow::Result<()> {
         println!("---------------------");
     }
 
-    if cmd.print_ir {
-        let expr = lutra_compiler::compile_overlay(&project, &cmd.program, Some("--program"))?;
-        let program = lutra_compiler::lower_expr(&project.root_module, &expr);
-        let program = lutra_compiler::layouter::on_program(program);
+    let expr = lutra_compiler::compile_overlay(&project, &cmd.program, Some("--program"))?;
+    let program = lutra_compiler::lower_expr(&project.root_module, &expr);
+    let program = lutra_compiler::layouter::on_program(program);
 
+    if cmd.print_ir {
         let program_source = lutra_bin::ir::print(&program);
         println!("------ IR ------");
         println!("{program_source}");

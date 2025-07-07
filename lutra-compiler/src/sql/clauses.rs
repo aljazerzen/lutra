@@ -493,8 +493,7 @@ impl<'a> Context<'a> {
                 let func = &call.args[1];
 
                 // index
-                let mut row = Vec::with_capacity(1);
-                row.push(self.new_rel_col(&array, 0, ir::Ty::new(ir::TyPrimitive::int64)));
+                let row = vec![self.new_rel_col(&array, 0, ir::Ty::new(ir::TyPrimitive::int64))];
 
                 // compile func body
                 let func = func.kind.as_function().unwrap();
@@ -511,13 +510,15 @@ impl<'a> Context<'a> {
                 }
 
                 self.functions.insert(func.id, FuncProvider::Expr(item_ref));
-                row.extend(self.compile_column_list(&func.body).unwrap_columns());
+                let mapped_item = self.compile_column_list(&func.body);
                 self.functions.remove(&func.id);
+
+                let item = self.row_or_join(row, mapped_item);
 
                 cr::ExprKind::BindCorrelated(
                     array,
                     Box::new(cr::Expr {
-                        kind: cr::ExprKind::From(cr::From::Row(row)),
+                        kind: item,
                         ty: expr.ty.clone(),
                     }),
                 )
@@ -845,7 +846,16 @@ impl<'a> Context<'a> {
 
                         ColumnsOrUnpack::Unpack(rel)
                     }
-                    _ => todo!(),
+                    ir::TyKind::Enum(_) => {
+                        let is_single_col = self.rel_cols_ty_nested(ty_mat).nth(1).is_some();
+                        if is_single_col {
+                            ColumnsOrUnpack::Columns(vec![rel])
+                        } else {
+                            ColumnsOrUnpack::Unpack(rel)
+                        }
+                    }
+                    ir::TyKind::Function(_) => unreachable!(),
+                    ir::TyKind::Ident(_) => unreachable!(),
                 }
             }
         }

@@ -63,7 +63,7 @@ impl fold::PrFold for super::TypeResolver<'_> {
                         return Ok(r);
                     }
                 };
-                let (ty, ty_args) = self.introduce_ty_into_scope(ty, span);
+                let (ty, ty_args) = self.introduce_ty_into_scope(ty, span.unwrap());
                 pr::Expr {
                     kind: pr::ExprKind::Ident(ident),
                     ty: Some(ty),
@@ -76,7 +76,9 @@ impl fold::PrFold for super::TypeResolver<'_> {
                 let base = self.fold_expr(*base)?;
                 let base_ty = base.ty.as_ref().unwrap();
 
-                let indirection = self.resolve_indirection(base_ty, &field).with_span(span)?;
+                let indirection = self
+                    .resolve_indirection(base_ty, &field, span.unwrap())
+                    .with_span(span)?;
                 match indirection.base {
                     BaseKind::Tuple => {
                         let kind = pr::ExprKind::Indirection {
@@ -96,13 +98,15 @@ impl fold::PrFold for super::TypeResolver<'_> {
                     BaseKind::Array => {
                         let std_index = pr::Path::new(vec!["std", "index"]);
                         let mut std_index_expr = pr::Expr::new(std_index.clone());
+                        std_index_expr.span = span;
                         std_index_expr.target = Some(pr::Ref::FullyQualified {
                             to_decl: std_index,
                             within: pr::Path::empty(),
                         });
 
                         let position = indirection.position.unwrap();
-                        let position = pr::Expr::new(pr::Literal::Integer(position as i64));
+                        let mut position = pr::Expr::new(pr::Literal::Integer(position as i64));
+                        position.span = span;
 
                         let func = Box::new(self.fold_expr(std_index_expr)?);
 

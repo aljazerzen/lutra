@@ -21,7 +21,7 @@ impl PrFold for Desugarator {
                 return self.desugar_pipeline(p);
             }
             pr::ExprKind::Range(r) => self.desugar_range(r)?,
-            pr::ExprKind::Unary(unary) => self.desugar_unary(unary)?,
+            pr::ExprKind::Unary(unary) => self.desugar_unary(unary, expr.span)?,
             pr::ExprKind::Binary(binary) => self.desugar_binary(binary, expr.span)?,
             pr::ExprKind::FString(items) => self.desugar_f_string(items)?,
             k => fold::fold_expr_kind(self, k)?,
@@ -33,7 +33,7 @@ impl PrFold for Desugarator {
 impl Desugarator {
     /// De-sugars range `a..b` into `{start=a, end=b}`.
     ///
-    /// TODO: Open bounds are mapped into `null`.
+    /// TODO: open bounds should be mapped into `null`.
     fn desugar_range(&mut self, v: pr::Range) -> Result<pr::ExprKind> {
         let start = fold::fold_optional_box(self, v.start)?
             .map(|b| *b)
@@ -92,7 +92,11 @@ impl Desugarator {
     }
 
     /// Desugar unary operators into function calls.
-    fn desugar_unary(&mut self, pr::UnaryExpr { op, expr }: pr::UnaryExpr) -> Result<pr::ExprKind> {
+    fn desugar_unary(
+        &mut self,
+        pr::UnaryExpr { op, expr }: pr::UnaryExpr,
+        span: Option<Span>,
+    ) -> Result<pr::ExprKind> {
         use pr::UnOp::*;
 
         let expr = self.fold_expr(*expr)?;
@@ -102,8 +106,10 @@ impl Desugarator {
             Not => ["std", "not"],
             Pos => return Ok(expr.kind),
         };
+        let mut op_func = pr::Expr::new(pr::Path::new(func_name.to_vec()));
+        op_func.span = span;
         Ok(pr::ExprKind::FuncCall(pr::FuncCall {
-            func: Box::new(pr::Expr::new(pr::Path::new(func_name.to_vec()))),
+            func: Box::new(op_func),
             args: vec![expr],
         }))
     }
@@ -134,7 +140,7 @@ impl Desugarator {
             pr::BinOp::RegexSearch => vec!["std", "regex_search"],
             pr::BinOp::And => vec!["std", "and"],
             pr::BinOp::Or => vec!["std", "or"],
-            pr::BinOp::Coalesce => vec!["std", "coalesce"],
+            pr::BinOp::Coalesce => vec!["std", "or_else"],
         };
 
         // For the power operator, we need to reverse the order, since `math.pow a
@@ -151,7 +157,7 @@ impl Desugarator {
         Ok(new_binop(left, &func_name, right, span).kind)
     }
 
-    /// Desugar f-string into function calls to std::concat
+    /// Desugar f-string into function calls to std::text_ops::concat
     fn desugar_f_string(&mut self, items: Vec<pr::InterpolateItem>) -> Result<pr::ExprKind> {
         let mut items = items.into_iter().map(|item| match item {
             pr::InterpolateItem::String(string) => Expr::new(pr::Literal::Text(string)),

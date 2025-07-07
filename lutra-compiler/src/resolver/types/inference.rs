@@ -30,14 +30,14 @@ impl TypeResolver<'_> {
                         pr::TyPrimitive::uint16,
                         pr::TyPrimitive::uint32,
                         pr::TyPrimitive::uint64,
-                    ]), expr.span));
+                    ]), expr.span.unwrap()));
                 },
             ExprKind::Literal(Literal::Float(_)) => {
                 // similar as integers
                 return Ok(self.introduce_ty_var(pr::TyParamDomain::OneOf(vec![
                     pr::TyPrimitive::float32,
                     pr::TyPrimitive::float64
-                ]), expr.span));
+                ]), expr.span.unwrap()));
             },
             ExprKind::Literal(_) => todo!(),
 
@@ -74,7 +74,7 @@ impl TypeResolver<'_> {
                     t
                 } else {
                     // no items, so we must infer the type
-                    self.introduce_ty_var(pr::TyParamDomain::Open, expr.span)
+                    self.introduce_ty_var(pr::TyParamDomain::Open, expr.span.unwrap())
                 };
                 TyKind::Array(Box::new(items_ty))
             }

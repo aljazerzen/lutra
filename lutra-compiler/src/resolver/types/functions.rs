@@ -37,8 +37,7 @@ impl TypeResolver<'_> {
 
             for param in func.params.iter_mut() {
                 if param.ty.is_none() {
-                    param.ty =
-                        Some(self.introduce_ty_var(pr::TyParamDomain::Open, Some(param.span)));
+                    param.ty = Some(self.introduce_ty_var(pr::TyParamDomain::Open, param.span));
                 }
             }
         }
