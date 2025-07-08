@@ -1002,13 +1002,17 @@ test_case!(std_sum_00, r#"std::sum([5,3,65,3,2,56,67])"#, "201");
 
 test_case!(std_sum_01, r#"std::sum([])"#, "0");
 
-test_case!(std_count_00, r#"std::count([5,3,65,3,2,56,67])"#, "7");
+test_case!(
+    std_count_00,
+    r#"std::count([5: int16,3,65,3,2,56,67])"#,
+    "7"
+);
 
-test_case!(std_count_01, r#"std::count([])"#, "0");
+test_case!(std_count_01, r#"std::count([]: [bool])"#, "0");
 
 test_case!(
     std_average_00,
-    r#"std::average([5,3,65,3,2,56,67])"#,
+    r#"std::average([5: int64,3,65,3,2,56,67])"#,
     "28.714285714285715"
 );
 

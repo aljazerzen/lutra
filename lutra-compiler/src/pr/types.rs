@@ -122,11 +122,20 @@ pub enum TyParamDomain {
 
     /// This param must be a tuple with following fields
     TupleFields(Vec<TyDomainTupleField>),
+
+    /// This param must be an enum with following variants
+    EnumVariants(Vec<TyDomainEnumVariant>),
 }
 
 #[derive(Debug, Clone)]
 pub struct TyDomainTupleField {
     pub location: super::IndirectionKind,
+    pub ty: Ty,
+}
+
+#[derive(Debug, Clone)]
+pub struct TyDomainEnumVariant {
+    pub name: String,
     pub ty: Ty,
 }
 

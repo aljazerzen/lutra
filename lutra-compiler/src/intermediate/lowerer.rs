@@ -417,13 +417,13 @@ impl<'a> Lowerer<'a> {
     ) -> Result<Option<ir::Expr>> {
         match &pattern.kind {
             // match a enum variant
-            pr::PatternKind::Enum(_, inner) => {
-                let tag = pattern.variant_tag.unwrap();
+            pr::PatternKind::Enum(variant_name, inner) => {
+                let tag = get_pattern_enum_eq_tag(subject, pattern, variant_name);
 
                 let mut expr = ir::Expr {
                     kind: ir::ExprKind::EnumEq(Box::new(ir::EnumEq {
                         subject: subject.clone(),
-                        tag: pattern.variant_tag.unwrap() as u64,
+                        tag: tag as u64,
                     })),
                     ty: ir::Ty::new(ir::TyPrimitive::bool),
                 };
@@ -660,8 +660,8 @@ impl<'a> Lowerer<'a> {
                 entries.push(subject_ref);
             }
 
-            pr::PatternKind::Enum(_, inner) => {
-                let tag = pattern.variant_tag.unwrap();
+            pr::PatternKind::Enum(variant_name, inner) => {
+                let tag = get_pattern_enum_eq_tag(&subject_ref, pattern, variant_name);
 
                 if let Some(inner) = inner {
                     let subject_ty = self.get_ty_mat(subject_ref.ty.clone());
@@ -769,6 +769,23 @@ impl<'a> Lowerer<'a> {
         };
 
         ir::Expr { kind, ty }
+    }
+}
+
+fn get_pattern_enum_eq_tag(subject: &ir::Expr, pattern: &pr::Pattern, variant_name: &str) -> usize {
+    if let Some(tag) = pattern.variant_tag {
+        tag
+    } else {
+        // this happens when subject of the pattern is a type var
+        // and we cannot determine the position of the variant until the
+        // concrete type is known. Which is now, after instantiating all type params.
+        let variants = subject.ty.kind.as_enum().unwrap();
+        let (tag, _) = variants
+            .iter()
+            .enumerate()
+            .find(|(_, v)| v.name == variant_name)
+            .unwrap();
+        tag
     }
 }
 

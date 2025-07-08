@@ -90,6 +90,7 @@ impl Printer {
                         match &ty_param.domain {
                             pr::TyParamDomain::Open => {}
                             pr::TyParamDomain::OneOf(tys) => {
+                                r += ": ";
                                 for (i, ty) in tys.iter().enumerate() {
                                     if i > 0 {
                                         r += " | ";
@@ -113,6 +114,20 @@ impl Printer {
                                         }
                                     }
                                     r += &self.print_ty(&field.ty);
+                                }
+                                r += ", ..}";
+                            }
+                            pr::TyParamDomain::EnumVariants(variants) => {
+                                r += ": enum {";
+                                for (i, variant) in variants.iter().enumerate() {
+                                    if i > 0 {
+                                        r += ", ";
+                                    }
+                                    r += &pr::display_ident(&variant.name);
+                                    if variant.ty.kind.as_tuple().is_some_and(|f| f.is_empty()) {
+                                        r += ": ";
+                                        r += &self.print_ty(&variant.ty);
+                                    }
                                 }
                                 r += ", ..}";
                             }

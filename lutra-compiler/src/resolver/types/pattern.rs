@@ -1,4 +1,4 @@
-use crate::diagnostic::Diagnostic;
+use crate::diagnostic::{Diagnostic, WithErrorInfo};
 use crate::{pr, utils};
 
 use crate::Result;
@@ -70,24 +70,53 @@ impl<'a> super::TypeResolver<'a> {
     ) -> Result<pr::Pattern> {
         match pattern.kind {
             pr::PatternKind::Enum(variant_name, inner) => {
-                let TyRef::Ty(subject_ty) = self.get_ty_mat(subject_ty)? else {
-                    todo!();
-                };
-                let pr::TyKind::Enum(variants) = &subject_ty.kind else {
-                    return Err(
-                        Diagnostic::new_custom("expected an enum").with_span(Some(pattern.span))
-                    );
-                };
+                let subject_ty_mat = self.get_ty_mat(subject_ty)?;
 
-                let Some((tag, variant)) = variants
-                    .iter()
-                    .enumerate()
-                    .find(|(_, v)| v.name == variant_name)
-                else {
-                    return Err(Diagnostic::new_custom("variant does not exist")
-                        .with_span(Some(pattern.span)));
+                let (tag, variant_ty) = match &subject_ty_mat {
+                    // this a concrete type
+                    TyRef::Ty(t) => {
+                        // has to be an enum
+                        let pr::TyKind::Enum(variants) = &t.kind else {
+                            return Err(Diagnostic::new_custom("expected an enum")
+                                .with_span(Some(pattern.span)));
+                        };
+
+                        // find variant by name
+                        let (tag, variant) = lookup_variant(variants, &variant_name)
+                            .with_span(Some(pattern.span))?;
+
+                        (Some(tag), variant.ty.clone())
+                    }
+
+                    // invalid, we don't support syntax for enums param domains
+                    TyRef::Param(_) => {
+                        return Err(Diagnostic::new_custom("expected an enum")
+                            .push_hint("found type parameter, which might not be an enum")
+                            .with_span(Some(pattern.span)));
+                    }
+
+                    // we must infer that this var is an enum with this variant
+                    TyRef::Var(_, id) => {
+                        let variant_ty = if inner.is_some() {
+                            // introduce a new type var for the type of this variant
+                            self.introduce_ty_var(pr::TyParamDomain::Open, pattern.span)
+                        } else {
+                            // there is no inner pattern, it must be a unit type
+                            pr::Ty::new(pr::TyKind::Tuple(vec![]))
+                        };
+
+                        // restrict existing ty var
+                        let restriction =
+                            pr::TyParamDomain::EnumVariants(vec![pr::TyDomainEnumVariant {
+                                name: variant_name.clone(),
+                                ty: variant_ty.clone(),
+                            }]);
+                        let scope = self.get_ty_var_scope();
+                        scope.infer_type_var_in_domain(*id, restriction);
+
+                        (None, variant_ty)
+                    }
                 };
-                let variant_ty = variant.ty.clone();
 
                 // inner
                 let inner = if let Some(inner) = inner {
@@ -99,7 +128,7 @@ impl<'a> super::TypeResolver<'a> {
 
                 Ok(pr::Pattern {
                     kind: pr::PatternKind::Enum(variant_name, inner),
-                    variant_tag: Some(tag),
+                    variant_tag: tag,
                     ..pattern
                 })
             }
@@ -112,4 +141,26 @@ impl<'a> super::TypeResolver<'a> {
             }
         }
     }
+}
+
+pub fn lookup_variant<'a>(
+    variants: &'a [pr::TyEnumVariant],
+    variant_name: &str,
+) -> Result<(usize, &'a pr::TyEnumVariant), Diagnostic> {
+    variants
+        .iter()
+        .enumerate()
+        .find(|(_, v)| v.name == variant_name)
+        .ok_or_else(|| Diagnostic::new_custom("variant does not exist"))
+}
+
+pub fn lookup_variant_in_domain<'a>(
+    variants: &'a [pr::TyDomainEnumVariant],
+    variant_name: &str,
+) -> Result<(usize, &'a pr::TyDomainEnumVariant), Diagnostic> {
+    variants
+        .iter()
+        .enumerate()
+        .find(|(_, v)| v.name == variant_name)
+        .ok_or_else(|| Diagnostic::new_custom("variant does not exist"))
 }

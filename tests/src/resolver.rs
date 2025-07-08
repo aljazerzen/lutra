@@ -395,6 +395,24 @@ fn types_19() {
 }
 
 #[test]
+fn types_20() {
+    // matching patterns into type vars
+
+    insta::assert_snapshot!(_test_ty(r#"
+        type Status: enum {Done, Pending: int16, Cancelled: text}
+
+        func () -> (
+          Status::Done
+          | func (x) -> match x {
+            .Done => "done",
+            .Cancelled(reason) => f"pending {reason}",
+            _ => f"something else",
+          }
+        )
+    "#), @"text");
+}
+
+#[test]
 fn array_00() {
     insta::assert_snapshot!(
         _test_err(

@@ -157,9 +157,9 @@ let max: func (column: [int]): int
 
 let sum: func (column: [int]): int
 
-let count: func (column: [int]):int
+let count: func <T> (column: [T]): int
 
-let average: func (column: [int]): float
+let average: func <T: int64> (column: [T]): float64
 
 let all: func (column: [bool]): bool
 

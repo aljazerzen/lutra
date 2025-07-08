@@ -397,6 +397,30 @@ impl TypeResolver<'_> {
                 // all ok
                 Ok(())
             }
+
+            TyParamDomain::EnumVariants(domain_variants) => {
+                let TyKind::Enum(ty_variants) = &ty.kind else {
+                    return Err(Diagnostic::new(
+                        format!(
+                            "{} to enums, found {}",
+                            msg_restricted_to(var_name, None),
+                            printer::print_ty(&ty)
+                        ),
+                        DiagnosticCode::TYPE_DOMAIN,
+                    ));
+                };
+
+                for domain_variant in domain_variants {
+                    let (_, variant) =
+                        super::pattern::lookup_variant(ty_variants, &domain_variant.name)?;
+
+                    self.validate_type(&variant.ty, &domain_variant.ty, &|| None)?;
+                    // ok
+                }
+
+                // all ok
+                Ok(())
+            }
         }
     }
 
@@ -431,15 +455,6 @@ impl TypeResolver<'_> {
                 Ok(())
             }
 
-            (TyParamDomain::TupleFields(_), TyParamDomain::OneOf(_)) => Err(Diagnostic::new(
-                // TODO: bad error message
-                format!(
-                    "{} concrete types, but {found_name} is a tuple with possibly unknown fields",
-                    msg_restricted_to(expected_name, None)
-                ),
-                DiagnosticCode::TYPE_DOMAIN,
-            )),
-
             (
                 TyParamDomain::TupleFields(found_fields),
                 TyParamDomain::TupleFields(expected_fields),
@@ -454,6 +469,30 @@ impl TypeResolver<'_> {
 
                 // all ok
                 Ok(())
+            }
+
+            (
+                TyParamDomain::EnumVariants(found_variants),
+                TyParamDomain::EnumVariants(expected_variants),
+            ) => {
+                for expected_variant in expected_variants {
+                    let (_, found_variant) = super::pattern::lookup_variant_in_domain(
+                        found_variants,
+                        &expected_variant.name,
+                    )?;
+
+                    self.validate_type(&found_variant.ty, &expected_variant.ty, &|| None)?;
+                }
+
+                // all ok
+                Ok(())
+            }
+
+            _ => {
+                Err(Diagnostic::new(
+                    "incompatible type domain", // TODO: bad error message "
+                    DiagnosticCode::TYPE_DOMAIN,
+                ))
             }
         }
     }

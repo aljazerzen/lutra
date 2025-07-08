@@ -22,12 +22,12 @@ impl super::TypeResolver<'_> {
             scope::TyRef::Param(id) => {
                 let (_, param) = self.get_ty_param(id);
                 return match param {
-                    pr::TyParamDomain::Open | pr::TyParamDomain::OneOf(_) => {
-                        Err(Diagnostic::new_custom(format!(
-                            "expected a tuple or an array, found {}",
-                            base.kind.as_ref()
-                        )))
-                    }
+                    pr::TyParamDomain::Open
+                    | pr::TyParamDomain::OneOf(_)
+                    | pr::TyParamDomain::EnumVariants(_) => Err(Diagnostic::new_custom(format!(
+                        "expected a tuple or an array, found {}",
+                        base.kind.as_ref()
+                    ))),
                     pr::TyParamDomain::TupleFields(fields) => lookup_in_domain(fields, indirection),
                 };
             }

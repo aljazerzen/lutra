@@ -190,7 +190,6 @@ impl Scope {
         constraints.push(TyVarConstraint::IsTy(id, ty));
     }
 
-    #[allow(dead_code)]
     pub fn infer_type_var_in_domain(&self, id: TyVarId, domain: pr::TyParamDomain) {
         tracing::debug!("inferring {id:?} in domain {domain:?}");
 
