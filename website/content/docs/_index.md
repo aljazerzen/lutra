@@ -2,38 +2,43 @@
 title: "Overview"
 ---
 
-Basic block of compilation is a **project**.
+The starting point for Lutra is a **project**.
 Usually, this is a directory of `.lt` files, which contain type definitions and the code of the functions.
 
-```elm
+```lt
 # project.lt
 
 type Movie: {id: int32, title: text}
 
+let my_movies: [Movie] = [
+  {id = 3, title = "Forrest Gump"},
+  {id = 7, title = "Conclave"},
+]
+
 let get_movie = func (param: int32) -> (
-    [
-        {id = 3, title = "Forrest Gump"},
-        {id = 7, title = "Conclave"},
-    ]
-    | std::filter(func (x: Movie) -> x.id == param)
-    | std::index(0)
+  my_movies
+  | std::filter(func (x: Movie) -> x.id == param)
+  | std::index(0)
 )
 
 let my_program = func() -> get_movie(3)
 ```
 
-The compiler is able to read these files, perform name resolution, type checking inference and report any problems with this code.
-From this checked project, it can then produce programs.
+The compiler can read these files, perform name resolution, type checking, and inference, and report any issues found in the code.
+Once the project is successfully checked, it can then generate executable programs.
 
 ```
 > lutra check project.lt
 All good.
 ```
 
-A **program** contains the compiled code and type annotations for its input and output value.
+A **program** consists of compiled code along with type annotations for its input and output values.
 
-A **runner** can execute programs. It consumes the input and produces output, both encoded in the binary format.
-Runner can be an interpreter (`interpreter-br`) or a driver that connects to a database and executes the program there (`sql-postgres`).
+A **runner** executes programs by taking input and producing output, both in binary format.
+Currently, there are two runners available:
+
+- `interpreter-br`: a local interpreter that executes programs in the same process,
+- `sql-postgres`: a PostgreSQL runner that executes SQL programs in a database.
 
 ```
 > lutra run project.lt my_program
@@ -43,7 +48,8 @@ Runner can be an interpreter (`interpreter-br`) or a driver that connects to a d
 }
 ```
 
-To execute a program from some other programming language (such as Rust or Python), it is recommended to use **codegen** to generate type definitions in the target language. These definitions can encode inputs and decode outputs of the programs.
+To call programs from other languages (Rust, Python, etc.), **codegen** can be used to generate type definitions in the target language.
+The generated code also handles serialization of inputs and deserialization of outputs.
 
 ```rust
 // build.rs

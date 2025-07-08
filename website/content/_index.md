@@ -2,57 +2,53 @@
 title: Lutra
 ---
 
-<div style="height: 2em"></div>
-<span class="muted">Lutra is a ...</span><br>
-<h2 style="margin-top: 0">Binary format</h2>
-</div>
 
+<p class="muted" style="margin-top: 2em; margin-bottom: -1.5em">Lutra is a ...</p>
 
-It defines a minimal algebraic type system and binary data format for each of the types.
-It provides code generation tools for creating bindings in other programming languages
-(currently only Rust is supported).
+## Language
 
-```
-type album: {id: int64, title: text}
+... for preserving type information between different software components.
+It is a high-level, statically typed language, designed for querying data
+and expressing data structures.
 
-type invoice: {id: int64, customer: text, total: float64}
-```
+```lt
+type Album: {id: int16, title: text}
 
-<div style="margin-top: 2em">
-<span class="muted">Lutra is a ...</span><br>
-<h2 style="margin-top: 0">Language</h2>
-</div>
+let get_albums: func (): [Album]
 
-Lutra programs are a high-level, statically typed language,
-which be compiled to lutra-runtime bytecode or
-to SQL to be executed by relational databases
-(currently only PostgreSQL is supported).
-
-```
-type album: {id: int64, title: text}
-
-let get_albums: func (): [album]
-
-let get_album_by_id = func (album_id: int64): album -> (
+let get_album_by_id = func (album_id: int16): Album -> (
   get_albums()
-  | std::filter(func (this: album) -> this.id == album_id)
-  | std::index(0)
+  | filter(func (this: Album) -> this.id == album_id)
+  | index(0)
 )
 ```
 
-<div style="height: 2em"></div>
-<span class="muted">Lutra is a ...</span><br>
-<h2 style="margin-top: 0">Database driver</h2>
-</div>
+<p class="muted" style="margin-top: 2em; margin-bottom: -1.5em">Lutra is a ...</p>
 
-Can execute Lutra programs on relational databases, while preserving typing information of query parameters and results.
+## Binary format
+
+... with a minimal algebraic type system and tooling for creating bindings in other programming languages.
+It focuses on simplicity and ease of use, but also provides partial decoding capabilities.
+
+```
+| id    | title                                                  |
+| 05 00 | 08 00 00 00 | 09 00 00 00 | 47 6c 61 64 69 61 74 6f 72 |
+| int16 | offset      | length      | contents                   |
+```
+
+<p class="muted" style="margin-top: 2em; margin-bottom: -1.5em">Lutra is a ...</p>
+
+## Runner
+
+... for executing Lutra programs on relational databases or locally, while preserving typing information of program inputs and outputs.
+This allows writing code that is portable across different execution targets and
+provides a modern, well-designed interface for interacting with databases.
 
 ```rust
 // main.rs
+let runner = lutra_db_driver::RunnerSync(...);
 
-let client = lutra_db_driver::RunnerSync(...);
-
-let result = client.run(&lutra::my_program(), &4).unwrap();
+let result = runner.run(&lutra::my_program(), &4)?;
 
 // result is a Rust struct
 println!("id={}, title={}", result.id, result.title);
@@ -60,14 +56,10 @@ println!("id={}, title={}", result.id, result.title);
 
 ## Why
 
-We believe that many pain points in modern programming stem from losing type information of
-the data that is handled by programs.
+Many challenges in modern programming arise from losing type information within a system. Often this is the fault of the programming language, but in many cases it is caused by passing data through type-erasing points.
 
-Sometimes this is fault of the programming language, but in many cases, it is caused by passing
-data through type-erasing points.
-These can be API calls that return JSON, reading from files, or calling out to a database.
-Such type-erasing points do have a notion of *expected data format*.
-but the tooling around them lacks the ability to use this information.
+For example, API calls that return JSON, reading from files, or calling out to a database all lose type information.
+While these interfaces usually have a notion of *expected data format*, most tools fail to express this information in a way that can be used by the toolchain and the programmer.
 
 The Lutra Project aims to provide this tooling and establish a standardized interface for interaction between software operating across different machines, processes, or programming languages.
 
@@ -77,20 +69,20 @@ The Lutra Project aims to provide this tooling and establish a standardized inte
 
 ### Data should always carry type information
 
-The business logic of programs should be fully typed.
+The business logic of programs should be fully statically typed.
 Each variable should have an associated type, either annotated explicitly
 or preferably inferred from context.
 
-This improves readability of the program and validates author's assumptions
-about written code. This first guides the author when writing code, but also
+This improves readability of the program and validates the author's assumptions
+about written code. It first guides the author when writing code, and also
 automates validation of these assumptions when changes to the program are made
 in the future.
 
 
 ### Type information should be available to the whole toolchain
 
-Compilers, code editors, language servers and GUI code explorers should all
-have access to type information of code.
+Development tools like compilers, editors, language servers and code explorers should all
+have access to complete type information.
 
 They should be able to assist development, suggest improvements, organize code and
 provide insights into the codebase.
@@ -101,11 +93,11 @@ to other languages where the data is used.
 
 ### Type information should exist only at compile time
 
-Many data formats carry type information into the run time. For example, JSON stores
-field names alongside data: `{"id": 3, "title": "Forrest Gump"}`.
+Many data formats carry type information into runtime. For example, JSON stores
+field names alongside data: `{"id": 3, "title": "Gladiator"}`.
 
 This is inefficient and unnecessary for situations when the program already makes
 assumptions about the value in a variable (e.g. `let x: Movie`).
 
-Additionally, runtime reflection increases complexity of the codebase and moves
-operations that should have been done at compile time into run time.
+Additionally, runtime reflection increases the complexity of the codebase and moves
+operations that should have been done at compile time into runtime.

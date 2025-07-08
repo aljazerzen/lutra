@@ -1,6 +1,6 @@
 ---
 title: Database driver
-weight: 3
+weight: 4
 ---
 
 Lutra projects can be compiled to SQL and executed on relational databases.
@@ -16,7 +16,7 @@ Supported databases:
 
 We start with a Lutra project.
 
-```elm
+```lt
 module db {
     type Movie: {id: int32, title: text}
 

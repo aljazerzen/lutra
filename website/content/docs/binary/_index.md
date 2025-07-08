@@ -1,6 +1,6 @@
 ---
 title: Binary format
-weight: 1
+weight: 3
 ---
 
 Lutra binary format is a method of serializing structured data. It can be used to transfer data between programming languages, processes or devices.
@@ -18,7 +18,7 @@ Currently supported languages:
 
 ## Example
 
-```elm
+```lt
 type Movie: {
   id: int16,
   title: text,
@@ -35,5 +35,5 @@ Given the type definition above, the `value` constant would be encoded as:
 ```
 | id    | title                                                  |
 | 05 00 | 08 00 00 00 | 09 00 00 00 | 47 6c 61 64 69 61 74 6f 72 |
-|       | offset      | length      | contents                   |
+| int16 | offset      | length      | contents                   |
 ```
