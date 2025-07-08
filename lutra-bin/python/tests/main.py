@@ -41,7 +41,7 @@ class TestCase(unittest.TestCase):
 
     @unittest.skip("todo")
     def test_u_01(self):
-        v = types.u(42, "Hello world!", [True, False])
+        v = types.u(f=True)
 
         b = lutra_bin.encode(v)
         self.assertEqual(b, b"\x00\x04\x00\x00\x00\x01")
@@ -51,7 +51,7 @@ class TestCase(unittest.TestCase):
 
     @unittest.skip("todo")
     def test_u_02(self):
-        v = types.u(42, "Hello world!", [True, False])
+        v = types.u(g=True)
 
         b = lutra_bin.encode(v)
         self.assertEqual(b, b"\x01\x00\x00\x00\x00")
@@ -61,7 +61,7 @@ class TestCase(unittest.TestCase):
 
     @unittest.skip("todo")
     def test_u_03(self):
-        v = types.u(42, "Hello world!", [True, False])
+        v = types.u(h=types.uh(-12, 3.16))
 
         b = lutra_bin.encode(v)
         self.assertEqual(
@@ -74,7 +74,7 @@ class TestCase(unittest.TestCase):
 
     @unittest.skip("todo")
     def test_v(self):
-        v = types.v(42, "Hello world!", [True, False])
+        v = types.v(no=True)
 
         b = lutra_bin.encode(v)
         self.assertEqual(b, b"\x01")
@@ -84,7 +84,7 @@ class TestCase(unittest.TestCase):
 
     @unittest.skip("todo")
     def test_t_01(self):
-        v = types.t(42, "Hello world!", [True, False])
+        v = types.t(single=2)
 
         b = lutra_bin.encode(v)
         self.assertEqual(b, b"\x00\x02\x00")
@@ -94,7 +94,7 @@ class TestCase(unittest.TestCase):
 
     @unittest.skip("todo")
     def test_t_02(self):
-        v = types.t(42, "Hello world!", [True, False])
+        v = types.t(double=2342)
 
         b = lutra_bin.encode(v)
         self.assertEqual(b, b"\x01&\x09")
@@ -116,7 +116,17 @@ class TestCase(unittest.TestCase):
 
     @unittest.skip("todo")
     def test_Tree(self):
-        v = types.Tree(42, "Hello world!", [True, False])
+        v = types.Tree(
+            node=types.TreeNode(
+                left=types.Tree(leaf=0),
+                right=types.Tree(
+                    node=types.TreeNode(
+                        left=types.Tree(left=7),
+                        right=types.Tree(left=10),
+                    )
+                ),
+            )
+        )
 
         b = lutra_bin.encode(v)
         self.assertEqual(
@@ -129,7 +139,7 @@ class TestCase(unittest.TestCase):
 
     @unittest.skip("todo")
     def test_opt_01(self):
-        v = types.opt(42, "Hello world!", [True, False])
+        v = types.opt(none=True)
 
         b = lutra_bin.encode(v)
         self.assertEqual(b, b"\x00\x00\x00\x00\x00")
@@ -139,7 +149,7 @@ class TestCase(unittest.TestCase):
 
     @unittest.skip("todo")
     def test_opt_02(self):
-        v = types.opt(42, "Hello world!", [True, False])
+        v = types.opt(some="text")
 
         b = lutra_bin.encode(v)
         self.assertEqual(b, b"\x01\x04\x00\x00\x00\x08\x00\x00\x00\x04\x00\x00\x00text")
@@ -149,7 +159,7 @@ class TestCase(unittest.TestCase):
 
     @unittest.skip("todo")
     def test_opt2_01(self):
-        v = types.opt2(42, "Hello world!", [True, False])
+        v = types.opt2(none=True)
 
         b = lutra_bin.encode(v)
         self.assertEqual(b, b"\x00\x00\x00")
@@ -159,7 +169,7 @@ class TestCase(unittest.TestCase):
 
     @unittest.skip("todo")
     def test_opt2_02(self):
-        v = types.opt2(42, "Hello world!", [True, False])
+        v = types.opt2(some=65)
 
         b = lutra_bin.encode(v)
         self.assertEqual(b, b"\x01A\x00")

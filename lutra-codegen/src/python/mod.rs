@@ -1,4 +1,4 @@
-use std::collections::{HashMap, VecDeque};
+use std::collections::{HashMap, HashSet, VecDeque};
 use std::fs;
 use std::path::PathBuf;
 use std::{borrow::Cow, fmt::Write};
@@ -45,6 +45,8 @@ pub struct Context<'a> {
     /// Buffer for types that don't have their own Lutra decl, but need their own Rust decl.
     /// When such type ref is encountered, it is pushed into here and generated later.
     def_buffer: VecDeque<ir::Ty>,
+
+    tys_written: HashSet<String>,
 
     // static env
     options: &'a super::GenerateOptions,
@@ -94,6 +96,7 @@ fn codegen_main(
     let mut ctx = Context {
         current_rust_mod: vec![],
         def_buffer: VecDeque::new(),
+        tys_written: Default::default(),
 
         options,
         ty_defs: &ty_defs,
@@ -149,14 +152,14 @@ fn codegen_module(
     ctx.current_rust_mod = module_path.clone();
 
     // write types
-    write_tys(w, tys, ctx)?;
+    let mut tys = write_tys(w, tys, ctx)?;
 
     // write traits for functions
     let module_path_str = module_path.as_slice().join("::");
     if ctx.options.generate_sr_modules.contains(&module_path_str) {
         write_sr_programs(w, &functions, ctx)?;
 
-        write_tys_in_buffer(w, ctx)?;
+        tys.extend(write_tys_in_buffer(w, ctx)?);
     }
 
     // recurse into sub modules
@@ -167,6 +170,11 @@ fn codegen_module(
         path.push(name.clone());
         codegen_module(w, sub_mod, path, ctx)?;
         writeln!(w, "}}\n")?;
+    }
+
+    // write codecs
+    for ty in &tys {
+        write_ty_def_codec(w, ty, ctx)?;
     }
 
     assert!(ctx.is_done(), "{ctx:?}");
@@ -196,6 +204,9 @@ pub fn write_tys_in_buffer(
 ) -> Result<Vec<ir::Ty>, std::fmt::Error> {
     let mut all_tys = Vec::new();
     while let Some(ty) = ctx.def_buffer.pop_front() {
+        if ctx.tys_written.contains(ty.name.as_ref().unwrap()) {
+            continue;
+        }
         let annotations = vec![];
         write_ty_def(w, &ty, &annotations, ctx)?;
 
@@ -204,7 +215,7 @@ pub fn write_tys_in_buffer(
     Ok(all_tys)
 }
 
-/// Generates a type definition.
+/// Generates a type definition, implementing Encodable
 #[rustfmt::skip::macros(writeln)]
 #[rustfmt::skip::macros(write)]
 pub fn write_ty_def(
@@ -214,44 +225,90 @@ pub fn write_ty_def(
     ctx: &mut Context,
 ) -> Result<(), std::fmt::Error> {
     let name = ty.name.as_ref().unwrap();
+    let codec_name = format!("{name}Codec");
 
     writeln!(w)?;
+    writeln!(w, "@dataclasses.dataclass")?;
+    writeln!(w, "class {name}(lutra_bin.Encodable):")?;
     match &ty.kind {
         ir::TyKind::Primitive(_) | ir::TyKind::Array(_) => {
-            writeln!(w, "@dataclasses.dataclass")?;
-            writeln!(w, "class {name}:")?;
             writeln!(w, "    value: {}", ty_ref(ty, ctx))?;
-
-            write_head_bytes(w, ty)?;
-            writeln!(w)?;
-            writeln!(w, "    @classmethod")?;
-            writeln!(w, "    def decode(cls, buf: bytes) -> '{name}':")?;
-            writeln!(w, "        return {name}({}.decode(buf))", ty_codec(ty, ctx))?;
-            writeln!(w)?;
-            writeln!(w, "    def encode_head(self, buf: lutra_bin.BytesMut) -> typing.Any:")?;
-            writeln!(w, "        return {}.encode_head(self.value, buf)", ty_codec(ty, ctx))?;
-            writeln!(w)?;
-            writeln!(w, "    def encode_body(self, residual: typing.Any, buf: lutra_bin.BytesMut) -> typing.Any:")?;
-            writeln!(w, "        return {}.encode_body(self.value, residual, buf)", ty_codec(ty, ctx))?;
         }
 
         ir::TyKind::Tuple(fields) => {
-            writeln!(w, "@dataclasses.dataclass")?;
-            writeln!(w, "class {name}:")?;
-
             // fields definitions
             for (index, field) in fields.iter().enumerate() {
                 let name = tuple_field_name(&field.name, index);
 
                 writeln!(w, "    {name}: {}", ty_ref(&field.ty, ctx))?;
             }
+        }
 
-            write_head_bytes(w, ty)?;
+        ir::TyKind::Enum(variants) => {
+            // variant definitions
+            for variant in variants {
+                let name = camel_to_snake(&variant.name);
 
+                let ty = if variant.ty.is_unit() {
+                    Cow::Borrowed("typing.Literal[True] | None")
+                } else {
+                    let ty = ty_ref(&variant.ty, ctx);
+                    if ty.contains('\'') {
+                        format!("typing.Optional[{ty}]").into()
+                    } else {
+                        format!("{ty} | None").into()
+                    }
+                };
+
+                writeln!(w, "    {name}: {ty} = None")?;
+            }
+        }
+
+        _ => unimplemented!(),
+    }
+    writeln!(w)?;
+    writeln!(w, "    @classmethod")?;
+    writeln!(w, "    def codec(cls) -> '{codec_name}':")?;
+    writeln!(w, "        return {codec_name}()")?;
+    writeln!(w)?;
+
+    ctx.tys_written.insert(name.clone());
+
+    Ok(())
+}
+
+/// Generates a code impl for a type
+#[rustfmt::skip::macros(writeln)]
+#[rustfmt::skip::macros(write)]
+pub fn write_ty_def_codec(
+    w: &mut impl Write,
+    ty: &ir::Ty,
+    ctx: &mut Context,
+) -> Result<(), std::fmt::Error> {
+    let name = ty.name.as_ref().unwrap();
+    let codec_name = format!("{name}Codec");
+
+    writeln!(w)?;
+    writeln!(w, "class {codec_name}:")?;
+
+    let head_bytes = ty.layout.as_ref().unwrap().head_size.div_ceil(8);
+    writeln!(w, "    def head_bytes(self) -> int:")?;
+    writeln!(w, "        return {head_bytes}")?;
+
+    match &ty.kind {
+        ir::TyKind::Primitive(_) | ir::TyKind::Array(_) => {
+            writeln!(w, "    def decode(self, buf: bytes) -> {name}:")?;
+            writeln!(w, "        return {name}({}.decode(buf))", ty_codec(ty, ctx))?;
+            writeln!(w, "    def encode_head(self, obj: {name}, buf: lutra_bin.BytesMut) -> typing.Any:")?;
+            writeln!(w, "        return {}.encode_head(obj.value, buf)", ty_codec(ty, ctx))?;
+            writeln!(w, "    def encode_body(self, obj: {name}, residual: typing.Any, buf: lutra_bin.BytesMut) -> typing.Any:")?;
+            writeln!(w, "        return {}.encode_body(obj.value, residual, buf)", ty_codec(ty, ctx))?;
+        }
+
+        ir::TyKind::Tuple(fields) => {
             // decode
             writeln!(w)?;
-            writeln!(w, "    @classmethod")?;
-            writeln!(w, "    def decode(cls, buf: bytes) -> '{name}':")?;
+            writeln!(w, "    def decode(self, buf: bytes) -> {name}:")?;
             writeln!(w, "        buf = memoryview(buf)")?;
 
             let offsets = layout::tuple_field_offsets(ty);
@@ -263,25 +320,26 @@ pub fn write_ty_def(
             for (index, _) in fields.iter().enumerate() {
                 write!(w, "f{index}, ")?;
             }
-            writeln!(w, ")\n")?;
+            writeln!(w, ")")?;
 
             // encode_head
-            writeln!(w, "    def encode_head(self, buf: lutra_bin.BytesMut) -> typing.Any:")?;
+            writeln!(w)?;
+            writeln!(w, "    def encode_head(self, obj: {name}, buf: lutra_bin.BytesMut) -> typing.Any:")?;
             writeln!(w, "        return (")?;
             for (index, field) in fields.iter().enumerate() {
                 let name = tuple_field_name(&field.name, index);
-                let val_ref = format!("self.{name}");
+                let val_ref = format!("obj.{name}");
                 write!(w, "            ",)?;
-                writeln!(w, "{},", ty_encode_head(&field.ty, &val_ref, ctx))?;
+                writeln!(w, "{}.encode_head({val_ref}, buf),", ty_codec(&field.ty, ctx))?;
             }
             writeln!(w, "        )")?;
-            writeln!(w)?;
 
             // encode_body
-            writeln!(w, "    def encode_body(self, residuals: typing.Any, buf: lutra_bin.BytesMut):")?;
+            writeln!(w)?;
+            writeln!(w, "    def encode_body(self, obj: {name}, residuals: typing.Any, buf: lutra_bin.BytesMut) -> typing.Any:")?;
             for (index, field) in fields.iter().enumerate() {
                 let name = tuple_field_name(&field.name, index);
-                let val_ref = format!("self.{name}");
+                let val_ref = format!("obj.{name}");
                 let res_ref = format!("residuals[{index}]");
 
                 let encode_body = ty_encode_body(&field.ty, &val_ref, &res_ref, ctx);
@@ -291,23 +349,35 @@ pub fn write_ty_def(
             }
         }
 
-        ir::TyKind::Enum(_) => {
-            writeln!(w, "class {name}:")?;
-
-            write_head_bytes(w, ty)?;
-
+        ir::TyKind::Enum(variants) => {
             // decode
+            let head = lutra_bin::layout::enum_head_format(variants);
+            let tag_bytes = head.tag_bytes;
+            let has_ptr = if head.has_ptr { "True" } else { "False" };
+
             writeln!(w)?;
-            writeln!(w, "    @classmethod")?;
-            writeln!(w, "    def decode(cls, buf: bytes) -> '{name}':")?;
-            writeln!(w, "        return {name}()")?;
+            writeln!(w, "    def decode(self, buf: bytes) -> {name}:")?;
+            writeln!(w, "        tag, inner_offset = lutra_bin.EnumCodec({tag_bytes}, {has_ptr}).decode_head(buf)")?;
+            for (tag, variant) in variants.iter().enumerate() {
+                let variant_name = camel_to_snake(&variant.name);
+                writeln!(w, "        if tag == {tag}:")?;
+
+                if variant.ty.is_unit() {
+                    writeln!(w, "            return {name}({variant_name}=True)")?;
+                } else {
+                    writeln!(w, "            return {name}({variant_name}={}.decode(buf[inner_offset:]))", ty_codec(&variant.ty, ctx))?;
+                }
+            }
+            writeln!(w, "        raise AssertionError()")?;
 
             // encode_head
-            writeln!(w, "    def encode_head(self, buf: lutra_bin.BytesMut) -> typing.Any:")?;
+            writeln!(w)?;
+            writeln!(w, "    def encode_head(self, obj: {name}, buf: lutra_bin.BytesMut) -> typing.Any:")?;
             writeln!(w, "        pass")?;
 
             // encode_body
-            writeln!(w, "    def encode_body(self, residuals: typing.Any, buf: lutra_bin.BytesMut):")?;
+            writeln!(w)?;
+            writeln!(w, "    def encode_body(self, obj: {name}, residual: typing.Any, buf: lutra_bin.BytesMut) -> typing.Any:")?;
             writeln!(w, "        pass")?;
         }
 
@@ -315,14 +385,6 @@ pub fn write_ty_def(
     }
     writeln!(w)?;
 
-    Ok(())
-}
-
-fn write_head_bytes(w: &mut impl Write, ty: &ir::Ty) -> Result<(), std::fmt::Error> {
-    let head_bytes = ty.layout.as_ref().unwrap().head_size.div_ceil(8);
-    writeln!(w)?;
-    writeln!(w, "    def head_bytes(self) -> int:")?;
-    writeln!(w, "        return {head_bytes}")?;
     Ok(())
 }
 
@@ -356,12 +418,17 @@ fn ty_ref(ty: &ir::Ty, ctx: &mut Context) -> Cow<'static, str> {
         }
 
         ir::TyKind::Tuple(_) | ir::TyKind::Enum(_) => {
-            ctx.def_buffer.push_back(ty.clone());
-
-            ty.name
+            let name = ty
+                .name
                 .clone()
-                .unwrap_or_else(|| panic!("no name for {ty:?}"))
-                .into()
+                .unwrap_or_else(|| panic!("no name for {ty:?}"));
+
+            if ctx.tys_written.contains(&name) {
+                name.into()
+            } else {
+                ctx.def_buffer.push_back(ty.clone());
+                format!("'{name}'").into()
+            }
         }
 
         _ => unimplemented!(),
@@ -388,7 +455,9 @@ fn ty_codec(ty: &ir::Ty, ctx: &mut Context) -> Cow<'static, str> {
             format!("lutra_bin.ArrayCodec({})", ty_codec(item_ty, ctx)).into()
         }
 
-        ir::TyKind::Ident(_) | ir::TyKind::Tuple(_) | ir::TyKind::Enum(_) => ty_ref(ty, ctx),
+        ir::TyKind::Ident(_) | ir::TyKind::Tuple(_) | ir::TyKind::Enum(_) => {
+            format!("{}.codec()", ty_ref(ty, ctx)).into()
+        }
 
         _ => unimplemented!(),
     }
@@ -409,36 +478,9 @@ fn ty_decode(ty: &ir::Ty, buf_ref: &str, ctx: &mut Context) -> String {
     }
 }
 
-fn ty_encode_head(ty: &ir::Ty, val_ref: &str, ctx: &mut Context) -> String {
-    match &ty.kind {
-        ir::TyKind::Primitive(_) | ir::TyKind::Array(_) => {
-            // these types use wrappers provided by lutra package, which need to be unwrapped
-            format!("{}.encode_head({val_ref}, buf)", ty_codec(ty, ctx))
-        }
-
-        ir::TyKind::Tuple(_) | ir::TyKind::Enum(_) | ir::TyKind::Ident(_) => {
-            format!("{val_ref}.encode_head(buf)")
-        }
-
-        _ => unimplemented!(),
-    }
-}
-
 fn ty_encode_body(ty: &ir::Ty, val_ref: &str, residual_ref: &str, ctx: &mut Context) -> String {
-    match &ty.kind {
-        ir::TyKind::Primitive(ir::TyPrimitive::text) | ir::TyKind::Array(_) => {
-            let codec = ty_codec(ty, ctx);
-            format!("{codec}.encode_body({val_ref}, {residual_ref}, buf)")
-        }
-
-        ir::TyKind::Primitive(_) => String::new(),
-
-        ir::TyKind::Tuple(_) | ir::TyKind::Enum(_) | ir::TyKind::Ident(_) => {
-            format!("{val_ref}.encode_body({residual_ref}, buf)")
-        }
-
-        _ => unimplemented!(),
-    }
+    let codec = ty_codec(ty, ctx);
+    format!("{codec}.encode_body({val_ref}, {residual_ref}, buf)")
 }
 
 fn write_sr_programs(
@@ -473,4 +515,22 @@ fn write_sr_programs(
     }
 
     Ok(())
+}
+
+fn camel_to_snake(camel: &str) -> String {
+    let mut snake = String::with_capacity(camel.len());
+    let mut chars = camel.chars().peekable();
+
+    while let Some(current) = chars.next() {
+        if current.is_uppercase() {
+            if !snake.is_empty() && snake.chars().last().unwrap() != '_' {
+                snake.push('_');
+            }
+            snake.push(current.to_lowercase().next().unwrap());
+        } else {
+            snake.push(current);
+        }
+    }
+
+    snake
 }

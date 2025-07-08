@@ -28,9 +28,7 @@ class Codec[T](typing.Protocol):
 
 class Encodable(typing.Protocol):
     @classmethod
-    def decode(cls, buf: bytes) -> typing.Self: ...
-    def encode_head(self, buf: BytesMut) -> typing.Any: ...
-    def encode_body(self, head_residual: typing.Any, buf: BytesMut): ...
+    def codec(cls) -> Codec[typing.Self]: ...
 
 
 class EncodableCodec[T: Encodable](Codec):
@@ -51,14 +49,17 @@ class EncodableCodec[T: Encodable](Codec):
 
 
 def encode[T: Encodable](obj: T) -> bytes:
+    codec = obj.codec()
+
     buf = BytesMut()
-    residuals = obj.encode_head(buf)
-    obj.encode_body(residuals, buf)
-    return buf.take()
+    residuals = codec.encode_head(obj, buf)
+    codec.encode_body(obj, residuals, buf)
+    return buf.into_bytes()
 
 
 def decode[T: Encodable](typ: type[T], buf: bytes) -> T:
-    return typ.decode(buf)
+    codec = typ.codec()
+    return codec.decode(buf)
 
 
 class TypedProgram[I: Encodable, O: Encodable]:

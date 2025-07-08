@@ -48,7 +48,7 @@ provides a modern, well-designed interface for interacting with databases.
 // main.rs
 let runner = lutra_db_driver::RunnerSync(...);
 
-let result = runner.run(&lutra::my_program(), &4)?;
+let result = runner.run(&lutra::get_album_by_id(), &4)?;
 
 // result is a Rust struct
 println!("id={}, title={}", result.id, result.title);
@@ -101,3 +101,10 @@ assumptions about the value in a variable (e.g. `let x: Movie`).
 
 Additionally, runtime reflection increases the complexity of the codebase and moves
 operations that should have been done at compile time into runtime.
+
+## Project status
+
+Lutra is a personal passion project, currently in a proof-of-concept stage.
+It is not ready for production use.
+
+We are looking for feedback and contributions.

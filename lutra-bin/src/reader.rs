@@ -143,26 +143,23 @@ impl<'d, 't> TupleReader<'d, 't> {
     }
 }
 
-pub struct EnumReader {
-    data: Data,
+pub struct EnumReader<'a> {
+    data: &'a [u8],
     tag: u64,
 }
 
-impl EnumReader {
-    pub fn new(data: Data, tag_bytes: u32, has_ptr: bool) -> Self {
+impl<'a> EnumReader<'a> {
+    pub fn new(mut data: &'a [u8], tag_bytes: u32, has_ptr: bool) -> Self {
         let tag_bytes = tag_bytes as usize;
 
         let mut tag = vec![0; 8];
-        data.slice(tag_bytes).copy_to_slice(&mut tag[0..tag_bytes]);
+        data.copy_to_slice(&mut tag[0..tag_bytes]);
         let tag = u64::from_le_bytes(tag.try_into().unwrap()) as u64;
-
-        let mut data = data;
-        data.skip(tag_bytes);
 
         if has_ptr {
             // read ptr and dereference
-            let offset = u32::from_le_bytes(data.slice(4).read_const::<4>());
-            data.skip(offset as usize);
+            let offset = u32::from_le_bytes(data.read_const::<4>());
+            data = data.skip(offset as usize);
         } else {
             // inner is right after the tag
         }
@@ -170,7 +167,7 @@ impl EnumReader {
         EnumReader { data, tag }
     }
 
-    pub fn new_for_ty(data: Data, ty: &ir::Ty) -> Self {
+    pub fn new_for_ty(data: &'a [u8], ty: &ir::Ty) -> Self {
         let ir::TyKind::Enum(variants) = &ty.kind else {
             panic!()
         };
@@ -182,7 +179,7 @@ impl EnumReader {
         self.tag
     }
 
-    pub fn get_inner(self) -> Data {
+    pub fn get_inner(self) -> &'a [u8] {
         self.data
     }
 }

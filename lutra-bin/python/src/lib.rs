@@ -27,6 +27,7 @@ fn main(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<Float64Codec>()?;
     m.add_class::<TextCodec>()?;
     m.add_class::<ArrayCodec>()?;
+    m.add_class::<EnumCodec>()?;
 
     ir::register(m)?;
     sr::register(m)?;
@@ -47,7 +48,7 @@ impl BytesMut {
         }
     }
 
-    fn take(&mut self) -> Cow<[u8]> {
+    fn into_bytes(&mut self) -> Cow<[u8]> {
         let bytes_mut = std::mem::take(&mut self.inner);
         Cow::from(bytes_mut.freeze().to_vec())
     }
@@ -230,6 +231,32 @@ impl ArrayCodec {
             item_c.call_method1(py, "encode_body", (item, residual, buf.clone()))?;
         }
         Ok(())
+    }
+}
+
+#[pyclass(module = "lutra_bin")]
+pub struct EnumCodec {
+    tag_bytes: u32,
+    has_ptr: bool,
+}
+
+#[pymethods]
+impl EnumCodec {
+    #[new]
+    fn __init__(tag_bytes: u32, has_ptr: bool) -> Self {
+        Self { tag_bytes, has_ptr }
+    }
+
+    fn decode_head(&self, buf: Bound<PyAny>) -> PyResult<(u64, usize)> {
+        let py_buf = PyBuffer::<u8>::get(&buf)?;
+        let buf_slice = buffer_as_slice(&py_buf)?;
+
+        let reader = lutra_bin::EnumReader::new(buf_slice, self.tag_bytes, self.has_ptr);
+
+        let tag = reader.get_tag();
+        let inner = reader.get_inner();
+        let inner_offset = buf_slice.len() - inner.len();
+        Ok((tag, inner_offset))
     }
 }
 
