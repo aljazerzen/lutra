@@ -1,0 +1,12 @@
+[package]
+name = "project2"
+resolver = "2"
+edition = "2021"
+
+[dependencies]
+lutra-bin = { path = "../../lutra-bin" }
+lutra-db-driver = { path = "../../lutra-db-driver" }
+postgres = "0.19.10"
+
+[build-dependencies]
+lutra-codegen = { path = "../../lutra-codegen" }

@@ -1,0 +1,7 @@
+
+default:
+    # generate
+    cargo run -p lutra-cli -- codegen types.lt generated.py --sr-modules ''
+
+    # run
+    python main.py

@@ -13,4 +13,6 @@ perf.data
 
 Cargo.lock
 
-examples/
+/examples/*
+!/examples/python
+!/examples/rust

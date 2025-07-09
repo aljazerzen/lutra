@@ -1,0 +1,16 @@
+type Movie: {
+    id: int64,
+    title: text,
+    is_released: bool,
+    genre: Genre,
+}
+
+type Genre: enum {
+    Fiction,
+    Drama,
+    Other: text
+}
+
+let get_movie = func (): Movie -> {
+    id = 54, title = "Hello", is_released = true, genre = Genre::Drama
+}
