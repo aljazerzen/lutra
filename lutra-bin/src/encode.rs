@@ -1,3 +1,4 @@
+use crate::layout;
 use crate::string;
 use crate::vec;
 
@@ -257,5 +258,36 @@ impl ReversePointer {
     pub fn write(self, w: &mut [u8], absolute_ptr: usize) {
         let relative = absolute_ptr - self.location;
         w[self.location..(self.location + 4)].copy_from_slice(&(relative as u32).to_le_bytes());
+    }
+}
+
+pub fn encode_enum_head_tag(
+    format: &layout::EnumFormat,
+    tag: u64,
+    buf: &mut BytesMut,
+) -> Option<ReversePointer> {
+    // tag
+    let tag_slice = &tag.to_le_bytes()[0..format.tag_bytes as usize];
+    buf.put_slice(tag_slice);
+
+    if format.has_ptr {
+        // inner pointer
+        let variant = &format.variants[tag as usize];
+        if !variant.is_unit {
+            Some(ReversePointer::new(buf))
+        } else {
+            // this is unit variant, no need for a pointer
+            None
+        }
+    } else {
+        // no pointer, head of inner should follow directly
+        None
+    }
+}
+
+pub fn encode_enum_head_padding(format: &layout::EnumFormat, tag: u64, buf: &mut BytesMut) {
+    let variant = &format.variants[tag as usize];
+    if variant.padding_bytes > 0 {
+        buf.put_bytes(0, variant.padding_bytes as usize);
     }
 }

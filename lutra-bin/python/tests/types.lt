@@ -19,7 +19,7 @@ type p: {[int64], [int64]}
 type i: {v, z}
 
 type Tree: enum {
-    Leaf: int64,
+    Leaf: int8,
     Node: {left: Tree, right: Tree},
 }
 

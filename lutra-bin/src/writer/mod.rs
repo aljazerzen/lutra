@@ -1,3 +1,18 @@
+//! Writers of the binary format for generic container types (array, tuple, enum).
+//!
+//! These functions operate on [Data] and are able to "patch" together multiple encoded
+//! data structure into one container type. For example, two buffers of `[int64]` can be
+//! patched into one buffer of `{[int64], [int64]}`.
+//!
+//! This is complicated because the relative pointers of the arrays need to be rewritten
+//! to point to new locations of the array contents.
+//!
+//! If you can looking for encoding of full data structure at once, use [crate::encode].
+//!
+//! TODO: term "writer" is not conveying that this is an "advanced" object for patching
+//! values together. Also, usage for this is quite limited and mostly aimed at the
+//! interpreter. Maybe these should be moved there?
+
 mod array;
 mod enum_;
 mod tuple;

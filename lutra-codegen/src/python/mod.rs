@@ -35,7 +35,12 @@ pub fn generate(
     std::io::Write::write_all(&mut file, generated.as_bytes()).unwrap();
 
     // return vec of input files
-    project.source.get_sources().map(|s| s.0.clone()).collect()
+    project
+        .source
+        .get_sources()
+        .filter(|s| s.0.to_str().is_none_or(|x| x != "std.lt"))
+        .map(|s| s.0.clone())
+        .collect()
 }
 
 #[derive(Debug)]
@@ -228,7 +233,19 @@ pub fn write_ty_def(
     let codec_name = format!("{name}Codec");
 
     writeln!(w)?;
-    writeln!(w, "@dataclasses.dataclass")?;
+
+    match &ty.kind {
+        ir::TyKind::Primitive(_) | ir::TyKind::Array(_) | ir::TyKind::Tuple(_) => {
+            writeln!(w, "@dataclasses.dataclass")?;
+        }
+
+        ir::TyKind::Enum(_) => {
+            writeln!(w, "@dataclasses.dataclass(kw_only=True, repr=False)")?;
+        }
+
+        _ => unimplemented!(),
+    }
+
     writeln!(w, "class {name}(lutra_bin.Encodable):")?;
     match &ty.kind {
         ir::TyKind::Primitive(_) | ir::TyKind::Array(_) => {
@@ -262,6 +279,20 @@ pub fn write_ty_def(
 
                 writeln!(w, "    {name}: {ty} = None")?;
             }
+
+            writeln!(w)?;
+            writeln!(w, "    def __repr__(self) -> str:")?;
+            for variant in variants {
+                let variant_name = camel_to_snake(&variant.name);
+                writeln!(w, "        if self.{variant_name} is not None:")?;
+
+                write!(w, r"            return ")?;
+                if variant.ty.is_unit() {
+                    writeln!(w, r#""{name}({variant_name})""#)?;
+                } else {
+                    writeln!(w, r#"f"{name}({variant_name}={{self.{variant_name}!r}})""#)?;
+                }
+            }
         }
 
         _ => unimplemented!(),
@@ -290,6 +321,20 @@ pub fn write_ty_def_codec(
 
     writeln!(w)?;
     writeln!(w, "class {codec_name}:")?;
+
+    match &ty.kind {
+        ir::TyKind::Enum(variants) => {
+            // for enums, we init the EnumCodecHelper
+            let enum_format = lutra_bin::layout::enum_format(variants);
+            let mut buf = bytes::BytesMut::new();
+            enum_format.encode(&mut buf);
+            let format_base85 = base85::encode(&buf);
+            writeln!(w, "    helper = lutra_bin.EnumCodecHelper(")?;
+            writeln!(w, "        base64.b85decode(b'{format_base85}'),")?;
+            writeln!(w, "    )")?;
+        }
+        _ => {}
+    }
 
     let head_bytes = ty.layout.as_ref().unwrap().head_size.div_ceil(8);
     writeln!(w, "    def head_bytes(self) -> int:")?;
@@ -352,12 +397,10 @@ pub fn write_ty_def_codec(
         ir::TyKind::Enum(variants) => {
             // decode
             let head = lutra_bin::layout::enum_head_format(variants);
-            let tag_bytes = head.tag_bytes;
-            let has_ptr = if head.has_ptr { "True" } else { "False" };
 
             writeln!(w)?;
             writeln!(w, "    def decode(self, buf: bytes) -> {name}:")?;
-            writeln!(w, "        tag, inner_offset = lutra_bin.EnumCodec({tag_bytes}, {has_ptr}).decode_head(buf)")?;
+            writeln!(w, "        tag, inner_offset = self.helper.decode_head(buf)")?;
             for (tag, variant) in variants.iter().enumerate() {
                 let variant_name = camel_to_snake(&variant.name);
                 writeln!(w, "        if tag == {tag}:")?;
@@ -373,12 +416,48 @@ pub fn write_ty_def_codec(
             // encode_head
             writeln!(w)?;
             writeln!(w, "    def encode_head(self, obj: {name}, buf: lutra_bin.BytesMut) -> typing.Any:")?;
-            writeln!(w, "        pass")?;
+            writeln!(w, "        tag: int")?;
+            writeln!(w, "        res: typing.Any")?;
+            for (tag, variant) in variants.iter().enumerate() {
+                let variant_name = camel_to_snake(&variant.name);
+                writeln!(w, "        if obj.{variant_name} is not None:")?;
+                writeln!(w, "            tag = {tag}")?;
+                writeln!(w, "            res = self.helper.encode_head_tag(tag, buf)")?;
+                if !head.has_ptr && !variant.ty.is_unit() {
+                    writeln!(w, "            res = {}.encode_head(obj.{variant_name}, buf)", ty_codec(&variant.ty, ctx))?;
+                }
+            }
+            writeln!(w, "        self.helper.encode_head_padding(tag, buf)")?;
+            writeln!(w, "        return res")?;
 
             // encode_body
             writeln!(w)?;
             writeln!(w, "    def encode_body(self, obj: {name}, residual: typing.Any, buf: lutra_bin.BytesMut) -> typing.Any:")?;
-            writeln!(w, "        pass")?;
+            if head.has_ptr {
+                writeln!(w, "        self.helper.encode_body_ptr(residual, buf)")?;
+                for variant in variants {
+                    if variant.ty.is_unit() {
+                        continue;
+                    }
+
+                    let variant_name = camel_to_snake(&variant.name);
+                    writeln!(w, "        if obj.{variant_name} is not None:")?;
+                    writeln!(w, "            r = {}.encode_head(obj.{variant_name}, buf)", ty_codec(&variant.ty, ctx))?;
+                    writeln!(w, "            {}.encode_body(obj.{variant_name}, r, buf)", ty_codec(&variant.ty, ctx))?;
+                }
+            } else {
+                writeln!(w, "        if residual is None:")?;
+                writeln!(w, "            return")?;
+                for variant in variants {
+                    if variant.ty.is_unit() {
+                        continue;
+                    }
+
+                    let variant_name = camel_to_snake(&variant.name);
+                    writeln!(w, "        if obj.{variant_name} is not None:")?;
+                    writeln!(w, "            {}.encode_body(obj.{variant_name}, residual, buf)", ty_codec(&variant.ty, ctx))?;
+                }
+            }
         }
 
         _ => unimplemented!(),
@@ -413,8 +492,12 @@ fn ty_ref(ty: &ir::Ty, ctx: &mut Context) -> Cow<'static, str> {
         ir::TyKind::Array(items_ty) => format!("list[{}]", ty_ref(items_ty, ctx)).into(),
 
         ir::TyKind::Ident(ident) => {
-            // TODO
-            ident.0.last().unwrap().clone().into()
+            let name = ident.0.last().unwrap().clone();
+            if ctx.tys_written.contains(&name) {
+                name.into()
+            } else {
+                format!("'{name}'").into()
+            }
         }
 
         ir::TyKind::Tuple(_) | ir::TyKind::Enum(_) => {

@@ -1,3 +1,12 @@
+//! Generic value object
+//!
+//! [Value] can represent any value in the Lutra type system.
+//! It is essentially moving type information from compile time into runtime,
+//! which is why it not recommended to use in general.
+//!
+//! Use this only when you need dynamic types, i.e. data whose type cannot be
+//! determined at compile time.
+
 use crate::string::ToString;
 use crate::{boxed, string, vec};
 
@@ -10,6 +19,7 @@ mod print_source;
 use crate::ir;
 use crate::{Error, Result};
 
+/// Generic Lutra value object
 #[derive(Clone, Debug, PartialEq)]
 pub enum Value {
     Bool(bool),

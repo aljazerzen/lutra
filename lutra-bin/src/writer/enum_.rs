@@ -50,7 +50,7 @@ impl EnumWriter {
     pub fn write_variant(
         tag: &[u8],
         has_ptr: bool,
-        variant_padding_bytes: u32,
+        variant_padding_bytes: u8,
         inner: Data,
     ) -> Data {
         // tag

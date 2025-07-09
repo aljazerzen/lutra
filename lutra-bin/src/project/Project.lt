@@ -1,0 +1,25 @@
+
+## SQL runner
+module sr {
+
+  ## Compiled program, executable with lutra-db-driver
+  type Program: {
+    sql: text,
+    input_ty: project::ir::Ty,
+    output_ty: project::ir::Ty,
+    types: [project::ir::TyDef],
+  }
+}
+
+module layout {
+    type EnumFormat: {
+        tag_bytes: uint8,
+        has_ptr: bool,
+        variants: [EnumVariantFormat],
+    }
+
+    type EnumVariantFormat: {
+        is_unit: bool,
+        padding_bytes: uint8,
+    }
+}

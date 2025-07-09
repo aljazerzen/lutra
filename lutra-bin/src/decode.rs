@@ -110,3 +110,22 @@ impl Decode for () {
         Ok(())
     }
 }
+
+pub fn decode_enum_head<'a>(mut data: &'a [u8], tag_bytes: u8, has_ptr: bool) -> (u64, &'a [u8]) {
+    use crate::ReaderExt;
+    use bytes::Buf;
+
+    let mut tag = vec![0; 8];
+    data.copy_to_slice(&mut tag[0..tag_bytes as usize]);
+    let tag = u64::from_le_bytes(tag.try_into().unwrap()) as u64;
+
+    if has_ptr {
+        // read ptr and dereference
+        let offset = u32::from_le_bytes(data.read_const::<4>());
+        data = data.skip(offset as usize);
+    } else {
+        // inner is right after the tag
+    }
+
+    (tag, data)
+}

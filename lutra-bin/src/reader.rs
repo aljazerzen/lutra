@@ -1,6 +1,4 @@
-use bytes::Buf;
-
-use crate::{borrow, vec};
+use crate::borrow;
 
 use crate::Data;
 use crate::ir;
@@ -140,46 +138,5 @@ impl<'d, 't> TupleReader<'d, 't> {
         let mut r = self.data.clone();
         r.skip(self.field_offsets[index] as usize);
         r
-    }
-}
-
-pub struct EnumReader<'a> {
-    data: &'a [u8],
-    tag: u64,
-}
-
-impl<'a> EnumReader<'a> {
-    pub fn new(mut data: &'a [u8], tag_bytes: u32, has_ptr: bool) -> Self {
-        let tag_bytes = tag_bytes as usize;
-
-        let mut tag = vec![0; 8];
-        data.copy_to_slice(&mut tag[0..tag_bytes]);
-        let tag = u64::from_le_bytes(tag.try_into().unwrap()) as u64;
-
-        if has_ptr {
-            // read ptr and dereference
-            let offset = u32::from_le_bytes(data.read_const::<4>());
-            data = data.skip(offset as usize);
-        } else {
-            // inner is right after the tag
-        }
-
-        EnumReader { data, tag }
-    }
-
-    pub fn new_for_ty(data: &'a [u8], ty: &ir::Ty) -> Self {
-        let ir::TyKind::Enum(variants) = &ty.kind else {
-            panic!()
-        };
-        let head = layout::enum_head_format(variants);
-        Self::new(data, head.tag_bytes, head.has_ptr)
-    }
-
-    pub fn get_tag(&self) -> u64 {
-        self.tag
-    }
-
-    pub fn get_inner(self) -> &'a [u8] {
-        self.data
     }
 }

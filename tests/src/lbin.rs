@@ -205,23 +205,21 @@ fn test_tree() {
     let value = Value::Enum(
         1, // Node
         Box::new(Value::Tuple(vec![
-            Value::Enum(0, Box::new(Value::Int64(4))), // Leaf
+            Value::Enum(0, Box::new(Value::Uint8(4))), // Leaf
             Value::Enum(
                 1, // Node
                 Box::new(Value::Tuple(vec![
-                    Value::Enum(0, Box::new(Value::Int64(7))),  // Leaf
-                    Value::Enum(0, Box::new(Value::Int64(10))), // Leaf
+                    Value::Enum(0, Box::new(Value::Uint8(7))),  // Leaf
+                    Value::Enum(0, Box::new(Value::Uint8(10))), // Leaf
                 ])),
             ),
         ])),
     );
-    assert_snapshot!(_test_encode_decode::<types::Tree>(value, &ty), @r#"
-    Length: 49 (0x31) bytes
-    0000:   01 04 00 00  00 00 09 00  00 00 01 0c  00 00 00 04   ................
-    0010:   00 00 00 00  00 00 00 00  09 00 00 00  00 0c 00 00   ................
-    0020:   00 07 00 00  00 00 00 00  00 0a 00 00  00 00 00 00   ................
-    0030:   00                                                   .
-    "#
+    assert_snapshot!(_test_encode_decode::<types::Tree>(value, &ty), @r"
+    Length: 28 (0x1c) bytes
+    0000:   01 04 00 00  00 00 09 00  00 00 01 05  00 00 00 04   ................
+    0010:   00 09 00 00  00 00 05 00  00 00 07 0a                ............
+    "
     );
 }
 

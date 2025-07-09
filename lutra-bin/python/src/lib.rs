@@ -27,7 +27,7 @@ fn main(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<Float64Codec>()?;
     m.add_class::<TextCodec>()?;
     m.add_class::<ArrayCodec>()?;
-    m.add_class::<EnumCodec>()?;
+    m.add_class::<EnumCodecHelper>()?;
 
     ir::register(m)?;
     sr::register(m)?;
@@ -234,29 +234,56 @@ impl ArrayCodec {
     }
 }
 
+/// EnumCoded does not implement the Codec protocol, but is more of a helper.
 #[pyclass(module = "lutra_bin")]
-pub struct EnumCodec {
-    tag_bytes: u32,
-    has_ptr: bool,
+pub struct EnumCodecHelper {
+    format: lutra_bin::layout::EnumFormat,
 }
 
 #[pymethods]
-impl EnumCodec {
+impl EnumCodecHelper {
     #[new]
-    fn __init__(tag_bytes: u32, has_ptr: bool) -> Self {
-        Self { tag_bytes, has_ptr }
+    fn new(enum_format: &[u8]) -> Self {
+        use lutra_bin::Decode;
+        Self {
+            format: lutra_bin::layout::EnumFormat::decode(enum_format).unwrap(),
+        }
     }
 
     fn decode_head(&self, buf: Bound<PyAny>) -> PyResult<(u64, usize)> {
         let py_buf = PyBuffer::<u8>::get(&buf)?;
         let buf_slice = buffer_as_slice(&py_buf)?;
 
-        let reader = lutra_bin::EnumReader::new(buf_slice, self.tag_bytes, self.has_ptr);
-
-        let tag = reader.get_tag();
-        let inner = reader.get_inner();
+        let (tag, inner) =
+            lutra_bin::decode_enum_head(buf_slice, self.format.tag_bytes, self.format.has_ptr);
         let inner_offset = buf_slice.len() - inner.len();
         Ok((tag, inner_offset))
+    }
+    fn encode_head_tag(&self, tag: u64, buf: Bound<BytesMut>) -> PyResult<Option<usize>> {
+        let mut bytes_mut = buf.try_borrow_mut()?;
+        let buf = &mut bytes_mut.inner;
+
+        let residual = lutra_bin::encode_enum_head_tag(&self.format, tag, buf);
+        Ok(residual.map(|r| r.unwrap()))
+    }
+    fn encode_head_padding(&self, tag: u64, buf: Bound<BytesMut>) -> PyResult<()> {
+        let mut bytes_mut = buf.try_borrow_mut()?;
+        let buf = &mut bytes_mut.inner;
+
+        lutra_bin::encode_enum_head_padding(&self.format, tag, buf);
+        Ok(())
+    }
+    fn encode_body_ptr(&self, residual: Option<usize>, buf: Bound<BytesMut>) -> PyResult<()> {
+        let Some(rev_ptr) = residual else {
+            return Ok(());
+        };
+        let rev_ptr = lutra_bin::ReversePointer::new_at(rev_ptr);
+
+        let mut bytes_mut = buf.try_borrow_mut()?;
+        let buf = &mut bytes_mut.inner;
+
+        rev_ptr.write_cur_len(buf);
+        Ok(())
     }
 }
 

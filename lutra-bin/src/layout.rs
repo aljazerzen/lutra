@@ -193,6 +193,21 @@ pub fn does_enum_variant_contain_recursive(enum_ty: &ir::Ty, variant_index: u16)
     enum_ty.variants_recursive.contains(&variant_index)
 }
 
+pub use crate::generated::layout::EnumFormat;
+
+pub fn enum_format(variants: &[ir::TyEnumVariant]) -> EnumFormat {
+    let head = enum_head_format(variants);
+    let variants = variants
+        .iter()
+        .map(|v| enum_variant_format(&head, &v.ty))
+        .collect();
+    EnumFormat {
+        tag_bytes: head.tag_bytes as u8,
+        has_ptr: head.has_ptr,
+        variants,
+    }
+}
+
 #[derive(Debug)]
 pub struct EnumHeadFormat {
     pub tag_bytes: u32,
@@ -221,11 +236,7 @@ pub fn enum_head_format(variants: &[ir::TyEnumVariant]) -> EnumHeadFormat {
     }
 }
 
-#[derive(Debug)]
-pub struct EnumVariantFormat {
-    pub is_unit: bool,
-    pub padding_bytes: u32,
-}
+pub use crate::generated::layout::EnumVariantFormat;
 
 pub fn enum_variant_format(head: &EnumHeadFormat, variant_ty: &ir::Ty) -> EnumVariantFormat {
     let inner_head_size = variant_ty.layout.as_ref().unwrap().head_size;
@@ -241,7 +252,7 @@ pub fn enum_variant_format(head: &EnumHeadFormat, variant_ty: &ir::Ty) -> EnumVa
             0
         }
     } else {
-        head.inner_bytes.saturating_sub(inner_head_bytes)
+        head.inner_bytes.saturating_sub(inner_head_bytes) as u8
     };
 
     EnumVariantFormat {

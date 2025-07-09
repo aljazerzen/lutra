@@ -16,11 +16,11 @@ mod writer;
 mod generated;
 
 pub use data::Data;
-pub use decode::Decode;
-pub use encode::{Encode, ReversePointer};
+pub use decode::{Decode, decode_enum_head};
+pub use encode::{Encode, ReversePointer, encode_enum_head_padding, encode_enum_head_tag};
 pub use error::{Error, Result};
 pub use layout::Layout;
-pub use reader::{ArrayReader, EnumReader, ReaderExt, TupleReader};
+pub use reader::{ArrayReader, ReaderExt, TupleReader};
 pub use value::Value;
 pub use writer::{ArrayWriter, EnumWriter, TupleWriter};
 

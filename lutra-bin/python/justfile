@@ -13,5 +13,5 @@ release:
 test:
     just develop
     cargo run -p lutra-cli -- codegen tests/types.lt tests/types_generated.py
-    mypy --enable-incomplete-feature=NewGenericSyntax tests
+    mypy --enable-incomplete-feature=NewGenericSyntax tests lutra_bin
     python -m unittest tests/main.py
