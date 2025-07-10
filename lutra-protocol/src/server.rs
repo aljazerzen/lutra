@@ -11,7 +11,7 @@ where
 {
     inner: C,
 
-    modules: Vec<(&'static str, &'static dyn lutra_runtime::NativeModule)>,
+    modules: Vec<(&'static str, &'static dyn lutra_interpreter::NativeModule)>,
 
     prepared_programs: HashMap<u32, br::Program>,
 }
@@ -22,7 +22,7 @@ where
 {
     pub fn new(
         inner: C,
-        modules: Vec<(&'static str, &'static dyn lutra_runtime::NativeModule)>,
+        modules: Vec<(&'static str, &'static dyn lutra_interpreter::NativeModule)>,
     ) -> Self {
         Self {
             inner,
@@ -53,7 +53,7 @@ where
                 log::trace!("execute");
 
                 let result =
-                    lutra_runtime::evaluate(program, execute.input, &self.modules).unwrap();
+                    lutra_interpreter::evaluate(program, execute.input, &self.modules).unwrap();
 
                 let response = messages::ServerMessage::Response(messages::Response {
                     request_id: execute.request_id,

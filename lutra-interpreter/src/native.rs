@@ -898,7 +898,7 @@ pub mod interpreter {
             _layout_args: &[u32],
             _args: Vec<Cell>,
         ) -> Result<Cell, EvalError> {
-            Ok(Cell::Data(encode("lutra-runtime 0.0.1")))
+            Ok(Cell::Data(encode("lutra-interpreter 0.0.1")))
         }
     }
 }

@@ -8,7 +8,7 @@ version.workspace = true
 
 [dependencies]
 lutra-bin = { path = "../lutra-bin" }
-lutra-runtime = { path = "../lutra-runtime" }
+lutra-interpreter = { path = "../lutra-interpreter" }
 lutra-compiler = { path = "../lutra-compiler" }
 
 tokio = { version = "1.42.0", features = ["rt", "io-util", "macros", "sync"] }

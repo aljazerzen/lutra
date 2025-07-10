@@ -7,7 +7,7 @@ async fn main() {
 
     let mut client = lutra_protocol::ClientConnection::new(io_client);
     let mut server =
-        lutra_protocol::ServerConnection::new(io_server, lutra_runtime::BUILTIN_MODULES.to_vec());
+        lutra_protocol::ServerConnection::new(io_server, lutra_interpreter::BUILTIN_MODULES.to_vec());
 
     let source = "let main = func (x: int64) -> 3 * x + 2";
     let program = lutra_compiler::_test_compile(source).unwrap();

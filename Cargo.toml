@@ -10,7 +10,7 @@ members = [
     "lutra-ir",
     "lutra-protocol",
     "lutra-rpc-embedded",
-    "lutra-runtime",
+    "lutra-interpreter",
     "lutra-typed-data",
     "lutra-tui",
 ]

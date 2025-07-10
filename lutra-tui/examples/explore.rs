@@ -28,7 +28,7 @@ fn execute_function(project: &lutra_compiler::Project, path: pr::Path) {
     let input_val = lutra_tui::prompt_for_ty(&input_ty, None).unwrap();
     let input = input_val.encode(&input_ty, &program.types).unwrap();
 
-    let result = lutra_runtime::evaluate(&bytecode, input, lutra_runtime::BUILTIN_MODULES).unwrap();
+    let result = lutra_interpreter::evaluate(&bytecode, input, lutra_interpreter::BUILTIN_MODULES).unwrap();
     let result =
         lutra_bin::Value::decode(&result, program.get_output_ty(), &program.types).unwrap();
 

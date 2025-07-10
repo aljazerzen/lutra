@@ -16,7 +16,7 @@ fn _runtime(lutra_source: &str) -> String {
     let bytecode = lutra_compiler::bytecode_program(program.clone());
 
     let output =
-        lutra_runtime::evaluate(&bytecode, vec![], lutra_runtime::BUILTIN_MODULES).unwrap();
+        lutra_interpreter::evaluate(&bytecode, vec![], lutra_interpreter::BUILTIN_MODULES).unwrap();
 
     let output =
         lutra_bin::Value::decode(&output, program.get_output_ty(), &program.types).unwrap();

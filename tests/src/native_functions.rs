@@ -14,7 +14,7 @@ impl runtime::Functions for RuntimeModule {
 
 #[test]
 fn test_01() {
-    let mut modules = lutra_runtime::BUILTIN_MODULES.to_vec();
+    let mut modules = lutra_interpreter::BUILTIN_MODULES.to_vec();
     modules.push(("world", &runtime::Wrapper(MODULE)));
 
     let program = ::lutra_ir::_test_parse(
@@ -31,7 +31,7 @@ fn test_01() {
     let output_ty = program.get_output_ty().clone();
     let bytecode = lutra_compiler::bytecode_program(program);
 
-    let value = lutra_runtime::evaluate(&bytecode, vec![], &modules).unwrap();
+    let value = lutra_interpreter::evaluate(&bytecode, vec![], &modules).unwrap();
 
     let value = Value::decode(&value, &output_ty, &[]).unwrap();
 
