@@ -73,6 +73,16 @@ The business logic of programs should be fully statically typed.
 Each variable should have an associated type, either annotated explicitly
 or preferably inferred from context.
 
+```lt
+# Without type information
+let result = request("GET", "http://my-app.com/v1/movies/" + str(movie_id))
+let movie_title = result["title"]
+
+# With type information
+let result: Movie = my_app::movies::get(movie_id)
+let movie_title = result.title
+```
+
 This improves readability of the program and validates the author's assumptions
 about written code. It first guides the author when writing code, and also
 automates validation of these assumptions when changes to the program are made

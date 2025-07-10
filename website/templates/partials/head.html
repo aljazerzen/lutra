@@ -4,7 +4,11 @@
 <title>{{ page.title }} | {{config.title }}</title>
 {% endif %}
 {% if section.title %}
+{% if section.title == config.title %}
+<title>{{ section.title }}</title>
+{% else %}
 <title>{{ section.title }} | {{config.title }}</title>
+{% endif %}
 {% endif %}
 <link rel="shortcut icon" href="{{ config.base_url }}/favicon.ico" />
 <link rel="stylesheet" href="{{ config.base_url }}/water.min.css">
@@ -106,7 +110,7 @@
         color: var(--text);
     }
     ul.navigation li.active>a {
-        color: var(--selection);
+        color: var(--links);
     }
     ul.navigation li.header:not(:first-child) {
         padding-top: 1.5rem;
