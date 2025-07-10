@@ -4,9 +4,9 @@ use embedded_io_async::Read;
 use embedded_io_async::ReadExactError;
 use embedded_io_async::Write;
 
-use crate::messages;
+use crate::binary::messages;
 
-pub struct Connection<C>
+pub struct Client<C>
 where
     C: Read + Write + Unpin,
 {
@@ -16,12 +16,12 @@ where
     next_request_id: u32,
 }
 
-impl<C> Connection<C>
+impl<C> Client<C>
 where
     C: Read + Write + Unpin,
 {
     pub fn new(inner: C) -> Self {
-        Connection {
+        Client {
             inner,
             next_program_id: 0,
             next_request_id: 0,
@@ -76,14 +76,14 @@ where
 
     pub async fn recv_response(&mut self, request_id: u32) -> Result<messages::Result, C::Error> {
         self.inner.flush().await?;
-        log::debug!("flushed");
+        tracing::debug!("flushed");
         loop {
             let res = super::read_message(&mut self.inner).await;
 
             let message = match res {
                 Ok(Ok(message)) => message,
                 Ok(Err(lutra_err)) => {
-                    log::error!("recv_response: {lutra_err:?}");
+                    tracing::error!("recv_response: {lutra_err:?}");
                     continue;
                 }
                 Err(ReadExactError::UnexpectedEof) => break,

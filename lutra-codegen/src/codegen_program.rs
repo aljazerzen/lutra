@@ -26,8 +26,7 @@ pub fn write_sr_programs(
 
         // encode and write to file
         let out_file = ctx.out_dir.join(format!("{fq_path}.sr.lb"));
-        let mut buf = bytes::BytesMut::new();
-        program.encode(&mut buf);
+        let buf = program.encode();
         std::fs::write(out_file, buf).unwrap();
 
         write!(w, "pub fn {name}() -> {lutra_bin}::sr::TypedProgram<(), ")?;

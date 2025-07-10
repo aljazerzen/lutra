@@ -3,8 +3,6 @@ use std::collections::HashMap;
 use indexmap::IndexSet;
 use lutra_bin::Encode;
 use lutra_bin::br::*;
-use lutra_bin::bytes;
-use lutra_bin::bytes::Buf;
 use lutra_bin::bytes::BufMut;
 use lutra_bin::ir;
 
@@ -80,22 +78,20 @@ impl ByteCoder {
     }
 
     fn compile_literal(&mut self, value: ir::Literal) -> Vec<u8> {
-        let mut buf = bytes::BytesMut::with_capacity(8);
         match value {
-            ir::Literal::bool(v) => v.encode(&mut buf),
-            ir::Literal::int8(v) => v.encode(&mut buf),
-            ir::Literal::int16(v) => v.encode(&mut buf),
-            ir::Literal::int32(v) => v.encode(&mut buf),
-            ir::Literal::int64(v) => v.encode(&mut buf),
-            ir::Literal::uint8(v) => v.encode(&mut buf),
-            ir::Literal::uint16(v) => v.encode(&mut buf),
-            ir::Literal::uint32(v) => v.encode(&mut buf),
-            ir::Literal::uint64(v) => v.encode(&mut buf),
-            ir::Literal::float32(v) => v.encode(&mut buf),
-            ir::Literal::float64(v) => v.encode(&mut buf),
-            ir::Literal::text(v) => v.encode(&mut buf),
-        };
-        buf.to_vec()
+            ir::Literal::bool(v) => v.encode(),
+            ir::Literal::int8(v) => v.encode(),
+            ir::Literal::int16(v) => v.encode(),
+            ir::Literal::int32(v) => v.encode(),
+            ir::Literal::int64(v) => v.encode(),
+            ir::Literal::uint8(v) => v.encode(),
+            ir::Literal::uint16(v) => v.encode(),
+            ir::Literal::uint32(v) => v.encode(),
+            ir::Literal::uint64(v) => v.encode(),
+            ir::Literal::float32(v) => v.encode(),
+            ir::Literal::float64(v) => v.encode(),
+            ir::Literal::text(v) => v.encode(),
+        }
     }
 
     fn compile_call(&mut self, value: ir::Call) -> Call {
@@ -229,10 +225,9 @@ impl ByteCoder {
                 let param_ty = as_ty_of_param(ty_mat);
                 let primitive = param_ty.kind.as_primitive().unwrap();
 
-                let mut buf = lutra_bin::bytes::BytesMut::with_capacity(1);
-                primitive.encode(&mut buf);
+                let mut buf = primitive.encode();
                 buf.put_bytes(0, 3); // padding
-                vec![buf.get_u32()]
+                vec![u32::from_be_bytes(buf[0..4].try_into().unwrap())]
             }
 
             "std::count" => vec![],
@@ -381,11 +376,10 @@ impl ByteCoder {
 
                 let output_item = ty_func.body.kind.as_array().unwrap();
 
-                let mut output_item_buf = lutra_bin::bytes::BytesMut::new();
-                output_item.encode(&mut output_item_buf);
+                let output_item_buf = output_item.encode();
 
                 let mut r = Vec::new();
-                pack_bytes_to_u32(output_item_buf.to_vec(), &mut r);
+                pack_bytes_to_u32(output_item_buf, &mut r);
                 r
             }
 

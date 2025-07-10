@@ -19,6 +19,7 @@ pub use data::Data;
 pub use decode::{Decode, decode_enum_head};
 pub use encode::{Encode, ReversePointer, encode_enum_head_padding, encode_enum_head_tag};
 pub use error::{Error, Result};
+pub use generated::Program;
 pub use layout::Layout;
 pub use reader::{ArrayReader, ReaderExt, TupleReader};
 pub use value::Value;
@@ -58,3 +59,19 @@ pub use std::boxed;
 pub use alloc::collections;
 #[cfg(feature = "std")]
 pub use std::collections;
+
+pub struct TypedProgram<I: crate::Encode, O: crate::Decode> {
+    pub inner: Program,
+    input_ty: core::marker::PhantomData<I>,
+    output_ty: core::marker::PhantomData<O>,
+}
+
+impl<I: crate::Encode, O: crate::Decode> From<Program> for TypedProgram<I, O> {
+    fn from(inner: Program) -> Self {
+        Self {
+            inner,
+            input_ty: core::marker::PhantomData,
+            output_ty: core::marker::PhantomData,
+        }
+    }
+}

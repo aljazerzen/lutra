@@ -111,7 +111,7 @@ impl Decode for () {
     }
 }
 
-pub fn decode_enum_head<'a>(mut data: &'a [u8], tag_bytes: u8, has_ptr: bool) -> (u64, &'a [u8]) {
+pub fn decode_enum_head(mut data: &[u8], tag_bytes: u8, has_ptr: bool) -> (u64, &[u8]) {
     use crate::ReaderExt;
     use bytes::Buf;
 

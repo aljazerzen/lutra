@@ -30,7 +30,7 @@ pub fn _run(source: &str, args: Vec<lutra_bin::Value>) -> (String, String) {
     // execute
     const POSTGRES_URL: &str = "postgresql://postgres:pass@localhost:5416";
     let mut client = postgres::Client::connect(POSTGRES_URL, postgres::NoTls).unwrap();
-    let rel_data = lutra_db_driver::query_sync(&mut client, &program, &input).unwrap();
+    let rel_data = lutra_runner_postgres::execute(&mut client, &program, &input).unwrap();
 
     // decode and print source
     let output = lutra_bin::Value::decode(&rel_data, &program.output_ty, &program.types).unwrap();

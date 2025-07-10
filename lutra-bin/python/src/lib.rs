@@ -48,6 +48,7 @@ impl BytesMut {
         }
     }
 
+    #[allow(clippy::wrong_self_convention)]
     fn into_bytes(&mut self) -> Cow<[u8]> {
         let bytes_mut = std::mem::take(&mut self.inner);
         Cow::from(bytes_mut.freeze().to_vec())
@@ -84,7 +85,7 @@ macro_rules! prim_pyclass {
             ) -> PyResult<()> {
                 use lutra_bin::Encode;
                 let mut bytes_mut = buf.try_borrow_mut()?;
-                Ok(val.encode(&mut bytes_mut.inner))
+                Ok(val.encode_head(&mut bytes_mut.inner))
             }
 
             fn encode_body(
@@ -311,9 +312,7 @@ mod ir {
         }
 
         fn encode(&self) -> Cow<'static, [u8]> {
-            let mut bytes = lutra_bin::bytes::BytesMut::new();
-            self.0.encode(&mut bytes);
-            bytes.to_vec().into()
+            self.0.encode().into()
         }
     }
 }
@@ -342,9 +341,7 @@ mod sr {
         }
 
         fn encode(&self) -> Cow<'static, [u8]> {
-            let mut bytes = lutra_bin::bytes::BytesMut::new();
-            self.0.encode(&mut bytes);
-            bytes.to_vec().into()
+            self.0.encode().into()
         }
     }
 }

@@ -1,8 +1,13 @@
 
+type Program: {
+    format: text,
+    inner: [uint8],
+}
+
 ## SQL runner
 module sr {
 
-  ## Compiled program, executable with lutra-db-driver
+  ## Compiled program, executable with lutra-runner-postgres
   type Program: {
     sql: text,
     input_ty: project::ir::Ty,

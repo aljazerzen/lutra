@@ -9,7 +9,7 @@ use postgres::Row;
 #[cfg(feature = "tokio-postgres")]
 use tokio_postgres::Row;
 
-pub fn from_sql(program: &sr::Program, rows: &[Row]) -> bytes::Bytes {
+pub fn from_sql(program: &sr::Program, rows: &[Row]) -> Vec<u8> {
     // write rows to buffer
     let mut buf = bytes::BytesMut::new();
 
@@ -18,7 +18,7 @@ pub fn from_sql(program: &sr::Program, rows: &[Row]) -> bytes::Bytes {
     let encoder = ctx.construct_rows_encoder(&program.output_ty);
     encoder.encode(&mut buf, rows);
 
-    buf.freeze()
+    buf.to_vec()
 }
 
 // TODO: use get_ty_mat for ident types (or recursive types in JSON)

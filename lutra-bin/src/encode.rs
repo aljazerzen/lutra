@@ -9,9 +9,11 @@ use crate::{Layout, Result};
 pub trait Encode {
     type HeadPtr;
 
-    fn encode(&self, buf: &mut BytesMut) {
-        let ptr = self.encode_head(buf);
-        self.encode_body(ptr, buf);
+    fn encode(&self) -> vec::Vec<u8> {
+        let mut buf = BytesMut::new();
+        let ptr = self.encode_head(&mut buf);
+        self.encode_body(ptr, &mut buf);
+        buf.to_vec()
     }
 
     fn encode_head(&self, buf: &mut BytesMut) -> Self::HeadPtr;

@@ -322,18 +322,14 @@ pub fn write_ty_def_codec(
     writeln!(w)?;
     writeln!(w, "class {codec_name}:")?;
 
-    match &ty.kind {
-        ir::TyKind::Enum(variants) => {
-            // for enums, we init the EnumCodecHelper
-            let enum_format = lutra_bin::layout::enum_format(variants);
-            let mut buf = bytes::BytesMut::new();
-            enum_format.encode(&mut buf);
-            let format_base85 = base85::encode(&buf);
-            writeln!(w, "    helper = lutra_bin.EnumCodecHelper(")?;
-            writeln!(w, "        base64.b85decode(b'{format_base85}'),")?;
-            writeln!(w, "    )")?;
-        }
-        _ => {}
+    if let ir::TyKind::Enum(variants) = &ty.kind {
+        // for enums, we init the EnumCodecHelper
+        let enum_format = lutra_bin::layout::enum_format(variants);
+        let buf = enum_format.encode();
+        let format_base85 = base85::encode(&buf);
+        writeln!(w, "    helper = lutra_bin.EnumCodecHelper(")?;
+        writeln!(w, "        base64.b85decode(b'{format_base85}'),")?;
+        writeln!(w, "    )")?;
     }
 
     let head_bytes = ty.layout.as_ref().unwrap().head_size.div_ceil(8);
@@ -583,8 +579,7 @@ fn write_sr_programs(
         let program = lutra_compiler::compile_to_sql(ctx.project, &fq_path);
 
         // encode to base85
-        let mut buf = bytes::BytesMut::new();
-        program.encode(&mut buf);
+        let buf = program.encode();
         let program_base85 = base85::encode(&buf);
 
         writeln!(w)?;
@@ -602,11 +597,9 @@ fn write_sr_programs(
 
 fn camel_to_snake(camel: &str) -> String {
     let mut snake = String::with_capacity(camel.len());
-    let mut chars = camel.chars().peekable();
-
-    while let Some(current) = chars.next() {
+    for current in camel.chars() {
         if current.is_uppercase() {
-            if !snake.is_empty() && snake.chars().last().unwrap() != '_' {
+            if !snake.ends_with('_') {
                 snake.push('_');
             }
             snake.push(current.to_lowercase().next().unwrap());

@@ -1,5 +1,5 @@
 [package]
-name = "lutra-db-driver"
+name = "lutra-runner-postgres"
 edition.workspace = true
 license.workspace = true
 repository.workspace = true
@@ -11,6 +11,7 @@ bytes = { workspace = true }
 tracing = { workspace = true }
 futures = { version = "0.3.31", default-features = false }
 lutra-bin = { version = "0.1.0", path = "../lutra-bin" }
+lutra-runner = { version = "0.1.0", path = "../lutra-runner" }
 tinyjson = "2"
 postgres-types = { version = "0.2.9", default-features = false }
 postgres-protocol = { version = "0.6.8", default-features = false }

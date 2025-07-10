@@ -15,10 +15,4 @@ pub enum Error {
 
     #[error("invalid type: type has no binary format")]
     InvalidType,
-
-    #[error("invalid type reference: {name}")]
-    InvalidTypeReference { name: string::String },
-
-    #[error("type has an infinite size")]
-    InvalidTypeRecursive,
 }

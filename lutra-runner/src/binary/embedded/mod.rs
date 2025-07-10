@@ -1,20 +1,6 @@
-#![cfg_attr(not(feature = "std"), no_std)]
-
 mod client;
 
-pub mod messages {
-    include!(concat!(env!("OUT_DIR"), "/messages.rs"));
-}
-
-pub use client::Connection;
-
-#[cfg(not(feature = "std"))]
-extern crate alloc;
-
-#[cfg(not(feature = "std"))]
-use alloc::vec;
-#[cfg(feature = "std")]
-use std::vec;
+pub use client::Client;
 
 use embedded_io_async::{Read, ReadExactError, Write};
 
@@ -22,15 +8,14 @@ async fn write_message<W: Write + Unpin>(
     mut tx: W,
     e: impl lutra_bin::Encode,
 ) -> Result<(), W::Error> {
-    log::debug!("writing message");
-    let mut buf = lutra_bin::bytes::BytesMut::new();
-    e.encode(&mut buf);
+    tracing::debug!("writing message");
+    let buf = e.encode();
 
-    log::debug!(".. len = {}", buf.len());
+    tracing::debug!(".. len = {}", buf.len());
     tx.write_all(&(buf.len() as u32).to_le_bytes()).await?;
-    log::debug!(".. contents");
+    tracing::debug!(".. contents");
     tx.write_all(&buf).await?;
-    log::debug!(".. done");
+    tracing::debug!(".. done");
     Ok(())
 }
 
@@ -39,18 +24,18 @@ where
     R: Read + Unpin,
     D: lutra_bin::Decode + Sized,
 {
-    log::debug!("read message");
+    tracing::debug!("read message");
 
     let mut buf = [0; 4];
     rx.read_exact(&mut buf).await?;
     let len = u32::from_le_bytes(buf) as usize;
-    log::debug!(".. len = {len}");
+    tracing::debug!(".. len = {len}");
 
     let mut buf = vec![0; len];
     rx.read_exact(&mut buf).await?;
-    log::debug!(".. decode");
+    tracing::debug!(".. decode");
 
     let r = D::decode(&buf);
-    log::debug!(".. done");
+    tracing::debug!(".. done");
     Ok(r)
 }

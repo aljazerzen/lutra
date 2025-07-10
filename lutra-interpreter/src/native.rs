@@ -1,4 +1,3 @@
-use lutra_bin::bytes;
 use lutra_bin::{Encode, Layout};
 
 use crate::NativeModule;
@@ -1026,7 +1025,5 @@ mod decode {
 }
 
 pub fn encode<T: Encode + Layout + ?Sized>(value: &T) -> lutra_bin::Data {
-    let mut buf = bytes::BytesMut::with_capacity(T::head_size().div_ceil(8));
-    value.encode(&mut buf);
-    lutra_bin::Data::new(buf.to_vec())
+    lutra_bin::Data::new(value.encode())
 }

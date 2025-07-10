@@ -25,8 +25,7 @@ pub fn encode_typed_data(
 
     let typed_data = schema::TypedData { ty, data };
 
-    let mut buf = lutra_bin::bytes::BytesMut::new();
-    typed_data.encode(&mut buf);
+    let buf = typed_data.encode();
 
     Ok(w.write_all(&buf))
 }

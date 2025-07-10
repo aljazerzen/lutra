@@ -11,6 +11,7 @@ mod lowerer;
 mod native_functions;
 mod postgres;
 mod resolver;
+mod runner;
 mod typed_data;
 
 fn init_logger() {

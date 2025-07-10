@@ -65,8 +65,7 @@ pub fn generate_program(
     let program = lutra_compiler::layouter::on_program(program);
     let program = lutra_compiler::bytecode_program(program);
 
-    let mut buf = bytes::BytesMut::new();
-    program.encode(&mut buf);
+    let buf = program.encode();
 
     std::fs::write(out_file, buf).unwrap();
 }

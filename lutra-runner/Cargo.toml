@@ -1,0 +1,21 @@
+[package]
+name = "lutra-runner"
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+version.workspace = true
+
+[features]
+std = ["lutra-bin/std"]
+binary-tokio = ["tokio", "std"]
+binary-embedded = ["embedded-io-async"]
+
+[dependencies]
+embedded-io-async = { version = "0.6.1", optional = true }
+lutra-bin = { version = "0.1.0", path = "../lutra-bin", default-features = false }
+tokio = { version = "1.46.1", features = ["io-util", "sync"], optional = true }
+tracing.workspace = true
+
+[build-dependencies]
+lutra-codegen = { version = "0.1.0", path = "../lutra-codegen" }
