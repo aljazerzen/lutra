@@ -6,10 +6,10 @@ async fn main() {
     loop {
         let (stream, _) = listener.accept().await.unwrap();
 
-        let (http_serve, rpc_io) = lutra_protocol::http::server(stream);
+        let (http_serve, rpc_io) = lutra_rpc::http::server(stream);
 
         let mut server =
-            lutra_protocol::ServerConnection::new(rpc_io, lutra_interpreter::BUILTIN_MODULES.to_vec());
+            lutra_rpc::ServerConnection::new(rpc_io, lutra_interpreter::BUILTIN_MODULES.to_vec());
 
         tokio::join!(server.run(), http_serve);
     }

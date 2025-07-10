@@ -1,18 +1,18 @@
 [workspace]
 members = [
-    "tests",
     "lutra-bin",
     "lutra-bin/python",
     "lutra-cli",
     "lutra-codegen",
     "lutra-compiler",
     "lutra-db-driver",
-    "lutra-ir",
-    "lutra-protocol",
-    "lutra-rpc-embedded",
     "lutra-interpreter",
-    "lutra-typed-data",
+    "lutra-ir",
+    "lutra-rpc-embedded",
+    "lutra-rpc",
     "lutra-tui",
+    "lutra-typed-data",
+    "tests",
 ]
 exclude = ["examples"]
 resolver = "2"

@@ -1,26 +1,20 @@
 use lutra_bin::br;
-use lutra_protocol::messages;
-use tokio::net::TcpStream;
+use lutra_rpc::messages;
 
 #[tokio::main(flavor = "current_thread")]
 async fn main() {
-    let address = std::net::SocketAddr::from(([127, 0, 0, 1], 3000));
-    let tcp_io = TcpStream::connect(address).await.unwrap();
+    let (io_client, io_server) = tokio::io::duplex(1000);
 
-    // Create the Hyper client
-    let (f, shutdown, rpc_io) = lutra_protocol::http::client(tcp_io).await;
+    let mut client = lutra_rpc::ClientConnection::new(io_client);
+    let mut server =
+        lutra_rpc::ServerConnection::new(io_server, lutra_interpreter::BUILTIN_MODULES.to_vec());
 
-    println!("connected");
-
-    let mut client = lutra_protocol::ClientConnection::new(rpc_io);
+    let source = "let main = func (x: int64) -> 3 * x + 2";
+    let program = lutra_compiler::_test_compile(source).unwrap();
+    let output_ty = program.get_output_ty().clone();
+    let program = lutra_compiler::bytecode_program(program);
 
     let c = async {
-        let source = "let main = func (x: int64) -> 3 * x + 2";
-        let program = lutra_compiler::_test_compile(source).unwrap();
-        let output_ty = program.get_output_ty().clone();
-        let program = lutra_compiler::bytecode_program(program);
-
-        println!("preparing...");
         let program_id = client.prepare(&program).await;
 
         let res = client
@@ -35,11 +29,9 @@ async fn main() {
         print_res(res, &output_ty);
 
         client.shutdown().await.unwrap();
-        println!("sending shutdown");
-        shutdown.send(()).unwrap();
     };
 
-    tokio::join!(f, c);
+    tokio::join!(c, server.run());
 }
 
 fn print_res(res: messages::Result, output_ty: &br::Ty) {
