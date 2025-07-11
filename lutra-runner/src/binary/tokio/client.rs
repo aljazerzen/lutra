@@ -36,7 +36,7 @@ where
     /// Prepare, execute and release.
     pub async fn run_once(
         &self,
-        program: &lutra_bin::Program,
+        program: &lutra_bin::rr::Program,
         input: &[u8],
     ) -> io::Result<messages::Result> {
         let program_id = self.send_prepare(program).await;
@@ -46,7 +46,7 @@ where
         self.recv_response(request_id).await
     }
 
-    pub async fn send_prepare(&self, program: &lutra_bin::Program) -> u32 {
+    pub async fn send_prepare(&self, program: &lutra_bin::rr::Program) -> u32 {
         let program_id = self
             .next_program_id
             .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
@@ -118,7 +118,7 @@ where
 
     async fn execute_raw(
         &self,
-        program: &lutra_bin::Program,
+        program: &lutra_bin::rr::Program,
         input: &[u8],
     ) -> Result<std::vec::Vec<u8>, Self::Error> {
         let res = self.run_once(program, input).await?;

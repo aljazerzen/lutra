@@ -23,7 +23,7 @@ pub struct Project {
 // as a Trait with a Struct for each type, which would use structure over values
 // (i.e. `Option<PathBuf>` below signifies whether it's a project or not). But
 // waiting until it's necessary before splitting it out.)
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone)]
 pub struct SourceTree {
     /// Path to the root of the source tree.
     pub root: PathBuf,
@@ -37,6 +37,14 @@ pub struct SourceTree {
 }
 
 impl SourceTree {
+    pub fn empty() -> Self {
+        SourceTree {
+            sources: Default::default(),
+            source_ids: Default::default(),
+            root: PathBuf::new(),
+        }
+    }
+
     pub fn single(path: PathBuf, content: String) -> Self {
         SourceTree {
             sources: [(path.clone(), content)].into(),

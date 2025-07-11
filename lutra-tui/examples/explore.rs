@@ -54,5 +54,5 @@ fn get_project() -> lutra_compiler::Project {
     "#;
 
     let source = lutra_compiler::SourceTree::single("".into(), source.into());
-    lutra_compiler::compile(source, Default::default()).unwrap()
+    lutra_compiler::check(source, Default::default()).unwrap()
 }

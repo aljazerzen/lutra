@@ -1,6 +1,7 @@
 use clap::{Parser, Subcommand};
 
-use lutra_compiler::{CompileParams, DiscoverParams, pr};
+use lutra_compiler::{CheckParams, DiscoverParams};
+use lutra_runner::Run;
 
 fn main() {
     let action = Command::parse();
@@ -17,7 +18,6 @@ fn main() {
         Action::Discover(cmd) => discover(cmd),
         Action::Check(cmd) => check(cmd),
         Action::Run(cmd) => run(cmd),
-        Action::Sql(cmd) => sql(cmd),
         Action::RunPostgres(cmd) => run_postgres(cmd),
         Action::PullSchemaPostgres(cmd) => pull_schema_postgres(cmd),
         Action::Codegen(cmd) => codegen(cmd),
@@ -49,9 +49,6 @@ pub enum Action {
 
     /// Compile the project
     Check(CheckCommand),
-
-    /// Compile the project to SQL
-    Sql(SqlCommand),
 
     /// Compile the project to bytecode and run it
     Run(RunCommand),
@@ -85,15 +82,15 @@ pub struct CheckCommand {
     discover: DiscoverParams,
 
     #[clap(flatten)]
-    compile: CompileParams,
-
-    /// Lutra program expression to be compiled
-    #[clap(long, default_value = "main")]
-    program: String,
+    check: CheckParams,
 
     /// Prints debug information about compiled project
     #[clap(long, default_value = "false")]
     print_project: bool,
+
+    /// Lutra program expression to be compiled
+    #[clap(long, default_value = "main")]
+    program: String,
 
     /// Prints the Intermediate Representation
     #[clap(long, default_value = "false")]
@@ -103,7 +100,7 @@ pub struct CheckCommand {
 pub fn check(cmd: CheckCommand) -> anyhow::Result<()> {
     let project = lutra_compiler::discover(cmd.discover)?;
 
-    let project = lutra_compiler::compile(project, cmd.compile)?;
+    let project = lutra_compiler::check(project, cmd.check)?;
 
     if cmd.print_project {
         println!("------ PROJECT ------");
@@ -111,7 +108,7 @@ pub fn check(cmd: CheckCommand) -> anyhow::Result<()> {
         println!("---------------------");
     }
 
-    let expr = lutra_compiler::compile_overlay(&project, &cmd.program, Some("--program"))?;
+    let expr = lutra_compiler::check_overlay(&project, &cmd.program, Some("--program"))?;
     let program = lutra_compiler::lower_expr(&project.root_module, &expr);
     let program = lutra_compiler::layouter::on_program(program);
 
@@ -135,58 +132,33 @@ pub struct RunCommand {
     discover: DiscoverParams,
 
     #[clap(flatten)]
-    compile: CompileParams,
+    check: CheckParams,
 
-    #[clap(default_value = "main")]
+    #[clap(long, default_value = "main")]
     program: String,
 }
 
-pub fn run(cmd: RunCommand) -> anyhow::Result<()> {
+#[tokio::main(flavor = "current_thread")]
+pub async fn run(cmd: RunCommand) -> anyhow::Result<()> {
+    // compile
     let project = lutra_compiler::discover(cmd.discover)?;
 
-    let project = lutra_compiler::compile(project, cmd.compile)?;
+    let project = lutra_compiler::check(project, cmd.check)?;
 
-    let expr = lutra_compiler::compile_overlay(&project, &cmd.program, Some("--program"))?;
-    let program = lutra_compiler::lower_expr(&project.root_module, &expr);
-    let program = lutra_compiler::layouter::on_program(program);
+    let (program, ty) = lutra_compiler::compile(
+        &project,
+        &cmd.program,
+        Some("--program"),
+        lutra_compiler::ProgramFormat::BytecodeLt,
+    )?;
 
-    tracing::debug!("ir:\n{}", lutra_bin::ir::print(&program));
-    let bytecode = lutra_compiler::bytecode_program(program.clone());
+    // execute
+    let runner = lutra_interpreter::InterpreterRunner::default();
+    let output = runner.execute_raw(&program, &[]).await?;
 
-    let res = lutra_interpreter::evaluate(&bytecode, vec![], lutra_interpreter::BUILTIN_MODULES)?;
-    let value = lutra_bin::Value::decode(&res, program.get_output_ty(), &program.types)?;
-
-    println!(
-        "{}",
-        value
-            .print_source(program.get_output_ty(), &program.types)
-            .unwrap()
-    );
-    Ok(())
-}
-
-#[derive(clap::Parser)]
-pub struct SqlCommand {
-    #[clap(flatten)]
-    discover: DiscoverParams,
-
-    #[clap(flatten)]
-    compile: CompileParams,
-
-    #[clap(default_value = "main")]
-    program: String,
-}
-
-pub fn sql(cmd: SqlCommand) -> anyhow::Result<()> {
-    let project = lutra_compiler::discover(cmd.discover)?;
-
-    let project = lutra_compiler::compile(project, cmd.compile)?;
-
-    let path = pr::Path::new(cmd.program.split("::"));
-
-    let program = lutra_compiler::compile_to_sql(&project, &path);
-
-    println!("{}", program.sql);
+    // handle output
+    let value = lutra_bin::Value::decode(&output, &ty.output, &ty.ty_defs)?;
+    println!("{}", value.print_source(&ty.output, &ty.ty_defs).unwrap());
     Ok(())
 }
 
@@ -196,37 +168,45 @@ pub struct RunPostgresCommand {
     discover: DiscoverParams,
 
     #[clap(flatten)]
-    compile: CompileParams,
+    check: CheckParams,
 
     #[clap(default_value = "postgresql://localhost:5432")]
     postgres_url: String,
 
-    #[clap(default_value = "main")]
-    path: String,
+    #[clap(long, default_value = "main")]
+    program: String,
 }
 
-pub fn run_postgres(cmd: RunPostgresCommand) -> anyhow::Result<()> {
+#[tokio::main(flavor = "current_thread")]
+pub async fn run_postgres(cmd: RunPostgresCommand) -> anyhow::Result<()> {
+    // compile
     let project = lutra_compiler::discover(cmd.discover)?;
 
-    let project = lutra_compiler::compile(project, cmd.compile)?;
+    let project = lutra_compiler::check(project, cmd.check)?;
 
-    let path = pr::Path::new(cmd.path.split("::"));
+    let (program, ty) = lutra_compiler::compile(
+        &project,
+        &cmd.program,
+        Some("--program"),
+        lutra_compiler::ProgramFormat::SqlPg,
+    )?;
+    let program = program.as_sql_pg().unwrap();
 
-    let program = lutra_compiler::compile_to_sql(&project, &path);
+    // debug: print formatted sql
+    if tracing::enabled!(tracing::Level::DEBUG) {
+        let options = sqlformat::FormatOptions::default();
+        let formatted_sql =
+            sqlformat::format(&program.sql, &sqlformat::QueryParams::None, &options);
+        tracing::debug!("sql:\n{formatted_sql}");
+    }
 
-    let options = sqlformat::FormatOptions::default();
-    let formatted_sql = sqlformat::format(&program.sql, &sqlformat::QueryParams::None, &options);
-    tracing::debug!("sql:\n{formatted_sql}");
-
+    // execute
     let mut client = postgres::Client::connect(&cmd.postgres_url, postgres::NoTls)?;
+    let output = lutra_runner_postgres::execute(&mut client, program, &[])?;
 
-    let data = lutra_runner_postgres::execute(&mut client, &program, &[])?;
-
-    let value = lutra_bin::Value::decode(&data, &program.output_ty, &program.types)?;
-    println!(
-        "{}",
-        value.print_source(&program.output_ty, &program.types)?
-    );
+    // handle output
+    let value = lutra_bin::Value::decode(&output, &ty.output, &ty.ty_defs)?;
+    println!("{}", value.print_source(&ty.output, &ty.ty_defs)?);
     Ok(())
 }
 

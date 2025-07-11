@@ -41,8 +41,8 @@ fn lower_01() {
     "#), @r"
     type chinook::album = {id: int64, title: text};
     type box_office::album_sale = {id: int64, total: float64};
-    let main = (func 0 ->
-      let 2 = (func 4 ->
+    let main = (func 1 ->
+      let 1 = (func 4 ->
         (call
           external.std::index: func ([{id: int64, total: float64}], int64) -> {id: int64, total: float64},
           (call
@@ -64,7 +64,7 @@ fn lower_01() {
           0: int64,
         ): {id: int64, total: float64}
       ): func (int64) -> box_office::album_sale;
-      let 1 = (func 2 ->
+      let 0 = (func 2 ->
         (call
           external.std::index: func ([{id: int64, title: text}], int64) -> {id: int64, title: text},
           (call
@@ -86,30 +86,29 @@ fn lower_01() {
           0: int64,
         ): {id: int64, title: text}
       ): func (int64) -> chinook::album;
-      let 0 = (func 1 ->
-        {
-          (call
-            external.chinook::get_albums: func () -> [chinook::album],
-          ): [chinook::album],
-          (call
-            var.1: func (int64) -> chinook::album,
-            (tuple_lookup
-              fn.1+0: {int64}
-              0
-            ): int64,
-          ): chinook::album,
-          (call
-            var.2: func (int64) -> box_office::album_sale,
-            (tuple_lookup
-              fn.1+0: {int64}
-              0
-            ): int64,
-          ): box_office::album_sale,
-        }: {[chinook::album], chinook::album, box_office::album_sale}
-      ): func (int64) -> {[chinook::album], chinook::album, box_office::album_sale};
       (call
-        var.0: func ({int64}) -> {[chinook::album], chinook::album, box_office::album_sale},
-        fn.0+0: {int64},
+        (func 0 ->
+          {
+            (call
+              external.chinook::get_albums: func () -> [chinook::album],
+            ): [chinook::album],
+            (call
+              var.0: func (int64) -> chinook::album,
+              (tuple_lookup
+                fn.0+0: {int64}
+                0
+              ): int64,
+            ): chinook::album,
+            (call
+              var.1: func (int64) -> box_office::album_sale,
+              (tuple_lookup
+                fn.0+0: {int64}
+                0
+              ): int64,
+            ): box_office::album_sale,
+          }: {[chinook::album], chinook::album, box_office::album_sale}
+        ): func ({int64}) -> {[chinook::album], chinook::album, box_office::album_sale},
+        fn.1+0: {int64},
       ): {[chinook::album], chinook::album, box_office::album_sale}
     ): func ({int64}) -> {[chinook::album], chinook::album, box_office::album_sale}
     ")
@@ -129,27 +128,21 @@ fn lower_02() {
     }
     "#), @r#"
     let main = (func 0 ->
-      let 0 = (func 1 ->
-        let 1 = (enum_variant 1): enum {Open, Closed: text};
+      let 0 = (enum_variant 1): enum {Open, Closed: text};
+      (
+        switch,
         (
-          switch,
-          (
-            (enum_eq
-              var.1: enum {Open, Closed: text}0
-            ): bool,
-            "open": text,
-          ),
-          (
-            (enum_eq
-              var.1: enum {Open, Closed: text}1
-            ): bool,
-            "closed": text,
-          ),
-        ): text
-      ): func () -> text;
-      (call
-        var.0: func ({}) -> text,
-        fn.0+0: {},
+          (enum_eq
+            var.0: enum {Open, Closed: text}0
+          ): bool,
+          "open": text,
+        ),
+        (
+          (enum_eq
+            var.0: enum {Open, Closed: text}1
+          ): bool,
+          "closed": text,
+        ),
       ): text
     ): func ({}) -> text
     "#)
@@ -162,26 +155,25 @@ fn lower_03() {
 
     func () -> twice([true, true, false])
     "#), @r"
-    let main = (func 0 ->
-      let 1 = (func 2 ->
+    let main = (func 1 ->
+      let 0 = (func 2 ->
         {
           fn.2+0: [bool],
           fn.2+0: [bool],
         }: {[bool], [bool]}
       ): func ([bool]) -> {[bool], [bool]};
-      let 0 = (func 1 ->
-        (call
-          var.1: func ([bool]) -> {[bool], [bool]},
-          [
-            true: bool,
-            true: bool,
-            false: bool,
-          ]: [bool],
-        ): {[bool], [bool]}
-      ): func () -> {[bool], [bool]};
       (call
-        var.0: func ({}) -> {[bool], [bool]},
-        fn.0+0: {},
+        (func 0 ->
+          (call
+            var.0: func ([bool]) -> {[bool], [bool]},
+            [
+              true: bool,
+              true: bool,
+              false: bool,
+            ]: [bool],
+          ): {[bool], [bool]}
+        ): func ({}) -> {[bool], [bool]},
+        fn.1+0: {},
       ): {[bool], [bool]}
     ): func ({}) -> {[bool], [bool]}
     ")

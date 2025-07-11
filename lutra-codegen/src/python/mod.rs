@@ -4,7 +4,7 @@ use std::path::PathBuf;
 use std::{borrow::Cow, fmt::Write};
 
 use lutra_bin::{Encode, ir, layout};
-use lutra_compiler::{CompileParams, DiscoverParams, Project, pr};
+use lutra_compiler::{CheckParams, DiscoverParams, ProgramFormat, Project, pr};
 
 #[track_caller]
 pub fn generate(
@@ -25,8 +25,7 @@ pub fn generate(
     .unwrap();
 
     // compile
-    let project =
-        lutra_compiler::compile(source, CompileParams {}).unwrap_or_else(|e| panic!("{e}"));
+    let project = lutra_compiler::check(source, CheckParams {}).unwrap_or_else(|e| panic!("{e}"));
 
     // generate
     let mut file = fs::File::create(out_file).unwrap();
@@ -574,9 +573,11 @@ fn write_sr_programs(
     for (name, func) in functions {
         let mut fq_path = pr::Path::new(&ctx.current_rust_mod);
         fq_path.push((*name).clone());
+        let fq_path = fq_path.to_string();
 
         // compile
-        let program = lutra_compiler::compile_to_sql(ctx.project, &fq_path);
+        let (program, _ty) =
+            lutra_compiler::compile(ctx.project, &fq_path, None, ProgramFormat::SqlPg).unwrap();
 
         // encode to base85
         let buf = program.encode();

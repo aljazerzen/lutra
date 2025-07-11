@@ -1,14 +1,26 @@
 
-type Program: {
-    format: text,
-    inner: [uint8],
-}
+module rr {
+  ## Compiled program, executable with lutra-runner
+  @derive(["Debug", "Clone", "enum_as_inner::EnumAsInner"])
+  type Program: enum {
+    SqlPg: SqlProgram,
+    BytecodeLt: project::br::Program,
+  }
 
-## SQL runner
-module sr {
+  ## Types of a program's input and output
+  type ProgramType: {
+    # Type of the program's input
+    input: project::ir::Ty,
 
-  ## Compiled program, executable with lutra-runner-postgres
-  type Program: {
+    # Type of the program's output
+    output: project::ir::Ty,
+
+    # Definitions that are referenced from input and output types.
+    ty_defs: [project::ir::TyDef],
+  }
+
+  ## SQL program, executable with lutra-runner-postgres
+  type SqlProgram: {
     sql: text,
     input_ty: project::ir::Ty,
     output_ty: project::ir::Ty,

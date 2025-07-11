@@ -30,7 +30,7 @@ fn main(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<EnumCodecHelper>()?;
 
     ir::register(m)?;
-    sr::register(m)?;
+    rr::register(m)?;
     Ok(())
 }
 
@@ -317,26 +317,26 @@ mod ir {
     }
 }
 
-mod sr {
+mod rr {
     use std::borrow::Cow;
 
     use lutra_bin::{Decode, Encode};
     use pyo3::{prelude::*, types::PyType};
 
     pub fn register(p: &Bound<'_, PyModule>) -> PyResult<()> {
-        let m = PyModule::new(p.py(), "sr")?;
+        let m = PyModule::new(p.py(), "rr")?;
         m.add_class::<Program>()?;
         p.add_submodule(&m)
     }
 
-    #[pyclass(module = "sr")]
-    pub struct Program(pub(crate) lutra_bin::sr::Program);
+    #[pyclass(module = "rr")]
+    pub struct Program(pub(crate) lutra_bin::rr::Program);
 
     #[pymethods]
     impl Program {
         #[classmethod]
         fn decode(_cls: &Bound<'_, PyType>, bytes: &[u8]) -> Program {
-            let ty = lutra_bin::sr::Program::decode(bytes).unwrap();
+            let ty = lutra_bin::rr::Program::decode(bytes).unwrap();
             Program(ty)
         }
 

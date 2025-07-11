@@ -14,15 +14,15 @@ fn inline_00() {
 
     func () -> twice([true, true, false])
     "#), @r"
-    let main = (func 0 ->
-      let 3 = [
+    let main = (func 1 ->
+      let 1 = [
         true: bool,
         true: bool,
         false: bool,
       ]: [bool];
       {
-        var.3: [bool],
-        var.3: [bool],
+        var.1: [bool],
+        var.1: [bool],
       }: {[bool], [bool]}
     ): func ({}) -> {[bool], [bool]}
     ")
@@ -35,7 +35,7 @@ fn inline_01() {
 
     func () -> once([true, true, false])
     "#), @r"
-    let main = (func 0 ->
+    let main = (func 1 ->
       {
         [
           true: bool,
@@ -53,8 +53,8 @@ fn inline_02() {
     let my_rel: [{int64, int64}] = [{5,3},{65,1},{3, 2}]
     func () -> std::aggregate(my_rel, func (x: {[int64], [int64]}) -> {std::min(x.0), std::min(x.1)})
     "#), @r"
-    let main = (func 0 ->
-      let 2 = [
+    let main = (func 2 ->
+      let 1 = [
         {
           5: int64,
           3: int64,
@@ -68,23 +68,23 @@ fn inline_02() {
           2: int64,
         }: {int64, int64},
       ]: [{int64, int64}];
-      let 4 = var.2: [{int64, int64}];
-      let 6 = (call
+      let 2 = var.1: [{int64, int64}];
+      let 4 = (call
         external.std::to_columnar: func ([{int64, int64}]) -> {[int64], [int64]},
-        var.4: [{int64, int64}],
+        var.2: [{int64, int64}],
       ): {[int64], [int64]};
       {
         (call
           external.std::min: func ([int64]) -> int64,
           (tuple_lookup
-            var.6: {[int64], [int64]}
+            var.4: {[int64], [int64]}
             0
           ): [int64],
         ): int64,
         (call
           external.std::min: func ([int64]) -> int64,
           (tuple_lookup
-            var.6: {[int64], [int64]}
+            var.4: {[int64], [int64]}
             1
           ): [int64],
         ): int64,

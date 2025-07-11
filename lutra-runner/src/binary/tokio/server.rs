@@ -14,7 +14,7 @@ where
     stream: C,
     runner: R,
 
-    prepared_programs: HashMap<u32, lutra_bin::Program>,
+    prepared_programs: HashMap<u32, lutra_bin::rr::Program>,
 }
 
 impl<C, R> Server<C, R>
@@ -43,7 +43,7 @@ where
     ) -> Result<(), std::io::Error> {
         match message {
             messages::ClientMessage::Prepare(prepare) => {
-                let program = lutra_bin::Program::decode(&prepare.program).unwrap();
+                let program = lutra_bin::rr::Program::decode(&prepare.program).unwrap();
                 tracing::trace!("prepare");
 
                 self.prepared_programs.insert(prepare.program_id, program);

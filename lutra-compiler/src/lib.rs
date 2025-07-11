@@ -1,5 +1,5 @@
 mod bytecoding;
-mod compile;
+mod check;
 mod diagnostic;
 mod discover;
 mod intermediate;
@@ -16,15 +16,56 @@ pub mod decl;
 pub mod error;
 pub mod pr;
 pub mod printer;
+
 pub use bytecoding::compile_program as bytecode_program;
-pub use compile::{CompileParams, compile, compile_overlay};
+pub use check::{CheckParams, check, check_overlay};
 pub use discover::{DiscoverParams, discover};
 pub use intermediate::{inline, layouter, lower_expr, lower_type_defs, lower_var};
-pub use lutra_bin::ir;
+pub use lutra_bin::{ir, rr};
 pub use project::{Project, SourceTree};
 pub use span::Span;
-pub use sql::compile as compile_to_sql;
 
+#[derive(Debug, Clone)]
+pub enum ProgramFormat {
+    SqlPg,
+    BytecodeLt,
+}
+
+pub fn compile(
+    project: &Project,
+    program: &str,
+    name_hint: Option<&str>,
+    format: ProgramFormat,
+) -> Result<(rr::Program, rr::ProgramType), error::Error> {
+    let program_pr = self::check::check_overlay(project, program, name_hint)?;
+    let program_ir = crate::intermediate::lower_expr(&project.root_module, &program_pr);
+
+    tracing::debug!("ir:\n{}", lutra_bin::ir::print(&program_ir));
+
+    let (program_ir, program) = match format {
+        ProgramFormat::SqlPg => {
+            let (program_ir, program_sr) = sql::compile_ir(program_ir);
+            (program_ir, rr::Program::SqlPg(program_sr))
+        }
+        ProgramFormat::BytecodeLt => {
+            let inner = bytecoding::compile_program(program_ir.clone());
+            (program_ir, rr::Program::BytecodeLt(inner))
+        }
+    };
+
+    // construct the program ty
+    let ir_func_ty = program_ir.main.ty.kind.into_function().unwrap();
+    let ty = rr::ProgramType {
+        input: ir_func_ty.params.into_iter().next().unwrap(),
+        output: ir_func_ty.body,
+        ty_defs: program_ir.types,
+    };
+
+    Ok((program, ty))
+}
+
+/// Internal implementation detail, do not use.
+// Only exposed because I don't want to maintain a separate lexer for IR parser.
 pub mod _lexer {
     pub use crate::diagnostic::Diagnostic;
     pub use crate::parser::lexer::{Token, TokenKind};
@@ -37,7 +78,7 @@ pub fn _test_compile_ty(ty_source: &str) -> ir::Ty {
     let source = format!("type t: {ty_source}");
 
     let source = SourceTree::single("".into(), source);
-    let project = compile(source, CompileParams {}).unwrap_or_else(|e| panic!("{e}"));
+    let project = check(source, CheckParams {}).unwrap_or_else(|e| panic!("{e}"));
 
     let name = pr::Path::from_name("t");
     let type_def = project.root_module.module.get(&name);
@@ -50,20 +91,11 @@ pub fn _test_compile_ty(ty_source: &str) -> ir::Ty {
 
 pub fn _test_compile(source: &str) -> Result<ir::Program, error::Error> {
     let source = SourceTree::single("".into(), source.to_string());
-    let project = compile(source, CompileParams {})?;
+    let project = check(source, CheckParams {})?;
 
     let path = pr::Path::from_name("main");
 
     let program = lower_var(&project.root_module, &path);
     assert!(program.get_input_ty().kind.is_tuple());
     Ok(layouter::on_program(program))
-}
-
-fn _lower_expr(project: &Project, overlay: &str) -> Result<ir::Program, error::Error> {
-    let expr = compile::compile_overlay(project, overlay, Some("<inline>"))
-        .unwrap_or_else(|e| panic!("{e}"));
-
-    let program = lower_expr(&project.root_module, &expr);
-    let program = layouter::on_program(program);
-    Ok(program)
 }

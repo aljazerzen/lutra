@@ -1,6 +1,6 @@
 use bytes::{BufMut, BytesMut};
 use core::str;
-use lutra_bin::{Encode, ReversePointer, ir, sr};
+use lutra_bin::{Encode, ReversePointer, ir, rr};
 use postgres_types as pg_ty;
 use std::collections::HashMap;
 
@@ -9,7 +9,7 @@ use postgres::Row;
 #[cfg(feature = "tokio-postgres")]
 use tokio_postgres::Row;
 
-pub fn from_sql(program: &sr::Program, rows: &[Row]) -> Vec<u8> {
+pub fn from_sql(program: &rr::SqlProgram, rows: &[Row]) -> Vec<u8> {
     // write rows to buffer
     let mut buf = bytes::BytesMut::new();
 

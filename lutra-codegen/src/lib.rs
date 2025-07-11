@@ -11,7 +11,7 @@ use std::path::PathBuf;
 use std::{collections::VecDeque, fs};
 
 use lutra_bin::{Encode, ir};
-use lutra_compiler::{CompileParams, DiscoverParams, Project, pr};
+use lutra_compiler::{CheckParams, DiscoverParams, Project, pr};
 
 #[track_caller]
 pub fn generate(
@@ -26,8 +26,7 @@ pub fn generate(
     .unwrap();
 
     // compile
-    let project =
-        lutra_compiler::compile(source, CompileParams {}).unwrap_or_else(|e| panic!("{e}"));
+    let project = lutra_compiler::check(source, CheckParams {}).unwrap_or_else(|e| panic!("{e}"));
 
     // generate
     let mut file = fs::File::create(out_file).unwrap();
@@ -57,8 +56,7 @@ pub fn generate_program(
     .unwrap();
 
     // compile
-    let project =
-        lutra_compiler::compile(source, CompileParams {}).unwrap_or_else(|e| panic!("{e}"));
+    let project = lutra_compiler::check(source, CheckParams {}).unwrap_or_else(|e| panic!("{e}"));
 
     // lower & bytecode
     let program = lutra_compiler::lower_var(&project.root_module, &pr::Path::new(expr_path));

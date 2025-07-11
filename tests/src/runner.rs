@@ -1,6 +1,7 @@
 use std::io;
 
-use lutra_bin::{Encode, br};
+use lutra_bin::br;
+use lutra_compiler::ProgramFormat;
 use lutra_runner::{Run, binary};
 
 #[tokio::test(flavor = "current_thread")]
@@ -14,25 +15,23 @@ async fn main() {
     let client = binary::tokio::Client::new(io_client);
     let mut server = binary::tokio::Server::new(io_server, runner);
 
+    // prepare a program
+    let source = lutra_compiler::SourceTree::empty();
+    let project = lutra_compiler::check(source, Default::default()).unwrap();
     let source = "let main = func (x: int64) -> 3 * x + 2";
-    let program = lutra_compiler::_test_compile(source).unwrap();
-    let output_ty = program.get_output_ty().clone();
-    let program = lutra_compiler::bytecode_program(program);
-    let program = lutra_bin::Program {
-        format: "bytecode-lt".into(),
-        inner: program.encode(),
-    };
+    let (program, ty) =
+        lutra_compiler::compile(&project, source, None, ProgramFormat::BytecodeLt).unwrap();
 
     let c = async {
         let res = client
             .execute_raw(&program, &[1, 0, 0, 0, 0, 0, 0, 0])
             .await;
-        print_res(res, &output_ty);
+        print_res(res, &ty.output);
 
         let res = client
             .execute_raw(&program, &[5, 0, 0, 0, 0, 0, 0, 0])
             .await;
-        print_res(res, &output_ty);
+        print_res(res, &ty.output);
 
         client.shutdown().await.unwrap();
     };

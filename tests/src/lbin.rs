@@ -47,7 +47,7 @@ fn _test_get_type(name: &'static str) -> ir::Ty {
         let source = include_str!("../lutra/bin.lt");
         let source = lutra_compiler::SourceTree::single("".into(), source.into());
 
-        let project = lutra_compiler::compile(source, lutra_compiler::CompileParams {})
+        let project = lutra_compiler::check(source, lutra_compiler::CheckParams {})
             .unwrap_or_else(|e| panic!("{e}"));
 
         let module = lutra_compiler::lower_type_defs(&project.root_module);

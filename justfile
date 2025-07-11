@@ -19,10 +19,11 @@ test-fast FILTER_SET='all()' *NEXTEST_ARGS='':
 
 [working-directory: 'lutra-bin/src/project']
 generate:
-    # For when current code does not compile,
-    # but we still have an old cli binary
-    # ../../../target/debug/lutra codegen --lutra-bin-path="crate" . ./generated.rs
-    # cargo fmt -p lutra-bin
-
     cargo run -p lutra-cli -- codegen --lutra-bin-path="crate" . ./generated.rs
+    cargo fmt -p lutra-bin
+
+[working-directory: 'lutra-bin/src/project']
+generate-precompiled:
+    # For when current code does not compile, but we still have an old cli binary
+    ../../../target/debug/lutra codegen --lutra-bin-path="crate" . ./generated.rs
     cargo fmt -p lutra-bin

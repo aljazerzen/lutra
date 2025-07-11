@@ -1,8 +1,8 @@
 use bytes::BufMut;
-use lutra_bin::{Decode, sr};
+use lutra_bin::{Decode, rr};
 use postgres_types as pg_ty;
 
-pub fn to_sql<'d>(program: &sr::Program, input: &'d [u8]) -> Args<'d> {
+pub fn to_sql<'d>(program: &rr::SqlProgram, input: &'d [u8]) -> Args<'d> {
     let input_tys = program.input_ty.iter_fields();
 
     let mut args = Vec::new();

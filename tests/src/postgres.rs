@@ -1,4 +1,4 @@
-use lutra_compiler::{SourceTree, pr};
+use lutra_compiler::{ProgramFormat, SourceTree};
 
 #[track_caller]
 pub fn _run(source: &str, args: Vec<lutra_bin::Value>) -> (String, String) {
@@ -6,37 +6,35 @@ pub fn _run(source: &str, args: Vec<lutra_bin::Value>) -> (String, String) {
 
     // compile
     let source = SourceTree::single("".into(), source.to_string());
-    let project = match lutra_compiler::compile(source, Default::default()) {
+    let project = match lutra_compiler::check(source, Default::default()) {
         Ok(p) => p,
         Err(e) => panic!("{e}"),
     };
 
     // compile to sql
-    let program = lutra_compiler::compile_to_sql(&project, &pr::Path::from_name("main"));
+    let (program, ty) =
+        lutra_compiler::compile(&project, "main", None, ProgramFormat::SqlPg).unwrap();
+    let program = program.as_sql_pg().unwrap();
 
     // format sql
     let options = sqlformat::FormatOptions::default();
     let formatted_sql = sqlformat::format(&program.sql, &sqlformat::QueryParams::None, &options);
     tracing::debug!("sql:\n{formatted_sql}");
 
-    let mut input_writer = lutra_bin::TupleWriter::new_for_ty(&program.input_ty);
-    for (arg, ty) in std::iter::zip(args, program.input_ty.iter_fields()) {
-        input_writer.write_field(lutra_bin::Data::new(
-            arg.encode(ty, &program.types).unwrap(),
-        ));
+    let mut input_writer = lutra_bin::TupleWriter::new_for_ty(&ty.input);
+    for (arg, a_ty) in std::iter::zip(args, ty.input.iter_fields()) {
+        input_writer.write_field(lutra_bin::Data::new(arg.encode(a_ty, &ty.ty_defs).unwrap()));
     }
     let input = input_writer.finish().flatten();
 
     // execute
     const POSTGRES_URL: &str = "postgresql://postgres:pass@localhost:5416";
     let mut client = postgres::Client::connect(POSTGRES_URL, postgres::NoTls).unwrap();
-    let rel_data = lutra_runner_postgres::execute(&mut client, &program, &input).unwrap();
+    let rel_data = lutra_runner_postgres::execute(&mut client, program, &input).unwrap();
 
     // decode and print source
-    let output = lutra_bin::Value::decode(&rel_data, &program.output_ty, &program.types).unwrap();
-    let output = output
-        .print_source(&program.output_ty, &program.types)
-        .unwrap();
+    let output = lutra_bin::Value::decode(&rel_data, &ty.output, &ty.ty_defs).unwrap();
+    let output = output.print_source(&ty.output, &ty.ty_defs).unwrap();
 
     (formatted_sql, output)
 }

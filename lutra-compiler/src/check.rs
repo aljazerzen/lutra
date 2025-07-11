@@ -11,11 +11,11 @@ use crate::project::SourceProvider;
 
 #[cfg_attr(feature = "clap", derive(clap::Parser))]
 #[derive(Default)]
-pub struct CompileParams {}
+pub struct CheckParams {}
 
-pub fn compile(
+pub fn check(
     mut source: project::SourceTree,
-    _: CompileParams,
+    _: CheckParams,
 ) -> Result<project::Project, error::Error> {
     crate::resolver::load_std_lib(&mut source);
     let source = source;
@@ -71,7 +71,7 @@ fn parse(
     }
 }
 
-pub fn compile_overlay(
+pub fn check_overlay(
     project: &project::Project,
     overlay: &str,
     overlay_name: Option<&str>,

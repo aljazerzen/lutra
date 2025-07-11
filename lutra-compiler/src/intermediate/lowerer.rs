@@ -20,7 +20,15 @@ pub fn lower_expr(root_module: &decl::RootModule, main_pr: &pr::Expr) -> ir::Pro
     );
     lowerer.is_main_func = main_pr.ty.as_ref().unwrap().kind.is_func();
 
-    let main = lowerer.lower_expr(main_pr).unwrap();
+    let main = if let Some(pr::Ref::FullyQualified { to_decl, within }) = &main_pr.target {
+        // optimization: inline direct idents, don't bind them to vars
+        assert!(within.is_empty());
+        lowerer
+            .lower_expr_decl(to_decl, main_pr.ty_args.clone())
+            .unwrap()
+    } else {
+        lowerer.lower_expr(main_pr).unwrap()
+    };
     let main = lowerer.prepare_entry_point(main);
 
     let main = lowerer.lower_var_bindings(main).unwrap();

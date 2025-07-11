@@ -18,7 +18,7 @@ pub fn discover(params: DiscoverParams) -> Result<project::SourceTree, std::io::
 
     let mut project = project::SourceTree {
         root: params.project_path,
-        ..Default::default()
+        ..project::SourceTree::empty()
     };
 
     if project.root.is_file() {

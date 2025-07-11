@@ -4,7 +4,6 @@ mod native;
 mod test;
 
 pub use interpreter::{Cell, EvalError, Interpreter, NativeFunction, evaluate};
-use lutra_bin::Decode;
 
 pub trait NativeModule: Sync {
     fn lookup_native_symbol(&self, id: &str) -> Option<interpreter::NativeFunction>;
@@ -26,14 +25,13 @@ impl<'a> lutra_runner::Run for InterpreterRunner<'a> {
 
     async fn execute_raw(
         &self,
-        program: &lutra_bin::Program,
+        program: &lutra_bin::rr::Program,
         input: &[u8],
     ) -> Result<std::vec::Vec<u8>, Self::Error> {
-        assert_eq!(program.format, "bytecode-lt");
-        let program = lutra_bin::br::Program::decode(&program.inner).unwrap();
+        let program = program.as_bytecode_lt().unwrap();
 
         // TODO: figure out how to remove this clone
-        evaluate(&program, input.to_vec(), self.modules)
+        evaluate(program, input.to_vec(), self.modules)
     }
 }
 

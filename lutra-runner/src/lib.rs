@@ -2,7 +2,7 @@
 
 pub mod binary;
 
-use lutra_bin::{string, vec};
+use lutra_bin::{rr, string, vec};
 
 // Runner Posix Interface:
 // - an executable that can read arguments and env variables,
@@ -32,14 +32,14 @@ pub trait Run {
     /// Program's format must match the format supported by this runner.
     fn execute_raw(
         &self,
-        program: &lutra_bin::Program,
+        program: &rr::Program,
         input: &[u8],
     ) -> impl Future<Output = Result<vec::Vec<u8>, Self::Error>>;
 
     /// Execute a compiled program.
     fn execute<I, O>(
         &self,
-        program: &lutra_bin::TypedProgram<I, O>,
+        program: &rr::TypedProgram<I, O>,
         input: &I,
     ) -> impl Future<Output = Result<lutra_bin::Result<O>, Self::Error>>
     where

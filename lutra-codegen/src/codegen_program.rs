@@ -20,22 +20,29 @@ pub fn write_sr_programs(
     for (name, func) in functions {
         let mut fq_path = pr::Path::new(&ctx.current_rust_mod);
         fq_path.push((*name).clone());
+        let fq_path = fq_path.to_string();
 
         // compile
-        let program = lutra_compiler::compile_to_sql(ctx.project, &fq_path);
+        let (program, _ty) = lutra_compiler::compile(
+            ctx.project,
+            &fq_path,
+            None,
+            lutra_compiler::ProgramFormat::SqlPg,
+        )
+        .unwrap();
 
         // encode and write to file
         let out_file = ctx.out_dir.join(format!("{fq_path}.sr.lb"));
         let buf = program.encode();
         std::fs::write(out_file, buf).unwrap();
 
-        write!(w, "pub fn {name}() -> {lutra_bin}::sr::TypedProgram<(), ")?;
+        write!(w, "pub fn {name}() -> {lutra_bin}::TypedProgram<(), ")?;
         codegen_ty::write_ty_ref(w, &func.body, false, ctx)?;
         writeln!(w, "> {{")?;
         writeln!(w, "    use {lutra_bin}::Decode;")?;
         writeln!(w, "    let program_lb = include_bytes!(\"./{fq_path}.sr.lb\");")?;
-        writeln!(w, "    let program = {lutra_bin}::sr::Program::decode(program_lb).unwrap();")?;
-        writeln!(w, "    {lutra_bin}::sr::TypedProgram::from(program)")?;
+        writeln!(w, "    let program = {lutra_bin}::Program::decode(program_lb).unwrap();")?;
+        writeln!(w, "    {lutra_bin}::TypedProgram::from(program)")?;
         writeln!(w, "}}\n")?;
     }
 

@@ -9,12 +9,12 @@ mod schema;
 
 pub use schema::{table_get, table_list};
 
-use lutra_bin::{Decode, sr};
+use lutra_bin::rr;
 
 #[cfg(feature = "postgres")]
 pub fn execute(
     client: &mut postgres::Client,
-    program: &sr::Program,
+    program: &rr::SqlProgram,
     input: &[u8],
 ) -> Result<Vec<u8>, postgres::Error> {
     // prepare
@@ -39,21 +39,20 @@ impl lutra_runner::Run for RunnerAsync {
 
     async fn execute_raw(
         &self,
-        program: &lutra_bin::Program,
+        program: &lutra_bin::rr::Program,
         input: &[u8],
     ) -> Result<std::vec::Vec<u8>, Self::Error> {
-        assert!(program.format == "sql-pg");
-        let program = lutra_bin::sr::Program::decode(&program.inner).unwrap(); // TODO: this unwrap?
+        let program = program.as_sql_pg().unwrap();
 
         // parse
         let stmt = self.0.prepare(&program.sql).await?;
 
         // pack input into query args
-        let args = params::to_sql(&program, input);
+        let args = params::to_sql(program, input);
 
         let rows = self.0.query(&stmt, &args.as_refs()).await?;
 
         // convert result from sql
-        Ok(result::from_sql(&program, &rows))
+        Ok(result::from_sql(program, &rows))
     }
 }
