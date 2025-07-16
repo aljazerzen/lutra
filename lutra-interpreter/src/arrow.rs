@@ -12,47 +12,62 @@ pub fn validate_schema(schema: &arrow_datatypes::Schema, item_ty: &ir::Ty) -> Re
             .clone()
             .unwrap_or_else(|| format!("field {index}"));
 
-        match &ty_f.ty.kind {
-            ir::TyKind::Primitive(prim) => {
-                let expected = match prim {
-                    ir::TyPrimitive::bool => arrow_datatypes::DataType::Boolean,
-                    ir::TyPrimitive::int8 => arrow_datatypes::DataType::Int8,
-                    ir::TyPrimitive::int16 => arrow_datatypes::DataType::Int16,
-                    ir::TyPrimitive::int32 => arrow_datatypes::DataType::Int32,
-                    ir::TyPrimitive::int64 => arrow_datatypes::DataType::Int64,
-                    ir::TyPrimitive::uint8 => arrow_datatypes::DataType::UInt8,
-                    ir::TyPrimitive::uint16 => arrow_datatypes::DataType::UInt16,
-                    ir::TyPrimitive::uint32 => arrow_datatypes::DataType::UInt32,
-                    ir::TyPrimitive::uint64 => arrow_datatypes::DataType::UInt64,
-                    ir::TyPrimitive::float32 => arrow_datatypes::DataType::Float32,
-                    ir::TyPrimitive::float64 => arrow_datatypes::DataType::Float64,
-                    ir::TyPrimitive::text => arrow_datatypes::DataType::Utf8,
-                };
-                validate_field(expected, f).map_err(|m| format!("{field_name}: {m}"))?;
-            }
-
-            ir::TyKind::Tuple(_) => unimplemented!(),
-            ir::TyKind::Array(_) => unimplemented!(),
-            ir::TyKind::Enum(_) => unimplemented!(),
-
-            ir::TyKind::Function(_) | ir::TyKind::Ident(_) => panic!(),
-        };
+        validate_field(ty_f, f).map_err(|m| format!("{field_name}: {m}"))?;
     }
     Ok(())
 }
 
 fn validate_field(
-    expected: arrow_datatypes::DataType,
+    ty_f: &ir::TyTupleField,
+    f: &std::sync::Arc<arrow_datatypes::Field>,
+) -> Result<(), String> {
+    match &ty_f.ty.kind {
+        ir::TyKind::Primitive(prim) => {
+            let expected: &[arrow_datatypes::DataType] = match prim {
+                ir::TyPrimitive::bool => &[arrow_datatypes::DataType::Boolean],
+                ir::TyPrimitive::int8 => &[arrow_datatypes::DataType::Int8],
+                ir::TyPrimitive::int16 => &[arrow_datatypes::DataType::Int16],
+                ir::TyPrimitive::int32 => &[arrow_datatypes::DataType::Int32],
+                ir::TyPrimitive::int64 => &[arrow_datatypes::DataType::Int64],
+                ir::TyPrimitive::uint8 => &[arrow_datatypes::DataType::UInt8],
+                ir::TyPrimitive::uint16 => &[arrow_datatypes::DataType::UInt16],
+                ir::TyPrimitive::uint32 => &[arrow_datatypes::DataType::UInt32],
+                ir::TyPrimitive::uint64 => &[arrow_datatypes::DataType::UInt64],
+                ir::TyPrimitive::float32 => &[arrow_datatypes::DataType::Float32],
+                ir::TyPrimitive::float64 => &[arrow_datatypes::DataType::Float64],
+                ir::TyPrimitive::text => &[
+                    arrow_datatypes::DataType::Utf8,
+                    arrow_datatypes::DataType::LargeUtf8,
+                ],
+            };
+            validate_data_type(expected, f)?;
+        }
+
+        ir::TyKind::Tuple(_) => unimplemented!(),
+        ir::TyKind::Array(_) => unimplemented!(),
+        ir::TyKind::Enum(_) => unimplemented!(),
+
+        ir::TyKind::Function(_) | ir::TyKind::Ident(_) => panic!(),
+    };
+    Ok(())
+}
+
+fn validate_data_type(
+    expected: &[arrow_datatypes::DataType],
     found: &arrow_datatypes::Field,
 ) -> Result<(), String> {
-    if &expected != found.data_type() {
-        let nullable = if found.is_nullable() { "nullable " } else { "" };
-        return Err(format!(
-            "expected {expected}, found {nullable}{}",
-            found.data_type()
-        ));
+    for e in expected {
+        if e == found.data_type() {
+            return Ok(());
+        }
     }
-    Ok(())
+    let nullable = if found.is_nullable() { "nullable " } else { "" };
+    let expected: Vec<_> = expected.iter().map(|f| f.to_string()).collect();
+    let expected = expected.join(" ,");
+    Err(format!(
+        "expected {expected}, found {nullable}{}",
+        found.data_type()
+    ))
 }
 
 pub fn arrow_to_lutra(
@@ -138,10 +153,15 @@ pub fn arrow_to_lutra(
                             .value(row_index),
                     ),
                     ir::TyKind::Primitive(ir::TyPrimitive::text) => encode(
-                        array
-                            .downcast_ref::<arrow_array::StringArray>()
-                            .unwrap()
-                            .value(row_index),
+                        Option::or(
+                            array
+                                .downcast_ref::<arrow_array::StringArray>()
+                                .map(|array| array.value(row_index)),
+                            array
+                                .downcast_ref::<arrow_array::LargeStringArray>()
+                                .map(|array| array.value(row_index)),
+                        )
+                        .unwrap(),
                     ),
 
                     ir::TyKind::Tuple(_) | ir::TyKind::Array(_) | ir::TyKind::Enum(_) => {

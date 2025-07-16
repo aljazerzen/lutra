@@ -3,6 +3,28 @@
 let default: func <T> (): T
 
 
+# Casts
+
+let to_int8: func <T: int8 | int16 | int32 | int64 | uint8 | uint16 | uint32 | uint64 | float32 | float64> (x: T): int8
+
+let to_int16: func <T: int8 | int16 | int32 | int64 | uint8 | uint16 | uint32 | uint64 | float32 | float64> (x: T): int16
+
+let to_int32: func <T: int8 | int16 | int32 | int64 | uint8 | uint16 | uint32 | uint64 | float32 | float64> (x: T): int32
+
+let to_int64: func <T: int8 | int16 | int32 | int64 | uint8 | uint16 | uint32 | uint64 | float32 | float64> (x: T): int64
+
+let to_uint8: func <T: int8 | int16 | int32 | int64 | uint8 | uint16 | uint32 | uint64 | float32 | float64> (x: T): uint8
+
+let to_uint16: func <T: int8 | int16 | int32 | int64 | uint8 | uint16 | uint32 | uint64 | float32 | float64> (x: T): uint16
+
+let to_uint32: func <T: int8 | int16 | int32 | int64 | uint8 | uint16 | uint32 | uint64 | float32 | float64> (x: T): uint32
+
+let to_uint64: func <T: int8 | int16 | int32 | int64 | uint8 | uint16 | uint32 | uint64 | float32 | float64> (x: T): uint64
+
+let to_float32: func <T: int8 | int16 | int32 | int64 | uint8 | uint16 | uint32 | uint64 | float32 | float64> (x: T): float32
+
+let to_float64: func <T: int8 | int16 | int32 | int64 | uint8 | uint16 | uint32 | uint64 | float32 | float64> (x: T): float64
+
 # Operators
 
 let mul: func <T: int8 | int16 | int32 | int64 | uint8 | uint16 | uint32 | uint64 | float32 | float64> (
@@ -220,5 +242,5 @@ module text_ops {
 }
 
 module fs {
-    let read_parquet: func <R> (file_name: text): [R]
+  let read_parquet: func <R> (file_name: text): [R]
 }
