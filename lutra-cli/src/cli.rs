@@ -89,8 +89,8 @@ pub struct CheckCommand {
     print_project: bool,
 
     /// Lutra program expression to be compiled
-    #[clap(long, default_value = "main")]
-    program: String,
+    #[clap(long)]
+    program: Option<String>,
 
     /// Prints the Intermediate Representation
     #[clap(long, default_value = "false")]
@@ -108,18 +108,21 @@ pub fn check(cmd: CheckCommand) -> anyhow::Result<()> {
         println!("---------------------");
     }
 
-    let expr = lutra_compiler::check_overlay(&project, &cmd.program, Some("--program"))?;
-    let program = lutra_compiler::lower_expr(&project.root_module, &expr);
-    let program = lutra_compiler::layouter::on_program(program);
+    if let Some(program) = &cmd.program {
+        let expr = lutra_compiler::check_overlay(&project, program, Some("--program"))?;
+        let program = lutra_compiler::lower_expr(&project.root_module, &expr);
+        let program = lutra_compiler::inline(program);
+        let program = lutra_compiler::layouter::on_program(program);
 
-    if cmd.print_ir {
-        let program_source = lutra_bin::ir::print(&program);
-        println!("------ IR ------");
-        println!("{program_source}");
-        println!("----------------");
+        if cmd.print_ir {
+            let program_source = lutra_bin::ir::print(&program);
+            println!("------ IR ------");
+            println!("{program_source}");
+            println!("----------------");
+        }
     }
 
-    if !cmd.print_project && !cmd.print_ir {
+    if !cmd.print_project {
         println!("All good.")
     }
 

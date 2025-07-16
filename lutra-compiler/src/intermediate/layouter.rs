@@ -8,7 +8,7 @@ use lutra_bin::ir;
 
 #[tracing::instrument(skip_all, name = "layouter")]
 pub fn on_program(mut program: ir::Program) -> ir::Program {
-    log::trace!(
+    tracing::trace!(
         "types: {:?}",
         program.types.iter().map(|x| &x.name).collect_vec()
     );
@@ -207,7 +207,7 @@ impl IrFold for Layouter {
 
         if ty.layout.is_none() && !ty.kind.is_function() {
             self.contains_missing_layout = true;
-            log::debug!("missing layout: {}", lutra_bin::ir::print_ty(&ty));
+            tracing::debug!("missing layout: {}", lutra_bin::ir::print_ty(&ty));
         }
 
         Ok(ty)

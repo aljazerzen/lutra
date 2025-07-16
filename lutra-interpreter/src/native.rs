@@ -8,7 +8,7 @@ pub mod std {
 
     use crate::{EvalError, native::*};
     use assume::LayoutArgsReader;
-    use lutra_bin::{ArrayReader, ArrayWriter, Data, Decode, TupleReader, TupleWriter};
+    use lutra_bin::{ArrayReader, ArrayWriter, Data, Decode, TupleReader, TupleWriter, ir};
 
     pub const MODULE: Module = Module;
 
@@ -17,6 +17,17 @@ pub mod std {
     impl NativeModule for Module {
         fn lookup_native_symbol(&self, id: &str) -> Option<crate::interpreter::NativeFunction> {
             Some(match id {
+                "to_int8" => &Self::to_int8,
+                "to_int16" => &Self::to_int16,
+                "to_int32" => &Self::to_int32,
+                "to_int64" => &Self::to_int64,
+                "to_uint8" => &Self::to_uint8,
+                "to_uint16" => &Self::to_uint16,
+                "to_uint32" => &Self::to_uint32,
+                "to_uint64" => &Self::to_uint64,
+                "to_float32" => &Self::to_float32,
+                "to_float64" => &Self::to_float64,
+
                 "mul" => &Self::mul,
                 "div" => &Self::div,
                 "mod" => &Self::r#mod,
@@ -83,6 +94,35 @@ pub mod std {
         };
     }
 
+    macro_rules! number_cast {
+        ($func_name: ident, $res_ty: ty) => {
+            pub fn $func_name(
+                _: &mut Interpreter,
+                layout_args: &[u32],
+                args: Vec<Cell>,
+            ) -> Result<Cell, EvalError> {
+                let input_ty = layout_args[0].to_be_bytes();
+                let input_ty = ir::TyPrimitive::decode(&input_ty).unwrap();
+
+                let [x] = assume::exactly_n(args);
+                let x = match input_ty {
+                    ir::TyPrimitive::int8 => assume::primitive::<i8>(&x)? as $res_ty,
+                    ir::TyPrimitive::int16 => assume::primitive::<i16>(&x)? as $res_ty,
+                    ir::TyPrimitive::int32 => assume::primitive::<i32>(&x)? as $res_ty,
+                    ir::TyPrimitive::int64 => assume::primitive::<i64>(&x)? as $res_ty,
+                    ir::TyPrimitive::uint8 => assume::primitive::<u8>(&x)? as $res_ty,
+                    ir::TyPrimitive::uint16 => assume::primitive::<u16>(&x)? as $res_ty,
+                    ir::TyPrimitive::uint32 => assume::primitive::<u32>(&x)? as $res_ty,
+                    ir::TyPrimitive::uint64 => assume::primitive::<u64>(&x)? as $res_ty,
+                    ir::TyPrimitive::float32 => assume::primitive::<f32>(&x)? as $res_ty,
+                    ir::TyPrimitive::float64 => assume::primitive::<f64>(&x)? as $res_ty,
+                    _ => panic!(),
+                };
+                Ok(Cell::Data(encode(&x)))
+            }
+        };
+    }
+
     macro_rules! bin_op {
         ($args: ident, $prim: ident, $op: tt, unchanged) => {
             bin_op!($args, $prim, $op, $prim)
@@ -118,19 +158,19 @@ pub mod std {
                 args: Vec<Cell>,
             ) -> Result<Cell, EvalError> {
                 let prim_set = layout_args[0].to_be_bytes();
-                let prim_set = lutra_bin::ir::TyPrimitive::decode(&prim_set).unwrap();
+                let prim_set = ir::TyPrimitive::decode(&prim_set).unwrap();
 
                 Ok(match prim_set {
-                    lutra_bin::ir::TyPrimitive::int8 => bin_op!(args, i8, $op, $res_ty),
-                    lutra_bin::ir::TyPrimitive::int16 => bin_op!(args, i16, $op, $res_ty),
-                    lutra_bin::ir::TyPrimitive::int32 => bin_op!(args, i32, $op, $res_ty),
-                    lutra_bin::ir::TyPrimitive::int64 => bin_op!(args, i64, $op, $res_ty),
-                    lutra_bin::ir::TyPrimitive::uint8 => bin_op!(args, u8, $op, $res_ty),
-                    lutra_bin::ir::TyPrimitive::uint16 => bin_op!(args, u16, $op, $res_ty),
-                    lutra_bin::ir::TyPrimitive::uint32 => bin_op!(args, u32, $op, $res_ty),
-                    lutra_bin::ir::TyPrimitive::uint64 => bin_op!(args, u64, $op, $res_ty),
-                    lutra_bin::ir::TyPrimitive::float32 => bin_op!(args, f32, $op, $res_ty),
-                    lutra_bin::ir::TyPrimitive::float64 => bin_op!(args, f64, $op, $res_ty),
+                    ir::TyPrimitive::int8 => bin_op!(args, i8, $op, $res_ty),
+                    ir::TyPrimitive::int16 => bin_op!(args, i16, $op, $res_ty),
+                    ir::TyPrimitive::int32 => bin_op!(args, i32, $op, $res_ty),
+                    ir::TyPrimitive::int64 => bin_op!(args, i64, $op, $res_ty),
+                    ir::TyPrimitive::uint8 => bin_op!(args, u8, $op, $res_ty),
+                    ir::TyPrimitive::uint16 => bin_op!(args, u16, $op, $res_ty),
+                    ir::TyPrimitive::uint32 => bin_op!(args, u32, $op, $res_ty),
+                    ir::TyPrimitive::uint64 => bin_op!(args, u64, $op, $res_ty),
+                    ir::TyPrimitive::float32 => bin_op!(args, f32, $op, $res_ty),
+                    ir::TyPrimitive::float64 => bin_op!(args, f64, $op, $res_ty),
                     _ => panic!(),
                 })
             }
@@ -145,21 +185,21 @@ pub mod std {
                 args: Vec<Cell>,
             ) -> Result<Cell, EvalError> {
                 let prim_set = layout_args[0].to_be_bytes();
-                let prim_set = lutra_bin::ir::TyPrimitive::decode(&prim_set).unwrap();
+                let prim_set = ir::TyPrimitive::decode(&prim_set).unwrap();
 
                 Ok(match prim_set {
-                    lutra_bin::ir::TyPrimitive::bool => bin_op!(args, bool, $op, $res_ty),
-                    lutra_bin::ir::TyPrimitive::int8 => bin_op!(args, i8, $op, $res_ty),
-                    lutra_bin::ir::TyPrimitive::int16 => bin_op!(args, i16, $op, $res_ty),
-                    lutra_bin::ir::TyPrimitive::int32 => bin_op!(args, i32, $op, $res_ty),
-                    lutra_bin::ir::TyPrimitive::int64 => bin_op!(args, i64, $op, $res_ty),
-                    lutra_bin::ir::TyPrimitive::uint8 => bin_op!(args, u8, $op, $res_ty),
-                    lutra_bin::ir::TyPrimitive::uint16 => bin_op!(args, u16, $op, $res_ty),
-                    lutra_bin::ir::TyPrimitive::uint32 => bin_op!(args, u32, $op, $res_ty),
-                    lutra_bin::ir::TyPrimitive::uint64 => bin_op!(args, u64, $op, $res_ty),
-                    lutra_bin::ir::TyPrimitive::float32 => bin_op!(args, f32, $op, $res_ty),
-                    lutra_bin::ir::TyPrimitive::float64 => bin_op!(args, f64, $op, $res_ty),
-                    lutra_bin::ir::TyPrimitive::text => {
+                    ir::TyPrimitive::bool => bin_op!(args, bool, $op, $res_ty),
+                    ir::TyPrimitive::int8 => bin_op!(args, i8, $op, $res_ty),
+                    ir::TyPrimitive::int16 => bin_op!(args, i16, $op, $res_ty),
+                    ir::TyPrimitive::int32 => bin_op!(args, i32, $op, $res_ty),
+                    ir::TyPrimitive::int64 => bin_op!(args, i64, $op, $res_ty),
+                    ir::TyPrimitive::uint8 => bin_op!(args, u8, $op, $res_ty),
+                    ir::TyPrimitive::uint16 => bin_op!(args, u16, $op, $res_ty),
+                    ir::TyPrimitive::uint32 => bin_op!(args, u32, $op, $res_ty),
+                    ir::TyPrimitive::uint64 => bin_op!(args, u64, $op, $res_ty),
+                    ir::TyPrimitive::float32 => bin_op!(args, f32, $op, $res_ty),
+                    ir::TyPrimitive::float64 => bin_op!(args, f64, $op, $res_ty),
+                    ir::TyPrimitive::text => {
                         let left = assume::text(&args[0])?;
                         let right = assume::text(&args[1])?;
                         let res = left $op right;
@@ -179,6 +219,17 @@ pub mod std {
     }
 
     impl Module {
+        number_cast!(to_int8, i8);
+        number_cast!(to_int16, i16);
+        number_cast!(to_int32, i32);
+        number_cast!(to_int64, i64);
+        number_cast!(to_uint8, u8);
+        number_cast!(to_uint16, u16);
+        number_cast!(to_uint32, u32);
+        number_cast!(to_uint64, u64);
+        number_cast!(to_float32, f32);
+        number_cast!(to_float64, f64);
+
         bin_num_func!(mul, *, unchanged);
 
         bin_num_func!(div, /, unchanged);
@@ -195,14 +246,14 @@ pub mod std {
             args: Vec<Cell>,
         ) -> Result<Cell, EvalError> {
             let prim_set = layout_args[0].to_be_bytes();
-            let prim_set = lutra_bin::ir::TyPrimitive::decode(&prim_set).unwrap();
+            let prim_set = ir::TyPrimitive::decode(&prim_set).unwrap();
             Ok(match prim_set {
-                lutra_bin::ir::TyPrimitive::int8 => neg_arg!(i8, args),
-                lutra_bin::ir::TyPrimitive::int16 => neg_arg!(i16, args),
-                lutra_bin::ir::TyPrimitive::int32 => neg_arg!(i32, args),
-                lutra_bin::ir::TyPrimitive::int64 => neg_arg!(i64, args),
-                lutra_bin::ir::TyPrimitive::float32 => neg_arg!(f32, args),
-                lutra_bin::ir::TyPrimitive::float64 => neg_arg!(f64, args),
+                ir::TyPrimitive::int8 => neg_arg!(i8, args),
+                ir::TyPrimitive::int16 => neg_arg!(i16, args),
+                ir::TyPrimitive::int32 => neg_arg!(i32, args),
+                ir::TyPrimitive::int64 => neg_arg!(i64, args),
+                ir::TyPrimitive::float32 => neg_arg!(f32, args),
+                ir::TyPrimitive::float64 => neg_arg!(f64, args),
                 _ => panic!(),
             })
         }

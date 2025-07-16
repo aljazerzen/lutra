@@ -73,7 +73,7 @@ macro_rules! test_case {
             test_fn!(
                 $ignore_runtime,
                 runtime,
-                assert_eq!(
+                similar_asserts::assert_eq!(
                     super::_runtime(CASE.source),
                     crate::normalize_expected(CASE.output),
                     "runtime != expected"
@@ -83,7 +83,7 @@ macro_rules! test_case {
             test_fn!(
                 $ignore_postgres,
                 postgres,
-                assert_eq!(
+                similar_asserts::assert_eq!(
                     crate::postgres::_run(CASE.source, vec![]).1,
                     crate::normalize_expected(CASE.output),
                     "pg != expected"
@@ -134,13 +134,13 @@ test_case!(std_mod_02, "(10 % -6): int64", "4");
 
 test_case!(std_mod_03, "(-10 % -6): int64", "-4");
 
-test_case!(std_mod_04, "(10.0 % 6.0): float64", "4");
+test_case!(std_mod_04, "(10.0 % 6.0): float64", "4.0");
 
-test_case!(std_mod_05, "(-10.0 % 6.0): float64", "-4");
+test_case!(std_mod_05, "(-10.0 % 6.0): float64", "-4.0");
 
-test_case!(std_mod_06, "(10.0 % -6.0): float64", "4");
+test_case!(std_mod_06, "(10.0 % -6.0): float64", "4.0");
 
-test_case!(std_mod_07, "(-10.0 % -6.0): float64", "-4");
+test_case!(std_mod_07, "(-10.0 % -6.0): float64", "-4.0");
 
 test_case!(std_add_int8_00, "(30 + 2): int8", r#"32"#, skip_postgres);
 
@@ -1774,7 +1774,7 @@ test_case!(
     r#"
     func (): float32 -> std::default()
     "#,
-    r#"0"#
+    r#"0.0"#
 );
 
 test_case!(
@@ -1845,8 +1845,8 @@ test_case!(
     func (): [float32] -> std::lag([std::default(), std::default()], 1)
     "#,
     r#"[
-  0,
-  0,
+  0.0,
+  0.0,
 ]"#
 );
 
@@ -1949,4 +1949,324 @@ test_case!(
     func () -> (OptText::None | std::or_default())
     "#,
     r#""""#
+);
+
+test_case!(
+    std_to_int8_00,
+    r#"
+{
+  (-4: int8 | std::to_int8),
+  (-400: int16 | std::to_int8),
+  (-400000: int32 | std::to_int8),
+  (-40000000001: int64 | std::to_int8),
+  (4: uint8 | std::to_int8),
+  (400: uint16 | std::to_int8),
+  (400000: uint32 | std::to_int8),
+  (40000000001: uint64 | std::to_int8),
+  (4.4: float32 | std::to_int8),
+  (125523.121231: float64 | std::to_int8),
+}
+    "#,
+    r#"
+{
+  -4,
+  112,
+  -128,
+  -1,
+  4,
+  -112,
+  -128,
+  1,
+  4,
+  127,
+}"#,
+    skip_postgres
+);
+
+test_case!(
+    std_to_int16_00,
+    r#"
+{
+  (-4: int8 | std::to_int16),
+  (-400: int16 | std::to_int16),
+  (-400000: int32 | std::to_int16),
+  (-40000000001: int64 | std::to_int16),
+  (4: uint8 | std::to_int16),
+  (400: uint16 | std::to_int16),
+  (400000: uint32 | std::to_int16),
+  (40000000001: uint64 | std::to_int16),
+  (4.4: float32 | std::to_int16),
+  (125523.121231: float64 | std::to_int16),
+}
+    "#,
+    r#"
+{
+  -4,
+  -400,
+  -6784,
+  28671,
+  4,
+  400,
+  6784,
+  -28671,
+  4,
+  32767,
+}"#,
+    skip_postgres
+);
+
+test_case!(
+    std_to_int32_00,
+    r#"
+{
+  (-4: int8 | std::to_int32),
+  (-400: int16 | std::to_int32),
+  (-400000: int32 | std::to_int32),
+  (-40000000001: int64 | std::to_int32),
+  (4: uint8 | std::to_int32),
+  (400: uint16 | std::to_int32),
+  (400000: uint32 | std::to_int32),
+  (40000000001: uint64 | std::to_int32),
+  (4.4: float32 | std::to_int32),
+  (125523.121231: float64 | std::to_int32),
+}
+    "#,
+    r#"
+{
+  -4,
+  -400,
+  -400000,
+  -1345294337,
+  4,
+  400,
+  400000,
+  1345294337,
+  4,
+  125523,
+}"#,
+    skip_postgres
+);
+
+test_case!(
+    std_to_int64_00,
+    r#"
+{
+  (-4: int8 | std::to_int64),
+  (-400: int16 | std::to_int64),
+  (-400000: int32 | std::to_int64),
+  (-40000000001: int64 | std::to_int64),
+  (4: uint8 | std::to_int64),
+  (400: uint16 | std::to_int64),
+  (400000: uint32 | std::to_int64),
+  (40000000001: uint64 | std::to_int64),
+  (4.4: float32 | std::to_int64),
+  (125523.121231: float64 | std::to_int64),
+}
+    "#,
+    r#"
+{
+  -4,
+  -400,
+  -400000,
+  -40000000001,
+  4,
+  400,
+  400000,
+  40000000001,
+  4,
+  125523,
+}"#,
+    skip_postgres
+);
+
+test_case!(
+    std_to_uint8_00,
+    r#"
+{
+  (-4: int8 | std::to_uint8),
+  (-400: int16 | std::to_uint8),
+  (-400000: int32 | std::to_uint8),
+  (-40000000001: int64 | std::to_uint8),
+  (4: uint8 | std::to_uint8),
+  (400: uint16 | std::to_uint8),
+  (400000: uint32 | std::to_uint8),
+  (40000000001: uint64 | std::to_uint8),
+  (4.4: float32 | std::to_uint8),
+  (125523.121231: float64 | std::to_uint8),
+}
+    "#,
+    r#"
+{
+  252,
+  112,
+  128,
+  255,
+  4,
+  144,
+  128,
+  1,
+  4,
+  255,
+}"#,
+    skip_postgres
+);
+
+test_case!(
+    std_to_uint16_00,
+    r#"
+{
+  (-4: int8 | std::to_uint16),
+  (-400: int16 | std::to_uint16),
+  (-400000: int32 | std::to_uint16),
+  (-40000000001: int64 | std::to_uint16),
+  (4: uint8 | std::to_uint16),
+  (400: uint16 | std::to_uint16),
+  (400000: uint32 | std::to_uint16),
+  (40000000001: uint64 | std::to_uint16),
+  (4.4: float32 | std::to_uint16),
+  (125523.121231: float64 | std::to_uint16),
+}
+    "#,
+    r#"
+{
+  65532,
+  65136,
+  58752,
+  28671,
+  4,
+  400,
+  6784,
+  36865,
+  4,
+  65535,
+}"#,
+    skip_postgres
+);
+
+test_case!(
+    std_to_uint32_00,
+    r#"
+{
+  (-4: int8 | std::to_uint32),
+  (-400: int16 | std::to_uint32),
+  (-400000: int32 | std::to_uint32),
+  (-40000000001: int64 | std::to_uint32),
+  (4: uint8 | std::to_uint32),
+  (400: uint16 | std::to_uint32),
+  (400000: uint32 | std::to_uint32),
+  (40000000001: uint64 | std::to_uint32),
+  (4.4: float32 | std::to_uint32),
+  (125523.121231: float64 | std::to_uint32),
+}
+    "#,
+    r#"
+{
+  4294967292,
+  4294966896,
+  4294567296,
+  2949672959,
+  4,
+  400,
+  400000,
+  1345294337,
+  4,
+  125523,
+}"#,
+    skip_postgres
+);
+
+test_case!(
+    std_to_uint64_00,
+    r#"
+{
+  (-4: int8 | std::to_uint64),
+  (-400: int16 | std::to_uint64),
+  (-400000: int32 | std::to_uint64),
+  (-40000000001: int64 | std::to_uint64),
+  (4: uint8 | std::to_uint64),
+  (400: uint16 | std::to_uint64),
+  (400000: uint32 | std::to_uint64),
+  (40000000001: uint64 | std::to_uint64),
+  (4.4: float32 | std::to_uint64),
+  (125523.121231: float64 | std::to_uint64),
+}
+    "#,
+    r#"
+{
+  18446744073709551612,
+  18446744073709551216,
+  18446744073709151616,
+  18446744033709551615,
+  4,
+  400,
+  400000,
+  40000000001,
+  4,
+  125523,
+}"#,
+    skip_postgres
+);
+
+test_case!(
+    std_to_float32_00,
+    r#"
+{
+  (-4: int8 | std::to_float32),
+  (-400: int16 | std::to_float32),
+  (-400000: int32 | std::to_float32),
+  (-40000000001: int64 | std::to_float32),
+  (4: uint8 | std::to_float32),
+  (400: uint16 | std::to_float32),
+  (400000: uint32 | std::to_float32),
+  (40000000001: uint64 | std::to_float32),
+  (4.4: float32 | std::to_float32),
+  (125523.121231: float64 | std::to_float32),
+}
+    "#,
+    r#"
+{
+  -4.0,
+  -400.0,
+  -400000.0,
+  -40000000000.0,
+  4.0,
+  400.0,
+  400000.0,
+  40000000000.0,
+  4.4,
+  125523.125,
+}"#,
+    skip_postgres
+);
+
+test_case!(
+    std_to_float64_00,
+    r#"
+{
+  (-4: int8 | std::to_float64),
+  (-400: int16 | std::to_float64),
+  (-400000: int32 | std::to_float64),
+  (-40000000001: int64 | std::to_float64),
+  (4: uint8 | std::to_float64),
+  (400: uint16 | std::to_float64),
+  (400000: uint32 | std::to_float64),
+  (40000000001: uint64 | std::to_float64),
+  (4.4: float32 | std::to_float64),
+  (125523.121231: float64 | std::to_float64),
+}
+    "#,
+    r#"
+{
+  -4.0,
+  -400.0,
+  -400000.0,
+  -40000000001.0,
+  4.0,
+  400.0,
+  400000.0,
+  40000000001.0,
+  4.400000095367432,
+  125523.121231,
+}"#,
+    skip_postgres
 );

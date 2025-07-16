@@ -409,7 +409,15 @@ impl<'a> Lowerer<'a> {
                 pr::TyPrimitive::uint64 => ir::Literal::uint64(*v as u64),
                 _ => return Err(Diagnostic::new_assert("int literal is not of int type?")),
             },
-            pr::Literal::Float(v) => ir::Literal::float64(*v),
+            pr::Literal::Float(v) => match prim {
+                pr::TyPrimitive::float32 => ir::Literal::float32(*v as f32),
+                pr::TyPrimitive::float64 => ir::Literal::float64(*v),
+                _ => {
+                    return Err(Diagnostic::new_assert(
+                        "float literal is not of float type?",
+                    ));
+                }
+            },
             pr::Literal::Boolean(v) => ir::Literal::bool(*v),
             pr::Literal::Text(v) => ir::Literal::text(v.clone()),
             pr::Literal::Date(_) => todo!(),
@@ -540,13 +548,13 @@ impl<'a> Lowerer<'a> {
 
     #[tracing::instrument(name = "lt", skip_all)]
     fn lower_ty(&mut self, ty: pr::Ty) -> ir::Ty {
-        log::trace!("lower ty: {}", crate::printer::print_ty(&ty));
+        tracing::trace!("lower ty: {}", crate::printer::print_ty(&ty));
 
         if let Some(target) = ty.target {
             if let pr::Ref::FullyQualified { to_decl, .. } = target {
                 self.type_defs_queue.push_back(to_decl.clone());
 
-                log::debug!("lower ty ident: {to_decl}");
+                tracing::debug!("lower ty ident: {to_decl}");
 
                 return ir::Ty {
                     kind: ir::TyKind::Ident(ir::Path(to_decl.into_iter().collect_vec())),

@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::path::PathBuf;
 
 use crate::SourceTree;
 use crate::diagnostic::Diagnostic;
@@ -17,6 +18,10 @@ pub fn check(
     mut source: project::SourceTree,
     _: CheckParams,
 ) -> Result<project::Project, error::Error> {
+    if source.sources.is_empty() {
+        source.insert(PathBuf::from(""), "".into());
+    }
+
     crate::resolver::load_std_lib(&mut source);
     let source = source;
 

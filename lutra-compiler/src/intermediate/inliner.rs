@@ -20,11 +20,13 @@ pub fn inline(program: ir::Program) -> ir::Program {
     };
     program.main = inliner.fold_expr(program.main).unwrap();
 
-    log::debug!("binding_usage = {:?}", inliner.binding_usage);
+    tracing::debug!("binding_usage = {:?}", inliner.binding_usage);
 
     // inline vars
     let mut inliner = VarInliner::new(inliner.binding_usage);
     program.main = inliner.fold_expr(program.main).unwrap();
+
+    tracing::debug!("ir (inlined):\n{}", ir::print(&program));
 
     program
 }
@@ -157,6 +159,8 @@ impl VarInliner {
             .filter(|(_, usage_count)| *usage_count <= 1)
             .map(|(id, _)| id)
             .collect();
+
+        tracing::debug!("inlining vars: {:?}", bindings_to_inline);
 
         VarInliner {
             bindings: Default::default(),

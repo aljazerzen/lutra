@@ -87,10 +87,10 @@ impl<'t> ValueVisitor<'t> for Printer<'t> {
         Ok(format!("{v}"))
     }
     fn visit_float32(&mut self, v: f32) -> Result<Self::Res, crate::Error> {
-        Ok(format!("{v}"))
+        Ok(format!("{v:#?}"))
     }
     fn visit_float64(&mut self, v: f64) -> Result<Self::Res, crate::Error> {
-        Ok(format!("{v}"))
+        Ok(format!("{v:#?}"))
     }
 
     fn visit_text(&mut self, v: &str) -> Result<Self::Res, crate::Error> {

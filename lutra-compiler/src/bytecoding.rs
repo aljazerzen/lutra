@@ -220,8 +220,11 @@ impl ByteCoder {
 
     fn compile_external_symbol(&self, id: String, ty_mat: &ir::Ty) -> ExternalSymbol {
         let layout_args: Vec<u32> = match id.as_str() {
-            "std::mul" | "std::div" | "std::mod" | "std::add" | "std::sub" | "std::neg"
-            | "std::eq" | "std::ne" | "std::gt" | "std::lt" | "std::gte" | "std::lte" => {
+            "std::to_int8" | "std::to_int16" | "std::to_int32" | "std::to_int64"
+            | "std::to_uint8" | "std::to_uint16" | "std::to_uint32" | "std::to_uint64"
+            | "std::to_float32" | "std::to_float64" | "std::mul" | "std::div" | "std::mod"
+            | "std::add" | "std::sub" | "std::neg" | "std::eq" | "std::ne" | "std::gt"
+            | "std::lt" | "std::gte" | "std::lte" => {
                 let param_ty = as_ty_of_param(ty_mat);
                 let primitive = param_ty.kind.as_primitive().unwrap();
 
@@ -260,12 +263,12 @@ impl ByteCoder {
                 let ty_func = ty_mat.kind.as_function().unwrap();
                 let ty_item = ty_func.body.kind.as_array().unwrap();
                 let default_val = self.construct_default_for_ty(ty_item);
-                log::debug!(
+                tracing::debug!(
                     "default value: {}",
                     default_val.print_source(ty_item, &[]).unwrap()
                 );
                 let default_val = default_val.encode(ty_item, &[]).unwrap(); // TODO: ty_defs
-                log::debug!("default value: {default_val:?}",);
+                tracing::debug!("default value: {default_val:?}",);
                 pack_bytes_to_u32(default_val, &mut r);
 
                 r

@@ -6,6 +6,8 @@ use lutra_runner::{Run, binary};
 
 #[tokio::test(flavor = "current_thread")]
 async fn main() {
+    crate::init_logger();
+
     let (io_client, io_server) = tokio::io::duplex(1000);
 
     let runner = lutra_interpreter::InterpreterRunner {
@@ -18,7 +20,7 @@ async fn main() {
     // prepare a program
     let source = lutra_compiler::SourceTree::empty();
     let project = lutra_compiler::check(source, Default::default()).unwrap();
-    let source = "let main = func (x: int64) -> 3 * x + 2";
+    let source = "func (x: int64) -> 3 * x + 2";
     let (program, ty) =
         lutra_compiler::compile(&project, source, None, ProgramFormat::BytecodeLt).unwrap();
 

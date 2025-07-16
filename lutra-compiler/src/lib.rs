@@ -48,6 +48,8 @@ pub fn compile(
             (program_ir, rr::Program::SqlPg(program_sr))
         }
         ProgramFormat::BytecodeLt => {
+            let program_ir = intermediate::inline(program_ir);
+            let program_ir = intermediate::layouter::on_program(program_ir);
             let inner = bytecoding::compile_program(program_ir.clone());
             (program_ir, rr::Program::BytecodeLt(inner))
         }
