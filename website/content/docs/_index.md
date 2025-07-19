@@ -2,6 +2,8 @@
 title: "Overview"
 ---
 
+## Project
+
 The starting point for Lutra is a **project**.
 Usually, this is a directory of `.lt` files, which contain type definitions and the code of the functions.
 
@@ -32,7 +34,14 @@ Once the project is successfully checked, it can then generate executable progra
 All good.
 ```
 
+## Program
+
 A **program** consists of compiled code along with type annotations for its input and output values.
+It is produced by compiler and embedded into the calling program. For example, when using Rust,
+it is most convenient to compile Lutra projects from build.rs script and include them in the compiled
+Rust binary via `include_bytes!`.
+
+## Runner
 
 A **runner** executes programs by taking input and producing output, both in binary format.
 Currently, there are two runners available:
