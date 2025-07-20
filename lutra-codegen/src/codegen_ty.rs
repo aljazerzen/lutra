@@ -106,7 +106,7 @@ pub fn write_ty_def(
             for (index, variant) in variants.iter().enumerate() {
                 write!(w, "    {}", variant.name)?;
                 if !is_unit_variant(&variant.ty) {
-                    let needs_box = layout::does_enum_variant_contain_recursive(ty, index as u16);
+                    let needs_box = variant_needs_box(ty, index);
 
                     write!(w, "(")?;
                     if needs_box {
@@ -129,6 +129,16 @@ pub fn write_ty_def(
     }
 
     Ok(())
+}
+
+pub fn variant_needs_box(ty: &ir::Ty, index: usize) -> bool {
+    let variants = ty.kind.as_enum().unwrap();
+
+    let layout = variants[index].ty.layout.as_ref().unwrap();
+    if layout.head_size > 200 {
+        return true;
+    }
+    layout::does_enum_variant_contain_recursive(ty, index as u16)
 }
 
 pub fn tuple_field_name(name: &Option<String>, index: usize) -> Cow<'_, str> {

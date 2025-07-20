@@ -3,7 +3,9 @@ use std::fmt::Write;
 use lutra_bin::{ir, layout};
 
 use crate::Context;
-use crate::codegen_ty::{is_option_enum, is_unit_variant, tuple_field_name, write_ty_ref};
+use crate::codegen_ty::{
+    is_option_enum, is_unit_variant, tuple_field_name, variant_needs_box, write_ty_ref,
+};
 
 pub fn write_encode_impls(
     w: &mut impl Write,
@@ -359,7 +361,7 @@ fn write_ty_def_impl(
                     writeln!(w, "::decode(buf)?;")?;
                 }
 
-                let needs_box = layout::does_enum_variant_contain_recursive(ty, index as u16);
+                let needs_box = variant_needs_box(ty, index);
 
                 if is_unit_variant(&variant.ty) {
                     writeln!(w, "                {name}::{}", variant.name)?;

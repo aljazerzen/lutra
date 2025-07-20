@@ -2801,7 +2801,7 @@ pub mod rr {
     #[derive(Debug, Clone, enum_as_inner::EnumAsInner)]
     #[allow(non_camel_case_types)]
     pub enum Program {
-        SqlPg(SqlProgram),
+        SqlPg(crate::boxed::Box<SqlProgram>),
         BytecodeLt(super::br::Program),
     }
 
@@ -2891,7 +2891,7 @@ pub mod rr {
                     0 => {
                         let offset = u32::from_le_bytes(buf.read_const::<4>());
                         let inner = super::SqlProgram::decode(buf.skip(offset as usize))?;
-                        Program::SqlPg(inner)
+                        Program::SqlPg(crate::boxed::Box::new(inner))
                     }
                     1 => {
                         let offset = u32::from_le_bytes(buf.read_const::<4>());

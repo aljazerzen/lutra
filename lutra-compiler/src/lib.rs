@@ -45,7 +45,7 @@ pub fn compile(
     let (program_ir, program) = match format {
         ProgramFormat::SqlPg => {
             let (program_ir, program_sr) = sql::compile_ir(program_ir);
-            (program_ir, rr::Program::SqlPg(program_sr))
+            (program_ir, rr::Program::SqlPg(Box::new(program_sr)))
         }
         ProgramFormat::BytecodeLt => {
             let program_ir = intermediate::inline(program_ir);

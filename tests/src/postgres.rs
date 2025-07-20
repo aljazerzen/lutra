@@ -48,7 +48,7 @@ pub fn _run_sql_output(lutra_source: &str) -> String {
 #[test]
 fn prim() {
     insta::assert_snapshot!(_run_sql_output(r#"
-        func () -> 3: int16
+        3: int16
     "#), @r"
     SELECT
       r0.value
@@ -65,7 +65,7 @@ fn prim() {
 #[test]
 fn tuple_prim() {
     insta::assert_snapshot!(_run_sql_output(r#"
-        func () -> {3: int16, false}
+        {3: int16, false}
     "#), @r"
     SELECT
       r0._0,
@@ -87,7 +87,7 @@ fn tuple_prim() {
 #[test]
 fn array_prim() {
     insta::assert_snapshot!(_run_sql_output(r#"
-        func () -> [3, 6, 12]: [int16]
+        [3, 6, 12]: [int16]
     "#), @r"
     SELECT
       r3.value
@@ -121,7 +121,7 @@ fn array_prim() {
 #[test]
 fn array_empty() {
     insta::assert_snapshot!(_run_sql_output(r#"
-        func () -> []: [bool]
+        []: [bool]
     "#), @r#"
     SELECT
       r0.value
@@ -143,7 +143,7 @@ fn array_empty() {
 #[test]
 fn tuple_tuple_prim() {
     insta::assert_snapshot!(_run_sql_output(r#"
-        func () -> {3: int16, {false, true, {"hello"}, 4: int32}}
+        {3: int16, {false, true, {"hello"}, 4: int32}}
     "#), @r#"
     SELECT
       r0._0,
@@ -178,7 +178,7 @@ fn tuple_tuple_prim() {
 #[test]
 fn tuple_array_prim() {
     insta::assert_snapshot!(_run_sql_output(r#"
-        func () -> {true, [1, 2, 3]: [int64], [4]: [int32], false}
+        {true, [1, 2, 3]: [int64], [4]: [int32], false}
     "#), @r"
     SELECT
       r6._0,
@@ -254,7 +254,7 @@ fn tuple_array_prim() {
 #[test]
 fn tuple_array_empty() {
     insta::assert_snapshot!(_run_sql_output(r#"
-        func () -> {true, []: [int64], false}
+        {true, []: [int64], false}
     "#), @r"
     SELECT
       r1._0,
@@ -297,7 +297,7 @@ fn tuple_array_empty() {
 #[test]
 fn array_array_prim() {
     insta::assert_snapshot!(_run_sql_output(r#"
-        func () -> [[1, 2, 3], [4, 5]]: [[int64]]
+        [[1, 2, 3], [4, 5]]: [[int64]]
     "#), @r"
     SELECT
       r9.value
@@ -379,7 +379,7 @@ fn array_array_prim() {
 #[test]
 fn array_tuple_prim() {
     insta::assert_snapshot!(_run_sql_output(r#"
-        func () -> [{3: int64, false}, {6, true}, {12, false}]
+        [{3: int64, false}, {6, true}, {12, false}]
     "#), @r#"
     SELECT
       r3._0,
@@ -426,7 +426,7 @@ fn array_tuple_prim() {
 #[test]
 fn tuple_array_tuple_prim() {
     insta::assert_snapshot!(_run_sql_output(r#"
-        func () -> {
+        {
             "hello",
             [{3: int16, false}, {6, true}, {12, false}],
         }
