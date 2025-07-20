@@ -1,4 +1,4 @@
-use clap::{Parser, Subcommand};
+use clap::{Args, Parser, Subcommand};
 
 use lutra_compiler::{CheckParams, DiscoverParams};
 use lutra_runner::Run;
@@ -18,8 +18,7 @@ fn main() {
         Action::Discover(cmd) => discover(cmd),
         Action::Check(cmd) => check(cmd),
         Action::Run(cmd) => run(cmd),
-        Action::RunPostgres(cmd) => run_postgres(cmd),
-        Action::PullSchemaPostgres(cmd) => pull_schema_postgres(cmd),
+        Action::Pull(cmd) => pull_interface(cmd),
         Action::Codegen(cmd) => codegen(cmd),
     };
 
@@ -47,20 +46,42 @@ pub enum Action {
     /// Read the project
     Discover(DiscoverCommand),
 
-    /// Compile the project
+    /// Validate the project
     Check(CheckCommand),
 
-    /// Compile the project to bytecode and run it
+    /// Compile a program and run it
     Run(RunCommand),
 
-    /// Compile the project to SQL and run it against PostgreSQL
-    RunPostgres(RunPostgresCommand),
-
-    /// Pull schema from PostgreSQL
-    PullSchemaPostgres(PullSchemaPostgresCommand),
+    /// Pull interface from the runner
+    Pull(PullSchemaPostgresCommand),
 
     /// Compile the project and generate bindings code
     Codegen(CodegenCommand),
+}
+
+#[derive(Args)]
+#[group(required = true, multiple = false)]
+struct RunnerParams {
+    /// Use interpreter runner
+    #[arg(long, short)]
+    interpreter: bool,
+
+    /// Use PostgreSQL runner. Requires a postgres:// URL.
+    #[arg(long)]
+    postgres: Option<String>,
+}
+
+impl RunnerParams {
+    /// Returns the program format needed for this runner
+    fn get_program_format(&self) -> lutra_compiler::ProgramFormat {
+        if self.interpreter {
+            lutra_compiler::ProgramFormat::BytecodeLt
+        } else if self.postgres.is_some() {
+            lutra_compiler::ProgramFormat::SqlPg
+        } else {
+            unreachable!()
+        }
+    }
 }
 
 #[derive(clap::Parser)]
@@ -137,6 +158,9 @@ pub struct RunCommand {
     #[clap(flatten)]
     check: CheckParams,
 
+    #[clap(flatten)]
+    runner: RunnerParams,
+
     #[clap(long, default_value = "main")]
     program: String,
 }
@@ -152,12 +176,19 @@ pub async fn run(cmd: RunCommand) -> anyhow::Result<()> {
         &project,
         &cmd.program,
         Some("--program"),
-        lutra_compiler::ProgramFormat::BytecodeLt,
+        cmd.runner.get_program_format(),
     )?;
 
     // execute
-    let runner = lutra_interpreter::InterpreterRunner::default();
-    let output = runner.execute_raw(&program, &[]).await?;
+    let output = if cmd.runner.interpreter {
+        let runner = lutra_interpreter::InterpreterRunner::default();
+        runner.execute_raw(&program, &[]).await?
+    } else if let Some(pg_url) = cmd.runner.postgres {
+        let runner = init_runner_postgres(&pg_url).await?;
+        runner.execute_raw(&program, &[]).await?
+    } else {
+        unreachable!()
+    };
 
     // handle output
     let value = lutra_bin::Value::decode(&output, &ty.output, &ty.ty_defs)?;
@@ -165,79 +196,43 @@ pub async fn run(cmd: RunCommand) -> anyhow::Result<()> {
     Ok(())
 }
 
-#[derive(clap::Parser)]
-pub struct RunPostgresCommand {
-    #[clap(flatten)]
-    discover: DiscoverParams,
+async fn init_runner_postgres(url: &str) -> anyhow::Result<lutra_runner_postgres::RunnerAsync> {
+    use tokio_postgres::{NoTls, connect};
 
-    #[clap(flatten)]
-    check: CheckParams,
+    let (client, connection) = connect(url, NoTls).await.unwrap();
 
-    #[clap(default_value = "postgresql://localhost:5432")]
-    postgres_url: String,
+    tokio::spawn(async move {
+        if let Err(e) = connection.await {
+            eprintln!("connection error: {e}");
+        }
+    });
 
-    #[clap(long, default_value = "main")]
-    program: String,
-}
-
-#[tokio::main(flavor = "current_thread")]
-pub async fn run_postgres(cmd: RunPostgresCommand) -> anyhow::Result<()> {
-    // compile
-    let project = lutra_compiler::discover(cmd.discover)?;
-
-    let project = lutra_compiler::check(project, cmd.check)?;
-
-    let (program, ty) = lutra_compiler::compile(
-        &project,
-        &cmd.program,
-        Some("--program"),
-        lutra_compiler::ProgramFormat::SqlPg,
-    )?;
-    let program = program.as_sql_pg().unwrap();
-
-    // debug: print formatted sql
-    if tracing::enabled!(tracing::Level::DEBUG) {
-        let options = sqlformat::FormatOptions::default();
-        let formatted_sql =
-            sqlformat::format(&program.sql, &sqlformat::QueryParams::None, &options);
-        tracing::debug!("sql:\n{formatted_sql}");
-    }
-
-    // execute
-    let mut client = postgres::Client::connect(&cmd.postgres_url, postgres::NoTls)?;
-    let output = lutra_runner_postgres::execute(&mut client, program, &[])?;
-
-    // handle output
-    let value = lutra_bin::Value::decode(&output, &ty.output, &ty.ty_defs)?;
-    println!("{}", value.print_source(&ty.output, &ty.ty_defs)?);
-    Ok(())
+    Ok(lutra_runner_postgres::RunnerAsync(client))
 }
 
 #[derive(clap::Parser)]
 pub struct PullSchemaPostgresCommand {
-    #[clap(default_value = "postgresql://localhost:5432")]
-    postgres_url: String,
+    #[clap(flatten)]
+    runner: RunnerParams,
 }
 
-pub fn pull_schema_postgres(cmd: PullSchemaPostgresCommand) -> anyhow::Result<()> {
-    let mut client = postgres::Client::connect(&cmd.postgres_url, postgres::NoTls)?;
+#[tokio::main(flavor = "current_thread")]
+pub async fn pull_interface(cmd: PullSchemaPostgresCommand) -> anyhow::Result<()> {
+    let interface = if cmd.runner.interpreter {
+        let runner = lutra_interpreter::InterpreterRunner::default();
+        runner.get_interface().await?
+    } else if let Some(pg_url) = cmd.runner.postgres {
+        let runner = init_runner_postgres(&pg_url).await?;
+        runner.get_interface().await?
+    } else {
+        unreachable!()
+    };
 
-    println!("# generated by Lutra CLI from PostgreSQL database schema");
-
-    let tables = lutra_runner_postgres::table_list(&mut client)?;
-    for table in tables {
-        let table_ty = lutra_runner_postgres::table_get(&mut client, &table)?;
-
-        let ty_name = if let Some(n) = table.strip_suffix("s") {
-            n.to_string()
-        } else {
-            format!("{table}_item")
-        };
-
-        println!();
-        println!("type {ty_name} = {}", lutra_bin::ir::print_ty(&table_ty));
-        println!("let {table}: func (): [{ty_name}]");
-    }
+    println!(
+        "# Generated by Lutra CLI {}\n",
+        std::env::var("CARGO_PKG_VERSION").unwrap_or_default()
+    );
+    println!("{interface}");
     Ok(())
 }
 

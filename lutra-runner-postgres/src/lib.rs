@@ -5,9 +5,9 @@ compile_error!("At least one of 'postgres' or 'tokio-postgres' features has to b
 
 mod params;
 mod result;
-mod schema;
 
-pub use schema::{table_get, table_list};
+#[cfg(feature = "tokio-postgres")]
+mod schema;
 
 use lutra_bin::rr;
 
@@ -54,5 +54,25 @@ impl lutra_runner::Run for RunnerAsync {
 
         // convert result from sql
         Ok(result::from_sql(program, &rows))
+    }
+
+    async fn get_interface(&self) -> Result<std::string::String, Self::Error> {
+        let mut output = String::new();
+
+        let tables = schema::table_list(&self.0).await?;
+        for table in tables {
+            let table_ty = schema::table_get(&self.0, &table).await?;
+
+            let ty_name = if let Some(n) = table.strip_suffix("s") {
+                n.to_string()
+            } else {
+                format!("{table}_item")
+            };
+
+            output += "\n";
+            output += &format!("type {ty_name} = {}\n", lutra_bin::ir::print_ty(&table_ty));
+            output += &format!("let {table}: func (): [{ty_name}]\n");
+        }
+        Ok(output)
     }
 }

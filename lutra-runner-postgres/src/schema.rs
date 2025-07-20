@@ -1,20 +1,20 @@
 use lutra_bin::ir;
 use postgres_types as pg_ty;
 
-pub fn table_list(client: &mut postgres::Client) -> Result<Vec<String>, postgres::Error> {
+pub async fn table_list(client: &tokio_postgres::Client) -> Result<Vec<String>, postgres::Error> {
     let query = "
         SELECT relname
         FROM pg_class
         JOIN pg_namespace ON (relnamespace = pg_namespace.oid)
         WHERE nspname = current_schema AND relkind = 'r'
     ";
-    let rows = client.query(query, &[])?;
+    let rows = client.query(query, &[]).await?;
 
     Ok(rows.into_iter().map(|r| r.get(0)).collect())
 }
 
-pub fn table_get(
-    client: &mut postgres::Client,
+pub async fn table_get(
+    client: &tokio_postgres::Client,
     table_name: &str,
 ) -> Result<ir::Ty, postgres::Error> {
     let query = "
@@ -25,7 +25,7 @@ pub fn table_get(
         WHERE nspname = current_schema AND relname = $1 AND attnum > 0 AND atttypid > 0
         ORDER BY attnum;
     ";
-    let rows = client.query(query, &[&table_name.to_string()])?;
+    let rows = client.query(query, &[&table_name.to_string()]).await?;
 
     let fields: Vec<_> = rows
         .into_iter()
