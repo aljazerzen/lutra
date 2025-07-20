@@ -121,6 +121,13 @@ let filter: func <T> (
   condition: func (T): bool,
 ): [T]
 
+let find = func <T> (
+  array: [T],
+  condition: func (T): bool,
+): T -> (
+    array | filter(condition) | index(0)
+)
+
 let slice: func <T> (
   array: [T],
   start: int64,
@@ -243,4 +250,9 @@ module text_ops {
 
 module fs {
   let read_parquet: func <R> (file_name: text): [R]
+}
+
+module sql {
+  # TODO: mark table_name as const
+  let from: func <R> (table_name: text): [R]
 }

@@ -1,5 +1,7 @@
 use lutra_compiler::{ProgramFormat, SourceTree};
 
+const POSTGRES_URL: &str = "postgresql://postgres:pass@localhost:5416";
+
 #[track_caller]
 pub fn _run(source: &str, args: Vec<lutra_bin::Value>) -> (String, String) {
     crate::init_logger();
@@ -28,7 +30,6 @@ pub fn _run(source: &str, args: Vec<lutra_bin::Value>) -> (String, String) {
     let input = input_writer.finish().flatten();
 
     // execute
-    const POSTGRES_URL: &str = "postgresql://postgres:pass@localhost:5416";
     let mut client = postgres::Client::connect(POSTGRES_URL, postgres::NoTls).unwrap();
     let rel_data = lutra_runner_postgres::execute(&mut client, program, &input).unwrap();
 
@@ -815,6 +816,60 @@ fn match_04() {
       "Hello Whiskers",
       "Come here Belie",
       "Who's a good boy?",
+    ]
+    "#);
+}
+
+#[test]
+fn sql_from_00() {
+    let mut client = postgres::Client::connect(POSTGRES_URL, postgres::NoTls).unwrap();
+    client
+        .batch_execute(
+            r#"
+        drop table if exists movies;
+        create table movies (id int4 primary key, title text, release_year int2);
+        insert into movies values (1, 'Forrest Gump', 1994), (2, 'Prestige', 2009);
+            "#,
+        )
+        .unwrap();
+
+    insta::assert_snapshot!(_run_sql_output(r#"
+    type Movie: {
+      id: int32,
+      title: text,
+      release_year: int16
+    }
+
+    func (): [Movie] -> std::sql::from("movies")
+    "#), @r#"
+    SELECT
+      r0._0,
+      r0._1,
+      r0._2
+    FROM
+      (
+        SELECT
+          NULL AS index,
+          id AS _0,
+          title AS _1,
+          release_year AS _2
+        FROM
+          movies
+      ) AS r0
+    ORDER BY
+      r0.index
+    ---
+    [
+      {
+        id = 1,
+        title = "Forrest Gump",
+        release_year = 1994,
+      },
+      {
+        id = 2,
+        title = "Prestige",
+        release_year = 2009,
+      },
     ]
     "#);
 }

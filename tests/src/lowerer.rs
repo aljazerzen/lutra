@@ -133,13 +133,15 @@ fn lower_02() {
         switch,
         (
           (enum_eq
-            var.0: enum {Open, Closed: text}0
+            var.0: enum {Open, Closed: text}
+            0
           ): bool,
           "open": text,
         ),
         (
           (enum_eq
-            var.0: enum {Open, Closed: text}1
+            var.0: enum {Open, Closed: text}
+            1
           ): bool,
           "closed": text,
         ),

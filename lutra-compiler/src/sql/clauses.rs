@@ -175,20 +175,6 @@ impl<'a> Context<'a> {
                 {
                     return self.compile_rel_std(expr);
                 }
-                ir::ExprKind::Pointer(ir::Pointer::External(ptr)) => {
-                    let is_table = self.ptr_is_table(&call.function);
-
-                    if !is_table {
-                        tracing::debug!("expected a table getter: {:?}", call.function.ty);
-                        todo!(
-                            "only supported external refs are table functions (no params, return array of tuples)"
-                        );
-                    }
-
-                    let parts = ptr.id.split("::");
-                    let table_name = parts.last().unwrap().to_string();
-                    cr::ExprKind::From(cr::From::Table(table_name))
-                }
                 ir::ExprKind::Pointer(_) => todo!(),
                 ir::ExprKind::Call(_) => todo!(),
                 ir::ExprKind::Function(func) if call.args.is_empty() => {
@@ -416,21 +402,6 @@ impl<'a> Context<'a> {
                 None,
             ),
         }
-    }
-
-    fn ptr_is_table(&mut self, expr: &ir::Expr) -> bool {
-        let ir::TyKind::Function(ty_func) = &self.get_ty_mat(&expr.ty).kind else {
-            return false;
-        };
-
-        if !ty_func.params.is_empty() {
-            return false;
-        }
-        let ir::TyKind::Array(ty_item) = &self.get_ty_mat(&ty_func.body).kind else {
-            return false;
-        };
-
-        self.get_ty_mat(ty_item).kind.is_tuple()
     }
 
     fn compile_rel_std(&mut self, expr: &ir::Expr) -> cr::Expr {
@@ -796,6 +767,16 @@ impl<'a> Context<'a> {
 
                 // reindex
                 cr::ExprKind::Transform(union, cr::Transform::IndexBy(None))
+            }
+
+            "std::sql::from" => {
+                let arg = &call.args[0];
+
+                let ir::ExprKind::Literal(ir::Literal::text(table_name)) = &arg.kind else {
+                    panic!("TODO: std::sql::from expects a literal table name, not an expression")
+                };
+
+                cr::ExprKind::From(cr::From::Table(table_name.clone()))
             }
 
             _ => {

@@ -20,6 +20,8 @@ pub fn inline(program: ir::Program) -> ir::Program {
     };
     program.main = inliner.fold_expr(program.main).unwrap();
 
+    tracing::debug!("ir (funcs inlined):\n{}", ir::print(&program));
+
     tracing::debug!("binding_usage = {:?}", inliner.binding_usage);
 
     // inline vars
@@ -45,8 +47,6 @@ struct FuncInliner {
 
 impl fold::IrFold for FuncInliner {
     fn fold_binding(&mut self, binding: ir::Binding, ty: ir::Ty) -> Result<ir::Expr, ()> {
-        self.binding_usage.insert(binding.id, 0);
-
         // bindings of type function
         if binding.expr.ty.kind.is_function() {
             match binding.expr.kind {
@@ -64,6 +64,8 @@ impl fold::IrFold for FuncInliner {
                 _ => panic!(),
             }
         }
+
+        self.binding_usage.insert(binding.id, 0);
         fold::fold_binding(self, binding, ty)
     }
 
@@ -125,7 +127,7 @@ impl fold::IrFold for FuncInliner {
                 return self.fold_expr(expr);
             }
 
-            ir::ExprKind::Pointer(ir::Pointer::Parameter(_)) => todo!(),
+            ir::ExprKind::Pointer(ir::Pointer::Parameter(_)) => call.function,
 
             ir::ExprKind::Pointer(ir::Pointer::External(_)) => call.function,
 
@@ -138,6 +140,15 @@ impl fold::IrFold for FuncInliner {
 
     fn fold_ptr(&mut self, ptr: ir::Pointer, ty: ir::Ty) -> Result<ir::Expr, ()> {
         if let ir::Pointer::Binding(binding_id) = &ptr {
+            // special case: when there is a function ptr that is not called directly
+            // we have to inline it
+            if let Some(func) = self.bindings.get(binding_id) {
+                return Ok(ir::Expr {
+                    kind: ir::ExprKind::Function(Box::new(func.clone())),
+                    ty,
+                });
+            }
+
             // count usage of bindings
             *self.binding_usage.entry(*binding_id).or_default() += 1;
         }
@@ -173,7 +184,8 @@ impl IrFold for VarInliner {
     fn fold_binding(&mut self, binding: ir::Binding, ty: ir::Ty) -> Result<ir::Expr, ()> {
         if self.bindings_to_inline.contains(&binding.id) {
             // store in self.bindings
-            self.bindings.insert(binding.id, binding.expr);
+            let expr = self.fold_expr(binding.expr)?;
+            self.bindings.insert(binding.id, expr);
 
             // return just the main expr
             return self.fold_expr(binding.main);

@@ -148,6 +148,7 @@ impl Printer {
 
                 r += &self.print_expr(&eq.subject);
 
+                r += &self.new_line();
                 r += &format!("{}", eq.tag);
                 self.dedent();
                 r += &self.new_line();
@@ -161,6 +162,7 @@ impl Printer {
 
                 r += &self.print_expr(&unwrap.subject);
 
+                r += &self.new_line();
                 r += &format!("{}", unwrap.tag);
                 self.dedent();
                 r += &self.new_line();

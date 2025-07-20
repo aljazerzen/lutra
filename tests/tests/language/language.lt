@@ -368,9 +368,7 @@ Open(
 )
 
 # === default_10
-
 func (): [bool] -> std::lag([std::default(), std::default()], 1)
-
 # >
 [
   false,
@@ -378,9 +376,7 @@ func (): [bool] -> std::lag([std::default(), std::default()], 1)
 ]
 
 # === default_11
-
 func (): [int32] -> std::lag([std::default(), std::default()], 1)
-
 # >
 [
   0,
@@ -388,9 +384,7 @@ func (): [int32] -> std::lag([std::default(), std::default()], 1)
 ]
 
 # === default_12
-
 func (): [float32] -> std::lag([std::default(), std::default()], 1)
-
 # >
 [
   0.0,
@@ -398,9 +392,7 @@ func (): [float32] -> std::lag([std::default(), std::default()], 1)
 ]
 
 # === default_13
-
 func (): [text] -> std::lag([std::default(), std::default()], 1)
-
 # >
 [
   "",
@@ -1070,6 +1062,12 @@ std::filter([{false, "one"},{true, "two"},{true, "three"},{false, "four"},{true,
     "five",
   },
 ]
+
+# === std_find_00
+std::find([5,3,65,3,2]: [int64], func (x) -> x > 10)
+# >
+65
+
 
 # === std_flat_map_00
 func () -> std::flat_map([1, 2, 3]: [int64], func (x) -> [x, x])

@@ -22,12 +22,10 @@ pub fn compile_ir(program: ir::Program) -> (ir::Program, rr::SqlProgram) {
     // compile to queries
     let query = queries::compile(clause, types);
 
-    tracing::debug!("sql ast: {query:?}");
+    tracing::trace!("sql ast: {query:?}");
 
     // serialize to SQL source
     let sql_source = query.to_string();
-
-    tracing::debug!("sql: {sql_source}");
 
     let program_sr = rr::SqlProgram {
         sql: sql_source,
