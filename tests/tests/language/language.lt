@@ -1,0 +1,2175 @@
+# --- [ Language tests ] ---
+#
+# This file contains tests for the language itself.
+# It is read by the main.rs and exposed as a seried of cargo-compatible tests.
+# A test consists of:
+#
+#    #  === <test name>       (test name)
+#    # skip: interpreter       (optional)
+#    # skip: postgres          (optional)
+#    <lutra project code>
+#    # <                   (input marker)
+#    <input>                   (optional)
+#    # >                  (output marker)
+#    <output>
+
+# === bindings_00
+let a: int32 = 4
+func () -> [{a, a + 1}, {a + 2, a + 3}]
+# >
+[
+  {
+    4,
+    5,
+  },
+  {
+    6,
+    7,
+  },
+]
+
+# === bindings_01
+let a = {3: int32, false}
+func () -> [{a.0, a.1}, {a.0 + 1, !a.1}]
+# >
+[
+  {
+    3,
+    false,
+  },
+  {
+    4,
+    true,
+  },
+]
+
+# === bindings_02
+let a: [int16] = [1, 2]
+func () -> [{a.0, a.1}, {a.0 + 1, a.1 + 1}]
+# >
+[
+  {
+    1,
+    2,
+  },
+  {
+    2,
+    3,
+  },
+]
+
+# === bindings_03
+let a: [int16] = [1, 2, 3]
+func () -> {true, std::map(a, func (x: int16) -> x * 2), false}
+# >
+{
+  true,
+  [
+    2,
+    4,
+    6,
+  ],
+  false,
+}
+
+# === bindings_04
+let a: [int32] = [1, 2, 3]
+func () -> {true, std::map(a, func (x: int32) -> x * 2).1, false}
+# >
+{
+  true,
+  4,
+  false,
+}
+
+# === complex_00
+
+let x: [int16] = [
+  1, 4, 2, 3, 2, 3, 4, 5, 1, 2
+]
+
+func () -> {
+  a = 1: int32 + 2,
+  {3: int64, 3 + 1: int16},
+  {2: int32, 2 + 1: int16},
+  hello = (
+    x
+    | std::map(func (y: int16) -> y + 1)
+    | std::filter(func (y: int16) -> !(y > 3))
+    # | std::sort(func (x: int16) -> x)
+    | std::map(func (y: int16) -> y % 3)
+  )
+}
+
+# >
+{
+  a = 3,
+  {
+    3,
+    4,
+  },
+  {
+    2,
+    3,
+  },
+  hello = [
+    2,
+    0,
+    0,
+    2,
+    0,
+  ],
+}
+
+
+# === complex_01
+
+module chinook {
+  type album: {id: int64, title: text}
+
+  let get_albums = func (): [album] -> [
+    {id = 3, title = "Hello world!"},
+    {id = 5, title = "Foo"},
+  ]
+
+  let get_album_by_id = func (album_id: int64): album -> (
+      get_albums()
+      | std::filter(func (this: album) -> this.id == album_id)
+      | std::index(0)
+    )
+  }
+
+module box_office {
+  type album_sale: {id: int64, total: float}
+
+  let get_album_sales = func (): [album_sale] -> [
+    {id = 3, total = 3.6},
+    {id = 3, total = 3.1},
+    {id = 5, total = 5.2},
+  ]
+
+  let get_album_sales_by_id = func (album_id: int64): album_sale -> (
+    get_album_sales()
+    | std::filter(func (this: album_sale) -> this.id == album_id)
+    | std::index(0)
+  )
+}
+
+func () -> {
+  chinook::get_albums(),
+  chinook::get_album_by_id(3),
+  box_office::get_album_sales_by_id(3),
+}
+
+# >
+
+{
+  [
+    {
+      id = 3,
+      title = "Hello world!",
+    },
+    {
+      id = 5,
+      title = "Foo",
+    },
+  ],
+  {
+    id = 3,
+    title = "Hello world!",
+  },
+  {
+    id = 3,
+    total = 3.6,
+  },
+}
+
+
+# === complex_02
+
+module chinook {
+  type album: {id: int, title: text}
+
+  let get_album = func (): album -> (
+    {id = 3, title = "Hello world!"}
+  )
+}
+
+func () -> {
+  5: int16,
+  chinook::get_album()
+}
+
+# >
+
+{
+  5,
+  {
+    id = 3,
+    title = "Hello world!",
+  },
+}
+
+
+# === complex_03
+
+module chinook {
+  type album: {id: int64, title: text}
+
+  let get_albums = func (): [album] -> [
+    {id = 3, title = "Hello world!"},
+    {id = 5, title = "Foo"},
+  ]
+
+  let get_album_by_id = func (album_id: int64): album -> (
+    get_albums()
+    | std::filter(func (this: album) -> this.id == album_id)
+    | std::index(0)
+  )
+}
+
+func () -> {chinook::get_album_by_id(3)}
+
+# >
+
+{
+  {
+    id = 3,
+    title = "Hello world!",
+  },
+}
+
+
+# === complex_04
+
+module chinook {
+  type album: {title: text, genre_id: int}
+  type genre: {id: int, name: text}
+
+  let get_genres = func (): [genre] -> [
+    {id = 1, name = "Rock"},
+    {id = 2, name = "EDM"},
+  ]
+
+  let get_albums = func (): [album] -> [
+    {title = "Suck It and See", genre_id = 1},
+    {title = "Random Access Memories", genre_id = 2},
+    {title = "AM", genre_id = 1},
+  ]
+
+  let get_albums_by_genre = func (genre_id: int): [album] -> (
+      get_albums()
+      | std::filter(func (this: album) -> this.genre_id == genre_id)
+    )
+  }
+
+func () -> (
+  chinook::get_genres()
+  | std::map(func (this: chinook::genre) -> {
+    name = this.name,
+    albums = (
+      chinook::get_albums_by_genre(this.id)
+      | std::map(func (this: chinook::album) -> this.title)
+    ),
+  })
+)
+
+# >
+[
+  {
+    name = "Rock",
+    albums = [
+      "Suck It and See",
+      "AM",
+    ],
+  },
+  {
+    name = "EDM",
+    albums = [
+      "Random Access Memories",
+    ],
+  },
+]
+
+
+# === constant_00
+
+{1: int32, [false, true], "hello"}
+
+# >
+
+{
+  1,
+  [
+    false,
+    true,
+  ],
+  "hello",
+}
+
+
+# === default_00
+
+func (): bool -> std::default()
+
+# >
+false
+
+# === default_01
+
+func (): int32 -> std::default()
+
+# >
+0
+
+# === default_02
+
+func (): float32 -> std::default()
+
+# >
+0.0
+
+# === default_03
+
+func (): text -> std::default()
+
+# >
+""
+
+# === default_04
+
+func (): [int64] -> std::default()
+
+# >
+[]
+
+# === default_05
+
+func (): {int8, text, [bool]} -> std::default()
+
+# >
+{
+  0,
+  "",
+  [],
+}
+
+# === default_06
+
+type Status: enum {
+  Open: int16,
+  Closed: bool,
+}
+func (): Status -> std::default()
+
+# >
+Open(
+  0
+)
+
+# === default_10
+
+func (): [bool] -> std::lag([std::default(), std::default()], 1)
+
+# >
+[
+  false,
+  false,
+]
+
+# === default_11
+
+func (): [int32] -> std::lag([std::default(), std::default()], 1)
+
+# >
+[
+  0,
+  0,
+]
+
+# === default_12
+
+func (): [float32] -> std::lag([std::default(), std::default()], 1)
+
+# >
+[
+  0.0,
+  0.0,
+]
+
+# === default_13
+
+func (): [text] -> std::lag([std::default(), std::default()], 1)
+
+# >
+[
+  "",
+  "",
+]
+
+# === default_14
+# skip: postgres
+
+func (): [[int64]] -> std::lag([std::default(), std::default()], 1)
+
+# >
+[
+  [],
+  [],
+]
+
+# === default_15
+# skip: postgres
+
+func (): [{int8, text, [bool]}] -> std::lag([std::default(), std::default()], 1)
+
+# >
+[
+  {
+    0,
+    "",
+    [],
+  },
+  {
+    0,
+    "",
+    [],
+  },
+]
+
+# === default_16
+# skip: postgres
+
+type Status: enum {
+  Open: int64,
+  Closed: bool,
+}
+func (): [Status] -> std::lag([std::default(), std::default()], 1)
+
+# >
+[
+  Open(
+    0
+  ),
+  Open(
+    0
+  ),
+]
+
+# === empty_array_00
+func (): [int64] -> []
+# >
+[]
+
+# === empty_array_01
+func (): [{a: int64, b: text}] -> []
+# >
+[]
+
+# === empty_array_02
+
+let ident = func (x: [bool]) -> x
+func () -> ident([])
+# >
+[]
+
+# === enum_construction_00
+
+type Status: enum {Done, Pending: int64, Cancelled: text}
+Status::Done
+# >
+Done
+
+# === enum_construction_01
+
+type Status: enum {Done, Pending: int64, Cancelled: text}
+Status::Pending(513)
+# >
+Pending(
+  513
+)
+
+# === enum_construction_02
+
+type Status: enum {Done, Pending: int64, Cancelled: text}
+Status::Cancelled("I don't like it")
+# >
+Cancelled(
+  "I don't like it"
+)
+
+# === enum_construction_03
+
+type Color: enum {Red, Green: bool, Blue: bool}
+Color::Red
+# >
+Red
+
+# === enum_construction_04
+
+type Color: enum {Red, Green: int16, Blue: bool}
+Color::Green(12312)
+# >
+Green(
+  12312
+)
+
+# === enum_construction_05
+
+type Color: enum {Red, Green: bool, Blue: bool}
+Color::Blue(false)
+# >
+Blue(
+  false
+)
+
+# === enum_construction_06
+
+type Item: {
+  id: int64,
+  color: enum {Red, Green: bool, Blue: bool},
+}
+Item::color::Green(true)
+# >
+Green(
+  true
+)
+
+# === enum_construction_07
+
+type X: {
+  a: int,
+  b: {c: bool, d: text},
+}
+func (): X::b -> {c = true, d = "d"}
+
+# >
+{
+  c = true,
+  d = "d",
+}
+
+# === enum_construction_08
+
+type Animal: enum {
+  Cat: text,
+  Dog: enum {Generic, Collie: text},
+}
+
+func () -> [
+  Animal::Cat("Whiskers"),
+  Animal::Dog(Animal::Dog::Collie("Belie")),
+  Animal::Dog(Animal::Dog::Generic),
+]
+# >
+[
+  Cat(
+    "Whiskers"
+  ),
+  Dog(
+    Collie(
+      "Belie"
+    )
+  ),
+  Dog(
+    Generic
+  ),
+]
+
+# === enum_construction_09
+# skip: interpreter
+
+type Status: enum {
+  Open: int16,
+  Closed: bool,
+}
+func (): [Status] -> [Status::Open(0), Status::Open(0)]
+# >
+[
+  Open(
+    0
+  ),
+  Open(
+    0
+  ),
+]
+
+# === functions_00
+let add_one = func (x: int64) -> x + 1
+func () -> {add_one(4), add_one(add_one(5))}
+# >
+{
+  5,
+  7,
+}
+
+# === functions_01
+
+func () -> (4 | func (x: int64) -> x + 1 | func (x: int64) -> x * 2)
+# >
+10
+
+# === functions_02
+
+let add_one = func (x: int64) -> x + 1
+let add_two = func (x: int64) -> add_one(add_one(x))
+let my_func = func (x: int64) -> add_two(x) + add_two(x)
+func () -> my_func(1)
+# >
+6
+
+# === match_00
+
+type Status: enum {Done, Pending: int64, Cancelled: text}
+func () -> match Status::Pending(4) {
+  .Pending => "pending",
+  .Cancelled => "cancelled",
+}
+
+# >
+"pending"
+
+# === match_01
+
+type Status: enum {Done, Pending: int32, Cancelled: text}
+func (): int32 -> match Status::Pending(4) {
+  .Done => 0,
+  .Pending(x) => x,
+  .Cancelled => 0,
+}
+
+# >
+4
+
+# === match_02
+
+type Animal: enum {
+  Cat: text,
+  Dog: enum {Generic, Collie: text},
+}
+
+func () -> (
+  Animal::Dog(Animal::Dog::Collie("Belie"))
+  | func (animal: Animal) -> match animal {
+    .Cat(name) => f"Hello {name}",
+    .Dog(.Generic) => "Who's a good boy?",
+    .Dog(.Collie(name)) => f"Come here {name}",
+  }
+)
+
+# >
+"Come here Belie"
+
+# === match_03
+
+type Animal: enum {
+  Cat: text,
+  Dog: text,
+}
+
+func () -> (
+  [
+    Animal::Cat("Whiskers"),
+    Animal::Dog("Belie"),
+  ]
+  | std::map(func (animal: Animal) -> match animal {
+    .Cat(name) => f"Hello {name}",
+    .Dog(name) => "Who's a good boy?",
+  })
+)
+
+# >
+[
+  "Hello Whiskers",
+  "Who's a good boy?",
+]
+
+
+# === match_04
+
+    type Animal: enum {
+        Cat: text,
+        Dog: enum {Generic, Collie: text},
+    }
+
+func () -> (
+  [
+    Animal::Cat("Whiskers"),
+    Animal::Dog(Animal::Dog::Collie("Belie")),
+    Animal::Dog(Animal::Dog::Generic),
+  ]
+  | std::map(func (animal: Animal) -> match animal {
+    .Cat(name) => f"Hello {name}",
+    .Dog(.Generic) => "Who's a good boy?",
+    .Dog(.Collie(name)) => f"Come here {name}",
+  })
+)
+
+# >
+[
+  "Hello Whiskers",
+  "Come here Belie",
+  "Who's a good boy?",
+]
+
+
+# === or_else_00
+
+type OptText: enum {
+  None,
+  Some: text
+}
+
+func () -> (OptText::Some("hello") | std::or_else("world"))
+# >
+"hello"
+
+# === or_else_01
+
+    type OptText: enum {
+      None,
+      Some: text
+    }
+
+func () -> (OptText::None | std::or_else("fallback"))
+# >
+"fallback"
+
+# === or_else_02
+
+    type OptText: enum {
+      None,
+      Some: text
+    }
+
+func () -> (OptText::None | std::or_default())
+# >
+""
+
+# === std_add_float64_00
+(30.2 + 2.30): float64
+# >
+32.5
+
+# === std_add_float64_01
+(2.30 + 30.2): float64
+# >
+32.5
+
+# === std_add_float64_02
+(1.4 + 0.2): float64
+# >
+1.5999999999999999
+
+# === std_add_int16_00
+(30 + 2): int16
+# >
+32
+
+# === std_add_int16_01
+(-2 + 30): int16
+# >
+28
+
+# === std_add_int32_00
+(30 + 2): int32
+# >
+32
+
+# === std_add_int32_01
+(-2 + 30): int32
+# >
+28
+
+# === std_add_int64_00
+(30 + 2): int64
+# >
+32
+
+# === std_add_int64_01
+(-2 + 30): int64
+# >
+28
+
+# === std_add_int8_00
+# skip: postgres
+(30 + 2): int8
+# >
+32
+
+# === std_add_int8_01
+# skip: postgres
+(-2 + 30): int8
+# >
+28
+
+# === std_add_uint16_00
+# skip: postgres
+(30 + 2): uint16
+# >
+32
+
+# === std_add_uint32_00
+# skip: postgres
+(30 + 2): uint32
+# >
+32
+
+# === std_add_uint64_00
+# skip: postgres
+(30 + 2): uint64
+# >
+32
+
+# === std_add_uint8_00
+# skip: postgres
+(30 + 2): uint8
+# >
+32
+
+# === std_aggregate_00
+
+let my_rel: [{int64, int64}] = [{5,3},{65,1},{3, 2}]
+func () -> std::aggregate(my_rel, func (x: {[int64], [int64]}) -> {std::min(x.0), std::min(x.1)})
+# >
+{
+  3,
+  1,
+}
+
+# === std_aggregate_01
+std::aggregate([{false,"hello"},{false,"world"},{true, "!"}], func (x: {[bool], [text]}) -> {x.0 .0, x.1 .2})
+# >
+{
+  false,
+  "!",
+}
+
+# === std_all_00
+std::all([true, false, false, true])
+# >
+false
+
+# === std_all_01
+std::all([false, false])
+# >
+false
+
+# === std_all_02
+std::all([true, true, true])
+# >
+true
+
+# === std_all_03
+std::all([])
+# >
+true
+
+# === std_and
+{false && false, false && true, true && false, true && true}
+# >
+{
+  false,
+  false,
+  false,
+  true,
+}
+
+# === std_any_00
+std::any([true, false, false, true])
+# >
+true
+
+# === std_any_01
+std::any([false, false])
+# >
+false
+
+# === std_any_02
+std::any([true, true, true])
+# >
+true
+
+# === std_any_03
+std::any([])
+# >
+false
+
+# === std_append_00
+func (): [int64] -> std::append(
+      [1, 2, 3],
+      [4, 5],
+    )
+
+# >
+[
+  1,
+  2,
+  3,
+  4,
+  5,
+]
+
+# === std_append_01
+func () -> std::append(
+      ["He", "ll", "o"],
+      ["Wo", "rld!"],
+    )
+
+# >
+[
+  "He",
+  "ll",
+  "o",
+  "Wo",
+  "rld!",
+]
+
+# === std_average_00
+std::average([5: int64,3,65,3,2,56,67])
+# >
+28.714285714285715
+
+# === std_contains_00
+std::contains([5,3,65,3,2,56,67], 3)
+# >
+true
+
+# === std_contains_01
+std::contains([5,3,65,3,2,56,67], 7)
+# >
+false
+
+# === std_contains_02
+std::contains([], 2)
+# >
+false
+
+# === std_count_00
+std::count([5: int16,3,65,3,2,56,67])
+# >
+7
+
+# === std_count_01
+std::count([]: [bool])
+# >
+0
+
+# === std_div_00
+(10 / 6): int64
+# >
+1
+
+# === std_div_01
+(-10 / 6): int64
+# >
+-1
+
+# === std_div_02
+(10 / -6): int64
+# >
+-1
+
+# === std_div_03
+(-10 / -6): int64
+# >
+1
+
+# === std_div_04
+(10.0 / 6.0): float64
+# >
+1.6666666666666667
+
+# === std_div_05
+(-10.0 / 6.0): float64
+# >
+-1.6666666666666667
+
+# === std_div_06
+(10.0 / -6.0): float64
+# >
+-1.6666666666666667
+
+# === std_div_07
+(-10.0 / -6.0): float64
+# >
+1.6666666666666667
+
+# === std_eq_00
+{30: int64 == 2, 30: int64 == 30}
+# >
+{
+  false,
+  true,
+}
+
+# === std_eq_01
+{30.3: float64 == 2.2, 30.3: float64 == 30.3}
+# >
+{
+  false,
+  true,
+}
+
+# === std_eq_02
+{false == true, false == false}
+# >
+{
+  false,
+  true,
+}
+
+# === std_eq_03
+{"aa" == "b", "aa" == "aa"}
+# >
+{
+  false,
+  true,
+}
+
+# === std_filter_00
+std::filter([5,3,65,3,2]: [int64], func (x: int) -> x > 3)
+# >
+[
+  5,
+  65,
+]
+
+# === std_filter_01
+std::filter([5,3,65,3,2]: [int64], func (x: int) -> x < 1)
+# >
+[]
+
+# === std_filter_02
+std::filter([], func (x: int) -> x > 3)
+# >
+[]
+
+# === std_filter_03
+std::filter([false,true,true,false,true], func (x: bool) -> !x)
+# >
+[
+  false,
+  false,
+]
+
+# === std_filter_04
+std::filter([{false, "one"},{true, "two"},{true, "three"},{false, "four"},{true, "five"}], func (x: {bool, text}) -> x.0)
+# >
+[
+  {
+    true,
+    "two",
+  },
+  {
+    true,
+    "three",
+  },
+  {
+    true,
+    "five",
+  },
+]
+
+# === std_flat_map_00
+func () -> std::flat_map([1, 2, 3]: [int64], func (x) -> [x, x])
+# >
+[
+  1,
+  1,
+  2,
+  2,
+  3,
+  3,
+]
+
+# === std_flat_map_01
+func () -> (
+      [{1: int64, false}, {2, true}]
+      | std::flat_map(func (x) -> [x, x])
+    )
+# >
+[
+  {
+    1,
+    false,
+  },
+  {
+    1,
+    false,
+  },
+  {
+    2,
+    true,
+  },
+  {
+    2,
+    true,
+  },
+]
+
+# === std_from_columnar_00
+std::from_columnar({[4: int16, 3, 2], [5: int32, 4, 1]})
+# >
+[
+  {
+    4,
+    5,
+  },
+  {
+    3,
+    4,
+  },
+  {
+    2,
+    1,
+  },
+]
+
+# === std_from_columnar_01
+std::from_columnar({[1]: [int32], []: [int64]})
+# >
+[]
+
+# === std_from_columnar_02
+std::from_columnar({[]: [int8], [2]: [int16]})
+# >
+[]
+
+# === std_from_columnar_03
+std::from_columnar({[1: int16, 2], [3: int16, 4, 5]})
+# >
+[
+  {
+    1,
+    3,
+  },
+  {
+    2,
+    4,
+  },
+]
+
+# === std_from_columnar_04
+std::from_columnar({[false, true], ["no", "yes", "neither"]})
+# >
+[
+  {
+    false,
+    "no",
+  },
+  {
+    true,
+    "yes",
+  },
+]
+
+# === std_group_00
+(
+      std::group([1, 2, 5, 1, 2, 4, 6, 12]: [int64], func (x) -> x % 2)
+      | std::sort(func (x) -> x.key)
+    )
+# >
+[
+  {
+    key = 0,
+    values = [
+      2,
+      2,
+      4,
+      6,
+      12,
+    ],
+  },
+  {
+    key = 1,
+    values = [
+      1,
+      5,
+      1,
+    ],
+  },
+]
+
+# === std_group_01
+func () -> (
+      [
+        {1, false, 10},
+        {2, false, 21},
+        {2, false, 22},
+        {1, true, 10}
+      ]: [{int64, bool, int64}]
+      | std::group(func (x: {int64, bool, int64}) -> {x.0, x.2})
+      | std::sort(func (x) -> x.key.0 + x.key.1)
+    )
+
+# >
+[
+  {
+    key = {
+      1,
+      10,
+    },
+    values = [
+      {
+        1,
+        false,
+        10,
+      },
+      {
+        1,
+        true,
+        10,
+      },
+    ],
+  },
+  {
+    key = {
+      2,
+      21,
+    },
+    values = [
+      {
+        2,
+        false,
+        21,
+      },
+    ],
+  },
+  {
+    key = {
+      2,
+      22,
+    },
+    values = [
+      {
+        2,
+        false,
+        22,
+      },
+    ],
+  },
+]
+
+# === std_group_02
+func () -> (
+      [
+        {1, false, 10},
+        {2, false, 21},
+        {2, false, 22},
+        {1, true, 10}
+      ]: [{int64, bool, int64}]
+      | std::group(
+        func (x: {int64, bool, int64}) -> {x.0, x.2}
+      )
+      | std::sort(func (x) -> x.key.0 + x.key.1)
+      | std::map(func (partition) -> {
+        k = partition.key.0,
+        v = std::sum(std::map(
+          partition.values,
+          func (x: {int64, bool, int64}) -> x.2
+        )),
+      })
+    )
+
+# >
+[
+  {
+    k = 1,
+    v = 20,
+  },
+  {
+    k = 2,
+    v = 21,
+  },
+  {
+    k = 2,
+    v = 22,
+  },
+]
+
+# === std_gt_00
+{3 > 2: int64, 2 > 3: int64, 2 > 2: int64}
+# >
+{
+  true,
+  false,
+  false,
+}
+
+# === std_gt_01
+{3.3 > 2.2: float64, 2.2 > 3.3: float64, 2.2 > 2.2: float64}
+# >
+{
+  true,
+  false,
+  false,
+}
+
+# === std_gte_00
+{3 >= 2: int64, 2 >= 3: int64, 2 >= 2: int64}
+# >
+{
+  true,
+  false,
+  true,
+}
+
+# === std_gte_01
+{3.3 >= 2.2: float64, 2.2 >= 3.3: float64, 2.2 >= 2.2: float64}
+# >
+{
+  true,
+  false,
+  true,
+}
+
+# === std_index_00
+std::index([5,3,65,3,2]: [int64], 3)
+# >
+3
+
+# === std_index_01
+([1, 2, 3].2): int64
+# >
+3
+
+# === std_index_02
+std::index([5.3,3.2,65.4,3.1,2.0], 3): float64
+# >
+3.1
+
+# === std_index_03
+([1.1, 2.2, 3.3].2): float64
+# >
+3.3
+
+# === std_index_04
+std::index([false, false, false, true, false], 3)
+# >
+true
+
+# === std_index_05
+[true, true, false].2
+# >
+false
+
+# === std_index_06
+["hello", "world", "!"].2
+# >
+"!"
+
+# === std_lag_00
+std::lag([5,3,65,3,2,56,67]: [int8], 2)
+# >
+[
+  0,
+  0,
+  5,
+  3,
+  65,
+  3,
+  2,
+]
+
+# === std_lag_01
+std::lag([5,3,65,3,2,56,67]: [int16], 12)
+# >
+[
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+]
+
+# === std_lag_02
+func (): [int64] -> std::lag([], 3)
+# >
+[]
+
+# === std_lag_03
+std::lag([5,3,65,4], -2): [int8]
+# >
+[
+  65,
+  4,
+  0,
+  0,
+]
+
+# === std_lead_00
+std::lead([5,3,65,3,2,56,67], 2): [int8]
+# >
+[
+  65,
+  3,
+  2,
+  56,
+  67,
+  0,
+  0,
+]
+
+# === std_lead_01
+std::lead([5,3,65,3,2,56,67], 12): [int64]
+# >
+[
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+]
+
+# === std_lead_02
+func (): [int32] -> std::lead([], 3)
+# >
+[]
+
+# === std_lead_03
+std::lead([5,3,65,4], -2): [int64]
+# >
+[
+  0,
+  0,
+  5,
+  3,
+]
+
+# === std_lt_00
+{3 < 2: int64, 2 < 3: int64, 2 < 2: int64}
+# >
+{
+  false,
+  true,
+  false,
+}
+
+# === std_lt_01
+{3.3 < 2.2: float64, 2.2 < 3.3: float64, 2.2 < 2.2: float64}
+# >
+{
+  false,
+  true,
+  false,
+}
+
+# === std_lte_00
+{3 <= 2: int64, 2 <= 3: int64, 2 <= 2: int64}
+# >
+{
+  false,
+  true,
+  true,
+}
+
+# === std_lte_01
+{3.3 <= 2.2: float64, 2.2 <= 3.3: float64, 2.2 <= 2.2: float64}
+# >
+{
+  false,
+  true,
+  true,
+}
+
+# === std_map_00
+func () -> std::map([5,3,65,3,2], func (x: int) -> x + 1)
+# >
+[
+  6,
+  4,
+  66,
+  4,
+  3,
+]
+
+# === std_map_01
+func () -> std::map([], func (x: int) -> x + 1)
+# >
+[]
+
+# === std_map_02
+func () -> std::map([false, true, false], func (x: bool) -> !x)
+# >
+[
+  true,
+  false,
+  true,
+]
+
+# === std_map_03
+func () -> std::map(["hello", "world", "!"], func (x: text) -> std::text_ops::length(x))
+# >
+[
+  5,
+  5,
+  1,
+]
+
+# === std_map_columnar_00
+std::map_columnar(
+        [{5: int16, 3: int16}, {65, 1}, {3, 2}],
+        func (x: {[int16], [int16]}) -> {
+            std::lag(x.0, 1),
+            std::lead(x.1, 1)
+        }
+    )
+
+# >
+[
+  {
+    0,
+    1,
+  },
+  {
+    5,
+    2,
+  },
+  {
+    65,
+    0,
+  },
+]
+
+# === std_map_columnar_01
+std::map_columnar(
+        [{false,"hello"},{false,"world"},{true, "!"}],
+        func (x: {[bool], [text]}) -> {
+            std::lead(x.0, 1),
+            std::lag(x.1, 1),
+        }
+    )
+
+# >
+[
+  {
+    false,
+    "",
+  },
+  {
+    true,
+    "hello",
+  },
+  {
+    false,
+    "world",
+  },
+]
+
+# === std_max_00
+std::max([5,3,65,3,2,56,67])
+# >
+67
+
+# === std_min_00
+std::min([5,3,65,3,2,56,67])
+# >
+2
+
+# === std_mod_00
+(10 % 6): int64
+# >
+4
+
+# === std_mod_01
+(-10 % 6): int64
+# >
+-4
+
+# === std_mod_02
+(10 % -6): int64
+# >
+4
+
+# === std_mod_03
+(-10 % -6): int64
+# >
+-4
+
+# === std_mod_04
+(10.0 % 6.0): float64
+# >
+4.0
+
+# === std_mod_05
+(-10.0 % 6.0): float64
+# >
+-4.0
+
+# === std_mod_06
+(10.0 % -6.0): float64
+# >
+4.0
+
+# === std_mod_07
+(-10.0 % -6.0): float64
+# >
+-4.0
+
+# === std_mul_01
+(2 * 3): int64
+# >
+6
+
+# === std_mul_02
+(2.1 * 3.5): float64
+# >
+7.3500000000000005
+
+# === std_ne_00
+{
+  30.3: float64 != 2.2,
+  30.3: float64 != 30.3
+}
+# >
+{
+  true,
+  false,
+}
+
+# === std_ne_01
+{
+  30.3: float64 != 2.2,
+  30.3: float64 != 30.3
+}
+# >
+{
+  true,
+  false,
+}
+
+# === std_ne_02
+{false != true, false != false}
+# >
+{
+  true,
+  false,
+}
+
+# === std_ne_03
+{"aa" != "b", "aa" != "aa"}
+# >
+{
+  true,
+  false,
+}
+
+# === std_neg_00
+{-2: int64, - (-3: int64)}
+# >
+{
+  -2,
+  3,
+}
+
+# === std_neg_01
+{-2.1: float64, - (-3.1: float64)}
+# >
+{
+  -2.1,
+  3.1,
+}
+
+# === std_not
+{!false, !true}
+# >
+{
+  true,
+  false,
+}
+
+# === std_or
+{false || false, false || true, true || false, true || true}
+# >
+{
+  false,
+  true,
+  true,
+  true,
+}
+
+# === std_row_number_00
+func () -> std::row_number([5,3,65,3,2,56,67]: [int64])
+# >
+[
+  0,
+  1,
+  2,
+  3,
+  4,
+  5,
+  6,
+]
+
+# === std_row_number_01
+func () -> std::row_number([]: [text])
+# >
+[]
+
+# === std_slice_00
+std::slice([5,3,65,3,2]: [int64], 1, 3)
+# >
+[
+  3,
+  65,
+]
+
+# === std_slice_01
+# skip: postgres
+std::slice([5,3,65,3,2]: [int64], 1, -1)
+# >
+[
+  3,
+  65,
+  3,
+]
+
+# === std_slice_02
+std::slice([5,3,65,3,2]: [int64], 4, 2)
+# >
+[]
+
+# === std_slice_03
+std::slice([5,3,65,3,2]: [int64], 6, 7)
+# >
+[]
+
+# === std_slice_04
+std::slice([5,3,65,3,2]: [int64], -7, 0)
+# >
+[]
+
+# === std_slice_05
+std::slice([false,true,false,false,true], 1, 4)
+# >
+[
+  true,
+  false,
+  false,
+]
+
+# === std_slice_06
+std::slice([{false,"hello"}, {false,"world"},{true, "!"},{false,"foo"},{true, "bar"}], 1, 4)
+# >
+[
+  {
+    false,
+    "world",
+  },
+  {
+    true,
+    "!",
+  },
+  {
+    false,
+    "foo",
+  },
+]
+
+# === std_sort_00
+func () -> std::sort([5,3,65,3,2]: [int64], func (x: int64) -> -x)
+# >
+[
+  65,
+  5,
+  3,
+  3,
+  2,
+]
+
+# === std_sort_01
+std::sort(
+      [{5: int64, "hello"}, {3: int64, "world"}, {65: int64, "!"}, {3: int64, "foo"}, {2: int64, "bar"}],
+      func (x: {int64, text}) -> x.0
+    )
+# >
+[
+  {
+    2,
+    "bar",
+  },
+  {
+    3,
+    "world",
+  },
+  {
+    3,
+    "foo",
+  },
+  {
+    5,
+    "hello",
+  },
+  {
+    65,
+    "!",
+  },
+]
+
+# === std_sub_00
+(30 - 2): int64
+# >
+28
+
+# === std_sub_01
+(2 - 30): int64
+# >
+-28
+
+# === std_sub_02
+(30.2 - 2.30): float64
+# >
+27.9
+
+# === std_sub_03
+(2.30 - 30.2): float64
+# >
+-27.9
+
+# === std_sum_00
+std::sum([5,3,65,3,2,56,67])
+# >
+201
+
+# === std_sum_01
+std::sum([])
+# >
+0
+
+# === std_to_columnar_00
+std::to_columnar([{5,3},{65,1},{3, 2}]: [{int64, int64}])
+# >
+{
+  [
+    5,
+    65,
+    3,
+  ],
+  [
+    3,
+    1,
+    2,
+  ],
+}
+
+# === std_to_columnar_01
+std::to_columnar([{false,"three"},{true,"one"},{false, "two"}])
+# >
+{
+  [
+    false,
+    true,
+    false,
+  ],
+  [
+    "three",
+    "one",
+    "two",
+  ],
+}
+
+# === std_to_float32_00
+# skip: postgres
+
+{
+  (-4: int8 | std::to_float32),
+  (-400: int16 | std::to_float32),
+  (-400000: int32 | std::to_float32),
+  (-40000000001: int64 | std::to_float32),
+  (4: uint8 | std::to_float32),
+  (400: uint16 | std::to_float32),
+  (400000: uint32 | std::to_float32),
+  (40000000001: uint64 | std::to_float32),
+  (4.4: float32 | std::to_float32),
+  (125523.121231: float64 | std::to_float32),
+}
+
+# >
+
+{
+  -4.0,
+  -400.0,
+  -400000.0,
+  -40000000000.0,
+  4.0,
+  400.0,
+  400000.0,
+  40000000000.0,
+  4.4,
+  125523.125,
+}
+
+# === std_to_float64_00
+# skip: postgres
+
+{
+  (-4: int8 | std::to_float64),
+  (-400: int16 | std::to_float64),
+  (-400000: int32 | std::to_float64),
+  (-40000000001: int64 | std::to_float64),
+  (4: uint8 | std::to_float64),
+  (400: uint16 | std::to_float64),
+  (400000: uint32 | std::to_float64),
+  (40000000001: uint64 | std::to_float64),
+  (4.4: float32 | std::to_float64),
+  (125523.121231: float64 | std::to_float64),
+}
+
+# >
+
+{
+  -4.0,
+  -400.0,
+  -400000.0,
+  -40000000001.0,
+  4.0,
+  400.0,
+  400000.0,
+  40000000001.0,
+  4.400000095367432,
+  125523.121231,
+}
+
+# === std_to_int16_00
+# skip: postgres
+
+{
+  (-4: int8 | std::to_int16),
+  (-400: int16 | std::to_int16),
+  (-400000: int32 | std::to_int16),
+  (-40000000001: int64 | std::to_int16),
+  (4: uint8 | std::to_int16),
+  (400: uint16 | std::to_int16),
+  (400000: uint32 | std::to_int16),
+  (40000000001: uint64 | std::to_int16),
+  (4.4: float32 | std::to_int16),
+  (125523.121231: float64 | std::to_int16),
+}
+
+# >
+{
+  -4,
+  -400,
+  -6784,
+  28671,
+  4,
+  400,
+  6784,
+  -28671,
+  4,
+  32767,
+}
+
+# === std_to_int32_00
+# skip: postgres
+{
+  (-4: int8 | std::to_int32),
+  (-400: int16 | std::to_int32),
+  (-400000: int32 | std::to_int32),
+  (-40000000001: int64 | std::to_int32),
+  (4: uint8 | std::to_int32),
+  (400: uint16 | std::to_int32),
+  (400000: uint32 | std::to_int32),
+  (40000000001: uint64 | std::to_int32),
+  (4.4: float32 | std::to_int32),
+  (125523.121231: float64 | std::to_int32),
+}
+
+# >
+{
+  -4,
+  -400,
+  -400000,
+  -1345294337,
+  4,
+  400,
+  400000,
+  1345294337,
+  4,
+  125523,
+}
+
+# === std_to_int64_00
+# skip: postgres
+{
+  (-4: int8 | std::to_int64),
+  (-400: int16 | std::to_int64),
+  (-400000: int32 | std::to_int64),
+  (-40000000001: int64 | std::to_int64),
+  (4: uint8 | std::to_int64),
+  (400: uint16 | std::to_int64),
+  (400000: uint32 | std::to_int64),
+  (40000000001: uint64 | std::to_int64),
+  (4.4: float32 | std::to_int64),
+  (125523.121231: float64 | std::to_int64),
+}
+
+# >
+{
+  -4,
+  -400,
+  -400000,
+  -40000000001,
+  4,
+  400,
+  400000,
+  40000000001,
+  4,
+  125523,
+}
+
+# === std_to_int8_00
+# skip: postgres
+{
+  (-4: int8 | std::to_int8),
+  (-400: int16 | std::to_int8),
+  (-400000: int32 | std::to_int8),
+  (-40000000001: int64 | std::to_int8),
+  (4: uint8 | std::to_int8),
+  (400: uint16 | std::to_int8),
+  (400000: uint32 | std::to_int8),
+  (40000000001: uint64 | std::to_int8),
+  (4.4: float32 | std::to_int8),
+  (125523.121231: float64 | std::to_int8),
+}
+
+# >
+{
+  -4,
+  112,
+  -128,
+  -1,
+  4,
+  -112,
+  -128,
+  1,
+  4,
+  127,
+}
+
+# === std_to_uint16_00
+# skip: postgres
+{
+  (-4: int8 | std::to_uint16),
+  (-400: int16 | std::to_uint16),
+  (-400000: int32 | std::to_uint16),
+  (-40000000001: int64 | std::to_uint16),
+  (4: uint8 | std::to_uint16),
+  (400: uint16 | std::to_uint16),
+  (400000: uint32 | std::to_uint16),
+  (40000000001: uint64 | std::to_uint16),
+  (4.4: float32 | std::to_uint16),
+  (125523.121231: float64 | std::to_uint16),
+}
+
+# >
+{
+  65532,
+  65136,
+  58752,
+  28671,
+  4,
+  400,
+  6784,
+  36865,
+  4,
+  65535,
+}
+
+# === std_to_uint32_00
+# skip: postgres
+{
+  (-4: int8 | std::to_uint32),
+  (-400: int16 | std::to_uint32),
+  (-400000: int32 | std::to_uint32),
+  (-40000000001: int64 | std::to_uint32),
+  (4: uint8 | std::to_uint32),
+  (400: uint16 | std::to_uint32),
+  (400000: uint32 | std::to_uint32),
+  (40000000001: uint64 | std::to_uint32),
+  (4.4: float32 | std::to_uint32),
+  (125523.121231: float64 | std::to_uint32),
+}
+
+# >
+{
+  4294967292,
+  4294966896,
+  4294567296,
+  2949672959,
+  4,
+  400,
+  400000,
+  1345294337,
+  4,
+  125523,
+}
+
+# === std_to_uint64_00
+# skip: postgres
+{
+  (-4: int8 | std::to_uint64),
+  (-400: int16 | std::to_uint64),
+  (-400000: int32 | std::to_uint64),
+  (-40000000001: int64 | std::to_uint64),
+  (4: uint8 | std::to_uint64),
+  (400: uint16 | std::to_uint64),
+  (400000: uint32 | std::to_uint64),
+  (40000000001: uint64 | std::to_uint64),
+  (4.4: float32 | std::to_uint64),
+  (125523.121231: float64 | std::to_uint64),
+}
+
+# >
+{
+  18446744073709551612,
+  18446744073709551216,
+  18446744073709151616,
+  18446744033709551615,
+  4,
+  400,
+  400000,
+  40000000001,
+  4,
+  125523,
+}
+
+# === std_to_uint8_00
+# skip: postgres
+{
+  (-4: int8 | std::to_uint8),
+  (-400: int16 | std::to_uint8),
+  (-400000: int32 | std::to_uint8),
+  (-40000000001: int64 | std::to_uint8),
+  (4: uint8 | std::to_uint8),
+  (400: uint16 | std::to_uint8),
+  (400000: uint32 | std::to_uint8),
+  (40000000001: uint64 | std::to_uint8),
+  (4.4: float32 | std::to_uint8),
+  (125523.121231: float64 | std::to_uint8),
+}
+
+# >
+{
+  252,
+  112,
+  128,
+  255,
+  4,
+  144,
+  128,
+  1,
+  4,
+  255,
+}
+
+# === tuple_00
+
+func () -> {key = {"code 1", false}, value = 5: int64}.key.1
+# >
+false

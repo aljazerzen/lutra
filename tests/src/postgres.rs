@@ -40,11 +40,6 @@ pub fn _run(source: &str, args: Vec<lutra_bin::Value>) -> (String, String) {
 }
 
 #[track_caller]
-pub fn _run_output(lutra_source: &str) -> String {
-    _run(lutra_source, vec![]).1
-}
-
-#[track_caller]
 pub fn _run_sql_output(lutra_source: &str) -> String {
     let (sql, output) = _run(lutra_source, vec![]);
     format!("{sql}\n---\n{output}")
