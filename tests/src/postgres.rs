@@ -873,3 +873,110 @@ fn sql_from_00() {
     ]
     "#);
 }
+
+#[test]
+fn group_00() {
+    insta::assert_snapshot!(_run_sql_output(r#"
+    let values: [int64] = [1, 1, 1, 3, 2, 3]
+
+    func () -> (
+      values
+      | std::group(func (x) -> x)
+      | std::map(func (this) -> {
+        value = this.key,
+        sum = std::sum(this.values),
+      })
+    )
+    "#), @r"
+    SELECT
+      r16._0,
+      r16._1
+    FROM
+      (
+        SELECT
+          r7.index AS index,
+          r7._0 AS _0,
+          (
+            SELECT
+              r13.value
+            FROM
+              (
+                SELECT
+                  COALESCE(SUM(r12.value), 0)::int8 AS value
+                FROM
+                  LATERAL (
+                    SELECT
+                      (ROW_NUMBER() OVER ())::int4 AS index,
+                      j.value::text::int8 AS value
+                    FROM
+                      jsonb_array_elements(r7._1) AS j
+                  ) AS r12
+              ) AS r13
+          ) AS _1
+        FROM
+          (
+            SELECT
+              (ROW_NUMBER() OVER ())::int4 AS index,
+              r6.value AS _0,
+              COALESCE(
+                jsonb_agg(
+                  r6.value
+                  ORDER BY
+                    r6.index
+                ),
+                '[]'::jsonb
+              ) AS _1
+            FROM
+              (
+                SELECT
+                  0::int8 AS index,
+                  1::int8 AS value
+                UNION
+                ALL
+                SELECT
+                  1::int8 AS index,
+                  1::int8 AS value
+                UNION
+                ALL
+                SELECT
+                  2::int8 AS index,
+                  1::int8 AS value
+                UNION
+                ALL
+                SELECT
+                  3::int8 AS index,
+                  3::int8 AS value
+                UNION
+                ALL
+                SELECT
+                  4::int8 AS index,
+                  2::int8 AS value
+                UNION
+                ALL
+                SELECT
+                  5::int8 AS index,
+                  3::int8 AS value
+              ) AS r6
+            GROUP BY
+              r6.value
+          ) AS r7
+      ) AS r16
+    ORDER BY
+      r16.index
+    ---
+    [
+      {
+        value = 1,
+        sum = 3,
+      },
+      {
+        value = 2,
+        sum = 2,
+      },
+      {
+        value = 3,
+        sum = 6,
+      },
+    ]
+    ");
+}
