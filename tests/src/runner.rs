@@ -25,15 +25,13 @@ async fn main() {
         lutra_compiler::compile(&project, source, None, ProgramFormat::BytecodeLt).unwrap();
 
     let c = async {
-        let res = client
-            .execute_raw(&program, &[1, 0, 0, 0, 0, 0, 0, 0])
-            .await;
-        print_res(res, &ty.output);
+        let program = client.prepare(program).await.unwrap();
 
-        let res = client
-            .execute_raw(&program, &[5, 0, 0, 0, 0, 0, 0, 0])
-            .await;
-        print_res(res, &ty.output);
+        let res = client.execute(&program, &[1, 0, 0, 0, 0, 0, 0, 0]).await;
+        assert_eq!("5", res_to_string(res, &ty.output));
+
+        let res = client.execute(&program, &[5, 0, 0, 0, 0, 0, 0, 0]).await;
+        assert_eq!("17", res_to_string(res, &ty.output));
 
         client.shutdown().await.unwrap();
     };
@@ -41,8 +39,8 @@ async fn main() {
     tokio::join!(c, server.run()).1.unwrap();
 }
 
-fn print_res(res: Result<Vec<u8>, io::Error>, output_ty: &br::Ty) {
+fn res_to_string(res: Result<Vec<u8>, io::Error>, output_ty: &br::Ty) -> String {
     let res = res.unwrap();
     let res = lutra_bin::Value::decode(&res, output_ty, &[]).unwrap();
-    println!("{}", res.print_source(output_ty, &[]).unwrap());
+    res.print_source(output_ty, &[]).unwrap()
 }

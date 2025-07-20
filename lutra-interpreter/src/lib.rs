@@ -22,8 +22,16 @@ pub struct InterpreterRunner<'a> {
 
 impl<'a> lutra_runner::Run for InterpreterRunner<'a> {
     type Error = EvalError;
+    type Prepared = lutra_bin::rr::Program;
 
-    async fn execute_raw(
+    async fn prepare(
+        &self,
+        program: lutra_bin::rr::Program,
+    ) -> Result<Self::Prepared, Self::Error> {
+        Ok(program)
+    }
+
+    async fn execute(
         &self,
         program: &lutra_bin::rr::Program,
         input: &[u8],

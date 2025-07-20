@@ -14,7 +14,7 @@ where
     stream: C,
     runner: R,
 
-    prepared_programs: HashMap<u32, lutra_bin::rr::Program>,
+    prepared_programs: HashMap<u32, R::Prepared>,
 }
 
 impl<C, R> Server<C, R>
@@ -46,7 +46,9 @@ where
                 let program = lutra_bin::rr::Program::decode(&prepare.program).unwrap();
                 tracing::trace!("prepare");
 
-                self.prepared_programs.insert(prepare.program_id, program);
+                let handle = self.runner.prepare(program).await.unwrap();
+
+                self.prepared_programs.insert(prepare.program_id, handle);
                 // maybe send some kind of successful prepare response?
             }
             messages::ClientMessage::Execute(messages::Execute {
@@ -85,7 +87,7 @@ where
             return messages::Result::Err(messages::Error {});
         };
 
-        let output = self.runner.execute_raw(program, input).await.unwrap();
+        let output = self.runner.execute(program, input).await.unwrap();
         messages::Result::Ok(output)
     }
 }

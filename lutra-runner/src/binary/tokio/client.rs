@@ -114,14 +114,23 @@ impl<C> Run for Client<C>
 where
     C: AsyncRead + AsyncWrite + Unpin,
 {
+    type Prepared = u32;
     type Error = io::Error;
 
-    async fn execute_raw(
+    async fn prepare(
         &self,
-        program: &lutra_bin::rr::Program,
+        program: lutra_bin::rr::Program,
+    ) -> Result<Self::Prepared, Self::Error> {
+        Ok(self.send_prepare(&program).await)
+    }
+
+    async fn execute(
+        &self,
+        program: &Self::Prepared,
         input: &[u8],
     ) -> Result<std::vec::Vec<u8>, Self::Error> {
-        let res = self.run_once(program, input).await?;
+        let request_id = self.send_execute(*program, input).await;
+        let res = self.recv_response(request_id).await?;
         let messages::Result::Ok(res) = res else {
             todo!()
         };

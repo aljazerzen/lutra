@@ -182,10 +182,12 @@ pub async fn run(cmd: RunCommand) -> anyhow::Result<()> {
     // execute
     let output = if cmd.runner.interpreter {
         let runner = lutra_interpreter::InterpreterRunner::default();
-        runner.execute_raw(&program, &[]).await?
+        let handle = runner.prepare(program).await?;
+        runner.execute(&handle, &[]).await?
     } else if let Some(pg_url) = cmd.runner.postgres {
         let runner = init_runner_postgres(&pg_url).await?;
-        runner.execute_raw(&program, &[]).await?
+        let handle = runner.prepare(program).await?;
+        runner.execute(&handle, &[]).await?
     } else {
         unreachable!()
     };
@@ -207,7 +209,7 @@ async fn init_runner_postgres(url: &str) -> anyhow::Result<lutra_runner_postgres
         }
     });
 
-    Ok(lutra_runner_postgres::RunnerAsync(client))
+    Ok(lutra_runner_postgres::RunnerAsync::new(client))
 }
 
 #[derive(clap::Parser)]

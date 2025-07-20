@@ -93,7 +93,7 @@ async fn run_on_pg(case: TestCase) -> Result<(), libtest_mimic::Failed> {
         }
     });
 
-    let runner = lutra_runner_postgres::RunnerAsync(client);
+    let runner = lutra_runner_postgres::RunnerAsync::new(client);
     run_program("pg", ProgramFormat::SqlPg, runner, case).await
 }
 
@@ -118,8 +118,11 @@ async fn run_program(
         todo!("parse lutra const expr: {}", case.input)
     };
 
-    let res = runner.execute_raw(&program, &input).await;
-    let output = res.map_err(|e| format!("Runner err: {e:?}"))?;
+    let res = runner.prepare(program).await;
+    let handle = res.map_err(|e| format!("Run::prepare: {e:?}"))?;
+
+    let res = runner.execute(&handle, &input).await;
+    let output = res.map_err(|e| format!("Run::execute: {e:?}"))?;
 
     let output = lutra_bin::Value::decode(&output, &ty.output, &ty.ty_defs)?;
     let output_source = output.print_source(&ty.output, &ty.ty_defs)?;

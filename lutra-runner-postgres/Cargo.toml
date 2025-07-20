@@ -10,6 +10,7 @@ version.workspace = true
 bytes = { workspace = true }
 tracing = { workspace = true }
 futures = { version = "0.3.31", default-features = false }
+tokio = { workspace = true }
 lutra-bin = { version = "0.1.0", path = "../lutra-bin" }
 lutra-runner = { version = "0.1.0", path = "../lutra-runner" }
 tinyjson = "2"

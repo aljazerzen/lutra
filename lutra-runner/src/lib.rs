@@ -27,17 +27,13 @@ use lutra_bin::{rr, string, vec};
 /// Ability to execute a lutra program.
 pub trait Run {
     type Error: core::fmt::Debug;
+    type Prepared;
 
-    /// Execute a compiled program.
-    /// Program's format must match the format supported by this runner.
-    fn execute_raw(
-        &self,
-        program: &rr::Program,
-        input: &[u8],
-    ) -> impl Future<Output = Result<vec::Vec<u8>, Self::Error>>;
-
-    /// Execute a compiled program.
-    fn execute<I, O>(
+    /// Execute a prepared program.
+    ///
+    /// This is helper function for [Run::prepare] followed by [Run::execute],
+    /// wrapped into
+    fn run<I, O>(
         &self,
         program: &rr::TypedProgram<I, O>,
         input: &I,
@@ -48,10 +44,32 @@ pub trait Run {
     {
         async {
             let input = input.encode();
-            let output = self.execute_raw(&program.inner, &input).await?;
+            let handle = self.prepare(program.inner.clone()).await?;
+            let output = self.execute(&handle, &input).await?;
             Ok(O::decode(&output))
         }
     }
+
+    /// Prepares a program for execution and returns a handle, which can be
+    /// used with [Run::execute]. Does not block.
+    ///
+    /// If the program is invalid, error is returned either now or later by [Run::execute].
+    ///
+    /// When the handle is returned, the program might not be
+    /// fully prepared yet, so first execution of the program
+    /// might take longer then subsequent [Run::execute] calls.
+    fn prepare(
+        &self,
+        program: rr::Program,
+    ) -> impl Future<Output = Result<Self::Prepared, Self::Error>>;
+
+    /// Execute a prepared program.
+    /// Program's format must match the format supported by this runner.
+    fn execute(
+        &self,
+        program: &Self::Prepared,
+        input: &[u8],
+    ) -> impl Future<Output = Result<vec::Vec<u8>, Self::Error>>;
 
     /// Return static interface of this runner as Lutra source code.
     ///
@@ -60,7 +78,7 @@ pub trait Run {
     /// Lutra source code.
     ///
     /// For example: interpreter can provide `fs::read_parquet()`
-    /// and PostgreSQL runner can provide `pg::reload_conf()`.
+    /// and PostgreSQL runner can provide `sql::read_table()`.
     fn get_interface(&self) -> impl Future<Output = Result<string::String, Self::Error>> {
         async { Ok(string::String::new()) }
     }

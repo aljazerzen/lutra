@@ -31,37 +31,54 @@ pub fn execute(
 }
 
 #[cfg(feature = "tokio-postgres")]
-pub struct RunnerAsync(pub tokio_postgres::Client);
+pub struct RunnerAsync {
+    client: tokio_postgres::Client,
+}
+
+impl RunnerAsync {
+    pub fn new(client: tokio_postgres::Client) -> Self {
+        RunnerAsync { client }
+    }
+}
+
+pub struct PreparedProgram {
+    program: rr::SqlProgram,
+    stmt: tokio_postgres::Statement,
+}
 
 #[cfg(feature = "tokio-postgres")]
 impl lutra_runner::Run for RunnerAsync {
     type Error = tokio_postgres::Error;
+    type Prepared = PreparedProgram;
 
-    async fn execute_raw(
+    async fn prepare(&self, program: rr::Program) -> Result<Self::Prepared, Self::Error> {
+        let program = *program.into_sql_pg().unwrap();
+
+        let stmt = self.client.prepare(&program.sql).await?;
+
+        Ok(PreparedProgram { program, stmt })
+    }
+
+    async fn execute(
         &self,
-        program: &lutra_bin::rr::Program,
+        handle: &Self::Prepared,
         input: &[u8],
     ) -> Result<std::vec::Vec<u8>, Self::Error> {
-        let program = program.as_sql_pg().unwrap();
-
-        // parse
-        let stmt = self.0.prepare(&program.sql).await?;
-
         // pack input into query args
-        let args = params::to_sql(program, input);
+        let args = params::to_sql(&handle.program, input);
 
-        let rows = self.0.query(&stmt, &args.as_refs()).await?;
+        let rows = self.client.query(&handle.stmt, &args.as_refs()).await?;
 
         // convert result from sql
-        Ok(result::from_sql(program, &rows))
+        Ok(result::from_sql(&handle.program, &rows))
     }
 
     async fn get_interface(&self) -> Result<std::string::String, Self::Error> {
         let mut output = String::new();
 
-        let tables = schema::table_list(&self.0).await?;
+        let tables = schema::table_list(&self.client).await?;
         for table in tables {
-            let table_ty = schema::table_get(&self.0, &table).await?;
+            let table_ty = schema::table_get(&self.client, &table).await?;
 
             let ty_name = if let Some(n) = table.strip_suffix("s") {
                 n.to_string()
