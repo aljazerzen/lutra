@@ -1,3 +1,4 @@
+---
 title: Python and PostgreSQL
 ---
 
@@ -50,7 +51,7 @@ type Movie: {
 }
 
 # function named get_movies that returns an array of movie
-let get_movies = func (): [Movie] -> (
+func get_movies(): [Movie] -> (
   # it is implemented by just reading the sql table
   std::sql::from_table('movies');
 )
@@ -137,7 +138,7 @@ see something like this:
 
 ```sh
 > python main.py
-[Movie(id=1, title="...", release_year=2009), ...]  
+[Movie(id=1, title="...", release_year=2009), ...]
 ```
 
 And that, dear reader, is the simplest type-safe way of querying PostgreSQL.

@@ -14,9 +14,9 @@ and expressing data structures.
 ```lt
 type Album: {id: int16, title: text}
 
-let get_albums: func (): [Album]
+func get_albums(): [Album]
 
-let get_album_by_id = func (album_id: int16): Album -> (
+func get_album_by_id(album_id: int16): Album -> (
   get_albums()
   | filter(func (this: Album) -> this.id == album_id)
   | index(0)

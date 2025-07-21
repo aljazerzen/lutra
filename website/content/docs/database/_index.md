@@ -23,7 +23,7 @@ module db {
     let movies: func (): [Movie]
 }
 
-let main = func (param: int32) -> (
+func main(param: int32) -> (
     db::movies()
     | std::filter(func (x: Movie) -> x.id == param)
     | std::index(0)

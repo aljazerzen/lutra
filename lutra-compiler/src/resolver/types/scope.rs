@@ -48,7 +48,7 @@ pub enum ScopedKind {
     ///
     /// For example, `T` is a type param:
     /// ```lt
-    /// let twice = func <T> (x: T): {T, T} -> {x: T, x}
+    /// func twice <T> (x: T): {T, T} -> {x: T, x}
     /// ```
     TyParam {
         name: String,

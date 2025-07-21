@@ -21,14 +21,13 @@ pub(crate) fn type_expr() -> impl Parser<TokenKind, Ty, Error = PError> + Clone 
 
         let func = keyword("func")
             .ignore_then(
-                type_params(nested_type_expr.clone())
-                    .then(func_params)
+                func_params
                     .then_ignore(ctrl(':'))
                     .then(nested_type_expr.clone().map(Box::new).map(Some))
-                    .map(|((type_params, params), body)| TyFunc {
+                    .map(|(params, body)| TyFunc {
                         params,
                         body,
-                        ty_params: type_params,
+                        ty_params: Vec::new(),
                     }),
             )
             .map(TyKind::Func);
@@ -128,14 +127,12 @@ fn primitive_set() -> impl Parser<TokenKind, TyPrimitive, Error = PError> {
         TokenKind::Ident(i) if i == "int16" => TyPrimitive::int16,
         TokenKind::Ident(i) if i == "int32" => TyPrimitive::int32,
         TokenKind::Ident(i) if i == "int64" => TyPrimitive::int64,
-        TokenKind::Ident(i) if i == "int" => TyPrimitive::int64,
         TokenKind::Ident(i) if i == "uint8" => TyPrimitive::uint8,
         TokenKind::Ident(i) if i == "uint16" => TyPrimitive::uint16,
         TokenKind::Ident(i) if i == "uint32" => TyPrimitive::uint32,
         TokenKind::Ident(i) if i == "uint64" => TyPrimitive::uint64,
         TokenKind::Ident(i) if i == "float32" => TyPrimitive::float32,
         TokenKind::Ident(i) if i == "float64" => TyPrimitive::float64,
-        TokenKind::Ident(i) if i == "float" => TyPrimitive::float64,
         TokenKind::Ident(i) if i == "bool"=> TyPrimitive::bool,
         TokenKind::Ident(i) if i == "text"=> TyPrimitive::text,
     }
@@ -143,7 +140,7 @@ fn primitive_set() -> impl Parser<TokenKind, TyPrimitive, Error = PError> {
 
 pub fn type_params<'a>(
     ty: impl Parser<TokenKind, Ty, Error = PError> + 'a,
-) -> impl Parser<TokenKind, Vec<TyParam>, Error = PError> + Clone + 'a {
+) -> impl Parser<TokenKind, Vec<TyParam>, Error = PError> + 'a {
     let tuple = ident_part()
         .then_ignore(ctrl(':'))
         .or_not()
@@ -196,10 +193,41 @@ pub fn type_params<'a>(
         })
         .labelled("tuple domain");
 
+    let one_of_numbers = ident_keyword("number").to(TyParamDomain::OneOf(vec![
+        TyPrimitive::int8,
+        TyPrimitive::int16,
+        TyPrimitive::int32,
+        TyPrimitive::int64,
+        TyPrimitive::uint8,
+        TyPrimitive::uint16,
+        TyPrimitive::uint32,
+        TyPrimitive::uint64,
+        TyPrimitive::float32,
+        TyPrimitive::float64,
+    ]));
+
+    let one_of_primitives = ident_keyword("primitive").to(TyParamDomain::OneOf(vec![
+        TyPrimitive::bool,
+        TyPrimitive::int8,
+        TyPrimitive::int16,
+        TyPrimitive::int32,
+        TyPrimitive::int64,
+        TyPrimitive::uint8,
+        TyPrimitive::uint16,
+        TyPrimitive::uint32,
+        TyPrimitive::uint64,
+        TyPrimitive::float32,
+        TyPrimitive::float64,
+        TyPrimitive::text,
+    ]));
+
     // domain
     let domain = ctrl(':')
         .ignore_then(choice((
+            // ctrl('*').to(TyParamDomain::Open),
             tuple,
+            one_of_primitives,
+            one_of_numbers,
             primitive_set()
                 .separated_by(ctrl('|'))
                 .at_least(1)
@@ -218,12 +246,5 @@ pub fn type_params<'a>(
             span: Some(span),
         });
 
-    param
-        .separated_by(ctrl(','))
-        .allow_trailing()
-        .at_least(1)
-        .delimited_by(ctrl('<'), ctrl('>'))
-        .or_not()
-        .map(|x| x.unwrap_or_default())
-        .boxed()
+    param.separated_by(ctrl(',')).allow_trailing().at_least(1)
 }

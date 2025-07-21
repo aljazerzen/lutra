@@ -10,7 +10,7 @@ fn _test_compile_and_print(source: &str) -> String {
 #[test]
 fn inline_00() {
     assert_snapshot!(_test_compile_and_print(r#"
-    let twice = func <T> (x: T) -> {x, x}
+    func twice(x: T) where T -> {x, x}
 
     func () -> twice([true, true, false])
     "#), @r"
@@ -31,7 +31,7 @@ fn inline_00() {
 #[test]
 fn inline_01() {
     assert_snapshot!(_test_compile_and_print(r#"
-    let once = func <T> (x: T) -> {x}
+    func once(x: T) where T -> {x}
 
     func () -> once([true, true, false])
     "#), @r"

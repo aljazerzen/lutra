@@ -47,14 +47,14 @@ fn types_02() {
     // inference of type arg
 
     insta::assert_snapshot!(_test_ty(r#"
-        let identity = func <T> (x: T) -> x
+        func identity(x: T) where T -> x
 
         func () -> identity(false)
     "#), @"bool");
 
     // same, but describe function as a type, not an expression
     insta::assert_snapshot!(_test_ty(r#"
-        let identity: func <T> (x: T): T
+        func identity(x: T): T where T
 
         func () -> identity(false)
     "#), @"bool");
@@ -64,33 +64,39 @@ fn types_03() {
     // validation of type params
 
     insta::assert_snapshot!(_test_err(r#"
-        let floor_64: func (x: float64): float64
+        func floor_64(x: float64): float64
 
-        let floor = func <T> (x: T) -> floor_64(x)
+        func floor(x: T) where T -> floor_64(x)
 
         func () -> floor(4.4)
     "#), @r"
     [E0004] Error:
-       ╭─[:4:49]
+       ╭─[:4:46]
        │
-     4 │         let floor = func <T> (x: T) -> floor_64(x)
-       │                                                 ┬
-       │                                                 ╰── function floor_64, one of the params expected type `float64`, but found type `T`
+     4 │         func floor(x: T) where T -> floor_64(x)
+       │                                              ┬
+       │                                              ╰── function floor_64, one of the params expected type `float64`, but found type `T`
     ───╯
     ");
 }
 #[test]
 fn types_05() {
     insta::assert_snapshot!(_test_ty(r#"
-        let identity = func <T> (x: T) -> x
-        let apply = func <I, O> (x: I, mapper: func (I): O): O -> mapper(x)
+        func identity(x: T) where T -> x
+
+        func apply(x: I, mapper: func (I): O): O
+        where I, O
+        -> mapper(x)
 
         func () -> apply(false, identity)
     "#), @"bool");
 
     insta::assert_snapshot!(_test_ty(r#"
-        let twice = func <T> (x: T) -> {x, x}
-        let apply = func <I, O> (x: I, mapper: func (I): O): O -> mapper(x)
+        func twice(x: T) where T -> {x, x}
+
+        func apply(x: I, mapper: func (I): O): O
+        where I, O
+        -> mapper(x)
 
         func () -> apply(false, twice)
     "#), @"{bool, bool}");
@@ -98,8 +104,10 @@ fn types_05() {
 #[test]
 fn types_06() {
     insta::assert_snapshot!(_test_ty(r#"
-        let identity = func <T> (x: T) -> x
-        let map: func <I, O> (x: [I], mapper: func (I): O): [O]
+        func identity(x: T) where T -> x
+
+        func map(x: [I], mapper: func (I): O): [O]
+        where I, O
 
         func () -> map([false, true, false], identity)
     "#), @"[bool]");
@@ -107,8 +115,10 @@ fn types_06() {
 #[test]
 fn types_07() {
     insta::assert_snapshot!(_test_ty(r#"
-        let twice = func <T> (x: T) -> {x, x}
-        let map: func <I, O> (x: [I], mapper: func (I): O): [O]
+        func twice(x: T) where T -> {x, x}
+
+        func map(x: [I], mapper: func (I): O): [O]
+        where I, O
 
         func () -> map([false, true, true], twice)
     "#), @"[{bool, bool}]");
@@ -116,9 +126,14 @@ fn types_07() {
 #[test]
 fn types_08() {
     insta::assert_snapshot!(_test_ty(r#"
-        let filter: func <T> (array: [T], condition: func (T): bool): [T]
-        let map: func <I, O> (x: [I], mapper: func (I): O): [O]
-        let slice: func <T> (x: [T], start: int64, end: int64): [T]
+        func filter(array: [T], condition: func (T): bool): [T]
+        where T
+
+        func map(x: [I], mapper: func (I): O): [O]
+        where I, O
+
+        func slice(x: [T], start: int64, end: int64): [T]
+        where T
 
         func () -> (
             [{"5", false}, {"4", true}, {"1", true}]
@@ -131,14 +146,15 @@ fn types_08() {
 #[test]
 fn types_09() {
     insta::assert_snapshot!(_test_err(r#"
-        let peek: func <T> (array: [T], condition: func <R> (T): R): [T]
+        func peek(array: [T], condition: func <R> (T): R): [T]
+        where T
     "#), @r"
-    Error:
-       ╭─[:2:58]
+    [E0003] Error:
+       ╭─[:2:47]
        │
-     2 │         let peek: func <T> (array: [T], condition: func <R> (T): R): [T]
-       │                                                          ┬
-       │                                                          ╰── generic type parameters are not allowed here
+     2 │         func peek(array: [T], condition: func <R> (T): R): [T]
+       │                                               ┬
+       │                                               ╰── type expected (, but found <
     ───╯
     ");
 }
@@ -153,10 +169,11 @@ fn types_10() {
 #[test]
 fn types_11() {
     insta::assert_snapshot!(_test_ty(r#"
-        type album_sale: {id: int, total: float}
-        let get_album_sales: func (): [album_sale]
+        type album_sale: {id: int64, total: float64}
+        func get_album_sales(): [album_sale]
 
-        let filter: func <T> (array: [T], condition: func (T): bool): [T]
+        func filter(array: [T], condition: func (T): bool): [T]
+        where T
 
         func (): [album_sale] -> (
             get_album_sales()
@@ -176,18 +193,22 @@ fn types_12() {
 #[test]
 fn types_13() {
     insta::assert_snapshot!(_test_ty(r#"
-        let floor: func <T: float32 | float64> (x: T): T
+        func floor(x: T): T
+        where T: float32 | float64
+
         func () -> floor(2.4: float32)
     "#), @"float32");
 
     insta::assert_snapshot!(_test_err(r#"
-        let floor: func <T: float32 | float64> (x: T): T
+        func floor(x: T): T
+        where T: float32 | float64
+
         func () -> floor(false)
     "#), @r"
     [E0005] Error:
-       ╭─[:3:20]
+       ╭─[:5:20]
        │
-     3 │         func () -> floor(false)
+     5 │         func () -> floor(false)
        │                    ──┬──
        │                      ╰──── T is restricted to one of float32, float64, found bool
     ───╯
@@ -198,44 +219,62 @@ fn types_14() {
     // validate type params: one of
 
     insta::assert_snapshot!(_test_err(r#"
-        let floor_64: func (x: float64): float64
-        let floor = func <T: float32 | float64> (x: T): T -> (
+        func floor_64(x: float64): float64
+
+        func floor(x: T): T
+        where T: float32 | float64
+        -> (
             floor_64(x)
         )
         func () -> floor(2.3)
     "#), @r"
     [E0004] Error:
-       ╭─[:4:22]
+       ╭─[:7:22]
        │
-     4 │             floor_64(x)
+     7 │             floor_64(x)
        │                      ┬
        │                      ╰── function floor_64, one of the params expected type `float64`, but found type `T`
     ───╯
     ");
 
     insta::assert_snapshot!(_test_ty(r#"
-        let floor: func <F: float32 | float64> (x: F): F
-        let twice_floored = func <T: float32 | float64> (x: T) -> {floor(4.5: float64), floor(x)}
+        func floor(x: F): F
+        where F: float32 | float64
+
+        func twice_floored(x: T)
+        where T: float32 | float64
+        -> {floor(4.5: float64), floor(x)}
+
         func (f: float32) -> twice_floored(f)
     "#), @"{float64, float32}");
 
     insta::assert_snapshot!(_test_ty(r#"
-        let floor: func <F: float32 | float64> (x: F): F
-        let twice_floored = func <T: float64> (x: T) -> {floor(x), floor(x)}
+        func floor(x: F): F
+        where F: float32 | float64
+
+        func twice_floored(x: T)
+        where T: float64
+        -> {floor(x), floor(x)}
+
         func () -> twice_floored(2.3: float64)
     "#), @"{float64, float64}");
 
     insta::assert_snapshot!(_test_err(r#"
-        let floor: func <F: float32 | float64> (x: F): F
-        let twice_floored = func <T: float64 | bool> (x: T) -> {floor(x), floor(x)}
+        func floor(x: F): F
+        where F: float32 | float64
+
+        func twice_floored(x: T)
+        where T: float64 | bool
+        -> {floor(x), floor(x)}
+
         func () -> twice_floored(2.3)
     "#), @r"
     [E0005] Error:
-       ╭─[:3:65]
+       ╭─[:7:13]
        │
-     3 │         let twice_floored = func <T: float64 | bool> (x: T) -> {floor(x), floor(x)}
-       │                                                                 ──┬──
-       │                                                                   ╰──── T is restricted to one of float32, float64, found bool
+     7 │         -> {floor(x), floor(x)}
+       │             ──┬──
+       │               ╰──── T is restricted to one of float32, float64, found bool
     ───╯
     ");
 }
@@ -243,30 +282,36 @@ fn types_14() {
 fn types_15() {
     // type param: tuple domain with named arg
     insta::assert_snapshot!(_test_ty(r#"
-        let get_b: func <T: {b: int64, ..}> (x: T): T
+        func get_b(x: T): T
+        where T: {b: int64, ..}
+
         func () -> get_b({a = false, b = 4: int64})
     "#), @"{a: bool, b: int64}");
 
     insta::assert_snapshot!(_test_err(r#"
-        let get_b: func <T: {b: int64, ..}> (x: T): T
+        func get_b(x: T): T
+        where T: {b: int64, ..}
+
         func () -> get_b({a = false, b = 4.6: float64})
     "#), @r"
     [E0004] Error:
-       ╭─[:3:42]
+       ╭─[:5:42]
        │
-     3 │         func () -> get_b({a = false, b = 4.6: float64})
+     5 │         func () -> get_b({a = false, b = 4.6: float64})
        │                                          ─┬─
        │                                           ╰─── expected type `int64`, but found type `float64`
     ───╯
     ");
     insta::assert_snapshot!(_test_err(r#"
-        let get_b: func <T: {b: int64, ..}> (x: T): T
+        func get_b(x: T): T
+        where T: {b: int64, ..}
+
         func () -> get_b({a = false, c = 4})
     "#), @r"
     Error:
-       ╭─[:3:20]
+       ╭─[:5:20]
        │
-     3 │         func () -> get_b({a = false, c = 4})
+     5 │         func () -> get_b({a = false, c = 4})
        │                    ──┬──
        │                      ╰──── field .b does not exist in type {a: bool, c: _}
     ───╯
@@ -276,37 +321,45 @@ fn types_15() {
 fn types_16() {
     // type param: tuple domain with positional arg
     insta::assert_snapshot!(_test_ty(r#"
-        let get_b: func <T: {bool, int64, ..}> (x: T): T
+        func get_b(x: T): T
+        where T: {bool, int64, ..}
+
         func () -> get_b({a = false, 4, c = 5.7: float32})
     "#), @"{a: bool, int64, c: float32}");
 
     insta::assert_snapshot!(_test_err(r#"
-        let get_b: func <T: {bool, int64, ..}> (x: T): T
+        func get_b(x: T): T
+        where T: {bool, int64, ..}
+
         func () -> get_b({a = "7", 4: int64, c = 5.7})
     "#), @r#"
     [E0004] Error:
-       ╭─[:3:31]
+       ╭─[:5:31]
        │
-     3 │         func () -> get_b({a = "7", 4: int64, c = 5.7})
+     5 │         func () -> get_b({a = "7", 4: int64, c = 5.7})
        │                               ─┬─
        │                                ╰─── expected type `bool`, but found type `text`
     ───╯
     "#);
 
     insta::assert_snapshot!(_test_err(r#"
-        let get_b: func <T: {bool, int64, a: bool, ..}> (x: T): T
+        func get_b(x: T): T
+        where T: {bool, int64, a: bool, ..}
+
         func () -> get_b({a = false})
     "#), @r"
     Error:
-       ╭─[:3:20]
+       ╭─[:5:20]
        │
-     3 │         func () -> get_b({a = false})
+     5 │         func () -> get_b({a = false})
        │                    ──┬──
        │                      ╰──── field .1 does not exist in type {a: bool}
     ───╯
     ");
     insta::assert_snapshot!(_test_ty(r#"
-        let get_b: func <T: {bool, int64, a: bool, ..}> (x: T): T
+        func get_b(x: T): T
+        where T: {bool, int64, a: bool, ..}
+
         func () -> get_b({a = false, 4})
     "#), @"{a: bool, int64}");
 }
@@ -316,50 +369,68 @@ fn types_17() {
     // validate type params: tuple domain
 
     insta::assert_snapshot!(_test_err(r#"
-        let get_int: func (x: {int64}): int64
-        let get = func <T: {int64, ..}> (x: T): T -> get_int(x)
+        func get_int(x: {int64}): int64
+
+        func get(x: T): T
+        where T: {int64, ..}
+        -> get_int(x)
+
         func () -> get({4})
     "#), @r"
     [E0004] Error:
-       ╭─[:3:62]
+       ╭─[:6:20]
        │
-     3 │         let get = func <T: {int64, ..}> (x: T): T -> get_int(x)
-       │                                                              ┬
-       │                                                              ╰── function get_int, one of the params expected type `{int64}`, but found type `T`
+     6 │         -> get_int(x)
+       │                    ┬
+       │                    ╰── function get_int, one of the params expected type `{int64}`, but found type `T`
     ───╯
     ");
 
     insta::assert_snapshot!(_test_err(r#"
-        let get_int: func (x: {a: int64}): int64
-        let get = func <T: {a: int64, ..}> (x: T): T -> get_int(x)
+        func get_int(x: {a: int64}): int64
+
+        func get(x: T): T
+        where T: {a: int64, ..}
+        -> get_int(x)
+
         func () -> get({4})
     "#), @r"
     [E0004] Error:
-       ╭─[:3:65]
+       ╭─[:6:20]
        │
-     3 │         let get = func <T: {a: int64, ..}> (x: T): T -> get_int(x)
-       │                                                                 ┬
-       │                                                                 ╰── function get_int, one of the params expected type `{a: int64}`, but found type `T`
+     6 │         -> get_int(x)
+       │                    ┬
+       │                    ╰── function get_int, one of the params expected type `{a: int64}`, but found type `T`
     ───╯
     ");
 
     insta::assert_snapshot!(_test_err(r#"
-        let needs_two: func <I: {int64, bool, ..}> (x: I): int64
-        let needs_one = func <T: {int64, ..}> (x: T): int64 -> needs_two(x)
+        func needs_two(x: I): int64
+        where I: {int64, bool, ..}
+
+        func needs_one(x: T): int64
+        where T: {int64, ..}
+        -> needs_two(x)
+
         func () -> needs_one({4})
     "#), @r"
     Error:
-       ╭─[:3:64]
+       ╭─[:7:12]
        │
-     3 │         let needs_one = func <T: {int64, ..}> (x: T): int64 -> needs_two(x)
-       │                                                                ────┬────
-       │                                                                    ╰────── field .1 does not exist
+     7 │         -> needs_two(x)
+       │            ────┬────
+       │                ╰────── field .1 does not exist
     ───╯
     ");
 
     insta::assert_snapshot!(_test_ty(r#"
-        let needs_one: func <I: {int64, ..}> (x: I): I
-        let needs_two = func <T: {int64, bool, ..}> (x: T): T -> needs_one(x)
+        func needs_one(x: I): I
+        where I: {int64, ..}
+
+        func needs_two(x: T): T
+        where T: {int64, bool, ..}
+        -> needs_one(x)
+
         func () -> needs_two({4: int64, false})
     "#), @"{int64, bool}");
 }
@@ -369,12 +440,13 @@ fn types_18() {
     // indirection into type params
 
     insta::assert_snapshot!(_test_ty(r#"
-        let f = func <T: {int64, ..}> (x: T) -> x.0
+        func f(x: T) where T: {int64, ..} -> x.0
+
         func () -> f({4: int64, false})
     "#), @"int64");
 
     insta::assert_snapshot!(_test_ty(r#"
-        let f = func <T: {a: int64, ..}> (x: T) -> x.a
+        func f(x: T) where T: {a: int64, ..} -> x.a
         func () -> f({false, a = 4: int64})
     "#), @"int64");
 }
@@ -382,14 +454,14 @@ fn types_18() {
 #[test]
 fn types_19() {
     insta::assert_snapshot!(_test_err(r#"
-        func <T> (x) -> x + 1
+        func f(x) where T -> x + 1
     "#), @r"
     Error:
-       ╭─[:2:19]
+       ╭─[:2:16]
        │
-     2 │         func <T> (x) -> x + 1
-       │                   ┬
-       │                   ╰── missing type annotations
+     2 │         func f(x) where T -> x + 1
+       │                ┬
+       │                ╰── missing type annotations
     ───╯
     ");
 }
@@ -553,7 +625,7 @@ fn primitives() {
                 float64,
                 text,
             }
-            let main = func () -> x()
+            func main() -> x()
             "
         ),
         @"{bool, int8, int16, int32, int64, uint8, uint16, uint32, uint64, float32, float64, text}"
@@ -567,7 +639,7 @@ fn enums_00() {
             "
             type Status: enum { Open, Done, Pending: text }
 
-            let main = func () -> Status::Done
+            func main() -> Status::Done
             "
         ),
         @"enum {Open, Done, Pending: text}"
@@ -581,7 +653,7 @@ fn enums_01() {
             r#"
             type Status: enum { Open, Done, Pending: text }
 
-            let main = func () -> Status::Pending("hello")
+            func main() -> Status::Pending("hello")
             "#
         ),
         @"enum {Open, Done, Pending: text}"
@@ -594,7 +666,7 @@ fn enums_02() {
             r#"
             type X: { a: int64 }
 
-            let main = func (): X::a -> 5
+            func main(): X::a -> 5
             "#
         ),
         @"int64"
@@ -605,16 +677,16 @@ fn enums_03() {
     insta::assert_snapshot!(
         _test_err(
             r#"
-            type X: { a: int, b: X::a }
+            type X: { a: int64, b: X::a }
             "#
         ),
         @r"
     Error:
-       ╭─[:2:34]
+       ╭─[:2:36]
        │
-     2 │             type X: { a: int, b: X::a }
-       │                                  ──┬─
-       │                                    ╰─── paths into self type are not allowed
+     2 │             type X: { a: int64, b: X::a }
+       │                                    ──┬─
+       │                                      ╰─── paths into self type are not allowed
     ───╯
     "
     );
@@ -635,7 +707,7 @@ fn recursive_00() {
                 None,
                 Some = Tree,
             }
-            let main = func (): OptionalTree -> OptionalTree::None
+            func main(): OptionalTree -> OptionalTree::None
             "#
         ),
         @r#"
@@ -649,7 +721,7 @@ fn match_00() {
     insta::assert_snapshot!(_test_ty(r#"
         type Status: enum {Done, Pending: int16, Cancelled: text}
 
-        let main = func () -> match Status::Done {
+        func main() -> match Status::Done {
           .Done => "done",
           .Pending => "pending",
           .Cancelled => "cancelled",
@@ -663,7 +735,7 @@ fn match_01() {
     insta::assert_snapshot!(_test_err(r#"
         type Status: enum {Done, Pending: int16, Cancelled: text}
 
-        let main = func () -> match Status::Done {
+        func main() -> match Status::Done {
           .Done => "done",
           .Cancelled => "cancelled",
         }
@@ -678,7 +750,7 @@ fn match_02() {
         type Status: enum {Done, Pending: int16, Cancelled: text}
         type Color: enum {Red, Green, Blue}
 
-        let main = func () -> match Status::Done {
+        func main() -> match Status::Done {
           .Red => "red",
           .Green => "green",
           .Blue => "blue",
@@ -699,7 +771,7 @@ fn match_03() {
     insta::assert_snapshot!(_test_err(r#"
         type Color: enum {Red, Green, Blue}
 
-        let main = func () -> match Color::Green {
+        func main() -> match Color::Green {
           .Red => "red",
           .Green => 1,
           .Blue => false,
@@ -720,7 +792,7 @@ fn match_04() {
     insta::assert_snapshot!(_test_ty(r#"
         type Status: enum {Pending: bool}
 
-        let main = func () -> match Status::Pending(false) {
+        func main() -> match Status::Pending(false) {
           .Pending(x) => x,
         }
     "#), @"bool");
@@ -731,7 +803,7 @@ fn match_05() {
     insta::assert_snapshot!(_test_ty(r#"
         type Status: enum {Pending: int32}
 
-        let main = func () -> match Status::Pending(4) {
+        func main() -> match Status::Pending(4) {
           .Pending(x) => x,
         }
     "#), @"int32");

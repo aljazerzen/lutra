@@ -5,7 +5,7 @@ use super::{ctrl, ident_part, keyword};
 use crate::Span;
 use crate::parser::lexer::TokenKind;
 use crate::parser::perror::PError;
-use crate::parser::types::type_expr;
+use crate::parser::types;
 use crate::pr::*;
 
 /// The top-level parser
@@ -14,7 +14,7 @@ pub fn source() -> impl Parser<TokenKind, Vec<Stmt>, Error = PError> {
 }
 
 fn module_contents() -> impl Parser<TokenKind, Vec<Stmt>, Error = PError> {
-    let ty = type_expr();
+    let ty = types::type_expr();
     let expr = expr(ty.clone());
 
     recursive(|module_contents| {
@@ -35,6 +35,7 @@ fn module_contents() -> impl Parser<TokenKind, Vec<Stmt>, Error = PError> {
             module_def,
             type_def(ty.clone()),
             import_def(),
+            func_def(expr.clone(), ty.clone()),
             var_def(expr, ty),
         ));
 
@@ -82,7 +83,7 @@ fn var_def(
     let let_ = keyword("let")
         .ignore_then(ident_part())
         .then(ctrl(':').ignore_then(ty).or_not())
-        .then(ctrl('=').ignore_then(expr.clone()).map(Box::new).or_not())
+        .then(ctrl('=').ignore_then(expr.clone()).map(Box::new).map(Some))
         .map(|((name, ty), value)| StmtKind::VarDef(VarDef { name, value, ty }));
 
     let main = expr.map(Box::new).map(|value| {
@@ -96,6 +97,60 @@ fn var_def(
     });
 
     let_.or(main).labelled("variable definition")
+}
+
+fn func_def<'a>(
+    expr: impl Parser<TokenKind, Expr, Error = PError> + Clone + 'a,
+    ty: impl Parser<TokenKind, Ty, Error = PError> + Clone + 'a,
+) -> impl Parser<TokenKind, StmtKind, Error = PError> + Clone + 'a {
+    let head = keyword("func").ignore_then(ident_part());
+
+    let params = ident_part()
+        .then(ctrl(':').ignore_then(ty.clone()).or_not())
+        .map_with_span(|(name, ty), span| FuncParam { name, ty, span })
+        .separated_by(ctrl(','))
+        .allow_trailing()
+        .delimited_by(ctrl('('), ctrl(')'));
+
+    let ty_params = keyword("where")
+        .ignore_then(types::type_params(ty.clone()).boxed())
+        .or_not()
+        .map(|x| x.unwrap_or_default());
+
+    head.then(params)
+        .then(ctrl(':').ignore_then(ty.clone()).or_not())
+        .then(ty_params)
+        .then(just(TokenKind::ArrowThin).ignore_then(expr).or_not())
+        .map_with_span(|((((name, params), return_ty), ty_params), body), span| {
+            StmtKind::VarDef(if let Some(body) = body {
+                let func = Func {
+                    return_ty,
+                    body: Box::new(body),
+                    params,
+                    ty_params,
+                };
+                let value = Expr::new_with_span(ExprKind::Func(Box::new(func)), span);
+                VarDef {
+                    name,
+                    ty: value.ty.clone(),
+                    value: Some(Box::new(value)),
+                }
+            } else {
+                let ty_func = TyFunc {
+                    params: params.into_iter().map(|p| p.ty).collect(),
+                    body: return_ty.map(Box::new),
+                    ty_params,
+                };
+                let ty = Some(Ty::new_with_span(TyKind::Func(ty_func), span));
+                VarDef {
+                    name,
+                    ty,
+                    value: None,
+                }
+            })
+        })
+        .labelled("function definition")
+        .boxed()
 }
 
 fn type_def(

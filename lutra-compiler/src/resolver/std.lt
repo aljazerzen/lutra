@@ -1,258 +1,272 @@
 # Utils
 
-let default: func <T> (): T
+func default(): T
+where T
 
 
 # Casts
 
-let to_int8: func <T: int8 | int16 | int32 | int64 | uint8 | uint16 | uint32 | uint64 | float32 | float64> (x: T): int8
+func to_int8(x: T): int8
+where
+  T: number
 
-let to_int16: func <T: int8 | int16 | int32 | int64 | uint8 | uint16 | uint32 | uint64 | float32 | float64> (x: T): int16
+func to_int16(x: T): int16
+where
+  T: number
 
-let to_int32: func <T: int8 | int16 | int32 | int64 | uint8 | uint16 | uint32 | uint64 | float32 | float64> (x: T): int32
+func to_int32(x: T): int32
+where
+  T: number
 
-let to_int64: func <T: int8 | int16 | int32 | int64 | uint8 | uint16 | uint32 | uint64 | float32 | float64> (x: T): int64
+func to_int64(x: T): int64
+where
+  T: number
 
-let to_uint8: func <T: int8 | int16 | int32 | int64 | uint8 | uint16 | uint32 | uint64 | float32 | float64> (x: T): uint8
+func to_uint8(x: T): uint8
+where
+  T: number
 
-let to_uint16: func <T: int8 | int16 | int32 | int64 | uint8 | uint16 | uint32 | uint64 | float32 | float64> (x: T): uint16
+func to_uint16(x: T): uint16
+where
+  T: number
 
-let to_uint32: func <T: int8 | int16 | int32 | int64 | uint8 | uint16 | uint32 | uint64 | float32 | float64> (x: T): uint32
+func to_uint32(x: T): uint32
+where
+  T: number
 
-let to_uint64: func <T: int8 | int16 | int32 | int64 | uint8 | uint16 | uint32 | uint64 | float32 | float64> (x: T): uint64
+func to_uint64(x: T): uint64
+where
+  T: number
 
-let to_float32: func <T: int8 | int16 | int32 | int64 | uint8 | uint16 | uint32 | uint64 | float32 | float64> (x: T): float32
+func to_float32(x: T): float32
+where
+  T: number
 
-let to_float64: func <T: int8 | int16 | int32 | int64 | uint8 | uint16 | uint32 | uint64 | float32 | float64> (x: T): float64
+func to_float64(x: T): float64
+where
+  T: number
 
 # Operators
 
-let mul: func <T: int8 | int16 | int32 | int64 | uint8 | uint16 | uint32 | uint64 | float32 | float64> (
-    left: T, right: T
-): T
+func mul(left: T, right: T): T
+where
+  T: number
 
-let div: func <T: int8 | int16 | int32 | int64 | uint8 | uint16 | uint32 | uint64 | float32 | float64> (
-    left: T, right: T
-): T
+func div(left: T, right: T): T
+where
+  T: number
 
-let mod: func <T: int8 | int16 | int32 | int64 | uint8 | uint16 | uint32 | uint64 | float32 | float64> (
-    left: T, right: T
-): T
+func mod(left: T, right: T): T
+where
+  T: number
 
-let add: func <T: int8 | int16 | int32 | int64 | uint8 | uint16 | uint32 | uint64 | float32 | float64> (
-    left: T, right: T
-): T
+func add(left: T, right: T): T
+where
+  T: number
 
-let sub: func <T: int8 | int16 | int32 | int64 | uint8 | uint16 | uint32 | uint64 | float32 | float64> (
-    left: T, right: T
-): T
+func sub(left: T, right: T): T
+where
+  T: number
 
-let neg: func <T: int8 | int16 | int32 | int64 | float32 | float64> (
-    x: T
-): T
+func neg(x: T): T
+where
+  T: int8 | int16 | int32 | int64 | float32 | float64
 
-let eq: func <T: bool | int8 | int16 | int32 | int64 | uint8 | uint16 | uint32 | uint64 | float32 | float64 | text> (
-    left: T, right: T
-): bool
+func eq(left: T, right: T): bool
+where
+  T: primitive
 
-let ne: func <T: bool | int8 | int16 | int32 | int64 | uint8 | uint16 | uint32 | uint64 | float32 | float64 | text> (
-    left: T, right: T
-): bool
+func ne(left: T, right: T): bool
+where
+  T: primitive
 
-let gt: func <T: int8 | int16 | int32 | int64 | uint8 | uint16 | uint32 | uint64 | float32 | float64> (
-    left: T, right: T
-): bool
+func gt(left: T, right: T): bool
+where
+  T: number
 
-let lt: func <T: int8 | int16 | int32 | int64 | uint8 | uint16 | uint32 | uint64 | float32 | float64> (
-    left: T, right: T
-): bool
+func lt(left: T, right: T): bool
+where
+  T: number
 
-let gte: func <T: int8 | int16 | int32 | int64 | uint8 | uint16 | uint32 | uint64 | float32 | float64> (
-    left: T, right: T
-): bool
+func gte(left: T, right: T): bool
+where
+  T: number
 
-let lte: func <T: int8 | int16 | int32 | int64 | uint8 | uint16 | uint32 | uint64 | float32 | float64> (
-    left: T, right: T
-): bool
+func lte(left: T, right: T): bool
+where
+  T: number
 
-let and: func (left: bool, right: bool): bool
+func and(left: bool, right: bool): bool
 
-let or: func (left: bool, right: bool): bool
+func or(left: bool, right: bool): bool
 
-let not: func (expr: bool): bool
+func not(expr: bool): bool
 
-let regex_search: func (text: text, pattern: text): bool
+func regex_search(text: text, pattern: text): bool
 
-let or_else = func <T> (
-    value: enum { None, Some: T },
-    fallback: T
-): T -> (
-    match value {
-        .Some(x) => x,
-        .None => fallback,
-    }
+func or_else(value: enum { None, Some: T }, fallback: T): T
+where T
+-> (
+  match value {
+      .Some(x) => x,
+      .None => fallback,
+  }
 )
 
-let or_default = func <T> (
-    value: enum { None, Some: T }
-): T -> (
-    match value {
-        .Some(x) => x,
-        .None => std::default(),
-    }
+func or_default(value: enum { None, Some: T }): T
+where T
+-> (
+  match value {
+      .Some(x) => x,
+      .None => std::default(),
+  }
 )
 
 # Array functions
 
-let index: func <T> (array: [T], position: int): T
+func index(array: [T], position: int64): T
+where T
 
-let map: func <I, O> (
-  array: [I],
-  mapper: func (I): O,
-): [O]
+func map(array: [I], mapper: func (I): O): [O]
+where I, O
 
-let flat_map: func <I, O> (
-  array: [I],
-  mapper: func (I): [O],
-): [O]
+func flat_map(array: [I], mapper: func (I): [O]): [O]
+where I, O
 
-let filter: func <T> (
-  array: [T],
-  condition: func (T): bool,
-): [T]
+func filter(array: [T], condition: func (T): bool): [T]
+where T
 
-let find = func <T> (
-  array: [T],
-  condition: func (T): bool,
-): T -> (
-    array | filter(condition) | index(0)
+func find(array: [T], condition: func (T): bool): T
+where T
+-> (
+  array | filter(condition) | index(0)
 )
 
-let slice: func <T> (
-  array: [T],
-  start: int64,
-  end: int64,
-): [T]
+func slice(array: [T], start: int64, end: int64): [T]
+where T
 
-let sort: func <I> (
-  array: [I],
-  key: func (I): int,
-): [I]
+func sort(array: [I], key: func (I): int64): [I]
+where I
 
-let to_columnar: func <A, B> ( # <I: {i1 = I1}>
-  x: [{A, B}]
-): {[A], [B]}
+func to_columnar(x: [{A, B}]): {[A], [B]}
+where A, B  # <I: {i1 = I1}>
 
-let from_columnar: func <A, B> ( # <I: {i1 = [I1]}>
-  columnar: {[A], [B]}
-): [{A, B}]
+func from_columnar(columnar: {[A], [B]}): [{A, B}]
+where A, B  # <I: {i1 = [I1]}>
 
-let map_columnar = func <A, B> ( # <I: {i1 = I1}, O: {o1 = O1}>
-  x: [{A, B}],
-  mapper: func ({[A], [B]}): {[A], [B]},
-): [{A, B}] -> (
+func map_columnar(x: [{A, B}], mapper: func ({[A], [B]}): {[A], [B]}): [{A, B}]
+where A, B # <I: {i1 = I1}, O: {o1 = O1}>
+-> (
   x | to_columnar | mapper | from_columnar
 )
 
-let aggregate = func <A, B, O> ( # <I: {i1 = I1}, O>
-  x: [{A, B}],
-  mapper: func ({[A], [B]}): O,
-): O -> (
+func aggregate(x: [{A, B}], mapper: func ({[A], [B]}): O): O
+where A, B, O # <I: {i1 = I1}, O>
+-> (
   x | to_columnar | mapper
 )
 
-# let join = func <A, B> (
+# func join<A, B>(
 #   with: [B],
 #   condition: bool,
 #   side: text,
 #   tbl: [A],
 # ): [{A, B}]
 
-let group: func <I, K> (
-  input: [I],
-  key: func (I): K,
-): [{key: K, values: [I]}]
+func group(input: [I], key: func (I): K): [{key: K, values: [I]}]
+where I, K
 
-let append: func <T> (
-    top: [T],
-    bottom: [T],
-): [T]
+func append(top: [T], bottom: [T]): [T]
+where T
 
 # Aggregation functions
 
-let min: func (column: [int]): int
+func min(column: [int64]): int64
 
-let max: func (column: [int]): int
+func max(column: [int64]): int64
 
-let sum: func (column: [int]): int
+func sum(column: [int64]): int64
 
-let count: func <T> (column: [T]): int
+func count(column: [T]): int64
+where T
 
-let average: func <T: int64> (column: [T]): float64
+func average(column: [T]): float64
+where T: int64
 
-let all: func (column: [bool]): bool
+func all(column: [bool]): bool
 
-let any: func (column: [bool]): bool
+func any(column: [bool]): bool
 
-let contains: func (value: [int], pattern: int): bool
+func contains(value: [int64], pattern: int64): bool
 
-let join: func (column: [text], separator: text): text
+func join(column: [text], separator: text): text
 
 # Window functions
 
-let lag: func <T> (array: [T], offset: int): [T]
-let lead: func <T> (array: [T], offset: int): [T]
-let row_number: func <T> (array: [T]): [int]
+func lag(array: [T], offset: int64): [T]
+where T
+
+func lead(array: [T], offset: int64): [T]
+where T
+
+func row_number(array: [T]): [int64]
+where T
+
 
 ## Mathematical functions
 module math {
-  let abs: func (val: int): int
-  let floor: func (val: int): int
-  let ceil: func (val: int): int
-  let pi: float
-  let exp: func (val: int): int
-  let ln: func (val: int): int
-  let log10: func (val: int): int
-  let log: func (base: int, val: int): int
-  let sqrt: func (val: int): int
-  let degrees: func (val: int): int
-  let radians: func (val: int): int
-  let cos: func (val: int): int
-  let acos: func (val: int): int
-  let sin: func (val: int): int
-  let asin: func (val: int): int
-  let tan: func (val: int): int
-  let atan: func (val: int): int
-  let pow: func (val: int, exponent: int): int
-  let round: func (val: int, n_digits: int): int
+  func abs(val: int64): int64
+  func sqrt(val: int64): int64
+  func ceil(val: int64): int64
+  func floor(val: int64): int64
+  func round(val: int64, n_digits: int64): int64
+
+  func pi(): float64
+
+  func pow(val: int64, exponent: int64): int64
+  func exp(val: int64): int64
+  func ln(val: int64): int64
+  func log10(val: int64): int64
+  func log(base: int64, val: int64): int64
+
+  func degrees(val: int64): int64
+  func radians(val: int64): int64
+  func cos(val: int64): int64
+  func acos(val: int64): int64
+  func sin(val: int64): int64
+  func asin(val: int64): int64
+  func tan(val: int64): int64
+  func atan(val: int64): int64
 }
 
 ## Text functions
 module text_ops {
-  let concat: func (left: text, right: text): text
+  func concat(left: text, right: text): text
 
-  let lower: func (value: text): text
-  let upper: func (value: text): text
+  func lower(value: text): text
+  func upper(value: text): text
 
-  let ltrim: func (value: text): text
-  let rtrim: func (value: text): text
-  let trim: func (value: text): text
+  func ltrim(value: text): text
+  func rtrim(value: text): text
+  func trim(value: text): text
 
-  let length: func (value: text): uint32
+  func length(value: text): uint32
 
-  let substring: func (value: text, offset: int, length: int): text
-  let replace: func (value: text, pattern: text, replacement: text): text
+  func substring(value: text, offset: int64, length: int64): text
+  func replace(value: text, pattern: text, replacement: text): text
 
-  let starts_with: func (value: text, prefix: text): bool
-  let contains: func (value: text, substr: text): bool
-  let ends_with: func (value: text, suffix: text): bool
+  func starts_with(value: text, prefix: text): bool
+  func contains(value: text, substr: text): bool
+  func ends_with(value: text, suffix: text): bool
 }
 
 module fs {
-  let read_parquet: func <R> (file_name: text): [R]
+  func read_parquet(file_name: text): [R]
+  where R
 }
 
 module sql {
   # TODO: mark table_name as const
-  let from: func <R> (table_name: text): [R]
+  func from(table_name: text): [R]
+  where R
 }

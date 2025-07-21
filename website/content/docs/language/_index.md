@@ -39,7 +39,7 @@ module task_ops {
   ]
 
   # Function to get task status as text
-  let get_status_text = func (status: Status) -> match status {
+  func get_status_text(status: Status) -> match status {
     .Pending => "Pending",
     .InProgress(info) => f"In Progress by {info.owner}",
     .Done(date) => f"Completed on {date}",
@@ -47,7 +47,7 @@ module task_ops {
   }
 
   # Function to get tasks by priority
-  let get_by_priority = func (min_priority: int8): [Task] -> (
+  func get_by_priority(min_priority: int8): [Task] -> (
     tasks
     | std::filter(func (t) -> t.priority >= min_priority)
     | std::sort(func (t) -> t.priority)
@@ -55,7 +55,7 @@ module task_ops {
 }
 
 # Main program that uses these features
-let my_program = func () -> {
+func my_program() -> {
   # Get high priority tasks
   high_priority = (
     task_ops::get_by_priority(2)

@@ -531,7 +531,7 @@ fn json_pack_00() {
     // Applying an operation of that array then forces it to unpack.
 
     insta::assert_snapshot!(_run(r#"
-    let get_data = func () -> {a = [2, 5, 4, 3, 1, 2]: [int32]}
+    func get_data() -> {a = [2, 5, 4, 3, 1, 2]: [int32]}
 
     func () -> (
       get_data().a
@@ -555,7 +555,7 @@ fn json_pack_01() {
     // Applying an operation of that array then forces it to unpack.
 
     insta::assert_snapshot!(_run(r#"
-    let get_data = func () -> {a = [{2: int32, false}, {5, true}, {4, false}]}
+    func get_data() -> {a = [{2: int32, false}, {5, true}, {4, false}]}
 
     func () -> (
       get_data().a
@@ -582,7 +582,7 @@ fn json_pack_01() {
 #[test]
 fn json_pack_02() {
     insta::assert_snapshot!(_run(r#"
-    let get_data = func () -> [[1: int16, 2, 3], [4, 5, 6]]
+    func get_data() -> [[1: int16, 2, 3], [4, 5, 6]]
 
     func () -> (
       get_data() | std::map(func (y: [int16]) -> (
@@ -600,7 +600,7 @@ fn json_pack_02() {
 #[test]
 fn json_pack_03() {
     insta::assert_snapshot!(_run(r#"
-    let get_data = func () -> [[1: int64, 2, 3], [4, 5, 6]]
+    func get_data() -> [[1: int64, 2, 3], [4, 5, 6]]
 
     func () -> (
       get_data()
@@ -627,7 +627,7 @@ fn json_pack_03() {
 #[test]
 fn json_pack_04() {
     insta::assert_snapshot!(_run(r#"
-    let get_data = func () -> {a = [false, true, true]}
+    func get_data() -> {a = [false, true, true]}
 
     func () -> (
       get_data().a
@@ -645,7 +645,7 @@ fn json_pack_04() {
 #[test]
 fn json_pack_05() {
     insta::assert_snapshot!(_run(r#"
-    let get_data = func () -> {a = ["no", "yes", "neither"]}
+    func get_data() -> {a = ["no", "yes", "neither"]}
 
     func () -> (
       get_data().a

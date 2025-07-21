@@ -17,13 +17,13 @@ let my_movies: [Movie] = [
   {id = 7, title = "Conclave"},
 ]
 
-let get_movie = func (param: int32) -> (
+func get_movie(param: int32) -> (
   my_movies
   | std::filter(func (x: Movie) -> x.id == param)
   | std::index(0)
 )
 
-let my_program = func() -> get_movie(3)
+func my_program() -> get_movie(3)
 ```
 
 The compiler can read these files, perform name resolution, type checking, and inference, and report any issues found in the code.

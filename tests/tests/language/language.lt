@@ -127,12 +127,12 @@ func () -> {
 module chinook {
   type album: {id: int64, title: text}
 
-  let get_albums = func (): [album] -> [
+  func get_albums(): [album] -> [
     {id = 3, title = "Hello world!"},
     {id = 5, title = "Foo"},
   ]
 
-  let get_album_by_id = func (album_id: int64): album -> (
+  func get_album_by_id(album_id: int64): album -> (
       get_albums()
       | std::filter(func (this: album) -> this.id == album_id)
       | std::index(0)
@@ -140,15 +140,15 @@ module chinook {
   }
 
 module box_office {
-  type album_sale: {id: int64, total: float}
+  type album_sale: {id: int64, total: float64}
 
-  let get_album_sales = func (): [album_sale] -> [
+  func get_album_sales(): [album_sale] -> [
     {id = 3, total = 3.6},
     {id = 3, total = 3.1},
     {id = 5, total = 5.2},
   ]
 
-  let get_album_sales_by_id = func (album_id: int64): album_sale -> (
+  func get_album_sales_by_id(album_id: int64): album_sale -> (
     get_album_sales()
     | std::filter(func (this: album_sale) -> this.id == album_id)
     | std::index(0)
@@ -188,9 +188,9 @@ func () -> {
 # === complex_02
 
 module chinook {
-  type album: {id: int, title: text}
+  type album: {id: int64, title: text}
 
-  let get_album = func (): album -> (
+  func get_album(): album -> (
     {id = 3, title = "Hello world!"}
   )
 }
@@ -216,12 +216,12 @@ func () -> {
 module chinook {
   type album: {id: int64, title: text}
 
-  let get_albums = func (): [album] -> [
+  func get_albums(): [album] -> [
     {id = 3, title = "Hello world!"},
     {id = 5, title = "Foo"},
   ]
 
-  let get_album_by_id = func (album_id: int64): album -> (
+  func get_album_by_id(album_id: int64): album -> (
     get_albums()
     | std::filter(func (this: album) -> this.id == album_id)
     | std::index(0)
@@ -243,21 +243,21 @@ func () -> {chinook::get_album_by_id(3)}
 # === complex_04
 
 module chinook {
-  type album: {title: text, genre_id: int}
-  type genre: {id: int, name: text}
+  type album: {title: text, genre_id: int64}
+  type genre: {id: int64, name: text}
 
-  let get_genres = func (): [genre] -> [
+  func get_genres(): [genre] -> [
     {id = 1, name = "Rock"},
     {id = 2, name = "EDM"},
   ]
 
-  let get_albums = func (): [album] -> [
+  func get_albums(): [album] -> [
     {title = "Suck It and See", genre_id = 1},
     {title = "Random Access Memories", genre_id = 2},
     {title = "AM", genre_id = 1},
   ]
 
-  let get_albums_by_genre = func (genre_id: int): [album] -> (
+  func get_albums_by_genre(genre_id: int64): [album] -> (
       get_albums()
       | std::filter(func (this: album) -> this.genre_id == genre_id)
     )
@@ -460,7 +460,7 @@ func (): [{a: int64, b: text}] -> []
 
 # === empty_array_02
 
-let ident = func (x: [bool]) -> x
+func ident(x: [bool]) -> x
 func () -> ident([])
 # >
 []
@@ -530,7 +530,7 @@ Green(
 # === enum_construction_07
 
 type X: {
-  a: int,
+  a: int64,
   b: {c: bool, d: text},
 }
 func (): X::b -> {c = true, d = "d"}
@@ -587,7 +587,7 @@ func (): [Status] -> [Status::Open(0), Status::Open(0)]
 ]
 
 # === functions_00
-let add_one = func (x: int64) -> x + 1
+func add_one(x: int64) -> x + 1
 func () -> {add_one(4), add_one(add_one(5))}
 # >
 {
@@ -603,9 +603,9 @@ func () -> (4 | func (x: int64) -> x + 1 | func (x: int64) -> x * 2)
 
 # === functions_02
 
-let add_one = func (x: int64) -> x + 1
-let add_two = func (x: int64) -> add_one(add_one(x))
-let my_func = func (x: int64) -> add_two(x) + add_two(x)
+func add_one(x: int64) -> x + 1
+func add_two(x: int64) -> add_one(add_one(x))
+func my_func(x: int64) -> add_two(x) + add_two(x)
 func () -> my_func(1)
 # >
 6
@@ -1020,7 +1020,7 @@ std::count([]: [bool])
 }
 
 # === std_filter_00
-std::filter([5,3,65,3,2]: [int64], func (x: int) -> x > 3)
+std::filter([5,3,65,3,2]: [int64], func (x: int64) -> x > 3)
 # >
 [
   5,
@@ -1028,12 +1028,12 @@ std::filter([5,3,65,3,2]: [int64], func (x: int) -> x > 3)
 ]
 
 # === std_filter_01
-std::filter([5,3,65,3,2]: [int64], func (x: int) -> x < 1)
+std::filter([5,3,65,3,2]: [int64], func (x: int64) -> x < 1)
 # >
 []
 
 # === std_filter_02
-std::filter([], func (x: int) -> x > 3)
+std::filter([], func (x: int64) -> x > 3)
 # >
 []
 
@@ -1476,7 +1476,7 @@ std::lead([5,3,65,4], -2): [int64]
 }
 
 # === std_map_00
-func () -> std::map([5,3,65,3,2], func (x: int) -> x + 1)
+func () -> std::map([5,3,65,3,2], func (x: int64) -> x + 1)
 # >
 [
   6,
@@ -1487,7 +1487,7 @@ func () -> std::map([5,3,65,3,2], func (x: int) -> x + 1)
 ]
 
 # === std_map_01
-func () -> std::map([], func (x: int) -> x + 1)
+func () -> std::map([], func (x: int64) -> x + 1)
 # >
 []
 

@@ -1,2 +1,2 @@
 
-let hello = func (a: float64, b: uint64): int64 -> 1
+func hello(a: float64, b: uint64): int64 -> 1

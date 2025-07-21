@@ -40,16 +40,16 @@ fn execute_function(project: &lutra_compiler::Project, path: pr::Path) {
 
 fn get_project() -> lutra_compiler::Project {
     let source = r#"
-        let is_even = func (a: int): bool -> a % 2 == 0
+        func is_even(a: int): bool -> a % 2 == 0
 
-        let square = func (a: int): int -> a * a
+        func square(a: int): int -> a * a
 
         type MyRel = {a = int, b = text}
 
         let x = 1 + 2
 
         module hello {
-            let say_hello = func (a: text): text -> f"Hello {a}"
+            func say_hello(a: text): text -> f"Hello {a}"
         }
     "#;
 

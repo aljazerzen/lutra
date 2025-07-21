@@ -8,7 +8,6 @@ use crate::pr::*;
 use crate::span::Span;
 
 use super::pipe;
-use super::types;
 
 pub(crate) fn expr<'a>(
     ty: impl Parser<TokenKind, Ty, Error = PError> + Clone + 'a,
@@ -371,12 +370,9 @@ fn lambda_func<'a>(
         .then(ctrl(':').ignore_then(ty.clone()).or_not())
         .map_with_span(|(name, ty), span| FuncParam { name, ty, span });
 
-    let type_params = types::type_params(ty.clone());
-
     // func
     keyword("func")
-        .ignore_then(type_params)
-        .then(
+        .ignore_then(
             param
                 .clone()
                 .separated_by(ctrl(','))
@@ -389,12 +385,12 @@ fn lambda_func<'a>(
         .then_ignore(just(TokenKind::ArrowThin))
         // body
         .then(expr.map(Box::new))
-        .map(|(((generic_type_params, params), return_ty), body)| {
+        .map(|((params, return_ty), body)| {
             Box::new(Func {
-                ty_params: generic_type_params,
                 params,
                 return_ty,
                 body,
+                ty_params: Vec::new(),
             })
         })
         .map(ExprKind::Func)

@@ -154,7 +154,7 @@ impl<'a> Lowerer<'a> {
             if !ty_func.ty_params.is_empty() {
                 // replace refs to type params with inferred type args
                 // For example:
-                // - `let identity = func<T>(x: T) -> x` contains type param T,
+                // - `func identity<T>(x: T) -> x` contains type param T,
                 // - `identity(false)` instantiates param into arg that is inferred to be bool,
                 // - when identify is lowered, we finalize the function into `func (x: bool): bool -> x`.
                 let mut mapping = HashMap::<pr::Ref, pr::Ty>::new();

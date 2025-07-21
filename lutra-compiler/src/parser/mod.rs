@@ -83,6 +83,12 @@ fn ident_part() -> impl Parser<TokenKind, String, Error = PError> + Clone {
     })
 }
 
+fn ident_keyword(kw: &'static str) -> impl Parser<TokenKind, (), Error = PError> + Clone {
+    select! {
+        TokenKind::Ident(ident) if ident == kw => ()
+    }
+}
+
 fn keyword(kw: &'static str) -> impl Parser<TokenKind, (), Error = PError> + Clone {
     just(TokenKind::Keyword(kw.to_string())).ignored()
 }

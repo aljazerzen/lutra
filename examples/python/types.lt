@@ -11,6 +11,6 @@ type Genre: enum {
     Other: text
 }
 
-let get_movie = func (): Movie -> {
+func get_movie(): Movie -> {
     id = 54, title = "Hello", is_released = true, genre = Genre::Drama
 }

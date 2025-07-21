@@ -10,11 +10,11 @@ fn _test_compile_and_print(source: &str) -> String {
 fn lower_01() {
     assert_snapshot!(_test_compile_and_print(r#"
     module chinook {
-      type album: {id: int, title: text}
+      type album: {id: int64, title: text}
 
-      let get_albums: func (): [album]
+      func get_albums(): [album]
 
-      let get_album_by_id = func (album_id: int): album -> (
+      func get_album_by_id(album_id: int64): album -> (
         get_albums()
         | std::filter(func (this: album) -> this.id == album_id)
         | std::index(0)
@@ -22,18 +22,18 @@ fn lower_01() {
     }
 
     module box_office {
-      type album_sale: {id: int, total: float}
+      type album_sale: {id: int64, total: float64}
 
-      let get_album_sales: func (): [album_sale]
+      func get_album_sales(): [album_sale]
 
-      let get_album_sales_by_id = func (album_id: int): album_sale -> (
+      func get_album_sales_by_id(album_id: int64): album_sale -> (
         get_album_sales()
         | std::filter(func (this: album_sale) -> this.id == album_id)
         | std::index(0)
       )
     }
 
-    func (album_id: int) -> {
+    func (album_id: int64) -> {
       chinook::get_albums(),
       chinook::get_album_by_id(album_id),
       box_office::get_album_sales_by_id(album_id),
@@ -153,7 +153,7 @@ fn lower_02() {
 #[test]
 fn lower_03() {
     assert_snapshot!(_test_compile_and_print(r#"
-    let twice = func <T> (x: T) -> {x, x}
+    func twice(x: T) where T -> {x, x}
 
     func () -> twice([true, true, false])
     "#), @r"

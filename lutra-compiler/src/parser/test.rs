@@ -120,7 +120,7 @@ fn parse_02() {
 }
 #[test]
 fn parse_03() {
-    assert_debug_snapshot!(parse_expr("func <A, B: int8 | int16> () -> 1"), @r#"
+    assert_debug_snapshot!(parse_expr("func f() where A, B: int8 | int16 -> 1"), @r#"
     Expr {
         kind: Func(
             Func {
@@ -132,7 +132,7 @@ fn parse_03() {
                         ),
                     ),
                     span: Some(
-                        0:32-33,
+                        0:37-38,
                     ),
                     ty: None,
                     ty_args: [],
@@ -145,7 +145,7 @@ fn parse_03() {
                         name: "A",
                         domain: Open,
                         span: Some(
-                            0:6-7,
+                            0:15-16,
                         ),
                     },
                     TyParam {
@@ -157,14 +157,14 @@ fn parse_03() {
                             ],
                         ),
                         span: Some(
-                            0:9-24,
+                            0:18-33,
                         ),
                     },
                 ],
             },
         ),
         span: Some(
-            0:0-33,
+            0:0-38,
         ),
         ty: None,
         ty_args: [],
@@ -175,7 +175,7 @@ fn parse_03() {
 }
 #[test]
 fn parse_04() {
-    assert_debug_snapshot!(parse_expr("func <T: {b: int64, ..}> () -> 1"), @r#"
+    assert_debug_snapshot!(parse_expr("func f() where T: {b: int64, ..} -> 1"), @r#"
     Expr {
         kind: Func(
             Func {
@@ -187,7 +187,7 @@ fn parse_04() {
                         ),
                     ),
                     span: Some(
-                        0:31-32,
+                        0:36-37,
                     ),
                     ty: None,
                     ty_args: [],
@@ -209,7 +209,7 @@ fn parse_04() {
                                             int64,
                                         ),
                                         span: Some(
-                                            0:13-18,
+                                            0:22-27,
                                         ),
                                         name: None,
                                         scope_id: None,
@@ -219,14 +219,14 @@ fn parse_04() {
                             ],
                         ),
                         span: Some(
-                            0:6-23,
+                            0:15-32,
                         ),
                     },
                 ],
             },
         ),
         span: Some(
-            0:0-32,
+            0:0-37,
         ),
         ty: None,
         ty_args: [],

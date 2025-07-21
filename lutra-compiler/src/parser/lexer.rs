@@ -78,6 +78,7 @@ fn lexer() -> impl Parser<char, Vec<Token>, Error = Cheap<char>> {
     let keyword = choice((
         just("enum"),
         just("func"),
+        just("where"),
         just("import"),
         just("internal"),
         just("let"),
