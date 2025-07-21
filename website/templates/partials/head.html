@@ -12,6 +12,8 @@
 {% endif %}
 <link rel="shortcut icon" href="{{ config.base_url }}/favicon.ico" />
 <link rel="stylesheet" href="{{ config.base_url }}/water.min.css">
+<link rel="stylesheet" type="text/css" href="/syntax-theme-dark.css" media="(prefers-color-scheme: dark)" />
+<link rel="stylesheet" type="text/css" href="/syntax-theme-light.css" media="(prefers-color-scheme: light)" />
 <style>
     @font-face {
         font-family: "Archivo Black";
@@ -33,6 +35,10 @@
         display: flex;
         flex-direction: column;
         align-items: center;
+    }
+
+    .z-code {
+        background-color: unset;
     }
 
     .container {

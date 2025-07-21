@@ -1,6 +1,6 @@
 ---
-title: Database driver
-weight: 4
+title: Rust and PostgreSQL
+weight: 1
 ---
 
 Lutra projects can be compiled to SQL and executed on relational databases.

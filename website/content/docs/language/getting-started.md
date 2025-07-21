@@ -3,7 +3,7 @@ title: Getting started
 weight: 2
 ---
 
-Easiest way to try out the language is to run .lt files with the CLI. To do that, first install the CLI:
+Easiest way to try out the language is to run `.lt` files with the CLI. To do that, first install the CLI:
 
 ```sh
 $ cargo install --git https://codeberg.org/aljazerzen/lutra lutra-cli
@@ -84,7 +84,7 @@ let actors = [
 func main() -> actors
 ```
 
-Note that all items of the array must be of the same type. We couldn't place a `5`, `true`, or `{name = ""Piper Parabo"}` into the array above.
+Note that all items of the array must be of the same type. We couldn't place a `5`, `true`, or `{name = "Piper Parabo"}` into the array above.
 
 ## Incomplete
 
