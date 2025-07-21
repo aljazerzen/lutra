@@ -14,6 +14,9 @@ pub fn source() -> impl Parser<TokenKind, Vec<Stmt>, Error = PError> {
 }
 
 fn module_contents() -> impl Parser<TokenKind, Vec<Stmt>, Error = PError> {
+    let ty = type_expr();
+    let expr = expr(ty.clone());
+
     recursive(|module_contents| {
         let module_def = keyword("module")
             .ignore_then(ident_part())
@@ -22,13 +25,18 @@ fn module_contents() -> impl Parser<TokenKind, Vec<Stmt>, Error = PError> {
             .labelled("module definition");
 
         let annotation = ctrl('@')
-            .ignore_then(expr())
+            .ignore_then(expr.clone())
             .map(|expr| Annotation {
                 expr: Box::new(expr),
             })
             .labelled("annotation");
 
-        let stmt_kind = choice((module_def, type_def(), import_def(), var_def()));
+        let stmt_kind = choice((
+            module_def,
+            type_def(ty.clone()),
+            import_def(),
+            var_def(expr, ty),
+        ));
 
         // Currently doc comments need to be before the annotation; probably
         // should relax this?
@@ -67,12 +75,13 @@ fn doc_comment() -> impl Parser<TokenKind, String, Error = PError> + Clone {
 /// A variable definition could be any of:
 /// - `let foo = 5`
 /// - `from artists` — captured as a "main"
-fn var_def() -> impl Parser<TokenKind, StmtKind, Error = PError> + Clone {
-    let expr = expr();
-
+fn var_def(
+    expr: impl Parser<TokenKind, Expr, Error = PError> + Clone,
+    ty: impl Parser<TokenKind, Ty, Error = PError> + Clone,
+) -> impl Parser<TokenKind, StmtKind, Error = PError> + Clone {
     let let_ = keyword("let")
         .ignore_then(ident_part())
-        .then(ctrl(':').ignore_then(type_expr()).or_not())
+        .then(ctrl(':').ignore_then(ty).or_not())
         .then(ctrl('=').ignore_then(expr.clone()).map(Box::new).or_not())
         .map(|((name, ty), value)| StmtKind::VarDef(VarDef { name, value, ty }));
 
@@ -89,10 +98,12 @@ fn var_def() -> impl Parser<TokenKind, StmtKind, Error = PError> + Clone {
     let_.or(main).labelled("variable definition")
 }
 
-fn type_def() -> impl Parser<TokenKind, StmtKind, Error = PError> + Clone {
+fn type_def(
+    ty: impl Parser<TokenKind, Ty, Error = PError> + Clone,
+) -> impl Parser<TokenKind, StmtKind, Error = PError> + Clone {
     keyword("type")
         .ignore_then(ident_part())
-        .then(ctrl(':').ignore_then(type_expr()))
+        .then(ctrl(':').ignore_then(ty))
         .map(|(name, ty)| StmtKind::TypeDef(TypeDef { name, ty }))
         .labelled("type definition")
 }

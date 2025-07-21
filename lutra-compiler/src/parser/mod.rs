@@ -36,7 +36,11 @@ pub fn parse_expr(source: &str, source_id: u16) -> (Option<pr::Expr>, Vec<Diagno
 
     let ast = if let Some(tokens) = tokens {
         let stream = prepare_stream(tokens, source_id);
-        let (ast, chum_errs) = expr::expr().parse_recovery(stream);
+
+        let ty = types::type_expr();
+        let expr = expr::expr(ty);
+
+        let (ast, chum_errs) = expr.parse_recovery(stream);
 
         errors.extend(chum_errs.into_iter().map(Diagnostic::from));
         ast

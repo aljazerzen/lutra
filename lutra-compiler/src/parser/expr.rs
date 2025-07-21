@@ -3,7 +3,6 @@ use chumsky::prelude::*;
 use crate::parser::interpolation;
 use crate::parser::lexer::TokenKind;
 use crate::parser::perror::PError;
-use crate::parser::types::type_expr;
 use crate::parser::{ctrl, ident_part, keyword, sequence};
 use crate::pr::*;
 use crate::span::Span;
@@ -11,13 +10,15 @@ use crate::span::Span;
 use super::pipe;
 use super::types;
 
-pub(crate) fn expr() -> impl Parser<TokenKind, Expr, Error = PError> + Clone {
+pub(crate) fn expr<'a>(
+    ty: impl Parser<TokenKind, Ty, Error = PError> + Clone + 'a,
+) -> impl Parser<TokenKind, Expr, Error = PError> + Clone + 'a {
     recursive(|expr| {
         let literal = select! { TokenKind::Literal(lit) => ExprKind::Literal(lit) };
 
         let ident_kind = ident().map(ExprKind::Ident);
 
-        let func = lambda_func(expr.clone());
+        let func = lambda_func(expr.clone(), ty.clone());
         let call = func_call(expr.clone());
 
         let tuple = tuple(expr.clone());
@@ -40,7 +41,7 @@ pub(crate) fn expr() -> impl Parser<TokenKind, Expr, Error = PError> + Clone {
         .map_with_span(Expr::new_with_span)
         .boxed();
 
-        let term = type_annotation(term);
+        let term = type_annotation(term, ty);
 
         let term = field_lookup(term);
         let term = unary(term);
@@ -362,15 +363,15 @@ where
         .labelled("function call")
 }
 
-fn lambda_func<'a, E>(expr: E) -> impl Parser<TokenKind, ExprKind, Error = PError> + Clone + 'a
-where
-    E: Parser<TokenKind, Expr, Error = PError> + Clone + 'a,
-{
+fn lambda_func<'a>(
+    expr: impl Parser<TokenKind, Expr, Error = PError> + Clone + 'a,
+    ty: impl Parser<TokenKind, Ty, Error = PError> + Clone + 'a,
+) -> impl Parser<TokenKind, ExprKind, Error = PError> + Clone + 'a {
     let param = ident_part()
-        .then(ctrl(':').ignore_then(type_expr()).or_not())
+        .then(ctrl(':').ignore_then(ty.clone()).or_not())
         .map_with_span(|(name, ty), span| FuncParam { name, ty, span });
 
-    let type_params = types::type_params(types::type_expr());
+    let type_params = types::type_params(ty.clone());
 
     // func
     keyword("func")
@@ -383,7 +384,7 @@ where
                 .delimited_by(ctrl('('), ctrl(')')),
         )
         // return type
-        .then(ctrl(':').ignore_then(type_expr()).or_not())
+        .then(ctrl(':').ignore_then(ty.clone()).or_not())
         // arrow
         .then_ignore(just(TokenKind::ArrowThin))
         // body
@@ -446,8 +447,9 @@ fn operator_coalesce() -> impl Parser<TokenKind, BinOp, Error = PError> + Clone 
 }
 fn type_annotation<'a>(
     expr: impl Parser<TokenKind, Expr, Error = PError> + 'a,
+    ty: impl Parser<TokenKind, Ty, Error = PError> + 'a,
 ) -> impl Parser<TokenKind, Expr, Error = PError> + Clone + 'a {
-    expr.then(ctrl(':').ignore_then(type_expr()).or_not())
+    expr.then(ctrl(':').ignore_then(ty).or_not())
         .map_with_span(|(expr, ty), span| {
             if let Some(ty) = ty {
                 let expr = Box::new(expr);
