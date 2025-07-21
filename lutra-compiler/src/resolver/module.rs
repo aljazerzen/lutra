@@ -2,9 +2,9 @@ use enum_as_inner::EnumAsInner;
 use indexmap::IndexMap;
 use itertools::Itertools;
 
-use crate::_lexer::Diagnostic;
 use crate::Span;
 use crate::decl;
+use crate::diagnostic::Diagnostic;
 use crate::pr;
 
 pub fn init_root(root_module_def: pr::ModuleDef) -> Result<decl::RootModule, Vec<Diagnostic>> {

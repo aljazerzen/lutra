@@ -27,8 +27,11 @@ fn _test_err(source: &str) -> String {
         Err(Error::Compile { diagnostics }) => diagnostics,
         Err(_) => unreachable!(),
     };
-    let diagnostic = diagnostics.into_iter().next().unwrap();
-    diagnostic.display().to_string()
+    let displays: Vec<_> = diagnostics
+        .into_iter()
+        .map(|d| d.display().to_string())
+        .collect();
+    displays.join("\n")
 }
 
 #[test]
@@ -873,6 +876,36 @@ fn decls_01() {
      3 │         func a() -> 6
        │         ──────┬──────
        │               ╰──────── duplicate declaration
+    ───╯
+    ");
+}
+#[test]
+fn constants_00() {
+    insta::assert_snapshot!(_test_err(r#"
+        let a = {false, true || false}
+        let b = [6: int64, 2 + 6]
+        let c = 5: int64
+        let d = [1, c]
+    "#), @r"
+    Error:
+       ╭─[:2:25]
+       │
+     2 │         let a = {false, true || false}
+       │                         ──────┬──────
+       │                               ╰──────── non-constant expression
+       │
+       │ Note:
+       │ use `func` instead of `const`
+    ───╯
+    Error:
+       ╭─[:3:28]
+       │
+     3 │         let b = [6: int64, 2 + 6]
+       │                            ──┬──
+       │                              ╰──── non-constant expression
+       │
+       │ Note:
+       │ use `func` instead of `const`
     ───╯
     ");
 }

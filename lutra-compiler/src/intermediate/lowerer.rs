@@ -4,8 +4,8 @@ use indexmap::IndexMap;
 use itertools::Itertools;
 use lutra_bin::ir;
 
-use crate::_lexer::Diagnostic;
 use crate::Result;
+use crate::diagnostic::Diagnostic;
 use crate::utils::{self, IdGenerator};
 use crate::{decl, pr};
 

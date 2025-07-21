@@ -162,7 +162,6 @@ func () -> {
 }
 
 # >
-
 {
   [
     {
@@ -186,7 +185,6 @@ func () -> {
 
 
 # === complex_02
-
 module chinook {
   type album: {id: int64, title: text}
 
@@ -201,7 +199,6 @@ func () -> {
 }
 
 # >
-
 {
   5,
   {
@@ -212,7 +209,6 @@ func () -> {
 
 
 # === complex_03
-
 module chinook {
   type album: {id: int64, title: text}
 
@@ -231,7 +227,6 @@ module chinook {
 func () -> {chinook::get_album_by_id(3)}
 
 # >
-
 {
   {
     id = 3,
@@ -241,7 +236,6 @@ func () -> {chinook::get_album_by_id(3)}
 
 
 # === complex_04
-
 module chinook {
   type album: {title: text, genre_id: int64}
   type genre: {id: int64, name: text}
@@ -293,11 +287,9 @@ func () -> (
 
 
 # === constant_00
-
 {1: int32, [false, true], "hello"}
 
 # >
-
 {
   1,
   [
@@ -309,44 +301,32 @@ func () -> (
 
 
 # === default_00
-
 func (): bool -> std::default()
-
 # >
 false
 
 # === default_01
-
 func (): int32 -> std::default()
-
 # >
 0
 
 # === default_02
-
 func (): float32 -> std::default()
-
 # >
 0.0
 
 # === default_03
-
 func (): text -> std::default()
-
 # >
 ""
 
 # === default_04
-
 func (): [int64] -> std::default()
-
 # >
 []
 
 # === default_05
-
 func (): {int8, text, [bool]} -> std::default()
-
 # >
 {
   0,
@@ -355,13 +335,11 @@ func (): {int8, text, [bool]} -> std::default()
 }
 
 # === default_06
-
 type Status: enum {
   Open: int16,
   Closed: bool,
 }
 func (): Status -> std::default()
-
 # >
 Open(
   0
@@ -401,9 +379,7 @@ func (): [text] -> std::lag([std::default(), std::default()], 1)
 
 # === default_14
 # skip: postgres
-
 func (): [[int64]] -> std::lag([std::default(), std::default()], 1)
-
 # >
 [
   [],
@@ -412,9 +388,7 @@ func (): [[int64]] -> std::lag([std::default(), std::default()], 1)
 
 # === default_15
 # skip: postgres
-
 func (): [{int8, text, [bool]}] -> std::lag([std::default(), std::default()], 1)
-
 # >
 [
   {
@@ -437,7 +411,6 @@ type Status: enum {
   Closed: bool,
 }
 func (): [Status] -> std::lag([std::default(), std::default()], 1)
-
 # >
 [
   Open(
@@ -459,7 +432,6 @@ func (): [{a: int64, b: text}] -> []
 []
 
 # === empty_array_02
-
 func ident(x: [bool]) -> x
 func () -> ident([])
 # >
@@ -597,12 +569,15 @@ func () -> {add_one(4), add_one(add_one(5))}
 
 # === functions_01
 
-func () -> (4 | func (x: int64) -> x + 1 | func (x: int64) -> x * 2)
+func () -> (
+  4
+  | func (x: int64) -> x + 1
+  | func (x: int64) -> x * 2
+)
 # >
 10
 
 # === functions_02
-
 func add_one(x: int64) -> x + 1
 func add_two(x: int64) -> add_one(add_one(x))
 func my_func(x: int64) -> add_two(x) + add_two(x)
@@ -611,7 +586,6 @@ func () -> my_func(1)
 6
 
 # === match_00
-
 type Status: enum {Done, Pending: int64, Cancelled: text}
 func () -> match Status::Pending(4) {
   .Pending => "pending",
@@ -622,7 +596,6 @@ func () -> match Status::Pending(4) {
 "pending"
 
 # === match_01
-
 type Status: enum {Done, Pending: int32, Cancelled: text}
 func (): int32 -> match Status::Pending(4) {
   .Done => 0,
@@ -634,12 +607,10 @@ func (): int32 -> match Status::Pending(4) {
 4
 
 # === match_02
-
 type Animal: enum {
   Cat: text,
   Dog: enum {Generic, Collie: text},
 }
-
 func () -> (
   Animal::Dog(Animal::Dog::Collie("Belie"))
   | func (animal: Animal) -> match animal {
@@ -679,10 +650,10 @@ func () -> (
 
 # === match_04
 
-    type Animal: enum {
-        Cat: text,
-        Dog: enum {Generic, Collie: text},
-    }
+type Animal: enum {
+  Cat: text,
+  Dog: enum {Generic, Collie: text},
+}
 
 func () -> (
   [
@@ -718,10 +689,10 @@ func () -> (OptText::Some("hello") | std::or_else("world"))
 
 # === or_else_01
 
-    type OptText: enum {
-      None,
-      Some: text
-    }
+type OptText: enum {
+  None,
+  Some: text
+}
 
 func () -> (OptText::None | std::or_else("fallback"))
 # >
@@ -729,98 +700,97 @@ func () -> (OptText::None | std::or_else("fallback"))
 
 # === or_else_02
 
-    type OptText: enum {
-      None,
-      Some: text
-    }
+type OptText: enum {
+  None,
+  Some: text
+}
 
 func () -> (OptText::None | std::or_default())
 # >
 ""
 
 # === std_add_float64_00
-(30.2 + 2.30): float64
+func () -> (30.2 + 2.30): float64
 # >
 32.5
 
 # === std_add_float64_01
-(2.30 + 30.2): float64
+func () -> (2.30 + 30.2): float64
 # >
 32.5
 
 # === std_add_float64_02
-(1.4 + 0.2): float64
+func () -> (1.4 + 0.2): float64
 # >
 1.5999999999999999
 
 # === std_add_int16_00
-(30 + 2): int16
+func () -> (30 + 2): int16
 # >
 32
 
 # === std_add_int16_01
-(-2 + 30): int16
+func () -> (-2 + 30): int16
 # >
 28
 
 # === std_add_int32_00
-(30 + 2): int32
+func () -> (30 + 2): int32
 # >
 32
 
 # === std_add_int32_01
-(-2 + 30): int32
+func () -> (-2 + 30): int32
 # >
 28
 
 # === std_add_int64_00
-(30 + 2): int64
+func () -> (30 + 2): int64
 # >
 32
 
 # === std_add_int64_01
-(-2 + 30): int64
+func () -> (-2 + 30): int64
 # >
 28
 
 # === std_add_int8_00
 # skip: postgres
-(30 + 2): int8
+func () -> (30 + 2): int8
 # >
 32
 
 # === std_add_int8_01
 # skip: postgres
-(-2 + 30): int8
+func () -> (-2 + 30): int8
 # >
 28
 
 # === std_add_uint16_00
 # skip: postgres
-(30 + 2): uint16
+func () -> (30 + 2): uint16
 # >
 32
 
 # === std_add_uint32_00
 # skip: postgres
-(30 + 2): uint32
+func () -> (30 + 2): uint32
 # >
 32
 
 # === std_add_uint64_00
 # skip: postgres
-(30 + 2): uint64
+func () -> (30 + 2): uint64
 # >
 32
 
 # === std_add_uint8_00
 # skip: postgres
-(30 + 2): uint8
+func () -> (30 + 2): uint8
 # >
 32
 
 # === std_aggregate_00
-
 let my_rel: [{int64, int64}] = [{5,3},{65,1},{3, 2}]
 func () -> std::aggregate(my_rel, func (x: {[int64], [int64]}) -> {std::min(x.0), std::min(x.1)})
 # >
@@ -830,7 +800,7 @@ func () -> std::aggregate(my_rel, func (x: {[int64], [int64]}) -> {std::min(x.0)
 }
 
 # === std_aggregate_01
-std::aggregate([{false,"hello"},{false,"world"},{true, "!"}], func (x: {[bool], [text]}) -> {x.0 .0, x.1 .2})
+func () -> std::aggregate([{false,"hello"},{false,"world"},{true, "!"}], func (x: {[bool], [text]}) -> {x.0 .0, x.1 .2})
 # >
 {
   false,
@@ -838,27 +808,27 @@ std::aggregate([{false,"hello"},{false,"world"},{true, "!"}], func (x: {[bool], 
 }
 
 # === std_all_00
-std::all([true, false, false, true])
+func () -> std::all([true, false, false, true])
 # >
 false
 
 # === std_all_01
-std::all([false, false])
+func () -> std::all([false, false])
 # >
 false
 
 # === std_all_02
-std::all([true, true, true])
+func () -> std::all([true, true, true])
 # >
 true
 
 # === std_all_03
-std::all([])
+func () -> std::all([])
 # >
 true
 
 # === std_and
-{false && false, false && true, true && false, true && true}
+func () -> {false && false, false && true, true && false, true && true}
 # >
 {
   false,
@@ -868,30 +838,30 @@ true
 }
 
 # === std_any_00
-std::any([true, false, false, true])
+func () -> std::any([true, false, false, true])
 # >
 true
 
 # === std_any_01
-std::any([false, false])
+func () -> std::any([false, false])
 # >
 false
 
 # === std_any_02
-std::any([true, true, true])
+func () -> std::any([true, true, true])
 # >
 true
 
 # === std_any_03
-std::any([])
+func () -> std::any([])
 # >
 false
 
 # === std_append_00
 func (): [int64] -> std::append(
-      [1, 2, 3],
-      [4, 5],
-    )
+  [1, 2, 3],
+  [4, 5],
+)
 
 # >
 [
@@ -904,10 +874,9 @@ func (): [int64] -> std::append(
 
 # === std_append_01
 func () -> std::append(
-      ["He", "ll", "o"],
-      ["Wo", "rld!"],
-    )
-
+  ["He", "ll", "o"],
+  ["Wo", "rld!"],
+)
 # >
 [
   "He",
@@ -918,77 +887,77 @@ func () -> std::append(
 ]
 
 # === std_average_00
-std::average([5: int64,3,65,3,2,56,67])
+func () -> std::average([5: int64,3,65,3,2,56,67])
 # >
 28.714285714285715
 
 # === std_contains_00
-std::contains([5,3,65,3,2,56,67], 3)
+func () -> std::contains([5,3,65,3,2,56,67], 3)
 # >
 true
 
 # === std_contains_01
-std::contains([5,3,65,3,2,56,67], 7)
+func () -> std::contains([5,3,65,3,2,56,67], 7)
 # >
 false
 
 # === std_contains_02
-std::contains([], 2)
+func () -> std::contains([], 2)
 # >
 false
 
 # === std_count_00
-std::count([5: int16,3,65,3,2,56,67])
+func () -> std::count([5: int16,3,65,3,2,56,67])
 # >
 7
 
 # === std_count_01
-std::count([]: [bool])
+func () -> std::count([]: [bool])
 # >
 0
 
 # === std_div_00
-(10 / 6): int64
+func () -> (10 / 6): int64
 # >
 1
 
 # === std_div_01
-(-10 / 6): int64
+func () -> (-10 / 6): int64
 # >
 -1
 
 # === std_div_02
-(10 / -6): int64
+func () -> (10 / -6): int64
 # >
 -1
 
 # === std_div_03
-(-10 / -6): int64
+func () -> (-10 / -6): int64
 # >
 1
 
 # === std_div_04
-(10.0 / 6.0): float64
+func () -> (10.0 / 6.0): float64
 # >
 1.6666666666666667
 
 # === std_div_05
-(-10.0 / 6.0): float64
+func () -> (-10.0 / 6.0): float64
 # >
 -1.6666666666666667
 
 # === std_div_06
-(10.0 / -6.0): float64
+func () -> (10.0 / -6.0): float64
 # >
 -1.6666666666666667
 
 # === std_div_07
-(-10.0 / -6.0): float64
+func () -> (-10.0 / -6.0): float64
 # >
 1.6666666666666667
 
 # === std_eq_00
-{30: int64 == 2, 30: int64 == 30}
+func () -> {30: int64 == 2, 30: int64 == 30}
 # >
 {
   false,
@@ -996,7 +965,7 @@ std::count([]: [bool])
 }
 
 # === std_eq_01
-{30.3: float64 == 2.2, 30.3: float64 == 30.3}
+func () -> {30.3: float64 == 2.2, 30.3: float64 == 30.3}
 # >
 {
   false,
@@ -1004,7 +973,7 @@ std::count([]: [bool])
 }
 
 # === std_eq_02
-{false == true, false == false}
+func () -> {false == true, false == false}
 # >
 {
   false,
@@ -1012,7 +981,7 @@ std::count([]: [bool])
 }
 
 # === std_eq_03
-{"aa" == "b", "aa" == "aa"}
+func () -> {"aa" == "b", "aa" == "aa"}
 # >
 {
   false,
@@ -1020,7 +989,7 @@ std::count([]: [bool])
 }
 
 # === std_filter_00
-std::filter([5,3,65,3,2]: [int64], func (x: int64) -> x > 3)
+func () -> std::filter([5,3,65,3,2]: [int64], func (x: int64) -> x > 3)
 # >
 [
   5,
@@ -1028,17 +997,17 @@ std::filter([5,3,65,3,2]: [int64], func (x: int64) -> x > 3)
 ]
 
 # === std_filter_01
-std::filter([5,3,65,3,2]: [int64], func (x: int64) -> x < 1)
+func () -> std::filter([5,3,65,3,2]: [int64], func (x: int64) -> x < 1)
 # >
 []
 
 # === std_filter_02
-std::filter([], func (x: int64) -> x > 3)
+func () -> std::filter([], func (x: int64) -> x > 3)
 # >
 []
 
 # === std_filter_03
-std::filter([false,true,true,false,true], func (x: bool) -> !x)
+func () -> std::filter([false,true,true,false,true], func (x: bool) -> !x)
 # >
 [
   false,
@@ -1046,7 +1015,10 @@ std::filter([false,true,true,false,true], func (x: bool) -> !x)
 ]
 
 # === std_filter_04
-std::filter([{false, "one"},{true, "two"},{true, "three"},{false, "four"},{true, "five"}], func (x: {bool, text}) -> x.0)
+func () -> std::filter(
+  [{false, "one"},{true, "two"},{true, "three"},{false, "four"},{true, "five"}],
+  func (x: {bool, text}) -> x.0
+)
 # >
 [
   {
@@ -1064,7 +1036,7 @@ std::filter([{false, "one"},{true, "two"},{true, "three"},{false, "four"},{true,
 ]
 
 # === std_find_00
-std::find([5,3,65,3,2]: [int64], func (x) -> x > 10)
+func () -> std::find([5,3,65,3,2]: [int64], func (x) -> x > 10)
 # >
 65
 
@@ -1083,9 +1055,9 @@ func () -> std::flat_map([1, 2, 3]: [int64], func (x) -> [x, x])
 
 # === std_flat_map_01
 func () -> (
-      [{1: int64, false}, {2, true}]
-      | std::flat_map(func (x) -> [x, x])
-    )
+  [{1: int64, false}, {2, true}]
+  | std::flat_map(func (x) -> [x, x])
+)
 # >
 [
   {
@@ -1107,7 +1079,7 @@ func () -> (
 ]
 
 # === std_from_columnar_00
-std::from_columnar({[4: int16, 3, 2], [5: int32, 4, 1]})
+func () -> std::from_columnar({[4: int16, 3, 2], [5: int32, 4, 1]})
 # >
 [
   {
@@ -1125,17 +1097,17 @@ std::from_columnar({[4: int16, 3, 2], [5: int32, 4, 1]})
 ]
 
 # === std_from_columnar_01
-std::from_columnar({[1]: [int32], []: [int64]})
+func () -> std::from_columnar({[1]: [int32], []: [int64]})
 # >
 []
 
 # === std_from_columnar_02
-std::from_columnar({[]: [int8], [2]: [int16]})
+func () -> std::from_columnar({[]: [int8], [2]: [int16]})
 # >
 []
 
 # === std_from_columnar_03
-std::from_columnar({[1: int16, 2], [3: int16, 4, 5]})
+func () -> std::from_columnar({[1: int16, 2], [3: int16, 4, 5]})
 # >
 [
   {
@@ -1149,7 +1121,7 @@ std::from_columnar({[1: int16, 2], [3: int16, 4, 5]})
 ]
 
 # === std_from_columnar_04
-std::from_columnar({[false, true], ["no", "yes", "neither"]})
+func () -> std::from_columnar({[false, true], ["no", "yes", "neither"]})
 # >
 [
   {
@@ -1163,10 +1135,10 @@ std::from_columnar({[false, true], ["no", "yes", "neither"]})
 ]
 
 # === std_group_00
-(
-      std::group([1, 2, 5, 1, 2, 4, 6, 12]: [int64], func (x) -> x % 2)
-      | std::sort(func (x) -> x.key)
-    )
+func () -> (
+  std::group([1, 2, 5, 1, 2, 4, 6, 12]: [int64], func (x) -> x % 2)
+  | std::sort(func (x) -> x.key)
+)
 # >
 [
   {
@@ -1191,15 +1163,15 @@ std::from_columnar({[false, true], ["no", "yes", "neither"]})
 
 # === std_group_01
 func () -> (
-      [
-        {1, false, 10},
-        {2, false, 21},
-        {2, false, 22},
-        {1, true, 10}
-      ]: [{int64, bool, int64}]
-      | std::group(func (x: {int64, bool, int64}) -> {x.0, x.2})
-      | std::sort(func (x) -> x.key.0 + x.key.1)
-    )
+  [
+    {1, false, 10},
+    {2, false, 21},
+    {2, false, 22},
+    {1, true, 10}
+  ]: [{int64, bool, int64}]
+  | std::group(func (x: {int64, bool, int64}) -> {x.0, x.2})
+  | std::sort(func (x) -> x.key.0 + x.key.1)
+)
 
 # >
 [
@@ -1287,7 +1259,7 @@ func () -> (
 ]
 
 # === std_gt_00
-{3 > 2: int64, 2 > 3: int64, 2 > 2: int64}
+func () -> {3 > 2: int64, 2 > 3: int64, 2 > 2: int64}
 # >
 {
   true,
@@ -1296,7 +1268,7 @@ func () -> (
 }
 
 # === std_gt_01
-{3.3 > 2.2: float64, 2.2 > 3.3: float64, 2.2 > 2.2: float64}
+func () -> {3.3 > 2.2: float64, 2.2 > 3.3: float64, 2.2 > 2.2: float64}
 # >
 {
   true,
@@ -1305,7 +1277,7 @@ func () -> (
 }
 
 # === std_gte_00
-{3 >= 2: int64, 2 >= 3: int64, 2 >= 2: int64}
+func () -> {3 >= 2: int64, 2 >= 3: int64, 2 >= 2: int64}
 # >
 {
   true,
@@ -1314,7 +1286,7 @@ func () -> (
 }
 
 # === std_gte_01
-{3.3 >= 2.2: float64, 2.2 >= 3.3: float64, 2.2 >= 2.2: float64}
+func () -> {3.3 >= 2.2: float64, 2.2 >= 3.3: float64, 2.2 >= 2.2: float64}
 # >
 {
   true,
@@ -1323,42 +1295,42 @@ func () -> (
 }
 
 # === std_index_00
-std::index([5,3,65,3,2]: [int64], 3)
+func () -> std::index([5,3,65,3,2]: [int64], 3)
 # >
 3
 
 # === std_index_01
-([1, 2, 3].2): int64
+func () -> ([1, 2, 3].2): int64
 # >
 3
 
 # === std_index_02
-std::index([5.3,3.2,65.4,3.1,2.0], 3): float64
+func () -> std::index([5.3,3.2,65.4,3.1,2.0], 3): float64
 # >
 3.1
 
 # === std_index_03
-([1.1, 2.2, 3.3].2): float64
+func () -> ([1.1, 2.2, 3.3].2): float64
 # >
 3.3
 
 # === std_index_04
-std::index([false, false, false, true, false], 3)
+func () -> std::index([false, false, false, true, false], 3)
 # >
 true
 
 # === std_index_05
-[true, true, false].2
+func () -> [true, true, false].2
 # >
 false
 
 # === std_index_06
-["hello", "world", "!"].2
+func () -> ["hello", "world", "!"].2
 # >
 "!"
 
 # === std_lag_00
-std::lag([5,3,65,3,2,56,67]: [int8], 2)
+func () -> std::lag([5,3,65,3,2,56,67]: [int8], 2)
 # >
 [
   0,
@@ -1371,7 +1343,7 @@ std::lag([5,3,65,3,2,56,67]: [int8], 2)
 ]
 
 # === std_lag_01
-std::lag([5,3,65,3,2,56,67]: [int16], 12)
+func () -> std::lag([5,3,65,3,2,56,67]: [int16], 12)
 # >
 [
   0,
@@ -1389,7 +1361,7 @@ func (): [int64] -> std::lag([], 3)
 []
 
 # === std_lag_03
-std::lag([5,3,65,4], -2): [int8]
+func () -> std::lag([5,3,65,4], -2): [int8]
 # >
 [
   65,
@@ -1399,7 +1371,7 @@ std::lag([5,3,65,4], -2): [int8]
 ]
 
 # === std_lead_00
-std::lead([5,3,65,3,2,56,67], 2): [int8]
+func () -> std::lead([5,3,65,3,2,56,67], 2): [int8]
 # >
 [
   65,
@@ -1412,7 +1384,7 @@ std::lead([5,3,65,3,2,56,67], 2): [int8]
 ]
 
 # === std_lead_01
-std::lead([5,3,65,3,2,56,67], 12): [int64]
+func () -> std::lead([5,3,65,3,2,56,67], 12): [int64]
 # >
 [
   0,
@@ -1430,7 +1402,7 @@ func (): [int32] -> std::lead([], 3)
 []
 
 # === std_lead_03
-std::lead([5,3,65,4], -2): [int64]
+func () -> std::lead([5,3,65,4], -2): [int64]
 # >
 [
   0,
@@ -1440,7 +1412,7 @@ std::lead([5,3,65,4], -2): [int64]
 ]
 
 # === std_lt_00
-{3 < 2: int64, 2 < 3: int64, 2 < 2: int64}
+func () -> {3 < 2: int64, 2 < 3: int64, 2 < 2: int64}
 # >
 {
   false,
@@ -1449,7 +1421,7 @@ std::lead([5,3,65,4], -2): [int64]
 }
 
 # === std_lt_01
-{3.3 < 2.2: float64, 2.2 < 3.3: float64, 2.2 < 2.2: float64}
+func () -> {3.3 < 2.2: float64, 2.2 < 3.3: float64, 2.2 < 2.2: float64}
 # >
 {
   false,
@@ -1458,7 +1430,7 @@ std::lead([5,3,65,4], -2): [int64]
 }
 
 # === std_lte_00
-{3 <= 2: int64, 2 <= 3: int64, 2 <= 2: int64}
+func () -> {3 <= 2: int64, 2 <= 3: int64, 2 <= 2: int64}
 # >
 {
   false,
@@ -1467,7 +1439,7 @@ std::lead([5,3,65,4], -2): [int64]
 }
 
 # === std_lte_01
-{3.3 <= 2.2: float64, 2.2 <= 3.3: float64, 2.2 <= 2.2: float64}
+func () -> {3.3 <= 2.2: float64, 2.2 <= 3.3: float64, 2.2 <= 2.2: float64}
 # >
 {
   false,
@@ -1510,13 +1482,13 @@ func () -> std::map(["hello", "world", "!"], func (x: text) -> std::text_ops::le
 ]
 
 # === std_map_columnar_00
-std::map_columnar(
-        [{5: int16, 3: int16}, {65, 1}, {3, 2}],
-        func (x: {[int16], [int16]}) -> {
-            std::lag(x.0, 1),
-            std::lead(x.1, 1)
-        }
-    )
+func () -> std::map_columnar(
+  [{5: int16, 3: int16}, {65, 1}, {3, 2}],
+  func (x: {[int16], [int16]}) -> {
+    std::lag(x.0, 1),
+    std::lead(x.1, 1)
+  }
+)
 
 # >
 [
@@ -1535,13 +1507,13 @@ std::map_columnar(
 ]
 
 # === std_map_columnar_01
-std::map_columnar(
-        [{false,"hello"},{false,"world"},{true, "!"}],
-        func (x: {[bool], [text]}) -> {
-            std::lead(x.0, 1),
-            std::lag(x.1, 1),
-        }
-    )
+func () -> std::map_columnar(
+    [{false,"hello"},{false,"world"},{true, "!"}],
+    func (x: {[bool], [text]}) -> {
+        std::lead(x.0, 1),
+        std::lag(x.1, 1),
+    }
+)
 
 # >
 [
@@ -1560,67 +1532,67 @@ std::map_columnar(
 ]
 
 # === std_max_00
-std::max([5,3,65,3,2,56,67])
+func () -> std::max([5,3,65,3,2,56,67])
 # >
 67
 
 # === std_min_00
-std::min([5,3,65,3,2,56,67])
+func () -> std::min([5,3,65,3,2,56,67])
 # >
 2
 
 # === std_mod_00
-(10 % 6): int64
+func () -> (10 % 6): int64
 # >
 4
 
 # === std_mod_01
-(-10 % 6): int64
+func () -> (-10 % 6): int64
 # >
 -4
 
 # === std_mod_02
-(10 % -6): int64
+func () -> (10 % -6): int64
 # >
 4
 
 # === std_mod_03
-(-10 % -6): int64
+func () -> (-10 % -6): int64
 # >
 -4
 
 # === std_mod_04
-(10.0 % 6.0): float64
+func () -> (10.0 % 6.0): float64
 # >
 4.0
 
 # === std_mod_05
-(-10.0 % 6.0): float64
+func () -> (-10.0 % 6.0): float64
 # >
 -4.0
 
 # === std_mod_06
-(10.0 % -6.0): float64
+func () -> (10.0 % -6.0): float64
 # >
 4.0
 
 # === std_mod_07
-(-10.0 % -6.0): float64
+func () -> (-10.0 % -6.0): float64
 # >
 -4.0
 
 # === std_mul_01
-(2 * 3): int64
+func () -> (2 * 3): int64
 # >
 6
 
 # === std_mul_02
-(2.1 * 3.5): float64
+func () -> (2.1 * 3.5): float64
 # >
 7.3500000000000005
 
 # === std_ne_00
-{
+func () -> {
   30.3: float64 != 2.2,
   30.3: float64 != 30.3
 }
@@ -1631,7 +1603,7 @@ std::min([5,3,65,3,2,56,67])
 }
 
 # === std_ne_01
-{
+func () -> {
   30.3: float64 != 2.2,
   30.3: float64 != 30.3
 }
@@ -1642,7 +1614,7 @@ std::min([5,3,65,3,2,56,67])
 }
 
 # === std_ne_02
-{false != true, false != false}
+func () -> {false != true, false != false}
 # >
 {
   true,
@@ -1650,7 +1622,7 @@ std::min([5,3,65,3,2,56,67])
 }
 
 # === std_ne_03
-{"aa" != "b", "aa" != "aa"}
+func () -> {"aa" != "b", "aa" != "aa"}
 # >
 {
   true,
@@ -1658,7 +1630,7 @@ std::min([5,3,65,3,2,56,67])
 }
 
 # === std_neg_00
-{-2: int64, - (-3: int64)}
+func () -> {-2: int64, - (-3: int64)}
 # >
 {
   -2,
@@ -1666,7 +1638,7 @@ std::min([5,3,65,3,2,56,67])
 }
 
 # === std_neg_01
-{-2.1: float64, - (-3.1: float64)}
+func () -> {-2.1: float64, - (-3.1: float64)}
 # >
 {
   -2.1,
@@ -1674,7 +1646,7 @@ std::min([5,3,65,3,2,56,67])
 }
 
 # === std_not
-{!false, !true}
+func () -> {!false, !true}
 # >
 {
   true,
@@ -1682,7 +1654,7 @@ std::min([5,3,65,3,2,56,67])
 }
 
 # === std_or
-{false || false, false || true, true || false, true || true}
+func () -> {false || false, false || true, true || false, true || true}
 # >
 {
   false,
@@ -1710,7 +1682,7 @@ func () -> std::row_number([]: [text])
 []
 
 # === std_slice_00
-std::slice([5,3,65,3,2]: [int64], 1, 3)
+func () -> std::slice([5,3,65,3,2]: [int64], 1, 3)
 # >
 [
   3,
@@ -1719,7 +1691,7 @@ std::slice([5,3,65,3,2]: [int64], 1, 3)
 
 # === std_slice_01
 # skip: postgres
-std::slice([5,3,65,3,2]: [int64], 1, -1)
+func () -> std::slice([5,3,65,3,2]: [int64], 1, -1)
 # >
 [
   3,
@@ -1728,22 +1700,22 @@ std::slice([5,3,65,3,2]: [int64], 1, -1)
 ]
 
 # === std_slice_02
-std::slice([5,3,65,3,2]: [int64], 4, 2)
+func () -> std::slice([5,3,65,3,2]: [int64], 4, 2)
 # >
 []
 
 # === std_slice_03
-std::slice([5,3,65,3,2]: [int64], 6, 7)
+func () -> std::slice([5,3,65,3,2]: [int64], 6, 7)
 # >
 []
 
 # === std_slice_04
-std::slice([5,3,65,3,2]: [int64], -7, 0)
+func () -> std::slice([5,3,65,3,2]: [int64], -7, 0)
 # >
 []
 
 # === std_slice_05
-std::slice([false,true,false,false,true], 1, 4)
+func () -> std::slice([false,true,false,false,true], 1, 4)
 # >
 [
   true,
@@ -1752,7 +1724,7 @@ std::slice([false,true,false,false,true], 1, 4)
 ]
 
 # === std_slice_06
-std::slice([{false,"hello"}, {false,"world"},{true, "!"},{false,"foo"},{true, "bar"}], 1, 4)
+func () -> std::slice([{false,"hello"}, {false,"world"},{true, "!"},{false,"foo"},{true, "bar"}], 1, 4)
 # >
 [
   {
@@ -1781,10 +1753,10 @@ func () -> std::sort([5,3,65,3,2]: [int64], func (x: int64) -> -x)
 ]
 
 # === std_sort_01
-std::sort(
-      [{5: int64, "hello"}, {3: int64, "world"}, {65: int64, "!"}, {3: int64, "foo"}, {2: int64, "bar"}],
-      func (x: {int64, text}) -> x.0
-    )
+func () -> std::sort(
+  [{5: int64, "hello"}, {3: int64, "world"}, {65: int64, "!"}, {3: int64, "foo"}, {2: int64, "bar"}],
+  func (x: {int64, text}) -> x.0
+)
 # >
 [
   {
@@ -1810,37 +1782,37 @@ std::sort(
 ]
 
 # === std_sub_00
-(30 - 2): int64
+func () -> (30 - 2): int64
 # >
 28
 
 # === std_sub_01
-(2 - 30): int64
+func () -> (2 - 30): int64
 # >
 -28
 
 # === std_sub_02
-(30.2 - 2.30): float64
+func () -> (30.2 - 2.30): float64
 # >
 27.9
 
 # === std_sub_03
-(2.30 - 30.2): float64
+func () -> (2.30 - 30.2): float64
 # >
 -27.9
 
 # === std_sum_00
-std::sum([5,3,65,3,2,56,67])
+func () -> std::sum([5,3,65,3,2,56,67])
 # >
 201
 
 # === std_sum_01
-std::sum([])
+func () -> std::sum([])
 # >
 0
 
 # === std_to_columnar_00
-std::to_columnar([{5,3},{65,1},{3, 2}]: [{int64, int64}])
+func () -> std::to_columnar([{5,3},{65,1},{3, 2}]: [{int64, int64}])
 # >
 {
   [
@@ -1856,7 +1828,7 @@ std::to_columnar([{5,3},{65,1},{3, 2}]: [{int64, int64}])
 }
 
 # === std_to_columnar_01
-std::to_columnar([{false,"three"},{true,"one"},{false, "two"}])
+func () -> std::to_columnar([{false,"three"},{true,"one"},{false, "two"}])
 # >
 {
   [
@@ -1873,8 +1845,7 @@ std::to_columnar([{false,"three"},{true,"one"},{false, "two"}])
 
 # === std_to_float32_00
 # skip: postgres
-
-{
+func () -> {
   (-4: int8 | std::to_float32),
   (-400: int16 | std::to_float32),
   (-400000: int32 | std::to_float32),
@@ -1886,9 +1857,7 @@ std::to_columnar([{false,"three"},{true,"one"},{false, "two"}])
   (4.4: float32 | std::to_float32),
   (125523.121231: float64 | std::to_float32),
 }
-
 # >
-
 {
   -4.0,
   -400.0,
@@ -1904,8 +1873,7 @@ std::to_columnar([{false,"three"},{true,"one"},{false, "two"}])
 
 # === std_to_float64_00
 # skip: postgres
-
-{
+func () -> {
   (-4: int8 | std::to_float64),
   (-400: int16 | std::to_float64),
   (-400000: int32 | std::to_float64),
@@ -1917,9 +1885,7 @@ std::to_columnar([{false,"three"},{true,"one"},{false, "two"}])
   (4.4: float32 | std::to_float64),
   (125523.121231: float64 | std::to_float64),
 }
-
 # >
-
 {
   -4.0,
   -400.0,
@@ -1935,8 +1901,7 @@ std::to_columnar([{false,"three"},{true,"one"},{false, "two"}])
 
 # === std_to_int16_00
 # skip: postgres
-
-{
+func () -> {
   (-4: int8 | std::to_int16),
   (-400: int16 | std::to_int16),
   (-400000: int32 | std::to_int16),
@@ -1965,7 +1930,7 @@ std::to_columnar([{false,"three"},{true,"one"},{false, "two"}])
 
 # === std_to_int32_00
 # skip: postgres
-{
+func () -> {
   (-4: int8 | std::to_int32),
   (-400: int16 | std::to_int32),
   (-400000: int32 | std::to_int32),
@@ -1994,7 +1959,7 @@ std::to_columnar([{false,"three"},{true,"one"},{false, "two"}])
 
 # === std_to_int64_00
 # skip: postgres
-{
+func () -> {
   (-4: int8 | std::to_int64),
   (-400: int16 | std::to_int64),
   (-400000: int32 | std::to_int64),
@@ -2023,7 +1988,7 @@ std::to_columnar([{false,"three"},{true,"one"},{false, "two"}])
 
 # === std_to_int8_00
 # skip: postgres
-{
+func () -> {
   (-4: int8 | std::to_int8),
   (-400: int16 | std::to_int8),
   (-400000: int32 | std::to_int8),
@@ -2052,7 +2017,7 @@ std::to_columnar([{false,"three"},{true,"one"},{false, "two"}])
 
 # === std_to_uint16_00
 # skip: postgres
-{
+func () -> {
   (-4: int8 | std::to_uint16),
   (-400: int16 | std::to_uint16),
   (-400000: int32 | std::to_uint16),
@@ -2081,7 +2046,7 @@ std::to_columnar([{false,"three"},{true,"one"},{false, "two"}])
 
 # === std_to_uint32_00
 # skip: postgres
-{
+func () -> {
   (-4: int8 | std::to_uint32),
   (-400: int16 | std::to_uint32),
   (-400000: int32 | std::to_uint32),
@@ -2110,7 +2075,7 @@ std::to_columnar([{false,"three"},{true,"one"},{false, "two"}])
 
 # === std_to_uint64_00
 # skip: postgres
-{
+func () -> {
   (-4: int8 | std::to_uint64),
   (-400: int16 | std::to_uint64),
   (-400000: int32 | std::to_uint64),
@@ -2139,7 +2104,7 @@ std::to_columnar([{false,"three"},{true,"one"},{false, "two"}])
 
 # === std_to_uint8_00
 # skip: postgres
-{
+func () -> {
   (-4: int8 | std::to_uint8),
   (-400: int16 | std::to_uint8),
   (-400000: int32 | std::to_uint8),

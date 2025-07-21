@@ -1,5 +1,6 @@
 //! Resolver (name resolution, type checking)
 
+mod const_eval;
 mod desugar;
 mod module;
 mod names;
@@ -31,6 +32,10 @@ pub fn resolve(module_tree: pr::ModuleDef) -> Result<decl::RootModule, Vec<Diagn
     types::run(&mut root_module, &resolution_order)?;
 
     root_module.ordering = resolution_order;
+
+    // resolve types
+    const_eval::run(&root_module)?;
+
     Ok(root_module)
 }
 
