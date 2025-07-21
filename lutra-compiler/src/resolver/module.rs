@@ -2,23 +2,25 @@ use enum_as_inner::EnumAsInner;
 use indexmap::IndexMap;
 use itertools::Itertools;
 
+use crate::_lexer::Diagnostic;
 use crate::Span;
 use crate::decl;
 use crate::pr;
 
-use super::NS_STD;
-
-pub fn init_root(root_module_def: pr::ModuleDef) -> decl::RootModule {
+pub fn init_root(root_module_def: pr::ModuleDef) -> Result<decl::RootModule, Vec<Diagnostic>> {
     let mut root = decl::Module {
-        names: IndexMap::from([(NS_STD.to_string(), decl::Decl::new(decl::Module::default()))]),
+        names: IndexMap::new(),
     };
 
-    root.populate_module(root_module_def.stmts);
+    let diagnostics = root.populate_module(root_module_def.stmts);
+    if !diagnostics.is_empty() {
+        return Err(diagnostics);
+    }
 
-    decl::RootModule {
+    Ok(decl::RootModule {
         module: root,
         ordering: Vec::new(), // computed later
-    }
+    })
 }
 
 #[derive(Debug, EnumAsInner)]
@@ -111,7 +113,9 @@ impl decl::Module {
         (unresolved.take().unwrap(), decl.span)
     }
 
-    pub(super) fn populate_module(&mut self, stmts: Vec<pr::Stmt>) {
+    pub(super) fn populate_module(&mut self, stmts: Vec<pr::Stmt>) -> Vec<Diagnostic> {
+        let mut diagnostics = Vec::new();
+
         for stmt in stmts {
             let name = get_stmt_name(&stmt).to_string();
 
@@ -119,7 +123,7 @@ impl decl::Module {
                 pr::StmtKind::ModuleDef(module_def) => {
                     // init new module and recurse
                     let mut new_mod = decl::Module::default();
-                    new_mod.populate_module(module_def.stmts);
+                    diagnostics.extend(new_mod.populate_module(module_def.stmts));
 
                     decl::DeclKind::Module(new_mod)
                 }
@@ -133,8 +137,14 @@ impl decl::Module {
                 kind,
                 annotations: stmt.annotations,
             };
-            self.names.insert(name, decl);
+
+            let existing = self.names.insert(name, decl);
+            if let Some(existing) = existing {
+                let span = stmt.span.or(existing.span);
+                diagnostics.push(Diagnostic::new_custom("duplicate declaration").with_span(span));
+            }
         }
+        diagnostics
     }
 }
 

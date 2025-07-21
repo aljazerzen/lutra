@@ -20,7 +20,7 @@ pub fn resolve(module_tree: pr::ModuleDef) -> Result<decl::RootModule, Vec<Diagn
     let module_tree = desugar::run(module_tree).map_err(|d| vec![d])?;
 
     // init the module structure
-    let mut root_module = module::init_root(module_tree);
+    let mut root_module = module::init_root(module_tree)?;
 
     // resolve names
     let resolution_order = names::run(&mut root_module).map_err(|d| vec![d])?;

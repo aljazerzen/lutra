@@ -845,3 +845,34 @@ fn func_param_03() {
         )
     "#), @"int16");
 }
+
+#[test]
+fn decls_00() {
+    insta::assert_snapshot!(_test_err(r#"
+        let a = 3
+        let a = 6
+    "#), @r"
+    Error:
+       ╭─[:3:9]
+       │
+     3 │         let a = 6
+       │         ────┬────
+       │             ╰────── duplicate declaration
+    ───╯
+    ");
+}
+#[test]
+fn decls_01() {
+    insta::assert_snapshot!(_test_err(r#"
+        func a() -> 3
+        func a() -> 6
+    "#), @r"
+    Error:
+       ╭─[:3:9]
+       │
+     3 │         func a() -> 6
+       │         ──────┬──────
+       │               ╰──────── duplicate declaration
+    ───╯
+    ");
+}

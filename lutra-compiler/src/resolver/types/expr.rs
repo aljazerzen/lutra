@@ -4,9 +4,9 @@ use crate::Result;
 use crate::diagnostic::{Diagnostic, WithErrorInfo};
 use crate::pr;
 use crate::pr::Ty;
-use crate::resolver::names;
 use crate::resolver::types::scope::{Named, ScopedKind};
 use crate::resolver::types::tuple::BaseKind;
+use crate::resolver::{NS_STD, names};
 use crate::utils::fold;
 
 use super::scope::{Scope, ScopeKind};
@@ -96,7 +96,7 @@ impl fold::PrFold for super::TypeResolver<'_> {
                         }
                     }
                     BaseKind::Array => {
-                        let std_index = pr::Path::new(vec!["std", "index"]);
+                        let std_index = pr::Path::new(vec![NS_STD, "index"]);
                         let mut std_index_expr = pr::Expr::new(std_index.clone());
                         std_index_expr.span = span;
                         std_index_expr.target = Some(pr::Ref::FullyQualified {
