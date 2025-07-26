@@ -117,4 +117,6 @@ operations that should have been done at compile time into runtime.
 Lutra is a personal passion project, currently in a proof-of-concept stage.
 It is not ready for production use.
 
+It works, but is not feature complete and will change in inconvenient ways.
+
 We are looking for feedback and contributions.
