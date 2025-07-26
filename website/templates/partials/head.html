@@ -100,7 +100,6 @@
         color: var(--text-muted);
         margin: 0 0.5rem;
     }
-
     ul.navigation {
         position: fixed;
         display: flex;
@@ -123,5 +122,14 @@
     }
     ul.navigation li.header>a {
         font-weight: bold;
+    }
+    @media (max-width: 1216px) {
+        .sidebar-start,.sidebar-end {
+            flex: 0 1 800px;
+            padding-bottom: 1rem;
+        }
+        ul.navigation {
+            position: relative;
+        }
     }
 </style>
