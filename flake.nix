@@ -56,7 +56,6 @@
             pkgs.zola
           ];
 
-          RUSTFLAGS = "-Clink-arg=-fuse-ld=${pkgs.mold}/bin/mold";
           venvDir = "./target/python";
         };
       }
