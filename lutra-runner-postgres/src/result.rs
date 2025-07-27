@@ -49,6 +49,8 @@ impl<'a> Context<'a> {
             Box::new(ArrayEncoder {
                 inner: self.construct_row_encoder(item_ty),
             })
+        } else if ty.is_unit() {
+            Box::new(EmptyRowEncoder)
         } else {
             Box::new(SingleRowEncoder {
                 inner: self.construct_row_encoder(ty),
@@ -185,6 +187,12 @@ impl EncodeRows for SingleRowEncoder {
         let mut row_iter = RowIter { row, idx: 0 };
         self.inner.encode_body(buf, &mut row_iter, head);
     }
+}
+
+struct EmptyRowEncoder;
+
+impl EncodeRows for EmptyRowEncoder {
+    fn encode(&self, _buf: &mut BytesMut, _rows: &[Row]) {}
 }
 
 trait EncodeRow {

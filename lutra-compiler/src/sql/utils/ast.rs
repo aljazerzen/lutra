@@ -1,5 +1,8 @@
 //! Utils for constructing SQL AST nodes
 
+use std::sync::OnceLock;
+
+use regex::Regex;
 use sqlparser::ast as sql_ast;
 use sqlparser::ast::helpers::attached_token::AttachedToken;
 
@@ -36,9 +39,9 @@ pub fn as_mut_sub_rel(rel: &mut sqlparser::ast::TableFactor) -> Option<&mut sql_
 
 pub fn new_table(name: Vec<String>, alias: Option<String>) -> sql_ast::TableFactor {
     sql_ast::TableFactor::Table {
-        name: sql_ast::ObjectName(name.into_iter().map(sql_ast::Ident::new).collect()),
+        name: sql_ast::ObjectName(name.into_iter().map(new_ident).collect()),
         alias: alias.map(|a| sql_ast::TableAlias {
-            name: sql_ast::Ident::new(a),
+            name: new_ident(a),
             columns: vec![],
         }),
         args: Default::default(),
@@ -56,7 +59,7 @@ pub fn sub_rel(query: sql_ast::Query, alias: String) -> sql_ast::TableFactor {
         lateral: false,
         subquery: Box::new(query),
         alias: Some(sql_ast::TableAlias {
-            name: sql_ast::Ident::new(alias),
+            name: new_ident(alias),
             columns: vec![],
         }),
     }
@@ -102,7 +105,7 @@ pub fn rel_func(
             .map(sql_ast::FunctionArg::Unnamed)
             .collect(),
         alias: alias.map(|a| sql_ast::TableAlias {
-            name: sql_ast::Ident::new(a),
+            name: new_ident(a),
             columns: vec![],
         }),
     }
@@ -195,7 +198,7 @@ pub fn unwrap_select_item(item: sql_ast::SelectItem) -> sql_ast::Expr {
 }
 
 pub fn new_expr(source: String) -> sql_ast::Expr {
-    sql_ast::Expr::Identifier(sql_ast::Ident::new(source))
+    sql_ast::Expr::Identifier(new_ident(source))
 }
 
 pub fn value(value: sql_ast::Value) -> sql_ast::Expr {
@@ -210,14 +213,11 @@ pub fn number(value: impl Into<String>) -> sql_ast::Expr {
     sql_ast::Expr::Value(sql_ast::Value::Number(value.into(), false))
 }
 
-pub fn ident(first: Option<impl Into<String>>, second: impl Into<String>) -> sql_ast::Expr {
+pub fn identifier(first: Option<impl Into<String>>, second: impl Into<String>) -> sql_ast::Expr {
     if let Some(table) = first {
-        sql_ast::Expr::CompoundIdentifier(vec![
-            sql_ast::Ident::new(table),
-            sql_ast::Ident::new(second),
-        ])
+        sql_ast::Expr::CompoundIdentifier(vec![new_ident(table), new_ident(second)])
     } else {
-        sql_ast::Expr::Identifier(sql_ast::Ident::new(second.into()))
+        sql_ast::Expr::Identifier(new_ident(second.into()))
     }
 }
 
@@ -226,7 +226,7 @@ pub fn func_call(
     args: impl IntoIterator<Item = sql_ast::Expr>,
 ) -> sql_ast::Expr {
     sql_ast::Expr::Function(sql_ast::Function {
-        name: sql_ast::ObjectName(vec![sql_ast::Ident::new(func_name)]),
+        name: sql_ast::ObjectName(vec![new_ident(func_name)]),
         uses_odbc_syntax: Default::default(),
         parameters: sql_ast::FunctionArguments::None,
         args: sql_ast::FunctionArguments::List(sql_ast::FunctionArgumentList {
@@ -268,7 +268,7 @@ pub fn with() -> sql_ast::With {
 pub fn cte(name: String, val: sql_ast::Query) -> sql_ast::Cte {
     sql_ast::Cte {
         alias: sql_ast::TableAlias {
-            name: sql_ast::Ident::new(name),
+            name: new_ident(name),
             columns: Default::default(),
         },
         query: Box::new(val),
@@ -276,4 +276,27 @@ pub fn cte(name: String, val: sql_ast::Query) -> sql_ast::Cte {
         materialized: Default::default(),
         closing_paren_token: AttachedToken::empty(),
     }
+}
+
+pub fn new_ident<S: Into<String>>(name: S) -> sql_ast::Ident {
+    let name: String = name.into();
+
+    if valid_ident_regex().is_match(&name) {
+        sql_ast::Ident::new(name)
+    } else {
+        sql_ast::Ident::with_quote('"', name)
+    }
+}
+
+pub(crate) fn valid_ident_regex() -> &'static Regex {
+    static VALID_IDENT: OnceLock<Regex> = OnceLock::new();
+    VALID_IDENT.get_or_init(|| {
+        // One of:
+        // - `*`
+        // - An ident starting with `a-z_\$` and containing other characters `a-z0-9_\$`
+        //
+        // We could replace this with pomsky (regex<>pomsky : sql<>prql)
+        // ^ ('*' | [ascii_lower '_$'] [ascii_lower ascii_digit '_$']* ) $
+        Regex::new(r"^((\*)|(^[a-z_\$][a-z0-9_\$]*))$").unwrap()
+    })
 }

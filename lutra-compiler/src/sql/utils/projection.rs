@@ -4,7 +4,7 @@ use lutra_bin::ir;
 use sqlparser::ast as sql_ast;
 
 use crate::sql::{COL_ARRAY_INDEX, COL_VALUE};
-use crate::sql::{clauses, queries};
+use crate::sql::{clauses, queries, utils};
 
 use super::ExprOrSource;
 
@@ -155,7 +155,7 @@ impl<'a> queries::Context<'a> {
         std::iter::zip(values, rel_cols)
             .map(|(expr, alias)| sql_ast::SelectItem::ExprWithAlias {
                 expr: expr.into_expr(),
-                alias: sql_ast::Ident::new(alias),
+                alias: utils::new_ident(alias),
             })
             .collect()
     }
@@ -169,7 +169,7 @@ impl<'a> queries::Context<'a> {
         include_index: bool,
     ) -> Vec<sql_ast::SelectItem> {
         self.rel_cols(ty, include_index)
-            .map(|name| sql_ast::SelectItem::UnnamedExpr(super::ident(rel_var_name, name)))
+            .map(|name| sql_ast::SelectItem::UnnamedExpr(super::identifier(rel_var_name, name)))
             .collect()
     }
 }

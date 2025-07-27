@@ -2,7 +2,7 @@ use itertools::Itertools;
 use std::collections::HashMap;
 
 use lutra_bin::ir;
-use sqlparser::ast as sql_ast;
+use sqlparser::ast::{self as sql_ast};
 
 use crate::sql::utils::{ExprOrSource, RelCols, Scoped};
 use crate::sql::{COL_ARRAY_INDEX, COL_VALUE};
@@ -16,14 +16,16 @@ pub fn compile(rel: cr::Expr, types: HashMap<&ir::Path, &ir::Ty>) -> sql_ast::Qu
     let query = ctx.compile_rel(&rel);
 
     if rel_ty.kind.is_array() {
-        // wrap into a top-level projection to remove array indexes
+        // wrap into a top-level projection to remove array indexes & apply the order
         let rel_name = query.expr.as_rel_var().unwrap().to_string();
         let mut query = ctx.scoped_into_query_ext(query, &rel_ty, false);
-        query.order_by = Some(utils::order_by_one(utils::ident(
+        query.order_by = Some(utils::order_by_one(utils::identifier(
             Some(rel_name),
             COL_ARRAY_INDEX,
         )));
         query
+    } else if let Some(q) = query.as_query() {
+        q.clone()
     } else {
         ctx.scoped_into_query(query, &rel_ty)
     }
@@ -113,9 +115,9 @@ impl<'a> Context<'a> {
                         &rel.ty,
                         Iterator::chain(
                             self.rel_cols(&left_in.rel.ty, true)
-                                .map(|col| utils::ident(Some(&left_name), col)),
+                                .map(|col| utils::identifier(Some(&left_name), col)),
                             self.rel_cols(&right_in.rel.ty, true)
-                                .map(|col| utils::ident(Some(&right_name), col)),
+                                .map(|col| utils::identifier(Some(&right_name), col)),
                         )
                         .map(ExprOrSource::new_expr),
                     ),
@@ -250,16 +252,11 @@ impl<'a> Context<'a> {
                     None,
                 )));
 
-                let ty_tuple = self.get_ty_mat(ty).kind.as_array().unwrap();
-                let ty_fields = self.get_ty_mat(ty_tuple).kind.as_tuple().unwrap();
+                let table_columns = self.get_table_columns(ty);
 
                 let values = Some(utils::value(sql_ast::Value::Null)) // index
                     .into_iter()
-                    .chain(
-                        ty_fields
-                            .iter()
-                            .map(|field| utils::ident(None::<&str>, field.name.as_ref().unwrap())),
-                    )
+                    .chain(table_columns.map(|name| utils::identifier(None::<&str>, name)))
                     .map(ExprOrSource::new_expr);
 
                 select.projection = self.projection(ty, values);
@@ -307,6 +304,14 @@ impl<'a> Context<'a> {
                 })))
             }
         }
+    }
+
+    /// Returns columns of the table, described by a type.
+    /// This is used in FROM and INSERT, not the in-query relation repr.
+    fn get_table_columns<'t>(&'t self, ty: &'t ir::Ty) -> impl Iterator<Item = &'t String> {
+        let ty_tuple = self.get_ty_mat(ty).kind.as_array().unwrap();
+        let ty_fields = self.get_ty_mat(ty_tuple).kind.as_tuple().unwrap();
+        ty_fields.iter().map(|field| field.name.as_ref().unwrap())
     }
 
     fn compile_rel_transform(
@@ -402,7 +407,7 @@ impl<'a> Context<'a> {
                 let limit = self.compile_column(limit);
                 query.limit = Some(limit.expr.into_expr());
                 if query.order_by.is_none() {
-                    query.order_by = Some(utils::order_by_one(utils::ident(
+                    query.order_by = Some(utils::order_by_one(utils::identifier(
                         None::<&str>,
                         COL_ARRAY_INDEX,
                     )));
@@ -425,7 +430,7 @@ impl<'a> Context<'a> {
                     rows: sql_ast::OffsetRows::None,
                 });
                 if query.order_by.is_none() {
-                    query.order_by = Some(utils::order_by_one(utils::ident(
+                    query.order_by = Some(utils::order_by_one(utils::identifier(
                         None::<&str>,
                         COL_ARRAY_INDEX,
                     )));
@@ -446,7 +451,7 @@ impl<'a> Context<'a> {
                 };
                 select.projection[0] = sql_ast::SelectItem::ExprWithAlias {
                     expr: key.expr.into_expr(),
-                    alias: sql_ast::Ident::new(COL_ARRAY_INDEX),
+                    alias: utils::new_ident(COL_ARRAY_INDEX),
                 };
 
                 select.from.extend(
@@ -464,7 +469,7 @@ impl<'a> Context<'a> {
 
                 // overwrite ORDER BY
                 let query = scoped.as_mut_query().unwrap();
-                query.order_by = Some(utils::order_by_one(utils::ident(
+                query.order_by = Some(utils::order_by_one(utils::identifier(
                     None::<&str>,
                     COL_ARRAY_INDEX,
                 )));
@@ -494,6 +499,45 @@ impl<'a> Context<'a> {
                     key.into_iter().map(ExprOrSource::into_expr).collect(),
                     vec![],
                 );
+            }
+
+            cr::Transform::Insert(table_name) => {
+                let source = self.scoped_into_query_ext(scoped, input_ty, false);
+
+                let table =
+                    sql_ast::TableObject::TableName(sql_ast::ObjectName(vec![utils::new_ident(
+                        table_name,
+                    )]));
+
+                let columns = self
+                    .get_table_columns(input_ty)
+                    .map(utils::new_ident)
+                    .collect();
+
+                let stmt = sql_ast::Statement::Insert(sql_ast::Insert {
+                    source: Some(Box::new(source)),
+                    table,
+                    columns,
+                    assignments: Vec::new(),
+
+                    or: None,
+                    ignore: false,
+                    into: true,
+                    table_alias: None,
+                    overwrite: false,
+                    partitioned: None,
+                    after_columns: Vec::new(),
+                    has_table_keyword: false,
+                    on: None,
+                    returning: None,
+                    replace_into: false,
+                    priority: None,
+                    insert_alias: None,
+                    settings: None,
+                    format_clause: None,
+                });
+                let query = utils::query_new(sql_ast::SetExpr::Insert(stmt));
+                scoped = self.query_into_scoped(query);
             }
         }
         scoped
@@ -600,14 +644,14 @@ impl<'a> Context<'a> {
                 */
 
                 query.from.push(utils::from(utils::rel_func(
-                    sql_ast::Ident::new("jsonb_array_elements"),
+                    utils::new_ident("jsonb_array_elements"),
                     vec![scoped.expr.into_expr()],
                     Some("j".into()),
                 )));
 
                 query.projection = vec![sql_ast::SelectItem::ExprWithAlias {
                     expr: ExprOrSource::Source("(ROW_NUMBER() OVER ())::int4".into()).into_expr(),
-                    alias: sql_ast::Ident::new("index"),
+                    alias: utils::new_ident("index"),
                 }];
 
                 let item_ty = self.get_ty_mat(ty_item);
@@ -617,13 +661,13 @@ impl<'a> Context<'a> {
                             ExprOrSource::Source(self.compile_json_item_cast("j.value", item_ty));
                         query.projection.push(sql_ast::SelectItem::ExprWithAlias {
                             expr: value.into_expr(),
-                            alias: sql_ast::Ident::new(COL_VALUE),
+                            alias: utils::new_ident(COL_VALUE),
                         });
                     }
                     ir::TyKind::Array(_) => {
                         query.projection.push(sql_ast::SelectItem::ExprWithAlias {
-                            expr: utils::ident(None::<&str>, "j.value"),
-                            alias: sql_ast::Ident::new(COL_VALUE),
+                            expr: utils::identifier(None::<&str>, "j.value"),
+                            alias: utils::new_ident(COL_VALUE),
                         });
                     }
                     ir::TyKind::Tuple(fields) => {
@@ -635,7 +679,7 @@ impl<'a> Context<'a> {
                             .into_expr();
                             query.projection.push(sql_ast::SelectItem::ExprWithAlias {
                                 expr: value,
-                                alias: sql_ast::Ident::new(format!("_{position}")),
+                                alias: utils::new_ident(format!("_{position}")),
                             });
                         }
                     }

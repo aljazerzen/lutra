@@ -614,7 +614,7 @@ fn primitives() {
     insta::assert_snapshot!(
         _test_ty(
             "
-            let x: func (): {
+            func x(): {
                 bool,
                 int8,
                 int16,
@@ -628,7 +628,7 @@ fn primitives() {
                 float64,
                 text,
             }
-            func main() -> x()
+            func () -> x()
             "
         ),
         @"{bool, int8, int16, int32, int64, uint8, uint16, uint32, uint64, float32, float64, text}"

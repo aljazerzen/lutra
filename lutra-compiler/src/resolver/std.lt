@@ -272,4 +272,8 @@ module sql {
   # TODO: mark table_name as const
   func from(table_name: text): [R]
   where R: {..}
+
+  # TODO: mark table_name as const
+  func insert(rows: [R], table_name: text): {}
+  where R: {..}
 }

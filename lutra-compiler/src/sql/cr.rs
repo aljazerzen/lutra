@@ -100,6 +100,9 @@ pub enum Transform {
 
     /// Groups rows into partitions by a given key
     Group(Vec<Expr>),
+
+    /// Inserts rows into a table
+    Insert(String),
 }
 
 impl std::fmt::Debug for Expr {

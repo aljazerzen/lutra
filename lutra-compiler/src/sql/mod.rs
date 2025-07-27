@@ -27,6 +27,19 @@ pub fn compile_ir(program: ir::Program) -> (ir::Program, rr::SqlProgram) {
     // serialize to SQL source
     let sql_source = query.to_string();
 
+    if tracing::enabled!(tracing::Level::DEBUG) {
+        // format sql
+        #[cfg(feature = "debug")]
+        {
+            let options = sqlformat::FormatOptions::default();
+            let formatted_sql =
+                sqlformat::format(&sql_source, &sqlformat::QueryParams::None, &options);
+            tracing::debug!("sql:\n{formatted_sql}");
+        };
+        #[cfg(not(feature = "debug"))]
+        tracing::debug!("sql:\n{sql_source}");
+    }
+
     let program_sr = rr::SqlProgram {
         sql: sql_source,
         input_ty: program.get_input_ty().clone(),

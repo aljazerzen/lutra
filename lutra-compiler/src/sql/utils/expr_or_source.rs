@@ -2,6 +2,8 @@ use std::fmt::Write;
 
 use sqlparser::ast as sql_ast;
 
+use crate::sql::utils;
+
 #[derive(Debug, Clone)]
 pub enum ExprOrSource {
     Expr(Box<sql_ast::Expr>),
@@ -62,8 +64,8 @@ impl ExprOrSource {
             ExprOrSource::Source(source) => sql_ast::Expr::Identifier(sql_ast::Ident::new(source)),
 
             ExprOrSource::RelVar(rvar_name) => sql_ast::Expr::CompoundIdentifier(vec![
-                sql_ast::Ident::new(rvar_name),
-                sql_ast::Ident::new("value"),
+                utils::new_ident(rvar_name),
+                utils::new_ident("value"),
             ]),
         }
     }

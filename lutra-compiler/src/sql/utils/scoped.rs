@@ -137,7 +137,7 @@ impl<'a> crate::sql::queries::Context<'a> {
             ExprOrSource::Expr(_) | ExprOrSource::Source(_) => {
                 select.projection = vec![sql_ast::SelectItem::ExprWithAlias {
                     expr: scoped.expr.into_expr(),
-                    alias: sql_ast::Ident::new("value"),
+                    alias: utils::new_ident("value"),
                 }];
             }
             ExprOrSource::RelVar(rvar_name) => {

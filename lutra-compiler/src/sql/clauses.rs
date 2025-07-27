@@ -770,13 +770,23 @@ impl<'a> Context<'a> {
             }
 
             "std::sql::from" => {
-                let arg = &call.args[0];
-
-                let ir::ExprKind::Literal(ir::Literal::text(table_name)) = &arg.kind else {
+                let table_name = &call.args[0];
+                let ir::ExprKind::Literal(ir::Literal::text(table_name)) = &table_name.kind else {
                     panic!("TODO: std::sql::from expects a literal table name, not an expression")
                 };
 
                 cr::ExprKind::From(cr::From::Table(table_name.clone()))
+            }
+            "std::sql::insert" => {
+                let rows = self.compile_rel(&call.args[0]);
+                let rows = self.new_binding(rows);
+
+                let table_name = &call.args[1];
+                let ir::ExprKind::Literal(ir::Literal::text(table_name)) = &table_name.kind else {
+                    panic!("TODO: std::sql::from expects a literal table name, not an expression")
+                };
+
+                cr::ExprKind::Transform(rows, cr::Transform::Insert(table_name.clone()))
             }
 
             _ => {
