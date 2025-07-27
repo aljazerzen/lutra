@@ -871,11 +871,12 @@ pub mod std_text_ops {
 }
 
 pub mod std_fs {
-    use ::std::{fs, path};
+    use ::std::{fs, io, path};
 
     use arrow::array::RecordBatchReader;
     use lutra_bin::{Decode, ir};
     use parquet::arrow::arrow_reader::ParquetRecordBatchReaderBuilder;
+    use parquet::arrow::arrow_writer::ArrowWriter;
 
     use crate::{EvalError, native::*};
 
@@ -887,6 +888,7 @@ pub mod std_fs {
         fn lookup_native_symbol(&self, id: &str) -> Option<crate::interpreter::NativeFunction> {
             Some(match id {
                 "read_parquet" => &Self::read_parquet,
+                "write_parquet" => &Self::write_parquet,
 
                 _ => return None,
             })
@@ -923,6 +925,39 @@ pub mod std_fs {
                 .map_err(|_| EvalError::BadProgram)?;
 
             Ok(Cell::Data(data))
+        }
+
+        pub fn write_parquet(
+            _it: &mut Interpreter,
+            layout_args: &[u32],
+            args: Vec<Cell>,
+        ) -> Result<Cell, EvalError> {
+            // unpack args
+            let [data, file_path] = assume::exactly_n(args);
+
+            let file_path = assume::text(&file_path)?;
+            let file_path = path::PathBuf::from(file_path);
+
+            let data = assume::into_data(data);
+
+            // decode item ty from layout args
+            let mut layout_args = assume::LayoutArgsReader::new(layout_args);
+            let ty_item = assume::bytes(layout_args.next_slice());
+            let ty_item = ir::Ty::decode(&ty_item).map_err(|_| EvalError::BadProgram)?;
+
+            // convert lutra to arrow
+            let data = crate::arrow::lutra_to_arrow(data, &ty_item);
+
+            // write to parquet
+            let Ok(file) = fs::File::create(&file_path) else {
+                panic!("write_parquet: file open error")
+            };
+            let mut writer = io::BufWriter::new(file);
+            let mut builder = ArrowWriter::try_new(&mut writer, data.schema(), None).unwrap();
+            builder.write(&data).unwrap();
+            builder.finish().unwrap();
+
+            Ok(Cell::Data(lutra_bin::Data::new(vec![])))
         }
     }
 }

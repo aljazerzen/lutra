@@ -263,6 +263,9 @@ module text_ops {
 module fs {
   func read_parquet(file_name: text): [R]
   where R
+
+  func write_parquet(data: [R], file_name: text): {}
+  where R
 }
 
 module sql {

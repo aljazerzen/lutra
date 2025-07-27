@@ -182,6 +182,8 @@ pub async fn run(cmd: RunCommand) -> anyhow::Result<()> {
     // execute
     let output = if cmd.runner.interpreter {
         let runner = lutra_interpreter::InterpreterRunner::default();
+        std::env::set_current_dir(project.source.root)?;
+
         let handle = runner.prepare(program).await?;
         runner.execute(&handle, &[]).await?
     } else if let Some(pg_url) = cmd.runner.postgres {

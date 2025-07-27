@@ -376,13 +376,20 @@ impl ByteCoder {
 
             "std::fs::read_parquet" => {
                 let ty_func = ty_mat.kind.as_function().unwrap();
+                let array_item = self.get_ty_mat(&ty_func.body).kind.as_array().unwrap();
 
-                let output_item = ty_func.body.kind.as_array().unwrap();
-
-                let output_item_buf = output_item.encode();
-
+                let array_item_buf = array_item.encode();
                 let mut r = Vec::new();
-                pack_bytes_to_u32(output_item_buf, &mut r);
+                pack_bytes_to_u32(array_item_buf, &mut r);
+                r
+            }
+            "std::fs::write_parquet" => {
+                let array = self.get_ty_mat(as_ty_of_param(ty_mat));
+                let array_item = array.kind.as_array().unwrap();
+
+                let array_item_buf = array_item.encode();
+                let mut r = Vec::new();
+                pack_bytes_to_u32(array_item_buf, &mut r);
                 r
             }
 
