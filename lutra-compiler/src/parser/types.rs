@@ -141,57 +141,61 @@ fn primitive_set() -> impl Parser<TokenKind, TyPrimitive, Error = PError> {
 pub fn type_params<'a>(
     ty: impl Parser<TokenKind, Ty, Error = PError> + 'a,
 ) -> impl Parser<TokenKind, Vec<TyParam>, Error = PError> + 'a {
-    let tuple = ident_part()
-        .then_ignore(ctrl(':'))
-        .or_not()
-        .then(ty)
-        .separated_by(ctrl(','))
-        .then_ignore(ctrl(',').then(just(TokenKind::Range)))
-        .delimited_by(ctrl('{'), ctrl('}'))
-        .recover_with(nested_delimiters(
-            TokenKind::Control('{'),
-            TokenKind::Control('}'),
-            [
-                (TokenKind::Control('{'), TokenKind::Control('}')),
-                (TokenKind::Control('('), TokenKind::Control(')')),
-                (TokenKind::Control('['), TokenKind::Control(']')),
-            ],
-            |_| vec![],
-        ))
-        .try_map(|mut positional, span| {
-            let first_named = positional
-                .iter()
-                .position(|p| p.0.is_some())
-                .unwrap_or(positional.len());
+    let tuple = choice((
+        ident_part()
+            .then_ignore(ctrl(':'))
+            .or_not()
+            .then(ty)
+            .separated_by(ctrl(','))
+            .at_least(1)
+            .then_ignore(ctrl(',').then(just(TokenKind::Range))),
+        just(TokenKind::Range).to(vec![]),
+    ))
+    .delimited_by(ctrl('{'), ctrl('}'))
+    .recover_with(nested_delimiters(
+        TokenKind::Control('{'),
+        TokenKind::Control('}'),
+        [
+            (TokenKind::Control('{'), TokenKind::Control('}')),
+            (TokenKind::Control('('), TokenKind::Control(')')),
+            (TokenKind::Control('['), TokenKind::Control(']')),
+        ],
+        |_| vec![],
+    ))
+    .try_map(|mut positional, span| {
+        let first_named = positional
+            .iter()
+            .position(|p| p.0.is_some())
+            .unwrap_or(positional.len());
 
-            let named = positional.split_off(first_named);
+        let named = positional.split_off(first_named);
 
-            let mut fields = Vec::new();
+        let mut fields = Vec::new();
 
-            // positional
-            for (i, (_, ty)) in positional.into_iter().enumerate() {
-                fields.push(TyDomainTupleField {
-                    location: IndirectionKind::Position(i as i64),
-                    ty,
-                });
-            }
+        // positional
+        for (i, (_, ty)) in positional.into_iter().enumerate() {
+            fields.push(TyDomainTupleField {
+                location: IndirectionKind::Position(i as i64),
+                ty,
+            });
+        }
 
-            // named
-            for (name, ty) in named {
-                let Some(name) = name else {
-                    return Err(PError::custom(
-                        span,
-                        "named field cannot be followed by a positional field",
-                    ));
-                };
-                fields.push(TyDomainTupleField {
-                    location: IndirectionKind::Name(name),
-                    ty,
-                });
-            }
-            Ok(TyParamDomain::TupleFields(fields))
-        })
-        .labelled("tuple domain");
+        // named
+        for (name, ty) in named {
+            let Some(name) = name else {
+                return Err(PError::custom(
+                    span,
+                    "named field cannot be followed by a positional field",
+                ));
+            };
+            fields.push(TyDomainTupleField {
+                location: IndirectionKind::Name(name),
+                ty,
+            });
+        }
+        Ok(TyParamDomain::TupleFields(fields))
+    })
+    .labelled("tuple domain");
 
     let one_of_numbers = ident_keyword("number").to(TyParamDomain::OneOf(vec![
         TyPrimitive::int8,

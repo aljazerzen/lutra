@@ -262,14 +262,14 @@ module text_ops {
 
 module fs {
   func read_parquet(file_name: text): [R]
-  where R
+  where R: {..}
 
   func write_parquet(data: [R], file_name: text): {}
-  where R
+  where R: {..}
 }
 
 module sql {
   # TODO: mark table_name as const
   func from(table_name: text): [R]
-  where R
+  where R: {..}
 }
