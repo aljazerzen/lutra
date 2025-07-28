@@ -51,6 +51,8 @@
 
             pkgs.python312Packages.python-lsp-server
             pkgs.python312Packages.python-lsp-ruff
+            pkgs.python312Packages.pylsp-mypy
+            # to make mypy pick up packages from venv, run `uv pip install mypy`
 
             # website
             pkgs.zola

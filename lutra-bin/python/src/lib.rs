@@ -6,7 +6,7 @@ use pyo3::buffer::PyBuffer;
 use pyo3::exceptions::PyValueError;
 use pyo3::ffi::c_str;
 use pyo3::prelude::*;
-use pyo3::types::{PyList, PySlice};
+use pyo3::types::{PyList, PySlice, PyTuple};
 
 /// Main module declaration
 #[pymodule(name = "lutra_bin")]
@@ -14,6 +14,7 @@ fn main(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<value::Value>()?;
     m.add_class::<BytesMut>()?;
 
+    m.add_class::<UnitCodec>()?;
     m.add_class::<BoolCodec>()?;
     m.add_class::<Int8Codec>()?;
     m.add_class::<Int16Codec>()?;
@@ -30,7 +31,6 @@ fn main(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<EnumCodecHelper>()?;
 
     ir::register(m)?;
-    rr::register(m)?;
     Ok(())
 }
 
@@ -52,6 +52,42 @@ impl BytesMut {
     fn into_bytes(&mut self) -> Cow<[u8]> {
         let bytes_mut = std::mem::take(&mut self.inner);
         Cow::from(bytes_mut.freeze().to_vec())
+    }
+}
+
+#[pyclass(module = "lutra_bin")]
+pub struct UnitCodec;
+
+#[pymethods]
+impl UnitCodec {
+    #[new]
+    fn __init__() -> Self {
+        Self
+    }
+
+    const fn head_bytes(&self) -> usize {
+        0
+    }
+
+    fn decode<'py>(&self, py: Python<'py>, _buf: PyBuffer<u8>) -> Bound<'py, PyTuple> {
+        PyTuple::empty(py)
+    }
+
+    fn encode_head<'py>(
+        &self,
+        py: Python<'py>,
+        _value: Bound<'py, PyTuple>,
+        _buf: Bound<crate::BytesMut>,
+    ) -> Bound<'py, PyTuple> {
+        PyTuple::empty(py)
+    }
+
+    fn encode_body(
+        &self,
+        _value: Bound<PyTuple>,
+        _residual: Bound<PyTuple>,
+        _buf: Bound<'_, crate::BytesMut>,
+    ) {
     }
 }
 
@@ -78,20 +114,22 @@ macro_rules! prim_pyclass {
                 Ok($primitive::decode(buf).unwrap())
             }
 
-            fn encode_head(
+            fn encode_head<'py>(
                 &self,
+                py: Python<'py>,
                 val: $primitive,
-                buf: Bound<'_, crate::BytesMut>,
-            ) -> PyResult<()> {
+                buf: Bound<'py, crate::BytesMut>,
+            ) -> PyResult<Bound<'py, PyTuple>> {
                 use lutra_bin::Encode;
                 let mut bytes_mut = buf.try_borrow_mut()?;
-                Ok(val.encode_head(&mut bytes_mut.inner))
+                val.encode_head(&mut bytes_mut.inner);
+                Ok(PyTuple::empty(py))
             }
 
             fn encode_body(
                 &self,
                 _val: $primitive,
-                _r: Bound<PyAny>,
+                _r: Bound<PyTuple>,
                 _buf: Bound<crate::BytesMut>,
             ) {
             }
@@ -296,48 +334,19 @@ mod ir {
 
     pub fn register(p: &Bound<'_, PyModule>) -> PyResult<()> {
         let m = PyModule::new(p.py(), "ir")?;
-        m.add_class::<IrTy>()?;
+        m.add_class::<Ty>()?;
         p.add_submodule(&m)
     }
 
     #[pyclass(module = "ir")]
-    pub struct IrTy(pub(crate) lutra_bin::ir::Ty);
+    pub struct Ty(pub(crate) lutra_bin::ir::Ty);
 
     #[pymethods]
-    impl IrTy {
+    impl Ty {
         #[classmethod]
-        fn decode(_cls: &Bound<'_, PyType>, bytes: &[u8]) -> IrTy {
+        fn decode(_cls: &Bound<'_, PyType>, bytes: &[u8]) -> Ty {
             let ty = lutra_bin::ir::Ty::decode(bytes).unwrap();
-            IrTy(ty)
-        }
-
-        fn encode(&self) -> Cow<'static, [u8]> {
-            self.0.encode().into()
-        }
-    }
-}
-
-mod rr {
-    use std::borrow::Cow;
-
-    use lutra_bin::{Decode, Encode};
-    use pyo3::{prelude::*, types::PyType};
-
-    pub fn register(p: &Bound<'_, PyModule>) -> PyResult<()> {
-        let m = PyModule::new(p.py(), "rr")?;
-        m.add_class::<Program>()?;
-        p.add_submodule(&m)
-    }
-
-    #[pyclass(module = "rr")]
-    pub struct Program(pub(crate) lutra_bin::rr::Program);
-
-    #[pymethods]
-    impl Program {
-        #[classmethod]
-        fn decode(_cls: &Bound<'_, PyType>, bytes: &[u8]) -> Program {
-            let ty = lutra_bin::rr::Program::decode(bytes).unwrap();
-            Program(ty)
+            Ty(ty)
         }
 
         fn encode(&self) -> Cow<'static, [u8]> {

@@ -12,12 +12,6 @@ pub fn generate(
     out_file: &std::path::Path,
     options: super::GenerateOptions,
 ) -> Vec<PathBuf> {
-    // tracing_subscriber::fmt::Subscriber::builder()
-    // .without_time()
-    // .with_max_level(tracing::Level::TRACE)
-    // .try_init()
-    // .ok();
-
     // discover the project
     let source = lutra_compiler::discover(DiscoverParams {
         project_path: project_dir.into(),
@@ -248,7 +242,7 @@ pub fn write_ty_def(
     writeln!(w, "class {name}(lutra_bin.Encodable):")?;
     match &ty.kind {
         ir::TyKind::Primitive(_) | ir::TyKind::Array(_) => {
-            writeln!(w, "    value: {}", ty_ref(ty, ctx))?;
+            writeln!(w, "    value: {}", ty_ref(ty, true, ctx))?;
         }
 
         ir::TyKind::Tuple(fields) => {
@@ -256,7 +250,7 @@ pub fn write_ty_def(
             for (index, field) in fields.iter().enumerate() {
                 let name = tuple_field_name(&field.name, index);
 
-                writeln!(w, "    {name}: {}", ty_ref(&field.ty, ctx))?;
+                writeln!(w, "    {name}: {}", ty_ref(&field.ty, true, ctx))?;
             }
         }
 
@@ -268,7 +262,7 @@ pub fn write_ty_def(
                 let ty = if variant.ty.is_unit() {
                     Cow::Borrowed("typing.Literal[True] | None")
                 } else {
-                    let ty = ty_ref(&variant.ty, ctx);
+                    let ty = ty_ref(&variant.ty, true, ctx);
                     if ty.contains('\'') {
                         format!("typing.Optional[{ty}]").into()
                     } else {
@@ -292,6 +286,7 @@ pub fn write_ty_def(
                     writeln!(w, r#"f"{name}({variant_name}={{self.{variant_name}!r}})""#)?;
                 }
             }
+            writeln!(w, "        raise AssertionError()")?;
         }
 
         _ => unimplemented!(),
@@ -468,8 +463,14 @@ fn tuple_field_name(name: &Option<String>, index: usize) -> Cow<'_, str> {
         .unwrap_or_else(|| format!("field{index}").into())
 }
 
-/// Reference to a python type
-fn ty_ref(ty: &ir::Ty, ctx: &mut Context) -> Cow<'static, str> {
+/// Reference to a python type.
+///
+/// When as_ty is true, forward references will be quoted. This is to be used in top-level context.
+fn ty_ref(ty: &ir::Ty, as_ty: bool, ctx: &mut Context) -> Cow<'static, str> {
+    if ty.is_unit() {
+        return "tuple[()]".into();
+    }
+
     match &ty.kind {
         ir::TyKind::Primitive(ir::TyPrimitive::bool) => "bool".into(),
         ir::TyKind::Primitive(ir::TyPrimitive::int8) => "int".into(),
@@ -484,7 +485,7 @@ fn ty_ref(ty: &ir::Ty, ctx: &mut Context) -> Cow<'static, str> {
         ir::TyKind::Primitive(ir::TyPrimitive::float64) => "float".into(),
         ir::TyKind::Primitive(ir::TyPrimitive::text) => "str".into(),
 
-        ir::TyKind::Array(items_ty) => format!("list[{}]", ty_ref(items_ty, ctx)).into(),
+        ir::TyKind::Array(items_ty) => format!("list[{}]", ty_ref(items_ty, as_ty, ctx)).into(),
 
         ir::TyKind::Ident(ident) => {
             let name = ident.0.last().unwrap().clone();
@@ -505,7 +506,11 @@ fn ty_ref(ty: &ir::Ty, ctx: &mut Context) -> Cow<'static, str> {
                 name.into()
             } else {
                 ctx.def_buffer.push_back(ty.clone());
-                format!("'{name}'").into()
+                if as_ty {
+                    format!("'{name}'").into()
+                } else {
+                    name.into()
+                }
             }
         }
 
@@ -515,6 +520,10 @@ fn ty_ref(ty: &ir::Ty, ctx: &mut Context) -> Cow<'static, str> {
 
 // Construct Codec class that can encode/decode the type
 fn ty_codec(ty: &ir::Ty, ctx: &mut Context) -> Cow<'static, str> {
+    if ty.is_unit() {
+        return "lutra_bin.UnitCodec()".into();
+    }
+
     match &ty.kind {
         ir::TyKind::Primitive(ir::TyPrimitive::bool) => "lutra_bin.BoolCodec()".into(),
         ir::TyKind::Primitive(ir::TyPrimitive::int8) => "lutra_bin.Int8Codec()".into(),
@@ -534,7 +543,7 @@ fn ty_codec(ty: &ir::Ty, ctx: &mut Context) -> Cow<'static, str> {
         }
 
         ir::TyKind::Ident(_) | ir::TyKind::Tuple(_) | ir::TyKind::Enum(_) => {
-            format!("{}.codec()", ty_ref(ty, ctx)).into()
+            format!("{}.codec()", ty_ref(ty, false, ctx)).into()
         }
 
         _ => unimplemented!(),
@@ -570,26 +579,35 @@ fn write_sr_programs(
         return Ok(());
     }
 
-    for (name, func) in functions {
+    for (name, _func) in functions {
         let mut fq_path = pr::Path::new(&ctx.current_rust_mod);
         fq_path.push((*name).clone());
         let fq_path = fq_path.to_string();
 
         // compile
-        let (program, _ty) =
+        let (program, mut ty) =
             lutra_compiler::compile(ctx.project, &fq_path, None, ProgramFormat::SqlPg).unwrap();
 
         // encode to base85
         let buf = program.encode();
         let program_base85 = base85::encode(&buf);
 
+        let name_camel = snake_to_sentence(name);
+        ty.input.name = Some(format!("{name_camel}Input"));
+        ty.output.name = Some(format!("{name_camel}Output"));
+
         writeln!(w)?;
         writeln!(w, "@functools.cache")?;
-        writeln!(w, "def {name}() -> lutra_bin.TypedProgram:")?;
-        writeln!(w, "    return lutra_bin.TypedProgram(")?;
+        writeln!(
+            w,
+            "def {name}() -> lutra_bin.Program[{}, {}]:",
+            ty_ref(&ty.input, true, ctx),
+            ty_ref(&ty.output, true, ctx)
+        )?;
+        writeln!(w, "    return lutra_bin.Program(")?;
         writeln!(w, "        base64.b85decode(b'{program_base85}'),")?;
-        writeln!(w, "        type(()),")?;
-        writeln!(w, "        {},", ty_codec(&func.body, ctx))?;
+        writeln!(w, "        {},", ty_codec(&ty.input, ctx))?;
+        writeln!(w, "        {},", ty_codec(&ty.output, ctx))?;
         writeln!(w, "    )")?;
     }
 
@@ -600,7 +618,7 @@ fn camel_to_snake(camel: &str) -> String {
     let mut snake = String::with_capacity(camel.len());
     for current in camel.chars() {
         if current.is_uppercase() {
-            if !snake.ends_with('_') {
+            if !snake.is_empty() && snake.ends_with('_') {
                 snake.push('_');
             }
             snake.push(current.to_lowercase().next().unwrap());
@@ -610,4 +628,24 @@ fn camel_to_snake(camel: &str) -> String {
     }
 
     snake
+}
+
+fn snake_to_sentence(snake: &str) -> String {
+    let mut sentence = String::with_capacity(snake.len());
+    let mut next_upper = true;
+    for current in snake.chars() {
+        if current == '_' {
+            next_upper = true;
+            continue;
+        }
+
+        if next_upper {
+            sentence.push(current.to_uppercase().next().unwrap());
+        } else {
+            sentence.push(current.to_lowercase().next().unwrap());
+        }
+        next_upper = false;
+    }
+
+    sentence
 }

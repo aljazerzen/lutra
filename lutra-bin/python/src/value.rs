@@ -13,14 +13,14 @@ pub struct Value(lutra_bin::Value);
 #[pymethods]
 impl Value {
     #[staticmethod]
-    fn decode(bytes: &[u8], ty: &crate::ir::IrTy) -> PyResult<Value> {
+    fn decode(bytes: &[u8], ty: &crate::ir::Ty) -> PyResult<Value> {
         let ty_defs = &[];
 
         let value = lutra_bin::Value::decode(bytes, &ty.0, ty_defs).unwrap();
         Ok(Value(value))
     }
 
-    fn encode(&self, ty: &crate::ir::IrTy) -> PyResult<Vec<u8>> {
+    fn encode(&self, ty: &crate::ir::Ty) -> PyResult<Vec<u8>> {
         let ty_defs = &[];
 
         let bytes = self.0.encode(&ty.0, ty_defs).unwrap();

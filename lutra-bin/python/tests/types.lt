@@ -19,8 +19,8 @@ type p: {[int64], [int64]}
 type i: {v, z}
 
 type Tree: enum {
-    Leaf: int8,
-    Node: {left: Tree, right: Tree},
+  Leaf: int8,
+  Node: {left: Tree, right: Tree},
 }
 
 type opt: enum { None, Some: text }

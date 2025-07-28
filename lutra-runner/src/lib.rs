@@ -29,10 +29,10 @@ pub trait Run {
     type Error: core::fmt::Debug;
     type Prepared;
 
-    /// Execute a prepared program.
+    /// Run a program.
     ///
     /// This is helper function for [Run::prepare] followed by [Run::execute],
-    /// wrapped into
+    /// with input encoding and output decoding.
     fn run<I, O>(
         &self,
         program: &rr::TypedProgram<I, O>,
@@ -51,7 +51,7 @@ pub trait Run {
     }
 
     /// Prepares a program for execution and returns a handle, which can be
-    /// used with [Run::execute]. Does not block.
+    /// used with [Run::execute].
     ///
     /// If the program is invalid, error is returned either now or later by [Run::execute].
     ///

@@ -1,7 +1,12 @@
 use lutra_bin::ir;
 use postgres_types as pg_ty;
 
-pub async fn table_list(client: &tokio_postgres::Client) -> Result<Vec<String>, postgres::Error> {
+#[cfg(feature = "postgres")]
+use postgres::Error;
+#[cfg(not(feature = "postgres"))]
+use tokio_postgres::Error;
+
+pub async fn table_list(client: &tokio_postgres::Client) -> Result<Vec<String>, Error> {
     let query = "
         SELECT relname
         FROM pg_class
@@ -13,10 +18,7 @@ pub async fn table_list(client: &tokio_postgres::Client) -> Result<Vec<String>, 
     Ok(rows.into_iter().map(|r| r.get(0)).collect())
 }
 
-pub async fn table_get(
-    client: &tokio_postgres::Client,
-    table_name: &str,
-) -> Result<ir::Ty, postgres::Error> {
+pub async fn table_get(client: &tokio_postgres::Client, table_name: &str) -> Result<ir::Ty, Error> {
     let query = "
         SELECT attname, atttypid, attnotnull
         FROM pg_attribute
@@ -85,70 +87,3 @@ fn from_db_type(ty: &str) -> Option<ir::Ty> {
     };
     Some(ir::Ty::new(prim))
 }
-
-/*
-
-/// Request over PG protocol. Executable either sync or async.
-trait Request {
-    type Output: Sized;
-
-    fn compose_query(&self) -> &'static str;
-
-    fn convert_result(&self, rows: Vec<tokio_postgres::Row>) -> Self::Output;
-}
-
-async fn execute_async<R: Request>(
-    request: &R,
-    client: &tokio_postgres::Client,
-) -> Result<R::Output, tokio_postgres::Error> {
-    let query = request.compose_query();
-    let result = client.query(query, &[]).await?;
-    Ok(request.convert_result(result))
-}
-
-fn execute_sync<R: Request>(
-    request: &R,
-    client: &mut postgres::Client,
-) -> Result<R::Output, postgres::Error> {
-    let query = request.compose_query();
-    let result = client.query(query, &[])?;
-    Ok(request.convert_result(result))
-}
-
-macro_rules! facade_async {
-    ($func: ident, $request_impl: ident) => {
-        pub async fn $func(
-            client: &tokio_postgres::Client,
-        ) -> Result<Vec<String>, tokio_postgres::Error> {
-            execute_async(&$request_impl, client).await
-        }
-    };
-}
-macro_rules! facade_sync {
-    ($func: ident, $request_impl: ident) => {
-        pub async fn $func(client: &mut postgres::Client) -> Result<Vec<String>, postgres::Error> {
-            execute_sync(&$request_impl, client)
-        }
-    };
-}
-
-facade_async!(table_list_async, TableList);
-facade_sync!(table_list_sync, TableList);
-
-struct TableList;
-
-impl Request for TableList {
-    type Output = Vec<String>;
-
-    fn compose_query(&self) -> &'static str {
-        "SELECT relname
-        FROM pg_class
-        JOIN pg_namespace ON (relnamespace = pg_namespace.oid)
-        WHERE nspname = current_schema AND relkind = 'r'"
-    }
-
-    fn convert_result(&self, rows: Vec<tokio_postgres::Row>) -> Self::Output {
-        rows.into_iter().map(|r| r.get::<_, String>(0)).collect()
-    }
-}
-*/

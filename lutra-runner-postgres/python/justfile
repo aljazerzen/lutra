@@ -12,6 +12,6 @@ release:
 
 test:
     just develop
-    cargo run -p lutra-cli -- codegen tests/types.lt tests/types_generated.py
-    mypy tests python/lutra_bin
+    cargo run -p lutra-cli -- codegen tests/lutra.lt tests/lutra_generated.py --sr-modules ''
+    python -m mypy python/lutra_runner_postgres tests
     python -m unittest tests/main.py
