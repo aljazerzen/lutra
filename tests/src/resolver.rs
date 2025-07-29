@@ -2,7 +2,7 @@
 fn _test_ty(source: &str) -> String {
     crate::init_logger();
 
-    let program = match lutra_compiler::_test_compile(source) {
+    let program = match lutra_compiler::_test_compile_main(source) {
         Ok(program) => program,
         Err(e) => panic!("{e}"),
     };
@@ -17,7 +17,7 @@ fn _test_err(source: &str) -> String {
 
     crate::init_logger();
 
-    let res = lutra_compiler::_test_compile(source);
+    let res = lutra_compiler::_test_compile_main(source);
 
     let diagnostics = match res {
         Ok(program) => {

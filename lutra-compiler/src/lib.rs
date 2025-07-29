@@ -20,7 +20,7 @@ pub mod printer;
 pub use bytecoding::compile_program as bytecode_program;
 pub use check::{CheckParams, check, check_overlay};
 pub use discover::{DiscoverParams, discover};
-pub use intermediate::{inline, layouter, lower_expr, lower_type_defs, lower_var};
+pub use intermediate::{inline, layouter, lower_expr, lower_type_defs};
 pub use lutra_bin::{ir, rr};
 pub use project::{Project, SourceTree};
 pub use span::Span;
@@ -91,13 +91,12 @@ pub fn _test_compile_ty(ty_source: &str) -> ir::Ty {
     layouter::on_ty(ir::Ty::from(ty))
 }
 
-pub fn _test_compile(source: &str) -> Result<ir::Program, error::Error> {
+pub fn _test_compile_main(source: &str) -> Result<ir::Program, error::Error> {
     let source = SourceTree::single("".into(), source.to_string());
     let project = check(source, CheckParams {})?;
 
-    let path = pr::Path::from_name("main");
-
-    let program = lower_var(&project.root_module, &path);
+    let main = check_overlay(&project, "main", None)?;
+    let program = lower_expr(&project.root_module, &main);
     assert!(program.get_input_ty().kind.is_tuple());
     Ok(layouter::on_program(program))
 }

@@ -11,7 +11,7 @@ use std::path::PathBuf;
 use std::{collections::VecDeque, fs};
 
 use lutra_bin::{Encode, ir};
-use lutra_compiler::{CheckParams, DiscoverParams, Project, pr};
+use lutra_compiler::{CheckParams, DiscoverParams, Project};
 
 #[track_caller]
 pub fn generate(
@@ -44,9 +44,9 @@ pub fn generate(
 }
 
 #[track_caller]
-pub fn generate_program(
+pub fn generate_program_bytecode(
     project_dir: &std::path::Path,
-    expr_path: &[&str],
+    program: &str,
     out_file: &std::path::Path,
 ) {
     // discover the project
@@ -59,12 +59,15 @@ pub fn generate_program(
     let project = lutra_compiler::check(source, CheckParams {}).unwrap_or_else(|e| panic!("{e}"));
 
     // lower & bytecode
-    let program = lutra_compiler::lower_var(&project.root_module, &pr::Path::new(expr_path));
-    let program = lutra_compiler::layouter::on_program(program);
-    let program = lutra_compiler::bytecode_program(program);
+    let (program, _ty) = lutra_compiler::compile(
+        &project,
+        program,
+        None,
+        lutra_compiler::ProgramFormat::BytecodeLt,
+    )
+    .unwrap();
 
-    let buf = program.encode();
-
+    let buf = program.into_bytecode_lt().unwrap().encode();
     std::fs::write(out_file, buf).unwrap();
 }
 

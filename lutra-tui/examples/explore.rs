@@ -1,41 +1,28 @@
-use lutra_compiler::pr;
+use lutra_compiler::ProgramFormat;
 
 fn main() {
     let project = get_project();
 
     let path = lutra_tui::prompt_for_decl(&project).unwrap();
-    let path = pr::Path::new(path.0);
-
-    let decl = project.root_module.module.get(&path).unwrap();
-    if let Ok(expr) = decl.into_expr() {
-        let ty = expr.ty.as_ref().unwrap();
-        if ty.kind.is_func() {
-            execute_function(&project, path);
-        } else {
-            todo!()
-        }
-    }
+    execute_program(&project, &path.0.join("::"));
 }
 
-fn execute_function(project: &lutra_compiler::Project, path: pr::Path) {
-    let program = lutra_compiler::lower_var(&project.root_module, &path);
+fn execute_program(project: &lutra_compiler::Project, program: &str) {
+    let (program, mut ty) =
+        lutra_compiler::compile(project, program, None, ProgramFormat::BytecodeLt).unwrap();
 
-    let mut input_ty = program.get_input_ty().clone();
-    input_ty.name = Some("input".into());
+    ty.input.name = Some("input".into());
+    ty.output.name = Some("output".into());
 
-    let bytecode = lutra_compiler::bytecode_program(program.clone());
+    let input_val = lutra_tui::prompt_for_ty(&ty.input, None).unwrap();
+    let input = input_val.encode(&ty.input, &ty.ty_defs).unwrap();
 
-    let input_val = lutra_tui::prompt_for_ty(&input_ty, None).unwrap();
-    let input = input_val.encode(&input_ty, &program.types).unwrap();
-
+    let program = program.into_bytecode_lt().unwrap();
     let result =
-        lutra_interpreter::evaluate(&bytecode, input, lutra_interpreter::BUILTIN_MODULES).unwrap();
-    let result =
-        lutra_bin::Value::decode(&result, program.get_output_ty(), &program.types).unwrap();
+        lutra_interpreter::evaluate(&program, input, lutra_interpreter::BUILTIN_MODULES).unwrap();
+    let result = lutra_bin::Value::decode(&result, &ty.output, &ty.ty_defs).unwrap();
 
-    let mut output_ty = program.get_output_ty().clone();
-    output_ty.name = Some("output".into());
-    lutra_tui::show_value(&output_ty, result).unwrap();
+    lutra_tui::show_value(&ty.output, result).unwrap();
 }
 
 fn get_project() -> lutra_compiler::Project {

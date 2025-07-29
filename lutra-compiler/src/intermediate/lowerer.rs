@@ -39,24 +39,6 @@ pub fn lower_expr(root_module: &decl::RootModule, main_pr: &pr::Expr) -> ir::Pro
     ir::Program { main, types }
 }
 
-pub fn lower_var(root_module: &decl::RootModule, path: &pr::Path) -> ir::Program {
-    // lookup path
-    let decl = root_module.module.get(path).unwrap();
-    let expr = decl.into_expr().unwrap();
-    let ty = expr.ty.clone();
-
-    // construct ref to the path
-    let mut expr = pr::Expr::new(path.clone());
-    expr.ty = ty;
-    expr.target = Some(pr::Ref::FullyQualified {
-        to_decl: path.clone(),
-        within: pr::Path::empty(),
-    });
-
-    // lower ref
-    lower_expr(root_module, &expr)
-}
-
 struct Lowerer<'a> {
     root_module: &'a decl::RootModule,
 
