@@ -5,6 +5,7 @@ mod lutra {
 }
 
 mod inliner;
+mod interpreter;
 mod lbin;
 mod lowerer;
 mod native_functions;

@@ -1,7 +1,6 @@
 mod arrow;
 mod interpreter;
 mod native;
-mod test;
 
 pub use interpreter::{Cell, EvalError, Interpreter, NativeFunction, evaluate};
 
@@ -49,10 +48,4 @@ impl<'a> Default for InterpreterRunner<'a> {
             modules: BUILTIN_MODULES,
         }
     }
-}
-
-#[test]
-fn interpreter_layout() {
-    // TODO: when we have a bench, see if boxes would yield any speed up
-    insta::assert_snapshot!(std::mem::size_of::<interpreter::Cell>(), @"32");
 }

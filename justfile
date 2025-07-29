@@ -2,8 +2,8 @@ _default:
     just --list
 
 show-deps-workspace:
-    cargo depgraph --workspace-only > ./target/deps-workspace.dot
-    dot ./target/deps-workspace.dot -Tsvg -o ./target/graph.svg
+    cargo depgraph --workspace-only --hide tests,lutra-cli,lutra-tui > ./target/deps-workspace.dot
+    dot ./target/deps-workspace.dot -Tsvg -o ./target/graph.svg -Gnodesep=0.5
     xdg-open ./target/graph.svg 2> /dev/null
 
 test-fast FILTER_SET='all()' *NEXTEST_ARGS='':

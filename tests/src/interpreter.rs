@@ -2,14 +2,15 @@
 
 use insta::{assert_debug_snapshot, assert_snapshot};
 
-use crate::EvalError;
+use lutra_interpreter::EvalError;
 
 #[track_caller]
 fn _test_interpret(program: &str) -> String {
     let program = lutra_ir::_test_parse(program);
     let bytecode = lutra_compiler::bytecode_program(program.clone());
 
-    let output = crate::interpreter::evaluate(&bytecode, vec![], crate::BUILTIN_MODULES).unwrap();
+    let output =
+        lutra_interpreter::evaluate(&bytecode, vec![], lutra_interpreter::BUILTIN_MODULES).unwrap();
 
     let output =
         lutra_bin::Value::decode(&output, program.get_output_ty(), &program.types).unwrap();
@@ -23,7 +24,13 @@ fn _test_err(program: &str) -> EvalError {
     let program = lutra_ir::_test_parse(program);
     let bytecode = lutra_compiler::bytecode_program(program.clone());
 
-    crate::interpreter::evaluate(&bytecode, vec![], crate::BUILTIN_MODULES).unwrap_err()
+    lutra_interpreter::evaluate(&bytecode, vec![], lutra_interpreter::BUILTIN_MODULES).unwrap_err()
+}
+
+#[test]
+fn interpreter_layout() {
+    // TODO: when we have a bench, see if boxes would yield any speed up
+    insta::assert_snapshot!(std::mem::size_of::<lutra_interpreter::Cell>(), @"32");
 }
 
 #[test]
