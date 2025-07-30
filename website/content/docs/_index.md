@@ -19,8 +19,7 @@ let my_movies: [Movie] = [
 
 func get_movie(param: int32) -> (
   my_movies
-  | std::filter(func (x: Movie) -> x.id == param)
-  | std::index(0)
+  | std::find(func (x: Movie) -> x.id == param)
 )
 
 func my_program() -> get_movie(3)
@@ -47,11 +46,11 @@ and include them in the compiled Rust binary via `include_bytes!`.
 A **runner** executes programs by taking input and producing output, both in binary format.
 Currently, there are two runners available:
 
-- `interpreter-br`: a local interpreter that executes programs in the same process,
-- `sql-postgres`: a PostgreSQL runner that executes SQL programs in a database.
+- `lutra-interpreter`: a local interpreter that executes programs in the same process,
+- `lutra-runner-postgres`: a PostgreSQL runner that executes SQL programs in a database.
 
 ```
-> lutra run project.lt my_program
+> lutra run --project project.lt --interpreter --program my_program
 {
   id = 3,
   title = "Forrest Gump",
