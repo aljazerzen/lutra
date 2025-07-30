@@ -25,4 +25,4 @@ anyhow = { workspace = true }
 lutra-runner = { version = "0.1.0", path = "../lutra-runner" }
 lutra-runner-postgres = { version = "0.1.0", path = "../lutra-runner-postgres", features = ["tokio-postgres"]}
 tokio-postgres = "0.7.13"
-tokio = {workspace = true, features = ["rt", "macros"]}
+tokio = {workspace = true, features = ["rt", "macros", "fs"]}

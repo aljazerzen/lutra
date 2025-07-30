@@ -3,6 +3,9 @@ use clap::{Args, Parser, Subcommand};
 use lutra_compiler::{CheckParams, DiscoverParams};
 use lutra_runner::Run;
 
+use tokio::fs;
+use tokio::io::{self, AsyncWriteExt};
+
 fn main() {
     let action = Command::parse();
 
@@ -66,8 +69,8 @@ struct RunnerParams {
     #[arg(long, short)]
     interpreter: bool,
 
-    /// Use PostgreSQL runner. Requires a postgres:// URL.
-    #[arg(long)]
+    /// Use PostgreSQL runner. Requires a postgres:// URL or a libpq-style connection config.
+    #[arg(long, name = "DSN")]
     postgres: Option<String>,
 }
 
@@ -161,8 +164,26 @@ pub struct RunCommand {
     #[clap(flatten)]
     runner: RunnerParams,
 
+    /// Read input from `.lb` file.
+    ///
+    /// When supplied, the program is wrapped into `func (input) -> ...`.
+    #[clap(long)]
+    input: Option<String>,
+
+    /// Program to execute.
+    ///
+    /// Usually this is a path to an expression in the project, but it can be
+    /// any lutra expression.
+    ///
+    /// When --input is supplied, the program is wrapped into `func (input) -> ...`.
     #[clap(long, default_value = "main")]
     program: String,
+
+    /// Write output to `.lb` file.
+    ///
+    /// When omitted, output is written to stdout in Lutra source format.
+    #[clap(long)]
+    output: Option<String>,
 }
 
 #[tokio::main(flavor = "current_thread")]
@@ -172,31 +193,74 @@ pub async fn run(cmd: RunCommand) -> anyhow::Result<()> {
 
     let project = lutra_compiler::check(project, cmd.check)?;
 
+    let mut program = cmd.program;
+    if cmd.input.is_some() {
+        program = format!("func (input) -> {program}");
+    }
+
     let (program, ty) = lutra_compiler::compile(
         &project,
-        &cmd.program,
+        &program,
         Some("--program"),
         cmd.runner.get_program_format(),
     )?;
 
+    // read input
+    let input = if let Some(input_file) = cmd.input {
+        let input_file = project.source.root.as_path().join(input_file);
+        fs::read(input_file).await?
+    } else {
+        if !ty.input.is_unit() {
+            return Err(anyhow::anyhow!(
+                "Missing --input. Expected type {}",
+                lutra_bin::ir::print_ty(&ty.input)
+            ));
+        }
+
+        Vec::new()
+    };
+
     // execute
     let output = if cmd.runner.interpreter {
         let runner = lutra_interpreter::InterpreterRunner::default();
-        std::env::set_current_dir(project.source.root)?;
+
+        // TODO: instead of setting cwd, pass the project dir to interpreter
+        let old_cwd = std::env::current_dir()?;
+        std::env::set_current_dir(&project.source.root)?;
 
         let handle = runner.prepare(program).await?;
-        runner.execute(&handle, &[]).await?
+        let output = runner.execute(&handle, &input).await?;
+
+        std::env::set_current_dir(old_cwd)?;
+
+        output
     } else if let Some(pg_url) = cmd.runner.postgres {
         let runner = init_runner_postgres(&pg_url).await?;
         let handle = runner.prepare(program).await?;
-        runner.execute(&handle, &[]).await?
+        runner.execute(&handle, &input).await?
     } else {
         unreachable!()
     };
 
     // handle output
-    let value = lutra_bin::Value::decode(&output, &ty.output, &ty.ty_defs)?;
-    println!("{}", value.print_source(&ty.output, &ty.ty_defs).unwrap());
+    if let Some(output_file) = cmd.output {
+        let output_file = project.source.root.as_path().join(output_file);
+
+        // write to file
+        let mut writer = io::BufWriter::new(fs::File::create(&output_file).await?);
+        writer.write_all(&output).await?;
+        writer.flush().await?;
+        println!(
+            "Output written to {} ({} bytes)",
+            output_file.display(),
+            output.len()
+        );
+    } else {
+        // print to stdout
+        let value = lutra_bin::Value::decode(&output, &ty.output, &ty.ty_defs)?;
+        println!("{}", value.print_source(&ty.output, &ty.ty_defs).unwrap());
+    }
+
     Ok(())
 }
 

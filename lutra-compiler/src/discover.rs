@@ -9,16 +9,17 @@ use crate::project;
 #[cfg_attr(feature = "clap", derive(clap::Parser))]
 pub struct DiscoverParams {
     /// Path to the project directory
-    #[cfg_attr(feature = "clap", arg(default_value = "."))]
-    pub project_path: PathBuf,
+    #[cfg_attr(feature = "clap", arg(long))]
+    pub project: Option<PathBuf>,
 }
 
 pub fn discover(params: DiscoverParams) -> Result<project::SourceTree, std::io::Error> {
-    let source_extension = Some(OsStr::new("lt"));
+    let mut project = project::SourceTree::empty();
 
-    let mut project = project::SourceTree {
-        root: params.project_path,
-        ..project::SourceTree::empty()
+    if let Some(root) = params.project {
+        project.root = root;
+    } else {
+        return Ok(project);
     };
 
     if project.root.is_file() {
@@ -27,6 +28,7 @@ pub fn discover(params: DiscoverParams) -> Result<project::SourceTree, std::io::
         return Ok(project);
     }
 
+    let source_extension = Some(OsStr::new("lt"));
     for entry in WalkDir::new(&project.root) {
         let entry = entry?;
         let path = entry.path();

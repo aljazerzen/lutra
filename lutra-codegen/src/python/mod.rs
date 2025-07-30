@@ -14,7 +14,7 @@ pub fn generate(
 ) -> Vec<PathBuf> {
     // discover the project
     let source = lutra_compiler::discover(DiscoverParams {
-        project_path: project_dir.into(),
+        project: Some(project_dir.into()),
     })
     .unwrap();
 
