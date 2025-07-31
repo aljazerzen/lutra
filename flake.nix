@@ -56,6 +56,7 @@
 
             # website
             pkgs.zola
+            pkgs.typos-lsp
           ];
 
           venvDir = "./target/python";

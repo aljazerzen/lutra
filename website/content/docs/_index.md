@@ -37,9 +37,10 @@ All good.
 ## Program
 
 A **program** consists of compiled code along with type annotations for its input and output values.
-It is produced by compiler and embedded into the calling program. For example, when using Rust,
-it is most convenient to compile Lutra projects from build.rs script and include them in the compiled
-Rust binary via `include_bytes!`.
+It is produced by compiler and embedded into the calling program.
+
+For example, when using Rust, it is most convenient to compile Lutra projects from `build.rs` script
+and include them in the compiled Rust binary via `include_bytes!`.
 
 ## Runner
 

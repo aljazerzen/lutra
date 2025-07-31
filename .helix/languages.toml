@@ -1,0 +1,11 @@
+[language-server]
+typos-lsp = { command = "typos-lsp" }
+
+[[language]]
+name = "markdown"
+scope = "source.md"
+injection-regex = "md|markdown"
+file-types = ["md"]
+language-servers = [ "markdown-oxide", "typos-lsp" ]
+indent = { tab-width = 2, unit = "  " }
+block-comment-tokens = { start = "<!--", end = "-->" }
