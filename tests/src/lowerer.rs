@@ -33,7 +33,7 @@ fn lower_01() {
       )
     }
 
-    func (album_id: int64) -> {
+    func main(album_id: int64) -> {
       chinook::get_albums(),
       chinook::get_album_by_id(album_id),
       box_office::get_album_sales_by_id(album_id),
@@ -122,7 +122,7 @@ fn lower_02() {
         Closed: text,
     }
 
-    func () -> match Status::Closed {
+    func main() -> match Status::Closed {
         .Open => "open",
         .Closed => "closed",
     }
@@ -155,7 +155,7 @@ fn lower_03() {
     assert_snapshot!(_test_compile_and_print(r#"
     func twice(x: T) where T -> {x, x}
 
-    func () -> twice([true, true, false])
+    func main() -> twice([true, true, false])
     "#), @r"
     let main = (func 1 ->
       let 0 = (func 2 ->

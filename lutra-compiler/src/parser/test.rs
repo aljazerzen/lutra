@@ -2,14 +2,15 @@
 
 use chumsky::Parser;
 use insta::assert_debug_snapshot;
-use itertools::Itertools;
 use std::fmt::Debug;
 
 use crate::diagnostic::Diagnostic;
+use crate::parser::expr;
 use crate::parser::lexer::TokenKind;
 use crate::parser::perror::PError;
 use crate::parser::prepare_stream;
 use crate::parser::stmt;
+use crate::parser::types;
 use crate::pr;
 use crate::pr::Stmt;
 
@@ -43,14 +44,15 @@ fn parse_source(source: &str) -> Result<Vec<Stmt>, Vec<Diagnostic>> {
 
 #[track_caller]
 fn parse_expr(source: &str) -> pr::Expr {
+    let parser = expr::expr(types::type_expr());
+    parse_with_parser(source, parser).unwrap()
+}
+
+#[track_caller]
+fn parse_func(source: &str) -> pr::Expr {
     let stmts = parse_with_parser(source, stmt::source()).unwrap();
-    let stmt = stmts
-        .into_iter()
-        .exactly_one()
-        .unwrap_or_else(|e| panic!("{e:#?}"));
-    let var = stmt.kind.into_var_def().unwrap();
-    let expr = var.value.unwrap();
-    *expr
+    let stmt = stmts.into_iter().next().unwrap();
+    *stmt.kind.into_var_def().unwrap().value.unwrap()
 }
 
 #[test]
@@ -120,7 +122,7 @@ fn parse_02() {
 }
 #[test]
 fn parse_03() {
-    assert_debug_snapshot!(parse_expr("func f() where A, B: int8 | int16 -> 1"), @r#"
+    assert_debug_snapshot!(parse_func("func f() where A, B: int8 | int16 -> 1"), @r#"
     Expr {
         kind: Func(
             Func {
@@ -175,7 +177,7 @@ fn parse_03() {
 }
 #[test]
 fn parse_04() {
-    assert_debug_snapshot!(parse_expr("func f() where T: {b: int64, ..} -> 1"), @r#"
+    assert_debug_snapshot!(parse_func("func f() where T: {b: int64, ..} -> 1"), @r#"
     Expr {
         kind: Func(
             Func {

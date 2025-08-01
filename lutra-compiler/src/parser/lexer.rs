@@ -82,6 +82,7 @@ fn lexer() -> impl Parser<char, Vec<Token>, Error = Cheap<char>> {
         just("import"),
         just("internal"),
         just("let"),
+        just("const"),
         just("match"),
         just("module"),
         just("type"),

@@ -12,7 +12,7 @@ fn inline_00() {
     assert_snapshot!(_test_compile_and_print(r#"
     func twice(x: T) where T -> {x, x}
 
-    func () -> twice([true, true, false])
+    func main() -> twice([true, true, false])
     "#), @r"
     let main = (func 1 ->
       let 1 = [
@@ -33,7 +33,7 @@ fn inline_01() {
     assert_snapshot!(_test_compile_and_print(r#"
     func once(x: T) where T -> {x}
 
-    func () -> once([true, true, false])
+    func main() -> once([true, true, false])
     "#), @r"
     let main = (func 1 ->
       {
@@ -50,8 +50,11 @@ fn inline_01() {
 #[test]
 fn inline_02() {
     assert_snapshot!(_test_compile_and_print(r#"
-    let my_rel: [{int64, int64}] = [{5,3},{65,1},{3, 2}]
-    func () -> std::aggregate(my_rel, func (x: {[int64], [int64]}) -> {std::min(x.0), std::min(x.1)})
+    const my_rel: [{int64, int64}] = [{5,3},{65,1},{3, 2}]
+    func main() -> (
+      my_rel
+      | std::aggregate(func (x: {[int64], [int64]}) -> {std::min(x.0), std::min(x.1)})
+    )
     "#), @r"
     let main = (func 2 ->
       let 1 = [

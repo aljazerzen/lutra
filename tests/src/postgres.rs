@@ -49,7 +49,7 @@ pub fn _run_sql_output(lutra_source: &str) -> String {
 #[test]
 fn prim() {
     insta::assert_snapshot!(_run_sql_output(r#"
-        3: int16
+        const main = 3: int16
     "#), @r"
     SELECT
       3::int2 AS value
@@ -61,7 +61,7 @@ fn prim() {
 #[test]
 fn tuple_prim() {
     insta::assert_snapshot!(_run_sql_output(r#"
-        {3: int16, false}
+        const main = {3: int16, false}
     "#), @r"
     SELECT
       3::int2 AS _0,
@@ -77,7 +77,7 @@ fn tuple_prim() {
 #[test]
 fn array_prim() {
     insta::assert_snapshot!(_run_sql_output(r#"
-        [3, 6, 12]: [int16]
+        const main = [3, 6, 12]: [int16]
     "#), @r"
     SELECT
       r3.value
@@ -111,7 +111,7 @@ fn array_prim() {
 #[test]
 fn array_empty() {
     insta::assert_snapshot!(_run_sql_output(r#"
-        []: [bool]
+        const main = []: [bool]
     "#), @r#"
     SELECT
       r0.value
@@ -133,7 +133,7 @@ fn array_empty() {
 #[test]
 fn tuple_tuple_prim() {
     insta::assert_snapshot!(_run_sql_output(r#"
-        {3: int16, {false, true, {"hello"}, 4: int32}}
+        const main = {3: int16, {false, true, {"hello"}, 4: int32}}
     "#), @r#"
     SELECT
       3::int2 AS _0,
@@ -159,7 +159,7 @@ fn tuple_tuple_prim() {
 #[test]
 fn tuple_array_prim() {
     insta::assert_snapshot!(_run_sql_output(r#"
-        {true, [1, 2, 3]: [int64], [4]: [int32], false}
+        const main = {true, [1, 2, 3]: [int64], [4]: [int32], false}
     "#), @r"
     SELECT
       TRUE AS _0,
@@ -227,7 +227,7 @@ fn tuple_array_prim() {
 #[test]
 fn tuple_array_empty() {
     insta::assert_snapshot!(_run_sql_output(r#"
-        {true, []: [int64], false}
+        const main = {true, []: [int64], false}
     "#), @r"
     SELECT
       TRUE AS _0,
@@ -263,7 +263,7 @@ fn tuple_array_empty() {
 #[test]
 fn array_array_prim() {
     insta::assert_snapshot!(_run_sql_output(r#"
-        [[1, 2, 3], [4, 5]]: [[int64]]
+        const main = [[1, 2, 3], [4, 5]]: [[int64]]
     "#), @r"
     SELECT
       r9.value
@@ -345,7 +345,7 @@ fn array_array_prim() {
 #[test]
 fn array_tuple_prim() {
     insta::assert_snapshot!(_run_sql_output(r#"
-        [{3: int64, false}, {6, true}, {12, false}]
+        const main = [{3: int64, false}, {6, true}, {12, false}]
     "#), @r#"
     SELECT
       r3._0,
@@ -392,7 +392,7 @@ fn array_tuple_prim() {
 #[test]
 fn tuple_array_tuple_prim() {
     insta::assert_snapshot!(_run_sql_output(r#"
-        {
+        const main = {
             "hello",
             [{3: int16, false}, {6, true}, {12, false}],
         }
@@ -453,7 +453,7 @@ fn tuple_array_tuple_prim() {
 #[test]
 fn param_00() {
     insta::assert_snapshot!(_run(r#"
-    func (x: int64, y: text) -> {x, y}
+    func main(x: int64, y: text) -> {x, y}
     "#,
     vec![lutra_bin::Value::Int64(3), lutra_bin::Value::Text("hello".into())]
     ).1, @r#"
@@ -467,7 +467,7 @@ fn param_00() {
 #[test]
 fn tuple_unpacking_00() {
     insta::assert_snapshot!(_run(r#"
-    func () -> {
+    func main() -> {
       4: int16,
       ([{id = 3: int32, title = "Hello world!"}] | std::index(0)),
     }
@@ -492,7 +492,7 @@ fn json_pack_00() {
     insta::assert_snapshot!(_run(r#"
     func get_data() -> {a = [2, 5, 4, 3, 1, 2]: [int32]}
 
-    func () -> (
+    func main() -> (
       get_data().a
       | std::map(func (y: int32) -> -y)
     )
@@ -516,7 +516,7 @@ fn json_pack_01() {
     insta::assert_snapshot!(_run(r#"
     func get_data() -> {a = [{2: int32, false}, {5, true}, {4, false}]}
 
-    func () -> (
+    func main() -> (
       get_data().a
       | std::map(func (y: {int32, bool}) -> {-y.0, !y.1})
     )
@@ -543,7 +543,7 @@ fn json_pack_02() {
     insta::assert_snapshot!(_run(r#"
     func get_data() -> [[1: int16, 2, 3], [4, 5, 6]]
 
-    func () -> (
+    func main() -> (
       get_data() | std::map(func (y: [int16]) -> (
         std::index(y, 1)
       ))
@@ -561,7 +561,7 @@ fn json_pack_03() {
     insta::assert_snapshot!(_run(r#"
     func get_data() -> [[1: int64, 2, 3], [4, 5, 6]]
 
-    func () -> (
+    func main() -> (
       get_data()
       | std::map(func (y: [int64]) -> (
         y | std::map(func (z: int64) -> 6-z)
@@ -588,7 +588,7 @@ fn json_pack_04() {
     insta::assert_snapshot!(_run(r#"
     func get_data() -> {a = [false, true, true]}
 
-    func () -> (
+    func main() -> (
       get_data().a
       | std::map(func (y: bool) -> !y)
     )
@@ -606,7 +606,7 @@ fn json_pack_05() {
     insta::assert_snapshot!(_run(r#"
     func get_data() -> {a = ["no", "yes", "neither"]}
 
-    func () -> (
+    func main() -> (
       get_data().a
       | std::map(func (y: text) -> y)
     )
@@ -627,7 +627,7 @@ fn match_04() {
       Dog: enum {Generic, Collie: text},
     }
 
-    func () -> (
+    func main() -> (
       [
         Animal::Cat("Whiskers"),
         Animal::Dog(Animal::Dog::Collie("Belie")),
@@ -799,7 +799,7 @@ fn sql_from_00() {
       release_year: int16
     }
 
-    func (): [Movie] -> std::sql::from("movies")
+    func main(): [Movie] -> std::sql::from("movies")
     "#), @r#"
     SELECT
       r0._0,
@@ -851,12 +851,12 @@ fn sql_insert_00() {
       title: text,
       release_year: int16
     }
-    let two_movies: [Movie] = [
+    const two_movies: [Movie] = [
       {id = 1, title = "Forrest Gump", release_year = 1994},
       {id = 2, title = "Prestige", release_year = 2009}
     ]
 
-    func (): {} -> std::sql::insert(two_movies, "movies2")
+    func main(): {} -> std::sql::insert(two_movies, "movies2")
     "#), @r"
     INSERT INTO
       movies2 (id, title, release_year)
@@ -890,7 +890,7 @@ fn sql_insert_00() {
       title: text,
       release_year: int16
     }
-    func (): [Movie] -> std::sql::from("movies2")
+    func main(): [Movie] -> std::sql::from("movies2")
     "#, vec![]).1, @r#"
     [
       {
@@ -910,9 +910,9 @@ fn sql_insert_00() {
 #[test]
 fn group_00() {
     insta::assert_snapshot!(_run_sql_output(r#"
-    let values: [int64] = [1, 1, 1, 3, 2, 3]
+    const values: [int64] = [1, 1, 1, 3, 2, 3]
 
-    func () -> (
+    func main() -> (
       values
       | std::group(func (x) -> x)
       | std::map(func (this) -> {

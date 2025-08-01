@@ -36,7 +36,7 @@ fn module_contents() -> impl Parser<TokenKind, Vec<Stmt>, Error = PError> {
             type_def(ty.clone()),
             import_def(),
             func_def(expr.clone(), ty.clone()),
-            var_def(expr, ty),
+            const_def(expr, ty),
         ));
 
         // Currently doc comments need to be before the annotation; probably
@@ -73,30 +73,16 @@ fn doc_comment() -> impl Parser<TokenKind, String, Error = PError> + Clone {
     .labelled("doc comment")
 }
 
-/// A variable definition could be any of:
-/// - `let foo = 5`
-/// - `from artists` — captured as a "main"
-fn var_def(
+fn const_def(
     expr: impl Parser<TokenKind, Expr, Error = PError> + Clone,
     ty: impl Parser<TokenKind, Ty, Error = PError> + Clone,
 ) -> impl Parser<TokenKind, StmtKind, Error = PError> + Clone {
-    let let_ = keyword("let")
+    keyword("const")
         .ignore_then(ident_part())
         .then(ctrl(':').ignore_then(ty).or_not())
         .then(ctrl('=').ignore_then(expr.clone()).map(Box::new).map(Some))
-        .map(|((name, ty), value)| StmtKind::VarDef(VarDef { name, value, ty }));
-
-    let main = expr.map(Box::new).map(|value| {
-        let name = "main".to_string();
-
-        StmtKind::VarDef(VarDef {
-            name,
-            value: Some(value),
-            ty: None,
-        })
-    });
-
-    let_.or(main).labelled("variable definition")
+        .map(|((name, ty), value)| StmtKind::VarDef(VarDef { name, value, ty }))
+        .labelled("constant definition")
 }
 
 fn func_def<'a>(

@@ -40,7 +40,7 @@ fn types_01() {
 
     insta::assert_snapshot!(
         _test_ty(
-            "func () -> false"
+            "const main = false"
         ),
         @"bool"
     );
@@ -52,14 +52,14 @@ fn types_02() {
     insta::assert_snapshot!(_test_ty(r#"
         func identity(x: T) where T -> x
 
-        func () -> identity(false)
+        func main() -> identity(false)
     "#), @"bool");
 
     // same, but describe function as a type, not an expression
     insta::assert_snapshot!(_test_ty(r#"
         func identity(x: T): T where T
 
-        func () -> identity(false)
+        func main() -> identity(false)
     "#), @"bool");
 }
 #[test]
@@ -71,7 +71,7 @@ fn types_03() {
 
         func floor(x: T) where T -> floor_64(x)
 
-        func () -> floor(4.4)
+        func main() -> floor(4.4)
     "#), @r"
     [E0004] Error:
        ╭─[:4:46]
@@ -91,7 +91,7 @@ fn types_05() {
         where I, O
         -> mapper(x)
 
-        func () -> apply(false, identity)
+        func main() -> apply(false, identity)
     "#), @"bool");
 
     insta::assert_snapshot!(_test_ty(r#"
@@ -101,7 +101,7 @@ fn types_05() {
         where I, O
         -> mapper(x)
 
-        func () -> apply(false, twice)
+        func main() -> apply(false, twice)
     "#), @"{bool, bool}");
 }
 #[test]
@@ -112,7 +112,7 @@ fn types_06() {
         func map(x: [I], mapper: func (I): O): [O]
         where I, O
 
-        func () -> map([false, true, false], identity)
+        func main() -> map([false, true, false], identity)
     "#), @"[bool]");
 }
 #[test]
@@ -123,7 +123,7 @@ fn types_07() {
         func map(x: [I], mapper: func (I): O): [O]
         where I, O
 
-        func () -> map([false, true, true], twice)
+        func main() -> map([false, true, true], twice)
     "#), @"[{bool, bool}]");
 }
 #[test]
@@ -138,7 +138,7 @@ fn types_08() {
         func slice(x: [T], start: int64, end: int64): [T]
         where T
 
-        func () -> (
+        func main() -> (
             [{"5", false}, {"4", true}, {"1", true}]
             | filter(func (x: {text, bool}) -> x.1)
             | map(func (x: {text, bool}) -> x.0)
@@ -166,7 +166,7 @@ fn types_10() {
     // range
 
     insta::assert_snapshot!(_test_ty(r#"
-        func () -> (3: int64)..(5: int64)
+        func main() -> (3: int64)..(5: int64)
     "#), @"{start: int64, end: int64}");
 }
 #[test]
@@ -178,7 +178,7 @@ fn types_11() {
         func filter(array: [T], condition: func (T): bool): [T]
         where T
 
-        func (): [album_sale] -> (
+        func main(): [album_sale] -> (
             get_album_sales()
             | std::filter(func (this: album_sale) -> this.id == 6)
         )
@@ -189,8 +189,8 @@ fn types_12() {
     // tuple indirection
 
     insta::assert_snapshot!(_test_ty(r#"
-        let a = {id = 4: int64, total = 4.5: float64}
-        func () -> a.total
+        const a = {id = 4: int64, total = 4.5: float64}
+        func main() -> a.total
     "#), @"float64");
 }
 #[test]
@@ -199,21 +199,21 @@ fn types_13() {
         func floor(x: T): T
         where T: float32 | float64
 
-        func () -> floor(2.4: float32)
+        func main() -> floor(2.4: float32)
     "#), @"float32");
 
     insta::assert_snapshot!(_test_err(r#"
         func floor(x: T): T
         where T: float32 | float64
 
-        func () -> floor(false)
+        func main() -> floor(false)
     "#), @r"
     [E0005] Error:
-       ╭─[:5:20]
+       ╭─[:5:24]
        │
-     5 │         func () -> floor(false)
-       │                    ──┬──
-       │                      ╰──── T is restricted to one of float32, float64, found bool
+     5 │         func main() -> floor(false)
+       │                        ──┬──
+       │                          ╰──── T is restricted to one of float32, float64, found bool
     ───╯
     ");
 }
@@ -229,7 +229,7 @@ fn types_14() {
         -> (
             floor_64(x)
         )
-        func () -> floor(2.3)
+        func main() -> floor(2.3)
     "#), @r"
     [E0004] Error:
        ╭─[:7:22]
@@ -248,7 +248,7 @@ fn types_14() {
         where T: float32 | float64
         -> {floor(4.5: float64), floor(x)}
 
-        func (f: float32) -> twice_floored(f)
+        func main(f: float32) -> twice_floored(f)
     "#), @"{float64, float32}");
 
     insta::assert_snapshot!(_test_ty(r#"
@@ -259,7 +259,7 @@ fn types_14() {
         where T: float64
         -> {floor(x), floor(x)}
 
-        func () -> twice_floored(2.3: float64)
+        func main() -> twice_floored(2.3: float64)
     "#), @"{float64, float64}");
 
     insta::assert_snapshot!(_test_err(r#"
@@ -270,7 +270,7 @@ fn types_14() {
         where T: float64 | bool
         -> {floor(x), floor(x)}
 
-        func () -> twice_floored(2.3)
+        func main() -> twice_floored(2.3)
     "#), @r"
     [E0005] Error:
        ╭─[:7:13]
@@ -288,35 +288,35 @@ fn types_15() {
         func get_b(x: T): T
         where T: {b: int64, ..}
 
-        func () -> get_b({a = false, b = 4: int64})
+        func main() -> get_b({a = false, b = 4: int64})
     "#), @"{a: bool, b: int64}");
 
     insta::assert_snapshot!(_test_err(r#"
         func get_b(x: T): T
         where T: {b: int64, ..}
 
-        func () -> get_b({a = false, b = 4.6: float64})
+        func main() -> get_b({a = false, b = 4.6: float64})
     "#), @r"
     [E0004] Error:
-       ╭─[:5:42]
+       ╭─[:5:46]
        │
-     5 │         func () -> get_b({a = false, b = 4.6: float64})
-       │                                          ─┬─
-       │                                           ╰─── expected type `int64`, but found type `float64`
+     5 │         func main() -> get_b({a = false, b = 4.6: float64})
+       │                                              ─┬─
+       │                                               ╰─── expected type `int64`, but found type `float64`
     ───╯
     ");
     insta::assert_snapshot!(_test_err(r#"
         func get_b(x: T): T
         where T: {b: int64, ..}
 
-        func () -> get_b({a = false, c = 4})
+        func main() -> get_b({a = false, c = 4})
     "#), @r"
     Error:
-       ╭─[:5:20]
+       ╭─[:5:24]
        │
-     5 │         func () -> get_b({a = false, c = 4})
-       │                    ──┬──
-       │                      ╰──── field .b does not exist in type {a: bool, c: _}
+     5 │         func main() -> get_b({a = false, c = 4})
+       │                        ──┬──
+       │                          ╰──── field .b does not exist in type {a: bool, c: _}
     ───╯
     ");
 }
@@ -327,21 +327,21 @@ fn types_16() {
         func get_b(x: T): T
         where T: {bool, int64, ..}
 
-        func () -> get_b({a = false, 4, c = 5.7: float32})
+        func main() -> get_b({a = false, 4, c = 5.7: float32})
     "#), @"{a: bool, int64, c: float32}");
 
     insta::assert_snapshot!(_test_err(r#"
         func get_b(x: T): T
         where T: {bool, int64, ..}
 
-        func () -> get_b({a = "7", 4: int64, c = 5.7})
+        func main() -> get_b({a = "7", 4: int64, c = 5.7})
     "#), @r#"
     [E0004] Error:
-       ╭─[:5:31]
+       ╭─[:5:35]
        │
-     5 │         func () -> get_b({a = "7", 4: int64, c = 5.7})
-       │                               ─┬─
-       │                                ╰─── expected type `bool`, but found type `text`
+     5 │         func main() -> get_b({a = "7", 4: int64, c = 5.7})
+       │                                   ─┬─
+       │                                    ╰─── expected type `bool`, but found type `text`
     ───╯
     "#);
 
@@ -349,21 +349,21 @@ fn types_16() {
         func get_b(x: T): T
         where T: {bool, int64, a: bool, ..}
 
-        func () -> get_b({a = false})
+        func main() -> get_b({a = false})
     "#), @r"
     Error:
-       ╭─[:5:20]
+       ╭─[:5:24]
        │
-     5 │         func () -> get_b({a = false})
-       │                    ──┬──
-       │                      ╰──── field .1 does not exist in type {a: bool}
+     5 │         func main() -> get_b({a = false})
+       │                        ──┬──
+       │                          ╰──── field .1 does not exist in type {a: bool}
     ───╯
     ");
     insta::assert_snapshot!(_test_ty(r#"
         func get_b(x: T): T
         where T: {bool, int64, a: bool, ..}
 
-        func () -> get_b({a = false, 4})
+        func main() -> get_b({a = false, 4})
     "#), @"{a: bool, int64}");
 }
 
@@ -378,7 +378,7 @@ fn types_17() {
         where T: {int64, ..}
         -> get_int(x)
 
-        func () -> get({4})
+        func main() -> get({4})
     "#), @r"
     [E0004] Error:
        ╭─[:6:20]
@@ -396,7 +396,7 @@ fn types_17() {
         where T: {a: int64, ..}
         -> get_int(x)
 
-        func () -> get({4})
+        func main() -> get({4})
     "#), @r"
     [E0004] Error:
        ╭─[:6:20]
@@ -415,7 +415,7 @@ fn types_17() {
         where T: {int64, ..}
         -> needs_two(x)
 
-        func () -> needs_one({4})
+        func main() -> needs_one({4})
     "#), @r"
     Error:
        ╭─[:7:12]
@@ -434,7 +434,7 @@ fn types_17() {
         where T: {int64, bool, ..}
         -> needs_one(x)
 
-        func () -> needs_two({4: int64, false})
+        func main() -> needs_two({4: int64, false})
     "#), @"{int64, bool}");
 }
 
@@ -445,12 +445,12 @@ fn types_18() {
     insta::assert_snapshot!(_test_ty(r#"
         func f(x: T) where T: {int64, ..} -> x.0
 
-        func () -> f({4: int64, false})
+        func main() -> f({4: int64, false})
     "#), @"int64");
 
     insta::assert_snapshot!(_test_ty(r#"
         func f(x: T) where T: {a: int64, ..} -> x.a
-        func () -> f({false, a = 4: int64})
+        func main() -> f({false, a = 4: int64})
     "#), @"int64");
 }
 
@@ -476,7 +476,7 @@ fn types_20() {
     insta::assert_snapshot!(_test_ty(r#"
         type Status: enum {Done, Pending: int16, Cancelled: text}
 
-        func () -> (
+        func main() -> (
           Status::Done
           | func (x) -> match x {
             .Done => "done",
@@ -491,15 +491,15 @@ fn types_20() {
 fn array_00() {
     insta::assert_snapshot!(
         _test_err(
-            "func () -> []"
+            "func main() -> []"
         ),
         @r"
     Error:
-       ╭─[:1:12]
+       ╭─[:1:16]
        │
-     1 │ func () -> []
-       │            ─┬
-       │             ╰── cannot infer type
+     1 │ func main() -> []
+       │                ─┬
+       │                 ╰── cannot infer type
     ───╯
     "
     );
@@ -509,15 +509,15 @@ fn array_00() {
 fn array_01() {
     insta::assert_snapshot!(
         _test_err(
-            "func () -> std::lag([], 1)"
+            "func main() -> std::lag([], 1)"
         ),
         @r"
     Error:
-       ╭─[:1:12]
+       ╭─[:1:16]
        │
-     1 │ func () -> std::lag([], 1)
-       │            ────┬───
-       │                ╰───── cannot infer type of T
+     1 │ func main() -> std::lag([], 1)
+       │                ────┬───
+       │                    ╰───── cannot infer type of T
     ───╯
     "
     );
@@ -527,7 +527,7 @@ fn array_01() {
 fn array_02() {
     insta::assert_snapshot!(
         _test_ty(
-            "func (): [int64] -> std::lag([], 1)"
+            "func main(): [int64] -> std::lag([], 1)"
         ),
         @"[int64]"
     );
@@ -537,15 +537,15 @@ fn array_02() {
 fn array_03() {
     insta::assert_snapshot!(
         _test_err(
-            "func () -> {false, [], true}"
+            "const main = {false, [], true}"
         ),
         @r"
     Error:
-       ╭─[:1:20]
+       ╭─[:1:22]
        │
-     1 │ func () -> {false, [], true}
-       │                    ─┬
-       │                     ╰── cannot infer type
+     1 │ const main = {false, [], true}
+       │                      ─┬
+       │                       ╰── cannot infer type
     ───╯
     "
     );
@@ -555,7 +555,7 @@ fn array_03() {
 fn array_04() {
     insta::assert_snapshot!(
         _test_ty(
-            "func () -> [{5: int64, false}, {4, true}, {1, true}]"
+            "const main = [{5: int64, false}, {4, true}, {1, true}]"
         ),
         @"[{int64, bool}]"
     );
@@ -565,7 +565,7 @@ fn array_04() {
 fn array_05() {
     insta::assert_snapshot!(
         _test_ty(
-            "func () -> [{5, false}, {4, true}, {1, true}]: [{int64, bool}]"
+            "const main = [{5, false}, {4, true}, {1, true}]: [{int64, bool}]"
         ),
         @"[{int64, bool}]"
     );
@@ -575,7 +575,7 @@ fn array_05() {
 fn type_annotation_00() {
     insta::assert_snapshot!(
         _test_ty(
-            "func () -> 5: int64"
+            "const main = 5: int64"
         ),
         @"int64"
     );
@@ -585,15 +585,15 @@ fn type_annotation_00() {
 fn type_annotation_01() {
     insta::assert_snapshot!(
         _test_err(
-            "func () -> 5: text"
+            "const main = 5: text"
         ),
         @r"
     [E0005] Error:
-       ╭─[:1:12]
+       ╭─[:1:14]
        │
-     1 │ func () -> 5: text
-       │            ┬
-       │            ╰── restricted to one of int8, int16, int32, int64, uint8, uint16, uint32, uint64, found text
+     1 │ const main = 5: text
+       │              ┬
+       │              ╰── restricted to one of int8, int16, int32, int64, uint8, uint16, uint32, uint64, found text
     ───╯
     "
     );
@@ -603,7 +603,7 @@ fn type_annotation_01() {
 fn type_annotation_02() {
     insta::assert_snapshot!(
         _test_ty(
-            "func () -> []: [bool]"
+            "const main = []: [bool]"
         ),
         @"[bool]"
     );
@@ -628,7 +628,7 @@ fn primitives() {
                 float64,
                 text,
             }
-            func () -> x()
+            func main() -> x()
             "
         ),
         @"{bool, int8, int16, int32, int64, uint8, uint16, uint32, uint64, float32, float64, text}"
@@ -815,7 +815,7 @@ fn match_05() {
 #[test]
 fn func_param_00() {
     insta::assert_snapshot!(_test_ty(r#"
-        func () -> (
+        func main() -> (
             false | func (a) -> !a
         )
     "#), @"bool");
@@ -824,7 +824,7 @@ fn func_param_00() {
 #[test]
 fn func_param_01() {
     insta::assert_snapshot!(_test_ty(r#"
-        func (): int16 -> (
+        func main(): int16 -> (
             3 | func (x) -> x * x
         )
     "#), @"int16");
@@ -833,7 +833,7 @@ fn func_param_01() {
 #[test]
 fn func_param_02() {
     insta::assert_snapshot!(_test_ty(r#"
-        func (): [int16] -> (
+        func main(): [int16] -> (
             [3, 2, 4, 1, 5, -3, 1]
             | std::map(func (x) -> -x)
         )
@@ -843,7 +843,7 @@ fn func_param_02() {
 #[test]
 fn func_param_03() {
     insta::assert_snapshot!(_test_ty(r#"
-        func () -> (
+        func main() -> (
             {a = 3, b = 5: int16} | func (x) -> x.a + x.b
         )
     "#), @"int16");
@@ -852,15 +852,15 @@ fn func_param_03() {
 #[test]
 fn decls_00() {
     insta::assert_snapshot!(_test_err(r#"
-        let a = 3
-        let a = 6
+        const a = 3
+        const a = 6
     "#), @r"
     Error:
        ╭─[:3:9]
        │
-     3 │         let a = 6
-       │         ────┬────
-       │             ╰────── duplicate declaration
+     3 │         const a = 6
+       │         ─────┬─────
+       │              ╰─────── duplicate declaration
     ───╯
     ");
 }
@@ -882,27 +882,27 @@ fn decls_01() {
 #[test]
 fn constants_00() {
     insta::assert_snapshot!(_test_err(r#"
-        let a = {false, true || false}
-        let b = [6: int64, 2 + 6]
-        let c = 5: int64
-        let d = [1, c]
+        const a = {false, true || false}
+        const b = [6: int64, 2 + 6]
+        const c = 5: int64
+        const d = [1, c]
     "#), @r"
     Error:
-       ╭─[:2:25]
+       ╭─[:2:27]
        │
-     2 │         let a = {false, true || false}
-       │                         ──────┬──────
-       │                               ╰──────── non-constant expression
+     2 │         const a = {false, true || false}
+       │                           ──────┬──────
+       │                                 ╰──────── non-constant expression
        │
        │ Note:
        │ use `func` instead of `const`
     ───╯
     Error:
-       ╭─[:3:28]
+       ╭─[:3:30]
        │
-     3 │         let b = [6: int64, 2 + 6]
-       │                            ──┬──
-       │                              ╰──── non-constant expression
+     3 │         const b = [6: int64, 2 + 6]
+       │                              ──┬──
+       │                                ╰──── non-constant expression
        │
        │ Note:
        │ use `func` instead of `const`
