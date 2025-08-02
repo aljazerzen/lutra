@@ -165,32 +165,29 @@ where:
 Return type of the function is optional if it can be inferred
 from the function body.
 
-## Declarations
+## Definitions
 
-Lutra source files are a sequences of declarations of variables,
-types and modules.
+Lutra source files are a sequences of definitions of functions, types, constants and modules.
 
-Variable declarations use keyword `let`, followed by the name,
-the type and the expression of the assigned value.
+Function definitions use keyword `func`, followed by the parameters, return type and the body.
 
 ```
-let my_variable: int64 = 5
+func my_function(param_a: int64): int64 -> 5
 ```
 
-Type may be omitted it can be inferred from the value expression.
+Return type can be omitted it can be inferred from the body expression.
 
-Type declarations are use keyword `type` followed by the name and the type.
+Types are defined using keyword `type` followed by the name and the type.
 
 ```
-let my_type = int64
+type my_type: int64
 ```
 
-Module declarations use keyword `module`. Modules are a namespace for
-other declarations.
+Module definition use keyword `module`.
+Modules are a namespace for other definitions.
 
 ```
 module my_module {
-  let my_variable = 3
+  func my_func() -> 3
 }
 ```
-

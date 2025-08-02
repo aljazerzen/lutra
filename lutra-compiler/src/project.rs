@@ -4,7 +4,7 @@ use std::str::FromStr;
 
 use itertools::Itertools;
 
-use crate::decl::RootModule;
+use crate::pr;
 
 /// Project, resolved.
 #[derive(Debug)]
@@ -12,8 +12,12 @@ pub struct Project {
     /// Discovered sources
     pub source: SourceTree,
 
-    /// Resolved declarations
-    pub root_module: RootModule,
+    /// Resolved definitions
+    pub root_module: pr::ModuleDef,
+
+    /// Resolution ordering of definitions
+    // TODO: make a more efficient "a ordered vec of unordered groups" data structure
+    pub ordering: Vec<Vec<pr::Path>>,
 }
 
 /// Sources used to resolve the project.

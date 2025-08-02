@@ -1,18 +1,19 @@
 #![cfg(test)]
 
 use chumsky::Parser;
+use indexmap::IndexMap;
 use insta::assert_debug_snapshot;
 use std::fmt::Debug;
 
 use crate::diagnostic::Diagnostic;
+use crate::parser::def;
 use crate::parser::expr;
 use crate::parser::lexer::TokenKind;
 use crate::parser::perror::PError;
 use crate::parser::prepare_stream;
-use crate::parser::stmt;
 use crate::parser::types;
 use crate::pr;
-use crate::pr::Stmt;
+use crate::pr::Def;
 
 /// Parse source code based on the supplied parser.
 ///
@@ -38,8 +39,8 @@ pub(crate) fn parse_with_parser<O: Debug>(
 
 /// Parse into statements
 #[track_caller]
-fn parse_source(source: &str) -> Result<Vec<Stmt>, Vec<Diagnostic>> {
-    parse_with_parser(source, stmt::source())
+fn parse_source(source: &str) -> Result<IndexMap<String, Def>, Vec<Diagnostic>> {
+    parse_with_parser(source, def::source()).map(|s| s.defs)
 }
 
 #[track_caller]
@@ -50,9 +51,9 @@ fn parse_expr(source: &str) -> pr::Expr {
 
 #[track_caller]
 fn parse_func(source: &str) -> pr::Expr {
-    let stmts = parse_with_parser(source, stmt::source()).unwrap();
-    let stmt = stmts.into_iter().next().unwrap();
-    *stmt.kind.into_var_def().unwrap().value.unwrap()
+    let module = parse_with_parser(source, def::source()).unwrap();
+    let (_, def) = module.defs.into_iter().next().unwrap();
+    *def.kind.into_expr().unwrap().value.unwrap()
 }
 
 #[test]

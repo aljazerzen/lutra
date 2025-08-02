@@ -1,4 +1,5 @@
 use chumsky::prelude::*;
+use indexmap::IndexMap;
 
 use super::expr::{expr, ident};
 use super::{ctrl, ident_part, keyword};
@@ -9,19 +10,25 @@ use crate::parser::types;
 use crate::pr::*;
 
 /// The top-level parser
-pub fn source() -> impl Parser<TokenKind, Vec<Stmt>, Error = PError> {
-    module_contents().then_ignore(end())
+pub fn source() -> impl Parser<TokenKind, ModuleDef, Error = PError> {
+    definitions()
+        .try_map(|defs, _span| into_module(defs))
+        .then_ignore(end())
 }
 
-fn module_contents() -> impl Parser<TokenKind, Vec<Stmt>, Error = PError> {
+fn definitions() -> impl Parser<TokenKind, Vec<(String, Def)>, Error = PError> {
     let ty = types::type_expr();
     let expr = expr(ty.clone());
 
-    recursive(|module_contents| {
+    recursive(|definitions| {
         let module_def = keyword("module")
             .ignore_then(ident_part())
-            .then(module_contents.delimited_by(ctrl('{'), ctrl('}')))
-            .map(|(name, stmts)| StmtKind::ModuleDef(ModuleDef { name, stmts }))
+            .then(
+                definitions
+                    .delimited_by(ctrl('{'), ctrl('}'))
+                    .try_map(|defs, _span| into_module(defs)),
+            )
+            .map(|(name, module_def)| (name, DefKind::Module(module_def)))
             .labelled("module definition");
 
         let annotation = ctrl('@')
@@ -31,7 +38,7 @@ fn module_contents() -> impl Parser<TokenKind, Vec<Stmt>, Error = PError> {
             })
             .labelled("annotation");
 
-        let stmt_kind = choice((
+        let def_kind = choice((
             module_def,
             type_def(ty.clone()),
             import_def(),
@@ -43,18 +50,30 @@ fn module_contents() -> impl Parser<TokenKind, Vec<Stmt>, Error = PError> {
         // should relax this?
         (doc_comment().or_not())
             .then(annotation.repeated())
-            .then(stmt_kind.map_with_span(into_stmt))
-            .map(|((doc_comment, annotations), mut inner)| {
-                inner.doc_comment = doc_comment;
-                inner.annotations = annotations;
-                inner
+            .then(def_kind.map_with_span(|(n, def), span| (n, into_def(def, span))))
+            .map(|((doc_comment, annotations), (name, mut def))| {
+                def.doc_comment = doc_comment;
+                def.annotations = annotations;
+                (name, def)
             })
             .repeated()
     })
 }
 
-fn into_stmt(kind: StmtKind, span: Span) -> Stmt {
-    Stmt {
+fn into_module(defs: Vec<(String, Def)>) -> Result<ModuleDef, PError> {
+    let mut result = IndexMap::with_capacity(defs.len());
+    for (name, def) in defs {
+        let span = def.span.unwrap();
+        let conflict = result.insert(name, def);
+        if conflict.is_some() {
+            return Err(PError::custom(span, "duplicate name"));
+        }
+    }
+    Ok(ModuleDef { defs: result })
+}
+
+fn into_def(kind: DefKind, span: Span) -> Def {
+    Def {
         kind,
         span: Some(span),
         annotations: vec![],
@@ -76,19 +95,19 @@ fn doc_comment() -> impl Parser<TokenKind, String, Error = PError> + Clone {
 fn const_def(
     expr: impl Parser<TokenKind, Expr, Error = PError> + Clone,
     ty: impl Parser<TokenKind, Ty, Error = PError> + Clone,
-) -> impl Parser<TokenKind, StmtKind, Error = PError> + Clone {
+) -> impl Parser<TokenKind, (String, DefKind), Error = PError> + Clone {
     keyword("const")
         .ignore_then(ident_part())
         .then(ctrl(':').ignore_then(ty).or_not())
         .then(ctrl('=').ignore_then(expr.clone()).map(Box::new).map(Some))
-        .map(|((name, ty), value)| StmtKind::VarDef(VarDef { name, value, ty }))
+        .map(|((name, ty), value)| (name, DefKind::Expr(ExprDef { value, ty })))
         .labelled("constant definition")
 }
 
 fn func_def<'a>(
     expr: impl Parser<TokenKind, Expr, Error = PError> + Clone + 'a,
     ty: impl Parser<TokenKind, Ty, Error = PError> + Clone + 'a,
-) -> impl Parser<TokenKind, StmtKind, Error = PError> + Clone + 'a {
+) -> impl Parser<TokenKind, (String, DefKind), Error = PError> + Clone + 'a {
     let head = keyword("func").ignore_then(ident_part());
 
     let params = ident_part()
@@ -108,7 +127,7 @@ fn func_def<'a>(
         .then(ty_params)
         .then(just(TokenKind::ArrowThin).ignore_then(expr).or_not())
         .map_with_span(|((((name, params), return_ty), ty_params), body), span| {
-            StmtKind::VarDef(if let Some(body) = body {
+            let def = DefKind::Expr(if let Some(body) = body {
                 let func = Func {
                     return_ty,
                     body: Box::new(body),
@@ -116,8 +135,7 @@ fn func_def<'a>(
                     ty_params,
                 };
                 let value = Expr::new_with_span(ExprKind::Func(Box::new(func)), span);
-                VarDef {
-                    name,
+                ExprDef {
                     ty: value.ty.clone(),
                     value: Some(Box::new(value)),
                 }
@@ -128,12 +146,9 @@ fn func_def<'a>(
                     ty_params,
                 };
                 let ty = Some(Ty::new_with_span(TyKind::Func(ty_func), span));
-                VarDef {
-                    name,
-                    ty,
-                    value: None,
-                }
-            })
+                ExprDef { ty, value: None }
+            });
+            (name, def)
         })
         .labelled("function definition")
         .boxed()
@@ -141,19 +156,24 @@ fn func_def<'a>(
 
 fn type_def(
     ty: impl Parser<TokenKind, Ty, Error = PError> + Clone,
-) -> impl Parser<TokenKind, StmtKind, Error = PError> + Clone {
+) -> impl Parser<TokenKind, (String, DefKind), Error = PError> + Clone {
     keyword("type")
         .ignore_then(ident_part())
         .then(ctrl(':').ignore_then(ty))
-        .map(|(name, ty)| StmtKind::TypeDef(TypeDef { name, ty }))
+        .map(|(name, ty)| (name, DefKind::Ty(TyDef { ty })))
         .labelled("type definition")
 }
 
-fn import_def() -> impl Parser<TokenKind, StmtKind, Error = PError> + Clone {
+fn import_def() -> impl Parser<TokenKind, (String, DefKind), Error = PError> + Clone {
     keyword("import")
         .ignore_then(ident_part().then_ignore(ctrl('=')).or_not())
         .then(ident())
-        .map(|(alias, name)| StmtKind::ImportDef(ImportDef { name, alias }))
+        .map(|(alias, target)| {
+            (
+                alias.unwrap_or_else(|| target.last().to_string()),
+                DefKind::Import(ImportDef { target }),
+            )
+        })
         .labelled("import statement")
 }
 

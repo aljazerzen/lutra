@@ -61,7 +61,7 @@ pub struct Expr {
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Ref {
     FullyQualified {
-        to_decl: Path,
+        to_def: Path,
         within: Path,
     },
     Local {

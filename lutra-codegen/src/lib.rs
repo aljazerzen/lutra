@@ -163,7 +163,7 @@ fn codegen_main(
 ) -> Result<String, std::fmt::Error> {
     use std::fmt::Write;
 
-    let module = lutra_compiler::lower_type_defs(&project.root_module);
+    let module = lutra_compiler::lower_type_defs(project);
     let module = lutra_compiler::layouter::on_root_module(module);
 
     let ty_defs = module.iter_types_re().collect();
@@ -192,15 +192,15 @@ fn codegen_module(
     module_path: Vec<String>,
     ctx: &mut Context,
 ) -> Result<(), std::fmt::Error> {
-    // collect decls
+    // collect defs
     let mut tys = Vec::new();
     let mut functions = Vec::new();
     let mut sub_modules = Vec::new();
 
-    // iterate pr decls (which keep the order in the source)
+    // iterate pr defs (which keep the order in the source)
     let root_mod = &ctx.project.root_module;
-    let pr_mod = root_mod.module.get_submodule(&module_path).unwrap();
-    for (name, pr_decl) in &pr_mod.names {
+    let pr_mod = root_mod.get_submodule(&module_path).unwrap();
+    for (name, pr_def) in &pr_mod.defs {
         let Some(decl) = module.decls.iter().find(|d| &d.name == name) else {
             continue;
         };
@@ -213,7 +213,7 @@ fn codegen_module(
                 let mut ty = ty.clone();
                 infer_names(name, &mut ty);
 
-                tys.push((ty, pr_decl.annotations.as_slice()));
+                tys.push((ty, pr_def.annotations.as_slice()));
             }
             ir::Decl::Var(ty) => {
                 let mut ty = ty.clone();
@@ -273,9 +273,9 @@ fn codegen_module(
 
 /// Types might not have names, because they are defined inline.
 /// This function traverses a type definition and generates names for all of the types.
-fn infer_names(stmt_name: &str, ty: &mut ir::Ty) {
+fn infer_names(def_name: &str, ty: &mut ir::Ty) {
     if ty.name.is_none() {
-        ty.name = Some(stmt_name.to_string());
+        ty.name = Some(def_name.to_string());
     }
 
     let mut name_prefix = Vec::new();

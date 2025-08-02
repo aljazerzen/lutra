@@ -215,7 +215,7 @@ impl TypeResolver<'_> {
         stack.find(|s| s.for_ty_vars()).unwrap()
     }
 
-    /// Get declaration from within the current scope.
+    /// Get definition from within the current scope.
     ///
     /// Does not mutate the current scope or module structure.
     pub(super) fn get_ident<'a>(&'a self, target: &pr::Ref) -> Result<Named<'a>> {
@@ -223,15 +223,14 @@ impl TypeResolver<'_> {
 
         match target {
             pr::Ref::FullyQualified {
-                to_decl: path,
+                to_def: path,
                 within,
             } => {
-                let decl = self
+                let def = self
                     .root_mod
-                    .module
                     .get(path)
                     .unwrap_or_else(|| panic!("cannot find {path}"));
-                match decl {
+                match def {
                     ExprOrTy::Expr(expr) => {
                         if !within.is_empty() {
                             unreachable!()

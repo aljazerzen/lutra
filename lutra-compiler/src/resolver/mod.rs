@@ -8,15 +8,16 @@ mod types;
 
 use std::str::FromStr;
 
+use crate::Project;
 use crate::Result;
-use crate::decl;
+use crate::SourceTree;
 use crate::diagnostic::Diagnostic;
 use crate::pr;
 
 pub const NS_STD: &str = "std";
 
 /// Runs semantic analysis on a project.
-pub fn resolve(module_tree: pr::ModuleDef) -> Result<decl::RootModule, Vec<Diagnostic>> {
+pub fn resolve(module_tree: pr::ModuleDef) -> Result<Project, Vec<Diagnostic>> {
     // desugar
     let module_tree = desugar::run(module_tree).map_err(|d| vec![d])?;
 
@@ -31,17 +32,21 @@ pub fn resolve(module_tree: pr::ModuleDef) -> Result<decl::RootModule, Vec<Diagn
     // resolve types
     types::run(&mut root_module, &resolution_order)?;
 
-    root_module.ordering = resolution_order;
+    let project = Project {
+        source: SourceTree::empty(),
+        root_module,
+        ordering: resolution_order,
+    };
 
     // resolve types
-    const_eval::run(&root_module)?;
+    const_eval::run(&project)?;
 
-    Ok(root_module)
+    Ok(project)
 }
 
 /// Runs semantic analysis of an expression within an already resolved project.
 pub fn resolve_overlay_expr(
-    root_module: &decl::RootModule,
+    root_module: &pr::ModuleDef,
     expr: pr::Expr,
 ) -> Result<pr::Expr, Vec<Diagnostic>> {
     // desugar
@@ -51,15 +56,14 @@ pub fn resolve_overlay_expr(
 
     // insert into the module tree
     let var_name = "_";
-    root_module.module.names.insert(
+    root_module.defs.insert(
         var_name.to_string(),
-        decl::Decl::new(decl::DeclKind::Unresolved(Some(pr::StmtKind::VarDef(
-            pr::VarDef {
-                name: var_name.to_string(),
+        pr::Def::new(pr::DefKind::Unresolved(Some(Box::new(pr::DefKind::Expr(
+            pr::ExprDef {
                 value: Some(Box::new(expr)),
                 ty: None,
             },
-        )))),
+        ))))),
     );
 
     // resolve names
@@ -70,8 +74,8 @@ pub fn resolve_overlay_expr(
     // resolve types
     types::run(&mut root_module, &resolution_order)?;
 
-    let decl = root_module.module.names.swap_remove(var_name).unwrap();
-    let expr = *decl.kind.into_expr().unwrap();
+    let def = root_module.defs.swap_remove(var_name).unwrap();
+    let expr = *def.kind.into_expr().unwrap().value.unwrap();
 
     Ok(expr)
 }

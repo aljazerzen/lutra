@@ -1,5 +1,6 @@
 #![allow(dead_code)]
 
+use indexmap::IndexMap;
 /// A trait to "fold" the PR AST, so we can transitively apply some logic to
 /// a whole tree by just defining how we want to handle each type.
 use itertools::Itertools;
@@ -21,12 +22,9 @@ use crate::pr::*;
 // implementors override the default while calling the function directly for
 // some cases. Ref https://stackoverflow.com/a/66077767/3064736
 pub trait PrFold {
-    fn fold_stmt(&mut self, mut stmt: Stmt) -> Result<Stmt> {
-        stmt.kind = fold_stmt_kind(self, stmt.kind)?;
-        Ok(stmt)
-    }
-    fn fold_stmts(&mut self, stmts: Vec<Stmt>) -> Result<Vec<Stmt>> {
-        stmts.into_iter().map(|stmt| self.fold_stmt(stmt)).collect()
+    fn fold_def(&mut self, mut def: Def) -> Result<Def> {
+        def.kind = fold_def_kind(self, def.kind)?;
+        Ok(def)
     }
     fn fold_expr(&mut self, mut expr: Expr) -> Result<Expr> {
         expr.kind = self.fold_expr_kind(expr.kind)?;
@@ -44,12 +42,11 @@ pub trait PrFold {
     fn fold_exprs(&mut self, exprs: Vec<Expr>) -> Result<Vec<Expr>> {
         exprs.into_iter().map(|node| self.fold_expr(node)).collect()
     }
-    fn fold_var_def(&mut self, var_def: VarDef) -> Result<VarDef> {
+    fn fold_var_def(&mut self, var_def: ExprDef) -> Result<ExprDef> {
         fold_var_def(self, var_def)
     }
-    fn fold_type_def(&mut self, ty_def: TypeDef) -> Result<TypeDef> {
-        Ok(TypeDef {
-            name: ty_def.name,
+    fn fold_type_def(&mut self, ty_def: TyDef) -> Result<TyDef> {
+        Ok(TyDef {
             ty: self.fold_type(ty_def.ty)?,
         })
     }
@@ -145,26 +142,32 @@ pub fn fold_expr_kind<T: ?Sized + PrFold>(fold: &mut T, expr_kind: ExprKind) -> 
     })
 }
 
-pub fn fold_stmt_kind<T: ?Sized + PrFold>(fold: &mut T, stmt_kind: StmtKind) -> Result<StmtKind> {
-    use StmtKind::*;
-    Ok(match stmt_kind {
-        VarDef(var_def) => VarDef(fold.fold_var_def(var_def)?),
-        TypeDef(type_def) => TypeDef(fold.fold_type_def(type_def)?),
-        ModuleDef(module_def) => ModuleDef(fold.fold_module_def(module_def)?),
-        ImportDef(_) => stmt_kind,
+pub fn fold_def_kind<T: ?Sized + PrFold>(fold: &mut T, def_kind: DefKind) -> Result<DefKind> {
+    use DefKind::*;
+    Ok(match def_kind {
+        Expr(var_def) => Expr(fold.fold_var_def(var_def)?),
+        Ty(type_def) => Ty(fold.fold_type_def(type_def)?),
+        Module(module_def) => Module(fold.fold_module_def(module_def)?),
+        Import(_) => def_kind,
+        Unresolved(inner) => Unresolved(
+            inner
+                .map(|x| fold_def_kind(fold, *x))
+                .transpose()?
+                .map(Box::new),
+        ),
     })
 }
 
 fn fold_module_def<F: ?Sized + PrFold>(fold: &mut F, module_def: ModuleDef) -> Result<ModuleDef> {
-    Ok(ModuleDef {
-        name: module_def.name,
-        stmts: fold.fold_stmts(module_def.stmts)?,
-    })
+    let mut defs = IndexMap::with_capacity(module_def.defs.len());
+    for (name, def) in module_def.defs {
+        defs.insert(name, fold.fold_def(def)?);
+    }
+    Ok(ModuleDef { defs })
 }
 
-pub fn fold_var_def<F: ?Sized + PrFold>(fold: &mut F, var_def: VarDef) -> Result<VarDef> {
-    Ok(pr::VarDef {
-        name: var_def.name,
+pub fn fold_var_def<F: ?Sized + PrFold>(fold: &mut F, var_def: ExprDef) -> Result<ExprDef> {
+    Ok(pr::ExprDef {
         value: fold_optional_box(fold, var_def.value)?,
         ty: var_def.ty.map(|x| fold.fold_type(x)).transpose()?,
     })

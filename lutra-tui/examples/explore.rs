@@ -3,7 +3,7 @@ use lutra_compiler::ProgramFormat;
 fn main() {
     let project = get_project();
 
-    let path = lutra_tui::prompt_for_decl(&project).unwrap();
+    let path = lutra_tui::prompt_for_def(&project).unwrap();
     execute_program(&project, &path.0.join("::"));
 }
 

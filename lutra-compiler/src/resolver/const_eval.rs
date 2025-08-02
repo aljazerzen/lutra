@@ -2,18 +2,18 @@ use std::collections::HashSet;
 
 use crate::diagnostic::{Diagnostic, WithErrorInfo};
 use crate::resolver::module::ExprOrTy;
-use crate::{Span, decl, pr};
+use crate::{Project, Span, pr};
 
-pub(crate) fn run(root_module: &decl::RootModule) -> Result<(), Vec<Diagnostic>> {
+pub(crate) fn run(project: &Project) -> Result<(), Vec<Diagnostic>> {
     let mut v = ConstantValidator {
         constants: Default::default(),
     };
 
     let mut diagnostics = Vec::new();
 
-    for group in &root_module.ordering {
+    for group in &project.ordering {
         for path in group {
-            let ExprOrTy::Expr(expr) = root_module.module.get(path).unwrap() else {
+            let ExprOrTy::Expr(expr) = project.root_module.get(path).unwrap() else {
                 continue;
             };
             if expr.kind.is_func() || expr.kind.is_internal() {
@@ -53,9 +53,9 @@ impl ConstantValidator {
             pr::ExprKind::Literal(_) => Ok(()),
 
             pr::ExprKind::Ident(_) => match expr.target.as_ref().unwrap() {
-                pr::Ref::FullyQualified { to_decl, within } => {
+                pr::Ref::FullyQualified { to_def, within } => {
                     assert!(within.is_empty());
-                    if self.constants.contains(to_decl) {
+                    if self.constants.contains(to_def) {
                         Ok(())
                     } else {
                         Err(expr.span)

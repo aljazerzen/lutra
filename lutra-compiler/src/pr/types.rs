@@ -12,7 +12,7 @@ pub struct Ty {
 
     pub span: Option<Span>,
 
-    /// Name inferred from the type's declaration.
+    /// Name inferred from the type's definition.
     pub name: Option<String>,
 
     /// When this expr is the root of a new scope, this holds the id of

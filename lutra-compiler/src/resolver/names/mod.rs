@@ -8,16 +8,15 @@ use itertools::Itertools;
 use scope::Scope;
 
 use crate::Result;
-use crate::decl;
 use crate::diagnostic::Diagnostic;
 use crate::{pr, utils};
 
-/// Runs name resolution for global names - names that refer to declarations.
+/// Runs name resolution for global names - names that refer to definitions.
 ///
-/// Keeps track of all inter-declaration references.
+/// Keeps track of all inter-definition references.
 /// Returns a resolution order.
-pub fn run(root: &mut decl::RootModule) -> Result<Vec<Vec<pr::Path>>> {
-    // resolve inter-declaration references
+pub fn run(root: &mut pr::ModuleDef) -> Result<Vec<Vec<pr::Path>>> {
+    // resolve inter-definition references
     let (refs_tys, refs_vars) = {
         let mut r = module::ModuleRefResolver {
             root,

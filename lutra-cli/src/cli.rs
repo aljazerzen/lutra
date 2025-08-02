@@ -134,7 +134,7 @@ pub fn check(cmd: CheckCommand) -> anyhow::Result<()> {
 
     if let Some(program) = &cmd.program {
         let expr = lutra_compiler::check_overlay(&project, program, Some("--program"))?;
-        let program = lutra_compiler::lower_expr(&project.root_module, &expr);
+        let program = lutra_compiler::lower_expr(&project, &expr);
         let program = lutra_compiler::inline(program);
         let program = lutra_compiler::layouter::on_program(program);
 

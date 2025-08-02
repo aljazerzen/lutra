@@ -850,32 +850,32 @@ fn func_param_03() {
 }
 
 #[test]
-fn decls_00() {
+fn defs_00() {
     insta::assert_snapshot!(_test_err(r#"
         const a = 3
         const a = 6
     "#), @r"
-    Error:
+    [E0003] Error:
        ╭─[:3:9]
        │
      3 │         const a = 6
        │         ─────┬─────
-       │              ╰─────── duplicate declaration
+       │              ╰─────── duplicate name
     ───╯
     ");
 }
 #[test]
-fn decls_01() {
+fn defs_01() {
     insta::assert_snapshot!(_test_err(r#"
         func a() -> 3
         func a() -> 6
     "#), @r"
-    Error:
+    [E0003] Error:
        ╭─[:3:9]
        │
      3 │         func a() -> 6
        │         ──────┬──────
-       │               ╰──────── duplicate declaration
+       │               ╰──────── duplicate name
     ───╯
     ");
 }

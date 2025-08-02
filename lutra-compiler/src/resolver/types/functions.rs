@@ -121,7 +121,7 @@ impl TypeResolver<'_> {
     /// In PRQL, func is just an expression and does not have a name (the same way
     /// as literals don't have a name). Regardless, we want to provide name hints for functions
     /// in error messages (i.e. `std.count requires 2 arguments, found 1`), so here we infer name
-    /// and annotations for functions from its declaration.
+    /// and annotations for functions from its definition.
     fn gather_func_metadata(&self, func: &Expr) -> FuncMetadata {
         let mut res = FuncMetadata::default();
 
@@ -151,6 +151,6 @@ impl FuncMetadata {
     pub(crate) fn as_debug_name(&self) -> &str {
         let ident = self.name_hint.as_ref();
 
-        ident.map(|n| n.name()).unwrap_or("<anonymous>")
+        ident.map(|n| n.last()).unwrap_or("<anonymous>")
     }
 }

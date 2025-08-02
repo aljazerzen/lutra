@@ -289,7 +289,7 @@ fn ident_keyword(kw: &'static str) -> impl Parser<TokenKind, (), Error = PError>
 }
 
 fn keyword(kw: &'static str) -> impl Parser<TokenKind, (), Error = PError> + Clone {
-    just(TokenKind::Keyword(kw.to_string())).ignored()
+    just(TokenKind::Keyword(kw)).ignored()
 }
 
 fn ctrl(char: char) -> impl Parser<TokenKind, (), Error = PError> + Clone {

@@ -4,13 +4,13 @@ use indexmap::IndexMap;
 use itertools::Itertools;
 use lutra_bin::ir;
 
-use crate::Result;
 use crate::diagnostic::Diagnostic;
+use crate::pr;
 use crate::utils::{self, IdGenerator};
-use crate::{decl, pr};
+use crate::{Project, Result};
 
-pub fn lower_expr(root_module: &decl::RootModule, main_pr: &pr::Expr) -> ir::Program {
-    let mut lowerer = Lowerer::new(root_module);
+pub fn lower_expr(project: &Project, main_pr: &pr::Expr) -> ir::Program {
+    let mut lowerer = Lowerer::new(&project.root_module);
 
     let input_ty = get_entry_point_input(main_pr);
     lowerer.program_input_ty = Some(lowerer.lower_ty(input_ty));
@@ -20,11 +20,11 @@ pub fn lower_expr(root_module: &decl::RootModule, main_pr: &pr::Expr) -> ir::Pro
     );
     lowerer.is_main_func = main_pr.ty.as_ref().unwrap().kind.is_func();
 
-    let main = if let Some(pr::Ref::FullyQualified { to_decl, within }) = &main_pr.target {
+    let main = if let Some(pr::Ref::FullyQualified { to_def, within }) = &main_pr.target {
         // optimization: inline direct idents, don't bind them to vars
         assert!(within.is_empty());
         lowerer
-            .lower_expr_decl(to_decl, main_pr.ty_args.clone())
+            .lower_expr_def(to_def, main_pr.ty_args.clone())
             .unwrap()
     } else {
         lowerer.lower_expr(main_pr).unwrap()
@@ -34,13 +34,13 @@ pub fn lower_expr(root_module: &decl::RootModule, main_pr: &pr::Expr) -> ir::Pro
     let main = lowerer.lower_var_bindings(main).unwrap();
 
     lowerer.lower_ty_defs_queue();
-    let types = order_ty_defs(lowerer.type_defs, root_module);
+    let types = order_ty_defs(lowerer.type_defs, project);
 
     ir::Program { main, types }
 }
 
 struct Lowerer<'a> {
-    root_module: &'a decl::RootModule,
+    root_module: &'a pr::ModuleDef,
 
     scopes: Vec<Scope>,
 
@@ -77,7 +77,7 @@ enum ScopeKind {
 }
 
 impl<'a> Lowerer<'a> {
-    fn new(root_module: &'a decl::RootModule) -> Self {
+    fn new(root_module: &'a pr::ModuleDef) -> Self {
         Self {
             root_module,
 
@@ -95,15 +95,15 @@ impl<'a> Lowerer<'a> {
     }
 
     #[tracing::instrument(name = "leed", skip_all)]
-    fn lower_external_expr_decl(&mut self, path: &pr::Path) -> Result<Option<ir::ExprKind>> {
+    fn lower_external_expr_def(&mut self, path: &pr::Path) -> Result<Option<ir::ExprKind>> {
         if path.as_slice() == ["std", "default"] {
             // special case: evaluate std::default in lowerer
             return Ok(None);
         }
 
-        let decl = self.root_module.module.get(path);
-        let decl = decl.unwrap_or_else(|| panic!("{path} does not exist"));
-        let expr = decl.into_expr().unwrap();
+        let def = self.root_module.get(path);
+        let def = def.unwrap_or_else(|| panic!("{path} does not exist"));
+        let expr = def.into_expr().unwrap();
 
         if !matches!(expr.kind, pr::ExprKind::Internal) {
             return Ok(None);
@@ -118,10 +118,10 @@ impl<'a> Lowerer<'a> {
     }
 
     #[tracing::instrument(name = "led", skip_all, fields(p = path.to_string()))]
-    fn lower_expr_decl(&mut self, path: &pr::Path, ty_args: Vec<pr::Ty>) -> Result<ir::Expr> {
-        let decl = self.root_module.module.get(path);
-        let decl = decl.unwrap_or_else(|| panic!("{path} does not exist"));
-        let expr = decl.into_expr().unwrap().clone();
+    fn lower_expr_def(&mut self, path: &pr::Path, ty_args: Vec<pr::Ty>) -> Result<ir::Expr> {
+        let def = self.root_module.get(path);
+        let def = def.unwrap_or_else(|| panic!("{path} does not exist"));
+        let expr = def.into_expr().unwrap().clone();
 
         if path.as_slice() == ["std", "default"] {
             return Ok(self.impl_std_default(ty_args.into_iter().next().unwrap()));
@@ -292,13 +292,13 @@ impl<'a> Lowerer<'a> {
                 }
 
                 pr::Ref::FullyQualified {
-                    to_decl,
+                    to_def,
                     within: _within,
                 } => {
-                    if let Some(ptr) = self.lower_external_expr_decl(to_decl)? {
+                    if let Some(ptr) = self.lower_external_expr_def(to_def)? {
                         ptr
                     } else {
-                        let reference = (to_decl.clone(), expr.ty_args.clone());
+                        let reference = (to_def.clone(), expr.ty_args.clone());
                         let entry = self.var_bindings.entry(reference);
                         let binding_id = match entry {
                             indexmap::map::Entry::Occupied(e) => *e.get(),
@@ -365,7 +365,7 @@ impl<'a> Lowerer<'a> {
             // consumed by type resolver
             pr::ExprKind::TypeAnnotation(_) => unreachable!(),
 
-            // caught in lower_var_decl
+            // caught in lower_var_def
             pr::ExprKind::Internal => unreachable!(),
 
             // desugared away
@@ -518,7 +518,7 @@ impl<'a> Lowerer<'a> {
             let reference = reference.clone();
             let id = *id;
 
-            let expr = self.lower_expr_decl(&reference.0, reference.1)?;
+            let expr = self.lower_expr_def(&reference.0, reference.1)?;
             main = ir::Expr {
                 ty: main.ty.clone(),
                 kind: ir::ExprKind::Binding(Box::new(ir::Binding { id, expr, main })),
@@ -540,13 +540,13 @@ impl<'a> Lowerer<'a> {
         tracing::trace!("lower ty: {}", crate::printer::print_ty(&ty));
 
         if let Some(target) = ty.target {
-            if let pr::Ref::FullyQualified { to_decl, .. } = target {
-                self.type_defs_queue.push_back(to_decl.clone());
+            if let pr::Ref::FullyQualified { to_def, .. } = target {
+                self.type_defs_queue.push_back(to_def.clone());
 
-                tracing::debug!("lower ty ident: {to_decl}");
+                tracing::debug!("lower ty ident: {to_def}");
 
                 return ir::Ty {
-                    kind: ir::TyKind::Ident(ir::Path(to_decl.into_iter().collect_vec())),
+                    kind: ir::TyKind::Ident(ir::Path(to_def.into_iter().collect_vec())),
                     layout: None,
                     name: ty.name,
                     variants_recursive: vec![],
@@ -637,8 +637,8 @@ impl<'a> Lowerer<'a> {
             return;
         }
 
-        let decl = self.root_module.module.get(&path).unwrap();
-        let ty = decl.into_ty().unwrap().clone();
+        let def = self.root_module.get(&path).unwrap();
+        let ty = def.into_ty().unwrap().clone();
 
         let ty = self.lower_ty(ty);
 
@@ -796,51 +796,49 @@ fn get_pattern_enum_eq_tag(subject: &ir::Expr, pattern: &pr::Pattern, variant_na
     }
 }
 
-pub fn lower_type_defs(root_module: &decl::RootModule) -> ir::Module {
-    let mut lowerer = Lowerer::new(root_module);
+pub fn lower_type_defs(project: &Project) -> ir::Module {
+    let mut lowerer = Lowerer::new(&project.root_module);
 
     let mut module = ir::Module { decls: Vec::new() };
 
-    for (name, decl) in root_module.module.iter_decls_re() {
+    for (name, def) in project.root_module.iter_defs_re() {
         if name.starts_with_part("std") {
             continue;
         }
 
-        match &decl.kind {
-            decl::DeclKind::Module(_) => {
-                unreachable!("iter_decls_re does not return modules");
+        match &def.kind {
+            pr::DefKind::Module(_) => {
+                unreachable!("iter_def_re does not return modules");
             }
 
-            decl::DeclKind::Expr(expr) => {
+            pr::DefKind::Expr(expr) => {
+                let expr = expr.value.as_ref().unwrap();
                 let ty = lowerer.lower_ty(expr.ty.clone().unwrap());
 
                 module.insert(name.full_path(), ir::Decl::Var(ty));
             }
 
-            decl::DeclKind::Ty(_) => {
+            pr::DefKind::Ty(_) => {
                 lowerer.type_defs_queue.push_back(name);
             }
 
-            decl::DeclKind::Import(_) => {}
+            pr::DefKind::Import(_) => {}
 
-            decl::DeclKind::Unresolved(_) => panic!(),
+            pr::DefKind::Unresolved(_) => panic!(),
         }
     }
 
     lowerer.lower_ty_defs_queue();
-    let types = order_ty_defs(lowerer.type_defs, root_module);
+    let types = order_ty_defs(lowerer.type_defs, project);
     for ty in types {
         module.insert(&ty.name.0, ir::Decl::Type(ty.ty));
     }
     module
 }
 
-fn order_ty_defs(
-    mut by_name: HashMap<pr::Path, ir::Ty>,
-    root_module: &decl::RootModule,
-) -> Vec<ir::TyDef> {
+fn order_ty_defs(mut by_name: HashMap<pr::Path, ir::Ty>, project: &Project) -> Vec<ir::TyDef> {
     let mut r = Vec::with_capacity(by_name.len());
-    for group in &root_module.ordering {
+    for group in &project.ordering {
         for p in group {
             if let Some(ty) = by_name.remove(p) {
                 r.push(ir::TyDef {

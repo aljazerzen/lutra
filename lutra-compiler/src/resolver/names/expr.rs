@@ -1,5 +1,4 @@
 use crate::Result;
-use crate::decl;
 use crate::diagnostic::{Diagnostic, WithErrorInfo};
 use crate::pr;
 use crate::resolver::NS_STD;
@@ -10,22 +9,23 @@ use super::Scope;
 
 /// Traverses AST and resolves identifiers.
 pub struct NameResolver<'a> {
-    pub root: &'a mut decl::RootModule,
-    pub decl_module_path: &'a [String],
+    pub root: &'a mut pr::ModuleDef,
+    pub def_module_path: &'a [String],
     pub scopes: Vec<Scope>,
     pub refs: Vec<pr::Path>,
     pub scope_id_gen: &'a mut IdGenerator<usize>,
 }
 
 impl NameResolver<'_> {
-    pub fn fold_stmt_kind(&mut self, stmt: pr::StmtKind) -> Result<pr::StmtKind> {
-        Ok(match stmt {
-            pr::StmtKind::VarDef(var_def) => pr::StmtKind::VarDef(self.fold_var_def(var_def)?),
-            pr::StmtKind::TypeDef(ty_def) => pr::StmtKind::TypeDef(self.fold_type_def(ty_def)?),
-            pr::StmtKind::ImportDef(import_def) => {
-                pr::StmtKind::ImportDef(self.fold_import_def(import_def)?)
+    pub fn fold_def_kind(&mut self, def: pr::DefKind) -> Result<pr::DefKind> {
+        Ok(match def {
+            pr::DefKind::Expr(var_def) => pr::DefKind::Expr(self.fold_var_def(var_def)?),
+            pr::DefKind::Ty(ty_def) => pr::DefKind::Ty(self.fold_type_def(ty_def)?),
+            pr::DefKind::Import(import_def) => {
+                pr::DefKind::Import(self.fold_import_def(import_def)?)
             }
-            pr::StmtKind::ModuleDef(_) => unreachable!(),
+            pr::DefKind::Module(_) => unreachable!(),
+            pr::DefKind::Unresolved(_) => unreachable!(),
         })
     }
 
@@ -33,25 +33,19 @@ impl NameResolver<'_> {
         &mut self,
         import_def: pr::ImportDef,
     ) -> Result<pr::ImportDef, Diagnostic> {
-        let target = self.resolve_ident(&import_def.name)?;
-        let pr::Ref::FullyQualified { to_decl, within } = target else {
+        let target = self.resolve_ident(&import_def.target)?;
+        let pr::Ref::FullyQualified { to_def, within } = target else {
             panic!()
         };
         if !within.is_empty() {
             panic!();
         }
-        Ok(pr::ImportDef {
-            name: to_decl,
-            alias: import_def.alias,
-        })
+        Ok(pr::ImportDef { target: to_def })
     }
 }
 
 impl fold::PrFold for NameResolver<'_> {
-    fn fold_stmt(&mut self, _stmt: pr::Stmt) -> Result<pr::Stmt> {
-        unreachable!()
-    }
-    fn fold_stmts(&mut self, _stmts: Vec<pr::Stmt>) -> Result<Vec<pr::Stmt>> {
+    fn fold_def(&mut self, _def: pr::Def) -> Result<pr::Def> {
         unreachable!()
     }
 
@@ -208,18 +202,18 @@ impl NameResolver<'_> {
         let steps = ident.full_path();
         let (base_path, steps) = match ident.first() {
             "project" => (vec![], &steps[1..]),
-            "module" => (self.decl_module_path.to_vec(), &steps[1..]),
+            "module" => (self.def_module_path.to_vec(), &steps[1..]),
             "super" => {
-                let mut path = self.decl_module_path.to_vec();
+                let mut path = self.def_module_path.to_vec();
                 path.pop();
                 (path, &steps[1..])
             }
             NS_STD => (vec![NS_STD.to_string()], &steps[1..]),
-            _ => (self.decl_module_path.to_vec(), steps),
+            _ => (self.def_module_path.to_vec(), steps),
         };
-        let base_decl = self.root.module.get_submodule(&base_path);
+        let base_def = self.root.get_submodule(&base_path);
 
-        let res = base_decl.map_or(Err(None), |module| module_lookup_steps(module, steps));
+        let res = base_def.map_or(Err(None), |module| module_lookup_steps(module, steps));
         let steps_within = match res {
             Err(err) => {
                 tracing::debug!("scopes: {:?}", self.scopes);
@@ -228,41 +222,41 @@ impl NameResolver<'_> {
             }
             Ok(within) => within,
         };
-        let (to_decl, within) = steps.split_at(steps.len() - steps_within);
+        let (to_def, within) = steps.split_at(steps.len() - steps_within);
 
         // prepend the ident with the module path
         // this will make this ident a fully-qualified ident
         let mut fq_ident = pr::Path::new(base_path);
-        for step in to_decl {
+        for step in to_def {
             fq_ident.push(step.clone());
         }
 
         self.refs.push(fq_ident.clone());
 
         Ok(pr::Ref::FullyQualified {
-            to_decl: fq_ident,
+            to_def: fq_ident,
             within: pr::Path::new(within),
         })
     }
 }
 
 /// Returns true if ok
-fn module_lookup_steps(module: &decl::Module, steps: &[String]) -> Result<usize, Option<String>> {
+fn module_lookup_steps(module: &pr::ModuleDef, steps: &[String]) -> Result<usize, Option<String>> {
     if steps.is_empty() {
         // references to modules do not mean anything
         return Err(Some("cannot refer to modules".to_string()));
     }
 
-    let Some(decl) = module.names.get(&steps[0]) else {
+    let Some(def) = module.defs.get(&steps[0]) else {
         return Err(Some("name does not exist".to_string()));
     };
 
-    match &decl.kind {
+    match &def.kind {
         // recurse into submodules
-        decl::DeclKind::Module(sub_module) => module_lookup_steps(sub_module, &steps[1..]),
+        pr::DefKind::Module(sub_module) => module_lookup_steps(sub_module, &steps[1..]),
 
         // resolve refs into types
-        decl::DeclKind::Unresolved(Some(stmt)) => stmt_lookup_steps(stmt, &steps[1..]),
+        pr::DefKind::Unresolved(Some(def_kind)) => def_lookup_steps(def_kind, &steps[1..]),
         _ => {
             // recursive lookup into self (we take node out of Unresolved during name resolution)
 
@@ -278,21 +272,21 @@ fn module_lookup_steps(module: &decl::Module, steps: &[String]) -> Result<usize,
     }
 }
 
-fn stmt_lookup_steps(stmt: &pr::StmtKind, steps: &[String]) -> Result<usize, Option<String>> {
+fn def_lookup_steps(def: &pr::DefKind, steps: &[String]) -> Result<usize, Option<String>> {
     if steps.is_empty() {
         return Ok(0);
     }
 
-    // into type enum declarations (referring to variants)
-    match stmt {
-        pr::StmtKind::VarDef(_) | pr::StmtKind::ImportDef(_) => {
+    // into type enum definition (referring to variants)
+    match def {
+        pr::DefKind::Expr(_) | pr::DefKind::Import(_) => {
             Err(Some("cannot lookup into expressions".to_string()))
         }
-        pr::StmtKind::TypeDef(ty_def) => {
+        pr::DefKind::Ty(ty_def) => {
             ty_lookup_steps(&ty_def.ty, steps).map_err(|_| None)?;
             Ok(steps.len())
         }
-        pr::StmtKind::ModuleDef(_) => unreachable!(),
+        pr::DefKind::Module(_) | pr::DefKind::Unresolved(_) => unreachable!(),
     }
 }
 

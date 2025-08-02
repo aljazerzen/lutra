@@ -78,7 +78,7 @@ fn codegen_main(
 ) -> Result<String, std::fmt::Error> {
     use std::fmt::Write;
 
-    let module = lutra_compiler::lower_type_defs(&project.root_module);
+    let module = lutra_compiler::lower_type_defs(project);
     let module = lutra_compiler::layouter::on_root_module(module);
 
     let ty_defs = module.iter_types_re().collect();
@@ -122,8 +122,8 @@ fn codegen_module(
 
     // iterate pr decls (which keep the order in the source)
     let root_mod = &ctx.project.root_module;
-    let pr_mod = root_mod.module.get_submodule(&module_path).unwrap();
-    for (name, pr_decl) in &pr_mod.names {
+    let pr_mod = root_mod.get_submodule(&module_path).unwrap();
+    for (name, pr_def) in &pr_mod.defs {
         let Some(decl) = module.decls.iter().find(|d| &d.name == name) else {
             continue;
         };
@@ -136,7 +136,7 @@ fn codegen_module(
                 let mut ty = ty.clone();
                 super::infer_names(name, &mut ty);
 
-                tys.push((ty, pr_decl.annotations.as_slice()));
+                tys.push((ty, pr_def.annotations.as_slice()));
             }
             ir::Decl::Var(ty) => {
                 let mut ty = ty.clone();

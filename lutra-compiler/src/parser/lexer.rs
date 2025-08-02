@@ -88,7 +88,6 @@ fn lexer() -> impl Parser<char, Vec<Token>, Error = Cheap<char>> {
         just("type"),
     ))
     .then_ignore(non_ident())
-    .map(|x| x.to_string())
     .map(TokenKind::Keyword);
 
     let ident = ident_part().map(TokenKind::Ident);

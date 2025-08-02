@@ -41,8 +41,8 @@ pub fn on_root_module(root_module: ir::Module) -> ir::Module {
         currently_resolving: None,
     };
     let mut vars = Vec::new();
-    for (path, decl) in root_module.iter_decls_re() {
-        match decl {
+    for (path, def) in root_module.iter_defs_re() {
+        match def {
             ir::Decl::Module(_) => unreachable!(),
             ir::Decl::Type(ty) => {
                 l.ty_defs.insert(path, ty.clone());

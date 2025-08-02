@@ -2,7 +2,7 @@ mod explore;
 mod input;
 mod terminal;
 
-pub use explore::prompt_for_decl;
+pub use explore::prompt_for_def;
 pub use input::prompt_for_ty;
 
 pub fn show_value(ty: &lutra_bin::ir::Ty, value: lutra_bin::Value) -> Result<(), anyhow::Error> {

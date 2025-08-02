@@ -12,7 +12,6 @@ mod utils;
 
 type Result<T, E = diagnostic::Diagnostic> = core::result::Result<T, E>;
 
-pub mod decl;
 pub mod error;
 pub mod pr;
 pub mod printer;
@@ -38,7 +37,7 @@ pub fn compile(
     format: ProgramFormat,
 ) -> Result<(rr::Program, rr::ProgramType), error::Error> {
     let program_pr = self::check::check_overlay(project, program, name_hint)?;
-    let program_ir = crate::intermediate::lower_expr(&project.root_module, &program_pr);
+    let program_ir = crate::intermediate::lower_expr(project, &program_pr);
 
     tracing::debug!("ir:\n{}", lutra_bin::ir::print(&program_ir));
 
@@ -83,7 +82,7 @@ pub fn _test_compile_ty(ty_source: &str) -> ir::Ty {
     let project = check(source, CheckParams {}).unwrap_or_else(|e| panic!("{e}"));
 
     let name = pr::Path::from_name("t");
-    let type_def = project.root_module.module.get(&name);
+    let type_def = project.root_module.get(&name);
 
     let mut ty = type_def.unwrap().into_ty().unwrap().clone();
     ty.name = None;
@@ -96,6 +95,6 @@ pub fn _test_compile_main(source: &str) -> Result<ir::Program, error::Error> {
     let project = check(source, CheckParams {})?;
 
     let main = check_overlay(&project, "main", None)?;
-    let program = lower_expr(&project.root_module, &main);
+    let program = lower_expr(&project, &main);
     Ok(layouter::on_program(program))
 }

@@ -1,33 +1,34 @@
 use layout::Offset;
 use lutra_bin::ir;
+use lutra_compiler::pr;
 use ratatui::prelude::*;
 
 use crate::terminal::{Action, EventResult};
 
-pub fn prompt_for_decl(project: &lutra_compiler::Project) -> anyhow::Result<ir::Path> {
+pub fn prompt_for_def(project: &lutra_compiler::Project) -> anyhow::Result<ir::Path> {
     let mut app = ExploreApp::new(project);
 
     crate::terminal::within_alternate_screen(|term| crate::terminal::run_app(&mut app, term))??;
 
-    let path = app.root_decl.get_path(&app.cursor);
+    let path = app.root_def.get_path(&app.cursor);
     Ok(ir::Path(path))
 }
 
 struct ExploreApp {
-    root_decl: Decl,
+    root_def: Decl,
     cursor: Vec<usize>,
 }
 
 impl ExploreApp {
     fn new(project: &lutra_compiler::Project) -> Self {
-        let root_decl = Decl {
+        let root_def = Decl {
             name: "".into(),
-            kind: DeclKind::Module(ModuleDecl::new(&project.root_module.module)),
+            kind: DeclKind::Module(ModuleDecl::new(&project.root_module)),
             focus: false,
         };
 
         let mut app = ExploreApp {
-            root_decl,
+            root_def,
             cursor: vec![],
         };
 
@@ -36,18 +37,18 @@ impl ExploreApp {
     }
 
     fn update_cursor_path_position(&mut self, update: impl FnOnce(usize) -> usize) {
-        let (mut position, found) = self.root_decl.take_focus();
+        let (mut position, found) = self.root_def.take_focus();
 
         if !found {
             position = 0;
         }
 
         let updated_position = update(position);
-        let res = self.root_decl.insert_focus(updated_position);
+        let res = self.root_def.insert_focus(updated_position);
 
         let Ok(path) = res else {
             // revert
-            self.root_decl.insert_focus(position).ok();
+            self.root_def.insert_focus(position).ok();
             return;
         };
         self.cursor = path;
@@ -56,7 +57,7 @@ impl ExploreApp {
 
 impl crate::terminal::Component for ExploreApp {
     fn render(&self, frame: &mut ratatui::Frame) {
-        let DeclKind::Module(ModuleDecl { decls, .. }) = &self.root_decl.kind else {
+        let DeclKind::Module(ModuleDecl { decls, .. }) = &self.root_def.kind else {
             panic!()
         };
 
@@ -92,12 +93,10 @@ struct Decl {
 }
 
 impl Decl {
-    fn new(name: &str, decl: &lutra_compiler::decl::Decl) -> Option<Self> {
+    fn new(name: &str, decl: &pr::Def) -> Option<Self> {
         let kind = match &decl.kind {
-            lutra_compiler::decl::DeclKind::Module(module) => {
-                DeclKind::Module(ModuleDecl::new(module))
-            }
-            lutra_compiler::decl::DeclKind::Expr(e) => {
+            pr::DefKind::Module(module) => DeclKind::Module(ModuleDecl::new(module)),
+            pr::DefKind::Expr(e) => {
                 let ty = ir::Ty::from(e.ty.clone().unwrap());
                 if ty.kind.is_function() {
                     DeclKind::Function(FunctionDecl::new(ty))
@@ -105,8 +104,8 @@ impl Decl {
                     DeclKind::Value(ValueDecl::new(ty))
                 }
             }
-            lutra_compiler::decl::DeclKind::Ty(ty) => {
-                let ty = ir::Ty::from(ty.clone());
+            pr::DefKind::Ty(ty) => {
+                let ty = ir::Ty::from(ty.ty.clone());
                 DeclKind::Ty(TypeDecl::new(ty))
             }
             _ => return None,
@@ -149,7 +148,7 @@ impl Decl {
             return (0, true);
         }
 
-        let passed_decls = match &mut self.kind {
+        let passed_defs = match &mut self.kind {
             DeclKind::Function(_) => 1,
             DeclKind::Value(_) => 1,
             DeclKind::Ty(_) => 1,
@@ -165,7 +164,7 @@ impl Decl {
                 position
             }
         };
-        (passed_decls, false)
+        (passed_defs, false)
     }
 
     fn insert_focus(&mut self, position: usize) -> Result<Vec<usize>, usize> {
@@ -221,9 +220,9 @@ struct ModuleDecl {
     decls: Vec<Decl>,
 }
 impl ModuleDecl {
-    fn new(module: &lutra_compiler::decl::Module) -> Self {
+    fn new(module: &pr::ModuleDef) -> Self {
         let decls = module
-            .iter_decls()
+            .iter_defs()
             .filter(|(n, _)| *n != "std")
             .flat_map(|(n, d)| Decl::new(n, d))
             .collect();

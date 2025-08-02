@@ -1,5 +1,4 @@
 use crate::Result;
-use crate::decl::DeclKind;
 use crate::resolver::NS_STD;
 use crate::resolver::types::scope;
 use crate::utils::fold::PrFold;
@@ -7,63 +6,68 @@ use crate::{pr, utils};
 
 impl super::TypeResolver<'_> {
     /// Entry point to the resolver.
-    pub fn resolve_decls(&mut self, order: &[Vec<pr::Path>]) -> Result<()> {
+    pub fn resolve_defs(&mut self, order: &[Vec<pr::Path>]) -> Result<()> {
         for group in order {
             for fq_ident in group {
-                self.resolve_decl(fq_ident)?;
+                self.resolve_def(fq_ident)?;
             }
         }
         Ok(())
     }
 
-    /// fq_ident must point to an unresolved declaration.
+    /// fq_ident must point to an unresolved definition.
     #[tracing::instrument(name = "d", skip_all, fields(n = fq_ident.to_string()))]
-    fn resolve_decl(&mut self, fq_ident: &pr::Path) -> Result<()> {
+    fn resolve_def(&mut self, fq_ident: &pr::Path) -> Result<()> {
         if !fq_ident.starts_with_part(NS_STD) {
-            tracing::debug!("resolving decl {fq_ident}");
+            tracing::debug!("resolving def {fq_ident}");
         }
 
-        self.debug_current_decl = fq_ident.clone();
+        self.debug_current_def = fq_ident.clone();
 
-        // take decl out of the module
-        let decl = self.root_mod.module.get_mut(fq_ident).unwrap();
+        // take def out of the module
+        let def = self.root_mod.get_mut(fq_ident).unwrap();
 
-        let decl_kind = match &mut decl.kind {
+        let def_kind = match &mut def.kind {
             // happens in first pass
-            DeclKind::Unresolved(stmt) => {
-                let stmt = stmt.take().unwrap();
-                self.resolve_unresolved(fq_ident, stmt)?
+            pr::DefKind::Unresolved(def) => {
+                let def = def.take().unwrap();
+                self.resolve_unresolved(fq_ident, *def)?
             }
 
             // happens in strict (second) pass
-            DeclKind::Ty(ty) => {
+            pr::DefKind::Ty(ty) => {
                 let ty_orig = ty.clone();
 
-                DeclKind::Ty(self.fold_type(ty_orig)?)
+                pr::DefKind::Ty(pr::TyDef {
+                    ty: self.fold_type(ty_orig.ty)?,
+                })
             }
 
-            DeclKind::Module(_) => unreachable!(),
-            DeclKind::Expr(_) => unreachable!(),
-            DeclKind::Import(_) => unreachable!(),
+            pr::DefKind::Module(_) => unreachable!(),
+            pr::DefKind::Expr(_) => unreachable!(),
+            pr::DefKind::Import(_) => unreachable!(),
         };
 
-        // put decl back in
-        let decl = self.root_mod.module.get_mut(fq_ident).unwrap();
-        decl.kind = decl_kind;
+        // put def back in
+        let def = self.root_mod.get_mut(fq_ident).unwrap();
+        def.kind = def_kind;
         Ok(())
     }
 
     pub fn resolve_unresolved(
         &mut self,
         fq_ident: &pr::Path,
-        stmt: pr::StmtKind,
-    ) -> Result<DeclKind> {
-        Ok(match stmt {
-            pr::StmtKind::ModuleDef(_) => {
+        def: pr::DefKind,
+    ) -> Result<pr::DefKind> {
+        Ok(match def {
+            pr::DefKind::Module(_) => {
                 unreachable!("module def cannot be unresolved at this point")
-                // it should have been converted into Module in resolve_decls::init_module_tree
+                // it should have been converted into Module in resolve_defs::init_module_tree
             }
-            pr::StmtKind::VarDef(var_def) => {
+            pr::DefKind::Unresolved(_) => {
+                unreachable!("nested unresolved?")
+            }
+            pr::DefKind::Expr(var_def) => {
                 // push a top-level scope for exprs that need inference type args but are not wrapped into a function
                 let scope = scope::Scope::new(usize::MAX, scope::ScopeKind::Isolated);
                 self.scopes.push(scope);
@@ -74,13 +78,13 @@ impl super::TypeResolver<'_> {
 
                 tracing::debug!("variable done");
 
-                let decl = match def.value {
+                let def = match def.value {
                     Some(mut def_value) => {
                         // var value is provided
 
                         // validate type
                         if let Some(expected_ty) = &expected_ty {
-                            let who = || Some(fq_ident.name().to_string());
+                            let who = || Some(fq_ident.last().to_string());
                             self.validate_expr_type(&mut def_value, expected_ty, &who)?;
                         }
 
@@ -88,7 +92,10 @@ impl super::TypeResolver<'_> {
                         let mapping = self.finalize_type_vars()?;
                         let def_value = utils::TypeReplacer::on_expr(*def_value, mapping);
 
-                        DeclKind::Expr(Box::new(def_value))
+                        pr::DefKind::Expr(pr::ExprDef {
+                            value: Some(Box::new(def_value)),
+                            ty: None,
+                        })
                     }
                     None => {
                         // finalize scope
@@ -97,18 +104,21 @@ impl super::TypeResolver<'_> {
                         // var value is not provided: treat this var as value provided by the runtime
                         let mut expr = Box::new(pr::Expr::new(pr::ExprKind::Internal));
                         expr.ty = expected_ty;
-                        DeclKind::Expr(expr)
+                        pr::DefKind::Expr(pr::ExprDef {
+                            value: Some(expr),
+                            ty: None,
+                        })
                     }
                 };
                 self.scopes.pop().unwrap();
-                decl
+                def
             }
-            pr::StmtKind::TypeDef(ty_def) => {
+            pr::DefKind::Ty(ty_def) => {
                 let mut ty = self.fold_type(ty_def.ty)?;
-                ty.name = Some(fq_ident.name().to_string());
-                DeclKind::Ty(ty)
+                ty.name = Some(fq_ident.last().to_string());
+                pr::DefKind::Ty(pr::TyDef { ty })
             }
-            pr::StmtKind::ImportDef(target) => DeclKind::Import(target.name),
+            pr::DefKind::Import(target) => pr::DefKind::Import(target),
         })
     }
 }

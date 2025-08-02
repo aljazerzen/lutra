@@ -112,10 +112,10 @@ impl Module {
         }
     }
 
-    pub fn iter_decls_re(&self) -> impl Iterator<Item = (Path, &Decl)> {
+    pub fn iter_defs_re(&self) -> impl Iterator<Item = (Path, &Decl)> {
         self.decls.iter().flat_map(|item| match &item.decl {
             Decl::Module(sub_module) => sub_module
-                .iter_decls_re()
+                .iter_defs_re()
                 .map(|(mut p, d)| {
                     p.0.insert(0, item.name.clone());
                     (p, d)
@@ -128,7 +128,7 @@ impl Module {
     }
 
     pub fn iter_types_re(&self) -> impl Iterator<Item = (Path, &Ty)> {
-        self.iter_decls_re().filter_map(|(p, d)| {
+        self.iter_defs_re().filter_map(|(p, d)| {
             if let Decl::Type(ty) = d {
                 Some((p, ty))
             } else {

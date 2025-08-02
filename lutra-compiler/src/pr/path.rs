@@ -22,7 +22,7 @@ impl Path {
         }
     }
 
-    pub fn name(&self) -> &str {
+    pub fn last(&self) -> &str {
         self.path.last().unwrap()
     }
 
@@ -110,7 +110,7 @@ impl Path {
 
 impl std::fmt::Debug for Path {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_list().entries(&self.path).finish()
+        f.write_str(&display_path(self))
     }
 }
 

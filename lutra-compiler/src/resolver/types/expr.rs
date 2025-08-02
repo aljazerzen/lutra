@@ -12,10 +12,6 @@ use crate::utils::fold;
 use super::scope::{Scope, ScopeKind};
 
 impl fold::PrFold for super::TypeResolver<'_> {
-    fn fold_stmts(&mut self, _: Vec<pr::Stmt>) -> Result<Vec<pr::Stmt>> {
-        unreachable!()
-    }
-
     #[tracing::instrument(name = "e", skip(self, node))]
     fn fold_expr(&mut self, node: pr::Expr) -> Result<pr::Expr> {
         tracing::debug!("{}", node.kind.as_ref());
@@ -100,7 +96,7 @@ impl fold::PrFold for super::TypeResolver<'_> {
                         let mut std_index_expr = pr::Expr::new(std_index.clone());
                         std_index_expr.span = span;
                         std_index_expr.target = Some(pr::Ref::FullyQualified {
-                            to_decl: std_index,
+                            to_def: std_index,
                             within: pr::Path::empty(),
                         });
 
@@ -201,19 +197,19 @@ impl fold::PrFold for super::TypeResolver<'_> {
 
             // inline idents into types
             pr::TyKind::Ident(_) => {
-                if let Some(pr::Ref::FullyQualified { to_decl, within }) = &ty.target {
+                if let Some(pr::Ref::FullyQualified { to_def, within }) = &ty.target {
                     if !within.is_empty() {
                         // Things like `my_tuple::field` are "references into types".
                         // They are needed for constructing enums and are useful in general.
                         // But they are inconvenient to work with in IR, because in addition
-                        // to the code that finds the decl, we need code to look into the decl
+                        // to the code that finds the def, we need code to look into the def
                         // as well/
                         // So instead, we inline these references during resolving.
                         // This is possible, because they are restricted to be non-recursive.
-                        tracing::debug!("inlining a 'path into type' for: {to_decl:?}.{within:?}");
+                        tracing::debug!("inlining a 'path into type' for: {to_def:?}.{within:?}");
 
-                        let decl = self.root_mod.module.get(to_decl).unwrap();
-                        let referenced = decl.into_ty().unwrap();
+                        let def = self.root_mod.get(to_def).unwrap();
+                        let referenced = def.into_ty().unwrap();
                         let referenced =
                             names::ty_lookup_steps(referenced, within.full_path()).unwrap();
 

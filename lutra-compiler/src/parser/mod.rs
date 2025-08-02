@@ -1,8 +1,8 @@
+pub(crate) mod def;
 mod expr;
 mod interpolation;
 pub(crate) mod lexer;
 pub(crate) mod perror;
-pub(crate) mod stmt;
 mod test;
 mod types;
 
@@ -15,12 +15,12 @@ use crate::diagnostic::Diagnostic;
 use crate::pr;
 use crate::span::Span;
 
-pub fn parse_source(source: &str, source_id: u16) -> (Option<Vec<pr::Stmt>>, Vec<Diagnostic>) {
+pub fn parse_source(source: &str, source_id: u16) -> (Option<pr::ModuleDef>, Vec<Diagnostic>) {
     let (tokens, mut errors) = lexer::lex_source_recovery(source, source_id);
 
     let ast = if let Some(tokens) = tokens {
         let stream = prepare_stream(tokens, source_id);
-        let (ast, chum_errs) = stmt::source().parse_recovery(stream);
+        let (ast, chum_errs) = def::source().parse_recovery(stream);
 
         errors.extend(chum_errs.into_iter().map(Diagnostic::from));
         ast
@@ -90,7 +90,7 @@ fn ident_keyword(kw: &'static str) -> impl Parser<TokenKind, (), Error = PError>
 }
 
 fn keyword(kw: &'static str) -> impl Parser<TokenKind, (), Error = PError> + Clone {
-    just(TokenKind::Keyword(kw.to_string())).ignored()
+    just(TokenKind::Keyword(kw)).ignored()
 }
 
 fn ctrl(char: char) -> impl Parser<TokenKind, (), Error = PError> + Clone {

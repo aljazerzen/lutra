@@ -32,13 +32,13 @@ pub fn execute(
     input: &[u8],
 ) -> Result<Vec<u8>, Error> {
     // prepare
-    let stmt = client.prepare(&program.sql)?;
+    let def = client.prepare(&program.sql)?;
 
     // pack input into query args
     let args = params::to_sql(program, input);
 
     // execute
-    let rows = client.query(&stmt, &args.as_refs())?;
+    let rows = client.query(&def, &args.as_refs())?;
 
     // convert result from sql
     result::from_sql(program, &rows)

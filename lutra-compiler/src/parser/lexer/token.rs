@@ -12,7 +12,7 @@ pub struct Token {
 #[derive(Clone, PartialEq, Debug)]
 pub enum TokenKind {
     Ident(String),
-    Keyword(String),
+    Keyword(&'static str),
     Literal(pr::Literal),
 
     Interpolation(char, String),

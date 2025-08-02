@@ -54,7 +54,7 @@ pub fn write_ty_def(
             .kind
             .as_func_call()
             .and_then(|c| c.func.kind.as_ident())
-            .is_some_and(|i| i.name() == "derive")
+            .is_some_and(|i| i.last() == "derive")
     });
     if let Some(derive_annotation) = derive_annotation {
         let c = derive_annotation.expr.kind.as_func_call().unwrap();

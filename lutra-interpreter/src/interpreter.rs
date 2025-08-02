@@ -85,9 +85,9 @@ fn find_external_func(
     external: &br::ExternalSymbol,
     native_modules: &HashMap<&str, &dyn NativeModule>,
 ) -> Option<NativeFunction> {
-    let (mod_id, decl_name) = external.id.rsplit_once("::")?;
+    let (mod_id, def_name) = external.id.rsplit_once("::")?;
     let module = native_modules.get(mod_id)?;
-    module.lookup_native_symbol(decl_name)
+    module.lookup_native_symbol(def_name)
 }
 
 impl Interpreter {
