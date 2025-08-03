@@ -9,14 +9,28 @@ mod result;
 #[cfg(feature = "tokio-postgres")]
 mod schema;
 
+#[cfg(feature = "postgres")]
+use postgres::Error as PgError;
+use thiserror::Error;
+#[cfg(not(feature = "postgres"))]
+use tokio_postgres::Error as PgError;
+
 use lutra_bin::rr;
+
+#[derive(Error, Debug)]
+pub enum Error {
+    #[error("bad result: {}", .0)]
+    BadDatabaseResponse(&'static str),
+    #[error("postgres: {}", .0)]
+    Postgres(#[from] PgError),
+}
 
 #[cfg(feature = "postgres")]
 pub fn execute(
     client: &mut postgres::Client,
     program: &rr::SqlProgram,
     input: &[u8],
-) -> Result<Vec<u8>, postgres::Error> {
+) -> Result<Vec<u8>, Error> {
     // prepare
     let stmt = client.prepare(&program.sql)?;
 
@@ -27,7 +41,7 @@ pub fn execute(
     let rows = client.query(&stmt, &args.as_refs())?;
 
     // convert result from sql
-    Ok(result::from_sql(program, &rows))
+    result::from_sql(program, &rows)
 }
 
 #[cfg(feature = "tokio-postgres")]
@@ -39,6 +53,18 @@ impl RunnerAsync {
     pub fn new(client: tokio_postgres::Client) -> Self {
         RunnerAsync { client }
     }
+
+    /// Helper for [tokio_postgres::connect] and [RunnerAsync::new].
+    pub async fn connect_no_tls(config: &str) -> Result<Self, Error> {
+        let (client, conn) = tokio_postgres::connect(config, tokio_postgres::NoTls).await?;
+        tokio::task::spawn(async {
+            if let Err(e) = conn.await {
+                eprintln!("{e}");
+            }
+        });
+
+        Ok(Self::new(client))
+    }
 }
 
 pub struct PreparedProgram {
@@ -48,7 +74,7 @@ pub struct PreparedProgram {
 
 #[cfg(feature = "tokio-postgres")]
 impl lutra_runner::Run for RunnerAsync {
-    type Error = tokio_postgres::Error;
+    type Error = Error;
     type Prepared = PreparedProgram;
 
     async fn prepare(&self, program: rr::Program) -> Result<Self::Prepared, Self::Error> {
@@ -70,7 +96,7 @@ impl lutra_runner::Run for RunnerAsync {
         let rows = self.client.query(&handle.stmt, &args.as_refs()).await?;
 
         // convert result from sql
-        Ok(result::from_sql(&handle.program, &rows))
+        result::from_sql(&handle.program, &rows)
     }
 
     async fn get_interface(&self) -> Result<std::string::String, Self::Error> {

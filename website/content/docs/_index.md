@@ -79,7 +79,7 @@ pub struct Movie {
     pub title: String,
 }
 
-pub fn my_program() -> sr::TypedProgram<(), Movie> { ... }
+pub fn my_program() -> rr::TypedProgram<(), Movie> { ... }
 
 ...
 ```

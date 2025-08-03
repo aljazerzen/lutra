@@ -324,3 +324,39 @@ fn infer_names_re(ty: &mut ir::Ty, name_prefix: &mut Vec<String>) {
         }
     }
 }
+
+fn camel_to_snake(camel: &str) -> String {
+    let mut snake = String::with_capacity(camel.len());
+    for current in camel.chars() {
+        if current.is_uppercase() {
+            if !snake.is_empty() && snake.ends_with('_') {
+                snake.push('_');
+            }
+            snake.push(current.to_lowercase().next().unwrap());
+        } else {
+            snake.push(current);
+        }
+    }
+
+    snake
+}
+
+fn snake_to_sentence(snake: &str) -> String {
+    let mut sentence = String::with_capacity(snake.len());
+    let mut next_upper = true;
+    for current in snake.chars() {
+        if current == '_' {
+            next_upper = true;
+            continue;
+        }
+
+        if next_upper {
+            sentence.push(current.to_uppercase().next().unwrap());
+        } else {
+            sentence.push(current.to_lowercase().next().unwrap());
+        }
+        next_upper = false;
+    }
+
+    sentence
+}

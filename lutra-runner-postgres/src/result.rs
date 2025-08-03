@@ -9,16 +9,18 @@ use postgres::Row;
 #[cfg(feature = "tokio-postgres")]
 use tokio_postgres::Row;
 
-pub fn from_sql(program: &rr::SqlProgram, rows: &[Row]) -> Vec<u8> {
+use crate::Error;
+
+pub fn from_sql(program: &rr::SqlProgram, rows: &[Row]) -> Result<Vec<u8>, Error> {
     // write rows to buffer
     let mut buf = bytes::BytesMut::new();
 
     let ctx = Context::new(&program.types);
 
     let encoder = ctx.construct_rows_encoder(&program.output_ty);
-    encoder.encode(&mut buf, rows);
+    encoder.encode(&mut buf, rows)?;
 
-    buf.to_vec()
+    Ok(buf.to_vec())
 }
 
 // TODO: use get_ty_mat for ident types (or recursive types in JSON)
@@ -144,7 +146,7 @@ enum HeadResidual {
 }
 
 trait EncodeRows {
-    fn encode(&self, buf: &mut BytesMut, rows: &[Row]);
+    fn encode(&self, buf: &mut BytesMut, rows: &[Row]) -> Result<(), Error>;
 }
 
 struct ArrayEncoder {
@@ -152,7 +154,7 @@ struct ArrayEncoder {
 }
 
 impl EncodeRows for ArrayEncoder {
-    fn encode(&self, buf: &mut BytesMut, rows: &[Row]) {
+    fn encode(&self, buf: &mut BytesMut, rows: &[Row]) -> Result<(), Error> {
         // write array head
         let body_ptr = lutra_bin::ReversePointer::new(buf);
         buf.put_u32_le(rows.len() as u32);
@@ -170,6 +172,7 @@ impl EncodeRows for ArrayEncoder {
             let mut row_iter = RowIter { row, idx: 0 };
             self.inner.encode_body(buf, &mut row_iter, h);
         }
+        Ok(())
     }
 }
 
@@ -178,21 +181,27 @@ struct SingleRowEncoder {
 }
 
 impl EncodeRows for SingleRowEncoder {
-    fn encode(&self, buf: &mut BytesMut, rows: &[Row]) {
-        let row = &rows[0];
+    fn encode(&self, buf: &mut BytesMut, rows: &[Row]) -> Result<(), Error> {
+        if rows.len() != 1 {
+            return Err(Error::BadDatabaseResponse("expected 1 row, got 0"));
+        }
+        let row = rows.first().unwrap();
 
         let mut row_iter = RowIter { row, idx: 0 };
         let head = self.inner.encode_head(buf, &mut row_iter);
 
         let mut row_iter = RowIter { row, idx: 0 };
         self.inner.encode_body(buf, &mut row_iter, head);
+        Ok(())
     }
 }
 
 struct EmptyRowEncoder;
 
 impl EncodeRows for EmptyRowEncoder {
-    fn encode(&self, _buf: &mut BytesMut, _rows: &[Row]) {}
+    fn encode(&self, _buf: &mut BytesMut, _rows: &[Row]) -> Result<(), Error> {
+        Ok(())
+    }
 }
 
 trait EncodeRow {
