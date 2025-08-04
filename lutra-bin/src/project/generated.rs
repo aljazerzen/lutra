@@ -904,7 +904,7 @@ pub mod ir {
     #[allow(non_camel_case_types)]
     pub struct Program {
         pub main: Expr,
-        pub types: crate::vec::Vec<TyDef>,
+        pub defs: crate::vec::Vec<TyDef>,
     }
 
     #[derive(Debug, Clone)]
@@ -1134,18 +1134,18 @@ pub mod ir {
             type HeadPtr = ProgramHeadPtr;
             fn encode_head(&self, buf: &mut crate::bytes::BytesMut) -> Self::HeadPtr {
                 let main = self.main.encode_head(buf);
-                let types = self.types.encode_head(buf);
-                ProgramHeadPtr { main, types }
+                let defs = self.defs.encode_head(buf);
+                ProgramHeadPtr { main, defs }
             }
             fn encode_body(&self, head: Self::HeadPtr, buf: &mut crate::bytes::BytesMut) {
                 self.main.encode_body(head.main, buf);
-                self.types.encode_body(head.types, buf);
+                self.defs.encode_body(head.defs, buf);
             }
         }
         #[allow(non_camel_case_types)]
         pub struct ProgramHeadPtr {
             main: <super::Expr as crate::Encode>::HeadPtr,
-            types: <crate::vec::Vec<super::TyDef> as crate::Encode>::HeadPtr,
+            defs: <crate::vec::Vec<super::TyDef> as crate::Encode>::HeadPtr,
         }
         impl crate::Layout for Program {
             fn head_size() -> usize {
@@ -1156,8 +1156,8 @@ pub mod ir {
         impl crate::Decode for Program {
             fn decode(buf: &[u8]) -> crate::Result<Self> {
                 let main = super::Expr::decode(buf.skip(0))?;
-                let types = crate::vec::Vec::<super::TyDef>::decode(buf.skip(28))?;
-                Ok(Program { main, types })
+                let defs = crate::vec::Vec::<super::TyDef>::decode(buf.skip(28))?;
+                Ok(Program { main, defs })
             }
         }
 
@@ -2810,7 +2810,7 @@ pub mod rr {
     pub struct ProgramType {
         pub input: super::ir::Ty,
         pub output: super::ir::Ty,
-        pub ty_defs: crate::vec::Vec<super::ir::TyDef>,
+        pub defs: crate::vec::Vec<super::ir::TyDef>,
     }
 
     #[derive(Debug, Clone)]
@@ -2819,7 +2819,7 @@ pub mod rr {
         pub sql: crate::string::String,
         pub input_ty: super::ir::Ty,
         pub output_ty: super::ir::Ty,
-        pub types: crate::vec::Vec<super::ir::TyDef>,
+        pub defs: crate::vec::Vec<super::ir::TyDef>,
     }
 
     mod impls {
@@ -2909,24 +2909,24 @@ pub mod rr {
             fn encode_head(&self, buf: &mut crate::bytes::BytesMut) -> Self::HeadPtr {
                 let input = self.input.encode_head(buf);
                 let output = self.output.encode_head(buf);
-                let ty_defs = self.ty_defs.encode_head(buf);
+                let defs = self.defs.encode_head(buf);
                 ProgramTypeHeadPtr {
                     input,
                     output,
-                    ty_defs,
+                    defs,
                 }
             }
             fn encode_body(&self, head: Self::HeadPtr, buf: &mut crate::bytes::BytesMut) {
                 self.input.encode_body(head.input, buf);
                 self.output.encode_body(head.output, buf);
-                self.ty_defs.encode_body(head.ty_defs, buf);
+                self.defs.encode_body(head.defs, buf);
             }
         }
         #[allow(non_camel_case_types)]
         pub struct ProgramTypeHeadPtr {
             input: <super::super::ir::Ty as crate::Encode>::HeadPtr,
             output: <super::super::ir::Ty as crate::Encode>::HeadPtr,
-            ty_defs: <crate::vec::Vec<super::super::ir::TyDef> as crate::Encode>::HeadPtr,
+            defs: <crate::vec::Vec<super::super::ir::TyDef> as crate::Encode>::HeadPtr,
         }
         impl crate::Layout for ProgramType {
             fn head_size() -> usize {
@@ -2938,11 +2938,11 @@ pub mod rr {
             fn decode(buf: &[u8]) -> crate::Result<Self> {
                 let input = super::super::ir::Ty::decode(buf.skip(0))?;
                 let output = super::super::ir::Ty::decode(buf.skip(23))?;
-                let ty_defs = crate::vec::Vec::<super::super::ir::TyDef>::decode(buf.skip(46))?;
+                let defs = crate::vec::Vec::<super::super::ir::TyDef>::decode(buf.skip(46))?;
                 Ok(ProgramType {
                     input,
                     output,
-                    ty_defs,
+                    defs,
                 })
             }
         }
@@ -2954,19 +2954,19 @@ pub mod rr {
                 let sql = self.sql.encode_head(buf);
                 let input_ty = self.input_ty.encode_head(buf);
                 let output_ty = self.output_ty.encode_head(buf);
-                let types = self.types.encode_head(buf);
+                let defs = self.defs.encode_head(buf);
                 SqlProgramHeadPtr {
                     sql,
                     input_ty,
                     output_ty,
-                    types,
+                    defs,
                 }
             }
             fn encode_body(&self, head: Self::HeadPtr, buf: &mut crate::bytes::BytesMut) {
                 self.sql.encode_body(head.sql, buf);
                 self.input_ty.encode_body(head.input_ty, buf);
                 self.output_ty.encode_body(head.output_ty, buf);
-                self.types.encode_body(head.types, buf);
+                self.defs.encode_body(head.defs, buf);
             }
         }
         #[allow(non_camel_case_types)]
@@ -2974,7 +2974,7 @@ pub mod rr {
             sql: <crate::string::String as crate::Encode>::HeadPtr,
             input_ty: <super::super::ir::Ty as crate::Encode>::HeadPtr,
             output_ty: <super::super::ir::Ty as crate::Encode>::HeadPtr,
-            types: <crate::vec::Vec<super::super::ir::TyDef> as crate::Encode>::HeadPtr,
+            defs: <crate::vec::Vec<super::super::ir::TyDef> as crate::Encode>::HeadPtr,
         }
         impl crate::Layout for SqlProgram {
             fn head_size() -> usize {
@@ -2987,12 +2987,12 @@ pub mod rr {
                 let sql = crate::string::String::decode(buf.skip(0))?;
                 let input_ty = super::super::ir::Ty::decode(buf.skip(8))?;
                 let output_ty = super::super::ir::Ty::decode(buf.skip(31))?;
-                let types = crate::vec::Vec::<super::super::ir::TyDef>::decode(buf.skip(54))?;
+                let defs = crate::vec::Vec::<super::super::ir::TyDef>::decode(buf.skip(54))?;
                 Ok(SqlProgram {
                     sql,
                     input_ty,
                     output_ty,
-                    types,
+                    defs,
                 })
             }
         }

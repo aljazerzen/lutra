@@ -9,7 +9,7 @@ pub(super) struct Context<'t> {
     bindings: HashMap<u32, usize>,
     functions: HashMap<u32, FuncProvider>,
 
-    types: HashMap<&'t ir::Path, &'t ir::Ty>,
+    defs: HashMap<&'t ir::Path, &'t ir::Ty>,
 
     scope_id_gen: IdGenerator,
 }
@@ -23,8 +23,8 @@ pub fn compile(program: &ir::Program) -> (cr::Expr, HashMap<&ir::Path, &ir::Ty>)
     let mut ctx = Context {
         bindings: Default::default(),
         functions: Default::default(),
-        types: program
-            .types
+        defs: program
+            .defs
             .iter()
             .map(|def| (&def.name, &def.ty))
             .collect(),
@@ -46,13 +46,13 @@ pub fn compile(program: &ir::Program) -> (cr::Expr, HashMap<&ir::Path, &ir::Ty>)
 
     let body = ctx.compile_rel(&func.body);
 
-    (body, ctx.types)
+    (body, ctx.defs)
 }
 
 impl<'a> Context<'a> {
     pub(super) fn get_ty_mat(&self, ty: &'a ir::Ty) -> &'a ir::Ty {
         match &ty.kind {
-            ir::TyKind::Ident(path) => self.types.get(path).unwrap(),
+            ir::TyKind::Ident(path) => self.defs.get(path).unwrap(),
             _ => ty,
         }
     }

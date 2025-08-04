@@ -44,7 +44,7 @@ pub fn compile_ir(program: ir::Program) -> (ir::Program, rr::SqlProgram) {
         sql: sql_source,
         input_ty: program.get_input_ty().clone(),
         output_ty: program.get_output_ty().clone(),
-        types: program.types.clone(),
+        defs: program.defs.clone(),
     };
     (program, program_sr)
 }

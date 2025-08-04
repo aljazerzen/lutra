@@ -59,7 +59,7 @@ pub fn compile(
     let ty = rr::ProgramType {
         input: ir_func_ty.params.into_iter().next().unwrap(),
         output: ir_func_ty.body,
-        ty_defs: program_ir.types,
+        defs: program_ir.defs,
     };
 
     Ok((program, ty))

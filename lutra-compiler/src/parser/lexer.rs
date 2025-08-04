@@ -76,16 +76,16 @@ fn lexer() -> impl Parser<char, Vec<Token>, Error = Cheap<char>> {
     let literal = literal().map(TokenKind::Literal);
 
     let keyword = choice((
+        just("const"),
         just("enum"),
         just("func"),
-        just("where"),
         just("import"),
         just("internal"),
         just("let"),
-        just("const"),
         just("match"),
         just("module"),
         just("type"),
+        just("where"),
     ))
     .then_ignore(non_ident())
     .map(TokenKind::Keyword);

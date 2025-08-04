@@ -918,7 +918,7 @@ let main =
                 variants_recursive: [],
             },
         },
-        types: [
+        defs: [
             TyDef {
                 name: Path(
                     [

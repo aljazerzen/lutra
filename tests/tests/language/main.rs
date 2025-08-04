@@ -124,8 +124,8 @@ async fn run_program(
     let res = runner.execute(&handle, &input).await;
     let output = res.map_err(|e| format!("Run::execute: {e:?}"))?;
 
-    let output = lutra_bin::Value::decode(&output, &ty.output, &ty.ty_defs)?;
-    let output_source = output.print_source(&ty.output, &ty.ty_defs)?;
+    let output = lutra_bin::Value::decode(&output, &ty.output, &ty.defs)?;
+    let output_source = output.print_source(&ty.output, &ty.defs)?;
 
     if case.output == output_source {
         Ok(())

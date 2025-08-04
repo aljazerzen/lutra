@@ -15,7 +15,7 @@ pub fn from_sql(program: &rr::SqlProgram, rows: &[Row]) -> Result<Vec<u8>, Error
     // write rows to buffer
     let mut buf = bytes::BytesMut::new();
 
-    let ctx = Context::new(&program.types);
+    let ctx = Context::new(&program.defs);
 
     let encoder = ctx.construct_rows_encoder(&program.output_ty);
     encoder.encode(&mut buf, rows)?;

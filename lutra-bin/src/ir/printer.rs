@@ -42,7 +42,7 @@ impl Printer {
     fn print_program(&mut self, program: &ir::Program) -> String {
         let mut r = String::new();
 
-        for ty_def in &program.types {
+        for ty_def in &program.defs {
             r += "type ";
             r += &self.print_path(&ty_def.name);
             r += " = ";

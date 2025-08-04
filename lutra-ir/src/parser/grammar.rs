@@ -6,7 +6,7 @@ use lutra_bin::ir::*;
 use lutra_compiler::_lexer::TokenKind;
 
 pub fn program() -> impl Parser<TokenKind, Program, Error = PError> {
-    let types = keyword("type")
+    let defs = keyword("type")
         .ignore_then(path())
         .then_ignore(ctrl('='))
         .then(ty())
@@ -20,9 +20,7 @@ pub fn program() -> impl Parser<TokenKind, Program, Error = PError> {
         .then(ctrl('='))
         .ignore_then(expr());
 
-    types
-        .then(main)
-        .map(|(types, main)| Program { main, types })
+    defs.then(main).map(|(defs, main)| Program { main, defs })
 }
 
 fn expr() -> impl Parser<TokenKind, Expr, Error = PError> + Clone {

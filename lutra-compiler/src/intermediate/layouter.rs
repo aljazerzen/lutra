@@ -10,11 +10,11 @@ use lutra_bin::ir;
 pub fn on_program(mut program: ir::Program) -> ir::Program {
     tracing::trace!(
         "types: {:?}",
-        program.types.iter().map(|x| &x.name).collect_vec()
+        program.defs.iter().map(|x| &x.name).collect_vec()
     );
 
     let mut l = Layouter {
-        ty_defs: program.types.into_iter().map(|d| (d.name, d.ty)).collect(),
+        ty_defs: program.defs.into_iter().map(|d| (d.name, d.ty)).collect(),
         contains_missing_layout: false,
         currently_resolving: None,
     };
@@ -25,7 +25,7 @@ pub fn on_program(mut program: ir::Program) -> ir::Program {
     // compute layout for the main expr
     program.main = l.fold_expr(program.main).unwrap();
 
-    program.types = l
+    program.defs = l
         .ty_defs
         .into_iter()
         .map(|(name, ty)| ir::TyDef { name, ty })

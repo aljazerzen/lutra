@@ -25,7 +25,7 @@ pub fn _run(source: &str, args: Vec<lutra_bin::Value>) -> (String, String) {
 
     let mut input_writer = lutra_bin::TupleWriter::new_for_ty(&ty.input);
     for (arg, a_ty) in std::iter::zip(args, ty.input.iter_fields()) {
-        input_writer.write_field(lutra_bin::Data::new(arg.encode(a_ty, &ty.ty_defs).unwrap()));
+        input_writer.write_field(lutra_bin::Data::new(arg.encode(a_ty, &ty.defs).unwrap()));
     }
     let input = input_writer.finish().flatten();
 
@@ -34,8 +34,8 @@ pub fn _run(source: &str, args: Vec<lutra_bin::Value>) -> (String, String) {
     let rel_data = lutra_runner_postgres::execute(&mut client, program, &input).unwrap();
 
     // decode and print source
-    let output = lutra_bin::Value::decode(&rel_data, &ty.output, &ty.ty_defs).unwrap();
-    let output = output.print_source(&ty.output, &ty.ty_defs).unwrap();
+    let output = lutra_bin::Value::decode(&rel_data, &ty.output, &ty.defs).unwrap();
+    let output = output.print_source(&ty.output, &ty.defs).unwrap();
 
     (formatted_sql, output)
 }

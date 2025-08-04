@@ -15,12 +15,12 @@ fn execute_program(project: &lutra_compiler::Project, program: &str) {
     ty.output.name = Some("output".into());
 
     let input_val = lutra_tui::prompt_for_ty(&ty.input, None).unwrap();
-    let input = input_val.encode(&ty.input, &ty.ty_defs).unwrap();
+    let input = input_val.encode(&ty.input, &ty.defs).unwrap();
 
     let program = program.into_bytecode_lt().unwrap();
     let result =
         lutra_interpreter::evaluate(&program, input, lutra_interpreter::BUILTIN_MODULES).unwrap();
-    let result = lutra_bin::Value::decode(&result, &ty.output, &ty.ty_defs).unwrap();
+    let result = lutra_bin::Value::decode(&result, &ty.output, &ty.defs).unwrap();
 
     lutra_tui::show_value(&ty.output, result).unwrap();
 }

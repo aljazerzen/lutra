@@ -12,11 +12,11 @@ use crate::{Project, Result};
 pub fn lower_expr(project: &Project, main_pr: &pr::Expr) -> ir::Program {
     let mut lowerer = Lowerer::new(&project.root_module);
 
-    let input_ty = get_entry_point_input(main_pr);
-    lowerer.program_input_ty = Some(lowerer.lower_ty(input_ty));
+    let (input_ty, packed) = get_entry_point_input(main_pr);
+    lowerer.program_input_ty = Some((lowerer.lower_ty(input_ty), packed));
     tracing::debug!(
         "program_input_ty = {}",
-        ir::print_ty(lowerer.program_input_ty.as_ref().unwrap())
+        ir::print_ty(&lowerer.program_input_ty.as_ref().unwrap().0)
     );
     lowerer.is_main_func = main_pr.ty.as_ref().unwrap().kind.is_func();
 
@@ -34,9 +34,9 @@ pub fn lower_expr(project: &Project, main_pr: &pr::Expr) -> ir::Program {
     let main = lowerer.lower_var_bindings(main).unwrap();
 
     lowerer.lower_ty_defs_queue();
-    let types = order_ty_defs(lowerer.type_defs, project);
+    let defs = order_ty_defs(lowerer.type_defs, project);
 
-    ir::Program { main, types }
+    ir::Program { main, defs }
 }
 
 struct Lowerer<'a> {
@@ -45,7 +45,9 @@ struct Lowerer<'a> {
     scopes: Vec<Scope>,
 
     is_main_func: bool,
-    program_input_ty: Option<ir::Ty>,
+
+    /// Type of the program's input. Flag for when input is packed from multiple params.
+    program_input_ty: Option<(ir::Ty, bool)>,
 
     /// Depended expressions that are referenced from generated IR.
     /// Contain FQ path and list of type arguments, pointing to id the should
@@ -270,13 +272,13 @@ impl<'a> Lowerer<'a> {
                                     },
                                 ));
                                 let input_ty = self.program_input_ty.as_ref();
-                                if input_ty.is_some_and(|x| x.kind.is_tuple()) {
-                                    // if the param is tuple of many original params,
+                                if input_ty.is_some_and(|(_, packed)| *packed) {
+                                    // if original function params have been packed into a tuple,
                                     // we also need to also inject tuple lookup.
                                     ir::ExprKind::TupleLookup(Box::new(ir::TupleLookup {
                                         base: ir::Expr {
                                             kind: param_ref,
-                                            ty: self.program_input_ty.clone().unwrap(),
+                                            ty: self.program_input_ty.clone().unwrap().0,
                                         },
                                         position: param_position as u16,
                                     }))
@@ -852,17 +854,17 @@ fn order_ty_defs(mut by_name: HashMap<pr::Path, ir::Ty>, project: &Project) -> V
 }
 
 /// Get the entry point's input type.
-fn get_entry_point_input(expr: &pr::Expr) -> pr::Ty {
+fn get_entry_point_input(expr: &pr::Expr) -> (pr::Ty, bool) {
     let ty = expr.ty.as_ref().unwrap();
     let Some(ty_func) = ty.kind.as_func() else {
-        return pr::Ty::new(pr::TyKind::Tuple(vec![]));
+        return (pr::Ty::new(pr::TyKind::Tuple(vec![])), true);
     };
 
     if ty_func.params.len() == 1 {
-        return ty_func.params[0].clone().unwrap();
+        return (ty_func.params[0].clone().unwrap(), false);
     }
 
-    pr::Ty::new(pr::TyKind::Tuple(
+    let ty = pr::Ty::new(pr::TyKind::Tuple(
         ty_func
             .params
             .iter()
@@ -871,5 +873,6 @@ fn get_entry_point_input(expr: &pr::Expr) -> pr::Ty {
                 name: None,
             })
             .collect(),
-    ))
+    ));
+    (ty, true)
 }

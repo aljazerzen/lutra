@@ -9,8 +9,8 @@ use lutra_bin::ir;
 pub fn compile_program(value: ir::Program) -> Program {
     let mut b = ByteCoder {
         externals: Default::default(),
-        types: value
-            .types
+        defs: value
+            .defs
             .into_iter()
             .map(|def| (def.name, def.ty))
             .collect(),
@@ -24,13 +24,13 @@ pub fn compile_program(value: ir::Program) -> Program {
 
 struct ByteCoder {
     externals: IndexSet<ExternalSymbol>,
-    types: HashMap<ir::Path, ir::Ty>,
+    defs: HashMap<ir::Path, ir::Ty>,
 }
 
 impl ByteCoder {
     fn get_ty_mat<'a>(&'a self, ty: &'a ir::Ty) -> &'a ir::Ty {
         match &ty.kind {
-            TyKind::Ident(path) => self.types.get(path).unwrap(),
+            TyKind::Ident(path) => self.defs.get(path).unwrap(),
             _ => ty,
         }
     }

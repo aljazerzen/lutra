@@ -254,9 +254,7 @@ fn parse_05() {
                 kind: Indirection {
                     base: Expr {
                         kind: Ident(
-                            [
-                                "item",
-                            ],
+                            item,
                         ),
                         span: Some(
                             0:15-19,

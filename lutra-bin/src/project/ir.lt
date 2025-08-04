@@ -1,6 +1,6 @@
 type Program: {
   main: Expr,
-  types: [TyDef]
+  defs: [TyDef]
 }
 
 type Expr: {

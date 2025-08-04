@@ -16,7 +16,7 @@ module rr {
     output: project::ir::Ty,
 
     # Definitions that are referenced from input and output types.
-    ty_defs: [project::ir::TyDef],
+    defs: [project::ir::TyDef],
   }
 
   ## SQL program, executable with lutra-runner-postgres
@@ -24,19 +24,19 @@ module rr {
     sql: text,
     input_ty: project::ir::Ty,
     output_ty: project::ir::Ty,
-    types: [project::ir::TyDef],
+    defs: [project::ir::TyDef],
   }
 }
 
 module layout {
-    type EnumFormat: {
-        tag_bytes: uint8,
-        has_ptr: bool,
-        variants: [EnumVariantFormat],
-    }
+  type EnumFormat: {
+    tag_bytes: uint8,
+    has_ptr: bool,
+    variants: [EnumVariantFormat],
+  }
 
-    type EnumVariantFormat: {
-        is_unit: bool,
-        padding_bytes: uint8,
-    }
+  type EnumVariantFormat: {
+    is_unit: bool,
+    padding_bytes: uint8,
+  }
 }

@@ -12,8 +12,8 @@ pub trait IrFold {
     fn fold_program(&mut self, program: Program) -> Result<Program> {
         Ok(Program {
             main: self.fold_expr(program.main)?,
-            types: program
-                .types
+            defs: program
+                .defs
                 .into_iter()
                 .map(|t| -> Result<TyDef> {
                     Ok(TyDef {

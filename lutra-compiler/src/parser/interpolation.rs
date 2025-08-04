@@ -93,9 +93,7 @@ fn parse_interpolate() {
         Expr {
             expr: Expr {
                 kind: Ident(
-                    [
-                        "a",
-                    ],
+                    a,
                 ),
                 span: Some(
                     0:8-9,
@@ -143,9 +141,7 @@ fn parse_interpolate() {
         Expr {
             expr: Expr {
                 kind: Ident(
-                    [
-                        "a",
-                    ],
+                    a,
                 ),
                 span: Some(
                     0:14-15,
