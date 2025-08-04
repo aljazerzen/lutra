@@ -35,11 +35,20 @@ pub fn parse(source: &str) -> (Option<ir::Program>, Vec<Error>) {
 fn prepare_stream<'a>(
     tokens: Vec<Token>,
 ) -> Stream<'a, TokenKind, Span, impl Iterator<Item = (TokenKind, Span)> + Sized + 'a> {
-    let final_span = tokens.last().map(|t| t.span.end).unwrap_or(0);
+    let final_span = tokens
+        .last()
+        .map(|t| t.span.start as usize + t.span.len as usize)
+        .unwrap_or(0);
 
-    let tokens = tokens
-        .into_iter()
-        .map(move |token| (token.kind, Span::from(token.span)));
+    let tokens = tokens.into_iter().map(move |token| {
+        (
+            token.kind,
+            Span {
+                start: token.span.start as usize,
+                end: token.span.start as usize + token.span.len as usize,
+            },
+        )
+    });
     let eoi = Span {
         start: final_span,
         end: final_span,

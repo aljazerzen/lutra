@@ -4,11 +4,11 @@ use itertools::Itertools;
 use crate::parser::lexer::TokenKind;
 use crate::parser::perror::{ChumError, PError};
 use crate::pr::*;
-use crate::span::{Span, string_stream};
+use crate::span::Span;
 
 /// Parses interpolated strings
 pub(crate) fn parse(string: String, span_base: Span) -> Result<Vec<InterpolateItem>, Vec<PError>> {
-    let prepped_stream = string_stream(string, span_base);
+    let prepped_stream = prepare_stream(&string, span_base);
 
     let res = interpolated_parser().parse(prepped_stream);
 
@@ -25,6 +25,25 @@ pub(crate) fn parse(string: String, span_base: Span) -> Result<Vec<InterpolateIt
             })
             .collect_vec()),
     }
+}
+
+pub(crate) fn prepare_stream<'a>(
+    source: &'a str,
+    span_base: Span,
+) -> chumsky::Stream<'a, char, Span, Box<dyn Iterator<Item = (char, Span)> + 'a>> {
+    let iter = super::lexer::CharIterator::new(source);
+
+    chumsky::Stream::from_iter(
+        Span {
+            start: span_base.start + source.len() as u32,
+            len: 0,
+            source_id: span_base.source_id,
+        },
+        Box::new(iter.map(move |(c, mut span)| {
+            span.start += span_base.start;
+            (c, span.with_source_id(span_base.source_id))
+        })),
+    )
 }
 
 fn interpolated_parser() -> impl Parser<char, Vec<InterpolateItem>, Error = ChumError<char>> {

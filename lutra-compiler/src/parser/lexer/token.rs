@@ -6,7 +6,13 @@ pub struct Tokens(pub Vec<Token>);
 #[derive(Clone, PartialEq, Eq)]
 pub struct Token {
     pub kind: TokenKind,
-    pub span: std::ops::Range<usize>,
+    pub span: SpanInSource,
+}
+
+#[derive(Clone, PartialEq, Eq)]
+pub struct SpanInSource {
+    pub start: u32,
+    pub len: u16,
 }
 
 #[derive(Clone, PartialEq, Debug)]
@@ -91,9 +97,48 @@ impl std::fmt::Display for TokenKind {
     }
 }
 
+impl SpanInSource {
+    pub fn with_source_id(self, source_id: u16) -> crate::Span {
+        crate::Span {
+            source_id,
+            start: self.start,
+            len: self.len,
+        }
+    }
+}
+
 impl std::fmt::Debug for Token {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "{}..{}: {:?}", self.span.start, self.span.end, self.kind)
+        write!(f, "{:?}: {:?}", self.span, self.kind)
+    }
+}
+
+impl std::fmt::Debug for SpanInSource {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "{}..{}", self.start, self.start + self.len as u32)
+    }
+}
+
+impl chumsky::Span for SpanInSource {
+    type Context = ();
+
+    type Offset = u32;
+
+    fn new(_: Self::Context, range: std::ops::Range<Self::Offset>) -> Self {
+        Self {
+            start: range.start,
+            len: (range.end - range.start) as u16,
+        }
+    }
+
+    fn context(&self) -> Self::Context {}
+
+    fn start(&self) -> Self::Offset {
+        self.start
+    }
+
+    fn end(&self) -> Self::Offset {
+        self.start + self.len as u32
     }
 }
 

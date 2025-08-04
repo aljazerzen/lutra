@@ -60,6 +60,7 @@ fn definitions() -> impl Parser<TokenKind, Vec<(String, Def)>, Error = PError> {
     })
 }
 
+#[allow(clippy::result_large_err)]
 fn into_module(defs: Vec<(String, Def)>) -> Result<ModuleDef, PError> {
     let mut result = IndexMap::with_capacity(defs.len());
     for (name, def) in defs {

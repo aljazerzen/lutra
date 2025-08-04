@@ -161,8 +161,8 @@ where
 fn compose_location(diagnostic: &Diagnostic, source: &ariadne::Source) -> Option<SourceLocation> {
     let span = diagnostic.span?;
 
-    let start = source.get_offset_line(span.start)?;
-    let end = source.get_offset_line(span.end)?;
+    let start = source.get_byte_line(span.start as usize)?;
+    let end = source.get_byte_line(span.start as usize + span.len as usize)?;
     Some(SourceLocation {
         start: (start.1, start.2),
         end: (end.1, end.2),

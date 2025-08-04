@@ -1,46 +1,32 @@
 use std::fmt::{self, Debug, Formatter};
 use std::ops::{Add, Range, Sub};
 
-use chumsky::Stream;
-
 #[derive(Clone, PartialEq, Eq, Copy)]
 pub struct Span {
-    pub start: usize,
-    pub end: usize,
+    /// Byte offset from the start of the source. 0 indexed.
+    pub start: u32,
+    /// Length of the span in bytes.
+    pub len: u16,
 
     /// A key representing the path of the source. Value is stored in prqlc's SourceTree::source_ids.
     pub source_id: u16,
 }
 
-impl Span {
-    pub fn merge(a: Span, b: Span) -> Span {
-        assert_eq!(a.source_id, b.source_id);
-        Span {
-            start: usize::min(a.start, b.start),
-            end: usize::max(a.end, b.end),
-
-            source_id: a.source_id,
-        }
-    }
-
-    pub fn merge_opt(a: Option<Span>, b: Option<Span>) -> Option<Span> {
-        match (a, b) {
-            (Some(a), Some(b)) => Some(Self::merge(a, b)),
-            (Some(s), None) | (None, Some(s)) => Some(s),
-            (None, None) => None,
-        }
-    }
-}
-
 impl From<Span> for Range<usize> {
     fn from(a: Span) -> Self {
-        a.start..a.end
+        a.start as usize..(a.start as usize + a.len as usize)
     }
 }
 
 impl Debug for Span {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        write!(f, "{}:{}-{}", self.source_id, self.start, self.end)
+        write!(
+            f,
+            "{}:{}-{}",
+            self.source_id,
+            self.start,
+            self.start + self.len as u32
+        )
     }
 }
 
@@ -48,10 +34,7 @@ impl PartialOrd for Span {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
         // We could expand this to compare source_id too, starting with minimum surprise
         match other.source_id.partial_cmp(&self.source_id) {
-            Some(std::cmp::Ordering::Equal) => {
-                debug_assert!((self.start <= other.start) == (self.end <= other.end));
-                self.start.partial_cmp(&other.start)
-            }
+            Some(std::cmp::Ordering::Equal) => self.start.partial_cmp(&other.start),
             _ => None,
         }
     }
@@ -60,12 +43,12 @@ impl PartialOrd for Span {
 impl chumsky::Span for Span {
     type Context = u16;
 
-    type Offset = usize;
+    type Offset = u32;
 
     fn new(context: Self::Context, range: std::ops::Range<Self::Offset>) -> Self {
         Self {
             start: range.start,
-            end: range.end,
+            len: (range.end - range.start) as u16,
             source_id: context,
         }
     }
@@ -79,7 +62,7 @@ impl chumsky::Span for Span {
     }
 
     fn end(&self) -> Self::Offset {
-        self.end
+        self.start + self.len as u32
     }
 }
 
@@ -88,8 +71,8 @@ impl Add<usize> for Span {
 
     fn add(self, rhs: usize) -> Span {
         Self {
-            start: self.start + rhs,
-            end: self.end + rhs,
+            start: self.start + rhs as u32,
+            len: self.len,
             source_id: self.source_id,
         }
     }
@@ -100,36 +83,11 @@ impl Sub<usize> for Span {
 
     fn sub(self, rhs: usize) -> Span {
         Self {
-            start: self.start - rhs,
-            end: self.end - rhs,
+            start: self.start - rhs as u32,
+            len: self.len,
             source_id: self.source_id,
         }
     }
-}
-
-pub(crate) fn string_stream<'a>(
-    s: String,
-    span_base: Span,
-) -> Stream<'a, char, Span, Box<dyn Iterator<Item = (char, Span)>>> {
-    let chars = s.chars().collect::<Vec<_>>();
-
-    Stream::from_iter(
-        Span {
-            start: span_base.start + chars.len(),
-            end: span_base.start + chars.len(),
-            source_id: span_base.source_id,
-        },
-        Box::new(chars.into_iter().enumerate().map(move |(i, c)| {
-            (
-                c,
-                Span {
-                    start: span_base.start + i,
-                    end: span_base.start + i + 1,
-                    source_id: span_base.source_id,
-                },
-            )
-        })),
-    )
 }
 
 #[cfg(test)]
@@ -140,17 +98,17 @@ mod test {
     fn test_span_partial_cmp() {
         let span1 = Span {
             start: 10,
-            end: 20,
+            len: 20,
             source_id: 1,
         };
         let span2 = Span {
             start: 15,
-            end: 25,
+            len: 25,
             source_id: 1,
         };
         let span3 = Span {
             start: 5,
-            end: 15,
+            len: 15,
             source_id: 2,
         };
 

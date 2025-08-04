@@ -43,8 +43,8 @@ impl From<lutra_compiler::_lexer::Diagnostic> for Error {
         Self {
             message: d.message,
             span: Span {
-                start: span.start,
-                end: span.end,
+                start: span.start as usize,
+                end: span.start as usize + span.len as usize,
             },
         }
     }

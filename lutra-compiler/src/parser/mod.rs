@@ -57,14 +57,17 @@ pub(crate) fn prepare_stream<'a>(
     tokens: Vec<lexer::Token>,
     source_id: u16,
 ) -> Stream<'a, TokenKind, Span, impl Iterator<Item = (TokenKind, Span)> + Sized + 'a> {
-    let final_span = tokens.last().map(|t| t.span.end).unwrap_or(0);
+    let final_offset = tokens
+        .last()
+        .map(|t| t.span.start + t.span.len as u32)
+        .unwrap_or(0);
 
     let tokens = tokens
         .into_iter()
-        .map(move |token| (token.kind, Span::new(source_id, token.span)));
+        .map(move |token| (token.kind, token.span.with_source_id(source_id)));
     let eoi = Span {
-        start: final_span,
-        end: final_span,
+        start: final_offset,
+        len: 0,
         source_id,
     };
     Stream::from_iter(eoi, tokens)

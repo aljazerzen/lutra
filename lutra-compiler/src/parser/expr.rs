@@ -265,7 +265,7 @@ where
         .foldl(|left, (op, right)| {
             let span = Span {
                 start: left.1.start,
-                end: right.1.end,
+                len: (right.1.start + right.1.len as u32 - left.1.start) as u16,
                 source_id: left.1.source_id,
             };
             let kind = ExprKind::Binary(BinaryExpr {
@@ -319,7 +319,7 @@ where
         .foldr(|(left, op), right| {
             let span = Span {
                 start: left.1.start,
-                end: right.1.end,
+                len: right.1.len,
                 source_id: left.1.source_id,
             };
             let kind = ExprKind::Binary(BinaryExpr {

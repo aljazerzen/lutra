@@ -2,7 +2,7 @@
 mod test;
 mod token;
 
-pub use token::{Token, TokenKind};
+pub use token::{SpanInSource, Token, TokenKind};
 
 use chumsky::error::Cheap;
 use chumsky::prelude::*;
@@ -13,9 +13,13 @@ use crate::diagnostic::{Diagnostic, DiagnosticCode};
 use crate::pr::Literal;
 use crate::span::Span;
 
+type LError = Cheap<char, SpanInSource>;
+
 /// Split source into tokens.
 pub fn lex_source_recovery(source: &str, source_id: u16) -> (Option<Vec<Token>>, Vec<Diagnostic>) {
-    let (tokens, lex_errors) = lexer().parse_recovery(source);
+    let stream = prepare_stream(source);
+
+    let (tokens, lex_errors) = lexer().parse_recovery(stream);
 
     let errors = lex_errors
         .into_iter()
@@ -27,25 +31,61 @@ pub fn lex_source_recovery(source: &str, source_id: u16) -> (Option<Vec<Token>>,
 }
 
 #[cfg(test)]
-pub fn lex_source(source: &str) -> Result<token::Tokens, Vec<Diagnostic>> {
-    lexer().parse(source).map(token::Tokens).map_err(|e| {
+pub fn lex_source(source: &str) -> Result<Vec<Token>, Vec<Diagnostic>> {
+    let stream = prepare_stream(source);
+    lexer().parse(stream).map_err(|e| {
         e.into_iter()
             .map(|x| convert_lexer_error(source, x, 0))
             .collect()
     })
 }
 
-fn convert_lexer_error(source: &str, e: chumsky::error::Cheap<char>, source_id: u16) -> Diagnostic {
-    // We want to slice based on the chars, not the bytes, so can't just index
-    // into the str.
-    let found: String = source
-        .chars()
-        .skip(e.span().start)
-        .take(e.span().end() - e.span().start)
-        .collect();
+pub fn prepare_stream(source: &str) -> chumsky::Stream<'_, char, SpanInSource, CharIterator<'_>> {
+    chumsky::Stream::from_iter(
+        SpanInSource {
+            start: source.len() as u32,
+            len: 0,
+        },
+        CharIterator::new(source),
+    )
+}
+
+pub(crate) struct CharIterator<'a> {
+    last_start: u32,
+    chars: std::str::Chars<'a>,
+}
+
+impl<'a> CharIterator<'a> {
+    pub fn new(string: &'a str) -> Self {
+        Self {
+            last_start: 0,
+            chars: string.chars(),
+        }
+    }
+}
+
+impl<'a> Iterator for CharIterator<'a> {
+    type Item = (char, SpanInSource);
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let c = self.chars.next()?;
+        let span = SpanInSource {
+            start: self.last_start,
+            len: c.len_utf8() as u16,
+        };
+        self.last_start += span.len as u32;
+        Some((c, span))
+    }
+}
+
+fn convert_lexer_error(source: &str, e: LError, source_id: u16) -> Diagnostic {
+    let start = e.span().start as usize;
+    let len = e.span().len as usize;
+
+    let found: &str = &source[start..start + len];
     let span = Some(Span {
         start: e.span().start,
-        end: e.span().end,
+        len: e.span().len,
         source_id,
     });
 
@@ -53,7 +93,7 @@ fn convert_lexer_error(source: &str, e: chumsky::error::Cheap<char>, source_id: 
 }
 
 /// Lex chars to tokens until the end of the input
-fn lexer() -> impl Parser<char, Vec<Token>, Error = Cheap<char>> {
+fn lexer() -> impl Parser<char, Vec<Token>, Error = LError> {
     let control_multi = choice((
         just("->").to(TokenKind::ArrowThin),
         just("=>").to(TokenKind::ArrowFat),
@@ -115,7 +155,7 @@ fn lexer() -> impl Parser<char, Vec<Token>, Error = Cheap<char>> {
         .then_ignore(end())
 }
 
-fn doc_comment() -> impl Parser<char, TokenKind, Error = Cheap<char>> {
+fn doc_comment() -> impl Parser<char, TokenKind, Error = LError> {
     just('#')
         .ignore_then(choice((just('#').to(false), just('!').to(true))))
         .then(newline().not().repeated().collect::<String>())
@@ -128,18 +168,18 @@ fn doc_comment() -> impl Parser<char, TokenKind, Error = Cheap<char>> {
         })
 }
 
-fn ignored() -> impl Parser<char, (), Error = Cheap<char>> {
+fn ignored() -> impl Parser<char, (), Error = LError> {
     let comment = just('#')
         .ignore_then(just('#').or(just('!')).not().rewind())
         .ignore_then(newline().not().repeated())
         .ignored();
 
-    let whitespace = filter::<char, _, Cheap<char>>(|c: &char| c.is_whitespace()).ignored();
+    let whitespace = filter::<char, _, LError>(|c: &char| c.is_whitespace()).ignored();
 
     comment.or(whitespace).repeated().ignored()
 }
 
-pub(crate) fn ident_part() -> impl Parser<char, String, Error = Cheap<char>> + Clone {
+pub(crate) fn ident_part() -> impl Parser<char, String, Error = LError> + Clone {
     let plain = filter(|c: &char| c.is_alphabetic() || *c == '_')
         .chain(filter(|c: &char| c.is_alphanumeric() || *c == '_').repeated());
 
@@ -148,7 +188,7 @@ pub(crate) fn ident_part() -> impl Parser<char, String, Error = Cheap<char>> + C
     plain.or(backticks).collect()
 }
 
-fn literal() -> impl Parser<char, Literal, Error = Cheap<char>> {
+fn literal() -> impl Parser<char, Literal, Error = LError> {
     let binary_notation = just("0b")
         .then_ignore(just("_").or_not())
         .ignore_then(
@@ -305,7 +345,7 @@ fn literal() -> impl Parser<char, Literal, Error = Cheap<char>> {
     ))
 }
 
-fn quoted_string(escaped: bool) -> impl Parser<char, String, Error = Cheap<char>> {
+fn quoted_string(escaped: bool) -> impl Parser<char, String, Error = LError> {
     choice((quoted_string_of_quote(&'"', escaped),))
         .collect::<String>()
         .labelled("string")
@@ -314,7 +354,7 @@ fn quoted_string(escaped: bool) -> impl Parser<char, String, Error = Cheap<char>
 fn quoted_string_of_quote(
     quote: &char,
     escaping: bool,
-) -> impl Parser<char, Vec<char>, Error = Cheap<char>> + '_ {
+) -> impl Parser<char, Vec<char>, Error = LError> + '_ {
     let opening = just(*quote).repeated().at_least(1);
 
     opening.then_with(move |opening| {
@@ -342,7 +382,7 @@ fn quoted_string_of_quote(
     })
 }
 
-fn escaped_character() -> impl Parser<char, char, Error = Cheap<char>> {
+fn escaped_character() -> impl Parser<char, char, Error = LError> {
     just('\\').ignore_then(choice((
         just('\\'),
         just('/'),
@@ -380,13 +420,13 @@ fn escaped_character() -> impl Parser<char, char, Error = Cheap<char>> {
     )))
 }
 
-fn digits(count: usize) -> impl Parser<char, Vec<char>, Error = Cheap<char>> {
+fn digits(count: usize) -> impl Parser<char, Vec<char>, Error = LError> {
     filter(|c: &char| c.is_ascii_digit())
         .repeated()
         .exactly(count)
 }
 
-fn non_ident() -> impl Parser<char, (), Error = Cheap<char>> {
+fn non_ident() -> impl Parser<char, (), Error = LError> {
     filter(|c: &char| c.is_alphanumeric() || *c == '_')
         .not()
         .ignored()

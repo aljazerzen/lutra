@@ -12,7 +12,7 @@ use crate::span::Span;
 #[derive(Clone, Debug)]
 pub struct ChumError<T: Hash + Eq + Debug> {
     span: Span,
-    message: Option<String>,
+    message: Option<&'static str>,
     expected: HashSet<Option<T>>,
     found: Option<T>,
     label: SimpleLabel,
@@ -22,10 +22,10 @@ pub type PError = ChumError<lexer::TokenKind>;
 
 impl<T: Hash + Eq + Debug> ChumError<T> {
     ///Create an error with a custom error message.
-    pub fn custom<M: ToString>(span: Span, msg: M) -> Self {
+    pub fn custom(span: Span, msg: &'static str) -> Self {
         Self {
             span,
-            message: Some(msg.to_string()),
+            message: Some(msg),
             expected: HashSet::default(),
             found: None,
             label: SimpleLabel::None,
@@ -48,8 +48,8 @@ impl<T: Hash + Eq + Debug> ChumError<T> {
     }
 
     /// Returns the reason for the error.
-    pub fn reason(&self) -> &Option<String> {
-        &self.message
+    pub fn reason(&self) -> Option<&'static str> {
+        self.message
     }
 
     /// Returns the error's label, if any.
@@ -94,18 +94,15 @@ impl<T: Hash + Eq + Display + Debug> chumsky::Error<T> for ChumError<T> {
     }
 
     fn unclosed_delimiter(
-        unclosed_span: Self::Span,
-        delimiter: T,
+        _unclosed_span: Self::Span,
+        _delimiter: T,
         span: Self::Span,
         expected: T,
         found: Option<T>,
     ) -> Self {
         Self {
             span,
-            message: Some(format!(
-                "unclosed delimiter: {delimiter} within span {}..{}",
-                unclosed_span.start, unclosed_span.end
-            )),
+            message: None,
             expected: core::iter::once(Some(expected)).collect(),
             found,
             label: SimpleLabel::None,
@@ -131,12 +128,7 @@ impl<T: Hash + Eq + Display + Debug> chumsky::Error<T> for ChumError<T> {
         //     (Some(mut r1), Some(r2)) => {r1.push('s');Some(r1)},
         // };
 
-        self.message = self.message.zip(other.message).map(|(mut r1, r2)| {
-            r1.push_str(" | ");
-            r1.push_str(r2.as_str());
-            r1
-        });
-
+        self.message = None;
         self.label = self.label.merge(other.label);
         self.expected.extend(other.expected);
         self

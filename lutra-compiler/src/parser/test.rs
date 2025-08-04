@@ -23,7 +23,7 @@ pub(crate) fn parse_with_parser<O: Debug>(
     parser: impl Parser<TokenKind, O, Error = PError>,
 ) -> Result<O, Vec<Diagnostic>> {
     let tokens = crate::parser::lexer::lex_source(source)?;
-    let stream = prepare_stream(tokens.0, 0);
+    let stream = prepare_stream(tokens, 0);
 
     // TODO: possibly should check we consume all the input? Either with an
     // end() parser or some other way (but if we add an end parser then this
@@ -539,7 +539,7 @@ fn test_error_unicode_string() {
             ),
             message: "unexpected ’",
             span: Some(
-                0:22-23,
+                0:22-25,
             ),
             additional: [],
         },
@@ -549,7 +549,7 @@ fn test_error_unicode_string() {
             ),
             message: "unexpected ’",
             span: Some(
-                0:35-36,
+                0:37-40,
             ),
             additional: [],
         },
