@@ -37,8 +37,8 @@ impl decl::Module {
         match &decl.kind {
             decl::DeclKind::Expr(expr) => Some(ExprOrTy::Expr(expr)),
             decl::DeclKind::Ty(ty) => Some(ExprOrTy::Ty(ty)),
-            decl::DeclKind::Unresolved(_) => {
-                panic!("unresolved")
+            decl::DeclKind::Unresolved(o) => {
+                panic!("unresolved: {o:?}")
             }
             decl::DeclKind::Module(_) | decl::DeclKind::Import(_) => None,
         }

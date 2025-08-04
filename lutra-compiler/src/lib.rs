@@ -97,6 +97,5 @@ pub fn _test_compile_main(source: &str) -> Result<ir::Program, error::Error> {
 
     let main = check_overlay(&project, "main", None)?;
     let program = lower_expr(&project.root_module, &main);
-    assert!(program.get_input_ty().kind.is_tuple());
     Ok(layouter::on_program(program))
 }

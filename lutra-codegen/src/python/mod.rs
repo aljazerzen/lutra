@@ -164,12 +164,11 @@ fn codegen_module(
 
     // recurse into sub modules
     for (name, sub_mod) in sub_modules {
-        writeln!(w, "pub mod {name} {{")?; // TODO: this is still rust syntax
-
+        // writeln!(w, "pub mod {name} {{")?; // TODO: this is still rust syntax
         let mut path = module_path.clone();
         path.push(name.clone());
         codegen_module(w, sub_mod, path, ctx)?;
-        writeln!(w, "}}\n")?;
+        // writeln!(w, "}}\n")?;
     }
 
     // write codecs

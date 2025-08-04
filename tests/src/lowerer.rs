@@ -94,23 +94,17 @@ fn lower_01() {
             ): [chinook::album],
             (call
               var.0: func (int64) -> chinook::album,
-              (tuple_lookup
-                fn.0+0: {int64}
-                0
-              ): int64,
+              fn.0+0: int64,
             ): chinook::album,
             (call
               var.1: func (int64) -> box_office::album_sale,
-              (tuple_lookup
-                fn.0+0: {int64}
-                0
-              ): int64,
+              fn.0+0: int64,
             ): box_office::album_sale,
           }: {[chinook::album], chinook::album, box_office::album_sale}
-        ): func ({int64}) -> {[chinook::album], chinook::album, box_office::album_sale},
-        fn.1+0: {int64},
+        ): func (int64) -> {[chinook::album], chinook::album, box_office::album_sale},
+        fn.1+0: int64,
       ): {[chinook::album], chinook::album, box_office::album_sale}
-    ): func ({int64}) -> {[chinook::album], chinook::album, box_office::album_sale}
+    ): func (int64) -> {[chinook::album], chinook::album, box_office::album_sale}
     ")
 }
 

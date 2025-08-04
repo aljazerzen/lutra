@@ -262,20 +262,27 @@ impl<'a> Lowerer<'a> {
                                 }))
                             } else {
                                 // special case: this is reference to param of the main func,
-                                // which is translated into func with exactly one tuple param.
-                                // So we need to also inject tuple lookup
-                                ir::ExprKind::TupleLookup(Box::new(ir::TupleLookup {
-                                    base: ir::Expr {
-                                        kind: ir::ExprKind::Pointer(ir::Pointer::Parameter(
-                                            ir::ParameterPtr {
-                                                function_id: *function_id,
-                                                param_position: 0,
-                                            },
-                                        )),
-                                        ty: self.program_input_ty.clone().unwrap(),
+                                // which is translated into func with exactly one param.
+                                let param_ref = ir::ExprKind::Pointer(ir::Pointer::Parameter(
+                                    ir::ParameterPtr {
+                                        function_id: *function_id,
+                                        param_position: 0,
                                     },
-                                    position: param_position as u16,
-                                }))
+                                ));
+                                let input_ty = self.program_input_ty.as_ref();
+                                if input_ty.is_some_and(|x| x.kind.is_tuple()) {
+                                    // if the param is tuple of many original params,
+                                    // we also need to also inject tuple lookup.
+                                    ir::ExprKind::TupleLookup(Box::new(ir::TupleLookup {
+                                        base: ir::Expr {
+                                            kind: param_ref,
+                                            ty: self.program_input_ty.clone().unwrap(),
+                                        },
+                                        position: param_position as u16,
+                                    }))
+                                } else {
+                                    param_ref
+                                }
                             }
                         }
                         ScopeKind::Local { entries } => {
@@ -683,16 +690,18 @@ impl<'a> Lowerer<'a> {
     /// Massages an expression for being the entry-point of a program.
     /// In particular, this makes sure that it is:
     /// - a function,
-    /// - with exactly one param (named input).
+    /// - with exactly one param (which is named input).
     fn prepare_entry_point(&mut self, mut main: ir::Expr) -> ir::Expr {
         if let ir::TyKind::Function(func) = &mut main.ty.kind {
             // change type from `func (a, b, c): d` into `func ({a, b, c}): d`
-            let fields = func
-                .params
-                .drain(..)
-                .map(|ty| ir::TyTupleField { ty, name: None })
-                .collect();
-            func.params = vec![ir::Ty::new(ir::TyKind::Tuple(fields))];
+            if func.params.len() != 1 {
+                let fields = func
+                    .params
+                    .drain(..)
+                    .map(|ty| ir::TyTupleField { ty, name: None })
+                    .collect();
+                func.params = vec![ir::Ty::new(ir::TyKind::Tuple(fields))];
+            }
             main
         } else {
             self.wrap_into_main_func(main)
@@ -850,6 +859,10 @@ fn get_entry_point_input(expr: &pr::Expr) -> pr::Ty {
     let Some(ty_func) = ty.kind.as_func() else {
         return pr::Ty::new(pr::TyKind::Tuple(vec![]));
     };
+
+    if ty_func.params.len() == 1 {
+        return ty_func.params[0].clone().unwrap();
+    }
 
     pr::Ty::new(pr::TyKind::Tuple(
         ty_func

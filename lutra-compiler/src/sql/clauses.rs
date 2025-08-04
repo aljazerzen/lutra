@@ -16,7 +16,7 @@ pub(super) struct Context<'t> {
 
 enum FuncProvider {
     Expr(cr::ExprKind),
-    Params,
+    QueryParam,
 }
 
 pub fn compile(program: &ir::Program) -> (cr::Expr, HashMap<&ir::Path, &ir::Ty>) {
@@ -42,7 +42,7 @@ pub fn compile(program: &ir::Program) -> (cr::Expr, HashMap<&ir::Path, &ir::Ty>)
         ir::ExprKind::Function(func) => Cow::Borrowed(func.as_ref()),
         _ => Cow::Owned(wrap_into_func_call(&program.main)),
     };
-    ctx.functions.insert(func.id, FuncProvider::Params);
+    ctx.functions.insert(func.id, FuncProvider::QueryParam);
 
     let body = ctx.compile_rel(&func.body);
 
@@ -208,15 +208,14 @@ impl<'a> Context<'a> {
                         assert_eq!(ptr.param_position, 0);
                         r_expr.clone()
                     }
-                    FuncProvider::Params => {
+                    FuncProvider::QueryParam => {
                         assert_eq!(ptr.param_position, 0);
-                        let columns = expr
-                            .ty
-                            .iter_fields() // TODO: do proper args unpacking
+                        let columns = self
+                            .rel_cols_ty_nested(&expr.ty)
                             .enumerate()
                             .map(|(p, field_ty)| cr::Expr {
                                 kind: cr::ExprKind::From(cr::From::Param(p as u8)),
-                                ty: field_ty.clone(),
+                                ty: field_ty.into_owned(),
                             })
                             .collect();
                         cr::ExprKind::From(cr::From::Row(columns))
