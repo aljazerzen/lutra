@@ -497,7 +497,6 @@ fn param_02() {
 }
 
 #[test]
-#[ignore] // TODO
 fn param_03() {
     insta::assert_snapshot!(_run(r#"
     func main(x: {int64, [text], int32}) -> x
@@ -517,7 +516,7 @@ fn param_03() {
         "hello",
         "world",
       ],
-      5
+      5,
     }
     "#);
 }

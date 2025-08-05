@@ -62,6 +62,9 @@ pub enum From {
     /// Converts a JSON-encoded value into a relation
     JsonUnpack(Box<Expr>),
 
+    /// Converts a relation into a JSON-encoded value
+    JsonPack(Box<Expr>),
+
     /// List of conditions and values.
     /// Evaluates to first value whose condition is true.
     /// Does not evaluate any following conditions or values.
@@ -135,6 +138,13 @@ impl Expr {
         Expr {
             ty: rel.rel.ty.clone(),
             kind: ExprKind::From(From::RelRef(rel.id)),
+        }
+    }
+
+    pub fn new_json_pack(rel: Expr) -> Self {
+        Expr {
+            ty: rel.ty.clone(),
+            kind: ExprKind::From(From::JsonPack(Box::new(rel))),
         }
     }
 }

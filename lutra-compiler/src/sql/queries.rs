@@ -284,6 +284,11 @@ impl<'a> Context<'a> {
                 self.compile_json_unpack(input, ty)
             }
 
+            cr::From::JsonPack(input) => {
+                let input = self.compile_rel(input);
+                self.compile_json_pack(input, ty)
+            }
+
             cr::From::Case(cases) => {
                 let mut conditions = Vec::new();
                 let mut results = Vec::new();
@@ -586,12 +591,6 @@ impl<'a> Context<'a> {
         if let Some(simplified) = rel.as_simplified_expr() {
             rel = simplified;
         }
-
-        // pack to JSON if needed
-        if expr.ty.kind.is_array() {
-            rel = self.compile_json_pack(rel, &expr.ty);
-        }
-
         rel
     }
 

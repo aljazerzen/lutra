@@ -655,7 +655,7 @@ impl<'a> Context<'a> {
 
                 let ty_out_fields = expr.ty.kind.as_tuple().unwrap();
 
-                let field0 = cr::Expr {
+                let field0 = cr::Expr::new_json_pack(cr::Expr {
                     kind: cr::ExprKind::Transform(
                         self.new_binding(cr::Expr::new_rel_ref(&array)),
                         cr::Transform::ProjectRetain(vec![
@@ -664,8 +664,8 @@ impl<'a> Context<'a> {
                         ]),
                     ),
                     ty: ty_out_fields[0].ty.clone(),
-                };
-                let field1 = cr::Expr {
+                });
+                let field1 = cr::Expr::new_json_pack(cr::Expr {
                     kind: cr::ExprKind::Transform(
                         self.new_binding(cr::Expr::new_rel_ref(&array)),
                         cr::Transform::ProjectRetain(vec![
@@ -674,7 +674,7 @@ impl<'a> Context<'a> {
                         ]),
                     ),
                     ty: ty_out_fields[0].ty.clone(),
-                };
+                });
 
                 cr::ExprKind::Transform(array, cr::Transform::Aggregate(vec![field0, field1]))
             }
@@ -846,11 +846,16 @@ impl<'a> Context<'a> {
             // it is actually complex: subquery
             _ => {
                 match &ty_mat.kind {
-                    ir::TyKind::Primitive(_) | ir::TyKind::Array(_) => {
+                    ir::TyKind::Primitive(_) => {
                         // return as a subquery
-
-                        // for arrays, using a subquery will trigger JSON packing in queries.rs
                         ColumnsOrUnpack::Columns(vec![rel])
+                    }
+                    ir::TyKind::Array(_) => {
+                        // arrays need to packed to JSON
+                        ColumnsOrUnpack::Columns(vec![cr::Expr {
+                            ty: rel.ty.clone(),
+                            kind: cr::ExprKind::From(cr::From::JsonPack(Box::new(rel))),
+                        }])
                     }
                     ir::TyKind::Tuple(_) => {
                         // non-constructed tuples need to be declared as a rel var and unpacked
@@ -865,8 +870,7 @@ impl<'a> Context<'a> {
                             ColumnsOrUnpack::Unpack(rel)
                         }
                     }
-                    ir::TyKind::Function(_) => unreachable!(),
-                    ir::TyKind::Ident(_) => unreachable!(),
+                    ir::TyKind::Function(_) | ir::TyKind::Ident(_) => unreachable!(),
                 }
             }
         }
