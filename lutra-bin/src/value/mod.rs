@@ -39,6 +39,12 @@ pub enum Value {
     Enum(usize, boxed::Box<Value>),
 }
 
+impl Value {
+    pub fn unit() -> Value {
+        Value::Tuple(vec![])
+    }
+}
+
 fn expect_ty<'t, F, K>(ty: &'t ir::Ty, cast: F, expected: &'static str) -> Result<&'t K>
 where
     F: Fn(&ir::TyKind) -> Option<&K>,

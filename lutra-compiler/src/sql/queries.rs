@@ -70,8 +70,8 @@ impl<'a> Context<'a> {
         }
     }
 
-    fn register_rel_var(&mut self, input: &cr::BoundExpr, output: &Scoped) {
-        let name = output.expr.as_rel_var().unwrap().to_string();
+    fn register_rel_var(&mut self, input: &cr::BoundExpr, output: &mut Scoped) {
+        let name = self.scoped_as_rel_var(output).to_string();
         let r = RelRef {
             name,
             is_cte: false,
@@ -93,14 +93,14 @@ impl<'a> Context<'a> {
             cr::ExprKind::From(from) => self.compile_from(from, &rel.ty),
 
             cr::ExprKind::Join(left_in, right_in, condition) => {
-                let left = self.compile_rel(&left_in.rel);
+                let mut left = self.compile_rel(&left_in.rel);
                 let left_name = left.expr.as_rel_var().unwrap().to_string();
 
-                let right = self.compile_rel(&right_in.rel);
+                let mut right = self.compile_rel(&right_in.rel);
                 let right_name = right.expr.as_rel_var().unwrap().to_string();
 
-                self.register_rel_var(left_in, &left);
-                self.register_rel_var(right_in, &right);
+                self.register_rel_var(left_in, &mut left);
+                self.register_rel_var(right_in, &mut right);
 
                 let mut scope = left;
                 scope.expr = right.expr;
@@ -142,9 +142,9 @@ impl<'a> Context<'a> {
 
             cr::ExprKind::BindCorrelated(bound_in, main_in) => {
                 // compile inner-to-outer
-                let bound = self.compile_rel(&bound_in.rel);
+                let mut bound = self.compile_rel(&bound_in.rel);
 
-                self.register_rel_var(bound_in, &bound);
+                self.register_rel_var(bound_in, &mut bound);
                 let main = self.compile_rel(main_in);
                 self.unregister_rel_var(bound_in);
 
@@ -162,9 +162,9 @@ impl<'a> Context<'a> {
             }
 
             cr::ExprKind::Transform(input, transform) => {
-                let input_sql = self.compile_rel(&input.rel);
+                let mut input_sql = self.compile_rel(&input.rel);
 
-                self.register_rel_var(input, &input_sql);
+                self.register_rel_var(input, &mut input_sql);
                 let r = self.compile_rel_transform(input_sql, transform, &input.rel.ty, &rel.ty);
                 self.unregister_rel_var(input);
 
@@ -596,9 +596,7 @@ impl<'a> Context<'a> {
     }
 
     fn compile_json_pack(&mut self, mut scoped: Scoped, ty: &ir::Ty) -> Scoped {
-        let Some(input) = scoped.expr.as_rel_var() else {
-            panic!("JSON pack expected a relation, got: {scoped:?}")
-        };
+        let input = self.scoped_as_rel_var(&mut scoped);
         let cols = self.rel_cols(ty, false);
 
         scoped.expr = match &self.get_ty_mat(ty).kind {
@@ -846,7 +844,7 @@ impl<'a> Context<'a> {
                 "bool"
             }
             ir::TyKind::Tuple(_) => todo!(),
-            ir::TyKind::Array(_) => "text",
+            ir::TyKind::Array(_) => "jsonb",
             ir::TyKind::Enum(_) => panic!("null value for enum does not make sense"),
             ir::TyKind::Function(_) => todo!(),
             ir::TyKind::Ident(_) => todo!(),

@@ -2,20 +2,17 @@ use bytes::{BufMut, BytesMut};
 use core::str;
 use lutra_bin::{Encode, ReversePointer, ir, rr};
 use postgres_types as pg_ty;
-use std::collections::HashMap;
 
 #[cfg(not(feature = "tokio-postgres"))]
 use postgres::Row;
 #[cfg(feature = "tokio-postgres")]
 use tokio_postgres::Row;
 
-use crate::Error;
+use crate::{Context, Error};
 
-pub fn from_sql(program: &rr::SqlProgram, rows: &[Row]) -> Result<Vec<u8>, Error> {
+pub fn from_sql(program: &rr::SqlProgram, rows: &[Row], ctx: &Context) -> Result<Vec<u8>, Error> {
     // write rows to buffer
     let mut buf = bytes::BytesMut::new();
-
-    let ctx = Context::new(&program.defs);
 
     let encoder = ctx.construct_rows_encoder(&program.output_ty);
     encoder.encode(&mut buf, rows)?;
@@ -23,25 +20,7 @@ pub fn from_sql(program: &rr::SqlProgram, rows: &[Row]) -> Result<Vec<u8>, Error
     Ok(buf.to_vec())
 }
 
-// TODO: use get_ty_mat for ident types (or recursive types in JSON)
-struct Context<'a> {
-    pub types: HashMap<&'a ir::Path, &'a ir::Ty>,
-}
-
-impl<'a> Context<'a> {
-    fn new(ty_defs: &'a [ir::TyDef]) -> Self {
-        Context {
-            types: ty_defs.iter().map(|def| (&def.name, &def.ty)).collect(),
-        }
-    }
-
-    fn get_ty_mat(&self, ty: &'a ir::Ty) -> &'a ir::Ty {
-        match &ty.kind {
-            ir::TyKind::Ident(path) => self.types.get(path).unwrap(),
-            _ => ty,
-        }
-    }
-
+impl<'a> super::Context<'a> {
     /// Constructs an encoder that takes a slice of rows and produces the given type
     #[tracing::instrument(name = "rows", skip_all)]
     fn construct_rows_encoder(&self, ty: &ir::Ty) -> Box<dyn EncodeRows> {

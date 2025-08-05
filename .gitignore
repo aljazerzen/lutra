@@ -1,7 +1,10 @@
 target/
+Cargo.lock
 
 .idea/
 .vscode
+.aider*
+.helix
 
 .envrc
 .direnv/
@@ -10,8 +13,6 @@ target/
 
 flamegraph.svg
 perf.data
-
-Cargo.lock
 
 /examples/*
 !/examples/python

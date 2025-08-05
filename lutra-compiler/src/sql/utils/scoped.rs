@@ -121,8 +121,8 @@ impl<'a> crate::sql::queries::Context<'a> {
         self.query_into_scoped(self.scoped_into_query(rel, rel_ty))
     }
 
-    pub fn scoped_into_query(&self, scope: Scoped, ty: &ir::Ty) -> sql_ast::Query {
-        self.scoped_into_query_ext(scope, ty, true)
+    pub fn scoped_into_query(&self, scoped: Scoped, ty: &ir::Ty) -> sql_ast::Query {
+        self.scoped_into_query_ext(scoped, ty, true)
     }
 
     pub fn scoped_into_query_ext(
@@ -197,5 +197,26 @@ impl<'a> crate::sql::queries::Context<'a> {
             }
         };
         select.as_mut()
+    }
+    pub fn scoped_as_rel_var<'s>(&mut self, scoped: &'s mut Scoped) -> &'s str {
+        let is_rel_var = scoped.expr.as_rel_var().is_some();
+        if !is_rel_var {
+            let rel_name = self.rel_name_gen.next();
+
+            let expr = std::mem::replace(&mut scoped.expr, ExprOrSource::RelVar(rel_name.clone()));
+
+            let mut select = utils::select_empty();
+            select.projection = vec![sql_ast::SelectItem::ExprWithAlias {
+                expr: expr.into_expr(),
+                alias: utils::new_ident("value"),
+            }];
+
+            let query = utils::query_select(select);
+
+            scoped
+                .rel_vars
+                .push(utils::sub_rel(query, rel_name.clone()));
+        }
+        scoped.expr.as_rel_var().unwrap()
     }
 }

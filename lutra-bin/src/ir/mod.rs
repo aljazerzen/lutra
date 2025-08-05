@@ -51,13 +51,6 @@ impl Ty {
     pub fn is_unit(&self) -> bool {
         self.kind.as_tuple().is_some_and(|f| f.is_empty())
     }
-
-    pub fn iter_fields<'a>(&'a self) -> boxed::Box<dyn Iterator<Item = &'a Ty> + 'a> {
-        match &self.kind {
-            TyKind::Tuple(fields) => boxed::Box::new(fields.iter().map(|f| &f.ty)),
-            _ => boxed::Box::new(Some(self).into_iter()),
-        }
-    }
 }
 
 impl From<TyPrimitive> for TyKind {

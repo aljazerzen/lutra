@@ -210,15 +210,30 @@ impl<'a> Context<'a> {
                     }
                     FuncProvider::QueryParam => {
                         assert_eq!(ptr.param_position, 0);
-                        let columns = self
-                            .rel_cols_ty_nested(&expr.ty)
-                            .enumerate()
-                            .map(|(p, field_ty)| cr::Expr {
-                                kind: cr::ExprKind::From(cr::From::Param(p as u8)),
-                                ty: field_ty.into_owned(),
-                            })
-                            .collect();
-                        cr::ExprKind::From(cr::From::Row(columns))
+
+                        match &self.get_ty_mat(&expr.ty).kind {
+                            ir::TyKind::Primitive(_) | ir::TyKind::Tuple(_) => {
+                                let columns = self
+                                    .rel_cols_ty_nested(&expr.ty)
+                                    .enumerate()
+                                    .map(|(p, field_ty)| cr::Expr {
+                                        kind: cr::ExprKind::From(cr::From::Param(p as u8)),
+                                        ty: field_ty.into_owned(),
+                                    })
+                                    .collect();
+                                cr::ExprKind::From(cr::From::Row(columns))
+                            }
+
+                            ir::TyKind::Array(_) | ir::TyKind::Enum(_) => {
+                                // param will be encoded as JSON
+                                cr::ExprKind::From(cr::From::JsonUnpack(Box::new(cr::Expr {
+                                    kind: cr::ExprKind::From(cr::From::Param(0)),
+                                    ty: expr.ty.clone(),
+                                })))
+                            }
+
+                            ir::TyKind::Function(_) | ir::TyKind::Ident(_) => unreachable!(),
+                        }
                     }
                 }
             }

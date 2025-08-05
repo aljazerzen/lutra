@@ -3,7 +3,7 @@ use lutra_compiler::{ProgramFormat, SourceTree};
 const POSTGRES_URL: &str = "postgresql://postgres:pass@localhost:5416";
 
 #[track_caller]
-pub fn _run(source: &str, args: Vec<lutra_bin::Value>) -> (String, String) {
+pub fn _run(source: &str, input: lutra_bin::Value) -> (String, String) {
     crate::init_logger();
 
     // compile
@@ -21,13 +21,8 @@ pub fn _run(source: &str, args: Vec<lutra_bin::Value>) -> (String, String) {
     // format sql
     let options = sqlformat::FormatOptions::default();
     let formatted_sql = sqlformat::format(&program.sql, &sqlformat::QueryParams::None, &options);
-    tracing::debug!("sql:\n{formatted_sql}");
 
-    let mut input_writer = lutra_bin::TupleWriter::new_for_ty(&ty.input);
-    for (arg, a_ty) in std::iter::zip(args, ty.input.iter_fields()) {
-        input_writer.write_field(lutra_bin::Data::new(arg.encode(a_ty, &ty.defs).unwrap()));
-    }
-    let input = input_writer.finish().flatten();
+    let input = input.encode(&ty.input, &ty.defs).unwrap();
 
     // execute
     let mut client = postgres::Client::connect(POSTGRES_URL, postgres::NoTls).unwrap();
@@ -42,7 +37,7 @@ pub fn _run(source: &str, args: Vec<lutra_bin::Value>) -> (String, String) {
 
 #[track_caller]
 pub fn _run_sql_output(lutra_source: &str) -> String {
-    let (sql, output) = _run(lutra_source, vec![]);
+    let (sql, output) = _run(lutra_source, lutra_bin::Value::unit());
     format!("{sql}\n---\n{output}")
 }
 
@@ -453,13 +448,99 @@ fn tuple_array_tuple_prim() {
 #[test]
 fn param_00() {
     insta::assert_snapshot!(_run(r#"
-    func main(x: int64, y: text) -> {x, y}
+    func main(x: int64) -> x + 1
     "#,
-    vec![lutra_bin::Value::Int64(3), lutra_bin::Value::Text("hello".into())]
+    lutra_bin::Value::Int64(3)
+    ).1, @"4");
+}
+
+#[test]
+fn param_01() {
+    insta::assert_snapshot!(_run(r#"
+    func main(x: int64, y: text) -> {y, x}
+    "#,
+    lutra_bin::Value::Tuple(vec![
+        lutra_bin::Value::Int64(3),
+        lutra_bin::Value::Text("hello".into())
+    ])
+    ).1, @r#"
+    {
+      "hello",
+      3,
+    }
+    "#);
+}
+
+#[test]
+fn param_02() {
+    insta::assert_snapshot!(_run(r#"
+    func main(x: {int64, {text, bool}, int32}) -> x
+    "#,
+    lutra_bin::Value::Tuple(vec![
+        lutra_bin::Value::Int64(3),
+        lutra_bin::Value::Tuple(vec![
+            lutra_bin::Value::Text("hello".into()),
+            lutra_bin::Value::Bool(true),
+        ]),
+        lutra_bin::Value::Int32(5),
+    ])
     ).1, @r#"
     {
       3,
-      "hello",
+      {
+        "hello",
+        true,
+      },
+      5,
+    }
+    "#);
+}
+
+#[test]
+#[ignore] // TODO
+fn param_03() {
+    insta::assert_snapshot!(_run(r#"
+    func main(x: {int64, [text], int32}) -> x
+    "#,
+    lutra_bin::Value::Tuple(vec![
+        lutra_bin::Value::Int64(3),
+        lutra_bin::Value::Array(vec![
+            lutra_bin::Value::Text("hello".into()),
+            lutra_bin::Value::Text("world".into()),
+        ]),
+        lutra_bin::Value::Int32(5),
+    ])
+    ).1, @r#"
+    {
+      3,
+      [
+        "hello",
+        "world",
+      ],
+      5
+    }
+    "#);
+}
+
+#[test]
+fn param_04() {
+    insta::assert_snapshot!(_run(r#"
+    func main(x: [{int64, text}]) -> x.1
+    "#,
+    lutra_bin::Value::Array(vec![
+        lutra_bin::Value::Tuple(vec![
+            lutra_bin::Value::Int64(5),
+            lutra_bin::Value::Text("hello".into()),
+        ]),
+        lutra_bin::Value::Tuple(vec![
+            lutra_bin::Value::Int64(7),
+            lutra_bin::Value::Text("world".into()),
+        ]),
+    ])
+    ).1, @r#"
+    {
+      7,
+      "world",
     }
     "#);
 }
@@ -472,7 +553,7 @@ fn tuple_unpacking_00() {
       ([{id = 3: int32, title = "Hello world!"}] | std::index(0)),
     }
     "#,
-    vec![]
+    lutra_bin::Value::unit(),
     ).1, @r#"
     {
       4,
@@ -496,7 +577,7 @@ fn json_pack_00() {
       get_data().a
       | std::map(func (y: int32) -> -y)
     )
-    "#, vec![]).1, @r#"
+    "#, lutra_bin::Value::unit()).1, @r#"
     [
       -2,
       -5,
@@ -520,7 +601,7 @@ fn json_pack_01() {
       get_data().a
       | std::map(func (y: {int32, bool}) -> {-y.0, !y.1})
     )
-    "#, vec![]).1, @r#"
+    "#, lutra_bin::Value::unit()).1, @r#"
     [
       {
         -2,
@@ -548,7 +629,7 @@ fn json_pack_02() {
         std::index(y, 1)
       ))
     )
-    "#, vec![]).1, @r#"
+    "#, lutra_bin::Value::unit()).1, @r#"
     [
       2,
       5,
@@ -567,7 +648,7 @@ fn json_pack_03() {
         y | std::map(func (z: int64) -> 6-z)
       ))
     )
-    "#, vec![]).1, @r#"
+    "#, lutra_bin::Value::unit()).1, @r#"
     [
       [
         5,
@@ -592,7 +673,7 @@ fn json_pack_04() {
       get_data().a
       | std::map(func (y: bool) -> !y)
     )
-    "#, vec![]).1, @r#"
+    "#, lutra_bin::Value::unit()).1, @r#"
     [
       true,
       false,
@@ -610,7 +691,7 @@ fn json_pack_05() {
       get_data().a
       | std::map(func (y: text) -> y)
     )
-    "#, vec![]).1, @r#"
+    "#, lutra_bin::Value::unit()).1, @r#"
     [
       "no",
       "yes",
@@ -891,7 +972,7 @@ fn sql_insert_00() {
       release_year: int16
     }
     func main(): [Movie] -> std::sql::from("movies2")
-    "#, vec![]).1, @r#"
+    "#, lutra_bin::Value::unit()).1, @r#"
     [
       {
         id = 1,

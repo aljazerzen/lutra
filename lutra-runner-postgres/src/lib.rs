@@ -9,13 +9,15 @@ mod result;
 #[cfg(feature = "tokio-postgres")]
 mod schema;
 
+use std::collections::HashMap;
+
 #[cfg(feature = "postgres")]
 use postgres::Error as PgError;
 use thiserror::Error;
 #[cfg(not(feature = "postgres"))]
 use tokio_postgres::Error as PgError;
 
-use lutra_bin::rr;
+use lutra_bin::{ir, rr};
 
 #[derive(Error, Debug)]
 pub enum Error {
@@ -34,14 +36,16 @@ pub fn execute(
     // prepare
     let def = client.prepare(&program.sql)?;
 
+    let ctx = Context::new(&program.defs);
+
     // pack input into query args
-    let args = params::to_sql(program, input);
+    let args = params::to_sql(program, input, &ctx);
 
     // execute
     let rows = client.query(&def, &args.as_refs())?;
 
     // convert result from sql
-    result::from_sql(program, &rows)
+    result::from_sql(program, &rows, &ctx)
 }
 
 #[cfg(feature = "tokio-postgres")]
@@ -90,13 +94,15 @@ impl lutra_runner::Run for RunnerAsync {
         handle: &Self::Prepared,
         input: &[u8],
     ) -> Result<std::vec::Vec<u8>, Self::Error> {
+        let ctx = Context::new(&handle.program.defs);
+
         // pack input into query args
-        let args = params::to_sql(&handle.program, input);
+        let args = params::to_sql(&handle.program, input, &ctx);
 
         let rows = self.client.query(&handle.stmt, &args.as_refs()).await?;
 
         // convert result from sql
-        result::from_sql(&handle.program, &rows)
+        result::from_sql(&handle.program, &rows, &ctx)
     }
 
     async fn get_interface(&self) -> Result<std::string::String, Self::Error> {
@@ -117,5 +123,24 @@ impl lutra_runner::Run for RunnerAsync {
             output += &format!("let {table}: func (): [{ty_name}]\n");
         }
         Ok(output)
+    }
+}
+
+struct Context<'a> {
+    pub types: HashMap<&'a ir::Path, &'a ir::Ty>,
+}
+
+impl<'a> Context<'a> {
+    fn new(ty_defs: &'a [ir::TyDef]) -> Self {
+        Context {
+            types: ty_defs.iter().map(|def| (&def.name, &def.ty)).collect(),
+        }
+    }
+
+    fn get_ty_mat(&self, ty: &'a ir::Ty) -> &'a ir::Ty {
+        match &ty.kind {
+            ir::TyKind::Ident(path) => self.types.get(path).unwrap(),
+            _ => ty,
+        }
     }
 }
