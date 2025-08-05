@@ -472,10 +472,19 @@ impl<'a> Context<'a> {
                 );
 
                 // drop index column
-                cr::ExprKind::Transform(
+                let mut rel = cr::ExprKind::Transform(
                     self.new_binding(rel_limit),
                     cr::Transform::ProjectDiscard(vec![0]),
-                )
+                );
+
+                if expr.ty.kind.is_array() {
+                    rel = cr::ExprKind::From(cr::From::JsonUnpack(Box::new(cr::Expr {
+                        kind: rel,
+                        ty: ir::Ty::new(ir::TyPrimitive::text),
+                    })));
+                }
+
+                rel
             }
             "std::map" => {
                 let array = self.compile_rel(&call.args[0]);

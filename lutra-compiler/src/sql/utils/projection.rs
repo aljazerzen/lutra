@@ -142,6 +142,9 @@ impl<'a> queries::Context<'a> {
             let values: Vec<_> = values.collect();
             let rel_cols: Vec<_> = rel_cols.collect();
 
+            if values.len() != rel_cols.len() {
+                tracing::error!("bad type detected in projection");
+            }
             assert_eq!(
                 values.len(),
                 rel_cols.len(),

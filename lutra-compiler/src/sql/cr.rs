@@ -141,6 +141,13 @@ impl Expr {
         }
     }
 
+    #[allow(dead_code)]
+    pub fn new_json_unpack(rel: Expr) -> Self {
+        Expr {
+            ty: rel.ty.clone(),
+            kind: ExprKind::From(From::JsonUnpack(Box::new(rel))),
+        }
+    }
     pub fn new_json_pack(rel: Expr) -> Self {
         Expr {
             ty: rel.ty.clone(),

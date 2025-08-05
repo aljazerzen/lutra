@@ -1,6 +1,6 @@
 use lutra_compiler::{ProgramFormat, SourceTree};
 
-const POSTGRES_URL: &str = "postgresql://postgres:pass@localhost:5416";
+use crate::POSTGRES_URL;
 
 #[track_caller]
 pub fn _run(source: &str, input: lutra_bin::Value) -> (String, String) {
@@ -334,6 +334,131 @@ fn array_array_prim() {
         5,
       ],
     ]
+    ");
+}
+
+#[test]
+fn array_array_array_tuple_prim() {
+    insta::assert_snapshot!(_run_sql_output(r#"
+        const main = [[[{1: int32, "hello", 2: int16}]]]
+    "#), @r#"
+    SELECT
+      r5.value
+    FROM
+      (
+        SELECT
+          0::int8 AS index,
+          (
+            SELECT
+              COALESCE(
+                jsonb_agg(
+                  r3.value
+                  ORDER BY
+                    r3.index
+                ),
+                '[]'::jsonb
+              ) AS value
+            FROM
+              (
+                SELECT
+                  0::int8 AS index,
+                  (
+                    SELECT
+                      COALESCE(
+                        jsonb_agg(
+                          jsonb_build_array(r1._0, r1._1, r1._2)
+                          ORDER BY
+                            r1.index
+                        ),
+                        '[]'::jsonb
+                      ) AS value
+                    FROM
+                      (
+                        SELECT
+                          0::int8 AS index,
+                          1::int4 AS _0,
+                          'hello' AS _1,
+                          2::int2 AS _2
+                      ) AS r1
+                  ) AS value
+              ) AS r3
+          ) AS value
+      ) AS r5
+    ORDER BY
+      r5.index
+    ---
+    [
+      [
+        [
+          {
+            1,
+            "hello",
+            2,
+          },
+        ],
+      ],
+    ]
+    "#);
+}
+
+#[test]
+fn tuple_array_tuple_tuple_prim() {
+    insta::assert_snapshot!(_run_sql_output(r#"
+        const main =
+          {
+            1: int32,
+            [
+              {
+                1: int32,
+                {
+                  1: int32, true, 2: int16
+                },
+                2: int16
+              }
+            ],
+            2: int16
+          }
+    "#), @r"
+    SELECT
+      1::int4 AS _0,
+      (
+        SELECT
+          COALESCE(
+            jsonb_agg(
+              jsonb_build_array(r1._0, r1._1_0, r1._1_1, r1._1_2, r1._2)
+              ORDER BY
+                r1.index
+            ),
+            '[]'::jsonb
+          ) AS value
+        FROM
+          (
+            SELECT
+              0::int8 AS index,
+              1::int4 AS _0,
+              1::int4 AS _1_0,
+              TRUE AS _1_1,
+              2::int2 AS _1_2,
+              2::int2 AS _2
+          ) AS r1
+      ) AS _1,
+      2::int2 AS _2
+    ---
+    {
+      1,
+      [
+        {
+          1,
+          {
+            1,
+            true,
+            2,
+          },
+          2,
+        },
+      ],
+      2,
+    }
     ");
 }
 
@@ -695,6 +820,67 @@ fn json_pack_05() {
       "no",
       "yes",
       "neither",
+    ]
+    "#);
+}
+
+#[test]
+fn json_pack_06() {
+    insta::assert_snapshot!(_run(r#"
+    func main() -> (
+      {"hello", [[true]]}.1
+    )
+    "#, lutra_bin::Value::unit()).1, @r"
+    [
+      [
+        true,
+      ],
+    ]
+    ");
+}
+
+#[test]
+fn json_pack_07() {
+    insta::assert_snapshot!(_run(r#"
+    func main() -> (
+      {
+        "hello",
+        [
+          {
+            "hello",
+            [{1: int32, {1: int32, [5: int32], 2: int16}, 2: int16}]
+          }.1
+        ]
+      }.1
+    )
+    "#, lutra_bin::Value::unit()).1, @r"
+    [
+      [
+        {
+          1,
+          {
+            1,
+            [
+              5,
+            ],
+            2,
+          },
+          2,
+        },
+      ],
+    ]
+    ");
+}
+
+#[test]
+fn json_pack_08() {
+    insta::assert_snapshot!(_run(r#"
+    func main() -> (
+      std::index([["hello"]], 0)
+    )
+    "#, lutra_bin::Value::unit()).1, @r#"
+    [
+      "hello",
     ]
     "#);
 }

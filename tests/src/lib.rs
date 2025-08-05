@@ -4,6 +4,9 @@ mod lutra {
     include!(concat!(env!("OUT_DIR"), "/lutra.rs"));
 }
 
+const POSTGRES_URL: &str = "postgresql://postgres:pass@localhost:5416";
+
+mod fuzz;
 mod inliner;
 mod interpreter;
 mod lbin;

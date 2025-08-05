@@ -100,11 +100,8 @@ impl<'a> super::Context<'a> {
             }
             ir::TyKind::Primitive(prim) => Box::new(JsonPrimEncoder { prim: *prim }),
 
-            ir::TyKind::Tuple(fields) => Box::new(JsonTupleEncoder {
-                inner: fields
-                    .iter()
-                    .map(|f| self.construct_json_encoder(&f.ty))
-                    .collect(),
+            ir::TyKind::Tuple(_) => Box::new(JsonTupleEncoder {
+                inner: self.construct_json_encoder_tuple(ty),
             }),
 
             ir::TyKind::Array(item) => Box::new(JsonArrayEncoder {
@@ -113,6 +110,21 @@ impl<'a> super::Context<'a> {
             ir::TyKind::Enum(_) => todo!(),
             ir::TyKind::Function(_) => todo!(),
             ir::TyKind::Ident(_) => todo!(),
+        }
+    }
+
+    /// For flattening tuples.
+    #[tracing::instrument(name = "json_tuple", skip_all)]
+    fn construct_json_encoder_tuple(&self, ty: &ir::Ty) -> Vec<Box<dyn EncodeJson>> {
+        tracing::debug!("json_tuple");
+
+        match &self.get_ty_mat(ty).kind {
+            ir::TyKind::Tuple(fields) => fields
+                .iter()
+                .flat_map(|f| self.construct_json_encoder_tuple(&f.ty))
+                .collect(),
+
+            _ => vec![self.construct_json_encoder(ty)],
         }
     }
 }

@@ -88,6 +88,7 @@ impl<'a> Context<'a> {
         self.rel_vars.remove(&input.id);
     }
 
+    #[tracing::instrument(name = "r", skip_all)]
     fn compile_rel(&mut self, rel: &cr::Expr) -> Scoped {
         match &rel.kind {
             cr::ExprKind::From(from) => self.compile_from(from, &rel.ty),
@@ -219,6 +220,7 @@ impl<'a> Context<'a> {
     }
 
     fn compile_from(&mut self, from: &cr::From, ty: &ir::Ty) -> Scoped {
+        tracing::debug!("from");
         match from {
             cr::From::Row(row) => {
                 let mut select = utils::select_empty();
@@ -326,6 +328,7 @@ impl<'a> Context<'a> {
         input_ty: &ir::Ty,
         ty: &ir::Ty,
     ) -> Scoped {
+        tracing::debug!("transform");
         match transform {
             cr::Transform::ProjectRetain(cols) => {
                 let must_wrap = scoped.as_query().is_none_or(|q| q.order_by.is_some());
@@ -603,16 +606,17 @@ impl<'a> Context<'a> {
                 let index = format!("{input}.{COL_ARRAY_INDEX}");
 
                 match &self.get_ty_mat(ty_item).kind {
-                    ir::TyKind::Primitive(_) => ExprOrSource::Source(format!(
-                        "COALESCE(jsonb_agg({input}.{COL_VALUE} ORDER BY {index}), '[]'::jsonb)",
-                    )),
+                    ir::TyKind::Primitive(_) | ir::TyKind::Array(_) => {
+                        ExprOrSource::Source(format!(
+                            "COALESCE(jsonb_agg({input}.{COL_VALUE} ORDER BY {index}), '[]'::jsonb)",
+                        ))
+                    }
                     ir::TyKind::Tuple(_) => {
                         let fields = cols.map(|c| format!("{input}.{c}")).join(", ");
                         ExprOrSource::Source(format!(
                             "COALESCE(jsonb_agg(jsonb_build_array({fields}) ORDER BY {index}), '[]'::jsonb)"
                         ))
                     }
-                    ir::TyKind::Array(_) => todo!(),
                     _ => todo!(),
                 }
             }
@@ -663,20 +667,25 @@ impl<'a> Context<'a> {
                     }
                     ir::TyKind::Array(_) => {
                         query.projection.push(sql_ast::SelectItem::ExprWithAlias {
-                            expr: utils::identifier(None::<&str>, "j.value"),
+                            expr: utils::identifier(Some("j"), "value"),
                             alias: utils::new_ident(COL_VALUE),
                         });
                     }
-                    ir::TyKind::Tuple(fields) => {
-                        for (position, field) in fields.iter().enumerate() {
+                    ir::TyKind::Tuple(_) => {
+                        for (position, (name, t)) in std::iter::zip(
+                            self.rel_cols_nested(item_ty, "".into()),
+                            self.rel_cols_ty_nested(item_ty),
+                        )
+                        .enumerate()
+                        {
                             let value = ExprOrSource::Source(self.compile_json_item_cast(
                                 &format!("(j.value->{position})"),
-                                self.get_ty_mat(&field.ty),
+                                self.get_ty_mat(&t),
                             ))
                             .into_expr();
                             query.projection.push(sql_ast::SelectItem::ExprWithAlias {
                                 expr: value,
-                                alias: utils::new_ident(format!("_{position}")),
+                                alias: utils::new_ident(name),
                             });
                         }
                     }
