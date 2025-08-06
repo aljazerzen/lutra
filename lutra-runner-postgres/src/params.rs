@@ -77,16 +77,12 @@ impl<'a> pg_ty::ToSql for Arg<'a> {
     {
         match ty.name() {
             "bool" => out.put_slice(&self.data[0..1]),
-            "int1" => todo!(),
+            "char" => out.extend(self.data[0..1].iter().rev()),
             "int2" => out.extend(self.data[0..2].iter().rev()),
             "int4" => out.extend(self.data[0..4].iter().rev()),
             "int8" => out.extend(self.data[0..8].iter().rev()),
-            "uint8" => todo!(),
-            "uint16" => todo!(),
-            "uint32" => todo!(),
-            "uint64" => todo!(),
-            "float32" => out.put_slice(&self.data[0..4]),
-            "float64" => out.put_slice(&self.data[0..8]),
+            "float4" => out.put_slice(&self.data[0..4]),
+            "float8" => out.put_slice(&self.data[0..8]),
             "text" => {
                 let (offset, len) = lutra_bin::ArrayReader::read_head(&self.data);
                 out.put_slice(&self.data[offset..(offset + len)])
@@ -96,7 +92,7 @@ impl<'a> pg_ty::ToSql for Arg<'a> {
                 out.put_u8(1); // version 1
                 out.put_slice(&self.data)
             }
-            _ => todo!(),
+            ty_name => todo!("unimplemented pg type mapping for {ty_name}"),
         }
         Ok(pg_ty::IsNull::No)
     }
