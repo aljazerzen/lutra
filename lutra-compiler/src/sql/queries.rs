@@ -95,10 +95,10 @@ impl<'a> Context<'a> {
 
             cr::ExprKind::Join(left_in, right_in, condition) => {
                 let mut left = self.compile_rel(&left_in.rel);
-                let left_name = left.expr.as_rel_var().unwrap().to_string();
+                let left_name = self.scoped_as_rel_var(&mut left).to_string();
 
                 let mut right = self.compile_rel(&right_in.rel);
-                let right_name = right.expr.as_rel_var().unwrap().to_string();
+                let right_name = self.scoped_as_rel_var(&mut right).to_string();
 
                 self.register_rel_var(left_in, &mut left);
                 self.register_rel_var(right_in, &mut right);
@@ -806,7 +806,9 @@ impl<'a> Context<'a> {
                 ))
             }
 
-            "std::greatest" => {
+            "std::text_ops::concat" => utils::new_bin_op("||", args),
+
+            "greatest" => {
                 let mut args = args.into_iter();
                 ExprOrSource::Source(format!(
                     "GREATEST({}, {})::int8",
@@ -815,7 +817,16 @@ impl<'a> Context<'a> {
                 ))
             }
 
-            "std::text_ops::concat" => utils::new_bin_op("||", args),
+            "is_null" => {
+                let mut args = args.into_iter();
+                let arg = args.next().unwrap();
+                ExprOrSource::Source(format!("{arg} IS NULL"))
+            }
+            "is_not_null" => {
+                let mut args = args.into_iter();
+                let arg = args.next().unwrap();
+                ExprOrSource::Source(format!("{arg} IS NOT NULL"))
+            }
 
             _ => todo!("sql impl for {id}"),
         }
@@ -831,7 +842,7 @@ impl<'a> Context<'a> {
     }
 
     fn compile_ty_name(&self, ty: &ir::Ty) -> sql_ast::DataType {
-        let type_name = match self.get_ty_mat(ty).kind {
+        let type_name = match &self.get_ty_mat(ty).kind {
             ir::TyKind::Primitive(prim) => match prim {
                 ir::TyPrimitive::bool => "bool",
                 ir::TyPrimitive::int8 => "\"char\"",
@@ -846,13 +857,16 @@ impl<'a> Context<'a> {
                 ir::TyPrimitive::float64 => "float8",
                 ir::TyPrimitive::text => "text",
             },
-            ir::TyKind::Tuple(ref fields) if fields.is_empty() => {
+            ir::TyKind::Tuple(fields) if fields.is_empty() => {
                 // unit type (holds no data) does not exist in sql so we use a type with
                 // the least amount of data
                 "bool"
             }
             ir::TyKind::Tuple(_) => todo!(),
             ir::TyKind::Array(_) => "jsonb",
+            ir::TyKind::Enum(variants) if utils::is_maybe(variants) => {
+                return self.compile_ty_name(&variants[1].ty);
+            }
             ir::TyKind::Enum(_) => panic!("null value for enum does not make sense"),
             ir::TyKind::Function(_) => todo!(),
             ir::TyKind::Ident(_) => todo!(),

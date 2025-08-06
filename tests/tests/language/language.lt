@@ -513,7 +513,7 @@ func main(): X::b -> {c = true, d = "d"}
 
 type Animal: enum {
   Cat: text,
-  Dog: enum {Generic, Collie: text},
+  Dog: enum {Collie: text, Generic},
 }
 
 func main() -> [
@@ -553,6 +553,53 @@ func main(): [Status] -> [Status::Open(0), Status::Open(0)]
     0
   ),
 ]
+
+# === enum_construction_10
+
+type OptText: enum {
+  None,
+  Some: text,
+}
+
+func main() -> [
+  OptText::None,
+  OptText::Some("Whiskers"),
+]
+# >
+[
+  None,
+  Some(
+    "Whiskers"
+  ),
+]
+
+# === enum_construction_11
+
+type Animal: enum {
+  Cat: text,
+  Dog: enum {None, Some: text},
+}
+
+func main() -> [
+  Animal::Cat("Whiskers"),
+  Animal::Dog(Animal::Dog::Some("Belie")),
+  Animal::Dog(Animal::Dog::None),
+]
+# >
+[
+  Cat(
+    "Whiskers"
+  ),
+  Dog(
+    Some(
+      "Belie"
+    )
+  ),
+  Dog(
+    None
+  ),
+]
+
 
 # === functions_00
 func add_one(x: int64) -> x + 1
@@ -605,7 +652,7 @@ func main(): int32 -> match Status::Pending(4) {
 # === match_02
 type Animal: enum {
   Cat: text,
-  Dog: enum {Generic, Collie: text},
+  Dog: enum {Collie: text, Generic},
 }
 func main() -> (
   Animal::Dog(Animal::Dog::Collie("Belie"))
@@ -648,7 +695,7 @@ func main() -> (
 
 type Animal: enum {
   Cat: text,
-  Dog: enum {Generic, Collie: text},
+  Dog: enum {Collie: text, Generic},
 }
 
 func main() -> (

@@ -890,7 +890,7 @@ fn match_04() {
     insta::assert_snapshot!(_run_sql_output(r#"
     type Animal: enum {
       Cat: text,
-      Dog: enum {Generic, Collie: text},
+      Dog: enum {Collie: text, Generic},
     }
 
     func main() -> (
@@ -922,14 +922,14 @@ fn match_04() {
                     r6._t,
                     r6._0,
                     r6._1_t,
-                    r6._1_1
+                    r6._1_0
                   FROM
                     (
                       SELECT
                         r3._t AS _t,
                         r3._0 AS _0,
                         r3._1_t AS _1_t,
-                        r3._1_1 AS _1_1
+                        r3._1_0 AS _1_0
                     ) AS r6
                 )
                 SELECT
@@ -959,7 +959,7 @@ fn match_04() {
                       SELECT
                         (
                           (r12.value = 1::"char")
-                          AND (r14.value = 0::"char")
+                          AND (r14.value = 1::"char")
                         ) AS value
                       FROM
                         (
@@ -979,7 +979,7 @@ fn match_04() {
                       SELECT
                         (
                           (r16.value = 1::"char")
-                          AND (r18.value = 1::"char")
+                          AND (r18.value = 0::"char")
                         ) AS value
                       FROM
                         (
@@ -1000,7 +1000,7 @@ fn match_04() {
                       FROM
                         (
                           SELECT
-                            r19._1_1 AS value
+                            r19._1_0 AS value
                           FROM
                             r5 AS r19
                         ) AS r20
@@ -1015,23 +1015,23 @@ fn match_04() {
               0::"char" AS _t,
               'Whiskers' AS _0,
               NULL::"char" AS _1_t,
-              NULL::text AS _1_1
+              NULL::text AS _1_0
             UNION
             ALL
             SELECT
               1::int8 AS index,
               1::"char" AS _t,
               NULL::text AS _0,
-              1::"char" AS _1_t,
-              'Belie' AS _1_1
+              0::"char" AS _1_t,
+              'Belie' AS _1_0
             UNION
             ALL
             SELECT
               2::int8 AS index,
               1::"char" AS _t,
               NULL::text AS _0,
-              0::"char" AS _1_t,
-              NULL::text AS _1_1
+              1::"char" AS _1_t,
+              NULL::text AS _1_0
           ) AS r3
       ) AS r23
     ORDER BY
@@ -1278,4 +1278,93 @@ fn group_00() {
       },
     ]
     ");
+}
+
+#[test]
+fn opt_00() {
+    insta::assert_snapshot!(_run_sql_output(r#"
+    type OptText: enum {
+      None,
+      Some: text,
+    }
+    func main() -> {
+      OptText::Some("hello"),
+      OptText::None,
+    }
+    "#), @r#"
+    SELECT
+      'hello' AS _0,
+      NULL::text AS _1
+    ---
+    {
+      Some(
+        "hello"
+      ),
+      None,
+    }
+    "#);
+}
+
+#[test]
+fn opt_01() {
+    insta::assert_snapshot!(_run_sql_output(r#"
+    type OptText: enum {
+      None,
+      Some: text,
+    }
+    func main() -> (
+      [OptText::Some("hello"), OptText::None, OptText::Some("world")]
+      | std::map(func (x) -> match x {
+          .Some(x) => x,
+          .None => "none",
+        })
+    )
+    "#), @r#"
+    SELECT
+      r7.value
+    FROM
+      (
+        SELECT
+          r3.index AS index,
+          (
+            SELECT
+              CASE
+                WHEN r5.value IS NOT NULL THEN (
+                  SELECT
+                    r5.value
+                )
+                WHEN r5.value IS NULL THEN 'none'
+              END AS value
+            FROM
+              (
+                SELECT
+                  r3.value AS value
+              ) AS r5
+          ) AS value
+        FROM
+          (
+            SELECT
+              0::int8 AS index,
+              'hello' AS value
+            UNION
+            ALL
+            SELECT
+              1::int8 AS index,
+              NULL::text AS value
+            UNION
+            ALL
+            SELECT
+              2::int8 AS index,
+              'world' AS value
+          ) AS r3
+      ) AS r7
+    ORDER BY
+      r7.index
+    ---
+    [
+      "hello",
+      "none",
+      "world",
+    ]
+    "#);
 }

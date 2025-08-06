@@ -10,6 +10,18 @@ pub use expr_or_source::*;
 pub use projection::RelCols;
 pub use scoped::*;
 
+use lutra_bin::ir;
+
+/// Checks if an enum is a "maybe" enum:
+/// - does it have exactly two variants?
+/// - is the first variant unit?
+/// - is the second variant a primitive?
+///
+/// If yes, then it can be compiled to a nullable value.
+pub fn is_maybe(variants: &[ir::TyEnumVariant]) -> bool {
+    variants.len() == 2 && variants[0].ty.is_unit() && variants[1].ty.kind.is_primitive()
+}
+
 pub fn retain_by_position<T>(vec: &mut Vec<T>, to_keep: &[usize]) {
     let mut to_keep = to_keep.to_vec();
     to_keep.sort();

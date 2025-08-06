@@ -144,3 +144,8 @@ impl<'a> Context<'a> {
         }
     }
 }
+
+/// Checks if an enum is a "maybe" enum. Must match [lutra_compiler::sql::utils::is_maybe].
+pub fn is_maybe(variants: &[ir::TyEnumVariant]) -> bool {
+    variants.len() == 2 && variants[0].ty.is_unit() && variants[1].ty.kind.is_primitive()
+}

@@ -8,7 +8,7 @@ use postgres::Row;
 #[cfg(feature = "tokio-postgres")]
 use tokio_postgres::Row;
 
-use crate::{Context, Error};
+use crate::{Context, Error, is_maybe};
 
 pub fn from_sql(program: &rr::SqlProgram, rows: &[Row], ctx: &Context) -> Result<Vec<u8>, Error> {
     // write rows to buffer
@@ -57,13 +57,18 @@ impl<'a> super::Context<'a> {
                     .collect(),
             }),
 
-            ir::TyKind::Enum(variants) => Box::new(EnumEncoder {
-                ty: variants.clone(),
-                inner: variants
+            ir::TyKind::Enum(variants) if is_maybe(variants) => Box::new(OptEncoder::new(
+                variants,
+                self.construct_row_encoder(&variants[1].ty),
+            )),
+
+            ir::TyKind::Enum(variants) => Box::new(EnumEncoder::new(
+                variants,
+                variants
                     .iter()
                     .map(|f| self.construct_row_encoder(&f.ty))
                     .collect(),
-            }),
+            )),
             ir::TyKind::Function(_) => todo!(),
             ir::TyKind::Ident(_) => todo!(),
         }
@@ -316,8 +321,15 @@ impl EncodeRow for TupleEncoder {
     }
 }
 struct EnumEncoder {
-    ty: Vec<ir::TyEnumVariant>,
+    format: lutra_bin::layout::EnumFormat,
     inner: Vec<Box<dyn EncodeRow>>,
+}
+
+impl EnumEncoder {
+    fn new(variants: &[ir::TyEnumVariant], inner: Vec<Box<dyn EncodeRow>>) -> Self {
+        let format = lutra_bin::layout::enum_format(variants);
+        Self { format, inner }
+    }
 }
 
 impl EncodeRow for EnumEncoder {
@@ -328,14 +340,12 @@ impl EncodeRow for EnumEncoder {
             i.skip(row)
         }
 
-        let head_format = lutra_bin::layout::enum_head_format(&self.ty);
-        let variant_ty = &self.ty[tag];
-        let variant_format = lutra_bin::layout::enum_variant_format(&head_format, &variant_ty.ty);
+        let variant_format = &self.format.variants[tag];
 
-        let tag_bytes = &(tag as u64).to_le_bytes()[0..head_format.tag_bytes as usize];
+        let tag_bytes = &(tag as u64).to_le_bytes()[0..self.format.tag_bytes as usize];
         buf.put_slice(tag_bytes);
 
-        let r = if head_format.has_ptr {
+        let r = if self.format.has_ptr {
             self.inner[tag].skip(row);
 
             if variant_format.is_unit {
@@ -367,9 +377,7 @@ impl EncodeRow for EnumEncoder {
             i.skip(row)
         }
 
-        let head_format = lutra_bin::layout::enum_head_format(&self.ty);
-
-        if head_format.has_ptr {
+        if self.format.has_ptr {
             match r {
                 HeadResidual::None => {
                     // unit variant, done
@@ -397,6 +405,87 @@ impl EncodeRow for EnumEncoder {
         for i in &self.inner {
             i.skip(row)
         }
+    }
+}
+struct OptEncoder {
+    format: lutra_bin::layout::EnumFormat,
+    inner: Box<dyn EncodeRow>,
+}
+
+impl OptEncoder {
+    fn new(variants: &[ir::TyEnumVariant], inner: Box<dyn EncodeRow>) -> Self {
+        let format = lutra_bin::layout::enum_format(variants);
+        Self { format, inner }
+    }
+}
+
+impl EncodeRow for OptEncoder {
+    fn encode_head(&self, buf: &mut BytesMut, row: &mut RowIter) -> HeadResidual {
+        let is_null = row.get::<IsNull>();
+        let tag = if is_null.0 { 0 } else { 1 };
+
+        let variant_format = &self.format.variants[tag];
+
+        let tag_bytes = &(tag as u64).to_le_bytes()[0..self.format.tag_bytes as usize];
+        buf.put_slice(tag_bytes);
+
+        let r = if self.format.has_ptr {
+            self.inner.skip(row);
+
+            if variant_format.is_unit {
+                // this is unit variant, no need to encode head
+                HeadResidual::None
+            } else {
+                let offset = ReversePointer::new(buf);
+
+                HeadResidual::Offset(offset)
+            }
+        } else {
+            #[allow(clippy::collapsible_else_if)]
+            if is_null.0 {
+                self.inner.skip(row);
+                HeadResidual::None
+            } else {
+                self.inner.encode_head(buf, row)
+            }
+        };
+
+        if variant_format.padding_bytes > 0 {
+            buf.put_bytes(0, variant_format.padding_bytes as usize);
+        }
+        r
+    }
+
+    fn encode_body(&self, buf: &mut BytesMut, row: &mut RowIter, r: HeadResidual) {
+        let is_null = row.get::<IsNull>();
+
+        if self.format.has_ptr {
+            match r {
+                HeadResidual::None => {
+                    // unit variant, done
+                }
+                HeadResidual::Offset(offset_ptr) => {
+                    offset_ptr.write_cur_len(buf);
+
+                    let mut row2 = row.clone();
+                    let residual = self.inner.encode_head(buf, &mut row2);
+                    self.inner.encode_body(buf, row, residual);
+                }
+                _ => unreachable!(),
+            }
+        } else {
+            #[allow(clippy::collapsible_else_if)]
+            if is_null.0 {
+                self.inner.skip(row);
+            } else {
+                self.inner.encode_body(buf, row, r);
+            }
+        }
+    }
+
+    fn skip(&self, row: &mut RowIter) {
+        // opt has exactly the same columns as inner, just nullable
+        self.inner.skip(row);
     }
 }
 
@@ -579,5 +668,26 @@ impl<'a> pg_ty::FromSql<'a> for Json<'a> {
 
     fn accepts(ty: &pg_ty::Type) -> bool {
         matches!(*ty, pg_ty::Type::JSON | pg_ty::Type::JSONB)
+    }
+}
+
+struct IsNull(bool);
+
+impl<'a> pg_ty::FromSql<'a> for IsNull {
+    fn from_sql(
+        _ty: &pg_ty::Type,
+        _raw: &'a [u8],
+    ) -> Result<IsNull, Box<dyn std::error::Error + Sync + Send>> {
+        Ok(IsNull(false))
+    }
+
+    fn from_sql_null(
+        _ty: &postgres_types::Type,
+    ) -> Result<Self, Box<dyn std::error::Error + Sync + Send>> {
+        Ok(IsNull(true))
+    }
+
+    fn accepts(_ty: &pg_ty::Type) -> bool {
+        true
     }
 }

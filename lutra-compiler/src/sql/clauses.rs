@@ -1,7 +1,7 @@
 use std::{borrow::Cow, collections::HashMap};
 
-use crate::sql::cr;
 use crate::sql::utils::RelCols;
+use crate::sql::{cr, utils};
 use crate::utils::IdGenerator;
 use lutra_bin::ir;
 
@@ -242,75 +242,118 @@ impl<'a> Context<'a> {
             ir::ExprKind::Function(_) => todo!(),
 
             ir::ExprKind::EnumVariant(variant) => {
-                let ty_variants = expr.ty.kind.as_enum().unwrap();
+                let ir::TyKind::Enum(ty_variants) = &self.get_ty_mat(&expr.ty).kind else {
+                    panic!("invalid program");
+                };
 
-                let mut row = Vec::with_capacity(ty_variants.len() + 1);
+                if utils::is_maybe(ty_variants) {
+                    // special case: nullable column
 
-                // tag
-                row.push(cr::Expr {
-                    kind: cr::ExprKind::From(cr::From::Literal(ir::Literal::int8(
-                        variant.tag as i8,
-                    ))),
-                    ty: ir::Ty::new(ir::TyPrimitive::int8),
-                });
+                    if variant.tag == 0 {
+                        let null = cr::Expr {
+                            kind: cr::ExprKind::From(cr::From::Null),
+                            ty: ty_variants[1].ty.clone(),
+                        };
+                        cr::ExprKind::From(cr::From::Row(vec![null]))
+                    } else {
+                        self.compile_rel(&variant.inner).kind
+                    }
+                } else {
+                    let mut row = Vec::with_capacity(ty_variants.len() + 1);
 
-                // spacing
-                let selected = variant.tag as usize;
-                row.extend(ty_variants.iter().take(selected).flat_map(|v| {
-                    self.rel_cols_ty_nested(&v.ty).map(|ty| cr::Expr {
-                        kind: cr::ExprKind::From(cr::From::Null),
-                        ty: ty.into_owned(),
-                    })
-                }));
+                    // tag
+                    row.push(cr::Expr {
+                        kind: cr::ExprKind::From(cr::From::Literal(ir::Literal::int8(
+                            variant.tag as i8,
+                        ))),
+                        ty: ir::Ty::new(ir::TyPrimitive::int8),
+                    });
 
-                // inner
-                row.extend(self.compile_column_list(&variant.inner).unwrap_columns());
+                    // spacing
+                    let selected = variant.tag as usize;
+                    row.extend(ty_variants.iter().take(selected).flat_map(|v| {
+                        self.rel_cols_ty_nested(&v.ty).map(|ty| cr::Expr {
+                            kind: cr::ExprKind::From(cr::From::Null),
+                            ty: ty.into_owned(),
+                        })
+                    }));
 
-                // spacing
-                row.extend(ty_variants.iter().skip(selected + 1).flat_map(|v| {
-                    self.rel_cols_ty_nested(&v.ty).map(|ty| cr::Expr {
-                        kind: cr::ExprKind::From(cr::From::Null),
-                        ty: ty.into_owned(),
-                    })
-                }));
+                    // inner
+                    row.extend(self.compile_column_list(&variant.inner).unwrap_columns());
 
-                cr::ExprKind::From(cr::From::Row(row))
+                    // spacing
+                    row.extend(ty_variants.iter().skip(selected + 1).flat_map(|v| {
+                        self.rel_cols_ty_nested(&v.ty).map(|ty| cr::Expr {
+                            kind: cr::ExprKind::From(cr::From::Null),
+                            ty: ty.into_owned(),
+                        })
+                    }));
+
+                    cr::ExprKind::From(cr::From::Row(row))
+                }
             }
             ir::ExprKind::EnumEq(enum_eq) => {
                 let base = self.compile_rel(&enum_eq.subject);
-                let base = self.new_binding(base);
 
-                let tag = cr::Expr {
-                    kind: cr::ExprKind::Transform(base, cr::Transform::ProjectRetain(vec![0])),
-                    ty: ir::Ty::new(ir::TyPrimitive::int8),
+                let ir::TyKind::Enum(variants) = &self.get_ty_mat(&enum_eq.subject.ty).kind else {
+                    panic!("invalid program");
                 };
+                if utils::is_maybe(variants) {
+                    // a nullable column
+                    let op = if enum_eq.tag == 0 {
+                        "is_null"
+                    } else {
+                        "is_not_null"
+                    };
+                    cr::ExprKind::From(cr::From::FuncCall(op.into(), vec![base]))
+                } else {
+                    // tag + one column for variant
 
-                let args = vec![tag, new_int8(enum_eq.tag as i8)];
-                cr::ExprKind::From(cr::From::FuncCall("std::eq".to_string(), args))
+                    let base = self.new_binding(base);
+
+                    let tag = cr::Expr {
+                        kind: cr::ExprKind::Transform(base, cr::Transform::ProjectRetain(vec![0])),
+                        ty: ir::Ty::new(ir::TyPrimitive::int8),
+                    };
+
+                    let args = vec![tag, new_int8(enum_eq.tag as i8)];
+                    cr::ExprKind::From(cr::From::FuncCall("std::eq".to_string(), args))
+                }
             }
             ir::ExprKind::EnumUnwrap(enum_unwrap) => {
                 let base = self.compile_rel(&enum_unwrap.subject);
-                let base = self.new_binding(base);
 
                 let ir::TyKind::Enum(variants) = &self.get_ty_mat(&enum_unwrap.subject.ty).kind
                 else {
                     panic!("invalid program");
                 };
 
-                // count number of columns in front of selected variant and the first tag
-                let start = 1 + variants
-                    .iter()
-                    .take(enum_unwrap.tag as usize)
-                    .map(|v| self.rel_cols_nested(&v.ty, String::new()).count())
-                    .sum::<usize>();
+                if utils::is_maybe(variants) {
+                    // a nullable column
+                    return base;
+                } else {
+                    // tag + one column for variant
 
-                // count number of columns of the selected variant
-                let end = start
-                    + self
-                        .rel_cols_nested(&variants[enum_unwrap.tag as usize].ty, String::new())
-                        .count();
+                    let base = self.new_binding(base);
 
-                cr::ExprKind::Transform(base, cr::Transform::ProjectRetain((start..end).collect()))
+                    // count number of columns in front of selected variant and the first tag
+                    let start = 1 + variants
+                        .iter()
+                        .take(enum_unwrap.tag as usize)
+                        .map(|v| self.rel_cols_nested(&v.ty, String::new()).count())
+                        .sum::<usize>();
+
+                    // count number of columns of the selected variant
+                    let end = start
+                        + self
+                            .rel_cols_nested(&variants[enum_unwrap.tag as usize].ty, String::new())
+                            .count();
+
+                    cr::ExprKind::Transform(
+                        base,
+                        cr::Transform::ProjectRetain((start..end).collect()),
+                    )
+                }
             }
 
             ir::ExprKind::TupleLookup(lookup) => {
@@ -373,8 +416,9 @@ impl<'a> Context<'a> {
 
                     self.bindings.remove(&binding.id).unwrap();
 
-                    let is_exactly_one_row =
-                        expr.rel.ty.kind.is_primitive() || expr.rel.ty.kind.is_tuple();
+                    let is_exactly_one_row = expr.rel.ty.kind.is_primitive()
+                        || expr.rel.ty.kind.is_tuple()
+                        || expr.rel.ty.kind.is_enum();
                     if is_exactly_one_row {
                         // if possible, use BindCorrelated, because it is easier for optimizers to work with
                         cr::ExprKind::BindCorrelated(expr, Box::new(main))
@@ -434,7 +478,7 @@ impl<'a> Context<'a> {
 
                 let start_clamped = new_bin_op(
                     start.clone(),
-                    "std::greatest",
+                    "greatest",
                     new_int(0),
                     ir::TyPrimitive::int64,
                 );
@@ -445,7 +489,7 @@ impl<'a> Context<'a> {
                     ir::TyPrimitive::int64,
                 );
                 let length_clamped =
-                    new_bin_op(length, "std::greatest", new_int(0), ir::TyPrimitive::int64);
+                    new_bin_op(length, "greatest", new_int(0), ir::TyPrimitive::int64);
 
                 let rel_offset = cr::Expr::new_iso_transform(
                     self.new_binding(array),
@@ -872,7 +916,7 @@ impl<'a> Context<'a> {
                         ColumnsOrUnpack::Unpack(rel)
                     }
                     ir::TyKind::Enum(_) => {
-                        let is_single_col = self.rel_cols_ty_nested(ty_mat).nth(1).is_some();
+                        let is_single_col = self.rel_cols_ty_nested(ty_mat).nth(1).is_none();
                         if is_single_col {
                             ColumnsOrUnpack::Columns(vec![rel])
                         } else {

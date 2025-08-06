@@ -71,6 +71,15 @@ pub trait RelCols<'a> {
                 }))
             }
 
+            ir::TyKind::Enum(variants) if utils::is_maybe(variants) => {
+                let name = if name_prefix.is_empty() {
+                    COL_VALUE.to_string()
+                } else {
+                    name_prefix
+                };
+                Box::new(Some(name).into_iter())
+            }
+
             ir::TyKind::Enum(variants) => Box::new(
                 Some(
                     format!("{name_prefix}_t"), // tag
@@ -104,6 +113,10 @@ pub trait RelCols<'a> {
 
             ir::TyKind::Tuple(fields) => {
                 Box::new(fields.iter().flat_map(|f| self.rel_cols_ty_nested(&f.ty)))
+            }
+
+            ir::TyKind::Enum(variants) if utils::is_maybe(variants) => {
+                Box::new(variants.iter().flat_map(|v| self.rel_cols_ty_nested(&v.ty)))
             }
 
             ir::TyKind::Enum(variants) => Box::new(itertools::chain(
@@ -213,7 +226,7 @@ mod rel_repr {
         assert_eq!(r(&array(prim())), "index, value");
         assert_eq!(r(&array(tuple_0())), "index");
         assert_eq!(r(&enum_(vec![tuple_0(), tuple_0(), tuple_0()])), "_t");
-        assert_eq!(r(&enum_(vec![tuple_0(), prim()])), "_t, _1");
+        assert_eq!(r(&enum_(vec![tuple_0(), prim()])), "value");
 
         // depth 3
         assert_eq!(r(&tuple_1(tuple_1(prim()))), "_0_0");

@@ -1,8 +1,8 @@
 use lutra_bin::ir;
 use sqlparser::ast::{self as sql_ast, Query};
 
-use crate::sql::utils;
 use crate::sql::utils::ExprOrSource;
+use crate::sql::utils;
 
 /// SQL expression and dependent relational variables
 #[derive(Debug, Clone)]
