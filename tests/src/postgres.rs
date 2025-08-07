@@ -674,6 +674,67 @@ fn param_04() {
 }
 
 #[test]
+fn param_05() {
+    insta::assert_snapshot!(_run(r#"
+    func main(x: [{int32, {int32, int16}, int16}]) -> x
+    "#,
+    lutra_bin::Value::Array(vec![
+        lutra_bin::Value::Tuple(vec![
+            lutra_bin::Value::Int32(5),
+            lutra_bin::Value::Tuple(vec![
+                lutra_bin::Value::Int32(7),
+                lutra_bin::Value::Int16(7),
+            ]),
+            lutra_bin::Value::Int16(1212),
+        ])
+    ])
+    ).1, @r"
+    [
+      {
+        5,
+        {
+          7,
+          7,
+        },
+        1212,
+      },
+    ]
+    ");
+}
+
+#[test]
+fn param_06() {
+    insta::assert_snapshot!(_run(r#"
+    func main(x: [{int32, {int32, int16}, int16}]) -> {"hello", x}
+    "#,
+    lutra_bin::Value::Array(vec![
+        lutra_bin::Value::Tuple(vec![
+            lutra_bin::Value::Int32(5),
+            lutra_bin::Value::Tuple(vec![
+                lutra_bin::Value::Int32(7),
+                lutra_bin::Value::Int16(7),
+            ]),
+            lutra_bin::Value::Int16(1212),
+        ])
+    ])
+    ).1, @r#"
+    {
+      "hello",
+      [
+        {
+          5,
+          {
+            7,
+            7,
+          },
+          1212,
+        },
+      ],
+    }
+    "#);
+}
+
+#[test]
 fn tuple_unpacking_00() {
     insta::assert_snapshot!(_run(r#"
     func main() -> {
