@@ -906,7 +906,7 @@ impl<'a> Context<'a> {
                     ir::TyKind::Array(_) => {
                         // arrays need to packed to JSON
                         ColumnsOrUnpack::Columns(vec![cr::Expr {
-                            ty: rel.ty.clone(),
+                            ty: ir::Ty::new(ir::TyPrimitive::text),
                             kind: cr::ExprKind::From(cr::From::JsonPack(Box::new(rel))),
                         }])
                     }

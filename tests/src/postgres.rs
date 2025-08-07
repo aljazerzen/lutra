@@ -41,6 +41,10 @@ pub fn _run_sql_output(lutra_source: &str) -> String {
     format!("{sql}\n---\n{output}")
 }
 
+pub fn _sql_and_output((sql, output): (String, String)) -> String {
+    format!("{sql}\n---\n{output}")
+}
+
 #[test]
 fn prim() {
     insta::assert_snapshot!(_run_sql_output(r#"
@@ -882,6 +886,33 @@ fn json_pack_08() {
     [
       "hello",
     ]
+    "#);
+}
+
+#[test]
+fn json_pack_09() {
+    // JsonUnpack(JsonPack(_)) should be optimized away
+
+    insta::assert_snapshot!(_sql_and_output(_run(r#"
+    func main(x: [int8]) -> {"hello", x}
+    "#,
+    lutra_bin::Value::Array(vec![
+        lutra_bin::Value::Int8(1),
+        lutra_bin::Value::Int8(2),
+        lutra_bin::Value::Int8(3),
+    ]))), @r#"
+    SELECT
+      'hello' AS _0,
+      $1::jsonb AS _1
+    ---
+    {
+      "hello",
+      [
+        1,
+        2,
+        3,
+      ],
+    }
     "#);
 }
 

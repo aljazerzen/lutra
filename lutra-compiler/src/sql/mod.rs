@@ -1,5 +1,6 @@
 mod clauses;
 mod cr;
+mod optimizer;
 mod queries;
 mod utils;
 
@@ -15,12 +16,14 @@ pub fn compile_ir(program: ir::Program) -> (ir::Program, rr::SqlProgram) {
     let program = crate::intermediate::layouter::on_program(program);
 
     // compile to clauses
-    let (clause, types) = clauses::compile(&program);
+    let (clauses, types) = clauses::compile(&program);
 
-    tracing::debug!("cr: {clause:#?}");
+    let clauses = optimizer::optimize(clauses);
+
+    tracing::debug!("cr: {clauses:#?}");
 
     // compile to queries
-    let query = queries::compile(clause, types);
+    let query = queries::compile(clauses, types);
 
     tracing::trace!("sql ast: {query:?}");
 

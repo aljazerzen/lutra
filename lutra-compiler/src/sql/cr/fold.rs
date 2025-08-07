@@ -1,0 +1,132 @@
+use super::*;
+
+type Result<T, E = ()> = std::result::Result<T, E>;
+
+pub trait CrFold {
+    fn fold_expr(&mut self, expr: Expr) -> Result<Expr> {
+        fold_expr(self, expr)
+    }
+    fn fold_expr_kind(&mut self, kind: ExprKind, ty: ir::Ty) -> Result<Expr> {
+        fold_expr_kind(self, kind, ty)
+    }
+    fn fold_bound_expr(&mut self, bound: BoundExpr) -> Result<BoundExpr> {
+        fold_bound_expr(self, bound)
+    }
+    fn fold_from(&mut self, from: From, ty: ir::Ty) -> Result<Expr> {
+        fold_from(self, from, ty)
+    }
+    fn fold_transform(&mut self, transform: Transform) -> Result<Transform> {
+        fold_transform(self, transform)
+    }
+}
+
+pub fn fold_expr<T: ?Sized + CrFold>(fold: &mut T, expr: Expr) -> Result<Expr> {
+    fold.fold_expr_kind(expr.kind, expr.ty)
+}
+
+pub fn fold_expr_kind<T: ?Sized + CrFold>(
+    fold: &mut T,
+    kind: ExprKind,
+    ty: ir::Ty,
+) -> Result<Expr> {
+    let kind = match kind {
+        ExprKind::From(from) => return fold.fold_from(from, ty),
+        ExprKind::Transform(bound, transform) => ExprKind::Transform(
+            Box::new(fold.fold_bound_expr(*bound)?),
+            fold.fold_transform(transform)?,
+        ),
+        ExprKind::Join(left, right, cond) => ExprKind::Join(
+            Box::new(fold.fold_bound_expr(*left)?),
+            Box::new(fold.fold_bound_expr(*right)?),
+            cond.map(|c| fold.fold_expr(*c)).transpose()?.map(Box::new),
+        ),
+        ExprKind::Bind(bound, expr) => ExprKind::Bind(
+            Box::new(fold.fold_bound_expr(*bound)?),
+            Box::new(fold.fold_expr(*expr)?),
+        ),
+        ExprKind::BindCorrelated(bound, expr) => ExprKind::BindCorrelated(
+            Box::new(fold.fold_bound_expr(*bound)?),
+            Box::new(fold.fold_expr(*expr)?),
+        ),
+        ExprKind::Union(exprs) => ExprKind::Union(
+            exprs
+                .into_iter()
+                .map(|e| fold.fold_expr(e))
+                .collect::<Result<_>>()?,
+        ),
+    };
+    Ok(Expr { kind, ty })
+}
+
+pub fn fold_bound_expr<T: ?Sized + CrFold>(fold: &mut T, bound: BoundExpr) -> Result<BoundExpr> {
+    Ok(BoundExpr {
+        id: bound.id,
+        rel: fold.fold_expr(bound.rel)?,
+    })
+}
+
+pub fn fold_from<T: ?Sized + CrFold>(fold: &mut T, from: From, ty: ir::Ty) -> Result<Expr> {
+    let from = match from {
+        From::Row(exprs) => From::Row(
+            exprs
+                .into_iter()
+                .map(|e| fold.fold_expr(e))
+                .collect::<Result<_>>()?,
+        ),
+        From::Table(name) => From::Table(name),
+        From::RelRef(id) => From::RelRef(id),
+        From::Null => From::Null,
+        From::Literal(lit) => From::Literal(lit),
+        From::Param(i) => From::Param(i),
+        From::FuncCall(name, args) => From::FuncCall(
+            name,
+            args.into_iter()
+                .map(|e| fold.fold_expr(e))
+                .collect::<Result<_>>()?,
+        ),
+        From::JsonUnpack(expr) => From::JsonUnpack(Box::new(fold.fold_expr(*expr)?)),
+        From::JsonPack(expr) => From::JsonPack(Box::new(fold.fold_expr(*expr)?)),
+        From::Case(arms) => From::Case(
+            arms.into_iter()
+                .map(|(c, v)| Ok((fold.fold_expr(c)?, fold.fold_expr(v)?)))
+                .collect::<Result<_>>()?,
+        ),
+    };
+    Ok(Expr {
+        kind: ExprKind::From(from),
+        ty,
+    })
+}
+
+pub fn fold_transform<T: ?Sized + CrFold>(fold: &mut T, transform: Transform) -> Result<Transform> {
+    Ok(match transform {
+        Transform::ProjectRetain(cols) => Transform::ProjectRetain(cols),
+        Transform::ProjectDiscard(cols) => Transform::ProjectDiscard(cols),
+        Transform::Aggregate(exprs) => Transform::Aggregate(
+            exprs
+                .into_iter()
+                .map(|e| fold.fold_expr(e))
+                .collect::<Result<_>>()?,
+        ),
+        Transform::Window(exprs) => Transform::Window(
+            exprs
+                .into_iter()
+                .map(|e| fold.fold_expr(e))
+                .collect::<Result<_>>()?,
+        ),
+        Transform::Limit(expr) => Transform::Limit(Box::new(fold.fold_expr(*expr)?)),
+        Transform::Offset(expr) => Transform::Offset(Box::new(fold.fold_expr(*expr)?)),
+        Transform::Where(expr) => Transform::Where(Box::new(fold.fold_expr(*expr)?)),
+        Transform::IndexBy(expr) => {
+            Transform::IndexBy(expr.map(|e| fold.fold_expr(*e)).transpose()?.map(Box::new))
+        }
+        Transform::Order => Transform::Order,
+        Transform::Group(exprs) => Transform::Group(
+            exprs
+                .into_iter()
+                .map(|e| fold.fold_expr(e))
+                .collect::<Result<_>>()?,
+        ),
+        Transform::Insert(name) => Transform::Insert(name),
+    })
+}

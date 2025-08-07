@@ -1,3 +1,7 @@
+mod fold;
+
+pub use fold::*;
+
 use lutra_bin::ir;
 
 #[derive(Clone)]

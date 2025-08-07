@@ -286,9 +286,9 @@ impl<'a> Context<'a> {
                 self.compile_json_unpack(input, ty)
             }
 
-            cr::From::JsonPack(input) => {
-                let input = self.compile_rel(input);
-                self.compile_json_pack(input, ty)
+            cr::From::JsonPack(expr_in) => {
+                let expr = self.compile_rel(expr_in);
+                self.compile_json_pack(expr, &expr_in.ty)
             }
 
             cr::From::Case(cases) => {
