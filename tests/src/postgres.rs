@@ -978,6 +978,47 @@ fn json_pack_09() {
 }
 
 #[test]
+fn json_pack_10() {
+    insta::assert_snapshot!(_sql_and_output(_run(r#"
+    func main() -> {"hello", [1: int8, 2]}
+    "#,
+    lutra_bin::Value::unit())), @r#"
+    SELECT
+      'hello' AS _0,
+      (
+        SELECT
+          COALESCE(
+            jsonb_agg(
+              ASCII(r2.value)
+              ORDER BY
+                r2.index
+            ),
+            '[]'::jsonb
+          ) AS value
+        FROM
+          (
+            SELECT
+              0::int8 AS index,
+              1::"char" AS value
+            UNION
+            ALL
+            SELECT
+              1::int8 AS index,
+              2::"char" AS value
+          ) AS r2
+      ) AS _1
+    ---
+    {
+      "hello",
+      [
+        1,
+        2,
+      ],
+    }
+    "#);
+}
+
+#[test]
 fn match_04() {
     insta::assert_snapshot!(_run_sql_output(r#"
     type Animal: enum {
@@ -1280,80 +1321,50 @@ fn group_00() {
     )
     "#), @r"
     SELECT
-      r16._0,
-      r16._1
+      r7._0,
+      r7._1
     FROM
       (
         SELECT
-          r7.index AS index,
-          r7._0 AS _0,
-          (
-            SELECT
-              r13.value
-            FROM
-              (
-                SELECT
-                  COALESCE(SUM(r12.value), 0)::int8 AS value
-                FROM
-                  LATERAL (
-                    SELECT
-                      (ROW_NUMBER() OVER ())::int4 AS index,
-                      j.value::text::int8 AS value
-                    FROM
-                      jsonb_array_elements(r7._1) AS j
-                  ) AS r12
-              ) AS r13
-          ) AS _1
+          (ROW_NUMBER() OVER ())::int4 AS index,
+          r6.value AS _0,
+          COALESCE(SUM(r6.value), 0)::int8 AS _1
         FROM
           (
             SELECT
-              (ROW_NUMBER() OVER ())::int4 AS index,
-              r6.value AS _0,
-              COALESCE(
-                jsonb_agg(
-                  r6.value
-                  ORDER BY
-                    r6.index
-                ),
-                '[]'::jsonb
-              ) AS _1
-            FROM
-              (
-                SELECT
-                  0::int8 AS index,
-                  1::int8 AS value
-                UNION
-                ALL
-                SELECT
-                  1::int8 AS index,
-                  1::int8 AS value
-                UNION
-                ALL
-                SELECT
-                  2::int8 AS index,
-                  1::int8 AS value
-                UNION
-                ALL
-                SELECT
-                  3::int8 AS index,
-                  3::int8 AS value
-                UNION
-                ALL
-                SELECT
-                  4::int8 AS index,
-                  2::int8 AS value
-                UNION
-                ALL
-                SELECT
-                  5::int8 AS index,
-                  3::int8 AS value
-              ) AS r6
-            GROUP BY
-              r6.value
-          ) AS r7
-      ) AS r16
+              0::int8 AS index,
+              1::int8 AS value
+            UNION
+            ALL
+            SELECT
+              1::int8 AS index,
+              1::int8 AS value
+            UNION
+            ALL
+            SELECT
+              2::int8 AS index,
+              1::int8 AS value
+            UNION
+            ALL
+            SELECT
+              3::int8 AS index,
+              3::int8 AS value
+            UNION
+            ALL
+            SELECT
+              4::int8 AS index,
+              2::int8 AS value
+            UNION
+            ALL
+            SELECT
+              5::int8 AS index,
+              3::int8 AS value
+          ) AS r6
+        GROUP BY
+          r6.value
+      ) AS r7
     ORDER BY
-      r16.index
+      r7.index
     ---
     [
       {
@@ -1361,12 +1372,12 @@ fn group_00() {
         sum = 3,
       },
       {
-        value = 2,
-        sum = 2,
-      },
-      {
         value = 3,
         sum = 6,
+      },
+      {
+        value = 2,
+        sum = 2,
       },
     ]
     ");

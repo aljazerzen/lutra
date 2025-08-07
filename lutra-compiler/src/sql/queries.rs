@@ -483,9 +483,7 @@ impl<'a> Context<'a> {
                 )));
             }
 
-            cr::Transform::Group(key) => {
-                let input = scoped.clone();
-
+            cr::Transform::Group(key, values_in) => {
                 // wrap into a new query
                 scoped = self.wrap_scoped(scoped, input_ty);
                 let select = self.scoped_as_mut_select(&mut scoped, input_ty);
@@ -496,17 +494,15 @@ impl<'a> Context<'a> {
                     // index
                     ExprOrSource::Source("(ROW_NUMBER() OVER ())::int4".into()),
                 ];
-                // key
-                projection.extend(key.clone());
-                // values (JSON packed)
-                let values = self.compile_json_pack(input, input_ty);
-                projection.push(values.expr);
-                select.projection = self.projection(ty, projection);
+
+                // value
+                projection.extend(self.compile_columns(values_in));
 
                 select.group_by = sql_ast::GroupByExpr::Expressions(
                     key.into_iter().map(ExprOrSource::into_expr).collect(),
                     vec![],
                 );
+                select.projection = self.projection(ty, projection);
             }
 
             cr::Transform::Insert(table_name) => {
@@ -599,20 +595,35 @@ impl<'a> Context<'a> {
 
     fn compile_json_pack(&mut self, mut scoped: Scoped, ty: &ir::Ty) -> Scoped {
         let input = self.scoped_as_rel_var(&mut scoped);
-        let cols = self.rel_cols(ty, false);
 
-        scoped.expr = match &self.get_ty_mat(ty).kind {
+        fn col_ref(input: &str, col: &str, ty: &ir::Ty) -> String {
+            let mut r = format!("{input}.{col}");
+            if let ir::TyKind::Primitive(ir::TyPrimitive::int8) = &ty.kind {
+                r = format!("ASCII({r})");
+            }
+            r
+        }
+
+        let ty_mat = self.get_ty_mat(ty);
+        scoped.expr = match &ty_mat.kind {
             ir::TyKind::Array(ty_item) => {
                 let index = format!("{input}.{COL_ARRAY_INDEX}");
 
-                match &self.get_ty_mat(ty_item).kind {
+                let ty_item_mat = self.get_ty_mat(ty_item);
+                match &ty_item_mat.kind {
                     ir::TyKind::Primitive(_) | ir::TyKind::Array(_) => {
+                        let col_ref = col_ref(input, COL_VALUE, ty_item_mat);
                         ExprOrSource::Source(format!(
-                            "COALESCE(jsonb_agg({input}.{COL_VALUE} ORDER BY {index}), '[]'::jsonb)",
+                            "COALESCE(jsonb_agg({col_ref} ORDER BY {index}), '[]'::jsonb)",
                         ))
                     }
                     ir::TyKind::Tuple(_) => {
-                        let fields = cols.map(|c| format!("{input}.{c}")).join(", ");
+                        let fields = std::iter::zip(
+                            self.rel_cols_nested(ty_item_mat, "".into()),
+                            self.rel_cols_ty_nested(ty_item_mat),
+                        )
+                        .map(|(col, ty)| col_ref(input, &col, &ty))
+                        .join(", ");
                         ExprOrSource::Source(format!(
                             "COALESCE(jsonb_agg(jsonb_build_array({fields}) ORDER BY {index}), '[]'::jsonb)"
                         ))
@@ -621,7 +632,12 @@ impl<'a> Context<'a> {
                 }
             }
             ir::TyKind::Tuple(_) => {
-                let fields = cols.map(|c| format!("{input}.{c}")).join(", ");
+                let fields = std::iter::zip(
+                    self.rel_cols_nested(ty_mat, "".into()),
+                    self.rel_cols_ty_nested(ty_mat),
+                )
+                .map(|(col, ty)| col_ref(input, &col, &ty))
+                .join(", ");
 
                 ExprOrSource::Source(format!("jsonb_build_array({fields})"))
             }
@@ -704,12 +720,14 @@ impl<'a> Context<'a> {
     }
 
     fn compile_json_item_cast(&self, item_ref: &str, ty: &ir::Ty) -> String {
-        if let ir::TyKind::Primitive(ir::TyPrimitive::text) = &ty.kind {
-            // we could use `ref #>> '{}'` here instead, but formatter breaks for the operator
-            // for now, let's use this much more verbose way
-            format!("jsonb_build_array({item_ref}) ->> 0")
-        } else {
-            format!("{item_ref}::text::{}", self.compile_ty_name(ty))
+        match &ty.kind {
+            ir::TyKind::Primitive(ir::TyPrimitive::text) => {
+                format!("jsonb_build_array({item_ref}) ->> 0")
+            }
+            ir::TyKind::Primitive(ir::TyPrimitive::int8) => {
+                format!("CHR({item_ref}::text::int2)::\"char\"")
+            }
+            _ => format!("{item_ref}::text::{}", self.compile_ty_name(ty)),
         }
     }
 

@@ -106,7 +106,7 @@ pub enum Transform {
     Order,
 
     /// Groups rows into partitions by a given key
-    Group(Vec<Expr>),
+    Group(Vec<Expr>, Vec<Expr>),
 
     /// Inserts rows into a table
     Insert(String),
@@ -154,7 +154,7 @@ impl Expr {
     }
     pub fn new_json_pack(rel: Expr) -> Self {
         Expr {
-            ty: rel.ty.clone(),
+            ty: ir::Ty::new(ir::TyPrimitive::text),
             kind: ExprKind::From(From::JsonPack(Box::new(rel))),
         }
     }

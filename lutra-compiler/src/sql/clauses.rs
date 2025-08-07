@@ -809,11 +809,15 @@ impl<'a> Context<'a> {
                     cr::Transform::ProjectDiscard(vec![0]), // discard index
                 );
 
-                self.functions.insert(func.id, FuncProvider::Expr(item_ref));
+                self.functions
+                    .insert(func.id, FuncProvider::Expr(item_ref.clone()));
                 let key = self.compile_column_list(&func.body).unwrap_columns();
                 self.functions.remove(&func.id);
 
-                cr::ExprKind::Transform(array, cr::Transform::Group(key))
+                let mut values = key.clone();
+                values.push(cr::Expr::new_json_pack(cr::Expr::new_rel_ref(&array)));
+
+                cr::ExprKind::Transform(array, cr::Transform::Group(key, values))
             }
 
             "std::append" => {
