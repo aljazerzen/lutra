@@ -1,5 +1,6 @@
 ---
 title: Python and PostgreSQL
+weight: 2
 ---
 
 Let's assume we have a Python application and a PostgreSQL database server were we want to

@@ -1,6 +1,7 @@
 ---
 title: Language
 weight: 2
+sort_by: weight
 ---
 
 Lutra is a minimal programming language featuring static typing and an algebraic type system. Designed primarily for interoperability, it serves as a bridge between different programming languages and platforms.
