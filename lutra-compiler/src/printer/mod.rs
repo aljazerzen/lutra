@@ -139,12 +139,16 @@ impl Printer {
                     r += ">";
                 }
                 r += " (";
-                for (i, ty_param) in func.params.iter().enumerate() {
+                for (i, (param_ty, param_const)) in func.params.iter().enumerate() {
                     if i > 0 {
                         r += ", ";
                     }
 
-                    if let Some(ty) = ty_param {
+                    if *param_const {
+                        r += "const ";
+                    }
+
+                    if let Some(ty) = param_ty {
                         r += &self.print_ty(ty);
                     } else {
                         r += "?";

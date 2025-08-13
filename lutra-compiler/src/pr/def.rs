@@ -39,6 +39,7 @@ pub struct ModuleDef {
 pub struct ExprDef {
     pub value: Option<Box<Expr>>,
 
+    pub constant: bool,
     pub ty: Option<Ty>,
 }
 
@@ -83,6 +84,7 @@ impl From<Expr> for DefKind {
         DefKind::Expr(ExprDef {
             value: Some(Box::new(expr)),
             ty: None,
+            constant: false,
         })
     }
 }

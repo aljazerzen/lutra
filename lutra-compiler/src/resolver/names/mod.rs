@@ -37,9 +37,12 @@ pub fn run(root: &mut pr::ModuleDef) -> Result<Vec<Vec<pr::Path>>> {
     let has_var_cycles = order_vars.iter().any(|scc| scc.len() != 1);
 
     if has_var_cycles {
-        return Err(Diagnostic::new_custom(
-            "unimplemented cyclic references between expressions",
-        ));
+        let scc = order_vars.iter().find(|scc| scc.len() != 1).unwrap();
+        let (def, _) = root.try_get(scc[0].as_slice()).unwrap();
+        return Err(
+            Diagnostic::new_custom("unimplemented cyclic references between expressions")
+                .with_span(def.span),
+        );
     }
 
     Ok(itertools::chain(order_tys, order_vars)

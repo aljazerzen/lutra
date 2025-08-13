@@ -616,7 +616,7 @@ impl<'a> Lowerer<'a> {
                 params: func
                     .params
                     .into_iter()
-                    .map(|p| self.lower_ty(p.unwrap()))
+                    .map(|(p_ty, _)| self.lower_ty(p_ty.unwrap()))
                     .collect(),
                 body: self.lower_ty(*func.body.clone().unwrap()),
             })),
@@ -871,6 +871,7 @@ fn order_ty_defs(mut by_name: HashMap<pr::Path, ir::Ty>, project: &Project) -> V
 }
 
 /// Get the entry point's input type.
+/// Returns the type and a bool indicating if the type is a tuple, packed from multiple input params.
 fn get_entry_point_input(expr: &pr::Expr) -> (pr::Ty, bool) {
     let ty = expr.ty.as_ref().unwrap();
     let Some(ty_func) = ty.kind.as_func() else {
@@ -878,7 +879,7 @@ fn get_entry_point_input(expr: &pr::Expr) -> (pr::Ty, bool) {
     };
 
     if ty_func.params.len() == 1 {
-        return (ty_func.params[0].clone().unwrap(), false);
+        return (ty_func.params[0].clone().0.unwrap(), false);
     }
 
     let ty = pr::Ty::new(pr::TyKind::Tuple(
@@ -886,7 +887,7 @@ fn get_entry_point_input(expr: &pr::Expr) -> (pr::Ty, bool) {
             .params
             .iter()
             .map(|ty| pr::TyTupleField {
-                ty: ty.clone().unwrap(),
+                ty: ty.clone().0.unwrap(),
                 unpack: false,
                 name: None,
             })

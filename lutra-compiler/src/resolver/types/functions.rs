@@ -90,7 +90,7 @@ impl TypeResolver<'_> {
         }
 
         let mut args_resolved = Vec::with_capacity(args.len());
-        for (param, arg) in std::iter::zip(&fn_ty.params, args) {
+        for ((param_ty, param_const), arg) in std::iter::zip(&fn_ty.params, args) {
             // fold
             let mut arg = self.fold_expr(arg)?;
 
@@ -101,8 +101,17 @@ impl TypeResolver<'_> {
                     .as_ref()
                     .map(|n| format!("function {n}, one of the params")) // TODO: param name
             };
-            if let Some(param_ty) = param {
+            if let Some(param_ty) = param_ty {
                 self.validate_expr_type(&mut arg, param_ty, &who)?;
+            }
+
+            if *param_const {
+                self.const_validator
+                    .validate_is_const(&arg)
+                    .map_err(|span| {
+                        Diagnostic::new_custom("non-constant expression")
+                            .with_span(span.or(arg.span))
+                    })?;
             }
 
             args_resolved.push(arg);
@@ -118,7 +127,7 @@ impl TypeResolver<'_> {
         })
     }
 
-    /// In PRQL, func is just an expression and does not have a name (the same way
+    /// In Lutra, func is just an expression and does not have a name (the same way
     /// as literals don't have a name). Regardless, we want to provide name hints for functions
     /// in error messages (i.e. `std.count requires 2 arguments, found 1`), so here we infer name
     /// and annotations for functions from its definition.

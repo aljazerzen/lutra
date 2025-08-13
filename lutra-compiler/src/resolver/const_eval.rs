@@ -1,54 +1,24 @@
 use std::collections::HashSet;
 
-use crate::diagnostic::{Diagnostic, WithErrorInfo};
-use crate::resolver::module::ExprOrTy;
-use crate::{Project, Span, pr};
+use crate::{Result, Span, pr};
 
-pub(crate) fn run(project: &Project) -> Result<(), Vec<Diagnostic>> {
-    let mut v = ConstantValidator {
-        constants: Default::default(),
-    };
+pub(super) struct ConstantValidator {
+    constants: HashSet<pr::Path>,
+}
 
-    let mut diagnostics = Vec::new();
-
-    for group in &project.ordering {
-        for path in group {
-            let ExprOrTy::Expr(expr) = project.root_module.get(path).unwrap() else {
-                continue;
-            };
-            if expr.kind.is_func() || expr.kind.is_internal() {
-                continue;
-            }
-
-            let res = v.validate(expr);
-            match res {
-                Ok(_) => {
-                    v.constants.insert(path.clone());
-                }
-                Err(span) => {
-                    diagnostics.push(
-                        Diagnostic::new_custom("non-constant expression")
-                            .with_span(span.or(expr.span))
-                            .push_hint("use `func` instead of `const`"),
-                    );
-                }
-            }
+impl ConstantValidator {
+    pub fn new() -> Self {
+        Self {
+            constants: Default::default(),
         }
     }
 
-    if diagnostics.is_empty() {
-        Ok(())
-    } else {
-        Err(diagnostics)
+    pub fn save_const(&mut self, path: pr::Path) {
+        self.constants.insert(path);
     }
-}
 
-struct ConstantValidator {
-    constants: HashSet<pr::Path>,
-}
-impl ConstantValidator {
     /// Validates that expr is constant
-    fn validate(&mut self, expr: &pr::Expr) -> Result<(), Option<Span>> {
+    pub fn validate_is_const(&mut self, expr: &pr::Expr) -> Result<(), Option<Span>> {
         let r = match &expr.kind {
             pr::ExprKind::Literal(_) => Ok(()),
 
@@ -64,22 +34,22 @@ impl ConstantValidator {
                 pr::Ref::Local { .. } => Err(expr.span),
             },
 
-            pr::ExprKind::Indirection { base, .. } => self.validate(base),
+            pr::ExprKind::Indirection { base, .. } => self.validate_is_const(base),
 
             pr::ExprKind::Tuple(fields) => fields
                 .iter()
-                .find_map(|f| self.validate(&f.expr).err())
+                .find_map(|f| self.validate_is_const(&f.expr).err())
                 .map(Err)
                 .unwrap_or(Ok(())),
             pr::ExprKind::Array(items) => items
                 .iter()
-                .find_map(|i| self.validate(i).err())
+                .find_map(|i| self.validate_is_const(i).err())
                 .map(Err)
                 .unwrap_or(Ok(())),
             pr::ExprKind::EnumVariant(variant) => variant
                 .inner
                 .as_ref()
-                .map(|i| self.validate(i))
+                .map(|i| self.validate_is_const(i))
                 .unwrap_or(Ok(())),
 
             pr::ExprKind::FuncCall(_) | pr::ExprKind::Func(_) | pr::ExprKind::Match(_) => {

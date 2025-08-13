@@ -19,7 +19,7 @@ pub struct NameResolver<'a> {
 impl NameResolver<'_> {
     pub fn fold_def_kind(&mut self, def: pr::DefKind) -> Result<pr::DefKind> {
         Ok(match def {
-            pr::DefKind::Expr(var_def) => pr::DefKind::Expr(self.fold_var_def(var_def)?),
+            pr::DefKind::Expr(var_def) => pr::DefKind::Expr(self.fold_expr_def(var_def)?),
             pr::DefKind::Ty(ty_def) => pr::DefKind::Ty(self.fold_type_def(ty_def)?),
             pr::DefKind::Import(import_def) => {
                 pr::DefKind::Import(self.fold_import_def(import_def)?)

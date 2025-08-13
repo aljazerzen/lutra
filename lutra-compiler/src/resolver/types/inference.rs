@@ -77,15 +77,17 @@ impl TypeResolver<'_> {
             // }
             ExprKind::Match(_) => unreachable!(), // type computed in the main pass
 
-            ExprKind::Func(func) => TyKind::Func(TyFunc {
-                params: func.params.iter().map(|p| p.ty.clone()).collect_vec(),
-                body: func
-                    .return_ty
-                    .clone()
-                    .or_else(|| func.body.ty.clone())
-                    .map(Box::new),
-                ty_params: func.ty_params.clone(),
-            }),
+            ExprKind::Func(func) => {
+                TyKind::Func(TyFunc {
+                    params: func.params.iter().map(|p| (p.ty.clone(), p.constant)).collect_vec(),
+                    body: func
+                        .return_ty
+                        .clone()
+                        .or_else(|| func.body.ty.clone())
+                        .map(Box::new),
+                    ty_params: func.ty_params.clone(),
+                })
+            },
 
             ExprKind::Ident(_)
             | ExprKind::EnumVariant(_) // constructed only in type resolver

@@ -101,7 +101,16 @@ fn const_def(
         .ignore_then(ident_part())
         .then(ctrl(':').ignore_then(ty).or_not())
         .then(ctrl('=').ignore_then(expr.clone()).map(Box::new).map(Some))
-        .map(|((name, ty), value)| (name, DefKind::Expr(ExprDef { value, ty })))
+        .map(|((name, ty), value)| {
+            (
+                name,
+                DefKind::Expr(ExprDef {
+                    value,
+                    ty,
+                    constant: true,
+                }),
+            )
+        })
         .labelled("constant definition")
 }
 
@@ -111,9 +120,15 @@ fn func_def<'a>(
 ) -> impl Parser<TokenKind, (String, DefKind), Error = PError> + Clone + 'a {
     let head = keyword("func").ignore_then(ident_part());
 
-    let params = ident_part()
+    let params = (keyword("const").or_not().map(|x| x.is_some()))
+        .then(ident_part())
         .then(ctrl(':').ignore_then(ty.clone()).or_not())
-        .map_with_span(|(name, ty), span| FuncParam { name, ty, span })
+        .map_with_span(|((constant, name), ty), span| FuncParam {
+            constant,
+            name,
+            ty,
+            span,
+        })
         .separated_by(ctrl(','))
         .allow_trailing()
         .delimited_by(ctrl('('), ctrl(')'));
@@ -139,15 +154,20 @@ fn func_def<'a>(
                 ExprDef {
                     ty: value.ty.clone(),
                     value: Some(Box::new(value)),
+                    constant: false,
                 }
             } else {
                 let ty_func = TyFunc {
-                    params: params.into_iter().map(|p| p.ty).collect(),
+                    params: params.into_iter().map(|p| (p.ty, p.constant)).collect(),
                     body: return_ty.map(Box::new),
                     ty_params,
                 };
                 let ty = Some(Ty::new_with_span(TyKind::Func(ty_func), span));
-                ExprDef { ty, value: None }
+                ExprDef {
+                    ty,
+                    value: None,
+                    constant: false,
+                }
             });
             (name, def)
         })

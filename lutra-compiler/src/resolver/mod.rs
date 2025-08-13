@@ -18,6 +18,8 @@ pub const NS_STD: &str = "std";
 
 /// Runs semantic analysis on a project.
 pub fn resolve(module_tree: pr::ModuleDef) -> Result<Project, Vec<Diagnostic>> {
+    tracing::debug!("{:#?}", module_tree);
+
     // desugar
     let module_tree = desugar::run(module_tree).map_err(|d| vec![d])?;
 
@@ -27,7 +29,7 @@ pub fn resolve(module_tree: pr::ModuleDef) -> Result<Project, Vec<Diagnostic>> {
     // resolve names
     let resolution_order = names::run(&mut root_module).map_err(|d| vec![d])?;
 
-    tracing::debug!("{:#?}", root_module);
+    // tracing::debug!("{:#?}", root_module);
 
     // resolve types
     types::run(&mut root_module, &resolution_order)?;
@@ -37,9 +39,6 @@ pub fn resolve(module_tree: pr::ModuleDef) -> Result<Project, Vec<Diagnostic>> {
         root_module,
         ordering: resolution_order,
     };
-
-    // resolve types
-    const_eval::run(&project)?;
 
     Ok(project)
 }
@@ -62,6 +61,7 @@ pub fn resolve_overlay_expr(
             pr::ExprDef {
                 value: Some(Box::new(expr)),
                 ty: None,
+                constant: false,
             },
         ))))),
     );

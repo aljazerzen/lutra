@@ -14,7 +14,7 @@ pub(crate) fn type_expr() -> impl Parser<TokenKind, Ty, Error = PError> + Clone 
         let ident = ident().map(TyKind::Ident);
 
         let func_params = (ident_part().then_ignore(ctrl(':')).or_not())
-            .ignore_then(nested_type_expr.clone().map(Some))
+            .ignore_then(nested_type_expr.clone().map(|x| (Some(x), false)))
             .separated_by(ctrl(','))
             .allow_trailing()
             .delimited_by(ctrl('('), ctrl(')'));

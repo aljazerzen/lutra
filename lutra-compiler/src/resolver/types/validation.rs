@@ -166,10 +166,19 @@ impl TypeResolver<'_> {
             (TyKind::Func(f_func), TyKind::Func(e_func))
                 if f_func.params.len() == e_func.params.len() =>
             {
-                for (f_arg, e_arg) in std::iter::zip(&f_func.params, &e_func.params) {
-                    if let Some((f_arg, e_arg)) = Option::zip(f_arg.as_ref(), e_arg.as_ref()) {
+                for ((f_p_ty, f_p_const), (e_p_ty, e_p_const)) in
+                    std::iter::zip(&f_func.params, &e_func.params)
+                {
+                    // if we expect a const param, validate that found param is const
+                    if *e_p_const && !*f_p_const {
+                        return Err(compose_type_error(&found, &expected, who));
+                    }
+
+                    // validate param types
+                    if let Some((f_param, e_param)) = Option::zip(f_p_ty.as_ref(), e_p_ty.as_ref())
+                    {
                         // contra-variant contained types
-                        self.validate_type(e_arg, f_arg, who)?;
+                        self.validate_type(e_param, f_param, who)?;
                     }
                 }
 

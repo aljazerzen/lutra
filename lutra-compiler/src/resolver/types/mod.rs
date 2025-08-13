@@ -7,6 +7,7 @@ mod scope;
 mod tuple;
 mod validation;
 
+use crate::diagnostic::Diagnostic;
 use crate::pr;
 
 pub fn run(
@@ -14,11 +15,15 @@ pub fn run(
     resolution_order: &[Vec<pr::Path>],
 ) -> Result<(), Vec<crate::diagnostic::Diagnostic>> {
     let mut resolver = TypeResolver::new(root_module);
-    resolver
-        .resolve_defs(resolution_order)
-        .map_err(|d| vec![d])?;
 
-    Ok(())
+    let diagnostic = resolver.resolve_defs(resolution_order).err();
+    resolver.diagnostics.extend(diagnostic);
+
+    if resolver.diagnostics.is_empty() {
+        Ok(())
+    } else {
+        Err(resolver.diagnostics)
+    }
 }
 
 /// Can fold (walk) over AST and for each function call or variable find what they are referencing.
@@ -28,6 +33,10 @@ struct TypeResolver<'a> {
     debug_current_def: crate::pr::Path,
 
     scopes: Vec<scope::Scope>,
+
+    const_validator: super::const_eval::ConstantValidator,
+
+    diagnostics: Vec<Diagnostic>,
 }
 
 impl TypeResolver<'_> {
@@ -36,6 +45,19 @@ impl TypeResolver<'_> {
             root_mod,
             debug_current_def: crate::pr::Path::from_name("?"),
             scopes: Vec::new(),
+
+            const_validator: super::const_eval::ConstantValidator::new(),
+            diagnostics: Vec::new(),
+        }
+    }
+
+    fn save_diagnostic<T>(&mut self, res: Result<T, Diagnostic>) -> Option<T> {
+        match res {
+            Ok(t) => Some(t),
+            Err(d) => {
+                self.diagnostics.push(d);
+                None
+            }
         }
     }
 }

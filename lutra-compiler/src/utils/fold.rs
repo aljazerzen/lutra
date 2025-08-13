@@ -42,8 +42,8 @@ pub trait PrFold {
     fn fold_exprs(&mut self, exprs: Vec<Expr>) -> Result<Vec<Expr>> {
         exprs.into_iter().map(|node| self.fold_expr(node)).collect()
     }
-    fn fold_var_def(&mut self, var_def: ExprDef) -> Result<ExprDef> {
-        fold_var_def(self, var_def)
+    fn fold_expr_def(&mut self, var_def: ExprDef) -> Result<ExprDef> {
+        fold_expr_def(self, var_def)
     }
     fn fold_type_def(&mut self, ty_def: TyDef) -> Result<TyDef> {
         Ok(TyDef {
@@ -146,7 +146,7 @@ pub fn fold_expr_kind<T: ?Sized + PrFold>(fold: &mut T, expr_kind: ExprKind) -> 
 pub fn fold_def_kind<T: ?Sized + PrFold>(fold: &mut T, def_kind: DefKind) -> Result<DefKind> {
     use DefKind::*;
     Ok(match def_kind {
-        Expr(var_def) => Expr(fold.fold_var_def(var_def)?),
+        Expr(var_def) => Expr(fold.fold_expr_def(var_def)?),
         Ty(type_def) => Ty(fold.fold_type_def(type_def)?),
         Module(module_def) => Module(fold.fold_module_def(module_def)?),
         Import(_) => def_kind,
@@ -167,10 +167,11 @@ fn fold_module_def<F: ?Sized + PrFold>(fold: &mut F, module_def: ModuleDef) -> R
     Ok(ModuleDef { defs })
 }
 
-pub fn fold_var_def<F: ?Sized + PrFold>(fold: &mut F, var_def: ExprDef) -> Result<ExprDef> {
+pub fn fold_expr_def<F: ?Sized + PrFold>(fold: &mut F, expr_def: ExprDef) -> Result<ExprDef> {
     Ok(pr::ExprDef {
-        value: fold_optional_box(fold, var_def.value)?,
-        ty: var_def.ty.map(|x| fold.fold_type(x)).transpose()?,
+        value: fold_optional_box(fold, expr_def.value)?,
+        ty: expr_def.ty.map(|x| fold.fold_type(x)).transpose()?,
+        constant: expr_def.constant,
     })
 }
 
@@ -249,6 +250,7 @@ pub fn fold_func_params<T: ?Sized + PrFold>(
         .into_iter()
         .map(|param| {
             Ok(FuncParam {
+                constant: param.constant,
                 name: param.name,
                 ty: fold_type_opt(fold, param.ty)?,
                 span: param.span,
@@ -305,11 +307,11 @@ pub fn fold_ty_func<F: ?Sized + PrFold>(fold: &mut F, f: TyFunc) -> Result<TyFun
 
 pub fn fold_ty_func_params<F: ?Sized + PrFold>(
     fold: &mut F,
-    params: Vec<Option<pr::Ty>>,
-) -> Result<Vec<Option<Ty>>> {
+    params: Vec<(Option<pr::Ty>, bool)>,
+) -> Result<Vec<(Option<Ty>, bool)>> {
     params
         .into_iter()
-        .map(|a| fold_type_opt(fold, a))
+        .map(|(ty, c)| Ok((fold_type_opt(fold, ty)?, c)))
         .try_collect()
 }
 

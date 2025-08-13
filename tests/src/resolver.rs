@@ -910,6 +910,37 @@ fn constants_00() {
     ");
 }
 #[test]
+fn constants_01() {
+    insta::assert_snapshot!(_test_err(r#"
+        const a = func () -> true
+    "#), @r"
+    Error:
+       ╭─[:2:19]
+       │
+     2 │         const a = func () -> true
+       │                   ───────┬───────
+       │                          ╰───────── non-constant expression
+       │
+       │ Note:
+       │ use `func` instead of `const`
+    ───╯
+    ");
+}
+#[test]
+fn constants_02() {
+    insta::assert_snapshot!(_test_err(r#"
+        func main(table_name: text): [{bool}] -> std::sql::from(table_name)
+    "#), @r"
+    Error:
+       ╭─[:2:65]
+       │
+     2 │         func main(table_name: text): [{bool}] -> std::sql::from(table_name)
+       │                                                                 ─────┬────
+       │                                                                      ╰────── non-constant expression
+    ───╯
+    ");
+}
+#[test]
 fn unpack_00() {
     insta::assert_snapshot!(_test_ty(r#"
         const x = {false, "hello"}

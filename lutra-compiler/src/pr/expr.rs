@@ -148,6 +148,8 @@ pub struct Func {
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct FuncParam {
+    pub constant: bool,
+
     pub name: String,
 
     pub ty: Option<Ty>,

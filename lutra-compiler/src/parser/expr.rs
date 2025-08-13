@@ -383,7 +383,12 @@ fn lambda_func<'a>(
 ) -> impl Parser<TokenKind, ExprKind, Error = PError> + Clone + 'a {
     let param = ident_part()
         .then(ctrl(':').ignore_then(ty.clone()).or_not())
-        .map_with_span(|(name, ty), span| FuncParam { name, ty, span });
+        .map_with_span(|(name, ty), span| FuncParam {
+            constant: false,
+            name,
+            ty,
+            span,
+        });
 
     // func
     keyword("func")
