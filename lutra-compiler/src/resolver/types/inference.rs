@@ -15,13 +15,14 @@ impl TypeResolver<'_> {
             ExprKind::Literal(Literal::Boolean(_)) => TyKind::Primitive(TyPrimitive::bool),
 
             ExprKind::Literal(Literal::Text(_)) => TyKind::Primitive(TyPrimitive::text),
-                ExprKind::FString(_) => TyKind::Primitive(TyPrimitive::text),
+            ExprKind::FString(_) => TyKind::Primitive(TyPrimitive::text),
 
             ExprKind::Literal(Literal::Integer(_)) => {
-                    // int literal (e.g. `4`) can be of type `int64` or `u8` or any other
-                    // integer type. So we have leave the type to be figured out later.
-                    // This is done with a new type param, constraint to integer types.
-                    return Ok(self.introduce_ty_var(pr::TyParamDomain::OneOf(vec![
+                // int literal (e.g. `4`) can be of type `int64` or `u8` or any other
+                // integer type. So we have leave the type to be figured out later.
+                // This is done with a new type param, constraint to integer types.
+                return Ok(self.introduce_ty_var(
+                    pr::TyParamDomain::OneOf(vec![
                         pr::TyPrimitive::int8,
                         pr::TyPrimitive::int16,
                         pr::TyPrimitive::int32,
@@ -30,22 +31,22 @@ impl TypeResolver<'_> {
                         pr::TyPrimitive::uint16,
                         pr::TyPrimitive::uint32,
                         pr::TyPrimitive::uint64,
-                    ]), expr.span.unwrap()));
-                },
+                    ]),
+                    expr.span.unwrap(),
+                ));
+            }
             ExprKind::Literal(Literal::Float(_)) => {
                 // similar as integers
-                return Ok(self.introduce_ty_var(pr::TyParamDomain::OneOf(vec![
-                    pr::TyPrimitive::float32,
-                    pr::TyPrimitive::float64
-                ]), expr.span.unwrap()));
-            },
-            ExprKind::Literal(_) => todo!(),
-
-            ExprKind::TypeAnnotation(annotation) => {
-                annotation.ty.kind.clone()
+                return Ok(self.introduce_ty_var(
+                    pr::TyParamDomain::OneOf(vec![
+                        pr::TyPrimitive::float32,
+                        pr::TyPrimitive::float64,
+                    ]),
+                    expr.span.unwrap(),
+                ));
             }
 
-            ExprKind::Tuple(_) => unreachable!(), // type computed in the main pass
+            ExprKind::TypeAnnotation(annotation) => annotation.ty.kind.clone(),
 
             ExprKind::Array(items) => {
                 let mut items_ty = None;
@@ -57,7 +58,7 @@ impl TypeResolver<'_> {
                         items_ty = Some(item_ty);
                     }
                 }
-                let items_ty  = if let Some(t) = items_ty {
+                let items_ty = if let Some(t) = items_ty {
                     t
                 } else {
                     // no items, so we must infer the type
@@ -66,37 +67,35 @@ impl TypeResolver<'_> {
                 TyKind::Array(Box::new(items_ty))
             }
 
-            // ExprKind::All { within, except } => {
-            //     let Some(within_ty) = self.infer_type(within)? else {
-            //         return Ok(None);
-            //     };
-            //     let Some(except_ty) = self.infer_type(except)? else {
-            //         return Ok(None);
-            //     };
-            //     self.ty_tuple_exclusion(within_ty, except_ty)?
-            // }
-            ExprKind::Match(_) => unreachable!(), // type computed in the main pass
+            ExprKind::Func(func) => TyKind::Func(TyFunc {
+                params: func
+                    .params
+                    .iter()
+                    .map(|p| (p.ty.clone(), p.constant))
+                    .collect_vec(),
+                body: func
+                    .return_ty
+                    .clone()
+                    .or_else(|| func.body.ty.clone())
+                    .map(Box::new),
+                ty_params: func.ty_params.clone(),
+            }),
 
-            ExprKind::Func(func) => {
-                TyKind::Func(TyFunc {
-                    params: func.params.iter().map(|p| (p.ty.clone(), p.constant)).collect_vec(),
-                    body: func
-                        .return_ty
-                        .clone()
-                        .or_else(|| func.body.ty.clone())
-                        .map(Box::new),
-                    ty_params: func.ty_params.clone(),
-                })
-            },
-
-            ExprKind::Ident(_)
-            | ExprKind::EnumVariant(_) // constructed only in type resolver
+            // type computed in the main pass
+            ExprKind::Literal(_)
+            | ExprKind::Ident(_)
+            | ExprKind::Tuple(_)
             | ExprKind::FuncCall(_)
+            | ExprKind::EnumVariant(_)
+            | ExprKind::Match(_)
             | ExprKind::Indirection { .. }
-            | ExprKind::Pipeline(_) // desugar-ed
-            | ExprKind::Range(_) // desugar-ed
-            | ExprKind::Binary(_) // desugar-ed
-            | ExprKind::Unary(_) // desugar-ed
+            | ExprKind::If(_) => unreachable!(),
+
+            // desugar-ed
+            ExprKind::Pipeline(_)
+            | ExprKind::Range(_)
+            | ExprKind::Binary(_)
+            | ExprKind::Unary(_)
             | ExprKind::Internal => unreachable!(),
         };
         let mut ty = Ty::new(kind);

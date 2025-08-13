@@ -3,9 +3,9 @@ use itertools::Itertools;
 use crate::Result;
 use crate::diagnostic::{Diagnostic, WithErrorInfo};
 use crate::pr;
-use crate::resolver::types::{scope, tuple};
+use crate::resolver::types::{TypeResolver, scope, tuple};
 use crate::resolver::{NS_STD, names};
-use crate::utils::fold;
+use crate::utils::fold::{self, PrFold};
 
 use super::scope::{Scope, ScopeKind};
 
@@ -159,14 +159,9 @@ impl fold::PrFold for super::TypeResolver<'_> {
 
             pr::ExprKind::Match(_) => self.resolve_match(node)?,
 
-            pr::ExprKind::Tuple(fields) => {
-                let (kind, ty) = self.resolve_tuple_constructor(fields)?;
-                pr::Expr {
-                    kind,
-                    ty: Some(ty),
-                    ..node
-                }
-            }
+            pr::ExprKind::If(_) => self.resolve_if(node)?,
+
+            pr::ExprKind::Tuple(_) => self.resolve_tuple_constructor(node)?,
 
             item => pr::Expr {
                 kind: fold::fold_expr_kind(self, item)?,
@@ -234,5 +229,35 @@ impl fold::PrFold for super::TypeResolver<'_> {
 
     fn fold_pattern(&mut self, _pattern: pr::Pattern) -> Result<pr::Pattern> {
         unreachable!() // use
+    }
+}
+
+impl TypeResolver<'_> {
+    fn resolve_if(&mut self, node: pr::Expr) -> Result<pr::Expr> {
+        let pr::ExprKind::If(if_else) = node.kind else {
+            unreachable!()
+        };
+
+        let bool = pr::Ty::new(pr::TyPrimitive::bool);
+        let mut condition = Box::new(self.fold_expr_or_recover(*if_else.condition, &bool));
+        self.validate_expr_type(&mut condition, &bool, &|| Some("if".into()))
+            .unwrap_or_else(self.push_diagnostic());
+
+        let then = Box::new(self.fold_expr(*if_else.then)?);
+        let ty = then.ty.clone().unwrap();
+
+        let mut els = Box::new(self.fold_expr(*if_else.els)?);
+        self.validate_expr_type(&mut els, &ty, &|| None)
+            .unwrap_or_else(self.push_diagnostic());
+
+        Ok(pr::Expr {
+            kind: pr::ExprKind::If(pr::If {
+                condition,
+                then,
+                els,
+            }),
+            ty: Some(ty),
+            ..node
+        })
     }
 }

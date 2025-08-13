@@ -52,9 +52,10 @@ impl ConstantValidator {
                 .map(|i| self.validate_is_const(i))
                 .unwrap_or(Ok(())),
 
-            pr::ExprKind::FuncCall(_) | pr::ExprKind::Func(_) | pr::ExprKind::Match(_) => {
-                Err(expr.span)
-            }
+            pr::ExprKind::FuncCall(_)
+            | pr::ExprKind::Func(_)
+            | pr::ExprKind::Match(_)
+            | pr::ExprKind::If(_) => Err(expr.span),
 
             // resolved away
             pr::ExprKind::TypeAnnotation(_)

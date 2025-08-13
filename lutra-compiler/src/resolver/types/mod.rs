@@ -9,6 +9,7 @@ mod validation;
 
 use crate::diagnostic::Diagnostic;
 use crate::pr;
+use crate::utils::fold::PrFold;
 
 pub fn run(
     root_module: &mut pr::ModuleDef,
@@ -51,12 +52,22 @@ impl TypeResolver<'_> {
         }
     }
 
-    fn save_diagnostic<T>(&mut self, res: Result<T, Diagnostic>) -> Option<T> {
-        match res {
-            Ok(t) => Some(t),
+    fn push_diagnostic(&mut self) -> impl FnOnce(Diagnostic) {
+        |d| self.diagnostics.push(d)
+    }
+
+    /// Resolve expr and try to recover errors.
+    /// On error, construct a "fallback placeholder" with provided type and
+    /// store the diagnostic so resolving will be aborted later.
+    fn fold_expr_or_recover(&mut self, expr: pr::Expr, fallback_ty: &pr::Ty) -> pr::Expr {
+        match self.fold_expr(expr) {
+            Ok(e) => e,
             Err(d) => {
                 self.diagnostics.push(d);
-                None
+
+                let mut placeholder = pr::Expr::new(pr::ExprKind::Tuple(vec![]));
+                placeholder.ty = Some(fallback_ty.clone());
+                placeholder
             }
         }
     }

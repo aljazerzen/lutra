@@ -112,6 +112,7 @@ pub fn fold_expr_kind<T: ?Sized + PrFold>(fold: &mut T, expr_kind: ExprKind) -> 
                 .try_collect()?,
         ),
         Match(match_) => Match(fold_match(fold, match_)?),
+        If(if_else) => If(fold_if(fold, if_else)?),
 
         FuncCall(func_call) => FuncCall(fold.fold_func_call(func_call)?),
         Func(func) => Func(Box::new(fold.fold_func(*func)?)),
@@ -223,6 +224,14 @@ pub fn fold_match_branch<F: ?Sized + PrFold>(
     Ok(MatchBranch {
         pattern: fold.fold_pattern(case.pattern)?,
         value: Box::new(fold.fold_expr(*case.value)?),
+    })
+}
+
+fn fold_if<F: ?Sized + PrFold>(fold: &mut F, if_else: If) -> Result<If> {
+    Ok(If {
+        condition: Box::new(fold.fold_expr(*if_else.condition)?),
+        then: Box::new(fold.fold_expr(*if_else.then)?),
+        els: Box::new(fold.fold_expr(*if_else.els)?),
     })
 }
 

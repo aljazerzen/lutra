@@ -87,7 +87,7 @@ pub fn lateral(relation: sql_ast::TableFactor) -> sql_ast::TableFactor {
             args,
             alias,
         },
-        _ => panic!(),
+        _ => panic!("lateral of {relation:?}"),
     }
 }
 

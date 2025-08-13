@@ -25,6 +25,7 @@ pub(crate) fn expr<'a>(
         let pipeline_expr = pipeline(expr.clone());
         let interpolation = interpolation();
         let match_ = match_(expr.clone());
+        let if_else = if_else(expr.clone());
 
         let term = choice((
             literal,
@@ -35,6 +36,7 @@ pub(crate) fn expr<'a>(
             call,
             ident_kind,
             match_,
+            if_else,
             pipeline_expr,
         ))
         .map_with_span(Expr::new_with_span)
@@ -477,4 +479,23 @@ fn type_annotation<'a>(
             }
         })
         .boxed()
+}
+fn if_else<'a>(
+    expr: impl Parser<TokenKind, Expr, Error = PError> + Clone + 'a,
+) -> impl Parser<TokenKind, ExprKind, Error = PError> + Clone + 'a {
+    let expr = expr.map(Box::new);
+
+    keyword("if")
+        .ignore_then(expr.clone())
+        .then_ignore(keyword("then"))
+        .then(expr.clone())
+        .then_ignore(keyword("else"))
+        .then(expr)
+        .map(|((condition, then), els)| {
+            ExprKind::If(If {
+                condition,
+                then,
+                els,
+            })
+        })
 }

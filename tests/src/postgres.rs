@@ -1019,6 +1019,89 @@ fn json_pack_10() {
 }
 
 #[test]
+fn if_01() {
+    insta::assert_snapshot!(_run_sql_output(r#"
+    const en = ["yes", "no"]
+    const sl = ["da", "ne"]
+    const lang = "sl"
+
+    func main() -> if lang == "en" then en else sl
+    "#), @r#"
+    SELECT
+      r14.value
+    FROM
+      (
+        WITH r0 AS (
+          SELECT
+            CASE
+              WHEN ('sl' = 'en') THEN 0::int2
+              ELSE 1::int2
+            END AS value
+        )
+        SELECT
+          r13.index,
+          r13.value
+        FROM
+          (
+            SELECT
+              r3.index,
+              r3.value
+            FROM
+              (
+                SELECT
+                  0::int8 AS index,
+                  'yes' AS value
+                UNION
+                ALL
+                SELECT
+                  1::int8 AS index,
+                  'no' AS value
+              ) AS r3,
+              LATERAL (
+                SELECT
+                  r5.value AS value
+                FROM
+                  r0 AS r5
+              ) AS r6
+            WHERE
+              (r6.value = 0::int2)
+            UNION
+            ALL
+            SELECT
+              r9.index,
+              r9.value
+            FROM
+              (
+                SELECT
+                  0::int8 AS index,
+                  'da' AS value
+                UNION
+                ALL
+                SELECT
+                  1::int8 AS index,
+                  'ne' AS value
+              ) AS r9,
+              LATERAL (
+                SELECT
+                  r11.value AS value
+                FROM
+                  r0 AS r11
+              ) AS r12
+            WHERE
+              (r12.value = 1::int2)
+          ) AS r13
+      ) AS r14
+    ORDER BY
+      r14.index
+    ---
+    [
+      "da",
+      "ne",
+    ]
+    "#);
+}
+
+#[test]
 fn match_04() {
     insta::assert_snapshot!(_run_sql_output(r#"
     type Animal: enum {
@@ -1040,14 +1123,14 @@ fn match_04() {
     )
     "#), @r#"
     SELECT
-      r23.value
+      r19.value
     FROM
       (
         SELECT
           r3.index AS index,
           (
             SELECT
-              r21.value
+              r17.value
             FROM
               (
                 WITH r5 AS (
@@ -1108,38 +1191,19 @@ fn match_04() {
                             r5 AS r13
                         ) AS r14
                     ) THEN 'Who''s a good boy?'
-                    WHEN (
+                    ELSE (
                       SELECT
-                        (
-                          (r16.value = 1::"char")
-                          AND (r18.value = 0::"char")
-                        ) AS value
+                        ('Come here ' || r16.value) AS value
                       FROM
                         (
                           SELECT
-                            r15._t AS value
+                            r15._1_0 AS value
                           FROM
                             r5 AS r15
-                        ) AS r16,
-                        (
-                          SELECT
-                            r17._1_t AS value
-                          FROM
-                            r5 AS r17
-                        ) AS r18
-                    ) THEN (
-                      SELECT
-                        ('Come here ' || r20.value) AS value
-                      FROM
-                        (
-                          SELECT
-                            r19._1_0 AS value
-                          FROM
-                            r5 AS r19
-                        ) AS r20
+                        ) AS r16
                     )
                   END AS value
-              ) AS r21
+              ) AS r17
           ) AS value
         FROM
           (
@@ -1166,9 +1230,9 @@ fn match_04() {
               1::"char" AS _1_t,
               NULL::text AS _1_0
           ) AS r3
-      ) AS r23
+      ) AS r19
     ORDER BY
-      r23.index
+      r19.index
     ---
     [
       "Hello Whiskers",
@@ -1436,7 +1500,7 @@ fn opt_01() {
                   SELECT
                     r5.value
                 )
-                WHEN r5.value IS NULL THEN 'none'
+                ELSE 'none'
               END AS value
             FROM
               (

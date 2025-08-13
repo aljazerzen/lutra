@@ -72,8 +72,8 @@ impl super::TypeResolver<'_> {
                         // validate type
                         if let Some(expected_ty) = &expected_ty {
                             let who = || Some(fq_ident.last().to_string());
-                            let res = self.validate_expr_type(&mut value, expected_ty, &who);
-                            self.save_diagnostic(res);
+                            self.validate_expr_type(&mut value, expected_ty, &who)
+                                .unwrap_or_else(self.push_diagnostic());
                         }
 
                         // finalize scope
@@ -82,12 +82,14 @@ impl super::TypeResolver<'_> {
 
                         // validate const
                         if expr_def.constant {
-                            let res = self.const_validator.validate_is_const(&value);
-                            self.save_diagnostic(res.map_err(|span| {
-                                Diagnostic::new_custom("non-constant expression")
-                                    .with_span(span.or(value.span))
-                                    .push_hint("use `func` instead of `const`")
-                            }));
+                            self.const_validator
+                                .validate_is_const(&value)
+                                .map_err(|span| {
+                                    Diagnostic::new_custom("non-constant expression")
+                                        .with_span(span.or(value.span))
+                                        .push_hint("use `func` instead of `const`")
+                                })
+                                .unwrap_or_else(self.push_diagnostic());
                             self.const_validator.save_const(fq_ident.clone());
                         }
 

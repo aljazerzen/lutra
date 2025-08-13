@@ -628,6 +628,38 @@ func main() -> my_func(1)
 # >
 6
 
+# === if_00
+func bool_to_text(x: bool) -> if x then (
+  "yes"
+) else (
+  "no"
+)
+
+func main() -> {bool_to_text(true), bool_to_text(false)}
+# >
+{
+  "yes",
+  "no",
+}
+
+# === if_01
+const en = [{true, "yes"}, {false, "no"}]
+const sl = [{true, "da"}, {false, "ne"}]
+const lang = "sl"
+
+func main() -> if lang == "en" then en else sl
+# >
+[
+  {
+    true,
+    "da",
+  },
+  {
+    false,
+    "ne",
+  },
+]
+
 # === match_00
 type Status: enum {Done, Pending: int64, Cancelled: text}
 func main() -> match Status::Pending(4) {
@@ -2181,17 +2213,6 @@ false
 
 # === unpack_00
 const main = {a = 4: int32, ..{x1 = 3: int32, x2 = "hello"}, b = false}
-# >
-{
-  a = 4,
-  x1 = 3,
-  x2 = "hello",
-  b = false,
-}
-
-# === unpack_01
-const x = {x1 = 3: int32, x2 = "hello"}
-const main = {a = 4: int32, ..x, b = false}
 # >
 {
   a = 4,

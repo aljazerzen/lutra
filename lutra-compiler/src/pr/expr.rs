@@ -98,6 +98,7 @@ pub enum ExprKind {
     Func(Box<Func>),
     FString(Vec<InterpolateItem>),
     Match(Match),
+    If(If),
 
     Internal,
 }
@@ -246,6 +247,13 @@ impl Pattern {
             variant_tag: None,
         }
     }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct If {
+    pub condition: Box<Expr>,
+    pub then: Box<Expr>,
+    pub els: Box<Expr>,
 }
 
 impl From<Literal> for ExprKind {

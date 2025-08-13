@@ -429,14 +429,76 @@ impl<'a> Context<'a> {
             }
 
             ir::ExprKind::Switch(switch) => {
-                let mut cases = Vec::new();
-                for branch in switch {
-                    let condition = self.compile_column(&branch.condition);
-                    let value = self.compile_column(&branch.value);
+                let single_col = self.rel_cols(&expr.ty, true).nth(1).is_none();
 
-                    cases.push((condition, value));
+                if single_col {
+                    // CASE
+                    // WHEN b0.condition THEN b0.value
+                    // WHEN b1.condition THEN b1.value
+                    //                   ELSE b2.value
+                    let mut cases = Vec::with_capacity(switch.len());
+                    for branch in switch {
+                        let condition = self.compile_column(&branch.condition);
+                        let value = self.compile_column(&branch.value);
+
+                        cases.push((condition, value));
+                    }
+                    cr::ExprKind::From(cr::From::Case(cases))
+                } else {
+                    // WITH selector AS (CASE ...)
+                    // b0.value WHERE selector = 0
+                    // UNION ALL
+                    // b1.value WHERE selector = 1
+                    // UNION ALL
+                    // b2.value WHERE selector = 2
+
+                    fn new_branch_selector(index: usize) -> cr::Expr {
+                        cr::Expr {
+                            kind: cr::ExprKind::From(cr::From::Literal(ir::Literal::int16(
+                                index as i16,
+                            ))),
+                            ty: ir::Ty::new(ir::TyPrimitive::int16),
+                        }
+                    }
+
+                    let mut cases = Vec::with_capacity(switch.len());
+                    for (index, branch) in switch.iter().enumerate() {
+                        let condition = self.compile_column(&branch.condition);
+                        let value = new_branch_selector(index);
+                        cases.push((condition, value));
+                    }
+                    let selector = cr::Expr {
+                        kind: cr::ExprKind::From(cr::From::Case(cases)),
+                        ty: ir::Ty::new(ir::TyPrimitive::int16),
+                    };
+                    let selector = self.new_binding(selector);
+
+                    let selector_ref = self.new_rel_col(&selector, 0, selector.rel.ty.clone());
+
+                    let mut branches = Vec::with_capacity(switch.len());
+                    for (index, branch) in switch.iter().enumerate() {
+                        let condition = cr::Expr {
+                            kind: cr::ExprKind::From(cr::From::FuncCall(
+                                "std::eq".into(),
+                                vec![selector_ref.clone(), new_branch_selector(index)],
+                            )),
+                            ty: ir::Ty::new(ir::TyPrimitive::bool),
+                        };
+
+                        let value = self.compile_rel(&branch.value);
+                        let value = self.new_binding(value);
+
+                        branches.push(cr::Expr::new_iso_transform(
+                            value,
+                            cr::Transform::Where(Box::new(condition)),
+                        ));
+                    }
+                    let union = cr::Expr {
+                        kind: cr::ExprKind::Union(branches),
+                        ty: expr.ty.clone(),
+                    };
+                    cr::ExprKind::Bind(selector, Box::new(union))
                 }
-                cr::ExprKind::From(cr::From::Case(cases))
             }
         };
         cr::Expr {

@@ -370,6 +370,21 @@ impl<'a> Lowerer<'a> {
                 return Ok(ir::Expr { kind, ty });
             }
 
+            pr::ExprKind::If(if_else) => {
+                let first = ir::SwitchBranch {
+                    condition: self.lower_expr(&if_else.condition)?,
+                    value: self.lower_expr(&if_else.then)?,
+                };
+                let second = ir::SwitchBranch {
+                    condition: ir::Expr {
+                        kind: ir::ExprKind::Literal(ir::Literal::bool(true)),
+                        ty: ir::Ty::new(ir::TyPrimitive::bool),
+                    },
+                    value: self.lower_expr(&if_else.els)?,
+                };
+                ir::ExprKind::Switch(vec![first, second])
+            }
+
             // consumed by type resolver
             pr::ExprKind::TypeAnnotation(_) => unreachable!(),
 

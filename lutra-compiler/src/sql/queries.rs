@@ -17,7 +17,7 @@ pub fn compile(rel: cr::Expr, types: HashMap<&ir::Path, &ir::Ty>) -> sql_ast::Qu
 
     if rel_ty.kind.is_array() {
         // wrap into a top-level projection to remove array indexes & apply the order
-        let rel_name = query.expr.as_rel_var().unwrap().to_string();
+        let rel_name = query.expr.as_rel_var().unwrap_or("value").to_string();
         let mut query = ctx.scoped_into_query_ext(query, &rel_ty, false);
         query.order_by = Some(utils::order_by_one(utils::identifier(
             Some(rel_name),
@@ -294,7 +294,7 @@ impl<'a> Context<'a> {
             cr::From::Case(cases) => {
                 let mut conditions = Vec::new();
                 let mut results = Vec::new();
-                for (cond, value) in cases {
+                for (cond, value) in cases.iter().take(cases.len() - 1) {
                     let cond_s = self.compile_column(cond);
                     let cond = self.scoped_into_expr(cond_s, &cond.ty);
                     conditions.push(cond.into_expr());
@@ -303,11 +303,17 @@ impl<'a> Context<'a> {
                     let value = self.scoped_into_expr(value_s, &value.ty);
                     results.push(value.into_expr());
                 }
+
+                // else
+                let (_, else_value) = cases.last().unwrap();
+                let else_value_s = self.compile_column(else_value);
+                let else_value = self.scoped_into_expr(else_value_s, &else_value.ty);
+
                 Scoped::from(ExprOrSource::Expr(Box::new(sql_ast::Expr::Case {
                     operand: None,
                     conditions,
                     results,
-                    else_result: None,
+                    else_result: Some(Box::new(else_value.into_expr())),
                 })))
             }
         }
@@ -394,6 +400,7 @@ impl<'a> Context<'a> {
                 let select = self.scoped_as_mut_select(&mut scoped, input_ty);
 
                 let cond = self.compile_column(cond);
+                dbg!(&cond);
                 select.selection = Some(cond.expr.into_expr());
 
                 select.from.extend(

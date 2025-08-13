@@ -6,10 +6,11 @@ use crate::{Result, Span, printer};
 use super::scope;
 
 impl super::TypeResolver<'_> {
-    pub fn resolve_tuple_constructor(
-        &mut self,
-        fields_in: Vec<pr::TupleField>,
-    ) -> Result<(pr::ExprKind, pr::Ty)> {
+    pub fn resolve_tuple_constructor(&mut self, node: pr::Expr) -> Result<pr::Expr> {
+        let pr::ExprKind::Tuple(fields_in) = node.kind else {
+            unreachable!()
+        };
+
         let mut fields = Vec::with_capacity(fields_in.len());
         let mut ty_fields: Vec<pr::TyTupleField> = Vec::with_capacity(fields_in.len());
 
@@ -69,7 +70,11 @@ impl super::TypeResolver<'_> {
         }
         let kind = pr::ExprKind::Tuple(fields);
         let ty = pr::Ty::new(pr::TyKind::Tuple(ty_fields));
-        Ok((kind, ty))
+        Ok(pr::Expr {
+            kind,
+            ty: Some(ty),
+            ..node
+        })
     }
 
     fn infer_tuple_field_name(&self, field: &pr::Expr) -> Option<String> {
