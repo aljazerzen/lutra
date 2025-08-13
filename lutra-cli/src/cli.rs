@@ -226,7 +226,11 @@ pub async fn run(cmd: RunCommand) -> anyhow::Result<()> {
 
         // TODO: instead of setting cwd, pass the project dir to interpreter
         let old_cwd = std::env::current_dir()?;
-        std::env::set_current_dir(&project.source.root)?;
+        if project.source.root.is_file() {
+            std::env::set_current_dir(project.source.root.parent().unwrap())?;
+        } else {
+            std::env::set_current_dir(&project.source.root)?;
+        }
 
         let handle = runner.prepare(program).await?;
         let output = runner.execute(&handle, &input).await?;

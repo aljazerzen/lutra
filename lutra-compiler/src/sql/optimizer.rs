@@ -188,11 +188,12 @@ fn push_correlated_into_group(expr: cr::Expr) -> (cr::Expr, bool) {
     );
     let orig_value = cr::Expr {
         kind: cr::ExprKind::From(cr::From::Row(orig_values)),
-        ty: expr.ty,
+        ty: new_expr.ty,
     };
 
     let mut replacer = RelRefReplacer::new(bound.id, orig_value);
     values.extend(correlated.map(|c| replacer.fold_expr(c).unwrap()));
+    new_expr.ty = expr.ty;
     (new_expr, true)
 }
 

@@ -44,7 +44,7 @@ impl Printer {
 
         for ty_def in &program.defs {
             r += "type ";
-            r += &self.print_path(&ty_def.name);
+            r += &display_path(&ty_def.name);
             r += " = ";
             r += &self.print_ty(&ty_def.ty);
             r += ";\n";
@@ -271,7 +271,7 @@ impl Printer {
                         r += ", ";
                     }
                     if let Some(name) = &field.name {
-                        r += name;
+                        r += &display_ident(name);
                         r += ": ";
                     }
                     r += &self.print_ty(&field.ty);
@@ -288,7 +288,7 @@ impl Printer {
                     if index > 0 {
                         r += ", ";
                     }
-                    r += &variant.name;
+                    r += &display_ident(&variant.name);
                     if !is_ty_unit(&variant.ty) {
                         r += ": ";
                         r += &self.print_ty(&variant.ty);
@@ -309,14 +309,8 @@ impl Printer {
                 r += &self.print_ty(&func.body);
                 r
             }
-            ir::TyKind::Ident(path) => self.print_path(path),
+            ir::TyKind::Ident(path) => display_path(path),
         }
-    }
-
-    #[allow(clippy::only_used_in_recursion)]
-    fn print_path(&self, path: &ir::Path) -> String {
-        // TODO: quote
-        path.0.join("::")
     }
 }
 
@@ -329,4 +323,33 @@ fn is_expr_unit(expr: &ir::Expr) -> bool {
 
 fn is_ty_unit(ty: &ir::Ty) -> bool {
     ty.kind.as_tuple().is_some_and(|f| f.is_empty())
+}
+
+fn display_path(path: &ir::Path) -> String {
+    let mut r = String::new();
+    for (index, part) in path.0.iter().enumerate() {
+        if index > 0 {
+            r += "::";
+        }
+        r += display_ident(part).as_ref();
+    }
+    r
+}
+
+pub fn display_ident(s: &str) -> std::borrow::Cow<'_, str> {
+    fn forbidden_start(c: char) -> bool {
+        !(c.is_ascii_alphabetic() || matches!(c, '_' | '$'))
+    }
+    fn forbidden_subsequent(c: char) -> bool {
+        !(c.is_ascii_alphanumeric() || matches!(c, '_'))
+    }
+    let needs_escape = s.is_empty()
+        || s.starts_with(forbidden_start)
+        || (s.len() > 1 && s.chars().skip(1).any(forbidden_subsequent));
+
+    if needs_escape {
+        format!("`{s}`").into()
+    } else {
+        s.into()
+    }
 }
