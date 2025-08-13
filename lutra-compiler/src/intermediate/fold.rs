@@ -55,7 +55,7 @@ pub fn fold_expr_kind<T: ?Sized + IrFold>(fold: &mut T, kind: ExprKind, ty: Ty) 
         Literal(lit) => Literal(lit),
         Call(call) => return fold.fold_call(*call, ty),
         Function(func) => return fold.fold_func(*func, ty),
-        Tuple(fields) => Tuple(fold_exprs(fold, fields)?),
+        Tuple(fields) => Tuple(fold_tuple_fields(fold, fields)?),
         Array(items) => Array(fold_exprs(fold, items)?),
         EnumVariant(variant) => EnumVariant(Box::new(fold_enum_variant(fold, *variant)?)),
         EnumEq(eq) => EnumEq(Box::new(fold_enum_eq(fold, *eq)?)),
@@ -69,6 +69,21 @@ pub fn fold_expr_kind<T: ?Sized + IrFold>(fold: &mut T, kind: ExprKind, ty: Ty) 
 
 pub fn fold_exprs<F: ?Sized + IrFold>(fold: &mut F, exprs: Vec<Expr>) -> Result<Vec<Expr>> {
     exprs.into_iter().map(|node| fold.fold_expr(node)).collect()
+}
+
+pub fn fold_tuple_fields<F: ?Sized + IrFold>(
+    fold: &mut F,
+    exprs: Vec<TupleField>,
+) -> Result<Vec<TupleField>> {
+    exprs
+        .into_iter()
+        .map(|field| {
+            Ok(TupleField {
+                expr: fold.fold_expr(field.expr)?,
+                unpack: field.unpack,
+            })
+        })
+        .collect()
 }
 
 pub fn fold_call<T: ?Sized + IrFold>(fold: &mut T, call: Call, ty: Ty) -> Result<Expr> {

@@ -14,7 +14,7 @@ type ExprKind: enum {
   Literal: Literal,
   Call: Call,
   Function: Function,
-  `Tuple`: [Expr],
+  Tuple: [TupleField],
   Array: [Expr],
   EnumVariant: EnumVariant,
   EnumEq: EnumEq,
@@ -65,6 +65,11 @@ type Call: {
 type Function: {
   id: uint32,
   body: Expr,
+}
+
+type TupleField: {
+  expr: Expr,
+  unpack: bool,
 }
 
 type EnumVariant: {

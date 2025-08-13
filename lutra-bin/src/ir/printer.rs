@@ -107,7 +107,10 @@ impl Printer {
                 self.indent();
                 for field in fields {
                     r += &self.new_line();
-                    r += &self.print_expr(field);
+                    if field.unpack {
+                        r += "..";
+                    }
+                    r += &self.print_expr(&field.expr);
                     r += ",";
                 }
                 self.dedent();

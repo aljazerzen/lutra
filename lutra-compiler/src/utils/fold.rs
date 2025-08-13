@@ -94,6 +94,7 @@ pub fn fold_expr_kind<T: ?Sized + PrFold>(fold: &mut T, expr_kind: ExprKind) -> 
                 .map(|field| -> Result<TupleField> {
                     Ok(TupleField {
                         name: field.name,
+                        unpack: field.unpack,
                         expr: fold.fold_expr(field.expr)?,
                     })
                 })
@@ -321,6 +322,7 @@ pub fn fold_ty_tuple_fields<F: ?Sized + PrFold>(
         .map(|field| -> Result<_> {
             Ok(TyTupleField {
                 name: field.name,
+                unpack: field.unpack,
                 ty: fold.fold_type(field.ty)?,
             })
         })

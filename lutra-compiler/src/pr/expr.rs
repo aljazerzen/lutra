@@ -169,6 +169,7 @@ pub struct TypeAnnotation {
 #[derive(Debug, PartialEq, Clone)]
 pub struct TupleField {
     pub name: Option<String>,
+    pub unpack: bool,
     pub expr: Expr,
 }
 

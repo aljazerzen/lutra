@@ -3,9 +3,7 @@ use itertools::Itertools;
 use crate::Result;
 use crate::diagnostic::{Diagnostic, WithErrorInfo};
 use crate::pr;
-use crate::pr::Ty;
-use crate::resolver::types::scope::{Named, ScopedKind};
-use crate::resolver::types::tuple::BaseKind;
+use crate::resolver::types::{scope, tuple};
 use crate::resolver::{NS_STD, names};
 use crate::utils::fold;
 
@@ -27,21 +25,21 @@ impl fold::PrFold for super::TypeResolver<'_> {
                 tracing::debug!("... resolved to {}", named.as_ref());
 
                 let ty = match named {
-                    Named::Expr(expr) => {
+                    scope::Named::Expr(expr) => {
                         // if the type contains generics, we need to instantiate those
                         // generics into current function scope
                         // let ty = self.instantiate_type(ty, id);
                         expr.ty.clone().unwrap()
                     }
 
-                    Named::Ty(_, _) => {
+                    scope::Named::Ty(_, _) => {
                         return Err(Diagnostic::new_custom("expected a value, but found a type")
                             .with_span(span));
                     }
-                    Named::Scoped(scoped) => match scoped {
-                        ScopedKind::Param { ty } => ty.clone(),
-                        ScopedKind::Local { ty } => ty.clone(),
-                        ScopedKind::TyParam { .. } | ScopedKind::TyVar { .. } => {
+                    scope::Named::Scoped(scoped) => match scoped {
+                        scope::ScopedKind::Param { ty } => ty.clone(),
+                        scope::ScopedKind::Local { ty } => ty.clone(),
+                        scope::ScopedKind::TyParam { .. } | scope::ScopedKind::TyVar { .. } => {
                             return Err(Diagnostic::new_custom(
                                 "expected a value, but found a type",
                             )
@@ -49,7 +47,7 @@ impl fold::PrFold for super::TypeResolver<'_> {
                             .with_span(span));
                         }
                     },
-                    Named::EnumVariant(ty, tag) => {
+                    scope::Named::EnumVariant(ty, tag) => {
                         let mut r = pr::Expr::new(pr::ExprKind::EnumVariant(pr::EnumVariant {
                             tag,
                             inner: None,
@@ -76,7 +74,7 @@ impl fold::PrFold for super::TypeResolver<'_> {
                     .resolve_indirection(base_ty, &field, span.unwrap())
                     .with_span(span)?;
                 match indirection.base {
-                    BaseKind::Tuple => {
+                    tuple::BaseKind::Tuple => {
                         let kind = pr::ExprKind::Indirection {
                             base: Box::new(base),
                             field: if let Some(p) = indirection.position {
@@ -91,7 +89,7 @@ impl fold::PrFold for super::TypeResolver<'_> {
                             ..node
                         }
                     }
-                    BaseKind::Array => {
+                    tuple::BaseKind::Array => {
                         let std_index = pr::Path::new(vec![NS_STD, "index"]);
                         let mut std_index_expr = pr::Expr::new(std_index.clone());
                         std_index_expr.span = span;
@@ -161,6 +159,15 @@ impl fold::PrFold for super::TypeResolver<'_> {
 
             pr::ExprKind::Match(_) => self.resolve_match(node)?,
 
+            pr::ExprKind::Tuple(fields) => {
+                let (kind, ty) = self.resolve_tuple_constructor(fields)?;
+                pr::Expr {
+                    kind,
+                    ty: Some(ty),
+                    ..node
+                }
+            }
+
             item => pr::Expr {
                 kind: fold::fold_expr_kind(self, item)?,
                 ..node
@@ -179,7 +186,7 @@ impl fold::PrFold for super::TypeResolver<'_> {
         Ok(r)
     }
 
-    fn fold_type(&mut self, ty: Ty) -> Result<Ty> {
+    fn fold_type(&mut self, ty: pr::Ty) -> Result<pr::Ty> {
         let ty = match ty.kind {
             // open a new scope for functions
             pr::TyKind::Func(ty_func) if self.scopes.is_empty() => {
@@ -189,7 +196,7 @@ impl fold::PrFold for super::TypeResolver<'_> {
                 let ty_func = fold::fold_ty_func(self, ty_func)?;
                 self.scopes.pop().unwrap();
 
-                Ty {
+                pr::Ty {
                     kind: pr::TyKind::Func(ty_func),
                     ..ty
                 }

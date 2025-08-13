@@ -45,21 +45,8 @@ impl TypeResolver<'_> {
                 annotation.ty.kind.clone()
             }
 
-            ExprKind::Tuple(fields) => {
-                let mut ty_fields: Vec<TyTupleField> = Vec::with_capacity(fields.len());
+            ExprKind::Tuple(_) => unreachable!(), // type computed in the main pass
 
-                for field in fields {
-                    let ty = self.infer_type(&field.expr)?;
-
-                    let name = field
-                        .name
-                        .clone()
-                        .or_else(|| self.infer_tuple_field_name(&field.expr));
-
-                    ty_fields.push(TyTupleField { name, ty });
-                }
-                ty_tuple_kind(ty_fields)
-            }
             ExprKind::Array(items) => {
                 let mut items_ty = None;
                 for item in items {
@@ -114,49 +101,10 @@ impl TypeResolver<'_> {
         ty.span = expr.span;
         Ok(ty)
     }
-
-    fn infer_tuple_field_name(&self, field: &Expr) -> Option<String> {
-        // at this stage, this expr should already be fully resolved
-        // this means that any indirections will be tuple positional
-        // so we check for that and pull the name from the type of the base
-
-        let ExprKind::Indirection {
-            base,
-            field: IndirectionKind::Position(pos),
-        } = &field.kind
-        else {
-            return None;
-        };
-
-        let ty = base.ty.as_ref()?;
-        self.get_ty_tuple_field_name(ty, *pos as usize)
-    }
-
-    fn get_ty_tuple_field_name(&self, ty: &Ty, pos: usize) -> Option<String> {
-        // SAFETY: get_my_ty will not error, because it has been resolved earlier already
-        let mat_ty = self.get_ty_mat(ty).unwrap();
-
-        match mat_ty {
-            super::scope::TyRef::Ty(ty) => match &ty.kind {
-                TyKind::Tuple(fields) => {
-                    // this tuple might contain Unpacks (which affect positions of fields after them)
-                    // so we need to resolve this type full first.
-
-                    // unpacks don't interfere with preceding fields
-                    let field = fields.get(pos)?;
-
-                    field.name.clone()
-                }
-
-                TyKind::Ident(_fq_ident) => unreachable!(),
-                _ => None,
-            },
-            super::scope::TyRef::Param(..) => None,
-            super::scope::TyRef::Var(..) => None,
-        }
-    }
 }
 
+#[allow(dead_code)]
+// TODO: decide how do we want to deal with duplicate tuple names
 fn ty_tuple_kind(fields: Vec<TyTupleField>) -> TyKind {
     let mut res: Vec<TyTupleField> = Vec::with_capacity(fields.len());
     for field in fields {

@@ -59,8 +59,15 @@ pub mod br {
     #[derive(Debug, Clone)]
     #[allow(non_camel_case_types)]
     pub struct Tuple {
-        pub fields: crate::vec::Vec<Expr>,
+        pub fields: crate::vec::Vec<TupleField>,
         pub field_layouts: crate::vec::Vec<TyLayout>,
+    }
+
+    #[derive(Debug, Clone)]
+    #[allow(non_camel_case_types)]
+    pub struct TupleField {
+        pub expr: Expr,
+        pub unpack: u8,
     }
 
     #[derive(Debug, Clone)]
@@ -597,7 +604,7 @@ pub mod br {
         }
         #[allow(non_camel_case_types)]
         pub struct TupleHeadPtr {
-            fields: <crate::vec::Vec<super::Expr> as crate::Encode>::HeadPtr,
+            fields: <crate::vec::Vec<super::TupleField> as crate::Encode>::HeadPtr,
             field_layouts: <crate::vec::Vec<super::TyLayout> as crate::Encode>::HeadPtr,
         }
         impl crate::Layout for Tuple {
@@ -608,12 +615,44 @@ pub mod br {
 
         impl crate::Decode for Tuple {
             fn decode(buf: &[u8]) -> crate::Result<Self> {
-                let fields = crate::vec::Vec::<super::Expr>::decode(buf.skip(0))?;
+                let fields = crate::vec::Vec::<super::TupleField>::decode(buf.skip(0))?;
                 let field_layouts = crate::vec::Vec::<super::TyLayout>::decode(buf.skip(8))?;
                 Ok(Tuple {
                     fields,
                     field_layouts,
                 })
+            }
+        }
+
+        #[allow(clippy::all, unused_variables)]
+        impl crate::Encode for TupleField {
+            type HeadPtr = TupleFieldHeadPtr;
+            fn encode_head(&self, buf: &mut crate::bytes::BytesMut) -> Self::HeadPtr {
+                let expr = self.expr.encode_head(buf);
+                let unpack = self.unpack.encode_head(buf);
+                TupleFieldHeadPtr { expr, unpack }
+            }
+            fn encode_body(&self, head: Self::HeadPtr, buf: &mut crate::bytes::BytesMut) {
+                self.expr.encode_body(head.expr, buf);
+                self.unpack.encode_body(head.unpack, buf);
+            }
+        }
+        #[allow(non_camel_case_types)]
+        pub struct TupleFieldHeadPtr {
+            expr: <super::Expr as crate::Encode>::HeadPtr,
+            unpack: <u8 as crate::Encode>::HeadPtr,
+        }
+        impl crate::Layout for TupleField {
+            fn head_size() -> usize {
+                48
+            }
+        }
+
+        impl crate::Decode for TupleField {
+            fn decode(buf: &[u8]) -> crate::Result<Self> {
+                let expr = super::Expr::decode(buf.skip(0))?;
+                let unpack = u8::decode(buf.skip(5))?;
+                Ok(TupleField { expr, unpack })
             }
         }
 
@@ -921,7 +960,7 @@ pub mod ir {
         Literal(Literal),
         Call(crate::boxed::Box<Call>),
         Function(crate::boxed::Box<Function>),
-        Tuple(crate::vec::Vec<Expr>),
+        Tuple(crate::vec::Vec<TupleField>),
         Array(crate::vec::Vec<Expr>),
         EnumVariant(crate::boxed::Box<EnumVariant>),
         EnumEq(crate::boxed::Box<EnumEq>),
@@ -981,6 +1020,13 @@ pub mod ir {
     pub struct Function {
         pub id: u32,
         pub body: Expr,
+    }
+
+    #[derive(Debug, Clone)]
+    #[allow(non_camel_case_types)]
+    pub struct TupleField {
+        pub expr: Expr,
+        pub unpack: bool,
     }
 
     #[derive(Debug, Clone)]
@@ -1425,8 +1471,9 @@ pub mod ir {
                     }
                     4 => {
                         let offset = u32::from_le_bytes(buf.read_const::<4>());
-                        let inner =
-                            crate::vec::Vec::<super::Expr>::decode(buf.skip(offset as usize))?;
+                        let inner = crate::vec::Vec::<super::TupleField>::decode(
+                            buf.skip(offset as usize),
+                        )?;
                         ExprKind::Tuple(inner)
                     }
                     5 => {
@@ -1969,6 +2016,38 @@ pub mod ir {
                 let id = u32::decode(buf.skip(0))?;
                 let body = super::Expr::decode(buf.skip(4))?;
                 Ok(Function { id, body })
+            }
+        }
+
+        #[allow(clippy::all, unused_variables)]
+        impl crate::Encode for TupleField {
+            type HeadPtr = TupleFieldHeadPtr;
+            fn encode_head(&self, buf: &mut crate::bytes::BytesMut) -> Self::HeadPtr {
+                let expr = self.expr.encode_head(buf);
+                let unpack = self.unpack.encode_head(buf);
+                TupleFieldHeadPtr { expr, unpack }
+            }
+            fn encode_body(&self, head: Self::HeadPtr, buf: &mut crate::bytes::BytesMut) {
+                self.expr.encode_body(head.expr, buf);
+                self.unpack.encode_body(head.unpack, buf);
+            }
+        }
+        #[allow(non_camel_case_types)]
+        pub struct TupleFieldHeadPtr {
+            expr: <super::Expr as crate::Encode>::HeadPtr,
+            unpack: <bool as crate::Encode>::HeadPtr,
+        }
+        impl crate::Layout for TupleField {
+            fn head_size() -> usize {
+                232
+            }
+        }
+
+        impl crate::Decode for TupleField {
+            fn decode(buf: &[u8]) -> crate::Result<Self> {
+                let expr = super::Expr::decode(buf.skip(0))?;
+                let unpack = bool::decode(buf.skip(28))?;
+                Ok(TupleField { expr, unpack })
             }
         }
 

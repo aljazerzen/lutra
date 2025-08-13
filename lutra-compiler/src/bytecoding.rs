@@ -112,12 +112,38 @@ impl ByteCoder {
         }
     }
 
-    fn compile_tuple(&mut self, fields: Vec<ir::Expr>) -> Tuple {
+    fn compile_tuple(&mut self, fields: Vec<ir::TupleField>) -> Tuple {
         let field_layouts = fields
             .iter()
-            .map(|f| self.compile_ty_layout(f.ty.layout.clone().unwrap()))
+            .flat_map(|f| {
+                if f.unpack {
+                    let ir::TyKind::Tuple(fields) = &self.get_ty_mat(&f.expr.ty).kind else {
+                        panic!();
+                    };
+                    fields.iter().map(|f| &f.ty).collect::<Vec<_>>()
+                } else {
+                    vec![&f.expr.ty]
+                }
+            })
+            .map(|ty| self.compile_ty_layout(ty.layout.clone().unwrap()))
             .collect();
-        let fields = fields.into_iter().map(|x| self.compile_expr(x)).collect();
+
+        let fields = fields
+            .into_iter()
+            .map(|f| {
+                let unpack = if f.unpack {
+                    let ir::TyKind::Tuple(fields) = &self.get_ty_mat(&f.expr.ty).kind else {
+                        panic!();
+                    };
+                    fields.len() as u8
+                } else {
+                    0
+                };
+                let expr = self.compile_expr(f.expr);
+
+                TupleField { expr, unpack }
+            })
+            .collect();
         Tuple {
             fields,
             field_layouts,
@@ -211,7 +237,7 @@ impl ByteCoder {
             .collect()
     }
 
-    fn compile_ty_layout(&mut self, value: ir::TyLayout) -> TyLayout {
+    fn compile_ty_layout(&self, value: ir::TyLayout) -> TyLayout {
         TyLayout {
             head_size: value.head_size,
             body_ptrs: value.body_ptrs,

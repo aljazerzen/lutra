@@ -118,41 +118,33 @@ fn quotes() {
 #[test]
 fn range() {
     assert_debug_snapshot!(lex(lexer(), "1..2").unwrap(), @r"
-
-        [
-            0..1: Literal(Integer(1)),
-            1..3: Range,
-            3..4: Literal(Integer(2)),
-        ],
-    )
+    [
+        0..1: Literal(Integer(1)),
+        1..3: Range,
+        3..4: Literal(Integer(2)),
+    ]
     ");
 
     assert_debug_snapshot!(lex(lexer(), "..2").unwrap(), @r"
-
-        [
-            0..2: Range,
-            2..3: Literal(Integer(2)),
-        ],
-    )
+    [
+        0..2: Range,
+        2..3: Literal(Integer(2)),
+    ]
     ");
 
     assert_debug_snapshot!(lex(lexer(), "1..").unwrap(), @r"
-
-        [
-            0..1: Literal(Integer(1)),
-            1..3: Range,
-        ],
-    )
+    [
+        0..1: Literal(Integer(1)),
+        1..3: Range,
+    ]
     ");
 
     assert_debug_snapshot!(lex(lexer(), "in ..5").unwrap(), @r#"
-
-        [
-            0..2: Ident("in"),
-            3..5: Range,
-            5..6: Literal(Integer(5)),
-        ],
-    )
+    [
+        0..2: Ident("in"),
+        3..5: Range,
+        5..6: Literal(Integer(5)),
+    ]
     "#);
 }
 

@@ -6,6 +6,7 @@ use lutra_bin::ir;
 
 use crate::diagnostic::Diagnostic;
 use crate::pr;
+use crate::resolver::NS_STD;
 use crate::utils::{self, IdGenerator};
 use crate::{Project, Result};
 
@@ -98,7 +99,7 @@ impl<'a> Lowerer<'a> {
 
     #[tracing::instrument(name = "leed", skip_all)]
     fn lower_external_expr_def(&mut self, path: &pr::Path) -> Result<Option<ir::ExprKind>> {
-        if path.as_slice() == ["std", "default"] {
+        if path.as_slice() == [NS_STD, "default"] {
             // special case: evaluate std::default in lowerer
             return Ok(None);
         }
@@ -125,7 +126,7 @@ impl<'a> Lowerer<'a> {
         let def = def.unwrap_or_else(|| panic!("{path} does not exist"));
         let expr = def.into_expr().unwrap().clone();
 
-        if path.as_slice() == ["std", "default"] {
+        if path.as_slice() == [NS_STD, "default"] {
             return Ok(self.impl_std_default(ty_args.into_iter().next().unwrap()));
         }
 
@@ -171,7 +172,12 @@ impl<'a> Lowerer<'a> {
             pr::ExprKind::Tuple(fields) => ir::ExprKind::Tuple(
                 fields
                     .iter()
-                    .map(|f| self.lower_expr(&f.expr))
+                    .map(|f| -> Result<ir::TupleField> {
+                        Ok(ir::TupleField {
+                            expr: self.lower_expr(&f.expr)?,
+                            unpack: f.unpack,
+                        })
+                    })
                     .try_collect()?,
             ),
             pr::ExprKind::Array(items) => ir::ExprKind::Array(self.lower_exprs(items)?),
@@ -577,16 +583,24 @@ impl<'a> Lowerer<'a> {
                 };
                 ir::TyKind::Primitive(primitive)
             }
-            pr::TyKind::Tuple(fields) => ir::TyKind::Tuple(
-                fields
-                    .into_iter()
-                    .map(|f| {
-                        let name = f.name.clone();
-                        let ty = self.lower_ty(f.ty);
-                        ir::TyTupleField { name, ty }
-                    })
-                    .collect(),
-            ),
+            pr::TyKind::Tuple(fields) => {
+                let mut r = Vec::with_capacity(fields.len());
+
+                for f in fields {
+                    let name = f.name.clone();
+                    let ty = self.lower_ty(f.ty);
+                    if f.unpack {
+                        let ir::TyKind::Tuple(fields) = self.get_ty_mat(ty).kind else {
+                            panic!("expected a tuple type in unpack");
+                        };
+                        r.extend(fields);
+                    } else {
+                        r.push(ir::TyTupleField { name, ty });
+                    }
+                }
+
+                ir::TyKind::Tuple(r)
+            }
             pr::TyKind::Array(items_ty) => ir::TyKind::Array(Box::new(self.lower_ty(*items_ty))),
             pr::TyKind::Enum(variants) => ir::TyKind::Enum(
                 variants
@@ -759,7 +773,10 @@ impl<'a> Lowerer<'a> {
             ir::TyKind::Tuple(ty_fields) => ir::ExprKind::Tuple(
                 ty_fields
                     .into_iter()
-                    .map(|f| self.construct_default_for_ty(f.ty))
+                    .map(|f| ir::TupleField {
+                        expr: self.construct_default_for_ty(f.ty),
+                        unpack: false,
+                    })
                     .collect(),
             ),
             ir::TyKind::Enum(ty_enum_variants) => {
@@ -804,7 +821,7 @@ pub fn lower_type_defs(project: &Project) -> ir::Module {
     let mut module = ir::Module { decls: Vec::new() };
 
     for (name, def) in project.root_module.iter_defs_re() {
-        if name.starts_with_part("std") {
+        if name.starts_with_part(NS_STD) {
             continue;
         }
 
@@ -870,6 +887,7 @@ fn get_entry_point_input(expr: &pr::Expr) -> (pr::Ty, bool) {
             .iter()
             .map(|ty| pr::TyTupleField {
                 ty: ty.clone().unwrap(),
+                unpack: false,
                 name: None,
             })
             .collect(),

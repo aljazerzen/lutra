@@ -94,13 +94,15 @@ pub enum Named<'a> {
 /// A reference to a type-like objects
 #[derive(Debug, Clone)]
 pub enum TyRef<'a> {
-    /// Concrete type
+    /// Concrete type (cannot be an ident)
     Ty(Cow<'a, pr::Ty>),
 
-    /// Reference to type param. Contains offset in scope and name.
+    /// Reference to type param: a placeholder which must support a few different concrete types.
+    /// Contains offset in scope.
     Param(usize),
 
-    /// Reference to type variable. Contains scope id, offset in scope and name hint.
+    /// Reference to type variable: a placeholder which will inferred to be some non-variable type
+    /// when scope is finalized. Contains scope id and offset in scope.
     Var(usize, usize),
 }
 

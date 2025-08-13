@@ -26,7 +26,11 @@ impl From<ir::Ty> for super::Ty {
                     .map(|f| {
                         let name = f.name.clone();
                         let ty = super::Ty::from(f.ty);
-                        super::TyTupleField { name, ty }
+                        super::TyTupleField {
+                            name,
+                            ty,
+                            unpack: false,
+                        }
                     })
                     .collect(),
             ),

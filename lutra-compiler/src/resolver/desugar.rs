@@ -1,5 +1,6 @@
 use crate::diagnostic::Diagnostic;
 use crate::pr::{self, Expr};
+use crate::resolver::NS_STD;
 use crate::utils::fold;
 use crate::utils::fold::PrFold;
 use crate::{Result, Span};
@@ -46,10 +47,12 @@ impl Desugarator {
         Ok(pr::ExprKind::Tuple(vec![
             pr::TupleField {
                 name: Some("start".into()),
+                unpack: false,
                 expr: start,
             },
             pr::TupleField {
                 name: Some("end".into()),
+                unpack: false,
                 expr: end,
             },
         ]))
@@ -102,8 +105,8 @@ impl Desugarator {
         let expr = self.fold_expr(*expr)?;
 
         let func_name = match op {
-            Neg => ["std", "neg"],
-            Not => ["std", "not"],
+            Neg => [NS_STD, "neg"],
+            Not => [NS_STD, "not"],
             Pos => return Ok(expr.kind),
         };
         let mut op_func = pr::Expr::new(pr::Path::new(func_name.to_vec()));
@@ -124,23 +127,23 @@ impl Desugarator {
         let right = self.fold_expr(*right)?;
 
         let func_name: Vec<&str> = match op {
-            pr::BinOp::Mul => vec!["std", "mul"],
-            pr::BinOp::DivInt => vec!["std", "div"],
-            pr::BinOp::DivFloat => vec!["std", "div"], // TODO
-            pr::BinOp::Mod => vec!["std", "mod"],
-            pr::BinOp::Pow => vec!["std", "math", "pow"],
-            pr::BinOp::Add => vec!["std", "add"],
-            pr::BinOp::Sub => vec!["std", "sub"],
-            pr::BinOp::Eq => vec!["std", "eq"],
-            pr::BinOp::Ne => vec!["std", "ne"],
-            pr::BinOp::Gt => vec!["std", "gt"],
-            pr::BinOp::Lt => vec!["std", "lt"],
-            pr::BinOp::Gte => vec!["std", "gte"],
-            pr::BinOp::Lte => vec!["std", "lte"],
-            pr::BinOp::RegexSearch => vec!["std", "regex_search"],
-            pr::BinOp::And => vec!["std", "and"],
-            pr::BinOp::Or => vec!["std", "or"],
-            pr::BinOp::Coalesce => vec!["std", "or_else"],
+            pr::BinOp::Mul => vec![NS_STD, "mul"],
+            pr::BinOp::DivInt => vec![NS_STD, "div"],
+            pr::BinOp::DivFloat => vec![NS_STD, "div"], // TODO
+            pr::BinOp::Mod => vec![NS_STD, "mod"],
+            pr::BinOp::Pow => vec![NS_STD, "math", "pow"],
+            pr::BinOp::Add => vec![NS_STD, "add"],
+            pr::BinOp::Sub => vec![NS_STD, "sub"],
+            pr::BinOp::Eq => vec![NS_STD, "eq"],
+            pr::BinOp::Ne => vec![NS_STD, "ne"],
+            pr::BinOp::Gt => vec![NS_STD, "gt"],
+            pr::BinOp::Lt => vec![NS_STD, "lt"],
+            pr::BinOp::Gte => vec![NS_STD, "gte"],
+            pr::BinOp::Lte => vec![NS_STD, "lte"],
+            pr::BinOp::RegexSearch => vec![NS_STD, "regex_search"],
+            pr::BinOp::And => vec![NS_STD, "and"],
+            pr::BinOp::Or => vec![NS_STD, "or"],
+            pr::BinOp::Coalesce => vec![NS_STD, "or_else"],
         };
 
         // For the power operator, we need to reverse the order, since `math.pow a
@@ -175,7 +178,7 @@ impl Desugarator {
         // concat with the following
         for item in items {
             let op_span = item.span;
-            expr = new_binop(expr, &["std", "text_ops", "concat"], item, op_span);
+            expr = new_binop(expr, &[NS_STD, "text_ops", "concat"], item, op_span);
         }
         Ok(expr.kind)
     }

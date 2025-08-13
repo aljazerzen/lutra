@@ -64,8 +64,9 @@ pub enum TyKind {
 
 #[derive(Debug, Clone, PartialEq, Hash)]
 pub struct TyTupleField {
-    /// Named tuple element.
     pub name: Option<String>,
+
+    pub unpack: bool,
 
     pub ty: Ty,
 }

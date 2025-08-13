@@ -168,6 +168,10 @@ fn tuple<'a>(
     nested_expr: impl Parser<TokenKind, Expr, Error = PError> + Clone + 'a,
 ) -> impl Parser<TokenKind, ExprKind, Error = PError> + Clone + 'a {
     nested_expr
+        .map(|expr| TupleField {
+            expr,
+            unpack: false,
+        })
         .separated_by(ctrl(','))
         .allow_trailing()
         .delimited_by(ctrl('{'), ctrl('}'))

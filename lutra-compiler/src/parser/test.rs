@@ -520,6 +520,68 @@ fn parse_07() {
 }
 
 #[test]
+fn parse_09() {
+    assert_debug_snapshot!(parse_expr(r"{1, ..x, 2}").kind, @r"
+    Tuple(
+        [
+            TupleField {
+                name: None,
+                unpack: false,
+                expr: Expr {
+                    kind: Literal(
+                        Integer(
+                            1,
+                        ),
+                    ),
+                    span: Some(
+                        0:1-2,
+                    ),
+                    ty: None,
+                    ty_args: [],
+                    scope_id: None,
+                    target: None,
+                },
+            },
+            TupleField {
+                name: None,
+                unpack: true,
+                expr: Expr {
+                    kind: Ident(
+                        x,
+                    ),
+                    span: Some(
+                        0:6-7,
+                    ),
+                    ty: None,
+                    ty_args: [],
+                    scope_id: None,
+                    target: None,
+                },
+            },
+            TupleField {
+                name: None,
+                unpack: false,
+                expr: Expr {
+                    kind: Literal(
+                        Integer(
+                            2,
+                        ),
+                    ),
+                    span: Some(
+                        0:9-10,
+                    ),
+                    ty: None,
+                    ty_args: [],
+                    scope_id: None,
+                    target: None,
+                },
+            },
+        ],
+    )
+    ");
+}
+
+#[test]
 fn test_error_unicode_string() {
     // Test various unicode strings successfully parse errors. We were
     // getting loops in the lexer before.

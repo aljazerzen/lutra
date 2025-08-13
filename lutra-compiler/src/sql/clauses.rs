@@ -93,7 +93,7 @@ impl<'a> Context<'a> {
                 let mut res_cols = Vec::new();
                 let mut res_ty_fields = Vec::new();
                 for (field, ty_field) in std::iter::zip(fields, ty_fields) {
-                    match self.compile_column_list(field) {
+                    match self.compile_column_list(&field.expr) {
                         ColumnsOrUnpack::Columns(cols) => {
                             res_cols.extend(cols);
                             res_ty_fields.push(ty_field.clone());

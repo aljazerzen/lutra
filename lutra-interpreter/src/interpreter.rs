@@ -1,4 +1,3 @@
-use std::borrow::Cow;
 use std::collections::HashMap;
 use std::ops::{BitAnd, Shr};
 use std::rc::Rc;
@@ -191,17 +190,40 @@ impl Interpreter {
             br::ExprKind::Literal(data) => Cell::Data(Data::new(data.clone())),
 
             br::ExprKind::Tuple(tuple) => {
-                let field_layouts: Cow<_> = tuple
+                let field_layouts: Vec<_> = tuple
                     .field_layouts
                     .iter()
                     .map(|x| (x.head_size.div_ceil(8), x.body_ptrs.as_slice()))
                     .collect();
-                let mut writer = lutra_bin::TupleWriter::new(field_layouts);
+
+                let mut field_index = 0;
+                let mut writer = lutra_bin::TupleWriter::new(field_layouts.as_slice().into());
                 for field in &tuple.fields {
-                    let cell = self.evaluate_expr(field)?;
+                    let cell = self.evaluate_expr(&field.expr)?;
                     let data = cell.into_data().map_err(|_| EvalError::BadProgram)?;
 
-                    writer.write_field(data);
+                    if field.unpack < 1 {
+                        // general case
+                        writer.write_field(data);
+                        field_index += 1;
+                    } else {
+                        // unpack
+                        let mut offsets = Vec::with_capacity(field.unpack as usize);
+                        let mut o = 0;
+                        for (head_bytes, _) in field_layouts
+                            .iter()
+                            .skip(field_index)
+                            .take(field.unpack as usize)
+                        {
+                            offsets.push(o);
+                            o += head_bytes;
+                        }
+                        let reader = lutra_bin::TupleReader::new(&data, offsets.into());
+                        for i in 0..field.unpack {
+                            writer.write_field(reader.get_field(i as usize));
+                        }
+                        field_index += field.unpack as usize;
+                    }
                 }
 
                 Cell::Data(writer.finish())

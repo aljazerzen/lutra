@@ -49,26 +49,31 @@ type Function: {
   body: Expr,
 }
 
-type `Tuple`: {
-    fields: [Expr],
-    field_layouts: [TyLayout]
+type Tuple: {
+  fields: [TupleField],
+  field_layouts: [TyLayout]
+}
+
+type TupleField: {
+  expr: Expr,
+  unpack: uint8,
 }
 
 type Array: {
-    item_layout: TyLayout,
-    items: [Expr],
+  item_layout: TyLayout,
+  items: [Expr],
 }
 
 type EnumVariant: {
-    tag: [uint8],
-    has_ptr: bool,
-    padding_bytes: uint8,
-    inner: Expr,
+  tag: [uint8],
+  has_ptr: bool,
+  padding_bytes: uint8,
+  inner: Expr,
 }
 
 type EnumEq: {
-    tag: [uint8],
-    expr: Expr,
+  tag: [uint8],
+  expr: Expr,
 }
 
 type Offset: {
@@ -87,8 +92,8 @@ type Binding: {
 }
 
 type SwitchBranch: {
-    condition: Expr,
-    value: Expr,
+  condition: Expr,
+  value: Expr,
 }
 
 @derive(["Debug", "Clone", "PartialEq", "Default"])

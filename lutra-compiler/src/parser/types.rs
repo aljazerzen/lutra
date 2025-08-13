@@ -36,7 +36,11 @@ pub(crate) fn type_expr() -> impl Parser<TokenKind, Ty, Error = PError> + Clone 
             .then_ignore(ctrl(':'))
             .or_not()
             .then(nested_type_expr.clone())
-            .map(|(name, ty)| TyTupleField { name, ty }),)))
+            .map(|(name, ty)| TyTupleField {
+                name,
+                ty,
+                unpack: false,
+            }),)))
         .delimited_by(ctrl('{'), ctrl('}'))
         .recover_with(nested_delimiters(
             TokenKind::Control('{'),

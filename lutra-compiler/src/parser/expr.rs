@@ -61,13 +61,28 @@ pub(crate) fn expr<'a>(
 fn tuple<'a>(
     nested_expr: impl Parser<TokenKind, Expr, Error = PError> + Clone + 'a,
 ) -> impl Parser<TokenKind, ExprKind, Error = PError> + Clone + 'a {
-    sequence(
+    choice((
+        // ..expr
+        just(TokenKind::Range)
+            .ignore_then(nested_expr.clone())
+            .map(|expr| TupleField {
+                name: None,
+                unpack: true,
+                expr,
+            }),
+        // name = expr
         ident_part()
             .then_ignore(ctrl('='))
             .or_not()
             .then(nested_expr)
-            .map(|(name, expr)| TupleField { name, expr }),
-    )
+            .map(|(name, expr)| TupleField {
+                name,
+                unpack: false,
+                expr,
+            }),
+    ))
+    .separated_by(ctrl(','))
+    .allow_trailing()
     .delimited_by(ctrl('{'), ctrl('}'))
     .recover_with(nested_delimiters(
         TokenKind::Control('{'),

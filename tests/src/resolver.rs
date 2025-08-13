@@ -909,3 +909,55 @@ fn constants_00() {
     ───╯
     ");
 }
+#[test]
+fn unpack_00() {
+    insta::assert_snapshot!(_test_ty(r#"
+        const x = {false, "hello"}
+        const main = {false, ..x, "hello"}
+    "#), @"{bool, bool, text, text}");
+}
+#[test]
+fn unpack_01() {
+    insta::assert_snapshot!(_test_err(r#"
+        const main = {false, ..true, "hello"}
+    "#), @r#"
+    Error:
+       ╭─[:2:32]
+       │
+     2 │         const main = {false, ..true, "hello"}
+       │                                ──┬─
+       │                                  ╰─── only tuples can be unpacked
+       │
+       │ Note:
+       │ got type bool
+    ───╯
+    "#);
+}
+#[test]
+fn unpack_02() {
+    insta::assert_snapshot!(_test_ty(r#"
+        type A: {int32, int32}
+        const x: A = {45, 6}
+        const main = {false, ..x, "hello"}
+    "#), @"{bool, int32, int32, text}");
+}
+#[test]
+fn unpack_03() {
+    insta::assert_snapshot!(_test_ty(r#"
+        func identity(x: T): T
+        where T: {..}
+        -> x
+
+        func main() -> {a = 4: int32, ..identity({true, false}), b = false}
+    "#), @"{a: int32, bool, bool, b: bool}");
+}
+#[test]
+fn unpack_04() {
+    insta::assert_snapshot!(_test_ty(r#"
+        func false_x_false(x: T)
+        where T: {..}
+        -> {false, ..x, false}
+
+        func main() -> false_x_false({"a", "b"})
+    "#), @"{bool, text, text, bool}");
+}

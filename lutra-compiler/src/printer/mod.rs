@@ -47,6 +47,9 @@ impl Printer {
                         r += &pr::display_ident(name);
                         r += ": ";
                     }
+                    if field.unpack {
+                        r += "..";
+                    }
                     r += &self.print_ty(&field.ty);
                 }
                 r += "}";

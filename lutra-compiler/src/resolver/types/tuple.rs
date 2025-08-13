@@ -1,14 +1,120 @@
-use crate::diagnostic::Diagnostic;
+use crate::diagnostic::{Diagnostic, WithErrorInfo};
 use crate::pr::{self, Ty};
+use crate::utils::fold::PrFold;
 use crate::{Result, Span, printer};
 
 use super::scope;
 
 impl super::TypeResolver<'_> {
+    pub fn resolve_tuple_constructor(
+        &mut self,
+        fields_in: Vec<pr::TupleField>,
+    ) -> Result<(pr::ExprKind, pr::Ty)> {
+        let mut fields = Vec::with_capacity(fields_in.len());
+        let mut ty_fields: Vec<pr::TyTupleField> = Vec::with_capacity(fields_in.len());
+
+        for f in fields_in {
+            let name = (f.name.clone()).or_else(|| self.infer_tuple_field_name(&f.expr));
+
+            let expr = self.fold_expr(f.expr)?;
+            let ty = expr.ty.clone().unwrap();
+
+            if f.unpack {
+                // validate that ty is a tuple
+                let ty_ref = self.get_ty_mat(&ty).unwrap();
+                match ty_ref {
+                    scope::TyRef::Ty(t) => {
+                        if !t.kind.is_tuple() {
+                            return Err(Diagnostic::new_custom("only tuples can be unpacked")
+                                .with_span(expr.span)
+                                .push_hint(format!("got type {}", printer::print_ty(t.as_ref()))));
+                        }
+                    }
+                    scope::TyRef::Param(id) => {
+                        let (p_name, domain) = self.get_ty_param(id);
+                        match domain {
+                            pr::TyParamDomain::Open
+                            | pr::TyParamDomain::OneOf(_)
+                            | pr::TyParamDomain::EnumVariants(_) => {
+                                return Err(Diagnostic::new_custom(format!(
+                                    "unpack expected a tuple, found {p_name}"
+                                ))
+                                .push_hint(format!("{p_name} is not constrained to tuples only")));
+                            }
+                            pr::TyParamDomain::TupleFields(_) => {
+                                // ok
+                            }
+                        }
+                    }
+                    scope::TyRef::Var(_, o) => {
+                        // restrict var to be a tuple
+
+                        let domain = pr::TyParamDomain::TupleFields(vec![]);
+                        let scope = self.get_ty_var_scope();
+                        scope.infer_type_var_in_domain(o, domain);
+                    }
+                };
+            }
+
+            fields.push(pr::TupleField {
+                name: f.name,
+                unpack: f.unpack,
+                expr,
+            });
+            ty_fields.push(pr::TyTupleField {
+                name,
+                unpack: f.unpack,
+                ty,
+            });
+        }
+        let kind = pr::ExprKind::Tuple(fields);
+        let ty = pr::Ty::new(pr::TyKind::Tuple(ty_fields));
+        Ok((kind, ty))
+    }
+
+    fn infer_tuple_field_name(&self, field: &pr::Expr) -> Option<String> {
+        // at this stage, this expr should already be fully resolved
+        // this means that any indirections will be tuple positional
+        // so we check for that and pull the name from the type of the base
+
+        let pr::ExprKind::Indirection {
+            base,
+            field: pr::IndirectionKind::Position(pos),
+        } = &field.kind
+        else {
+            return None;
+        };
+
+        let ty = base.ty.as_ref()?;
+        self.get_ty_tuple_field_name(ty, *pos as usize)
+    }
+
+    fn get_ty_tuple_field_name(&self, ty: &Ty, pos: usize) -> Option<String> {
+        // SAFETY: get_my_ty will not error, because it has been resolved earlier already
+        let mat_ty = self.get_ty_mat(ty).unwrap();
+
+        match mat_ty {
+            super::scope::TyRef::Ty(ty) => match &ty.kind {
+                pr::TyKind::Tuple(fields) => {
+                    // this tuple might contain Unpacks (which affect positions of fields after them)
+                    // so we need to resolve this type full first.
+
+                    // unpacks don't interfere with preceding fields
+                    let field = fields.get(pos)?;
+
+                    field.name.clone()
+                }
+
+                pr::TyKind::Ident(_fq_ident) => unreachable!(),
+                _ => None,
+            },
+            super::scope::TyRef::Param(..) => None,
+            super::scope::TyRef::Var(..) => None,
+        }
+    }
+
     /// Resolve indirections (lookups).
     /// For example, `base.indirection` where `base` either has a tuple or array type.
-    ///
-    /// Returns a positional indirection into the base.
     pub fn resolve_indirection(
         &mut self,
         base: &Ty,
