@@ -1481,17 +1481,45 @@ fn opt_00() {
     func main() -> {
       OptText::Some("hello"),
       OptText::None,
+      std::is_some(OptText::Some("hello")),
+      std::is_none(OptText::Some("hello")),
     }
     "#), @r#"
     SELECT
       'hello' AS _0,
-      NULL::text AS _1
+      NULL::text AS _1,
+      (
+        SELECT
+          CASE
+            WHEN r0.value IS NOT NULL THEN TRUE
+            ELSE FALSE
+          END AS value
+        FROM
+          (
+            SELECT
+              'hello' AS value
+          ) AS r0
+      ) AS _2,
+      (
+        SELECT
+          CASE
+            WHEN r1.value IS NOT NULL THEN FALSE
+            ELSE TRUE
+          END AS value
+        FROM
+          (
+            SELECT
+              'hello' AS value
+          ) AS r1
+      ) AS _3
     ---
     {
       Some(
         "hello"
       ),
       None,
+      true,
+      false,
     }
     "#);
 }
