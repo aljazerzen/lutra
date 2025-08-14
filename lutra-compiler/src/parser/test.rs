@@ -80,7 +80,11 @@ fn parse_01() {
 
 #[test]
 fn parse_02() {
-    assert!(parse_expr("(4..5)").kind.is_range());
+    assert!(
+        parse_expr("(4..5)").kind.as_pipeline().unwrap().exprs[0]
+            .kind
+            .is_range()
+    );
     assert!(parse_expr("func () -> 4..5").kind.is_func());
     assert_debug_snapshot!(parse_expr("4..5").kind, @r#"
     Range(

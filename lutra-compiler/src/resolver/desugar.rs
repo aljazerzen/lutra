@@ -24,7 +24,7 @@ impl PrFold for Desugarator {
             pr::ExprKind::Range(r) => self.desugar_range(r)?,
             pr::ExprKind::Unary(unary) => self.desugar_unary(unary, expr.span)?,
             pr::ExprKind::Binary(binary) => self.desugar_binary(binary, expr.span)?,
-            pr::ExprKind::FString(items) => self.desugar_f_string(items)?,
+            pr::ExprKind::FString(items) => self.desugar_f_string(items, expr.span.unwrap())?,
             k => fold::fold_expr_kind(self, k)?,
         };
         Ok(expr)
@@ -58,11 +58,13 @@ impl Desugarator {
         ]))
     }
 
-    fn desugar_pipeline(&mut self, mut pipeline: pr::Pipeline) -> Result<pr::Expr> {
-        let value = pipeline.exprs.remove(0);
+    fn desugar_pipeline(&mut self, pipeline: pr::Pipeline) -> Result<pr::Expr> {
+        let mut pipeline = pipeline.exprs.into_iter();
+
+        let value = pipeline.next().unwrap();
         let mut value = self.fold_expr(value)?;
 
-        for expr in pipeline.exprs {
+        for expr in pipeline {
             let mut expr = self.fold_expr(expr)?;
             let span = expr.span;
 
@@ -161,9 +163,15 @@ impl Desugarator {
     }
 
     /// Desugar f-string into function calls to std::text_ops::concat
-    fn desugar_f_string(&mut self, items: Vec<pr::InterpolateItem>) -> Result<pr::ExprKind> {
+    fn desugar_f_string(
+        &mut self,
+        items: Vec<pr::InterpolateItem>,
+        string_span: Span,
+    ) -> Result<pr::ExprKind> {
         let mut items = items.into_iter().map(|item| match item {
-            pr::InterpolateItem::String(string) => Expr::new(pr::Literal::Text(string)),
+            pr::InterpolateItem::String(string) => {
+                Expr::new_with_span(pr::Literal::Text(string), string_span)
+            }
             pr::InterpolateItem::Expr {
                 expr,
                 format: _format,

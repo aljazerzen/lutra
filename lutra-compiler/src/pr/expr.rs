@@ -161,6 +161,7 @@ pub struct FuncParam {
 /// A value and a series of functions that are to be applied to that value one after another.
 #[derive(Debug, PartialEq, Clone)]
 pub struct Pipeline {
+    /// Items of the pipeline. Must contain at least one element.
     pub exprs: Vec<Expr>,
 }
 
@@ -234,6 +235,9 @@ pub struct Pattern {
 pub enum PatternKind {
     /// Match an enum variant, recurse into matching inner
     Enum(String, Option<Box<Pattern>>),
+
+    /// Match value of a primitive type
+    Literal(Literal),
 
     /// Match anything, bind it to a name
     Bind(String),

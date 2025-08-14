@@ -498,6 +498,32 @@ impl<'a> Lowerer<'a> {
                 Ok(Some(expr))
             }
 
+            // match a literal value
+            pr::PatternKind::Literal(lit) => {
+                let subject_ty = self.get_ty_mat(subject.ty.clone());
+                let subject_ty_pr = pr::Ty::from(subject_ty.clone());
+                let lit = ir::Expr {
+                    kind: ir::ExprKind::Literal(self.lower_literal(lit, &subject_ty_pr)?),
+                    ty: subject_ty.clone(),
+                };
+
+                Ok(Some(ir::Expr {
+                    kind: ir::ExprKind::Call(Box::new(ir::Call {
+                        function: ir::Expr {
+                            kind: ir::ExprKind::Pointer(ir::Pointer::External(ir::ExternalPtr {
+                                id: "std::eq".to_string(),
+                            })),
+                            ty: ir::Ty::new(ir::TyFunction {
+                                params: vec![subject_ty.clone(), subject_ty.clone()],
+                                body: ir::Ty::new(ir::TyPrimitive::bool),
+                            }),
+                        },
+                        args: vec![subject.clone(), lit],
+                    })),
+                    ty: ir::Ty::new(ir::TyPrimitive::bool),
+                }))
+            }
+
             // bind always matches
             pr::PatternKind::Bind(_) => Ok(None),
         }
@@ -691,7 +717,6 @@ impl<'a> Lowerer<'a> {
         entries: &mut Vec<ir::Expr>,
     ) {
         match &pattern.kind {
-            // bind always matches
             pr::PatternKind::Bind(_) => {
                 entries.push(subject_ref);
             }
@@ -715,6 +740,8 @@ impl<'a> Lowerer<'a> {
                     self.collect_pattern_scope(inner, inner_ref, entries)
                 }
             }
+
+            pr::PatternKind::Literal(_) => {}
         }
     }
 

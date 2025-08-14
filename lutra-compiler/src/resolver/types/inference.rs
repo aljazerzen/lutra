@@ -1,7 +1,7 @@
 use itertools::Itertools;
 
-use crate::Result;
 use crate::pr::{self, *};
+use crate::{Result, Span};
 
 use super::TypeResolver;
 
@@ -12,39 +12,11 @@ impl TypeResolver<'_> {
         }
 
         let kind = match &expr.kind {
-            ExprKind::Literal(Literal::Boolean(_)) => TyKind::Primitive(TyPrimitive::bool),
+            ExprKind::Literal(literal) => {
+                return Ok(self.infer_type_of_literal(literal, expr.span));
+            }
 
-            ExprKind::Literal(Literal::Text(_)) => TyKind::Primitive(TyPrimitive::text),
             ExprKind::FString(_) => TyKind::Primitive(TyPrimitive::text),
-
-            ExprKind::Literal(Literal::Integer(_)) => {
-                // int literal (e.g. `4`) can be of type `int64` or `u8` or any other
-                // integer type. So we have leave the type to be figured out later.
-                // This is done with a new type param, constraint to integer types.
-                return Ok(self.introduce_ty_var(
-                    pr::TyParamDomain::OneOf(vec![
-                        pr::TyPrimitive::int8,
-                        pr::TyPrimitive::int16,
-                        pr::TyPrimitive::int32,
-                        pr::TyPrimitive::int64,
-                        pr::TyPrimitive::uint8,
-                        pr::TyPrimitive::uint16,
-                        pr::TyPrimitive::uint32,
-                        pr::TyPrimitive::uint64,
-                    ]),
-                    expr.span.unwrap(),
-                ));
-            }
-            ExprKind::Literal(Literal::Float(_)) => {
-                // similar as integers
-                return Ok(self.introduce_ty_var(
-                    pr::TyParamDomain::OneOf(vec![
-                        pr::TyPrimitive::float32,
-                        pr::TyPrimitive::float64,
-                    ]),
-                    expr.span.unwrap(),
-                ));
-            }
 
             ExprKind::TypeAnnotation(annotation) => annotation.ty.kind.clone(),
 
@@ -82,8 +54,7 @@ impl TypeResolver<'_> {
             }),
 
             // type computed in the main pass
-            ExprKind::Literal(_)
-            | ExprKind::Ident(_)
+            ExprKind::Ident(_)
             | ExprKind::Tuple(_)
             | ExprKind::FuncCall(_)
             | ExprKind::EnumVariant(_)
@@ -101,6 +72,48 @@ impl TypeResolver<'_> {
         let mut ty = Ty::new(kind);
         ty.span = expr.span;
         Ok(ty)
+    }
+
+    pub fn infer_type_of_literal(&mut self, literal: &pr::Literal, span: Option<Span>) -> pr::Ty {
+        let kind = match literal {
+            Literal::Boolean(_) => TyKind::Primitive(TyPrimitive::bool),
+
+            Literal::Text(_) => TyKind::Primitive(TyPrimitive::text),
+
+            Literal::Integer(_) => {
+                // int literal (e.g. `4`) can be of type `int64` or `u8` or any other
+                // integer type. So we have leave the type to be figured out later.
+                // This is done with a new type param, constraint to integer types.
+                return self.introduce_ty_var(
+                    pr::TyParamDomain::OneOf(vec![
+                        pr::TyPrimitive::int8,
+                        pr::TyPrimitive::int16,
+                        pr::TyPrimitive::int32,
+                        pr::TyPrimitive::int64,
+                        pr::TyPrimitive::uint8,
+                        pr::TyPrimitive::uint16,
+                        pr::TyPrimitive::uint32,
+                        pr::TyPrimitive::uint64,
+                    ]),
+                    span.unwrap(),
+                );
+            }
+            Literal::Float(_) => {
+                // similar as integers
+                return self.introduce_ty_var(
+                    pr::TyParamDomain::OneOf(vec![
+                        pr::TyPrimitive::float32,
+                        pr::TyPrimitive::float64,
+                    ]),
+                    span.unwrap(),
+                );
+            }
+
+            _ => todo!(),
+        };
+        let mut ty = Ty::new(kind);
+        ty.span = span;
+        ty
     }
 }
 

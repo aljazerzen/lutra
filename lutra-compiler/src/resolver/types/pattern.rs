@@ -139,6 +139,18 @@ impl<'a> super::TypeResolver<'a> {
 
                 Ok(pattern)
             }
+
+            pr::PatternKind::Literal(l) => {
+                let found_ty = self.infer_type_of_literal(&l, Some(pattern.span));
+
+                self.validate_type(&found_ty, subject_ty, &|| Some("match".into()))
+                    .unwrap_or_else(self.push_diagnostic());
+
+                Ok(pr::Pattern {
+                    kind: pr::PatternKind::Literal(l),
+                    ..pattern
+                })
+            }
         }
     }
 }

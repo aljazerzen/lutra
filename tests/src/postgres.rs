@@ -1241,6 +1241,30 @@ fn match_04() {
     ]
     "#);
 }
+#[test]
+fn match_05() {
+    insta::assert_snapshot!(_run_sql_output(r#"
+    const name = "Tom"
+
+    func main() -> match name {
+      "world" => "Hello world!",
+      n => f"Hello {n}"
+    }
+    "#), @r#"
+    SELECT
+      CASE
+        WHEN (r0.value = 'world') THEN 'Hello world!'
+        ELSE ('Hello ' || r0.value)
+      END AS value
+    FROM
+      (
+        SELECT
+          'Tom' AS value
+      ) AS r0
+    ---
+    "Hello Tom"
+    "#);
+}
 
 #[test]
 fn sql_from_00() {

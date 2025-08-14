@@ -22,6 +22,9 @@ fn main() {
     let test_file = std::fs::read_to_string("tests/language/language.lt").unwrap();
     let cases = parse_file(&test_file);
 
+    // let mut tree_sitter_file =
+    //     std::io::BufWriter::new(std::fs::File::create("tests/language/language.txt").unwrap());
+
     let mut trails = Vec::new();
     for case in cases {
         let c = case.clone();
@@ -35,6 +38,13 @@ fn main() {
             Trial::test(format!("{}::postgres", c.name), || run_on_pg(c))
                 .with_ignored_flag(case.ignored_postgres),
         );
+
+        // writeln!(tree_sitter_file, "===").unwrap();
+        // writeln!(tree_sitter_file, "{}", case.name).unwrap();
+        // writeln!(tree_sitter_file, "===").unwrap();
+        // writeln!(tree_sitter_file, "{}", case.program).unwrap();
+        // writeln!(tree_sitter_file, "---").unwrap();
+        // writeln!(tree_sitter_file).unwrap();
     }
 
     libtest_mimic::run(&args, trails).exit();
@@ -53,7 +63,11 @@ struct TestCase {
 fn parse_file(contents: &str) -> Vec<TestCase> {
     let mut cases = Vec::new();
     for case in contents.split("\n# ===") {
-        if case.trim().is_empty() {
+        if case.trim().is_empty()
+            || case
+                .split('\n')
+                .all(|l| l.trim_start().is_empty() || l.trim_start().starts_with("#"))
+        {
             continue;
         }
         let (first_line, remaining) = case.split_once("\n").unwrap_or((case, ""));

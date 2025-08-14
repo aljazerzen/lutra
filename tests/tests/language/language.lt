@@ -1,7 +1,7 @@
 # --- [ Language tests ] ---
 #
 # This file contains tests for the language itself.
-# It is read by the main.rs and exposed as a seried of cargo-compatible tests.
+# It is read by the main.rs and exposed as a series of cargo-compatible tests.
 # A test consists of:
 #
 #    #  === <test name>       (test name)
@@ -724,12 +724,10 @@ func main() -> (
 
 
 # === match_04
-
 type Animal: enum {
   Cat: text,
   Dog: enum {Collie: text, Generic},
 }
-
 func main() -> (
   [
     Animal::Cat("Whiskers"),
@@ -742,13 +740,22 @@ func main() -> (
     .Dog(.Collie(name)) => f"Come here {name}",
   })
 )
-
 # >
 [
   "Hello Whiskers",
   "Come here Belie",
   "Who's a good boy?",
 ]
+
+# === match_05
+const name = "Tom"
+
+func main() -> match name {
+  "world" => "Hello world!",
+  n => f"Hello, {n}!"
+}
+# >
+"Hello, Tom!"
 
 
 # === or_else_00

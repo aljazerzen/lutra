@@ -18,10 +18,10 @@ pub const NS_STD: &str = "std";
 
 /// Runs semantic analysis on a project.
 pub fn resolve(module_tree: pr::ModuleDef) -> Result<Project, Vec<Diagnostic>> {
-    tracing::debug!("{:#?}", module_tree);
-
     // desugar
     let module_tree = desugar::run(module_tree).map_err(|d| vec![d])?;
+
+    tracing::debug!("{:#?}", module_tree);
 
     // init the module structure
     let mut root_module = module::init_root(module_tree)?;

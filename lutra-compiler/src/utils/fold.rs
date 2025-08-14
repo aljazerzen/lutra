@@ -72,7 +72,7 @@ pub trait PrFold {
         })
     }
     fn fold_pattern(&mut self, pattern: Pattern) -> Result<Pattern> {
-        Ok(pattern)
+        fold_pattern(self, pattern)
     }
 }
 
@@ -266,6 +266,23 @@ pub fn fold_func_params<T: ?Sized + PrFold>(
             })
         })
         .try_collect()
+}
+
+pub fn fold_pattern<T: ?Sized + PrFold>(fold: &mut T, pattern: Pattern) -> Result<Pattern> {
+    Ok(Pattern {
+        kind: match pattern.kind {
+            PatternKind::Enum(name, inner) => PatternKind::Enum(
+                name,
+                inner
+                    .map(|p| fold.fold_pattern(*p).map(Box::new))
+                    .transpose()?,
+            ),
+            PatternKind::Literal(lit) => PatternKind::Literal(lit),
+            PatternKind::Bind(name) => PatternKind::Bind(name),
+        },
+        span: pattern.span,
+        variant_tag: pattern.variant_tag,
+    })
 }
 
 #[inline]

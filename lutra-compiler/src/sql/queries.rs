@@ -400,7 +400,6 @@ impl<'a> Context<'a> {
                 let select = self.scoped_as_mut_select(&mut scoped, input_ty);
 
                 let cond = self.compile_column(cond);
-                dbg!(&cond);
                 select.selection = Some(cond.expr.into_expr());
 
                 select.from.extend(

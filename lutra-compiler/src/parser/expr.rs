@@ -13,7 +13,7 @@ pub(crate) fn expr<'a>(
     ty: impl Parser<TokenKind, Ty, Error = PError> + Clone + 'a,
 ) -> impl Parser<TokenKind, Expr, Error = PError> + Clone + 'a {
     recursive(|expr| {
-        let literal = select! { TokenKind::Literal(lit) => ExprKind::Literal(lit) };
+        let literal = literal().map(ExprKind::Literal);
 
         let ident_kind = ident().map(ExprKind::Ident);
 
@@ -58,6 +58,10 @@ pub(crate) fn expr<'a>(
         let expr = binary_op_parser(expr, operator_or());
         range(expr)
     })
+}
+
+fn literal() -> impl Parser<TokenKind, Literal, Error = PError> {
+    select! { TokenKind::Literal(lit) => lit }
 }
 
 fn tuple<'a>(
@@ -152,9 +156,11 @@ fn match_(
                 )
                 .map(|(path, inner)| PatternKind::Enum(path, inner)),
             ident_part().map(PatternKind::Bind),
+            literal().map(PatternKind::Literal),
         ))
         .map_with_span(Pattern::new_with_span)
-    });
+    })
+    .labelled("pattern");
 
     let branch = pattern
         .then_ignore(just(TokenKind::ArrowFat))
@@ -244,16 +250,7 @@ fn pipeline<'a>(
 
     expr.separated_by(pipe())
         .at_least(1)
-        .map(|exprs| {
-            // If there's only one expr, then we don't need to wrap it
-            // in a pipeline — just return the lone expr. Otherwise,
-            // wrap them in a pipeline.
-            if exprs.len() == 1 {
-                exprs.into_iter().next().unwrap().kind
-            } else {
-                ExprKind::Pipeline(Pipeline { exprs })
-            }
-        })
+        .map(|exprs| ExprKind::Pipeline(Pipeline { exprs }))
         .recover_with(nested_delimiters(
             TokenKind::Control('('),
             TokenKind::Control(')'),

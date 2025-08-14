@@ -134,6 +134,9 @@ impl fold::PrFold for NameResolver<'_> {
                 let scope = self.scopes.last_mut().unwrap();
                 scope.insert_local(name);
             }
+
+            // currently just [PatternKind::Literal]
+            k => pattern.kind = k,
         }
         Ok(pattern)
     }
