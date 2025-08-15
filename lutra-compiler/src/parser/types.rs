@@ -179,7 +179,7 @@ pub fn type_params<'a>(
         // positional
         for (i, (_, ty)) in positional.into_iter().enumerate() {
             fields.push(TyDomainTupleField {
-                location: IndirectionKind::Position(i as i64),
+                location: Lookup::Position(i as i64),
                 ty,
             });
         }
@@ -193,7 +193,7 @@ pub fn type_params<'a>(
                 ));
             };
             fields.push(TyDomainTupleField {
-                location: IndirectionKind::Name(name),
+                location: Lookup::Name(name),
                 ty,
             });
         }

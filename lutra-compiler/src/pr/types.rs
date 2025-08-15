@@ -1,5 +1,4 @@
 use enum_as_inner::EnumAsInner;
-use strum::AsRefStr;
 
 use crate::pr::path::Path;
 use crate::span::Span;
@@ -21,7 +20,7 @@ pub struct Ty {
     pub scope_id: Option<usize>,
 
     /// When this type expr is an ident, this holds information
-    /// what is being referecenced by the ident.
+    /// what is being referenced by the ident.
     pub target: Option<Ref>,
 }
 
@@ -38,7 +37,7 @@ pub struct TyLayout {
     pub body_ptrs: Vec<u32>,
 }
 
-#[derive(Debug, Clone, PartialEq, Hash, EnumAsInner, AsRefStr)]
+#[derive(Debug, Clone, PartialEq, Hash, EnumAsInner)]
 pub enum TyKind {
     /// Identifier that still needs to be resolved.
     Ident(Path),
@@ -130,7 +129,7 @@ pub enum TyParamDomain {
 
 #[derive(Debug, Clone)]
 pub struct TyDomainTupleField {
-    pub location: super::IndirectionKind,
+    pub location: super::Lookup,
     pub ty: Ty,
 }
 
@@ -233,5 +232,11 @@ impl std::hash::Hash for TyParam {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
         self.name.hash(state);
         // self.domain.hash(state);
+    }
+}
+
+impl TyTupleField {
+    pub(crate) fn matches_name(&self, name: &str) -> bool {
+        self.name.as_ref().is_some_and(|n| n == name)
     }
 }

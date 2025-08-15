@@ -59,7 +59,7 @@ impl TypeResolver<'_> {
             | ExprKind::FuncCall(_)
             | ExprKind::EnumVariant(_)
             | ExprKind::Match(_)
-            | ExprKind::Indirection { .. }
+            | ExprKind::TupleLookup { .. }
             | ExprKind::If(_) => unreachable!(),
 
             // desugar-ed

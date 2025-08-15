@@ -79,9 +79,9 @@ pub enum ExprKind {
 
     /// A lookup into an object by name or position.
     /// Currently, this includes only tuple field lookups, primarily by name.
-    Indirection {
+    TupleLookup {
         base: Box<Expr>,
-        field: IndirectionKind,
+        lookup: Lookup,
     },
     Literal(Literal),
     Pipeline(Pipeline),
@@ -104,7 +104,7 @@ pub enum ExprKind {
 }
 
 #[derive(Debug, EnumAsInner, PartialEq, Clone)]
-pub enum IndirectionKind {
+pub enum Lookup {
     Name(String),
     Position(i64),
 }

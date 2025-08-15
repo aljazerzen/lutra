@@ -196,17 +196,17 @@ fn field_lookup<'a>(
     expr.then(
         ctrl('.')
             .ignore_then(choice((
-                ident_part().map(IndirectionKind::Name),
+                ident_part().map(Lookup::Name),
                 select! {
-                    TokenKind::Literal(Literal::Integer(i)) => IndirectionKind::Position(i)
+                    TokenKind::Literal(Literal::Integer(i)) => Lookup::Position(i)
                 },
             )))
             .map_with_span(|f, s| (f, s))
             .repeated(),
     )
-    .foldl(|base, (field, span)| {
+    .foldl(|base, (lookup, span)| {
         let base = Box::new(base);
-        let kind = ExprKind::Indirection { base, field };
+        let kind = ExprKind::TupleLookup { base, lookup };
         Expr::new_with_span(kind, span)
     })
 }

@@ -34,7 +34,7 @@ impl ConstantValidator {
                 pr::Ref::Local { .. } => Err(expr.span),
             },
 
-            pr::ExprKind::Indirection { base, .. } => self.validate_is_const(base),
+            pr::ExprKind::TupleLookup { base, .. } => self.validate_is_const(base),
 
             pr::ExprKind::Tuple(fields) => fields
                 .iter()

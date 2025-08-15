@@ -195,32 +195,25 @@ impl<'a> Lowerer<'a> {
                         }),
                 }))
             }
-            pr::ExprKind::Indirection { base, field } => {
-                ir::ExprKind::TupleLookup(Box::new(ir::TupleLookup {
-                    base: self.lower_expr(base)?,
-                    position: match field {
-                        // most of the cases
-                        pr::IndirectionKind::Position(position) => *position as u16,
+            pr::ExprKind::TupleLookup { base, lookup } => {
+                // At this stage, ty vars and ty params should have all been compiled away
+                // and we can expect the base to be a concrete tuple.
+                // This means we can iterate over the fields and find the correct tuple offset that way.
+                let position = match lookup {
+                    pr::Lookup::Position(position) => *position as u16,
 
-                        pr::IndirectionKind::Name(name) => {
-                            // This happens when base is a tuple ty var or ty param
-                            // At this stage, that should have all been compiled away and we can expect
-                            // the base to be a plain tuple, that does contain the field name we need.
-                            // TODO: base might be an ident, we need to do a lookup here
-                            let pr::TyKind::Tuple(ty_fields) = &base.ty.as_ref().unwrap().kind
-                            else {
-                                panic!("expected a tuple: {:?}", base.ty)
-                            };
+                    pr::Lookup::Name(name) => {
+                        let base_ty = base.ty.as_ref().unwrap();
+                        let mut fields = self.tuple_iter_fields(base_ty).enumerate();
 
-                            let (position, _) = ty_fields
-                                .iter()
-                                .enumerate()
-                                .find(|(_, f)| f.name.as_ref().is_some_and(|n| n == name))
-                                .unwrap();
-                            position as u16
-                        }
-                    },
-                }))
+                        let res = fields.find(|(_, f)| f.matches_name(name));
+                        let (position, _) = res.unwrap();
+                        position as u16
+                    }
+                };
+
+                let base = self.lower_expr(base)?;
+                ir::ExprKind::TupleLookup(Box::new(ir::TupleLookup { base, position }))
             }
 
             pr::ExprKind::FuncCall(call) => ir::ExprKind::Call(Box::new(ir::Call {
@@ -686,6 +679,37 @@ impl<'a> Lowerer<'a> {
         } else {
             ty
         }
+    }
+
+    fn get_ty_mat_pr(&self, ty: &'a pr::Ty) -> &'a pr::Ty {
+        if let pr::TyKind::Ident(_) = &ty.kind {
+            let Some(pr::Ref::FullyQualified { to_def, within }) = &ty.target else {
+                panic!();
+            };
+            assert!(within.is_empty());
+            let expr_or_ty = self.root_module.get(to_def).unwrap();
+            let ty = expr_or_ty.as_ty().unwrap();
+
+            self.get_ty_mat_pr(ty)
+        } else {
+            ty
+        }
+    }
+
+    fn tuple_iter_fields(&'a self, ty: &'a pr::Ty) -> impl Iterator<Item = &'a pr::TyTupleField> {
+        let base_ty = self.get_ty_mat_pr(ty);
+        let pr::TyKind::Tuple(ty_fields) = &base_ty.kind else {
+            panic!("expected a tuple: {ty:?}")
+        };
+        ty_fields
+            .iter()
+            .flat_map(|f| -> Box<dyn Iterator<Item = &'a pr::TyTupleField>> {
+                if f.unpack {
+                    Box::new(self.tuple_iter_fields(&f.ty))
+                } else {
+                    Box::new(Some(f).into_iter())
+                }
+            })
     }
 
     /// Lowers a type definition

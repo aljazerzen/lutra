@@ -2,6 +2,8 @@ use insta::assert_snapshot;
 
 #[track_caller]
 fn _test_compile_and_print(source: &str) -> String {
+    crate::init_logger();
+
     let program = lutra_compiler::_test_compile_main(source).unwrap_or_else(|e| panic!("{e}"));
     lutra_bin::ir::print(&program)
 }

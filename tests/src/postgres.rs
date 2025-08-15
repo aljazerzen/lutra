@@ -653,7 +653,7 @@ fn param_03() {
 #[test]
 fn param_04() {
     insta::assert_snapshot!(_run(r#"
-    func main(x: [{int64, text}]) -> x.1
+    func main(x: [{int64, text}]) -> std::index(x, 1)
     "#,
     lutra_bin::Value::Array(vec![
         lutra_bin::Value::Tuple(vec![

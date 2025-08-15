@@ -1,4 +1,3 @@
-use std::borrow::Cow;
 use std::cell::RefCell;
 use std::collections::HashMap;
 
@@ -95,7 +94,7 @@ pub enum Named<'a> {
 #[derive(Debug, Clone)]
 pub enum TyRef<'a> {
     /// Concrete type (cannot be an ident)
-    Ty(Cow<'a, pr::Ty>),
+    Ty(&'a pr::Ty),
 
     /// Reference to type param: a placeholder which must support a few different concrete types.
     /// Contains offset in scope.
@@ -103,19 +102,20 @@ pub enum TyRef<'a> {
 
     /// Reference to type variable: a placeholder which will inferred to be some non-variable type
     /// when scope is finalized. Contains scope id and offset in scope.
+    #[allow(dead_code)] // TODO: actually use scope_id when fetching the scope
     Var(usize, usize),
 }
 
-impl<'a> TyRef<'a> {
-    #[allow(dead_code)]
-    fn into_owned(self) -> TyRef<'static> {
-        match self {
-            TyRef::Ty(v) => TyRef::Ty(Cow::Owned(v.as_ref().clone())),
-            TyRef::Param(v) => TyRef::Param(v),
-            TyRef::Var(s, o) => TyRef::Var(s, o),
-        }
-    }
-}
+// impl<'a> TyRef<'a> {
+//     #[allow(dead_code)]
+//     fn into_owned(self) -> TyRef<'static> {
+//         match self {
+//             TyRef::Ty(v) => TyRef::Ty(Cow::Owned(v.as_ref().clone())),
+//             TyRef::Param(v) => TyRef::Param(v),
+//             TyRef::Var(s, o) => TyRef::Var(s, o),
+//         }
+//     }
+// }
 
 impl Scope {
     pub fn new(id: usize, kind: ScopeKind) -> Self {
@@ -271,7 +271,7 @@ impl TypeResolver<'_> {
     /// Resolves if type is an ident. Does not recurse.
     pub fn get_ty_mat<'t>(&'t self, ty: &'t pr::Ty) -> Result<TyRef<'t>> {
         let pr::TyKind::Ident(ident) = &ty.kind else {
-            return Ok(TyRef::Ty(Cow::Borrowed(ty)));
+            return Ok(TyRef::Ty(ty));
         };
 
         let target = ty.target.as_ref().unwrap();
@@ -383,6 +383,7 @@ impl TypeResolver<'_> {
             scope: scope.id, // current scope
             offset: scope.names.len(),
         });
+        ty_arg.span = Some(span);
 
         scope.insert_type_var(None, span, domain);
         ty_arg

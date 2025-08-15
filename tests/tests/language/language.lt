@@ -13,6 +13,18 @@
 #    # >                  (output marker)
 #    <output>
 
+# === constant_00
+const main = {1: int32, [false, true], "hello"}
+# >
+{
+  1,
+  [
+    false,
+    true,
+  ],
+  "hello",
+}
+
 # === bindings_00
 const a: int32 = 4
 func main() -> [{a, a + 1}, {a + 2, a + 3}]
@@ -45,7 +57,10 @@ func main() -> [{a.0, a.1}, {a.0 + 1, !a.1}]
 
 # === bindings_02
 const a: [int16] = [1, 2]
-func main() -> [{a.0, a.1}, {a.0 + 1, a.1 + 1}]
+func main() -> [
+  {std::index(a, 0), std::index(a, 1)},
+  {std::index(a, 0) + 1, std::index(a, 1) + 1}
+]
 # >
 [
   {
@@ -74,7 +89,11 @@ func main() -> {true, std::map(a, func (x: int16) -> x * 2), false}
 
 # === bindings_04
 const a: [int32] = [1, 2, 3]
-func main() -> {true, std::map(a, func (x: int32) -> x * 2).1, false}
+func main() -> {
+  true,
+  std::index(std::map(a, func (x: int32) -> x * 2), 1),
+  false
+}
 # >
 {
   true,
@@ -282,19 +301,6 @@ func main() -> (
     ],
   },
 ]
-
-
-# === constant_00
-const main = {1: int32, [false, true], "hello"}
-# >
-{
-  1,
-  [
-    false,
-    true,
-  ],
-  "hello",
-}
 
 # === default_00
 func main(): bool -> std::default()
@@ -882,7 +888,9 @@ func main() -> std::aggregate(my_rel, func (x: {[int64], [int64]}) -> {std::min(
 }
 
 # === std_aggregate_01
-func main() -> std::aggregate([{false,"hello"},{false,"world"},{true, "!"}], func (x: {[bool], [text]}) -> {x.0 .0, x.1 .2})
+func main() -> std::aggregate(
+  [{false,"hello"},{false,"world"},{true, "!"}],
+  func (x: {[bool], [text]}) -> {std::index(x.0, 0), std::index(x.1, 2)})
 # >
 {
   false,
@@ -1381,33 +1389,18 @@ func main() -> std::index([5,3,65,3,2]: [int64], 3)
 # >
 3
 
-# === std_index_01
-func main() -> ([1, 2, 3].2): int64
-# >
-3
-
 # === std_index_02
 func main() -> std::index([5.3,3.2,65.4,3.1,2.0], 3): float64
 # >
 3.1
-
-# === std_index_03
-func main() -> ([1.1, 2.2, 3.3].2): float64
-# >
-3.3
 
 # === std_index_04
 func main() -> std::index([false, false, false, true, false], 3)
 # >
 true
 
-# === std_index_05
-func main() -> [true, true, false].2
-# >
-false
-
 # === std_index_06
-func main() -> ["hello", "world", "!"].2
+func main() -> std::index(["hello", "world", "!"], 2)
 # >
 "!"
 
@@ -2266,3 +2259,58 @@ func main() -> false_x_false({true, true})
   true,
   false,
 }
+
+# === unpack_04
+const main = {a = 4: int32, ..{x1 = 3: int32, x2 = "hello"}, b = false}.x2
+# >
+"hello"
+
+# === unpack_05
+const x = {x1 = 3: int32, x2 = "hello"}
+const main = {a = 4: int32, ..x, b = false}.x2
+# >
+"hello"
+
+# === unpack_06
+func main() -> (
+  {x1 = true, x2 = false}
+  | func (x) -> {4: int32, ..x: {x1: bool, x2: bool}, "hello"}.x2
+)
+# >
+false
+
+# === unpack_07
+func false_x_false(x: T) where T: {x2: text, ..} -> {false, ..x, false}.x2
+func main() -> false_x_false({true, x2 = "hello"})
+# >
+"hello"
+
+# === unpack_08
+const main = {a = 4: int32, ..{x1 = 3: int32, x2 = "hello"}, b = false}.2
+# >
+"hello"
+
+# === unpack_09
+const main = {..{3: int32, "hello"}, ..{"world", ..{false, ..{true, true}}}, "a"}.6
+# >
+"a"
+
+# === unpack_10
+const x = {x1 = 3: int32, x2 = "hello"}
+const main = {a = 4: int32, ..x, b = false}.2
+# >
+"hello"
+
+# === unpack_12
+func main() -> (
+  {true, false}
+  | func (x) -> {4: int32, ..x: {bool, bool}, "hello"}.2
+)
+# >
+false
+
+# === unpack_14
+func false_x_false(x: T) where T: {bool, text, ..} -> {false, ..x, false}.2
+func main() -> false_x_false({true, "hello"})
+# >
+"hello"

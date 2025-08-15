@@ -3,8 +3,8 @@ use itertools::Itertools;
 use crate::Result;
 use crate::diagnostic::{Diagnostic, WithErrorInfo};
 use crate::pr;
-use crate::resolver::types::{TypeResolver, scope, tuple};
-use crate::resolver::{NS_STD, names};
+use crate::resolver::names;
+use crate::resolver::types::{TypeResolver, scope};
 use crate::utils::fold::{self, PrFold};
 
 use super::scope::{Scope, ScopeKind};
@@ -66,47 +66,41 @@ impl fold::PrFold for super::TypeResolver<'_> {
                 }
             }
 
-            pr::ExprKind::Indirection { base, field } => {
+            pr::ExprKind::TupleLookup { base, lookup } => {
                 let base = self.fold_expr(*base)?;
                 let base_ty = base.ty.as_ref().unwrap();
 
-                let indirection = self
-                    .resolve_indirection(base_ty, &field, span.unwrap())
+                let target_ty = self
+                    .resolve_tuple_lookup(base_ty, &lookup, span.unwrap())
                     .with_span(span)?;
-                match indirection.base {
-                    tuple::BaseKind::Tuple => {
-                        let kind = pr::ExprKind::Indirection {
-                            base: Box::new(base),
-                            field: if let Some(p) = indirection.position {
-                                pr::IndirectionKind::Position(p as i64)
-                            } else {
-                                field
-                            },
-                        };
-                        pr::Expr {
-                            ty: Some(indirection.target_ty),
-                            kind,
-                            ..node
-                        }
-                    }
-                    tuple::BaseKind::Array => {
-                        let std_index = pr::Path::new(vec![NS_STD, "index"]);
-                        let mut std_index_expr = pr::Expr::new(std_index.clone());
-                        std_index_expr.span = span;
-                        std_index_expr.target = Some(pr::Ref::FullyQualified {
-                            to_def: std_index,
-                            within: pr::Path::empty(),
-                        });
 
-                        let position = indirection.position.unwrap();
-                        let mut position = pr::Expr::new(pr::Literal::Integer(position as i64));
-                        position.span = span;
-
-                        let func = Box::new(self.fold_expr(std_index_expr)?);
-
-                        self.resolve_func_call(func, vec![base, position], span)?
-                    }
+                let kind = pr::ExprKind::TupleLookup {
+                    base: Box::new(base),
+                    lookup,
+                };
+                pr::Expr {
+                    ty: Some(target_ty),
+                    kind,
+                    ..node
                 }
+
+                // tuple::BaseKind::Array => {
+                //     let std_index = pr::Path::new(vec![NS_STD, "index"]);
+                //     let mut std_index_expr = pr::Expr::new(std_index.clone());
+                //     std_index_expr.span = span;
+                //     std_index_expr.target = Some(pr::Ref::FullyQualified {
+                //         to_def: std_index,
+                //         within: pr::Path::empty(),
+                //     });
+
+                //     let position = field.into_position().unwrap();
+                //     let mut position = pr::Expr::new(pr::Literal::Integer(position));
+                //     position.span = span;
+
+                //     let func = Box::new(self.fold_expr(std_index_expr)?);
+
+                //     self.resolve_func_call(func, vec![base, position], span)?
+                // }
             }
 
             pr::ExprKind::FuncCall(pr::FuncCall { func, args }) => {
@@ -153,8 +147,17 @@ impl fold::PrFold for super::TypeResolver<'_> {
 
                 self.validate_expr_type(&mut expr, &ty, &|| None)?;
 
-                // return inner expr directly (without type annotation)
-                return Ok(expr);
+                // return inner expr, with ty set to the explicit type
+                // (this removes ExprKind::TypeAnnotation)
+                // Using the explicit type matters when inferred type is a ty var
+                // and user wants to help the compiler.
+                let mut ty = ty;
+                expr.span = span;
+                ty.span = span;
+                return Ok(pr::Expr {
+                    ty: Some(ty),
+                    ..expr
+                });
             }
 
             pr::ExprKind::Match(_) => self.resolve_match(node)?,

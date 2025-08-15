@@ -54,7 +54,7 @@ impl TypeResolver<'_> {
         match (found_ref, expected_ref) {
             // base case: both types are concrete types, check for compatibility
             (TyRef::Ty(f), TyRef::Ty(e)) => {
-                self.validate_type_material(f.into_owned(), e.into_owned(), who)?
+                self.validate_type_material(f.clone(), e.clone(), who)?
             }
 
             // type params
@@ -70,7 +70,7 @@ impl TypeResolver<'_> {
                 // validate that a type parameter is an concrete type - which is never true.
                 // example:
                 //     func <T> (x: T) -> (x: int64)
-                return Err(compose_type_error(found, &expected, who));
+                return Err(compose_type_error(found, expected, who));
             }
             (TyRef::Param(found_id), TyRef::Param(expected_id)) => {
                 if found_id != expected_id {
@@ -81,7 +81,7 @@ impl TypeResolver<'_> {
             // type vars
             (TyRef::Ty(ty), TyRef::Var(_, var_id)) | (TyRef::Var(_, var_id), TyRef::Ty(ty)) => {
                 let scope = self.get_ty_var_scope();
-                scope.infer_type_var(var_id, ty.into_owned());
+                scope.infer_type_var(var_id, ty.clone());
             }
             (TyRef::Var(_, a_id), TyRef::Var(_, b_id)) => {
                 let scope = self.get_ty_var_scope();
@@ -340,6 +340,10 @@ impl TypeResolver<'_> {
     }
 
     /// Validates that a type is an a domain of a type param.
+    ///
+    /// This does two things:
+    /// - returns an error if the type is not in the domain,
+    /// - infers ty var constraints such that the type is in the domain.
     pub fn validate_type_domain(
         &self,
         ty: &Ty,
@@ -373,7 +377,7 @@ impl TypeResolver<'_> {
                         format!(
                             "{} one of {possible_tys}, found {}",
                             msg_restricted_to(var_name, None),
-                            printer::print_ty(&ty)
+                            printer::print_ty(ty)
                         ),
                         DiagnosticCode::TYPE_DOMAIN,
                     ));
@@ -383,23 +387,13 @@ impl TypeResolver<'_> {
             }
 
             TyParamDomain::TupleFields(domain_fields) => {
-                let TyKind::Tuple(ty_fields) = &ty.kind else {
-                    return Err(Diagnostic::new(
-                        format!(
-                            "{} to tuples, found {}",
-                            msg_restricted_to(var_name, None),
-                            printer::print_ty(&ty)
-                        ),
-                        DiagnosticCode::TYPE_DOMAIN,
-                    ));
-                };
+                let ty = ty.clone();
 
                 for domain_field in domain_fields {
-                    let indirection =
-                        super::tuple::lookup_in_tuple(&ty, ty_fields, &domain_field.location)?;
+                    let target_ty = self.lookup_in_tuple(&ty, &domain_field.location)?;
 
-                    self.validate_type(&indirection.target_ty, &domain_field.ty, &|| None)
-                        .with_span_fallback(indirection.target_ty.span)?;
+                    self.validate_type(&target_ty, &domain_field.ty, &|| None)
+                        .with_span_fallback(target_ty.span)?;
                     // ok
                 }
 
@@ -413,7 +407,7 @@ impl TypeResolver<'_> {
                         format!(
                             "{} to enums, found {}",
                             msg_restricted_to(var_name, None),
-                            printer::print_ty(&ty)
+                            printer::print_ty(ty)
                         ),
                         DiagnosticCode::TYPE_DOMAIN,
                     ));
@@ -469,11 +463,11 @@ impl TypeResolver<'_> {
                 TyParamDomain::TupleFields(expected_fields),
             ) => {
                 for expected_field in expected_fields {
-                    let indirection =
-                        super::tuple::lookup_in_domain(found_fields, &expected_field.location)?;
+                    let target_ty =
+                        Self::lookup_in_tuple_domain(found_fields, &expected_field.location)?;
 
-                    self.validate_type(&indirection.target_ty, &expected_field.ty, &|| None)
-                        .with_span_fallback(indirection.target_ty.span)?;
+                    self.validate_type(&target_ty, &expected_field.ty, &|| None)
+                        .with_span_fallback(target_ty.span)?;
                 }
 
                 // all ok

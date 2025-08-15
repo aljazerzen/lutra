@@ -186,7 +186,7 @@ fn types_11() {
 }
 #[test]
 fn types_12() {
-    // tuple indirection
+    // tuple lookup
 
     insta::assert_snapshot!(_test_ty(r#"
         const a = {id = 4: int64, total = 4.5: float64}
@@ -301,8 +301,8 @@ fn types_15() {
        ╭─[:5:46]
        │
      5 │         func main() -> get_b({a = false, b = 4.6: float64})
-       │                                              ─┬─
-       │                                               ╰─── expected type `int64`, but found type `float64`
+       │                                              ──────┬─────
+       │                                                    ╰─────── expected type `int64`, but found type `float64`
     ───╯
     ");
     insta::assert_snapshot!(_test_err(r#"
@@ -311,7 +311,7 @@ fn types_15() {
 
         func main() -> get_b({a = false, c = 4})
     "#), @r"
-    Error:
+    [E0004] Error:
        ╭─[:5:24]
        │
      5 │         func main() -> get_b({a = false, c = 4})
@@ -351,7 +351,7 @@ fn types_16() {
 
         func main() -> get_b({a = false})
     "#), @r"
-    Error:
+    [E0004] Error:
        ╭─[:5:24]
        │
      5 │         func main() -> get_b({a = false})
@@ -417,7 +417,7 @@ fn types_17() {
 
         func main() -> needs_one({4})
     "#), @r"
-    Error:
+    [E0004] Error:
        ╭─[:7:12]
        │
      7 │         -> needs_two(x)
@@ -440,7 +440,7 @@ fn types_17() {
 
 #[test]
 fn types_18() {
-    // indirection into type params
+    // lookup into type params
 
     insta::assert_snapshot!(_test_ty(r#"
         func f(x: T) where T: {int64, ..} -> x.0
@@ -485,6 +485,108 @@ fn types_20() {
           }
         )
     "#), @"text");
+}
+
+#[test]
+fn types_21() {
+    // error messages on bad lookups into type vars
+
+    insta::assert_snapshot!(_test_err(r#"
+        func main() -> (
+          {a = false, "hello", c = "world"}
+          | func (x) -> x.b
+        )
+    "#), @r"
+    [E0004] Error:
+       ╭─[:4:19]
+       │
+     4 │           | func (x) -> x.b
+       │                   ┬
+       │                   ╰── field .b does not exist in type {a: bool, text, c: text}
+    ───╯
+    ");
+    insta::assert_snapshot!(_test_err(r#"
+        func main() -> (
+          {a = false, "hello", c = "world"}
+          | func (x) -> x.3
+        )
+    "#), @r"
+    [E0004] Error:
+       ╭─[:4:19]
+       │
+     4 │           | func (x) -> x.3
+       │                   ┬
+       │                   ╰── field .3 does not exist in type {a: bool, text, c: text}
+    ───╯
+    ");
+}
+
+#[test]
+fn types_22() {
+    // error messages on bad lookups into things that are not tuples
+
+    insta::assert_snapshot!(_test_err(r#"
+        func main() -> [true, false].a
+    "#), @r"
+    [E0004] Error:
+       ╭─[:2:37]
+       │
+     2 │         func main() -> [true, false].a
+       │                                     ─┬
+       │                                      ╰── lookup expected a tuple, found [bool]
+    ───╯
+    ");
+    insta::assert_snapshot!(_test_err(r#"
+        func main() -> "hello".a
+    "#), @r#"
+    [E0004] Error:
+       ╭─[:2:31]
+       │
+     2 │         func main() -> "hello".a
+       │                               ─┬
+       │                                ╰── lookup expected a tuple, found text
+    ───╯
+    "#);
+    insta::assert_snapshot!(_test_err(r#"
+        func main(x: T) where T: int32 | text -> x.a
+    "#), @r"
+    Error:
+       ╭─[:2:51]
+       │
+     2 │         func main(x: T) where T: int32 | text -> x.a
+       │                                                   ─┬
+       │                                                    ╰── lookup expected a tuple, found type parameter T
+       │
+       │ Note:
+       │ add `T: {}` to constrain it to tuples
+    ───╯
+    ");
+    insta::assert_snapshot!(_test_err(r#"
+        func main(x: T) where T -> x.a
+    "#), @r"
+    Error:
+       ╭─[:2:37]
+       │
+     2 │         func main(x: T) where T -> x.a
+       │                                     ─┬
+       │                                      ╰── lookup expected a tuple, found type parameter T
+       │
+       │ Note:
+       │ add `T: {}` to constrain it to tuples
+    ───╯
+    ");
+    insta::assert_snapshot!(_test_err(r#"
+        type t: text
+        func main(x: t) -> x.a
+    "#), @r"
+    [E0004] Error:
+       ╭─[:3:29]
+       │
+     3 │         func main(x: t) -> x.a
+       │                             ─┬
+       │                              ╰── lookup expected a tuple, found text
+    ───╯
+    ");
 }
 
 #[test]
@@ -952,7 +1054,7 @@ fn unpack_01() {
     insta::assert_snapshot!(_test_err(r#"
         const main = {false, ..true, "hello"}
     "#), @r#"
-    Error:
+    [E0004] Error:
        ╭─[:2:32]
        │
      2 │         const main = {false, ..true, "hello"}
@@ -991,4 +1093,96 @@ fn unpack_04() {
 
         func main() -> false_x_false({"a", "b"})
     "#), @"{bool, text, text, bool}");
+}
+
+#[test]
+#[ignore] // TODO
+fn unpack_05() {
+    insta::assert_snapshot!(_test_ty(r#"
+        const main = {
+          a = 4: int32,
+          ..{
+            x1 = 3: int32,
+            x2 = "hello",
+          },
+          ..{
+            x3 = "world",
+          },
+          b = false
+        }.x3
+    "#), @"text");
+}
+
+#[test]
+fn unpack_06() {
+    // lookup into an unpack of a type var
+
+    insta::assert_snapshot!(_test_err(r#"
+      func main() -> (
+        {x1 = true, x2 = false}
+        | func (x) -> {4: int32, ..x, "hello"}.x2
+      )
+    "#), @r#"
+    Error:
+       ╭─[:4:47]
+       │
+     4 │         | func (x) -> {4: int32, ..x, "hello"}.x2
+       │                                               ─┬─
+       │                                                ╰─── ambiguous lookup into unpack of an unknown type
+       │
+       │ Note:
+       │ consider annotating the unpacked expression
+    ───╯
+    "#);
+}
+
+#[test]
+fn unpack_11() {
+    insta::assert_snapshot!(_test_err(r#"
+    func identity(x: T): T where T: {..} -> x
+    func main() -> {4: int32, ..identity({true, false}), "hello"}.2
+    "#), @r#"
+    Error:
+       ╭─[:3:66]
+       │
+     3 │     func main() -> {4: int32, ..identity({true, false}), "hello"}.2
+       │                                                                  ─┬
+       │                                                                   ╰── ambiguous lookup into unpack of an unknown type
+       │
+       │ Note:
+       │ consider annotating the unpacked expression
+    ───╯
+    "#);
+}
+
+#[test]
+fn unpack_12() {
+    insta::assert_snapshot!(_test_ty(r#"
+    func identity(x: T): T where T: {..} -> x
+    func main() -> {4: int32, ..identity({true, false}): {bool, bool}, "hello"}.2
+    "#), @"bool");
+}
+
+#[test]
+fn unpack_13() {
+    insta::assert_snapshot!(_test_err(r#"
+    func false_x_false(x: T) where T: {x2: text, ..} -> {false, ..x, false}.2
+    func main() -> false_x_false({true, x2 = "hello"})
+    "#), @r"
+    Error:
+       ╭─[:2:76]
+       │
+     2 │     func false_x_false(x: T) where T: {x2: text, ..} -> {false, ..x, false}.2
+       │                                                                            ─┬
+       │                                                                             ╰── cannot do positional lookup into unpack of this type param
+    ───╯
+    ");
+}
+
+#[test]
+fn unpack_14() {
+    insta::assert_snapshot!(_test_ty(r#"
+    func false_x_false(x: T) where T: {bool, text, ..} -> {false, ..x, false}.2
+    func main() -> false_x_false({true, "hello"})
+    "#), @"text");
 }

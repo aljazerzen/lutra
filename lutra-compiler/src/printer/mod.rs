@@ -108,11 +108,11 @@ impl Printer {
                                         r += ", ";
                                     }
                                     match &field.location {
-                                        pr::IndirectionKind::Name(name) => {
+                                        pr::Lookup::Name(name) => {
                                             r += &pr::display_ident(name);
                                             r += ": ";
                                         }
-                                        pr::IndirectionKind::Position(p) => {
+                                        pr::Lookup::Position(p) => {
                                             assert_eq!(i, *p as usize); // TODO: print these fields when they are out of order
                                         }
                                     }

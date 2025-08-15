@@ -84,9 +84,9 @@ pub fn fold_expr_kind<T: ?Sized + PrFold>(fold: &mut T, expr_kind: ExprKind) -> 
         //     within: Box::new(fold.fold_expr(*within)?),
         //     except: Box::new(fold.fold_expr(*except)?),
         // },
-        Indirection { base, field } => Indirection {
+        TupleLookup { base, lookup } => TupleLookup {
             base: Box::new(fold.fold_expr(*base)?),
-            field,
+            lookup,
         },
         Tuple(items) => Tuple(
             items

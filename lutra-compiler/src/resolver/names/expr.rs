@@ -60,16 +60,10 @@ impl fold::PrFold for NameResolver<'_> {
                     ..expr
                 }
             }
-            pr::ExprKind::Indirection { .. } => {
-                // special case: indirection might be compiled to a call to std::index,
-                // so we add a ref here. This could be conditional.
-                self.refs.push(pr::Path::new(vec![NS_STD, "index"]));
-
-                pr::Expr {
-                    kind: fold::fold_expr_kind(self, expr.kind)?,
-                    ..expr
-                }
-            }
+            pr::ExprKind::TupleLookup { .. } => pr::Expr {
+                kind: fold::fold_expr_kind(self, expr.kind)?,
+                ..expr
+            },
 
             pr::ExprKind::Func(func) => {
                 let scope_id = self.scope_id_gen.next();

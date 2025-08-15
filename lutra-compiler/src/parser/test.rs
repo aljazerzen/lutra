@@ -255,7 +255,7 @@ fn parse_05() {
     Match(
         Match {
             subject: Expr {
-                kind: Indirection {
+                kind: TupleLookup {
                     base: Expr {
                         kind: Ident(
                             item,
@@ -268,7 +268,7 @@ fn parse_05() {
                         scope_id: None,
                         target: None,
                     },
-                    field: Name(
+                    lookup: Name(
                         "status",
                     ),
                 },
