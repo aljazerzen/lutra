@@ -15,9 +15,8 @@ use super::TypeResolver;
 pub struct Scope {
     pub(super) id: usize,
 
-    #[allow(dead_code)]
     pub(super) kind: ScopeKind,
-    pub(super) names: Vec<ScopedKind>,
+    pub(super) names: append_only_vec::AppendOnlyVec<ScopedKind>,
 
     pub(super) ty_var_constraints: RefCell<Vec<TyVarConstraint>>,
 }
@@ -122,7 +121,7 @@ impl Scope {
         Self {
             id,
             kind,
-            names: Vec::new(),
+            names: Default::default(),
             ty_var_constraints: RefCell::new(Vec::new()),
         }
     }
@@ -161,28 +160,29 @@ impl Scope {
         if d.is_empty() { Ok(()) } else { Err(d) }
     }
 
+    #[must_use]
     pub fn insert_type_var(
-        &mut self,
+        &self,
         name_hint: Option<String>,
         span: Span,
         domain: pr::TyParamDomain,
-    ) {
-        let var_id = self.names.len();
+    ) -> usize {
         let type_arg = TyVar {
             name_hint,
             span: Some(span),
         };
+        let var_id = self.names.push(ScopedKind::TyVar(type_arg));
 
-        self.names.push(ScopedKind::TyVar(type_arg));
         self.ty_var_constraints
             .borrow_mut()
-            .push(TyVarConstraint::InDomain(var_id, domain))
+            .push(TyVarConstraint::InDomain(var_id, domain));
+        var_id
     }
 
-    pub fn insert_local(&mut self, ty: pr::Ty) {
+    pub fn insert_local(&mut self, ty: pr::Ty) -> usize {
         let local = ScopedKind::Local { ty };
 
-        self.names.push(local);
+        self.names.push(local)
     }
 
     pub fn infer_type_var(&self, id: TyVarId, ty: pr::Ty) {
@@ -252,23 +252,23 @@ impl TypeResolver<'_> {
                     .find(|s| s.id == *scope)
                     .ok_or_else(|| panic!("cannot find scope by id"))
                     .unwrap();
-                Ok(scope.names.get(*offset).map(Named::Scoped).unwrap())
+                Ok(Named::Scoped(&scope.names[*offset]))
             }
         }
     }
 
     pub fn get_ty_param(&self, param_id: usize) -> (&String, &pr::TyParamDomain) {
         let scope = self.scopes.last().unwrap();
-        let scoped = scope.names.get(param_id).unwrap();
+        let scoped = &scope.names[param_id];
         scoped.as_ty_param().unwrap()
     }
 
     pub fn get_ty_var(&self, id: TyVarId) -> &TyVar {
-        let scoped = self.get_ty_var_scope().names.get(id).unwrap();
+        let scoped = &self.get_ty_var_scope().names[id];
         scoped.as_ty_var().unwrap()
     }
 
-    /// Resolves if type is an ident. Does not recurse.
+    /// Resolves type identifiers. Does not resolve identifiers in contained types.
     pub fn get_ty_mat<'t>(&'t self, ty: &'t pr::Ty) -> Result<TyRef<'t>> {
         let pr::TyKind::Ident(ident) = &ty.kind else {
             return Ok(TyRef::Ty(ty));
@@ -356,7 +356,7 @@ impl TypeResolver<'_> {
                 // path does matter here, it is just for error messages
                 pr::Path::new(vec![gtp.name.clone()]),
             );
-            let offset = scope.names.len();
+            let offset = scope.insert_type_var(Some(gtp.name), span, gtp.domain);
             ty_arg_ident.target = Some(pr::Ref::Local {
                 scope: scope.id, // current scope
                 offset,
@@ -364,8 +364,6 @@ impl TypeResolver<'_> {
 
             mapping.insert(gtp_ref, ty_arg_ident.clone());
             ty_args.push(ty_arg_ident);
-
-            scope.insert_type_var(Some(gtp.name), span, gtp.domain);
         }
 
         let ty = pr::Ty {
@@ -375,18 +373,18 @@ impl TypeResolver<'_> {
         (utils::TypeReplacer::on_ty(ty, mapping), ty_args)
     }
 
-    pub fn introduce_ty_var(&mut self, domain: pr::TyParamDomain, span: Span) -> pr::Ty {
-        let scope = self.get_ty_var_scope_mut();
+    pub fn introduce_ty_var(&self, domain: pr::TyParamDomain, span: Span) -> pr::Ty {
+        let scope = self.get_ty_var_scope();
+        let var_id = scope.insert_type_var(None, span, domain);
 
-        let mut ty_arg = pr::Ty::new(pr::TyKind::Ident(pr::Path::from_name("_")));
-        ty_arg.target = Some(pr::Ref::Local {
-            scope: scope.id, // current scope
-            offset: scope.names.len(),
-        });
-        ty_arg.span = Some(span);
-
-        scope.insert_type_var(None, span, domain);
-        ty_arg
+        pr::Ty {
+            span: Some(span),
+            target: Some(pr::Ref::Local {
+                scope: scope.id,
+                offset: var_id,
+            }),
+            ..pr::Ty::new(pr::TyKind::Ident(pr::Path::from_name("_")))
+        }
     }
 }
 

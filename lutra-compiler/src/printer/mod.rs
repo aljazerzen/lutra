@@ -162,6 +162,23 @@ impl Printer {
 
                 r
             }
+            pr::TyKind::TupleComprehension(comp) => {
+                let mut r = String::new();
+                r += "{for ";
+                r += &pr::display_ident(&comp.variable_name);
+                r += ": ";
+                r += &pr::display_ident(&comp.variable_ty);
+                r += " in ";
+                r += &self.print_ty(&comp.tuple);
+                r += " do ";
+                if let Some(name) = &comp.body_name {
+                    r += &pr::display_ident(name);
+                    r += ": ";
+                }
+                r += &self.print_ty(&comp.body_ty);
+                r += "}";
+                r
+            }
         }
     }
 }

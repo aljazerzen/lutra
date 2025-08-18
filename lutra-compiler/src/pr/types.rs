@@ -56,6 +56,9 @@ pub enum TyKind {
 
     /// Type of functions with defined params and return types.
     Func(TyFunc),
+
+    /// Tuple that is constructed by iterating over fields of a tuple
+    TupleComprehension(TyTupleComprehension),
     // /// Tuples that have fields of `base` tuple, but don't have fields of `except` tuple.
     // /// Implies that `base` has all fields of `except`.
     // Exclude { base: Box<Ty>, except: Box<Ty> },
@@ -137,6 +140,17 @@ pub struct TyDomainTupleField {
 pub struct TyDomainEnumVariant {
     pub name: String,
     pub ty: Ty,
+}
+
+#[derive(Debug, Clone, PartialEq, Hash)]
+pub struct TyTupleComprehension {
+    pub tuple: Box<Ty>,
+
+    pub variable_name: String,
+    pub variable_ty: String,
+
+    pub body_name: Option<String>,
+    pub body_ty: Box<Ty>,
 }
 
 impl Ty {

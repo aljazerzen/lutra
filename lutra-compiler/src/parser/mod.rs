@@ -100,8 +100,8 @@ fn ctrl(char: char) -> impl Parser<TokenKind, (), Error = PError> + Clone {
     just(TokenKind::Control(char)).ignored()
 }
 
-/// Parse a sequence, allowing commas and new lines between items. Doesn't
-/// include the surrounding delimiters.
+/// Parse a sequence, allowing commas between items.
+/// Doesn't include the surrounding delimiters.
 fn sequence<'a, P, O>(parser: P) -> impl Parser<TokenKind, Vec<O>, Error = PError> + Clone
 where
     P: Parser<TokenKind, O, Error = PError> + Clone,

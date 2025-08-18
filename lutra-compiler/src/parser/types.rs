@@ -32,28 +32,41 @@ pub(crate) fn type_expr() -> impl Parser<TokenKind, Ty, Error = PError> + Clone 
             )
             .map(TyKind::Func);
 
-        let tuple = sequence(choice((ident_part()
-            .then_ignore(ctrl(':'))
-            .or_not()
-            .then(nested_type_expr.clone())
-            .map(|(name, ty)| TyTupleField {
-                name,
-                ty,
-                unpack: false,
-            }),)))
-        .delimited_by(ctrl('{'), ctrl('}'))
-        .recover_with(nested_delimiters(
-            TokenKind::Control('{'),
-            TokenKind::Control('}'),
-            [
-                (TokenKind::Control('{'), TokenKind::Control('}')),
-                (TokenKind::Control('('), TokenKind::Control(')')),
-                (TokenKind::Control('['), TokenKind::Control(']')),
-            ],
-            |_| vec![],
-        ))
-        .map(TyKind::Tuple)
-        .labelled("tuple");
+        let tuple = delimited_by_braces(
+            sequence(
+                ident_part()
+                    .then_ignore(ctrl(':'))
+                    .or_not()
+                    .then(nested_type_expr.clone())
+                    .map(|(name, ty)| TyTupleField {
+                        name,
+                        ty,
+                        unpack: false,
+                    }),
+            )
+            .map(TyKind::Tuple),
+        );
+
+        let tuple_comprehension = delimited_by_braces(
+            keyword("for")
+                .ignore_then(ident_part())
+                .then_ignore(ctrl(':'))
+                .then(ident_part())
+                .then_ignore(keyword("in"))
+                .then(nested_type_expr.clone().map(Box::new))
+                .then_ignore(keyword("do"))
+                .then(ident_part().then_ignore(ctrl(':')).or_not())
+                .then(nested_type_expr.clone().map(Box::new))
+                .map(|((((v_n, v_t), tuple), b_n), b_t)| TyTupleComprehension {
+                    tuple,
+                    variable_name: v_n,
+                    variable_ty: v_t,
+                    body_name: b_n,
+                    body_ty: b_t,
+                })
+                .map(TyKind::TupleComprehension),
+        );
+        let tuple = tuple_comprehension.or(tuple);
 
         let enum_ = keyword("enum")
             .ignore_then(
@@ -118,11 +131,30 @@ pub(crate) fn type_expr() -> impl Parser<TokenKind, Ty, Error = PError> + Clone 
         //         };
         //         TyKind::into_ty(kind, span)
         //     })
+
         choice((primitive, ident, func, tuple, array, enum_))
             .map_with_span(Ty::new_with_span)
             .boxed()
     })
     .labelled("type")
+}
+
+fn delimited_by_braces(
+    tuple_contents: impl Parser<TokenKind, TyKind, Error = PError>,
+) -> impl Parser<TokenKind, TyKind, Error = PError> {
+    tuple_contents
+        .delimited_by(ctrl('{'), ctrl('}'))
+        .recover_with(nested_delimiters(
+            TokenKind::Control('{'),
+            TokenKind::Control('}'),
+            [
+                (TokenKind::Control('{'), TokenKind::Control('}')),
+                (TokenKind::Control('('), TokenKind::Control(')')),
+                (TokenKind::Control('['), TokenKind::Control(']')),
+            ],
+            |_| TyKind::Tuple(vec![]),
+        ))
+        .labelled("tuple")
 }
 
 fn primitive_set() -> impl Parser<TokenKind, TyPrimitive, Error = PError> {

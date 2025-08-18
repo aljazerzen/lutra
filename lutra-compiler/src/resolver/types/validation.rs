@@ -54,7 +54,7 @@ impl TypeResolver<'_> {
         match (found_ref, expected_ref) {
             // base case: both types are concrete types, check for compatibility
             (TyRef::Ty(f), TyRef::Ty(e)) => {
-                self.validate_type_material(f.clone(), e.clone(), who)?
+                self.validate_type_concrete(f.clone(), e.clone(), who)?
             }
 
             // type params
@@ -107,7 +107,9 @@ impl TypeResolver<'_> {
         Ok(())
     }
 
-    fn validate_type_material<F>(&self, found: Ty, expected: Ty, who: &F) -> crate::Result<()>
+    /// Validate that an found type matches the expected type.
+    /// Both type are concrete: they cannot be identifiers, variables or parameters.
+    fn validate_type_concrete<F>(&self, found: Ty, expected: Ty, who: &F) -> crate::Result<()>
     where
         F: Fn() -> Option<String>,
     {
@@ -123,46 +125,79 @@ impl TypeResolver<'_> {
                 self.validate_type(&found_items.clone(), &expected_items.clone(), who)
             }
             (TyKind::Tuple(found_fields), TyKind::Tuple(expected_fields)) => {
-                // here we need to check that found tuple has all fields that are expected.
+                // here we need to check that all tuple fields match in types (but not necessarily names)
 
-                // build index of found fields
-                let found_types: HashMap<_, _> = found_fields
-                    .iter()
-                    .filter_map(|e| e.name.as_ref().map(|n| (n, &e.ty)))
-                    .collect();
-
-                let mut expected_but_not_found = Vec::new();
-                for (index, e_field) in expected_fields.iter().enumerate() {
-                    if let Some(e_name) = &e_field.name {
-                        // when a named field is expected
-
-                        // if it was found
-                        if let Some(f_ty) = found_types.get(e_name) {
-                            // check its type
-
-                            // co-variant contained type
-                            self.validate_type(f_ty, &e_field.ty, who)?;
-                        } else {
-                            expected_but_not_found.push(e_field);
-                        }
-                    } else {
-                        // when a positional field is expected
-                        if let Some(f_field) = found_fields.get(index) {
-                            // co-variant contained type
-                            self.validate_type(&f_field.ty, &e_field.ty, who)?;
-                        } else {
-                            expected_but_not_found.push(e_field);
-                        }
-                    }
-                }
-
-                if !expected_but_not_found.is_empty() {
-                    // not all fields were found
+                if found_fields.len() != expected_fields.len() {
                     return Err(compose_type_error(&found, &expected, who));
                 }
 
+                let mut last_err = None;
+                for (f, e) in std::iter::zip(found_fields.iter(), expected_fields.iter()) {
+                    // co-variant contained type
+                    let r = self
+                        .validate_type(&f.ty, &e.ty, who)
+                        .with_span_fallback(f.ty.span);
+
+                    if let Err(d) = r {
+                        last_err
+                            .take()
+                            .map(self.try_push_diagnostic())
+                            .transpose()?;
+                        last_err = Some(d);
+                    }
+                }
+
+                if let Some(d) = last_err {
+                    Err(d)
+                } else {
+                    Ok(())
+                }
+            }
+
+            (TyKind::TupleComprehension(found_comp), TyKind::Tuple(expected_fields)) => {
+                // here we need to check that the result of comprehension has all fields that are expected
+                // TODO ... and that the number of fields matches between the two tuples.
+
+                for (index, e_field) in expected_fields.iter().enumerate() {
+                    if e_field.unpack {
+                        todo!();
+                    }
+
+                    let lookup = pr::Lookup::Position(index as i64);
+
+                    let span = e_field.ty.span.unwrap();
+
+                    let _var_input = self.resolve_tuple_lookup(&found_comp.tuple, &lookup, span)?;
+                    // TODO: take found_comp.body_ty and replace each found_comp.variable_ty with var_input
+                    // TODO: validate that found_comp.body_ty matches e_field.ty
+                }
                 Ok(())
             }
+            (TyKind::Tuple(found_fields), TyKind::TupleComprehension(expected_comp)) => {
+                // here we need to check that the result of comprehension has all fields that are found
+                // TODO ... and that the number of fields matches between the two tuples.
+
+                for (index, e_field) in found_fields.iter().enumerate() {
+                    if e_field.unpack {
+                        todo!();
+                    }
+
+                    let lookup = pr::Lookup::Position(index as i64);
+
+                    let span = e_field.ty.span.unwrap();
+                    let _var_input =
+                        self.resolve_tuple_lookup(&expected_comp.tuple, &lookup, span)?;
+                }
+                Ok(())
+            }
+            (TyKind::TupleComprehension(found_comp), TyKind::TupleComprehension(expected_comp)) => {
+                self.validate_type(&found_comp.tuple, &expected_comp.tuple, who)?;
+
+                // TODO: validate body_ty
+                // self.validate_type(&found_comp.body_ty, &expected_comp.body_ty, who)?;
+                Ok(())
+            }
+
             (TyKind::Func(f_func), TyKind::Func(e_func))
                 if f_func.params.len() == e_func.params.len() =>
             {

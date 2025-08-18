@@ -770,28 +770,21 @@ impl<'a> Context<'a> {
 
                 let ty_out_fields = expr.ty.kind.as_tuple().unwrap();
 
-                let field0 = cr::Expr::new_json_pack(cr::Expr {
-                    kind: cr::ExprKind::Transform(
-                        self.new_binding(cr::Expr::new_rel_ref(&array)),
-                        cr::Transform::ProjectRetain(vec![
-                            0, // index
-                            1, // first tuple field
-                        ]),
-                    ),
-                    ty: ty_out_fields[0].ty.clone(),
-                });
-                let field1 = cr::Expr::new_json_pack(cr::Expr {
-                    kind: cr::ExprKind::Transform(
-                        self.new_binding(cr::Expr::new_rel_ref(&array)),
-                        cr::Transform::ProjectRetain(vec![
-                            0, // index
-                            2, // second tuple field
-                        ]),
-                    ),
-                    ty: ty_out_fields[0].ty.clone(),
-                });
+                let mut aggregate_cols = Vec::with_capacity(ty_out_fields.len());
+                for (index, ty_out_field) in ty_out_fields.iter().enumerate() {
+                    aggregate_cols.push(cr::Expr::new_json_pack(cr::Expr {
+                        kind: cr::ExprKind::Transform(
+                            self.new_binding(cr::Expr::new_rel_ref(&array)),
+                            cr::Transform::ProjectRetain(vec![
+                                0,         // index
+                                1 + index, // tuple field value
+                            ]),
+                        ),
+                        ty: ty_out_field.ty.clone(),
+                    }));
+                }
 
-                cr::ExprKind::Transform(array, cr::Transform::Aggregate(vec![field0, field1]))
+                cr::ExprKind::Transform(array, cr::Transform::Aggregate(aggregate_cols))
             }
 
             "std::from_columnar" => {

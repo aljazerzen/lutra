@@ -1918,6 +1918,41 @@ func main() -> std::to_columnar([{false,"three"},{true,"one"},{false, "two"}])
   ],
 }
 
+# === std_to_columnar_02
+func main() -> std::to_columnar([
+  {false, "three", true},
+  {true,  "one",   false},
+  {false, "two",   false},
+])
+# >
+{
+  [
+    false,
+    true,
+    false,
+  ],
+  [
+    "three",
+    "one",
+    "two",
+  ],
+  [
+    true,
+    false,
+    false,
+  ],
+}
+
+# === std_to_columnar_03
+func main() -> std::to_columnar([
+  {},
+  {},
+  {},
+])
+# >
+{
+}
+
 # === std_to_float32_00
 # skip: postgres
 func main() -> {

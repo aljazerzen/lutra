@@ -129,6 +129,9 @@ fn lexer() -> impl Parser<char, Vec<Token>, Error = LError> {
         just("if"),
         just("then"),
         just("else"),
+        just("for"),
+        just("in"),
+        just("do"),
     ))
     .then_ignore(non_ident())
     .map(TokenKind::Keyword);

@@ -74,8 +74,11 @@ enum ScopeKind {
         is_main: bool,
     },
     Local {
-        /// A pre-compiled node that can be used for each scope entry
-        entries: Vec<ir::Expr>,
+        /// Pre-compiled nodes that can substitute references into scope
+        values: Vec<ir::Expr>,
+    },
+    TyLocal {
+        types: Vec<ir::Ty>,
     },
 }
 
@@ -286,8 +289,11 @@ impl<'a> Lowerer<'a> {
                                 }
                             }
                         }
-                        ScopeKind::Local { entries } => {
-                            entries.get(*offset).map(|e| e.kind.clone()).unwrap()
+                        ScopeKind::Local { values } => {
+                            values.get(*offset).map(|e| e.kind.clone()).unwrap()
+                        }
+                        ScopeKind::TyLocal { .. } => {
+                            unreachable!()
                         }
                     }
                 }
@@ -334,11 +340,11 @@ impl<'a> Lowerer<'a> {
                     });
 
                     // collect pattern scope
-                    let mut entries = Vec::new();
-                    self.collect_pattern_scope(&branch.pattern, subject_ref.clone(), &mut entries);
+                    let mut values = Vec::new();
+                    self.collect_pattern_scope(&branch.pattern, subject_ref.clone(), &mut values);
                     self.scopes.push(Scope {
                         id: branch.value.scope_id.unwrap(),
-                        kind: ScopeKind::Local { entries },
+                        kind: ScopeKind::Local { values },
                     });
 
                     // compile value
@@ -582,19 +588,28 @@ impl<'a> Lowerer<'a> {
         tracing::trace!("lower ty: {}", crate::printer::print_ty(&ty));
 
         if let Some(target) = ty.target {
-            if let pr::Ref::FullyQualified { to_def, .. } = target {
-                self.type_defs_queue.push_back(to_def.clone());
+            match target {
+                pr::Ref::FullyQualified { to_def, .. } => {
+                    self.type_defs_queue.push_back(to_def.clone());
+                    tracing::debug!("lower ty ident: {to_def}");
+                    return ir::Ty {
+                        kind: ir::TyKind::Ident(ir::Path(to_def.into_iter().collect_vec())),
+                        layout: None,
+                        name: ty.name,
+                        variants_recursive: vec![],
+                    };
+                }
+                pr::Ref::Local { scope, offset } => {
+                    let scope = self.scopes.iter().find(|s| s.id == scope).unwrap();
 
-                tracing::debug!("lower ty ident: {to_def}");
+                    match &scope.kind {
+                        ScopeKind::TyLocal { types } => {
+                            return types[offset].clone();
+                        }
 
-                return ir::Ty {
-                    kind: ir::TyKind::Ident(ir::Path(to_def.into_iter().collect_vec())),
-                    layout: None,
-                    name: ty.name,
-                    variants_recursive: vec![],
-                };
-            } else {
-                panic!("{:?} {target:?}", ty.kind)
+                        ScopeKind::Function { .. } | ScopeKind::Local { .. } => unreachable!(),
+                    }
+                }
             }
         }
 
@@ -654,6 +669,45 @@ impl<'a> Lowerer<'a> {
                     .collect(),
                 body: self.lower_ty(*func.body.clone().unwrap()),
             })),
+            pr::TyKind::TupleComprehension(comp) => {
+                let tuple = self.lower_ty(*comp.tuple);
+                let ir::TyKind::Tuple(fields) = self.get_ty_mat(tuple).kind else {
+                    panic!("expected a tuple type in unpack");
+                };
+
+                let scope_id = ty.scope_id.unwrap();
+                self.scopes.push(Scope {
+                    id: scope_id,
+                    kind: ScopeKind::TyLocal { types: vec![] },
+                });
+
+                let mut r = Vec::with_capacity(fields.len());
+                for field in fields {
+                    // setup the scope with field.ty,
+                    // so comp.variable_ty references can be replaced with field.ty
+                    let ScopeKind::TyLocal { types } = &mut self.scopes.last_mut().unwrap().kind
+                    else {
+                        panic!()
+                    };
+                    *types = vec![field.ty];
+
+                    // fold (and replace references)
+                    let f_ty = self.lower_ty(*comp.body_ty.clone());
+
+                    r.push(ir::TyTupleField {
+                        name: if comp.body_name.is_some() {
+                            field.name
+                        } else {
+                            None
+                        },
+                        ty: f_ty,
+                    });
+                }
+
+                self.scopes.pop();
+
+                ir::TyKind::Tuple(r)
+            }
         };
 
         ir::Ty {

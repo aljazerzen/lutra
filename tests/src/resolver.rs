@@ -558,6 +558,7 @@ fn types_22() {
        │                                                    ╰── lookup expected a tuple, found type parameter T
        │
        │ Note:
+       │ T is not constrained to tuples only
        │ add `T: {}` to constrain it to tuples
     ───╯
     ");
@@ -572,6 +573,7 @@ fn types_22() {
        │                                      ╰── lookup expected a tuple, found type parameter T
        │
        │ Note:
+       │ T is not constrained to tuples only
        │ add `T: {}` to constrain it to tuples
     ───╯
     ");
@@ -1185,4 +1187,317 @@ fn unpack_14() {
     func false_x_false(x: T) where T: {bool, text, ..} -> {false, ..x, false}.2
     func main() -> false_x_false({true, "hello"})
     "#), @"text");
+}
+
+#[test]
+fn ty_tuple_comprehension_00() {
+    // map to a simple type
+
+    insta::assert_snapshot!(_test_ty(r#"
+    type A: {id: int64, title: text}
+
+    func main(): {for f: F in A do bool}
+    -> std::default()
+    "#), @"{bool, bool}");
+}
+
+#[test]
+fn ty_tuple_comprehension_01() {
+    // map to a simple type
+
+    insta::assert_snapshot!(_test_ty(r#"
+    type A: {id: int64, title: text}
+
+    func main(): {for f: F in A do f: bool}
+    -> std::default()
+    "#), @"{id: bool, title: bool}");
+}
+
+#[test]
+fn ty_tuple_comprehension_01a() {
+    // bad body field name
+
+    insta::assert_snapshot!(_test_err(r#"
+    type A: {id: int64, title: text}
+
+    func main(): {for f: F in A do g: bool}
+    -> std::default()
+    "#), @r"
+    Error:
+       ╭─[:4:5]
+       │
+     4 │ ╭─▶     func main(): {for f: F in A do g: bool}
+     5 │ ├─▶     -> std::default()
+       │ │
+       │ ╰─────────────────────────── expected field to be named f
+    ───╯
+    ");
+}
+
+#[test]
+fn ty_tuple_comprehension_02() {
+    // map to a complex type, without refs to comprehension variable
+
+    insta::assert_snapshot!(_test_ty(r#"
+    type A: {id: int64, title: text}
+
+    func main(): {for f: F in A do f: [bool]}
+    -> std::default()
+    "#), @"{id: [bool], title: [bool]}");
+}
+
+#[test] // TODO
+fn ty_tuple_comprehension_03() {
+    // lookup in tuple comprehension
+
+    insta::assert_snapshot!(_test_err(r#"
+    type A: {id: int64, title: text}
+    type B: {for f: F in A do f: bool}
+
+    func f(flags: B): bool -> flags.id && flags.title
+
+    func main() -> f({id = true, title = false})
+    "#), @r"
+    Error:
+       ╭─[:5:36]
+       │
+     5 │     func f(flags: B): bool -> flags.id && flags.title
+       │                                    ─┬─
+       │                                     ╰─── lookup into tuple comprehension is not yet supported
+    ───╯
+    ");
+}
+
+#[test]
+fn ty_tuple_comprehension_04() {
+    // remove tuple names
+
+    insta::assert_snapshot!(_test_ty(r#"
+    type A: {id: int64, title: text}
+
+    func main(): {for f: F in A do F}
+    -> std::default()
+    "#), @"{int64, text}");
+}
+
+#[test]
+fn ty_tuple_comprehension_05() {
+    // wrap into array
+
+    insta::assert_snapshot!(_test_ty(r#"
+    type A: {id: int64, title: text}
+
+    func main(): {for f: F in A do f: [F]}
+    -> std::default()
+    "#), @"{id: [int64], title: [text]}");
+}
+
+#[test]
+fn ty_tuple_comprehension_06() {
+    // validate tuples against comprehension
+
+    insta::assert_snapshot!(_test_ty(r#"
+    func make_flags(x: T): {for f: F in T do f: bool}
+    where T: {..}
+    -> std::default()
+
+    type A: {id: int64, title: text}
+
+    func main(a: A): {id: bool, title: bool} -> make_flags(a)
+    "#), @"{id: bool, title: bool}");
+
+    insta::assert_snapshot!(_test_err(r#"
+    func make_flags(x: T): {for f: F in T do f: bool}
+    where T: {..}
+    -> std::default()
+
+    type A: {id: int64, title: text}
+
+    func main(a: A): {id: bool, title: bool, release_year: bool} -> make_flags(a)
+    "#), @r"
+    [E0004] Error:
+       ╭─[:8:69]
+       │
+     8 │     func main(a: A): {id: bool, title: bool, release_year: bool} -> make_flags(a)
+       │                                                                     ─────┬────
+       │                                                                          ╰────── field .2 does not exist in type {id: int64, title: text}
+    ───╯
+    ");
+
+    // TODO: this should error out - it actually returns additional `release_year: bool` field
+    insta::assert_snapshot!(_test_ty(r#"
+    func make_flags(x: T): {for f: F in T do f: bool}
+    where T: {..}
+    -> std::default()
+
+    type A: {id: int64, title: text, release_year: int16}
+
+    func main(a: A): {id: bool, title: bool} -> make_flags(a)
+    "#), @"{id: bool, title: bool}");
+}
+
+#[test]
+fn ty_tuple_comprehension_07() {
+    // validate tuples against comprehension
+
+    insta::assert_snapshot!(_test_ty(r#"
+    type A: {id: int64, title: text}
+    func main(a: {id: bool, title: bool}): {for f: F in A do f: bool} -> a
+    "#), @"{id: bool, title: bool}");
+}
+
+#[test]
+fn tuple_00() {
+    // tuples, named type validation
+
+    insta::assert_snapshot!(_test_ty(r#"
+    func main(): {title: text, is_released: bool} -> {title = "hello", is_released = true}
+    "#), @"{title: text, is_released: bool}");
+
+    insta::assert_snapshot!(_test_err(r#"
+    func main(): {title: text, is_released: bool} -> {title = "hello"}
+    "#), @r#"
+    [E0004] Error:
+       ╭─[:2:54]
+       │
+     2 │     func main(): {title: text, is_released: bool} -> {title = "hello"}
+       │                                                      ────────┬────────
+       │                                                              ╰────────── expected type `{title: text, is_released: bool}`, but found type `{title: text}`
+    ───╯
+    "#);
+
+    insta::assert_snapshot!(_test_err(r#"
+    func main(): {title: text} -> {title = "hello", is_released = true}
+    "#), @r#"
+    [E0004] Error:
+       ╭─[:2:35]
+       │
+     2 │     func main(): {title: text} -> {title = "hello", is_released = true}
+       │                                   ──────────────────┬──────────────────
+       │                                                     ╰──────────────────── expected type `{title: text}`, but found type `{title: text, is_released: bool}`
+    ───╯
+    "#);
+}
+
+#[test]
+fn tuple_01() {
+    // tuples, positional type validation
+
+    insta::assert_snapshot!(_test_ty(r#"
+    func main(): {text, bool} -> {"hello", true}
+    "#), @"{text, bool}");
+
+    insta::assert_snapshot!(_test_err(r#"
+    func main(): {text, bool} -> {"hello"}
+    "#), @r#"
+    [E0004] Error:
+       ╭─[:2:34]
+       │
+     2 │     func main(): {text, bool} -> {"hello"}
+       │                                  ────┬────
+       │                                      ╰────── expected type `{text, bool}`, but found type `{text}`
+    ───╯
+    "#);
+
+    insta::assert_snapshot!(_test_err(r#"
+    func main(): {text} -> {"hello", true}
+    "#), @r#"
+    [E0004] Error:
+       ╭─[:2:28]
+       │
+     2 │     func main(): {text} -> {"hello", true}
+       │                            ───────┬───────
+       │                                   ╰───────── expected type `{text}`, but found type `{text, bool}`
+    ───╯
+    "#);
+}
+
+#[test]
+fn tuple_02() {
+    // tuples, positional type variation of named tuples
+
+    insta::assert_snapshot!(_test_ty(r#"
+    func main(): {text, bool} -> {title = "hello", is_released = true}
+    "#), @"{text, bool}");
+
+    insta::assert_snapshot!(_test_err(r#"
+    func main(): {text, bool} -> {title = "hello"}
+    "#), @r#"
+    [E0004] Error:
+       ╭─[:2:34]
+       │
+     2 │     func main(): {text, bool} -> {title = "hello"}
+       │                                  ────────┬────────
+       │                                          ╰────────── expected type `{text, bool}`, but found type `{title: text}`
+    ───╯
+    "#);
+
+    insta::assert_snapshot!(_test_err(r#"
+    func main(): {text} -> {title = "hello", is_released = true}
+    "#), @r#"
+    [E0004] Error:
+       ╭─[:2:28]
+       │
+     2 │     func main(): {text} -> {title = "hello", is_released = true}
+       │                            ──────────────────┬──────────────────
+       │                                              ╰──────────────────── expected type `{text}`, but found type `{title: text, is_released: bool}`
+    ───╯
+    "#);
+}
+
+#[test]
+fn tuple_03() {
+    // tuples, named type validation of unnamed tuples
+
+    insta::assert_snapshot!(_test_ty(r#"
+    func main(): {title: text, is_released: bool} -> {"hello", true}
+    "#), @"{title: text, is_released: bool}");
+
+    insta::assert_snapshot!(_test_err(r#"
+    func main(): {title: text, is_released: bool} -> {"hello"}
+    "#), @r#"
+    [E0004] Error:
+       ╭─[:2:54]
+       │
+     2 │     func main(): {title: text, is_released: bool} -> {"hello"}
+       │                                                      ────┬────
+       │                                                          ╰────── expected type `{title: text, is_released: bool}`, but found type `{text}`
+    ───╯
+    "#);
+
+    insta::assert_snapshot!(_test_err(r#"
+    func main(): {title: text} -> {"hello", true}
+    "#), @r#"
+    [E0004] Error:
+       ╭─[:2:35]
+       │
+     2 │     func main(): {title: text} -> {"hello", true}
+       │                                   ───────┬───────
+       │                                          ╰───────── expected type `{title: text}`, but found type `{text, bool}`
+    ───╯
+    "#);
+}
+
+#[test]
+fn tuple_04() {
+    // tuples, multiple diagnostics
+
+    insta::assert_snapshot!(_test_err(r#"
+    func main(): {title: bool, is_released: bool} -> {"hello", "world"}
+    "#), @r#"
+    [E0004] Error:
+       ╭─[:2:55]
+       │
+     2 │     func main(): {title: bool, is_released: bool} -> {"hello", "world"}
+       │                                                       ───┬───
+       │                                                          ╰───── expected type `bool`, but found type `text`
+    ───╯
+    [E0004] Error:
+       ╭─[:2:64]
+       │
+     2 │     func main(): {title: bool, is_released: bool} -> {"hello", "world"}
+       │                                                                ───┬───
+       │                                                                   ╰───── expected type `bool`, but found type `text`
+    ───╯
+    "#);
 }

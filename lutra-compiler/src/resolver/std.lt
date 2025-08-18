@@ -166,20 +166,20 @@ where T
 func sort(array: [I], key: func (I): int64): [I]
 where I
 
-func to_columnar(x: [{A, B}]): {[A], [B]}
-where A, B  # <I: {i1 = I1}>
+func to_columnar(rows: [T]): {for f: F in T do f: [F]}
+where T: {..}
 
 func from_columnar(columnar: {[A], [B]}): [{A, B}]
 where A, B  # <I: {i1 = [I1]}>
 
 func map_columnar(x: [{A, B}], mapper: func ({[A], [B]}): {[A], [B]}): [{A, B}]
-where A, B # <I: {i1 = I1}, O: {o1 = O1}>
+where A, B  # <I: {i1 = I1}, O: {o1 = O1}>
 -> (
   x | to_columnar | mapper | from_columnar
 )
 
-func aggregate(x: [{A, B}], mapper: func ({[A], [B]}): O): O
-where A, B, O # <I: {i1 = I1}, O>
+func aggregate(x: [T], mapper: func ({for f: F in T do f: [F]}): O): O
+where T: {..}, O
 -> (
   x | to_columnar | mapper
 )

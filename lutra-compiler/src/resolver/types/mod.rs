@@ -20,10 +20,10 @@ pub fn run(
     let diagnostic = resolver.resolve_defs(resolution_order).err();
     resolver.diagnostics.extend(diagnostic);
 
-    if resolver.diagnostics.is_empty() {
+    if resolver.diagnostics.len() == 0 {
         Ok(())
     } else {
-        Err(resolver.diagnostics)
+        Err(resolver.diagnostics.into_vec())
     }
 }
 
@@ -37,7 +37,7 @@ struct TypeResolver<'a> {
 
     const_validator: super::const_eval::ConstantValidator,
 
-    diagnostics: Vec<Diagnostic>,
+    diagnostics: append_only_vec::AppendOnlyVec<Diagnostic>,
 }
 
 impl TypeResolver<'_> {
@@ -48,12 +48,28 @@ impl TypeResolver<'_> {
             scopes: Vec::new(),
 
             const_validator: super::const_eval::ConstantValidator::new(),
-            diagnostics: Vec::new(),
+            diagnostics: Default::default(),
         }
     }
 
-    fn push_diagnostic(&mut self) -> impl FnOnce(Diagnostic) {
-        |d| self.diagnostics.push(d)
+    fn push_diagnostic(&self) -> impl FnOnce(Diagnostic) {
+        |d| {
+            assert!(d.span.is_some());
+            self.diagnostics.push(d);
+        }
+    }
+
+    /// If diagnostic has span, push it to buffer.
+    /// If it does not, return it back so it can be propagated up the stack where is should find the span.
+    fn try_push_diagnostic(&self) -> impl FnOnce(Diagnostic) -> Result<(), Diagnostic> {
+        |d| {
+            if d.span.is_some() {
+                self.diagnostics.push(d);
+                Ok(())
+            } else {
+                Err(d)
+            }
+        }
     }
 
     /// Resolve expr and try to recover errors.

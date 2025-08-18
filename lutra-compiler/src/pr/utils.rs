@@ -118,6 +118,8 @@ impl From<super::Ty> for ir::Ty {
                     .collect(),
                 body: ir::Ty::from(*func.body.clone().unwrap()),
             })),
+
+            super::TyKind::TupleComprehension(_) => todo!(),
         };
 
         ir::Ty {

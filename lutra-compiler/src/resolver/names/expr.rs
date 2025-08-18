@@ -173,6 +173,36 @@ impl fold::PrFold for NameResolver<'_> {
                     fold::fold_type(self, ty)?
                 }
             }
+            pr::TyKind::TupleComprehension(ref comp) => {
+                // validate that variable name is equal to body name
+                // This restricts the generality of comprehension
+                // (variable name cannot be used in some inner comprehension)
+                // but for now, that generality is not needed.
+                if comp
+                    .body_name
+                    .as_ref()
+                    .is_some_and(|b| b != &comp.variable_name)
+                {
+                    return Err(Diagnostic::new_custom(format!(
+                        "expected field to be named {}",
+                        comp.variable_name
+                    )));
+                }
+
+                // new scope that for comp.variable_ty
+                let scope_id = self.scope_id_gen.next();
+                let mut scope = Scope::new_empty(scope_id);
+                scope.insert_ty_local(&comp.variable_ty);
+                self.scopes.push(scope);
+
+                // fold
+                let mut ty = fold::fold_type(self, ty)?;
+                ty.scope_id = Some(scope_id);
+
+                self.scopes.pop();
+
+                ty
+            }
             _ => fold::fold_type(self, ty)?,
         })
     }

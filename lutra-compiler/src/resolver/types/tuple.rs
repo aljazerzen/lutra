@@ -35,21 +35,12 @@ impl super::TypeResolver<'_> {
                         }
                     }
                     scope::TyRef::Param(id) => {
-                        let (p_name, domain) = self.get_ty_param(id);
-                        match domain {
-                            pr::TyParamDomain::Open
-                            | pr::TyParamDomain::OneOf(_)
-                            | pr::TyParamDomain::EnumVariants(_) => {
-                                return Err(Diagnostic::new(
-                                    format!("unpack expected a tuple, found {p_name}"),
-                                    DiagnosticCode::TYPE,
-                                )
-                                .push_hint(format!("{p_name} is not constrained to tuples only")));
-                            }
-                            pr::TyParamDomain::TupleFields(_) => {
-                                // ok
-                            }
-                        }
+                        let (param_name, domain) = self.get_ty_param(id);
+                        let pr::TyParamDomain::TupleFields(_) = domain else {
+                            return Err(error_lookup_into_unpack_of_ty_param(param_name));
+                        };
+
+                        // ok
                     }
                     scope::TyRef::Var(_, o) => {
                         // restrict var to be a tuple
@@ -82,43 +73,13 @@ impl super::TypeResolver<'_> {
     }
 
     fn infer_tuple_field_name(&self, field: &pr::Expr) -> Option<String> {
-        // at this stage, this expr should already be fully resolved
-        // this means that any lookups will be tuple positional
-        // so we check for that and pull the name from the type of the base
-
-        let pr::ExprKind::TupleLookup {
-            base,
-            lookup: pr::Lookup::Position(pos),
-        } = &field.kind
-        else {
+        let pr::ExprKind::TupleLookup { base: _, lookup } = &field.kind else {
             return None;
         };
 
-        let ty = base.ty.as_ref()?;
-        self.get_ty_tuple_field_name(ty, *pos as usize)
-    }
-
-    fn get_ty_tuple_field_name(&self, ty: &Ty, pos: usize) -> Option<String> {
-        // SAFETY: get_my_ty will not error, because it has been resolved earlier already
-        let mat_ty = self.get_ty_mat(ty).unwrap();
-
-        match mat_ty {
-            super::scope::TyRef::Ty(ty) => match &ty.kind {
-                pr::TyKind::Tuple(fields) => {
-                    // this tuple might contain Unpacks (which affect positions of fields after them)
-                    // so we need to resolve this type full first.
-
-                    // unpacks don't interfere with preceding fields
-                    let field = fields.get(pos)?;
-
-                    field.name.clone()
-                }
-
-                pr::TyKind::Ident(_fq_ident) => unreachable!(),
-                _ => None,
-            },
-            super::scope::TyRef::Param(..) => None,
-            super::scope::TyRef::Var(..) => None,
+        match lookup {
+            pr::Lookup::Name(name) => Some(name.clone()),
+            pr::Lookup::Position(_) => None,
         }
     }
 
@@ -128,7 +89,7 @@ impl super::TypeResolver<'_> {
     ///
     /// Span is the span of the lookup node - the thing that invoked the lookup.
     pub fn resolve_tuple_lookup(
-        &mut self,
+        &self,
         base: &Ty,
         lookup: &pr::Lookup,
         span: Span,
@@ -161,6 +122,12 @@ impl super::TypeResolver<'_> {
     /// Takes a concrete tuple and finds the field identifier by [pr::Lookup].
     pub fn lookup_in_tuple(&self, base: &Ty, lookup: &pr::Lookup) -> Result<pr::Ty> {
         let pr::TyKind::Tuple(fields) = &base.kind else {
+            if base.kind.is_tuple_comprehension() {
+                return Err(Diagnostic::new_custom(
+                    "lookup into tuple comprehension is not yet supported",
+                ));
+            }
+
             return Err(Diagnostic::new(
                 format!("lookup expected a tuple, found {}", printer::print_ty(base)),
                 DiagnosticCode::TYPE,
@@ -318,6 +285,7 @@ fn error_lookup_into_unpack_of_ty_param(param_name: &str) -> Diagnostic {
     Diagnostic::new_custom(format!(
         "lookup expected a tuple, found type parameter {param_name}"
     ))
+    .push_hint(format!("{param_name} is not constrained to tuples only"))
     .push_hint(format!(
         "add `{param_name}: {{}}` to constrain it to tuples"
     ))

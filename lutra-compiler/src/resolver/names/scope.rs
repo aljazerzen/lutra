@@ -5,14 +5,7 @@ use crate::pr;
 #[derive(Debug)]
 pub struct Scope {
     id: usize,
-    names: IndexMap<String, ScopedKind>,
-}
-
-#[derive(Debug, Clone, enum_as_inner::EnumAsInner)]
-pub enum ScopedKind {
-    Param,
-    Generic,
-    Local,
+    names: IndexMap<String, ()>,
 }
 
 impl Scope {
@@ -38,24 +31,27 @@ impl Scope {
 
     pub fn insert_generics(&mut self, type_params: &[pr::TyParam]) -> crate::Result<()> {
         for param in type_params {
-            let scoped = ScopedKind::Generic;
-            self.names.insert(param.name.clone(), scoped);
+            self.names.insert(param.name.clone(), ());
         }
         Ok(())
     }
 
     pub fn insert_params(&mut self, func: &pr::Func) -> crate::Result<()> {
         for param in func.params.iter() {
-            self.names.insert(param.name.clone(), ScopedKind::Param);
+            self.names.insert(param.name.clone(), ());
         }
         Ok(())
     }
 
     pub fn insert_local(&mut self, name: &str) {
-        self.names.insert(name.to_string(), ScopedKind::Local);
+        self.names.insert(name.to_string(), ());
     }
 
-    pub fn get(&self, name: &str) -> Option<(usize, usize, &ScopedKind)> {
+    pub fn insert_ty_local(&mut self, name: &str) {
+        self.names.insert(name.to_string(), ());
+    }
+
+    pub fn get(&self, name: &str) -> Option<(usize, usize, &())> {
         let (position, _, scoped) = self.names.get_full(name)?;
         Some((self.id, position, scoped))
     }
