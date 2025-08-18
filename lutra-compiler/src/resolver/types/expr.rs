@@ -202,24 +202,24 @@ impl fold::PrFold for super::TypeResolver<'_> {
 
             // inline idents into types
             pr::TyKind::Ident(_) => {
-                if let Some(pr::Ref::FullyQualified { to_def, within }) = &ty.target {
-                    if !within.is_empty() {
-                        // Things like `my_tuple::field` are "references into types".
-                        // They are needed for constructing enums and are useful in general.
-                        // But they are inconvenient to work with in IR, because in addition
-                        // to the code that finds the def, we need code to look into the def
-                        // as well/
-                        // So instead, we inline these references during resolving.
-                        // This is possible, because they are restricted to be non-recursive.
-                        tracing::debug!("inlining a 'path into type' for: {to_def:?}.{within:?}");
+                if let Some(pr::Ref::FullyQualified { to_def, within }) = &ty.target
+                    && !within.is_empty()
+                {
+                    // Things like `my_tuple::field` are "references into types".
+                    // They are needed for constructing enums and are useful in general.
+                    // But they are inconvenient to work with in IR, because in addition
+                    // to the code that finds the def, we need code to look into the def
+                    // as well/
+                    // So instead, we inline these references during resolving.
+                    // This is possible, because they are restricted to be non-recursive.
+                    tracing::debug!("inlining a 'path into type' for: {to_def:?}.{within:?}");
 
-                        let def = self.root_mod.get(to_def).unwrap();
-                        let referenced = def.into_ty().unwrap();
-                        let referenced =
-                            names::ty_lookup_steps(referenced, within.full_path()).unwrap();
+                    let def = self.root_mod.get(to_def).unwrap();
+                    let referenced = def.into_ty().unwrap();
+                    let referenced =
+                        names::ty_lookup_steps(referenced, within.full_path()).unwrap();
 
-                        return self.fold_type(referenced.clone());
-                    }
+                    return self.fold_type(referenced.clone());
                 }
                 ty
             }

@@ -154,10 +154,10 @@ impl Layouter {
             return Ok(());
         }
 
-        if let ir::TyKind::Ident(ident) = &ty.kind {
-            if Some(ident) == self.currently_resolving.as_ref() {
-                return Ok(());
-            }
+        if let ir::TyKind::Ident(ident) = &ty.kind
+            && Some(ident) == self.currently_resolving.as_ref()
+        {
+            return Ok(());
         }
 
         ty.layout = match &ty_mat.kind {

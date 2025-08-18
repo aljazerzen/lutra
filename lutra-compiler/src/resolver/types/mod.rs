@@ -41,7 +41,7 @@ struct TypeResolver<'a> {
 }
 
 impl TypeResolver<'_> {
-    fn new(root_mod: &mut pr::ModuleDef) -> TypeResolver {
+    fn new(root_mod: &mut pr::ModuleDef) -> TypeResolver<'_> {
         TypeResolver {
             root_mod,
             debug_current_def: crate::pr::Path::from_name("?"),

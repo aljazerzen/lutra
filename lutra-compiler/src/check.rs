@@ -103,7 +103,7 @@ pub(super) struct SourceFile<'a> {
     pub content: &'a str,
 }
 
-pub fn linearize_tree(tree: &SourceTree) -> Result<Vec<SourceFile>, error::Error> {
+pub fn linearize_tree(tree: &SourceTree) -> Result<Vec<SourceFile<'_>>, error::Error> {
     // find root
     let root_path;
 

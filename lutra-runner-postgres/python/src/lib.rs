@@ -26,7 +26,7 @@ struct Prepared {
 #[pymethods]
 impl Runner {
     #[staticmethod]
-    fn connect(py: Python<'_>, config: String) -> PyResult<Bound<PyAny>> {
+    fn connect(py: Python<'_>, config: String) -> PyResult<Bound<'_, PyAny>> {
         pyo3_async_runtimes::tokio::future_into_py(py, async move {
             // TODO: tls options
             let res = tokio_postgres::connect(&config, tokio_postgres::NoTls).await;

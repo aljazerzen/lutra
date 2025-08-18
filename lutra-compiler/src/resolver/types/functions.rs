@@ -149,13 +149,6 @@ pub struct FuncMetadata {
     pub name_hint: Option<Path>,
 }
 
-#[derive(Debug, PartialEq, Clone)]
-pub struct ImplicitClosureConfig {
-    pub param: u8,
-    pub this: Option<u8>,
-    pub that: Option<u8>,
-}
-
 impl FuncMetadata {
     pub(crate) fn as_debug_name(&self) -> &str {
         let ident = self.name_hint.as_ref();

@@ -27,10 +27,10 @@ impl TypeReplacer {
 
 impl fold::PrFold for TypeReplacer {
     fn fold_type(&mut self, ty: pr::Ty) -> Result<pr::Ty> {
-        if let Some(target) = &ty.target {
-            if let Some(new_ty) = self.mapping.get(target) {
-                return self.fold_type(new_ty.clone());
-            }
+        if let Some(target) = &ty.target
+            && let Some(new_ty) = self.mapping.get(target)
+        {
+            return self.fold_type(new_ty.clone());
         }
         fold::fold_type(self, ty)
     }

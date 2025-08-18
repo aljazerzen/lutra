@@ -27,7 +27,7 @@ pub enum ExprOrTy<'a> {
 
 impl pr::ModuleDef {
     /// Get definition by fully qualified ident.
-    pub fn get(&self, fq_ident: &pr::Path) -> Option<ExprOrTy> {
+    pub fn get(&self, fq_ident: &pr::Path) -> Option<ExprOrTy<'_>> {
         let module_steps = &fq_ident.full_path()[0..(fq_ident.len() - 1)];
         let sub_module = self.get_submodule(module_steps)?;
 

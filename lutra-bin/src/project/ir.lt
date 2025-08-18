@@ -180,7 +180,7 @@ type Module: {
 }
 
 type Decl: enum {
-    Module: Module,
-    Type: Ty,
-    Var: Ty,
+  Module: Module,
+  Type: Ty,
+  Var: Ty,
 }

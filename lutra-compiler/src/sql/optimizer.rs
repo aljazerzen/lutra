@@ -36,10 +36,10 @@ fn unpack_pack(expr: cr::Expr) -> cr::Expr {
         return expr;
     };
     let mut packed = packed.as_ref();
-    if let cr::ExprKind::From(cr::From::Row(row)) = &packed.kind {
-        if row.len() == 1 {
-            packed = &row[0];
-        }
+    if let cr::ExprKind::From(cr::From::Row(row)) = &packed.kind
+        && row.len() == 1
+    {
+        packed = &row[0];
     };
     let cr::ExprKind::From(cr::From::JsonPack(_)) = &packed.kind else {
         return expr;
@@ -67,10 +67,10 @@ fn pack_unpack(expr: cr::Expr) -> cr::Expr {
         return expr;
     };
     let mut unpacked = unpacked.as_ref();
-    if let cr::ExprKind::From(cr::From::Row(row)) = &unpacked.kind {
-        if row.len() == 1 {
-            unpacked = &row[0];
-        }
+    if let cr::ExprKind::From(cr::From::Row(row)) = &unpacked.kind
+        && row.len() == 1
+    {
+        unpacked = &row[0];
     };
     let cr::ExprKind::From(cr::From::JsonUnpack(_)) = &unpacked.kind else {
         return expr;

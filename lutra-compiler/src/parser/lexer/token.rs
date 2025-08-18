@@ -1,8 +1,5 @@
 use crate::pr;
 
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Tokens(pub Vec<Token>);
-
 #[derive(Clone, PartialEq, Eq)]
 pub struct Token {
     pub kind: TokenKind,

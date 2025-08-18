@@ -134,7 +134,7 @@ impl Decl {
         }
     }
 
-    fn name_widget(&self) -> Span {
+    fn name_widget(&self) -> Span<'_> {
         if self.focus {
             self.name.as_str().black().on_white()
         } else {

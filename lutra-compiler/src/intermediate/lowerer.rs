@@ -138,25 +138,25 @@ impl<'a> Lowerer<'a> {
 
         let mut expr = expr;
 
-        if let pr::TyKind::Func(ty_func) = &expr.ty.as_ref().unwrap().kind {
-            if !ty_func.ty_params.is_empty() {
-                // replace refs to type params with inferred type args
-                // For example:
-                // - `func identity<T>(x: T) -> x` contains type param T,
-                // - `identity(false)` instantiates param into arg that is inferred to be bool,
-                // - when identify is lowered, we finalize the function into `func (x: bool): bool -> x`.
-                let mut mapping = HashMap::<pr::Ref, pr::Ty>::new();
-                for (gtp_index, arg) in ty_args.into_iter().enumerate() {
-                    mapping.insert(
-                        pr::Ref::Local {
-                            scope: expr.scope_id.unwrap(),
-                            offset: gtp_index,
-                        },
-                        arg,
-                    );
-                }
-                expr = utils::TypeReplacer::on_expr(expr, mapping);
+        if let pr::TyKind::Func(ty_func) = &expr.ty.as_ref().unwrap().kind
+            && !ty_func.ty_params.is_empty()
+        {
+            // replace refs to type params with inferred type args
+            // For example:
+            // - `func identity<T>(x: T) -> x` contains type param T,
+            // - `identity(false)` instantiates param into arg that is inferred to be bool,
+            // - when identify is lowered, we finalize the function into `func (x: bool): bool -> x`.
+            let mut mapping = HashMap::<pr::Ref, pr::Ty>::new();
+            for (gtp_index, arg) in ty_args.into_iter().enumerate() {
+                mapping.insert(
+                    pr::Ref::Local {
+                        scope: expr.scope_id.unwrap(),
+                        offset: gtp_index,
+                    },
+                    arg,
+                );
             }
+            expr = utils::TypeReplacer::on_expr(expr, mapping);
         }
 
         let res = self.lower_expr(&expr)?;

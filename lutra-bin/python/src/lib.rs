@@ -49,7 +49,7 @@ impl BytesMut {
     }
 
     #[allow(clippy::wrong_self_convention)]
-    fn into_bytes(&mut self) -> Cow<[u8]> {
+    fn into_bytes(&mut self) -> Cow<'_, [u8]> {
         let bytes_mut = std::mem::take(&mut self.inner);
         Cow::from(bytes_mut.freeze().to_vec())
     }
