@@ -19,11 +19,17 @@ fn main() {
     let mut args = Arguments::from_args();
     args.color = Some(libtest_mimic::ColorSetting::Always);
 
-    let test_file = std::fs::read_to_string("tests/language/language.lt").unwrap();
-    let cases = parse_file(&test_file);
+    const TEST_FILES: [&str; 2] = ["tests/corpus/language.lt", "tests/corpus/casts.lt"];
 
+    let mut cases = Vec::new();
+    for path in TEST_FILES {
+        let test_file = std::fs::read_to_string(path).unwrap();
+        cases.extend(parse_file(&test_file));
+    }
+
+    // Uncomment this to generate tree sitter file.
     // let mut tree_sitter_file =
-    //     std::io::BufWriter::new(std::fs::File::create("tests/language/language.txt").unwrap());
+    //     std::io::BufWriter::new(std::fs::File::create("tests/corpus/all.txt").unwrap());
 
     let mut trails = Vec::new();
     for case in cases {

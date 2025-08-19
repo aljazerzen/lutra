@@ -35,6 +35,6 @@ tracing-subscriber = { workspace = true, features = ["fmt", "env-filter"] }
 tokio = { workspace = true, features = ["rt", "macros"] }
 
 [[test]]
-name = "language"
-path = "tests/language/main.rs"
+name = "corpus"
+path = "tests/corpus/main.rs"
 harness = false
