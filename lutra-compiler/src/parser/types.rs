@@ -229,7 +229,7 @@ pub fn type_params<'a>(
                 ty,
             });
         }
-        Ok(TyParamDomain::TupleFields(fields))
+        Ok(TyParamDomain::TupleHasFields(fields))
     })
     .labelled("tuple domain");
 

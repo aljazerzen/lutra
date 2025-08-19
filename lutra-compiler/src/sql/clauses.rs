@@ -797,59 +797,80 @@ impl<'a> Context<'a> {
                 let ty_out_fields = ty_out_item.kind.as_tuple().unwrap();
 
                 // construct correlated subqueries
-                let field0 = {
-                    let input = self.new_rel_col(&tuple, 0, ir::Ty::new(ir::TyPrimitive::text));
-                    cr::Expr {
-                        ty: ty_in_fields[0].ty.clone(),
-                        kind: cr::ExprKind::From(cr::From::JsonUnpack(Box::new(input))),
+                let mut fields = Vec::new();
+                for (pos, ty_in_field) in ty_in_fields.iter().enumerate() {
+                    let input_col =
+                        self.new_rel_col(&tuple, pos, ir::Ty::new(ir::TyPrimitive::text));
+                    fields.push(cr::Expr {
+                        ty: ty_in_field.ty.clone(),
+                        kind: cr::ExprKind::From(cr::From::JsonUnpack(Box::new(input_col))),
+                    });
+                }
+                let fields_len = fields.len();
+                let mut fields = fields.into_iter().enumerate();
+
+                if let Some((_, mut joined)) = fields.next() {
+                    for (f_index, curr) in fields {
+                        let prev = self.new_binding(joined);
+                        let curr = self.new_binding(curr);
+
+                        let ty_index = ir::Ty::new(ir::TyPrimitive::int64);
+                        let join_cond = cr::Expr {
+                            ty: ir::Ty::new(ir::TyPrimitive::bool),
+                            kind: cr::ExprKind::From(cr::From::FuncCall(
+                                "std::eq".into(),
+                                vec![
+                                    self.new_rel_col(&prev, 0, ty_index.clone()),
+                                    self.new_rel_col(&curr, 0, ty_index.clone()),
+                                ],
+                            )),
+                        };
+
+                        let ty_index_field = ir::TyTupleField {
+                            ty: ty_index,
+                            name: None,
+                        };
+                        let mut ty_join_fields = Vec::new();
+                        for ty_out_field in &ty_out_fields[..f_index] {
+                            ty_join_fields.push(ty_out_field.clone());
+                        }
+                        ty_join_fields.push(ty_index_field.clone());
+                        ty_join_fields.push(ty_out_fields[f_index].clone());
+                        let ty_join = ir::Ty::new(ir::TyKind::Array(Box::new(ir::Ty::new(
+                            ir::TyKind::Tuple(ty_join_fields),
+                        ))));
+
+                        let ty_joined_fields = ty_out_fields[..f_index + 1].to_vec();
+                        let ty_joined = ir::Ty::new(ir::TyKind::Array(Box::new(ir::Ty::new(
+                            ir::TyKind::Tuple(ty_joined_fields),
+                        ))));
+
+                        joined = cr::Expr {
+                            kind: cr::ExprKind::Transform(
+                                self.new_binding(cr::Expr {
+                                    kind: cr::ExprKind::Join(prev, curr, Some(Box::new(join_cond))),
+                                    ty: ty_join,
+                                }),
+                                cr::Transform::ProjectDiscard(vec![f_index + 1]),
+                            ),
+                            ty: ty_joined,
+                        };
                     }
-                };
-                let field0 = self.new_binding(field0);
-                let field1 = {
-                    let input = self.new_rel_col(&tuple, 1, ir::Ty::new(ir::TyPrimitive::text));
-                    cr::Expr {
-                        ty: ty_in_fields[1].ty.clone(),
-                        kind: cr::ExprKind::From(cr::From::JsonUnpack(Box::new(input))),
+
+                    if fields_len == 1 {
+                        joined = cr::Expr {
+                            kind: cr::ExprKind::Transform(
+                                self.new_binding(joined),
+                                cr::Transform::ProjectRetain(vec![0, 1]),
+                            ),
+                            ty: expr.ty.clone(),
+                        }
                     }
-                };
-                let field1 = self.new_binding(field1);
 
-                let ty_index = ir::Ty::new(ir::TyPrimitive::int64);
-                let join_cond = cr::Expr {
-                    ty: ir::Ty::new(ir::TyPrimitive::bool),
-                    kind: cr::ExprKind::From(cr::From::FuncCall(
-                        "std::eq".into(),
-                        vec![
-                            self.new_rel_col(&field0, 0, ty_index.clone()),
-                            self.new_rel_col(&field1, 0, ty_index.clone()),
-                        ],
-                    )),
-                };
-
-                let ty_index_field = ir::TyTupleField {
-                    ty: ty_index.clone(),
-                    name: None,
-                };
-                let joined_type = ir::Ty::new(ir::TyKind::Tuple(vec![
-                    ty_index_field.clone(),
-                    ty_out_fields[0].clone(),
-                    ty_index_field,
-                    ty_out_fields[1].clone(),
-                ]));
-
-                cr::ExprKind::BindCorrelated(
-                    tuple,
-                    Box::new(cr::Expr {
-                        kind: cr::ExprKind::Transform(
-                            self.new_binding(cr::Expr {
-                                kind: cr::ExprKind::Join(field0, field1, Some(Box::new(join_cond))),
-                                ty: joined_type,
-                            }),
-                            cr::Transform::ProjectRetain(vec![0, 1, 3]),
-                        ),
-                        ty: expr.ty.clone(),
-                    }),
-                )
+                    cr::ExprKind::BindCorrelated(tuple, Box::new(joined))
+                } else {
+                    cr::ExprKind::Union(vec![])
+                }
             }
 
             "std::group" => {

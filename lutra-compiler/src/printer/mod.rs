@@ -101,7 +101,7 @@ impl Printer {
                                     r += &ty.to_string();
                                 }
                             }
-                            pr::TyParamDomain::TupleFields(fields) => {
+                            pr::TyParamDomain::TupleHasFields(fields) => {
                                 r += ": {";
                                 for (i, field) in fields.iter().enumerate() {
                                     if i > 0 {
@@ -119,6 +119,12 @@ impl Printer {
                                     r += &self.print_ty(&field.ty);
                                 }
                                 r += ", ..}";
+                            }
+                            pr::TyParamDomain::TupleLen { n } => {
+                                // not actual Lutra syntax (there is no syntax for this)
+                                r += ": {.. ";
+                                r += &n.to_string();
+                                r += " ..}";
                             }
                             pr::TyParamDomain::EnumVariants(variants) => {
                                 r += ": enum {";

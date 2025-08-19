@@ -27,7 +27,6 @@ pub enum ExprKind {
     BindCorrelated(Box<BoundExpr>, Box<Expr>),
 
     /// Computes relations separately and concatenates them together
-    #[allow(dead_code)]
     Union(Vec<Expr>),
 }
 
@@ -113,10 +112,13 @@ pub enum Transform {
 }
 
 impl std::fmt::Debug for Expr {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        self.kind.fmt(f)?;
-        f.write_str(": ")?;
-        f.write_str(&ir::print_ty(&self.ty))?;
+    fn fmt(&self, fmt: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match &self.kind {
+            ExprKind::From(f) => f.fmt(fmt)?,
+            k => k.fmt(fmt)?,
+        }
+        fmt.write_str(": ")?;
+        fmt.write_str(&ir::print_ty(&self.ty))?;
         Ok(())
     }
 }

@@ -124,13 +124,16 @@ pub enum TyParamDomain {
     OneOf(Vec<TyPrimitive>),
 
     /// This param must be a tuple with following fields
-    TupleFields(Vec<TyDomainTupleField>),
+    TupleHasFields(Vec<TyDomainTupleField>),
+
+    /// This param must be a tuple with exactly N fields
+    TupleLen { n: usize },
 
     /// This param must be an enum with following variants
     EnumVariants(Vec<TyDomainEnumVariant>),
 }
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct TyDomainTupleField {
     pub location: super::Lookup,
     pub ty: Ty,
@@ -252,5 +255,14 @@ impl std::hash::Hash for TyParam {
 impl TyTupleField {
     pub(crate) fn matches_name(&self, name: &str) -> bool {
         self.name.as_ref().is_some_and(|n| n == name)
+    }
+}
+
+impl std::fmt::Debug for TyDomainTupleField {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("TyDomainTupleField")
+            .field("location", &self.location)
+            .field("ty", &crate::printer::print_ty(&self.ty))
+            .finish()
     }
 }

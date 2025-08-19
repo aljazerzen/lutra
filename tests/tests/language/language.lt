@@ -1224,6 +1224,40 @@ func main() -> std::from_columnar({[false, true], ["no", "yes", "neither"]})
   },
 ]
 
+# === std_from_columnar_05
+func main() -> std::from_columnar({[1: int16, 2]})
+# >
+[
+  {
+    1,
+  },
+  {
+    2,
+  },
+]
+
+# === std_from_columnar_06
+func main() -> std::from_columnar({})
+# >
+[]
+
+# === std_from_columnar_07
+func main() -> std::from_columnar({[false, true], ["no", "yes", "neither"], [1: int16, 2]})
+# >
+[
+  {
+    false,
+    "no",
+    1,
+  },
+  {
+    true,
+    "yes",
+    2,
+  },
+]
+
+
 # === std_group_00
 func main() -> (
   std::group([1, 2, 5, 1, 2, 4, 6, 12]: [int64], func (x) -> x % 2)

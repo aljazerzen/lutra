@@ -1098,7 +1098,6 @@ fn unpack_04() {
 }
 
 #[test]
-#[ignore] // TODO
 fn unpack_05() {
     insta::assert_snapshot!(_test_ty(r#"
         const main = {
@@ -1246,26 +1245,18 @@ fn ty_tuple_comprehension_02() {
     "#), @"{id: [bool], title: [bool]}");
 }
 
-#[test] // TODO
+#[test]
 fn ty_tuple_comprehension_03() {
     // lookup in tuple comprehension
 
-    insta::assert_snapshot!(_test_err(r#"
+    insta::assert_snapshot!(_test_ty(r#"
     type A: {id: int64, title: text}
     type B: {for f: F in A do f: bool}
 
     func f(flags: B): bool -> flags.id && flags.title
 
     func main() -> f({id = true, title = false})
-    "#), @r"
-    Error:
-       ╭─[:5:36]
-       │
-     5 │     func f(flags: B): bool -> flags.id && flags.title
-       │                                    ─┬─
-       │                                     ╰─── lookup into tuple comprehension is not yet supported
-    ───╯
-    ");
+    "#), @"bool");
 }
 
 #[test]
@@ -1324,8 +1315,7 @@ fn ty_tuple_comprehension_06() {
     ───╯
     ");
 
-    // TODO: this should error out - it actually returns additional `release_year: bool` field
-    insta::assert_snapshot!(_test_ty(r#"
+    insta::assert_snapshot!(_test_err(r#"
     func make_flags(x: T): {for f: F in T do f: bool}
     where T: {..}
     -> std::default()
@@ -1333,7 +1323,15 @@ fn ty_tuple_comprehension_06() {
     type A: {id: int64, title: text, release_year: int16}
 
     func main(a: A): {id: bool, title: bool} -> make_flags(a)
-    "#), @"{id: bool, title: bool}");
+    "#), @r"
+    [E0005] Error:
+       ╭─[:8:49]
+       │
+     8 │     func main(a: A): {id: bool, title: bool} -> make_flags(a)
+       │                                                 ─────┬────
+       │                                                      ╰────── expected a tuple with 2 fields, found {id: int64, title: text, release_year: int16}
+    ───╯
+    ");
 }
 
 #[test]
@@ -1344,6 +1342,16 @@ fn ty_tuple_comprehension_07() {
     type A: {id: int64, title: text}
     func main(a: {id: bool, title: bool}): {for f: F in A do f: bool} -> a
     "#), @"{id: bool, title: bool}");
+}
+
+#[test]
+fn ty_tuple_comprehension_08() {
+    // lookup into comprehension
+
+    insta::assert_snapshot!(_test_ty(r#"
+    type A: {id: int64, title: text}
+    func main(a: {for f: F in A do f: {F, F}}) -> a.title
+    "#), @"{text, text}");
 }
 
 #[test]

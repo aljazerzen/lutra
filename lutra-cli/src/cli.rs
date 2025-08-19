@@ -12,6 +12,7 @@ fn main() {
     if action.verbose {
         tracing_subscriber::fmt::Subscriber::builder()
             .without_time()
+            .with_target(false)
             .with_max_level(tracing::Level::DEBUG)
             .with_writer(std::io::stderr)
             .init();

@@ -41,6 +41,9 @@ pub enum ScopedKind {
     Local {
         ty: pr::Ty,
     },
+    LocalTy {
+        ty: pr::Ty,
+    },
 
     /// Type parameter to a function.
     ///
@@ -173,15 +176,21 @@ impl Scope {
         };
         let var_id = self.names.push(ScopedKind::TyVar(type_arg));
 
-        self.ty_var_constraints
-            .borrow_mut()
-            .push(TyVarConstraint::InDomain(var_id, domain));
+        if !matches!(domain, pr::TyParamDomain::Open) {
+            self.ty_var_constraints
+                .borrow_mut()
+                .push(TyVarConstraint::InDomain(var_id, domain));
+        }
         var_id
     }
 
     pub fn insert_local(&mut self, ty: pr::Ty) -> usize {
         let local = ScopedKind::Local { ty };
+        self.names.push(local)
+    }
 
+    pub fn insert_local_ty(&mut self, ty: pr::Ty) -> usize {
+        let local = ScopedKind::LocalTy { ty };
         self.names.push(local)
     }
 
@@ -304,6 +313,7 @@ impl TypeResolver<'_> {
                             .push_hint(format!("got local var of type `{}`", printer::print_ty(ty)))
                             .with_span(ty.span))
                     }
+                    ScopedKind::LocalTy { ty } => self.get_ty_mat(ty),
                     ScopedKind::TyParam { .. } => Ok(TyRef::Param(*offset)),
                     ScopedKind::TyVar(_) => {
                         // return type var

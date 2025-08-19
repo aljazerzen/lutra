@@ -205,23 +205,13 @@ fn parse_04() {
                 ty_params: [
                     TyParam {
                         name: "T",
-                        domain: TupleFields(
+                        domain: TupleHasFields(
                             [
                                 TyDomainTupleField {
                                     location: Name(
                                         "b",
                                     ),
-                                    ty: Ty {
-                                        kind: Primitive(
-                                            int64,
-                                        ),
-                                        span: Some(
-                                            0:22-27,
-                                        ),
-                                        name: None,
-                                        scope_id: None,
-                                        target: None,
-                                    },
+                                    ty: "int64",
                                 },
                             ],
                         ),

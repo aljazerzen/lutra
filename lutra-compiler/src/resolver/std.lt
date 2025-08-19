@@ -169,11 +169,14 @@ where I
 func to_columnar(rows: [T]): {for f: F in T do f: [F]}
 where T: {..}
 
-func from_columnar(columnar: {[A], [B]}): [{A, B}]
-where A, B  # <I: {i1 = [I1]}>
+func from_columnar(columnar: {for f: F in T do f: [F]}): [T]
+where T: {..}
 
-func map_columnar(x: [{A, B}], mapper: func ({[A], [B]}): {[A], [B]}): [{A, B}]
-where A, B  # <I: {i1 = I1}, O: {o1 = O1}>
+func map_columnar(
+  x: [I],
+  mapper: func ({for f: F in I do f: [F]}): {for f: F in O do f: [F]}
+): [O]
+where I: {..}, O: {..}
 -> (
   x | to_columnar | mapper | from_columnar
 )

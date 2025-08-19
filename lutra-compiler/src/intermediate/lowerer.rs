@@ -1,3 +1,4 @@
+use std::borrow::Cow;
 use std::collections::{HashMap, VecDeque};
 
 use indexmap::IndexMap;
@@ -750,20 +751,46 @@ impl<'a> Lowerer<'a> {
         }
     }
 
-    fn tuple_iter_fields(&'a self, ty: &'a pr::Ty) -> impl Iterator<Item = &'a pr::TyTupleField> {
+    fn tuple_iter_fields(
+        &'a self,
+        ty: &'a pr::Ty,
+    ) -> Box<dyn Iterator<Item = Cow<'a, pr::TyTupleField>> + 'a> {
         let base_ty = self.get_ty_mat_pr(ty);
-        let pr::TyKind::Tuple(ty_fields) = &base_ty.kind else {
-            panic!("expected a tuple: {ty:?}")
-        };
-        ty_fields
-            .iter()
-            .flat_map(|f| -> Box<dyn Iterator<Item = &'a pr::TyTupleField>> {
+        match &base_ty.kind {
+            pr::TyKind::Tuple(ty_fields) => Box::new(ty_fields.iter().flat_map(|f| {
                 if f.unpack {
-                    Box::new(self.tuple_iter_fields(&f.ty))
+                    self.tuple_iter_fields(&f.ty)
                 } else {
-                    Box::new(Some(f).into_iter())
+                    Box::new(Some(Cow::Borrowed(f)).into_iter())
                 }
-            })
+            })),
+            pr::TyKind::TupleComprehension(comp) => {
+                // this is very inefficient: we are basically materializing the type on-the-fly,
+                // and then pick out just one field.
+
+                Box::new(self.tuple_iter_fields(&comp.tuple).map(|var_input| {
+                    let var_input = var_input.into_owned();
+
+                    let var_ref = pr::Ref::Local {
+                        scope: base_ty.scope_id.unwrap(),
+                        offset: 0,
+                    };
+                    let mapping = HashMap::from_iter(Some((var_ref, var_input.ty)));
+                    let ty = utils::TypeReplacer::on_ty(*comp.body_ty.clone(), mapping);
+
+                    Cow::Owned(pr::TyTupleField {
+                        name: if comp.body_name.is_some() {
+                            var_input.name
+                        } else {
+                            None
+                        },
+                        ty,
+                        unpack: false,
+                    })
+                }))
+            }
+            _ => panic!("expected a tuple: {ty:?}"),
+        }
     }
 
     /// Lowers a type definition

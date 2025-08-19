@@ -1,3 +1,4 @@
+use indexmap::IndexMap;
 use itertools::Itertools;
 use std::collections::HashMap;
 
@@ -34,7 +35,7 @@ impl TypeResolver<'_> {
 
     /// Validates that a type of a found node has an expected type.
     /// Might infer type variable constraints, that need to be finalized later.
-    pub fn validate_type<F>(&self, found: &Ty, expected: &Ty, who: &F) -> Result<(), Diagnostic>
+    pub fn validate_type<F>(&mut self, found: &Ty, expected: &Ty, who: &F) -> Result<(), Diagnostic>
     where
         F: Fn() -> Option<String>,
     {
@@ -109,7 +110,7 @@ impl TypeResolver<'_> {
 
     /// Validate that an found type matches the expected type.
     /// Both type are concrete: they cannot be identifiers, variables or parameters.
-    fn validate_type_concrete<F>(&self, found: Ty, expected: Ty, who: &F) -> crate::Result<()>
+    fn validate_type_concrete<F>(&mut self, found: Ty, expected: Ty, who: &F) -> crate::Result<()>
     where
         F: Fn() -> Option<String>,
     {
@@ -154,40 +155,41 @@ impl TypeResolver<'_> {
                 }
             }
 
-            (TyKind::TupleComprehension(found_comp), TyKind::Tuple(expected_fields)) => {
-                // here we need to check that the result of comprehension has all fields that are expected
-                // TODO ... and that the number of fields matches between the two tuples.
+            (TyKind::TupleComprehension(comp), TyKind::Tuple(fields))
+            | (TyKind::Tuple(fields), TyKind::TupleComprehension(comp)) => {
+                let comp_scope_id = if found.kind.is_tuple_comprehension() {
+                    found.scope_id.unwrap()
+                } else {
+                    expected.scope_id.unwrap()
+                };
 
-                for (index, e_field) in expected_fields.iter().enumerate() {
+                // here we need to check:
+
+                // a) the result of comprehension has all fields that are expected
+                for (position, e_field) in fields.iter().enumerate() {
                     if e_field.unpack {
                         todo!();
                     }
 
-                    let lookup = pr::Lookup::Position(index as i64);
-
+                    // lookup the field in the comprehended tuple
+                    let lookup = pr::Lookup::Position(position as i64);
                     let span = e_field.ty.span.unwrap();
+                    let var_input = self.resolve_tuple_lookup(&comp.tuple, &lookup, span)?;
 
-                    let _var_input = self.resolve_tuple_lookup(&found_comp.tuple, &lookup, span)?;
-                    // TODO: take found_comp.body_ty and replace each found_comp.variable_ty with var_input
-                    // TODO: validate that found_comp.body_ty matches e_field.ty
+                    // setup scope, so it provides value of the comp.variable_ty
+                    let mut scope = scope::Scope::new(comp_scope_id, scope::ScopeKind::Nested);
+                    scope.insert_local_ty(var_input);
+                    self.scopes.push(scope);
+
+                    // validate comp.body_ty
+                    self.validate_type(&comp.body_ty, &e_field.ty, who)?;
+
+                    self.scopes.pop();
                 }
-                Ok(())
-            }
-            (TyKind::Tuple(found_fields), TyKind::TupleComprehension(expected_comp)) => {
-                // here we need to check that the result of comprehension has all fields that are found
-                // TODO ... and that the number of fields matches between the two tuples.
 
-                for (index, e_field) in found_fields.iter().enumerate() {
-                    if e_field.unpack {
-                        todo!();
-                    }
-
-                    let lookup = pr::Lookup::Position(index as i64);
-
-                    let span = e_field.ty.span.unwrap();
-                    let _var_input =
-                        self.resolve_tuple_lookup(&expected_comp.tuple, &lookup, span)?;
-                }
+                // b) the number of fields matches between the two tuples.
+                let domain = pr::TyParamDomain::TupleLen { n: fields.len() };
+                self.validate_type_domain(&comp.tuple, &domain, None)?;
                 Ok(())
             }
             (TyKind::TupleComprehension(found_comp), TyKind::TupleComprehension(expected_comp)) => {
@@ -249,51 +251,125 @@ impl TypeResolver<'_> {
     }
 
     pub fn finalize_type_vars(&mut self) -> crate::Result<HashMap<pr::Ref, pr::Ty>> {
-        let mut known_types = HashMap::new();
+        let mut known_types = IndexMap::new();
+        let mut domains: IndexMap<usize, Vec<pr::TyParamDomain>> = Default::default();
         let mut constraints = {
             let scope = self.scopes.last_mut().unwrap();
             scope.ty_var_constraints.take()
         };
-        while !constraints.is_empty() {
-            let mut remaining_constraints = Vec::with_capacity(constraints.len());
 
-            let len = constraints.len();
-            for constraint in constraints {
-                match constraint {
-                    scope::TyVarConstraint::IsTy(id, ty) => {
-                        self.finalize_var(&mut known_types, id, ty)?;
-                    }
-                    scope::TyVarConstraint::Equals(a, b) => {
-                        if let Some(ty) = known_types.get(&a).cloned() {
-                            self.finalize_var(&mut known_types, b, ty)?;
-                        } else if let Some(ty) = known_types.get(&b).cloned() {
-                            self.finalize_var(&mut known_types, a, ty)?;
-                        } else {
-                            remaining_constraints.push(constraint);
+        while !constraints.is_empty() {
+            // part 1: consolidate constraints for IsTy and Equals
+            while !constraints.is_empty() {
+                let mut done_anything = false;
+                let mut remaining_constraints = Vec::with_capacity(constraints.len());
+                for constraint in constraints {
+                    match constraint {
+                        scope::TyVarConstraint::IsTy(id, ty) => {
+                            self.finalize_var(&mut known_types, id, ty)?;
+                            done_anything = true;
                         }
-                    }
-                    scope::TyVarConstraint::InDomain(ref id, ref domain) => {
-                        if let Some(ty) = known_types.get(id) {
-                            let var = self.get_ty_var(*id);
-                            self.validate_type_domain(ty, domain, var.name_hint.as_deref())
-                                .with_span_fallback(var.span)?;
-                        } else {
-                            remaining_constraints.push(constraint);
+                        scope::TyVarConstraint::Equals(a, b) => {
+                            if let Some(ty) = known_types.get(&a).cloned() {
+                                self.finalize_var(&mut known_types, b, ty)?;
+                                done_anything = true;
+                            } else if let Some(ty) = known_types.get(&b).cloned() {
+                                self.finalize_var(&mut known_types, a, ty)?;
+                                done_anything = true;
+                            } else {
+                                remaining_constraints.push(constraint);
+                            }
+                        }
+
+                        scope::TyVarConstraint::InDomain(_, pr::TyParamDomain::Open) => {}
+                        scope::TyVarConstraint::InDomain(id, domain) => {
+                            let domains = domains.entry(id).or_default();
+                            domains.push(domain);
                         }
                     }
                 }
-            }
-            constraints = remaining_constraints;
+                constraints = remaining_constraints;
 
-            if len == constraints.len() {
-                // no constraints were enforced in this loop, error out
-                break;
+                if !done_anything {
+                    // no constraints were enforced in this loop, error out
+                    break;
+                }
             }
 
+            // part 2: validate domains of known types
+            for (id, ty) in &known_types {
+                if let Some(domains) = domains.shift_remove(id) {
+                    let var = self.get_ty_var(*id).clone();
+                    for domain in domains {
+                        self.validate_type_domain(ty, &domain, var.name_hint.as_deref())
+                            .with_span_fallback(var.span)?;
+                    }
+                }
+            }
+
+            // validation might have inferred more constraints, which we retrieve here
+            let l = constraints.len();
             constraints.extend({
                 let scope = self.scopes.last_mut().unwrap();
                 scope.ty_var_constraints.take()
             });
+            if l < constraints.len() {
+                // if any constraints were retrieved, return to step 1
+                continue;
+            }
+
+            // part 3: consolidate domains into types
+            // nothing else worked, so now we try to combine multiple domains into a type
+            let mut inferred_anything = false;
+            for (id, domains) in &domains {
+                // option 1: tuple
+                let tuple_len = domains.iter().find_map(|d| match d {
+                    TyParamDomain::TupleLen { n } => Some(n),
+                    _ => None,
+                });
+                if let Some(tuple_len) = tuple_len {
+                    let mut consolidated = vec![None; *tuple_len];
+                    for domain in domains {
+                        if let TyParamDomain::TupleHasFields(fields) = domain {
+                            for field in fields {
+                                match field.location {
+                                    Lookup::Position(p) => {
+                                        consolidated[p as usize] = Some(field.ty.clone());
+                                    }
+                                    Lookup::Name(_) => {}
+                                }
+                            }
+                        }
+                    }
+                    if consolidated.iter().all(Option::is_some) {
+                        // success, infer the type
+                        let ty = pr::Ty::new(pr::TyKind::Tuple(
+                            consolidated
+                                .into_iter()
+                                .map(|x| pr::TyTupleField {
+                                    ty: x.unwrap(),
+                                    name: None,
+                                    unpack: false,
+                                })
+                                .collect(),
+                        ));
+
+                        tracing::debug!(
+                            "consolidated domains to infer {id} is {}",
+                            printer::print_ty(&ty)
+                        );
+                        known_types.insert(*id, ty);
+                        inferred_anything = true;
+                    }
+                }
+
+                // option 2: AnyOf
+                // TODO
+            }
+            if !inferred_anything {
+                // nothing worked, stop and raise an error
+                break;
+            }
         }
 
         let mut mapping = HashMap::new();
@@ -346,26 +422,27 @@ impl TypeResolver<'_> {
         }
 
         if !mapping.is_empty() {
-            tracing::debug!("finalized scope {}: {mapping:#?}", scope.id);
+            tracing::debug!("finalized scope {}: {:?}", scope.id, DebugMapping(&mapping));
         }
         Ok(mapping)
     }
 
     fn finalize_var(
-        &self,
-        known: &mut HashMap<usize, pr::Ty>,
+        &mut self,
+        known: &mut IndexMap<usize, pr::Ty>,
         id: usize,
         ty: pr::Ty,
     ) -> crate::Result<()> {
-        use std::collections::hash_map::Entry;
+        use indexmap::map::Entry;
 
         let entry = known.entry(id);
         match entry {
             Entry::Occupied(existing) => {
                 let ty_var = self.get_ty_var(id);
+                let span = ty_var.span;
 
                 self.validate_type(existing.get(), &ty, &|| None)
-                    .with_span_fallback(ty_var.span)?;
+                    .with_span_fallback(span)?;
             }
             Entry::Vacant(entry) => {
                 entry.insert(ty);
@@ -380,20 +457,25 @@ impl TypeResolver<'_> {
     /// - returns an error if the type is not in the domain,
     /// - infers ty var constraints such that the type is in the domain.
     pub fn validate_type_domain(
-        &self,
+        &mut self,
         ty: &Ty,
         domain: &TyParamDomain,
-        var_name: Option<&str>,
+        arg_name: Option<&str>,
     ) -> Result<(), Diagnostic> {
         let ty_ref = self.get_ty_mat(ty)?;
         let ty = match ty_ref {
             TyRef::Ty(cow) => cow,
             TyRef::Param(param_id) => {
                 let (found_name, found) = self.get_ty_param(param_id);
-                self.validate_type_domains(found, domain, found_name, var_name)?;
+                let (found_name, found) = (found_name.clone(), found.clone());
+                self.validate_type_domains(&found, domain, &found_name, arg_name)?;
                 return Ok(());
             }
-            TyRef::Var(_, _) => unreachable!(""),
+            TyRef::Var(_, id) => {
+                self.get_ty_var_scope()
+                    .infer_type_var_in_domain(id, domain.clone());
+                return Ok(());
+            }
         };
 
         match domain {
@@ -411,7 +493,7 @@ impl TypeResolver<'_> {
                     return Err(Diagnostic::new(
                         format!(
                             "{} one of {possible_tys}, found {}",
-                            msg_restricted_to(var_name, None),
+                            msg_restricted_to(arg_name, None),
                             printer::print_ty(ty)
                         ),
                         DiagnosticCode::TYPE_DOMAIN,
@@ -421,11 +503,12 @@ impl TypeResolver<'_> {
                 Ok(())
             }
 
-            TyParamDomain::TupleFields(domain_fields) => {
+            TyParamDomain::TupleHasFields(domain_fields) => {
                 let ty = ty.clone();
 
                 for domain_field in domain_fields {
-                    let target_ty = self.lookup_in_tuple(&ty, &domain_field.location)?;
+                    let span = domain_field.ty.span.unwrap();
+                    let target_ty = self.lookup_in_tuple(&ty, &domain_field.location, span)?;
 
                     self.validate_type(&target_ty, &domain_field.ty, &|| None)
                         .with_span_fallback(target_ty.span)?;
@@ -435,22 +518,42 @@ impl TypeResolver<'_> {
                 // all ok
                 Ok(())
             }
+            TyParamDomain::TupleLen { n } => {
+                fn diagnostic(n: usize, ty: &pr::Ty) -> Diagnostic {
+                    Diagnostic::new(
+                        format!(
+                            "expected a tuple with {n} fields, found {}",
+                            printer::print_ty(ty)
+                        ),
+                        DiagnosticCode::TYPE_DOMAIN,
+                    )
+                }
+
+                let TyKind::Tuple(fields) = &ty.kind else {
+                    return Err(diagnostic(*n, ty));
+                };
+                if fields.len() != *n {
+                    return Err(diagnostic(*n, ty));
+                }
+                Ok(())
+            }
 
             TyParamDomain::EnumVariants(domain_variants) => {
                 let TyKind::Enum(ty_variants) = &ty.kind else {
                     return Err(Diagnostic::new(
                         format!(
                             "{} to enums, found {}",
-                            msg_restricted_to(var_name, None),
+                            msg_restricted_to(arg_name, None),
                             printer::print_ty(ty)
                         ),
                         DiagnosticCode::TYPE_DOMAIN,
                     ));
                 };
+                let ty_variants = ty_variants.clone();
 
                 for domain_variant in domain_variants {
                     let (_, variant) =
-                        super::pattern::lookup_variant(ty_variants, &domain_variant.name)?;
+                        super::pattern::lookup_variant(&ty_variants, &domain_variant.name)?;
 
                     self.validate_type(&variant.ty, &domain_variant.ty, &|| None)?;
                     // ok
@@ -464,7 +567,7 @@ impl TypeResolver<'_> {
 
     /// Validates that found domain is subset of expected domain.
     pub fn validate_type_domains(
-        &self,
+        &mut self,
         found: &TyParamDomain,
         expected: &TyParamDomain,
         found_name: &str,
@@ -494,8 +597,8 @@ impl TypeResolver<'_> {
             }
 
             (
-                TyParamDomain::TupleFields(found_fields),
-                TyParamDomain::TupleFields(expected_fields),
+                TyParamDomain::TupleHasFields(found_fields),
+                TyParamDomain::TupleHasFields(expected_fields),
             ) => {
                 for expected_field in expected_fields {
                     let target_ty =
@@ -597,4 +700,26 @@ where
         ));
     }
     e
+}
+
+struct DebugMapping<'a>(&'a HashMap<pr::Ref, pr::Ty>);
+
+impl std::fmt::Debug for DebugMapping<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let mut m = f.debug_map();
+        for (key, val) in self.0 {
+            let key = match key {
+                Ref::FullyQualified { to_def, within } => {
+                    if within.is_empty() {
+                        format!("{to_def}")
+                    } else {
+                        format!("{to_def}.{within}")
+                    }
+                }
+                Ref::Local { scope, offset } => format!("{scope}.{offset}"),
+            };
+            m.entry(&key, &printer::print_ty(val));
+        }
+        m.finish()
+    }
 }

@@ -152,15 +152,15 @@ impl<'a> queries::Context<'a> {
         // asserts eq values and rel cols
         #[cfg(debug_assertions)]
         let (values, rel_cols) = {
-            let values: Vec<_> = values.collect();
             let rel_cols: Vec<_> = rel_cols.collect();
+            let values: Vec<_> = values.collect();
 
             if values.len() != rel_cols.len() {
                 tracing::error!("bad type detected in projection");
             }
             assert_eq!(
-                values.len(),
                 rel_cols.len(),
+                values.len(),
                 "expected columns: {rel_cols:?}, got: {}, ty: {}",
                 super::expr_or_source::ExprOrSourceDisplay { exprs: &values },
                 ir::print_ty(ty)

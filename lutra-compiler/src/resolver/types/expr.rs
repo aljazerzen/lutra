@@ -39,7 +39,9 @@ impl fold::PrFold for super::TypeResolver<'_> {
                     scope::Named::Scoped(scoped) => match scoped {
                         scope::ScopedKind::Param { ty } => ty.clone(),
                         scope::ScopedKind::Local { ty } => ty.clone(),
-                        scope::ScopedKind::TyParam { .. } | scope::ScopedKind::TyVar { .. } => {
+                        scope::ScopedKind::LocalTy { .. }
+                        | scope::ScopedKind::TyParam { .. }
+                        | scope::ScopedKind::TyVar { .. } => {
                             return Err(Diagnostic::new_custom(
                                 "expected a value, but found a type",
                             )

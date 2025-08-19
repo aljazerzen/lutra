@@ -1,7 +1,9 @@
+use std::collections::HashMap;
+
 use crate::diagnostic::{Diagnostic, DiagnosticCode, WithErrorInfo};
 use crate::pr::{self, Ty};
 use crate::utils::fold::PrFold;
-use crate::{Result, Span, printer};
+use crate::{Result, Span, printer, utils};
 
 use super::scope;
 
@@ -36,7 +38,7 @@ impl super::TypeResolver<'_> {
                     }
                     scope::TyRef::Param(id) => {
                         let (param_name, domain) = self.get_ty_param(id);
-                        let pr::TyParamDomain::TupleFields(_) = domain else {
+                        let pr::TyParamDomain::TupleHasFields(_) = domain else {
                             return Err(error_lookup_into_unpack_of_ty_param(param_name));
                         };
 
@@ -45,7 +47,7 @@ impl super::TypeResolver<'_> {
                     scope::TyRef::Var(_, o) => {
                         // restrict var to be a tuple
 
-                        let domain = pr::TyParamDomain::TupleFields(vec![]);
+                        let domain = pr::TyParamDomain::TupleHasFields(vec![]);
                         let scope = self.get_ty_var_scope();
                         scope.infer_type_var_in_domain(o, domain);
                     }
@@ -89,7 +91,7 @@ impl super::TypeResolver<'_> {
     ///
     /// Span is the span of the lookup node - the thing that invoked the lookup.
     pub fn resolve_tuple_lookup(
-        &self,
+        &mut self,
         base: &Ty,
         lookup: &pr::Lookup,
         span: Span,
@@ -105,7 +107,7 @@ impl super::TypeResolver<'_> {
                 let field_ty = self.introduce_ty_var(pr::TyParamDomain::Open, span);
 
                 // restrict existing ty var to tuples with this field
-                let domain = pr::TyParamDomain::TupleFields(vec![pr::TyDomainTupleField {
+                let domain = pr::TyParamDomain::TupleHasFields(vec![pr::TyDomainTupleField {
                     location: lookup.clone(),
                     ty: field_ty.clone(),
                 }]);
@@ -116,40 +118,47 @@ impl super::TypeResolver<'_> {
             }
         };
         let base = base.clone();
-        self.lookup_in_tuple(&base, lookup)
+        self.lookup_in_tuple(&base, lookup, span)
     }
 
     /// Takes a concrete tuple and finds the field identifier by [pr::Lookup].
-    pub fn lookup_in_tuple(&self, base: &Ty, lookup: &pr::Lookup) -> Result<pr::Ty> {
-        let pr::TyKind::Tuple(fields) = &base.kind else {
-            if base.kind.is_tuple_comprehension() {
-                return Err(Diagnostic::new_custom(
-                    "lookup into tuple comprehension is not yet supported",
-                ));
+    pub fn lookup_in_tuple(
+        &mut self,
+        base: &Ty,
+        lookup: &pr::Lookup,
+        span: Span,
+    ) -> Result<pr::Ty> {
+        match &base.kind {
+            pr::TyKind::Tuple(fields) => {
+                let r = match lookup {
+                    pr::Lookup::Name(name) => self.lookup_name_in_tuple(fields, name)?,
+                    pr::Lookup::Position(pos) => self
+                        .lookup_position_in_tuple(fields, *pos as usize, 0)
+                        .map(|x| x.ok())?,
+                };
+                r.ok_or_else(|| error_no_field(base, lookup))
             }
+            pr::TyKind::TupleComprehension(comp) => {
+                if comp.body_name.is_none() && lookup.is_name() {
+                    return Err(error_no_field(base, lookup));
+                }
 
-            return Err(Diagnostic::new(
+                // lookup in comp input
+                let var_input = self.resolve_tuple_lookup(&comp.tuple, lookup, span)?;
+
+                // replace var_ref in comp.body_ty with var_input
+                let var_ref = pr::Ref::Local {
+                    scope: base.scope_id.unwrap(),
+                    offset: 0,
+                };
+                let mapping = HashMap::from_iter(Some((var_ref, var_input)));
+                Ok(utils::TypeReplacer::on_ty(*comp.body_ty.clone(), mapping))
+            }
+            _ => Err(Diagnostic::new(
                 format!("lookup expected a tuple, found {}", printer::print_ty(base)),
                 DiagnosticCode::TYPE,
-            ));
-        };
-
-        let r = match lookup {
-            pr::Lookup::Name(name) => self.lookup_name_in_tuple(fields, name)?,
-            pr::Lookup::Position(pos) => self
-                .lookup_position_in_tuple(fields, *pos as usize, 0)
-                .map(|x| x.ok())?,
-        };
-        r.ok_or_else(|| {
-            Diagnostic::new(
-                format!(
-                    "field {} does not exist in type {}",
-                    print_lookup(lookup),
-                    printer::print_ty(base)
-                ),
-                DiagnosticCode::TYPE,
-            )
-        })
+            )),
+        }
     }
 
     /// Takes a concrete tuple and finds the field by name.
@@ -242,7 +251,7 @@ impl super::TypeResolver<'_> {
 
     fn lookup_position_in_ty_param(&self, param_id: usize, position: usize) -> Result<Ty> {
         let (param_name, param_domain) = self.get_ty_param(param_id);
-        let pr::TyParamDomain::TupleFields(fields) = param_domain else {
+        let pr::TyParamDomain::TupleHasFields(fields) = param_domain else {
             return Err(error_lookup_into_unpack_of_ty_param(param_name));
         };
         let lookup = pr::Lookup::Position(position as i64);
@@ -255,7 +264,7 @@ impl super::TypeResolver<'_> {
 
     fn lookup_name_in_ty_param(&self, lookup: &pr::Lookup, id: usize) -> Result<pr::Ty> {
         let (param_name, param) = self.get_ty_param(id);
-        let pr::TyParamDomain::TupleFields(fields) = param else {
+        let pr::TyParamDomain::TupleHasFields(fields) = param else {
             return Err(error_lookup_into_unpack_of_ty_param(param_name));
         };
 
@@ -274,6 +283,17 @@ impl super::TypeResolver<'_> {
         };
         Ok(field.ty.clone())
     }
+}
+
+fn error_no_field(base: &Ty, lookup: &pr::Lookup) -> Diagnostic {
+    Diagnostic::new(
+        format!(
+            "field {} does not exist in type {}",
+            print_lookup(lookup),
+            printer::print_ty(base)
+        ),
+        DiagnosticCode::TYPE,
+    )
 }
 
 fn error_lookup_into_unpack_of_ty_var() -> Diagnostic {
