@@ -268,10 +268,10 @@ impl<'a> Context<'a> {
 
             cr::From::Null => ExprOrSource::new_expr(self.null(ty)).into(),
             cr::From::Literal(literal) => self.compile_literal(literal, ty).into(),
-            cr::From::FuncCall(func_name, args) => {
-                let (args, rel_vars) = self.compile_columns_scoped(args);
+            cr::From::FuncCall(func_name, args_in) => {
+                let (args, rel_vars) = self.compile_columns_scoped(args_in);
                 Scoped {
-                    expr: self.compile_func_call(func_name, ty, args),
+                    expr: self.compile_func_call(func_name, ty, args, args_in),
                     rel_vars,
                 }
             }
@@ -742,18 +742,15 @@ impl<'a> Context<'a> {
         id: &str,
         ty: &ir::Ty,
         args: impl IntoIterator<Item = ExprOrSource>,
+        args_in: &[cr::Expr],
     ) -> ExprOrSource {
         match id {
             "std::mul" => utils::new_bin_op("*", args),
             "std::div" => utils::new_bin_op("/", args),
             "std::mod" => match ty.kind.as_primitive().unwrap() {
                 ir::TyPrimitive::float32 | ir::TyPrimitive::float64 => {
-                    let mut args = args.into_iter();
-                    ExprOrSource::Source(format!(
-                        "MOD({}::numeric, {}::numeric)::float8",
-                        args.next().unwrap(),
-                        args.next().unwrap(),
-                    ))
+                    let [l, r] = unpack_args(args);
+                    ExprOrSource::Source(format!("MOD({l}::numeric, {r}::numeric)::float8"))
                 }
                 _ => utils::new_bin_op("%", args),
             },
@@ -774,20 +771,19 @@ impl<'a> Context<'a> {
             "std::not" => utils::new_un_op("NOT", args),
 
             "std::text_ops::length" => {
-                let mut args = args.into_iter();
-                let text = args.next().unwrap();
+                let [text] = unpack_args(args);
                 ExprOrSource::Source(format!("LENGTH({text})::int8"))
             }
 
             "std::min" => utils::new_func_call("MIN", args),
             "std::max" => utils::new_func_call("MAX", args),
             "std::sum" => {
-                let arg = args.into_iter().next().unwrap();
+                let [arg] = unpack_args(args);
                 let ty = self.compile_ty_name(ty);
                 ExprOrSource::Source(format!("COALESCE(SUM({arg}), 0)::{ty}"))
             }
             "std::average" => {
-                let arg = args.into_iter().next().unwrap();
+                let [arg] = unpack_args(args);
                 let ty = self.compile_ty_name(ty);
                 ExprOrSource::Source(format!("AVG({arg})::{ty}"))
             }
@@ -801,17 +797,13 @@ impl<'a> Context<'a> {
                 utils::new_func_call("BOOL_AND", args)
             )),
             "std::contains" => {
-                let mut args = args.into_iter();
-                let haystack = args.next().unwrap();
-                let needle = args.next().unwrap();
+                let [haystack, needle] = unpack_args(args);
                 ExprOrSource::Source(format!("COALESCE(BOOL_OR({needle} = {haystack}), FALSE)"))
             }
 
             "std::row_number" => ExprOrSource::Source("(ROW_NUMBER() OVER () - 1)".to_string()),
             "std::lead" => {
-                let mut args = args.into_iter();
-                let arg = args.next().unwrap();
-                let offset = args.next().unwrap();
+                let [arg, offset] = unpack_args(args);
 
                 let filler = get_default_value_for_ty(ty);
                 ExprOrSource::Source(format!(
@@ -819,9 +811,7 @@ impl<'a> Context<'a> {
                 ))
             }
             "std::lag" => {
-                let mut args = args.into_iter();
-                let arg = args.next().unwrap();
-                let offset = args.next().unwrap();
+                let [arg, offset] = unpack_args(args);
 
                 let filler = get_default_value_for_ty(ty);
 
@@ -842,14 +832,38 @@ impl<'a> Context<'a> {
             }
 
             "is_null" => {
-                let mut args = args.into_iter();
-                let arg = args.next().unwrap();
+                let [arg] = unpack_args(args);
                 ExprOrSource::Source(format!("{arg} IS NULL"))
             }
             "is_not_null" => {
-                let mut args = args.into_iter();
-                let arg = args.next().unwrap();
+                let [arg] = unpack_args(args);
                 ExprOrSource::Source(format!("{arg} IS NOT NULL"))
+            }
+
+            "std::to_int8" | "std::to_int16" | "std::to_int32" | "std::to_int64"
+            | "std::to_uint8" | "std::to_uint16" | "std::to_uint32" | "std::to_uint64" => {
+                let [arg] = unpack_args(args);
+                let ty = self.compile_ty_name(ty);
+                match args_in[0].ty.kind.as_primitive().unwrap() {
+                    ir::TyPrimitive::int8
+                    | ir::TyPrimitive::int16
+                    | ir::TyPrimitive::int32
+                    | ir::TyPrimitive::int64
+                    | ir::TyPrimitive::uint8
+                    | ir::TyPrimitive::uint16
+                    | ir::TyPrimitive::uint32
+                    | ir::TyPrimitive::uint64 => ExprOrSource::Source(format!("{arg}::{ty}")),
+                    ir::TyPrimitive::float32 | ir::TyPrimitive::float64 => {
+                        ExprOrSource::Source(format!("trunc({arg})::{ty}"))
+                    }
+                    _ => panic!(),
+                }
+            }
+
+            "std::to_float32" | "std::to_float64" => {
+                let [arg] = unpack_args(args);
+                let ty = self.compile_ty_name(ty);
+                ExprOrSource::Source(format!("{arg}::{ty}"))
             }
 
             _ => todo!("sql impl for {id}"),
@@ -967,4 +981,13 @@ fn get_default_value_for_ty(ty: &ir::Ty) -> &str {
         ir::TyKind::Primitive(ir::TyPrimitive::text) => "''",
         _ => todo!(),
     }
+}
+
+fn unpack_args<const N: usize>(args: impl IntoIterator<Item = ExprOrSource>) -> [ExprOrSource; N] {
+    let mut r = Vec::with_capacity(N);
+    let mut args = args.into_iter();
+    for _ in 0..N {
+        r.push(args.next().unwrap());
+    }
+    r.try_into().unwrap()
 }

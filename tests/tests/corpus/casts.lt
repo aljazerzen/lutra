@@ -66,22 +66,47 @@ func main() -> (-4: int8 | std::to_int16)
 -4
 
 # === cast_int16_to_int16
-# skip: postgres
 func main() -> (-400: int16 | std::to_int16)
 # >
 -400
 
 # === cast_int32_to_int16
-# skip: postgres
-func main() -> (-400000: int32 | std::to_int16)
+func main() -> (
+  [
+    1,
+    -1,
+    32767,
+    # 32768,
+    -32768,
+    # -32769,
+    # -400000
+  ]: [int32]
+  | std::map(std::to_int16)
+)
 # >
--6784
+[
+  1,
+  -1,
+  32767,
+  -32768,
+]
 
 # === cast_int64_to_int16
-# skip: postgres
-func main() -> (-40000000001: int64 | std::to_int16)
+func main() -> (
+  [
+    1,
+    -1,
+    # 9223372036854775807,
+    # -9223372036854775808,
+    # -40000000001
+  ]: [int64]
+  | std::map(std::to_int16)
+)
 # >
-28671
+[
+  1,
+  -1,
+]
 
 # === cast_uint8_to_int16
 # skip: postgres
@@ -108,16 +133,41 @@ func main() -> (40000000001: uint64 | std::to_int16)
 -28671
 
 # === cast_float32_to_int16
-# skip: postgres
-func main() -> (4.4: float32 | std::to_int16)
+func main() -> (
+  [
+    5.1,
+    5.6,
+    -12.1,
+    -12.6,
+  ]: [float32]
+  | std::map(std::to_int16)
+)
 # >
-4
+[
+  5,
+  5,
+  -12,
+  -12,
+]
 
 # === cast_float64_to_int16
-# skip: postgres
-func main() -> (125523.121231: float64 | std::to_int16)
+func main() -> (
+  [
+    5.1,
+    5.6,
+    -12.1,
+    -12.6,
+    # 125523.121231
+  ]: [float64]
+  | std::map(std::to_int16)
+)
 # >
-32767
+[
+  5,
+  5,
+  -12,
+  -12,
+]
 
 # === cast_int8_to_int32
 # skip: postgres
@@ -126,22 +176,29 @@ func main() -> (-4: int8 | std::to_int32)
 -4
 
 # === cast_int16_to_int32
-# skip: postgres
 func main() -> (-400: int16 | std::to_int32)
 # >
 -400
 
 # === cast_int32_to_int32
-# skip: postgres
 func main() -> (-400000: int32 | std::to_int32)
 # >
 -400000
 
 # === cast_int64_to_int32
-# skip: postgres
-func main() -> (-40000000001: int64 | std::to_int32)
+func main() -> (
+  [
+    1,
+    -1,
+    # -40000000001
+  ]: [int64]
+  | std::map(std::to_int32)
+)
 # >
--1345294337
+[
+  1,
+  -1,
+]
 
 # === cast_uint8_to_int32
 # skip: postgres
@@ -168,13 +225,11 @@ func main() -> (40000000001: uint64 | std::to_int32)
 1345294337
 
 # === cast_float32_to_int32
-# skip: postgres
 func main() -> (4.4: float32 | std::to_int32)
 # >
 4
 
 # === cast_float64_to_int32
-# skip: postgres
 func main() -> (125523.121231: float64 | std::to_int32)
 # >
 125523
@@ -186,19 +241,16 @@ func main() -> (-4: int8 | std::to_int64)
 -4
 
 # === cast_int16_to_int64
-# skip: postgres
 func main() -> (-400: int16 | std::to_int64)
 # >
 -400
 
 # === cast_int32_to_int64
-# skip: postgres
 func main() -> (-400000: int32 | std::to_int64)
 # >
 -400000
 
 # === cast_int64_to_int64
-# skip: postgres
 func main() -> (-40000000001: int64 | std::to_int64)
 # >
 -40000000001
@@ -228,13 +280,11 @@ func main() -> (40000000001: uint64 | std::to_int64)
 40000000001
 
 # === cast_float32_to_int64
-# skip: postgres
 func main() -> (4.4: float32 | std::to_int64)
 # >
 4
 
 # === cast_float64_to_int64
-# skip: postgres
 func main() -> (125523.121231: float64 | std::to_int64)
 # >
 125523
@@ -486,19 +536,16 @@ func main() -> (-4: int8 | std::to_float32)
 -4.0
 
 # === cast_int16_to_float32
-# skip: postgres
 func main() -> (-400: int16 | std::to_float32)
 # >
 -400.0
 
 # === cast_int32_to_float32
-# skip: postgres
 func main() -> (-400000: int32 | std::to_float32)
 # >
 -400000.0
 
 # === cast_int64_to_float32
-# skip: postgres
 func main() -> (-40000000001: int64 | std::to_float32)
 # >
 -40000000000.0
@@ -528,13 +575,11 @@ func main() -> (40000000001: uint64 | std::to_float32)
 40000000000.0
 
 # === cast_float32_to_float32
-# skip: postgres
 func main() -> (4.4: float32 | std::to_float32)
 # >
 4.4
 
 # === cast_float64_to_float32
-# skip: postgres
 func main() -> (125523.121231: float64 | std::to_float32)
 # >
 125523.125
@@ -546,19 +591,16 @@ func main() -> (-4: int8 | std::to_float64)
 -4.0
 
 # === cast_int16_to_float64
-# skip: postgres
 func main() -> (-400: int16 | std::to_float64)
 # >
 -400.0
 
 # === cast_int32_to_float64
-# skip: postgres
 func main() -> (-400000: int32 | std::to_float64)
 # >
 -400000.0
 
 # === cast_int64_to_float64
-# skip: postgres
 func main() -> (-40000000001: int64 | std::to_float64)
 # >
 -40000000001.0
@@ -588,13 +630,11 @@ func main() -> (40000000001: uint64 | std::to_float64)
 40000000001.0
 
 # === cast_float32_to_float64
-# skip: postgres
 func main() -> (4.4: float32 | std::to_float64)
 # >
 4.400000095367432
 
 # === cast_float64_to_float64
-# skip: postgres
 func main() -> (125523.121231: float64 | std::to_float64)
 # >
 125523.121231

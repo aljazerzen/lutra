@@ -145,8 +145,8 @@ fn lexer() -> impl Parser<char, Vec<Token>, Error = LError> {
     let token = choice((
         control_multi,
         interpolation,
-        control,
         literal,
+        control,
         keyword,
         ident,
         doc_comment(),
@@ -239,7 +239,9 @@ fn literal() -> impl Parser<char, Literal, Error = LError> {
 
     let exp = one_of("eE").chain(one_of("+-").or_not().chain::<char, _, _>(text::digits(10)));
 
-    let integer = filter(|c: &char| c.is_ascii_digit() && *c != '0')
+    let integer = just('-')
+        .or_not()
+        .then(filter(|c: &char| c.is_ascii_digit() && *c != '0'))
         .chain::<_, Vec<char>, _>(filter(|c: &char| c.is_ascii_digit() || *c == '_').repeated())
         .or(just('0').map(|c| vec![c]));
 

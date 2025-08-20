@@ -1,5 +1,6 @@
 use std::{borrow::Cow, collections::HashMap};
 
+use crate::intermediate;
 use crate::sql::utils::RelCols;
 use crate::sql::{cr, utils};
 use crate::utils::IdGenerator;
@@ -12,6 +13,7 @@ pub(super) struct Context<'t> {
     defs: HashMap<&'t ir::Path, &'t ir::Ty>,
 
     scope_id_gen: IdGenerator,
+    func_id_gen: IdGenerator,
 }
 
 enum FuncProvider {
@@ -20,6 +22,9 @@ enum FuncProvider {
 }
 
 pub fn compile(program: &ir::Program) -> (cr::Expr, HashMap<&ir::Path, &ir::Ty>) {
+    // TODO: this clone is a bit unnecessary
+    let (_, id_counts) = intermediate::IdCounter::run(program.clone());
+
     let mut ctx = Context {
         bindings: Default::default(),
         functions: Default::default(),
@@ -29,6 +34,7 @@ pub fn compile(program: &ir::Program) -> (cr::Expr, HashMap<&ir::Path, &ir::Ty>)
             .map(|def| (&def.name, &def.ty))
             .collect(),
         scope_id_gen: Default::default(),
+        func_id_gen: IdGenerator::new_at(id_counts.max_func_id as usize),
     };
 
     assert!(
@@ -38,10 +44,7 @@ pub fn compile(program: &ir::Program) -> (cr::Expr, HashMap<&ir::Path, &ir::Ty>)
     );
 
     // find the top-level function
-    let func = match &program.main.kind {
-        ir::ExprKind::Function(func) => Cow::Borrowed(func.as_ref()),
-        _ => Cow::Owned(wrap_into_func_call(&program.main)),
-    };
+    let func = ctx.as_function_or_wrap(&program.main);
     ctx.functions.insert(func.id, FuncProvider::QueryParam);
 
     let body = ctx.compile_rel(&func.body);
@@ -602,7 +605,7 @@ impl<'a> Context<'a> {
                 let row = vec![self.new_rel_col(&array, 0, ir::Ty::new(ir::TyPrimitive::int64))];
 
                 // compile func body
-                let func = func.kind.as_function().unwrap();
+                let func = self.as_function_or_wrap(func);
                 let mut item_ref = cr::ExprKind::Transform(
                     self.new_binding(cr::Expr::new_rel_ref(&array)),
                     cr::Transform::ProjectDiscard(vec![0]), // discard index
@@ -1025,6 +1028,47 @@ impl<'a> Context<'a> {
             ty: expr.ty.clone(),
         }
     }
+
+    /// Ensures that an expression is a function - not just in type, but also in form.
+    /// When it is not, it wraps the expressions into a new function that just calls it.
+    ///
+    /// Example: `ident` of type `func(a, b) -> c` is wrapped into
+    ///          `func (x: a, y: b) -> ident(a, b)`
+    fn as_function_or_wrap<'e>(&mut self, expr: &'e ir::Expr) -> Cow<'e, ir::Function> {
+        if let ir::ExprKind::Function(func) = &expr.kind {
+            return Cow::Borrowed(func.as_ref());
+        }
+        let expr = expr.clone();
+        let ty_func = expr.ty.kind.as_function().unwrap().clone();
+
+        let function_id = self.func_id_gen.next() as u32;
+
+        Cow::Owned({
+            ir::Function {
+                id: function_id,
+                body: ir::Expr {
+                    ty: ty_func.body,
+                    kind: ir::ExprKind::Call(Box::new(ir::Call {
+                        function: expr.clone(),
+                        args: ty_func
+                            .params
+                            .into_iter()
+                            .enumerate()
+                            .map(|(position, ty)| ir::Expr {
+                                kind: ir::ExprKind::Pointer(ir::Pointer::Parameter(
+                                    ir::ParameterPtr {
+                                        function_id,
+                                        param_position: position as u8,
+                                    },
+                                )),
+                                ty,
+                            })
+                            .collect(),
+                    })),
+                },
+            }
+        })
+    }
 }
 
 #[derive(Debug)]
@@ -1075,33 +1119,4 @@ fn ty_concat_tuples(a: ir::Ty, b: ir::Ty) -> ir::Ty {
     let mut concat = a;
     concat.extend(b);
     ir::Ty::new(ir::TyKind::Tuple(concat))
-}
-
-/// Wraps an expr of func type into a call to this function
-///
-/// Example: p: func(a, b) -> c` is wrapped into `func (x: a, y: b) -> p(a, b)`
-fn wrap_into_func_call(expr: &ir::Expr) -> ir::Function {
-    let ty_function = expr.ty.kind.as_function().unwrap();
-
-    ir::Function {
-        id: u32::MAX,
-        body: ir::Expr {
-            ty: ty_function.body.clone(),
-            kind: ir::ExprKind::Call(Box::new(ir::Call {
-                function: expr.clone(),
-                args: ty_function
-                    .params
-                    .iter()
-                    .enumerate()
-                    .map(|(position, ty_p)| ir::Expr {
-                        kind: ir::ExprKind::Pointer(ir::Pointer::Parameter(ir::ParameterPtr {
-                            function_id: u32::MAX,
-                            param_position: position as u8,
-                        })),
-                        ty: ty_p.clone(),
-                    })
-                    .collect(),
-            })),
-        },
-    }
 }

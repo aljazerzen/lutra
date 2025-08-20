@@ -233,13 +233,13 @@ impl fold::IrFold for Substituter {
 }
 
 #[derive(Default)]
-struct IdCounter {
+pub(crate) struct IdCounter {
     pub max_var_id: u32,
     pub max_func_id: u32,
 }
 
 impl IdCounter {
-    fn run(mut program: ir::Program) -> (ir::Program, IdCounter) {
+    pub(crate) fn run(mut program: ir::Program) -> (ir::Program, IdCounter) {
         let mut c = Self::default();
         program.main = c.fold_expr(program.main).unwrap();
         (program, c)
