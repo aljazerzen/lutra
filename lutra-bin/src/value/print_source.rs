@@ -157,13 +157,7 @@ impl<'t> ValueVisitor<'t> for Printer<'t> {
         let is_unit = variant.ty.kind.as_tuple().is_some_and(|x| x.is_empty());
         if !is_unit {
             r += "(";
-            self.indent();
-
-            r += &self.new_line();
             r += &self.visit_value(inner, &variant.ty)?;
-
-            self.deindent();
-            r += &self.new_line();
             r += ")";
         }
 

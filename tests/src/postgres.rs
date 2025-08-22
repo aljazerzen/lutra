@@ -172,15 +172,11 @@ fn array_enum() {
     ---
     [
       Pending,
-      InProgress(
-        {
-          started_at = "today",
-          owner = "me",
-        }
-      ),
-      Done(
-        "ok"
-      ),
+      InProgress({
+        started_at = "today",
+        owner = "me",
+      }),
+      Done("ok"),
     ]
     "#);
 }
@@ -262,15 +258,11 @@ fn enum_array() {
       "statuses:",
       [
         Pending,
-        InProgress(
-          [
-            "today",
-            "me",
-          ]
-        ),
-        Done(
-          "ok"
-        ),
+        InProgress([
+          "today",
+          "me",
+        ]),
+        Done("ok"),
       ],
     }
     "#);
@@ -429,15 +421,11 @@ fn tuple_array_enum() {
       "statuses:",
       [
         Pending,
-        InProgress(
-          {
-            started_at = "today",
-            owner = "me",
-          }
-        ),
-        Done(
-          "ok"
-        ),
+        InProgress({
+          started_at = "today",
+          owner = "me",
+        }),
+        Done("ok"),
       ],
     }
     "#);
@@ -1680,9 +1668,7 @@ fn opt_00() {
       ) AS _3
     ---
     {
-      Some(
-        "hello"
-      ),
+      Some("hello"),
       None,
       true,
       false,

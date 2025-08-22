@@ -343,9 +343,7 @@ type Status: enum {
 }
 func main(): Status -> std::default()
 # >
-Open(
-  0
-)
+Open(0)
 
 # === default_10
 func main(): [bool] -> std::lag([std::default(), std::default()], 1)
@@ -415,12 +413,8 @@ type Status: enum {
 func main(): [Status] -> std::lag([std::default(), std::default()], 1)
 # >
 [
-  Open(
-    0
-  ),
-  Open(
-    0
-  ),
+  Open(0),
+  Open(0),
 ]
 
 # === empty_array_00
@@ -451,18 +445,14 @@ Done
 type Status: enum {Done, Pending: int64, Cancelled: text}
 const main = Status::Pending(513)
 # >
-Pending(
-  513
-)
+Pending(513)
 
 # === enum_construction_02
 
 type Status: enum {Done, Pending: int64, Cancelled: text}
 const main = Status::Cancelled("I don't like it")
 # >
-Cancelled(
-  "I don't like it"
-)
+Cancelled("I don't like it")
 
 # === enum_construction_03
 
@@ -476,18 +466,14 @@ Red
 type Color: enum {Red, Green: int16, Blue: bool}
 const main = Color::Green(12312)
 # >
-Green(
-  12312
-)
+Green(12312)
 
 # === enum_construction_05
 
 type Color: enum {Red, Green: bool, Blue: bool}
 const main = Color::Blue(false)
 # >
-Blue(
-  false
-)
+Blue(false)
 
 # === enum_construction_06
 
@@ -497,9 +483,7 @@ type Item: {
 }
 const main = Item::color::Green(true)
 # >
-Green(
-  true
-)
+Green(true)
 
 # === enum_construction_07
 
@@ -529,17 +513,9 @@ func main() -> [
 ]
 # >
 [
-  Cat(
-    "Whiskers"
-  ),
-  Dog(
-    Collie(
-      "Belie"
-    )
-  ),
-  Dog(
-    Generic
-  ),
+  Cat("Whiskers"),
+  Dog(Collie("Belie")),
+  Dog(Generic),
 ]
 
 # === enum_construction_09
@@ -552,12 +528,8 @@ type Status: enum {
 func main(): [Status] -> [Status::Open(0), Status::Open(0)]
 # >
 [
-  Open(
-    0
-  ),
-  Open(
-    0
-  ),
+  Open(0),
+  Open(0),
 ]
 
 # === enum_construction_10
@@ -574,9 +546,7 @@ func main() -> [
 # >
 [
   None,
-  Some(
-    "Whiskers"
-  ),
+  Some("Whiskers"),
 ]
 
 # === enum_construction_11
@@ -593,17 +563,9 @@ func main() -> [
 ]
 # >
 [
-  Cat(
-    "Whiskers"
-  ),
-  Dog(
-    Some(
-      "Belie"
-    )
-  ),
-  Dog(
-    None
-  ),
+  Cat("Whiskers"),
+  Dog(Some("Belie")),
+  Dog(None),
 ]
 
 
@@ -2108,12 +2070,8 @@ const main = [
 ]
 # >
 [
-  Leaf(
-    10
-  ),
-  Leaf(
-    12
-  ),
+  Leaf(10),
+  Leaf(12),
 ]
 
 # === recursive_type_01
@@ -2132,30 +2090,16 @@ const main = Tree::Node({
   }),
 })
 # >
-Node(
-  {
-    left = Leaf(
-      10
-    ),
-    right = Node(
-      {
-        left = Node(
-          {
-            left = Leaf(
-              12
-            ),
-            right = Leaf(
-              18
-            ),
-          }
-        ),
-        right = Leaf(
-          20
-        ),
-      }
-    ),
-  }
-)
+Node({
+  left = Leaf(10),
+  right = Node({
+    left = Node({
+      left = Leaf(12),
+      right = Leaf(18),
+    }),
+    right = Leaf(20),
+  }),
+})
 
 # === recursive_type_02
 type Tree: enum {
@@ -2175,33 +2119,15 @@ const main = Tree::Node([
   Tree::Leaf(21),
 ])
 # >
-Node(
-  [
-    Leaf(
-      10
-    ),
-    Node(
-      [
-        Node(
-          [
-            Leaf(
-              12
-            ),
-            Leaf(
-              15
-            ),
-            Leaf(
-              18
-            ),
-          ]
-        ),
-        Leaf(
-          20
-        ),
-      ]
-    ),
-    Leaf(
-      21
-    ),
-  ]
-)
+Node([
+  Leaf(10),
+  Node([
+    Node([
+      Leaf(12),
+      Leaf(15),
+      Leaf(18),
+    ]),
+    Leaf(20),
+  ]),
+  Leaf(21),
+])
