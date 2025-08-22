@@ -123,8 +123,8 @@ fn lutra_to_json(value: lutra_bin::Value, out: &mut String) {
         lutra_bin::Value::Array(items) => {
             lutra_to_json_array(items.into_iter(), out);
         }
-        lutra_bin::Value::Tuple(_) => {
-            lutra_to_json_array(iter_fields(value), out);
+        lutra_bin::Value::Tuple(fields) => {
+            lutra_to_json_array(fields.into_iter(), out);
         }
         lutra_bin::Value::Enum(_tag, _value) => todo!(),
     }
@@ -139,14 +139,4 @@ fn lutra_to_json_array(items: impl Iterator<Item = lutra_bin::Value>, out: &mut 
         lutra_to_json(field, out);
     }
     out.push(']');
-}
-
-fn iter_fields(value: lutra_bin::Value) -> Box<dyn Iterator<Item = lutra_bin::Value>> {
-    match value {
-        lutra_bin::Value::Tuple(values) => {
-            Box::new(values.into_iter().flat_map(|v| iter_fields(v)))
-        }
-        lutra_bin::Value::Enum(_, _) => todo!(),
-        _ => Box::new(Some(value).into_iter()),
-    }
 }

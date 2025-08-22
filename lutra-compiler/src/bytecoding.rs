@@ -158,7 +158,7 @@ impl ByteCoder {
     }
 
     fn compile_enum_variant(&mut self, ty: Ty, v: ir::EnumVariant) -> EnumVariant {
-        let ir::TyKind::Enum(ty_variants) = &ty.kind else {
+        let ir::TyKind::Enum(ty_variants) = &self.get_ty_mat(&ty).kind else {
             panic!()
         };
         let ty_variant = ty_variants.get(v.tag as usize).unwrap();

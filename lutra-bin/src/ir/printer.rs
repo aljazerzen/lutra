@@ -288,6 +288,13 @@ impl Printer {
                     if index > 0 {
                         r += ", ";
                     }
+                    let is_recursive =
+                        crate::layout::does_enum_variant_contain_recursive(ty, index as u16);
+
+                    if is_recursive {
+                        r += "@recursive ";
+                    }
+
                     r += &display_ident(&variant.name);
                     if !is_ty_unit(&variant.ty) {
                         r += ": ";

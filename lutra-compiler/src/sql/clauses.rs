@@ -4,6 +4,7 @@ use crate::intermediate;
 use crate::sql::utils::RelCols;
 use crate::sql::{cr, utils};
 use crate::utils::IdGenerator;
+use itertools::Itertools;
 use lutra_bin::ir;
 
 pub(super) struct Context<'t> {
@@ -245,7 +246,8 @@ impl<'a> Context<'a> {
             ir::ExprKind::Function(_) => todo!(),
 
             ir::ExprKind::EnumVariant(variant) => {
-                let ir::TyKind::Enum(ty_variants) = &self.get_ty_mat(&expr.ty).kind else {
+                let ty_mat = self.get_ty_mat(&expr.ty);
+                let ir::TyKind::Enum(ty_variants) = &ty_mat.kind else {
                     panic!("invalid program");
                 };
 
@@ -262,9 +264,15 @@ impl<'a> Context<'a> {
                         self.compile_rel(&variant.inner).kind
                     }
                 } else {
-                    let mut row = Vec::with_capacity(ty_variants.len() + 1);
+                    let cols = std::iter::zip(
+                        self.rel_cols_nested(&expr.ty, "".into()),
+                        self.rel_cols_ty_nested(&expr.ty),
+                    );
+                    let mut row = Vec::with_capacity(cols.size_hint().1.unwrap_or_default());
+                    let mut cols = cols.peekable();
 
                     // tag
+                    cols.next().unwrap();
                     row.push(cr::Expr {
                         kind: cr::ExprKind::From(cr::From::Literal(ir::Literal::int8(
                             variant.tag as i8,
@@ -272,25 +280,37 @@ impl<'a> Context<'a> {
                         ty: ir::Ty::new(ir::TyPrimitive::int8),
                     });
 
+                    let inner_name = format!("_{}", variant.tag);
+
                     // spacing
-                    let selected = variant.tag as usize;
-                    row.extend(ty_variants.iter().take(selected).flat_map(|v| {
-                        self.rel_cols_ty_nested(&v.ty).map(|ty| cr::Expr {
-                            kind: cr::ExprKind::From(cr::From::Null),
-                            ty: ty.into_owned(),
-                        })
-                    }));
+                    row.extend(
+                        // columns before inner
+                        cols.peeking_take_while(|(n, _)| !n.starts_with(&inner_name))
+                            .map(|(_, t)| t.into_owned())
+                            .map(cr::Expr::null),
+                    );
+                    // consume inner columns
+                    cols.peeking_take_while(|(n, _)| n.starts_with(&inner_name))
+                        .count();
+                    // column after inner
+                    let spacing_after: Vec<_> = cols
+                        .map(|(_, t)| t.into_owned())
+                        .map(cr::Expr::null)
+                        .collect();
 
                     // inner
-                    row.extend(self.compile_column_list(&variant.inner).unwrap_columns());
+                    let is_recursive = lutra_bin::layout::does_enum_variant_contain_recursive(
+                        ty_mat,
+                        variant.tag as u16,
+                    );
+                    if is_recursive {
+                        let inner = self.compile_rel(&variant.inner);
+                        row.push(cr::Expr::new_json_pack(inner));
+                    } else {
+                        row.extend(self.compile_column_list(&variant.inner).unwrap_columns());
+                    }
 
-                    // spacing
-                    row.extend(ty_variants.iter().skip(selected + 1).flat_map(|v| {
-                        self.rel_cols_ty_nested(&v.ty).map(|ty| cr::Expr {
-                            kind: cr::ExprKind::From(cr::From::Null),
-                            ty: ty.into_owned(),
-                        })
-                    }));
+                    row.extend(spacing_after);
 
                     cr::ExprKind::From(cr::From::Row(row))
                 }
@@ -419,9 +439,10 @@ impl<'a> Context<'a> {
 
                     self.bindings.remove(&binding.id).unwrap();
 
-                    let is_exactly_one_row = expr.rel.ty.kind.is_primitive()
-                        || expr.rel.ty.kind.is_tuple()
-                        || expr.rel.ty.kind.is_enum();
+                    let rel_ty_mat = self.get_ty_mat(&expr.rel.ty);
+                    let is_exactly_one_row = rel_ty_mat.kind.is_primitive()
+                        || rel_ty_mat.kind.is_tuple()
+                        || rel_ty_mat.kind.is_enum();
                     if is_exactly_one_row {
                         // if possible, use BindCorrelated, because it is easier for optimizers to work with
                         cr::ExprKind::BindCorrelated(expr, Box::new(main))

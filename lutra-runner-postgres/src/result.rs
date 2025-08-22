@@ -2,6 +2,7 @@ use bytes::{BufMut, BytesMut};
 use core::str;
 use lutra_bin::{Encode, ReversePointer, ir, rr};
 use postgres_types as pg_ty;
+use std::collections::HashMap;
 
 #[cfg(not(feature = "tokio-postgres"))]
 use postgres::Row;
@@ -44,7 +45,8 @@ impl<'a> super::Context<'a> {
     fn construct_row_encoder(&self, ty: &ir::Ty) -> Box<dyn EncodeRow> {
         tracing::debug!("row for: {}", lutra_bin::ir::print_ty(ty));
 
-        match &self.get_ty_mat(ty).kind {
+        let ty_mat = self.get_ty_mat(ty);
+        match &ty_mat.kind {
             // we expected X but got {X}: just take the first row
             ir::TyKind::Primitive(_) | ir::TyKind::Array(_) => Box::new(RowCellEncoder {
                 inner: self.construct_cell_encoder(ty),
@@ -66,7 +68,20 @@ impl<'a> super::Context<'a> {
                 variants,
                 variants
                     .iter()
-                    .map(|f| self.construct_row_encoder(&f.ty))
+                    .enumerate()
+                    .map(|(i, f)| {
+                        let is_recursive = lutra_bin::layout::does_enum_variant_contain_recursive(
+                            ty_mat, i as u16,
+                        );
+                        if is_recursive {
+                            // serialized
+                            Box::new(RowCellEncoder {
+                                inner: self.construct_cell_encoder(&f.ty),
+                            })
+                        } else {
+                            self.construct_row_encoder(&f.ty)
+                        }
+                    })
                     .collect(),
             )),
             ir::TyKind::Function(_) => todo!(),
@@ -83,11 +98,15 @@ impl<'a> super::Context<'a> {
             ir::TyKind::Primitive(prim) if *prim == ir::TyPrimitive::text => Box::new(TextEncoder),
             ir::TyKind::Primitive(prim) => Box::new(PrimEncoder { prim: *prim }),
 
-            ir::TyKind::Tuple(_) => unreachable!(),
-
-            ir::TyKind::Array(_) => Box::new(JsonCellEncoder {
-                inner: self.construct_json_encoder(ty),
-            }),
+            ir::TyKind::Tuple(_) | ir::TyKind::Array(_) => {
+                let mut ctx = JsonContext {
+                    encoders: Default::default(),
+                };
+                Box::new(JsonCellEncoder {
+                    inner: self.construct_json_encoder(ty, &mut ctx),
+                    ctx,
+                })
+            }
             ir::TyKind::Enum(_) => todo!(),
             ir::TyKind::Function(_) => todo!(),
             ir::TyKind::Ident(_) => todo!(),
@@ -96,40 +115,60 @@ impl<'a> super::Context<'a> {
 
     /// Constructs an encoder that takes JSON and produces the given type
     #[tracing::instrument(name = "json", skip_all)]
-    fn construct_json_encoder(&self, ty: &ir::Ty) -> Box<dyn EncodeJson> {
-        tracing::debug!("json");
+    fn construct_json_encoder(
+        &self,
+        ty: &ir::Ty,
+        json_ctx: &mut JsonContext,
+    ) -> Box<dyn EncodeJson> {
+        tracing::debug!("json for: {}", lutra_bin::ir::print_ty(ty));
 
-        match &self.get_ty_mat(ty).kind {
+        match &ty.kind {
             ir::TyKind::Primitive(prim) if *prim == ir::TyPrimitive::text => {
                 Box::new(JsonTextEncoder)
             }
             ir::TyKind::Primitive(prim) => Box::new(JsonPrimEncoder { prim: *prim }),
 
-            ir::TyKind::Tuple(_) => Box::new(JsonTupleEncoder {
-                inner: self.construct_json_encoder_tuple(ty),
+            ir::TyKind::Tuple(fields) => Box::new(JsonTupleEncoder {
+                inner: fields
+                    .iter()
+                    .map(|f| self.construct_json_encoder(&f.ty, json_ctx))
+                    .collect(),
             }),
 
             ir::TyKind::Array(item) => Box::new(JsonArrayEncoder {
-                inner: self.construct_json_encoder(item),
+                inner: self.construct_json_encoder(item, json_ctx),
             }),
-            ir::TyKind::Enum(_) => todo!(),
-            ir::TyKind::Function(_) => todo!(),
-            ir::TyKind::Ident(_) => todo!(),
-        }
-    }
+            ir::TyKind::Enum(variants) => Box::new(JsonEnumEncoder {
+                format: lutra_bin::layout::enum_format(variants),
+                inner: variants
+                    .iter()
+                    .map(|v| self.construct_json_encoder(&v.ty, json_ctx))
+                    .collect(),
+            }),
 
-    /// For flattening tuples.
-    #[tracing::instrument(name = "json_tuple", skip_all)]
-    fn construct_json_encoder_tuple(&self, ty: &ir::Ty) -> Vec<Box<dyn EncodeJson>> {
-        tracing::debug!("json_tuple");
+            ir::TyKind::Ident(path) => {
+                if !json_ctx.encoders.contains_key(path) {
+                    // insert a dummy
+                    json_ctx.encoders.insert(
+                        path.clone(),
+                        Box::new(JsonPrimEncoder {
+                            prim: ir::TyPrimitive::bool,
+                        }),
+                    );
 
-        match &self.get_ty_mat(ty).kind {
-            ir::TyKind::Tuple(fields) => fields
-                .iter()
-                .flat_map(|f| self.construct_json_encoder_tuple(&f.ty))
-                .collect(),
+                    // recurse
+                    let encoder = self.construct_json_encoder(self.get_ty_mat(ty), json_ctx);
 
-            _ => vec![self.construct_json_encoder(ty)],
+                    // insert correct encoder
+                    *json_ctx.encoders.get_mut(path).unwrap() = encoder;
+                }
+
+                Box::new(JsonRefEncoder {
+                    ident: path.clone(),
+                })
+            }
+
+            ir::TyKind::Function(_) => unreachable!(),
         }
     }
 }
@@ -491,13 +530,16 @@ impl EncodeRow for OptEncoder {
 
 struct JsonCellEncoder {
     inner: Box<dyn EncodeJson>,
+
+    // TODO: move this to the top-level, so it is shared between multiple JSON-serialized values
+    ctx: JsonContext,
 }
 
 impl EncodeCell for JsonCellEncoder {
     fn encode_head(&self, buf: &mut BytesMut, cell: &RowIter) -> HeadResidual {
         let value = cell.get::<Json>();
         let value: tinyjson::JsonValue = value.0.parse().unwrap();
-        let r = self.inner.encode_head(buf, &value);
+        let r = self.inner.encode_head(buf, &value, &self.ctx);
         HeadResidual::Json(value, Box::new(r))
     }
 
@@ -505,14 +547,29 @@ impl EncodeCell for JsonCellEncoder {
         let HeadResidual::Json(value, r) = r else {
             panic!()
         };
-        self.inner.encode_body(buf, &value, *r);
+        self.inner.encode_body(buf, &value, *r, &self.ctx);
     }
 }
 
 trait EncodeJson {
-    fn encode_head(&self, buf: &mut BytesMut, value: &tinyjson::JsonValue) -> HeadResidual;
+    fn encode_head(
+        &self,
+        buf: &mut BytesMut,
+        value: &tinyjson::JsonValue,
+        ctx: &JsonContext,
+    ) -> HeadResidual;
 
-    fn encode_body(&self, buf: &mut BytesMut, value: &tinyjson::JsonValue, r: HeadResidual);
+    fn encode_body(
+        &self,
+        buf: &mut BytesMut,
+        value: &tinyjson::JsonValue,
+        r: HeadResidual,
+        ctx: &JsonContext,
+    );
+}
+
+struct JsonContext {
+    encoders: HashMap<ir::Path, Box<dyn EncodeJson>>,
 }
 
 struct JsonPrimEncoder {
@@ -520,7 +577,12 @@ struct JsonPrimEncoder {
 }
 
 impl EncodeJson for JsonPrimEncoder {
-    fn encode_head(&self, buf: &mut BytesMut, value: &tinyjson::JsonValue) -> HeadResidual {
+    fn encode_head(
+        &self,
+        buf: &mut BytesMut,
+        value: &tinyjson::JsonValue,
+        _: &JsonContext,
+    ) -> HeadResidual {
         match (self.prim, value) {
             (ir::TyPrimitive::bool, tinyjson::JsonValue::Boolean(v)) => (*v).encode_head(buf),
             (ir::TyPrimitive::int8, tinyjson::JsonValue::Number(v)) => (*v as i8).encode_head(buf),
@@ -559,20 +621,38 @@ impl EncodeJson for JsonPrimEncoder {
         HeadResidual::None
     }
 
-    fn encode_body(&self, _buf: &mut BytesMut, _value: &tinyjson::JsonValue, _r: HeadResidual) {}
+    fn encode_body(
+        &self,
+        _buf: &mut BytesMut,
+        _value: &tinyjson::JsonValue,
+        _r: HeadResidual,
+        _: &JsonContext,
+    ) {
+    }
 }
 
 struct JsonTextEncoder;
 
 impl EncodeJson for JsonTextEncoder {
-    fn encode_head(&self, buf: &mut BytesMut, value: &tinyjson::JsonValue) -> HeadResidual {
+    fn encode_head(
+        &self,
+        buf: &mut BytesMut,
+        value: &tinyjson::JsonValue,
+        _: &JsonContext,
+    ) -> HeadResidual {
         let tinyjson::JsonValue::String(value) = value else {
             panic!()
         };
         HeadResidual::Offset(value.encode_head(buf))
     }
 
-    fn encode_body(&self, buf: &mut BytesMut, value: &tinyjson::JsonValue, r: HeadResidual) {
+    fn encode_body(
+        &self,
+        buf: &mut BytesMut,
+        value: &tinyjson::JsonValue,
+        r: HeadResidual,
+        _: &JsonContext,
+    ) {
         let tinyjson::JsonValue::String(value) = value else {
             panic!()
         };
@@ -588,7 +668,12 @@ struct JsonArrayEncoder {
 }
 
 impl EncodeJson for JsonArrayEncoder {
-    fn encode_head(&self, buf: &mut BytesMut, value: &tinyjson::JsonValue) -> HeadResidual {
+    fn encode_head(
+        &self,
+        buf: &mut BytesMut,
+        value: &tinyjson::JsonValue,
+        _: &JsonContext,
+    ) -> HeadResidual {
         let tinyjson::JsonValue::Array(value) = value else {
             panic!()
         };
@@ -598,7 +683,13 @@ impl EncodeJson for JsonArrayEncoder {
         HeadResidual::Offset(offset_ptr)
     }
 
-    fn encode_body(&self, buf: &mut BytesMut, value: &tinyjson::JsonValue, r: HeadResidual) {
+    fn encode_body(
+        &self,
+        buf: &mut BytesMut,
+        value: &tinyjson::JsonValue,
+        r: HeadResidual,
+        ctx: &JsonContext,
+    ) {
         let tinyjson::JsonValue::Array(value) = value else {
             panic!()
         };
@@ -610,11 +701,11 @@ impl EncodeJson for JsonArrayEncoder {
 
         let mut head_residuals = Vec::with_capacity(value.len());
         for i in value {
-            head_residuals.push(self.inner.encode_head(buf, i));
+            head_residuals.push(self.inner.encode_head(buf, i, ctx));
         }
 
         for (v, r) in value.iter().zip(head_residuals.into_iter()) {
-            self.inner.encode_body(buf, v, r)
+            self.inner.encode_body(buf, v, r, ctx)
         }
     }
 }
@@ -624,20 +715,31 @@ struct JsonTupleEncoder {
 }
 
 impl EncodeJson for JsonTupleEncoder {
-    fn encode_head(&self, buf: &mut BytesMut, value: &tinyjson::JsonValue) -> HeadResidual {
+    fn encode_head(
+        &self,
+        buf: &mut BytesMut,
+        value: &tinyjson::JsonValue,
+        ctx: &JsonContext,
+    ) -> HeadResidual {
         let tinyjson::JsonValue::Array(value) = value else {
             panic!()
         };
 
         let mut head_residuals = Vec::with_capacity(self.inner.len());
         for (encoder, value) in self.inner.iter().zip(value) {
-            head_residuals.push(encoder.encode_head(buf, value));
+            head_residuals.push(encoder.encode_head(buf, value, ctx));
         }
 
         HeadResidual::Tuple(head_residuals)
     }
 
-    fn encode_body(&self, buf: &mut BytesMut, value: &tinyjson::JsonValue, r: HeadResidual) {
+    fn encode_body(
+        &self,
+        buf: &mut BytesMut,
+        value: &tinyjson::JsonValue,
+        r: HeadResidual,
+        ctx: &JsonContext,
+    ) {
         let tinyjson::JsonValue::Array(value) = value else {
             panic!()
         };
@@ -646,8 +748,108 @@ impl EncodeJson for JsonTupleEncoder {
         };
 
         for ((encoder, v), r) in self.inner.iter().zip(value).zip(head_residuals.into_iter()) {
-            encoder.encode_body(buf, v, r)
+            encoder.encode_body(buf, v, r, ctx)
         }
+    }
+}
+
+struct JsonEnumEncoder {
+    format: lutra_bin::layout::EnumFormat,
+    inner: Vec<Box<dyn EncodeJson>>,
+}
+
+impl EncodeJson for JsonEnumEncoder {
+    fn encode_head(
+        &self,
+        buf: &mut BytesMut,
+        value: &tinyjson::JsonValue,
+        ctx: &JsonContext,
+    ) -> HeadResidual {
+        let tinyjson::JsonValue::Object(values) = value else {
+            panic!()
+        };
+        let (key, value) = values.iter().next().unwrap();
+        let tag: usize = key.parse().unwrap();
+
+        let variant_format = &self.format.variants[tag];
+
+        let tag_bytes = &(tag as u64).to_le_bytes()[0..self.format.tag_bytes as usize];
+        buf.put_slice(tag_bytes);
+
+        let r = if self.format.has_ptr {
+            if variant_format.is_unit {
+                // this is unit variant, no need to encode head
+                HeadResidual::None
+            } else {
+                let offset = ReversePointer::new(buf);
+                HeadResidual::Offset(offset)
+            }
+        } else {
+            self.inner[tag].encode_head(buf, value, ctx)
+        };
+
+        if variant_format.padding_bytes > 0 {
+            buf.put_bytes(0, variant_format.padding_bytes as usize);
+        }
+        r
+    }
+
+    fn encode_body(
+        &self,
+        buf: &mut BytesMut,
+        value: &tinyjson::JsonValue,
+        r: HeadResidual,
+        ctx: &JsonContext,
+    ) {
+        let tinyjson::JsonValue::Object(values) = value else {
+            panic!()
+        };
+        let (key, value) = values.iter().next().unwrap();
+        let tag: usize = key.parse().unwrap();
+
+        if self.format.has_ptr {
+            match r {
+                HeadResidual::None => {
+                    // unit variant, done
+                }
+                HeadResidual::Offset(offset_ptr) => {
+                    offset_ptr.write_cur_len(buf);
+
+                    let residual = self.inner[tag].encode_head(buf, value, ctx);
+                    self.inner[tag].encode_body(buf, value, residual, ctx);
+                }
+                _ => unreachable!(),
+            }
+        } else {
+            self.inner[tag].encode_body(buf, value, r, ctx);
+        }
+    }
+}
+
+struct JsonRefEncoder {
+    ident: ir::Path,
+}
+
+impl EncodeJson for JsonRefEncoder {
+    fn encode_head(
+        &self,
+        buf: &mut BytesMut,
+        value: &tinyjson::JsonValue,
+        ctx: &JsonContext,
+    ) -> HeadResidual {
+        let encoder = ctx.encoders.get(&self.ident).unwrap();
+        encoder.encode_head(buf, value, ctx)
+    }
+
+    fn encode_body(
+        &self,
+        buf: &mut BytesMut,
+        value: &tinyjson::JsonValue,
+        r: HeadResidual,
+        ctx: &JsonContext,
+    ) {
+        let encoder = ctx.encoders.get(&self.ident).unwrap();
+        encoder.encode_body(buf, value, r, ctx)
     }
 }
 

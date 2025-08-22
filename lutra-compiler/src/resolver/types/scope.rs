@@ -89,7 +89,7 @@ pub enum Named<'a> {
     Expr(&'a pr::Expr),
     Ty(&'a pr::Ty, bool),
     Scoped(&'a ScopedKind),
-    EnumVariant(&'a pr::Ty, usize),
+    EnumVariant(&'a pr::Ty, Option<pr::Path>, usize),
 }
 
 /// A reference to a type-like objects
@@ -216,7 +216,7 @@ impl Scope {
     }
 }
 
-impl TypeResolver<'_> {
+impl<'a> TypeResolver<'a> {
     pub fn get_ty_var_scope(&self) -> &Scope {
         let mut stack = self.scopes.iter().rev();
         stack.find(|s| s.for_ty_vars()).unwrap()
@@ -229,19 +229,13 @@ impl TypeResolver<'_> {
     /// Get definition from within the current scope.
     ///
     /// Does not mutate the current scope or module structure.
-    pub(super) fn get_ident<'a>(&'a self, target: &pr::Ref) -> Result<Named<'a>> {
+    pub(super) fn get_ident(&'a self, target: &pr::Ref) -> Result<Named<'a>> {
         tracing::trace!("get_ident: {target:?}");
 
         match target {
-            pr::Ref::FullyQualified {
-                to_def: path,
-                within,
-            } => {
-                let def = self
-                    .root_mod
-                    .get(path)
-                    .unwrap_or_else(|| panic!("cannot find {path}"));
-                match def {
+            pr::Ref::FullyQualified { to_def, within } => {
+                let def = self.root_mod.get(to_def);
+                match def.unwrap_or_else(|| panic!("cannot find {to_def}")) {
                     ExprOrTy::Expr(expr) => {
                         if !within.is_empty() {
                             unreachable!()
@@ -249,7 +243,8 @@ impl TypeResolver<'_> {
                         Ok(Named::Expr(expr))
                     }
 
-                    ExprOrTy::Ty(ty) => lookup_into_ty(ty, within.full_path(), true)
+                    ExprOrTy::Ty(ty) => self
+                        .lookup_into_ty(ty, Some(to_def), within.full_path(), true)
                         .ok_or_else(|| Diagnostic::new_custom("unknown name")),
                 }
             }
@@ -321,11 +316,9 @@ impl TypeResolver<'_> {
                     }
                 }
             }
-            Named::EnumVariant(_, _) => {
-                Err(Diagnostic::new_assert("expected a type, found a value")
-                    .push_hint(format!("{ident} is an enum variant"))
-                    .with_span(ty.span))
-            }
+            Named::EnumVariant(..) => Err(Diagnostic::new_assert("expected a type, found a value")
+                .push_hint(format!("{ident} is an enum variant"))
+                .with_span(ty.span)),
         }
     }
 
@@ -396,33 +389,52 @@ impl TypeResolver<'_> {
             ..pr::Ty::new(pr::TyKind::Ident(pr::Path::from_name("_")))
         }
     }
-}
 
-fn lookup_into_ty<'t>(ty: &'t pr::Ty, steps: &[String], top_level: bool) -> Option<Named<'t>> {
-    if steps.is_empty() {
-        return Some(Named::Ty(ty, top_level));
-    }
-    match &ty.kind {
-        pr::TyKind::Enum(variants) => {
-            // path into enum
+    fn lookup_into_ty(
+        &'a self,
+        ty: &'a pr::Ty,
+        ty_fq: Option<&pr::Path>,
+        steps: &[String],
+        top_level: bool,
+    ) -> Option<Named<'a>> {
+        if steps.is_empty() {
+            return Some(Named::Ty(ty, top_level));
+        }
+        let TyRef::Ty(ty_mat) = self.get_ty_mat(ty).unwrap() else {
+            todo!()
+        };
+        match &ty_mat.kind {
+            pr::TyKind::Enum(variants) => {
+                // path into enum
+                let (position, variant) = variants.iter().find_position(|v| v.name == steps[0])?;
 
-            let (position, variant) = variants.iter().find_position(|v| v.name == steps[0])?;
+                if steps.len() == 1 {
+                    // find fully qualified path to the type of enum being referenced
+                    let ty_fq = ty_fq // when provided by caller, use that
+                        .cloned()
+                        .or_else(|| // fallback to ty.target
+                            ty.target.as_ref().and_then(|r| match r {
+                                pr::Ref::FullyQualified { to_def, within } if within.is_empty() => {
+                                    Some(to_def.clone())
+                                }
+                                _ => None,
+                            }));
 
-            if steps.len() == 1 {
-                Some(Named::EnumVariant(ty, position))
-            } else {
-                lookup_into_ty(&variant.ty, &steps[1..], false)
+                    Some(Named::EnumVariant(ty, ty_fq, position))
+                } else {
+                    self.lookup_into_ty(&variant.ty, None, &steps[1..], false)
+                }
             }
-        }
-        pr::TyKind::Tuple(fields) => {
-            // path into tuple
+            pr::TyKind::Tuple(fields) => {
+                // path into tuple
 
-            let field = fields
-                .iter()
-                .find(|f| f.name.as_ref().is_some_and(|n| n == &steps[0]))?;
+                let field = fields
+                    .iter()
+                    .find(|f| f.name.as_ref().is_some_and(|n| n == &steps[0]))?;
 
-            lookup_into_ty(&field.ty, &steps[1..], false)
+                self.lookup_into_ty(&field.ty, None, &steps[1..], false)
+            }
+            _ => None,
         }
-        _ => None,
     }
 }

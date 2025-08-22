@@ -1,5 +1,3 @@
-use itertools::Itertools;
-
 use crate::Result;
 use crate::diagnostic::{Diagnostic, WithErrorInfo};
 use crate::pr;
@@ -49,13 +47,30 @@ impl fold::PrFold for super::TypeResolver<'_> {
                             .with_span(span));
                         }
                     },
-                    scope::Named::EnumVariant(ty, tag) => {
-                        let mut r = pr::Expr::new(pr::ExprKind::EnumVariant(pr::EnumVariant {
-                            tag,
-                            inner: None,
-                        }));
-                        r.span = span;
-                        r.ty = Some(ty.clone());
+                    scope::Named::EnumVariant(ty, ty_fq, tag) => {
+                        let ty = if let Some(ty_fq) = ty_fq {
+                            // when possible, use ident as the type
+                            pr::Ty {
+                                target: Some(pr::Ref::FullyQualified {
+                                    to_def: ty_fq,
+                                    within: pr::Path::empty(),
+                                }),
+                                span,
+                                ..pr::Ty::new(pr::TyKind::Ident(ident))
+                            }
+                        } else {
+                            // fallback to concrete enum type
+                            ty.clone()
+                        };
+
+                        let r = pr::Expr {
+                            span,
+                            ty: Some(ty),
+                            ..pr::Expr::new(pr::ExprKind::EnumVariant(pr::EnumVariant {
+                                tag,
+                                inner: None,
+                            }))
+                        };
                         return Ok(r);
                     }
                 };
@@ -111,12 +126,27 @@ impl fold::PrFold for super::TypeResolver<'_> {
 
                 if let pr::ExprKind::EnumVariant(mut variant) = func.kind {
                     // special case: enum variant construction
-                    let inner = args.into_iter().exactly_one().unwrap();
+                    let ty = func.ty.as_ref().unwrap();
+
+                    if args.len() != 1 {
+                        return Err(Diagnostic::new_custom(format!(
+                            "{}expected exactly one argument, but got {}",
+                            ty.name.clone().unwrap_or_default(),
+                            args.len(),
+                        ))
+                        .with_span(span));
+                    }
+
+                    let inner = args.into_iter().next().unwrap();
                     let mut inner = self.fold_expr(inner)?;
 
                     // validate type of inner
-                    let ty_variants = func.ty.as_ref().unwrap().kind.as_enum().unwrap();
-                    let ty_variant = ty_variants.get(variant.tag).unwrap();
+                    let ty_enum = self.get_ty_mat(ty).unwrap();
+                    let scope::TyRef::Ty(ty_enum) = ty_enum else {
+                        panic!()
+                    };
+                    let ty_variants = ty_enum.kind.as_enum().unwrap();
+                    let ty_variant = ty_variants.get(variant.tag).unwrap().clone();
                     self.validate_expr_type(&mut inner, &ty_variant.ty, &|| {
                         Some(ty_variant.name.clone())
                     })?;

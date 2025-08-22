@@ -21,6 +21,7 @@ fn init_logger() {
     tracing_subscriber::fmt::Subscriber::builder()
         .without_time()
         .with_env_filter(tracing_subscriber::EnvFilter::from_default_env())
+        .with_target(false)
         .try_init()
         .ok();
 

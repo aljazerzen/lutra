@@ -123,20 +123,21 @@ fn lower_02() {
         .Closed => "closed",
     }
     "#), @r#"
+    type Status = enum {Open, Closed: text};
     let main = (func 0 ->
-      let 0 = (enum_variant 1): enum {Open, Closed: text};
+      let 0 = (enum_variant 1): Status;
       (
         switch,
         (
           (enum_eq
-            var.0: enum {Open, Closed: text}
+            var.0: Status
             0
           ): bool,
           "open": text,
         ),
         (
           (enum_eq
-            var.0: enum {Open, Closed: text}
+            var.0: Status
             1
           ): bool,
           "closed": text,

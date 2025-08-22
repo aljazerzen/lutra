@@ -749,7 +749,7 @@ fn enums_00() {
             func main() -> Status::Done
             "
         ),
-        @"enum {Open, Done, Pending: text}"
+        @"Status"
     );
 }
 
@@ -763,7 +763,7 @@ fn enums_01() {
             func main() -> Status::Pending("hello")
             "#
         ),
-        @"enum {Open, Done, Pending: text}"
+        @"Status"
     );
 }
 #[test]

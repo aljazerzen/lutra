@@ -2095,3 +2095,113 @@ func false_x_false(x: T) where T: {bool, text, ..} -> {false, ..x, false}.2
 func main() -> false_x_false({true, "hello"})
 # >
 "hello"
+
+
+# === recursive_type_00
+type Tree: enum {
+  Leaf: int8,
+  Node: {left: Tree, right: Tree},
+}
+const main = [
+  Tree::Leaf(10),
+  Tree::Leaf(12),
+]
+# >
+[
+  Leaf(
+    10
+  ),
+  Leaf(
+    12
+  ),
+]
+
+# === recursive_type_01
+type Tree: enum {
+  Leaf: int8,
+  Node: {left: Tree, right: Tree},
+}
+const main = Tree::Node({
+  left = Tree::Leaf(10),
+  right = Tree::Node({
+    left = Tree::Node({
+      left = Tree::Leaf(12),
+      right = Tree::Leaf(18),
+    }),
+    right = Tree::Leaf(20),
+  }),
+})
+# >
+Node(
+  {
+    left = Leaf(
+      10
+    ),
+    right = Node(
+      {
+        left = Node(
+          {
+            left = Leaf(
+              12
+            ),
+            right = Leaf(
+              18
+            ),
+          }
+        ),
+        right = Leaf(
+          20
+        ),
+      }
+    ),
+  }
+)
+
+# === recursive_type_02
+type Tree: enum {
+  Leaf: int8,
+  Node: [Tree],
+}
+const main = Tree::Node([
+  Tree::Leaf(10),
+  Tree::Node([
+    Tree::Node([
+      Tree::Leaf(12),
+      Tree::Leaf(15),
+      Tree::Leaf(18),
+    ]),
+    Tree::Leaf(20),
+  ]),
+  Tree::Leaf(21),
+])
+# >
+Node(
+  [
+    Leaf(
+      10
+    ),
+    Node(
+      [
+        Node(
+          [
+            Leaf(
+              12
+            ),
+            Leaf(
+              15
+            ),
+            Leaf(
+              18
+            ),
+          ]
+        ),
+        Leaf(
+          20
+        ),
+      ]
+    ),
+    Leaf(
+      21
+    ),
+  ]
+)

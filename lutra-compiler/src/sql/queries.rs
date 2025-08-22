@@ -1,11 +1,10 @@
-use itertools::Itertools;
 use std::collections::HashMap;
 
 use lutra_bin::ir;
 use sqlparser::ast::{self as sql_ast};
 
+use crate::sql::COL_ARRAY_INDEX;
 use crate::sql::utils::{ExprOrSource, RelCols, Scoped};
-use crate::sql::{COL_ARRAY_INDEX, COL_VALUE};
 use crate::sql::{cr, utils};
 use crate::utils::NameGenerator;
 
@@ -283,12 +282,12 @@ impl<'a> Context<'a> {
 
             cr::From::JsonUnpack(input) => {
                 let input = self.compile_rel(input);
-                self.compile_json_unpack(input, ty)
+                self.deserialize_json(input, ty)
             }
 
             cr::From::JsonPack(expr_in) => {
                 let expr = self.compile_rel(expr_in);
-                self.compile_json_pack(expr, &expr_in.ty)
+                self.serialize_json(expr, &expr_in.ty)
             }
 
             cr::From::Case(cases) => {
@@ -599,144 +598,6 @@ impl<'a> Context<'a> {
         rel
     }
 
-    fn compile_json_pack(&mut self, mut scoped: Scoped, ty: &ir::Ty) -> Scoped {
-        let input = self.scoped_as_rel_var(&mut scoped);
-
-        fn col_ref(input: &str, col: &str, ty: &ir::Ty) -> String {
-            let mut r = format!("{input}.{col}");
-            if let ir::TyKind::Primitive(ir::TyPrimitive::int8) = &ty.kind {
-                r = format!("ASCII({r})");
-            }
-            r
-        }
-
-        let ty_mat = self.get_ty_mat(ty);
-        scoped.expr = match &ty_mat.kind {
-            ir::TyKind::Array(ty_item) => {
-                let index = format!("{input}.{COL_ARRAY_INDEX}");
-
-                let ty_item_mat = self.get_ty_mat(ty_item);
-                match &ty_item_mat.kind {
-                    ir::TyKind::Primitive(_) | ir::TyKind::Array(_) => {
-                        let col_ref = col_ref(input, COL_VALUE, ty_item_mat);
-                        ExprOrSource::Source(format!(
-                            "COALESCE(jsonb_agg({col_ref} ORDER BY {index}), '[]'::jsonb)",
-                        ))
-                    }
-                    ir::TyKind::Tuple(_) => {
-                        let fields = std::iter::zip(
-                            self.rel_cols_nested(ty_item_mat, "".into()),
-                            self.rel_cols_ty_nested(ty_item_mat),
-                        )
-                        .map(|(col, ty)| col_ref(input, &col, &ty))
-                        .join(", ");
-                        ExprOrSource::Source(format!(
-                            "COALESCE(jsonb_agg(jsonb_build_array({fields}) ORDER BY {index}), '[]'::jsonb)"
-                        ))
-                    }
-                    _ => todo!(),
-                }
-            }
-            ir::TyKind::Tuple(_) => {
-                let fields = std::iter::zip(
-                    self.rel_cols_nested(ty_mat, "".into()),
-                    self.rel_cols_ty_nested(ty_mat),
-                )
-                .map(|(col, ty)| col_ref(input, &col, &ty))
-                .join(", ");
-
-                ExprOrSource::Source(format!("jsonb_build_array({fields})"))
-            }
-            _ => unreachable!("{:?}", ty),
-        };
-        scoped
-    }
-
-    fn compile_json_unpack(&mut self, mut scoped: Scoped, ty: &ir::Ty) -> Scoped {
-        if let Some(simplified) = scoped.as_simplified_expr() {
-            scoped = simplified;
-        }
-
-        match &self.get_ty_mat(ty).kind {
-            ir::TyKind::Array(ty_item) => {
-                let mut query = utils::select_empty();
-
-                /*
-                FROM json_array_elements(...expr...) j
-                SELECT ROW_NUMBER(), j.value
-                */
-
-                query.from.push(utils::from(utils::rel_func(
-                    utils::new_ident("jsonb_array_elements"),
-                    vec![scoped.expr.into_expr()],
-                    Some("j".into()),
-                )));
-
-                query.projection = vec![sql_ast::SelectItem::ExprWithAlias {
-                    expr: ExprOrSource::Source("(ROW_NUMBER() OVER ())::int4".into()).into_expr(),
-                    alias: utils::new_ident("index"),
-                }];
-
-                let item_ty = self.get_ty_mat(ty_item);
-                match &item_ty.kind {
-                    ir::TyKind::Primitive(_) => {
-                        let value =
-                            ExprOrSource::Source(self.compile_json_item_cast("j.value", item_ty));
-                        query.projection.push(sql_ast::SelectItem::ExprWithAlias {
-                            expr: value.into_expr(),
-                            alias: utils::new_ident(COL_VALUE),
-                        });
-                    }
-                    ir::TyKind::Array(_) => {
-                        query.projection.push(sql_ast::SelectItem::ExprWithAlias {
-                            expr: utils::identifier(Some("j"), "value"),
-                            alias: utils::new_ident(COL_VALUE),
-                        });
-                    }
-                    ir::TyKind::Tuple(_) => {
-                        for (position, (name, t)) in std::iter::zip(
-                            self.rel_cols_nested(item_ty, "".into()),
-                            self.rel_cols_ty_nested(item_ty),
-                        )
-                        .enumerate()
-                        {
-                            let value = ExprOrSource::Source(self.compile_json_item_cast(
-                                &format!("(j.value->{position})"),
-                                self.get_ty_mat(&t),
-                            ))
-                            .into_expr();
-                            query.projection.push(sql_ast::SelectItem::ExprWithAlias {
-                                expr: value,
-                                alias: utils::new_ident(name),
-                            });
-                        }
-                    }
-
-                    _ => todo!(),
-                }
-                let rel_var_name = self.rel_name_gen.next();
-                let rel_var = utils::sub_rel(utils::query_select(query), rel_var_name.clone());
-                scoped.rel_vars.push(utils::lateral(rel_var));
-                scoped.expr = ExprOrSource::RelVar(rel_var_name);
-            }
-            ir::TyKind::Tuple(_) => todo!(),
-            _ => unreachable!("{:?}", ty),
-        }
-        scoped
-    }
-
-    fn compile_json_item_cast(&self, item_ref: &str, ty: &ir::Ty) -> String {
-        match &ty.kind {
-            ir::TyKind::Primitive(ir::TyPrimitive::text) => {
-                format!("jsonb_build_array({item_ref}) ->> 0")
-            }
-            ir::TyKind::Primitive(ir::TyPrimitive::int8) => {
-                format!("CHR({item_ref}::text::int2)::\"char\"")
-            }
-            _ => format!("{item_ref}::text::{}", self.compile_ty_name(ty)),
-        }
-    }
-
     fn compile_func_call(
         &self,
         id: &str,
@@ -879,7 +740,7 @@ impl<'a> Context<'a> {
         }
     }
 
-    fn compile_ty_name(&self, ty: &ir::Ty) -> sql_ast::DataType {
+    pub(super) fn compile_ty_name(&self, ty: &ir::Ty) -> sql_ast::DataType {
         let type_name = match &self.get_ty_mat(ty).kind {
             ir::TyKind::Primitive(prim) => match prim {
                 ir::TyPrimitive::bool => "bool",
@@ -900,8 +761,7 @@ impl<'a> Context<'a> {
                 // the least amount of data
                 "bool"
             }
-            ir::TyKind::Tuple(_) => todo!(),
-            ir::TyKind::Array(_) => "jsonb",
+            ir::TyKind::Tuple(_) | ir::TyKind::Array(_) => "jsonb",
             ir::TyKind::Enum(variants) if utils::is_maybe(variants) => {
                 return self.compile_ty_name(&variants[1].ty);
             }

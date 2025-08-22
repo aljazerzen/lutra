@@ -160,4 +160,11 @@ impl Expr {
             kind: ExprKind::From(From::JsonPack(Box::new(rel))),
         }
     }
+
+    pub fn null(ty: ir::Ty) -> Expr {
+        Expr {
+            kind: ExprKind::From(From::Null),
+            ty,
+        }
+    }
 }

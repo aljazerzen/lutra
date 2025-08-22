@@ -36,21 +36,23 @@ pub fn compile(
     name_hint: Option<&str>,
     format: ProgramFormat,
 ) -> Result<(rr::Program, rr::ProgramType), error::Error> {
+    // resolve
     let program_pr = self::check::check_overlay(project, program, name_hint)?;
-    let program_ir = crate::intermediate::lower_expr(project, &program_pr);
 
+    // lower
+    let program_ir = intermediate::lower_expr(project, &program_pr);
     tracing::debug!("ir:\n{}", lutra_bin::ir::print(&program_ir));
 
-    let (program_ir, program) = match format {
-        ProgramFormat::SqlPg => {
-            let (program_ir, program_sr) = sql::compile_ir(program_ir);
-            (program_ir, rr::Program::SqlPg(Box::new(program_sr)))
-        }
+    // intermediate optimizations
+    let program_ir = intermediate::inline(program_ir);
+    tracing::debug!("ir (inlined): {}", lutra_bin::ir::print(&program_ir));
+    let program_ir = intermediate::layouter::on_program(program_ir);
+    tracing::debug!("ir (layout): {}", lutra_bin::ir::print(&program_ir));
+
+    let program = match format {
+        ProgramFormat::SqlPg => rr::Program::SqlPg(Box::new(sql::compile_ir(&program_ir))),
         ProgramFormat::BytecodeLt => {
-            let program_ir = intermediate::inline(program_ir);
-            let program_ir = intermediate::layouter::on_program(program_ir);
-            let inner = bytecoding::compile_program(program_ir.clone());
-            (program_ir, rr::Program::BytecodeLt(inner))
+            rr::Program::BytecodeLt(bytecoding::compile_program(program_ir.clone()))
         }
     };
 

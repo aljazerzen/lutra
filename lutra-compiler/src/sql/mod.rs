@@ -2,6 +2,7 @@ mod clauses;
 mod cr;
 mod optimizer;
 mod queries;
+mod serialization;
 mod utils;
 
 use lutra_bin::{ir, rr};
@@ -9,14 +10,9 @@ use lutra_bin::{ir, rr};
 const COL_VALUE: &str = "value";
 const COL_ARRAY_INDEX: &str = "index";
 
-pub fn compile_ir(program: ir::Program) -> (ir::Program, rr::SqlProgram) {
-    // intermediate optimizations
-    let program = crate::intermediate::inline(program);
-    tracing::debug!("ir (inlined): {}", lutra_bin::ir::print(&program));
-    let program = crate::intermediate::layouter::on_program(program);
-
+pub fn compile_ir(program: &ir::Program) -> rr::SqlProgram {
     // compile to clauses
-    let (clauses, types) = clauses::compile(&program);
+    let (clauses, types) = clauses::compile(program);
 
     let clauses = optimizer::optimize(clauses);
 
@@ -43,11 +39,10 @@ pub fn compile_ir(program: ir::Program) -> (ir::Program, rr::SqlProgram) {
         tracing::debug!("sql:\n{sql_source}");
     }
 
-    let program_sr = rr::SqlProgram {
+    rr::SqlProgram {
         sql: sql_source,
         input_ty: program.get_input_ty().clone(),
         output_ty: program.get_output_ty().clone(),
         defs: program.defs.clone(),
-    };
-    (program, program_sr)
+    }
 }

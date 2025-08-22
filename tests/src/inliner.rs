@@ -95,3 +95,69 @@ fn inline_02() {
     ): func ({}) -> {int64, int64}
     ")
 }
+
+#[test]
+fn inline_03() {
+    assert_snapshot!(_test_compile_and_print(r#"
+    type OptText: enum {
+      None,
+      Some: text,
+    }
+    func main() -> {
+      OptText::Some("hello"),
+      OptText::None,
+      std::is_some(OptText::Some("hello")),
+      std::is_none(OptText::Some("hello")),
+    }
+    "#), @r#"
+    type OptText = enum {None, Some: text};
+    let main = (func 1 ->
+      {
+        (enum_variant 1
+          "hello": text
+        ): OptText,
+        (enum_variant 0): OptText,
+        let 2 = (enum_variant 1
+          "hello": text
+        ): OptText;
+        (
+          switch,
+          (
+            (enum_eq
+              var.2: enum {None, Some: text}
+              1
+            ): bool,
+            true: bool,
+          ),
+          (
+            (enum_eq
+              var.2: enum {None, Some: text}
+              0
+            ): bool,
+            false: bool,
+          ),
+        ): bool,
+        let 3 = (enum_variant 1
+          "hello": text
+        ): OptText;
+        (
+          switch,
+          (
+            (enum_eq
+              var.3: enum {None, Some: text}
+              1
+            ): bool,
+            false: bool,
+          ),
+          (
+            (enum_eq
+              var.3: enum {None, Some: text}
+              0
+            ): bool,
+            true: bool,
+          ),
+        ): bool,
+      }: {OptText, OptText, bool, bool}
+    ): func ({}) -> {OptText, OptText, bool, bool}
+    "#)
+}

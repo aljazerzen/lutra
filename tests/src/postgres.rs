@@ -130,6 +130,153 @@ fn array_empty() {
 }
 
 #[test]
+fn array_enum() {
+    insta::assert_snapshot!(_run_sql_output(r#"
+        type Status: enum {
+          Pending, InProgress: {started_at: text, owner: text}, Done: text
+        }
+        const main = [Status::Pending, Status::InProgress({"today", "me"}), Status::Done("ok")]
+    "#), @r#"
+    SELECT
+      r3._t,
+      r3._1_0,
+      r3._1_1,
+      r3._2
+    FROM
+      (
+        SELECT
+          0::int8 AS index,
+          0::"char" AS _t,
+          NULL::text AS _1_0,
+          NULL::text AS _1_1,
+          NULL::text AS _2
+        UNION
+        ALL
+        SELECT
+          1::int8 AS index,
+          1::"char" AS _t,
+          'today' AS _1_0,
+          'me' AS _1_1,
+          NULL::text AS _2
+        UNION
+        ALL
+        SELECT
+          2::int8 AS index,
+          2::"char" AS _t,
+          NULL::text AS _1_0,
+          NULL::text AS _1_1,
+          'ok' AS _2
+      ) AS r3
+    ORDER BY
+      r3.index
+    ---
+    [
+      Pending,
+      InProgress(
+        {
+          started_at = "today",
+          owner = "me",
+        }
+      ),
+      Done(
+        "ok"
+      ),
+    ]
+    "#);
+}
+
+#[test]
+fn enum_array() {
+    insta::assert_snapshot!(_run_sql_output(r#"
+        type Status: enum {
+          Pending, InProgress: [text], Done: text
+        }
+        const main = {
+          "statuses:",
+          [Status::Pending, Status::InProgress(["today", "me"]), Status::Done("ok")],
+        }
+    "#), @r#"
+    SELECT
+      'statuses:' AS _0,
+      (
+        SELECT
+          COALESCE(
+            jsonb_agg(
+              CASE
+                ASCII(r6._t)
+                WHEN 0 THEN json_build_object('0', jsonb_build_array())
+                WHEN 1 THEN json_build_object('1', r6._1)
+                WHEN 2 THEN json_build_object('2', r6._2)
+              END
+              ORDER BY
+                r6.index
+            ),
+            '[]'::jsonb
+          ) AS value
+        FROM
+          (
+            SELECT
+              0::int8 AS index,
+              0::"char" AS _t,
+              NULL::jsonb AS _1,
+              NULL::text AS _2
+            UNION
+            ALL
+            SELECT
+              1::int8 AS index,
+              1::"char" AS _t,
+              (
+                SELECT
+                  COALESCE(
+                    jsonb_agg(
+                      r3.value
+                      ORDER BY
+                        r3.index
+                    ),
+                    '[]'::jsonb
+                  ) AS value
+                FROM
+                  (
+                    SELECT
+                      0::int8 AS index,
+                      'today' AS value
+                    UNION
+                    ALL
+                    SELECT
+                      1::int8 AS index,
+                      'me' AS value
+                  ) AS r3
+              ) AS _1,
+              NULL::text AS _2
+            UNION
+            ALL
+            SELECT
+              2::int8 AS index,
+              2::"char" AS _t,
+              NULL::jsonb AS _1,
+              'ok' AS _2
+          ) AS r6
+      ) AS _1
+    ---
+    {
+      "statuses:",
+      [
+        Pending,
+        InProgress(
+          [
+            "today",
+            "me",
+          ]
+        ),
+        Done(
+          "ok"
+        ),
+      ],
+    }
+    "#);
+}
+
+#[test]
 fn tuple_tuple_prim() {
     insta::assert_snapshot!(_run_sql_output(r#"
         const main = {3: int16, {false, true, {"hello"}, 4: int32}}
@@ -221,6 +368,79 @@ fn tuple_array_prim() {
       false,
     }
     ");
+}
+
+#[test]
+fn tuple_array_enum() {
+    insta::assert_snapshot!(_run_sql_output(r#"
+        type Status: enum {
+          Pending, InProgress: {started_at: text, owner: text}, Done: text
+        }
+        const main = {
+          "statuses:",
+          [Status::Pending, Status::InProgress({"today", "me"}), Status::Done("ok")],
+        }
+    "#), @r#"
+    SELECT
+      'statuses:' AS _0,
+      (
+        SELECT
+          COALESCE(
+            jsonb_agg(
+              CASE
+                ASCII(r3._t)
+                WHEN 0 THEN json_build_object('0', jsonb_build_array())
+                WHEN 1 THEN json_build_object('1', jsonb_build_array(r3._1_0, r3._1_1))
+                WHEN 2 THEN json_build_object('2', r3._2)
+              END
+              ORDER BY
+                r3.index
+            ),
+            '[]'::jsonb
+          ) AS value
+        FROM
+          (
+            SELECT
+              0::int8 AS index,
+              0::"char" AS _t,
+              NULL::text AS _1_0,
+              NULL::text AS _1_1,
+              NULL::text AS _2
+            UNION
+            ALL
+            SELECT
+              1::int8 AS index,
+              1::"char" AS _t,
+              'today' AS _1_0,
+              'me' AS _1_1,
+              NULL::text AS _2
+            UNION
+            ALL
+            SELECT
+              2::int8 AS index,
+              2::"char" AS _t,
+              NULL::text AS _1_0,
+              NULL::text AS _1_1,
+              'ok' AS _2
+          ) AS r3
+      ) AS _1
+    ---
+    {
+      "statuses:",
+      [
+        Pending,
+        InProgress(
+          {
+            started_at = "today",
+            owner = "me",
+          }
+        ),
+        Done(
+          "ok"
+        ),
+      ],
+    }
+    "#);
 }
 
 #[test]
@@ -429,7 +649,11 @@ fn tuple_array_tuple_tuple_prim() {
         SELECT
           COALESCE(
             jsonb_agg(
-              jsonb_build_array(r1._0, r1._1_0, r1._1_1, r1._1_2, r1._2)
+              jsonb_build_array(
+                r1._0,
+                jsonb_build_array(r1._1_0, r1._1_1, r1._1_2),
+                r1._2
+              )
               ORDER BY
                 r1.index
             ),
@@ -1123,87 +1347,29 @@ fn match_04() {
     )
     "#), @r#"
     SELECT
-      r19.value
+      r12.value
     FROM
       (
         SELECT
           r3.index AS index,
           (
             SELECT
-              r17.value
+              CASE
+                WHEN (r5._t = 0::"char") THEN ('Hello ' || r5._0)
+                WHEN (
+                  (r5._t = 1::"char")
+                  AND (r5._1_t = 1::"char")
+                ) THEN 'Who''s a good boy?'
+                ELSE ('Come here ' || r5._1_0)
+              END AS value
             FROM
               (
-                WITH r5 AS (
-                  SELECT
-                    r6._t,
-                    r6._0,
-                    r6._1_t,
-                    r6._1_0
-                  FROM
-                    (
-                      SELECT
-                        r3._t AS _t,
-                        r3._0 AS _0,
-                        r3._1_t AS _1_t,
-                        r3._1_0 AS _1_0
-                    ) AS r6
-                )
                 SELECT
-                  CASE
-                    WHEN (
-                      SELECT
-                        (r8.value = 0::"char") AS value
-                      FROM
-                        (
-                          SELECT
-                            r7._t AS value
-                          FROM
-                            r5 AS r7
-                        ) AS r8
-                    ) THEN (
-                      SELECT
-                        ('Hello ' || r10.value) AS value
-                      FROM
-                        (
-                          SELECT
-                            r9._0 AS value
-                          FROM
-                            r5 AS r9
-                        ) AS r10
-                    )
-                    WHEN (
-                      SELECT
-                        (
-                          (r12.value = 1::"char")
-                          AND (r14.value = 1::"char")
-                        ) AS value
-                      FROM
-                        (
-                          SELECT
-                            r11._t AS value
-                          FROM
-                            r5 AS r11
-                        ) AS r12,
-                        (
-                          SELECT
-                            r13._1_t AS value
-                          FROM
-                            r5 AS r13
-                        ) AS r14
-                    ) THEN 'Who''s a good boy?'
-                    ELSE (
-                      SELECT
-                        ('Come here ' || r16.value) AS value
-                      FROM
-                        (
-                          SELECT
-                            r15._1_0 AS value
-                          FROM
-                            r5 AS r15
-                        ) AS r16
-                    )
-                  END AS value
-              ) AS r17
+                  r3._t AS _t,
+                  r3._0 AS _0,
+                  r3._1_t AS _1_t,
+                  r3._1_0 AS _1_0
+              ) AS r5
           ) AS value
         FROM
           (
@@ -1230,9 +1396,9 @@ fn match_04() {
               1::"char" AS _1_t,
               NULL::text AS _1_0
           ) AS r3
-      ) AS r19
+      ) AS r12
     ORDER BY
-      r19.index
+      r12.index
     ---
     [
       "Hello Whiskers",

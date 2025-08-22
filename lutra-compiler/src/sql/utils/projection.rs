@@ -54,7 +54,8 @@ pub trait RelCols<'a> {
         ty: &'a ir::Ty,
         name_prefix: String,
     ) -> Box<dyn Iterator<Item = String> + 'a> {
-        match &self.get_ty_mat(ty).kind {
+        let ty_mat = self.get_ty_mat(ty);
+        match &ty_mat.kind {
             ir::TyKind::Primitive(_) | ir::TyKind::Array(_) => {
                 let name = if name_prefix.is_empty() {
                     COL_VALUE.to_string()
@@ -90,8 +91,18 @@ pub trait RelCols<'a> {
                         .iter()
                         .enumerate()
                         .flat_map(move |(i, variant)| {
-                            let name_prefix = format!("{name_prefix}_{i}");
-                            self.rel_cols_nested(&variant.ty, name_prefix)
+                            let is_recursive =
+                                lutra_bin::layout::does_enum_variant_contain_recursive(
+                                    ty_mat, i as u16,
+                                );
+                            if is_recursive {
+                                // recursive variants are serialized
+                                Box::new(Some(format!("{name_prefix}_{i}")).into_iter())
+                            } else {
+                                // recurse
+                                let name_prefix = format!("{name_prefix}_{i}");
+                                self.rel_cols_nested(&variant.ty, name_prefix)
+                            }
                         }),
                 ),
             ),
@@ -123,7 +134,15 @@ pub trait RelCols<'a> {
                 // tag
                 Some(Cow::Owned(ir::Ty::new(ir::TyPrimitive::int8))),
                 // variants
-                variants.iter().flat_map(|v| self.rel_cols_ty_nested(&v.ty)),
+                variants.iter().enumerate().flat_map(|(i, v)| {
+                    let is_recursive =
+                        lutra_bin::layout::does_enum_variant_contain_recursive(ty_mat, i as u16);
+                    if is_recursive {
+                        Box::new(Some(Cow::Borrowed(&v.ty)).into_iter())
+                    } else {
+                        self.rel_cols_ty_nested(&v.ty)
+                    }
+                }),
             )),
             ir::TyKind::Function(_) => todo!(),
             ir::TyKind::Ident(_) => todo!(),
