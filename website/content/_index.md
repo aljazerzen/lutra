@@ -42,7 +42,7 @@ SQL is the biggest offender (see
 [9](https://dev.to/shaqq/10-things-i-hate-about-sql-a9e)
 ), but many other languages are similarly problematic.
 
-Lutra aims to be a "proper" programming language, with user-defined functions, an algebraic type system, generic function type parameters, Hindly-Miller-like type inference and many small, "quality of life" features.
+Lutra aims to be a "proper" programming language, with user-defined functions, an algebraic type system, generic function type parameters, Hindley-Milner-like type inference and many small, "quality of life" features.
 
 That all compiles to a [minimal intermediate representation](https://codeberg.org/lutra/lutra/src/branch/main/lutra-bin/src/project/ir.lt) that *should* be easy to compile for different execution targets.
 The goal is to support SQL and most major relational databases, but also other *runners* like WebAssembly or [Polars](https://www.pola.rs/).
