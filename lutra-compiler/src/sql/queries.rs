@@ -761,11 +761,13 @@ impl<'a> Context<'a> {
                 // the least amount of data
                 "bool"
             }
-            ir::TyKind::Tuple(_) | ir::TyKind::Array(_) => "jsonb",
             ir::TyKind::Enum(variants) if utils::is_maybe(variants) => {
                 return self.compile_ty_name(&variants[1].ty);
             }
-            ir::TyKind::Enum(_) => panic!("null value for enum does not make sense"),
+
+            // serialize as json
+            ir::TyKind::Tuple(_) | ir::TyKind::Array(_) | ir::TyKind::Enum(_) => "jsonb",
+
             ir::TyKind::Function(_) => todo!(),
             ir::TyKind::Ident(_) => todo!(),
         };

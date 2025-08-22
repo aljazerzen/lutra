@@ -94,7 +94,7 @@ impl<'a> queries::Context<'a> {
             scoped = simplified;
         }
 
-        match &self.get_ty_mat(ty).kind {
+        let query = match &self.get_ty_mat(ty).kind {
             ir::TyKind::Array(ty_item) => {
                 let mut query = utils::select_empty();
 
@@ -124,14 +124,32 @@ impl<'a> queries::Context<'a> {
                     });
                 }
 
-                let rel_var_name = self.rel_name_gen.next();
-                let rel_var = utils::sub_rel(utils::query_select(query), rel_var_name.clone());
-                scoped.rel_vars.push(utils::lateral(rel_var));
-                scoped.expr = ExprOrSource::RelVar(rel_var_name);
+                query
             }
             ir::TyKind::Tuple(_) => todo!(),
+            ir::TyKind::Enum(_) => {
+                let mut query = utils::select_empty();
+
+                let json_ref = scoped.expr.into_expr().to_string();
+
+                let values = self.deserialize_json_nested(json_ref, ty);
+
+                let names = self.rel_cols_nested(ty, "".into());
+                for (value, name) in std::iter::zip(values, names) {
+                    query.projection.push(sql_ast::SelectItem::ExprWithAlias {
+                        expr: ExprOrSource::Source(value).into_expr(),
+                        alias: utils::new_ident(name),
+                    });
+                }
+                query
+            }
             _ => unreachable!("{:?}", ty),
-        }
+        };
+        let rel_var_name = self.rel_name_gen.next();
+        let rel_var = utils::sub_rel(utils::query_select(query), rel_var_name.clone());
+
+        scoped.rel_vars.push(utils::lateral(rel_var));
+        scoped.expr = ExprOrSource::RelVar(rel_var_name);
         scoped
     }
 
@@ -144,7 +162,7 @@ impl<'a> queries::Context<'a> {
                 let r = match prim {
                     ir::TyPrimitive::text => format!("jsonb_build_array({json_ref}) ->> 0"),
                     ir::TyPrimitive::int8 => {
-                        format!("CHR({json_ref}::text::int2)::\"char\"")
+                        format!("{json_ref}::int::\"char\"")
                     }
                     _ => format!("{json_ref}::text::{}", self.compile_ty_name(ty)),
                 };
@@ -159,10 +177,22 @@ impl<'a> queries::Context<'a> {
                 let mut r = Vec::new();
 
                 for (position, f) in fields.iter().enumerate() {
-                    r.extend(self.deserialize_json_nested(
-                        format!("({json_ref}->{position})"),
-                        self.get_ty_mat(&f.ty),
-                    ))
+                    r.extend(
+                        self.deserialize_json_nested(format!("({json_ref}->{position})"), &f.ty),
+                    )
+                }
+
+                r
+            }
+            ir::TyKind::Enum(variant) => {
+                let mut r = Vec::new();
+
+                r.push(format!(
+                    "(SELECT jsonb_object_keys({json_ref}) LIMIT 1)::int::\"char\""
+                ));
+
+                for (tag, f) in variant.iter().enumerate() {
+                    r.extend(self.deserialize_json_nested(format!("({json_ref}->'{tag}')"), &f.ty))
                 }
 
                 r

@@ -138,7 +138,10 @@ impl<'a> Context<'a> {
                     let mut result = res_rels.next().unwrap();
                     for r in res_rels {
                         result = cr::Expr {
-                            ty: ty_concat_tuples(result.ty.clone(), r.ty.clone()),
+                            ty: ty_concat_as_tuples(
+                                self.get_ty_mat(&result.ty).clone(),
+                                self.get_ty_mat(&r.ty).clone(),
+                            ),
                             kind: cr::ExprKind::Join(
                                 self.new_binding(result),
                                 self.new_binding(r),
@@ -216,7 +219,9 @@ impl<'a> Context<'a> {
                         assert_eq!(ptr.param_position, 0);
 
                         match &self.get_ty_mat(&expr.ty).kind {
-                            ir::TyKind::Primitive(_) | ir::TyKind::Tuple(_) => {
+                            ir::TyKind::Primitive(_)
+                            | ir::TyKind::Tuple(_)
+                            | ir::TyKind::Enum(_) => {
                                 let columns = self
                                     .rel_cols_ty_nested(&expr.ty)
                                     .enumerate()
@@ -228,7 +233,7 @@ impl<'a> Context<'a> {
                                 cr::ExprKind::From(cr::From::Row(columns))
                             }
 
-                            ir::TyKind::Array(_) | ir::TyKind::Enum(_) => {
+                            ir::TyKind::Array(_) => {
                                 // param will be encoded as JSON
                                 cr::ExprKind::From(cr::From::JsonUnpack(Box::new(cr::Expr {
                                     kind: cr::ExprKind::From(cr::From::Param(0)),
@@ -1134,10 +1139,17 @@ fn new_int8(int: i8) -> cr::Expr {
     }
 }
 
-fn ty_concat_tuples(a: ir::Ty, b: ir::Ty) -> ir::Ty {
-    let a = a.kind.into_tuple().unwrap();
-    let b = b.kind.into_tuple().unwrap();
-    let mut concat = a;
-    concat.extend(b);
-    ir::Ty::new(ir::TyKind::Tuple(concat))
+fn ty_concat_as_tuples(a: ir::Ty, b: ir::Ty) -> ir::Ty {
+    let mut fields = Vec::new();
+    if let ir::TyKind::Tuple(a) = a.kind {
+        fields.extend(a);
+    } else {
+        fields.push(ir::TyTupleField { name: None, ty: a });
+    }
+    if let ir::TyKind::Tuple(b) = b.kind {
+        fields.extend(b);
+    } else {
+        fields.push(ir::TyTupleField { name: None, ty: b });
+    }
+    ir::Ty::new(ir::TyKind::Tuple(fields))
 }

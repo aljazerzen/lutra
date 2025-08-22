@@ -44,6 +44,15 @@ fn fuzz() {
             param_count: 0,
         },
         Construct {
+            name: "enum_0",
+            val_source: "Status::Pending",
+            val_builder: Box::new(|_| {
+                lutra_bin::Value::Enum(0, Box::new(lutra_bin::Value::unit()))
+            }),
+            ty_source: "Status",
+            param_count: 0,
+        },
+        Construct {
             name: "tuple_1",
             val_source: "{1: int32, $0, 2: int16}",
             val_builder: Box::new(|args| {
@@ -97,7 +106,13 @@ fn fuzz() {
         },
     ];
 
-    let source = lutra_compiler::SourceTree::empty();
+    let source = lutra_compiler::SourceTree::single(
+        "".into(),
+        r#"
+        type Status: enum { Pending, InProgress: {started_at: text, owner: text}, Done: text }
+        "#
+        .into(),
+    );
     let project = lutra_compiler::check(source, Default::default()).unwrap();
 
     let mut client = postgres::Client::connect(POSTGRES_URL, postgres::NoTls).unwrap();
@@ -116,8 +131,6 @@ fn generate_and_test(
     let mut rng = rand::rngs::SmallRng::seed_from_u64(seed);
     let case = generate(constructs, &mut rng, 0);
 
-    // dbg!(&case);
-
     // fetch the value from source
     let (program, ty) = lutra_compiler::compile(
         project,
@@ -128,7 +141,7 @@ fn generate_and_test(
     .unwrap();
     let program = program.into_sql_pg().unwrap();
     let result = lutra_runner_postgres::execute(client, &program, &[]).unwrap();
-    let case_val = case.val.encode(&ty.output, &[]).unwrap();
+    let case_val = case.val.encode(&ty.output, &ty.defs).unwrap();
     assert_eq!(result, case_val);
 
     // roundtrip

@@ -947,6 +947,106 @@ fn param_06() {
 }
 
 #[test]
+fn param_07() {
+    insta::assert_snapshot!(_sql_and_output(_run(r#"
+    type Status: enum {
+      Pending, InProgress: {started_at: text, owner: text}, Done: text
+    }
+    func main(x: Status) -> {"hello", x}
+    "#,
+    lutra_bin::Value::Enum(
+        1,
+        Box::new(lutra_bin::Value::Tuple(vec![
+            lutra_bin::Value::Text("today".into()),
+            lutra_bin::Value::Text("me".into())
+        ]))
+    )
+    )), @r#"
+    SELECT
+      'hello' AS _0,
+      $1::"char" AS _1_t,
+      $2::text AS _1_1_0,
+      $3::text AS _1_1_1,
+      $4::text AS _1_2
+    ---
+    {
+      "hello",
+      InProgress({
+        started_at = "today",
+        owner = "me",
+      }),
+    }
+    "#);
+}
+
+#[test]
+fn param_08() {
+    insta::assert_snapshot!(_sql_and_output(_run(r#"
+    type Status: enum {
+      Pending, InProgress: {started_at: text, owner: text}, Done: text
+    }
+    func main(x: [Status]) -> {"hello", x}
+    "#,
+    lutra_bin::Value::Array(vec![
+        lutra_bin::Value::Enum(
+            1,
+            Box::new(lutra_bin::Value::Tuple(vec![
+                lutra_bin::Value::Text("today".into()),
+                lutra_bin::Value::Text("me".into())
+            ]))
+        ),
+        lutra_bin::Value::Enum(
+            0,
+            Box::new(lutra_bin::Value::Tuple(vec![]))
+        ),
+        lutra_bin::Value::Enum(
+            2,
+            Box::new(lutra_bin::Value::Text("ok".into()))
+        ),
+    ])
+    )), @r#"
+    SELECT
+      'hello' AS _0,
+      $1::jsonb AS _1
+    ---
+    {
+      "hello",
+      [
+        InProgress({
+          started_at = "today",
+          owner = "me",
+        }),
+        Pending,
+        Done("ok"),
+      ],
+    }
+    "#);
+}
+
+#[test]
+fn param_09() {
+    insta::assert_snapshot!(_run(r#"
+    type Status: enum {
+      Pending, InProgress: {started_at: text, owner: text}, Done: text
+    }
+    func main(x: {text, Status}) -> x
+    "#,
+    lutra_bin::Value::Tuple(vec![
+        lutra_bin::Value::Text("hello".into()),
+        lutra_bin::Value::Enum(
+            2,
+            Box::new(lutra_bin::Value::Text("ok".into()))
+        ),
+    ])
+    ).1, @r#"
+    {
+      "hello",
+      Done("ok"),
+    }
+    "#);
+}
+
+#[test]
 fn tuple_unpacking_00() {
     insta::assert_snapshot!(_run(r#"
     func main() -> {

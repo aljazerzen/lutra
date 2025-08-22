@@ -8,45 +8,95 @@ use tinyjson::JsonValue;
 use crate::Context;
 
 pub fn to_sql<'d>(program: &rr::SqlProgram, input: &'d [u8], ctx: &Context) -> Args<'d> {
-    let arg_tys = ctx.fields_of_ty(&program.input_ty);
-
     let mut args = Vec::new();
-    let mut offset = 0;
-    for arg_ty in arg_tys {
-        match &ctx.get_ty_mat(arg_ty).kind {
-            ir::TyKind::Primitive(_) => {
-                args.push(Arg {
-                    data: Cow::Borrowed(&input[offset..]),
-                });
-            }
-
-            ir::TyKind::Array(_) | ir::TyKind::Enum(_) => {
-                let value =
-                    lutra_bin::Value::decode(&input[offset..], arg_ty, &program.defs).unwrap();
-                let mut out = String::new();
-                lutra_to_json(value, &mut out);
-                args.push(Arg {
-                    data: Cow::Owned(out.into_bytes()),
-                });
-            }
-            ir::TyKind::Tuple(_) | ir::TyKind::Function(_) | ir::TyKind::Ident(_) => todo!(),
-        }
-
-        offset += arg_ty.layout.as_ref().unwrap().head_size.div_ceil(8) as usize;
-    }
+    ctx.encode_args(input, &program.input_ty, &mut args, program);
 
     Args { args }
 }
 
 impl<'a> Context<'a> {
-    fn fields_of_ty(&'a self, ty: &'a ir::Ty) -> Box<dyn Iterator<Item = &'a ir::Ty> + 'a> {
+    fn encode_args<'d>(
+        &'a self,
+        input: &'d [u8],
+        ty: &'a ir::Ty,
+        args: &mut Vec<Arg<'d>>,
+        program: &rr::SqlProgram,
+    ) {
         match &self.get_ty_mat(ty).kind {
-            ir::TyKind::Tuple(fields) => {
-                Box::new(fields.iter().flat_map(|f| self.fields_of_ty(&f.ty)))
+            ir::TyKind::Primitive(_) => {
+                args.push(Arg {
+                    data: Cow::Borrowed(input),
+                });
             }
-            _ => Box::new(Some(ty).into_iter()),
+
+            // serialize to JSON
+            ir::TyKind::Array(_) => {
+                args.push(Arg {
+                    data: Cow::Owned(serialize_input_to_json(input, ty, program)),
+                });
+            }
+
+            ir::TyKind::Tuple(fields) => {
+                let mut offset = 0;
+                for field in fields {
+                    self.encode_args(&input[offset..], &field.ty, args, program);
+                    offset += field.ty.layout.as_ref().unwrap().head_size.div_ceil(8) as usize;
+                }
+            }
+            ir::TyKind::Enum(variants) => {
+                let format = lutra_bin::layout::enum_format(variants);
+
+                let (tag, inner) =
+                    lutra_bin::decode_enum_head(input, format.tag_bytes, format.has_ptr);
+                args.push(Arg {
+                    data: Cow::Owned(vec![tag as u8]),
+                }); // tag
+                for (position, variant) in variants.iter().enumerate() {
+                    if position == tag as usize {
+                        let variant = variants.get(tag as usize).unwrap();
+                        self.encode_args(inner, &variant.ty, args, program);
+                    } else {
+                        self.push_nulls(&variant.ty, args);
+                    }
+                }
+            }
+
+            ir::TyKind::Function(_) | ir::TyKind::Ident(_) => panic!(),
         }
     }
+
+    fn push_nulls<'d>(&'a self, ty: &'a ir::Ty, args: &mut Vec<Arg<'d>>) {
+        match &self.get_ty_mat(ty).kind {
+            ir::TyKind::Primitive(_) | ir::TyKind::Array(_) => {
+                args.push(Arg {
+                    data: Cow::Owned(vec![]),
+                });
+            }
+
+            ir::TyKind::Tuple(fields) => {
+                for field in fields {
+                    self.push_nulls(&field.ty, args);
+                }
+            }
+            ir::TyKind::Enum(variants) => {
+                args.push(Arg {
+                    data: Cow::Owned(vec![]),
+                });
+                for variant in variants {
+                    self.push_nulls(&variant.ty, args);
+                }
+            }
+
+            ir::TyKind::Function(_) | ir::TyKind::Ident(_) => panic!(),
+        }
+    }
+}
+
+fn serialize_input_to_json(input: &[u8], ty: &ir::Ty, program: &rr::SqlProgram) -> Vec<u8> {
+    let value = lutra_bin::Value::decode(input, ty, &program.defs).unwrap();
+    let mut out = String::new();
+    lutra_to_json(value, &mut out);
+    out.into_bytes()
 }
 pub struct Args<'a> {
     args: Vec<Arg<'a>>,
@@ -75,6 +125,10 @@ impl<'a> pg_ty::ToSql for Arg<'a> {
     where
         Self: Sized,
     {
+        if self.data.is_empty() {
+            return Ok(pg_ty::IsNull::Yes);
+        }
+
         match ty.name() {
             "bool" => out.put_slice(&self.data[0..1]),
             "char" => out.extend(self.data[0..1].iter().rev()),
@@ -126,7 +180,13 @@ fn lutra_to_json(value: lutra_bin::Value, out: &mut String) {
         lutra_bin::Value::Tuple(fields) => {
             lutra_to_json_array(fields.into_iter(), out);
         }
-        lutra_bin::Value::Enum(_tag, _value) => todo!(),
+        lutra_bin::Value::Enum(tag, inner) => {
+            *out += "{\"";
+            *out += &tag.to_string();
+            *out += "\":";
+            lutra_to_json(*inner, out);
+            *out += "}";
+        }
     }
 }
 

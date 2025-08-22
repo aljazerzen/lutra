@@ -284,18 +284,22 @@ fn module_lookup_steps(module: &pr::ModuleDef, steps: &[String]) -> Result<usize
 
         // resolve refs into types
         pr::DefKind::Unresolved(Some(def_kind)) => def_lookup_steps(def_kind, &steps[1..]),
-        _ => {
-            // recursive lookup into self (we take node out of Unresolved during name resolution)
 
+        // recursive lookup into self (we take node out of Unresolved during name resolution)
+        pr::DefKind::Unresolved(None) => {
             if steps.len() == 1 {
                 return Ok(0);
             }
 
             // We do not support this, because we want to
             // inline any lookups into types, to keep IR simpler.
+            dbg!(steps);
 
             Err(Some("paths into self type are not allowed".into()))
         }
+
+        // resolve refs into already resolved stuff
+        def_kind => def_lookup_steps(def_kind, &steps[1..]),
     }
 }
 
