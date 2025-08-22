@@ -21,7 +21,7 @@ func get_album_by_id(album_id: int16): Album -> (
 It is minimal and designed to be extended to new execution targets.
 Currently, it can run on a reference-implementation interpreter and PostgreSQL.
 
-[More code examples](https://codeberg.org/lutra/lutra/src/branch/main/tests/tests/language/language.lt).
+[More code examples](https://codeberg.org/lutra/lutra/src/branch/main/tests/tests/corpus/language.lt).
 
 
 ## Why
