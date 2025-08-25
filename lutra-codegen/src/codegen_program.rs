@@ -36,9 +36,17 @@ pub fn write_sr_programs(
         let buf = program.encode();
         std::fs::write(out_file, buf).unwrap();
 
-        let name_camel = snake_to_sentence(name);
-        ty.input.name = Some(format!("{name_camel}Input"));
-        ty.output.name = Some(format!("{name_camel}Output"));
+        let mut name_camel = vec![snake_to_sentence(name)];
+        {
+            name_camel.push("Input".into());
+            super::infer_names_re(&mut ty.input, &mut name_camel);
+            name_camel.pop();
+        }
+        {
+            name_camel.push("Output".into());
+            super::infer_names_re(&mut ty.output, &mut name_camel);
+            name_camel.pop();
+        }
 
         write!(w, "pub fn {name}() -> {lutra_bin}::rr::TypedProgram<")?;
         codegen_ty::write_ty_ref(w, &ty.input, false, ctx)?;

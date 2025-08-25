@@ -156,6 +156,10 @@ pub fn write_ty_ref(
     as_expr: bool,
     ctx: &mut Context,
 ) -> Result<(), std::fmt::Error> {
+    if ty.is_unit() {
+        return write!(w, "()");
+    }
+
     let lutra_bin = &ctx.options.lutra_bin_path;
 
     match &ty.kind {
