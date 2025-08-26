@@ -7,8 +7,6 @@ use crate::parser::{ctrl, ident_part, keyword, sequence};
 use crate::pr::*;
 use crate::span::Span;
 
-use super::pipe;
-
 pub(crate) fn expr<'a>(
     ty: impl Parser<TokenKind, Ty, Error = PError> + Clone + 'a,
 ) -> impl Parser<TokenKind, Expr, Error = PError> + Clone + 'a {
@@ -22,7 +20,7 @@ pub(crate) fn expr<'a>(
 
         let tuple = tuple(expr.clone());
         let array = array(expr.clone());
-        let pipeline_expr = pipeline(expr.clone());
+        let nested = nested(expr.clone());
         let interpolation = interpolation();
         let match_ = match_(expr.clone());
         let if_else = if_else(expr.clone());
@@ -37,7 +35,7 @@ pub(crate) fn expr<'a>(
             ident_kind,
             match_,
             if_else,
-            pipeline_expr,
+            nested,
         ))
         .map_with_span(Expr::new_with_span)
         .boxed();
@@ -56,7 +54,8 @@ pub(crate) fn expr<'a>(
         let expr = binary_op_parser(expr, operator_coalesce());
         let expr = binary_op_parser(expr, operator_and());
         let expr = binary_op_parser(expr, operator_or());
-        range(expr)
+        let expr = range(expr);
+        binary_op_parser(expr, ctrl('|').to(BinOp::Pipe))
     })
 }
 
@@ -241,16 +240,11 @@ fn range<'a>(
         }))
 }
 
-/// A pipeline of `expr`, separated by pipes. Doesn't require parentheses.
-fn pipeline<'a>(
+fn nested<'a>(
     expr: impl Parser<TokenKind, Expr, Error = PError> + Clone + 'a,
 ) -> impl Parser<TokenKind, ExprKind, Error = PError> + Clone + 'a {
-    // expr has to be a param, because it can be either a normal expr() or a
-    // recursive expr called from within expr(), which causes a stack overflow
-
-    expr.separated_by(pipe())
-        .at_least(1)
-        .map(|exprs| ExprKind::Pipeline(Pipeline { exprs }))
+    expr.map(Box::new)
+        .map(ExprKind::Nested)
         .recover_with(nested_delimiters(
             TokenKind::Control('('),
             TokenKind::Control(')'),
@@ -261,7 +255,6 @@ fn pipeline<'a>(
             |_| ExprKind::Tuple(vec![]),
         ))
         .delimited_by(ctrl('('), ctrl(')'))
-        .labelled("pipeline")
 }
 
 fn binary_op_parser<'a, Term, Op>(
@@ -277,11 +270,8 @@ where
     term.clone()
         .then(op.then(term).repeated())
         .foldl(|left, (op, right)| {
-            let span = Span {
-                start: left.1.start,
-                len: (right.1.start + right.1.len as u32 - left.1.start) as u16,
-                source_id: left.1.source_id,
-            };
+            let mut span = left.1;
+            span.with_end(&right.1);
             let kind = ExprKind::Binary(BinaryExpr {
                 left: Box::new(left.0),
                 op,
@@ -331,11 +321,8 @@ where
             (r, free)
         })
         .foldr(|(left, op), right| {
-            let span = Span {
-                start: left.1.start,
-                len: right.1.len,
-                source_id: left.1.source_id,
-            };
+            let mut span = left.1;
+            span.with_end(&right.1);
             let kind = ExprKind::Binary(BinaryExpr {
                 left: Box::new(left.0),
                 op,

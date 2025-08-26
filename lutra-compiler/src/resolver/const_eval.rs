@@ -62,7 +62,7 @@ impl ConstantValidator {
             | pr::ExprKind::Range(_)
             | pr::ExprKind::Binary(_)
             | pr::ExprKind::Unary(_)
-            | pr::ExprKind::Pipeline(_)
+            | pr::ExprKind::Nested(_)
             | pr::ExprKind::FString(_)
             | pr::ExprKind::Internal => unreachable!(),
         };

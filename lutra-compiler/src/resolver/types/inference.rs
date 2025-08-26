@@ -63,7 +63,7 @@ impl TypeResolver<'_> {
             | ExprKind::If(_) => unreachable!(),
 
             // desugar-ed
-            ExprKind::Pipeline(_)
+            ExprKind::Nested(_)
             | ExprKind::Range(_)
             | ExprKind::Binary(_)
             | ExprKind::Unary(_)

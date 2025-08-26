@@ -18,12 +18,13 @@ struct Desugarator;
 impl PrFold for Desugarator {
     fn fold_expr(&mut self, mut expr: pr::Expr) -> Result<pr::Expr> {
         expr.kind = match expr.kind {
-            pr::ExprKind::Pipeline(p) => {
-                return self.desugar_pipeline(p);
+            pr::ExprKind::Nested(p) => {
+                // unwrap the Expr
+                return self.fold_expr(*p);
             }
             pr::ExprKind::Range(r) => self.desugar_range(r)?,
-            pr::ExprKind::Unary(unary) => self.desugar_unary(unary, expr.span)?,
-            pr::ExprKind::Binary(binary) => self.desugar_binary(binary, expr.span)?,
+            pr::ExprKind::Unary(unary) => self.desugar_unary(unary, expr.span.unwrap())?,
+            pr::ExprKind::Binary(binary) => self.desugar_binary(binary, expr.span.unwrap())?,
             pr::ExprKind::FString(items) => self.desugar_f_string(items, expr.span.unwrap())?,
             k => fold::fold_expr_kind(self, k)?,
         };
@@ -58,49 +59,33 @@ impl Desugarator {
         ]))
     }
 
-    fn desugar_pipeline(&mut self, pipeline: pr::Pipeline) -> Result<pr::Expr> {
-        let mut pipeline = pipeline.exprs.into_iter();
+    fn desugar_pipeline(&mut self, left: pr::Expr, right: pr::Expr) -> Result<pr::ExprKind> {
+        let value = self.fold_expr(left)?;
+        let func = self.fold_expr(right)?;
+        match func.kind {
+            pr::ExprKind::FuncCall(mut func_call) => {
+                func_call.args.insert(0, value);
 
-        let value = pipeline.next().unwrap();
-        let mut value = self.fold_expr(value)?;
-
-        for expr in pipeline {
-            let mut expr = self.fold_expr(expr)?;
-            let span = expr.span;
-
-            match expr.kind {
-                pr::ExprKind::FuncCall(mut func_call) => {
-                    func_call.args.insert(0, value);
-                    expr.kind = pr::ExprKind::FuncCall(func_call);
-
-                    value = expr;
-                }
-                pr::ExprKind::Func(_) | pr::ExprKind::Ident(_) => {
-                    let func = expr;
-
-                    value = pr::Expr::new(pr::ExprKind::FuncCall(pr::FuncCall {
-                        func: Box::new(func),
-                        args: vec![value],
-                    }));
-                    value.span = span;
-                }
-                _ => {
-                    return Err(Diagnostic::new_custom(
-                        "pipeline can only contain function calls or functions",
-                    )
-                    .with_span(span));
-                }
-            };
+                Ok(pr::ExprKind::FuncCall(func_call))
+            }
+            pr::ExprKind::Func(_) | pr::ExprKind::Ident(_) => {
+                Ok(pr::ExprKind::FuncCall(pr::FuncCall {
+                    func: Box::new(func),
+                    args: vec![value],
+                }))
+            }
+            _ => Err(
+                Diagnostic::new_custom("pipe operator requires function calls or functions")
+                    .with_span(func.span),
+            ),
         }
-
-        Ok(value)
     }
 
     /// Desugar unary operators into function calls.
     fn desugar_unary(
         &mut self,
         pr::UnaryExpr { op, expr }: pr::UnaryExpr,
-        span: Option<Span>,
+        span: Span,
     ) -> Result<pr::ExprKind> {
         use pr::UnOp::*;
 
@@ -112,7 +97,7 @@ impl Desugarator {
             Pos => return Ok(expr.kind),
         };
         let mut op_func = pr::Expr::new(pr::Path::new(func_name.to_vec()));
-        op_func.span = span;
+        op_func.span = Some(span);
         Ok(pr::ExprKind::FuncCall(pr::FuncCall {
             func: Box::new(op_func),
             args: vec![expr],
@@ -123,8 +108,12 @@ impl Desugarator {
     fn desugar_binary(
         &mut self,
         pr::BinaryExpr { op, left, right }: pr::BinaryExpr,
-        span: Option<Span>,
+        span: Span,
     ) -> Result<pr::ExprKind> {
+        if op == pr::BinOp::Pipe {
+            return self.desugar_pipeline(*left, *right);
+        }
+
         let left = self.fold_expr(*left)?;
         let right = self.fold_expr(*right)?;
 
@@ -146,6 +135,7 @@ impl Desugarator {
             pr::BinOp::And => vec![NS_STD, "and"],
             pr::BinOp::Or => vec![NS_STD, "or"],
             pr::BinOp::Coalesce => vec![NS_STD, "or_else"],
+            pr::BinOp::Pipe => unreachable!(),
         };
 
         // For the power operator, we need to reverse the order, since `math.pow a
@@ -159,7 +149,7 @@ impl Desugarator {
             pr::BinOp::Pow => (right, left),
             _ => (left, right),
         };
-        Ok(new_binop(left, &func_name, right, span).kind)
+        Ok(new_binop(left, &func_name, right, Some(span)).kind)
     }
 
     /// Desugar f-string into function calls to std::text_ops::concat
@@ -185,7 +175,7 @@ impl Desugarator {
 
         // concat with the following
         for item in items {
-            let op_span = item.span;
+            let op_span = Some(item.span.unwrap());
             expr = new_binop(expr, &[NS_STD, "text_ops", "concat"], item, op_span);
         }
         Ok(expr.kind)

@@ -109,7 +109,3 @@ where
 {
     parser.separated_by(ctrl(',')).allow_trailing()
 }
-
-fn pipe() -> impl Parser<TokenKind, (), Error = PError> + Clone {
-    ctrl('|').ignored()
-}

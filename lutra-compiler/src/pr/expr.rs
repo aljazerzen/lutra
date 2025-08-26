@@ -84,7 +84,7 @@ pub enum ExprKind {
         lookup: Lookup,
     },
     Literal(Literal),
-    Pipeline(Pipeline),
+    Nested(Box<Expr>),
     TypeAnnotation(TypeAnnotation),
 
     Tuple(Vec<TupleField>),

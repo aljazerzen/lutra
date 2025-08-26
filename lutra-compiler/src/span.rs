@@ -12,6 +12,15 @@ pub struct Span {
     pub source_id: u16,
 }
 
+impl Span {
+    pub fn with_end(&mut self, other: &Span) {
+        assert_eq!(self.source_id, other.source_id);
+
+        let other_end = other.start + other.len as u32;
+        self.len = (other_end.saturating_sub(self.start)) as u16;
+    }
+}
+
 impl From<Span> for Range<usize> {
     fn from(a: Span) -> Self {
         a.start as usize..(a.start as usize + a.len as usize)

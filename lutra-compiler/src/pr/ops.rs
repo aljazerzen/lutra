@@ -44,4 +44,6 @@ pub enum BinOp {
     Or,
     #[strum(to_string = "??")]
     Coalesce,
+    #[strum(to_string = "|")]
+    Pipe,
 }

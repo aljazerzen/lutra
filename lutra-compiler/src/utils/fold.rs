@@ -120,9 +120,7 @@ pub fn fold_expr_kind<T: ?Sized + PrFold>(fold: &mut T, expr_kind: ExprKind) -> 
         //     func: Box::new(fold.fold_expr(*func_app.func)?),
         //     args: fold.fold_exprs(func_app.args)?,
         // }),
-        Pipeline(pipeline) => Pipeline(pr::Pipeline {
-            exprs: fold.fold_exprs(pipeline.exprs)?,
-        }),
+        Nested(inner) => Nested(Box::new(fold.fold_expr(*inner)?)),
         Range(range) => Range(pr::Range {
             start: fold_optional_box(fold, range.start)?,
             end: fold_optional_box(fold, range.end)?,

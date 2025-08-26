@@ -81,7 +81,10 @@ fn parse_01() {
 #[test]
 fn parse_02() {
     assert!(
-        parse_expr("(4..5)").kind.as_pipeline().unwrap().exprs[0]
+        parse_expr("(4..5)")
+            .kind
+            .as_nested()
+            .unwrap()
             .kind
             .is_range()
     );
@@ -559,6 +562,271 @@ fn parse_09() {
         ],
     )
     ");
+}
+
+#[test]
+fn parse_10() {
+    assert_debug_snapshot!(parse_expr(r"{1 | to_int32}"), @r"
+    Expr {
+        kind: Tuple(
+            [
+                TupleField {
+                    name: None,
+                    unpack: false,
+                    expr: Expr {
+                        kind: Binary(
+                            BinaryExpr {
+                                left: Expr {
+                                    kind: Literal(
+                                        Integer(
+                                            1,
+                                        ),
+                                    ),
+                                    span: Some(
+                                        0:1-2,
+                                    ),
+                                    ty: None,
+                                    ty_args: [],
+                                    scope_id: None,
+                                    target: None,
+                                },
+                                op: Pipe,
+                                right: Expr {
+                                    kind: Ident(
+                                        to_int32,
+                                    ),
+                                    span: Some(
+                                        0:5-13,
+                                    ),
+                                    ty: None,
+                                    ty_args: [],
+                                    scope_id: None,
+                                    target: None,
+                                },
+                            },
+                        ),
+                        span: Some(
+                            0:1-13,
+                        ),
+                        ty: None,
+                        ty_args: [],
+                        scope_id: None,
+                        target: None,
+                    },
+                },
+            ],
+        ),
+        span: Some(
+            0:0-14,
+        ),
+        ty: None,
+        ty_args: [],
+        scope_id: None,
+        target: None,
+    }
+    ");
+    assert_debug_snapshot!(parse_expr(r"1 + 2 | std::to_int32").kind, @r"
+    Binary(
+        BinaryExpr {
+            left: Expr {
+                kind: Binary(
+                    BinaryExpr {
+                        left: Expr {
+                            kind: Literal(
+                                Integer(
+                                    1,
+                                ),
+                            ),
+                            span: Some(
+                                0:0-1,
+                            ),
+                            ty: None,
+                            ty_args: [],
+                            scope_id: None,
+                            target: None,
+                        },
+                        op: Add,
+                        right: Expr {
+                            kind: Literal(
+                                Integer(
+                                    2,
+                                ),
+                            ),
+                            span: Some(
+                                0:4-5,
+                            ),
+                            ty: None,
+                            ty_args: [],
+                            scope_id: None,
+                            target: None,
+                        },
+                    },
+                ),
+                span: Some(
+                    0:0-5,
+                ),
+                ty: None,
+                ty_args: [],
+                scope_id: None,
+                target: None,
+            },
+            op: Pipe,
+            right: Expr {
+                kind: Ident(
+                    std::to_int32,
+                ),
+                span: Some(
+                    0:8-21,
+                ),
+                ty: None,
+                ty_args: [],
+                scope_id: None,
+                target: None,
+            },
+        },
+    )
+    ");
+    assert_debug_snapshot!(parse_expr(r"1 | to_int32 | to_int32").kind, @r"
+    Binary(
+        BinaryExpr {
+            left: Expr {
+                kind: Binary(
+                    BinaryExpr {
+                        left: Expr {
+                            kind: Literal(
+                                Integer(
+                                    1,
+                                ),
+                            ),
+                            span: Some(
+                                0:0-1,
+                            ),
+                            ty: None,
+                            ty_args: [],
+                            scope_id: None,
+                            target: None,
+                        },
+                        op: Pipe,
+                        right: Expr {
+                            kind: Ident(
+                                to_int32,
+                            ),
+                            span: Some(
+                                0:4-12,
+                            ),
+                            ty: None,
+                            ty_args: [],
+                            scope_id: None,
+                            target: None,
+                        },
+                    },
+                ),
+                span: Some(
+                    0:0-12,
+                ),
+                ty: None,
+                ty_args: [],
+                scope_id: None,
+                target: None,
+            },
+            op: Pipe,
+            right: Expr {
+                kind: Ident(
+                    to_int32,
+                ),
+                span: Some(
+                    0:15-23,
+                ),
+                ty: None,
+                ty_args: [],
+                scope_id: None,
+                target: None,
+            },
+        },
+    )
+    ");
+    assert_debug_snapshot!(parse_expr(r"1 | func (x) -> x | to_int32").kind, @r#"
+    Binary(
+        BinaryExpr {
+            left: Expr {
+                kind: Literal(
+                    Integer(
+                        1,
+                    ),
+                ),
+                span: Some(
+                    0:0-1,
+                ),
+                ty: None,
+                ty_args: [],
+                scope_id: None,
+                target: None,
+            },
+            op: Pipe,
+            right: Expr {
+                kind: Func(
+                    Func {
+                        return_ty: None,
+                        body: Expr {
+                            kind: Binary(
+                                BinaryExpr {
+                                    left: Expr {
+                                        kind: Ident(
+                                            x,
+                                        ),
+                                        span: Some(
+                                            0:16-17,
+                                        ),
+                                        ty: None,
+                                        ty_args: [],
+                                        scope_id: None,
+                                        target: None,
+                                    },
+                                    op: Pipe,
+                                    right: Expr {
+                                        kind: Ident(
+                                            to_int32,
+                                        ),
+                                        span: Some(
+                                            0:20-28,
+                                        ),
+                                        ty: None,
+                                        ty_args: [],
+                                        scope_id: None,
+                                        target: None,
+                                    },
+                                },
+                            ),
+                            span: Some(
+                                0:16-28,
+                            ),
+                            ty: None,
+                            ty_args: [],
+                            scope_id: None,
+                            target: None,
+                        },
+                        params: [
+                            FuncParam {
+                                constant: false,
+                                name: "x",
+                                ty: None,
+                                span: 0:10-11,
+                            },
+                        ],
+                        ty_params: [],
+                    },
+                ),
+                span: Some(
+                    0:4-28,
+                ),
+                ty: None,
+                ty_args: [],
+                scope_id: None,
+                target: None,
+            },
+        },
+    )
+    "#);
 }
 
 #[test]

@@ -392,7 +392,7 @@ impl<'a> Lowerer<'a> {
             pr::ExprKind::Internal => unreachable!(),
 
             // desugared away
-            pr::ExprKind::Pipeline(_) => unreachable!(),
+            pr::ExprKind::Nested(_) => unreachable!(),
             pr::ExprKind::Binary(_) => unreachable!(),
             pr::ExprKind::Unary(_) => unreachable!(),
             pr::ExprKind::Range(_) => unreachable!(),

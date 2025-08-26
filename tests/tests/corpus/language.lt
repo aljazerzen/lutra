@@ -733,7 +733,7 @@ type OptText: enum {
   Some: text
 }
 
-func main() -> (OptText::Some("hello") | std::or_else("world"))
+func main() -> OptText::Some("hello") | std::or_else("world")
 # >
 "hello"
 
@@ -744,7 +744,7 @@ type OptText: enum {
   Some: text
 }
 
-func main() -> (OptText::None | std::or_else("fallback"))
+func main() -> OptText::None | std::or_else("fallback")
 # >
 "fallback"
 
@@ -755,7 +755,7 @@ type OptText: enum {
   Some: text
 }
 
-func main() -> (OptText::None | std::or_default())
+func main() -> OptText::None | std::or_default()
 # >
 ""
 
