@@ -20,6 +20,10 @@ postgres-protocol = { version = "0.6.8", default-features = false }
 
 tokio-postgres = { version = "0.7.13", default-features = false, optional = true }
 postgres = { version = "0.19.10", default-features = false, optional = true }
+regex = { version = "1.11.2", default-features = false }
+
+[build-dependencies]
+lutra-codegen = { version = "0.1.0", path = "../lutra-codegen" }
 
 [features]
 default = ["postgres", "tokio-postgres"]

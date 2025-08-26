@@ -3,6 +3,7 @@
 #[cfg(not(any(feature = "postgres", feature = "tokio-postgres")))]
 compile_error!("At least one of 'postgres' or 'tokio-postgres' features has to be enabled.");
 
+mod case;
 mod params;
 mod result;
 
@@ -10,10 +11,10 @@ mod result;
 mod schema;
 
 use std::collections::HashMap;
+use thiserror::Error;
 
 #[cfg(feature = "postgres")]
 use postgres::Error as PgError;
-use thiserror::Error;
 #[cfg(not(feature = "postgres"))]
 use tokio_postgres::Error as PgError;
 
@@ -106,23 +107,7 @@ impl lutra_runner::Run for RunnerAsync {
     }
 
     async fn get_interface(&self) -> Result<std::string::String, Self::Error> {
-        let mut output = String::new();
-
-        let tables = schema::table_list(&self.client).await?;
-        for table in tables {
-            let table_ty = schema::table_get(&self.client, &table).await?;
-
-            let ty_name = if let Some(n) = table.strip_suffix("s") {
-                n.to_string()
-            } else {
-                format!("{table}_item")
-            };
-
-            output += "\n";
-            output += &format!("type {ty_name} = {}\n", lutra_bin::ir::print_ty(&table_ty));
-            output += &format!("let {table}: func (): [{ty_name}]\n");
-        }
-        Ok(output)
+        Ok(crate::schema::pull_interface(self).await?)
     }
 }
 
