@@ -103,7 +103,7 @@ async fn run_on_interpreter(case: TestCase) -> Result<(), libtest_mimic::Failed>
 #[tokio::main(flavor = "current_thread")]
 async fn run_on_pg(case: TestCase) -> Result<(), libtest_mimic::Failed> {
     const POSTGRES_URL: &str = "postgresql://postgres:pass@localhost:5416";
-    let (mut client, connection) = tokio_postgres::connect(POSTGRES_URL, postgres::NoTls)
+    let (mut client, connection) = tokio_postgres::connect(POSTGRES_URL, tokio_postgres::NoTls)
         .await
         .unwrap();
 

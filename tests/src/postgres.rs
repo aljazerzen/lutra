@@ -3,20 +3,29 @@ use std::hash::{Hash, Hasher};
 use std::{env, sync, time};
 
 use lutra_compiler::{ProgramFormat, SourceTree};
-use postgres::GenericClient;
+use lutra_runner::Run;
+use lutra_runner_postgres::RunnerAsync;
+use tokio::io::{AsyncRead, AsyncWrite};
 
 use crate::POSTGRES_URL_SHARED;
 
 #[track_caller]
-pub fn _run(source: &str, input: lutra_bin::Value) -> (String, String) {
-    let mut client = postgres::Client::connect(POSTGRES_URL_SHARED, postgres::NoTls).unwrap();
-    let mut tran = client.transaction().unwrap();
-    _run_on(&mut tran, source, input)
+#[tokio::main(flavor = "current_thread")]
+pub async fn _run(source: &str, input: lutra_bin::Value) -> (String, String) {
+    let mut client = run_connection(
+        tokio_postgres::connect(POSTGRES_URL_SHARED, tokio_postgres::NoTls)
+            .await
+            .unwrap(),
+    );
+
+    let tran = client.transaction().await.unwrap();
+
+    let mut runner = RunnerAsync::new(tran);
+    _run_on(&mut runner, source, input).await
 }
 
-#[track_caller]
-pub fn _run_on(
-    client: &mut impl GenericClient,
+pub async fn _run_on(
+    runner: &mut impl lutra_runner::Run,
     source: &str,
     input: lutra_bin::Value,
 ) -> (String, String) {
@@ -26,22 +35,28 @@ pub fn _run_on(
     let source = SourceTree::single("".into(), source.to_string());
     let project = match lutra_compiler::check(source, Default::default()) {
         Ok(p) => p,
-        Err(e) => panic!("{e}"),
+        Err(e) => return (format!("{e}"), String::new()),
     };
 
     // compile to sql
-    let (program, ty) =
-        lutra_compiler::compile(&project, "main", None, ProgramFormat::SqlPg).unwrap();
-    let program = program.as_sql_pg().unwrap();
+    let res = lutra_compiler::compile(&project, "main", None, ProgramFormat::SqlPg);
+    let (program, ty) = match res {
+        Ok(x) => x,
+        Err(e) => return (format!("{e}"), String::new()),
+    };
 
     // format sql
-    let options = sqlformat::FormatOptions::default();
-    let formatted_sql = sqlformat::format(&program.sql, &sqlformat::QueryParams::None, &options);
+    let formatted_sql = {
+        let program = program.as_sql_pg().unwrap();
+        let options = sqlformat::FormatOptions::default();
+        sqlformat::format(&program.sql, &sqlformat::QueryParams::None, &options)
+    };
 
     let input = input.encode(&ty.input, &ty.defs).unwrap();
 
     // execute
-    let rel_data = lutra_runner_postgres::execute(client, program, &input).unwrap();
+    let program = runner.prepare(program).await.unwrap();
+    let rel_data = runner.execute(&program, &input).await.unwrap();
 
     // decode and print source
     let output = lutra_bin::Value::decode(&rel_data, &ty.output, &ty.defs).unwrap();
@@ -64,19 +79,22 @@ static RUN_ID: sync::LazyLock<u64> = sync::LazyLock::new(|| {
     h.finish()
 });
 
-pub fn _get_test_db_client() -> Result<postgres::Client, postgres::Error> {
+pub async fn _get_test_db_client() -> Result<tokio_postgres::Client, tokio_postgres::Error> {
     let run_id = *RUN_ID as i64;
     let db_name = format!("l-test-{run_id:016x}");
 
-    let config_shared = POSTGRES_URL_SHARED.parse::<postgres::Config>()?;
+    let config_shared = POSTGRES_URL_SHARED.parse::<tokio_postgres::Config>()?;
     let mut config_test = config_shared.clone();
     config_test.dbname(&db_name);
 
-    let mut client_main = config_shared.connect(postgres::NoTls)?;
-    client_main.execute("SELECT pg_advisory_lock($1)", &[&run_id])?;
+    let client_main = run_connection(config_shared.connect(tokio_postgres::NoTls).await?);
+    client_main
+        .execute("SELECT pg_advisory_lock($1)", &[&run_id])
+        .await?;
 
     let databases: HashSet<String> = client_main
-        .query("SELECT datname FROM pg_database", &[])?
+        .query("SELECT datname FROM pg_database", &[])
+        .await?
         .iter()
         .map(|r| r.get::<_, String>(0))
         .filter(|d| d.starts_with("l-test-"))
@@ -85,22 +103,43 @@ pub fn _get_test_db_client() -> Result<postgres::Client, postgres::Error> {
     if !databases.contains(&db_name) {
         // cleanup old test dbs
         for d in databases {
-            client_main.execute(&format!("DROP DATABASE \"{d}\""), &[])?;
+            client_main
+                .execute(&format!("DROP DATABASE \"{d}\""), &[])
+                .await?;
         }
 
         // create test db
-        client_main.execute(&format!("CREATE DATABASE \"{db_name}\""), &[])?;
+        client_main
+            .execute(&format!("CREATE DATABASE \"{db_name}\""), &[])
+            .await?;
 
-        let mut client_test = config_test.connect(postgres::NoTls)?;
-        client_test.batch_execute(MOVIES_SETUP)?;
+        let client_test = run_connection(config_test.connect(tokio_postgres::NoTls).await?);
+        client_test.batch_execute(MOVIES_SETUP).await?;
 
         drop(client_main); // this will release the lock
         Ok(client_test)
     } else {
         drop(client_main);
 
-        config_test.connect(postgres::NoTls)
+        Ok(run_connection(
+            config_test.connect(tokio_postgres::NoTls).await?,
+        ))
     }
+}
+
+pub fn run_connection<S, T>(
+    (client, conn): (tokio_postgres::Client, tokio_postgres::Connection<S, T>),
+) -> tokio_postgres::Client
+where
+    S: AsyncWrite + AsyncRead + Unpin + Send + 'static,
+    T: AsyncWrite + AsyncRead + Unpin + Send + 'static,
+{
+    tokio::task::spawn(async {
+        if let Err(e) = conn.await {
+            eprintln!("{e}");
+        }
+    });
+    client
 }
 
 const MOVIES_SETUP: &str = r#"
@@ -1635,11 +1674,12 @@ fn match_05() {
     "#);
 }
 
-#[test]
-fn sql_from_00() {
-    let mut client = _get_test_db_client().unwrap();
+#[tokio::test(flavor = "current_thread")]
+async fn sql_from_00() {
+    let client = _get_test_db_client().await.unwrap();
+    let mut runner = RunnerAsync::new(client);
 
-    insta::assert_snapshot!(_sql_and_output(_run_on(&mut client, r#"
+    insta::assert_snapshot!(_sql_and_output(_run_on(&mut runner, r#"
     type Movie: {
       id: int32,
       title: text,
@@ -1648,7 +1688,7 @@ fn sql_from_00() {
     }
 
     func main(): [Movie] -> std::sql::from("movies")
-    "#, lutra_bin::Value::unit())), @r#"
+    "#, lutra_bin::Value::unit()).await), @r#"
     SELECT
       r0._0,
       r0._1,
@@ -1685,17 +1725,18 @@ fn sql_from_00() {
     "#);
 }
 
-#[test]
-fn sql_from_01() {
+#[tokio::test(flavor = "current_thread")]
+async fn sql_from_01() {
     // test schema names
 
-    let mut client = _get_test_db_client().unwrap();
+    let client = _get_test_db_client().await.unwrap();
+    let mut runner = RunnerAsync::new(client);
 
-    insta::assert_snapshot!(_run_on(&mut client, r#"
+    insta::assert_snapshot!(_run_on(&mut runner, r#"
     type Movie: {title: text}
 
     func main(): [Movie] -> std::sql::from("public/movies")
-    "#, lutra_bin::Value::unit()).1, @r#"
+    "#, lutra_bin::Value::unit()).await.1, @r#"
     [
       {
         title = "Forrest Gump",
@@ -1706,11 +1747,11 @@ fn sql_from_01() {
     ]
     "#);
 
-    insta::assert_snapshot!(_run_on(&mut client, r#"
+    insta::assert_snapshot!(_run_on(&mut runner, r#"
     type Day: {name: text}
 
     func main(): [Day] -> std::sql::from("another/days")
-    "#, lutra_bin::Value::unit()).1, @r#"
+    "#, lutra_bin::Value::unit()).await.1, @r#"
     [
       {
         name = "Monday",
@@ -1721,11 +1762,11 @@ fn sql_from_01() {
     ]
     "#);
 
-    insta::assert_snapshot!(_run_on(&mut client, r#"
+    insta::assert_snapshot!(_run_on(&mut runner, r#"
     type Day: {name: text}
 
     func main(): [Day] -> std::sql::from("another/proj/days")
-    "#, lutra_bin::Value::unit()).1, @r#"
+    "#, lutra_bin::Value::unit()).await.1, @r#"
     [
       {
         name = "Wednesday",
@@ -1740,12 +1781,13 @@ fn sql_from_01() {
     "#);
 }
 
-#[test]
-fn sql_insert_00() {
-    let mut client = _get_test_db_client().unwrap();
-    let mut tran = client.transaction().unwrap();
+#[tokio::test(flavor = "current_thread")]
+async fn sql_insert_00() {
+    let mut client = _get_test_db_client().await.unwrap();
+    let tran = client.transaction().await.unwrap();
+    let mut runner = RunnerAsync::new(tran);
 
-    insta::assert_snapshot!(_sql_and_output(_run_on(&mut tran, r#"
+    insta::assert_snapshot!(_sql_and_output(_run_on(&mut runner, r#"
     type Movie: {
       title: text,
       release_year: int16
@@ -1756,7 +1798,7 @@ fn sql_insert_00() {
     ]
 
     func main(): {} -> std::sql::insert(two_movies, "movies")
-    "#, lutra_bin::Value::unit())), @r"
+    "#, lutra_bin::Value::unit()).await), @r"
     INSERT INTO
       movies (title, release_year)
     SELECT
@@ -1780,7 +1822,7 @@ fn sql_insert_00() {
     }
     ");
 
-    insta::assert_snapshot!(_run_on(&mut tran, r#"
+    insta::assert_snapshot!(_run_on(&mut runner, r#"
     type Movie: {
       title: text,
       release_year: int16
@@ -1789,7 +1831,7 @@ fn sql_insert_00() {
       std::sql::from("movies")
       | std::sort(func (m) -> std::to_int64(m.release_year))
     )
-    "#, lutra_bin::Value::unit()).1, @r#"
+    "#, lutra_bin::Value::unit()).await.1, @r#"
     [
       {
         title = "Forrest Gump",
@@ -2040,4 +2082,60 @@ fn std_array_unpack() {
       3,
     ]
     ");
+}
+
+#[tokio::test(flavor = "current_thread")]
+async fn pull_interface() {
+    let client = _get_test_db_client().await.unwrap();
+    let runner = RunnerAsync::new(client);
+
+    insta::assert_snapshot!(runner.get_interface().await.unwrap(), @r#"
+    type Person: {id: int32, first_name: text, last_name: text}
+    func from_persons(): [Person] -> std::sql::from("persons")
+    func insert_persons(values: [Person]) -> std::sql::insert(values, "persons")
+
+    ## Lookup Person using persons_pkey index
+    func get_persons_by_id(id: int32): Person -> (
+      from_persons() | std::find(func (x) -> x.id == id)
+    )
+
+    type Movie: {id: int32, title: text, release_year: int16, director_id: int32}
+    func from_movies(): [Movie] -> std::sql::from("movies")
+    func insert_movies(values: [Movie]) -> std::sql::insert(values, "movies")
+
+    ## Lookup Movie using movies_pkey index
+    func get_movies_by_id(id: int32): Movie -> (
+      from_movies() | std::find(func (x) -> x.id == id)
+    )
+
+    ## Lookup Movie using movies_release_year_idx index
+    func get_movies_by_release_year(release_year: int32): [Movie] -> (
+      from_movies() | std::filter(func (x) -> x.release_year == release_year)
+    )
+
+    type MovieActor: {source: int32, target: int32, role: text}
+    func from_movie_actors(): [MovieActor] -> std::sql::from("movie_actors")
+    func insert_movie_actors(values: [MovieActor]) -> std::sql::insert(values, "movie_actors")
+
+    module another {
+
+      type Day: {id: int32, name: text}
+      func from_days(): [Day] -> std::sql::from("days")
+      func insert_days(values: [Day]) -> std::sql::insert(values, "days")
+
+      ## Lookup Day using days_pkey index
+      func get_days_by_id(id: int32): Day -> (
+        from_days() | std::find(func (x) -> x.id == id)
+      )
+
+      type Proj/day: {id: int32, name: text}
+      func from_proj/days(): [Proj/day] -> std::sql::from("proj/days")
+      func insert_proj/days(values: [Proj/day]) -> std::sql::insert(values, "proj/days")
+
+      ## Lookup Proj/day using proj/days_pkey index
+      func get_proj/days_by_id(id: int32): Proj/day -> (
+        from_proj/days() | std::find(func (x) -> x.id == id)
+      )
+    }
+    "#);
 }

@@ -10,6 +10,8 @@ mod result;
 #[cfg(feature = "tokio-postgres")]
 mod schema;
 
+pub use lutra_runner::Run;
+
 use std::collections::HashMap;
 use thiserror::Error;
 

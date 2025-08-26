@@ -1,3 +1,10 @@
+use std::{sync::Arc, thread};
+
+use tokio::sync;
+
+use lutra_runner::Run;
+use lutra_runner_postgres::RunnerAsync;
+
 use rand::{Rng, SeedableRng};
 
 use crate::POSTGRES_URL_SHARED;
@@ -6,7 +13,7 @@ use crate::POSTGRES_URL_SHARED;
 struct Construct {
     name: &'static str,
     val_source: &'static str,
-    val_builder: Box<dyn Fn(Vec<lutra_bin::Value>) -> lutra_bin::Value>,
+    val_builder: Box<dyn Fn(Vec<lutra_bin::Value>) -> lutra_bin::Value + Sync + Send>,
     ty_source: &'static str,
     param_count: usize,
 }
@@ -115,19 +122,58 @@ fn fuzz() {
     );
     let project = lutra_compiler::check(source, Default::default()).unwrap();
 
-    let mut client = postgres::Client::connect(POSTGRES_URL_SHARED, postgres::NoTls).unwrap();
+    let constructs = Arc::new(constructs);
+    let project = Arc::new(project);
+    let seeds = std::sync::Arc::new(sync::Mutex::new(tqdm::tqdm(0..100000)));
 
-    for i in tqdm::tqdm(0..10000) {
-        generate_and_test(&constructs, i, &project, &mut client);
+    let mut handles = Vec::new();
+    for _ in 0..thread::available_parallelism().unwrap().get() {
+        let constructs = constructs.clone();
+        let project = project.clone();
+        let seeds = seeds.clone();
+        handles.push(thread::spawn(move || {
+            let f = async {
+                let client = RunnerAsync::connect_no_tls(POSTGRES_URL_SHARED)
+                    .await
+                    .unwrap();
+
+                loop {
+                    let i = {
+                        let mut lock = seeds.lock().await;
+                        lock.next()
+                    };
+                    match i {
+                        Some(i) => {
+                            generate_and_test(constructs.as_ref(), i, &project, &client).await
+                        }
+                        _ => break,
+                    };
+                }
+            };
+
+            let rt = tokio::runtime::Builder::new_current_thread()
+                .enable_all()
+                .build()
+                .unwrap();
+            rt.block_on(f);
+        }));
     }
+    for handle in handles {
+        handle.join().unwrap();
+    }
+
+    // (0..100000)
+    // .into_par_iter()
+    // .for_each(|i| generate_and_test(constructs.as_ref(), i, &project));
 }
 
-fn generate_and_test(
+async fn generate_and_test(
     constructs: &[Construct],
     seed: u64,
     project: &lutra_compiler::Project,
-    client: &mut postgres::Client,
+    client: &RunnerAsync,
 ) {
+    // println!("{seed} started");
     let mut rng = rand::rngs::SmallRng::seed_from_u64(seed);
     let case = generate(constructs, &mut rng, 0);
 
@@ -139,8 +185,8 @@ fn generate_and_test(
         lutra_compiler::ProgramFormat::SqlPg,
     )
     .unwrap();
-    let program = program.into_sql_pg().unwrap();
-    let result = lutra_runner_postgres::execute(client, &program, &[]).unwrap();
+    let program = client.prepare(program).await.unwrap();
+    let result = client.execute(&program, &[]).await.unwrap();
     let case_val = case.val.encode(&ty.output, &ty.defs).unwrap();
     assert_eq!(result, case_val);
 
@@ -152,9 +198,11 @@ fn generate_and_test(
         lutra_compiler::ProgramFormat::SqlPg,
     )
     .unwrap();
-    let program = program.into_sql_pg().unwrap();
-    let result = lutra_runner_postgres::execute(client, &program, &case_val).unwrap();
+    let program = client.prepare(program).await.unwrap();
+    let result = client.execute(&program, &case_val).await.unwrap();
     assert_eq!(result, case_val);
+
+    // println!("{seed} ended");
 }
 
 fn generate(constructs: &[Construct], rng: &mut impl Rng, depth: usize) -> Case {
