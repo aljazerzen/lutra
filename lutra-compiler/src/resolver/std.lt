@@ -295,4 +295,7 @@ module sql {
 
   func insert(rows: [R], const table_name: text): {}
   where R: {..}
+
+  func unpack_array(array: text): [T]
+  where T
 }

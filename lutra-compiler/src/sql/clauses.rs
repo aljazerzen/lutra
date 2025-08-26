@@ -948,7 +948,7 @@ impl<'a> Context<'a> {
             "std::sql::from" => {
                 let table_name = &call.args[0];
                 let ir::ExprKind::Literal(ir::Literal::text(table_name)) = &table_name.kind else {
-                    panic!("TODO: std::sql::from expects a literal table name, not an expression")
+                    panic!("table param is const")
                 };
 
                 cr::ExprKind::From(cr::From::Table(table_name.clone()))
@@ -959,16 +959,13 @@ impl<'a> Context<'a> {
 
                 let table_name = &call.args[1];
                 let ir::ExprKind::Literal(ir::Literal::text(table_name)) = &table_name.kind else {
-                    panic!("TODO: std::sql::from expects a literal table name, not an expression")
+                    panic!("table param is const")
                 };
 
                 cr::ExprKind::Transform(rows, cr::Transform::Insert(table_name.clone()))
             }
 
-            _ => {
-                let expr = self.compile_expr_std(expr);
-                cr::ExprKind::From(cr::From::Row(vec![expr]))
-            }
+            _ => return self.compile_expr_std(expr),
         };
         cr::Expr {
             kind,

@@ -268,11 +268,8 @@ impl<'a> Context<'a> {
             cr::From::Null => ExprOrSource::new_expr(self.null(ty)).into(),
             cr::From::Literal(literal) => self.compile_literal(literal, ty).into(),
             cr::From::FuncCall(func_name, args_in) => {
-                let (args, rel_vars) = self.compile_columns_scoped(args_in);
-                Scoped {
-                    expr: self.compile_func_call(func_name, ty, args, args_in),
-                    rel_vars,
-                }
+                let (args, arg_rel_vars) = self.compile_columns_scoped(args_in);
+                self.compile_func_call(func_name, ty, args, args_in, arg_rel_vars)
             }
             cr::From::Param(param_index) => Scoped::from(ExprOrSource::Source(format!(
                 "${}::{}",
@@ -599,13 +596,15 @@ impl<'a> Context<'a> {
     }
 
     fn compile_func_call(
-        &self,
+        &mut self,
         id: &str,
         ty: &ir::Ty,
         args: impl IntoIterator<Item = ExprOrSource>,
         args_in: &[cr::Expr],
-    ) -> ExprOrSource {
-        match id {
+        args_rel_vars: Vec<sql_ast::TableFactor>,
+    ) -> Scoped {
+        let mut rel_vars = args_rel_vars;
+        let expr = match id {
             "std::mul" => utils::new_bin_op("*", args),
             "std::div" => utils::new_bin_op("/", args),
             "std::mod" => match ty.kind.as_primitive().unwrap() {
@@ -727,8 +726,35 @@ impl<'a> Context<'a> {
                 ExprOrSource::Source(format!("{arg}::{ty}"))
             }
 
+            "std::sql::unpack_array" => {
+                let [arg] = unpack_args(args);
+
+                // SELECT ordinality AS index, unnest AS value FROM UNNEST({arg}) WITH ORDINALITY
+
+                let mut select = utils::select_empty();
+                select.from.push(utils::from(sql_ast::TableFactor::UNNEST {
+                    alias: None,
+                    array_exprs: vec![arg.into_expr()],
+                    with_offset: false,
+                    with_offset_alias: None,
+                    with_ordinality: true,
+                }));
+                select.projection.push(sql_ast::SelectItem::ExprWithAlias {
+                    expr: utils::identifier(None::<&str>, "ordinality"),
+                    alias: sql_ast::Ident::new("index"),
+                });
+                select.projection.push(sql_ast::SelectItem::ExprWithAlias {
+                    expr: utils::identifier(None::<&str>, "unnest"),
+                    alias: sql_ast::Ident::new("value"),
+                });
+                let scoped = self.query_into_scoped(utils::query_select(select));
+                rel_vars.extend(scoped.rel_vars.into_iter().map(utils::lateral));
+                scoped.expr
+            }
+
             _ => todo!("sql impl for {id}"),
-        }
+        };
+        Scoped { expr, rel_vars }
     }
 
     fn null(&self, ty: &ir::Ty) -> sql_ast::Expr {
