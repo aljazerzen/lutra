@@ -54,7 +54,7 @@ type Movie: {
 # function named get_movies that returns an array of movie
 func get_movies(): [Movie] -> (
   # it is implemented by just reading the sql table
-  std::sql::from_table('movies');
+  std::sql::from("movies");
 )
 ```
 

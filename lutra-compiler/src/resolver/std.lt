@@ -290,10 +290,23 @@ module fs {
 }
 
 module sql {
-  func from(const table_name: text): [R]
+
+  ## Reads data from a table.
+  ##
+  ## The order of table rows is unknown and might change over repeated invocations.
+  ##
+  ## Table identifier can contain slashes to denote table namespaces.
+  ## Any additional slashes will remain in table name verbatim.
+  ## For example:
+  ## - `from("my_schema/invoices")` will read from `my_schema.invoices`,
+  ## - `from("my_schema/hello/world")` will read from `my_schema."hello/world"`.
+  func from(const table_identifier: text): [R]
   where R: {..}
 
-  func insert(rows: [R], const table_name: text): {}
+  ## Inserts rows into a table.
+  ##
+  ## For table identifier format, see documentation of [std::sql::from].
+  func insert(rows: [R], const table_identifier: text): {}
   where R: {..}
 
   func unpack_array(array: text): [T]

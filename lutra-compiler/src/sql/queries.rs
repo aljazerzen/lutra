@@ -235,7 +235,8 @@ impl<'a> Context<'a> {
 
                 if rel_ref.is_cte {
                     let alias = self.rel_name_gen.next();
-                    let rel_var = utils::new_table(vec![rel_name], Some(alias.clone()));
+                    let rel_var =
+                        utils::new_table(utils::new_object_name([rel_name]), Some(alias.clone()));
                     Scoped::new(alias, vec![rel_var])
                 } else {
                     Scoped {
@@ -245,11 +246,11 @@ impl<'a> Context<'a> {
                 }
             }
 
-            cr::From::Table(table_name) => {
+            cr::From::Table(table_ident) => {
                 let mut select = utils::select_empty();
 
                 select.from.push(utils::from(utils::new_table(
-                    vec![table_name.clone()],
+                    translate_table_ident(table_ident),
                     None,
                 )));
 
@@ -507,13 +508,10 @@ impl<'a> Context<'a> {
                 select.projection = self.projection(ty, projection);
             }
 
-            cr::Transform::Insert(table_name) => {
+            cr::Transform::Insert(table_ident) => {
                 let source = self.scoped_into_query_ext(scoped, input_ty, false);
 
-                let table =
-                    sql_ast::TableObject::TableName(sql_ast::ObjectName(vec![utils::new_ident(
-                        table_name,
-                    )]));
+                let table = sql_ast::TableObject::TableName(translate_table_ident(table_ident));
 
                 let columns = self
                     .get_table_columns(input_ty)
@@ -878,4 +876,29 @@ fn unpack_args<const N: usize>(args: impl IntoIterator<Item = ExprOrSource>) -> 
         r.push(args.next().unwrap());
     }
     r.try_into().unwrap()
+}
+
+/// Converts a "lutra table identifier" into an SQL object name.
+///
+/// For example:
+/// - `"invoices" -> invoices`
+/// - `"mySchema/invoices" -> "mySchema".invoices`
+/// - `"my_schema/hello/world" -> my_schema."hello/world"`
+/// - `"public/my_dir/sub_dir/data.parquet" -> public."my_dir/sub_dir/data.parquet"`
+///
+/// Splits the name on first slash and uses preceding part (if it exists)
+/// for the schema name, and following part as the table name.
+/// Thus, table name can contain slashes.
+///
+/// This function will be specialized for different databases,
+/// because current behavior targets PostgreSQL.
+/// For example, BigQuery uses organizations, projects and datasets in table identifiers.
+/// So when translating to BigQuery SQL we will translate:
+/// - `"my_organization/my_project/my_dataset/my_table" -> my_organization.my_project.my_dataset.my_table`,
+fn translate_table_ident(table_ident: &str) -> sql_ast::ObjectName {
+    if let Some((schema, table)) = table_ident.split_once('/') {
+        utils::new_object_name([schema, table])
+    } else {
+        utils::new_object_name([table_ident])
+    }
 }

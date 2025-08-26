@@ -37,13 +37,10 @@ pub fn as_mut_sub_rel(rel: &mut sqlparser::ast::TableFactor) -> Option<&mut sql_
     }
 }
 
-pub fn new_table(name: Vec<String>, alias: Option<String>) -> sql_ast::TableFactor {
+pub fn new_table(name: sql_ast::ObjectName, alias: Option<String>) -> sql_ast::TableFactor {
     sql_ast::TableFactor::Table {
-        name: sql_ast::ObjectName(name.into_iter().map(new_ident).collect()),
-        alias: alias.map(|a| sql_ast::TableAlias {
-            name: new_ident(a),
-            columns: vec![],
-        }),
+        name,
+        alias: alias.map(new_table_alias),
         args: Default::default(),
         with_hints: Default::default(),
         version: Default::default(),
@@ -58,10 +55,7 @@ pub fn sub_rel(query: sql_ast::Query, alias: String) -> sql_ast::TableFactor {
     sql_ast::TableFactor::Derived {
         lateral: false,
         subquery: Box::new(query),
-        alias: Some(sql_ast::TableAlias {
-            name: new_ident(alias),
-            columns: vec![],
-        }),
+        alias: Some(new_table_alias(alias)),
     }
 }
 
@@ -104,10 +98,7 @@ pub fn rel_func(
             .map(sql_ast::FunctionArgExpr::Expr)
             .map(sql_ast::FunctionArg::Unnamed)
             .collect(),
-        alias: alias.map(|a| sql_ast::TableAlias {
-            name: new_ident(a),
-            columns: vec![],
-        }),
+        alias: alias.map(new_table_alias),
     }
 }
 
@@ -267,10 +258,7 @@ pub fn with() -> sql_ast::With {
 
 pub fn cte(name: String, val: sql_ast::Query) -> sql_ast::Cte {
     sql_ast::Cte {
-        alias: sql_ast::TableAlias {
-            name: new_ident(name),
-            columns: Default::default(),
-        },
+        alias: new_table_alias(name),
         query: Box::new(val),
         from: Default::default(),
         materialized: Default::default(),
@@ -299,4 +287,19 @@ pub(crate) fn valid_ident_regex() -> &'static Regex {
         // ^ ('*' | [ascii_lower '_$'] [ascii_lower ascii_digit '_$']* ) $
         Regex::new(r"^((\*)|(^[a-z_\$][a-z0-9_\$]*))$").unwrap()
     })
+}
+
+pub fn new_object_name<S, I>(parts: I) -> sql_ast::ObjectName
+where
+    S: Into<String>,
+    I: IntoIterator<Item = S>,
+{
+    sql_ast::ObjectName(parts.into_iter().map(new_ident).collect())
+}
+
+pub fn new_table_alias(name: impl Into<String>) -> sql_ast::TableAlias {
+    sql_ast::TableAlias {
+        name: new_ident(name),
+        columns: vec![],
+    }
 }
