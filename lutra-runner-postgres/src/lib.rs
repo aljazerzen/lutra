@@ -30,7 +30,7 @@ pub enum Error {
 
 #[cfg(feature = "postgres")]
 pub fn execute(
-    client: &mut postgres::Client,
+    client: &mut impl postgres::GenericClient,
     program: &rr::SqlProgram,
     input: &[u8],
 ) -> Result<Vec<u8>, Error> {
@@ -50,15 +50,20 @@ pub fn execute(
 }
 
 #[cfg(feature = "tokio-postgres")]
-pub struct RunnerAsync {
-    client: tokio_postgres::Client,
+pub struct RunnerAsync<C: tokio_postgres::GenericClient = tokio_postgres::Client> {
+    client: C,
 }
 
-impl RunnerAsync {
-    pub fn new(client: tokio_postgres::Client) -> Self {
+impl<C> RunnerAsync<C>
+where
+    C: tokio_postgres::GenericClient,
+{
+    pub fn new(client: C) -> Self {
         RunnerAsync { client }
     }
+}
 
+impl RunnerAsync<tokio_postgres::Client> {
     /// Helper for [tokio_postgres::connect] and [RunnerAsync::new].
     pub async fn connect_no_tls(config: &str) -> Result<Self, Error> {
         let (client, conn) = tokio_postgres::connect(config, tokio_postgres::NoTls).await?;
@@ -78,7 +83,10 @@ pub struct PreparedProgram {
 }
 
 #[cfg(feature = "tokio-postgres")]
-impl lutra_runner::Run for RunnerAsync {
+impl<C> lutra_runner::Run for RunnerAsync<C>
+where
+    C: tokio_postgres::GenericClient,
+{
     type Error = Error;
     type Prepared = PreparedProgram;
 

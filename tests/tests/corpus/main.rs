@@ -103,7 +103,7 @@ async fn run_on_interpreter(case: TestCase) -> Result<(), libtest_mimic::Failed>
 #[tokio::main(flavor = "current_thread")]
 async fn run_on_pg(case: TestCase) -> Result<(), libtest_mimic::Failed> {
     const POSTGRES_URL: &str = "postgresql://postgres:pass@localhost:5416";
-    let (client, connection) = tokio_postgres::connect(POSTGRES_URL, postgres::NoTls)
+    let (mut client, connection) = tokio_postgres::connect(POSTGRES_URL, postgres::NoTls)
         .await
         .unwrap();
 
@@ -113,7 +113,9 @@ async fn run_on_pg(case: TestCase) -> Result<(), libtest_mimic::Failed> {
         }
     });
 
-    let runner = lutra_runner_postgres::RunnerAsync::new(client);
+    let tran = client.transaction().await.unwrap();
+
+    let runner = lutra_runner_postgres::RunnerAsync::new(tran);
     run_program("pg", ProgramFormat::SqlPg, runner, case).await
 }
 

@@ -15,7 +15,10 @@ mod lutra {
 }
 
 #[cfg(feature = "tokio-postgres")]
-pub async fn pull_interface(runner: &RunnerAsync) -> Result<String, tokio_postgres::Error> {
+pub async fn pull_interface<C>(runner: &RunnerAsync<C>) -> Result<String, tokio_postgres::Error>
+where
+    C: tokio_postgres::GenericClient,
+{
     use lutra_runner::Run;
 
     let program = lutra::pull_interface();

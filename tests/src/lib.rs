@@ -4,7 +4,8 @@ mod lutra {
     include!(concat!(env!("OUT_DIR"), "/lutra.rs"));
 }
 
-const POSTGRES_URL: &str = "postgresql://postgres:pass@localhost:5416";
+/// URL of a PostgreSQL database with permissions to create new databases.
+const POSTGRES_URL_SHARED: &str = "postgresql://postgres:pass@localhost:5416";
 
 mod fuzz;
 mod inliner;

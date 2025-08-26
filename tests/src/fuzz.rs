@@ -1,6 +1,6 @@
 use rand::{Rng, SeedableRng};
 
-use crate::POSTGRES_URL;
+use crate::POSTGRES_URL_SHARED;
 
 #[allow(dead_code)]
 struct Construct {
@@ -115,7 +115,7 @@ fn fuzz() {
     );
     let project = lutra_compiler::check(source, Default::default()).unwrap();
 
-    let mut client = postgres::Client::connect(POSTGRES_URL, postgres::NoTls).unwrap();
+    let mut client = postgres::Client::connect(POSTGRES_URL_SHARED, postgres::NoTls).unwrap();
 
     for i in tqdm::tqdm(0..10000) {
         generate_and_test(&constructs, i, &project, &mut client);

@@ -141,7 +141,7 @@ fn range() {
 
     assert_debug_snapshot!(lex(lexer(), "in ..5").unwrap(), @r#"
     [
-        0..2: Ident("in"),
+        0..2: Keyword("in"),
         3..5: Range,
         5..6: Literal(Integer(5)),
     ]
