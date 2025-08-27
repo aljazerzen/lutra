@@ -279,10 +279,10 @@ impl<'a> Context<'a> {
                     // tag
                     cols.next().unwrap();
                     row.push(cr::Expr {
-                        kind: cr::ExprKind::From(cr::From::Literal(ir::Literal::int8(
-                            variant.tag as i8,
+                        kind: cr::ExprKind::From(cr::From::Literal(ir::Literal::uint16(
+                            variant.tag as u16,
                         ))),
-                        ty: ir::Ty::new(ir::TyPrimitive::int8),
+                        ty: ir::Ty::new(ir::TyPrimitive::uint16),
                     });
 
                     let inner_name = format!("_{}", variant.tag);
@@ -341,10 +341,10 @@ impl<'a> Context<'a> {
 
                     let tag = cr::Expr {
                         kind: cr::ExprKind::Transform(base, cr::Transform::ProjectRetain(vec![0])),
-                        ty: ir::Ty::new(ir::TyPrimitive::int8),
+                        ty: ir::Ty::new(ir::TyPrimitive::uint16),
                     };
 
-                    let args = vec![tag, new_int8(enum_eq.tag as i8)];
+                    let args = vec![tag, new_uint16(enum_eq.tag as u16)];
                     cr::ExprKind::From(cr::From::FuncCall("std::eq".to_string(), args))
                 }
             }
@@ -1130,11 +1130,11 @@ fn new_int(int: i64) -> cr::Expr {
     }
 }
 
-fn new_int8(int: i8) -> cr::Expr {
-    let kind = cr::ExprKind::From(cr::From::Literal(ir::Literal::int8(int)));
+fn new_uint16(int: u16) -> cr::Expr {
+    let kind = cr::ExprKind::From(cr::From::Literal(ir::Literal::uint16(int)));
     cr::Expr {
         kind,
-        ty: ir::Ty::new(ir::TyPrimitive::int8),
+        ty: ir::Ty::new(ir::TyPrimitive::uint16),
     }
 }
 

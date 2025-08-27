@@ -31,14 +31,8 @@ impl<'a> queries::Context<'a> {
     fn serialize_json_nested(&self, input_rel: &str, input_cols: &[String], ty: &ir::Ty) -> String {
         let ty_mat = self.get_ty_mat(ty);
         match &ty_mat.kind {
-            ir::TyKind::Primitive(prim) => {
-                let r = format!("{input_rel}.{}", input_cols[0]);
-                match *prim {
-                    ir::TyPrimitive::int8 => {
-                        format!("ASCII({r})")
-                    }
-                    _ => r,
-                }
+            ir::TyKind::Primitive(_) => {
+                format!("{input_rel}.{}", input_cols[0])
                 // if strict { format!("to_json({r})") } else { r }
             }
             ir::TyKind::Tuple(fields) => {
@@ -83,7 +77,7 @@ impl<'a> queries::Context<'a> {
                     cases += ")";
                 }
 
-                format!("CASE ASCII({input_rel}.{tag}){cases} END")
+                format!("CASE {input_rel}.{tag} {cases} END")
             }
             ir::TyKind::Function(_) | ir::TyKind::Ident(_) => unreachable!(),
         }
@@ -161,9 +155,6 @@ impl<'a> queries::Context<'a> {
             ir::TyKind::Primitive(prim) => {
                 let r = match prim {
                     ir::TyPrimitive::text => format!("jsonb_build_array({json_ref}) ->> 0"),
-                    ir::TyPrimitive::int8 => {
-                        format!("{json_ref}::int::\"char\"")
-                    }
                     _ => format!("{json_ref}::text::{}", self.compile_ty_name(ty)),
                 };
                 vec![r]
@@ -188,7 +179,7 @@ impl<'a> queries::Context<'a> {
                 let mut r = Vec::new();
 
                 r.push(format!(
-                    "(SELECT jsonb_object_keys({json_ref}) LIMIT 1)::int::\"char\""
+                    "(SELECT jsonb_object_keys({json_ref}) LIMIT 1)::int::int2"
                 ));
 
                 for (tag, f) in variant.iter().enumerate() {

@@ -7,7 +7,7 @@ use tinyjson::JsonValue;
 
 use crate::Context;
 
-pub fn to_sql<'d>(program: &rr::SqlProgram, input: &'d [u8], ctx: &Context) -> Args<'d> {
+pub fn to_sql<'a>(program: &'a rr::SqlProgram, input: &'a [u8], ctx: &'a Context) -> Args<'a> {
     let mut args = Vec::new();
     ctx.encode_args(input, &program.input_ty, &mut args, program);
 
@@ -15,17 +15,19 @@ pub fn to_sql<'d>(program: &rr::SqlProgram, input: &'d [u8], ctx: &Context) -> A
 }
 
 impl<'a> Context<'a> {
-    fn encode_args<'d>(
+    fn encode_args(
         &'a self,
-        input: &'d [u8],
+        input: &'a [u8],
         ty: &'a ir::Ty,
-        args: &mut Vec<Arg<'d>>,
+        args: &mut Vec<Arg<'a>>,
         program: &rr::SqlProgram,
     ) {
-        match &self.get_ty_mat(ty).kind {
+        let ty_mat = self.get_ty_mat(ty);
+        match &ty_mat.kind {
             ir::TyKind::Primitive(_) => {
                 args.push(Arg {
                     data: Cow::Borrowed(input),
+                    ty: Cow::Borrowed(&ty_mat.kind),
                 });
             }
 
@@ -33,6 +35,7 @@ impl<'a> Context<'a> {
             ir::TyKind::Array(_) => {
                 args.push(Arg {
                     data: Cow::Owned(serialize_input_to_json(input, ty, program)),
+                    ty: Cow::Borrowed(&ty_mat.kind),
                 });
             }
 
@@ -49,7 +52,8 @@ impl<'a> Context<'a> {
                 let (tag, inner) =
                     lutra_bin::decode_enum_head(input, format.tag_bytes, format.has_ptr);
                 args.push(Arg {
-                    data: Cow::Owned(vec![tag as u8]),
+                    data: Cow::Owned((tag as u16).to_le_bytes().to_vec()),
+                    ty: Cow::Owned(ir::TyKind::Primitive(ir::TyPrimitive::int16)),
                 }); // tag
                 for (position, variant) in variants.iter().enumerate() {
                     if position == tag as usize {
@@ -65,11 +69,13 @@ impl<'a> Context<'a> {
         }
     }
 
-    fn push_nulls<'d>(&'a self, ty: &'a ir::Ty, args: &mut Vec<Arg<'d>>) {
-        match &self.get_ty_mat(ty).kind {
+    fn push_nulls(&'a self, ty: &'a ir::Ty, args: &mut Vec<Arg<'a>>) {
+        let ty_mat = self.get_ty_mat(ty);
+        match &ty_mat.kind {
             ir::TyKind::Primitive(_) | ir::TyKind::Array(_) => {
                 args.push(Arg {
                     data: Cow::Owned(vec![]),
+                    ty: Cow::Borrowed(&ty_mat.kind),
                 });
             }
 
@@ -81,6 +87,7 @@ impl<'a> Context<'a> {
             ir::TyKind::Enum(variants) => {
                 args.push(Arg {
                     data: Cow::Owned(vec![]),
+                    ty: Cow::Owned(ir::TyKind::Primitive(ir::TyPrimitive::int16)),
                 });
                 for variant in variants {
                     self.push_nulls(&variant.ty, args);
@@ -114,6 +121,7 @@ impl<'a> Args<'a> {
 #[derive(Debug)]
 struct Arg<'a> {
     data: Cow<'a, [u8]>,
+    ty: Cow<'a, ir::TyKind>,
 }
 
 impl<'a> pg_ty::ToSql for Arg<'a> {
@@ -129,24 +137,48 @@ impl<'a> pg_ty::ToSql for Arg<'a> {
             return Ok(pg_ty::IsNull::Yes);
         }
 
-        match ty.name() {
-            "bool" => out.put_slice(&self.data[0..1]),
-            "char" => out.extend(self.data[0..1].iter().rev()),
-            "int2" => out.extend(self.data[0..2].iter().rev()),
-            "int4" => out.extend(self.data[0..4].iter().rev()),
-            "int8" => out.extend(self.data[0..8].iter().rev()),
-            "float4" => out.put_slice(&self.data[0..4]),
-            "float8" => out.put_slice(&self.data[0..8]),
-            "text" => {
+        match self.ty.as_ref() {
+            ir::TyKind::Primitive(ir::TyPrimitive::bool) => out.put_slice(&self.data[0..1]),
+            ir::TyKind::Primitive(ir::TyPrimitive::int8)
+            | ir::TyKind::Primitive(ir::TyPrimitive::uint8) => out.put_slice(&self.data[0..1]),
+
+            ir::TyKind::Primitive(ir::TyPrimitive::int16)
+            | ir::TyKind::Primitive(ir::TyPrimitive::uint16) => {
+                out.extend(self.data[0..2].iter().rev())
+            }
+            ir::TyKind::Primitive(ir::TyPrimitive::int32)
+            | ir::TyKind::Primitive(ir::TyPrimitive::uint32) => {
+                out.extend(self.data[0..4].iter().rev())
+            }
+            ir::TyKind::Primitive(ir::TyPrimitive::int64)
+            | ir::TyKind::Primitive(ir::TyPrimitive::uint64) => {
+                out.extend(self.data[0..8].iter().rev())
+            }
+
+            ir::TyKind::Primitive(ir::TyPrimitive::float32) => out.put_slice(&self.data[0..4]),
+            ir::TyKind::Primitive(ir::TyPrimitive::float64) => out.put_slice(&self.data[0..8]),
+
+            ir::TyKind::Primitive(ir::TyPrimitive::text) => {
                 let (offset, len) = lutra_bin::ArrayReader::read_head(&self.data);
                 out.put_slice(&self.data[offset..(offset + len)])
             }
-            "json" => out.put_slice(&self.data),
-            "jsonb" => {
-                out.put_u8(1); // version 1
-                out.put_slice(&self.data)
+
+            ir::TyKind::Array(_) => {
+                // JSON serialization
+                match ty.name() {
+                    "json" => out.put_slice(&self.data),
+                    "jsonb" => {
+                        out.put_u8(1); // version 1
+                        out.put_slice(&self.data)
+                    }
+                    _ => panic!(),
+                }
             }
-            ty_name => todo!("unimplemented pg type mapping for {ty_name}"),
+
+            ir::TyKind::Tuple(_)
+            | ir::TyKind::Enum(_)
+            | ir::TyKind::Ident(_)
+            | ir::TyKind::Function(_) => unreachable!(),
         }
         Ok(pg_ty::IsNull::No)
     }

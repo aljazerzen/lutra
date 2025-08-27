@@ -300,7 +300,7 @@ fn array_enum() {
       (
         SELECT
           0::int8 AS index,
-          0::"char" AS _t,
+          0::int2 AS _t,
           NULL::text AS _1_0,
           NULL::text AS _1_1,
           NULL::text AS _2
@@ -308,7 +308,7 @@ fn array_enum() {
         ALL
         SELECT
           1::int8 AS index,
-          1::"char" AS _t,
+          1::int2 AS _t,
           'today' AS _1_0,
           'me' AS _1_1,
           NULL::text AS _2
@@ -316,7 +316,7 @@ fn array_enum() {
         ALL
         SELECT
           2::int8 AS index,
-          2::"char" AS _t,
+          2::int2 AS _t,
           NULL::text AS _1_0,
           NULL::text AS _1_1,
           'ok' AS _2
@@ -353,7 +353,7 @@ fn enum_array() {
           COALESCE(
             jsonb_agg(
               CASE
-                ASCII(r6._t)
+                r6._t
                 WHEN 0 THEN json_build_object('0', jsonb_build_array())
                 WHEN 1 THEN json_build_object('1', r6._1)
                 WHEN 2 THEN json_build_object('2', r6._2)
@@ -367,14 +367,14 @@ fn enum_array() {
           (
             SELECT
               0::int8 AS index,
-              0::"char" AS _t,
+              0::int2 AS _t,
               NULL::jsonb AS _1,
               NULL::text AS _2
             UNION
             ALL
             SELECT
               1::int8 AS index,
-              1::"char" AS _t,
+              1::int2 AS _t,
               (
                 SELECT
                   COALESCE(
@@ -402,7 +402,7 @@ fn enum_array() {
             ALL
             SELECT
               2::int8 AS index,
-              2::"char" AS _t,
+              2::int2 AS _t,
               NULL::jsonb AS _1,
               'ok' AS _2
           ) AS r6
@@ -534,7 +534,7 @@ fn tuple_array_enum() {
           COALESCE(
             jsonb_agg(
               CASE
-                ASCII(r3._t)
+                r3._t
                 WHEN 0 THEN json_build_object('0', jsonb_build_array())
                 WHEN 1 THEN json_build_object('1', jsonb_build_array(r3._1_0, r3._1_1))
                 WHEN 2 THEN json_build_object('2', r3._2)
@@ -548,7 +548,7 @@ fn tuple_array_enum() {
           (
             SELECT
               0::int8 AS index,
-              0::"char" AS _t,
+              0::int2 AS _t,
               NULL::text AS _1_0,
               NULL::text AS _1_1,
               NULL::text AS _2
@@ -556,7 +556,7 @@ fn tuple_array_enum() {
             ALL
             SELECT
               1::int8 AS index,
-              1::"char" AS _t,
+              1::int2 AS _t,
               'today' AS _1_0,
               'me' AS _1_1,
               NULL::text AS _2
@@ -564,7 +564,7 @@ fn tuple_array_enum() {
             ALL
             SELECT
               2::int8 AS index,
-              2::"char" AS _t,
+              2::int2 AS _t,
               NULL::text AS _1_0,
               NULL::text AS _1_1,
               'ok' AS _2
@@ -1118,7 +1118,7 @@ fn param_07() {
     )), @r#"
     SELECT
       'hello' AS _0,
-      $1::"char" AS _1_t,
+      $1::int2 AS _1_t,
       $2::text AS _1_1_0,
       $3::text AS _1_1_1,
       $4::text AS _1_2
@@ -1455,7 +1455,7 @@ fn json_pack_10() {
         SELECT
           COALESCE(
             jsonb_agg(
-              ASCII(r2.value)
+              r2.value
               ORDER BY
                 r2.index
             ),
@@ -1465,12 +1465,12 @@ fn json_pack_10() {
           (
             SELECT
               0::int8 AS index,
-              1::"char" AS value
+              1::int2 AS value
             UNION
             ALL
             SELECT
               1::int8 AS index,
-              2::"char" AS value
+              2::int2 AS value
           ) AS r2
       ) AS _1
     ---
@@ -1597,10 +1597,10 @@ fn match_04() {
           (
             SELECT
               CASE
-                WHEN (r5._t = 0::"char") THEN ('Hello ' || r5._0)
+                WHEN (r5._t = 0::int2) THEN ('Hello ' || r5._0)
                 WHEN (
-                  (r5._t = 1::"char")
-                  AND (r5._1_t = 1::"char")
+                  (r5._t = 1::int2)
+                  AND (r5._1_t = 1::int2)
                 ) THEN 'Who''s a good boy?'
                 ELSE ('Come here ' || r5._1_0)
               END AS value
@@ -1617,25 +1617,25 @@ fn match_04() {
           (
             SELECT
               0::int8 AS index,
-              0::"char" AS _t,
+              0::int2 AS _t,
               'Whiskers' AS _0,
-              NULL::"char" AS _1_t,
+              NULL::int2 AS _1_t,
               NULL::text AS _1_0
             UNION
             ALL
             SELECT
               1::int8 AS index,
-              1::"char" AS _t,
+              1::int2 AS _t,
               NULL::text AS _0,
-              0::"char" AS _1_t,
+              0::int2 AS _1_t,
               'Belie' AS _1_0
             UNION
             ALL
             SELECT
               2::int8 AS index,
-              1::"char" AS _t,
+              1::int2 AS _t,
               NULL::text AS _0,
-              1::"char" AS _1_t,
+              1::int2 AS _1_t,
               NULL::text AS _1_0
           ) AS r3
       ) AS r12

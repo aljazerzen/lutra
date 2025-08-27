@@ -202,10 +202,12 @@ fn literal() -> impl Parser<char, Literal, Error = LError> {
             filter(|c: &char| *c == '0' || *c == '1')
                 .repeated()
                 .at_least(1)
-                .at_most(32)
+                .at_most(64)
                 .collect::<String>()
                 .try_map(|digits, _| {
-                    Ok(Literal::Integer(i64::from_str_radix(&digits, 2).unwrap()))
+                    Ok(Literal::Integer(
+                        u64::from_str_radix(&digits, 2).unwrap() as i64
+                    ))
                 }),
         )
         .labelled("number");
@@ -216,10 +218,12 @@ fn literal() -> impl Parser<char, Literal, Error = LError> {
             filter(|c: &char| c.is_ascii_hexdigit())
                 .repeated()
                 .at_least(1)
-                .at_most(12)
+                .at_most(16)
                 .collect::<String>()
                 .try_map(|digits, _| {
-                    Ok(Literal::Integer(i64::from_str_radix(&digits, 16).unwrap()))
+                    Ok(Literal::Integer(
+                        u64::from_str_radix(&digits, 16).unwrap() as i64
+                    ))
                 }),
         )
         .labelled("number");
@@ -230,10 +234,12 @@ fn literal() -> impl Parser<char, Literal, Error = LError> {
             filter(|&c| ('0'..='7').contains(&c))
                 .repeated()
                 .at_least(1)
-                .at_most(12)
+                .at_most(16)
                 .collect::<String>()
                 .try_map(|digits, _| {
-                    Ok(Literal::Integer(i64::from_str_radix(&digits, 8).unwrap()))
+                    Ok(Literal::Integer(
+                        u64::from_str_radix(&digits, 8).unwrap() as i64
+                    ))
                 }),
         )
         .labelled("number");
@@ -258,6 +264,8 @@ fn literal() -> impl Parser<char, Literal, Error = LError> {
 
             if let Ok(i) = str.parse::<i64>() {
                 Ok(Literal::Integer(i))
+            } else if let Ok(i) = str.parse::<u64>() {
+                Ok(Literal::Integer(i as i64))
             } else if let Ok(f) = str.parse::<f64>() {
                 Ok(Literal::Float(f))
             } else {

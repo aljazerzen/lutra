@@ -630,7 +630,7 @@ impl<'a> Context<'a> {
 
             "std::text_ops::length" => {
                 let [text] = unpack_args(args);
-                ExprOrSource::Source(format!("LENGTH({text})::int8"))
+                ExprOrSource::Source(format!("LENGTH({text})::int4"))
             }
 
             "std::min" => utils::new_func_call("MIN", args),
@@ -768,14 +768,18 @@ impl<'a> Context<'a> {
         let type_name = match &self.get_ty_mat(ty).kind {
             ir::TyKind::Primitive(prim) => match prim {
                 ir::TyPrimitive::bool => "bool",
-                ir::TyPrimitive::int8 => "\"char\"",
+
+                ir::TyPrimitive::int8 => "int2",
+                ir::TyPrimitive::uint8 => "int2",
                 ir::TyPrimitive::int16 => "int2",
+                ir::TyPrimitive::uint16 => "int2",
+
                 ir::TyPrimitive::int32 => "int4",
+                ir::TyPrimitive::uint32 => "int4",
+
                 ir::TyPrimitive::int64 => "int8",
-                ir::TyPrimitive::uint8 => todo!(),
-                ir::TyPrimitive::uint16 => todo!(),
-                ir::TyPrimitive::uint32 => todo!(),
-                ir::TyPrimitive::uint64 => todo!(),
+                ir::TyPrimitive::uint64 => "int8",
+
                 ir::TyPrimitive::float32 => "float4",
                 ir::TyPrimitive::float64 => "float8",
                 ir::TyPrimitive::text => "text",
@@ -805,14 +809,62 @@ impl<'a> Context<'a> {
         ExprOrSource::Source(match lit {
             ir::Literal::bool(true) => "TRUE".to_string(),
             ir::Literal::bool(false) => "FALSE".to_string(),
-            ir::Literal::int8(v) => format!("{v}::{}", self.compile_ty_name(ty)),
-            ir::Literal::int16(v) => format!("{v}::{}", self.compile_ty_name(ty)),
-            ir::Literal::int32(v) => format!("{v}::{}", self.compile_ty_name(ty)),
-            ir::Literal::int64(v) => format!("{v}::{}", self.compile_ty_name(ty)),
-            ir::Literal::uint8(v) => format!("{v}::{}", self.compile_ty_name(ty)),
-            ir::Literal::uint16(v) => format!("{v}::{}", self.compile_ty_name(ty)),
-            ir::Literal::uint32(v) => format!("{v}::{}", self.compile_ty_name(ty)),
-            ir::Literal::uint64(v) => format!("{v}::{}", self.compile_ty_name(ty)),
+            ir::Literal::int8(v) => {
+                if *v >= 0 {
+                    format!("{v}::{}", self.compile_ty_name(ty))
+                } else {
+                    format!("({v})::{}", self.compile_ty_name(ty))
+                }
+            }
+            ir::Literal::int16(v) => {
+                if *v >= 0 {
+                    format!("{v}::{}", self.compile_ty_name(ty))
+                } else {
+                    format!("({v})::{}", self.compile_ty_name(ty))
+                }
+            }
+            ir::Literal::int32(v) => {
+                if *v >= 0 {
+                    format!("{v}::{}", self.compile_ty_name(ty))
+                } else {
+                    format!("({v})::{}", self.compile_ty_name(ty))
+                }
+            }
+            ir::Literal::int64(v) => {
+                if *v >= 0 {
+                    format!("{v}::{}", self.compile_ty_name(ty))
+                } else {
+                    format!("({v})::{}", self.compile_ty_name(ty))
+                }
+            }
+            ir::Literal::uint8(v) => {
+                if *v < 0x80 {
+                    format!("{v}::{}", self.compile_ty_name(ty))
+                } else {
+                    format!("{}::{}", *v as i8, self.compile_ty_name(ty))
+                }
+            }
+            ir::Literal::uint16(v) => {
+                if *v < 0x8000 {
+                    format!("{v}::{}", self.compile_ty_name(ty))
+                } else {
+                    format!("{}::{}", *v as i16, self.compile_ty_name(ty))
+                }
+            }
+            ir::Literal::uint32(v) => {
+                if *v < 0x80000000 {
+                    format!("{v}::{}", self.compile_ty_name(ty))
+                } else {
+                    format!("{}::{}", *v as i32, self.compile_ty_name(ty))
+                }
+            }
+            ir::Literal::uint64(v) => {
+                if *v < 0x8000000000000000 {
+                    format!("{v}::{}", self.compile_ty_name(ty))
+                } else {
+                    format!("{}::{}", *v as i64, self.compile_ty_name(ty))
+                }
+            }
             ir::Literal::float32(v) => format!("{v}::{}", self.compile_ty_name(ty)),
             ir::Literal::float64(v) => format!("{v}::{}", self.compile_ty_name(ty)),
             ir::Literal::text(s) => {
@@ -857,7 +909,7 @@ impl<'a> Context<'a> {
 fn get_default_value_for_ty(ty: &ir::Ty) -> &str {
     let item_ty = ty.kind.as_array().unwrap();
     match &item_ty.kind {
-        ir::TyKind::Primitive(ir::TyPrimitive::int8) => "0::\"char\"",
+        ir::TyKind::Primitive(ir::TyPrimitive::int8) => "0::int2",
         ir::TyKind::Primitive(ir::TyPrimitive::int16) => "0::int2",
         ir::TyKind::Primitive(ir::TyPrimitive::int32) => "0::int4",
         ir::TyKind::Primitive(ir::TyPrimitive::int64) => "0::int8",

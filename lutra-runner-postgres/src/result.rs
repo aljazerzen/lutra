@@ -298,14 +298,14 @@ impl EncodeCell for PrimEncoder {
     fn encode_head(&self, buf: &mut BytesMut, cell: &RowIter) -> HeadResidual {
         match self.prim {
             ir::TyPrimitive::bool => cell.get::<bool>().encode_head(buf),
-            ir::TyPrimitive::int8 => cell.get::<i8>().encode_head(buf),
+            ir::TyPrimitive::int8 => (cell.get::<i16>() as i8).encode_head(buf),
             ir::TyPrimitive::int16 => cell.get::<i16>().encode_head(buf),
             ir::TyPrimitive::int32 => cell.get::<i32>().encode_head(buf),
             ir::TyPrimitive::int64 => cell.get::<i64>().encode_head(buf),
             ir::TyPrimitive::uint8 => (cell.get::<i16>() as u8).encode_head(buf),
-            ir::TyPrimitive::uint16 => (cell.get::<i32>() as u16).encode_head(buf),
-            ir::TyPrimitive::uint32 => (cell.get::<i64>() as u32).encode_head(buf),
-            ir::TyPrimitive::uint64 => todo!(),
+            ir::TyPrimitive::uint16 => (cell.get::<i16>() as u16).encode_head(buf),
+            ir::TyPrimitive::uint32 => (cell.get::<i32>() as u32).encode_head(buf),
+            ir::TyPrimitive::uint64 => (cell.get::<i64>() as u64).encode_head(buf),
             ir::TyPrimitive::float32 => cell.get::<f32>().encode_head(buf),
             ir::TyPrimitive::float64 => cell.get::<f64>().encode_head(buf),
             ir::TyPrimitive::text => unreachable!(),
@@ -373,7 +373,7 @@ impl EnumEncoder {
 
 impl EncodeRow for EnumEncoder {
     fn encode_head(&self, buf: &mut BytesMut, row: &mut RowIter) -> HeadResidual {
-        let tag = row.get::<i8>() as usize;
+        let tag = row.get::<i16>() as usize;
         row.advance();
         for i in &self.inner[0..tag] {
             i.skip(row)
@@ -410,7 +410,7 @@ impl EncodeRow for EnumEncoder {
     }
 
     fn encode_body(&self, buf: &mut BytesMut, row: &mut RowIter, r: HeadResidual) {
-        let tag = row.get::<i8>() as usize;
+        let tag = row.get::<i16>() as usize;
         row.advance();
         for i in &self.inner[0..tag] {
             i.skip(row)

@@ -612,6 +612,16 @@ func main() -> (1.4 + 0.2): float64
 # >
 1.5999999999999999
 
+# === std_add_int8_00
+func main() -> (30 + 2): int8
+# >
+32
+
+# === std_add_int8_01
+func main() -> (-2 + 30): int8
+# >
+28
+
 # === std_add_int16_00
 func main() -> (30 + 2): int16
 # >
@@ -642,39 +652,29 @@ func main() -> (-2 + 30): int64
 # >
 28
 
-# === std_add_int8_00
-# skip: postgres
-func main() -> (30 + 2): int8
+# === std_add_uint8_00
+func main() -> (30 + 2): uint8
 # >
 32
 
-# === std_add_int8_01
-# skip: postgres
-func main() -> (-2 + 30): int8
-# >
-28
-
 # === std_add_uint16_00
-# skip: postgres
 func main() -> (30 + 2): uint16
 # >
 32
 
-# === std_add_uint32_00
+# === std_add_uint16_01
 # skip: postgres
+func main() -> (16384 + 16384): uint16
+# >
+32768
+
+# === std_add_uint32_00
 func main() -> (30 + 2): uint32
 # >
 32
 
 # === std_add_uint64_00
-# skip: postgres
 func main() -> (30 + 2): uint64
-# >
-32
-
-# === std_add_uint8_00
-# skip: postgres
-func main() -> (30 + 2): uint8
 # >
 32
 

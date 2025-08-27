@@ -21,7 +21,7 @@ fn main() {
 
     const TEST_FILES: &[&str] = &[
         "tests/corpus/language.lt",
-        "tests/corpus/casts.lt",
+        "tests/corpus/numbers.lt",
         "tests/corpus/complex.lt",
     ];
 
