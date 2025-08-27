@@ -103,14 +103,15 @@ impl<'a> Lowerer<'a> {
 
     #[tracing::instrument(name = "leed", skip_all)]
     fn lower_external_expr_def(&mut self, path: &pr::Path) -> Result<Option<ir::ExprKind>> {
-        if path.as_slice() == [NS_STD, "default"] {
+        if path.as_steps() == [NS_STD, "default"] {
             // special case: evaluate std::default in lowerer
             return Ok(None);
         }
 
         let def = self.root_module.get(path);
         let def = def.unwrap_or_else(|| panic!("{path} does not exist"));
-        let expr = def.into_expr().unwrap();
+        let expr = def.kind.as_expr().unwrap();
+        let expr = expr.value.as_ref().unwrap();
 
         if !matches!(expr.kind, pr::ExprKind::Internal) {
             return Ok(None);
@@ -128,9 +129,10 @@ impl<'a> Lowerer<'a> {
     fn lower_expr_def(&mut self, path: &pr::Path, ty_args: Vec<pr::Ty>) -> Result<ir::Expr> {
         let def = self.root_module.get(path);
         let def = def.unwrap_or_else(|| panic!("{path} does not exist"));
-        let expr = def.into_expr().unwrap().clone();
+        let expr = def.kind.as_expr().unwrap();
+        let expr = *expr.value.as_ref().unwrap().clone();
 
-        if path.as_slice() == [NS_STD, "default"] {
+        if path.as_steps() == [NS_STD, "default"] {
             return Ok(self.impl_std_default(ty_args.into_iter().next().unwrap()));
         }
 
@@ -742,10 +744,10 @@ impl<'a> Lowerer<'a> {
                 panic!();
             };
             assert!(within.is_empty());
-            let expr_or_ty = self.root_module.get(to_def).unwrap();
-            let ty = expr_or_ty.as_ty().unwrap();
+            let def = self.root_module.get(to_def).unwrap();
+            let def = def.kind.as_ty().unwrap();
 
-            self.get_ty_mat_pr(ty)
+            self.get_ty_mat_pr(&def.ty)
         } else {
             ty
         }
@@ -800,9 +802,9 @@ impl<'a> Lowerer<'a> {
         }
 
         let def = self.root_module.get(&path).unwrap();
-        let ty = def.into_ty().unwrap().clone();
+        let def = def.kind.as_ty().unwrap().clone();
 
-        let ty = self.lower_ty(ty);
+        let ty = self.lower_ty(def.ty);
 
         self.type_defs.insert(path, ty);
     }
@@ -981,7 +983,7 @@ pub fn lower_type_defs(project: &Project) -> ir::Module {
                 let expr = expr.value.as_ref().unwrap();
                 let ty = lowerer.lower_ty(expr.ty.clone().unwrap());
 
-                module.insert(name.full_path(), ir::Decl::Var(ty));
+                module.insert(name.as_steps(), ir::Decl::Var(ty));
             }
 
             pr::DefKind::Ty(_) => {

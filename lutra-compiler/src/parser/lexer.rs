@@ -116,22 +116,23 @@ fn lexer() -> impl Parser<char, Vec<Token>, Error = LError> {
     let literal = literal().map(TokenKind::Literal);
 
     let keyword = choice((
+        just("as"),
         just("const"),
+        just("do"),
+        just("else"),
         just("enum"),
+        just("for"),
         just("func"),
+        just("if"),
         just("import"),
+        just("in"),
         just("internal"),
         just("let"),
         just("match"),
         just("module"),
+        just("then"),
         just("type"),
         just("where"),
-        just("if"),
-        just("then"),
-        just("else"),
-        just("for"),
-        just("in"),
-        just("do"),
     ))
     .then_ignore(non_ident())
     .map(TokenKind::Keyword);

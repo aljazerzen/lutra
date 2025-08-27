@@ -3,9 +3,8 @@ use std::collections::HashMap;
 
 use itertools::Itertools;
 
-use crate::diagnostic::{Diagnostic, WithErrorInfo};
+use crate::diagnostic::{Diagnostic, DiagnosticCode, WithErrorInfo};
 use crate::pr;
-use crate::resolver::module::ExprOrTy;
 use crate::{Result, Span};
 use crate::{printer, utils};
 
@@ -88,6 +87,7 @@ pub enum TyVarConstraint {
 pub enum Named<'a> {
     Expr(&'a pr::Expr),
     Ty(&'a pr::Ty, bool),
+    Module,
     Scoped(&'a ScopedKind),
     EnumVariant(&'a pr::Ty, Option<pr::Path>, usize),
 }
@@ -235,17 +235,20 @@ impl<'a> TypeResolver<'a> {
         match target {
             pr::Ref::FullyQualified { to_def, within } => {
                 let def = self.root_mod.get(to_def);
-                match def.unwrap_or_else(|| panic!("cannot find {to_def}")) {
-                    ExprOrTy::Expr(expr) => {
+                match &def.unwrap_or_else(|| panic!("cannot find {to_def}")).kind {
+                    pr::DefKind::Expr(expr) => {
                         if !within.is_empty() {
                             unreachable!()
                         }
-                        Ok(Named::Expr(expr))
+                        Ok(Named::Expr(expr.value.as_ref().unwrap()))
                     }
-
-                    ExprOrTy::Ty(ty) => self
-                        .lookup_into_ty(ty, Some(to_def), within.full_path(), true)
+                    pr::DefKind::Ty(def) => self
+                        .lookup_into_ty(&def.ty, Some(to_def), within.as_steps(), true)
                         .ok_or_else(|| Diagnostic::new_custom("unknown name")),
+
+                    pr::DefKind::Module(_) => Ok(Named::Module),
+
+                    pr::DefKind::Unresolved(_) | pr::DefKind::Import(_) => unreachable!(),
                 }
             }
 
@@ -280,10 +283,6 @@ impl<'a> TypeResolver<'a> {
 
         let target = ty.target.as_ref().unwrap();
         let named = self.get_ident(target).with_span(ty.span)?;
-        // Diagnostic::new_assert("cannot find type ident")
-        //     .push_hint(format!("ident={ident}"))
-        //     .push_hint(format!("target={target:?}"))
-        //     .with_span(ty.span)
 
         match named {
             Named::Ty(ty, _is_top_level) => {
@@ -292,31 +291,32 @@ impl<'a> TypeResolver<'a> {
                 // but refed ty might be an ident too: recurse!
                 self.get_ty_mat(ty)
             }
-            Named::Expr(_) => Err(Diagnostic::new_assert("expected a type").with_span(ty.span)),
             Named::Scoped(scoped) => {
                 let pr::Ref::Local { scope, offset } = target else {
                     panic!()
                 };
                 match scoped {
-                    ScopedKind::Param { ty, .. } => {
-                        Err(Diagnostic::new_assert("expected a type, found a value")
-                            .push_hint(format!("got param of type `{}`", printer::print_ty(ty)))
-                            .with_span(ty.span))
-                    }
-                    ScopedKind::Local { ty, .. } => {
-                        Err(Diagnostic::new_assert("expected a type, found a value")
-                            .push_hint(format!("got local var of type `{}`", printer::print_ty(ty)))
-                            .with_span(ty.span))
-                    }
                     ScopedKind::LocalTy { ty } => self.get_ty_mat(ty),
                     ScopedKind::TyParam { .. } => Ok(TyRef::Param(*offset)),
                     ScopedKind::TyVar(_) => {
                         // return type var
                         Ok(TyRef::Var(*scope, *offset))
                     }
+
+                    ScopedKind::Param { ty, .. } => Err(err_name_kind("a type", "a value")
+                        .with_span(ty.span)
+                        .push_hint(format!("got param of type `{}`", printer::print_ty(ty)))
+                        .with_span(ty.span)),
+                    ScopedKind::Local { ty, .. } => Err(err_name_kind("a type", "a value")
+                        .with_span(ty.span)
+                        .push_hint(format!("got local var of type `{}`", printer::print_ty(ty)))
+                        .with_span(ty.span)),
                 }
             }
-            Named::EnumVariant(..) => Err(Diagnostic::new_assert("expected a type, found a value")
+            Named::Expr(_) => Err(err_name_kind("a type", "a value").with_span(ty.span)),
+            Named::Module => Err(err_name_kind("a type", "a module").with_span(ty.span)),
+            Named::EnumVariant(..) => Err(err_name_kind("a type", "a value")
+                .with_span(ty.span)
                 .push_hint(format!("{ident} is an enum variant"))
                 .with_span(ty.span)),
         }
@@ -437,4 +437,11 @@ impl<'a> TypeResolver<'a> {
             _ => None,
         }
     }
+}
+
+pub(super) fn err_name_kind(expected: &str, found: &str) -> Diagnostic {
+    Diagnostic::new(
+        format!("expected {expected}, found {found}"),
+        DiagnosticCode::NAME_KIND,
+    )
 }

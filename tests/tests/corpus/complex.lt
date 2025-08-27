@@ -1,0 +1,184 @@
+# --- [ Complex tests ] ---
+#
+# This file contains tests for the language itself.
+# It is read by the main.rs and exposed as a series of cargo-compatible tests.
+# A test consists of:
+#
+#    #  === <test name>       (test name)
+#    # skip: interpreter       (optional)
+#    # skip: postgres          (optional)
+#    <lutra project code>
+#    # <                   (input marker)
+#    <input>                   (optional)
+#    # >                  (output marker)
+#    <output>
+
+# === chinook_00
+
+module chinook {
+  import std::filter
+  import std::index
+
+  type Album: {id: int64, title: text}
+
+  func get_albums(): [Album] -> [
+    {id = 3, title = "Hello world!"},
+    {id = 5, title = "Foo"},
+  ]
+
+  func get_album_by_id(album_id: int64): Album -> (
+      get_albums()
+      | filter(func (this: Album) -> this.id == album_id)
+      | index(0)
+    )
+  }
+
+module box_office {
+  import std::filter
+  import std::index
+
+  type Invoice: {id: int64, total: float64}
+
+  func get_album_sales(): [Invoice] -> [
+    {id = 3, total = 3.6},
+    {id = 3, total = 3.1},
+    {id = 5, total = 5.2},
+  ]
+
+  func get_album_sales_by_id(album_id: int64): Invoice -> (
+    get_album_sales()
+    | filter(func (this: Invoice) -> this.id == album_id)
+    | index(0)
+  )
+}
+
+func main() -> {
+  chinook::get_albums(),
+  chinook::get_album_by_id(3),
+  box_office::get_album_sales_by_id(3),
+}
+
+# >
+{
+  [
+    {
+      id = 3,
+      title = "Hello world!",
+    },
+    {
+      id = 5,
+      title = "Foo",
+    },
+  ],
+  {
+    id = 3,
+    title = "Hello world!",
+  },
+  {
+    id = 3,
+    total = 3.6,
+  },
+}
+
+
+# === chinook_01
+module chinook {
+  type Album: {id: int64, title: text}
+
+  func get_album(): Album -> (
+    {id = 3, title = "Hello world!"}
+  )
+}
+
+func main() -> {
+  5: int16,
+  chinook::get_album()
+}
+
+# >
+{
+  5,
+  {
+    id = 3,
+    title = "Hello world!",
+  },
+}
+
+
+# === chinook_02
+module chinook {
+  type Album: {id: int64, title: text}
+
+  func get_albums(): [Album] -> [
+    {id = 3, title = "Hello world!"},
+    {id = 5, title = "Foo"},
+  ]
+
+  func get_album_by_id(album_id: int64): Album -> (
+    get_albums()
+    | std::filter(func (this: Album) -> this.id == album_id)
+    | std::index(0)
+  )
+}
+
+func main() -> {chinook::get_album_by_id(3)}
+
+# >
+{
+  {
+    id = 3,
+    title = "Hello world!",
+  },
+}
+
+
+# === chinook_03
+module chinook {
+  type Album: {title: text, genre_id: int64}
+  type Genre: {id: int64, name: text}
+
+  func get_genres(): [Genre] -> [
+    {id = 1, name = "Rock"},
+    {id = 2, name = "EDM"},
+  ]
+
+  func get_albums(): [Album] -> [
+    {title = "Suck It and See", genre_id = 1},
+    {title = "Random Access Memories", genre_id = 2},
+    {title = "AM", genre_id = 1},
+  ]
+
+  func get_albums_by_genre(genre_id: int64): [Album] -> (
+    get_albums()
+    | std::filter(func (this: Album) -> this.genre_id == genre_id)
+  )
+}
+
+import chinook as c
+
+func main() -> (
+  c::get_genres()
+  | std::map(func (this: c::Genre) -> {
+    name = this.name,
+    albums = (
+      c::get_albums_by_genre(this.id)
+      | std::map(func (this: c::Album) -> this.title)
+    ),
+  })
+)
+# >
+[
+  {
+    name = "Rock",
+    albums = [
+      "Suck It and See",
+      "AM",
+    ],
+  },
+  {
+    name = "EDM",
+    albums = [
+      "Random Access Memories",
+    ],
+  },
+]

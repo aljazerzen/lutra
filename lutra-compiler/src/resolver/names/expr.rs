@@ -9,11 +9,12 @@ use super::Scope;
 
 /// Traverses AST and resolves identifiers.
 pub struct NameResolver<'a> {
-    pub root: &'a mut pr::ModuleDef,
+    pub root: &'a pr::ModuleDef,
     pub def_module_path: &'a [String],
     pub scopes: Vec<Scope>,
     pub refs: Vec<pr::Path>,
     pub scope_id_gen: &'a mut IdGenerator<usize>,
+    pub allow_recursive: bool,
 }
 
 impl NameResolver<'_> {
@@ -21,11 +22,10 @@ impl NameResolver<'_> {
         Ok(match def {
             pr::DefKind::Expr(var_def) => pr::DefKind::Expr(self.fold_expr_def(var_def)?),
             pr::DefKind::Ty(ty_def) => pr::DefKind::Ty(self.fold_type_def(ty_def)?),
-            pr::DefKind::Import(import_def) => {
-                pr::DefKind::Import(self.fold_import_def(import_def)?)
+
+            pr::DefKind::Module(_) | pr::DefKind::Import(_) | pr::DefKind::Unresolved(_) => {
+                unreachable!()
             }
-            pr::DefKind::Module(_) => unreachable!(),
-            pr::DefKind::Unresolved(_) => unreachable!(),
         })
     }
 
@@ -33,14 +33,11 @@ impl NameResolver<'_> {
         &mut self,
         import_def: pr::ImportDef,
     ) -> Result<pr::ImportDef, Diagnostic> {
-        let target = self.resolve_ident(&import_def.target)?;
-        let pr::Ref::FullyQualified { to_def, within } = target else {
-            panic!()
-        };
-        if !within.is_empty() {
-            panic!();
+        let fq = self.lookup_in_root(self.def_module_path, &import_def.target)?;
+        if !fq.within.is_empty() {
+            todo!();
         }
-        Ok(pr::ImportDef { target: to_def })
+        Ok(pr::ImportDef { target: fq.to_def })
     }
 }
 
@@ -52,7 +49,7 @@ impl fold::PrFold for NameResolver<'_> {
     fn fold_expr(&mut self, expr: pr::Expr) -> Result<pr::Expr> {
         Ok(match expr.kind {
             pr::ExprKind::Ident(ident) => {
-                let target = Some(self.resolve_ident(&ident).with_span(expr.span)?);
+                let target = Some(self.lookup_ident(&ident).with_span_fallback(expr.span)?);
 
                 pr::Expr {
                     kind: pr::ExprKind::Ident(ident),
@@ -138,7 +135,7 @@ impl fold::PrFold for NameResolver<'_> {
     fn fold_type(&mut self, ty: pr::Ty) -> Result<pr::Ty> {
         Ok(match ty.kind {
             pr::TyKind::Ident(ident) => {
-                let target = Some(self.resolve_ident(&ident).with_span(ty.span)?);
+                let target = Some(self.lookup_ident(&ident).with_span_fallback(ty.span)?);
 
                 pr::Ty {
                     kind: pr::TyKind::Ident(ident),
@@ -210,7 +207,7 @@ impl fold::PrFold for NameResolver<'_> {
 
 impl NameResolver<'_> {
     /// Returns resolved fully-qualified ident
-    fn resolve_ident(&mut self, ident: &pr::Path) -> Result<pr::Ref> {
+    fn lookup_ident(&mut self, ident: &pr::Path) -> Result<pr::Ref> {
         for scope in self.scopes.iter().rev() {
             if let Some((scope, offset, _)) = scope.get(ident.first()) {
                 // match: this ident references a locally-scoped name
@@ -225,117 +222,178 @@ impl NameResolver<'_> {
             }
         }
 
-        // find lookup base
-        let steps = ident.full_path();
-        let (base_path, steps) = match ident.first() {
-            "project" => (vec![], &steps[1..]),
-            "module" => (self.def_module_path.to_vec(), &steps[1..]),
-            "super" => {
-                let mut path = self.def_module_path.to_vec();
-                path.pop();
-                (path, &steps[1..])
-            }
-            NS_STD => (vec![NS_STD.to_string()], &steps[1..]),
-            _ => (self.def_module_path.to_vec(), steps),
-        };
-        let base_def = self.root.get_submodule(&base_path);
-
-        let res = base_def.map_or(Err(None), |module| module_lookup_steps(module, steps));
-        let steps_within = match res {
-            Err(err) => {
-                tracing::debug!("scopes: {:?}", self.scopes);
-                let message = err.unwrap_or_else(|| format!("unknown name {ident}"));
-                return Err(Diagnostic::new_custom(message));
-            }
-            Ok(within) => within,
-        };
-        let (to_def, within) = steps.split_at(steps.len() - steps_within);
-
-        // prepend the ident with the module path
-        // this will make this ident a fully-qualified ident
-        let mut fq_ident = pr::Path::new(base_path);
-        for step in to_def {
-            fq_ident.push(step.clone());
-        }
-
-        self.refs.push(fq_ident.clone());
+        let fq = (self.lookup_in_root(self.def_module_path, ident)).inspect_err(|_| {
+            tracing::debug!("scopes: {:?}", self.scopes);
+        })?;
+        self.refs.push(fq.to_def.clone());
 
         Ok(pr::Ref::FullyQualified {
-            to_def: fq_ident,
-            within: pr::Path::new(within),
+            to_def: fq.to_def,
+            within: fq.within,
         })
     }
-}
 
-/// Returns true if ok
-fn module_lookup_steps(module: &pr::ModuleDef, steps: &[String]) -> Result<usize, Option<String>> {
-    if steps.is_empty() {
-        // references to modules do not mean anything
-        return Err(Some("cannot refer to modules".to_string()));
+    #[tracing::instrument("lookup", skip_all, fields(from = pr::Path::new(def_mod_fq).to_string()))]
+    fn lookup_in_root(&self, def_mod_fq: &[String], ident: &pr::Path) -> Result<FullyQualified> {
+        tracing::debug!("lookup for {ident}");
+
+        // find lookup base
+        let steps = ident.as_steps();
+        let (base_path, relative) = match ident.first() {
+            "project" => (pr::Path::empty(), pr::Path::new(&steps[1..])),
+            "module" => (pr::Path::new(def_mod_fq), pr::Path::new(&steps[1..])),
+            "super" => {
+                let mut path = pr::Path::new(def_mod_fq);
+                path.pop();
+                (path, pr::Path::new(&steps[1..]))
+            }
+            NS_STD => (pr::Path::from_name(NS_STD), pr::Path::new(&steps[1..])),
+            _ => (pr::Path::new(def_mod_fq), pr::Path::new(steps)),
+        };
+
+        let base_def = (self.root.get_submodule(base_path.as_steps()))
+            .ok_or_else(|| Diagnostic::new_custom("unknown name"))?;
+
+        self.lookup_in_module(base_def, base_path, relative)
     }
 
-    let Some(def) = module.defs.get(&steps[0]) else {
-        return Err(Some("name does not exist".to_string()));
-    };
+    fn lookup_in_module(
+        &self,
+        base_mod: &pr::ModuleDef,
+        mut base_fq: pr::Path,
+        mut steps: pr::Path,
+    ) -> Result<FullyQualified> {
+        let Some(first) = steps.pop_first() else {
+            return Ok(FullyQualified {
+                to_def: base_fq,
+                within: pr::Path::empty(),
+            });
+        };
 
-    match &def.kind {
-        // recurse into submodules
-        pr::DefKind::Module(sub_module) => module_lookup_steps(sub_module, &steps[1..]),
+        let Some(def) = base_mod.defs.get(&first) else {
+            return Err(Diagnostic::new_custom("name does not exist".to_string())
+                .push_hint(format!("base_fq: {base_fq}"))
+                .push_hint(format!("first: {first}"))
+                .push_hint(format!("steps: {steps}")));
+        };
+        base_fq.push(first);
 
-        // resolve refs into types
-        pr::DefKind::Unresolved(Some(def_kind)) => def_lookup_steps(def_kind, &steps[1..]),
+        match &def.kind {
+            // recurse into submodules
+            pr::DefKind::Module(sub_module) => self.lookup_in_module(sub_module, base_fq, steps),
 
-        // recursive lookup into self (we take node out of Unresolved during name resolution)
-        pr::DefKind::Unresolved(None) => {
-            if steps.len() == 1 {
-                return Ok(0);
+            // resolved imports
+            pr::DefKind::Import(import) => {
+                // use resolved fq ident and extend it with remaining steps
+                let mut new_path = import.target.clone();
+                new_path.extend(steps);
+                self.lookup_in_root(&[], &new_path)
             }
 
-            // We do not support this, because we want to
-            // inline any lookups into types, to keep IR simpler.
-            dbg!(steps);
+            // unresolved imports
+            pr::DefKind::Unresolved(Some(def_kind)) if def_kind.is_import() => {
+                let import = def_kind.as_import().unwrap();
 
-            Err(Some("paths into self type are not allowed".into()))
+                // resolve import target
+                let import_fq = self
+                    .lookup_in_root(base_fq.parent(), &import.target)
+                    .with_span_fallback(def.span)?;
+
+                tracing::debug!("resolved import to {import_fq:?}, steps={steps}");
+
+                // combine import target with remaining steps and resolve again
+                let mut new_path = import_fq.to_def;
+                new_path.extend(import_fq.within);
+                new_path.extend(steps);
+                self.lookup_in_root(&[], &new_path)
+            }
+
+            // recursive lookup into self (we take node out of Unresolved during name resolution)
+            pr::DefKind::Unresolved(None) => {
+                if steps.is_empty() {
+                    if self.allow_recursive {
+                        Ok(FullyQualified {
+                            to_def: base_fq,
+                            within: pr::Path::empty(),
+                        })
+                    } else {
+                        Err(Diagnostic::new_custom("recursive path"))
+                    }
+                } else {
+                    // recursive, with remaining steps into self
+
+                    // We do not support this, because we want to
+                    // inline any lookups into types, to keep IR simpler.
+                    Err(Diagnostic::new_custom(
+                        "recursive paths into self are not allowed",
+                    ))
+                }
+            }
+
+            // resolve refs into types
+            pr::DefKind::Unresolved(Some(def_kind)) => lookup_in_def(def_kind, steps.as_steps())
+                .map(|_| FullyQualified {
+                    to_def: base_fq,
+                    within: steps,
+                })
+                .map_err(|msg| {
+                    Diagnostic::new_custom(msg.unwrap_or_else(|| "unknown name".into()))
+                }),
+
+            // resolve refs into already resolved stuff
+            def_kind => lookup_in_def(def_kind, steps.as_steps())
+                .map(|_| FullyQualified {
+                    to_def: base_fq,
+                    within: steps,
+                })
+                .map_err(|msg| {
+                    Diagnostic::new_custom(msg.unwrap_or_else(|| "unknown name".into()))
+                }),
         }
-
-        // resolve refs into already resolved stuff
-        def_kind => def_lookup_steps(def_kind, &steps[1..]),
     }
 }
 
-fn def_lookup_steps(def: &pr::DefKind, steps: &[String]) -> Result<usize, Option<String>> {
+#[derive(Debug)]
+struct FullyQualified {
+    to_def: pr::Path,
+    within: pr::Path,
+}
+
+fn lookup_in_def(def: &pr::DefKind, steps: &[String]) -> Result<(), Option<String>> {
     if steps.is_empty() {
-        return Ok(0);
+        return Ok(());
     }
 
-    // into type enum definition (referring to variants)
     match def {
-        pr::DefKind::Expr(_) | pr::DefKind::Import(_) => {
-            Err(Some("cannot lookup into expressions".to_string()))
-        }
         pr::DefKind::Ty(ty_def) => {
-            ty_lookup_steps(&ty_def.ty, steps).map_err(|_| None)?;
-            Ok(steps.len())
+            // into type enum definition (referring to enum variants or tuple fields)
+            lookup_in_ty(&ty_def.ty, steps).map_err(|_| None)?;
+            Ok(())
         }
-        pr::DefKind::Module(_) | pr::DefKind::Unresolved(_) => unreachable!(),
+
+        pr::DefKind::Expr(_) => Err(Some("cannot lookup into expressions".to_string())),
+
+        pr::DefKind::Module(_) | pr::DefKind::Import(_) | pr::DefKind::Unresolved(_) => {
+            unreachable!()
+        }
     }
 }
 
-pub fn ty_lookup_steps<'t>(ty: &'t pr::Ty, steps: &[String]) -> Result<&'t pr::Ty, ()> {
+pub fn lookup_in_ty<'t>(ty: &'t pr::Ty, steps: &[String]) -> Result<&'t pr::Ty, ()> {
     if steps.is_empty() {
         return Ok(ty);
     }
     match &ty.kind {
         pr::TyKind::Enum(variants) => {
             let variant = variants.iter().find(|v| v.name == steps[0]).ok_or(())?;
-            ty_lookup_steps(&variant.ty, &steps[1..])
+            lookup_in_ty(&variant.ty, &steps[1..])
         }
         pr::TyKind::Tuple(fields) => {
             let field = fields
                 .iter()
                 .find(|f| f.name.as_ref().is_some_and(|n| n == &steps[0]))
                 .ok_or(())?;
-            ty_lookup_steps(&field.ty, &steps[1..])
+            lookup_in_ty(&field.ty, &steps[1..])
         }
         _ => Err(()),
     }

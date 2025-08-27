@@ -29,10 +29,11 @@ impl fold::PrFold for super::TypeResolver<'_> {
                         // let ty = self.instantiate_type(ty, id);
                         expr.ty.clone().unwrap()
                     }
-
+                    scope::Named::Module => {
+                        return Err(scope::err_name_kind("a value", "a module").with_span(span));
+                    }
                     scope::Named::Ty(_, _) => {
-                        return Err(Diagnostic::new_custom("expected a value, but found a type")
-                            .with_span(span));
+                        return Err(scope::err_name_kind("a value", "a type").with_span(span));
                     }
                     scope::Named::Scoped(scoped) => match scoped {
                         scope::ScopedKind::Param { ty } => ty.clone(),
@@ -40,11 +41,9 @@ impl fold::PrFold for super::TypeResolver<'_> {
                         scope::ScopedKind::LocalTy { .. }
                         | scope::ScopedKind::TyParam { .. }
                         | scope::ScopedKind::TyVar { .. } => {
-                            return Err(Diagnostic::new_custom(
-                                "expected a value, but found a type",
-                            )
-                            .push_hint(format!("scoped = {scoped:?}"))
-                            .with_span(span));
+                            return Err(scope::err_name_kind("a value", "a type")
+                                .push_hint(format!("scoped = {scoped:?}"))
+                                .with_span(span));
                         }
                     },
                     scope::Named::EnumVariant(ty, ty_fq, tag) => {
@@ -247,9 +246,8 @@ impl fold::PrFold for super::TypeResolver<'_> {
                     tracing::debug!("inlining a 'path into type' for: {to_def:?}.{within:?}");
 
                     let def = self.root_mod.get(to_def).unwrap();
-                    let referenced = def.into_ty().unwrap();
-                    let referenced =
-                        names::ty_lookup_steps(referenced, within.full_path()).unwrap();
+                    let def = def.kind.as_ty().unwrap();
+                    let referenced = names::lookup_in_ty(&def.ty, within.as_steps()).unwrap();
 
                     return self.fold_type(referenced.clone());
                 }

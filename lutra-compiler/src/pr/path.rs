@@ -22,19 +22,19 @@ impl Path {
         }
     }
 
-    pub fn last(&self) -> &str {
-        self.path.last().unwrap()
-    }
-
-    pub fn path(&self) -> &[String] {
-        &self.path[0..(self.len() - 1)]
-    }
-
     pub fn first(&self) -> &str {
         self.path.first().unwrap()
     }
 
-    pub fn full_path(&self) -> &[String] {
+    pub fn last(&self) -> &str {
+        self.path.last().unwrap()
+    }
+
+    pub fn parent(&self) -> &[String] {
+        &self.path[0..(self.len() - 1)]
+    }
+
+    pub fn as_steps(&self) -> &[String] {
         &self.path
     }
 
@@ -46,27 +46,30 @@ impl Path {
         self.path.is_empty()
     }
 
-    /// Remove last part of the ident.
-    /// Result will generally refer to the parent of this ident.
-    pub fn pop(&mut self) -> Option<String> {
-        self.path.pop()
+    pub fn prepend(self, mut prefix: Path) -> Path {
+        prefix.path.extend(self.path);
+        prefix
     }
 
-    pub fn pop_front(&mut self) -> Option<String> {
-        if self.path.is_empty() {
-            None
-        } else {
-            Some(self.path.remove(0))
-        }
-    }
-
-    pub fn prepend(self, mut parts: Vec<String>) -> Path {
-        parts.extend(self);
-        Path::new(parts)
+    pub fn extend(&mut self, suffix: Path) {
+        self.path.extend(suffix);
     }
 
     pub fn push(&mut self, name: String) {
         self.path.push(name);
+    }
+
+    pub fn pop(&mut self) -> Option<String> {
+        self.path.pop()
+    }
+
+    pub fn pop_first(&mut self) -> Option<String> {
+        if self.is_empty() {
+            return None;
+        }
+        let remaining = self.path.split_off(1);
+        let first = std::mem::replace(&mut self.path, remaining);
+        Some(first.into_iter().next().unwrap())
     }
 
     pub fn with_name<S: ToString>(mut self, name: S) -> Self {
@@ -76,10 +79,6 @@ impl Path {
 
     pub fn iter(&self) -> impl DoubleEndedIterator<Item = &String> {
         self.path.iter()
-    }
-
-    pub fn as_slice(&self) -> &[String] {
-        self.path.as_slice()
     }
 
     pub fn starts_with(&self, prefix: &Path) -> bool {

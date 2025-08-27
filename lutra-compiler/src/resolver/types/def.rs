@@ -28,7 +28,7 @@ impl super::TypeResolver<'_> {
         // take def out of the module
         let def = self.root_mod.get_mut(fq_ident).unwrap();
         let pr::DefKind::Unresolved(def) = &mut def.kind else {
-            unreachable!()
+            unreachable!("resolving already resolved: {fq_ident}")
         };
         let def_kind = def.take().unwrap();
 
@@ -63,7 +63,7 @@ impl super::TypeResolver<'_> {
                 let expr_def = self.fold_expr_def(expr_def)?;
                 let expected_ty = expr_def.ty;
 
-                tracing::debug!("variable done");
+                tracing::trace!("def done");
 
                 let def = match expr_def.value {
                     Some(mut value) => {

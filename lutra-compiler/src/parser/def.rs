@@ -187,9 +187,9 @@ fn type_def(
 
 fn import_def() -> impl Parser<TokenKind, (String, DefKind), Error = PError> + Clone {
     keyword("import")
-        .ignore_then(ident_part().then_ignore(ctrl('=')).or_not())
-        .then(ident())
-        .map(|(alias, target)| {
+        .ignore_then(ident())
+        .then(keyword("as").ignore_then(ident_part()).or_not())
+        .map(|(target, alias)| {
             (
                 alias.unwrap_or_else(|| target.last().to_string()),
                 DefKind::Import(ImportDef { target }),

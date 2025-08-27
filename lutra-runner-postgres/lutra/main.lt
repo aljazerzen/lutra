@@ -1,52 +1,59 @@
+import std::filter
+import std::sort
+import std::map
+import std::find
+import std::to_int32
+import std::to_int64
+import pg_catalog as pg
 
 func pull_interface() -> (
-  pg_catalog::from_pg_namespace()
-  | std::filter(func (n) -> (
+  pg::from_pg_namespace()
+  | filter(func (n) -> (
     n.nspname != "pg_catalog"
     && n.nspname != "pg_toast"
     && n.nspname != "information_schema"
   ))
-  | std::map(func (n: pg_catalog::PgNamespaceRow) -> {
+  | map(func (n: pg::PgNamespaceRow) -> {
     schema_name = n.nspname,
     tables = (
-      pg_catalog::from_pg_class()
-      | std::filter(func (t: pg_catalog::PgClass) -> (
+      pg::from_pg_class()
+      | filter(func (t: pg::PgClass) -> (
         t.relnamespace == n.oid
         && t.relkind == "r"
       ))
-      | std::map(func (t: pg_catalog::PgClass) -> {
+      | map(func (t: pg::PgClass) -> {
         table_name = t.relname,
         columns = (
-          pg_catalog::from_pg_attribute()
-          | std::filter(func (a) -> a.attrelid == t.oid)
-          | std::filter(func (a) -> a.attnum > 0 && a.atttypid > 0)
-          | std::sort(func (a) -> (a.attnum | std::to_int64))
-          | std::map(func (a) -> {
+          pg::from_pg_attribute()
+          | filter(func (a) -> a.attrelid == t.oid)
+          | filter(func (a) -> a.attnum > 0 && a.atttypid > 0)
+          | sort(func (a) -> (a.attnum | to_int64))
+          | map(func (a) -> {
             name = a.attname,
-            typ_id = (a.atttypid | std::to_int32),
+            typ_id = (a.atttypid | to_int32),
             is_nullable = !a.attnotnull,
           })
         ),
         indexes = (
-          pg_catalog::from_pg_index()
-          | std::filter(func (i) -> i.indrelid == t.oid)
-          | std::map(func (i) -> (
-            pg_catalog::from_pg_class()
-            | std::find(func (ci) -> ci.oid == i.indexrelid)
+          pg::from_pg_index()
+          | filter(func (i) -> i.indrelid == t.oid)
+          | map(func (i) -> (
+            pg::from_pg_class()
+            | find(func (ci) -> ci.oid == i.indexrelid)
             | func (ci) -> {i = i, ci = ci}
           ))
-          | std::map(func (this) -> {
+          | map(func (this) -> {
             index_name = this.ci.relname,
             is_unique = this.i.indisunique,
             columns = (
               std::sql::unpack_array(this.i.indkey)
-              | std::map(func (ik) -> (
-                pg_catalog::from_pg_attribute()
-                | std::find(func (a) ->
+              | map(func (ik) -> (
+                pg::from_pg_attribute()
+                | find(func (a) ->
                   a.attrelid == this.i.indrelid && a.attnum == ik
                 )
               ))
-              | std::map(func (a) -> a.attname)
+              | map(func (a) -> a.attname)
             ),
           })
         ),

@@ -73,7 +73,7 @@ fn types_03() {
 
         func main() -> floor(4.4)
     "#), @r"
-    [E0004] Error:
+    [E0006] Error:
        ╭─[:4:46]
        │
      4 │         func floor(x: T) where T -> floor_64(x)
@@ -208,7 +208,7 @@ fn types_13() {
 
         func main() -> floor(false)
     "#), @r"
-    [E0005] Error:
+    [E0007] Error:
        ╭─[:5:24]
        │
      5 │         func main() -> floor(false)
@@ -231,7 +231,7 @@ fn types_14() {
         )
         func main() -> floor(2.3)
     "#), @r"
-    [E0004] Error:
+    [E0006] Error:
        ╭─[:7:22]
        │
      7 │             floor_64(x)
@@ -272,7 +272,7 @@ fn types_14() {
 
         func main() -> twice_floored(2.3)
     "#), @r"
-    [E0005] Error:
+    [E0007] Error:
        ╭─[:7:13]
        │
      7 │         -> {floor(x), floor(x)}
@@ -297,7 +297,7 @@ fn types_15() {
 
         func main() -> get_b({a = false, b = 4.6: float64})
     "#), @r"
-    [E0004] Error:
+    [E0006] Error:
        ╭─[:5:46]
        │
      5 │         func main() -> get_b({a = false, b = 4.6: float64})
@@ -311,7 +311,7 @@ fn types_15() {
 
         func main() -> get_b({a = false, c = 4})
     "#), @r"
-    [E0004] Error:
+    [E0006] Error:
        ╭─[:5:24]
        │
      5 │         func main() -> get_b({a = false, c = 4})
@@ -336,7 +336,7 @@ fn types_16() {
 
         func main() -> get_b({a = "7", 4: int64, c = 5.7})
     "#), @r#"
-    [E0004] Error:
+    [E0006] Error:
        ╭─[:5:35]
        │
      5 │         func main() -> get_b({a = "7", 4: int64, c = 5.7})
@@ -351,7 +351,7 @@ fn types_16() {
 
         func main() -> get_b({a = false})
     "#), @r"
-    [E0004] Error:
+    [E0006] Error:
        ╭─[:5:24]
        │
      5 │         func main() -> get_b({a = false})
@@ -380,7 +380,7 @@ fn types_17() {
 
         func main() -> get({4})
     "#), @r"
-    [E0004] Error:
+    [E0006] Error:
        ╭─[:6:20]
        │
      6 │         -> get_int(x)
@@ -398,7 +398,7 @@ fn types_17() {
 
         func main() -> get({4})
     "#), @r"
-    [E0004] Error:
+    [E0006] Error:
        ╭─[:6:20]
        │
      6 │         -> get_int(x)
@@ -417,7 +417,7 @@ fn types_17() {
 
         func main() -> needs_one({4})
     "#), @r"
-    [E0004] Error:
+    [E0006] Error:
        ╭─[:7:12]
        │
      7 │         -> needs_two(x)
@@ -497,7 +497,7 @@ fn types_21() {
           | func (x) -> x.b
         )
     "#), @r"
-    [E0004] Error:
+    [E0006] Error:
        ╭─[:4:19]
        │
      4 │           | func (x) -> x.b
@@ -511,7 +511,7 @@ fn types_21() {
           | func (x) -> x.3
         )
     "#), @r"
-    [E0004] Error:
+    [E0006] Error:
        ╭─[:4:19]
        │
      4 │           | func (x) -> x.3
@@ -528,7 +528,7 @@ fn types_22() {
     insta::assert_snapshot!(_test_err(r#"
         func main() -> [true, false].a
     "#), @r"
-    [E0004] Error:
+    [E0006] Error:
        ╭─[:2:37]
        │
      2 │         func main() -> [true, false].a
@@ -539,7 +539,7 @@ fn types_22() {
     insta::assert_snapshot!(_test_err(r#"
         func main() -> "hello".a
     "#), @r#"
-    [E0004] Error:
+    [E0006] Error:
        ╭─[:2:31]
        │
      2 │         func main() -> "hello".a
@@ -581,7 +581,7 @@ fn types_22() {
         type t: text
         func main(x: t) -> x.a
     "#), @r"
-    [E0004] Error:
+    [E0006] Error:
        ╭─[:3:29]
        │
      3 │         func main(x: t) -> x.a
@@ -692,7 +692,7 @@ fn type_annotation_01() {
             "const main = 5: text"
         ),
         @r"
-    [E0005] Error:
+    [E0007] Error:
        ╭─[:1:14]
        │
      1 │ const main = 5: text
@@ -793,7 +793,7 @@ fn enums_03() {
        │
      2 │             type X: { a: int64, b: X::a }
        │                                    ──┬─
-       │                                      ╰─── paths into self type are not allowed
+       │                                      ╰─── recursive paths into self are not allowed
     ───╯
     "
     );
@@ -884,7 +884,7 @@ fn match_03() {
           .Blue => false,
         }
     "#), @r"
-    [E0004] Error:
+    [E0006] Error:
        ╭─[:7:20]
        │
      7 │           .Blue => false,
@@ -1056,7 +1056,7 @@ fn unpack_01() {
     insta::assert_snapshot!(_test_err(r#"
         const main = {false, ..true, "hello"}
     "#), @r#"
-    [E0004] Error:
+    [E0006] Error:
        ╭─[:2:32]
        │
      2 │         const main = {false, ..true, "hello"}
@@ -1306,7 +1306,7 @@ fn ty_tuple_comprehension_06() {
 
     func main(a: A): {id: bool, title: bool, release_year: bool} -> make_flags(a)
     "#), @r"
-    [E0004] Error:
+    [E0006] Error:
        ╭─[:8:69]
        │
      8 │     func main(a: A): {id: bool, title: bool, release_year: bool} -> make_flags(a)
@@ -1324,7 +1324,7 @@ fn ty_tuple_comprehension_06() {
 
     func main(a: A): {id: bool, title: bool} -> make_flags(a)
     "#), @r"
-    [E0005] Error:
+    [E0007] Error:
        ╭─[:8:49]
        │
      8 │     func main(a: A): {id: bool, title: bool} -> make_flags(a)
@@ -1365,7 +1365,7 @@ fn tuple_00() {
     insta::assert_snapshot!(_test_err(r#"
     func main(): {title: text, is_released: bool} -> {title = "hello"}
     "#), @r#"
-    [E0004] Error:
+    [E0006] Error:
        ╭─[:2:54]
        │
      2 │     func main(): {title: text, is_released: bool} -> {title = "hello"}
@@ -1377,7 +1377,7 @@ fn tuple_00() {
     insta::assert_snapshot!(_test_err(r#"
     func main(): {title: text} -> {title = "hello", is_released = true}
     "#), @r#"
-    [E0004] Error:
+    [E0006] Error:
        ╭─[:2:35]
        │
      2 │     func main(): {title: text} -> {title = "hello", is_released = true}
@@ -1398,7 +1398,7 @@ fn tuple_01() {
     insta::assert_snapshot!(_test_err(r#"
     func main(): {text, bool} -> {"hello"}
     "#), @r#"
-    [E0004] Error:
+    [E0006] Error:
        ╭─[:2:34]
        │
      2 │     func main(): {text, bool} -> {"hello"}
@@ -1410,7 +1410,7 @@ fn tuple_01() {
     insta::assert_snapshot!(_test_err(r#"
     func main(): {text} -> {"hello", true}
     "#), @r#"
-    [E0004] Error:
+    [E0006] Error:
        ╭─[:2:28]
        │
      2 │     func main(): {text} -> {"hello", true}
@@ -1431,7 +1431,7 @@ fn tuple_02() {
     insta::assert_snapshot!(_test_err(r#"
     func main(): {text, bool} -> {title = "hello"}
     "#), @r#"
-    [E0004] Error:
+    [E0006] Error:
        ╭─[:2:34]
        │
      2 │     func main(): {text, bool} -> {title = "hello"}
@@ -1443,7 +1443,7 @@ fn tuple_02() {
     insta::assert_snapshot!(_test_err(r#"
     func main(): {text} -> {title = "hello", is_released = true}
     "#), @r#"
-    [E0004] Error:
+    [E0006] Error:
        ╭─[:2:28]
        │
      2 │     func main(): {text} -> {title = "hello", is_released = true}
@@ -1464,7 +1464,7 @@ fn tuple_03() {
     insta::assert_snapshot!(_test_err(r#"
     func main(): {title: text, is_released: bool} -> {"hello"}
     "#), @r#"
-    [E0004] Error:
+    [E0006] Error:
        ╭─[:2:54]
        │
      2 │     func main(): {title: text, is_released: bool} -> {"hello"}
@@ -1476,7 +1476,7 @@ fn tuple_03() {
     insta::assert_snapshot!(_test_err(r#"
     func main(): {title: text} -> {"hello", true}
     "#), @r#"
-    [E0004] Error:
+    [E0006] Error:
        ╭─[:2:35]
        │
      2 │     func main(): {title: text} -> {"hello", true}
@@ -1493,14 +1493,14 @@ fn tuple_04() {
     insta::assert_snapshot!(_test_err(r#"
     func main(): {title: bool, is_released: bool} -> {"hello", "world"}
     "#), @r#"
-    [E0004] Error:
+    [E0006] Error:
        ╭─[:2:55]
        │
      2 │     func main(): {title: bool, is_released: bool} -> {"hello", "world"}
        │                                                       ───┬───
        │                                                          ╰───── expected type `bool`, but found type `text`
     ───╯
-    [E0004] Error:
+    [E0006] Error:
        ╭─[:2:64]
        │
      2 │     func main(): {title: bool, is_released: bool} -> {"hello", "world"}
@@ -1508,4 +1508,99 @@ fn tuple_04() {
        │                                                                   ╰───── expected type `bool`, but found type `text`
     ───╯
     "#);
+}
+
+#[test]
+fn import_00() {
+    insta::assert_snapshot!(_test_ty(r#"
+    module a {
+      func f() -> "f"
+
+      const c = "c"
+
+      type T: text
+    }
+
+    import a::f
+    import a::c as d
+    import a::T as U
+
+    func main() -> {d, f()}: {a::T, U}
+    "#), @"{a::T, a::T}");
+}
+
+#[test]
+fn import_01() {
+    insta::assert_snapshot!(_test_ty(r#"
+    module a {
+      module b {
+        const c = "c"
+        import project::a::b::d2 as d1
+        import super::d3 as d2
+      }
+      import b::c as d3
+    }
+
+    func main() -> a::b::d1
+    "#), @"text");
+}
+
+#[test]
+fn import_02() {
+    insta::assert_snapshot!(_test_err(r#"
+    module a {
+      import project::a::b as b
+    }
+    func main() -> {}
+    "#), @r"
+    Error:
+       ╭─[:3:7]
+       │
+     3 │       import project::a::b as b
+       │       ────────────┬────────────
+       │                   ╰────────────── recursive path
+    ───╯
+    ");
+}
+
+#[test]
+fn import_03() {
+    insta::assert_snapshot!(_test_ty(r#"
+    module a {
+      module b {
+        const c = "hello"
+      }
+      const d = false
+    }
+    import a as e
+    func main() -> {e::d, e::b::c}
+    "#), @"{bool, text}");
+}
+
+#[test]
+fn import_04() {
+    insta::assert_snapshot!(_test_err(r#"
+    module a {}
+    func main() -> a
+    "#), @r"
+    [E0005] Error:
+       ╭─[:3:20]
+       │
+     3 │     func main() -> a
+       │                    ┬
+       │                    ╰── expected a value, found a module
+    ───╯
+    ");
+    insta::assert_snapshot!(_test_err(r#"
+    module a {}
+    func main(): a -> 1
+    "#), @r"
+    [E0005] Error:
+       ╭─[:3:18]
+       │
+     3 │     func main(): a -> 1
+       │                  ┬
+       │                  ╰── expected a type, found a module
+    ───╯
+    ");
 }

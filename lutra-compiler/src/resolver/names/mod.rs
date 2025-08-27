@@ -2,7 +2,7 @@ mod expr;
 mod module;
 mod scope;
 
-pub use expr::ty_lookup_steps;
+pub use expr::lookup_in_ty;
 
 use itertools::Itertools;
 use scope::Scope;
@@ -22,10 +22,10 @@ pub fn run(root: &mut pr::ModuleDef) -> Result<Vec<Vec<pr::Path>>> {
             root,
             refs_tys: Default::default(),
             refs_vars: Default::default(),
-            current_path: Vec::new(),
+            current_path: pr::Path::empty(),
             scope_id_gen: Default::default(),
         };
-        r.resolve_refs()?;
+        r.run()?;
         (r.refs_tys, r.refs_vars)
     };
 
@@ -38,7 +38,7 @@ pub fn run(root: &mut pr::ModuleDef) -> Result<Vec<Vec<pr::Path>>> {
 
     if has_var_cycles {
         let scc = order_vars.iter().find(|scc| scc.len() != 1).unwrap();
-        let (def, _) = root.try_get(scc[0].as_slice()).unwrap();
+        let (def, _) = root.try_get(scc[0].as_steps()).unwrap();
         return Err(
             Diagnostic::new_custom("unimplemented cyclic references between expressions")
                 .with_span(def.span),

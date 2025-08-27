@@ -1,4 +1,3 @@
-use enum_as_inner::EnumAsInner;
 use indexmap::IndexMap;
 use itertools::Itertools;
 
@@ -19,27 +18,11 @@ pub fn init_root(root_module_def: pr::ModuleDef) -> Result<pr::ModuleDef, Vec<Di
     Ok(root)
 }
 
-#[derive(Debug, EnumAsInner)]
-pub enum ExprOrTy<'a> {
-    Expr(&'a pr::Expr),
-    Ty(&'a pr::Ty),
-}
-
 impl pr::ModuleDef {
     /// Get definition by fully qualified ident.
-    pub fn get(&self, fq_ident: &pr::Path) -> Option<ExprOrTy<'_>> {
-        let module_steps = &fq_ident.full_path()[0..(fq_ident.len() - 1)];
-        let sub_module = self.get_submodule(module_steps)?;
-
-        let def = sub_module.defs.get(fq_ident.last())?;
-        match &def.kind {
-            pr::DefKind::Expr(expr) => Some(ExprOrTy::Expr(expr.value.as_ref().unwrap())),
-            pr::DefKind::Ty(ty) => Some(ExprOrTy::Ty(&ty.ty)),
-            pr::DefKind::Unresolved(o) => {
-                panic!("unresolved: {o:?}")
-            }
-            pr::DefKind::Module(_) | pr::DefKind::Import(_) => None,
-        }
+    pub fn get(&self, fq_ident: &pr::Path) -> Option<&pr::Def> {
+        let sub_module = self.get_submodule(fq_ident.parent())?;
+        sub_module.defs.get(fq_ident.last())
     }
 
     /// Get definition by fully qualified ident and return remaining steps into the def.
@@ -58,8 +41,7 @@ impl pr::ModuleDef {
 
     /// Get an exclusive reference to definition by fully qualified ident.
     pub fn get_mut(&mut self, ident: &pr::Path) -> Option<&mut pr::Def> {
-        let module_steps = &ident.full_path()[0..(ident.len() - 1)];
-        let module = self.get_submodule_mut(module_steps)?;
+        let module = self.get_module_mut(ident.parent())?;
 
         module.defs.get_mut(ident.last())
     }
@@ -73,7 +55,7 @@ impl pr::ModuleDef {
         Some(curr_mod)
     }
 
-    pub fn get_submodule_mut(&mut self, path: &[String]) -> Option<&mut pr::ModuleDef> {
+    pub fn get_module_mut(&mut self, path: &[String]) -> Option<&mut pr::ModuleDef> {
         let mut curr_mod = self;
         for step in path {
             let def = curr_mod.defs.get_mut(step)?;
@@ -97,7 +79,7 @@ impl pr::ModuleDef {
                 let sub_module = d.kind.as_module().unwrap();
                 sub_module
                     .iter_defs_re()
-                    .map(|(p, d)| (p.prepend(vec![name.clone()]), d))
+                    .map(|(p, d)| (p.prepend(pr::Path::from_name(name)), d))
                     .collect_vec()
             });
 
@@ -127,17 +109,9 @@ impl pr::ModuleDef {
 
                     pr::DefKind::Module(new_mod)
                 }
-                kind => {
-                    // insert "DeclKind::Unresolved"
-                    pr::DefKind::Unresolved(Some(Box::new(kind)))
-                }
+                kind => pr::DefKind::Unresolved(Some(Box::new(kind))),
             };
-            let def = pr::Def { kind, ..def };
-
-            let existing = self.defs.insert(name, def);
-            if existing.is_some() {
-                panic!()
-            }
+            self.defs.insert(name, pr::Def { kind, ..def });
         }
         diagnostics
     }

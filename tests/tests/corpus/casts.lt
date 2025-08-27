@@ -1,3 +1,17 @@
+# --- [ Cast tests ] ---
+#
+# This file contains tests for the language itself.
+# It is read by the main.rs and exposed as a series of cargo-compatible tests.
+# A test consists of:
+#
+#    #  === <test name>       (test name)
+#    # skip: interpreter       (optional)
+#    # skip: postgres          (optional)
+#    <lutra project code>
+#    # <                   (input marker)
+#    <input>                   (optional)
+#    # >                  (output marker)
+#    <output>
 
 # === cast_int8_to_int8
 # skip: postgres

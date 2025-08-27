@@ -19,7 +19,11 @@ fn main() {
     let mut args = Arguments::from_args();
     args.color = Some(libtest_mimic::ColorSetting::Always);
 
-    const TEST_FILES: [&str; 2] = ["tests/corpus/language.lt", "tests/corpus/casts.lt"];
+    const TEST_FILES: &[&str] = &[
+        "tests/corpus/language.lt",
+        "tests/corpus/casts.lt",
+        "tests/corpus/complex.lt",
+    ];
 
     let mut cases = Vec::new();
     for path in TEST_FILES {
