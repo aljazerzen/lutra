@@ -1,6 +1,5 @@
 use crate::borrow;
 
-use crate::Data;
 use crate::ir;
 use crate::layout;
 
@@ -28,14 +27,17 @@ impl ReaderExt for &[u8] {
 }
 
 #[derive(Clone)]
-pub struct ArrayReader {
+pub struct ArrayReader<B: bytes::Buf + Clone> {
     item_head_bytes: usize,
-    next: Data,
+    buf_next: B,
     remaining: usize,
 }
 
-impl ArrayReader {
-    pub fn new_for_ty(data: Data, ty: &ir::Ty) -> Self {
+impl<B> ArrayReader<B>
+where
+    B: bytes::Buf + Clone,
+{
+    pub fn new_for_ty(data: B, ty: &ir::Ty) -> Self {
         let ir::TyKind::Array(items_ty) = &ty.kind else {
             panic!()
         };
@@ -44,17 +46,21 @@ impl ArrayReader {
         Self::new(data, item_head_size.div_ceil(8))
     }
 
-    pub fn new(data: Data, item_head_bytes: usize) -> Self {
-        let (offset, len) = Self::read_head(data.slice(8));
+    pub fn new(data: B, item_head_bytes: usize) -> Self {
+        let (offset, len) = Self::read_head(data.chunk());
 
         let mut body = data.clone();
-        body.skip(offset);
+        body.advance(offset);
 
         ArrayReader {
             item_head_bytes,
-            next: body,
+            buf_next: body,
             remaining: len,
         }
+    }
+
+    pub fn remaining(&self) -> usize {
+        self.remaining
     }
 
     pub fn read_head(buffer: &[u8]) -> (usize, usize) {
@@ -64,28 +70,27 @@ impl ArrayReader {
         (offset as usize, len as usize)
     }
 
-    pub fn remaining(&self) -> usize {
-        self.remaining
-    }
-
-    pub fn get(&self, index: usize) -> Option<Data> {
+    pub fn get(&self, index: usize) -> Option<B> {
         if index >= self.remaining {
             return None;
         }
 
-        let mut data = self.next.clone();
-        data.skip(self.item_head_bytes * index);
+        let mut data = self.buf_next.clone();
+        data.advance(self.item_head_bytes * index);
         Some(data)
     }
 }
 
-impl Iterator for ArrayReader {
-    type Item = Data;
+impl<B> Iterator for ArrayReader<B>
+where
+    B: bytes::Buf + Clone,
+{
+    type Item = B;
 
     fn next(&mut self) -> Option<Self::Item> {
         if self.remaining > 0 {
-            let this = self.next.clone();
-            self.next.skip(self.item_head_bytes);
+            let this = self.buf_next.clone();
+            self.buf_next.advance(self.item_head_bytes);
             self.remaining -= 1;
             Some(this)
         } else {
@@ -99,7 +104,7 @@ impl Iterator for ArrayReader {
         } else {
             n
         };
-        self.next.skip(self.item_head_bytes * n);
+        self.buf_next.advance(self.item_head_bytes * n);
         self.remaining -= n;
         self.next()
     }
@@ -116,27 +121,30 @@ impl Iterator for ArrayReader {
     }
 }
 
-pub struct TupleReader<'d, 't> {
-    data: &'d Data,
+pub struct TupleReader<'t, B> {
+    buf: B,
     field_offsets: borrow::Cow<'t, [u32]>,
 }
 
-impl<'d, 't> TupleReader<'d, 't> {
-    pub fn new(data: &'d Data, field_offsets: borrow::Cow<'t, [u32]>) -> Self {
+impl<'t, B> TupleReader<'t, B>
+where
+    B: bytes::Buf + Clone,
+{
+    pub fn new(data: B, field_offsets: borrow::Cow<'t, [u32]>) -> Self {
         TupleReader {
-            data,
+            buf: data,
             field_offsets,
         }
     }
 
-    pub fn new_for_ty(data: &'d Data, ty: &ir::Ty) -> Self {
+    pub fn new_for_ty(data: B, ty: &ir::Ty) -> Self {
         let field_offsets = layout::tuple_field_offsets(ty);
         Self::new(data, field_offsets.into())
     }
 
-    pub fn get_field(&self, index: usize) -> Data {
-        let mut r = self.data.clone();
-        r.skip(self.field_offsets[index] as usize);
+    pub fn get_field(&self, index: usize) -> B {
+        let mut r = self.buf.clone();
+        r.advance(self.field_offsets[index] as usize);
         r
     }
 }

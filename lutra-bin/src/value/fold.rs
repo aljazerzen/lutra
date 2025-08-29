@@ -2,7 +2,6 @@ use crate::ir;
 
 use crate::Value;
 
-#[allow(dead_code)]
 pub trait ValueVisitor<'t> {
     type Res;
 

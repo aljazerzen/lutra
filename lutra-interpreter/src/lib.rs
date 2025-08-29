@@ -1,8 +1,12 @@
 mod arrow;
+mod data;
 mod interpreter;
 mod native;
+mod writer;
 
+pub use data::Data;
 pub use interpreter::{Cell, EvalError, Interpreter, NativeFunction, evaluate};
+pub use writer::{ArrayWriter, EnumWriter, TupleWriter};
 
 pub trait NativeModule: Sync {
     fn lookup_native_symbol(&self, id: &str) -> Option<interpreter::NativeFunction>;

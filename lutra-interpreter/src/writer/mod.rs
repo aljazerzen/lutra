@@ -21,12 +21,12 @@ pub use array::ArrayWriter;
 pub use enum_::EnumWriter;
 pub use tuple::TupleWriter;
 
-use crate::vec;
 use core::iter::zip;
+use std::vec;
 
 use crate::Data;
-use crate::ReaderExt;
-use crate::ReversePointer;
+use lutra_bin::ReaderExt;
+use lutra_bin::ReversePointer;
 
 #[derive(Debug)]
 struct SeveredBodies {
@@ -34,12 +34,12 @@ struct SeveredBodies {
     buf: Data,
 
     // Locations of pointers to bodies within the buffer of the head, in bytes.
-    body_ptr_offsets: vec::Vec<u32>,
+    body_ptr_offsets: Vec<u32>,
 
     // Locations of starts of bodies (except the first one) within the buf, in bytes.
     // The first body is skipped, because it is guaranteed to be 0.
     // This is because we skip the buf so the first body is always at the beginning of the buf.
-    body_offsets: vec::Vec<u32>,
+    body_offsets: Vec<u32>,
 }
 
 impl SeveredBodies {
@@ -65,7 +65,7 @@ fn extract_head_and_body<'b>(
     head_bytes: u32,
     body_ptrs: &[u32],
 ) -> (&'b [u8], Option<SeveredBodies>) {
-    let head = buf.slice(head_bytes as usize);
+    let head = &buf.chunk()[0..head_bytes as usize];
 
     let body = if !body_ptrs.is_empty() {
         let mut ptrs = body_ptrs.iter();
@@ -82,7 +82,7 @@ fn extract_head_and_body<'b>(
             body_offsets.push(body_offset - first_body_offset);
         }
 
-        buf.skip(first_body_offset as usize);
+        buf.advance(first_body_offset as usize);
         Some(SeveredBodies {
             buf,
             body_ptr_offsets: body_ptrs.to_vec(),

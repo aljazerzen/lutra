@@ -1,6 +1,5 @@
-use lutra_bin::{ArrayWriter, TupleWriter};
-use lutra_bin::{Data, Value};
-use lutra_bin::{EnumWriter, ir};
+use lutra_bin::{Value, ir};
+use lutra_interpreter::{ArrayWriter, Data, EnumWriter, TupleWriter};
 
 #[track_caller]
 pub(crate) fn _test_array_writer(items: Vec<Data>, output_ty: &ir::Ty) -> String {
@@ -85,7 +84,7 @@ fn array_02() {
     ]);
 
     let mut data4 = data3.clone();
-    data4.skip(8);
+    data4.advance(8);
 
     let items = vec![data1, data2, data3, data4];
 

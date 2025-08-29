@@ -1,14 +1,14 @@
 use lutra_bin::{Encode, Layout};
 
-use crate::NativeModule;
 use crate::interpreter::{Cell, Interpreter};
+use crate::{Data, NativeModule};
 
 pub mod std {
     use ::std::{borrow::Cow, collections::HashMap};
 
-    use crate::{EvalError, native::*};
+    use crate::{ArrayWriter, Data, EvalError, TupleWriter, native::*};
     use assume::LayoutArgsReader;
-    use lutra_bin::{ArrayReader, ArrayWriter, Data, Decode, TupleReader, TupleWriter, ir};
+    use lutra_bin::{ArrayReader, Decode, TupleReader, ir};
 
     pub const MODULE: Module = Module;
 
@@ -465,7 +465,7 @@ pub mod std {
 
             // partition input into output arrays
             for item in input {
-                let tuple = TupleReader::new(&item, fields_offsets.into());
+                let tuple = TupleReader::new(item, fields_offsets.into());
 
                 for (index, output_array) in output_arrays.iter_mut().enumerate() {
                     let field = tuple.get_field(index);
@@ -513,10 +513,10 @@ pub mod std {
                 field_offsets.push(8_u32 * i as u32); // array head has 8 bytes
             }
 
-            let input = TupleReader::new(assume::as_data(&columnar)?, field_offsets.into());
+            let input = TupleReader::new(assume::into_data(columnar), field_offsets.into());
 
             // init input array readers
-            let mut input_arrays: Vec<ArrayReader> = fields_item_head_bytes
+            let mut input_arrays: Vec<ArrayReader<_>> = fields_item_head_bytes
                 .iter()
                 .enumerate()
                 .map(|(i, head_bytes)| ArrayReader::new(input.get_field(i), *head_bytes as usize))
@@ -563,14 +563,12 @@ pub mod std {
             let [input, key_getter] = assume::exactly_n(args);
             let input = ArrayReader::new(assume::into_data(input), input_head_bytes as usize);
 
-            let mut partitions: HashMap<Vec<u8>, Vec<lutra_bin::Data>> = HashMap::new();
+            let mut partitions: HashMap<Vec<u8>, Vec<Data>> = HashMap::new();
             for item in input {
                 let item_cell = Cell::Data(item.clone());
 
                 let key = it.evaluate_func_call(&key_getter, vec![item_cell])?;
-                let key = assume::into_data(key)
-                    .slice(output_fields_layouts[0].0 as usize)
-                    .to_vec();
+                let key = assume::into_data(key).chunk().to_vec();
 
                 let partition = partitions.entry(key).or_default();
                 partition.push(item);
@@ -632,7 +630,7 @@ pub mod std {
             let [array] = assume::exactly_n(args);
             let array = assume::into_data(array);
 
-            let (_offset, len) = lutra_bin::ArrayReader::read_head(array.slice(8));
+            let (_offset, len) = lutra_bin::ArrayReader::<&[u8]>::read_head(array.chunk());
 
             let res = len as i64;
             Ok(Cell::Data(encode(&res)))
@@ -747,14 +745,14 @@ pub mod std {
         }
 
         fn shift(
-            array: ArrayReader,
+            array: ArrayReader<Data>,
             offset: isize,
             head_bytes: u32,
             body_ptrs: &[u32],
             default_val: Vec<u8>,
         ) -> Result<Cell, EvalError> {
             tracing::debug!("default val = {default_val:?}");
-            let default_val = lutra_bin::Data::new(default_val);
+            let default_val = Data::new(default_val);
 
             let array_len = array.remaining();
 
@@ -786,7 +784,7 @@ pub mod std {
             let [array] = assume::exactly_n(args);
             let array = assume::into_data(array);
 
-            let (_offset, len) = lutra_bin::ArrayReader::read_head(array.slice(8));
+            let (_offset, len) = lutra_bin::ArrayReader::<&[u8]>::read_head(array.chunk());
 
             let mut out = ArrayWriter::new(8, &[]); // uint64 head = 8
             for index in 0..len {
@@ -806,7 +804,7 @@ pub mod std {
 }
 
 pub mod std_text_ops {
-    use crate::{EvalError, native::*};
+    use crate::{Data, EvalError, native::*};
     use lutra_bin::ReaderExt;
 
     pub const MODULE: Module = Module;
@@ -834,23 +832,23 @@ pub mod std_text_ops {
 
             // TODO: string reader
             let mut left = assume::into_data(left);
-            let left_offset = u32::from_le_bytes(left.slice(4).read_const());
-            let left_length = u32::from_le_bytes((&left.slice(8)[4..8]).read_const());
-            left.skip(left_offset as usize);
+            let left_offset = u32::from_le_bytes(left.chunk().read_const());
+            let left_length = u32::from_le_bytes((&left.chunk()[4..8]).read_const());
+            left.advance(left_offset as usize);
 
             let mut right = assume::into_data(right);
-            let right_offset = u32::from_le_bytes(right.slice(4).read_const());
-            let right_length = u32::from_le_bytes((&right.slice(8)[4..8]).read_const());
-            right.skip(right_offset as usize);
+            let right_offset = u32::from_le_bytes(right.chunk().read_const());
+            let right_length = u32::from_le_bytes((&right.chunk()[4..8]).read_const());
+            right.advance(right_offset as usize);
 
             // TODO: string writer
             let mut buf = Vec::with_capacity(8 + left_length as usize + right_length as usize);
             buf.extend(&[8, 0, 0, 0]);
             buf.extend((left_length + right_length).to_le_bytes());
-            buf.extend(left.slice(left_length as usize));
-            buf.extend(right.slice(right_length as usize));
+            buf.extend(&left.chunk()[0..left_length as usize]);
+            buf.extend(&right.chunk()[0..right_length as usize]);
 
-            Ok(Cell::Data(lutra_bin::Data::new(buf)))
+            Ok(Cell::Data(Data::new(buf)))
         }
 
         pub fn length(
@@ -862,7 +860,7 @@ pub mod std_text_ops {
 
             // TODO: string reader
             // TODO: report length in chars, not bytes (length of ž should be 1)
-            let text = assume::as_data(&text)?.slice(8).skip(4);
+            let text = assume::as_data(&text)?.chunk().skip(4);
             let length = u32::from_le_bytes(text.read_const());
 
             Ok(Cell::Data(encode(&length)))
@@ -878,7 +876,7 @@ pub mod std_fs {
     use parquet::arrow::arrow_reader::ParquetRecordBatchReaderBuilder;
     use parquet::arrow::arrow_writer::ArrowWriter;
 
-    use crate::{EvalError, native::*};
+    use crate::{Data, EvalError, native::*};
 
     pub const MODULE: Module = Module;
 
@@ -957,7 +955,7 @@ pub mod std_fs {
             builder.write(&data).unwrap();
             builder.finish().unwrap();
 
-            Ok(Cell::Data(lutra_bin::Data::new(vec![])))
+            Ok(Cell::Data(Data::new(vec![])))
         }
     }
 }
@@ -990,10 +988,10 @@ pub mod interpreter {
 
 mod assume {
     use super::decode;
-    use crate::{EvalError, interpreter::Cell};
+    use crate::{Data, EvalError, interpreter::Cell};
     use lutra_bin::{ArrayReader, Decode};
 
-    pub fn into_data(cell: Cell) -> lutra_bin::Data {
+    pub fn into_data(cell: Cell) -> Data {
         match cell {
             Cell::Data(val) => val,
             Cell::Function(..) => panic!(),
@@ -1002,7 +1000,7 @@ mod assume {
         }
     }
 
-    pub fn as_data(cell: &Cell) -> Result<&lutra_bin::Data, EvalError> {
+    pub fn as_data(cell: &Cell) -> Result<&Data, EvalError> {
         match cell {
             Cell::Data(val) => Ok(val),
             Cell::Function(..) => Err(EvalError::BadProgram),
@@ -1036,7 +1034,7 @@ mod assume {
         Ok(decode::text(as_data(cell)?))
     }
 
-    pub fn array(cell: Cell, item_head_bytes: u32) -> ArrayReader {
+    pub fn array(cell: Cell, item_head_bytes: u32) -> ArrayReader<Data> {
         ArrayReader::new(into_data(cell), item_head_bytes as usize)
     }
 
@@ -1085,23 +1083,25 @@ mod assume {
 }
 
 mod decode {
-    use lutra_bin::{Data, Decode};
+    use lutra_bin::Decode;
+
+    use crate::Data;
 
     pub fn primitive<T: Decode>(data: &Data) -> T {
-        T::decode(data.slice(T::head_size().div_ceil(8))).unwrap()
+        T::decode(data.chunk()).unwrap()
     }
 
     pub fn int(data: &Data) -> i64 {
-        i64::decode(data.slice(8)).unwrap()
+        i64::decode(data.chunk()).unwrap()
     }
 
     #[allow(dead_code)]
     pub fn uint32(data: &Data) -> u32 {
-        u32::decode(data.slice(4)).unwrap()
+        u32::decode(data.chunk()).unwrap()
     }
 
     pub fn bool(data: &Data) -> bool {
-        bool::decode(data.slice(1)).unwrap()
+        bool::decode(data.chunk()).unwrap()
     }
 
     pub fn text(data: &Data) -> String {
@@ -1110,6 +1110,6 @@ mod decode {
     }
 }
 
-pub fn encode<T: Encode + Layout + ?Sized>(value: &T) -> lutra_bin::Data {
-    lutra_bin::Data::new(value.encode())
+pub fn encode<T: Encode + Layout + ?Sized>(value: &T) -> Data {
+    Data::new(value.encode())
 }

@@ -163,7 +163,7 @@ impl<'a> pg_ty::ToSql for Arg<'a> {
             ir::TyKind::Primitive(ir::TyPrimitive::float64) => out.put_slice(&self.data[0..8]),
 
             ir::TyKind::Primitive(ir::TyPrimitive::text) => {
-                let (offset, len) = lutra_bin::ArrayReader::read_head(&self.data);
+                let (offset, len) = lutra_bin::ArrayReader::<&[u8]>::read_head(&self.data);
                 out.put_slice(&self.data[offset..(offset + len)])
             }
 

@@ -83,7 +83,7 @@ pub fn write_functions(
 
         // encode result
         writeln!(w, "        let buf = {lutra_bin}::Encode::encode(&res);")?;
-        writeln!(w, "        Ok(::lutra_interpreter::Cell::Data({lutra_bin}::Data::new(buf.to_vec())))")?;
+        writeln!(w, "        Ok(::lutra_interpreter::Cell::Data(::lutra_interpreter::Data::new(buf.to_vec())))")?;
         writeln!(w, "    }}")?;
     }
     writeln!(w, "}}\n")?;

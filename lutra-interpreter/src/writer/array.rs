@@ -1,7 +1,8 @@
-use crate::vec;
+use std::vec;
+
+use lutra_bin::ir;
 
 use crate::Data;
-use crate::ir;
 
 use super::SeveredBodies;
 
@@ -67,7 +68,7 @@ impl<'t> ArrayWriter<'t> {
         let mut total_len = self.buf.len();
         for body in &self.item_bodies {
             body.write_pointers(&mut self.buf, total_len);
-            total_len += body.buf.len();
+            total_len += body.buf.remaining();
         }
 
         // construct data

@@ -74,7 +74,7 @@ impl Decode for string::String {
 }
 impl<E: Decode> Decode for vec::Vec<E> {
     fn decode(r: &[u8]) -> Result<Self> {
-        let (offset, len) = reader::ArrayReader::read_head(r);
+        let (offset, len) = reader::ArrayReader::<&[u8]>::read_head(r);
         let mut buf = r.skip(offset);
 
         let mut out = vec::Vec::with_capacity(len);

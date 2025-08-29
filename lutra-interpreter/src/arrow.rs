@@ -7,6 +7,8 @@ use arrow::datatypes::{self as arrow_datatypes, DataType, Field, Schema, SchemaR
 
 use lutra_bin::{Decode, ir};
 
+use crate::{ArrayWriter, Data, TupleWriter};
+
 pub fn validate_schema(schema: &arrow_datatypes::Schema, item_ty: &ir::Ty) -> Result<(), String> {
     let ty_fields = item_ty.kind.as_tuple().unwrap();
 
@@ -77,15 +79,15 @@ fn validate_data_type(
 pub fn arrow_to_lutra(
     reader: impl arrow_array::RecordBatchReader,
     item_ty: &ir::Ty,
-) -> Result<lutra_bin::Data, ()> {
+) -> Result<Data, ()> {
     let ty_fields = item_ty.kind.as_tuple().ok_or(())?;
 
-    let mut output = lutra_bin::ArrayWriter::new_for_item_ty(item_ty);
+    let mut output = ArrayWriter::new_for_item_ty(item_ty);
     for batch in reader {
         let batch = batch.unwrap();
 
         for row_index in 0..batch.num_rows() {
-            let mut tuple = lutra_bin::TupleWriter::new_for_ty(item_ty);
+            let mut tuple = TupleWriter::new_for_ty(item_ty);
             for (col_index, ty_field) in ty_fields.iter().enumerate() {
                 let array = batch.column(col_index).as_any();
 
@@ -184,15 +186,15 @@ pub fn arrow_to_lutra(
     Ok(output.finish())
 }
 
-fn encode<T: lutra_bin::Encode + ?Sized>(value: &T) -> lutra_bin::Data {
-    lutra_bin::Data::new(value.encode())
+fn encode<T: lutra_bin::Encode + ?Sized>(value: &T) -> Data {
+    Data::new(value.encode())
 }
 
-fn decode<T: lutra_bin::Decode>(data: lutra_bin::Data) -> T {
-    T::decode(data.slice(T::head_size().div_ceil(8))).unwrap()
+fn decode<T: lutra_bin::Decode>(data: Data) -> T {
+    T::decode(data.chunk()).unwrap()
 }
 
-pub(crate) fn lutra_to_arrow(data: lutra_bin::Data, ty_item: &ir::Ty) -> arrow_array::RecordBatch {
+pub(crate) fn lutra_to_arrow(data: Data, ty_item: &ir::Ty) -> arrow_array::RecordBatch {
     let ir::TyKind::Tuple(ty_fields) = &ty_item.kind else {
         panic!()
     };
@@ -206,7 +208,7 @@ pub(crate) fn lutra_to_arrow(data: lutra_bin::Data, ty_item: &ir::Ty) -> arrow_a
     let array_reader = lutra_bin::ArrayReader::new(data, item_head_size.div_ceil(8));
     writer.prepare_for_batch(array_reader.remaining()).unwrap();
     for item in array_reader {
-        let tuple_reader = lutra_bin::TupleReader::new(&item, Cow::Borrowed(&item_field_offsets));
+        let tuple_reader = lutra_bin::TupleReader::new(item, Cow::Borrowed(&item_field_offsets));
         for (i, ty_field) in ty_fields.iter().enumerate() {
             match &ty_field.ty.kind {
                 ir::TyKind::Primitive(ir::TyPrimitive::bool) => {

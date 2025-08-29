@@ -48,7 +48,7 @@ fn decode_inner<'t>(
         TyClass::Array(item_ty) => {
             let mut body = r.clone();
 
-            let (offset, len) = ArrayReader::read_head(r.chunk());
+            let (offset, len) = ArrayReader::<&[u8]>::read_head(r.chunk());
             r.advance(8);
 
             body.advance(offset);

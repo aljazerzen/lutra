@@ -2,10 +2,10 @@ use std::collections::HashMap;
 use std::ops::{BitAnd, Shr};
 use std::rc::Rc;
 
-use lutra_bin::br;
-use lutra_bin::{Data, Decode};
+use lutra_bin::Decode;
+use lutra_bin::{ReaderExt, br};
 
-use crate::NativeModule;
+use crate::{ArrayWriter, Data, EnumWriter, NativeModule};
 
 type Addr = usize;
 
@@ -197,7 +197,7 @@ impl Interpreter {
                     .collect();
 
                 let mut field_index = 0;
-                let mut writer = lutra_bin::TupleWriter::new(field_layouts.as_slice().into());
+                let mut writer = crate::TupleWriter::new(field_layouts.as_slice().into());
                 for field in &tuple.fields {
                     let cell = self.evaluate_expr(&field.expr)?;
                     let data = cell.into_data().map_err(|_| EvalError::BadProgram)?;
@@ -218,7 +218,7 @@ impl Interpreter {
                             offsets.push(o);
                             o += head_bytes;
                         }
-                        let reader = lutra_bin::TupleReader::new(&data, offsets.into());
+                        let reader = lutra_bin::TupleReader::new(data, offsets.into());
                         for i in 0..field.unpack {
                             writer.write_field(reader.get_field(i as usize));
                         }
@@ -229,7 +229,7 @@ impl Interpreter {
                 Cell::Data(writer.finish())
             }
             br::ExprKind::Array(array) => {
-                let mut writer = lutra_bin::ArrayWriter::new(
+                let mut writer = ArrayWriter::new(
                     array.item_layout.head_size.div_ceil(8),
                     &array.item_layout.body_ptrs,
                 );
@@ -245,7 +245,7 @@ impl Interpreter {
                 let inner = self.evaluate_expr(&variant.inner)?;
                 let inner = inner.into_data().map_err(|_| EvalError::BadProgram)?;
 
-                Cell::Data(lutra_bin::EnumWriter::write_variant(
+                Cell::Data(EnumWriter::write_variant(
                     &variant.tag,
                     variant.has_ptr,
                     variant.padding_bytes,
@@ -256,7 +256,7 @@ impl Interpreter {
                 let expr = self.evaluate_expr(&enum_eq.expr)?;
                 let expr = expr.into_data().map_err(|_| EvalError::BadProgram)?;
 
-                let expr_tag = expr.slice(enum_eq.tag.len());
+                let expr_tag = &expr.chunk()[0..enum_eq.tag.len()];
                 let eq = expr_tag == enum_eq.tag;
 
                 Cell::Data(Data::new(vec![if eq { 1_u8 } else { 0_u8 }]))
@@ -265,15 +265,15 @@ impl Interpreter {
                 let base = self.evaluate_expr(&lookup.base)?;
 
                 let mut data = base.into_data().map_err(|_| EvalError::BadProgram)?;
-                data.skip(lookup.offset as usize);
+                data.advance(lookup.offset as usize);
                 Cell::Data(data)
             }
             br::ExprKind::Deref(deref) => {
                 let data = self.evaluate_expr(&deref.ptr)?;
 
                 let mut data = data.into_data().map_err(|_| EvalError::BadProgram)?;
-                let offset = u32::from_le_bytes(data.slice(4).try_into().unwrap());
-                data.skip(offset as usize);
+                let offset = u32::from_le_bytes(data.chunk().read_const());
+                data.advance(offset as usize);
 
                 Cell::Data(data)
             }
@@ -310,7 +310,7 @@ impl Interpreter {
                 for branch in to_check {
                     let condition = self.evaluate_expr(&branch.condition)?;
                     let condition = condition.into_data().map_err(|_| EvalError::BadProgram)?;
-                    let condition = bool::decode(condition.slice(1)).unwrap();
+                    let condition = bool::decode(condition.chunk()).unwrap();
 
                     if condition {
                         return self.evaluate_expr(&branch.value);

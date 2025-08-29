@@ -1,5 +1,7 @@
-use crate::rc;
-use crate::vec;
+use std::rc;
+use std::vec;
+
+use lutra_bin::bytes;
 
 #[derive(Debug, Clone)]
 #[allow(private_interfaces)]
@@ -32,36 +34,36 @@ impl Data {
         }
     }
 
-    pub fn slice(&self, len: usize) -> &[u8] {
+    pub fn chunk(&self) -> &[u8] {
         match self {
-            Data::Single(slice) => slice.slice(len),
-            Data::Combined(combined) => combined.slice(len),
+            Data::Single(slice) => slice.chunk(),
+            Data::Combined(combined) => combined.chunk(),
         }
     }
 
-    pub fn skip(&mut self, bytes: usize) {
+    pub fn advance(&mut self, bytes: usize) {
         match self {
-            Data::Single(slice) => slice.skip(bytes),
-            Data::Combined(combined) => combined.skip(bytes),
+            Data::Single(slice) => slice.advance(bytes),
+            Data::Combined(combined) => combined.advance(bytes),
         }
     }
 
-    pub fn len(&self) -> usize {
+    pub fn remaining(&self) -> usize {
         match self {
-            Data::Single(s) => s.len(),
-            Data::Combined(c) => c.len(),
+            Data::Single(s) => s.remaining(),
+            Data::Combined(c) => c.remaining(),
         }
     }
 
-    pub fn is_empty(&self) -> bool {
+    pub fn has_remaining(&self) -> bool {
         match self {
             Data::Single(s) => s.is_empty(),
-            Data::Combined(c) => c.is_empty(),
+            Data::Combined(c) => c.has_remaining(),
         }
     }
 
     pub fn flatten(&self) -> vec::Vec<u8> {
-        let mut out = vec::Vec::with_capacity(self.len());
+        let mut out = vec::Vec::with_capacity(self.remaining());
         self.write_all(&mut out);
         out
     }
@@ -90,19 +92,18 @@ impl Slice {
         self.buf.get(index + self.offset).copied()
     }
 
-    fn slice(&self, len: usize) -> &[u8] {
-        assert!(self.len() >= len);
-        &self.buf[self.offset..][..len]
+    fn chunk(&self) -> &[u8] {
+        &self.buf[self.offset..]
     }
 
-    fn skip(&mut self, bytes: usize) {
+    fn advance(&mut self, bytes: usize) {
         self.offset += bytes;
         if self.offset > self.buf.len() {
             panic!()
         }
     }
 
-    fn len(&self) -> usize {
+    fn remaining(&self) -> usize {
         self.buf.len() - self.offset
     }
 
@@ -131,11 +132,11 @@ impl CombinedSlices {
     fn locate_offset(&self, mut offset: usize) -> Option<(usize, usize)> {
         // TODO: use binary search instead (log n)
         for (p_i, p) in self.parts.iter().enumerate() {
-            let len = p.len();
+            let len = p.remaining();
             if offset < len {
                 return Some((p_i, offset));
             }
-            offset -= p.len();
+            offset -= p.remaining();
         }
         None
     }
@@ -145,27 +146,27 @@ impl CombinedSlices {
         self.parts[b_i].get(offset)
     }
 
-    fn slice(&self, len: usize) -> &[u8] {
-        self.parts.first().unwrap().slice(len)
+    fn chunk(&self) -> &[u8] {
+        self.parts.first().unwrap().chunk()
     }
 
-    fn skip(&mut self, bytes: usize) {
+    fn advance(&mut self, bytes: usize) {
         if let Some((b_i, offset)) = self.locate_offset(bytes) {
             self.parts.drain(0..b_i);
             if offset > 0 {
-                self.parts.first_mut().unwrap().skip(offset);
+                self.parts.first_mut().unwrap().advance(offset);
             }
         } else {
             self.parts.clear();
         }
     }
 
-    fn len(&self) -> usize {
-        self.parts.iter().map(|d| d.len()).sum()
+    fn remaining(&self) -> usize {
+        self.parts.iter().map(|d| d.remaining()).sum()
     }
 
-    fn is_empty(&self) -> bool {
-        self.parts.iter().all(|d| d.is_empty())
+    fn has_remaining(&self) -> bool {
+        self.parts.iter().all(|d| d.has_remaining())
     }
 
     fn write_all(&self, w: &mut vec::Vec<u8>) {
@@ -180,8 +181,26 @@ fn main() {
     let my_buf = Slice::new(vec![0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
 
     let mut skipped = my_buf.clone(); // this is cheap
-    skipped.skip(3);
+    skipped.advance(3);
 
     assert_eq!(my_buf.get(0), Some(0)); // the original buffer has not moved
     assert_eq!(skipped.get(0), Some(3)); // but the cloned one has
+}
+
+impl bytes::Buf for Data {
+    fn remaining(&self) -> usize {
+        self.remaining()
+    }
+
+    fn chunk(&self) -> &[u8] {
+        self.chunk()
+    }
+
+    fn advance(&mut self, cnt: usize) {
+        self.advance(cnt);
+    }
+
+    fn has_remaining(&self) -> bool {
+        self.has_remaining()
+    }
 }

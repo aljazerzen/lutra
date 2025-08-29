@@ -210,7 +210,7 @@ impl ArrayCodec {
         // decode head
         let py_buf = PyBuffer::<u8>::get(&buf)?;
         let buf_slice = buffer_as_slice(&py_buf)?;
-        let (offset, len) = lutra_bin::ArrayReader::read_head(buf_slice);
+        let (offset, len) = lutra_bin::ArrayReader::<&[u8]>::read_head(buf_slice);
 
         // prepare memoryview of buf
         let buf = py.eval(c_str!("memoryview"), None, None)?.call1((buf,))?;

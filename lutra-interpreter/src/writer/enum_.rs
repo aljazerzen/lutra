@@ -1,8 +1,9 @@
-use crate::vec;
+use std::vec;
+
+use lutra_bin::ir;
+use lutra_bin::layout;
 
 use crate::Data;
-use crate::ir;
-use crate::layout;
 
 #[derive(Debug)]
 pub struct EnumWriter {
@@ -68,7 +69,7 @@ impl EnumWriter {
             // This allows us to drop `variant.is_unit` param.
         } else {
             // inner
-            let inner_oversized = inner.len() >= 4;
+            let inner_oversized = inner.remaining() >= 4;
             let mut data = Data::new(buf).combine(inner);
 
             // padding
