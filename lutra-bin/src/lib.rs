@@ -6,9 +6,11 @@ mod encode;
 mod error;
 pub mod ir;
 pub mod layout;
+mod printer;
 pub mod reader;
 pub mod rr;
 mod value;
+mod visitor;
 
 #[path = "project/generated.rs"]
 mod generated;
@@ -19,6 +21,10 @@ pub use error::{Error, Result};
 pub use layout::Layout;
 pub use reader::{ArrayReader, ReaderExt, TupleReader};
 pub use value::{Value, ValueVisitor};
+pub use visitor::Visitor;
+
+#[cfg(feature = "std")]
+pub use printer::print_source;
 
 pub use bytes;
 

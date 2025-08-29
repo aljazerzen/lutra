@@ -20,9 +20,8 @@ fn execute_program(project: &lutra_compiler::Project, program: &str) {
     let program = program.into_bytecode_lt().unwrap();
     let result =
         lutra_interpreter::evaluate(&program, input, lutra_interpreter::BUILTIN_MODULES).unwrap();
-    let result = lutra_bin::Value::decode(&result, &ty.output, &ty.defs).unwrap();
 
-    lutra_tui::show_value(&ty.output, result).unwrap();
+    lutra_tui::show_value(&ty.output, &result).unwrap();
 }
 
 fn get_project() -> lutra_compiler::Project {

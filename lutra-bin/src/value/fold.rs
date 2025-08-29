@@ -5,7 +5,15 @@ use crate::Value;
 pub trait ValueVisitor<'t> {
     type Res;
 
-    fn get_mat_ty(&self, ty: &'t ir::Ty) -> &'t ir::Ty;
+    fn get_ty(&self, name: &ir::Path) -> &'t ir::Ty;
+
+    fn get_mat_ty(&self, ty: &'t ir::Ty) -> &'t ir::Ty {
+        let mut ty = ty;
+        while let ir::TyKind::Ident(name) = &ty.kind {
+            ty = self.get_ty(name);
+        }
+        ty
+    }
 
     fn visit_value(&mut self, value: &Value, ty: &'t ir::Ty) -> Result<Self::Res, crate::Error> {
         let ty = self.get_mat_ty(ty);

@@ -65,8 +65,7 @@ impl Decode for f64 {
 
 impl Decode for string::String {
     fn decode(r: &[u8]) -> Result<Self> {
-        let offset = u32::from_le_bytes(r.read_const()) as usize;
-        let len = u32::from_le_bytes(r.skip(4).read_const()) as usize;
+        let (offset, len) = reader::ArrayReader::<&[u8]>::read_head(r);
 
         let buf = r.skip(offset).read_n(len).to_vec();
         Ok(string::String::from_utf8(buf).unwrap())

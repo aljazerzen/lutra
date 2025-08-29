@@ -12,10 +12,7 @@ fn _test_interpret(program: &str) -> String {
     let output =
         lutra_interpreter::evaluate(&bytecode, vec![], lutra_interpreter::BUILTIN_MODULES).unwrap();
 
-    let output = lutra_bin::Value::decode(&output, program.get_output_ty(), &program.defs).unwrap();
-    output
-        .print_source(program.get_output_ty(), &program.defs)
-        .unwrap()
+    lutra_bin::print_source(&output, program.get_output_ty(), &[]).unwrap()
 }
 
 #[track_caller]

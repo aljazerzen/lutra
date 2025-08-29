@@ -48,7 +48,10 @@ fn test_print_01() {
         ]),
     ]);
 
-    assert_snapshot!(value.print_source(&ty, &[]).unwrap(), @r#"
+    let value = value.encode(&ty, &[]).unwrap();
+    let source = lutra_bin::print_source(&value, &ty, &[]).unwrap();
+
+    assert_snapshot!(source, @r#"
     {
       n_rows = 100,
       page = [
@@ -88,7 +91,9 @@ fn test_print_02() {
         Value::Prim64(4),
     ]);
 
-    assert_snapshot!(value.print_source(&ty, &[]).unwrap(), @r#"
+    let value = value.encode(&ty, &[]).unwrap();
+    let source = lutra_bin::print_source(&value, &ty, &[]).unwrap();
+    assert_snapshot!(source, @r#"
     [
       1,
       2,

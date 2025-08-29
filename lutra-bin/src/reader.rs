@@ -37,19 +37,19 @@ impl<B> ArrayReader<B>
 where
     B: bytes::Buf + Clone,
 {
-    pub fn new_for_ty(data: B, ty: &ir::Ty) -> Self {
+    pub fn new_for_ty(buf: B, ty: &ir::Ty) -> Self {
         let ir::TyKind::Array(items_ty) = &ty.kind else {
             panic!()
         };
         let item_head_size = items_ty.layout.as_ref().unwrap().head_size as usize;
 
-        Self::new(data, item_head_size.div_ceil(8))
+        Self::new(buf, item_head_size.div_ceil(8))
     }
 
-    pub fn new(data: B, item_head_bytes: usize) -> Self {
-        let (offset, len) = Self::read_head(data.chunk());
+    pub fn new(buf: B, item_head_bytes: usize) -> Self {
+        let (offset, len) = Self::read_head(buf.chunk());
 
-        let mut body = data.clone();
+        let mut body = buf.clone();
         body.advance(offset);
 
         ArrayReader {
@@ -130,16 +130,13 @@ impl<'t, B> TupleReader<'t, B>
 where
     B: bytes::Buf + Clone,
 {
-    pub fn new(data: B, field_offsets: borrow::Cow<'t, [u32]>) -> Self {
-        TupleReader {
-            buf: data,
-            field_offsets,
-        }
+    pub fn new(buf: B, field_offsets: borrow::Cow<'t, [u32]>) -> Self {
+        TupleReader { buf, field_offsets }
     }
 
-    pub fn new_for_ty(data: B, ty: &ir::Ty) -> Self {
+    pub fn new_for_ty(buf: B, ty: &ir::Ty) -> Self {
         let field_offsets = layout::tuple_field_offsets(ty);
-        Self::new(data, field_offsets.into())
+        Self::new(buf, field_offsets.into())
     }
 
     pub fn get_field(&self, index: usize) -> B {

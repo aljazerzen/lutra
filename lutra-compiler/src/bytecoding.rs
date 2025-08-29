@@ -289,12 +289,7 @@ impl ByteCoder {
                 let ty_func = ty_mat.kind.as_function().unwrap();
                 let ty_item = ty_func.body.kind.as_array().unwrap();
                 let default_val = self.construct_default_for_ty(ty_item);
-                tracing::debug!(
-                    "default value: {}",
-                    default_val.print_source(ty_item, &[]).unwrap()
-                );
                 let default_val = default_val.encode(ty_item, &[]).unwrap(); // TODO: ty_defs
-                tracing::debug!("default value: {default_val:?}",);
                 pack_bytes_to_u32(default_val, &mut r);
 
                 r

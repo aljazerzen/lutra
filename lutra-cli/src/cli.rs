@@ -262,8 +262,10 @@ pub async fn run(cmd: RunCommand) -> anyhow::Result<()> {
         );
     } else {
         // print to stdout
-        let value = lutra_bin::Value::decode(&output, &ty.output, &ty.defs)?;
-        println!("{}", value.print_source(&ty.output, &ty.defs).unwrap());
+        println!(
+            "{}",
+            lutra_bin::print_source(&output, &ty.output, &ty.defs).unwrap()
+        );
     }
 
     Ok(())

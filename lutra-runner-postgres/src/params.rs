@@ -1,7 +1,7 @@
 use std::{borrow::Cow, collections::HashMap};
 
 use bytes::BufMut;
-use lutra_bin::{ValueVisitor, ir, rr};
+use lutra_bin::{Visitor, ir, rr};
 use postgres_types as pg_ty;
 use tinyjson::JsonValue;
 
@@ -99,14 +99,14 @@ impl<'a> Context<'a> {
     }
 }
 
-// TODO: this is very inefficient - deserializing into lutra_bin::Value should be avoided
 fn serialize_input_to_json(input: &[u8], ty: &ir::Ty, program: &rr::SqlProgram) -> Vec<u8> {
-    let value = lutra_bin::Value::decode(input, ty, &program.defs).unwrap();
     let mut json_encoder = JsonEncoder {
         out: String::with_capacity(input.len()),
+
+        // reuse this HashMap over the whole [to_sql] invocation
         defs: program.defs.iter().map(|d| (&d.name, &d.ty)).collect(),
     };
-    json_encoder.visit_value(&value, ty).unwrap();
+    json_encoder.visit(input, ty).unwrap();
     json_encoder.out.into_bytes()
 }
 pub struct Args<'a> {
@@ -194,20 +194,16 @@ impl<'a> pg_ty::ToSql for Arg<'a> {
     pg_ty::to_sql_checked!();
 }
 
-// TODO: this is very inefficient.
 struct JsonEncoder<'t> {
     out: String,
     defs: HashMap<&'t ir::Path, &'t ir::Ty>,
 }
 
-impl<'t> lutra_bin::ValueVisitor<'t> for JsonEncoder<'t> {
+impl<'t, 'a> lutra_bin::Visitor<'t, &'a [u8]> for JsonEncoder<'t> {
     type Res = ();
 
-    fn get_mat_ty(&self, mut ty: &'t ir::Ty) -> &'t ir::Ty {
-        while let ir::TyKind::Ident(name) = &ty.kind {
-            ty = self.defs.get(name).unwrap();
-        }
-        ty
+    fn get_ty(&self, name: &ir::Path) -> &'t ir::Ty {
+        self.defs.get(name).unwrap()
     }
 
     fn visit_bool(&mut self, v: bool) -> Result<Self::Res, lutra_bin::Error> {
@@ -265,29 +261,30 @@ impl<'t> lutra_bin::ValueVisitor<'t> for JsonEncoder<'t> {
         Ok(())
     }
 
-    fn visit_text(&mut self, v: &str) -> Result<Self::Res, lutra_bin::Error> {
+    fn visit_text(&mut self, content: &[u8], len: usize) -> Result<Self::Res, lutra_bin::Error> {
+        let s = String::from_utf8(content[0..len].to_vec())
+            .map_err(|_| lutra_bin::Error::InvalidData)?;
+
         self.out
-            .push_str(&JsonValue::String(v.to_string()).stringify().unwrap());
+            .push_str(&JsonValue::String(s).stringify().unwrap());
         Ok(())
     }
 
     fn visit_tuple(
         &mut self,
-        fields: &[lutra_bin::Value],
-        ty_fields: &'t [ir::TyTupleField],
+        fields: impl Iterator<Item = (&'a [u8], &'t ir::TyTupleField)>,
     ) -> Result<Self::Res, lutra_bin::Error> {
-        let tys = ty_fields.iter().map(|t| &t.ty);
-        let items = std::iter::zip(fields, tys);
-        self.encode_json_array(items);
+        let fields = fields.map(|(b, f)| (b, &f.ty));
+        self.encode_json_array(fields);
         Ok(())
     }
 
     fn visit_array(
         &mut self,
-        items: &[lutra_bin::Value],
+        items: impl Iterator<Item = &'a [u8]>,
         ty_items: &'t ir::Ty,
     ) -> Result<Self::Res, lutra_bin::Error> {
-        let items = items.iter().map(|v| (v, ty_items));
+        let items = items.map(|v| (v, ty_items));
         self.encode_json_array(items);
         Ok(())
     }
@@ -295,29 +292,26 @@ impl<'t> lutra_bin::ValueVisitor<'t> for JsonEncoder<'t> {
     fn visit_enum(
         &mut self,
         tag: usize,
-        inner: &lutra_bin::Value,
+        inner: &'a [u8],
         ty_variants: &'t [ir::TyEnumVariant],
     ) -> Result<Self::Res, lutra_bin::Error> {
         self.out += "{\"";
         self.out += &tag.to_string();
         self.out += "\":";
-        self.visit_value(inner, &ty_variants[tag].ty)?;
+        self.visit(inner, &ty_variants[tag].ty)?;
         self.out += "}";
         Ok(())
     }
 }
 
 impl<'t> JsonEncoder<'t> {
-    fn encode_json_array<'a>(
-        &mut self,
-        items: impl Iterator<Item = (&'a lutra_bin::Value, &'t ir::Ty)>,
-    ) {
+    fn encode_json_array<'a>(&mut self, items: impl Iterator<Item = (&'a [u8], &'t ir::Ty)>) {
         self.out.push('[');
         for (index, (field, field_ty)) in items.into_iter().enumerate() {
             if index > 0 {
                 self.out.push(',');
             }
-            self.visit_value(field, field_ty).unwrap();
+            self.visit(field, field_ty).unwrap();
         }
         self.out.push(']');
     }

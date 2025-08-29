@@ -56,11 +56,10 @@ pub async fn _run_on(
 
     // execute
     let program = runner.prepare(program).await.unwrap();
-    let rel_data = runner.execute(&program, &input).await.unwrap();
+    let output = runner.execute(&program, &input).await.unwrap();
 
     // decode and print source
-    let output = lutra_bin::Value::decode(&rel_data, &ty.output, &ty.defs).unwrap();
-    let output = output.print_source(&ty.output, &ty.defs).unwrap();
+    let output = lutra_bin::print_source(&output, &ty.output, &ty.defs).unwrap();
 
     (formatted_sql, output)
 }

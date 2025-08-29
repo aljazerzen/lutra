@@ -5,12 +5,12 @@ mod terminal;
 pub use explore::prompt_for_def;
 pub use input::prompt_for_ty;
 
-pub fn show_value(ty: &lutra_bin::ir::Ty, value: lutra_bin::Value) -> Result<(), anyhow::Error> {
+pub fn show_value(ty: &lutra_bin::ir::Ty, value: &[u8]) -> Result<(), anyhow::Error> {
     use crossterm::event;
     use ratatui::widgets::Paragraph;
     use ratatui::widgets::Wrap;
 
-    let text = value.print_source(ty, &[]).unwrap();
+    let text = lutra_bin::print_source(value, ty, &[]).unwrap();
 
     crate::terminal::within_alternate_screen(|term| -> std::io::Result<()> {
         term.draw(|frame| {

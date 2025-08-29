@@ -41,6 +41,5 @@ async fn main() {
 
 fn res_to_string(res: Result<Vec<u8>, io::Error>, output_ty: &br::Ty) -> String {
     let res = res.unwrap();
-    let res = lutra_bin::Value::decode(&res, output_ty, &[]).unwrap();
-    res.print_source(output_ty, &[]).unwrap()
+    lutra_bin::print_source(&res, output_ty, &[]).unwrap()
 }
