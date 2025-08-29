@@ -35,5 +35,5 @@ fn test_01() {
 
     let value = Value::decode(&value, &output_ty, &[]).unwrap();
 
-    assert_eq!(value, Value::Int64(6));
+    assert_eq!(value, Value::Prim64(6));
 }

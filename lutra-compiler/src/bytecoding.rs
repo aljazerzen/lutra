@@ -427,17 +427,19 @@ impl ByteCoder {
     fn construct_default_for_ty(&self, ty: &ir::Ty) -> lutra_bin::Value {
         match &self.get_ty_mat(ty).kind {
             ir::TyKind::Primitive(prim) => match prim {
-                ir::TyPrimitive::bool => lutra_bin::Value::Bool(false),
-                ir::TyPrimitive::int8 => lutra_bin::Value::Int8(0),
-                ir::TyPrimitive::int16 => lutra_bin::Value::Int16(0),
-                ir::TyPrimitive::int32 => lutra_bin::Value::Int32(0),
-                ir::TyPrimitive::int64 => lutra_bin::Value::Int64(0),
-                ir::TyPrimitive::uint8 => lutra_bin::Value::Uint8(0),
-                ir::TyPrimitive::uint16 => lutra_bin::Value::Uint16(0),
-                ir::TyPrimitive::uint32 => lutra_bin::Value::Uint32(0),
-                ir::TyPrimitive::uint64 => lutra_bin::Value::Uint64(0),
-                ir::TyPrimitive::float32 => lutra_bin::Value::Float32(0.0),
-                ir::TyPrimitive::float64 => lutra_bin::Value::Float64(0.0),
+                ir::TyPrimitive::bool | ir::TyPrimitive::int8 | ir::TyPrimitive::uint8 => {
+                    lutra_bin::Value::Prim8(0)
+                }
+
+                ir::TyPrimitive::int16 | ir::TyPrimitive::uint16 => lutra_bin::Value::Prim16(0),
+
+                ir::TyPrimitive::int32 | ir::TyPrimitive::uint32 | ir::TyPrimitive::float32 => {
+                    lutra_bin::Value::Prim32(0)
+                }
+
+                ir::TyPrimitive::int64 | ir::TyPrimitive::uint64 | ir::TyPrimitive::float64 => {
+                    lutra_bin::Value::Prim64(0)
+                }
                 ir::TyPrimitive::text => lutra_bin::Value::Text("".into()),
             },
             ir::TyKind::Array(_) => lutra_bin::Value::Array(vec![]),

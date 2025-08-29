@@ -32,7 +32,7 @@ fn fuzz() {
         Construct {
             name: "int32",
             val_source: "5: int32",
-            val_builder: Box::new(|_| lutra_bin::Value::Int32(5)),
+            val_builder: Box::new(|_| lutra_bin::Value::Prim32(5)),
             ty_source: "int32",
             param_count: 0,
         },
@@ -46,7 +46,7 @@ fn fuzz() {
         Construct {
             name: "bool",
             val_source: "true",
-            val_builder: Box::new(|_| lutra_bin::Value::Bool(true)),
+            val_builder: Box::new(|_| lutra_bin::Value::Prim8(1)),
             ty_source: "bool",
             param_count: 0,
         },
@@ -64,9 +64,9 @@ fn fuzz() {
             val_source: "{1: int32, $0, 2: int16}",
             val_builder: Box::new(|args| {
                 lutra_bin::Value::Tuple(vec![
-                    lutra_bin::Value::Int32(1),
+                    lutra_bin::Value::Prim32(1),
                     args.into_iter().next().unwrap(),
-                    lutra_bin::Value::Int16(2),
+                    lutra_bin::Value::Prim16(2),
                 ])
             }),
             ty_source: "{int32, $0, int16}",
@@ -87,11 +87,11 @@ fn fuzz() {
             val_builder: Box::new(|args| {
                 let mut args = args.into_iter();
                 lutra_bin::Value::Tuple(vec![
-                    lutra_bin::Value::Int32(1),
+                    lutra_bin::Value::Prim32(1),
                     args.next().unwrap(),
-                    lutra_bin::Value::Int16(2),
+                    lutra_bin::Value::Prim16(2),
                     args.next().unwrap(),
-                    lutra_bin::Value::Int16(3),
+                    lutra_bin::Value::Prim16(3),
                 ])
             }),
             ty_source: "{int32, $0, int16, $1, int16}",
@@ -210,7 +210,7 @@ fn generate(constructs: &[Construct], rng: &mut impl Rng, depth: usize) -> Case 
         return Case {
             val_source: "false".into(),
             ty_source: "bool".into(),
-            val: lutra_bin::Value::Bool(false),
+            val: lutra_bin::Value::Prim8(0),
         };
     }
 

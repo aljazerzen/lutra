@@ -21,9 +21,9 @@ fn _test_typed_data_roundtrip(value: Value, ty: &str) -> String {
 fn test_typed_data_01() {
     insta::assert_snapshot!(_test_typed_data_roundtrip(
         Value::Tuple(vec![
-            Value::Int64(42),
+            Value::Prim64(42),
             Value::Text("Hello world!".to_string()),
-            Value::Array(vec![Value::Bool(true), Value::Bool(false)]),
+            Value::Array(vec![Value::Prim8(1), Value::Prim8(0)]),
         ]),
         "{int64, text, [bool]}",
     ), @r##"
@@ -45,7 +45,7 @@ fn test_typed_data_01() {
 
 #[test]
 fn test_typed_data_02() {
-    insta::assert_snapshot!(_test_typed_data_roundtrip(Value::Bool(true), "bool"), @r#"
+    insta::assert_snapshot!(_test_typed_data_roundtrip(Value::Prim8(1), "bool"), @r#"
     Length: 32 (0x20) bytes
     0000:   00 11 00 00  00 01 0d 00  00 00 15 00  00 00 01 00   ................
     0010:   00 00 00 08  00 00 00 08  00 00 00 00  00 00 00 01   ................

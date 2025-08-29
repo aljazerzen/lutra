@@ -1,13 +1,11 @@
-use crate::string;
-
 pub type Result<T, E = Error> = core::result::Result<T, E>;
 
 #[derive(thiserror::Error, Debug)]
 pub enum Error {
-    #[error("type mismatch: expected {expected}, but found {found}")]
-    TypeMismatch {
+    #[error("type error: expected {expected}, but found {found}")]
+    BadValueType {
         expected: &'static str,
-        found: string::String,
+        found: &'static str,
     },
 
     #[error("invalid data for given type")]

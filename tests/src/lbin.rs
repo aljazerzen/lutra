@@ -64,9 +64,9 @@ fn test_x() {
     let ty = _test_get_type("x");
 
     let value = Value::Tuple(vec![
-        Value::Int64(42),
+        Value::Prim64(42),
         Value::Text("Hello world!".to_string()),
-        Value::Array(vec![Value::Bool(true), Value::Bool(false)]),
+        Value::Array(vec![Value::Prim8(1), Value::Prim8(0)]),
     ]);
 
     assert_snapshot!(_test_encode_decode::<types::x>(value, ty), @r#"
@@ -81,7 +81,7 @@ fn test_x() {
 #[test]
 fn test_y() {
     let ty = _test_get_type("y");
-    let value = Value::Array(vec![Value::Int64(12), Value::Int64(55), Value::Int64(2)]);
+    let value = Value::Array(vec![Value::Prim64(12), Value::Prim64(55), Value::Prim64(2)]);
     assert_snapshot!(_test_encode_decode::<types::y>(value, ty), @r#"
     Length: 32 (0x20) bytes
     0000:   08 00 00 00  03 00 00 00  0c 00 00 00  00 00 00 00   ................
@@ -93,7 +93,7 @@ fn test_y() {
 #[test]
 fn test_z() {
     let ty = _test_get_type("z");
-    let value = Value::Bool(true);
+    let value = Value::Prim8(1);
 
     assert_snapshot!(_test_encode_decode::<types::z>(value, ty), @r#"
     Length: 1 (0x1) bytes
@@ -105,7 +105,7 @@ fn test_z() {
 #[test]
 fn test_u_01() {
     let ty = _test_get_type("u");
-    let value = Value::Enum(0, Box::new(Value::Bool(true)));
+    let value = Value::Enum(0, Box::new(Value::Prim8(1)));
 
     assert_snapshot!(_test_encode_decode::<types::u>(value, ty), @r#"
     Length: 6 (0x6) bytes
@@ -131,7 +131,10 @@ fn test_u_03() {
     let ty = _test_get_type("u");
     let value = Value::Enum(
         2,
-        Box::new(Value::Tuple(vec![Value::Int64(-12), Value::Float64(3.16)])),
+        Box::new(Value::Tuple(vec![
+            Value::Prim64(-12_i64 as u64),
+            Value::Prim64(u64::from_ne_bytes((3.16_f64).to_ne_bytes())),
+        ])),
     );
 
     assert_snapshot!(_test_encode_decode::<types::u>(value, ty), @r#"
@@ -157,7 +160,7 @@ fn test_v() {
 #[test]
 fn test_t_01() {
     let ty = _test_get_type("t");
-    let value = Value::Enum(0, Box::new(Value::Int8(2)));
+    let value = Value::Enum(0, Box::new(Value::Prim8(2)));
 
     assert_snapshot!(_test_encode_decode::<types::t>(value, ty), @r#"
     Length: 3 (0x3) bytes
@@ -169,7 +172,7 @@ fn test_t_01() {
 #[test]
 fn test_t_02() {
     let ty = _test_get_type("t");
-    let value = Value::Enum(1, Box::new(Value::Int16(2342)));
+    let value = Value::Enum(1, Box::new(Value::Prim16(2342)));
 
     assert_snapshot!(_test_encode_decode::<types::t>(value, ty), @r#"
     Length: 3 (0x3) bytes
@@ -182,8 +185,8 @@ fn test_t_02() {
 fn test_p() {
     let ty = _test_get_type("p");
     let value = Value::Tuple(vec![
-        Value::Array(vec![Value::Int64(2), Value::Int64(4)]),
-        Value::Array(vec![Value::Int64(5), Value::Int64(6), Value::Int64(7)]),
+        Value::Array(vec![Value::Prim64(2), Value::Prim64(4)]),
+        Value::Array(vec![Value::Prim64(5), Value::Prim64(6), Value::Prim64(7)]),
     ]);
 
     assert_snapshot!(_test_encode_decode::<types::p>(value, ty), @r#"
@@ -201,7 +204,7 @@ fn test_i() {
     let ty = _test_get_type("i");
     let value = Value::Tuple(vec![
         Value::Enum(1, Box::new(Value::Tuple(vec![]))),
-        Value::Bool(false),
+        Value::Prim8(0),
     ]);
 
     assert_snapshot!(_test_encode_decode::<types::i>(value, ty), @r"
@@ -217,12 +220,12 @@ fn test_tree() {
     let value = Value::Enum(
         1, // Node
         Box::new(Value::Tuple(vec![
-            Value::Enum(0, Box::new(Value::Uint8(4))), // Leaf
+            Value::Enum(0, Box::new(Value::Prim8(4))), // Leaf
             Value::Enum(
                 1, // Node
                 Box::new(Value::Tuple(vec![
-                    Value::Enum(0, Box::new(Value::Uint8(7))),  // Leaf
-                    Value::Enum(0, Box::new(Value::Uint8(10))), // Leaf
+                    Value::Enum(0, Box::new(Value::Prim8(7))),  // Leaf
+                    Value::Enum(0, Box::new(Value::Prim8(10))), // Leaf
                 ])),
             ),
         ])),
@@ -283,7 +286,7 @@ fn test_opt2_02() {
     let ty = _test_get_type("opt2");
     let value = Value::Enum(
         1, // Some
-        Box::new(Value::Int16(65)),
+        Box::new(Value::Prim16(65)),
     );
     assert_snapshot!(_test_encode_decode::<types::opt2>(value, ty), @r#"
     Length: 3 (0x3) bytes

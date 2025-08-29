@@ -7,14 +7,14 @@
 //! Use this only when you need dynamic types, i.e. data whose type cannot be
 //! determined at compile time.
 
-use crate::string::ToString;
-use crate::{boxed, string, vec};
-
 mod decode;
 mod encode;
 mod fold;
-mod print_pretty;
 mod print_source;
+
+pub use fold::ValueVisitor;
+
+use crate::{boxed, string, vec};
 
 use crate::ir;
 use crate::{Error, Result};
@@ -22,17 +22,10 @@ use crate::{Error, Result};
 /// Generic Lutra value object
 #[derive(Clone, Debug, PartialEq)]
 pub enum Value {
-    Bool(bool),
-    Int8(i8),
-    Int16(i16),
-    Int32(i32),
-    Int64(i64),
-    Uint8(u8),
-    Uint16(u16),
-    Uint32(u32),
-    Uint64(u64),
-    Float32(f32),
-    Float64(f64),
+    Prim8(u8),
+    Prim16(u16),
+    Prim32(u32),
+    Prim64(u64),
     Text(string::String),
     Tuple(vec::Vec<Value>),
     Array(vec::Vec<Value>),
@@ -43,59 +36,136 @@ impl Value {
     pub fn unit() -> Value {
         Value::Tuple(vec![])
     }
-}
 
-fn expect_ty<'t, F, K>(ty: &'t ir::Ty, cast: F, expected: &'static str) -> Result<&'t K>
-where
-    F: Fn(&ir::TyKind) -> Option<&K>,
-{
-    cast(&ty.kind).ok_or_else(|| Error::TypeMismatch {
-        expected,
-        found: ty_kind_name(&ty.kind).to_string(),
-    })
-}
-
-fn expect_ty_primitive(ty: &ir::Ty, expected: ir::TyPrimitive) -> Result<()> {
-    let ir::TyKind::Primitive(found) = &ty.kind else {
-        return Err(Error::TypeMismatch {
-            expected: primitive_set_name(&expected),
-            found: ty_kind_name(&ty.kind).to_string(),
-        });
-    };
-
-    if *found != expected {
-        return Err(Error::TypeMismatch {
-            expected: primitive_set_name(&expected),
-            found: primitive_set_name(found).to_string(),
-        });
+    pub fn expect_prim8(&self) -> Result<u8> {
+        match self {
+            Value::Prim8(value) => Ok(*value),
+            _ => Err(Error::BadValueType {
+                expected: "Prim8",
+                found: self.name(),
+            }),
+        }
     }
-    Ok(())
-}
 
-fn primitive_set_name(expected: &ir::TyPrimitive) -> &'static str {
-    match expected {
-        ir::TyPrimitive::bool => "bool",
-        ir::TyPrimitive::int8 => "int8",
-        ir::TyPrimitive::int16 => "int16",
-        ir::TyPrimitive::int32 => "int32",
-        ir::TyPrimitive::int64 => "int64",
-        ir::TyPrimitive::uint8 => "uint8",
-        ir::TyPrimitive::uint16 => "uint16",
-        ir::TyPrimitive::uint32 => "uint32",
-        ir::TyPrimitive::uint64 => "uint64",
-        ir::TyPrimitive::float32 => "float32",
-        ir::TyPrimitive::float64 => "float64",
-        ir::TyPrimitive::text => "text",
+    pub fn expect_prim16(&self) -> Result<u16> {
+        match self {
+            Value::Prim16(value) => Ok(*value),
+            _ => Err(Error::BadValueType {
+                expected: "Prim16",
+                found: self.name(),
+            }),
+        }
+    }
+
+    pub fn expect_prim32(&self) -> Result<u32> {
+        match self {
+            Value::Prim32(value) => Ok(*value),
+            _ => Err(Error::BadValueType {
+                expected: "Prim32",
+                found: self.name(),
+            }),
+        }
+    }
+
+    pub fn expect_prim64(&self) -> Result<u64> {
+        match self {
+            Value::Prim64(value) => Ok(*value),
+            _ => Err(Error::BadValueType {
+                expected: "Prim64",
+                found: self.name(),
+            }),
+        }
+    }
+
+    pub fn expect_text(&self) -> Result<&str> {
+        match self {
+            Value::Text(value) => Ok(value),
+            _ => Err(Error::BadValueType {
+                expected: "Text",
+                found: self.name(),
+            }),
+        }
+    }
+
+    pub fn expect_tuple(&self) -> Result<&[Value]> {
+        match self {
+            Value::Tuple(value) => Ok(value),
+            _ => Err(Error::BadValueType {
+                expected: "Tuple",
+                found: self.name(),
+            }),
+        }
+    }
+
+    pub fn expect_array(&self) -> Result<&[Value]> {
+        match self {
+            Value::Array(value) => Ok(value),
+            _ => Err(Error::BadValueType {
+                expected: "Array",
+                found: self.name(),
+            }),
+        }
+    }
+
+    pub fn expect_enum(&self) -> Result<(usize, &Value)> {
+        match self {
+            Value::Enum(tag, inner) => Ok((*tag, inner)),
+            _ => Err(Error::BadValueType {
+                expected: "Enum",
+                found: self.name(),
+            }),
+        }
+    }
+
+    fn name(&self) -> &'static str {
+        match self {
+            Value::Prim8(..) => "Prim8",
+            Value::Prim16(..) => "Prim16",
+            Value::Prim32(..) => "Prim32",
+            Value::Prim64(..) => "Prim64",
+            Value::Text(..) => "Text",
+            Value::Tuple(..) => "Tuple",
+            Value::Array(..) => "Array",
+            Value::Enum(..) => "Enum",
+        }
     }
 }
 
-fn ty_kind_name(expected: &ir::TyKind) -> &'static str {
-    match expected {
-        ir::TyKind::Primitive(_) => "primitive",
-        ir::TyKind::Tuple(_) => "tuple",
-        ir::TyKind::Array(_) => "array",
-        ir::TyKind::Enum(_) => "enum",
-        ir::TyKind::Function(_) => "function",
-        ir::TyKind::Ident(_) => "ident",
+#[derive(Clone, Copy, Debug, PartialEq)]
+enum TyClass<'t> {
+    Prim8,
+    Prim16,
+    Prim32,
+    Prim64,
+    PrimText,
+    Tuple(&'t [ir::TyTupleField]),
+    Array(&'t ir::Ty),
+    Enum(&'t [ir::TyEnumVariant]),
+}
+
+impl<'t> TyClass<'t> {
+    fn of_ty(ty_mat: &'t ir::Ty) -> Result<Self> {
+        Ok(match &ty_mat.kind {
+            ir::TyKind::Primitive(ir::TyPrimitive::bool)
+            | ir::TyKind::Primitive(ir::TyPrimitive::int8)
+            | ir::TyKind::Primitive(ir::TyPrimitive::uint8) => TyClass::Prim8,
+            ir::TyKind::Primitive(ir::TyPrimitive::int16)
+            | ir::TyKind::Primitive(ir::TyPrimitive::uint16) => TyClass::Prim16,
+            ir::TyKind::Primitive(ir::TyPrimitive::int32)
+            | ir::TyKind::Primitive(ir::TyPrimitive::uint32)
+            | ir::TyKind::Primitive(ir::TyPrimitive::float32) => TyClass::Prim32,
+            ir::TyKind::Primitive(ir::TyPrimitive::int64)
+            | ir::TyKind::Primitive(ir::TyPrimitive::uint64)
+            | ir::TyKind::Primitive(ir::TyPrimitive::float64) => TyClass::Prim64,
+
+            ir::TyKind::Primitive(ir::TyPrimitive::text) => TyClass::PrimText,
+
+            ir::TyKind::Tuple(t) => TyClass::Tuple(t),
+            ir::TyKind::Array(t) => TyClass::Array(t),
+            ir::TyKind::Enum(t) => TyClass::Enum(t),
+
+            ir::TyKind::Function(..) => return Err(Error::InvalidType),
+            ir::TyKind::Ident(..) => unreachable!(),
+        })
     }
 }

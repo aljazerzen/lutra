@@ -46,6 +46,6 @@ fn get_value() -> lutra_bin::Value {
             Value::Text("top-side".into()),
             Value::Text("file.txt".into()),
         ]),
-        Value::Bool(true),
+        Value::Prim8(1),
     ])
 }

@@ -56,13 +56,13 @@ impl BoolForm {
     }
 
     pub(crate) fn get_value(&self) -> lutra_bin::Value {
-        lutra_bin::Value::Bool(self.value)
+        lutra_bin::Value::Prim8(self.value as u8)
     }
 
     pub(crate) fn set_value(&mut self, value: lutra_bin::Value) {
-        let lutra_bin::Value::Bool(value) = value else {
+        let lutra_bin::Value::Prim8(value) = value else {
             panic!()
         };
-        self.value = value;
+        self.value = value != 0;
     }
 }

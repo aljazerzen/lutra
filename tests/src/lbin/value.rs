@@ -21,29 +21,29 @@ fn test_print_01() {
     );
 
     let value = Value::Tuple(vec![
-        Value::Int64(100),
+        Value::Prim64(100),
         Value::Array(vec![
             Value::Tuple(vec![
-                Value::Int64(2),                  // id = int,
+                Value::Prim64(2),                 // id = int,
                 Value::Text("aljaz".to_string()), // name = text,
                 Value::Tuple(vec![
                     // address = {
                     Value::Text("Ljubljana".into()), //     city = text,
                     Value::Text("Trubarjeva ulica".into()), //     street = text
                 ]), // },
-                Value::Int64(27),                 // int,
-                Value::Bool(true),                // is_admin = bool
+                Value::Prim64(27),                // int,
+                Value::Prim8(1),                  // is_admin = bool
             ]),
             Value::Tuple(vec![
-                Value::Int64(12),               // id = int,
+                Value::Prim64(12),              // id = int,
                 Value::Text("tom".to_string()), // name = text,
                 Value::Tuple(vec![
                     // address = {
                     Value::Text("London".into()),    //     city = text,
                     Value::Text("Trafalgar".into()), //     street = text
                 ]), // },
-                Value::Int64(18),               // int,
-                Value::Bool(false),             // is_admin = bool
+                Value::Prim64(18),              // int,
+                Value::Prim8(0),                // is_admin = bool
             ]),
         ]),
     ]);
@@ -82,10 +82,10 @@ fn test_print_02() {
     let ty = lutra_compiler::_test_compile_ty("[int64]");
 
     let value = Value::Array(vec![
-        Value::Int64(1),
-        Value::Int64(2),
-        Value::Int64(3),
-        Value::Int64(4),
+        Value::Prim64(1),
+        Value::Prim64(2),
+        Value::Prim64(3),
+        Value::Prim64(4),
     ]);
 
     assert_snapshot!(value.print_source(&ty, &[]).unwrap(), @r#"

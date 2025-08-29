@@ -1,7 +1,7 @@
-use std::borrow::Cow;
+use std::{borrow::Cow, collections::HashMap};
 
 use bytes::BufMut;
-use lutra_bin::{ir, rr};
+use lutra_bin::{ValueVisitor, ir, rr};
 use postgres_types as pg_ty;
 use tinyjson::JsonValue;
 
@@ -99,11 +99,15 @@ impl<'a> Context<'a> {
     }
 }
 
+// TODO: this is very inefficient - deserializing into lutra_bin::Value should be avoided
 fn serialize_input_to_json(input: &[u8], ty: &ir::Ty, program: &rr::SqlProgram) -> Vec<u8> {
     let value = lutra_bin::Value::decode(input, ty, &program.defs).unwrap();
-    let mut out = String::new();
-    lutra_to_json(value, &mut out);
-    out.into_bytes()
+    let mut json_encoder = JsonEncoder {
+        out: String::with_capacity(input.len()),
+        defs: program.defs.iter().map(|d| (&d.name, &d.ty)).collect(),
+    };
+    json_encoder.visit_value(&value, ty).unwrap();
+    json_encoder.out.into_bytes()
 }
 pub struct Args<'a> {
     args: Vec<Arg<'a>>,
@@ -191,44 +195,130 @@ impl<'a> pg_ty::ToSql for Arg<'a> {
 }
 
 // TODO: this is very inefficient.
-// We should instead instantiate a transcoder, which would read lb and directly translate to JSON
-fn lutra_to_json(value: lutra_bin::Value, out: &mut String) {
-    match value {
-        lutra_bin::Value::Bool(v) => out.push_str(if v { "true" } else { "false" }),
-        lutra_bin::Value::Int8(v) => out.push_str(&v.to_string()),
-        lutra_bin::Value::Int16(v) => out.push_str(&v.to_string()),
-        lutra_bin::Value::Int32(v) => out.push_str(&v.to_string()),
-        lutra_bin::Value::Int64(v) => out.push_str(&v.to_string()),
-        lutra_bin::Value::Uint8(v) => out.push_str(&v.to_string()),
-        lutra_bin::Value::Uint16(v) => out.push_str(&v.to_string()),
-        lutra_bin::Value::Uint32(v) => out.push_str(&v.to_string()),
-        lutra_bin::Value::Uint64(v) => out.push_str(&v.to_string()),
-        lutra_bin::Value::Float32(v) => out.push_str(&v.to_string()),
-        lutra_bin::Value::Float64(v) => out.push_str(&v.to_string()),
-        lutra_bin::Value::Text(v) => out.push_str(&JsonValue::String(v).stringify().unwrap()),
-        lutra_bin::Value::Array(items) => {
-            lutra_to_json_array(items.into_iter(), out);
+struct JsonEncoder<'t> {
+    out: String,
+    defs: HashMap<&'t ir::Path, &'t ir::Ty>,
+}
+
+impl<'t> lutra_bin::ValueVisitor<'t> for JsonEncoder<'t> {
+    type Res = ();
+
+    fn get_mat_ty(&self, mut ty: &'t ir::Ty) -> &'t ir::Ty {
+        while let ir::TyKind::Ident(name) = &ty.kind {
+            ty = self.defs.get(name).unwrap();
         }
-        lutra_bin::Value::Tuple(fields) => {
-            lutra_to_json_array(fields.into_iter(), out);
-        }
-        lutra_bin::Value::Enum(tag, inner) => {
-            *out += "{\"";
-            *out += &tag.to_string();
-            *out += "\":";
-            lutra_to_json(*inner, out);
-            *out += "}";
-        }
+        ty
+    }
+
+    fn visit_bool(&mut self, v: bool) -> Result<Self::Res, lutra_bin::Error> {
+        self.out.push_str(if v { "true" } else { "false" });
+        Ok(())
+    }
+
+    fn visit_int8(&mut self, v: i8) -> Result<Self::Res, lutra_bin::Error> {
+        self.out.push_str(&v.to_string());
+        Ok(())
+    }
+
+    fn visit_int16(&mut self, v: i16) -> Result<Self::Res, lutra_bin::Error> {
+        self.out.push_str(&v.to_string());
+        Ok(())
+    }
+
+    fn visit_int32(&mut self, v: i32) -> Result<Self::Res, lutra_bin::Error> {
+        self.out.push_str(&v.to_string());
+        Ok(())
+    }
+
+    fn visit_int64(&mut self, v: i64) -> Result<Self::Res, lutra_bin::Error> {
+        self.out.push_str(&v.to_string());
+        Ok(())
+    }
+
+    fn visit_uint8(&mut self, v: u8) -> Result<Self::Res, lutra_bin::Error> {
+        self.out.push_str(&v.to_string());
+        Ok(())
+    }
+
+    fn visit_uint16(&mut self, v: u16) -> Result<Self::Res, lutra_bin::Error> {
+        self.out.push_str(&v.to_string());
+        Ok(())
+    }
+
+    fn visit_uint32(&mut self, v: u32) -> Result<Self::Res, lutra_bin::Error> {
+        self.out.push_str(&v.to_string());
+        Ok(())
+    }
+
+    fn visit_uint64(&mut self, v: u64) -> Result<Self::Res, lutra_bin::Error> {
+        self.out.push_str(&v.to_string());
+        Ok(())
+    }
+
+    fn visit_float32(&mut self, v: f32) -> Result<Self::Res, lutra_bin::Error> {
+        self.out.push_str(&v.to_string());
+        Ok(())
+    }
+
+    fn visit_float64(&mut self, v: f64) -> Result<Self::Res, lutra_bin::Error> {
+        self.out.push_str(&v.to_string());
+        Ok(())
+    }
+
+    fn visit_text(&mut self, v: &str) -> Result<Self::Res, lutra_bin::Error> {
+        self.out
+            .push_str(&JsonValue::String(v.to_string()).stringify().unwrap());
+        Ok(())
+    }
+
+    fn visit_tuple(
+        &mut self,
+        fields: &[lutra_bin::Value],
+        ty_fields: &'t [ir::TyTupleField],
+    ) -> Result<Self::Res, lutra_bin::Error> {
+        let tys = ty_fields.iter().map(|t| &t.ty);
+        let items = std::iter::zip(fields, tys);
+        self.encode_json_array(items);
+        Ok(())
+    }
+
+    fn visit_array(
+        &mut self,
+        items: &[lutra_bin::Value],
+        ty_items: &'t ir::Ty,
+    ) -> Result<Self::Res, lutra_bin::Error> {
+        let items = items.iter().map(|v| (v, ty_items));
+        self.encode_json_array(items);
+        Ok(())
+    }
+
+    fn visit_enum(
+        &mut self,
+        tag: usize,
+        inner: &lutra_bin::Value,
+        ty_variants: &'t [ir::TyEnumVariant],
+    ) -> Result<Self::Res, lutra_bin::Error> {
+        self.out += "{\"";
+        self.out += &tag.to_string();
+        self.out += "\":";
+        self.visit_value(inner, &ty_variants[tag].ty)?;
+        self.out += "}";
+        Ok(())
     }
 }
 
-fn lutra_to_json_array(items: impl Iterator<Item = lutra_bin::Value>, out: &mut String) {
-    out.push('[');
-    for (index, field) in items.into_iter().enumerate() {
-        if index > 0 {
-            out.push(',');
+impl<'t> JsonEncoder<'t> {
+    fn encode_json_array<'a>(
+        &mut self,
+        items: impl Iterator<Item = (&'a lutra_bin::Value, &'t ir::Ty)>,
+    ) {
+        self.out.push('[');
+        for (index, (field, field_ty)) in items.into_iter().enumerate() {
+            if index > 0 {
+                self.out.push(',');
+            }
+            self.visit_value(field, field_ty).unwrap();
         }
-        lutra_to_json(field, out);
+        self.out.push(']');
     }
-    out.push(']');
 }

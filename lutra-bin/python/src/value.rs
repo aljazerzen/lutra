@@ -29,67 +29,67 @@ impl Value {
 
     fn as_bool(&self) -> PyResult<bool> {
         match &self.0 {
-            lutra_bin::Value::Bool(v) => Ok(*v),
+            lutra_bin::Value::Prim8(v) => Ok(*v != 0),
             _ => Err(pyo3::exceptions::PyValueError::new_err("expected bool")),
         }
     }
     fn as_int8(&self) -> PyResult<i8> {
         match &self.0 {
-            lutra_bin::Value::Int8(v) => Ok(*v),
+            lutra_bin::Value::Prim8(v) => Ok(*v as i8),
             _ => Err(pyo3::exceptions::PyValueError::new_err("expected int8")),
         }
     }
     fn as_int16(&self) -> PyResult<i16> {
         match &self.0 {
-            lutra_bin::Value::Int16(v) => Ok(*v),
+            lutra_bin::Value::Prim16(v) => Ok(*v as i16),
             _ => Err(pyo3::exceptions::PyValueError::new_err("expected int16")),
         }
     }
     fn as_int32(&self) -> PyResult<i32> {
         match &self.0 {
-            lutra_bin::Value::Int32(v) => Ok(*v),
+            lutra_bin::Value::Prim32(v) => Ok(*v as i32),
             _ => Err(pyo3::exceptions::PyValueError::new_err("expected int32")),
         }
     }
     fn as_int64(&self) -> PyResult<i64> {
         match &self.0 {
-            lutra_bin::Value::Int64(v) => Ok(*v),
+            lutra_bin::Value::Prim64(v) => Ok(*v as i64),
             _ => Err(pyo3::exceptions::PyValueError::new_err("expected int64")),
         }
     }
     fn as_uint8(&self) -> PyResult<u8> {
         match &self.0 {
-            lutra_bin::Value::Uint8(v) => Ok(*v),
+            lutra_bin::Value::Prim8(v) => Ok(*v),
             _ => Err(pyo3::exceptions::PyValueError::new_err("expected uint8")),
         }
     }
     fn as_uint16(&self) -> PyResult<u16> {
         match &self.0 {
-            lutra_bin::Value::Uint16(v) => Ok(*v),
+            lutra_bin::Value::Prim16(v) => Ok(*v),
             _ => Err(pyo3::exceptions::PyValueError::new_err("expected uint16")),
         }
     }
     fn as_uint32(&self) -> PyResult<u32> {
         match &self.0 {
-            lutra_bin::Value::Uint32(v) => Ok(*v),
+            lutra_bin::Value::Prim32(v) => Ok(*v),
             _ => Err(pyo3::exceptions::PyValueError::new_err("expected uint32")),
         }
     }
     fn as_uint64(&self) -> PyResult<u64> {
         match &self.0 {
-            lutra_bin::Value::Uint64(v) => Ok(*v),
+            lutra_bin::Value::Prim64(v) => Ok(*v),
             _ => Err(pyo3::exceptions::PyValueError::new_err("expected uint64")),
         }
     }
     fn as_float32(&self) -> PyResult<f32> {
         match &self.0 {
-            lutra_bin::Value::Float32(v) => Ok(*v),
+            lutra_bin::Value::Prim32(v) => Ok(*v as f32),
             _ => Err(pyo3::exceptions::PyValueError::new_err("expected float32")),
         }
     }
     fn as_float64(&self) -> PyResult<f64> {
         match &self.0 {
-            lutra_bin::Value::Float64(v) => Ok(*v),
+            lutra_bin::Value::Prim64(v) => Ok(*v as f64),
             _ => Err(pyo3::exceptions::PyValueError::new_err("expected float64")),
         }
     }

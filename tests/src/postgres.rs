@@ -945,7 +945,7 @@ fn param_00() {
     insta::assert_snapshot!(_run(r#"
     func main(x: int64) -> x + 1
     "#,
-    lutra_bin::Value::Int64(3)
+    lutra_bin::Value::Prim64(3)
     ).1, @"4");
 }
 
@@ -955,7 +955,7 @@ fn param_01() {
     func main(x: int64, y: text) -> {y, x}
     "#,
     lutra_bin::Value::Tuple(vec![
-        lutra_bin::Value::Int64(3),
+        lutra_bin::Value::Prim64(3),
         lutra_bin::Value::Text("hello".into())
     ])
     ).1, @r#"
@@ -972,12 +972,12 @@ fn param_02() {
     func main(x: {int64, {text, bool}, int32}) -> x
     "#,
     lutra_bin::Value::Tuple(vec![
-        lutra_bin::Value::Int64(3),
+        lutra_bin::Value::Prim64(3),
         lutra_bin::Value::Tuple(vec![
             lutra_bin::Value::Text("hello".into()),
-            lutra_bin::Value::Bool(true),
+            lutra_bin::Value::Prim8(1),
         ]),
-        lutra_bin::Value::Int32(5),
+        lutra_bin::Value::Prim32(5),
     ])
     ).1, @r#"
     {
@@ -997,12 +997,12 @@ fn param_03() {
     func main(x: {int64, [text], int32}) -> x
     "#,
     lutra_bin::Value::Tuple(vec![
-        lutra_bin::Value::Int64(3),
+        lutra_bin::Value::Prim64(3),
         lutra_bin::Value::Array(vec![
             lutra_bin::Value::Text("hello".into()),
             lutra_bin::Value::Text("world".into()),
         ]),
-        lutra_bin::Value::Int32(5),
+        lutra_bin::Value::Prim32(5),
     ])
     ).1, @r#"
     {
@@ -1023,11 +1023,11 @@ fn param_04() {
     "#,
     lutra_bin::Value::Array(vec![
         lutra_bin::Value::Tuple(vec![
-            lutra_bin::Value::Int64(5),
+            lutra_bin::Value::Prim64(5),
             lutra_bin::Value::Text("hello".into()),
         ]),
         lutra_bin::Value::Tuple(vec![
-            lutra_bin::Value::Int64(7),
+            lutra_bin::Value::Prim64(7),
             lutra_bin::Value::Text("world".into()),
         ]),
     ])
@@ -1046,12 +1046,12 @@ fn param_05() {
     "#,
     lutra_bin::Value::Array(vec![
         lutra_bin::Value::Tuple(vec![
-            lutra_bin::Value::Int32(5),
+            lutra_bin::Value::Prim32(5),
             lutra_bin::Value::Tuple(vec![
-                lutra_bin::Value::Int32(7),
-                lutra_bin::Value::Int16(7),
+                lutra_bin::Value::Prim32(7),
+                lutra_bin::Value::Prim16(7),
             ]),
-            lutra_bin::Value::Int16(1212),
+            lutra_bin::Value::Prim16(1212),
         ])
     ])
     ).1, @r"
@@ -1075,12 +1075,12 @@ fn param_06() {
     "#,
     lutra_bin::Value::Array(vec![
         lutra_bin::Value::Tuple(vec![
-            lutra_bin::Value::Int32(5),
+            lutra_bin::Value::Prim32(5),
             lutra_bin::Value::Tuple(vec![
-                lutra_bin::Value::Int32(7),
-                lutra_bin::Value::Int16(7),
+                lutra_bin::Value::Prim32(7),
+                lutra_bin::Value::Prim16(7),
             ]),
-            lutra_bin::Value::Int16(1212),
+            lutra_bin::Value::Prim16(1212),
         ])
     ])
     ).1, @r#"
@@ -1424,9 +1424,9 @@ fn json_pack_09() {
     func main(x: [int8]) -> {"hello", x}
     "#,
     lutra_bin::Value::Array(vec![
-        lutra_bin::Value::Int8(1),
-        lutra_bin::Value::Int8(2),
-        lutra_bin::Value::Int8(3),
+        lutra_bin::Value::Prim8(1),
+        lutra_bin::Value::Prim8(2),
+        lutra_bin::Value::Prim8(3),
     ]))), @r#"
     SELECT
       'hello' AS _0,

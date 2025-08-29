@@ -1,3 +1,4 @@
+use crate::value::TyClass;
 use crate::{boxed, string, vec};
 
 use bytes::Buf;
@@ -7,7 +8,7 @@ use super::encode::Context;
 
 use crate::ir;
 use crate::layout::{self, Layout};
-use crate::{ArrayReader, Decode, Error, Result};
+use crate::{ArrayReader, Decode, Result};
 
 impl Value {
     /// Convert .ld binary encoding into Lutra [Value].
@@ -26,32 +27,25 @@ fn decode_inner<'t>(
 ) -> Result<Value> {
     let ty = ctx.get_mat_ty(ty);
 
-    Ok(match &ty.kind {
-        ir::TyKind::Primitive(ir::TyPrimitive::bool) => Value::Bool(decode::<bool>(r)?),
-        ir::TyKind::Primitive(ir::TyPrimitive::int8) => Value::Int8(decode::<i8>(r)?),
-        ir::TyKind::Primitive(ir::TyPrimitive::int16) => Value::Int16(decode::<i16>(r)?),
-        ir::TyKind::Primitive(ir::TyPrimitive::int32) => Value::Int32(decode::<i32>(r)?),
-        ir::TyKind::Primitive(ir::TyPrimitive::int64) => Value::Int64(decode::<i64>(r)?),
-        ir::TyKind::Primitive(ir::TyPrimitive::uint8) => Value::Uint8(decode::<u8>(r)?),
-        ir::TyKind::Primitive(ir::TyPrimitive::uint16) => Value::Uint16(decode::<u16>(r)?),
-        ir::TyKind::Primitive(ir::TyPrimitive::uint32) => Value::Uint32(decode::<u32>(r)?),
-        ir::TyKind::Primitive(ir::TyPrimitive::uint64) => Value::Uint64(decode::<u64>(r)?),
-        ir::TyKind::Primitive(ir::TyPrimitive::float32) => Value::Float32(decode::<f32>(r)?),
-        ir::TyKind::Primitive(ir::TyPrimitive::float64) => Value::Float64(decode::<f64>(r)?),
-        ir::TyKind::Primitive(ir::TyPrimitive::text) => {
+    Ok(match TyClass::of_ty(ty)? {
+        TyClass::Prim8 => Value::Prim8(decode::<u8>(r)?),
+        TyClass::Prim16 => Value::Prim16(decode::<u16>(r)?),
+        TyClass::Prim32 => Value::Prim32(decode::<u32>(r)?),
+        TyClass::Prim64 => Value::Prim64(decode::<u64>(r)?),
+        TyClass::PrimText => {
             let res = string::String::decode(r.chunk())?;
             r.advance(string::String::head_size().div_ceil(8));
             Value::Text(res)
         }
 
-        ir::TyKind::Tuple(fields) => {
+        TyClass::Tuple(fields) => {
             let mut res = vec::Vec::with_capacity(fields.len());
             for field in fields {
                 res.push(decode_inner(r, &field.ty, ctx)?);
             }
             Value::Tuple(res)
         }
-        ir::TyKind::Array(item_ty) => {
+        TyClass::Array(item_ty) => {
             let mut body = r.clone();
 
             let (offset, len) = ArrayReader::read_head(r.chunk());
@@ -67,7 +61,7 @@ fn decode_inner<'t>(
             Value::Array(buf)
         }
 
-        ir::TyKind::Enum(variants) => {
+        TyClass::Enum(variants) => {
             let head = layout::enum_head_format(variants);
 
             let mut tag_bytes = vec![0; 8];
@@ -95,8 +89,6 @@ fn decode_inner<'t>(
             r.advance(variant_format.padding_bytes as usize);
             Value::Enum(tag, boxed::Box::new(inner))
         }
-
-        _ => return Err(Error::InvalidType),
     })
 }
 

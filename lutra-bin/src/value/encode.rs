@@ -7,7 +7,7 @@ use std::collections::HashMap as Map;
 
 use bytes::{BufMut, BytesMut};
 
-use super::{Value, expect_ty, expect_ty_primitive};
+use super::{TyClass, Value};
 use crate::encode::ReversePointer;
 use crate::ir;
 use crate::layout::{self, EnumHeadFormat, EnumVariantFormat};
@@ -34,71 +34,36 @@ fn encode_head<'t>(
 ) -> Result<ValueHeadPtr> {
     let ty = ctx.get_mat_ty(ty);
 
-    match value {
-        Value::Bool(v) => {
-            expect_ty_primitive(ty, ir::TyPrimitive::bool)?;
-
+    match TyClass::of_ty(ty)? {
+        TyClass::Prim8 => {
+            let v = value.expect_prim8()?;
+            v.encode_head(buf);
+            Ok(ValueHeadPtr::None)
+        }
+        TyClass::Prim16 => {
+            let v = value.expect_prim16()?;
+            v.encode_head(buf);
+            Ok(ValueHeadPtr::None)
+        }
+        TyClass::Prim32 => {
+            let v = value.expect_prim32()?;
             v.encode_head(buf);
             Ok(ValueHeadPtr::None)
         }
 
-        Value::Int8(v) => {
-            expect_ty_primitive(ty, ir::TyPrimitive::int8)?;
+        TyClass::Prim64 => {
+            let v = value.expect_prim64()?;
             v.encode_head(buf);
             Ok(ValueHeadPtr::None)
         }
-        Value::Int16(v) => {
-            expect_ty_primitive(ty, ir::TyPrimitive::int16)?;
-            v.encode_head(buf);
-            Ok(ValueHeadPtr::None)
-        }
-        Value::Int32(v) => {
-            expect_ty_primitive(ty, ir::TyPrimitive::int32)?;
-            v.encode_head(buf);
-            Ok(ValueHeadPtr::None)
-        }
-        Value::Int64(v) => {
-            expect_ty_primitive(ty, ir::TyPrimitive::int64)?;
-            v.encode_head(buf);
-            Ok(ValueHeadPtr::None)
-        }
-        Value::Uint8(v) => {
-            expect_ty_primitive(ty, ir::TyPrimitive::uint8)?;
-            v.encode_head(buf);
-            Ok(ValueHeadPtr::None)
-        }
-        Value::Uint16(v) => {
-            expect_ty_primitive(ty, ir::TyPrimitive::uint16)?;
-            v.encode_head(buf);
-            Ok(ValueHeadPtr::None)
-        }
-        Value::Uint32(v) => {
-            expect_ty_primitive(ty, ir::TyPrimitive::uint32)?;
-            v.encode_head(buf);
-            Ok(ValueHeadPtr::None)
-        }
-        Value::Uint64(v) => {
-            expect_ty_primitive(ty, ir::TyPrimitive::uint64)?;
-            v.encode_head(buf);
-            Ok(ValueHeadPtr::None)
-        }
-        Value::Float32(v) => {
-            expect_ty_primitive(ty, ir::TyPrimitive::float32)?;
-            v.encode_head(buf);
-            Ok(ValueHeadPtr::None)
-        }
-        Value::Float64(v) => {
-            expect_ty_primitive(ty, ir::TyPrimitive::float64)?;
-            v.encode_head(buf);
-            Ok(ValueHeadPtr::None)
-        }
-        Value::Text(v) => {
-            expect_ty_primitive(ty, ir::TyPrimitive::text)?;
 
+        TyClass::PrimText => {
+            let v = value.expect_text()?;
             Ok(ValueHeadPtr::Offset(v.encode_head(buf)))
         }
-        Value::Tuple(fields) => {
-            let ty_fields = expect_ty(ty, |k| k.as_tuple(), "tuple")?;
+
+        TyClass::Tuple(ty_fields) => {
+            let fields = value.expect_tuple()?;
 
             let mut head_ptrs = vec::Vec::with_capacity(fields.len());
             for (f, f_ty) in fields.iter().zip(ty_fields) {
@@ -107,17 +72,17 @@ fn encode_head<'t>(
 
             Ok(ValueHeadPtr::Tuple(head_ptrs))
         }
-        Value::Array(items) => {
-            expect_ty(ty, |k| k.as_array(), "array")?;
+        TyClass::Array(_ty_items) => {
+            let items = value.expect_array()?;
 
             let offset_ptr = ReversePointer::new(buf);
             buf.put_u32_le(items.len() as u32);
             Ok(ValueHeadPtr::Offset(offset_ptr))
         }
-        Value::Enum(tag, inner) => {
-            let variants = expect_ty(ty, |k| k.as_enum(), "enum")?;
+        TyClass::Enum(ty_variants) => {
+            let (tag, inner) = value.expect_enum()?;
 
-            let (head, variant, tag, variant_ty) = enum_params_encode(*tag, variants)?;
+            let (head, variant, tag, variant_ty) = enum_params_encode(tag, ty_variants)?;
 
             let tag_bytes = &(tag as u64).to_le_bytes()[0..head.tag_bytes as usize];
             buf.put_slice(tag_bytes);
@@ -158,20 +123,10 @@ fn encode_body<'t>(
 ) -> Result<()> {
     let ty = ctx.get_mat_ty(ty);
 
-    match value {
-        Value::Int8(_)
-        | Value::Int16(_)
-        | Value::Int32(_)
-        | Value::Int64(_)
-        | Value::Uint8(_)
-        | Value::Uint16(_)
-        | Value::Uint32(_)
-        | Value::Uint64(_)
-        | Value::Float32(_)
-        | Value::Float64(_)
-        | Value::Bool(_) => {}
-        Value::Text(v) => {
-            expect_ty_primitive(ty, ir::TyPrimitive::text)?;
+    match TyClass::of_ty(ty)? {
+        TyClass::Prim8 | TyClass::Prim16 | TyClass::Prim32 | TyClass::Prim64 => {}
+        TyClass::PrimText => {
+            let v = value.expect_text()?;
 
             let ValueHeadPtr::Offset(offset_ptr) = head_ptr else {
                 unreachable!()
@@ -179,8 +134,8 @@ fn encode_body<'t>(
 
             v.encode_body(offset_ptr, w);
         }
-        Value::Tuple(fields) => {
-            let ty_fields = expect_ty(ty, |k| k.as_tuple(), "tuple")?;
+        TyClass::Tuple(ty_fields) => {
+            let fields = value.expect_tuple()?;
 
             let ValueHeadPtr::Tuple(tuple_ptrs) = head_ptr else {
                 unreachable!()
@@ -190,8 +145,8 @@ fn encode_body<'t>(
                 encode_body(w, f, h, &f_ty.ty, ctx)?
             }
         }
-        Value::Array(items) => {
-            let items_ty = expect_ty(ty, |k| k.as_array(), "array")?;
+        TyClass::Array(items_ty) => {
+            let items = value.expect_array()?;
 
             let ValueHeadPtr::Offset(offset_ptr) = head_ptr else {
                 unreachable!()
@@ -207,10 +162,10 @@ fn encode_body<'t>(
                 encode_body(w, i, h, items_ty, ctx)?;
             }
         }
-        Value::Enum(tag, inner) => {
-            let variants = expect_ty(ty, |k| k.as_enum(), "enum")?;
+        TyClass::Enum(variants) => {
+            let (tag, inner) = value.expect_enum()?;
 
-            let (head_format, _, _, variant_ty) = enum_params_encode(*tag, variants)?;
+            let (head_format, _, _, variant_ty) = enum_params_encode(tag, variants)?;
 
             if head_format.has_ptr {
                 match head_ptr {

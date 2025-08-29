@@ -34,11 +34,11 @@ impl IntForm {
         };
 
         let value = value.parse::<i64>().unwrap_or_default();
-        lutra_bin::Value::Int64(value)
+        lutra_bin::Value::Prim64(value as u64)
     }
 
     pub(crate) fn set_value(&mut self, value: lutra_bin::Value) {
-        let lutra_bin::Value::Int64(value) = value else {
+        let lutra_bin::Value::Prim64(value) = value else {
             panic!()
         };
         let value = lutra_bin::Value::Text(value.to_string());

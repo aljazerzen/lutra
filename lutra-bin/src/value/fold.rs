@@ -6,73 +6,60 @@ use crate::Value;
 pub trait ValueVisitor<'t> {
     type Res;
 
-    fn get_mat_ty(&self, ty: &'t ir::Ty) -> &'t ir::Ty {
-        ty
-    }
+    fn get_mat_ty(&self, ty: &'t ir::Ty) -> &'t ir::Ty;
 
     fn visit_value(&mut self, value: &Value, ty: &'t ir::Ty) -> Result<Self::Res, crate::Error> {
         let ty = self.get_mat_ty(ty);
-        match value {
-            Value::Bool(v) => {
-                super::expect_ty_primitive(ty, ir::TyPrimitive::bool)?;
-                self.visit_bool(*v)
+
+        match &ty.kind {
+            ir::TyKind::Primitive(ir::TyPrimitive::bool) => {
+                self.visit_bool(value.expect_prim8()? != 0)
             }
-            Value::Int8(v) => {
-                super::expect_ty_primitive(ty, ir::TyPrimitive::int8)?;
-                self.visit_int8(*v)
+            ir::TyKind::Primitive(ir::TyPrimitive::int8) => {
+                self.visit_int8(value.expect_prim8()? as i8)
             }
-            Value::Int16(v) => {
-                super::expect_ty_primitive(ty, ir::TyPrimitive::int16)?;
-                self.visit_int16(*v)
+            ir::TyKind::Primitive(ir::TyPrimitive::uint8) => {
+                self.visit_uint8(value.expect_prim8()?)
             }
-            Value::Int32(v) => {
-                super::expect_ty_primitive(ty, ir::TyPrimitive::int32)?;
-                self.visit_int32(*v)
+            ir::TyKind::Primitive(ir::TyPrimitive::int16) => {
+                self.visit_int16(value.expect_prim16()? as i16)
             }
-            Value::Int64(v) => {
-                super::expect_ty_primitive(ty, ir::TyPrimitive::int64)?;
-                self.visit_int64(*v)
+            ir::TyKind::Primitive(ir::TyPrimitive::uint16) => {
+                self.visit_uint16(value.expect_prim16()?)
             }
-            Value::Uint8(v) => {
-                super::expect_ty_primitive(ty, ir::TyPrimitive::uint8)?;
-                self.visit_uint8(*v)
+            ir::TyKind::Primitive(ir::TyPrimitive::int32) => {
+                self.visit_int32(value.expect_prim32()? as i32)
             }
-            Value::Uint16(v) => {
-                super::expect_ty_primitive(ty, ir::TyPrimitive::uint16)?;
-                self.visit_uint16(*v)
+            ir::TyKind::Primitive(ir::TyPrimitive::uint32) => {
+                self.visit_uint32(value.expect_prim32()?)
             }
-            Value::Uint32(v) => {
-                super::expect_ty_primitive(ty, ir::TyPrimitive::uint32)?;
-                self.visit_uint32(*v)
+            ir::TyKind::Primitive(ir::TyPrimitive::float32) => {
+                self.visit_float32(f32::from_ne_bytes(value.expect_prim32()?.to_ne_bytes()))
             }
-            Value::Uint64(v) => {
-                super::expect_ty_primitive(ty, ir::TyPrimitive::uint64)?;
-                self.visit_uint64(*v)
+            ir::TyKind::Primitive(ir::TyPrimitive::int64) => {
+                self.visit_int64(value.expect_prim64()? as i64)
             }
-            Value::Float32(v) => {
-                super::expect_ty_primitive(ty, ir::TyPrimitive::float32)?;
-                self.visit_float32(*v)
+            ir::TyKind::Primitive(ir::TyPrimitive::uint64) => {
+                self.visit_uint64(value.expect_prim64()?)
             }
-            Value::Float64(v) => {
-                super::expect_ty_primitive(ty, ir::TyPrimitive::float64)?;
-                self.visit_float64(*v)
+            ir::TyKind::Primitive(ir::TyPrimitive::float64) => {
+                self.visit_float64(f64::from_ne_bytes(value.expect_prim64()?.to_ne_bytes()))
             }
-            Value::Text(v) => {
-                super::expect_ty_primitive(ty, ir::TyPrimitive::text)?;
-                self.visit_text(v)
+            ir::TyKind::Primitive(ir::TyPrimitive::text) => self.visit_text(value.expect_text()?),
+            ir::TyKind::Tuple(ty_fields) => {
+                let fields = value.expect_tuple()?;
+                self.visit_tuple(fields, ty_fields)
             }
-            Value::Tuple(fields) => {
-                let t = super::expect_ty(ty, |k| k.as_tuple(), "tuple")?;
-                self.visit_tuple(fields, t)
+            ir::TyKind::Array(ty_items) => {
+                let items = value.expect_array()?;
+                self.visit_array(items, ty_items)
             }
-            Value::Array(items) => {
-                let t = super::expect_ty(ty, |k| k.as_array(), "array")?;
-                self.visit_array(items, t)
+            ir::TyKind::Enum(variants) => {
+                let (tag, inner) = value.expect_enum()?;
+                self.visit_enum(tag, inner, variants)
             }
-            Value::Enum(tag, inner) => {
-                let t = super::expect_ty(ty, |k| k.as_enum(), "enum")?;
-                self.visit_enum(*tag, inner, t)
-            }
+
+            ir::TyKind::Function(..) | ir::TyKind::Ident(..) => unreachable!(),
         }
     }
 

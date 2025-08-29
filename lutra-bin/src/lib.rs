@@ -21,7 +21,7 @@ pub use encode::{Encode, ReversePointer, encode_enum_head_padding, encode_enum_h
 pub use error::{Error, Result};
 pub use layout::Layout;
 pub use reader::{ArrayReader, ReaderExt, TupleReader};
-pub use value::Value;
+pub use value::{Value, ValueVisitor};
 pub use writer::{ArrayWriter, EnumWriter, TupleWriter};
 
 pub use bytes;

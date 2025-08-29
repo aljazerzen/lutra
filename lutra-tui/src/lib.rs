@@ -10,7 +10,7 @@ pub fn show_value(ty: &lutra_bin::ir::Ty, value: lutra_bin::Value) -> Result<(),
     use ratatui::widgets::Paragraph;
     use ratatui::widgets::Wrap;
 
-    let text = value.print_pretty(ty, &[]).unwrap();
+    let text = value.print_source(ty, &[]).unwrap();
 
     crate::terminal::within_alternate_screen(|term| -> std::io::Result<()> {
         term.draw(|frame| {
