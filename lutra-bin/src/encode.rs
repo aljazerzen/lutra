@@ -20,6 +20,22 @@ pub trait Encode {
 
     fn encode_body(&self, head: Self::HeadPtr, buf: &mut BytesMut);
 }
+
+impl<T> Encode for &T
+where
+    T: Encode,
+{
+    type HeadPtr = T::HeadPtr;
+
+    fn encode_head(&self, buf: &mut BytesMut) -> Self::HeadPtr {
+        T::encode_head(self, buf)
+    }
+
+    fn encode_body(&self, head: Self::HeadPtr, buf: &mut BytesMut) {
+        T::encode_body(self, head, buf)
+    }
+}
+
 impl Encode for bool {
     type HeadPtr = ();
 

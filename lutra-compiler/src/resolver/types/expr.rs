@@ -5,8 +5,6 @@ use crate::resolver::names;
 use crate::resolver::types::{TypeResolver, scope};
 use crate::utils::fold::{self, PrFold};
 
-use super::scope::{Scope, ScopeKind};
-
 impl fold::PrFold for super::TypeResolver<'_> {
     #[tracing::instrument(name = "e", skip(self, node))]
     fn fold_expr(&mut self, node: pr::Expr) -> Result<pr::Expr> {
@@ -217,13 +215,19 @@ impl fold::PrFold for super::TypeResolver<'_> {
 
     fn fold_type(&mut self, ty: pr::Ty) -> Result<pr::Ty> {
         let ty = match ty.kind {
-            // open a new scope for functions
-            pr::TyKind::Func(ty_func) if self.scopes.is_empty() => {
-                let mut scope = Scope::new(ty.scope_id.unwrap(), ScopeKind::Nested);
-                scope.insert_type_params(&ty_func.ty_params);
-                self.scopes.push(scope);
-                let ty_func = fold::fold_ty_func(self, ty_func)?;
-                self.scopes.pop().unwrap();
+            // introduce new ty vars for missing type annotations
+            // (this is needed to find non-inferable params)
+            pr::TyKind::Func(mut ty_func) => {
+                for (p, _) in &mut ty_func.params {
+                    if p.is_none() {
+                        *p = Some(self.introduce_ty_var(pr::TyParamDomain::Open, ty.span.unwrap()))
+                    }
+                }
+                if ty_func.body.is_none() {
+                    ty_func.body = Some(Box::new(
+                        self.introduce_ty_var(pr::TyParamDomain::Open, ty.span.unwrap()),
+                    ));
+                }
 
                 pr::Ty {
                     kind: pr::TyKind::Func(ty_func),
@@ -261,7 +265,7 @@ impl fold::PrFold for super::TypeResolver<'_> {
     }
 
     fn fold_pattern(&mut self, _pattern: pr::Pattern) -> Result<pr::Pattern> {
-        unreachable!() // use
+        unreachable!()
     }
 }
 

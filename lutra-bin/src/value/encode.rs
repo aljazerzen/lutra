@@ -129,7 +129,7 @@ fn encode_body<'t>(
             let v = value.expect_text()?;
 
             let ValueHeadPtr::Offset(offset_ptr) = head_ptr else {
-                unreachable!()
+                return Err(Error::Bug);
             };
 
             v.encode_body(offset_ptr, w);
@@ -138,7 +138,7 @@ fn encode_body<'t>(
             let fields = value.expect_tuple()?;
 
             let ValueHeadPtr::Tuple(tuple_ptrs) = head_ptr else {
-                unreachable!()
+                return Err(Error::Bug);
             };
 
             for ((f, h), f_ty) in fields.iter().zip(tuple_ptrs.into_iter()).zip(ty_fields) {
@@ -149,7 +149,7 @@ fn encode_body<'t>(
             let items = value.expect_array()?;
 
             let ValueHeadPtr::Offset(offset_ptr) = head_ptr else {
-                unreachable!()
+                return Err(Error::Bug);
             };
             offset_ptr.write_cur_len(w);
 
@@ -178,7 +178,7 @@ fn encode_body<'t>(
                         let head_ptr = encode_head(w, inner, variant_ty, ctx)?;
                         encode_body(w, inner, head_ptr, variant_ty, ctx)?;
                     }
-                    ValueHeadPtr::Tuple(_) => unreachable!(),
+                    ValueHeadPtr::Tuple(_) => return Err(Error::Bug),
                 }
             } else {
                 encode_body(w, inner, head_ptr, variant_ty, ctx)?;

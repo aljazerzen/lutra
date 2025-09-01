@@ -136,8 +136,17 @@ impl<'a> Lowerer<'a> {
             return Ok(self.impl_std_default(ty_args.into_iter().next().unwrap()));
         }
 
-        // should have been lowered earlier
-        assert!(!matches!(expr.kind, pr::ExprKind::Internal));
+        if matches!(expr.kind, pr::ExprKind::Internal) {
+            // Usually, this is lowered earlier, when lowering pointers.
+            // But for top-level external symbols, we do it here.
+
+            let external_symbol_id = path.iter().join("::");
+            let kind = ir::ExprKind::Pointer(ir::Pointer::External(ir::ExternalPtr {
+                id: external_symbol_id,
+            }));
+            let ty = self.lower_ty(expr.ty.clone().unwrap());
+            return Ok(ir::Expr { kind, ty });
+        }
 
         let mut expr = expr;
 

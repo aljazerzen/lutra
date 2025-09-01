@@ -10,8 +10,6 @@ pub mod std {
     use assume::LayoutArgsReader;
     use lutra_bin::{ArrayReader, Decode, TupleReader, ir};
 
-    pub const MODULE: Module = Module;
-
     pub struct Module;
 
     impl NativeModule for Module {
@@ -318,7 +316,7 @@ pub mod std {
 
                 let value = it.evaluate_func_call(&func, vec![cell])?;
 
-                output.write_item(assume::into_data(value));
+                output.write_item(assume::into_data(value)?);
             }
 
             Ok(Cell::Data(output.finish()))
@@ -513,7 +511,7 @@ pub mod std {
                 field_offsets.push(8_u32 * i as u32); // array head has 8 bytes
             }
 
-            let input = TupleReader::new(assume::into_data(columnar), field_offsets.into());
+            let input = TupleReader::new(assume::into_data(columnar)?, field_offsets.into());
 
             // init input array readers
             let mut input_arrays: Vec<ArrayReader<_>> = fields_item_head_bytes
@@ -561,14 +559,14 @@ pub mod std {
             }
 
             let [input, key_getter] = assume::exactly_n(args);
-            let input = ArrayReader::new(assume::into_data(input), input_head_bytes as usize);
+            let input = ArrayReader::new(assume::into_data(input)?, input_head_bytes as usize);
 
             let mut partitions: HashMap<Vec<u8>, Vec<Data>> = HashMap::new();
             for item in input {
                 let item_cell = Cell::Data(item.clone());
 
                 let key = it.evaluate_func_call(&key_getter, vec![item_cell])?;
-                let key = assume::into_data(key).chunk().to_vec();
+                let key = assume::into_data(key)?.chunk().to_vec();
 
                 let partition = partitions.entry(key).or_default();
                 partition.push(item);
@@ -604,12 +602,12 @@ pub mod std {
 
             let mut output = ArrayWriter::new(input_head_bytes, input_body_ptrs);
 
-            let first = ArrayReader::new(assume::into_data(first), input_head_bytes as usize);
+            let first = ArrayReader::new(assume::into_data(first)?, input_head_bytes as usize);
             for item in first {
                 output.write_item(item);
             }
 
-            let second = ArrayReader::new(assume::into_data(second), input_head_bytes as usize);
+            let second = ArrayReader::new(assume::into_data(second)?, input_head_bytes as usize);
             for item in second {
                 output.write_item(item);
             }
@@ -628,7 +626,7 @@ pub mod std {
             args: Vec<Cell>,
         ) -> Result<Cell, EvalError> {
             let [array] = assume::exactly_n(args);
-            let array = assume::into_data(array);
+            let array = assume::into_data(array)?;
 
             let (_offset, len) = lutra_bin::ArrayReader::<&[u8]>::read_head(array.chunk());
 
@@ -782,7 +780,7 @@ pub mod std {
             args: Vec<Cell>,
         ) -> Result<Cell, EvalError> {
             let [array] = assume::exactly_n(args);
-            let array = assume::into_data(array);
+            let array = assume::into_data(array)?;
 
             let (_offset, len) = lutra_bin::ArrayReader::<&[u8]>::read_head(array.chunk());
 
@@ -803,11 +801,9 @@ pub mod std {
     }
 }
 
-pub mod std_text_ops {
+pub mod std_text {
     use crate::{Data, EvalError, native::*};
     use lutra_bin::ReaderExt;
-
-    pub const MODULE: Module = Module;
 
     pub struct Module;
 
@@ -831,12 +827,12 @@ pub mod std_text_ops {
             let [left, right] = assume::exactly_n(args);
 
             // TODO: string reader
-            let mut left = assume::into_data(left);
+            let mut left = assume::into_data(left)?;
             let left_offset = u32::from_le_bytes(left.chunk().read_const());
             let left_length = u32::from_le_bytes((&left.chunk()[4..8]).read_const());
             left.advance(left_offset as usize);
 
-            let mut right = assume::into_data(right);
+            let mut right = assume::into_data(right)?;
             let right_offset = u32::from_le_bytes(right.chunk().read_const());
             let right_length = u32::from_le_bytes((&right.chunk()[4..8]).read_const());
             right.advance(right_offset as usize);
@@ -858,12 +854,58 @@ pub mod std_text_ops {
         ) -> Result<Cell, EvalError> {
             let [text] = assume::exactly_n(args);
 
-            // TODO: string reader
-            // TODO: report length in chars, not bytes (length of ž should be 1)
-            let text = assume::as_data(&text)?.chunk().skip(4);
-            let length = u32::from_le_bytes(text.read_const());
+            let mut data = assume::into_data(text)?;
+            let string = decode::text_ref(&mut data);
+            let length = string.chars().count() as u32;
 
             Ok(Cell::Data(encode(&length)))
+        }
+    }
+}
+
+pub mod std_math {
+    use crate::native::{assume, encode};
+    use crate::{Cell, EvalError, Interpreter, NativeModule};
+    use lutra_bin::{Decode, ir};
+
+    pub struct Module;
+
+    impl NativeModule for Module {
+        fn lookup_native_symbol(&self, id: &str) -> Option<crate::interpreter::NativeFunction> {
+            Some(match id {
+                "abs" => &Self::abs,
+
+                _ => return None,
+            })
+        }
+    }
+
+    impl Module {
+        fn abs(
+            _it: &mut Interpreter,
+            layout_args: &[u32],
+            args: Vec<Cell>,
+        ) -> Result<Cell, EvalError> {
+            let [arg] = assume::exactly_n(args);
+
+            let prim = layout_args[0].to_be_bytes();
+            let prim = ir::TyPrimitive::decode(&prim).unwrap();
+
+            Ok(Cell::Data(match prim {
+                ir::TyPrimitive::int8 => encode(&assume::primitive::<i8>(&arg)?.abs()),
+                ir::TyPrimitive::int16 => encode(&assume::primitive::<i16>(&arg)?.abs()),
+                ir::TyPrimitive::int32 => encode(&assume::primitive::<i32>(&arg)?.abs()),
+                ir::TyPrimitive::int64 => encode(&assume::primitive::<i64>(&arg)?.abs()),
+                ir::TyPrimitive::float32 => encode(&assume::primitive::<f32>(&arg)?.abs()),
+                ir::TyPrimitive::float64 => encode(&assume::primitive::<f64>(&arg)?.abs()),
+
+                ir::TyPrimitive::uint8
+                | ir::TyPrimitive::uint16
+                | ir::TyPrimitive::uint32
+                | ir::TyPrimitive::uint64 => return Ok(arg),
+
+                _ => return Err(EvalError::BadProgram),
+            }))
         }
     }
 }
@@ -877,8 +919,6 @@ pub mod std_fs {
     use parquet::arrow::arrow_writer::ArrowWriter;
 
     use crate::{Data, EvalError, native::*};
-
-    pub const MODULE: Module = Module;
 
     pub struct Module;
 
@@ -936,7 +976,7 @@ pub mod std_fs {
             let file_path = assume::text(&file_path)?;
             let file_path = path::PathBuf::from(file_path);
 
-            let data = assume::into_data(data);
+            let data = assume::into_data(data)?;
 
             // decode item ty from layout args
             let mut layout_args = assume::LayoutArgsReader::new(layout_args);
@@ -963,7 +1003,6 @@ pub mod std_fs {
 pub mod interpreter {
     use crate::{EvalError, native::*};
 
-    pub const MODULE: Module = Module;
     pub struct Module;
 
     impl NativeModule for Module {
@@ -991,12 +1030,12 @@ mod assume {
     use crate::{Data, EvalError, interpreter::Cell};
     use lutra_bin::{ArrayReader, Decode};
 
-    pub fn into_data(cell: Cell) -> Data {
+    pub fn into_data(cell: Cell) -> Result<Data, EvalError> {
         match cell {
-            Cell::Data(val) => val,
-            Cell::Function(..) => panic!(),
-            Cell::FunctionNative(..) => panic!(),
-            Cell::Vacant => panic!(),
+            Cell::Data(val) => Ok(val),
+            Cell::Function(..) => Err(EvalError::BadProgram),
+            Cell::FunctionNative(..) => Err(EvalError::BadProgram),
+            Cell::Vacant => Err(EvalError::Bug),
         }
     }
 
@@ -1035,12 +1074,12 @@ mod assume {
     }
 
     pub fn array(cell: Cell, item_head_bytes: u32) -> ArrayReader<Data> {
-        ArrayReader::new(into_data(cell), item_head_bytes as usize)
+        ArrayReader::new(into_data(cell).unwrap(), item_head_bytes as usize)
     }
 
     #[allow(dead_code)]
     pub fn uint32(cell: Cell) -> u32 {
-        decode::uint32(&into_data(cell))
+        decode::uint32(&into_data(cell).unwrap())
     }
 
     #[allow(dead_code)]
@@ -1083,7 +1122,7 @@ mod assume {
 }
 
 mod decode {
-    use lutra_bin::Decode;
+    use lutra_bin::{ArrayReader, Decode};
 
     use crate::Data;
 
@@ -1105,8 +1144,14 @@ mod decode {
     }
 
     pub fn text(data: &Data) -> String {
-        // TODO: string reader
         String::decode(&data.flatten()).unwrap()
+    }
+
+    pub fn text_ref(data: &mut Data) -> &str {
+        let (offset, len) = ArrayReader::<&[u8]>::read_head(data.chunk());
+        data.advance(offset);
+
+        str::from_utf8(&data.chunk()[..len]).unwrap()
     }
 }
 

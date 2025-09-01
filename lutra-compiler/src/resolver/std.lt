@@ -236,13 +236,17 @@ where T
 
 ## Mathematical functions
 module math {
-  func abs(val: int64): int64
+  ## Absolute value
+  func abs(val: T): T
+  where T: number
+
   func sqrt(val: int64): int64
   func ceil(val: int64): int64
   func floor(val: int64): int64
   func round(val: int64, n_digits: int64): int64
 
-  func pi(): float64
+  const pi32: float32 = 3.1415927
+  const pi64: float64 = 3.141592653589793
 
   func pow(val: int64, exponent: int64): int64
   func exp(val: int64): int64
@@ -261,7 +265,7 @@ module math {
 }
 
 ## Text functions
-module text_ops {
+module text {
   func concat(left: text, right: text): text
 
   func lower(value: text): text

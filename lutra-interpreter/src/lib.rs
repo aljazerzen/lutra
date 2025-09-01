@@ -13,10 +13,11 @@ pub trait NativeModule: Sync {
 }
 
 pub static BUILTIN_MODULES: &[(&str, &dyn NativeModule)] = &[
-    ("std", &native::std::MODULE),
-    ("std::text_ops", &native::std_text_ops::MODULE),
-    ("std::fs", &native::std_fs::MODULE),
-    ("interpreter", &native::interpreter::MODULE),
+    ("std", &native::std::Module),
+    ("std::text", &native::std_text::Module),
+    ("std::math", &native::std_math::Module),
+    ("std::fs", &native::std_fs::Module),
+    ("interpreter", &native::interpreter::Module),
 ];
 
 pub struct InterpreterRunner<'a> {

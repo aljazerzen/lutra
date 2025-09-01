@@ -152,7 +152,7 @@ impl Desugarator {
         Ok(new_binop(left, &func_name, right, Some(span)).kind)
     }
 
-    /// Desugar f-string into function calls to std::text_ops::concat
+    /// Desugar f-string into function calls to std::text::concat
     fn desugar_f_string(
         &mut self,
         items: Vec<pr::InterpolateItem>,
@@ -176,7 +176,7 @@ impl Desugarator {
         // concat with the following
         for item in items {
             let op_span = Some(item.span.unwrap());
-            expr = new_binop(expr, &[NS_STD, "text_ops", "concat"], item, op_span);
+            expr = new_binop(expr, &[NS_STD, "text", "concat"], item, op_span);
         }
         Ok(expr.kind)
     }

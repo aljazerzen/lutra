@@ -3,6 +3,8 @@ use std::vec;
 
 use lutra_bin::bytes;
 
+/// A buffer of data, stored in not contingent chunks.
+/// Allows O(1) shallow copy, but does not support modifying underlying buffers.
 #[derive(Debug, Clone)]
 #[allow(private_interfaces)]
 pub enum Data {

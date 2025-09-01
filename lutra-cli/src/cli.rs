@@ -1,5 +1,6 @@
 use clap::{Args, Parser, Subcommand};
 
+use lutra_bin::Encode;
 use lutra_compiler::{CheckParams, DiscoverParams};
 use lutra_runner::Run;
 
@@ -21,6 +22,7 @@ fn main() {
     let res = match action.command {
         Action::Discover(cmd) => discover(cmd),
         Action::Check(cmd) => check(cmd),
+        Action::Compile(cmd) => compile(cmd),
         Action::Run(cmd) => run(cmd),
         Action::Pull(cmd) => pull_interface(cmd),
         Action::Codegen(cmd) => codegen(cmd),
@@ -52,6 +54,9 @@ pub enum Action {
 
     /// Validate the project
     Check(CheckCommand),
+
+    /// Compile a program
+    Compile(CompileCommand),
 
     /// Compile a program and run it
     Run(RunCommand),
@@ -151,6 +156,69 @@ pub fn check(cmd: CheckCommand) -> anyhow::Result<()> {
         println!("All good.")
     }
 
+    Ok(())
+}
+
+#[derive(clap::Parser)]
+pub struct CompileCommand {
+    #[clap(flatten)]
+    discover: DiscoverParams,
+
+    #[clap(flatten)]
+    check: CheckParams,
+
+    /// Program to execute.
+    ///
+    /// Usually this is a path to an expression in the project, but it can be
+    /// any lutra expression.
+    ///
+    /// When --input is supplied, the program is wrapped into `func (input) -> ...`.
+    #[clap(long, default_value = "main")]
+    program: String,
+
+    #[clap(long, default_value = "bytecode-lt")]
+    format: lutra_compiler::ProgramFormat,
+}
+
+pub fn compile(cmd: CompileCommand) -> anyhow::Result<()> {
+    let project_dir = cmd.discover.project.clone();
+
+    // compile
+    let project = lutra_compiler::discover(cmd.discover)?;
+
+    let project = lutra_compiler::check(project, cmd.check)?;
+
+    let (program, ty) =
+        lutra_compiler::compile(&project, &cmd.program, Some("--program"), cmd.format)?;
+
+    println!("Compiled.");
+
+    println!();
+    println!("Input:  {}", lutra_bin::ir::print_ty(&ty.input));
+    println!("Output: {}", lutra_bin::ir::print_ty(&ty.output));
+    if !ty.defs.is_empty() {
+        println!("Type definitions:");
+        for def in &ty.defs {
+            println!(
+                "  {}: {}",
+                def.name.0.join("::"),
+                lutra_bin::ir::print_ty(&def.ty)
+            );
+        }
+    }
+
+    let project_dir = project_dir.unwrap_or_else(|| std::env::current_dir().unwrap());
+    let out_dir = project_dir.join("program.rr.lb");
+
+    let program_lt = program.encode();
+    std::fs::write(&out_dir, &program_lt)?;
+
+    println!();
+    println!(
+        "Program written to {} ({} bytes)",
+        out_dir.display(),
+        program_lt.len()
+    );
     Ok(())
 }
 

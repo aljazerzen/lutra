@@ -2,6 +2,7 @@
 
 use insta::{assert_debug_snapshot, assert_snapshot};
 
+use lutra_bin::Encode;
 use lutra_interpreter::EvalError;
 
 #[track_caller]
@@ -172,5 +173,36 @@ fn eval_error_01() {
           )
         ): func ({int64}) -> int64
         "#), @"BadInputs",
+    );
+}
+
+#[test]
+fn func_call_size() {
+    let source = lutra_compiler::SourceTree::single(
+        "".into(),
+        r#"
+        func x(): {}
+        "#
+        .into(),
+    );
+
+    let project = lutra_compiler::check(source, lutra_compiler::CheckParams {}).unwrap();
+    let (program, _ty) = lutra_compiler::compile(
+        &project,
+        "x",
+        None,
+        lutra_compiler::ProgramFormat::BytecodeLt,
+    )
+    .unwrap();
+
+    let program_lt = program.encode();
+
+    // ideally, we'd bring that down to 30
+    const MAX_SIZE: usize = 40;
+
+    assert!(
+        program_lt.len() < MAX_SIZE,
+        "plain func call should be less than MAX_SIZE bytes, it is {} bytes",
+        program_lt.len()
     );
 }

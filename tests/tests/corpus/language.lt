@@ -1382,7 +1382,7 @@ func main() -> std::map([false, true, false], func (x: bool) -> !x)
 ]
 
 # === std_map_03
-func main() -> std::map(["hello", "world", "!"], func (x: text) -> std::text_ops::length(x))
+func main() -> std::map(["hello", "world", "!"], func (x: text) -> std::text::length(x))
 # >
 [
   5,
@@ -1786,6 +1786,41 @@ func main() -> std::to_columnar([
 # >
 {
 }
+
+# === std_text_length_00
+func main() -> std::text::length("Hello world\n")
+# >
+12
+
+# === std_text_length_01
+func main() -> std::text::length("Aljaž")
+# >
+5
+
+# === std_math_abs_00
+func main() -> std::math::abs(-3: int16)
+# >
+3
+
+# === std_math_abs_01
+func main() -> std::math::abs(-3.3: float32)
+# >
+3.3
+
+# === std_math_abs_02
+func main() -> std::math::abs(0.0: float64)
+# >
+0.0
+
+# === std_math_pi_00
+func main(): float32 -> std::math::pi32
+# >
+3.1415927
+
+# === std_math_pi_01
+func main(): float64 -> std::math::pi64
+# >
+3.141592653589793
 
 # === tuple_00
 func main() -> {key = {"code 1", false}, value = 5: int64}.key.1

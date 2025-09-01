@@ -628,11 +628,6 @@ impl<'a> Context<'a> {
             "std::or" => utils::new_bin_op("OR", args),
             "std::not" => utils::new_un_op("NOT", args),
 
-            "std::text_ops::length" => {
-                let [text] = unpack_args(args);
-                ExprOrSource::Source(format!("LENGTH({text})::int4"))
-            }
-
             "std::min" => utils::new_func_call("MIN", args),
             "std::max" => utils::new_func_call("MAX", args),
             "std::sum" => {
@@ -678,7 +673,16 @@ impl<'a> Context<'a> {
                 ))
             }
 
-            "std::text_ops::concat" => utils::new_bin_op("||", args),
+            "std::text::length" => {
+                let [text] = unpack_args(args);
+                ExprOrSource::Source(format!("LENGTH({text})::int4"))
+            }
+            "std::text::concat" => utils::new_bin_op("||", args),
+
+            "std::math::abs" => {
+                let [text] = unpack_args(args);
+                ExprOrSource::Source(format!("ABS({text})"))
+            }
 
             "greatest" => {
                 let mut args = args.into_iter();

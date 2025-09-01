@@ -592,6 +592,51 @@ fn types_22() {
 }
 
 #[test]
+fn types_23() {
+    // error messages on missing types on functions
+
+    insta::assert_snapshot!(_test_ty(r#"
+        func main(a: int32, b) -> a + b
+    "#), @"int32");
+
+    insta::assert_snapshot!(_test_err(r#"
+        func main(a: int32, b) -> a + 1
+    "#), @r"
+    Error:
+       ╭─[:2:29]
+       │
+     2 │         func main(a: int32, b) -> a + 1
+       │                             ┬
+       │                             ╰── cannot infer type
+    ───╯
+    ");
+
+    insta::assert_snapshot!(_test_err(r#"
+        func main()
+    "#), @r"
+    Error:
+       ╭─[:2:9]
+       │
+     2 │         func main()
+       │         ─────┬─────
+       │              ╰─────── cannot infer type
+    ───╯
+    ");
+
+    insta::assert_snapshot!(_test_err(r#"
+        func main(name): {}
+    "#), @r"
+    Error:
+       ╭─[:2:9]
+       │
+     2 │         func main(name): {}
+       │         ─────────┬─────────
+       │                  ╰─────────── cannot infer type
+    ───╯
+    ");
+}
+
+#[test]
 fn array_00() {
     insta::assert_snapshot!(
         _test_err(

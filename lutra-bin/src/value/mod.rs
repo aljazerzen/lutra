@@ -165,7 +165,7 @@ impl<'t> TyClass<'t> {
             ir::TyKind::Enum(t) => TyClass::Enum(t),
 
             ir::TyKind::Function(..) => return Err(Error::InvalidType),
-            ir::TyKind::Ident(..) => unreachable!(),
+            ir::TyKind::Ident(..) => return Err(Error::Bug),
         })
     }
 }

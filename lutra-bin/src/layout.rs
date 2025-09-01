@@ -3,9 +3,19 @@ use crate::vec;
 
 use crate::ir;
 
+// TODO: conceptually, this shouldn't exist
 pub trait Layout {
     /// Returns the size of the head in bits for a given type.
     fn head_size() -> usize;
+}
+
+impl<T> Layout for &T
+where
+    T: Layout,
+{
+    fn head_size() -> usize {
+        T::head_size()
+    }
 }
 
 impl Layout for bool {

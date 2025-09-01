@@ -25,6 +25,7 @@ pub use project::{Project, SourceTree};
 pub use span::Span;
 
 #[derive(Debug, Clone)]
+#[cfg_attr(feature = "clap", derive(clap::ValueEnum))]
 pub enum ProgramFormat {
     SqlPg,
     BytecodeLt,

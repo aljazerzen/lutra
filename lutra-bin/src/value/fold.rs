@@ -1,5 +1,6 @@
 use crate::ir;
 
+use crate::Error;
 use crate::Value;
 
 pub trait ValueVisitor<'t> {
@@ -66,7 +67,8 @@ pub trait ValueVisitor<'t> {
                 self.visit_enum(tag, inner, variants)
             }
 
-            ir::TyKind::Function(..) | ir::TyKind::Ident(..) => unreachable!(),
+            ir::TyKind::Function(..) => Err(Error::InvalidType),
+            ir::TyKind::Ident(..) => Err(Error::Bug),
         }
     }
 

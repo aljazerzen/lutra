@@ -2,6 +2,7 @@ use crate::vec;
 
 use crate::ArrayReader;
 use crate::Decode;
+use crate::Error;
 use crate::TupleReader;
 use crate::ir;
 use crate::layout;
@@ -111,7 +112,8 @@ where
                 self.visit_enum(tag, buf_inner, variants)
             }
 
-            ir::TyKind::Function(..) | ir::TyKind::Ident(..) => unreachable!(),
+            ir::TyKind::Function(..) => Err(Error::InvalidType),
+            ir::TyKind::Ident(..) => Err(Error::Bug),
         }
     }
 
