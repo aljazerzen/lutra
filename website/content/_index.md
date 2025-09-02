@@ -121,7 +121,7 @@ It focuses on simplicity and ease of use, but also provides partial decoding cap
 
 Lutra is a personal passion project, currently in a proof-of-concept stage.
 It is not ready for production use.
-
 It works, but is not feature complete and will change in inconvenient ways.
 
-We are looking for feedback and contributions.
+Feel free to try it out or come and chat with me at [Zulip](https://lutra.zulipchat.com/).
+
