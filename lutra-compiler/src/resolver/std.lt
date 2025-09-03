@@ -142,7 +142,7 @@ where T
 
 # Array functions
 
-func index(array: [T], position: int64): T
+func index(array: [T], position: int64): enum { None, Some: T }
 where T
 
 func map(array: [I], mapper: func (I): O): [O]
@@ -154,7 +154,7 @@ where I, O
 func filter(array: [T], condition: func (T): bool): [T]
 where T
 
-func find(array: [T], condition: func (T): bool): T
+func find(array: [T], condition: func (T): bool): enum { None, Some: T }
 where T
 -> (
   array | filter(condition) | index(0)
@@ -313,6 +313,20 @@ module sql {
   func insert(rows: [R], const table_identifier: text): {}
   where R: {..}
 
-  func unpack_array(array: text): [T]
-  where T
+  ## Evaluates an SQL expression.
+  ##
+  ## This function is an escape hatch for accessing SQL directly.
+  ## It should be used as a last resort, because it circumvents type checking
+  ## and can cause program panic on malformed SQL or incorrect resulting type.
+  ## 
+  ## Resulting type of the expression must match the "SQL relationalal representation"
+  ## of the Lutra type:
+  ## - primitives expect a single column,
+  ## - tuples expect one column for each tuple field,
+  ## - nested tuples are unpacked into parent relation,
+  ## - arrays expect one index column, followed by columns of inner object,
+  ## - enums expect one tag columns, followed by columns of each of the possible variants,
+  ## - enums that are the Maybe, exprect one nullable column.
+  func expr(const sql_source: text): R
+  where R
 }

@@ -103,7 +103,7 @@ impl Printer {
                 r
             }
             ir::ExprKind::Tuple(fields) => {
-                let mut r = "{".to_string();
+                let mut r = "(tuple".to_string();
                 self.indent();
                 for field in fields {
                     r += &self.new_line();
@@ -115,7 +115,7 @@ impl Printer {
                 }
                 self.dedent();
                 r += &self.new_line();
-                r += "}";
+                r += ")";
                 r
             }
             ir::ExprKind::Array(items) => {

@@ -87,6 +87,7 @@ pub fn fold_from<T: ?Sized + CrFold>(fold: &mut T, from: From, ty: ir::Ty) -> Re
                 .map(|(c, v)| Ok((fold.fold_expr(c)?, fold.fold_expr(v)?)))
                 .collect::<Result<_>>()?,
         ),
+        From::SQLSource(s) => From::SQLSource(s),
     };
     Ok(Expr {
         kind: ExprKind::From(from),

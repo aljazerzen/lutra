@@ -66,6 +66,7 @@ type Array: {
 
 type EnumVariant: {
   tag: [uint8],
+  inner_bytes: uint8,
   has_ptr: bool,
   padding_bytes: uint8,
   inner: Expr,

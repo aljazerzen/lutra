@@ -58,8 +58,14 @@ func main() -> [{a.0, a.1}, {a.0 + 1, !a.1}]
 # === bindings_02
 const a: [int16] = [1, 2]
 func main() -> [
-  {std::index(a, 0), std::index(a, 1)},
-  {std::index(a, 0) + 1, std::index(a, 1) + 1}
+  {
+    a | std::index(0) | std::or_default,
+    a | std::index(1) | std::or_default,
+  },
+  {
+    a | std::index(0) | std::or_default | std::add(1),
+    a | std::index(1) | std::or_default | std::add(1),
+  }
 ]
 # >
 [
@@ -91,13 +97,13 @@ func main() -> {true, std::map(a, func (x: int16) -> x * 2), false}
 const a: [int32] = [1, 2, 3]
 func main() -> {
   true,
-  std::index(std::map(a, func (x: int32) -> x * 2), 1),
+  a | std::map(func (x: int32) -> x * 2) | std::index(1),
   false
 }
 # >
 {
   true,
-  4,
+  Some(4),
   false,
 }
 
@@ -693,8 +699,8 @@ func main() -> std::aggregate(
   func (x: {[bool], [text]}) -> {std::index(x.0, 0), std::index(x.1, 2)})
 # >
 {
-  false,
-  "!",
+  Some(false),
+  Some("!"),
 }
 
 # === std_all_00
@@ -925,10 +931,16 @@ func main() -> std::filter(
   },
 ]
 
+
 # === std_find_00
-func main() -> std::find([5,3,65,3,2]: [int64], func (x) -> x > 10)
+func main() -> std::find([5,3,65,11,2]: [int64], func (x) -> x > 10)
 # >
-65
+Some(65)
+
+# === std_find_01
+func main() -> std::find([5,3,65,3,2]: [int64], func (x) -> x < 0)
+# >
+None
 
 
 # === std_flat_map_00
@@ -1221,22 +1233,27 @@ func main() -> {3.3 >= 2.2: float64, 2.2 >= 3.3: float64, 2.2 >= 2.2: float64}
 # === std_index_00
 func main() -> std::index([5,3,65,3,2]: [int64], 3)
 # >
-3
+Some(3)
+
+# === std_index_01
+func main() -> std::index([5,3,65,3,2]: [int64], 10)
+# >
+None
 
 # === std_index_02
-func main() -> std::index([5.3,3.2,65.4,3.1,2.0], 3): float64
+func main() -> std::index([5.3,3.2,65.4,3.1,2.0], 3): enum { None, Some: float64 }
 # >
-3.1
+Some(3.1)
 
 # === std_index_04
 func main() -> std::index([false, false, false, true, false], 3)
 # >
-true
+Some(true)
 
 # === std_index_06
 func main() -> std::index(["hello", "world", "!"], 2)
 # >
-"!"
+Some("!")
 
 # === std_lag_00
 func main() -> std::lag([5,3,65,3,2,56,67]: [int8], 2)

@@ -241,7 +241,7 @@ fn enum_03() {
     let inner = Data::new(vec![1, 2, 3, 4, 5, 6, 7, 8, 9]);
     insta::assert_snapshot!(_test_enum_writer(2, inner, &output_ty), @r"
     Cancelled(true)
-    Length: 10 (0xa) bytes
-    0000:   02 01 02 03  04 05 06 07  08 09                      ..........
+    Length: 3 (0x3) bytes
+    0000:   02 01 02                                             ...
     ");
 }

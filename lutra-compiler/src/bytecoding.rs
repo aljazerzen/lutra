@@ -167,6 +167,7 @@ impl ByteCoder {
 
         EnumVariant {
             tag: v.tag.to_le_bytes()[0..head_format.tag_bytes as usize].to_vec(),
+            inner_bytes: head_format.inner_bytes as u8,
             has_ptr: head_format.has_ptr,
             padding_bytes: variant_format.padding_bytes,
             inner: self.compile_expr(v.inner),
@@ -261,12 +262,27 @@ impl ByteCoder {
 
             "std::count" => vec![],
 
-            "std::index" | "std::min" | "std::max" | "std::sum" | "std::average"
-            | "std::contains" => {
+            "std::min" | "std::max" | "std::sum" | "std::average" | "std::contains" => {
                 let item_layout = as_layout_of_param_array(ty_mat);
                 vec![
                     item_layout.head_size.div_ceil(8), // item_head_size
                 ]
+            }
+
+            "std::index" => {
+                let item_layout = as_layout_of_param_array(ty_mat);
+
+                let ty_func = ty_mat.kind.as_function().unwrap();
+                let ty_out_variants = ty_func.body.kind.as_enum().unwrap();
+                let ty_out_format = lutra_bin::layout::enum_format(ty_out_variants);
+                let ty_out_format = ty_out_format.encode();
+
+                let mut r = vec![
+                    item_layout.head_size.div_ceil(8), // item_head_size
+                ];
+
+                pack_bytes_to_u32(ty_out_format, &mut r);
+                r
             }
 
             "std::filter" | "std::slice" | "std::sort" | "std::append" => {

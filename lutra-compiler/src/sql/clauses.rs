@@ -134,22 +134,32 @@ impl<'a> Context<'a> {
                         });
                     }
 
-                    let mut res_rels = res_rels.into_iter();
+                    let mut res_rels = res_rels.into_iter().peekable();
                     let mut result = res_rels.next().unwrap();
-                    for r in res_rels {
-                        result = cr::Expr {
-                            ty: ty_concat_as_tuples(
-                                self.get_ty_mat(&result.ty).clone(),
-                                self.get_ty_mat(&r.ty).clone(),
-                            ),
-                            kind: cr::ExprKind::Join(
-                                self.new_binding(result),
-                                self.new_binding(r),
-                                None,
-                            ),
-                        };
+
+                    if res_rels.peek().is_none() {
+                        // a single rel, wrap it into a Transform::ProjectDiscard to update column names
+                        cr::ExprKind::Transform(
+                            self.new_binding(result),
+                            cr::Transform::ProjectDiscard(vec![]),
+                        )
+                    } else {
+                        // Join with all remaining rels
+                        for r in res_rels {
+                            result = cr::Expr {
+                                ty: ty_concat_as_tuples(
+                                    self.get_ty_mat(&result.ty).clone(),
+                                    self.get_ty_mat(&r.ty).clone(),
+                                ),
+                                kind: cr::ExprKind::Join(
+                                    self.new_binding(result),
+                                    self.new_binding(r),
+                                    None,
+                                ),
+                            };
+                        }
+                        result.kind
                     }
-                    result.kind
                 }
             }
             ir::ExprKind::Array(items) => {
@@ -596,6 +606,8 @@ impl<'a> Context<'a> {
                 let array = self.compile_rel(&call.args[0]);
                 let index = self.compile_column(&call.args[1]);
 
+                let item_ty = array.ty.kind.as_array().unwrap().clone();
+
                 let rel_offset = cr::Expr::new_iso_transform(
                     self.new_binding(array),
                     cr::Transform::Offset(Box::new(index)),
@@ -607,19 +619,73 @@ impl<'a> Context<'a> {
                 );
 
                 // drop index column
-                let mut rel = cr::ExprKind::Transform(
+                let item = cr::ExprKind::Transform(
                     self.new_binding(rel_limit),
                     cr::Transform::ProjectDiscard(vec![0]),
                 );
 
-                if expr.ty.kind.is_array() {
-                    rel = cr::ExprKind::From(cr::From::JsonUnpack(Box::new(cr::Expr {
-                        kind: rel,
-                        ty: ir::Ty::new(ir::TyPrimitive::text),
-                    })));
-                }
+                let item = cr::Expr {
+                    kind: item,
+                    ty: if item_ty.kind.is_array() {
+                        ir::Ty::new(ir::TyPrimitive::text)
+                    } else {
+                        *item_ty
+                    },
+                };
 
-                rel
+                let ty_variants = expr.ty.kind.as_enum().unwrap();
+
+                if utils::is_maybe(ty_variants) {
+                    // construct Option::Some
+                    let some = item;
+
+                    // construct Option::None
+                    let none = cr::Expr {
+                        kind: cr::ExprKind::From(cr::From::Null),
+                        ty: some.ty.clone(),
+                    };
+
+                    // union both variants and take first
+                    cr::ExprKind::Transform(
+                        self.new_binding(cr::Expr {
+                            kind: cr::ExprKind::Union(vec![some, none]),
+                            ty: expr.ty.clone(),
+                        }),
+                        cr::Transform::Limit(Box::new(new_int(1))),
+                    )
+                } else {
+                    // construct Option::Some
+                    let some_tag = new_uint16(1);
+                    let some = cr::Expr {
+                        kind: cr::ExprKind::Join(
+                            self.new_binding(some_tag),
+                            self.new_binding(item),
+                            None,
+                        ),
+                        ty: expr.ty.clone(),
+                    };
+
+                    // construct Option::None
+                    let none_tag = new_uint16(0);
+                    let mut none_cols = vec![none_tag];
+                    none_cols.extend(self.rel_cols_ty_nested(&expr.ty).skip(1).map(|t| cr::Expr {
+                        kind: cr::ExprKind::From(cr::From::Null),
+                        ty: t.into_owned(),
+                    }));
+                    let none = cr::Expr {
+                        kind: cr::ExprKind::From(cr::From::Row(none_cols)),
+                        ty: expr.ty.clone(),
+                    };
+
+                    // union both variants and take first
+                    cr::ExprKind::Transform(
+                        self.new_binding(cr::Expr {
+                            kind: cr::ExprKind::Union(vec![some, none]),
+                            ty: expr.ty.clone(),
+                        }),
+                        cr::Transform::Limit(Box::new(new_int(1))),
+                    )
+                }
             }
             "std::map" => {
                 let array = self.compile_rel(&call.args[0]);
@@ -965,6 +1031,13 @@ impl<'a> Context<'a> {
                 };
 
                 cr::ExprKind::Transform(rows, cr::Transform::Insert(table_ident.clone()))
+            }
+            "std::sql::expr" => {
+                let source = &call.args[0];
+                let ir::ExprKind::Literal(ir::Literal::text(source)) = &source.kind else {
+                    panic!("sql_source must be const")
+                };
+                cr::ExprKind::From(cr::From::SQLSource(source.clone()))
             }
 
             _ => return self.compile_expr_std(expr),

@@ -1,13 +1,12 @@
 use lutra_bin::ir;
-use sqlparser::ast as sql_ast;
 
 use crate::sql::COL_ARRAY_INDEX;
-use crate::sql::utils::{ExprOrSource, RelCols, Scoped};
+use crate::sql::utils::{ExprOrRelVar, RelCols, Scoped};
 use crate::sql::{queries, utils};
 
 impl<'a> queries::Context<'a> {
     pub(super) fn serialize_json(&mut self, mut scoped: Scoped, ty: &ir::Ty) -> Scoped {
-        let input = self.scoped_as_rel_var(&mut scoped);
+        let input = self.scoped_as_rel_var(&mut scoped, ty);
 
         let ty_mat = self.get_ty_mat(ty);
         scoped.expr = match &ty_mat.kind {
@@ -15,13 +14,13 @@ impl<'a> queries::Context<'a> {
                 let item_cols: Vec<_> = self.rel_cols_nested(ty_item, "".into()).collect();
                 let item_serialized = self.serialize_json_nested(input, &item_cols, ty_item);
 
-                ExprOrSource::Source(format!(
+                ExprOrRelVar::new(format!(
                     "COALESCE(jsonb_agg({item_serialized} ORDER BY {input}.{COL_ARRAY_INDEX}), '[]'::jsonb)"
                 ))
             }
             ir::TyKind::Tuple(_) => {
                 let cols: Vec<_> = self.rel_cols_nested(ty_mat, "".into()).collect();
-                ExprOrSource::Source(self.serialize_json_nested(input, &cols, ty_mat))
+                ExprOrRelVar::new(self.serialize_json_nested(input, &cols, ty_mat))
             }
             _ => unreachable!("{:?}", ty),
         };
@@ -99,22 +98,22 @@ impl<'a> queries::Context<'a> {
 
                 query.from.push(utils::from(utils::rel_func(
                     utils::new_ident("jsonb_array_elements"),
-                    vec![scoped.expr.into_expr()],
+                    vec![scoped.expr.into_expr().unwrap()],
                     Some("j".into()),
                 )));
 
-                query.projection = vec![sql_ast::SelectItem::ExprWithAlias {
-                    expr: ExprOrSource::Source("(ROW_NUMBER() OVER ())::int4".into()).into_expr(),
-                    alias: utils::new_ident("index"),
+                query.projection = vec![sql_ast::SelectItem {
+                    expr: sql_ast::Expr::Source("(ROW_NUMBER() OVER ())::int4".into()),
+                    alias: Some(utils::new_ident("index")),
                 }];
 
                 let values = self.deserialize_json_nested("j.value".into(), ty_item);
                 let names = self.rel_cols_nested(ty_item, "".into());
 
                 for (value, name) in std::iter::zip(values, names) {
-                    query.projection.push(sql_ast::SelectItem::ExprWithAlias {
-                        expr: ExprOrSource::Source(value).into_expr(),
-                        alias: utils::new_ident(name),
+                    query.projection.push(sql_ast::SelectItem {
+                        expr: sql_ast::Expr::Source(value),
+                        alias: Some(utils::new_ident(name)),
                     });
                 }
 
@@ -124,15 +123,15 @@ impl<'a> queries::Context<'a> {
             ir::TyKind::Enum(_) => {
                 let mut query = utils::select_empty();
 
-                let json_ref = scoped.expr.into_expr().to_string();
+                let json_ref = scoped.expr.into_expr().unwrap().to_string();
 
                 let values = self.deserialize_json_nested(json_ref, ty);
 
                 let names = self.rel_cols_nested(ty, "".into());
                 for (value, name) in std::iter::zip(values, names) {
-                    query.projection.push(sql_ast::SelectItem::ExprWithAlias {
-                        expr: ExprOrSource::Source(value).into_expr(),
-                        alias: utils::new_ident(name),
+                    query.projection.push(sql_ast::SelectItem {
+                        expr: sql_ast::Expr::Source(value),
+                        alias: Some(utils::new_ident(name)),
                     });
                 }
                 query
@@ -143,7 +142,7 @@ impl<'a> queries::Context<'a> {
         let rel_var = utils::sub_rel(utils::query_select(query), rel_var_name.clone());
 
         scoped.rel_vars.push(utils::lateral(rel_var));
-        scoped.expr = ExprOrSource::RelVar(rel_var_name);
+        scoped.expr = ExprOrRelVar::RelVar(rel_var_name);
         scoped
     }
 
@@ -162,7 +161,7 @@ impl<'a> queries::Context<'a> {
 
             ir::TyKind::Array(_) => {
                 // arrays remain serialized in a single column
-                vec![json_ref.to_string()]
+                vec![json_ref]
             }
             ir::TyKind::Tuple(fields) => {
                 let mut r = Vec::new();

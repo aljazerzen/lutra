@@ -149,14 +149,13 @@ pub fn get_layout_simple(ty: &ir::Ty) -> Option<ir::TyLayout> {
         ir::TyKind::Array(_) => vec![0],
         ir::TyKind::Enum(variants) => {
             let head = enum_head_format(variants);
-            if head.inner_bytes < 4 {
-                // inline
+            if head.has_ptr {
+                vec![head.tag_bytes]
+            } else {
                 // here we should include body_ptrs in the head of inner type,
                 // but no type with a ptr fits into 4 bytes, so we can just skip
                 // that and assume there are no body_ptrs
                 vec![]
-            } else {
-                vec![head.tag_bytes]
             }
         }
 
@@ -213,6 +212,7 @@ pub fn enum_format(variants: &[ir::TyEnumVariant]) -> EnumFormat {
         .collect();
     EnumFormat {
         tag_bytes: head.tag_bytes as u8,
+        inner_bytes: head.inner_bytes as u8,
         has_ptr: head.has_ptr,
         variants,
     }

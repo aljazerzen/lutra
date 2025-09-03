@@ -58,7 +58,7 @@ fn print_01() {
       ): func (float64) -> [float64];
       let 2 = var.1: func (float64) -> [float64];
       (tuple_lookup
-        {
+        (tuple
           (call
             var.2: func (float64) -> [float64],
             3.5: float64,
@@ -78,7 +78,7 @@ fn print_01() {
             6: int64,
             2: int64,
           ): int64,
-        }: {[float64], [int64], int64}
+        ): {[float64], [int64], int64}
         1
       ): [int64]
     ): func () -> [int64]

@@ -1,0 +1,15 @@
+[package]
+name = "sql-ast"
+
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+version.workspace = true
+
+[features]
+default = ["std"]
+std = []
+
+[dependencies]
+log = "0.4"

@@ -18,6 +18,10 @@ impl Data {
     }
 
     pub fn combine(self, other: Data) -> Self {
+        if !other.has_remaining() {
+            return self;
+        }
+
         let mut this = match self {
             Data::Single(slice) => CombinedSlices::new(vec![Data::Single(slice)]),
             Data::Combined(combined) => combined,
@@ -59,7 +63,7 @@ impl Data {
 
     pub fn has_remaining(&self) -> bool {
         match self {
-            Data::Single(s) => s.is_empty(),
+            Data::Single(s) => s.has_remaining(),
             Data::Combined(c) => c.has_remaining(),
         }
     }
@@ -109,8 +113,8 @@ impl Slice {
         self.buf.len() - self.offset
     }
 
-    fn is_empty(&self) -> bool {
-        self.buf.len() >= self.offset
+    fn has_remaining(&self) -> bool {
+        self.offset < self.buf.len()
     }
 
     fn write_all(&self, w: &mut vec::Vec<u8>) {
@@ -149,7 +153,11 @@ impl CombinedSlices {
     }
 
     fn chunk(&self) -> &[u8] {
-        self.parts.first().unwrap().chunk()
+        self.parts
+            .iter()
+            .find(|p| p.has_remaining())
+            .map(|p| p.chunk())
+            .unwrap_or(&[])
     }
 
     fn advance(&mut self, bytes: usize) {
@@ -168,7 +176,7 @@ impl CombinedSlices {
     }
 
     fn has_remaining(&self) -> bool {
-        self.parts.iter().all(|d| d.has_remaining())
+        self.parts.iter().any(|d| d.has_remaining())
     }
 
     fn write_all(&self, w: &mut vec::Vec<u8>) {

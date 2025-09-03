@@ -20,10 +20,10 @@ fn inline_00() {
         true: bool,
         false: bool,
       ]: [bool];
-      {
+      (tuple
         var.1: [bool],
         var.1: [bool],
-      }: {[bool], [bool]}
+      ): {[bool], [bool]}
     ): func ({}) -> {[bool], [bool]}
     ")
 }
@@ -36,13 +36,13 @@ fn inline_01() {
     func main() -> once([true, true, false])
     "#), @r"
     let main = (func 1 ->
-      {
+      (tuple
         [
           true: bool,
           true: bool,
           false: bool,
         ]: [bool],
-      }: {[bool]}
+      ): {[bool]}
     ): func ({}) -> {[bool]}
     ")
 }
@@ -58,25 +58,25 @@ fn inline_02() {
     "#), @r"
     let main = (func 2 ->
       let 1 = [
-        {
+        (tuple
           5: int64,
           3: int64,
-        }: {int64, int64},
-        {
+        ): {int64, int64},
+        (tuple
           65: int64,
           1: int64,
-        }: {int64, int64},
-        {
+        ): {int64, int64},
+        (tuple
           3: int64,
           2: int64,
-        }: {int64, int64},
+        ): {int64, int64},
       ]: [{int64, int64}];
       let 2 = var.1: [{int64, int64}];
       let 4 = (call
         external.std::to_columnar: func ([{int64, int64}]) -> {[int64], [int64]},
         var.2: [{int64, int64}],
       ): {[int64], [int64]};
-      {
+      (tuple
         (call
           external.std::min: func ([int64]) -> int64,
           (tuple_lookup
@@ -91,7 +91,7 @@ fn inline_02() {
             1
           ): [int64],
         ): int64,
-      }: {int64, int64}
+      ): {int64, int64}
     ): func ({}) -> {int64, int64}
     ")
 }
@@ -112,7 +112,7 @@ fn inline_03() {
     "#), @r#"
     type OptText = enum {None, Some: text};
     let main = (func 1 ->
-      {
+      (tuple
         (enum_variant 1
           "hello": text
         ): OptText,
@@ -157,7 +157,7 @@ fn inline_03() {
             true: bool,
           ),
         ): bool,
-      }: {OptText, OptText, bool, bool}
+      ): {OptText, OptText, bool, bool}
     ): func ({}) -> {OptText, OptText, bool, bool}
     "#)
 }

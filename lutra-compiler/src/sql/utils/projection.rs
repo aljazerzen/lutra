@@ -1,12 +1,9 @@
 use std::borrow::Cow;
 
 use lutra_bin::ir;
-use sqlparser::ast as sql_ast;
 
 use crate::sql::{COL_ARRAY_INDEX, COL_VALUE};
 use crate::sql::{clauses, queries, utils};
-
-use super::ExprOrSource;
 
 /// Compute relational columns of a type.
 /// Basically, mapping of IR types to SQL relations.
@@ -162,7 +159,7 @@ impl<'a> queries::Context<'a> {
     pub fn projection(
         &self,
         ty: &ir::Ty,
-        values: impl IntoIterator<Item = ExprOrSource>,
+        values: impl IntoIterator<Item = sql_ast::Expr>,
     ) -> Vec<sql_ast::SelectItem> {
         let rel_cols = self.rel_cols(ty, true);
 
@@ -181,16 +178,16 @@ impl<'a> queries::Context<'a> {
                 rel_cols.len(),
                 values.len(),
                 "expected columns: {rel_cols:?}, got: {}, ty: {}",
-                super::expr_or_source::ExprOrSourceDisplay { exprs: &values },
+                super::expr_or_rel_var::ExprDisplay { exprs: &values },
                 ir::print_ty(ty)
             );
             (values, rel_cols)
         };
 
         std::iter::zip(values, rel_cols)
-            .map(|(expr, alias)| sql_ast::SelectItem::ExprWithAlias {
-                expr: expr.into_expr(),
-                alias: utils::new_ident(alias),
+            .map(|(expr, alias)| sql_ast::SelectItem {
+                expr,
+                alias: Some(utils::new_ident(alias)),
             })
             .collect()
     }
@@ -204,7 +201,10 @@ impl<'a> queries::Context<'a> {
         include_index: bool,
     ) -> Vec<sql_ast::SelectItem> {
         self.rel_cols(ty, include_index)
-            .map(|name| sql_ast::SelectItem::UnnamedExpr(super::identifier(rel_var_name, name)))
+            .map(|name| sql_ast::SelectItem {
+                expr: super::identifier(rel_var_name, name),
+                alias: None,
+            })
             .collect()
     }
 }

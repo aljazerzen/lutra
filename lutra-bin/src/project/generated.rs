@@ -81,6 +81,7 @@ pub mod br {
     #[allow(non_camel_case_types)]
     pub struct EnumVariant {
         pub tag: crate::vec::Vec<u8>,
+        pub inner_bytes: u8,
         pub has_ptr: bool,
         pub padding_bytes: u8,
         pub inner: Expr,
@@ -693,11 +694,13 @@ pub mod br {
             type HeadPtr = EnumVariantHeadPtr;
             fn encode_head(&self, buf: &mut crate::bytes::BytesMut) -> Self::HeadPtr {
                 let tag = self.tag.encode_head(buf);
+                let inner_bytes = self.inner_bytes.encode_head(buf);
                 let has_ptr = self.has_ptr.encode_head(buf);
                 let padding_bytes = self.padding_bytes.encode_head(buf);
                 let inner = self.inner.encode_head(buf);
                 EnumVariantHeadPtr {
                     tag,
+                    inner_bytes,
                     has_ptr,
                     padding_bytes,
                     inner,
@@ -705,6 +708,7 @@ pub mod br {
             }
             fn encode_body(&self, head: Self::HeadPtr, buf: &mut crate::bytes::BytesMut) {
                 self.tag.encode_body(head.tag, buf);
+                self.inner_bytes.encode_body(head.inner_bytes, buf);
                 self.has_ptr.encode_body(head.has_ptr, buf);
                 self.padding_bytes.encode_body(head.padding_bytes, buf);
                 self.inner.encode_body(head.inner, buf);
@@ -713,24 +717,27 @@ pub mod br {
         #[allow(non_camel_case_types)]
         pub struct EnumVariantHeadPtr {
             tag: <crate::vec::Vec<u8> as crate::Encode>::HeadPtr,
+            inner_bytes: <u8 as crate::Encode>::HeadPtr,
             has_ptr: <bool as crate::Encode>::HeadPtr,
             padding_bytes: <u8 as crate::Encode>::HeadPtr,
             inner: <super::Expr as crate::Encode>::HeadPtr,
         }
         impl crate::Layout for EnumVariant {
             fn head_size() -> usize {
-                120
+                128
             }
         }
 
         impl crate::Decode for EnumVariant {
             fn decode(buf: &[u8]) -> crate::Result<Self> {
                 let tag = crate::vec::Vec::<u8>::decode(buf.skip(0))?;
-                let has_ptr = bool::decode(buf.skip(8))?;
-                let padding_bytes = u8::decode(buf.skip(9))?;
-                let inner = super::Expr::decode(buf.skip(10))?;
+                let inner_bytes = u8::decode(buf.skip(8))?;
+                let has_ptr = bool::decode(buf.skip(9))?;
+                let padding_bytes = u8::decode(buf.skip(10))?;
+                let inner = super::Expr::decode(buf.skip(11))?;
                 Ok(EnumVariant {
                     tag,
+                    inner_bytes,
                     has_ptr,
                     padding_bytes,
                     inner,
@@ -3083,6 +3090,7 @@ pub mod layout {
     #[allow(non_camel_case_types)]
     pub struct EnumFormat {
         pub tag_bytes: u8,
+        pub inner_bytes: u8,
         pub has_ptr: bool,
         pub variants: crate::vec::Vec<EnumVariantFormat>,
     }
@@ -3105,16 +3113,19 @@ pub mod layout {
             type HeadPtr = EnumFormatHeadPtr;
             fn encode_head(&self, buf: &mut crate::bytes::BytesMut) -> Self::HeadPtr {
                 let tag_bytes = self.tag_bytes.encode_head(buf);
+                let inner_bytes = self.inner_bytes.encode_head(buf);
                 let has_ptr = self.has_ptr.encode_head(buf);
                 let variants = self.variants.encode_head(buf);
                 EnumFormatHeadPtr {
                     tag_bytes,
+                    inner_bytes,
                     has_ptr,
                     variants,
                 }
             }
             fn encode_body(&self, head: Self::HeadPtr, buf: &mut crate::bytes::BytesMut) {
                 self.tag_bytes.encode_body(head.tag_bytes, buf);
+                self.inner_bytes.encode_body(head.inner_bytes, buf);
                 self.has_ptr.encode_body(head.has_ptr, buf);
                 self.variants.encode_body(head.variants, buf);
             }
@@ -3122,22 +3133,25 @@ pub mod layout {
         #[allow(non_camel_case_types)]
         pub struct EnumFormatHeadPtr {
             tag_bytes: <u8 as crate::Encode>::HeadPtr,
+            inner_bytes: <u8 as crate::Encode>::HeadPtr,
             has_ptr: <bool as crate::Encode>::HeadPtr,
             variants: <crate::vec::Vec<super::EnumVariantFormat> as crate::Encode>::HeadPtr,
         }
         impl crate::Layout for EnumFormat {
             fn head_size() -> usize {
-                80
+                88
             }
         }
 
         impl crate::Decode for EnumFormat {
             fn decode(buf: &[u8]) -> crate::Result<Self> {
                 let tag_bytes = u8::decode(buf.skip(0))?;
-                let has_ptr = bool::decode(buf.skip(1))?;
-                let variants = crate::vec::Vec::<super::EnumVariantFormat>::decode(buf.skip(2))?;
+                let inner_bytes = u8::decode(buf.skip(1))?;
+                let has_ptr = bool::decode(buf.skip(2))?;
+                let variants = crate::vec::Vec::<super::EnumVariantFormat>::decode(buf.skip(3))?;
                 Ok(EnumFormat {
                     tag_bytes,
+                    inner_bytes,
                     has_ptr,
                     variants,
                 })

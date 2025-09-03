@@ -38,7 +38,7 @@ pub struct BoundExpr {
     pub rel: Expr,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, strum::AsRefStr)]
 pub enum From {
     /// Relation with one row and many columns, where each cell can have
     /// a different expression.
@@ -73,6 +73,9 @@ pub enum From {
     /// Does not evaluate any following conditions or values.
     /// Does not evaluate values whose conditions are false.
     Case(Vec<(Expr, Expr)>),
+
+    /// Direct SQL source. Should be used for std::sql::expr only.
+    SQLSource(String),
 }
 
 #[derive(Debug, Clone)]

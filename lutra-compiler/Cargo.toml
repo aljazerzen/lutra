@@ -29,7 +29,7 @@ semver = { version = "1.0.23", features = ["serde"] }
 chumsky = { workspace = true }
 
 # sql backend
-sqlparser = {version = "0.54.0", features = ["std"]}
+sql-ast = { path = "../sql-ast" }
 regex = "1.11.1"
 
 enum-as-inner = { workspace = true }

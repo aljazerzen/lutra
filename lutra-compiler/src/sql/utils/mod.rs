@@ -1,12 +1,12 @@
 #![allow(dead_code)]
 
 mod ast;
-mod expr_or_source;
+mod expr_or_rel_var;
 mod projection;
 mod scoped;
 
 pub use ast::*;
-pub use expr_or_source::*;
+pub use expr_or_rel_var::*;
 pub use projection::RelCols;
 pub use scoped::*;
 

@@ -6,7 +6,7 @@ use crate::{Data, NativeModule};
 pub mod std {
     use ::std::{borrow::Cow, collections::HashMap};
 
-    use crate::{ArrayWriter, Data, EvalError, TupleWriter, native::*};
+    use crate::{ArrayWriter, Data, EnumWriter, EvalError, TupleWriter, native::*};
     use assume::LayoutArgsReader;
     use lutra_bin::{ArrayReader, Decode, TupleReader, ir};
 
@@ -287,15 +287,28 @@ pub mod std {
             layout_args: &[u32],
             args: Vec<Cell>,
         ) -> Result<Cell, EvalError> {
-            let input_item_head_bytes = layout_args[0];
+            let mut layout_args = LayoutArgsReader::new(layout_args);
+            let input_item_head_bytes = layout_args.next_u32();
+
+            let output_format = assume::bytes(layout_args.next_slice());
+            let output_format = lutra_bin::layout::EnumFormat::decode(&output_format).unwrap();
 
             let [array, position] = assume::exactly_n(args);
 
             let array = assume::array(array, input_item_head_bytes);
             let position = assume::int64(&position)?;
+            let position = position as usize;
 
-            let item = array.get(position as usize).unwrap();
-            Ok(Cell::Data(item))
+            let enum_writer = EnumWriter::new(output_format);
+
+            Ok(Cell::Data(if position >= array.remaining() {
+                // None
+                enum_writer.write(0, Data::new(vec![]))
+            } else {
+                // Some
+                let item = array.get(position).unwrap();
+                enum_writer.write(1, item)
+            }))
         }
 
         pub fn map(

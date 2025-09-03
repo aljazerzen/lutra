@@ -2,6 +2,7 @@ import std::filter
 import std::sort
 import std::map
 import std::find
+import std::or_default
 import std::to_int32
 import std::to_int64
 import pg_catalog as pg
@@ -40,18 +41,20 @@ func pull_interface() -> (
           | map(func (i) -> (
             pg::from_pg_class()
             | find(func (ci) -> ci.oid == i.indexrelid)
+            | or_default()
             | func (ci) -> {i = i, ci = ci}
           ))
           | map(func (this) -> {
             index_name = this.ci.relname,
             is_unique = this.i.indisunique,
             columns = (
-              std::sql::unpack_array(this.i.indkey)
+              this.i.indkey
               | map(func (ik) -> (
                 pg::from_pg_attribute()
                 | find(func (a) ->
                   a.attrelid == this.i.indrelid && a.attnum == ik
                 )
+                | or_default()
               ))
               | map(func (a) -> a.attname)
             ),
@@ -63,22 +66,24 @@ func pull_interface() -> (
 )
 
 module pg_catalog {
-  type PgTypeRow: {oid: int32, typname: text, typnamespace: int32, typowner: int32, typlen: int16, typbyval: bool, typtype: text, typcategory: text, typispreferred: bool, typisdefined: bool, typdelim: text, typrelid: int32, typsubscript: text, typelem: int32, typarray: int32, typinput: text, typoutput: text, typreceive: text, typsend: text, typmodin: text, typmodout: text, typanalyze: text, typalign: text, typstorage: text, typnotnull: bool, typbasetype: int32, typtypmod: int32, typndims: int32, typcollation: int32, typdefaultbin: text, typdefault: text, typacl: [text]}
+  type PgTypeRow: {oid: int32, typname: text, typnamespace: int32, typowner: int32, typlen: int16, typbyval: bool, typtype: text, typcategory: text, typispreferred: bool, typisdefined: bool, typdelim: text, typrelid: int32, typsubscript: text, typelem: int32, typarray: int32, typinput: text, typoutput: text, typreceive: text, typsend: text, typmodin: text, typmodout: text, typanalyze: text, typalign: text, typstorage: text, typnotnull: bool, typbasetype: int32, typtypmod: int32, typndims: int32, typcollation: int32, typdefaultbin: text, typdefault: text}
   func from_pg_type(): [PgTypeRow] -> std::sql::from("pg_catalog/pg_type")
 
-  type PgAttributeRow: {attrelid: int32, attname: text, atttypid: int32, attlen: int16, attnum: int16, attcacheoff: int32, atttypmod: int32, attndims: int16, attbyval: bool, attalign: text, attstorage: text, attcompression: text, attnotnull: bool, atthasdef: bool, atthasmissing: bool, attidentity: text, attgenerated: text, attisdropped: bool, attislocal: bool, attinhcount: int16, attstattarget: int16, attcollation: int32, attacl: [text], attoptions: [text], attfdwoptions: [text], attmissingval: text}
+  type PgAttributeRow: {attrelid: int32, attname: text, atttypid: int32, attlen: int16, attnum: int16, attcacheoff: int32, atttypmod: int32, attndims: int16, attbyval: bool, attalign: text, attstorage: text, attcompression: text, attnotnull: bool, atthasdef: bool, atthasmissing: bool, attidentity: text, attgenerated: text, attisdropped: bool, attislocal: bool, attinhcount: int16, attstattarget: int16, attcollation: int32, attoptions: text, attfdwoptions: text, attmissingval: text}
   func from_pg_attribute(): [PgAttributeRow] -> std::sql::from("pg_catalog/pg_attribute")
 
-  type PgClass: {oid: int32, relname: text, relnamespace: int32, reltype: int32, reloftype: int32, relowner: int32, relam: int32, relfilenode: int32, reltablespace: int32, relpages: int32, reltuples: float32, relallvisible: int32, reltoastrelid: int32, relhasindex: bool, relisshared: bool, relpersistence: text, relkind: text, relnatts: int16, relchecks: int16, relhasrules: bool, relhastriggers: bool, relhassubclass: bool, relrowsecurity: bool, relforcerowsecurity: bool, relispopulated: bool, relreplident: text, relispartition: bool, relrewrite: int32, relfrozenxid: text, relminmxid: text, relacl: [text], reloptions: [text], relpartbound: text}
+  type PgClass: {oid: int32, relname: text, relnamespace: int32, reltype: int32, reloftype: int32, relowner: int32, relam: int32, relfilenode: int32, reltablespace: int32, relpages: int32, reltuples: float32, relallvisible: int32, reltoastrelid: int32, relhasindex: bool, relisshared: bool, relpersistence: text, relkind: text, relnatts: int16, relchecks: int16, relhasrules: bool, relhastriggers: bool, relhassubclass: bool, relrowsecurity: bool, relforcerowsecurity: bool, relispopulated: bool, relreplident: text, relispartition: bool, relrewrite: int32, relfrozenxid: text, relminmxid: text, reloptions: text, relpartbound: text}
   func from_pg_class(): [PgClass] -> std::sql::from("pg_catalog/pg_class")
 
   type PgConstraintRow: {oid: int32, conname: text, connamespace: int32, contype: text, condeferrable: bool, condeferred: bool, convalidated: bool, conrelid: int32, contypid: int32, conindid: int32, conparentid: int32, confrelid: int32, confupdtype: text, confdeltype: text, confmatchtype: text, conislocal: bool, coninhcount: int16, connoinherit: bool, conkey: [int16], confkey: [int16], conpfeqop: [int32], conppeqop: [int32], conffeqop: [int32], confdelsetcols: [int16], conexclop: [int32], conbin: text}
   func from_pg_constraint(): [PgConstraintRow] -> std::sql::from("pg_catalog/pg_constraint")
 
-  type PgIndexRow: {indexrelid: int32, indrelid: int32, indnatts: int16, indnkeyatts: int16, indisunique: bool, indnullsnotdistinct: bool, indisprimary: bool, indisexclusion: bool, indimmediate: bool, indisclustered: bool, indisvalid: bool, indcheckxmin: bool, indisready: bool, indislive: bool, indisreplident: bool, indkey: text, indcollation: text, indclass: text, indoption: text, indexprs: text, indpred: text}
-  func from_pg_index(): [PgIndexRow] -> std::sql::from("pg_catalog/pg_index")
+  type PgIndexRow: {indexrelid: int32, indrelid: int32, indisunique: bool, indkey: [int16]}
+  func from_pg_index(): [PgIndexRow] -> std::sql::expr(
+    "SELECT NULL::int4 as index, indexrelid as _0, indrelid as _1, indisunique as _2, to_jsonb(string_to_array(indkey::text, ' ')::int2[]) as _3 FROM pg_catalog.pg_index"
+  )
 
-  type PgNamespaceRow: {oid: int32, nspname: text, nspowner: int32, nspacl: [text]}
+  type PgNamespaceRow: {oid: int32, nspname: text, nspowner: int32}
   func from_pg_namespace(): [PgNamespaceRow] -> std::sql::from("pg_catalog/pg_namespace")
 }
 

@@ -202,7 +202,7 @@ impl Interpreter {
                     let cell = self.evaluate_expr(&field.expr)?;
                     let data = cell.into_data().map_err(|_| EvalError::BadProgram)?;
 
-                    if field.unpack < 1 {
+                    if field.unpack == 0 {
                         // general case
                         writer.write_field(data);
                         field_index += 1;
@@ -247,6 +247,7 @@ impl Interpreter {
 
                 Cell::Data(EnumWriter::write_variant(
                     &variant.tag,
+                    variant.inner_bytes,
                     variant.has_ptr,
                     variant.padding_bytes,
                     inner,

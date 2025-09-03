@@ -19,6 +19,13 @@ pub fn generate(
     out_file: &std::path::Path,
     options: GenerateOptions,
 ) -> Vec<PathBuf> {
+    tracing_subscriber::fmt::Subscriber::builder()
+        .without_time()
+        .with_target(false)
+        .with_max_level(tracing::Level::DEBUG)
+        .with_writer(std::io::stderr)
+        .init();
+
     // discover the project
     let source = lutra_compiler::discover(DiscoverParams {
         project: Some(project_dir.into()),

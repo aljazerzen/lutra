@@ -13,6 +13,7 @@ members = [
     "lutra-runner",
     "lutra-runner-postgres",
     "lutra-runner-postgres/python",
+    "sql-ast",
 ]
 exclude = ["examples"]
 resolver = "2"

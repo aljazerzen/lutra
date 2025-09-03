@@ -35,14 +35,14 @@ pub async fn _run_on(
     let source = SourceTree::single("".into(), source.to_string());
     let project = match lutra_compiler::check(source, Default::default()) {
         Ok(p) => p,
-        Err(e) => return (format!("{e}"), String::new()),
+        Err(e) => return (String::new(), format!("check error:\n{e}")),
     };
 
     // compile to sql
     let res = lutra_compiler::compile(&project, "main", None, ProgramFormat::SqlPg);
     let (program, ty) = match res {
         Ok(x) => x,
-        Err(e) => return (format!("{e}"), String::new()),
+        Err(e) => return (String::new(), format!("compile error:\n{e}")),
     };
 
     // format sql
@@ -264,7 +264,7 @@ fn array_prim() {
 fn array_empty() {
     insta::assert_snapshot!(_sql_and_output(_run(r#"
         const main = []: [bool]
-    "#, lutra_bin::Value::unit())), @r#"
+    "#, lutra_bin::Value::unit())), @r"
     SELECT
       r0.value
     FROM
@@ -273,13 +273,13 @@ fn array_empty() {
           0 AS index,
           NULL::bool AS value
         WHERE
-          false
+          FALSE
       ) AS r0
     ORDER BY
       r0.index
     ---
     []
-    "#);
+    ");
 }
 
 #[test]
@@ -607,7 +607,7 @@ fn tuple_array_empty() {
               0 AS index,
               NULL::int8 AS value
             WHERE
-              false
+              FALSE
           ) AS r0
       ) AS _1,
       FALSE AS _2
@@ -1031,10 +1031,10 @@ fn param_04() {
         ]),
     ])
     ).1, @r#"
-    {
+    Some({
       7,
       "world",
-    }
+    })
     "#);
 }
 
@@ -1211,10 +1211,10 @@ fn tuple_unpacking_00() {
     ).1, @r#"
     {
       4,
-      {
+      Some({
         id = 3,
         title = "Hello world!",
-      },
+      }),
     }
     "#);
 }
@@ -1283,12 +1283,12 @@ fn json_pack_02() {
         std::index(y, 1)
       ))
     )
-    "#, lutra_bin::Value::unit()).1, @r#"
+    "#, lutra_bin::Value::unit()).1, @r"
     [
-      2,
-      5,
+      Some(2),
+      Some(5),
     ]
-    "#);
+    ");
 }
 
 #[test]
@@ -1409,9 +1409,9 @@ fn json_pack_08() {
       std::index([["hello"]], 0)
     )
     "#, lutra_bin::Value::unit()).1, @r#"
-    [
+    Some([
       "hello",
-    ]
+    ])
     "#);
 }
 
@@ -1521,15 +1521,16 @@ fn if_01() {
                 SELECT
                   1::int8 AS index,
                   'no' AS value
-              ) AS r3,
-              LATERAL (
-                SELECT
-                  r5.value AS value
-                FROM
-                  r0 AS r5
-              ) AS r6
+              ) AS r3
             WHERE
-              (r6.value = 0::int2)
+              (
+                (
+                  SELECT
+                    r5.value AS value
+                  FROM
+                    r0 AS r5
+                ) = 0::int2
+              )
             UNION
             ALL
             SELECT
@@ -1545,15 +1546,16 @@ fn if_01() {
                 SELECT
                   1::int8 AS index,
                   'ne' AS value
-              ) AS r9,
-              LATERAL (
-                SELECT
-                  r11.value AS value
-                FROM
-                  r0 AS r11
-              ) AS r12
+              ) AS r9
             WHERE
-              (r12.value = 1::int2)
+              (
+                (
+                  SELECT
+                    r11.value AS value
+                  FROM
+                    r0 AS r11
+                ) = 1::int2
+              )
           ) AS r13
       ) AS r14
     ORDER BY
@@ -1697,10 +1699,10 @@ async fn sql_from_00() {
       (
         SELECT
           NULL AS index,
-          id AS _0,
-          title AS _1,
-          release_year AS _2,
-          director_id AS _3
+          id::int4 AS _0,
+          title::text AS _1,
+          release_year::int2 AS _2,
+          director_id::int4 AS _3
         FROM
           movies
       ) AS r0
@@ -2004,10 +2006,7 @@ fn opt_01() {
           (
             SELECT
               CASE
-                WHEN r5.value IS NOT NULL THEN (
-                  SELECT
-                    r5.value
-                )
+                WHEN r5.value IS NOT NULL THEN r5.value
                 ELSE 'none'
               END AS value
             FROM
@@ -2042,45 +2041,6 @@ fn opt_01() {
       "world",
     ]
     "#);
-}
-
-#[test]
-fn std_array_unpack() {
-    insta::assert_snapshot!(_run(r#"
-    type PgIndex: {
-      indrelid: int32,
-      indisunique: bool,
-      indisprimary: bool,
-      indkey: text,
-    }
-    type PgClass: {
-      oid: int32,
-      relname: text,
-    }
-    func main() -> (
-      # find pg_class row
-      std::sql::from("pg_catalog/pg_class"): [PgClass]
-
-      # for pg_class table
-      | std::find(func (c) -> c.relname == "pg_class")
-
-      # find pg_index row
-      | func (c) -> (
-        std::sql::from("pg_catalog/pg_index"): [PgIndex]
-        | std::find(func (i) -> (
-          i.indrelid == c.oid # on this table
-          && !i.indisprimary && i.indisunique # that is unique, but not primary
-        ))
-      )
-      # and unpack indkey, which is int2vec
-      | func (i) -> std::sql::unpack_array(i.indkey): [int16]
-    )
-    "#, lutra_bin::Value::unit()).1, @r"
-    [
-      2,
-      3,
-    ]
-    ");
 }
 
 #[tokio::test(flavor = "current_thread")]
