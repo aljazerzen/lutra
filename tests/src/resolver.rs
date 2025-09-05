@@ -721,6 +721,21 @@ fn array_05() {
 }
 
 #[test]
+fn array_06() {
+    insta::assert_snapshot!(_test_err(r#"
+        const main = [false, "true", false]"#
+    ), @r#"
+    [E0006] Error:
+       ╭─[:2:30]
+       │
+     2 │         const main = [false, "true", false]
+       │                              ───┬──
+       │                                 ╰──── expected type `bool`, but found type `text`
+    ───╯
+    "#);
+}
+
+#[test]
 fn type_annotation_00() {
     insta::assert_snapshot!(
         _test_ty(
@@ -959,6 +974,50 @@ fn match_05() {
           .Pending(x) => x,
         }
     "#), @"int32");
+}
+
+#[test]
+fn match_06() {
+    insta::assert_snapshot!(_test_err(r#"
+        type Animal: enum {
+          Cat: text,
+          Dog: bool,
+        }
+
+        func main(): [text] -> match Animal::Cat {
+          .Cat(name) | .Dog(is_vaccinated) => true,
+        }
+    "#), @r"
+    Error:
+       ╭─[:8:24]
+       │
+     8 │           .Cat(name) | .Dog(is_vaccinated) => true,
+       │                        ─────────┬─────────
+       │                                 ╰─────────── patterns introduce different variable names
+    ───╯
+    ");
+}
+
+#[test]
+fn match_07() {
+    insta::assert_snapshot!(_test_err(r#"
+        type Animal: enum {
+          Cat: text,
+          Dog: bool,
+        }
+
+        func main(): text -> match Animal::Cat {
+          .Cat(name) | .Dog(name) => name,
+        }
+    "#), @r"
+    [E0006] Error:
+       ╭─[:8:29]
+       │
+     8 │           .Cat(name) | .Dog(name) => name,
+       │                             ──┬─
+       │                               ╰─── expected type `text`, but found type `bool`
+    ───╯
+    ");
 }
 
 #[test]

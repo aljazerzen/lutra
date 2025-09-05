@@ -1,5 +1,6 @@
 use itertools::Itertools;
 
+use crate::diagnostic::WithErrorInfo;
 use crate::pr::{self, *};
 use crate::{Result, Span};
 
@@ -25,7 +26,8 @@ impl TypeResolver<'_> {
                 for item in items {
                     let item_ty = self.infer_type(item)?;
                     if let Some(items_ty) = &items_ty {
-                        self.validate_type(&item_ty, items_ty, &|| None)?;
+                        self.validate_type(&item_ty, items_ty, &|| None)
+                            .with_span_fallback(item.span)?;
                     } else {
                         items_ty = Some(item_ty);
                     }

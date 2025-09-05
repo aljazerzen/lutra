@@ -569,6 +569,66 @@ func main() -> match name {
 # >
 "Hello, Tom!"
 
+# === match_06
+func main() -> (
+  ["Tom", "world", "Alice"]
+  | std::map(func (n) -> match n {
+    "world" => "Hello world!",
+    n => f"Hello, {n}!"
+  })
+)
+# >
+[
+  "Hello, Tom!",
+  "Hello world!",
+  "Hello, Alice!",
+]
+
+# === match_07
+type Animal: enum {
+  Cat,
+  Dog,
+  Hamster,
+}
+
+func main() -> (
+  [Animal::Cat, Animal::Dog, Animal::Hamster, Animal::Dog]
+  | std::map(func (a) -> match a {
+    .Cat | .Hamster => false,
+    _ => true
+  })
+)
+# >
+[
+  false,
+  true,
+  false,
+  true,
+]
+
+# === match_08
+type Animal: enum {
+  Cat: text,
+  Dog: enum {Collie: text, Generic},
+}
+
+func main(): [text] -> (
+  [
+    Animal::Cat("Whiskers"),
+    Animal::Dog(Animal::Dog::Generic),
+    Animal::Dog(Animal::Dog::Collie("Jessie")),
+  ]
+  | std::map(func (a: Animal): text -> match a {
+    .Cat(name) | .Dog(.Collie(name)) => name,
+    _ => "<unnamed>"
+  })
+)
+# >
+[
+  "Whiskers",
+  "<unnamed>",
+  "Jessie",
+]
 
 # === or_else_00
 

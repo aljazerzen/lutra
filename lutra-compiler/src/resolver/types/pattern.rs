@@ -27,8 +27,14 @@ impl<'a> super::TypeResolver<'a> {
                 ScopeKind::Nested,
             ));
 
-            // fold pattern (this will populate the scope)
-            let pattern = self.resolve_pattern(subject_ty, branch.pattern)?;
+            // resolve pattern
+            let (pattern, bound_tys) = self.resolve_pattern(subject_ty, branch.pattern)?;
+
+            // populate scope
+            let scope = self.scopes.last_mut().unwrap();
+            for bound_ty in bound_tys {
+                scope.insert_local(bound_ty.clone());
+            }
 
             // fold value
             let value = self.fold_expr(*branch.value)?;
@@ -67,7 +73,7 @@ impl<'a> super::TypeResolver<'a> {
         &mut self,
         subject_ty: &pr::Ty,
         pattern: pr::Pattern,
-    ) -> Result<pr::Pattern> {
+    ) -> Result<(pr::Pattern, Vec<pr::Ty>)> {
         match pattern.kind {
             pr::PatternKind::Enum(variant_name, inner) => {
                 let subject_ty_mat = self.get_ty_mat(subject_ty)?;
@@ -119,25 +125,54 @@ impl<'a> super::TypeResolver<'a> {
                 };
 
                 // inner
-                let inner = if let Some(inner) = inner {
-                    let inner = self.resolve_pattern(&variant_ty, *inner)?;
-                    Some(Box::new(inner))
+                let (inner, bound_tys) = if let Some(inner) = inner {
+                    let (inner, bound_tys) = self.resolve_pattern(&variant_ty, *inner)?;
+                    (Some(Box::new(inner)), bound_tys)
                 } else {
-                    None
+                    (None, Vec::new())
                 };
 
-                Ok(pr::Pattern {
+                let pattern = pr::Pattern {
                     kind: pr::PatternKind::Enum(variant_name, inner),
                     variant_tag: tag,
                     ..pattern
-                })
+                };
+                Ok((pattern, bound_tys))
+            }
+
+            pr::PatternKind::AnyOf(branches) => {
+                assert!(!branches.is_empty());
+
+                let mut res = Vec::with_capacity(branches.len());
+                let mut res_bound_tys = None;
+                for br in branches {
+                    let span = br.span;
+                    let (pat, bound_tys) = self.resolve_pattern(subject_ty, br)?;
+                    res.push(pat);
+
+                    if let Some(res) = &res_bound_tys {
+                        // validate that branches require same type for their bound variables
+                        for (e, f) in std::iter::zip(res, bound_tys) {
+                            self.validate_type(&f, e, &|| None)
+                                .with_span_fallback(f.span)
+                                .with_span_fallback(Some(span))?;
+                        }
+                    } else {
+                        res_bound_tys = Some(bound_tys);
+                    }
+                }
+
+                let pattern = pr::Pattern {
+                    kind: pr::PatternKind::AnyOf(res),
+                    ..pattern
+                };
+                Ok((pattern, res_bound_tys.unwrap()))
             }
 
             pr::PatternKind::Bind(_) => {
-                let scope = self.scopes.last_mut().unwrap();
-                scope.insert_local(subject_ty.clone());
-
-                Ok(pattern)
+                let mut bound_ty = subject_ty.clone();
+                bound_ty.span = dbg!(Some(pattern.span));
+                Ok((pattern, vec![bound_ty]))
             }
 
             pr::PatternKind::Literal(l) => {
@@ -146,10 +181,11 @@ impl<'a> super::TypeResolver<'a> {
                 self.validate_type(&found_ty, subject_ty, &|| Some("match".into()))
                     .unwrap_or_else(self.push_diagnostic());
 
-                Ok(pr::Pattern {
+                let pattern = pr::Pattern {
                     kind: pr::PatternKind::Literal(l),
                     ..pattern
-                })
+                };
+                Ok((pattern, vec![]))
             }
         }
     }

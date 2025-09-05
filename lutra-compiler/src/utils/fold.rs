@@ -276,6 +276,11 @@ pub fn fold_pattern<T: ?Sized + PrFold>(fold: &mut T, pattern: Pattern) -> Resul
                     .transpose()?,
             ),
             PatternKind::Literal(lit) => PatternKind::Literal(lit),
+            PatternKind::AnyOf(pats) => PatternKind::AnyOf(
+                pats.into_iter()
+                    .map(|p| fold.fold_pattern(p))
+                    .collect::<Result<_, _>>()?,
+            ),
             PatternKind::Bind(name) => PatternKind::Bind(name),
         },
         span: pattern.span,

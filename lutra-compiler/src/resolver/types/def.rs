@@ -17,7 +17,7 @@ impl super::TypeResolver<'_> {
     }
 
     /// fq_ident must point to an unresolved definition.
-    #[tracing::instrument(name = "d", skip_all, fields(n = fq_ident.to_string()))]
+    #[tracing::instrument(name = "types", skip_all, fields(def = fq_ident.to_string()))]
     fn resolve_def(&mut self, fq_ident: &pr::Path) -> Result<()> {
         if !fq_ident.starts_with_part(NS_STD) {
             tracing::debug!("resolving def {fq_ident}");

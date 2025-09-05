@@ -43,7 +43,7 @@ impl Scope {
         Ok(())
     }
 
-    pub fn insert_local(&mut self, name: &str) {
+    pub fn insert_local(&mut self, name: String) {
         self.names.insert(name.to_string(), ());
     }
 

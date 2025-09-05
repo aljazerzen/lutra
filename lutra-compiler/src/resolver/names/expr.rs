@@ -109,26 +109,14 @@ impl fold::PrFold for NameResolver<'_> {
         })
     }
 
-    fn fold_pattern(&mut self, mut pattern: pr::Pattern) -> Result<pr::Pattern> {
-        match pattern.kind {
-            pr::PatternKind::Enum(variant, inner) => {
-                // inner
-                let inner = if let Some(inner) = inner {
-                    Some(Box::new(self.fold_pattern(*inner)?))
-                } else {
-                    None
-                };
+    fn fold_pattern(&mut self, pattern: pr::Pattern) -> Result<pr::Pattern> {
+        let binds = collect_pattern_binds(&pattern)?;
 
-                pattern.kind = pr::PatternKind::Enum(variant, inner);
-            }
-            pr::PatternKind::Bind(ref name) => {
-                let scope = self.scopes.last_mut().unwrap();
-                scope.insert_local(name);
-            }
-
-            // currently just [PatternKind::Literal]
-            k => pattern.kind = k,
+        let scope = self.scopes.last_mut().unwrap();
+        for b in binds {
+            scope.insert_local(b);
         }
+
         Ok(pattern)
     }
 
@@ -396,5 +384,43 @@ pub fn lookup_in_ty<'t>(ty: &'t pr::Ty, steps: &[String]) -> Result<&'t pr::Ty, 
             lookup_in_ty(&field.ty, &steps[1..])
         }
         _ => Err(()),
+    }
+}
+
+/// Traverses a pattern and returns the set of all bound names.
+/// For example `.Cat(name) | .Dog(name)` would return `[name]`.
+fn collect_pattern_binds(pattern: &pr::Pattern) -> Result<Vec<String>> {
+    match &pattern.kind {
+        pr::PatternKind::Literal(_) => Ok(vec![]),
+        pr::PatternKind::Bind(name) => Ok(vec![name.clone()]),
+
+        pr::PatternKind::Enum(_, inner) => Ok(inner
+            .as_ref()
+            .map(|p| collect_pattern_binds(p))
+            .transpose()?
+            .unwrap_or_default()),
+        pr::PatternKind::AnyOf(branches) => {
+            assert!(branches.len() >= 2);
+
+            let mut result = None;
+            for b in branches {
+                let binds = collect_pattern_binds(b)?;
+
+                if let Some(result) = &result {
+                    // in subsequent branches, validate that binds match previous binds
+                    if &binds != result {
+                        return Err(Diagnostic::new_custom(
+                            "patterns introduce different variable names",
+                        )
+                        .with_span(Some(b.span)));
+                    }
+                } else {
+                    // in the first branch, use collected binds
+                    result = Some(binds);
+                }
+            }
+
+            Ok(result.unwrap())
+        }
     }
 }

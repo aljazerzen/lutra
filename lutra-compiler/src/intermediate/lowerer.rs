@@ -353,7 +353,7 @@ impl<'a> Lowerer<'a> {
 
                     // collect pattern scope
                     let mut values = Vec::new();
-                    self.collect_pattern_scope(&branch.pattern, subject_ref.clone(), &mut values);
+                    self.collect_pattern_binds(&branch.pattern, subject_ref.clone(), &mut values);
                     self.scopes.push(Scope {
                         id: branch.value.scope_id.unwrap(),
                         kind: ScopeKind::Local { values },
@@ -483,27 +483,7 @@ impl<'a> Lowerer<'a> {
                     let inner_cond = self.lower_pattern_to_condition(&inner_ref, inner)?;
 
                     if let Some(inner_cond) = inner_cond {
-                        // new_bin_op(expr, "std::and", inner_cond)
-                        expr = ir::Expr {
-                            kind: ir::ExprKind::Call(Box::new(ir::Call {
-                                function: ir::Expr {
-                                    kind: ir::ExprKind::Pointer(ir::Pointer::External(
-                                        ir::ExternalPtr {
-                                            id: "std::and".to_string(),
-                                        },
-                                    )),
-                                    ty: ir::Ty::new(ir::TyFunction {
-                                        params: vec![
-                                            ir::Ty::new(ir::TyPrimitive::bool),
-                                            ir::Ty::new(ir::TyPrimitive::bool),
-                                        ],
-                                        body: ir::Ty::new(ir::TyPrimitive::bool),
-                                    }),
-                                },
-                                args: vec![expr, inner_cond],
-                            })),
-                            ty: ir::Ty::new(ir::TyPrimitive::bool),
-                        }
+                        expr = new_bool_bin_func("std::and", expr, inner_cond);
                     }
                 }
                 Ok(Some(expr))
@@ -518,21 +498,24 @@ impl<'a> Lowerer<'a> {
                     ty: subject_ty.clone(),
                 };
 
-                Ok(Some(ir::Expr {
-                    kind: ir::ExprKind::Call(Box::new(ir::Call {
-                        function: ir::Expr {
-                            kind: ir::ExprKind::Pointer(ir::Pointer::External(ir::ExternalPtr {
-                                id: "std::eq".to_string(),
-                            })),
-                            ty: ir::Ty::new(ir::TyFunction {
-                                params: vec![subject_ty.clone(), subject_ty.clone()],
-                                body: ir::Ty::new(ir::TyPrimitive::bool),
-                            }),
-                        },
-                        args: vec![subject.clone(), lit],
-                    })),
-                    ty: ir::Ty::new(ir::TyPrimitive::bool),
-                }))
+                Ok(Some(new_bool_bin_func("std::eq", subject.clone(), lit)))
+            }
+
+            // AnyOf matches if any of branches match
+            pr::PatternKind::AnyOf(branches) => {
+                let mut conditions = Vec::with_capacity(branches.len());
+                for br in branches {
+                    conditions.extend(self.lower_pattern_to_condition(subject, br)?);
+                }
+
+                let mut conditions = conditions.into_iter().rev();
+                let Some(mut res) = conditions.next() else {
+                    return Ok(None);
+                };
+                for c in conditions {
+                    res = new_bool_bin_func("std::or", c, res);
+                }
+                Ok(Some(res))
             }
 
             // bind always matches
@@ -826,7 +809,7 @@ impl<'a> Lowerer<'a> {
 
     /// For a given pattern, this function collects all scope entries (variable bindings)
     /// and returns ir nodes that can be used as a reference to this entry.
-    fn collect_pattern_scope(
+    fn collect_pattern_binds(
         &mut self,
         pattern: &pr::Pattern,
         subject_ref: ir::Expr,
@@ -835,6 +818,53 @@ impl<'a> Lowerer<'a> {
         match &pattern.kind {
             pr::PatternKind::Bind(_) => {
                 entries.push(subject_ref);
+            }
+
+            pr::PatternKind::AnyOf(branches) => {
+                assert!(branches.len() >= 2);
+
+                // collect variables for each branch
+                let mut branches_vars = Vec::new();
+                let mut var_types: Option<Vec<ir::Ty>> = None;
+                for br in branches {
+                    let mut br_vars = Vec::new();
+                    self.collect_pattern_binds(br, subject_ref.clone(), &mut br_vars);
+
+                    if var_types.is_none() {
+                        var_types = Some(br_vars.iter().map(|e| e.ty.clone()).collect());
+                    }
+
+                    branches_vars.push(br_vars.into_iter());
+                }
+
+                // each branch has the same number of vars (enforced at name checking)
+                // TODO: ... which are of the same type (enforced as type checking)
+
+                // for each bound variable
+                for var_ty in var_types.unwrap() {
+                    // construct a switch that will pick correct variable
+                    let mut cases = Vec::new();
+                    for (branch, vars) in std::iter::zip(branches, branches_vars.iter_mut()) {
+                        let var = vars.next().unwrap();
+
+                        let condition = self
+                            .lower_pattern_to_condition(&subject_ref, branch)
+                            .unwrap();
+                        let condition = condition.unwrap_or_else(|| ir::Expr {
+                            kind: ir::ExprKind::Literal(ir::Literal::bool(true)),
+                            ty: ir::Ty::new(ir::TyPrimitive::bool),
+                        });
+                        cases.push(ir::SwitchBranch {
+                            condition,
+                            value: var,
+                        });
+                    }
+                    let var = ir::Expr {
+                        kind: ir::ExprKind::Switch(cases),
+                        ty: var_ty,
+                    };
+                    entries.push(var);
+                }
             }
 
             pr::PatternKind::Enum(variant_name, inner) => {
@@ -853,7 +883,7 @@ impl<'a> Lowerer<'a> {
                         ty: inner_ty,
                     };
 
-                    self.collect_pattern_scope(inner, inner_ref, entries)
+                    self.collect_pattern_binds(inner, inner_ref, entries)
                 }
             }
 
@@ -953,6 +983,25 @@ impl<'a> Lowerer<'a> {
         };
 
         ir::Expr { kind, ty }
+    }
+}
+
+fn new_bool_bin_func(func_id: &str, left: ir::Expr, right: ir::Expr) -> ir::Expr {
+    let bool_ty = ir::Ty::new(ir::TyPrimitive::bool);
+    ir::Expr {
+        kind: ir::ExprKind::Call(Box::new(ir::Call {
+            function: ir::Expr {
+                kind: ir::ExprKind::Pointer(ir::Pointer::External(ir::ExternalPtr {
+                    id: func_id.to_string(),
+                })),
+                ty: ir::Ty::new(ir::TyFunction {
+                    params: vec![left.ty.clone(), right.ty.clone()],
+                    body: bool_ty.clone(),
+                }),
+            },
+            args: vec![left, right],
+        })),
+        ty: bool_ty,
     }
 }
 

@@ -144,20 +144,36 @@ fn match_(
     expr: impl Parser<TokenKind, Expr, Error = PError> + Clone,
 ) -> impl Parser<TokenKind, ExprKind, Error = PError> + Clone {
     let pattern = recursive(|pattern| {
-        choice((
-            ctrl('.')
-                .ignore_then(ident_part())
-                .then(
-                    pattern
-                        .delimited_by(ctrl('('), ctrl(')'))
-                        .map(Box::new)
-                        .or_not(),
-                )
-                .map(|(path, inner)| PatternKind::Enum(path, inner)),
+        let variant = ctrl('.')
+            .ignore_then(ident_part())
+            .then(
+                pattern
+                    .delimited_by(ctrl('('), ctrl(')'))
+                    .map(Box::new)
+                    .or_not(),
+            )
+            .map(|(path, inner)| PatternKind::Enum(path, inner));
+
+        let term = choice((
+            // enum variant
+            variant,
+            // bind
             ident_part().map(PatternKind::Bind),
+            // literal
             literal().map(PatternKind::Literal),
         ))
-        .map_with_span(Pattern::new_with_span)
+        .map_with_span(Pattern::new_with_span);
+
+        // any of
+        term.separated_by(ctrl('|'))
+            .at_least(1)
+            .map_with_span(|terms, span| {
+                if terms.len() > 1 {
+                    Pattern::new_with_span(PatternKind::AnyOf(terms), span)
+                } else {
+                    terms.into_iter().next().unwrap()
+                }
+            })
     })
     .labelled("pattern");
 

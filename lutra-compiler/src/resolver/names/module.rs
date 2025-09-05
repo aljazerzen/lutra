@@ -26,7 +26,6 @@ impl ModuleRefResolver<'_> {
         Ok(())
     }
 
-    #[tracing::instrument("i", skip_all, fields(p = self.current_path.to_string()))]
     fn resolve_imports(&mut self) -> Result<()> {
         let path = &mut self.current_path;
         let module = self.root.get_module_mut(path.as_steps()).unwrap();
@@ -45,6 +44,10 @@ impl ModuleRefResolver<'_> {
                 _ => {}
             }
         }
+
+        let trace_span =
+            tracing::span!(tracing::Level::DEBUG, "imports", module = path.to_string());
+        let _trace_enter = trace_span.enter();
 
         for name in imports {
             tracing::trace!("import {name}");
@@ -75,6 +78,8 @@ impl ModuleRefResolver<'_> {
             path.pop();
         }
 
+        drop(_trace_enter);
+
         for name in submodules {
             self.current_path.push(name);
             self.resolve_imports()?;
@@ -83,7 +88,6 @@ impl ModuleRefResolver<'_> {
         Ok(())
     }
 
-    #[tracing::instrument("r", skip_all, fields(p = self.current_path.to_string()))]
     fn resolve_refs(&mut self) -> Result<()> {
         let path = &mut self.current_path;
         let module = self.root.get_module_mut(path.as_steps()).unwrap();
@@ -102,6 +106,9 @@ impl ModuleRefResolver<'_> {
                 _ => {}
             }
         }
+
+        let trace_span = tracing::span!(tracing::Level::DEBUG, "names", module = path.to_string());
+        let _trace_enter = trace_span.enter();
 
         for name in unresolved_defs {
             tracing::trace!("def {name}");
@@ -142,6 +149,7 @@ impl ModuleRefResolver<'_> {
 
             path.pop();
         }
+        drop(_trace_enter);
 
         for name in submodules {
             self.current_path.push(name);

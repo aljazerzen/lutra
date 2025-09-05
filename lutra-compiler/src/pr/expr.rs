@@ -239,6 +239,9 @@ pub enum PatternKind {
     /// Match value of a primitive type
     Literal(Literal),
 
+    /// Match any of the following
+    AnyOf(Vec<Pattern>),
+
     /// Match anything, bind it to a name
     Bind(String),
 }
