@@ -6,7 +6,7 @@ use std::{borrow::Cow, fmt::Write};
 use lutra_bin::{Encode, ir, layout};
 use lutra_compiler::{CheckParams, DiscoverParams, ProgramFormat, Project, pr};
 
-use crate::{camel_to_snake, snake_to_sentence};
+use crate::camel_to_snake;
 
 #[track_caller]
 pub fn generate(
@@ -593,9 +593,7 @@ fn write_sr_programs(
         let buf = program.encode();
         let program_base85 = base85::encode(&buf);
 
-        let name_camel = snake_to_sentence(name);
-        ty.input.name = Some(format!("{name_camel}Input"));
-        ty.output.name = Some(format!("{name_camel}Output"));
+        super::infer_names_of_program_ty(&mut ty, name);
 
         writeln!(w)?;
         writeln!(w, "@functools.cache")?;

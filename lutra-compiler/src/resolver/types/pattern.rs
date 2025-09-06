@@ -171,7 +171,7 @@ impl<'a> super::TypeResolver<'a> {
 
             pr::PatternKind::Bind(_) => {
                 let mut bound_ty = subject_ty.clone();
-                bound_ty.span = dbg!(Some(pattern.span));
+                bound_ty.span = Some(pattern.span);
                 Ok((pattern, vec![bound_ty]))
             }
 

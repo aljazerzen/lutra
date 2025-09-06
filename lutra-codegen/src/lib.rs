@@ -19,12 +19,12 @@ pub fn generate(
     out_file: &std::path::Path,
     options: GenerateOptions,
 ) -> Vec<PathBuf> {
-    tracing_subscriber::fmt::Subscriber::builder()
-        .without_time()
-        .with_target(false)
-        .with_max_level(tracing::Level::DEBUG)
-        .with_writer(std::io::stderr)
-        .init();
+    // tracing_subscriber::fmt::Subscriber::builder()
+    //     .without_time()
+    //     .with_target(false)
+    //     .with_max_level(tracing::Level::DEBUG)
+    //     .with_writer(std::io::stderr)
+    //     .init();
 
     // discover the project
     let source = lutra_compiler::discover(DiscoverParams {
@@ -287,6 +287,20 @@ fn infer_names(def_name: &str, ty: &mut ir::Ty) {
 
     let mut name_prefix = Vec::new();
     infer_names_re(ty, &mut name_prefix);
+}
+
+fn infer_names_of_program_ty(ty: &mut lutra_bin::rr::ProgramType, program_name: &str) {
+    let mut name_camel = vec![snake_to_sentence(program_name)];
+    {
+        name_camel.push("Input".into());
+        infer_names_re(&mut ty.input, &mut name_camel);
+        name_camel.pop();
+    }
+    {
+        name_camel.push("Output".into());
+        infer_names_re(&mut ty.output, &mut name_camel);
+        name_camel.pop();
+    }
 }
 
 fn infer_names_re(ty: &mut ir::Ty, name_prefix: &mut Vec<String>) {

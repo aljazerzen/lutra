@@ -3,7 +3,7 @@ use std::fmt::Write;
 use lutra_bin::{Encode, ir};
 use lutra_compiler::pr;
 
-use crate::{Context, codegen_ty, snake_to_sentence};
+use crate::{Context, codegen_ty};
 
 #[rustfmt::skip::macros(writeln)]
 #[rustfmt::skip::macros(write)]
@@ -36,17 +36,7 @@ pub fn write_sr_programs(
         let buf = program.encode();
         std::fs::write(out_file, buf).unwrap();
 
-        let mut name_camel = vec![snake_to_sentence(name)];
-        {
-            name_camel.push("Input".into());
-            super::infer_names_re(&mut ty.input, &mut name_camel);
-            name_camel.pop();
-        }
-        {
-            name_camel.push("Output".into());
-            super::infer_names_re(&mut ty.output, &mut name_camel);
-            name_camel.pop();
-        }
+        super::infer_names_of_program_ty(&mut ty, name);
 
         write!(w, "pub fn {name}() -> {lutra_bin}::rr::TypedProgram<")?;
         codegen_ty::write_ty_ref(w, &ty.input, false, ctx)?;
