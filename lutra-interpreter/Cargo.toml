@@ -11,8 +11,8 @@ test = false
 
 [dependencies]
 arrow = "55.1.0"
-lutra-bin = { path = "../lutra-bin" }
-lutra-runner = { path = "../lutra-runner" }
+lutra-bin = { workspace = true }
+lutra-runner = { workspace = true }
 parquet = { version = "55.1.0" }
 thiserror.workspace = true
 tracing.workspace = true

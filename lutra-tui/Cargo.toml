@@ -11,6 +11,6 @@ anyhow = { workspace = true }
 itertools = { workspace = true }
 crossterm = "0.28.0"
 ratatui = "0.29.0"
-lutra-compiler = { path = "../lutra-compiler" }
-lutra-bin = { path = "../lutra-bin" }
-lutra-interpreter = { path = "../lutra-interpreter" }
+lutra-compiler = { workspace = true }
+lutra-bin = { workspace = true }
+lutra-interpreter = { workspace = true }

@@ -7,7 +7,7 @@ rust-version.workspace = true
 version.workspace = true
 
 [dependencies]
-lutra-bin = { path = "../lutra-bin" }
+lutra-bin = { workspace = true }
 
 [build-dependencies]
-lutra-codegen = { path = "../lutra-codegen" }
+lutra-codegen = { workspace = true }

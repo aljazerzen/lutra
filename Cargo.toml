@@ -40,3 +40,18 @@ indexmap = "2.6.0"
 tracing = "0.1"
 tracing-subscriber = "0.3.19"
 tokio = "1.42.0"
+
+lutra-bin = { version = "0.1", registry = "codeberg-org", path = "lutra-bin", default-features = false }
+lutra-bin-python = { version = "0.1", registry = "codeberg-org", path = "lutra-bin/python" }
+lutra-cli = { version = "0.1", registry = "codeberg-org", path = "lutra-cli" }
+lutra-codegen = { version = "0.1", registry = "codeberg-org", path = "lutra-codegen" }
+lutra-compiler = { version = "0.1", registry = "codeberg-org", path = "lutra-compiler" }
+lutra-interpreter = { version = "0.1", registry = "codeberg-org", path = "lutra-interpreter" }
+lutra-ir = { version = "0.1", registry = "codeberg-org", path = "lutra-ir" }
+lutra-tui = { version = "0.1", registry = "codeberg-org", path = "lutra-tui" }
+lutra-typed-data = { version = "0.1", registry = "codeberg-org", path = "lutra-typed-data" }
+tests = { version = "0.1", registry = "codeberg-org", path = "tests" }
+lutra-runner = { version = "0.1", registry = "codeberg-org", path = "lutra-runner" }
+lutra-runner-postgres = { version = "0.1", registry = "codeberg-org", path = "lutra-runner-postgres", default-features = false }
+lutra-runner-postgres-python = { version = "0.1", registry = "codeberg-org", path = "lutra-runner-postgres/python", default-features = false }
+sql-ast = { version = "0.1", registry = "codeberg-org", path = "sql-ast" }

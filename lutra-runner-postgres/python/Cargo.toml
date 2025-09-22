@@ -17,5 +17,5 @@ pyo3-async-runtimes = { version = "0.25.0", features = ["tokio-runtime"] }
 tokio-postgres = "0.7.13"
 tokio = { workspace = true }
 log.workspace = true
-lutra-runner = { version = "0.1.0", path = "../../lutra-runner" }
-lutra-bin = { version = "0.1.0", path = "../../lutra-bin" }
+lutra-runner = { workspace = true }
+lutra-bin = { workspace = true }

@@ -12,8 +12,8 @@ tracing = { workspace = true }
 thiserror = { workspace = true }
 futures = { version = "0.3.31", default-features = false }
 tokio = { workspace = true }
-lutra-bin = { version = "0.1.0", path = "../lutra-bin" }
-lutra-runner = { version = "0.1.0", path = "../lutra-runner" }
+lutra-bin = { workspace = true, features = ["std"] }
+lutra-runner = { workspace = true }
 tinyjson = "2"
 postgres-types = { version = "0.2.9", default-features = false }
 postgres-protocol = { version = "0.6.8", default-features = false }
@@ -23,7 +23,7 @@ postgres = { version = "0.19.10", default-features = false, optional = true }
 regex = { version = "1.11.2", default-features = false }
 
 [build-dependencies]
-lutra-codegen = { version = "0.1.0", path = "../lutra-codegen" }
+lutra-codegen = { workspace = true }
 
 [features]
 default = ["postgres", "tokio-postgres"]

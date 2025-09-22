@@ -29,14 +29,14 @@ semver = { version = "1.0.23", features = ["serde"] }
 chumsky = { workspace = true }
 
 # sql backend
-sql-ast = { path = "../sql-ast" }
+sql-ast = { workspace = true }
 regex = "1.11.1"
 
 enum-as-inner = { workspace = true }
 strum = { version = "0.26.3", features = ["std", "derive"] }
 indexmap = { workspace = true }
 
-lutra-bin = { path = "../lutra-bin" }
+lutra-bin = { workspace = true, features = ["std"] }
 
 # cli
 clap = { version = "4.4.18", features = ["derive"], optional = true }

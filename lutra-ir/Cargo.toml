@@ -11,8 +11,8 @@ version.workspace = true
 chumsky = { workspace = true }
 itertools = { workspace = true }
 log = { workspace = true }
-lutra-compiler = { path = "../lutra-compiler" }
-lutra-bin = { path = "../lutra-bin" }
+lutra-compiler = { workspace = true }
+lutra-bin = { workspace = true }
 
 [dev-dependencies]
 insta = { workspace = true }

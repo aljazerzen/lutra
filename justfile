@@ -27,3 +27,13 @@ generate-precompiled:
     # For when current code does not compile, but we still have an old cli binary
     ../../../target/debug/lutra codegen --lutra-bin-path="crate" . ./generated.rs
     cargo fmt -p lutra-bin
+
+publish:
+    cargo publish -p lutra-bin
+    cargo publish -p sql-ast
+    cargo publish -p lutra-compiler
+    cargo publish -p lutra-codegen
+    cargo publish -p lutra-runner
+    cargo publish -p lutra-runner-postgres
+    cargo publish -p lutra-interpreter
+    cargo publish -p lutra-cli  

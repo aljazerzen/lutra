@@ -4,9 +4,9 @@ resolver = "2"
 edition = "2021"
 
 [dependencies]
-lutra-bin = { path = "../../lutra-bin" }
-lutra-runner-postgres = { path = "../../lutra-runner-postgres" }
+lutra-bin = { workspace = true }
+lutra-runner-postgres = { workspace = true }
 postgres = "0.19.10"
 
 [build-dependencies]
-lutra-codegen = { path = "../../lutra-codegen" }
+lutra-codegen = { workspace = true }

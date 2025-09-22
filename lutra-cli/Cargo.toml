@@ -13,16 +13,16 @@ bench = false
 test = false
 
 [dependencies]
-lutra-bin = { path = "../lutra-bin" }
-lutra-compiler = { path = "../lutra-compiler", features = ["clap", "debug"] }
-lutra-interpreter = { path = "../lutra-interpreter" }
-lutra-codegen = { path = "../lutra-codegen" }
+lutra-bin = { workspace = true }
+lutra-compiler = { workspace = true, features = ["clap", "debug"] }
+lutra-interpreter = { workspace = true }
+lutra-codegen = { workspace = true }
+lutra-runner = { workspace = true }
+lutra-runner-postgres = { workspace = true, features = ["tokio-postgres"]}
 
 tracing = { workspace = true }
 clap = { version = "4.4.18", features = ["derive"] }
 tracing-subscriber = { workspace = true }
 anyhow = { workspace = true }
-lutra-runner = { version = "0.1.0", path = "../lutra-runner" }
-lutra-runner-postgres = { version = "0.1.0", path = "../lutra-runner-postgres", features = ["tokio-postgres"]}
 tokio-postgres = "0.7.13"
 tokio = {workspace = true, features = ["rt", "macros", "fs"]}
