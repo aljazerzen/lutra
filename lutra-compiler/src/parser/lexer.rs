@@ -6,7 +6,7 @@ pub use token::{SpanInSource, Token, TokenKind};
 
 use chumsky::error::Cheap;
 use chumsky::prelude::*;
-use chumsky::text::newline;
+use chumsky::text::{Character, newline};
 
 use crate::diagnostic::{Diagnostic, DiagnosticCode};
 
@@ -15,8 +15,14 @@ use crate::span::Span;
 
 type LError = Cheap<char, SpanInSource>;
 
+#[derive(Debug, Default)]
+pub struct Tokens {
+    pub semantic: Vec<Token>,
+    pub trivia: Vec<Token>,
+}
+
 /// Split source into tokens.
-pub fn lex_source_recovery(source: &str, source_id: u16) -> (Option<Vec<Token>>, Vec<Diagnostic>) {
+pub fn lex_source_recovery(source: &str, source_id: u16) -> (Option<Tokens>, Vec<Diagnostic>) {
     let stream = prepare_stream(source);
 
     let (tokens, lex_errors) = lexer().parse_recovery(stream);
@@ -25,6 +31,14 @@ pub fn lex_source_recovery(source: &str, source_id: u16) -> (Option<Vec<Token>>,
         .into_iter()
         .map(|e| convert_lexer_error(source, e, source_id))
         .collect();
+
+    let tokens = tokens.map(|tok_vec| {
+        let (trivia, semantic) = tok_vec
+            .into_iter()
+            .partition(|t| matches!(t.kind, TokenKind::Comment(_) | TokenKind::NewLine));
+
+        Tokens { semantic, trivia }
+    });
 
     tracing::debug!("lex errors: {:?}", errors);
     (tokens, errors)
@@ -143,6 +157,8 @@ fn lexer() -> impl Parser<char, Vec<Token>, Error = LError> {
         .then(quoted_string(true))
         .map(|(c, s)| TokenKind::Interpolation(c, s));
 
+    let new_lines = just('\n').to(TokenKind::NewLine);
+
     let token = choice((
         control_multi,
         interpolation,
@@ -150,40 +166,35 @@ fn lexer() -> impl Parser<char, Vec<Token>, Error = LError> {
         control,
         keyword,
         ident,
-        doc_comment(),
+        comment(),
+        new_lines,
     ))
     .recover_with(skip_then_retry_until([]).skip_start())
     .map_with_span(|kind, span| Token { kind, span });
 
     token
-        .separated_by(ignored())
+        .separated_by(inline_whitespace())
         .allow_leading()
         .allow_trailing()
         .then_ignore(end())
 }
 
-fn doc_comment() -> impl Parser<char, TokenKind, Error = LError> {
-    just('#')
-        .ignore_then(choice((just('#').to(false), just('!').to(true))))
-        .then(newline().not().repeated().collect::<String>())
-        .map(|(is_self, text)| {
-            if is_self {
-                TokenKind::DocCommentSelf(text)
-            } else {
-                TokenKind::DocComment(text)
-            }
-        })
+fn inline_whitespace() -> chumsky::combinator::Repeated<impl Parser<char, (), Error = LError>> {
+    filter(|c: &char| c.is_inline_whitespace())
+        .ignored()
+        .repeated()
 }
 
-fn ignored() -> impl Parser<char, (), Error = LError> {
-    let comment = just('#')
-        .ignore_then(just('#').or(just('!')).not().rewind())
-        .ignore_then(newline().not().repeated())
-        .ignored();
-
-    let whitespace = filter::<char, _, LError>(|c: &char| c.is_whitespace()).ignored();
-
-    comment.or(whitespace).repeated().ignored()
+fn comment() -> impl Parser<char, TokenKind, Error = LError> {
+    just('#')
+        .ignore_then(choice((just('#').to(false), just('!').to(true))).or_not())
+        .then_ignore(just(' ').or_not())
+        .then(newline().not().repeated().collect::<String>())
+        .map(|(kind, text)| match kind {
+            None => TokenKind::Comment(text),
+            Some(false) => TokenKind::DocComment(text),
+            Some(true) => TokenKind::DocCommentSelf(text),
+        })
 }
 
 pub(crate) fn ident_part() -> impl Parser<char, String, Error = LError> + Clone {

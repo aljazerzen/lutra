@@ -8,18 +8,24 @@ mod types;
 
 use chumsky::{Stream, prelude::*};
 
-use self::lexer::TokenKind;
+use self::lexer::{Token, TokenKind};
 use self::perror::PError;
 
 use crate::diagnostic::Diagnostic;
 use crate::pr;
 use crate::span::Span;
 
-pub fn parse_source(source: &str, source_id: u16) -> (Option<pr::ModuleDef>, Vec<Diagnostic>) {
+pub fn parse_source(
+    source: &str,
+    source_id: u16,
+) -> (Option<pr::ModuleDef>, Vec<Diagnostic>, Vec<Token>) {
     let (tokens, mut errors) = lexer::lex_source_recovery(source, source_id);
 
+    let mut trivia = Vec::new();
+
     let ast = if let Some(tokens) = tokens {
-        let stream = prepare_stream(tokens, source_id);
+        trivia = tokens.trivia;
+        let stream = prepare_stream(tokens.semantic, source_id);
         let (ast, chum_errs) = def::source().parse_recovery(stream);
 
         errors.extend(chum_errs.into_iter().map(Diagnostic::from));
@@ -28,14 +34,14 @@ pub fn parse_source(source: &str, source_id: u16) -> (Option<pr::ModuleDef>, Vec
         None
     };
 
-    (ast, errors)
+    (ast, errors, trivia)
 }
 
 pub fn parse_expr(source: &str, source_id: u16) -> (Option<pr::Expr>, Vec<Diagnostic>) {
     let (tokens, mut errors) = lexer::lex_source_recovery(source, source_id);
 
     let ast = if let Some(tokens) = tokens {
-        let stream = prepare_stream(tokens, source_id);
+        let stream = prepare_stream(tokens.semantic, source_id);
 
         let ty = types::type_expr();
         let expr = expr::expr(ty);

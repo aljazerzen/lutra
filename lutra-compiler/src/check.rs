@@ -36,6 +36,18 @@ pub fn check(
     Ok(project)
 }
 
+pub fn check_overlay(
+    project: &project::Project,
+    overlay: &str,
+    overlay_name: Option<&str>,
+) -> Result<pr::Expr, error::Error> {
+    let source = crate::project::SourceOverlay::new(&project.source, overlay, overlay_name);
+
+    parse_overlay(&source)
+        .and_then(|expr| crate::resolver::resolve_overlay_expr(&project.root_module, expr))
+        .map_err(|e| Error::from_diagnostics(e, &source))
+}
+
 fn parse(tree: &SourceTree, files: Vec<SourceFile>) -> Result<pr::ModuleDef, Vec<Diagnostic>> {
     // reverse the id->file_path map
     let ids: HashMap<_, _> = tree
@@ -57,7 +69,7 @@ fn parse(tree: &SourceTree, files: Vec<SourceFile>) -> Result<pr::ModuleDef, Vec
             .map(|x| **x)
             .expect("source tree has malformed ids");
 
-        let (ast, errs) = crate::parser::parse_source(source_file.content, id);
+        let (ast, errs, _) = crate::parser::parse_source(source_file.content, id);
 
         diagnostics.extend(errs);
         if let Some(module) = ast {
@@ -73,18 +85,6 @@ fn parse(tree: &SourceTree, files: Vec<SourceFile>) -> Result<pr::ModuleDef, Vec
     } else {
         Err(diagnostics)
     }
-}
-
-pub fn check_overlay(
-    project: &project::Project,
-    overlay: &str,
-    overlay_name: Option<&str>,
-) -> Result<pr::Expr, error::Error> {
-    let source = crate::project::SourceOverlay::new(&project.source, overlay, overlay_name);
-
-    parse_overlay(&source)
-        .and_then(|expr| crate::resolver::resolve_overlay_expr(&project.root_module, expr))
-        .map_err(|e| Error::from_diagnostics(e, &source))
 }
 
 fn parse_overlay(overlay: &SourceOverlay) -> Result<pr::Expr, Vec<Diagnostic>> {
@@ -104,20 +104,18 @@ pub(super) struct SourceFile<'a> {
 }
 
 pub fn linearize_tree(tree: &SourceTree) -> Result<Vec<SourceFile<'_>>, error::Error> {
-    // find root
-    let root_path;
-
     let std = Path::new("std.lt");
     let sources: Vec<_> = tree.sources.keys().filter(|p| p != &std).collect();
 
-    if sources.len() == 1 {
+    // find root
+    let root_path = if sources.len() == 1 {
         // if there is only one file, use that as the root
-        root_path = sources.into_iter().next().unwrap();
+        sources.into_iter().next().unwrap()
     } else if let Some(root) = tree.sources.get_key_value(&PathBuf::from("")) {
         // if there is an empty path, that's the root
-        root_path = root.0;
+        root.0
     } else if let Some(root) = sources.iter().cloned().find(path_starts_with_uppercase) {
-        root_path = root;
+        root
     } else {
         if tree.sources.is_empty() {
             return Err(error::Error::InvalidSourceStructure {
@@ -136,7 +134,7 @@ pub fn linearize_tree(tree: &SourceTree) -> Result<Vec<SourceFile<'_>>, error::E
                 "Cannot determine the root module within the following files:\n{file_names}"
             ),
         });
-    }
+    };
 
     let mut sources: Vec<_> = Vec::with_capacity(tree.sources.len());
 

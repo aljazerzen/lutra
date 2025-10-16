@@ -231,7 +231,7 @@ pub struct Pattern {
     pub variant_tag: Option<usize>,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, strum::AsRefStr)]
 pub enum PatternKind {
     /// Match an enum variant, recurse into matching inner
     Enum(String, Option<Box<Pattern>>),

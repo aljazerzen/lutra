@@ -1,3 +1,5 @@
+use std::fmt::Write;
+
 use crate::pr;
 
 #[derive(Clone, PartialEq, Eq)]
@@ -40,6 +42,9 @@ pub enum TokenKind {
 
     DocComment(String),
     DocCommentSelf(String),
+
+    NewLine,
+    Comment(String),
 }
 
 // This is here because Literal::Float(f64) does not implement Hash, so we cannot simply derive it.
@@ -88,8 +93,11 @@ impl std::fmt::Display for TokenKind {
             TokenKind::Interpolation(c, s) => {
                 write!(f, "{c}\"{s}\"")
             }
-            TokenKind::DocComment(text) => writeln!(f, "##{text}"),
-            TokenKind::DocCommentSelf(text) => writeln!(f, "#!{text}"),
+            TokenKind::DocComment(text) => writeln!(f, "## {text}"),
+            TokenKind::DocCommentSelf(text) => writeln!(f, "#! {text}"),
+
+            TokenKind::Comment(text) => writeln!(f, "# {text}"),
+            TokenKind::NewLine => f.write_char('\n'),
         }
     }
 }
@@ -159,7 +167,7 @@ mod test {
 
         assert_snapshot!(
             make_str(r#"he's nice"#).to_string(),
-            @r###""he's nice""###
+            @r#""he's nice""#
         );
 
         assert_snapshot!(

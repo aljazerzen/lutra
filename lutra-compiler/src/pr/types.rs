@@ -37,7 +37,7 @@ pub struct TyLayout {
     pub body_ptrs: Vec<u32>,
 }
 
-#[derive(Debug, Clone, PartialEq, Hash, EnumAsInner)]
+#[derive(Debug, Clone, PartialEq, Hash, EnumAsInner, strum::AsRefStr)]
 pub enum TyKind {
     /// Identifier that still needs to be resolved.
     Ident(Path),

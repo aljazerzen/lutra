@@ -75,7 +75,7 @@ fn debug_display() {
 fn doc_comment() {
     assert_debug_snapshot!(lex(lexer(), "## docs").unwrap(), @r#"
     [
-        0..7: DocComment(" docs"),
+        0..7: DocComment("docs"),
     ]
     "#);
 }

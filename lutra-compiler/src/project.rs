@@ -99,7 +99,7 @@ impl std::fmt::Display for SourceTree {
     }
 }
 
-/// Contains a SourceTree and a snippet without a path
+/// Project source (in [SourceTree]) and a code snippet
 pub struct SourceOverlay<'a> {
     tree: &'a SourceTree,
 
@@ -119,7 +119,7 @@ impl<'a> SourceOverlay<'a> {
     }
 }
 
-pub trait SourceProvider {
+pub(crate) trait SourceProvider {
     fn get_path(&self, id: u16) -> Option<&std::path::Path>;
 
     fn get_source(&self, path: &std::path::Path) -> Option<&str>;

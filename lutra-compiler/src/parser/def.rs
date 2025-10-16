@@ -152,7 +152,7 @@ fn func_def<'a>(
                 };
                 let value = Expr::new_with_span(ExprKind::Func(Box::new(func)), span);
                 ExprDef {
-                    ty: value.ty.clone(),
+                    ty: None,
                     value: Some(Box::new(value)),
                     constant: false,
                 }
@@ -211,11 +211,11 @@ mod tests {
         ## doc comment
         ## another line
 
-        "#, doc_comment()), @r###"
+        "#, doc_comment()), @r#"
         Ok(
-            " doc comment\n another line",
+            "doc comment\nanother line",
         )
-        "###);
+        "#);
     }
 
     #[test]

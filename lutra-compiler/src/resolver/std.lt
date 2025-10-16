@@ -126,7 +126,7 @@ func is_some(value: enum { None, Some: T }): bool
 where T
 -> (
   match value {
-    .Some(x) => true,
+    .Some => true,
     .None => false,
   }
 )
@@ -135,7 +135,7 @@ func is_none(value: enum { None, Some: T }): bool
 where T
 -> (
   match value {
-    .Some(x) => false,
+    .Some => false,
     .None => true,
   }
 )
@@ -173,8 +173,7 @@ func from_columnar(columnar: {for f: F in T do f: [F]}): [T]
 where T: {..}
 
 func map_columnar(
-  x: [I],
-  mapper: func ({for f: F in I do f: [F]}): {for f: F in O do f: [F]}
+  x: [I], mapper: func ({for f: F in I do f: [F]}): {for f: F in O do f: [F]}
 ): [O]
 where I: {..}, O: {..}
 -> (
@@ -318,7 +317,7 @@ module sql {
   ## This function is an escape hatch for accessing SQL directly.
   ## It should be used as a last resort, because it circumvents type checking
   ## and can cause program panic on malformed SQL or incorrect resulting type.
-  ## 
+  ##
   ## Resulting type of the expression must match the "SQL relationalal representation"
   ## of the Lutra type:
   ## - primitives expect a single column,

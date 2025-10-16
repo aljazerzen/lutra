@@ -26,6 +26,7 @@ fn main() {
         Action::Run(cmd) => run(cmd),
         Action::Pull(cmd) => pull_interface(cmd),
         Action::Codegen(cmd) => codegen(cmd),
+        Action::Format(cmd) => format(cmd),
     };
 
     match res {
@@ -66,6 +67,9 @@ pub enum Action {
 
     /// Compile the project and generate bindings code
     Codegen(CodegenCommand),
+
+    /// Format source files
+    Format(FormatCommand),
 }
 
 #[derive(Args)]
@@ -432,5 +436,23 @@ pub fn codegen(cmd: CodegenCommand) -> anyhow::Result<()> {
     println!("Output written to {}", cmd.output_file.display());
     println!("Done.");
 
+    Ok(())
+}
+
+#[derive(clap::Parser)]
+pub struct FormatCommand {
+    #[clap(flatten)]
+    discover: lutra_compiler::DiscoverParams,
+}
+
+pub fn format(cmd: FormatCommand) -> anyhow::Result<()> {
+    let source_tree = lutra_compiler::discover(cmd.discover)?;
+
+    let formatted = lutra_compiler::format(source_tree);
+
+    for (path, content) in formatted.get_sources() {
+        println!("-- {} --", path.display());
+        println!("{content}");
+    }
     Ok(())
 }
