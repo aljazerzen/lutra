@@ -31,9 +31,9 @@ use crate::parser::lexer::{Token, TokenKind};
 use crate::pr;
 
 pub fn print_ty(ty: &pr::Ty) -> String {
-    ty.print(Printer::new(&CONFIG_NO_WRAP, None))
-        .unwrap()
-        .buffer
+    let mut p = Printer::new(&CONFIG_NO_WRAP, None);
+    ty.print(&mut p).unwrap();
+    p.buffer
 }
 
 pub fn print_source(module_tree: &pr::ModuleDef, trivia: Option<&[Token]>) -> String {
@@ -43,16 +43,18 @@ pub fn print_source(module_tree: &pr::ModuleDef, trivia: Option<&[Token]>) -> St
         source_id: 0,
     };
 
-    (module_tree, Some(span))
-        .print(Printer::new(&CONFIG_PRETTY, trivia))
-        .unwrap()
-        .buffer
+    let mut p = Printer::new(&CONFIG_PRETTY, trivia);
+    (module_tree, Some(span)).print(&mut p).unwrap();
+
+    p.new_line(); // trailing new line
+
+    p.buffer
 }
 
 /// Print source code of an AST node, within constrains of a printer
 /// (e.g. remaining line width). If this is not possible, return `None`.
 trait PrintSource {
-    fn print<'c>(&self, p: Printer<'c>) -> Option<Printer<'c>>;
+    fn print<'c>(&self, p: &mut Printer<'c>) -> Option<()>;
 
     /// Return span of the AST node.
     /// Used for emitting leading & following trivia (comments, new lines).
@@ -141,9 +143,10 @@ impl<'c> Printer<'c> {
         self.buffer += snippet.as_ref();
     }
 
-    /// Creates a printer for a sub-node.
-    /// Every printer created by this method must be [Printer::merge]ed.
-    fn sub(&self) -> Printer<'c> {
+    /// Creates a new [Printer] for trying printing for a sub-node without
+    /// affecting the original [Printer].
+    /// When successful, the forked [Printer] has to be [Printer::merge]ed back.
+    fn fork(&self) -> Printer<'c> {
         Printer {
             config: self.config,
             buffer: String::new(),
@@ -156,16 +159,11 @@ impl<'c> Printer<'c> {
         }
     }
 
-    /// Merges a result of a [PrintSource::print] call into self.
-    ///
-    /// This will append generated code into self and overwrite the `rem_width`
-    /// with the new value. Conceptually, this is equivalent to using
-    /// [Self::push], but it is faster, because it does not iterate over
-    /// generated code (again).
-    fn merge(&mut self, other: Printer<'c>) {
-        self.rem_width = other.rem_width;
-        self.trivia = other.trivia;
-        self.buffer += &other.buffer;
+    /// Merges a forked printer back into the parent.
+    fn merge(&mut self, forked: Printer<'c>) {
+        self.rem_width = forked.rem_width;
+        self.trivia = forked.trivia;
+        self.buffer += &forked.buffer;
     }
 
     /// Subtracts remaining widths. Returns `None` when there is not enough

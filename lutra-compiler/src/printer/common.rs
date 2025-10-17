@@ -11,14 +11,15 @@ pub(super) struct Separated<'a, N: PrintSource> {
 
 impl<'a, N: PrintSource> PrintSource for Separated<'a, N> {
     #[tracing::instrument(name = "sep", skip_all)]
-    fn print<'c>(&self, mut p: Printer<'c>) -> Option<Printer<'c>> {
+    fn print<'c>(&self, p: &mut Printer<'c>) -> Option<()> {
         tracing::trace!("try inline {p:?}");
 
         // try inline
-        if let Some(inline) = self.print_inline(p.sub()) {
+        let mut inline = p.fork();
+        if self.print_inline(&mut inline).is_some() {
             tracing::trace!("inline");
             p.merge(inline);
-            return Some(p);
+            return Some(());
         }
 
         if p.single_line {
@@ -40,12 +41,12 @@ impl<'a, N: PrintSource> PrintSource for Separated<'a, N> {
             }
 
             p.pending_suffix += suffix_width;
-            p.merge(node.print(p.sub())?);
+            node.print(p)?;
 
             p.push_unchecked(self.sep_line_end);
         }
         tracing::trace!("one per line");
-        Some(p)
+        Some(())
     }
 
     fn span(&self) -> Option<crate::Span> {
@@ -60,7 +61,7 @@ impl<'a, N: PrintSource> PrintSource for Separated<'a, N> {
 }
 
 impl<'a, N: PrintSource> Separated<'a, N> {
-    fn print_inline<'c>(&self, mut p: Printer<'c>) -> Option<Printer<'c>> {
+    fn print_inline<'c>(&self, p: &mut Printer<'c>) -> Option<()> {
         p.require_single_line(self.span())?;
 
         // optimization: consume separator width in advance
@@ -72,10 +73,10 @@ impl<'a, N: PrintSource> Separated<'a, N> {
             if i > 0 {
                 p.push_unchecked(self.sep_inline);
             }
-            p.merge(expr.print(p.sub())?);
+            expr.print(p)?;
         }
 
-        Some(p)
+        Some(())
     }
 }
 
@@ -91,14 +92,15 @@ pub(super) struct Between<'a, N: PrintSource> {
 
 impl<'a, N: PrintSource> PrintSource for Between<'a, N> {
     #[tracing::instrument(name = "btwn", skip_all)]
-    fn print<'c>(&self, mut p: Printer<'c>) -> Option<Printer<'c>> {
+    fn print<'c>(&self, p: &mut Printer<'c>) -> Option<()> {
         tracing::trace!("try inline {p:?}");
 
         // try inline
-        if let Some(inline) = self.print_inline(p.sub()) {
+        let mut inline = p.fork();
+        if self.print_inline(&mut inline).is_some() {
             tracing::trace!("inline");
             p.merge(inline);
-            return Some(p);
+            return Some(());
         }
 
         if p.single_line {
@@ -116,7 +118,7 @@ impl<'a, N: PrintSource> PrintSource for Between<'a, N> {
         p.inject_trivia_leading(self.node.span().map(|s| s.start), false);
 
         p.pending_suffix += self.suffix.chars().count() as u16;
-        p.merge(self.node.print(p.sub())?);
+        self.node.print(p)?;
 
         p.inject_trivia_inline(self.span().map(|s| s.end()));
 
@@ -127,7 +129,7 @@ impl<'a, N: PrintSource> PrintSource for Between<'a, N> {
 
         p.push(self.suffix)?;
         tracing::trace!("separate line");
-        Some(p)
+        Some(())
     }
 
     fn span(&self) -> Option<crate::Span> {
@@ -136,12 +138,12 @@ impl<'a, N: PrintSource> PrintSource for Between<'a, N> {
 }
 
 impl<'a, N: PrintSource> Between<'a, N> {
-    fn print_inline<'c>(&self, mut p: Printer<'c>) -> Option<Printer<'c>> {
+    fn print_inline<'c>(&self, p: &mut Printer<'c>) -> Option<()> {
         p.require_single_line(self.span())?;
 
         p.push(self.prefix)?;
-        p.merge(self.node.print(p.sub())?);
+        self.node.print(p)?;
         p.push(self.suffix)?;
-        Some(p)
+        Some(())
     }
 }

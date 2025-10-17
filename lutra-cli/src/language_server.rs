@@ -8,7 +8,18 @@ use tower_lsp_server::lsp_types::*;
 use lutra_compiler::{SourceTree, codespan, pr};
 
 #[derive(clap::Parser)]
-pub struct Command {}
+pub struct Command {
+    #[clap(flatten)]
+    transport: Transport,
+}
+
+#[derive(clap::Args)]
+#[group(required = true, multiple = false)]
+struct Transport {
+    /// Use stdin/stdout transport
+    #[clap(long)]
+    stdio: bool,
+}
 
 #[tokio::main(flavor = "current_thread")]
 pub async fn run(_cmd: Command) {
@@ -68,13 +79,6 @@ impl tower_lsp_server::LanguageServer for Backend {
                 // TODO: support for incremental sync
                 text_document_sync: Some(TextDocumentSyncCapability::Kind(
                     TextDocumentSyncKind::FULL,
-                )),
-                diagnostic_provider: Some(DiagnosticServerCapabilities::Options(
-                    DiagnosticOptions {
-                        inter_file_dependencies: true,
-                        workspace_diagnostics: false,
-                        ..Default::default()
-                    },
                 )),
                 document_formatting_provider: Some(OneOf::Left(true)),
                 ..Default::default()

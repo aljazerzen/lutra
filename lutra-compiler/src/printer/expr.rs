@@ -4,13 +4,13 @@ use crate::printer::{PrintSource, Printer};
 
 impl PrintSource for pr::Expr {
     #[tracing::instrument(name = "e", skip_all)]
-    fn print<'c>(&self, mut p: Printer<'c>) -> Option<Printer<'c>> {
+    fn print<'c>(&self, p: &mut Printer<'c>) -> Option<()> {
         tracing::trace!("expr {}", self.kind.as_ref());
 
         match &self.kind {
             pr::ExprKind::Ident(path) => p.push(path.to_string())?,
             pr::ExprKind::TupleLookup { base, lookup } => {
-                p.merge(base.print(p.sub())?);
+                base.print(p)?;
                 p.push(".")?;
                 match lookup {
                     pr::Lookup::Name(n) => p.push(n)?,
@@ -20,17 +20,17 @@ impl PrintSource for pr::Expr {
             pr::ExprKind::Literal(literal) => p.push(literal.to_string())?,
 
             pr::ExprKind::TypeAnnotation(ann) => {
-                p.merge(ann.expr.print(p.sub())?);
+                ann.expr.print(p)?;
                 p.push(": ")?;
-                p.merge(ann.ty.print(p.sub())?);
+                ann.ty.print(p)?;
             }
             pr::ExprKind::Range(range) => {
                 if let Some(start) = &range.start {
-                    p.merge(start.print(p.sub())?);
+                    start.print(p)?;
                 }
                 p.push("..")?;
                 if let Some(end) = &range.end {
-                    p.merge(end.print(p.sub())?);
+                    end.print(p)?;
                 }
             }
             pr::ExprKind::Binary(binary) => {
@@ -49,7 +49,7 @@ impl PrintSource for pr::Expr {
             }
             pr::ExprKind::Unary(unary) => {
                 p.push(unary.op.to_string())?;
-                p.merge(unary.expr.print(p.sub())?);
+                unary.expr.print(p)?;
             }
 
             pr::ExprKind::Nested(expr) => {
@@ -89,20 +89,19 @@ impl PrintSource for pr::Expr {
             }
 
             pr::ExprKind::FuncCall(call) => {
-                p.merge(call.func.print(p.sub())?);
-                p.merge(
-                    Between {
-                        prefix: "(",
-                        node: &Separated {
-                            nodes: &call.args,
-                            sep_inline: ", ",
-                            sep_line_end: ",",
-                        },
-                        suffix: ")",
-                        span: self.span,
-                    }
-                    .print(p.sub())?,
-                );
+                call.func.print(p)?;
+
+                Between {
+                    prefix: "(",
+                    node: &Separated {
+                        nodes: &call.args,
+                        sep_inline: ", ",
+                        sep_line_end: ",",
+                    },
+                    suffix: ")",
+                    span: self.span,
+                }
+                .print(p)?;
             }
 
             pr::ExprKind::Func(func) => return print_func(func, None, p),
@@ -115,7 +114,7 @@ impl PrintSource for pr::Expr {
                         }
                         pr::InterpolateItem::Expr { expr, format } => {
                             p.push("{")?;
-                            p.merge(expr.print(p.sub())?);
+                            expr.print(p)?;
                             if let Some(format) = format {
                                 p.push(":")?;
                                 p.push(format)?;
@@ -132,12 +131,12 @@ impl PrintSource for pr::Expr {
                 }
 
                 p.push("match ")?;
-                p.merge(match_.subject.print(p.sub())?);
+                match_.subject.print(p)?;
                 p.push(" {")?;
                 p.indent();
                 for branch in &match_.branches {
                     p.new_line();
-                    p.merge(branch.print(p.sub())?);
+                    branch.print(p)?;
                     p.push(",")?;
                 }
                 p.dedent();
@@ -146,16 +145,16 @@ impl PrintSource for pr::Expr {
             }
             pr::ExprKind::If(if_) => {
                 p.push("if ")?;
-                p.merge(if_.condition.print(p.sub())?);
+                if_.condition.print(p);
                 p.push(" then ")?;
-                p.merge(if_.then.print(p.sub())?);
+                if_.then.print(p);
                 p.push(" else ")?;
-                p.merge(if_.els.print(p.sub())?);
+                if_.els.print(p);
             }
 
             pr::ExprKind::EnumVariant(_) | pr::ExprKind::Internal => unreachable!(),
         }
-        Some(p)
+        Some(())
     }
 
     fn span(&self) -> Option<crate::Span> {
@@ -187,7 +186,7 @@ fn flatten_binary(binary: &pr::BinaryExpr) -> (&pr::Expr, Vec<(pr::BinOp, &pr::E
 }
 
 impl PrintSource for (Option<pr::BinOp>, &pr::Expr) {
-    fn print<'c>(&self, mut p: Printer<'c>) -> Option<Printer<'c>> {
+    fn print<'c>(&self, p: &mut Printer<'c>) -> Option<()> {
         if let Some(op) = self.0 {
             p.push(op.to_string())?;
             p.push(" ")?;
@@ -203,30 +202,29 @@ impl PrintSource for (Option<pr::BinOp>, &pr::Expr) {
 pub(super) fn print_func<'c>(
     func: &pr::Func,
     name: Option<&str>,
-    mut p: Printer<'c>,
-) -> Option<Printer<'c>> {
+    p: &mut Printer<'c>,
+) -> Option<()> {
     p.push("func ")?;
 
     if let Some(name) = name {
         p.push(pr::display_ident(name))?;
     }
 
-    p.merge(
-        Between {
-            prefix: "(",
-            node: &Separated {
-                nodes: &func.params,
-                sep_inline: ", ",
-                sep_line_end: ",",
-            },
-            suffix: ")",
-            span: None,
-        }
-        .print(p.sub())?,
-    );
+    Between {
+        prefix: "(",
+        node: &Separated {
+            nodes: &func.params,
+            sep_inline: ", ",
+            sep_line_end: ",",
+        },
+        suffix: ")",
+        span: None,
+    }
+    .print(p)?;
+
     if let Some(return_ty) = &func.return_ty {
         p.push(": ")?;
-        p.merge(return_ty.print(p.sub())?);
+        return_ty.print(p)?;
     }
 
     if !func.ty_params.is_empty() {
@@ -238,14 +236,14 @@ pub(super) fn print_func<'c>(
         p.push("where ")?;
 
         p.indent();
-        p.merge(
-            Separated {
-                nodes: &func.ty_params,
-                sep_inline: ", ",
-                sep_line_end: ",",
-            }
-            .print(p.sub())?,
-        );
+
+        Separated {
+            nodes: &func.ty_params,
+            sep_inline: ", ",
+            sep_line_end: ",",
+        }
+        .print(p)?;
+
         p.dedent();
 
         p.new_line();
@@ -254,12 +252,12 @@ pub(super) fn print_func<'c>(
         p.push(" -> ")?;
     }
 
-    p.merge(func.body.print(p.sub())?);
-    Some(p)
+    func.body.print(p)?;
+    Some(())
 }
 
 impl PrintSource for pr::TupleField {
-    fn print<'c>(&self, mut p: Printer<'c>) -> Option<Printer<'c>> {
+    fn print<'c>(&self, p: &mut Printer<'c>) -> Option<()> {
         if let Some(name) = &self.name {
             let name = pr::display_ident(name);
             p.push(name)?;
@@ -270,8 +268,8 @@ impl PrintSource for pr::TupleField {
             p.push("..")?;
         }
 
-        p.merge(self.expr.print(p.sub())?);
-        Some(p)
+        self.expr.print(p)?;
+        Some(())
     }
 
     fn span(&self) -> Option<crate::Span> {
@@ -280,7 +278,7 @@ impl PrintSource for pr::TupleField {
 }
 
 impl PrintSource for pr::FuncParam {
-    fn print<'c>(&self, mut p: Printer<'c>) -> Option<Printer<'c>> {
+    fn print<'c>(&self, p: &mut Printer<'c>) -> Option<()> {
         if self.constant {
             p.push("const ")?;
         }
@@ -290,10 +288,10 @@ impl PrintSource for pr::FuncParam {
 
         if let Some(ty) = &self.ty {
             p.push(": ")?;
-            p.merge(ty.print(p.sub())?);
+            ty.print(p)?;
         }
 
-        Some(p)
+        Some(())
     }
 
     fn span(&self) -> Option<crate::Span> {
@@ -302,11 +300,11 @@ impl PrintSource for pr::FuncParam {
 }
 
 impl PrintSource for pr::MatchBranch {
-    fn print<'c>(&self, mut p: Printer<'c>) -> Option<Printer<'c>> {
-        p.merge(self.pattern.print(p.sub())?);
+    fn print<'c>(&self, p: &mut Printer<'c>) -> Option<()> {
+        self.pattern.print(p)?;
         p.push(" => ")?;
-        p.merge(self.value.print(p.sub())?);
-        Some(p)
+        self.value.print(p)?;
+        Some(())
     }
 
     fn span(&self) -> Option<crate::Span> {
@@ -316,7 +314,7 @@ impl PrintSource for pr::MatchBranch {
 
 impl PrintSource for pr::Pattern {
     #[tracing::instrument(name = "p", skip_all)]
-    fn print<'c>(&self, mut p: Printer<'c>) -> Option<Printer<'c>> {
+    fn print<'c>(&self, p: &mut Printer<'c>) -> Option<()> {
         tracing::trace!("pattern {}", self.kind.as_ref());
 
         match &self.kind {
@@ -325,7 +323,7 @@ impl PrintSource for pr::Pattern {
                 p.push(pr::display_ident(name))?;
                 if let Some(inner) = inner {
                     p.push("(")?;
-                    p.merge(inner.print(p.sub())?);
+                    inner.print(p)?;
                     p.push(")")?;
                 }
             }
@@ -340,7 +338,7 @@ impl PrintSource for pr::Pattern {
             }
             pr::PatternKind::Bind(name) => p.push(pr::display_ident(name))?,
         };
-        Some(p)
+        Some(())
     }
 
     fn span(&self) -> Option<crate::Span> {

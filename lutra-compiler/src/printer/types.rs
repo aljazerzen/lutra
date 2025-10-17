@@ -4,7 +4,7 @@ use crate::printer::{PrintSource, Printer};
 
 impl PrintSource for pr::Ty {
     #[tracing::instrument(name = "t", skip_all)]
-    fn print<'c>(&self, mut p: Printer<'c>) -> Option<Printer<'c>> {
+    fn print<'c>(&self, p: &mut Printer<'c>) -> Option<()> {
         tracing::trace!("ty {}", self.kind.as_ref());
 
         match &self.kind {
@@ -34,19 +34,18 @@ impl PrintSource for pr::Ty {
             }
             pr::TyKind::Enum(variants) => {
                 p.push("enum ")?;
-                p.merge(
-                    Between {
-                        prefix: "{",
-                        node: &Separated {
-                            nodes: variants,
-                            sep_inline: ", ",
-                            sep_line_end: ",",
-                        },
-                        suffix: "}",
-                        span: self.span,
-                    }
-                    .print(p.sub())?,
-                );
+
+                Between {
+                    prefix: "{",
+                    node: &Separated {
+                        nodes: variants,
+                        sep_inline: ", ",
+                        sep_line_end: ",",
+                    },
+                    suffix: "}",
+                    span: self.span,
+                }
+                .print(p)?;
             }
             pr::TyKind::Func(func) => return print_ty_func(func, None, p),
             pr::TyKind::TupleComprehension(comp) => {
@@ -55,17 +54,17 @@ impl PrintSource for pr::Ty {
                 p.push(": ")?;
                 p.push(pr::display_ident(&comp.variable_ty))?;
                 p.push(" in ")?;
-                p.merge(comp.tuple.print(p.sub())?);
+                comp.tuple.print(p)?;
                 p.push(" do ")?;
                 if let Some(name) = &comp.body_name {
                     p.push(pr::display_ident(name))?;
                     p.push(": ")?;
                 }
-                p.merge(comp.body_ty.print(p.sub())?);
+                comp.body_ty.print(p)?;
                 p.push("}")?;
             }
         };
-        Some(p)
+        Some(())
     }
 
     fn span(&self) -> Option<crate::Span> {
@@ -76,59 +75,59 @@ impl PrintSource for pr::Ty {
 pub(super) fn print_ty_func<'c>(
     func: &pr::TyFunc,
     name: Option<&str>,
-    mut p: Printer<'c>,
-) -> Option<Printer<'c>> {
+    p: &mut Printer<'c>,
+) -> Option<()> {
     p.push("func ")?;
     if let Some(name) = name {
         p.push(pr::display_ident(name))?;
     }
-    p.merge(
-        Between {
-            prefix: "(",
-            node: &Separated {
-                nodes: &func.params,
-                sep_inline: ", ",
-                sep_line_end: ",",
-            },
-            suffix: ")",
-            span: None,
-        }
-        .print(p.sub())?,
-    );
+
+    Between {
+        prefix: "(",
+        node: &Separated {
+            nodes: &func.params,
+            sep_inline: ", ",
+            sep_line_end: ",",
+        },
+        suffix: ")",
+        span: None,
+    }
+    .print(p)?;
+
     if let Some(return_ty) = &func.body {
         p.push(": ")?;
-        p.merge(return_ty.print(p.sub())?);
+        return_ty.print(p)?;
     }
     if !func.ty_params.is_empty() {
         p.new_line();
         p.push("where ")?;
 
         p.indent();
-        p.merge(
-            Separated {
-                nodes: &func.ty_params,
-                sep_inline: ", ",
-                sep_line_end: ",",
-            }
-            .print(p.sub())?,
-        );
+
+        Separated {
+            nodes: &func.ty_params,
+            sep_inline: ", ",
+            sep_line_end: ",",
+        }
+        .print(p)?;
+
         p.dedent();
     }
 
-    Some(p)
+    Some(())
 }
 
 impl PrintSource for (Option<pr::Ty>, bool) {
-    fn print<'c>(&self, mut p: Printer<'c>) -> Option<Printer<'c>> {
+    fn print<'c>(&self, p: &mut Printer<'c>) -> Option<()> {
         if self.1 {
             p.push("const ")?;
         }
 
         if let Some(ty) = &self.0 {
-            p.merge(ty.print(p.sub())?);
+            ty.print(p)?;
         }
 
-        Some(p)
+        Some(())
     }
 
     fn span(&self) -> Option<crate::Span> {
@@ -137,7 +136,7 @@ impl PrintSource for (Option<pr::Ty>, bool) {
 }
 
 impl PrintSource for pr::TyTupleField {
-    fn print<'c>(&self, mut p: Printer<'c>) -> Option<Printer<'c>> {
+    fn print<'c>(&self, p: &mut Printer<'c>) -> Option<()> {
         if let Some(name) = &self.name {
             p.push(pr::display_ident(name))?;
             p.push(": ")?;
@@ -153,12 +152,12 @@ impl PrintSource for pr::TyTupleField {
     }
 }
 impl PrintSource for pr::TyEnumVariant {
-    fn print<'c>(&self, mut p: Printer<'c>) -> Option<Printer<'c>> {
+    fn print<'c>(&self, p: &mut Printer<'c>) -> Option<()> {
         p.push(pr::display_ident(&self.name))?;
 
         let is_unit = self.ty.kind.as_tuple().is_some_and(|f| f.is_empty());
         if is_unit {
-            return Some(p);
+            return Some(());
         }
 
         p.push(": ")?;
@@ -171,7 +170,7 @@ impl PrintSource for pr::TyEnumVariant {
 }
 
 impl PrintSource for pr::TyParam {
-    fn print<'c>(&self, mut p: Printer<'c>) -> Option<Printer<'c>> {
+    fn print<'c>(&self, p: &mut Printer<'c>) -> Option<()> {
         p.push(pr::display_ident(&self.name))?;
         match &self.domain {
             pr::TyParamDomain::Open => {}
@@ -196,7 +195,7 @@ impl PrintSource for pr::TyParam {
                             assert_eq!(i, *p as usize); // TODO: print these fields when they are out of order
                         }
                     }
-                    p.merge(field.ty.print(p.sub())?);
+                    field.ty.print(p)?;
                     p.push(", ")?;
                 }
                 p.push("..}")?;
@@ -216,13 +215,13 @@ impl PrintSource for pr::TyParam {
                     p.push(pr::display_ident(&variant.name))?;
                     if variant.ty.kind.as_tuple().is_some_and(|f| f.is_empty()) {
                         p.push(": ")?;
-                        p.merge(variant.ty.print(p.sub())?);
+                        variant.ty.print(p)?;
                     }
                 }
                 p.push(", ..}")?;
             }
         }
-        Some(p)
+        Some(())
     }
 
     fn span(&self) -> Option<crate::Span> {
