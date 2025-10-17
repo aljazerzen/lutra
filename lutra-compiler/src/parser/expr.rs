@@ -1,11 +1,11 @@
 use chumsky::prelude::*;
 
+use crate::codespan::Span;
 use crate::parser::interpolation;
 use crate::parser::lexer::TokenKind;
 use crate::parser::perror::PError;
 use crate::parser::{ctrl, ident_part, keyword, sequence};
 use crate::pr::*;
-use crate::span::Span;
 
 pub(crate) fn expr<'a>(
     ty: impl Parser<TokenKind, Ty, Error = PError> + Clone + 'a,

@@ -1,6 +1,6 @@
 use std::fmt::{self, Debug, Formatter};
-use std::ops::{Add, Range, Sub};
 
+/// A span of source code
 #[derive(Clone, PartialEq, Eq, Copy)]
 pub struct Span {
     /// Byte offset from the start of the source. 0 indexed.
@@ -8,7 +8,8 @@ pub struct Span {
     /// Length of the span in bytes.
     pub len: u16,
 
-    /// A key representing the path of the source. Value is stored in prqlc's SourceTree::source_ids.
+    /// A key representing the path of the source file.
+    /// Full path is stored in [crate::SourceTree::source_ids].
     pub source_id: u16,
 }
 
@@ -19,9 +20,13 @@ impl Span {
         let other_end = other.start + other.len as u32;
         self.len = (other_end.saturating_sub(self.start)) as u16;
     }
+
+    pub fn end(&self) -> u32 {
+        self.start + self.len as u32
+    }
 }
 
-impl From<Span> for Range<usize> {
+impl From<Span> for std::ops::Range<usize> {
     fn from(a: Span) -> Self {
         a.start as usize..(a.start as usize + a.len as usize)
     }
@@ -29,13 +34,7 @@ impl From<Span> for Range<usize> {
 
 impl Debug for Span {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        write!(
-            f,
-            "{}:{}-{}",
-            self.source_id,
-            self.start,
-            self.start + self.len as u32
-        )
+        write!(f, "{}:{}-{}", self.source_id, self.start, self.end())
     }
 }
 
@@ -75,7 +74,7 @@ impl chumsky::Span for Span {
     }
 }
 
-impl Add<usize> for Span {
+impl std::ops::Add<usize> for Span {
     type Output = Span;
 
     fn add(self, rhs: usize) -> Span {
@@ -87,7 +86,7 @@ impl Add<usize> for Span {
     }
 }
 
-impl Sub<usize> for Span {
+impl std::ops::Sub<usize> for Span {
     type Output = Span;
 
     fn sub(self, rhs: usize) -> Span {

@@ -1,5 +1,3 @@
-use chumsky::Span;
-
 use crate::printer::{PrintSource, Printer};
 
 /// A construct that can print nodes separated by some delimiter.
@@ -19,7 +17,8 @@ impl<'a, N: PrintSource> PrintSource for Separated<'a, N> {
         // try inline
         if let Some(inline) = self.print_inline(p.sub()) {
             tracing::trace!("inline");
-            return Some(inline);
+            p.merge(inline);
+            return Some(p);
         }
 
         if p.single_line {
@@ -53,7 +52,8 @@ impl<'a, N: PrintSource> PrintSource for Separated<'a, N> {
         let (mut first, last) = Option::zip(
             self.nodes.first().and_then(|n| n.span()),
             self.nodes.last().and_then(|n| n.span()),
-        )?;
+        )
+        .filter(|(a, b)| a.source_id == b.source_id)?;
         first.with_end(&last);
         Some(first)
     }
@@ -97,7 +97,8 @@ impl<'a, N: PrintSource> PrintSource for Between<'a, N> {
         // try inline
         if let Some(inline) = self.print_inline(p.sub()) {
             tracing::trace!("inline");
-            return Some(inline);
+            p.merge(inline);
+            return Some(p);
         }
 
         if p.single_line {

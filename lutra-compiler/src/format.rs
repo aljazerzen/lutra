@@ -1,18 +1,31 @@
 use crate::SourceTree;
+use crate::error;
 
-pub fn format(source_tree: SourceTree) -> SourceTree {
-    let mut result = SourceTree::empty();
+pub fn format(source_tree: &SourceTree) -> (Option<error::Error>, SourceTree) {
+    let mut formatted_tree = SourceTree::empty();
+    let mut diagnostics = Vec::new();
 
-    for (id, path) in source_tree.source_ids {
-        let content = source_tree.sources.get(&path).unwrap();
+    for (id, path) in &source_tree.source_ids {
+        let content = source_tree.sources.get(path).unwrap();
 
-        let (ast, _diagnostics, trivia) = crate::parser::parse_source(content, id);
+        let (ast, diags, trivia) = crate::parser::parse_source(content, *id);
 
-        if let Some(ast) = ast {
+        if diagnostics.is_empty()
+            && let Some(ast) = ast
+        {
             let formatted = crate::printer::print_source(&ast, Some(&trivia));
 
-            result.insert(path, formatted);
+            formatted_tree.insert(path.clone(), formatted);
         }
+
+        diagnostics.extend(diags);
     }
-    result
+
+    let err = if diagnostics.is_empty() {
+        None
+    } else {
+        Some(error::Error::from_diagnostics(diagnostics, source_tree))
+    };
+
+    (err, formatted_tree)
 }

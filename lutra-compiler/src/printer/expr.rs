@@ -196,7 +196,7 @@ impl PrintSource for (Option<pr::BinOp>, &pr::Expr) {
     }
 
     fn span(&self) -> Option<crate::Span> {
-        None
+        self.1.span
     }
 }
 

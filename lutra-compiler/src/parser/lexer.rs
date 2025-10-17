@@ -10,8 +10,8 @@ use chumsky::text::{Character, newline};
 
 use crate::diagnostic::{Diagnostic, DiagnosticCode};
 
+use crate::codespan::Span;
 use crate::pr::Literal;
-use crate::span::Span;
 
 type LError = Cheap<char, SpanInSource>;
 
@@ -33,9 +33,7 @@ pub fn lex_source_recovery(source: &str, source_id: u16) -> (Option<Tokens>, Vec
         .collect();
 
     let tokens = tokens.map(|tok_vec| {
-        let (trivia, semantic) = tok_vec
-            .into_iter()
-            .partition(|t| matches!(t.kind, TokenKind::Comment(_) | TokenKind::NewLine));
+        let (semantic, trivia) = tok_vec.into_iter().partition(is_semantic);
 
         Tokens { semantic, trivia }
     });
@@ -44,14 +42,20 @@ pub fn lex_source_recovery(source: &str, source_id: u16) -> (Option<Tokens>, Vec
     (tokens, errors)
 }
 
+fn is_semantic(t: &Token) -> bool {
+    !matches!(t.kind, TokenKind::Comment(_) | TokenKind::NewLine)
+}
+
 #[cfg(test)]
 pub fn lex_source(source: &str) -> Result<Vec<Token>, Vec<Diagnostic>> {
     let stream = prepare_stream(source);
-    lexer().parse(stream).map_err(|e| {
+    let tokens = lexer().parse(stream).map_err(|e| {
         e.into_iter()
             .map(|x| convert_lexer_error(source, x, 0))
-            .collect()
-    })
+            .collect::<Vec<_>>()
+    })?;
+
+    Ok(tokens.into_iter().filter(is_semantic).collect())
 }
 
 pub fn prepare_stream(source: &str) -> chumsky::Stream<'_, char, SpanInSource, CharIterator<'_>> {

@@ -27,8 +27,6 @@ mod expr;
 mod test;
 mod types;
 
-use chumsky::Span;
-
 use crate::parser::lexer::{Token, TokenKind};
 use crate::pr;
 
@@ -56,6 +54,8 @@ pub fn print_source(module_tree: &pr::ModuleDef, trivia: Option<&[Token]>) -> St
 trait PrintSource {
     fn print<'c>(&self, p: Printer<'c>) -> Option<Printer<'c>>;
 
+    /// Return span of the AST node.
+    /// Used for emitting leading & following trivia (comments, new lines).
     fn span(&self) -> Option<crate::Span>;
 }
 
@@ -142,6 +142,7 @@ impl<'c> Printer<'c> {
     }
 
     /// Creates a printer for a sub-node.
+    /// Every printer created by this method must be [Printer::merge]ed.
     fn sub(&self) -> Printer<'c> {
         Printer {
             config: self.config,

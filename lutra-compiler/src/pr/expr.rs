@@ -1,7 +1,7 @@
 use enum_as_inner::EnumAsInner;
 
+use crate::codespan::Span;
 use crate::pr::{BinOp, Literal, Ty, UnOp};
-use crate::span::Span;
 
 use super::{Path, TyParam};
 

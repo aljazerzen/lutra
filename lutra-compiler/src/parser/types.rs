@@ -77,7 +77,9 @@ pub(crate) fn type_expr() -> impl Parser<TokenKind, Ty, Error = PError> + Clone 
                         ctrl(':')
                             .ignore_then(nested_type_expr.clone())
                             .or_not()
-                            .map(|ty| ty.unwrap_or_else(|| Ty::new(TyKind::Tuple(vec![])))),
+                            .map_with_span(|ty, span| {
+                                ty.unwrap_or_else(|| Ty::new_with_span(TyKind::Tuple(vec![]), span))
+                            }),
                     )
                     .map(|(name, ty)| TyEnumVariant { name, ty })
                     .separated_by(ctrl(','))

@@ -7,7 +7,7 @@ use std::hash::Hash;
 use crate::diagnostic::{Diagnostic, DiagnosticCode};
 use crate::parser::lexer;
 
-use crate::span::Span;
+use crate::codespan::Span;
 
 #[derive(Clone, Debug)]
 pub struct ChumError<T: Hash + Eq + Debug> {

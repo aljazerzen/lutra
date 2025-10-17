@@ -110,6 +110,10 @@ impl SpanInSource {
             len: self.len,
         }
     }
+
+    pub fn end(&self) -> u32 {
+        self.start + self.len as u32
+    }
 }
 
 impl std::fmt::Debug for Token {
@@ -120,7 +124,7 @@ impl std::fmt::Debug for Token {
 
 impl std::fmt::Debug for SpanInSource {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "{}..{}", self.start, self.start + self.len as u32)
+        write!(f, "{}..{}", self.start, self.end())
     }
 }
 

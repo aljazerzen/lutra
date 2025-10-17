@@ -4,6 +4,7 @@ use std::path::{Path, PathBuf};
 
 use itertools::Itertools;
 
+use crate::codespan;
 use crate::diagnostic::{Diagnostic, DiagnosticCode};
 
 #[derive(thiserror::Error, Debug)]
@@ -37,7 +38,7 @@ pub struct DiagnosticMessage {
 
     display: String,
 
-    location: SourceLocation,
+    range: codespan::Range,
 }
 
 impl DiagnosticMessage {
@@ -57,20 +58,9 @@ impl DiagnosticMessage {
         &self.display
     }
 
-    pub fn location(&self) -> &SourceLocation {
-        &self.location
+    pub fn range(&self) -> &codespan::Range {
+        &self.range
     }
-}
-
-/// Location within the source file.
-/// Tuples contain:
-/// - line number (0-based),
-/// - column number within that line (0-based),
-#[derive(Debug, Clone)]
-pub struct SourceLocation {
-    pub start: (usize, usize),
-
-    pub end: (usize, usize),
 }
 
 fn compose_diagnostic_messages(
@@ -99,7 +89,7 @@ fn compose_diagnostic_messages(
             messages.push(DiagnosticMessage {
                 diagnostic,
                 display,
-                location,
+                range: location,
             });
         } else {
             panic!(
@@ -158,15 +148,21 @@ where
     out.lines().map(|l| l.trim_end()).join("\n")
 }
 
-fn compose_location(diagnostic: &Diagnostic, source: &ariadne::Source) -> Option<SourceLocation> {
+fn compose_location(diagnostic: &Diagnostic, source: &ariadne::Source) -> Option<codespan::Range> {
     let span = diagnostic.span?;
 
     let start = source.get_byte_line(span.start as usize)?;
+    let start = codespan::LineColumn {
+        line: start.1 as u32,
+        column: start.2 as u32,
+    };
+
     let end = source.get_byte_line(span.start as usize + span.len as usize)?;
-    Some(SourceLocation {
-        start: (start.1, start.2),
-        end: (end.1, end.2),
-    })
+    let end = codespan::LineColumn {
+        line: end.1 as u32,
+        column: end.2 as u32,
+    };
+    Some(codespan::Range { start, end })
 }
 
 struct FileTreeCache<'a, S: crate::project::SourceProvider> {

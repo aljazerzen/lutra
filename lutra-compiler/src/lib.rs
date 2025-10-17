@@ -7,24 +7,24 @@ mod intermediate;
 mod parser;
 mod project;
 mod resolver;
-mod span;
 mod sql;
 mod utils;
 
 type Result<T, E = diagnostic::Diagnostic> = core::result::Result<T, E>;
 
+pub mod codespan;
 pub mod error;
 pub mod pr;
 pub mod printer;
 
 pub use bytecoding::compile_program as bytecode_program;
 pub use check::{CheckParams, check, check_overlay};
+pub use codespan::Span;
 pub use discover::{DiscoverParams, discover};
 pub use format::format;
 pub use intermediate::{inline, layouter, lower_expr, lower_type_defs};
 pub use lutra_bin::{ir, rr};
 pub use project::{Project, SourceTree};
-pub use span::Span;
 
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "clap", derive(clap::ValueEnum))]

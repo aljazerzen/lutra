@@ -6,6 +6,10 @@ use insta::assert_snapshot;
 fn _format(source: &str) -> String {
     let (ast, dia, trivia) = crate::parser::parse_source(source, 0);
 
+    if !dia.is_empty() {
+        panic!("parse err: {dia:?}");
+    }
+
     let Some(ast) = ast else {
         panic!("parse err: {dia:?}");
     };
@@ -332,4 +336,59 @@ fn trivia_06() {
     } # inline x
     "
     )
+}
+
+#[test]
+fn trivia_07() {
+    assert_snapshot!(_format(r#"
+    type Status: enum {
+      # initial
+      Pending,
+      # user has clicked "start"
+      InProgress: {started: text, owner: text},
+
+      # completed
+      Done,
+    }
+    "#), @r#"
+    type Status: enum {
+      # initial
+      Pending,
+      # user has clicked "start"
+      InProgress: {started: text, owner: text},
+
+      # completed
+      Done,
+    }
+    "#
+    );
+}
+
+#[test]
+fn trivia_08() {
+    assert_snapshot!(_format(r#"
+    type Task: {
+      # id
+      int64,
+      # some title
+      title: text,
+
+      # completed
+      bool,
+
+      # TODO: add a few others
+    }
+ "#), @r"
+    type Task: {
+      # id
+      int64,
+      # some title
+      title: text,
+
+      # completed
+      bool,
+
+      # TODO: add a few others
+    }
+    ");
 }

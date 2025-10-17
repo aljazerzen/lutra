@@ -20,6 +20,7 @@ fn line_wrap() {
     [
         0..1: Literal(Integer(5)),
         2..3: Control('+'),
+        3..4: NewLine,
         10..11: Literal(Integer(3)),
     ]
     ");
@@ -28,13 +29,18 @@ fn line_wrap() {
 # comment
    # comment with whitespace
     3 "
-        ).unwrap(), @r"
+        ).unwrap(), @r#"
     [
         0..1: Literal(Integer(5)),
         2..3: Control('+'),
+        3..4: NewLine,
+        4..13: Comment("comment"),
+        13..14: NewLine,
+        17..42: Comment("comment with whitespace"),
+        42..43: NewLine,
         47..48: Literal(Integer(3)),
     ]
-    ");
+    "#);
 }
 
 #[test]

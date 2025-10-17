@@ -1,3 +1,5 @@
+mod language_server;
+
 use clap::{Args, Parser, Subcommand};
 
 use lutra_bin::Encode;
@@ -27,6 +29,10 @@ fn main() {
         Action::Pull(cmd) => pull_interface(cmd),
         Action::Codegen(cmd) => codegen(cmd),
         Action::Format(cmd) => format(cmd),
+        Action::LanguageServer(cmd) => {
+            language_server::run(cmd);
+            Ok(())
+        }
     };
 
     match res {
@@ -70,6 +76,9 @@ pub enum Action {
 
     /// Format source files
     Format(FormatCommand),
+
+    /// Start language server (LSP)
+    LanguageServer(language_server::Command),
 }
 
 #[derive(Args)]
@@ -448,7 +457,12 @@ pub struct FormatCommand {
 pub fn format(cmd: FormatCommand) -> anyhow::Result<()> {
     let source_tree = lutra_compiler::discover(cmd.discover)?;
 
-    let formatted = lutra_compiler::format(source_tree);
+    let (err, formatted) = lutra_compiler::format(&source_tree);
+
+    if let Some(err) = err {
+        println!("[Error]:");
+        println!("{err}");
+    }
 
     for (path, content) in formatted.get_sources() {
         println!("-- {} --", path.display());

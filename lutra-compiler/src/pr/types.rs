@@ -1,7 +1,7 @@
 use enum_as_inner::EnumAsInner;
 
+use crate::codespan::Span;
 use crate::pr::path::Path;
-use crate::span::Span;
 
 use super::Ref;
 
@@ -174,32 +174,6 @@ impl Ty {
             name: None,
             target: None,
             scope_id: None,
-        }
-    }
-
-    pub fn relation(tuple_fields: Vec<TyTupleField>) -> Self {
-        let tuple = Ty::new(TyKind::Tuple(tuple_fields));
-        Ty::new(TyKind::Array(Box::new(tuple)))
-    }
-
-    pub fn as_relation(&self) -> Option<&Vec<TyTupleField>> {
-        self.kind.as_array()?.kind.as_tuple()
-    }
-
-    pub fn as_relation_mut(&mut self) -> Option<&mut Vec<TyTupleField>> {
-        self.kind.as_array_mut()?.kind.as_tuple_mut()
-    }
-
-    pub fn into_relation(self) -> Option<Vec<TyTupleField>> {
-        self.kind.into_array().ok()?.kind.into_tuple().ok()
-    }
-
-    pub fn is_relation(&self) -> bool {
-        match &self.kind {
-            TyKind::Array(elem) => {
-                matches!(elem.kind, TyKind::Tuple(_))
-            }
-            _ => false,
         }
     }
 }

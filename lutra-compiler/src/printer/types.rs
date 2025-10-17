@@ -11,21 +11,17 @@ impl PrintSource for pr::Ty {
             pr::TyKind::Ident(ident) => p.push(ident.to_string())?,
             pr::TyKind::Primitive(prim) => p.push(prim.to_string())?,
             pr::TyKind::Tuple(fields) => {
-                p.push("{")?;
-                for (i, field) in fields.iter().enumerate() {
-                    if i > 0 {
-                        p.push(", ")?;
-                    }
-                    if let Some(name) = &field.name {
-                        p.push(pr::display_ident(name))?;
-                        p.push(": ")?;
-                    }
-                    if field.unpack {
-                        p.push("..")?;
-                    }
-                    p.merge(field.ty.print(p.sub())?);
+                return Between {
+                    prefix: "{",
+                    node: &Separated {
+                        nodes: fields,
+                        sep_inline: ", ",
+                        sep_line_end: ",",
+                    },
+                    suffix: "}",
+                    span: self.span,
                 }
-                p.push("}")?;
+                .print(p);
             }
             pr::TyKind::Array(item) => {
                 return Between {
@@ -140,20 +136,37 @@ impl PrintSource for (Option<pr::Ty>, bool) {
     }
 }
 
+impl PrintSource for pr::TyTupleField {
+    fn print<'c>(&self, mut p: Printer<'c>) -> Option<Printer<'c>> {
+        if let Some(name) = &self.name {
+            p.push(pr::display_ident(name))?;
+            p.push(": ")?;
+        }
+        if self.unpack {
+            p.push("..")?;
+        }
+        self.ty.print(p)
+    }
+
+    fn span(&self) -> Option<crate::Span> {
+        self.ty.span
+    }
+}
 impl PrintSource for pr::TyEnumVariant {
     fn print<'c>(&self, mut p: Printer<'c>) -> Option<Printer<'c>> {
         p.push(pr::display_ident(&self.name))?;
 
         let is_unit = self.ty.kind.as_tuple().is_some_and(|f| f.is_empty());
-        if !is_unit {
-            p.push(": ")?;
-            p.merge(self.ty.print(p.sub())?);
+        if is_unit {
+            return Some(p);
         }
-        Some(p)
+
+        p.push(": ")?;
+        self.ty.print(p)
     }
 
     fn span(&self) -> Option<crate::Span> {
-        None
+        self.ty.span
     }
 }
 
@@ -213,6 +226,6 @@ impl PrintSource for pr::TyParam {
     }
 
     fn span(&self) -> Option<crate::Span> {
-        None
+        self.span
     }
 }

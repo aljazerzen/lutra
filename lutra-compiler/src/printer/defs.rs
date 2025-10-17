@@ -36,7 +36,7 @@ impl PrintSource for (&pr::ModuleDef, Option<crate::Span>) {
     }
 
     fn span(&self) -> Option<crate::Span> {
-        None
+        unreachable!()
     }
 }
 
@@ -103,6 +103,6 @@ impl PrintSource for (&str, &pr::Def) {
     }
 
     fn span(&self) -> Option<crate::Span> {
-        None
+        unreachable!()
     }
 }

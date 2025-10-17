@@ -11,9 +11,9 @@ use chumsky::{Stream, prelude::*};
 use self::lexer::{Token, TokenKind};
 use self::perror::PError;
 
+use crate::codespan::Span;
 use crate::diagnostic::Diagnostic;
 use crate::pr;
-use crate::span::Span;
 
 pub fn parse_source(
     source: &str,
