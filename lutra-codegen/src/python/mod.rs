@@ -30,12 +30,7 @@ pub fn generate(
     std::io::Write::write_all(&mut file, generated.as_bytes()).unwrap();
 
     // return vec of input files
-    project
-        .source
-        .get_sources()
-        .filter(|s| s.0.to_str().is_none_or(|x| x != "std.lt"))
-        .map(|s| s.0.clone())
-        .collect()
+    project.source.get_sources().map(|s| s.0.clone()).collect()
 }
 
 #[derive(Debug)]

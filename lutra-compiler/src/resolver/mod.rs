@@ -6,18 +6,20 @@ mod module;
 mod names;
 mod types;
 
-use std::str::FromStr;
-
 use crate::Project;
 use crate::Result;
 use crate::SourceTree;
 use crate::diagnostic::Diagnostic;
 use crate::pr;
+use crate::project::Dependency;
 
 pub const NS_STD: &str = "std";
 
 /// Runs semantic analysis on a project.
-pub fn resolve(module_tree: pr::ModuleDef) -> Result<Project, Vec<Diagnostic>> {
+pub fn resolve(
+    module_tree: pr::ModuleDef,
+    dependencies: Vec<Dependency>,
+) -> Result<Project, Vec<Diagnostic>> {
     // desugar
     let module_tree = desugar::run(module_tree).map_err(|d| vec![d])?;
 
@@ -25,6 +27,14 @@ pub fn resolve(module_tree: pr::ModuleDef) -> Result<Project, Vec<Diagnostic>> {
 
     // init the module structure
     let mut root_module = module::init_root(module_tree)?;
+
+    // inject dependencies
+    for dep in &dependencies {
+        root_module.defs.insert(
+            dep.name.clone(),
+            pr::Def::new(dep.inner.root_module.clone()),
+        );
+    }
 
     // resolve names
     let resolution_order = names::run(&mut root_module).map_err(|d| vec![d])?;
@@ -38,6 +48,7 @@ pub fn resolve(module_tree: pr::ModuleDef) -> Result<Project, Vec<Diagnostic>> {
         source: SourceTree::empty(),
         root_module,
         ordering: resolution_order,
+        dependencies,
     };
 
     Ok(project)
@@ -78,14 +89,4 @@ pub fn resolve_overlay_expr(
     let expr = *def.kind.into_expr().unwrap().value.unwrap();
 
     Ok(expr)
-}
-
-/// Preferred way of injecting std module.
-pub fn load_std_lib(source: &mut crate::SourceTree) {
-    use crate::project::SourceProvider;
-
-    let path = std::path::PathBuf::from_str("std.lt").unwrap();
-    if source.get_source(&path).is_none() {
-        source.insert(path, include_str!("std.lt").to_string());
-    }
 }

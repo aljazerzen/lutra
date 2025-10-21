@@ -8,12 +8,12 @@ pub fn format(source_tree: &SourceTree) -> (Option<error::Error>, SourceTree) {
     for (id, path) in &source_tree.source_ids {
         let content = source_tree.sources.get(path).unwrap();
 
-        let (ast, diags, trivia) = crate::parser::parse_source(content, *id);
+        let (parsed, diags, trivia) = crate::parser::parse_source(content, *id);
 
         if diagnostics.is_empty()
-            && let Some(ast) = ast
+            && let Some(parsed) = parsed
         {
-            let formatted = crate::printer::print_source(&ast, Some(&trivia));
+            let formatted = crate::printer::print_source(&parsed.root, Some(&trivia));
 
             formatted_tree.insert(path.clone(), formatted);
         }

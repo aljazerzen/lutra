@@ -6,7 +6,7 @@ use itertools::Itertools;
 
 use crate::pr;
 
-/// Project, resolved.
+/// Project, checked.
 #[derive(Debug)]
 pub struct Project {
     /// Discovered sources
@@ -18,6 +18,15 @@ pub struct Project {
     /// Resolution ordering of definitions
     // TODO: make a more efficient "a ordered vec of unordered groups" data structure
     pub ordering: Vec<Vec<pr::Path>>,
+
+    pub dependencies: Vec<Dependency>,
+}
+
+#[derive(Debug)]
+pub struct Dependency {
+    pub name: String,
+
+    pub inner: Project,
 }
 
 /// Sources used to resolve the project.

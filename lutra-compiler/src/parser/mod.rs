@@ -13,12 +13,20 @@ use self::perror::PError;
 
 use crate::codespan::Span;
 use crate::diagnostic::Diagnostic;
+use crate::parser::def::ParsedSource;
 use crate::pr;
+
+pub fn is_submodule(source: &str) -> Result<bool, Vec<Diagnostic>> {
+    let mut tokens = lexer::lex_source(source)?;
+    Ok(tokens
+        .next()
+        .is_some_and(|t| matches!(t.kind, TokenKind::Keyword("submodule"))))
+}
 
 pub fn parse_source(
     source: &str,
     source_id: u16,
-) -> (Option<pr::ModuleDef>, Vec<Diagnostic>, Vec<Token>) {
+) -> (Option<ParsedSource>, Vec<Diagnostic>, Vec<Token>) {
     let (tokens, mut errors) = lexer::lex_source_recovery(source, source_id);
 
     let mut trivia = Vec::new();

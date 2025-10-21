@@ -1,9 +1,9 @@
+use std::collections::HashMap;
 use std::ffi::OsStr;
 use std::fs;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
-use walkdir::WalkDir;
-
+use crate::error::Error;
 use crate::project;
 
 #[cfg_attr(feature = "clap", derive(clap::Parser))]
@@ -13,40 +13,83 @@ pub struct DiscoverParams {
     pub project: Option<PathBuf>,
 }
 
-pub fn discover(params: DiscoverParams) -> Result<project::SourceTree, std::io::Error> {
+pub fn discover(params: DiscoverParams) -> Result<project::SourceTree, Error> {
     let mut project = project::SourceTree::empty();
-
-    if let Some(root) = params.project {
-        project.root = root;
-    } else {
+    let Some(mut root) = params.project else {
         return Ok(project);
     };
 
-    if project.root.is_file() {
-        let file_contents = fs::read_to_string(&project.root)?;
-        project.insert(project.root.clone(), file_contents);
-        return Ok(project);
+    // walk up the module tree
+    let mut loaded_files = HashMap::new();
+    if root.is_dir() {
+        root.push("module.lt");
+    }
+    loop {
+        let file_contents =
+            fs::read_to_string(&root).map_err(|io| Error::CannotReadSourceFile {
+                file: root.clone(),
+                io,
+            })?;
+
+        let is_submodule = crate::parser::is_submodule(&file_contents).unwrap_or(false);
+
+        loaded_files.insert(root.clone(), file_contents);
+        if is_submodule {
+            root = parent_module(&root).ok_or(Error::CannotFindProjectRoot)?;
+        } else {
+            break;
+        }
+    }
+    if root.ends_with("module.lt") {
+        project.root = root.parent().unwrap().to_path_buf();
+    } else {
+        project.root = root.clone();
     }
 
-    let source_extension = Some(OsStr::new("lt"));
-    for entry in WalkDir::new(&project.root) {
-        let entry = entry?;
-        let path = entry.path();
+    // walk down the module tree
+    let target_extension = Some(OsStr::new("lt"));
+    let mut paths_to_load = vec![root];
+    while let Some(path) = paths_to_load.pop() {
+        let content = if let Some(c) = loaded_files.remove(&path) {
+            // use file that was read before
+            c
+        } else {
+            // read the file
+            let content = fs::read_to_string(&path)?;
+
+            // but include it only if it is a submodule
+            let is_submodule = crate::parser::is_submodule(&content).unwrap_or(true);
+            if !is_submodule {
+                continue;
+            }
+            content
+        };
+
         let relative_path = path.strip_prefix(&project.root).unwrap().to_path_buf();
+        project.insert(relative_path, content);
 
-        if path.is_file() {
-            match path.extension() {
-                e if e == source_extension => {
-                    let file_contents = fs::read_to_string(path)?;
+        // for module files, read the whole dir
+        if path.ends_with("module.lt") {
+            for entry in fs::read_dir(path.parent().unwrap())? {
+                let entry = entry?;
+                let entry_path = entry.path();
+                let metadata = entry.metadata()?;
 
-                    project.insert(relative_path, file_contents);
+                if metadata.is_dir() {
+                    paths_to_load.push(entry.path().join("module.lt"));
+                } else if metadata.is_file()
+                    && entry.file_name() != "module.lt" // we've already read that
+                    && entry_path.extension() == target_extension
+                {
+                    paths_to_load.push(entry.path());
                 }
-
-                // ignore
-                _ => {}
             }
         }
     }
 
     Ok(project)
+}
+
+fn parent_module(path: &Path) -> Option<PathBuf> {
+    Some(path.parent()?.join("module.lt"))
 }

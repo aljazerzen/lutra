@@ -4,17 +4,17 @@ use insta::assert_snapshot;
 
 #[track_caller]
 fn _format(source: &str) -> String {
-    let (ast, dia, trivia) = crate::parser::parse_source(source, 0);
+    let (parsed, dia, trivia) = crate::parser::parse_source(source, 0);
 
     if !dia.is_empty() {
         panic!("parse err: {dia:?}");
     }
 
-    let Some(ast) = ast else {
+    let Some(parsed) = parsed else {
         panic!("parse err: {dia:?}");
     };
 
-    super::print_source(&ast, Some(&trivia))
+    super::print_source(&parsed.root, Some(&trivia))
 }
 
 #[test]

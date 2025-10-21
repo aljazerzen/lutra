@@ -3,7 +3,7 @@ use std::{env, path::Path};
 fn main() {
     println!("cargo::rerun-if-changed=build.rs");
 
-    let project_dir = Path::new("src");
+    let project_dir = Path::new("src/binary/messages.lt");
     let out_dir = env::var_os("OUT_DIR").unwrap();
     let out_file = Path::new(&out_dir).join("messages.rs");
 

@@ -15,6 +15,15 @@ pub enum Error {
     #[error("invalid path: {path}")]
     InvalidPath { path: PathBuf },
 
+    #[error("cannot find project root")]
+    CannotFindProjectRoot,
+
+    #[error("cannot read source file {file}: {io:?}")]
+    CannotReadSourceFile {
+        file: std::path::PathBuf,
+        io: std::io::Error,
+    },
+
     #[error("invalid source structure: {problem}")]
     InvalidSourceStructure { problem: String },
 

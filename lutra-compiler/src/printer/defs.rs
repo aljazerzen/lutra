@@ -96,7 +96,7 @@ impl PrintSource for (&str, &pr::Def) {
                     p.push(pr::display_ident(self.0))?;
                 }
             }
-            pr::DefKind::Unresolved(def_kind) => unreachable!(),
+            pr::DefKind::Unresolved(_) => unreachable!(),
         }
 
         Some(())

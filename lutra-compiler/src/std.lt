@@ -118,7 +118,7 @@ where T
 -> (
   match value {
     .Some(x) => x,
-    .None => std::default(),
+    .None => default(),
   }
 )
 

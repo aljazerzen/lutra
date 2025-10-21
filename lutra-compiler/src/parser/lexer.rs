@@ -46,8 +46,7 @@ fn is_semantic(t: &Token) -> bool {
     !matches!(t.kind, TokenKind::Comment(_) | TokenKind::NewLine)
 }
 
-#[cfg(test)]
-pub fn lex_source(source: &str) -> Result<Vec<Token>, Vec<Diagnostic>> {
+pub fn lex_source(source: &str) -> Result<impl Iterator<Item = Token>, Vec<Diagnostic>> {
     let stream = prepare_stream(source);
     let tokens = lexer().parse(stream).map_err(|e| {
         e.into_iter()
@@ -55,7 +54,7 @@ pub fn lex_source(source: &str) -> Result<Vec<Token>, Vec<Diagnostic>> {
             .collect::<Vec<_>>()
     })?;
 
-    Ok(tokens.into_iter().filter(is_semantic).collect())
+    Ok(tokens.into_iter().filter(is_semantic))
 }
 
 pub fn prepare_stream(source: &str) -> chumsky::Stream<'_, char, SpanInSource, CharIterator<'_>> {
@@ -150,6 +149,7 @@ fn lexer() -> impl Parser<char, Vec<Token>, Error = LError> {
         just("module"),
         just("then"),
         just("type"),
+        just("submodule"),
         just("where"),
     ))
     .then_ignore(non_ident())

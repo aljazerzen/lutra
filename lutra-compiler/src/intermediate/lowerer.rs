@@ -20,7 +20,7 @@ pub fn lower_expr(project: &Project, main_pr: &pr::Expr) -> ir::Program {
         "program_input_ty = {}",
         ir::print_ty(&lowerer.program_input_ty.as_ref().unwrap().0)
     );
-    lowerer.is_main_func = main_pr.ty.as_ref().unwrap().kind.is_func();
+    lowerer.is_main_a_func = main_pr.ty.as_ref().unwrap().kind.is_func();
 
     let main = if let Some(pr::Ref::FullyQualified { to_def, within }) = &main_pr.target {
         // optimization: inline direct idents, don't bind them to vars
@@ -46,7 +46,12 @@ struct Lowerer<'a> {
 
     scopes: Vec<Scope>,
 
-    is_main_func: bool,
+    /// Set when we are lowering an expression *in* an dependency.
+    /// Effect of this is that any fully-qualified path must be prefixed with
+    /// dependency name.
+    in_dependency: Vec<&'static str>,
+
+    is_main_a_func: bool,
 
     /// Type of the program's input. Flag for when input is packed from multiple params.
     program_input_ty: Option<(ir::Ty, bool)>,
@@ -88,10 +93,11 @@ impl<'a> Lowerer<'a> {
         Self {
             root_module,
 
-            is_main_func: false,
+            is_main_a_func: false,
             program_input_ty: None,
 
             scopes: vec![],
+            in_dependency: Default::default(),
             var_bindings: Default::default(),
             type_defs: Default::default(),
             type_defs_queue: Default::default(),
@@ -133,6 +139,7 @@ impl<'a> Lowerer<'a> {
         let expr = *expr.value.as_ref().unwrap().clone();
 
         if path.as_steps() == [NS_STD, "default"] {
+            // special case: evaluate std::default in lowerer
             return Ok(self.impl_std_default(ty_args.into_iter().next().unwrap()));
         }
 
@@ -171,7 +178,15 @@ impl<'a> Lowerer<'a> {
             expr = utils::TypeReplacer::on_expr(expr, mapping);
         }
 
+        if path.starts_with_part(NS_STD) {
+            self.in_dependency.push(NS_STD);
+        }
+
         let res = self.lower_expr(&expr)?;
+
+        if path.starts_with_part(NS_STD) {
+            self.in_dependency.pop();
+        }
 
         Ok(res)
     }
@@ -242,12 +257,12 @@ impl<'a> Lowerer<'a> {
                     kind: ScopeKind::Function {
                         function_id,
                         start_of_params: func.ty_params.len(),
-                        is_main: self.is_main_func,
+                        is_main: self.is_main_a_func,
                     },
                 };
 
                 self.scopes.push(scope);
-                self.is_main_func = false;
+                self.is_main_a_func = false;
                 let body = self.lower_expr(&func.body)?;
                 self.scopes.pop();
 
@@ -314,10 +329,16 @@ impl<'a> Lowerer<'a> {
                     to_def,
                     within: _within,
                 } => {
-                    if let Some(ptr) = self.lower_external_expr_def(to_def)? {
+                    let to_def = if let Some(dep_name) = self.in_dependency.last() {
+                        Cow::Owned(pr::Path::from_name(dep_name) + to_def.clone())
+                    } else {
+                        Cow::Borrowed(to_def)
+                    };
+
+                    if let Some(ptr) = self.lower_external_expr_def(&to_def)? {
                         ptr
                     } else {
-                        let reference = (to_def.clone(), expr.ty_args.clone());
+                        let reference = (to_def.into_owned(), expr.ty_args.clone());
                         let entry = self.var_bindings.entry(reference);
                         let binding_id = match entry {
                             indexmap::map::Entry::Occupied(e) => *e.get(),

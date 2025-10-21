@@ -1,3 +1,5 @@
+submodule
+
 type x: {int64, a: text, b: [bool]}
 
 type y: [int64]

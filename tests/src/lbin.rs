@@ -38,8 +38,10 @@ static SCHEMA: OnceLock<Vec<ir::TyDef>> = OnceLock::new();
 #[track_caller]
 fn _test_get_type(name: &'static str) -> &'static ir::Ty {
     let ty_defs = SCHEMA.get_or_init(|| {
-        let source = include_str!("../lutra/bin.lt");
-        let source = lutra_compiler::SourceTree::single("".into(), source.into());
+        let source = lutra_compiler::discover(lutra_compiler::DiscoverParams {
+            project: Some("lutra".into()),
+        })
+        .unwrap();
 
         let project = lutra_compiler::check(source, lutra_compiler::CheckParams {})
             .unwrap_or_else(|e| panic!("{e}"));
@@ -55,7 +57,7 @@ fn _test_get_type(name: &'static str) -> &'static ir::Ty {
             .collect()
     });
 
-    let def = ty_defs.iter().find(|d| d.name.0 == [name]).unwrap();
+    let def = ty_defs.iter().find(|d| d.name.0 == ["bin", name]).unwrap();
     &def.ty
 }
 

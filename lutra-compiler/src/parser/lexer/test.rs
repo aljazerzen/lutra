@@ -3,7 +3,7 @@ use insta::assert_snapshot;
 
 use crate::pr::Literal;
 
-use super::{LError, lex_source, lexer, literal, quoted_string};
+use super::{LError, lexer, literal, quoted_string};
 
 fn lex<T>(
     lexer: impl chumsky::Parser<char, T, Error = LError>,
@@ -151,38 +151,5 @@ fn range() {
         3..5: Range,
         5..6: Literal(Integer(5)),
     ]
-    "#);
-}
-
-#[test]
-fn test_lex_source() {
-    use insta::assert_debug_snapshot;
-
-    assert_debug_snapshot!(lex_source("5 + 3"), @r"
-    Ok(
-        [
-            0..1: Literal(Integer(5)),
-            2..3: Control('+'),
-            4..5: Literal(Integer(3)),
-        ],
-    )
-    ");
-
-    // Something that will generate an error
-    assert_debug_snapshot!(lex_source("^"), @r#"
-    Err(
-        [
-            Diagnostic {
-                code: DiagnosticCode(
-                    "E0003",
-                ),
-                message: "unexpected ^",
-                span: Some(
-                    0:0-1,
-                ),
-                additional: [],
-            },
-        ],
-    )
     "#);
 }

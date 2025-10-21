@@ -9,25 +9,23 @@ use crate::parser::perror::PError;
 use crate::parser::types;
 use crate::pr::*;
 
-/// The top-level parser
-pub fn source() -> impl Parser<TokenKind, ModuleDef, Error = PError> {
-    definitions()
-        .try_map(|defs, _span| into_module(defs))
-        .then_ignore(end())
+#[derive(Debug)]
+pub struct ParsedSource {
+    pub is_submodule: bool,
+    pub root: ModuleDef,
 }
 
-fn definitions() -> impl Parser<TokenKind, Vec<(String, Def)>, Error = PError> {
+/// The top-level parser
+pub fn source() -> impl Parser<TokenKind, ParsedSource, Error = PError> {
+    let is_submodule = keyword("submodule").or_not().map(|x| x.is_some());
+
     let ty = types::type_expr();
     let expr = expr(ty.clone());
 
-    recursive(|definitions| {
+    let definitions = recursive(|definitions| {
         let module_def = keyword("module")
             .ignore_then(ident_part())
-            .then(
-                definitions
-                    .delimited_by(ctrl('{'), ctrl('}'))
-                    .try_map(|defs, _span| into_module(defs)),
-            )
+            .then(definitions.delimited_by(ctrl('{'), ctrl('}')))
             .map(|(name, module_def)| (name, DefKind::Module(module_def)))
             .labelled("module definition");
 
@@ -48,29 +46,36 @@ fn definitions() -> impl Parser<TokenKind, Vec<(String, Def)>, Error = PError> {
 
         // Currently doc comments need to be before the annotation; probably
         // should relax this?
-        (doc_comment().or_not())
+        let def = (doc_comment().or_not())
             .then(annotation.repeated())
             .then(def_kind.map_with_span(|(n, def), span| (n, into_def(def, span))))
             .map(|((doc_comment, annotations), (name, mut def))| {
                 def.doc_comment = doc_comment;
                 def.annotations = annotations;
                 (name, def)
-            })
-            .repeated()
-    })
+            });
+
+        def.repeated()
+            .validate(|defs, _span, emit| into_module(defs, emit))
+    });
+
+    is_submodule
+        .then(definitions)
+        .map(|(is_submodule, root)| ParsedSource { is_submodule, root })
+        .then_ignore(end())
 }
 
-#[allow(clippy::result_large_err)]
-fn into_module(defs: Vec<(String, Def)>) -> Result<ModuleDef, PError> {
-    let mut result = IndexMap::with_capacity(defs.len());
-    for (name, def) in defs {
+fn into_module(def_vec: Vec<(String, Def)>, emit: &mut dyn FnMut(PError)) -> ModuleDef {
+    let mut defs = IndexMap::with_capacity(def_vec.len());
+    for (name, def) in def_vec {
         let span = def.span.unwrap();
-        let conflict = result.insert(name, def);
-        if conflict.is_some() {
-            return Err(PError::custom(span, "duplicate name"));
+        let conflict = defs.insert(name, def);
+        if let Some(conflict) = conflict {
+            emit(PError::custom(span, "duplicate name"));
+            emit(PError::custom(conflict.span.unwrap(), "duplicate name"));
         }
     }
-    Ok(ModuleDef { defs: result })
+    ModuleDef { defs }
 }
 
 fn into_def(kind: DefKind, span: Span) -> Def {

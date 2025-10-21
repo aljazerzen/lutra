@@ -1,3 +1,5 @@
+submodule
+
 type Program: {
   main: Expr,
   defs: [TyDef]

@@ -1,3 +1,5 @@
+submodule
+
 type Program: {
   externals: [ExternalSymbol],
   main: Expr,

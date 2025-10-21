@@ -45,7 +45,6 @@ pub fn generate(
     project
         .source
         .get_sources()
-        .filter(|s| s.0.to_str().is_none_or(|x| x != "std.lt"))
         .map(|s| project.source.root.join(s.0))
         .collect()
 }

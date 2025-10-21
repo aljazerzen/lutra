@@ -3,14 +3,15 @@ use std::path::{Path, PathBuf};
 
 use itertools::Itertools;
 
-use crate::diagnostic::Diagnostic;
-use crate::error;
+use crate::diagnostic::{Diagnostic, WithErrorInfo};
 use crate::error::Error;
 use crate::pr;
-use crate::project;
 use crate::project::SourceOverlay;
 use crate::project::SourceProvider;
+use crate::project::{self, Dependency};
+use crate::resolver::NS_STD;
 use crate::{SourceTree, diagnostic};
+use crate::{Span, error};
 
 #[cfg_attr(feature = "clap", derive(clap::Parser))]
 #[derive(Default)]
@@ -24,13 +25,13 @@ pub fn check(
         source.insert(PathBuf::from(""), "".into());
     }
 
-    crate::resolver::load_std_lib(&mut source);
-    let source = source;
+    let std_lib = Dependency {
+        name: NS_STD.into(),
+        inner: compile_std_lib()?,
+    };
 
-    let source_files = linearize_tree(&source)?;
-
-    let mut project = parse(&source, source_files)
-        .and_then(crate::resolver::resolve)
+    let mut project = parse(&source)?
+        .and_then(|ast| crate::resolver::resolve(ast, vec![std_lib]))
         .map_err(|e| Error::from_diagnostics(e, &source))?;
     project.source = source;
     Ok(project)
@@ -48,13 +49,9 @@ pub fn check_overlay(
         .map_err(|e| Error::from_diagnostics(e, &source))
 }
 
-fn parse(tree: &SourceTree, files: Vec<SourceFile>) -> Result<pr::ModuleDef, Vec<Diagnostic>> {
+fn parse(tree: &SourceTree) -> Result<Result<pr::ModuleDef, Vec<Diagnostic>>, error::Error> {
     // reverse the id->file_path map
-    let ids: HashMap<_, _> = tree
-        .source_ids
-        .iter()
-        .map(|(a, b)| (b.as_path(), a))
-        .collect();
+    let ids: HashMap<_, _> = tree.source_ids.iter().map(|(a, b)| (b, a)).collect();
 
     // init the root module def
     let mut root = pr::ModuleDef {
@@ -62,29 +59,42 @@ fn parse(tree: &SourceTree, files: Vec<SourceFile>) -> Result<pr::ModuleDef, Vec
     };
 
     // parse and insert into the root
-    let mut diagnostics = Vec::new();
-    for source_file in files {
+    let mut diags = Vec::new();
+    for (file_path, content) in tree.get_sources() {
         let id = ids
-            .get(&source_file.file_path)
+            .get(&file_path)
             .map(|x| **x)
             .expect("source tree has malformed ids");
 
-        let (ast, errs, _) = crate::parser::parse_source(source_file.content, id);
+        let module_path = os_path_to_mod_path(file_path)?;
 
-        diagnostics.extend(errs);
-        if let Some(module) = ast {
-            diagnostics.extend(insert_module_at_path(
-                &mut root,
-                source_file.module_path,
-                module,
-            ));
+        let (parsed, errs, _) = crate::parser::parse_source(content, id);
+        diags.extend(errs);
+        if let Some(parsed) = parsed {
+            // TODO: improve these error messages
+
+            if module_path.is_empty() && parsed.is_submodule {
+                diags.push(
+                    Diagnostic::new_custom("cannot load the project root")
+                        .with_span(Some(Span {
+                            start: 0,
+                            len: 1,
+                            source_id: id,
+                        }))
+                        .push_hint(format!("file {} is a submodule", file_path.display())),
+                );
+            }
+            let included = module_path.is_empty() || parsed.is_submodule;
+            if included {
+                diags.extend(insert_module_at_path(&mut root, module_path, parsed.root));
+            }
         }
     }
-    if diagnostics.is_empty() {
+    Ok(if diags.is_empty() {
         Ok(root)
     } else {
-        Err(diagnostics)
-    }
+        Err(diags)
+    })
 }
 
 fn parse_overlay(overlay: &SourceOverlay) -> Result<pr::Expr, Vec<Diagnostic>> {
@@ -95,76 +105,6 @@ fn parse_overlay(overlay: &SourceOverlay) -> Result<pr::Expr, Vec<Diagnostic>> {
     } else {
         Err(diagnostics)
     }
-}
-
-pub(super) struct SourceFile<'a> {
-    pub file_path: &'a Path,
-    pub module_path: Vec<String>,
-    pub content: &'a str,
-}
-
-pub fn linearize_tree(tree: &SourceTree) -> Result<Vec<SourceFile<'_>>, error::Error> {
-    let std = Path::new("std.lt");
-    let sources: Vec<_> = tree.sources.keys().filter(|p| p != &std).collect();
-
-    // find root
-    let root_path = if sources.len() == 1 {
-        // if there is only one file, use that as the root
-        sources.into_iter().next().unwrap()
-    } else if let Some(root) = tree.sources.get_key_value(&PathBuf::from("")) {
-        // if there is an empty path, that's the root
-        root.0
-    } else if let Some(root) = sources.iter().cloned().find(path_starts_with_uppercase) {
-        root
-    } else {
-        if tree.sources.is_empty() {
-            return Err(error::Error::InvalidSourceStructure {
-                problem: "No `.lt` files found".to_string(),
-            });
-        }
-
-        let file_names = sources
-            .iter()
-            .map(|p| format!(" - {}", p.to_str().unwrap_or_default()))
-            .sorted()
-            .join("\n");
-
-        return Err(error::Error::InvalidSourceStructure {
-            problem: format!(
-                "Cannot determine the root module within the following files:\n{file_names}"
-            ),
-        });
-    };
-
-    let mut sources: Vec<_> = Vec::with_capacity(tree.sources.len());
-
-    // prepare paths
-    for (path, source) in &tree.sources {
-        if path == root_path {
-            continue;
-        }
-
-        let module_path = os_path_to_prql_path(path)?;
-
-        sources.push(SourceFile {
-            file_path: path,
-            module_path,
-            content: source,
-        });
-    }
-
-    // sort to make this deterministic
-    sources.sort_by(|a, b| a.module_path.cmp(&b.module_path));
-
-    // add root
-    let root_content = tree.sources.get(root_path).unwrap();
-    sources.push(SourceFile {
-        file_path: root_path,
-        module_path: Vec::new(),
-        content: root_content,
-    });
-
-    Ok(sources)
 }
 
 pub fn insert_module_at_path(
@@ -201,17 +141,14 @@ pub fn insert_module_at_path(
     insert_module_at_path(submodule, path, to_insert)
 }
 
-fn path_starts_with_uppercase(p: &&PathBuf) -> bool {
-    p.components()
-        .next()
-        .and_then(|x| x.as_os_str().to_str())
-        .and_then(|x| x.chars().next())
-        .is_some_and(|x| x.is_uppercase())
-}
-
-fn os_path_to_prql_path(path: &Path) -> Result<Vec<String>, error::Error> {
-    // remove file format extension
-    let path = path.with_extension("");
+fn os_path_to_mod_path(path: &Path) -> Result<Vec<String>, error::Error> {
+    let path = if path.ends_with("module.lt") {
+        // remove module.lt suffix
+        path.parent().unwrap().to_path_buf()
+    } else {
+        // remove file format extension
+        path.with_extension("")
+    };
 
     // split by /
     path.components()
@@ -222,4 +159,17 @@ fn os_path_to_prql_path(path: &Path) -> Result<Vec<String>, error::Error> {
                 .ok_or_else(|| error::Error::InvalidPath { path: path.clone() })
         })
         .try_collect()
+}
+
+fn compile_std_lib() -> Result<crate::Project, error::Error> {
+    let source = SourceTree::single(
+        std::path::PathBuf::new(),
+        include_str!("std.lt").to_string(),
+    );
+
+    let mut project = parse(&source)?
+        .and_then(|root| crate::resolver::resolve(root, vec![]))
+        .map_err(|e| Error::from_diagnostics(e, &source))?;
+    project.source = source;
+    Ok(project)
 }

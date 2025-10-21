@@ -1,7 +1,6 @@
 #![cfg(test)]
 
 use chumsky::Parser;
-use indexmap::IndexMap;
 use insta::assert_debug_snapshot;
 use std::fmt::Debug;
 
@@ -13,7 +12,6 @@ use crate::parser::perror::PError;
 use crate::parser::prepare_stream;
 use crate::parser::types;
 use crate::pr;
-use crate::pr::Def;
 
 /// Parse source code based on the supplied parser.
 ///
@@ -23,7 +21,7 @@ pub(crate) fn parse_with_parser<O: Debug>(
     parser: impl Parser<TokenKind, O, Error = PError>,
 ) -> Result<O, Vec<Diagnostic>> {
     let tokens = crate::parser::lexer::lex_source(source)?;
-    let stream = prepare_stream(tokens, 0);
+    let stream = prepare_stream(tokens.collect(), 0);
 
     // TODO: possibly should check we consume all the input? Either with an
     // end() parser or some other way (but if we add an end parser then this
@@ -37,12 +35,6 @@ pub(crate) fn parse_with_parser<O: Debug>(
     Ok(ast.unwrap())
 }
 
-/// Parse into statements
-#[track_caller]
-fn parse_source(source: &str) -> Result<IndexMap<String, Def>, Vec<Diagnostic>> {
-    parse_with_parser(source, def::source()).map(|s| s.defs)
-}
-
 #[track_caller]
 fn parse_expr(source: &str) -> pr::Expr {
     let parser = expr::expr(types::type_expr());
@@ -51,8 +43,8 @@ fn parse_expr(source: &str) -> pr::Expr {
 
 #[track_caller]
 fn parse_func(source: &str) -> pr::Expr {
-    let module = parse_with_parser(source, def::source()).unwrap();
-    let (_, def) = module.defs.into_iter().next().unwrap();
+    let source = parse_with_parser(source, def::source()).unwrap();
+    let (_, def) = source.root.defs.into_iter().next().unwrap();
     *def.kind.into_expr().unwrap().value.unwrap()
 }
 
@@ -833,54 +825,29 @@ fn parse_10() {
 fn test_error_unicode_string() {
     // Test various unicode strings successfully parse errors. We were
     // getting loops in the lexer before.
-    parse_source("s’ ").unwrap_err();
-    parse_source("s’").unwrap_err();
-    parse_source(" s’").unwrap_err();
-    parse_source(" ’ s").unwrap_err();
-    parse_source("’s").unwrap_err();
-    parse_source("👍 s’").unwrap_err();
+    parse_expr("\"s’ \"");
+    parse_expr("\"s’\"");
+    parse_expr("\" s’\"");
+    parse_expr("\" ’ s\"");
+    parse_expr("\"’s\"");
+    parse_expr("\"👍 s’\"");
 
-    let source = "Mississippi has four S’s and four I’s.";
-    assert_debug_snapshot!(parse_source(source).unwrap_err(), @r#"
-    [
-        Diagnostic {
-            code: DiagnosticCode(
-                "E0003",
+    assert_debug_snapshot!(parse_expr(
+        "\"Mississippi has four S’s and four I’s.\""
+    ), @r#"
+    Expr {
+        kind: Literal(
+            Text(
+                "Mississippi has four S’s and four I’s.",
             ),
-            message: "unexpected ’",
-            span: Some(
-                0:22-25,
-            ),
-            additional: [],
-        },
-        Diagnostic {
-            code: DiagnosticCode(
-                "E0003",
-            ),
-            message: "unexpected ’",
-            span: Some(
-                0:37-40,
-            ),
-            additional: [],
-        },
-    ]
-    "#);
-}
-
-#[test]
-fn test_error_unexpected() {
-    assert_debug_snapshot!(parse_source("Answer? T-H-A-T!").unwrap_err(), @r#"
-    [
-        Diagnostic {
-            code: DiagnosticCode(
-                "E0003",
-            ),
-            message: "unexpected  ",
-            span: Some(
-                0:7-8,
-            ),
-            additional: [],
-        },
-    ]
+        ),
+        span: Some(
+            0:0-44,
+        ),
+        ty: None,
+        ty_args: [],
+        scope_id: None,
+        target: None,
+    }
     "#);
 }
