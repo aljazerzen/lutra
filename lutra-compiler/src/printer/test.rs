@@ -166,6 +166,40 @@ const stats = {
 }
 
 #[test]
+fn format_10() {
+    assert_snapshot!(_format(r#"
+func a() ->
+ if
+ true
+ then
+ "a"
+ else
+ "no a"
+    "#), @r#"func a() -> if true then "a" else "no a""#
+    )
+}
+
+#[test]
+fn format_11() {
+    assert_snapshot!(_format(r#"
+func some_very_long_name_that_makes_the_line_break() ->
+ if
+ true
+ then
+ "a"
+ else
+ "no a"
+    "#), @r#"
+    func some_very_long_name_that_makes_the_line_break() -> if true then (
+      "a"
+    ) else (
+      "no a"
+    )
+    "#
+    )
+}
+
+#[test]
 fn trivia_00() {
     assert_snapshot!(_format(r#"
     # TODO

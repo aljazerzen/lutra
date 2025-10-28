@@ -144,12 +144,32 @@ impl PrintSource for pr::Expr {
                 p.push("}")?;
             }
             pr::ExprKind::If(if_) => {
+                // try inline
+                let mut inline = p.fork();
+                if print_if_inline(if_, self.span, &mut inline).is_some() {
+                    p.merge(inline);
+                    return Some(());
+                }
+
                 p.push("if ")?;
-                if_.condition.print(p);
-                p.push(" then ")?;
-                if_.then.print(p);
-                p.push(" else ")?;
-                if_.els.print(p);
+                if_.condition.print(p)?;
+                p.push(" then (")?;
+
+                p.indent();
+                p.new_line();
+                if_.then.print(p)?;
+
+                p.dedent();
+                p.new_line();
+                p.push(") else (")?;
+
+                p.indent();
+                p.new_line();
+                if_.els.print(p)?;
+
+                p.dedent();
+                p.new_line();
+                p.push(")")?;
             }
 
             pr::ExprKind::EnumVariant(_) | pr::ExprKind::Internal => unreachable!(),
@@ -183,6 +203,19 @@ fn flatten_binary(binary: &pr::BinaryExpr) -> (&pr::Expr, Vec<(pr::BinOp, &pr::E
     }
 
     (first, operations)
+}
+
+fn print_if_inline<'c>(if_: &pr::If, span: Option<crate::Span>, p: &mut Printer<'c>) -> Option<()> {
+    p.require_single_line(span)?;
+
+    p.push("if ")?;
+    if_.condition.print(p)?;
+    p.push(" then ")?;
+    if_.then.print(p)?;
+    p.push(" else ")?;
+    if_.els.print(p)?;
+
+    Some(())
 }
 
 impl PrintSource for (Option<pr::BinOp>, &pr::Expr) {

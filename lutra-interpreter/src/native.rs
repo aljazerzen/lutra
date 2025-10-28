@@ -936,9 +936,9 @@ pub mod std_fs {
     impl Interpreter {
         fn resolve_path(&self, path: &str) -> Result<path::PathBuf, EvalError> {
             let Some(file_system_root) = &self.file_system else {
-                return Err(EvalError::ExternalError(format!(
-                    "lutra-interpreter was not provided with file-system access"
-                )));
+                return Err(EvalError::ExternalError(
+                    "lutra-interpreter was not provided with file-system access".into(),
+                ));
             };
 
             let resolved = file_system_root.join(path);

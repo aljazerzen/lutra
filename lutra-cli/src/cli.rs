@@ -75,6 +75,7 @@ pub enum Action {
     Codegen(CodegenCommand),
 
     /// Format source files
+    #[clap(alias = "fmt")]
     Format(FormatCommand),
 
     /// Start language server (LSP)
@@ -311,9 +312,7 @@ pub async fn run(cmd: RunCommand) -> anyhow::Result<()> {
             lutra_interpreter::InterpreterRunner::default().with_file_system(cmd.discover.project);
 
         let handle = runner.prepare(program).await?;
-        let output = runner.execute(&handle, &input).await?;
-
-        output
+        runner.execute(&handle, &input).await?
     } else if let Some(pg_url) = cmd.runner.postgres {
         let runner = init_runner_postgres(&pg_url).await?;
         let handle = runner.prepare(program).await?;

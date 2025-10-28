@@ -94,7 +94,7 @@ impl SourceTree {
     }
 
     pub fn get_files_paths(&self) -> impl Iterator<Item = PathBuf> {
-        self.sources.iter().map(|(path, _)| {
+        self.sources.keys().map(|path| {
             if path.as_os_str().is_empty() {
                 self.root.clone()
             } else {

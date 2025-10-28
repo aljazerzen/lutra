@@ -45,6 +45,7 @@ pub fn print_source(source: &pr::Source, trivia: Option<&[Token]>) -> String {
 /// Print source code of an AST node, within constrains of a printer
 /// (e.g. remaining line width). If this is not possible, return `None`.
 trait PrintSource {
+    #[must_use]
     fn print<'c>(&self, p: &mut Printer<'c>) -> Option<()>;
 
     /// Return span of the AST node.
