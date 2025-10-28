@@ -10,9 +10,7 @@ async fn main() {
 
     let (io_client, io_server) = tokio::io::duplex(1000);
 
-    let runner = lutra_interpreter::InterpreterRunner {
-        modules: lutra_interpreter::BUILTIN_MODULES,
-    };
+    let runner = lutra_interpreter::InterpreterRunner::default();
 
     let client = binary::tokio::Client::new(io_client);
     let mut server = binary::tokio::Server::new(io_server, runner);

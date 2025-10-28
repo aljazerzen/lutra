@@ -5,6 +5,27 @@ use crate::printer::expr::print_func;
 use crate::printer::types::print_ty_func;
 use crate::printer::{PrintSource, Printer};
 
+impl PrintSource for pr::Source {
+    fn print<'c>(&self, p: &mut Printer<'c>) -> Option<()> {
+        if self.is_submodule {
+            p.push("submodule")?;
+            p.new_line();
+            p.new_line();
+        }
+
+        // defs
+        (&self.root, Some(self.span)).print(p)?;
+
+        // trailing new line
+        p.new_line();
+        Some(())
+    }
+
+    fn span(&self) -> Option<crate::Span> {
+        unreachable!()
+    }
+}
+
 impl PrintSource for (&pr::ModuleDef, Option<crate::Span>) {
     fn print<'c>(&self, p: &mut Printer<'c>) -> Option<()> {
         for (i, (name, def)) in self.0.defs.iter().enumerate() {

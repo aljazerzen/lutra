@@ -37,3 +37,8 @@ publish:
     cargo publish -p lutra-runner-postgres
     cargo publish -p lutra-interpreter
     cargo publish -p lutra-cli  
+
+py *ARGS='':
+    cd lutra-bin/python && just {{ARGS}}
+    cd lutra-runner-postgres/python && just {{ARGS}}
+

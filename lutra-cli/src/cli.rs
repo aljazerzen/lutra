@@ -271,7 +271,8 @@ pub struct RunCommand {
 #[tokio::main(flavor = "current_thread")]
 pub async fn run(cmd: RunCommand) -> anyhow::Result<()> {
     // compile
-    let project = lutra_compiler::discover(cmd.discover)?;
+    println!("Compiling...");
+    let project = lutra_compiler::discover(cmd.discover.clone())?;
 
     let project = lutra_compiler::check(project, cmd.check)?;
 
@@ -288,6 +289,7 @@ pub async fn run(cmd: RunCommand) -> anyhow::Result<()> {
     )?;
 
     // read input
+    println!("Reading input...");
     let input = if let Some(input_file) = cmd.input {
         let input_file = project.source.root.as_path().join(input_file);
         fs::read(input_file).await?
@@ -303,21 +305,13 @@ pub async fn run(cmd: RunCommand) -> anyhow::Result<()> {
     };
 
     // execute
+    println!("Executing...");
     let output = if cmd.runner.interpreter {
-        let runner = lutra_interpreter::InterpreterRunner::default();
-
-        // TODO: instead of setting cwd, pass the project dir to interpreter
-        let old_cwd = std::env::current_dir()?;
-        if project.source.root.is_file() {
-            std::env::set_current_dir(project.source.root.parent().unwrap())?;
-        } else {
-            std::env::set_current_dir(&project.source.root)?;
-        }
+        let runner =
+            lutra_interpreter::InterpreterRunner::default().with_file_system(cmd.discover.project);
 
         let handle = runner.prepare(program).await?;
         let output = runner.execute(&handle, &input).await?;
-
-        std::env::set_current_dir(old_cwd)?;
 
         output
     } else if let Some(pg_url) = cmd.runner.postgres {

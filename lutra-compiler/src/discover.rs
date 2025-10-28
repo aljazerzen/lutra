@@ -7,6 +7,7 @@ use crate::error::Error;
 use crate::project;
 
 #[cfg_attr(feature = "clap", derive(clap::Parser))]
+#[derive(Clone)]
 pub struct DiscoverParams {
     /// Path to the project directory
     #[cfg_attr(feature = "clap", arg(long))]

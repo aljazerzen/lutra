@@ -42,11 +42,7 @@ pub fn generate(
     std::io::Write::write_all(&mut file, generated.as_bytes()).unwrap();
 
     // return vec of input files
-    project
-        .source
-        .get_sources()
-        .map(|s| project.source.root.join(s.0))
-        .collect()
+    project.source.get_files_paths().collect()
 }
 
 #[track_caller]

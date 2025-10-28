@@ -14,7 +14,7 @@ fn _format(source: &str) -> String {
         panic!("parse err: {dia:?}");
     };
 
-    super::print_source(&parsed.root, Some(&trivia))
+    super::print_source(&parsed, Some(&trivia))
 }
 
 #[test]
@@ -390,5 +390,14 @@ fn trivia_08() {
 
       # TODO: add a few others
     }
+    ");
+}
+
+#[test]
+fn source_00() {
+    assert_snapshot!(_format(r"submodule const a = 3"), @r"
+    submodule
+
+    const a = 3
     ");
 }

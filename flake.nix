@@ -41,6 +41,8 @@
             pkgs.cargo-depgraph
             pkgs.graphviz
 
+            pkgs.pgcli
+
             # python
             pkgs.python312Packages.python
             pkgs.python312Packages.venvShellHook

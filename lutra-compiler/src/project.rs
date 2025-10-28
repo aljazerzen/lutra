@@ -92,6 +92,16 @@ impl SourceTree {
     pub fn get_sources(&self) -> impl Iterator<Item = (&PathBuf, &String)> {
         self.sources.iter()
     }
+
+    pub fn get_files_paths(&self) -> impl Iterator<Item = PathBuf> {
+        self.sources.iter().map(|(path, _)| {
+            if path.as_os_str().is_empty() {
+                self.root.clone()
+            } else {
+                self.root.join(path)
+            }
+        })
+    }
 }
 
 impl std::fmt::Display for SourceTree {

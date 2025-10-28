@@ -36,18 +36,9 @@ pub fn print_ty(ty: &pr::Ty) -> String {
     p.buffer
 }
 
-pub fn print_source(module_tree: &pr::ModuleDef, trivia: Option<&[Token]>) -> String {
-    let span = crate::Span {
-        start: 0,
-        len: u16::MAX,
-        source_id: 0,
-    };
-
+pub fn print_source(source: &pr::Source, trivia: Option<&[Token]>) -> String {
     let mut p = Printer::new(&CONFIG_PRETTY, trivia);
-    (module_tree, Some(span)).print(&mut p).unwrap();
-
-    p.new_line(); // trailing new line
-
+    source.print(&mut p).unwrap();
     p.buffer
 }
 

@@ -16,3 +16,11 @@ mod ops;
 mod path;
 mod types;
 mod utils;
+
+#[derive(Debug)]
+pub struct Source {
+    pub is_submodule: bool,
+    pub root: ModuleDef,
+
+    pub span: crate::Span,
+}

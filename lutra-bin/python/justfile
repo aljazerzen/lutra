@@ -1,14 +1,11 @@
 _default:
     just --list
 
-build:
-    maturin build
+build MODE='':
+    maturin build {{MODE}}
 
 develop:
     maturin develop
-
-release:
-    maturin release
 
 test:
     just develop

@@ -31,7 +31,7 @@ fn test_01() {
     let output_ty = program.get_output_ty().clone();
     let bytecode = lutra_compiler::bytecode_program(program);
 
-    let value = lutra_interpreter::evaluate(&bytecode, vec![], &modules).unwrap();
+    let value = lutra_interpreter::evaluate(&bytecode, vec![], &modules, None).unwrap();
 
     let value = Value::decode(&value, &output_ty, &[]).unwrap();
 

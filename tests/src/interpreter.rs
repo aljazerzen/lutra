@@ -11,7 +11,8 @@ fn _test_interpret(program: &str) -> String {
     let bytecode = lutra_compiler::bytecode_program(program.clone());
 
     let output =
-        lutra_interpreter::evaluate(&bytecode, vec![], lutra_interpreter::BUILTIN_MODULES).unwrap();
+        lutra_interpreter::evaluate(&bytecode, vec![], lutra_interpreter::BUILTIN_MODULES, None)
+            .unwrap();
 
     lutra_bin::print_source(&output, program.get_output_ty(), &[]).unwrap()
 }
@@ -21,7 +22,8 @@ fn _test_err(program: &str) -> EvalError {
     let program = lutra_ir::_test_parse(program);
     let bytecode = lutra_compiler::bytecode_program(program.clone());
 
-    lutra_interpreter::evaluate(&bytecode, vec![], lutra_interpreter::BUILTIN_MODULES).unwrap_err()
+    lutra_interpreter::evaluate(&bytecode, vec![], lutra_interpreter::BUILTIN_MODULES, None)
+        .unwrap_err()
 }
 
 #[test]

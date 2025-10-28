@@ -933,6 +933,22 @@ pub mod std_fs {
 
     use crate::{Data, EvalError, native::*};
 
+    impl Interpreter {
+        fn resolve_path(&self, path: &str) -> Result<path::PathBuf, EvalError> {
+            let Some(file_system_root) = &self.file_system else {
+                return Err(EvalError::ExternalError(format!(
+                    "lutra-interpreter was not provided with file-system access"
+                )));
+            };
+
+            let resolved = file_system_root.join(path);
+            if !resolved.starts_with(file_system_root) {
+                return Err(EvalError::ExternalError(format!("invalid path: {path}")));
+            }
+            Ok(resolved)
+        }
+    }
+
     pub struct Module;
 
     impl NativeModule for Module {
@@ -948,14 +964,14 @@ pub mod std_fs {
 
     impl Module {
         pub fn read_parquet(
-            _it: &mut Interpreter,
+            it: &mut Interpreter,
             layout_args: &[u32],
             args: Vec<Cell>,
         ) -> Result<Cell, EvalError> {
             // unpack args
             let [file_path] = assume::exactly_n(args);
             let file_path = assume::text(&file_path)?;
-            let file_path = path::PathBuf::from(file_path);
+            let file_path = it.resolve_path(&file_path)?;
 
             // decode item ty from layout args
             let mut layout_args = assume::LayoutArgsReader::new(layout_args);
@@ -963,8 +979,11 @@ pub mod std_fs {
             let ty_item = ir::Ty::decode(&ty_item).map_err(|_| EvalError::BadProgram)?;
 
             // init parquet reader
-            let Ok(file) = fs::File::open(&file_path) else {
-                panic!("read_parquet: file open error")
+            let file = match fs::File::open(&file_path) {
+                Ok(file) => file,
+                Err(e) => {
+                    return Err(EvalError::ExternalError(format!("read_parquet: {e}")));
+                }
             };
             let builder = ParquetRecordBatchReaderBuilder::try_new(file).unwrap();
 
@@ -979,7 +998,7 @@ pub mod std_fs {
         }
 
         pub fn write_parquet(
-            _it: &mut Interpreter,
+            it: &mut Interpreter,
             layout_args: &[u32],
             args: Vec<Cell>,
         ) -> Result<Cell, EvalError> {
@@ -987,7 +1006,7 @@ pub mod std_fs {
             let [data, file_path] = assume::exactly_n(args);
 
             let file_path = assume::text(&file_path)?;
-            let file_path = path::PathBuf::from(file_path);
+            let file_path = it.resolve_path(&file_path)?;
 
             let data = assume::into_data(data)?;
 
@@ -1000,8 +1019,11 @@ pub mod std_fs {
             let data = crate::arrow::lutra_to_arrow(data, &ty_item);
 
             // write to parquet
-            let Ok(file) = fs::File::create(&file_path) else {
-                panic!("write_parquet: file open error")
+            let file = match fs::File::create(&file_path) {
+                Ok(file) => file,
+                Err(e) => {
+                    return Err(EvalError::ExternalError(format!("write_parquet: {e}")));
+                }
             };
             let mut writer = io::BufWriter::new(file);
             let mut builder = ArrowWriter::try_new(&mut writer, data.schema(), None).unwrap();

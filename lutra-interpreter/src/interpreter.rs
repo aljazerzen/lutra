@@ -14,6 +14,8 @@ pub struct Interpreter {
 
     bindings: HashMap<br::Sid, Addr>,
     scopes: HashMap<br::Sid, Vec<Addr>>,
+
+    pub(crate) file_system: Option<std::path::PathBuf>,
 }
 
 #[derive(Clone)]
@@ -39,17 +41,22 @@ pub enum EvalError {
     WorkInProgress,
     #[error("bug")]
     Bug,
+    #[error("error: {0}")]
+    ExternalError(String),
 }
 
 pub fn evaluate(
     program: &br::Program,
     input: Vec<u8>,
     native_modules: &[(&str, &dyn NativeModule)],
+    file_system: Option<std::path::PathBuf>,
 ) -> Result<Vec<u8>, EvalError> {
     let mut interpreter = Interpreter {
         memory: Vec::<Cell>::new(),
         bindings: HashMap::new(),
         scopes: HashMap::new(),
+
+        file_system,
     };
 
     // load external symbols

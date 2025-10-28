@@ -13,7 +13,6 @@ use self::perror::PError;
 
 use crate::codespan::Span;
 use crate::diagnostic::Diagnostic;
-use crate::parser::def::ParsedSource;
 use crate::pr;
 
 pub fn is_submodule(source: &str) -> Result<bool, Vec<Diagnostic>> {
@@ -26,7 +25,7 @@ pub fn is_submodule(source: &str) -> Result<bool, Vec<Diagnostic>> {
 pub fn parse_source(
     source: &str,
     source_id: u16,
-) -> (Option<ParsedSource>, Vec<Diagnostic>, Vec<Token>) {
+) -> (Option<pr::Source>, Vec<Diagnostic>, Vec<Token>) {
     let (tokens, mut errors) = lexer::lex_source_recovery(source, source_id);
 
     let mut trivia = Vec::new();

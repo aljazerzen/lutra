@@ -13,7 +13,7 @@ pub fn format(source_tree: &SourceTree) -> (Option<error::Error>, SourceTree) {
         if diagnostics.is_empty()
             && let Some(parsed) = parsed
         {
-            let formatted = crate::printer::print_source(&parsed.root, Some(&trivia));
+            let formatted = crate::printer::print_source(&parsed, Some(&trivia));
 
             formatted_tree.insert(path.clone(), formatted);
         }

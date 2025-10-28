@@ -9,14 +9,8 @@ use crate::parser::perror::PError;
 use crate::parser::types;
 use crate::pr::*;
 
-#[derive(Debug)]
-pub struct ParsedSource {
-    pub is_submodule: bool,
-    pub root: ModuleDef,
-}
-
 /// The top-level parser
-pub fn source() -> impl Parser<TokenKind, ParsedSource, Error = PError> {
+pub fn source() -> impl Parser<TokenKind, Source, Error = PError> {
     let is_submodule = keyword("submodule").or_not().map(|x| x.is_some());
 
     let ty = types::type_expr();
@@ -61,7 +55,11 @@ pub fn source() -> impl Parser<TokenKind, ParsedSource, Error = PError> {
 
     is_submodule
         .then(definitions)
-        .map(|(is_submodule, root)| ParsedSource { is_submodule, root })
+        .map_with_span(|(is_submodule, root), span| Source {
+            is_submodule,
+            root,
+            span,
+        })
         .then_ignore(end())
 }
 

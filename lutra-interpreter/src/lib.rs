@@ -21,7 +21,9 @@ pub static BUILTIN_MODULES: &[(&str, &dyn NativeModule)] = &[
 ];
 
 pub struct InterpreterRunner<'a> {
-    pub modules: &'a [(&'a str, &'a dyn NativeModule)],
+    modules: &'a [(&'a str, &'a dyn NativeModule)],
+
+    file_system: Option<std::path::PathBuf>,
 }
 
 impl<'a> lutra_runner::Run for InterpreterRunner<'a> {
@@ -42,8 +44,19 @@ impl<'a> lutra_runner::Run for InterpreterRunner<'a> {
     ) -> Result<std::vec::Vec<u8>, Self::Error> {
         let program = program.as_bytecode_lt().unwrap();
 
-        // TODO: figure out how to remove this clone
-        evaluate(program, input.to_vec(), self.modules)
+        evaluate(
+            program,
+            input.to_vec(), // TODO: figure out how to remove this clone
+            self.modules,
+            self.file_system.clone(),
+        )
+    }
+}
+
+impl<'a> InterpreterRunner<'a> {
+    pub fn with_file_system(mut self, file_system: Option<std::path::PathBuf>) -> Self {
+        self.file_system = file_system;
+        self
     }
 }
 
@@ -51,6 +64,7 @@ impl<'a> Default for InterpreterRunner<'a> {
     fn default() -> Self {
         Self {
             modules: BUILTIN_MODULES,
+            file_system: None,
         }
     }
 }
