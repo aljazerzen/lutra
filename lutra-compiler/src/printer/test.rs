@@ -14,7 +14,8 @@ fn _format(source: &str) -> String {
         panic!("parse err: {dia:?}");
     };
 
-    super::print_source(&parsed, Some(&trivia))
+    let edits = super::print_source(&parsed, Some(&trivia));
+    crate::codespan::apply_text_edits(source, &edits)
 }
 
 #[test]
@@ -433,5 +434,29 @@ fn source_00() {
     submodule
 
     const a = 3
+    ");
+}
+
+#[test]
+fn source_01() {
+    // When a def fails to print, don't produce an edit for it.
+    // (for tests, we mark missing nodes with `...`)
+
+    assert_snapshot!(_format(r#"
+const a = 3
+
+## Comment
+# TODO: make this shorter
+const a_name_that_is_too_long_to_fit_on_one_line_and_will_surly_fail_to_print = 4 # TODO: too long
+
+const b = 5
+    "#), @r"
+    const a = 3
+
+    ## Comment
+    # TODO: make this shorter
+    const a_name_that_is_too_long_to_fit_on_one_line_and_will_surly_fail_to_print = 4 # TODO: too long
+
+    const b = 5
     ");
 }

@@ -141,31 +141,15 @@ impl tower_lsp_server::LanguageServer for Backend {
             doc.clone()
         };
 
-        let doc_lines: usize = doc.text.chars().filter(|c| *c == '\n').count();
-
         let source_tree = document_to_source_tree(doc);
 
-        let (_err, formatted) = lutra_compiler::format(&source_tree);
-        let Some((_, formatted)) = formatted.get_sources().next() else {
-            // not formatted (probably because parsing failed), don't return anything
-            return Ok(None);
-        };
+        let (_err, edits) = lutra_compiler::format(&source_tree);
 
-        let full_replace = TextEdit {
-            range: Range {
-                start: Position {
-                    line: 0,
-                    character: 0,
-                },
-                end: Position {
-                    line: doc_lines as u32 + 1,
-                    character: 0,
-                },
-            },
-            new_text: formatted.clone(),
-        };
+        let (_, source) = source_tree.get_sources().next().unwrap();
 
-        Ok(Some(vec![full_replace]))
+        let edits = codespan::minimize_text_edits(source, edits);
+
+        Ok(Some(convert_text_edits(source, edits)))
     }
 }
 
@@ -226,4 +210,18 @@ fn convert_diagnostic(d: lutra_compiler::error::DiagnosticMessage) -> Diagnostic
         range: convert_range(d.range()),
         ..Default::default()
     }
+}
+
+fn convert_text_edits(source: &str, edits: Vec<codespan::TextEdit>) -> Vec<TextEdit> {
+    let line_numbers = codespan::LineNumbers::new(source);
+
+    let mut r = Vec::with_capacity(edits.len());
+    for edit in edits {
+        let range = line_numbers.range_of_span(edit.span);
+        r.push(TextEdit {
+            range: convert_range(&range),
+            new_text: edit.new_text,
+        });
+    }
+    r
 }

@@ -27,19 +27,26 @@ mod expr;
 mod test;
 mod types;
 
+use crate::codespan;
 use crate::parser::lexer::{Token, TokenKind};
 use crate::pr;
 
 pub fn print_ty(ty: &pr::Ty) -> String {
     let mut p = Printer::new(&CONFIG_NO_WRAP, None);
     ty.print(&mut p).unwrap();
+
+    assert!(p.edits.is_empty());
     p.buffer
 }
 
-pub fn print_source(source: &pr::Source, trivia: Option<&[Token]>) -> String {
+pub fn print_source(source: &pr::Source, trivia: Option<&[Token]>) -> Vec<codespan::TextEdit> {
     let mut p = Printer::new(&CONFIG_PRETTY, trivia);
+    p.buffer_span.source_id = source.span.source_id;
+
     source.print(&mut p).unwrap();
-    p.buffer
+
+    p.finish_edit();
+    p.edits
 }
 
 /// Print source code of an AST node, within constrains of a printer
@@ -60,6 +67,11 @@ struct Printer<'c> {
     /// Buffer for generated code.
     buffer: String,
 
+    /// Span of the original code that the buffer contains code for.
+    /// Note that this is not consistent at every step - only when *particular*
+    /// nodes are finished, we increase this value.
+    buffer_span: crate::Span,
+
     /// Remaining width of the current line.
     rem_width: u16,
 
@@ -76,6 +88,10 @@ struct Printer<'c> {
 
     /// Trivia tokens from original source (e.g. comments, new lines)
     trivia: Option<&'c [Token]>,
+
+    /// Finished edits of preceding nodes, whose code might not be contingent to
+    /// the code of the nodes in the current [Self::buffer].
+    edits: Vec<codespan::TextEdit>,
 }
 
 struct Config {
@@ -99,12 +115,18 @@ impl<'c> Printer<'c> {
             config,
 
             buffer: String::new(),
+            buffer_span: crate::Span {
+                source_id: 0, // this is incorrect, but it is overridden later
+                start: 0,
+                len: 0,
+            },
             indent: 0,
             rem_width: config.max_width,
             single_line: false,
             pending_suffix: 0,
 
             trivia,
+            edits: Vec::new(),
         }
     }
 
@@ -135,6 +157,20 @@ impl<'c> Printer<'c> {
         self.buffer += snippet.as_ref();
     }
 
+    /// Mark a span as fully printed (its printed code is in [Self::buffer]).
+    /// This is used for producing [codespan::TextEdit].
+    fn mark_printed(&mut self, span: &Option<crate::Span>) {
+        if let Some(span) = span {
+            self.buffer_span.set_end_of(span);
+        }
+    }
+
+    /// Mark the buffer to contain code for nodes up to some offset of the
+    /// original code.
+    fn mark_printed_up_to(&mut self, offset: u32) {
+        self.buffer_span.set_end(offset);
+    }
+
     /// Creates a new [Printer] for trying printing for a sub-node without
     /// affecting the original [Printer].
     /// When successful, the forked [Printer] has to be [Printer::merge]ed back.
@@ -142,12 +178,18 @@ impl<'c> Printer<'c> {
         Printer {
             config: self.config,
             buffer: String::new(),
+            buffer_span: crate::Span {
+                source_id: self.buffer_span.source_id,
+                start: self.buffer_span.end(),
+                len: 0,
+            },
             rem_width: self.rem_width,
             indent: self.indent,
             single_line: self.single_line,
             pending_suffix: self.pending_suffix,
 
             trivia: self.trivia,
+            edits: Vec::new(),
         }
     }
 
@@ -156,6 +198,8 @@ impl<'c> Printer<'c> {
         self.rem_width = forked.rem_width;
         self.trivia = forked.trivia;
         self.buffer += &forked.buffer;
+        self.buffer_span.set_end_of(&forked.buffer_span);
+        self.edits.extend(forked.edits);
     }
 
     /// Subtracts remaining widths. Returns `None` when there is not enough
@@ -292,6 +336,19 @@ impl<'c> Printer<'c> {
             }
         }
         Some(())
+    }
+
+    /// Convert current buffer into an [codespan::TextEdit] and save it.
+    /// This is used to skip formatting of some nodes, i.e. not produce
+    /// any [codespan::TextEdit] that would change it.
+    fn finish_edit(&mut self) {
+        let code = std::mem::take(&mut self.buffer);
+        self.edits.push(codespan::TextEdit {
+            span: self.buffer_span,
+            new_text: code,
+        });
+        self.buffer_span.start = self.buffer_span.end();
+        self.buffer_span.len = 0;
     }
 }
 

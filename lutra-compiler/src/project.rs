@@ -102,6 +102,10 @@ impl SourceTree {
             }
         })
     }
+
+    pub fn get_path(&self, source_id: u16) -> Option<&std::path::Path> {
+        self.source_ids.get(&source_id).map(|x| x.as_path())
+    }
 }
 
 impl std::fmt::Display for SourceTree {

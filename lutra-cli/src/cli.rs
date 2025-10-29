@@ -1,9 +1,12 @@
 mod language_server;
 
+use std::collections::HashMap;
+use std::path;
+
 use clap::{Args, Parser, Subcommand};
 
 use lutra_bin::Encode;
-use lutra_compiler::{CheckParams, DiscoverParams};
+use lutra_compiler::{CheckParams, DiscoverParams, codespan};
 use lutra_runner::Run;
 
 use tokio::fs;
@@ -450,16 +453,31 @@ pub struct FormatCommand {
 pub fn format(cmd: FormatCommand) -> anyhow::Result<()> {
     let source_tree = lutra_compiler::discover(cmd.discover)?;
 
-    let (err, formatted) = lutra_compiler::format(&source_tree);
+    let (err, edits) = lutra_compiler::format(&source_tree);
 
     if let Some(err) = err {
         println!("[Error]:");
         println!("{err}");
     }
 
-    for (path, content) in formatted.get_sources() {
+    let mut edits_by_source: HashMap<&path::Path, Vec<_>> = HashMap::new();
+    for edit in edits {
+        let Some(path) = source_tree.get_path(edit.span.source_id) else {
+            continue;
+        };
+        let vec = edits_by_source.entry(path).or_default();
+        vec.push(edit);
+    }
+
+    for (path, content) in source_tree.get_sources() {
         println!("-- {} --", path.display());
-        println!("{content}");
+
+        if let Some(edits) = edits_by_source.get(path.as_path()) {
+            let formatted = codespan::apply_text_edits(content, edits);
+            println!("{formatted}");
+        } else {
+            println!("  <unchanged>");
+        }
     }
     Ok(())
 }

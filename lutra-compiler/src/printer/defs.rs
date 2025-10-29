@@ -14,10 +14,11 @@ impl PrintSource for pr::Source {
         }
 
         // defs
-        (&self.root, Some(self.span)).print(p)?;
+        (&self.root, Some(self.span)).print(p).unwrap();
 
         // trailing new line
         p.new_line();
+        p.mark_printed(&Some(self.span));
         Some(())
     }
 
@@ -46,13 +47,13 @@ impl PrintSource for (&pr::ModuleDef, Option<crate::Span>) {
 
             p.inject_trivia_leading(def.span.map(|s| s.start), false);
 
-            (name.as_str(), def).print(p)?;
+            let named_def: NamedDef = (name.as_str(), def);
+
+            print_or_not(&named_def, p);
         }
 
         p.inject_trivia_inline(self.1.map(|s| s.end()));
-
         p.inject_trivia_trailing(self.1.map(|s| s.end()));
-
         Some(())
     }
 
@@ -61,7 +62,28 @@ impl PrintSource for (&pr::ModuleDef, Option<crate::Span>) {
     }
 }
 
-impl PrintSource for (&str, &pr::Def) {
+fn print_or_not<T: PrintSource>(t: &T, p: &mut Printer) {
+    let span = t.span().unwrap();
+    p.mark_printed_up_to(span.start);
+
+    let mut normal_print = p.fork();
+    if t.print(&mut normal_print).is_some() {
+        p.merge(normal_print);
+        return;
+    }
+
+    // we failed to print, so we save the preceding code and advance the
+    // buffer_span, so it skips the node we cannot print
+
+    p.finish_edit();
+    p.buffer_span.start = span.end();
+    p.buffer_span.len = 0;
+    while p.take_trivia(p.buffer_span.start).is_some() {}
+}
+
+type NamedDef<'a> = (&'a str, &'a pr::Def);
+
+impl PrintSource for NamedDef<'_> {
     #[tracing::instrument(name = "d", skip_all)]
     fn print<'c>(&self, p: &mut Printer<'c>) -> Option<()> {
         match &self.1.kind {
@@ -120,10 +142,11 @@ impl PrintSource for (&str, &pr::Def) {
             pr::DefKind::Unresolved(_) => unreachable!(),
         }
 
+        p.mark_printed(&self.1.span);
         Some(())
     }
 
     fn span(&self) -> Option<crate::Span> {
-        unreachable!()
+        self.1.span
     }
 }

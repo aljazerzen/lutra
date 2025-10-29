@@ -14,11 +14,13 @@ pub struct Span {
 }
 
 impl Span {
-    pub fn with_end(&mut self, other: &Span) {
+    pub fn set_end_of(&mut self, other: &Span) {
         assert_eq!(self.source_id, other.source_id);
+        self.set_end(other.end());
+    }
 
-        let other_end = other.start + other.len as u32;
-        self.len = (other_end.saturating_sub(self.start)) as u16;
+    pub fn set_end(&mut self, end: u32) {
+        self.len = end.saturating_sub(self.start) as u16;
     }
 
     pub fn end(&self) -> u32 {
@@ -71,30 +73,6 @@ impl chumsky::Span for Span {
 
     fn end(&self) -> Self::Offset {
         self.start + self.len as u32
-    }
-}
-
-impl std::ops::Add<usize> for Span {
-    type Output = Span;
-
-    fn add(self, rhs: usize) -> Span {
-        Self {
-            start: self.start + rhs as u32,
-            len: self.len,
-            source_id: self.source_id,
-        }
-    }
-}
-
-impl std::ops::Sub<usize> for Span {
-    type Output = Span;
-
-    fn sub(self, rhs: usize) -> Span {
-        Self {
-            start: self.start - rhs as u32,
-            len: self.len,
-            source_id: self.source_id,
-        }
     }
 }
 

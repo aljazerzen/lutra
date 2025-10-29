@@ -1,8 +1,9 @@
 use crate::SourceTree;
+use crate::codespan;
 use crate::error;
 
-pub fn format(source_tree: &SourceTree) -> (Option<error::Error>, SourceTree) {
-    let mut formatted_tree = SourceTree::empty();
+pub fn format(source_tree: &SourceTree) -> (Option<error::Error>, Vec<codespan::TextEdit>) {
+    let mut edits = Vec::new();
     let mut diagnostics = Vec::new();
 
     for (id, path) in &source_tree.source_ids {
@@ -13,9 +14,8 @@ pub fn format(source_tree: &SourceTree) -> (Option<error::Error>, SourceTree) {
         if diagnostics.is_empty()
             && let Some(parsed) = parsed
         {
-            let formatted = crate::printer::print_source(&parsed, Some(&trivia));
-
-            formatted_tree.insert(path.clone(), formatted);
+            let e = crate::printer::print_source(&parsed, Some(&trivia));
+            edits.extend(codespan::minimize_text_edits(content, e));
         }
 
         diagnostics.extend(diags);
@@ -27,5 +27,5 @@ pub fn format(source_tree: &SourceTree) -> (Option<error::Error>, SourceTree) {
         Some(error::Error::from_diagnostics(diagnostics, source_tree))
     };
 
-    (err, formatted_tree)
+    (err, edits)
 }

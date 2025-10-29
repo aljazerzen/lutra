@@ -86,7 +86,7 @@ fn compose_diagnostic_messages(
             let source_path = sources.get_path(span.source_id).unwrap();
 
             let source = cache.fetch(&source_path).unwrap();
-            let Some(location) = compose_location(&diagnostic, source) else {
+            let Some(range) = compose_range(&diagnostic, source) else {
                 panic!(
                     "span {:?} is out of bounds of the source (len = {})",
                     diagnostic.span,
@@ -98,7 +98,7 @@ fn compose_diagnostic_messages(
             messages.push(DiagnosticMessage {
                 diagnostic,
                 display,
-                range: location,
+                range,
             });
         } else {
             panic!(
@@ -157,7 +157,7 @@ where
     out.lines().map(|l| l.trim_end()).join("\n")
 }
 
-fn compose_location(diagnostic: &Diagnostic, source: &ariadne::Source) -> Option<codespan::Range> {
+fn compose_range(diagnostic: &Diagnostic, source: &ariadne::Source) -> Option<codespan::Range> {
     let span = diagnostic.span?;
 
     let start = source.get_byte_line(span.start as usize)?;

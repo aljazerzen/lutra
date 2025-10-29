@@ -1,0 +1,33 @@
+pub struct TextEdit {
+    pub span: crate::Span,
+    pub new_text: String,
+}
+
+/// Apply edits to the source code
+pub fn apply_text_edits(text: &str, edits: &[TextEdit]) -> String {
+    let mut out = String::new();
+    let mut current_offset: usize = 0;
+
+    for edit in edits {
+        assert!(
+            current_offset <= edit.span.start as usize,
+            "[TextEdit]s are not ordered"
+        );
+
+        out += &text[current_offset..edit.span.start as usize];
+        out += &edit.new_text;
+        current_offset = edit.span.end() as usize;
+    }
+    out
+}
+
+/// Drop text edits that do not change the source.
+pub fn minimize_text_edits(text: &str, edits: Vec<TextEdit>) -> Vec<TextEdit> {
+    edits
+        .into_iter()
+        .filter(|e| {
+            let old_text = &text[e.span.start as usize..e.span.end() as usize];
+            old_text != e.new_text
+        })
+        .collect()
+}

@@ -33,10 +33,15 @@ pub fn parse_source(
     let ast = if let Some(tokens) = tokens {
         trivia = tokens.trivia;
         let stream = prepare_stream(tokens.semantic, source_id);
-        let (ast, chum_errs) = def::source().parse_recovery(stream);
+        let (mut parsed, chum_errs) = def::source().parse_recovery(stream);
 
+        if let Some(parsed) = &mut parsed {
+            parsed.span.start = 0;
+            parsed.span.len = source.len() as u16;
+        }
         errors.extend(chum_errs.into_iter().map(Diagnostic::from));
-        ast
+
+        parsed
     } else {
         None
     };

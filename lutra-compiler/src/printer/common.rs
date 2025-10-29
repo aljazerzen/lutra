@@ -55,7 +55,7 @@ impl<'a, N: PrintSource> PrintSource for Separated<'a, N> {
             self.nodes.last().and_then(|n| n.span()),
         )
         .filter(|(a, b)| a.source_id == b.source_id)?;
-        first.with_end(&last);
+        first.set_end_of(&last);
         Some(first)
     }
 }

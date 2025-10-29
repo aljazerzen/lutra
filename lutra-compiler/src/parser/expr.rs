@@ -126,8 +126,9 @@ fn interpolation() -> impl Parser<TokenKind, ExprKind, Error = PError> + Clone {
     select! {
         TokenKind::Interpolation('f', string) => (ExprKind::FString as fn(_) -> _, string),
     }
-    .validate(
-        |(finish, string), span: Span, emit| match interpolation::parse(string, span + 2) {
+    .validate(|(finish, string), mut span: Span, emit| {
+        span.start += 2;
+        match interpolation::parse(string, span) {
             Ok(items) => finish(items),
             Err(errors) => {
                 for err in errors {
@@ -135,8 +136,8 @@ fn interpolation() -> impl Parser<TokenKind, ExprKind, Error = PError> + Clone {
                 }
                 finish(vec![])
             }
-        },
-    )
+        }
+    })
     .labelled("interpolated string")
 }
 
@@ -287,7 +288,7 @@ where
         .then(op.then(term).repeated())
         .foldl(|left, (op, right)| {
             let mut span = left.1;
-            span.with_end(&right.1);
+            span.set_end_of(&right.1);
             let kind = ExprKind::Binary(BinaryExpr {
                 left: Box::new(left.0),
                 op,
@@ -338,7 +339,7 @@ where
         })
         .foldr(|(left, op), right| {
             let mut span = left.1;
-            span.with_end(&right.1);
+            span.set_end_of(&right.1);
             let kind = ExprKind::Binary(BinaryExpr {
                 left: Box::new(left.0),
                 op,
