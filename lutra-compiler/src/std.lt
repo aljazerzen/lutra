@@ -318,14 +318,14 @@ module sql {
   ## It should be used as a last resort, because it circumvents type checking
   ## and can cause program panic on malformed SQL or incorrect resulting type.
   ##
-  ## Resulting type of the expression must match the "SQL relationalal representation"
+  ## Resulting type of the expression must match the "SQL relational representation"
   ## of the Lutra type:
   ## - primitives expect a single column,
   ## - tuples expect one column for each tuple field,
   ## - nested tuples are unpacked into parent relation,
   ## - arrays expect one index column, followed by columns of inner object,
   ## - enums expect one tag columns, followed by columns of each of the possible variants,
-  ## - enums that are the Maybe, exprect one nullable column.
+  ## - enums that are the Maybe, expect one nullable column.
   func expr(const sql_source: text): R
   where R
 }

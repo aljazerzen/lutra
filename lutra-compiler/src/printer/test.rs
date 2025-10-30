@@ -201,6 +201,25 @@ func some_very_long_name_that_makes_the_line_break() ->
 }
 
 #[test]
+fn format_12() {
+    // don't duplicate the block parenthesis
+    assert_snapshot!(_format(r#"
+    func some_very_long_name_that_makes_the_line_break() -> if true then (
+      "a"
+    ) else (
+      "no a"
+    )
+    "#), @r#"
+    func some_very_long_name_that_makes_the_line_break() -> if true then (
+      "a"
+    ) else (
+      "no a"
+    )
+    "#
+    )
+}
+
+#[test]
 fn trivia_00() {
     assert_snapshot!(_format(r#"
     # TODO

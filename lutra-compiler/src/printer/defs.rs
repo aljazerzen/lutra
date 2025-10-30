@@ -39,8 +39,8 @@ impl PrintSource for (&pr::ModuleDef, Option<crate::Span>) {
 
             if let Some(doc_comment) = &def.doc_comment {
                 for line in doc_comment.lines() {
-                    p.push("## ")?;
-                    p.push(line)?;
+                    p.push_unchecked("## ");
+                    p.push_unchecked(line);
                     p.new_line();
                 }
             }

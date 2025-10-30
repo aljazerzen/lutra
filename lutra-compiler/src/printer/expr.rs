@@ -153,23 +153,10 @@ impl PrintSource for pr::Expr {
 
                 p.push("if ")?;
                 if_.condition.print(p)?;
-                p.push(" then (")?;
-
-                p.indent();
-                p.new_line();
-                if_.then.print(p)?;
-
-                p.dedent();
-                p.new_line();
-                p.push(") else (")?;
-
-                p.indent();
-                p.new_line();
-                if_.els.print(p)?;
-
-                p.dedent();
-                p.new_line();
-                p.push(")")?;
+                p.push(" then ")?;
+                print_block(&if_.then, p)?;
+                p.push(" else ")?;
+                print_block(&if_.els, p)?;
             }
 
             pr::ExprKind::EnumVariant(_) | pr::ExprKind::Internal => unreachable!(),
@@ -215,6 +202,24 @@ fn print_if_inline<'c>(if_: &pr::If, span: Option<crate::Span>, p: &mut Printer<
     p.push(" else ")?;
     if_.els.print(p)?;
 
+    Some(())
+}
+
+fn print_block<'c>(node: &pr::Expr, p: &mut Printer<'c>) -> Option<()> {
+    p.push("(")?;
+
+    p.indent();
+    p.new_line();
+
+    if let pr::ExprKind::Nested(unwrapped) = &node.kind {
+        unwrapped.print(p)?;
+    } else {
+        node.print(p)?;
+    }
+
+    p.dedent();
+    p.new_line();
+    p.push(")")?;
     Some(())
 }
 

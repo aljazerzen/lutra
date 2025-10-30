@@ -143,7 +143,11 @@ impl tower_lsp_server::LanguageServer for Backend {
 
         let source_tree = document_to_source_tree(doc);
 
-        let (_err, edits) = lutra_compiler::format(&source_tree);
+        let (err, edits) = lutra_compiler::format(&source_tree);
+        if err.is_some() {
+            // don't format syntactically invalid documents
+            return Ok(None);
+        }
 
         let (_, source) = source_tree.get_sources().next().unwrap();
 
