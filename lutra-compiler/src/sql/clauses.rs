@@ -90,7 +90,7 @@ impl<'a> Context<'a> {
                 ty: expr.ty.clone(),
             }])),
             ir::ExprKind::Tuple(fields) => {
-                let ty_fields = expr.ty.kind.as_tuple().unwrap();
+                let ty_fields = self.get_ty_mat(&expr.ty).kind.as_tuple().unwrap();
 
                 let mut res_rels = Vec::new();
 

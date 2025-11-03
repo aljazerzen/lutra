@@ -224,3 +224,66 @@ func main() -> (
   dept = 373.8299254002286,
 }
 
+
+# === compounding_interest_01
+
+type Payment: {time: int32, amount: float64}
+
+type State: {
+  time: int32, dept: float64, last_payment: Payment,
+}
+
+const payments: [Payment] = [
+  {3, 10000.0}, # no fmt
+  {5, 10000.0},
+  {7, 10000.0},
+  {9, 11200.0},
+  {13, 10373.0},
+]
+
+func apply_time(state: State, time: int32): State -> {
+  time = time,
+  dept = (
+    state.dept
+    * std::math::pow(1.0 + 0.05 / 12.0, time - state.time | std::to_float64)
+  ),
+  last_payment = state.last_payment,
+}
+
+func apply_payment(state: State, payment: Payment): State -> {
+  time = state.time, dept = state.dept - payment.amount, last_payment = payment,
+}
+
+func simulate_dept(at_time: int32) -> (
+  payments
+  | std::filter(func (p: Payment) -> p.time <= at_time)
+  | std::fold(
+    {time = 0, dept = 50000.0, last_payment = std::default()}: State,
+    func (state: State, payment: Payment) -> (
+      state | apply_time(payment.time) | apply_payment(payment)
+    ),
+  )
+  | apply_time(at_time)
+)
+
+func main() -> [10, 15] | std::map(func (x) -> simulate_dept(x))
+
+# >
+[
+  {
+    time = 10,
+    dept = 10245.230201028651,
+    last_payment = {
+      time = 9,
+      amount = 11200.0,
+    },
+  },
+  {
+    time = 15,
+    dept = 0.8368558536575957,
+    last_payment = {
+      time = 13,
+      amount = 10373.0,
+    },
+  },
+]
