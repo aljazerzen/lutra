@@ -1014,90 +1014,8 @@ impl<'a> Context<'a> {
                 cr::ExprKind::Transform(union, cr::Transform::IndexBy(None))
             }
 
-            "std::reduce" => {
-                let inputs = self.compile_rel(&call.args[0]);
-                let inputs = self.new_binding(inputs);
-
-                let iteration_id = self.scope_id_gen.next();
-
-                let initial = &call.args[1];
-                let reducer = &call.args[2];
-
-                let ty_state = ir::Ty::new(ir::TyKind::Array(Box::new(initial.ty.clone())));
-
-                // -- initial state
-                let initial = self.compile_column_list(initial);
-                let initial = cr::Expr {
-                    kind: self.row_or_join(
-                        vec![new_int(0)], // index
-                        initial,
-                    ),
-                    ty: ty_state.clone(),
-                };
-
-                // -- iteration step
-
-                // a relational reference to the recursive CTE
-                let re_state_rel = self.new_binding(cr::Expr {
-                    kind: cr::ExprKind::From(cr::From::RelRef(iteration_id)),
-                    ty: ty_state.clone(),
-                });
-
-                // reference input rel & pick the row by index
-                let input_rel = self.new_binding(cr::Expr::new_rel_ref(&inputs));
-                let find_by_index = cr::Transform::Where(Box::new(new_bin_op(
-                    self.new_rel_col(&input_rel, 0, ir::Ty::new(ir::TyPrimitive::int64)),
-                    "std::eq",
-                    self.new_rel_col(&re_state_rel, 0, ir::Ty::new(ir::TyPrimitive::int64)),
-                    ir::TyPrimitive::bool,
-                )));
-                let input_rel =
-                    self.new_binding(cr::Expr::new_iso_transform(input_rel, find_by_index));
-
-                //  prepare reducer args
-                let input_arg = cr::ExprKind::Transform(
-                    self.new_binding(cr::Expr::new_rel_ref(&input_rel)),
-                    cr::Transform::ProjectDiscard(vec![0]), // discard index
-                );
-                let state_arg = cr::ExprKind::Transform(
-                    self.new_binding(cr::Expr::new_rel_ref(&re_state_rel)),
-                    cr::Transform::ProjectDiscard(vec![0]), // discard index
-                );
-
-                // compile reduced state
-                let reducer = self.as_function_or_wrap(reducer);
-                self.functions
-                    .insert(reducer.id, FuncProvider::Expr(vec![input_arg, state_arg]));
-                let reduced = self.compile_column_list(&reducer.body);
-                self.functions.remove(&reducer.id);
-
-                // compose the new state
-                let new_index = new_bin_op(
-                    self.new_rel_col(&re_state_rel, 0, ir::Ty::new(ir::TyPrimitive::int64)),
-                    "std::add",
-                    new_int(1),
-                    ir::TyPrimitive::int64,
-                );
-                let new_state = cr::Expr {
-                    kind: self.row_or_join(vec![new_index], reduced),
-                    ty: ty_state.clone(),
-                };
-
-                let step = cr::Expr::new_bind_correlated(
-                    re_state_rel,
-                    cr::Expr::new_bind_correlated(input_rel, new_state),
-                );
-
-                let iteration = cr::Expr {
-                    kind: cr::ExprKind::Iteration(
-                        Box::new(initial),
-                        Box::new(cr::BoundExpr {
-                            id: iteration_id,
-                            rel: step,
-                        }),
-                    ),
-                    ty: ty_state,
-                };
+            "std::fold" => {
+                let (inputs, iteration) = self.compile_std_scan(call);
 
                 // order by -index
                 let iteration = self.new_binding(iteration);
@@ -1125,6 +1043,25 @@ impl<'a> Context<'a> {
                     ),
                     ty: expr.ty.clone(),
                 };
+
+                cr::ExprKind::Bind(inputs, Box::new(iteration))
+            }
+
+            "std::scan" => {
+                let (inputs, iteration) = self.compile_std_scan(call);
+
+                // filter out initial accumulator
+                let iteration = self.new_binding(iteration);
+                let filter_initial_acc = new_bin_op(
+                    self.new_rel_col(&iteration, 0, ir::Ty::new(ir::TyPrimitive::int64)),
+                    "std::gt",
+                    new_int(0),
+                    ir::TyPrimitive::bool,
+                );
+                let iteration = cr::Expr::new_iso_transform(
+                    iteration,
+                    cr::Transform::Where(Box::new(filter_initial_acc)),
+                );
 
                 cr::ExprKind::Bind(inputs, Box::new(iteration))
             }
@@ -1164,6 +1101,94 @@ impl<'a> Context<'a> {
             kind,
             ty: expr.ty.clone(),
         }
+    }
+
+    /// Compiles call to `std::scan` to [cr::ExprKind::Iteration].
+    /// Result also includes an item for the initial value.
+    fn compile_std_scan(&mut self, call: &ir::Call) -> (Box<cr::BoundExpr>, cr::Expr) {
+        let inputs = self.compile_rel(&call.args[0]);
+        let inputs = self.new_binding(inputs);
+
+        let iteration_id = self.scope_id_gen.next();
+
+        let initial = &call.args[1];
+        let operation = &call.args[2];
+
+        let ty_acc = ir::Ty::new(ir::TyKind::Array(Box::new(initial.ty.clone())));
+
+        // -- initial state
+        let initial = self.compile_column_list(initial);
+        let initial = cr::Expr {
+            kind: self.row_or_join(
+                vec![new_int(0)], // index
+                initial,
+            ),
+            ty: ty_acc.clone(),
+        };
+
+        // -- iteration step
+
+        // a relational reference to the recursive CTE
+        let prev_acc_rel = self.new_binding(cr::Expr {
+            kind: cr::ExprKind::From(cr::From::RelRef(iteration_id)),
+            ty: ty_acc.clone(),
+        });
+
+        // reference input rel & pick the row by index
+        let input_rel = self.new_binding(cr::Expr::new_rel_ref(&inputs));
+        let find_by_index = cr::Transform::Where(Box::new(new_bin_op(
+            self.new_rel_col(&input_rel, 0, ir::Ty::new(ir::TyPrimitive::int64)),
+            "std::eq",
+            self.new_rel_col(&prev_acc_rel, 0, ir::Ty::new(ir::TyPrimitive::int64)),
+            ir::TyPrimitive::bool,
+        )));
+        let input_rel = self.new_binding(cr::Expr::new_iso_transform(input_rel, find_by_index));
+
+        //  prepare operation args
+        let acc_ref = cr::ExprKind::Transform(
+            self.new_binding(cr::Expr::new_rel_ref(&prev_acc_rel)),
+            cr::Transform::ProjectDiscard(vec![0]), // discard index
+        );
+        let input_ref = cr::ExprKind::Transform(
+            self.new_binding(cr::Expr::new_rel_ref(&input_rel)),
+            cr::Transform::ProjectDiscard(vec![0]), // discard index
+        );
+
+        // compile reduced state
+        let operation = self.as_function_or_wrap(operation);
+        self.functions
+            .insert(operation.id, FuncProvider::Expr(vec![acc_ref, input_ref]));
+        let op_result = self.compile_column_list(&operation.body);
+        self.functions.remove(&operation.id);
+
+        // compose the new state
+        let new_index = new_bin_op(
+            self.new_rel_col(&prev_acc_rel, 0, ir::Ty::new(ir::TyPrimitive::int64)),
+            "std::add",
+            new_int(1),
+            ir::TyPrimitive::int64,
+        );
+        let new_acc = cr::Expr {
+            kind: self.row_or_join(vec![new_index], op_result),
+            ty: ty_acc.clone(),
+        };
+
+        let step = cr::Expr::new_bind_correlated(
+            prev_acc_rel,
+            cr::Expr::new_bind_correlated(input_rel, new_acc),
+        );
+
+        let iteration = cr::Expr {
+            kind: cr::ExprKind::Iteration(
+                Box::new(initial),
+                Box::new(cr::BoundExpr {
+                    id: iteration_id,
+                    rel: step,
+                }),
+            ),
+            ty: ty_acc,
+        };
+        (inputs, iteration)
     }
 
     /// Compiles an expression into a column

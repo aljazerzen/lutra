@@ -190,7 +190,7 @@ func main() -> (
 
 # === compounding_interest_00
 
-type State: {time: int32, repayment: float64, dept: float64}
+type Accumulator: {time: int32, repayment: float64, dept: float64}
 
 const payments: [{time: int32, amount: float64}] = [
   {3, 10_000.0}, # no fmt
@@ -202,15 +202,15 @@ const payments: [{time: int32, amount: float64}] = [
 
 func main() -> (
   payments
-  | std::reduce(
+  | std::fold(
     {time = 0, repayment = 0.0, dept = 50000.0},
-    func (payment: {time: int32, amount: float64}, state: State) -> (
+    func (acc: Accumulator, payment: {time: int32, amount: float64}) -> (
       {
         time = payment.time,
         repayment = payment.amount,
         dept = (
-          state.dept
-          * std::math::pow(1.0 + 0.05 / 12.0, payment.time - state.time | std::to_float64)
+          acc.dept
+          * std::math::pow(1.0 + 0.05 / 12.0, payment.time - acc.time | std::to_float64)
           - payment.amount
         ),
       }

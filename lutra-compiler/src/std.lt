@@ -199,12 +199,44 @@ where I, K
 func append(top: [T], bottom: [T]): [T]
 where T
 
-func reduce(
+## Folds every input into the an accumulator value by applying an operation,
+## returning the final result.
+##
+## The `operation` takes two arguments: accumulator and an input.
+## It returns the value that the accumulator should have in next iteration.
+##
+## The `initial` value is the accumulator for the first call.
+##
+## After folding all inputs, the last accumulator is returned.
+##
+## This function is sometimes also called "reduce" or "inject".
+## This function is similar to [std::scan], but it returns only the final
+## accumulator.
+func fold(
   inputs: [I],
-  initial: S,
-  reducer: func (I, S): S,
-): S
-where I, S
+  initial: A,
+  operation: func (A, I): A,
+): A
+where I, A
+
+## Applies an operation to each input, using the output from the previous
+## iteration.
+##
+## The `operation` takes two arguments: accumulator and an input.
+## It returns the value that the accumulator should have in next iteration.
+##
+## The `initial` value is the accumulator for the first call.
+##
+## Returns values of all produced accumulators.
+##
+## This function is similar to [std::fold], but it returns all accumulators,
+## instead of only the final one.
+func scan(
+  inputs: [I],
+  initial: A,
+  operation: func (A, I): A,
+): [A]
+where I, A
 
 # Aggregation functions
 

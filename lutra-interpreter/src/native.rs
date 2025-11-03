@@ -204,7 +204,8 @@ pub mod std {
                 "from_columnar" => &Self::from_columnar,
                 "group" => &Self::group,
                 "append" => &Self::append,
-                "reduce" => &Self::reduce,
+                "fold" => &Self::fold,
+                "scan" => &Self::scan,
 
                 "min" => &Self::min,
                 "max" => &Self::max,
@@ -636,7 +637,7 @@ pub mod std {
             Ok(Cell::Data(output.finish()))
         }
 
-        pub fn reduce(
+        pub fn fold(
             it: &mut Interpreter,
             layout_args: &[u32],
             args: Vec<Cell>,
@@ -644,15 +645,38 @@ pub mod std {
             let mut layout_args = LayoutArgsReader::new(layout_args);
             let input_head_bytes = layout_args.next_u32();
 
-            let [inputs, initial, reducer] = assume::exactly_n(args);
+            let [inputs, initial, operation] = assume::exactly_n(args);
 
             let inputs = ArrayReader::new(assume::into_data(inputs)?, input_head_bytes as usize);
-            let mut state = initial;
+            let mut acc = initial;
             for input in inputs {
-                let args = vec![Cell::Data(input), state];
-                state = it.evaluate_func_call(&reducer, args)?;
+                let args = vec![acc, Cell::Data(input)];
+                acc = it.evaluate_func_call(&operation, args)?;
             }
-            Ok(state)
+            Ok(acc)
+        }
+
+        pub fn scan(
+            it: &mut Interpreter,
+            layout_args: &[u32],
+            args: Vec<Cell>,
+        ) -> Result<Cell, EvalError> {
+            let mut layout_args = LayoutArgsReader::new(layout_args);
+            let input_head_bytes = layout_args.next_u32();
+            let output_head_bytes = layout_args.next_u32();
+            let output_body_ptrs = layout_args.next_slice();
+
+            let [inputs, initial, operation] = assume::exactly_n(args);
+
+            let inputs = ArrayReader::new(assume::into_data(inputs)?, input_head_bytes as usize);
+            let mut acc = assume::into_data(initial)?;
+            let mut outputs = ArrayWriter::new(output_head_bytes, output_body_ptrs);
+            for input in inputs {
+                let args = vec![Cell::Data(acc), Cell::Data(input)];
+                acc = assume::into_data(it.evaluate_func_call(&operation, args)?)?;
+                outputs.write_item(acc.clone());
+            }
+            Ok(Cell::Data(outputs.finish()))
         }
 
         reduce_func!(min, decode::int, |a, b| if a < b { a } else { b }, 0);
