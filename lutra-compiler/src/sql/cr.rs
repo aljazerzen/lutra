@@ -18,16 +18,24 @@ pub enum ExprKind {
     /// Applies a relational transform.
     Transform(Box<BoundExpr>, Transform),
 
+    /// Computes cartesian product of two relations, filtered by an expression.
+    /// (translates to two FROM and WHERE)
     Join(Box<BoundExpr>, Box<BoundExpr>, Option<Box<Expr>>),
 
     /// Bind a relation and evaluate an unrelated expression
+    /// (translates to CTE)
     Bind(Box<BoundExpr>, Box<Expr>),
 
     /// Bind a relation and evaluate an correlated expression
+    /// (translates to either SELECT or FROM LATERAL)
     BindCorrelated(Box<BoundExpr>, Box<Expr>),
 
     /// Computes relations separately and concatenates them together
     Union(Vec<Expr>),
+
+    /// Fixed-point iteration. Has initial value and an update step.
+    /// Update step expression can refer to its own id.
+    Iteration(Box<Expr>, Box<BoundExpr>),
 }
 
 /// An expression, bound to an identifier.
@@ -168,6 +176,14 @@ impl Expr {
         Expr {
             kind: ExprKind::From(From::Null),
             ty,
+        }
+    }
+
+    /// Helper for creating transforms that do not modify type of the expr
+    pub fn new_bind_correlated(bound: Box<BoundExpr>, correlated: Expr) -> Self {
+        Expr {
+            ty: correlated.ty.clone(),
+            kind: ExprKind::BindCorrelated(bound, Box::new(correlated)),
         }
     }
 }

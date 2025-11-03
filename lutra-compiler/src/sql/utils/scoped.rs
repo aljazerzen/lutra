@@ -83,14 +83,6 @@ impl Scoped {
             rel_vars: vec![],
         })
     }
-
-    pub fn merge_lateral(mut self, mut before: Scoped) -> Self {
-        before
-            .rel_vars
-            .extend(self.rel_vars.into_iter().map(utils::lateral));
-        self.rel_vars = before.rel_vars;
-        self
-    }
 }
 
 impl From<ExprOrRelVar> for Scoped {
@@ -114,7 +106,7 @@ impl std::fmt::Debug for Scoped {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         for rvar in &self.rel_vars {
             f.write_str("WITH {")?;
-            rvar.fmt(f)?;
+            f.write_str(&rvar.to_string())?;
             f.write_str("}")?;
             if f.alternate() {
                 f.write_char('\n')?;
@@ -134,14 +126,22 @@ impl<'a> crate::sql::queries::Context<'a> {
     }
 
     pub fn wrap_scoped(&mut self, rel: Scoped, rel_ty: &ir::Ty) -> Scoped {
-        self.query_into_scoped(self.scoped_into_query(rel, rel_ty))
+        self.query_into_scoped(self.scoped_into_select_query(rel, rel_ty))
     }
 
     pub fn scoped_into_query(&self, scoped: Scoped, ty: &ir::Ty) -> sql_ast::Query {
-        self.scoped_into_query_ext(scoped, ty, true)
+        if let Some(query) = scoped.as_query() {
+            query.clone()
+        } else {
+            self.scoped_into_select_query_ext(scoped, ty, true)
+        }
     }
 
-    pub fn scoped_into_query_ext(
+    pub fn scoped_into_select_query(&self, scoped: Scoped, ty: &ir::Ty) -> sql_ast::Query {
+        self.scoped_into_select_query_ext(scoped, ty, true)
+    }
+
+    pub fn scoped_into_select_query_ext(
         &self,
         scoped: Scoped,
         ty: &ir::Ty,
@@ -151,9 +151,7 @@ impl<'a> crate::sql::queries::Context<'a> {
 
         self.expr_into_query(scoped.expr, &mut select, ty, include_index);
 
-        select
-            .from
-            .extend(scoped.rel_vars.into_iter().map(utils::from));
+        select.from.extend(scoped.rel_vars);
         utils::query_select(select)
     }
 
@@ -241,10 +239,10 @@ impl<'a> crate::sql::queries::Context<'a> {
                 } else {
                     let s = expr.to_string();
                     let s = s.strip_prefix("(").unwrap().strip_suffix(")").unwrap();
-                    select.from.push(utils::from(utils::sub_rel(
+                    select.from.push(utils::sub_rel(
                         utils::query_new(sql_ast::SetExpr::Source(s.to_string())),
                         COL_VALUE.into(),
-                    )));
+                    ));
                     select.projection = self.projection_noop(None, ty, include_index);
                 }
             }

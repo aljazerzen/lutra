@@ -16,14 +16,12 @@ pub fn compile(rel: cr::Expr, types: HashMap<&ir::Path, &ir::Ty>) -> sql_ast::Qu
     if rel_ty.kind.is_array() {
         // wrap into a top-level projection to remove array indexes & apply the order
         let rel_name = query.expr.as_rel_var().map(|s| s.to_string());
-        let mut query = ctx.scoped_into_query_ext(query, &rel_ty, false);
+        let mut query = ctx.scoped_into_select_query_ext(query, &rel_ty, false);
         query.order_by = Some(utils::order_by_one(utils::identifier(
             rel_name,
             COL_ARRAY_INDEX,
         )));
         query
-    } else if let Some(q) = query.as_query() {
-        q.clone()
     } else {
         ctx.scoped_into_query(query, &rel_ty)
     }
@@ -144,7 +142,7 @@ impl<'a> Context<'a> {
                 let mut bound = self.compile_rel(&bound_in.rel);
 
                 self.register_rel_var(bound_in, &mut bound);
-                let main = self.compile_rel(main_in);
+                let mut main = self.compile_rel(main_in);
                 self.unregister_rel_var(bound_in);
 
                 if let Some(row) = main.as_row() {
@@ -156,7 +154,15 @@ impl<'a> Context<'a> {
                     bound
                 } else {
                     // lateral
-                    main.merge_lateral(bound)
+                    assert!(matches!(bound.expr, ExprOrRelVar::RelVar(_)));
+
+                    main.rel_vars = std::iter::Iterator::chain(
+                        bound.rel_vars.into_iter(),
+                        main.rel_vars.into_iter().map(utils::lateral),
+                    )
+                    .collect();
+
+                    main
                 }
             }
 
@@ -184,7 +190,7 @@ impl<'a> Context<'a> {
                 self.unregister_rel_var(val_in);
 
                 let val = self.scoped_into_query(val, &val_in.rel.ty);
-                let mut main = self.scoped_into_query(main, &main_in.ty);
+                let mut main = self.scoped_into_select_query(main, &main_in.ty);
 
                 main.with = Some(utils::with());
                 let ctes = &mut main.with.as_mut().unwrap().cte_tables;
@@ -200,11 +206,7 @@ impl<'a> Context<'a> {
                 for part_in in parts {
                     let part = self.compile_rel(part_in);
 
-                    let part = if let Some(query) = part.as_query() {
-                        query.clone()
-                    } else {
-                        self.scoped_into_query(part, &part_in.ty)
-                    };
+                    let part = self.scoped_into_query(part, &part_in.ty);
 
                     if let Some(r) = res {
                         res = Some(utils::union(r, utils::query_into_set_expr(part)))
@@ -216,9 +218,39 @@ impl<'a> Context<'a> {
                 let query =
                     utils::query_new(res.unwrap_or_else(|| self.construct_empty_rel(&rel.ty)));
 
-                let name = self.rel_name_gen.next();
-                let rel = utils::sub_rel(query, name.clone());
-                Scoped::new(name, vec![rel])
+                self.query_into_scoped(query)
+            }
+
+            cr::ExprKind::Iteration(initial_in, step_in) => {
+                let initial = self.compile_rel(initial_in);
+
+                let re_name = self.rel_name_gen.next();
+
+                self.register_cte(step_in, re_name.clone());
+                let step = self.compile_rel(&step_in.rel);
+                self.unregister_rel_var(step_in);
+
+                let cte_query = utils::union(
+                    utils::query_into_set_expr(self.scoped_into_query(initial, &initial_in.ty)),
+                    utils::query_into_set_expr(self.scoped_into_query(step, &step_in.rel.ty)),
+                );
+
+                let mut main = utils::select_empty();
+                main.projection = self.projection_noop(None, &rel.ty, true);
+                main.from = vec![utils::new_table(
+                    utils::new_object_name([re_name.clone()]),
+                    None,
+                )];
+
+                let mut main = utils::query_select(main);
+                main.with = Some(utils::with());
+
+                let with = main.with.as_mut().unwrap();
+                with.recursive = true;
+                with.cte_tables
+                    .push(utils::cte(re_name, utils::query_new(cte_query)));
+
+                self.query_into_scoped(main)
             }
         }
     }
@@ -254,10 +286,9 @@ impl<'a> Context<'a> {
             cr::From::Table(table_ident) => {
                 let mut select = utils::select_empty();
 
-                select.from.push(utils::from(utils::new_table(
-                    translate_table_ident(table_ident),
-                    None,
-                )));
+                select
+                    .from
+                    .push(utils::new_table(translate_table_ident(table_ident), None));
 
                 let columns = itertools::chain(
                     // index
@@ -373,9 +404,7 @@ impl<'a> Context<'a> {
 
                 let (values, rel_vars) = self.compile_rels_scoped(columns);
                 select.projection = self.projection(ty, values);
-                select
-                    .from
-                    .extend(rel_vars.into_iter().map(utils::lateral).map(utils::from));
+                select.from.extend(rel_vars.into_iter().map(utils::lateral));
             }
 
             cr::Transform::Where(cond_in) => {
@@ -475,7 +504,7 @@ impl<'a> Context<'a> {
             }
 
             cr::Transform::Insert(table_ident) => {
-                let source = self.scoped_into_query_ext(scoped, input_ty, false);
+                let source = self.scoped_into_select_query_ext(scoped, input_ty, false);
 
                 let table = translate_table_ident(table_ident);
 
@@ -550,7 +579,7 @@ impl<'a> Context<'a> {
             return sql_ast::Expr::Subquery(Box::new(query.clone()));
         }
 
-        let query = self.scoped_into_query(rel, &expr.ty);
+        let query = self.scoped_into_select_query(rel, &expr.ty);
         sql_ast::Expr::Subquery(Box::new(query))
     }
 
@@ -636,6 +665,10 @@ impl<'a> Context<'a> {
             "std::math::abs" => {
                 let [text] = unpack_args(args);
                 sql_ast::Expr::Source(format!("ABS({text})"))
+            }
+            "std::math::pow" => {
+                let [operand, exponent] = unpack_args(args);
+                sql_ast::Expr::Source(format!("POW({operand}, {exponent})"))
             }
 
             "greatest" => {

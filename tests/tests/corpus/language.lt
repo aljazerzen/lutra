@@ -842,6 +842,27 @@ func main() -> std::append(
   "rld!",
 ]
 
+# === std_reduce_00
+func main() -> std::reduce(
+  [1, 2, 3, 4, 5]: [int64],
+  0,
+  func (n: int64, s: int64): int64 -> n + s
+)
+# >
+15
+
+# === std_reduce_01
+func main() -> std::reduce(
+  [1, 2, 3, 4, 5]: [int64],
+  {0, 0}: {sum: int64, count: int64},
+  func (n: int64, s) -> {sum = s.sum + n, count = s.count + 1}
+)
+# >
+{
+  sum = 15,
+  count = 5,
+}
+
 # === std_average_00
 func main() -> std::average([5: int64,3,65,3,2,56,67])
 # >

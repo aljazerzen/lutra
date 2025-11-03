@@ -95,12 +95,11 @@ impl<'a> queries::Context<'a> {
                 FROM json_array_elements(...expr...) j
                 SELECT ROW_NUMBER(), j.value
                 */
-
-                query.from.push(utils::from(utils::rel_func(
+                query.from.push(utils::rel_func(
                     utils::new_ident("jsonb_array_elements"),
                     vec![scoped.expr.into_expr().unwrap()],
                     Some("j".into()),
-                )));
+                ));
 
                 query.projection = vec![sql_ast::SelectItem {
                     expr: sql_ast::Expr::Source("(ROW_NUMBER() OVER ())::int4".into()),

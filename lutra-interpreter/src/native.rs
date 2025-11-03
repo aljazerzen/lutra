@@ -3,6 +3,158 @@ use lutra_bin::{Encode, Layout};
 use crate::interpreter::{Cell, Interpreter};
 use crate::{Data, NativeModule};
 
+macro_rules! reduce_func {
+    ($name: ident, $item_decode: path, $reduce: expr, $default: literal) => {
+        pub fn $name(
+            _: &mut Interpreter,
+            layout_args: &[u32],
+            args: Vec<Cell>,
+        ) -> Result<Cell, EvalError> {
+            let [array] = assume::exactly_n(args);
+            let array = assume::array(array, layout_args[0]);
+
+            let res = array
+                .map(|x| $item_decode(&x))
+                .reduce($reduce)
+                .unwrap_or($default);
+
+            Ok(Cell::Data(encode(&res)))
+        }
+    };
+}
+
+macro_rules! number_cast {
+    ($func_name: ident, $res_ty: ty) => {
+        pub fn $func_name(
+            _: &mut Interpreter,
+            layout_args: &[u32],
+            args: Vec<Cell>,
+        ) -> Result<Cell, EvalError> {
+            let input_ty = layout_args[0].to_be_bytes();
+            let input_ty = ir::TyPrimitive::decode(&input_ty).unwrap();
+
+            let [x] = assume::exactly_n(args);
+            let x = match input_ty {
+                ir::TyPrimitive::int8 => assume::primitive::<i8>(&x)? as $res_ty,
+                ir::TyPrimitive::int16 => assume::primitive::<i16>(&x)? as $res_ty,
+                ir::TyPrimitive::int32 => assume::primitive::<i32>(&x)? as $res_ty,
+                ir::TyPrimitive::int64 => assume::primitive::<i64>(&x)? as $res_ty,
+                ir::TyPrimitive::uint8 => assume::primitive::<u8>(&x)? as $res_ty,
+                ir::TyPrimitive::uint16 => assume::primitive::<u16>(&x)? as $res_ty,
+                ir::TyPrimitive::uint32 => assume::primitive::<u32>(&x)? as $res_ty,
+                ir::TyPrimitive::uint64 => assume::primitive::<u64>(&x)? as $res_ty,
+                ir::TyPrimitive::float32 => assume::primitive::<f32>(&x)? as $res_ty,
+                ir::TyPrimitive::float64 => assume::primitive::<f64>(&x)? as $res_ty,
+                _ => panic!(),
+            };
+            Ok(Cell::Data(encode(&x)))
+        }
+    };
+}
+
+macro_rules! bin_op {
+    ($args: ident, $prim: ident, $op: tt, unchanged) => {
+        bin_op!($args, $prim, $op, $prim)
+    };
+
+    ($args: ident, $prim: ty, $op: ident, $res_ty: ty) => {
+        {
+            let left = assume::primitive::<$prim>(&$args[0])?;
+            let right = assume::primitive::<$prim>(&$args[1])?;
+            let res = left.$op(right);
+            Cell::Data(encode::<$res_ty>(&res))
+        }
+    };
+    ($args: ident, $prim: ty, $op: tt, $res_ty: ty) => {
+        {
+            let left = assume::primitive::<$prim>(&$args[0])?;
+            let right = assume::primitive::<$prim>(&$args[1])?;
+            let res = left $op right;
+            Cell::Data(encode::<$res_ty>(&res))
+        }
+    };
+}
+
+macro_rules! bin_func {
+    ($name: ident, $args_ty: ty, $op: tt, $res_ty: ty) => {
+        pub fn $name(
+            _: &mut Interpreter,
+            _layout_args: &[u32],
+            args: Vec<Cell>,
+        ) -> Result<Cell, EvalError> {
+            Ok(bin_op!(args, $args_ty, $op, $res_ty))
+        }
+    };
+}
+
+macro_rules! bin_num_func {
+    ($name: ident, $op: tt, $res_ty: ident) => {
+        pub fn $name(
+            _: &mut Interpreter,
+            layout_args: &[u32],
+            args: Vec<Cell>,
+        ) -> Result<Cell, EvalError> {
+            let ty_prim = layout_args[0].to_be_bytes();
+            let prim = ir::TyPrimitive::decode(&ty_prim).unwrap();
+
+            Ok(match prim {
+                ir::TyPrimitive::int8 => bin_op!(args, i8, $op, $res_ty),
+                ir::TyPrimitive::int16 => bin_op!(args, i16, $op, $res_ty),
+                ir::TyPrimitive::int32 => bin_op!(args, i32, $op, $res_ty),
+                ir::TyPrimitive::int64 => bin_op!(args, i64, $op, $res_ty),
+                ir::TyPrimitive::uint8 => bin_op!(args, u8, $op, $res_ty),
+                ir::TyPrimitive::uint16 => bin_op!(args, u16, $op, $res_ty),
+                ir::TyPrimitive::uint32 => bin_op!(args, u32, $op, $res_ty),
+                ir::TyPrimitive::uint64 => bin_op!(args, u64, $op, $res_ty),
+                ir::TyPrimitive::float32 => bin_op!(args, f32, $op, $res_ty),
+                ir::TyPrimitive::float64 => bin_op!(args, f64, $op, $res_ty),
+                _ => panic!(),
+            })
+        }
+    };
+}
+
+macro_rules! bin_prim_func {
+    ($name: ident, $op: tt, $res_ty: ident) => {
+        pub fn $name(
+            _: &mut Interpreter,
+            layout_args: &[u32],
+            args: Vec<Cell>,
+        ) -> Result<Cell, EvalError> {
+            let ty_prim = layout_args[0].to_be_bytes();
+            let prim = ir::TyPrimitive::decode(&ty_prim).unwrap();
+
+            Ok(match prim {
+                ir::TyPrimitive::bool => bin_op!(args, bool, $op, $res_ty),
+                ir::TyPrimitive::int8 => bin_op!(args, i8, $op, $res_ty),
+                ir::TyPrimitive::int16 => bin_op!(args, i16, $op, $res_ty),
+                ir::TyPrimitive::int32 => bin_op!(args, i32, $op, $res_ty),
+                ir::TyPrimitive::int64 => bin_op!(args, i64, $op, $res_ty),
+                ir::TyPrimitive::uint8 => bin_op!(args, u8, $op, $res_ty),
+                ir::TyPrimitive::uint16 => bin_op!(args, u16, $op, $res_ty),
+                ir::TyPrimitive::uint32 => bin_op!(args, u32, $op, $res_ty),
+                ir::TyPrimitive::uint64 => bin_op!(args, u64, $op, $res_ty),
+                ir::TyPrimitive::float32 => bin_op!(args, f32, $op, $res_ty),
+                ir::TyPrimitive::float64 => bin_op!(args, f64, $op, $res_ty),
+                ir::TyPrimitive::text => {
+                    let left = assume::text(&args[0])?;
+                    let right = assume::text(&args[1])?;
+                    let res = left $op right;
+                    Cell::Data(encode::<$res_ty>(&res))
+                },
+            })
+        }
+    };
+}
+
+macro_rules! neg_arg {
+    ($prim: ty, $args: ident) => {{
+        let operand = assume::primitive::<$prim>(&$args[0])?;
+        let res = -operand;
+        Cell::Data(encode::<$prim>(&res))
+    }};
+}
+
 pub mod std {
     use ::std::{borrow::Cow, collections::HashMap};
 
@@ -52,6 +204,7 @@ pub mod std {
                 "from_columnar" => &Self::from_columnar,
                 "group" => &Self::group,
                 "append" => &Self::append,
+                "reduce" => &Self::reduce,
 
                 "min" => &Self::min,
                 "max" => &Self::max,
@@ -70,150 +223,6 @@ pub mod std {
                 _ => return None,
             })
         }
-    }
-
-    macro_rules! reduce_func {
-        ($name: ident, $item_decode: path, $reduce: expr, $default: literal) => {
-            pub fn $name(
-                _: &mut Interpreter,
-                layout_args: &[u32],
-                args: Vec<Cell>,
-            ) -> Result<Cell, EvalError> {
-                let [array] = assume::exactly_n(args);
-                let array = assume::array(array, layout_args[0]);
-
-                let res = array
-                    .map(|x| $item_decode(&x))
-                    .reduce($reduce)
-                    .unwrap_or($default);
-
-                Ok(Cell::Data(encode(&res)))
-            }
-        };
-    }
-
-    macro_rules! number_cast {
-        ($func_name: ident, $res_ty: ty) => {
-            pub fn $func_name(
-                _: &mut Interpreter,
-                layout_args: &[u32],
-                args: Vec<Cell>,
-            ) -> Result<Cell, EvalError> {
-                let input_ty = layout_args[0].to_be_bytes();
-                let input_ty = ir::TyPrimitive::decode(&input_ty).unwrap();
-
-                let [x] = assume::exactly_n(args);
-                let x = match input_ty {
-                    ir::TyPrimitive::int8 => assume::primitive::<i8>(&x)? as $res_ty,
-                    ir::TyPrimitive::int16 => assume::primitive::<i16>(&x)? as $res_ty,
-                    ir::TyPrimitive::int32 => assume::primitive::<i32>(&x)? as $res_ty,
-                    ir::TyPrimitive::int64 => assume::primitive::<i64>(&x)? as $res_ty,
-                    ir::TyPrimitive::uint8 => assume::primitive::<u8>(&x)? as $res_ty,
-                    ir::TyPrimitive::uint16 => assume::primitive::<u16>(&x)? as $res_ty,
-                    ir::TyPrimitive::uint32 => assume::primitive::<u32>(&x)? as $res_ty,
-                    ir::TyPrimitive::uint64 => assume::primitive::<u64>(&x)? as $res_ty,
-                    ir::TyPrimitive::float32 => assume::primitive::<f32>(&x)? as $res_ty,
-                    ir::TyPrimitive::float64 => assume::primitive::<f64>(&x)? as $res_ty,
-                    _ => panic!(),
-                };
-                Ok(Cell::Data(encode(&x)))
-            }
-        };
-    }
-
-    macro_rules! bin_op {
-        ($args: ident, $prim: ident, $op: tt, unchanged) => {
-            bin_op!($args, $prim, $op, $prim)
-        };
-
-        ($args: ident, $prim: ty, $op: tt, $res_ty: ty) => {
-            {
-                let left = assume::primitive::<$prim>(&$args[0])?;
-                let right = assume::primitive::<$prim>(&$args[1])?;
-                let res = left $op right;
-                Cell::Data(encode::<$res_ty>(&res))
-            }
-        };
-    }
-
-    macro_rules! bin_func {
-        ($name: ident, $args_ty: ty, $op: tt, $res_ty: ty) => {
-            pub fn $name(
-                _: &mut Interpreter,
-                _layout_args: &[u32],
-                args: Vec<Cell>,
-            ) -> Result<Cell, EvalError> {
-                Ok(bin_op!(args, $args_ty, $op, $res_ty))
-            }
-        };
-    }
-
-    macro_rules! bin_num_func {
-        ($name: ident, $op: tt, $res_ty: ident) => {
-            pub fn $name(
-                _: &mut Interpreter,
-                layout_args: &[u32],
-                args: Vec<Cell>,
-            ) -> Result<Cell, EvalError> {
-                let prim_set = layout_args[0].to_be_bytes();
-                let prim_set = ir::TyPrimitive::decode(&prim_set).unwrap();
-
-                Ok(match prim_set {
-                    ir::TyPrimitive::int8 => bin_op!(args, i8, $op, $res_ty),
-                    ir::TyPrimitive::int16 => bin_op!(args, i16, $op, $res_ty),
-                    ir::TyPrimitive::int32 => bin_op!(args, i32, $op, $res_ty),
-                    ir::TyPrimitive::int64 => bin_op!(args, i64, $op, $res_ty),
-                    ir::TyPrimitive::uint8 => bin_op!(args, u8, $op, $res_ty),
-                    ir::TyPrimitive::uint16 => bin_op!(args, u16, $op, $res_ty),
-                    ir::TyPrimitive::uint32 => bin_op!(args, u32, $op, $res_ty),
-                    ir::TyPrimitive::uint64 => bin_op!(args, u64, $op, $res_ty),
-                    ir::TyPrimitive::float32 => bin_op!(args, f32, $op, $res_ty),
-                    ir::TyPrimitive::float64 => bin_op!(args, f64, $op, $res_ty),
-                    _ => panic!(),
-                })
-            }
-        };
-    }
-
-    macro_rules! bin_prim_func {
-        ($name: ident, $op: tt, $res_ty: ident) => {
-            pub fn $name(
-                _: &mut Interpreter,
-                layout_args: &[u32],
-                args: Vec<Cell>,
-            ) -> Result<Cell, EvalError> {
-                let prim_set = layout_args[0].to_be_bytes();
-                let prim_set = ir::TyPrimitive::decode(&prim_set).unwrap();
-
-                Ok(match prim_set {
-                    ir::TyPrimitive::bool => bin_op!(args, bool, $op, $res_ty),
-                    ir::TyPrimitive::int8 => bin_op!(args, i8, $op, $res_ty),
-                    ir::TyPrimitive::int16 => bin_op!(args, i16, $op, $res_ty),
-                    ir::TyPrimitive::int32 => bin_op!(args, i32, $op, $res_ty),
-                    ir::TyPrimitive::int64 => bin_op!(args, i64, $op, $res_ty),
-                    ir::TyPrimitive::uint8 => bin_op!(args, u8, $op, $res_ty),
-                    ir::TyPrimitive::uint16 => bin_op!(args, u16, $op, $res_ty),
-                    ir::TyPrimitive::uint32 => bin_op!(args, u32, $op, $res_ty),
-                    ir::TyPrimitive::uint64 => bin_op!(args, u64, $op, $res_ty),
-                    ir::TyPrimitive::float32 => bin_op!(args, f32, $op, $res_ty),
-                    ir::TyPrimitive::float64 => bin_op!(args, f64, $op, $res_ty),
-                    ir::TyPrimitive::text => {
-                        let left = assume::text(&args[0])?;
-                        let right = assume::text(&args[1])?;
-                        let res = left $op right;
-                        Cell::Data(encode::<$res_ty>(&res))
-                    },
-                })
-            }
-        };
-    }
-
-    macro_rules! neg_arg {
-        ($prim: ty, $args: ident) => {{
-            let operand = assume::primitive::<$prim>(&$args[0])?;
-            let res = -operand;
-            Cell::Data(encode::<$prim>(&res))
-        }};
     }
 
     impl Module {
@@ -627,6 +636,25 @@ pub mod std {
             Ok(Cell::Data(output.finish()))
         }
 
+        pub fn reduce(
+            it: &mut Interpreter,
+            layout_args: &[u32],
+            args: Vec<Cell>,
+        ) -> Result<Cell, EvalError> {
+            let mut layout_args = LayoutArgsReader::new(layout_args);
+            let input_head_bytes = layout_args.next_u32();
+
+            let [inputs, initial, reducer] = assume::exactly_n(args);
+
+            let inputs = ArrayReader::new(assume::into_data(inputs)?, input_head_bytes as usize);
+            let mut state = initial;
+            for input in inputs {
+                let args = vec![Cell::Data(input), state];
+                state = it.evaluate_func_call(&reducer, args)?;
+            }
+            Ok(state)
+        }
+
         reduce_func!(min, decode::int, |a, b| if a < b { a } else { b }, 0);
 
         reduce_func!(max, decode::int, |a, b| if a > b { a } else { b }, 0);
@@ -887,6 +915,7 @@ pub mod std_math {
         fn lookup_native_symbol(&self, id: &str) -> Option<crate::interpreter::NativeFunction> {
             Some(match id {
                 "abs" => &Self::abs,
+                "pow" => &Self::pow,
 
                 _ => return None,
             })
@@ -918,6 +947,68 @@ pub mod std_math {
                 | ir::TyPrimitive::uint64 => return Ok(arg),
 
                 _ => return Err(EvalError::BadProgram),
+            }))
+        }
+
+        pub fn pow(
+            _: &mut Interpreter,
+            layout_args: &[u32],
+            args: Vec<Cell>,
+        ) -> Result<Cell, EvalError> {
+            let ty_prim = layout_args[0].to_be_bytes();
+            let prim = ir::TyPrimitive::decode(&ty_prim).unwrap();
+            Ok(Cell::Data(match prim {
+                ir::TyPrimitive::int8 => {
+                    let (left, right) = assume::primitive2::<i8>(&args)?;
+                    let res = left.pow(right as u32);
+                    encode::<i8>(&res)
+                }
+                ir::TyPrimitive::int16 => {
+                    let (left, right) = assume::primitive2::<i16>(&args)?;
+                    let res = left.pow(right as u32);
+                    encode::<i16>(&res)
+                }
+                ir::TyPrimitive::int32 => {
+                    let (left, right) = assume::primitive2::<i32>(&args)?;
+                    let res = left.pow(right as u32);
+                    encode::<i32>(&res)
+                }
+                ir::TyPrimitive::int64 => {
+                    let (left, right) = assume::primitive2::<i64>(&args)?;
+                    let res = left.pow(right as u32);
+                    encode::<i64>(&res)
+                }
+                ir::TyPrimitive::uint8 => {
+                    let (left, right) = assume::primitive2::<u8>(&args)?;
+                    let res = left.pow(right as u32);
+                    encode::<u8>(&res)
+                }
+                ir::TyPrimitive::uint16 => {
+                    let (left, right) = assume::primitive2::<u16>(&args)?;
+                    let res = left.pow(right as u32);
+                    encode::<u16>(&res)
+                }
+                ir::TyPrimitive::uint32 => {
+                    let (left, right) = assume::primitive2::<u32>(&args)?;
+                    let res = left.pow(right);
+                    encode::<u32>(&res)
+                }
+                ir::TyPrimitive::uint64 => {
+                    let (left, right) = assume::primitive2::<u64>(&args)?;
+                    let res = left.pow(right as u32);
+                    encode::<u64>(&res)
+                }
+                ir::TyPrimitive::float32 => {
+                    let (left, right) = assume::primitive2::<f32>(&args)?;
+                    let res = left.powf(right);
+                    encode::<f32>(&res)
+                }
+                ir::TyPrimitive::float64 => {
+                    let (left, right) = assume::primitive2::<f64>(&args)?;
+                    let res = left.powf(right);
+                    encode::<f64>(&res)
+                }
+                _ => panic!(),
             }))
         }
     }
@@ -1094,6 +1185,10 @@ mod assume {
 
     pub fn primitive<T: Decode>(cell: &Cell) -> Result<T, EvalError> {
         Ok(decode::primitive::<T>(as_data(cell)?))
+    }
+
+    pub fn primitive2<T: Decode>(cells: &[Cell]) -> Result<(T, T), EvalError> {
+        Ok((primitive(&cells[0])?, primitive(&cells[1])?))
     }
 
     pub fn int64(cell: &Cell) -> Result<i64, EvalError> {

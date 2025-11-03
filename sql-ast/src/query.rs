@@ -67,7 +67,7 @@ pub enum SetExpr {
     Insert(Insert),
     Update {
         /// TABLE
-        table: TableWithJoins,
+        table: RelVar,
         /// Column assignments
         assignments: Vec<Assignment>,
         /// Table which provide value to be set
@@ -268,7 +268,7 @@ pub struct Select {
     /// INTO
     pub into: Option<SelectInto>,
     /// FROM
-    pub from: Vec<TableWithJoins>,
+    pub from: Vec<RelVar>,
     /// WHERE
     pub selection: Option<Expr>,
     /// GROUP BY
@@ -459,23 +459,6 @@ impl fmt::Display for SelectItem {
         if let Some(alias) = &self.alias {
             f.write_str(" AS ")?;
             alias.fmt(f)?;
-        }
-        Ok(())
-    }
-}
-
-#[derive(Debug, Clone, PartialEq, PartialOrd, Eq, Ord, Hash)]
-pub struct TableWithJoins {
-    pub relation: RelVar,
-    pub joins: Vec<Join>,
-}
-
-impl fmt::Display for TableWithJoins {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        self.relation.fmt(f)?;
-        for join in &self.joins {
-            SpaceOrNewline.fmt(f)?;
-            join.fmt(f)?;
         }
         Ok(())
     }
@@ -1120,8 +1103,8 @@ impl fmt::Display for GroupByExpr {
 pub enum UpdateTableFromKind {
     /// Update Statement where the 'FROM' clause is before the 'SET' keyword (Supported by Snowflake)
     /// For Example: `UPDATE FROM t1 SET t1.name='aaa'`
-    BeforeSet(Vec<TableWithJoins>),
+    BeforeSet(Vec<RelVar>),
     /// Update Statement where the 'FROM' clause is after the 'SET' keyword (Which is the standard way)
     /// For Example: `UPDATE SET t1.name='aaa' FROM t1`
-    AfterSet(Vec<TableWithJoins>),
+    AfterSet(Vec<RelVar>),
 }

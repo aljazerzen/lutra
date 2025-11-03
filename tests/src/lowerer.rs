@@ -46,67 +46,67 @@ fn lower_01() {
     let main = (func 1 ->
       let 1 = (func 4 ->
         (call
-          external.std::index: func ([{id: int64, total: float64}], int64) -> enum {None, Some: {id: int64, total: float64}},
+          external.std::index[90m: func ([{id: int64, total: float64}], int64) -> enum {None, Some: {id: int64, total: float64}}[0m,
           (call
-            external.std::filter: func ([{id: int64, total: float64}], func ({id: int64, total: float64}) -> bool) -> [{id: int64, total: float64}],
+            external.std::filter[90m: func ([{id: int64, total: float64}], func ({id: int64, total: float64}) -> bool) -> [{id: int64, total: float64}][0m,
             (call
-              external.box_office::get_album_sales: func () -> [box_office::AlbumSale],
-            ): [box_office::AlbumSale],
+              external.box_office::get_album_sales[90m: func () -> [box_office::AlbumSale][0m,
+            )[90m: [box_office::AlbumSale][0m,
             (func 5 ->
               (call
-                external.std::eq: func (int64, int64) -> bool,
+                external.std::eq[90m: func (int64, int64) -> bool[0m,
                 (tuple_lookup
-                  fn.5+0: box_office::AlbumSale
+                  fn.5+0[90m: box_office::AlbumSale[0m
                   0
-                ): int64,
-                fn.4+0: int64,
-              ): bool
-            ): func (box_office::AlbumSale) -> bool,
-          ): [{id: int64, total: float64}],
-          0: int64,
-        ): enum {None, Some: {id: int64, total: float64}}
-      ): func (int64) -> enum {None, Some: box_office::AlbumSale};
+                )[90m: int64[0m,
+                fn.4+0[90m: int64[0m,
+              )[90m: bool[0m
+            )[90m: func (box_office::AlbumSale) -> bool[0m,
+          )[90m: [{id: int64, total: float64}][0m,
+          0[90m: int64[0m,
+        )[90m: enum {None, Some: {id: int64, total: float64}}[0m
+      )[90m: func (int64) -> enum {None, Some: box_office::AlbumSale}[0m;
       let 0 = (func 2 ->
         (call
-          external.std::index: func ([{id: int64, title: text}], int64) -> enum {None, Some: {id: int64, title: text}},
+          external.std::index[90m: func ([{id: int64, title: text}], int64) -> enum {None, Some: {id: int64, title: text}}[0m,
           (call
-            external.std::filter: func ([{id: int64, title: text}], func ({id: int64, title: text}) -> bool) -> [{id: int64, title: text}],
+            external.std::filter[90m: func ([{id: int64, title: text}], func ({id: int64, title: text}) -> bool) -> [{id: int64, title: text}][0m,
             (call
-              external.chinook::get_albums: func () -> [chinook::album],
-            ): [chinook::album],
+              external.chinook::get_albums[90m: func () -> [chinook::album][0m,
+            )[90m: [chinook::album][0m,
             (func 3 ->
               (call
-                external.std::eq: func (int64, int64) -> bool,
+                external.std::eq[90m: func (int64, int64) -> bool[0m,
                 (tuple_lookup
-                  fn.3+0: chinook::album
+                  fn.3+0[90m: chinook::album[0m
                   0
-                ): int64,
-                fn.2+0: int64,
-              ): bool
-            ): func (chinook::album) -> bool,
-          ): [{id: int64, title: text}],
-          0: int64,
-        ): enum {None, Some: {id: int64, title: text}}
-      ): func (int64) -> enum {None, Some: chinook::album};
+                )[90m: int64[0m,
+                fn.2+0[90m: int64[0m,
+              )[90m: bool[0m
+            )[90m: func (chinook::album) -> bool[0m,
+          )[90m: [{id: int64, title: text}][0m,
+          0[90m: int64[0m,
+        )[90m: enum {None, Some: {id: int64, title: text}}[0m
+      )[90m: func (int64) -> enum {None, Some: chinook::album}[0m;
       (call
         (func 0 ->
           (tuple
             (call
-              external.chinook::get_albums: func () -> [chinook::album],
-            ): [chinook::album],
+              external.chinook::get_albums[90m: func () -> [chinook::album][0m,
+            )[90m: [chinook::album][0m,
             (call
-              var.0: func (int64) -> enum {None, Some: chinook::album},
-              fn.0+0: int64,
-            ): enum {None, Some: chinook::album},
+              var.0[90m: func (int64) -> enum {None, Some: chinook::album}[0m,
+              fn.0+0[90m: int64[0m,
+            )[90m: enum {None, Some: chinook::album}[0m,
             (call
-              var.1: func (int64) -> enum {None, Some: box_office::AlbumSale},
-              fn.0+0: int64,
-            ): enum {None, Some: box_office::AlbumSale},
-          ): {[chinook::album], enum {None, Some: chinook::album}, enum {None, Some: box_office::AlbumSale}}
-        ): func (int64) -> {[chinook::album], enum {None, Some: chinook::album}, enum {None, Some: box_office::AlbumSale}},
-        fn.1+0: int64,
-      ): {[chinook::album], enum {None, Some: chinook::album}, enum {None, Some: box_office::AlbumSale}}
-    ): func (int64) -> {[chinook::album], enum {None, Some: chinook::album}, enum {None, Some: box_office::AlbumSale}}
+              var.1[90m: func (int64) -> enum {None, Some: box_office::AlbumSale}[0m,
+              fn.0+0[90m: int64[0m,
+            )[90m: enum {None, Some: box_office::AlbumSale}[0m,
+          )[90m: {[chinook::album], enum {None, Some: chinook::album}, enum {None, Some: box_office::AlbumSale}}[0m
+        )[90m: func (int64) -> {[chinook::album], enum {None, Some: chinook::album}, enum {None, Some: box_office::AlbumSale}}[0m,
+        fn.1+0[90m: int64[0m,
+      )[90m: {[chinook::album], enum {None, Some: chinook::album}, enum {None, Some: box_office::AlbumSale}}[0m
+    )[90m: func (int64) -> {[chinook::album], enum {None, Some: chinook::album}, enum {None, Some: box_office::AlbumSale}}[0m
     ")
 }
 
@@ -125,25 +125,25 @@ fn lower_02() {
     "#), @r#"
     type Status = enum {Open, Closed: text};
     let main = (func 0 ->
-      let 0 = (enum_variant 1): Status;
+      let 0 = (enum_variant 1)[90m: Status[0m;
       (
         switch,
         (
           (enum_eq
-            var.0: Status
+            var.0[90m: Status[0m
             0
-          ): bool,
-          "open": text,
+          )[90m: bool[0m,
+          "open"[90m: text[0m,
         ),
         (
           (enum_eq
-            var.0: Status
+            var.0[90m: Status[0m
             1
-          ): bool,
-          "closed": text,
+          )[90m: bool[0m,
+          "closed"[90m: text[0m,
         ),
-      ): text
-    ): func ({}) -> text
+      )[90m: text[0m
+    )[90m: func ({}) -> text[0m
     "#)
 }
 
@@ -157,23 +157,23 @@ fn lower_03() {
     let main = (func 1 ->
       let 0 = (func 2 ->
         (tuple
-          fn.2+0: [bool],
-          fn.2+0: [bool],
-        ): {[bool], [bool]}
-      ): func ([bool]) -> {[bool], [bool]};
+          fn.2+0[90m: [bool][0m,
+          fn.2+0[90m: [bool][0m,
+        )[90m: {[bool], [bool]}[0m
+      )[90m: func ([bool]) -> {[bool], [bool]}[0m;
       (call
         (func 0 ->
           (call
-            var.0: func ([bool]) -> {[bool], [bool]},
+            var.0[90m: func ([bool]) -> {[bool], [bool]}[0m,
             [
-              true: bool,
-              true: bool,
-              false: bool,
-            ]: [bool],
-          ): {[bool], [bool]}
-        ): func ({}) -> {[bool], [bool]},
-        fn.1+0: {},
-      ): {[bool], [bool]}
-    ): func ({}) -> {[bool], [bool]}
+              true[90m: bool[0m,
+              true[90m: bool[0m,
+              false[90m: bool[0m,
+            ][90m: [bool][0m,
+          )[90m: {[bool], [bool]}[0m
+        )[90m: func ({}) -> {[bool], [bool]}[0m,
+        fn.1+0[90m: {}[0m,
+      )[90m: {[bool], [bool]}[0m
+    )[90m: func ({}) -> {[bool], [bool]}[0m
     ")
 }

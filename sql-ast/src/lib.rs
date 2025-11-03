@@ -30,7 +30,7 @@ pub use self::query::{
     Cte, CteAsMaterialized, Distinct, ExprWithAlias, GroupByExpr, GroupByWithModifier, Join,
     JoinConstraint, JoinOperator, LateralView, OrderBy, OrderByExpr, OrderByKind, OrderByOptions,
     PivotValueSource, Query, RelExpr, RelVar, Select, SelectInto, SelectItem, SetExpr, SetOperator,
-    SetQuantifier, TableAlias, TableVersion, TableWithJoins, UpdateTableFromKind, Values, With,
+    SetQuantifier, TableAlias, TableVersion, Values, With,
 };
 
 pub use self::string::escape as escape_string;

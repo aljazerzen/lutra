@@ -251,7 +251,7 @@ impl ByteCoder {
             | "std::to_uint8" | "std::to_uint16" | "std::to_uint32" | "std::to_uint64"
             | "std::to_float32" | "std::to_float64" | "std::mul" | "std::div" | "std::mod"
             | "std::add" | "std::sub" | "std::neg" | "std::eq" | "std::ne" | "std::gt"
-            | "std::lt" | "std::gte" | "std::lte" | "std::math::abs" => {
+            | "std::lt" | "std::gte" | "std::lte" | "std::math::abs" | "std::math::pow" => {
                 let param_ty = as_ty_of_param(ty_mat);
                 let primitive = param_ty.kind.as_primitive().unwrap();
 
@@ -262,7 +262,8 @@ impl ByteCoder {
 
             "std::count" => vec![],
 
-            "std::min" | "std::max" | "std::sum" | "std::average" | "std::contains" => {
+            "std::min" | "std::max" | "std::sum" | "std::average" | "std::contains"
+            | "std::reduce" => {
                 let item_layout = as_layout_of_param_array(ty_mat);
                 vec![
                     item_layout.head_size.div_ceil(8), // item_head_size

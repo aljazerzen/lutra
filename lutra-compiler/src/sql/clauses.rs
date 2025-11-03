@@ -18,7 +18,7 @@ pub(super) struct Context<'t> {
 }
 
 enum FuncProvider {
-    Expr(cr::ExprKind),
+    Expr(Vec<cr::ExprKind>),
     QueryParam,
 }
 
@@ -222,8 +222,7 @@ impl<'a> Context<'a> {
                 let provider = self.functions.get(&ptr.function_id).unwrap();
                 match provider {
                     FuncProvider::Expr(r_expr) => {
-                        assert_eq!(ptr.param_position, 0);
-                        r_expr.clone()
+                        r_expr.get(ptr.param_position as usize).unwrap().clone()
                     }
                     FuncProvider::QueryParam => {
                         assert_eq!(ptr.param_position, 0);
@@ -710,7 +709,8 @@ impl<'a> Context<'a> {
                     })));
                 }
 
-                self.functions.insert(func.id, FuncProvider::Expr(item_ref));
+                self.functions
+                    .insert(func.id, FuncProvider::Expr(vec![item_ref]));
                 let mapped_item = self.compile_column_list(&func.body);
                 self.functions.remove(&func.id);
 
@@ -750,7 +750,8 @@ impl<'a> Context<'a> {
                     })));
                 }
 
-                self.functions.insert(func.id, FuncProvider::Expr(item_ref));
+                self.functions
+                    .insert(func.id, FuncProvider::Expr(vec![item_ref]));
                 let mapped_items = self.compile_rel(&func.body);
                 self.functions.remove(&func.id);
 
@@ -791,7 +792,8 @@ impl<'a> Context<'a> {
                     cr::Transform::ProjectDiscard(vec![0]), // discard index
                 );
 
-                self.functions.insert(func.id, FuncProvider::Expr(item_ref));
+                self.functions
+                    .insert(func.id, FuncProvider::Expr(vec![item_ref]));
                 let cond = self.compile_column(&func.body);
                 self.functions.remove(&func.id);
 
@@ -809,7 +811,8 @@ impl<'a> Context<'a> {
                     cr::Transform::ProjectDiscard(vec![0]), // discard index
                 );
 
-                self.functions.insert(func.id, FuncProvider::Expr(item_ref));
+                self.functions
+                    .insert(func.id, FuncProvider::Expr(vec![item_ref]));
                 let key = self.compile_column(&func.body);
                 self.functions.remove(&func.id);
 
@@ -981,7 +984,7 @@ impl<'a> Context<'a> {
                 );
 
                 self.functions
-                    .insert(func.id, FuncProvider::Expr(item_ref.clone()));
+                    .insert(func.id, FuncProvider::Expr(vec![item_ref.clone()]));
                 let key = self.compile_column_list(&func.body).unwrap_columns();
                 self.functions.remove(&func.id);
 
@@ -1009,6 +1012,121 @@ impl<'a> Context<'a> {
 
                 // reindex
                 cr::ExprKind::Transform(union, cr::Transform::IndexBy(None))
+            }
+
+            "std::reduce" => {
+                let inputs = self.compile_rel(&call.args[0]);
+                let inputs = self.new_binding(inputs);
+
+                let iteration_id = self.scope_id_gen.next();
+
+                let initial = &call.args[1];
+                let reducer = &call.args[2];
+
+                let ty_state = ir::Ty::new(ir::TyKind::Array(Box::new(initial.ty.clone())));
+
+                // -- initial state
+                let initial = self.compile_column_list(initial);
+                let initial = cr::Expr {
+                    kind: self.row_or_join(
+                        vec![new_int(0)], // index
+                        initial,
+                    ),
+                    ty: ty_state.clone(),
+                };
+
+                // -- iteration step
+
+                // a relational reference to the recursive CTE
+                let re_state_rel = self.new_binding(cr::Expr {
+                    kind: cr::ExprKind::From(cr::From::RelRef(iteration_id)),
+                    ty: ty_state.clone(),
+                });
+
+                // reference input rel & pick the row by index
+                let input_rel = self.new_binding(cr::Expr::new_rel_ref(&inputs));
+                let find_by_index = cr::Transform::Where(Box::new(new_bin_op(
+                    self.new_rel_col(&input_rel, 0, ir::Ty::new(ir::TyPrimitive::int64)),
+                    "std::eq",
+                    self.new_rel_col(&re_state_rel, 0, ir::Ty::new(ir::TyPrimitive::int64)),
+                    ir::TyPrimitive::bool,
+                )));
+                let input_rel =
+                    self.new_binding(cr::Expr::new_iso_transform(input_rel, find_by_index));
+
+                //  prepare reducer args
+                let input_arg = cr::ExprKind::Transform(
+                    self.new_binding(cr::Expr::new_rel_ref(&input_rel)),
+                    cr::Transform::ProjectDiscard(vec![0]), // discard index
+                );
+                let state_arg = cr::ExprKind::Transform(
+                    self.new_binding(cr::Expr::new_rel_ref(&re_state_rel)),
+                    cr::Transform::ProjectDiscard(vec![0]), // discard index
+                );
+
+                // compile reduced state
+                let reducer = self.as_function_or_wrap(reducer);
+                self.functions
+                    .insert(reducer.id, FuncProvider::Expr(vec![input_arg, state_arg]));
+                let reduced = self.compile_column_list(&reducer.body);
+                self.functions.remove(&reducer.id);
+
+                // compose the new state
+                let new_index = new_bin_op(
+                    self.new_rel_col(&re_state_rel, 0, ir::Ty::new(ir::TyPrimitive::int64)),
+                    "std::add",
+                    new_int(1),
+                    ir::TyPrimitive::int64,
+                );
+                let new_state = cr::Expr {
+                    kind: self.row_or_join(vec![new_index], reduced),
+                    ty: ty_state.clone(),
+                };
+
+                let step = cr::Expr::new_bind_correlated(
+                    re_state_rel,
+                    cr::Expr::new_bind_correlated(input_rel, new_state),
+                );
+
+                let iteration = cr::Expr {
+                    kind: cr::ExprKind::Iteration(
+                        Box::new(initial),
+                        Box::new(cr::BoundExpr {
+                            id: iteration_id,
+                            rel: step,
+                        }),
+                    ),
+                    ty: ty_state,
+                };
+
+                // order by -index
+                let iteration = self.new_binding(iteration);
+                let index = self.new_rel_col(&iteration, 0, ir::Ty::new(ir::TyPrimitive::int64));
+                let iteration = cr::Expr::new_iso_transform(
+                    iteration,
+                    cr::Transform::IndexBy(Some(Box::new(new_un_op(
+                        "std::neg",
+                        index,
+                        ir::TyPrimitive::int64,
+                    )))),
+                );
+
+                // limit 1
+                let iteration = cr::Expr::new_iso_transform(
+                    self.new_binding(iteration),
+                    cr::Transform::Limit(Box::new(new_int(1))),
+                );
+
+                // drop index
+                let iteration = cr::Expr {
+                    kind: cr::ExprKind::Transform(
+                        self.new_binding(iteration),
+                        cr::Transform::ProjectDiscard(vec![0]),
+                    ),
+                    ty: expr.ty.clone(),
+                };
+
+                cr::ExprKind::Bind(inputs, Box::new(iteration))
             }
 
             "std::sql::from" => {
@@ -1189,6 +1307,14 @@ impl ColumnsOrUnpack {
 
 fn new_bin_op(left: cr::Expr, op: &str, right: cr::Expr, ty: ir::TyPrimitive) -> cr::Expr {
     let kind = cr::ExprKind::From(cr::From::FuncCall(op.to_string(), vec![left, right]));
+    cr::Expr {
+        kind,
+        ty: ir::Ty::new(ty),
+    }
+}
+
+fn new_un_op(op: &str, operand: cr::Expr, ty: ir::TyPrimitive) -> cr::Expr {
+    let kind = cr::ExprKind::From(cr::From::FuncCall(op.to_string(), vec![operand]));
     cr::Expr {
         kind,
         ty: ir::Ty::new(ty),

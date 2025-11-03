@@ -199,6 +199,13 @@ where I, K
 func append(top: [T], bottom: [T]): [T]
 where T
 
+func reduce(
+  inputs: [I],
+  initial: S,
+  reducer: func (I, S): S,
+): S
+where I, S
+
 # Aggregation functions
 
 func min(column: [int64]): int64
@@ -247,7 +254,10 @@ module math {
   const pi32: float32 = 3.1415927
   const pi64: float64 = 3.141592653589793
 
-  func pow(val: int64, exponent: int64): int64
+  # TODO: exponent should probably always be uint32
+  func pow(val: T, exponent: T): T
+  where T: int64 | float64
+
   func exp(val: int64): int64
   func ln(val: int64): int64
   func log10(val: int64): int64

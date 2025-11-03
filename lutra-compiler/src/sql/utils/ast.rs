@@ -61,13 +61,6 @@ pub fn rel_func(
     }
 }
 
-pub fn from(relation: sql_ast::RelVar) -> sql_ast::TableWithJoins {
-    sql_ast::TableWithJoins {
-        relation,
-        joins: Vec::new(),
-    }
-}
-
 pub fn select_empty() -> sql_ast::Select {
     sql_ast::Select {
         distinct: Default::default(),

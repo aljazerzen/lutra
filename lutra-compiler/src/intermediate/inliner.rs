@@ -28,8 +28,6 @@ pub fn inline(program: ir::Program) -> ir::Program {
     let mut inliner = VarInliner::new(inliner.binding_usage);
     program.main = inliner.fold_expr(program.main).unwrap();
 
-    tracing::debug!("ir (inlined):\n{}", ir::print(&program));
-
     program
 }
 
@@ -83,33 +81,7 @@ impl fold::IrFold for FuncInliner {
                 *self.binding_usage.entry(*binding_id).or_default() += 1;
 
                 if let Some(func) = self.bindings.get(binding_id) {
-                    // generate args bound to vars
-                    let mut arg_var_ids = Vec::with_capacity(args.len());
-                    let mut arg_pointers = Vec::with_capacity(args.len());
-                    for arg in &args {
-                        let id = self.generator_var_binding.next() as u32;
-                        arg_var_ids.push(id);
-                        arg_pointers.push(ir::Expr {
-                            kind: ir::ExprKind::Pointer(ir::Pointer::Binding(id)),
-                            ty: arg.ty.clone(),
-                        });
-                    }
-
-                    // substitute
-                    tracing::debug!("inlining call to function {} with {arg_var_ids:?}", func.id);
-                    let mut expr = Substituter::run(func.body.clone(), func.id, arg_pointers);
-
-                    // wrap in Bindings
-                    for (id, arg) in std::iter::zip(arg_var_ids, args) {
-                        expr = ir::Expr {
-                            ty: expr.ty.clone(),
-                            kind: ir::ExprKind::Binding(Box::new(ir::Binding {
-                                id,
-                                expr: arg,
-                                main: expr,
-                            })),
-                        }
-                    }
+                    let expr = self.substitute_function(func.clone(), args);
 
                     self.currently_inlining.insert(*binding_id);
                     let expr = self.fold_expr(expr);
@@ -123,7 +95,8 @@ impl fold::IrFold for FuncInliner {
             // calls of lambda functions
             ir::ExprKind::Function(func) => {
                 // substitute
-                let expr = Substituter::run(func.body, func.id, args);
+
+                let expr = self.substitute_function(*func, args);
                 return self.fold_expr(expr);
             }
 
@@ -153,6 +126,39 @@ impl fold::IrFold for FuncInliner {
             *self.binding_usage.entry(*binding_id).or_default() += 1;
         }
         fold::fold_ptr(ptr, ty)
+    }
+}
+
+impl FuncInliner {
+    fn substitute_function(&mut self, func: ir::Function, args: Vec<ir::Expr>) -> ir::Expr {
+        // generate args bound to vars
+        let mut arg_var_ids = Vec::with_capacity(args.len());
+        let mut arg_pointers = Vec::with_capacity(args.len());
+        for arg in &args {
+            let id = self.generator_var_binding.next() as u32;
+            arg_var_ids.push(id);
+            arg_pointers.push(ir::Expr {
+                kind: ir::ExprKind::Pointer(ir::Pointer::Binding(id)),
+                ty: arg.ty.clone(),
+            });
+        }
+
+        // substitute
+        tracing::debug!("inlining call to function {} with {arg_var_ids:?}", func.id);
+        let mut expr = Substituter::run(func.body, func.id, arg_pointers);
+
+        // wrap in Bindings
+        for (id, arg) in std::iter::zip(arg_var_ids, args) {
+            expr = ir::Expr {
+                ty: expr.ty.clone(),
+                kind: ir::ExprKind::Binding(Box::new(ir::Binding {
+                    id,
+                    expr: arg,
+                    main: expr,
+                })),
+            }
+        }
+        expr
     }
 }
 

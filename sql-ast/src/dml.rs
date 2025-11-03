@@ -8,13 +8,10 @@ use alloc::{
 
 use core::fmt::{self, Display};
 
-use crate::{SelectInto, Values};
+use crate::{RelVar, SelectInto, Values};
 
 use super::display_utils::{Indent, SpaceOrNewline, indented_list};
-use super::{
-    Expr, Ident, ObjectName, OrderByExpr, Query, SelectItem, TableWithJoins,
-    display_comma_separated,
-};
+use super::{Expr, Ident, ObjectName, OrderByExpr, Query, SelectItem, display_comma_separated};
 
 /// INSERT statement.
 #[derive(Debug, Clone, PartialEq, PartialOrd, Eq, Ord, Hash)]
@@ -48,7 +45,7 @@ pub struct Delete {
     /// FROM
     pub from: FromTable,
     /// USING (Snowflake, Postgres, MySQL)
-    pub using: Option<Vec<TableWithJoins>>,
+    pub using: Option<Vec<RelVar>>,
     /// WHERE
     pub selection: Option<Expr>,
     /// RETURNING
@@ -113,10 +110,10 @@ impl Display for Delete {
 #[derive(Debug, Clone, PartialEq, PartialOrd, Eq, Ord, Hash)]
 pub enum FromTable {
     /// An explicit `FROM` keyword was specified.
-    WithFromKeyword(Vec<TableWithJoins>),
+    WithFromKeyword(Vec<RelVar>),
     /// BigQuery: `FROM` keyword was omitted.
     /// <https://cloud.google.com/bigquery/docs/reference/standard-sql/dml-syntax#delete_statement>
-    WithoutKeyword(Vec<TableWithJoins>),
+    WithoutKeyword(Vec<RelVar>),
 }
 impl Display for FromTable {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {

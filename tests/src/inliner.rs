@@ -15,16 +15,16 @@ fn inline_00() {
     func main() -> twice([true, true, false])
     "#), @r"
     let main = (func 1 ->
-      let 1 = [
-        true: bool,
-        true: bool,
-        false: bool,
-      ]: [bool];
+      let 2 = [
+        true[90m: bool[0m,
+        true[90m: bool[0m,
+        false[90m: bool[0m,
+      ][90m: [bool][0m;
       (tuple
-        var.1: [bool],
-        var.1: [bool],
-      ): {[bool], [bool]}
-    ): func ({}) -> {[bool], [bool]}
+        var.2[90m: [bool][0m,
+        var.2[90m: [bool][0m,
+      )[90m: {[bool], [bool]}[0m
+    )[90m: func ({}) -> {[bool], [bool]}[0m
     ")
 }
 
@@ -38,12 +38,12 @@ fn inline_01() {
     let main = (func 1 ->
       (tuple
         [
-          true: bool,
-          true: bool,
-          false: bool,
-        ]: [bool],
-      ): {[bool]}
-    ): func ({}) -> {[bool]}
+          true[90m: bool[0m,
+          true[90m: bool[0m,
+          false[90m: bool[0m,
+        ][90m: [bool][0m,
+      )[90m: {[bool]}[0m
+    )[90m: func ({}) -> {[bool]}[0m
     ")
 }
 
@@ -59,40 +59,40 @@ fn inline_02() {
     let main = (func 2 ->
       let 1 = [
         (tuple
-          5: int64,
-          3: int64,
-        ): {int64, int64},
+          5[90m: int64[0m,
+          3[90m: int64[0m,
+        )[90m: {int64, int64}[0m,
         (tuple
-          65: int64,
-          1: int64,
-        ): {int64, int64},
+          65[90m: int64[0m,
+          1[90m: int64[0m,
+        )[90m: {int64, int64}[0m,
         (tuple
-          3: int64,
-          2: int64,
-        ): {int64, int64},
-      ]: [{int64, int64}];
-      let 2 = var.1: [{int64, int64}];
-      let 4 = (call
-        external.std::to_columnar: func ([{int64, int64}]) -> {[int64], [int64]},
-        var.2: [{int64, int64}],
-      ): {[int64], [int64]};
+          3[90m: int64[0m,
+          2[90m: int64[0m,
+        )[90m: {int64, int64}[0m,
+      ][90m: [{int64, int64}][0m;
+      let 3 = var.1[90m: [{int64, int64}][0m;
+      let 5 = (call
+        external.std::to_columnar[90m: func ([{int64, int64}]) -> {[int64], [int64]}[0m,
+        var.3[90m: [{int64, int64}][0m,
+      )[90m: {[int64], [int64]}[0m;
       (tuple
         (call
-          external.std::min: func ([int64]) -> int64,
+          external.std::min[90m: func ([int64]) -> int64[0m,
           (tuple_lookup
-            var.4: {[int64], [int64]}
+            var.5[90m: {[int64], [int64]}[0m
             0
-          ): [int64],
-        ): int64,
+          )[90m: [int64][0m,
+        )[90m: int64[0m,
         (call
-          external.std::min: func ([int64]) -> int64,
+          external.std::min[90m: func ([int64]) -> int64[0m,
           (tuple_lookup
-            var.4: {[int64], [int64]}
+            var.5[90m: {[int64], [int64]}[0m
             1
-          ): [int64],
-        ): int64,
-      ): {int64, int64}
-    ): func ({}) -> {int64, int64}
+          )[90m: [int64][0m,
+        )[90m: int64[0m,
+      )[90m: {int64, int64}[0m
+    )[90m: func ({}) -> {int64, int64}[0m
     ")
 }
 
@@ -114,50 +114,50 @@ fn inline_03() {
     let main = (func 1 ->
       (tuple
         (enum_variant 1
-          "hello": text
-        ): OptText,
-        (enum_variant 0): OptText,
+          "hello"[90m: text[0m
+        )[90m: OptText[0m,
+        (enum_variant 0)[90m: OptText[0m,
         let 2 = (enum_variant 1
-          "hello": text
-        ): OptText;
+          "hello"[90m: text[0m
+        )[90m: OptText[0m;
         (
           switch,
           (
             (enum_eq
-              var.2: enum {None, Some: text}
+              var.2[90m: enum {None, Some: text}[0m
               1
-            ): bool,
-            true: bool,
+            )[90m: bool[0m,
+            true[90m: bool[0m,
           ),
           (
             (enum_eq
-              var.2: enum {None, Some: text}
+              var.2[90m: enum {None, Some: text}[0m
               0
-            ): bool,
-            false: bool,
+            )[90m: bool[0m,
+            false[90m: bool[0m,
           ),
-        ): bool,
+        )[90m: bool[0m,
         let 3 = (enum_variant 1
-          "hello": text
-        ): OptText;
+          "hello"[90m: text[0m
+        )[90m: OptText[0m;
         (
           switch,
           (
             (enum_eq
-              var.3: enum {None, Some: text}
+              var.3[90m: enum {None, Some: text}[0m
               1
-            ): bool,
-            false: bool,
+            )[90m: bool[0m,
+            false[90m: bool[0m,
           ),
           (
             (enum_eq
-              var.3: enum {None, Some: text}
+              var.3[90m: enum {None, Some: text}[0m
               0
-            ): bool,
-            true: bool,
+            )[90m: bool[0m,
+            true[90m: bool[0m,
           ),
-        ): bool,
-      ): {OptText, OptText, bool, bool}
-    ): func ({}) -> {OptText, OptText, bool, bool}
+        )[90m: bool[0m,
+      )[90m: {OptText, OptText, bool, bool}[0m
+    )[90m: func ({}) -> {OptText, OptText, bool, bool}[0m
     "#)
 }

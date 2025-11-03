@@ -243,8 +243,9 @@ impl Printer {
 
         let print_ty = !matches!(expr.kind, ir::ExprKind::Binding(_));
         if print_ty {
-            r += ": ";
+            r += "\x1b[90m: ";
             r += &self.print_ty(&expr.ty);
+            r += "\x1b[0m";
         }
         r
     }

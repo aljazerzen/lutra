@@ -60,6 +60,10 @@ pub fn fold_expr_kind<T: ?Sized + CrFold>(
             Box::new(fold.fold_expr(*expr)?),
         ),
         ExprKind::Union(exprs) => ExprKind::Union(fold_exprs(fold, exprs)?),
+        ExprKind::Iteration(initial, step) => ExprKind::Iteration(
+            Box::new(fold.fold_expr(*initial)?),
+            Box::new(fold.fold_bound_expr(*step)?),
+        ),
     };
     Ok(Expr { kind, ty })
 }
