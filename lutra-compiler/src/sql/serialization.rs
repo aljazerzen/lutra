@@ -1,30 +1,34 @@
 use lutra_bin::ir;
 
 use crate::sql::COL_ARRAY_INDEX;
-use crate::sql::utils::{ExprOrRelVar, RelCols, Scoped};
+use crate::sql::utils::{Node, RelCols};
 use crate::sql::{queries, utils};
 
 impl<'a> queries::Context<'a> {
-    pub(super) fn serialize_json(&mut self, mut scoped: Scoped, ty: &ir::Ty) -> Scoped {
-        let input = self.scoped_as_rel_var(&mut scoped, ty);
+    pub(super) fn serialize_json(&mut self, scoped: Node, ty: &ir::Ty) -> Node {
+        let (input, input_rels) = self.node_into_rel_var(scoped, ty);
 
         let ty_mat = self.get_ty_mat(ty);
-        scoped.expr = match &ty_mat.kind {
+        let expr = match &ty_mat.kind {
             ir::TyKind::Array(ty_item) => {
                 let item_cols: Vec<_> = self.rel_cols_nested(ty_item, "".into()).collect();
-                let item_serialized = self.serialize_json_nested(input, &item_cols, ty_item);
+                let item_serialized = self.serialize_json_nested(&input, &item_cols, ty_item);
 
-                ExprOrRelVar::new(format!(
+                format!(
                     "COALESCE(jsonb_agg({item_serialized} ORDER BY {input}.{COL_ARRAY_INDEX}), '[]'::jsonb)"
-                ))
+                )
             }
             ir::TyKind::Tuple(_) => {
                 let cols: Vec<_> = self.rel_cols_nested(ty_mat, "".into()).collect();
-                ExprOrRelVar::new(self.serialize_json_nested(input, &cols, ty_mat))
+                self.serialize_json_nested(&input, &cols, ty_mat)
             }
             _ => unreachable!("{:?}", ty),
         };
-        scoped
+
+        Node::Column {
+            expr: Box::new(sql_ast::Expr::Source(expr)),
+            rels: input_rels.into_iter().collect(),
+        }
     }
 
     fn serialize_json_nested(&self, input_rel: &str, input_cols: &[String], ty: &ir::Ty) -> String {
@@ -82,26 +86,25 @@ impl<'a> queries::Context<'a> {
         }
     }
 
-    pub(super) fn deserialize_json(&mut self, mut scoped: Scoped, ty: &ir::Ty) -> Scoped {
-        if let Some(simplified) = scoped.as_simplified_expr() {
-            scoped = simplified;
-        }
+    pub(super) fn deserialize_json(&mut self, input: Node, input_ty: &ir::Ty, ty: &ir::Ty) -> Node {
+        let (input_expr, input_rels) = self.node_into_column_and_rels(input, input_ty);
 
-        let query = match &self.get_ty_mat(ty).kind {
+        let mut result = utils::select_empty();
+        result.from.extend(input_rels);
+
+        match &self.get_ty_mat(ty).kind {
             ir::TyKind::Array(ty_item) => {
-                let mut query = utils::select_empty();
-
                 /*
                 FROM json_array_elements(...expr...) j
                 SELECT ROW_NUMBER(), j.value
                 */
-                query.from.push(utils::rel_func(
+                result.from.push(utils::lateral(utils::rel_func(
                     utils::new_ident("jsonb_array_elements"),
-                    vec![scoped.expr.into_expr().unwrap()],
+                    vec![input_expr],
                     Some("j".into()),
-                ));
+                )));
 
-                query.projection = vec![sql_ast::SelectItem {
+                result.projection = vec![sql_ast::SelectItem {
                     expr: sql_ast::Expr::Source("(ROW_NUMBER() OVER ())::int4".into()),
                     alias: Some(utils::new_ident("index")),
                 }];
@@ -110,39 +113,30 @@ impl<'a> queries::Context<'a> {
                 let names = self.rel_cols_nested(ty_item, "".into());
 
                 for (value, name) in std::iter::zip(values, names) {
-                    query.projection.push(sql_ast::SelectItem {
+                    result.projection.push(sql_ast::SelectItem {
                         expr: sql_ast::Expr::Source(value),
                         alias: Some(utils::new_ident(name)),
                     });
                 }
-
-                query
             }
             ir::TyKind::Tuple(_) => todo!(),
             ir::TyKind::Enum(_) => {
-                let mut query = utils::select_empty();
-
-                let json_ref = scoped.expr.into_expr().unwrap().to_string();
+                let json_ref = input_expr.to_string();
 
                 let values = self.deserialize_json_nested(json_ref, ty);
 
                 let names = self.rel_cols_nested(ty, "".into());
                 for (value, name) in std::iter::zip(values, names) {
-                    query.projection.push(sql_ast::SelectItem {
+                    result.projection.push(sql_ast::SelectItem {
                         expr: sql_ast::Expr::Source(value),
                         alias: Some(utils::new_ident(name)),
                     });
                 }
-                query
             }
             _ => unreachable!("{:?}", ty),
         };
-        let rel_var_name = self.rel_name_gen.next();
-        let rel_var = utils::sub_rel(utils::query_select(query), rel_var_name.clone());
 
-        scoped.rel_vars.push(utils::lateral(rel_var));
-        scoped.expr = ExprOrRelVar::RelVar(rel_var_name);
-        scoped
+        Node::Select(result)
     }
 
     /// Given a serialized JSON value, accessible at `json_ref`,

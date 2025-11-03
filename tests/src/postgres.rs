@@ -232,7 +232,7 @@ fn array_prim() {
         const main = [3, 6, 12]: [int16]
     "#, lutra_bin::Value::unit())), @r"
     SELECT
-      r3.value
+      r0.value
     FROM
       (
         SELECT
@@ -248,9 +248,9 @@ fn array_prim() {
         SELECT
           2::int8 AS index,
           12::int2 AS value
-      ) AS r3
+      ) AS r0
     ORDER BY
-      r3.index
+      index
     ---
     [
       3,
@@ -276,7 +276,7 @@ fn array_empty() {
           FALSE
       ) AS r0
     ORDER BY
-      r0.index
+      index
     ---
     []
     ");
@@ -291,10 +291,10 @@ fn array_enum() {
         const main = [Status::Pending, Status::InProgress({"today", "me"}), Status::Done("ok")]
     "#, lutra_bin::Value::unit())), @r#"
     SELECT
-      r3._t,
-      r3._1_0,
-      r3._1_1,
-      r3._2
+      r0._t,
+      r0._1_0,
+      r0._1_1,
+      r0._2
     FROM
       (
         SELECT
@@ -319,9 +319,9 @@ fn array_enum() {
           NULL::text AS _1_0,
           NULL::text AS _1_1,
           'ok' AS _2
-      ) AS r3
+      ) AS r0
     ORDER BY
-      r3.index
+      index
     ---
     [
       Pending,
@@ -352,13 +352,13 @@ fn enum_array() {
           COALESCE(
             jsonb_agg(
               CASE
-                r6._t
+                r1._t
                 WHEN 0 THEN json_build_object('0', jsonb_build_array())
-                WHEN 1 THEN json_build_object('1', r6._1)
-                WHEN 2 THEN json_build_object('2', r6._2)
+                WHEN 1 THEN json_build_object('1', r1._1)
+                WHEN 2 THEN json_build_object('2', r1._2)
               END
               ORDER BY
-                r6.index
+                r1.index
             ),
             '[]'::jsonb
           ) AS value
@@ -378,9 +378,9 @@ fn enum_array() {
                 SELECT
                   COALESCE(
                     jsonb_agg(
-                      r3.value
+                      r0.value
                       ORDER BY
-                        r3.index
+                        r0.index
                     ),
                     '[]'::jsonb
                   ) AS value
@@ -394,7 +394,7 @@ fn enum_array() {
                     SELECT
                       1::int8 AS index,
                       'me' AS value
-                  ) AS r3
+                  ) AS r0
               ) AS _1,
               NULL::text AS _2
             UNION
@@ -404,7 +404,7 @@ fn enum_array() {
               2::int2 AS _t,
               NULL::jsonb AS _1,
               'ok' AS _2
-          ) AS r6
+          ) AS r1
       ) AS _1
     ---
     {
@@ -458,9 +458,9 @@ fn tuple_array_prim() {
         SELECT
           COALESCE(
             jsonb_agg(
-              r3.value
+              r0.value
               ORDER BY
-                r3.index
+                r0.index
             ),
             '[]'::jsonb
           ) AS value
@@ -479,15 +479,15 @@ fn tuple_array_prim() {
             SELECT
               2::int8 AS index,
               3::int8 AS value
-          ) AS r3
+          ) AS r0
       ) AS _1,
       (
         SELECT
           COALESCE(
             jsonb_agg(
-              r5.value
+              r1.value
               ORDER BY
-                r5.index
+                r1.index
             ),
             '[]'::jsonb
           ) AS value
@@ -496,7 +496,7 @@ fn tuple_array_prim() {
             SELECT
               0::int8 AS index,
               4::int4 AS value
-          ) AS r5
+          ) AS r1
       ) AS _2,
       FALSE AS _3
     ---
@@ -533,13 +533,13 @@ fn tuple_array_enum() {
           COALESCE(
             jsonb_agg(
               CASE
-                r3._t
+                r0._t
                 WHEN 0 THEN json_build_object('0', jsonb_build_array())
-                WHEN 1 THEN json_build_object('1', jsonb_build_array(r3._1_0, r3._1_1))
-                WHEN 2 THEN json_build_object('2', r3._2)
+                WHEN 1 THEN json_build_object('1', jsonb_build_array(r0._1_0, r0._1_1))
+                WHEN 2 THEN json_build_object('2', r0._2)
               END
               ORDER BY
-                r3.index
+                r0.index
             ),
             '[]'::jsonb
           ) AS value
@@ -567,7 +567,7 @@ fn tuple_array_enum() {
               NULL::text AS _1_0,
               NULL::text AS _1_1,
               'ok' AS _2
-          ) AS r3
+          ) AS r0
       ) AS _1
     ---
     {
@@ -626,7 +626,7 @@ fn array_array_prim() {
         const main = [[1, 2, 3], [4, 5]]: [[int64]]
     "#, lutra_bin::Value::unit())), @r"
     SELECT
-      r9.value
+      r2.value
     FROM
       (
         SELECT
@@ -635,9 +635,9 @@ fn array_array_prim() {
             SELECT
               COALESCE(
                 jsonb_agg(
-                  r3.value
+                  r0.value
                   ORDER BY
-                    r3.index
+                    r0.index
                 ),
                 '[]'::jsonb
               ) AS value
@@ -656,7 +656,7 @@ fn array_array_prim() {
                 SELECT
                   2::int8 AS index,
                   3::int8 AS value
-              ) AS r3
+              ) AS r0
           ) AS value
         UNION
         ALL
@@ -666,9 +666,9 @@ fn array_array_prim() {
             SELECT
               COALESCE(
                 jsonb_agg(
-                  r7.value
+                  r1.value
                   ORDER BY
-                    r7.index
+                    r1.index
                 ),
                 '[]'::jsonb
               ) AS value
@@ -682,11 +682,11 @@ fn array_array_prim() {
                 SELECT
                   1::int8 AS index,
                   5::int8 AS value
-              ) AS r7
+              ) AS r1
           ) AS value
-      ) AS r9
+      ) AS r2
     ORDER BY
-      r9.index
+      index
     ---
     [
       [
@@ -708,7 +708,7 @@ fn array_array_array_tuple_prim() {
         const main = [[[{1: int32, "hello", 2: int16}]]]
     "#, lutra_bin::Value::unit())), @r#"
     SELECT
-      r5.value
+      r2.value
     FROM
       (
         SELECT
@@ -717,9 +717,9 @@ fn array_array_array_tuple_prim() {
             SELECT
               COALESCE(
                 jsonb_agg(
-                  r3.value
+                  r1.value
                   ORDER BY
-                    r3.index
+                    r1.index
                 ),
                 '[]'::jsonb
               ) AS value
@@ -731,9 +731,9 @@ fn array_array_array_tuple_prim() {
                     SELECT
                       COALESCE(
                         jsonb_agg(
-                          jsonb_build_array(r1._0, r1._1, r1._2)
+                          jsonb_build_array(r0._0, r0._1, r0._2)
                           ORDER BY
-                            r1.index
+                            r0.index
                         ),
                         '[]'::jsonb
                       ) AS value
@@ -744,13 +744,13 @@ fn array_array_array_tuple_prim() {
                           1::int4 AS _0,
                           'hello' AS _1,
                           2::int2 AS _2
-                      ) AS r1
+                      ) AS r0
                   ) AS value
-              ) AS r3
+              ) AS r1
           ) AS value
-      ) AS r5
+      ) AS r2
     ORDER BY
-      r5.index
+      index
     ---
     [
       [
@@ -791,12 +791,12 @@ fn tuple_array_tuple_tuple_prim() {
           COALESCE(
             jsonb_agg(
               jsonb_build_array(
-                r1._0,
-                jsonb_build_array(r1._1_0, r1._1_1, r1._1_2),
-                r1._2
+                r0._0,
+                jsonb_build_array(r0._1_0, r0._1_1, r0._1_2),
+                r0._2
               )
               ORDER BY
-                r1.index
+                r0.index
             ),
             '[]'::jsonb
           ) AS value
@@ -809,7 +809,7 @@ fn tuple_array_tuple_tuple_prim() {
               TRUE AS _1_1,
               2::int2 AS _1_2,
               2::int2 AS _2
-          ) AS r1
+          ) AS r0
       ) AS _1,
       2::int2 AS _2
     ---
@@ -835,10 +835,10 @@ fn tuple_array_tuple_tuple_prim() {
 fn array_tuple_prim() {
     insta::assert_snapshot!(_sql_and_output(_run(r#"
         const main = [{3: int64, false}, {6, true}, {12, false}]
-    "#, lutra_bin::Value::unit())), @r#"
+    "#, lutra_bin::Value::unit())), @r"
     SELECT
-      r3._0,
-      r3._1
+      r0._0,
+      r0._1
     FROM
       (
         SELECT
@@ -857,9 +857,9 @@ fn array_tuple_prim() {
           2::int8 AS index,
           12::int8 AS _0,
           FALSE AS _1
-      ) AS r3
+      ) AS r0
     ORDER BY
-      r3.index
+      index
     ---
     [
       {
@@ -875,7 +875,7 @@ fn array_tuple_prim() {
         false,
       },
     ]
-    "#);
+    ");
 }
 
 #[test]
@@ -892,9 +892,9 @@ fn tuple_array_tuple_prim() {
         SELECT
           COALESCE(
             jsonb_agg(
-              jsonb_build_array(r3._0, r3._1)
+              jsonb_build_array(r0._0, r0._1)
               ORDER BY
-                r3.index
+                r0.index
             ),
             '[]'::jsonb
           ) AS value
@@ -916,7 +916,7 @@ fn tuple_array_tuple_prim() {
               2::int8 AS index,
               12::int2 AS _0,
               FALSE AS _1
-          ) AS r3
+          ) AS r0
       ) AS _1
     ---
     {
@@ -1221,8 +1221,8 @@ fn tuple_unpacking_00() {
 
 #[test]
 fn json_pack_00() {
-    // Having array in a tuple forces it to be packed to JSON.
-    // Applying an operation of that array then forces it to unpack.
+    // Having array in a tuple forces serialization to JSON.
+    // Applying an operation of that array then forces deserialization.
 
     insta::assert_snapshot!(_run(r#"
     func get_data() -> {a = [2, 5, 4, 3, 1, 2]: [int32]}
@@ -1245,8 +1245,8 @@ fn json_pack_00() {
 
 #[test]
 fn json_pack_01() {
-    // Having array in a tuple forces it to be packed to JSON.
-    // Applying an operation of that array then forces it to unpack.
+    // Having array in a tuple forces serialization to JSON.
+    // Applying an operation of that array then forces deserialization.
 
     insta::assert_snapshot!(_run(r#"
     func get_data() -> {a = [{2: int32, false}, {5, true}, {4, false}]}
@@ -1454,9 +1454,9 @@ fn json_pack_10() {
         SELECT
           COALESCE(
             jsonb_agg(
-              r2.value
+              r0.value
               ORDER BY
-                r2.index
+                r0.index
             ),
             '[]'::jsonb
           ) AS value
@@ -1470,7 +1470,7 @@ fn json_pack_10() {
             SELECT
               1::int8 AS index,
               2::int2 AS value
-          ) AS r2
+          ) AS r0
       ) AS _1
     ---
     {
@@ -1493,7 +1493,7 @@ fn if_01() {
     func main() -> if lang == "en" then en else sl
     "#, lutra_bin::Value::unit())), @r#"
     SELECT
-      r14.value
+      r5.value
     FROM
       (
         WITH r0 AS (
@@ -1504,62 +1504,56 @@ fn if_01() {
             END AS value
         )
         SELECT
-          r13.index,
-          r13.value
+          r1.index,
+          r1.value
         FROM
           (
             SELECT
-              r3.index,
-              r3.value
-            FROM
-              (
-                SELECT
-                  0::int8 AS index,
-                  'yes' AS value
-                UNION
-                ALL
-                SELECT
-                  1::int8 AS index,
-                  'no' AS value
-              ) AS r3
-            WHERE
-              (
-                (
-                  SELECT
-                    r5.value AS value
-                  FROM
-                    r0 AS r5
-                ) = 0::int2
-              )
+              0::int8 AS index,
+              'yes' AS value
             UNION
             ALL
             SELECT
-              r9.index,
-              r9.value
-            FROM
-              (
-                SELECT
-                  0::int8 AS index,
-                  'da' AS value
-                UNION
-                ALL
-                SELECT
-                  1::int8 AS index,
-                  'ne' AS value
-              ) AS r9
-            WHERE
-              (
-                (
-                  SELECT
-                    r11.value AS value
-                  FROM
-                    r0 AS r11
-                ) = 1::int2
-              )
-          ) AS r13
-      ) AS r14
+              1::int8 AS index,
+              'no' AS value
+          ) AS r1
+        WHERE
+          (
+            (
+              SELECT
+                r2.value AS value
+              FROM
+                r0 AS r2
+            ) = 0::int2
+          )
+        UNION
+        ALL
+        SELECT
+          r3.index,
+          r3.value
+        FROM
+          (
+            SELECT
+              0::int8 AS index,
+              'da' AS value
+            UNION
+            ALL
+            SELECT
+              1::int8 AS index,
+              'ne' AS value
+          ) AS r3
+        WHERE
+          (
+            (
+              SELECT
+                r4.value AS value
+              FROM
+                r0 AS r4
+            ) = 1::int2
+          )
+      ) AS r5
     ORDER BY
-      r14.index
+      index
     ---
     [
       "da",
@@ -1590,29 +1584,29 @@ fn match_04() {
     )
     "#, lutra_bin::Value::unit())), @r#"
     SELECT
-      r12.value
+      r2.value
     FROM
       (
         SELECT
-          r3.index AS index,
+          r0.index AS index,
           (
             SELECT
               CASE
-                WHEN (r5._t = 0::int2) THEN ('Hello ' || r5._0)
+                WHEN (r1._t = 0::int2) THEN ('Hello ' || r1._0)
                 WHEN (
-                  (r5._t = 1::int2)
-                  AND (r5._1_t = 1::int2)
+                  (r1._t = 1::int2)
+                  AND (r1._1_t = 1::int2)
                 ) THEN 'Who''s a good boy?'
-                ELSE ('Come here ' || r5._1_0)
+                ELSE ('Come here ' || r1._1_0)
               END AS value
             FROM
               (
                 SELECT
-                  r3._t AS _t,
-                  r3._0 AS _0,
-                  r3._1_t AS _1_t,
-                  r3._1_0 AS _1_0
-              ) AS r5
+                  r0._t AS _t,
+                  r0._0 AS _0,
+                  r0._1_t AS _1_t,
+                  r0._1_0 AS _1_0
+              ) AS r1
           ) AS value
         FROM
           (
@@ -1638,10 +1632,10 @@ fn match_04() {
               NULL::text AS _0,
               1::int2 AS _1_t,
               NULL::text AS _1_0
-          ) AS r3
-      ) AS r12
+          ) AS r0
+      ) AS r2
     ORDER BY
-      r12.index
+      index
     ---
     [
       "Hello Whiskers",
@@ -1707,7 +1701,7 @@ async fn sql_from_00() {
           movies
       ) AS r0
     ORDER BY
-      r0.index
+      index
     ---
     [
       {
@@ -1803,8 +1797,8 @@ async fn sql_insert_00() {
     INSERT INTO
       movies (title, release_year)
     SELECT
-      r2._0,
-      r2._1
+      r0._0,
+      r0._1
     FROM
       (
         SELECT
@@ -1817,7 +1811,7 @@ async fn sql_insert_00() {
           1::int8 AS index,
           'Inception' AS _0,
           2010::int2 AS _1
-      ) AS r2
+      ) AS r0
     ---
     {
     }
@@ -1869,14 +1863,17 @@ fn group_00() {
     )
     "#, lutra_bin::Value::unit())), @r"
     SELECT
-      r7._0,
-      r7._1
+      r1._0,
+      r1._1
     FROM
       (
         SELECT
           (ROW_NUMBER() OVER ())::int4 AS index,
-          r6.value AS _0,
-          COALESCE(SUM(r6.value), 0)::int8 AS _1
+          r0.value AS _0,
+          (
+            SELECT
+              COALESCE(SUM(r0.value), 0)::int8 AS value
+          ) AS _1
         FROM
           (
             SELECT
@@ -1907,12 +1904,12 @@ fn group_00() {
             SELECT
               5::int8 AS index,
               3::int8 AS value
-          ) AS r6
+          ) AS r0
         GROUP BY
-          r6.value
-      ) AS r7
+          r0.value
+      ) AS r1
     ORDER BY
-      r7.index
+      index
     ---
     [
       {
@@ -1998,22 +1995,22 @@ fn opt_01() {
     )
     "#, lutra_bin::Value::unit())), @r#"
     SELECT
-      r7.value
+      r2.value
     FROM
       (
         SELECT
-          r3.index AS index,
+          r0.index AS index,
           (
             SELECT
               CASE
-                WHEN r5.value IS NOT NULL THEN r5.value
+                WHEN r1.value IS NOT NULL THEN r1.value
                 ELSE 'none'
               END AS value
             FROM
               (
                 SELECT
-                  r3.value AS value
-              ) AS r5
+                  r0.value AS value
+              ) AS r1
           ) AS value
         FROM
           (
@@ -2030,15 +2027,44 @@ fn opt_01() {
             SELECT
               2::int8 AS index,
               'world' AS value
-          ) AS r3
-      ) AS r7
+          ) AS r0
+      ) AS r2
     ORDER BY
-      r7.index
+      index
     ---
     [
       "hello",
       "none",
       "world",
+    ]
+    "#);
+}
+
+#[test]
+fn from_sql() {
+    insta::assert_snapshot!(_sql_and_output(_run(r#"
+    func main(): [{hello: text, world: bool}] -> (
+      std::sql::expr("select 0 as index, 'a' as _0, TRUE as _1")
+    )
+    "#, lutra_bin::Value::unit())), @r#"
+    SELECT
+      r0._0,
+      r0._1
+    FROM
+      (
+        select
+          0 as index,
+          'a' as _0,
+          TRUE as _1
+      ) AS r0
+    ORDER BY
+      index
+    ---
+    [
+      {
+        hello = "a",
+        world = true,
+      },
     ]
     "#);
 }

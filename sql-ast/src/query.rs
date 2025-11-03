@@ -67,7 +67,7 @@ pub enum SetExpr {
     Insert(Insert),
     Update {
         /// TABLE
-        table: RelVar,
+        table: RelNamed,
         /// Column assignments
         assignments: Vec<Assignment>,
         /// Table which provide value to be set
@@ -84,9 +84,9 @@ pub enum SetExpr {
         /// optional INTO keyword
         into: bool,
         /// Specifies the table to merge
-        table: RelVar,
+        table: RelNamed,
         /// Specifies the table or subquery to join with the target table
-        source: RelVar,
+        source: RelNamed,
         /// Specifies the expression on which to join the target table and source
         on: Box<Expr>,
         /// Specifies the actions to perform when values match or do not match.
@@ -268,7 +268,7 @@ pub struct Select {
     /// INTO
     pub into: Option<SelectInto>,
     /// FROM
-    pub from: Vec<RelVar>,
+    pub from: Vec<RelNamed>,
     /// WHERE
     pub selection: Option<Expr>,
     /// GROUP BY
@@ -489,7 +489,7 @@ impl fmt::Display for ExprWithAlias {
 
 /// A table name or a parenthesized subquery with an optional alias
 #[derive(Debug, Clone, PartialEq, PartialOrd, Eq, Ord, Hash)]
-pub struct RelVar {
+pub struct RelNamed {
     pub lateral: bool,
     pub alias: Option<TableAlias>,
     pub expr: RelExpr,
@@ -530,7 +530,7 @@ pub enum RelExpr {
     /// [BigQuery](https://cloud.google.com/bigquery/docs/reference/standard-sql/query-syntax#pivot_operator)
     /// [Snowflake](https://docs.snowflake.com/en/sql-reference/constructs/pivot)
     Pivot {
-        table: Box<RelVar>,
+        table: Box<RelNamed>,
         aggregate_functions: Vec<ExprWithAlias>, // Function expression
         value_column: Vec<Expr>,
         value_source: PivotValueSource,
@@ -546,7 +546,7 @@ pub enum RelExpr {
     /// See <https://docs.snowflake.com/en/sql-reference/constructs/unpivot>.
     /// See <https://docs.databricks.com/aws/en/sql/language-manual/sql-ref-syntax-qry-select-unpivot>.
     Unpivot {
-        table: Box<RelVar>,
+        table: Box<RelNamed>,
         value: Expr,
         name: Ident,
         columns: Vec<ExprWithAlias>,
@@ -586,7 +586,7 @@ impl fmt::Display for PivotValueSource {
     }
 }
 
-impl fmt::Display for RelVar {
+impl fmt::Display for RelNamed {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         if self.lateral {
             write!(f, "LATERAL ")?;
@@ -728,7 +728,7 @@ impl Display for TableVersion {
 
 #[derive(Debug, Clone, PartialEq, PartialOrd, Eq, Ord, Hash)]
 pub struct Join {
-    pub relation: RelVar,
+    pub relation: RelNamed,
     pub join_operator: JoinOperator,
 }
 
@@ -1103,8 +1103,8 @@ impl fmt::Display for GroupByExpr {
 pub enum UpdateTableFromKind {
     /// Update Statement where the 'FROM' clause is before the 'SET' keyword (Supported by Snowflake)
     /// For Example: `UPDATE FROM t1 SET t1.name='aaa'`
-    BeforeSet(Vec<RelVar>),
+    BeforeSet(Vec<RelNamed>),
     /// Update Statement where the 'FROM' clause is after the 'SET' keyword (Which is the standard way)
     /// For Example: `UPDATE SET t1.name='aaa' FROM t1`
-    AfterSet(Vec<RelVar>),
+    AfterSet(Vec<RelNamed>),
 }

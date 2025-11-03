@@ -8,7 +8,7 @@ use alloc::{
 
 use core::fmt::{self, Display};
 
-use crate::{RelVar, SelectInto, Values};
+use crate::{RelNamed, SelectInto, Values};
 
 use super::display_utils::{Indent, SpaceOrNewline, indented_list};
 use super::{Expr, Ident, ObjectName, OrderByExpr, Query, SelectItem, display_comma_separated};
@@ -45,7 +45,7 @@ pub struct Delete {
     /// FROM
     pub from: FromTable,
     /// USING (Snowflake, Postgres, MySQL)
-    pub using: Option<Vec<RelVar>>,
+    pub using: Option<Vec<RelNamed>>,
     /// WHERE
     pub selection: Option<Expr>,
     /// RETURNING
@@ -110,10 +110,10 @@ impl Display for Delete {
 #[derive(Debug, Clone, PartialEq, PartialOrd, Eq, Ord, Hash)]
 pub enum FromTable {
     /// An explicit `FROM` keyword was specified.
-    WithFromKeyword(Vec<RelVar>),
+    WithFromKeyword(Vec<RelNamed>),
     /// BigQuery: `FROM` keyword was omitted.
     /// <https://cloud.google.com/bigquery/docs/reference/standard-sql/dml-syntax#delete_statement>
-    WithoutKeyword(Vec<RelVar>),
+    WithoutKeyword(Vec<RelNamed>),
 }
 impl Display for FromTable {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {

@@ -29,8 +29,8 @@ pub use self::dml::{Delete, Insert};
 pub use self::query::{
     Cte, CteAsMaterialized, Distinct, ExprWithAlias, GroupByExpr, GroupByWithModifier, Join,
     JoinConstraint, JoinOperator, LateralView, OrderBy, OrderByExpr, OrderByKind, OrderByOptions,
-    PivotValueSource, Query, RelExpr, RelVar, Select, SelectInto, SelectItem, SetExpr, SetOperator,
-    SetQuantifier, TableAlias, TableVersion, Values, With,
+    PivotValueSource, Query, RelExpr, RelNamed, Select, SelectInto, SelectItem, SetExpr,
+    SetOperator, SetQuantifier, TableAlias, TableVersion, Values, With,
 };
 
 pub use self::string::escape as escape_string;

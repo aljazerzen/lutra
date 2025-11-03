@@ -104,7 +104,6 @@ pub fn fold_transform<T: ?Sized + CrFold>(fold: &mut T, transform: Transform) ->
         Transform::ProjectRetain(cols) => Transform::ProjectRetain(cols),
         Transform::ProjectDiscard(cols) => Transform::ProjectDiscard(cols),
         Transform::Aggregate(exprs) => Transform::Aggregate(fold_exprs(fold, exprs)?),
-        Transform::Window(exprs) => Transform::Window(fold_exprs(fold, exprs)?),
         Transform::Limit(expr) => Transform::Limit(Box::new(fold.fold_expr(*expr)?)),
         Transform::Offset(expr) => Transform::Offset(Box::new(fold.fold_expr(*expr)?)),
         Transform::Where(expr) => Transform::Where(Box::new(fold.fold_expr(*expr)?)),

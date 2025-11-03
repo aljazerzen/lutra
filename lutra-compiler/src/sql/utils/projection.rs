@@ -167,7 +167,7 @@ impl<'a> queries::Context<'a> {
 
         // asserts eq values and rel cols
         #[cfg(debug_assertions)]
-        let (values, rel_cols) = {
+        let (values, rel_cols) = if std::env::var("OUT_DIR").is_err() {
             let rel_cols: Vec<_> = rel_cols.collect();
             let values: Vec<_> = values.collect();
 
@@ -177,11 +177,13 @@ impl<'a> queries::Context<'a> {
             assert_eq!(
                 rel_cols.len(),
                 values.len(),
-                "expected columns: {rel_cols:?}, got: {}, ty: {}",
-                super::expr_or_rel_var::ExprDisplay { exprs: &values },
+                "expected columns: {rel_cols:?}, got: {:?}, ty: {}",
+                values,
                 ir::print_ty(ty)
             );
             (values, rel_cols)
+        } else {
+            (values.collect(), rel_cols.collect())
         };
 
         std::iter::zip(values, rel_cols)
@@ -192,17 +194,17 @@ impl<'a> queries::Context<'a> {
             .collect()
     }
 
-    /// Generates an identity (no-op) projection of a relation of type `ty`, from relation variable `rel_var_name`.
+    /// Generates an identity (no-op) projection of a relation of type `ty`, from relation variable `rel_var`.
     /// When `top_level` is set, the projection does not include array index.
     pub fn projection_noop(
         &self,
-        rel_var_name: Option<&str>,
+        rel_var: Option<&str>,
         ty: &ir::Ty,
         include_index: bool,
     ) -> Vec<sql_ast::SelectItem> {
         self.rel_cols(ty, include_index)
             .map(|name| sql_ast::SelectItem {
-                expr: super::identifier(rel_var_name, name),
+                expr: super::identifier(rel_var, name),
                 alias: None,
             })
             .collect()

@@ -16,6 +16,7 @@ pub enum ExprKind {
     From(From),
 
     /// Applies a relational transform.
+    // TODO: combine this into BindCorrelated
     Transform(Box<BoundExpr>, Transform),
 
     /// Computes cartesian product of two relations, filtered by an expression.
@@ -86,7 +87,7 @@ pub enum From {
     SQLSource(String),
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, strum::AsRefStr)]
 pub enum Transform {
     /// Projection that retains columns by position
     ProjectRetain(Vec<usize>),
@@ -95,8 +96,6 @@ pub enum Transform {
     ProjectDiscard(Vec<usize>),
 
     Aggregate(Vec<Expr>),
-
-    Window(Vec<Expr>),
 
     /// Filters by retaining only first N rows
     Limit(Box<Expr>),

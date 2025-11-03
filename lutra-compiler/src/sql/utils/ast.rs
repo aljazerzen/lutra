@@ -4,35 +4,34 @@ use std::sync::OnceLock;
 
 use regex::Regex;
 
-#[track_caller]
-pub fn get_rel_alias(rel: &sql_ast::RelVar) -> &str {
-    rel.alias.as_ref().map(|r| &r.name.value).unwrap()
+pub fn get_rel_alias(rel: &sql_ast::RelNamed) -> Option<&str> {
+    rel.alias.as_ref().map(|r| r.name.value.as_str())
 }
 
-pub fn as_sub_rel(rel: &sql_ast::RelVar) -> Option<&sql_ast::Query> {
+pub fn as_sub_rel(rel: &sql_ast::RelNamed) -> Option<&sql_ast::Query> {
     match &rel.expr {
         sql_ast::RelExpr::Subquery { subquery, .. } => Some(subquery),
         _ => None,
     }
 }
 
-pub fn as_mut_sub_rel(rel: &mut sql_ast::RelVar) -> Option<&mut sql_ast::Query> {
+pub fn as_mut_sub_rel(rel: &mut sql_ast::RelNamed) -> Option<&mut sql_ast::Query> {
     match &mut rel.expr {
         sql_ast::RelExpr::Subquery { subquery, .. } => Some(subquery),
         _ => None,
     }
 }
 
-pub fn new_table(name: sql_ast::ObjectName, alias: Option<String>) -> sql_ast::RelVar {
-    sql_ast::RelVar {
+pub fn new_table(name: sql_ast::ObjectName, alias: Option<String>) -> sql_ast::RelNamed {
+    sql_ast::RelNamed {
         expr: sql_ast::RelExpr::Table { name },
         lateral: false,
         alias: alias.map(new_table_alias),
     }
 }
 
-pub fn sub_rel(query: sql_ast::Query, alias: String) -> sql_ast::RelVar {
-    sql_ast::RelVar {
+pub fn sub_rel(query: sql_ast::Query, alias: String) -> sql_ast::RelNamed {
+    sql_ast::RelNamed {
         lateral: false,
         expr: sql_ast::RelExpr::Subquery {
             subquery: Box::new(query),
@@ -41,7 +40,7 @@ pub fn sub_rel(query: sql_ast::Query, alias: String) -> sql_ast::RelVar {
     }
 }
 
-pub fn lateral(mut relation: sql_ast::RelVar) -> sql_ast::RelVar {
+pub fn lateral(mut relation: sql_ast::RelNamed) -> sql_ast::RelNamed {
     relation.lateral = true;
     relation
 }
@@ -50,8 +49,8 @@ pub fn rel_func(
     name: sql_ast::Ident,
     args: Vec<sql_ast::Expr>,
     alias: Option<String>,
-) -> sql_ast::RelVar {
-    sql_ast::RelVar {
+) -> sql_ast::RelNamed {
+    sql_ast::RelNamed {
         lateral: false,
         expr: sql_ast::RelExpr::Function {
             name: sql_ast::ObjectName(vec![name]),
@@ -67,6 +66,19 @@ pub fn select_empty() -> sql_ast::Select {
         projection: Default::default(),
         into: Default::default(),
         from: Default::default(),
+        selection: Default::default(),
+        group_by: sql_ast::GroupByExpr::Expressions(vec![], vec![]),
+        sort_by: Default::default(),
+        having: Default::default(),
+    }
+}
+
+pub fn select_from(rel: sql_ast::RelNamed) -> sql_ast::Select {
+    sql_ast::Select {
+        distinct: Default::default(),
+        projection: Default::default(),
+        into: Default::default(),
+        from: vec![rel],
         selection: Default::default(),
         group_by: sql_ast::GroupByExpr::Expressions(vec![], vec![]),
         sort_by: Default::default(),
@@ -111,10 +123,6 @@ pub fn query_select(select: sql_ast::Select) -> sql_ast::Query {
 #[track_caller]
 pub fn unwrap_select_item(item: sql_ast::SelectItem) -> sql_ast::Expr {
     item.expr
-}
-
-pub fn new_expr(source: String) -> sql_ast::Expr {
-    sql_ast::Expr::Source(source)
 }
 
 pub fn bool(value: bool) -> sql_ast::Expr {
@@ -196,4 +204,34 @@ pub fn new_table_alias(name: impl Into<String>) -> sql_ast::TableAlias {
         name: new_ident(name),
         columns: vec![],
     }
+}
+
+pub fn new_bin_op(op: &str, args: impl IntoIterator<Item = sql_ast::Expr>) -> sql_ast::Expr {
+    let mut args = args.into_iter();
+    sql_ast::Expr::Source(format!(
+        "({} {op} {})",
+        args.next().unwrap(),
+        args.next().unwrap(),
+    ))
+}
+
+pub fn new_un_op(op: &str, args: impl IntoIterator<Item = sql_ast::Expr>) -> sql_ast::Expr {
+    let mut args = args.into_iter();
+    sql_ast::Expr::Source(format!("({op} {})", args.next().unwrap()))
+}
+
+pub fn new_func_call(
+    func_name: &str,
+    args: impl IntoIterator<Item = sql_ast::Expr>,
+) -> sql_ast::Expr {
+    let mut r = func_name.to_string();
+    r += "(";
+    for (index, arg) in args.into_iter().enumerate() {
+        if index > 0 {
+            r += ", ";
+        }
+        r += &arg.to_string();
+    }
+    r += ")";
+    sql_ast::Expr::Source(r)
 }

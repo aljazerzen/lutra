@@ -859,7 +859,7 @@ impl<'a> Context<'a> {
                         ty: expr.ty.clone(),
                     },
                 ];
-                cr::ExprKind::Transform(array, cr::Transform::Window(row))
+                cr::ExprKind::Transform(array, cr::Transform::Aggregate(row))
             }
 
             "std::to_columnar" => {
