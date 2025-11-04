@@ -18,6 +18,7 @@ pub fn apply_text_edits(text: &str, edits: &[TextEdit]) -> String {
         out += &edit.new_text;
         current_offset = edit.span.end() as usize;
     }
+    out += &text[current_offset..];
     out
 }
 

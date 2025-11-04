@@ -45,7 +45,7 @@ pub struct SourceTree {
     /// Paths are relative to the root.
     pub(crate) sources: HashMap<PathBuf, String>,
 
-    /// Index of source ids to paths. Used to keep [error::Span] lean.
+    /// Index of source ids to paths. Used to keep [crate::codespan::Span] lean.
     pub(crate) source_ids: HashMap<u16, PathBuf>,
 }
 
@@ -89,22 +89,38 @@ impl SourceTree {
         self.source_ids.insert(last_id + 1, path);
     }
 
+    pub fn replace(&mut self, path: &std::path::Path, content: String) -> Option<String> {
+        let Some(source) = self.sources.get_mut(path) else {
+            return None
+        };
+        Some(std::mem::replace(source, content))
+    }
+
+    pub fn get_source_ids(&self) -> impl Iterator<Item = &u16> {
+        self.source_ids.keys()
+    }
     pub fn get_sources(&self) -> impl Iterator<Item = (&PathBuf, &String)> {
         self.sources.iter()
     }
 
     pub fn get_files_paths(&self) -> impl Iterator<Item = PathBuf> {
-        self.sources.keys().map(|path| {
-            if path.as_os_str().is_empty() {
-                self.root.clone()
-            } else {
-                self.root.join(path)
-            }
-        })
+        self.sources.keys().map(|path| self.get_absolute_path(path))
+    }
+
+    pub fn get_absolute_path(&self, path: &std::path::Path) -> PathBuf {
+        if path.as_os_str().is_empty() {
+            self.root.to_path_buf()
+        } else {
+            self.root.join(path)
+        }
     }
 
     pub fn get_path(&self, source_id: u16) -> Option<&std::path::Path> {
         self.source_ids.get(&source_id).map(|x| x.as_path())
+    }
+
+    pub fn get_source(&self, path: &std::path::Path) -> Option<&str> {
+        self.sources.get(path).map(|s| s.as_str())
     }
 }
 
