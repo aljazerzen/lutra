@@ -29,12 +29,18 @@ impl PrintSource for pr::Source {
 
 impl PrintSource for (&pr::ModuleDef, Option<crate::Span>) {
     fn print<'c>(&self, p: &mut Printer<'c>) -> Option<()> {
+        let mut last: Option<&pr::Def> = None;
         for (i, (name, def)) in self.0.defs.iter().enumerate() {
             if i > 0 {
                 p.inject_trivia_inline(def.span.map(|s| s.start()));
 
+                let condensed = matches!(def.kind, pr::DefKind::Import(_))
+                    && last.is_some_and(|l| matches!(l.kind, pr::DefKind::Import(_)));
+
                 p.new_line();
-                p.new_line();
+                if !condensed {
+                    p.new_line();
+                }
             }
 
             if let Some(doc_comment) = &def.doc_comment {
@@ -50,6 +56,8 @@ impl PrintSource for (&pr::ModuleDef, Option<crate::Span>) {
             let named_def: NamedDef = (name.as_str(), def);
 
             print_or_not(&named_def, p);
+
+            last = Some(def);
         }
 
         p.inject_trivia_inline(self.1.map(|s| s.end()));

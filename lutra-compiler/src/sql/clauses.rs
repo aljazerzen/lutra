@@ -192,12 +192,11 @@ impl<'a> Context<'a> {
                 {
                     return self.compile_rel_std(expr);
                 }
+                ir::ExprKind::Pointer(ir::Pointer::External(ptr)) => {
+                    panic!("Function {} is not implemented", ptr.id)
+                }
                 ir::ExprKind::Pointer(_) => todo!(),
                 ir::ExprKind::Call(_) => todo!(),
-                ir::ExprKind::Function(func) if call.args.is_empty() => {
-                    // shortcut: `(call (func -> x))` is equivalent to just `x`
-                    return self.compile_rel(&func.body);
-                }
                 ir::ExprKind::Function(_) => todo!(),
 
                 ir::ExprKind::TupleLookup(_) => todo!(),

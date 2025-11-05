@@ -14,22 +14,19 @@ pub enum Literal {
 impl std::fmt::Display for Literal {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Literal::Integer(i) => write!(f, "{i}")?,
-            Literal::Float(i) => write!(f, "{i}")?,
+            Literal::Integer(i) => write!(f, "{i}"),
+            Literal::Float(n) => std::fmt::Debug::fmt(n, f),
 
             Literal::Text(s) => {
-                write!(f, "{}", quote_string(escape_all_except_quotes(s).as_str()))?;
+                write!(f, "{}", quote_string(escape_all_except_quotes(s).as_str()))
             }
 
-            Literal::Boolean(b) => {
-                f.write_str(if *b { "true" } else { "false" })?;
-            }
+            Literal::Boolean(b) => f.write_str(if *b { "true" } else { "false" }),
 
             Literal::Date(inner) | Literal::Time(inner) | Literal::Timestamp(inner) => {
-                write!(f, "@{inner}")?;
+                write!(f, "@{inner}")
             }
         }
-        Ok(())
     }
 }
 
@@ -67,4 +64,19 @@ pub fn escape_all_except_quotes(s: &str) -> String {
         }
     }
     result
+}
+
+#[test]
+#[cfg(test)]
+fn test_display_literal() {
+    assert_eq!(
+        Literal::Integer(i64::MAX).to_string(),
+        "9223372036854775807"
+    );
+    assert_eq!(
+        Literal::Integer(i64::MIN).to_string(),
+        "-9223372036854775808"
+    );
+    assert_eq!(Literal::Float(10.00000).to_string(), "10.0");
+    assert_eq!(Literal::Float(004.0232323).to_string(), "4.0232323");
 }
