@@ -13,7 +13,7 @@ impl PrintSource for pr::Expr {
                 base.print(p)?;
                 p.push(".")?;
                 match lookup {
-                    pr::Lookup::Name(n) => p.push(n)?,
+                    pr::Lookup::Name(n) => p.push(pr::display_ident(n))?,
                     pr::Lookup::Position(i) => p.push(i.to_string())?,
                 }
             }

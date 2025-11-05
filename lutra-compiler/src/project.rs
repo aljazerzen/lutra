@@ -1,5 +1,5 @@
 use std::collections::HashMap;
-use std::path::PathBuf;
+use std::path;
 use std::str::FromStr;
 
 use itertools::Itertools;
@@ -39,14 +39,14 @@ pub struct Dependency {
 #[derive(Debug, Clone)]
 pub struct SourceTree {
     /// Path to the root of the source tree.
-    pub root: PathBuf,
+    pub root: path::PathBuf,
 
     /// Mapping from file paths into into their contents.
     /// Paths are relative to the root.
-    pub(crate) sources: HashMap<PathBuf, String>,
+    pub(crate) sources: HashMap<path::PathBuf, String>,
 
     /// Index of source ids to paths. Used to keep [crate::codespan::Span] lean.
-    pub(crate) source_ids: HashMap<u16, PathBuf>,
+    pub(crate) source_ids: HashMap<u16, path::PathBuf>,
 }
 
 impl SourceTree {
@@ -54,21 +54,21 @@ impl SourceTree {
         SourceTree {
             sources: Default::default(),
             source_ids: Default::default(),
-            root: PathBuf::new(),
+            root: path::PathBuf::new(),
         }
     }
 
-    pub fn single(path: PathBuf, content: String) -> Self {
+    pub fn single(path: path::PathBuf, content: String) -> Self {
         SourceTree {
             sources: [(path.clone(), content)].into(),
             source_ids: [(1, path)].into(),
-            root: PathBuf::new(),
+            root: path::PathBuf::new(),
         }
     }
 
-    pub fn new<I>(iter: I, root: PathBuf) -> Self
+    pub fn new<I>(iter: I, root: path::PathBuf) -> Self
     where
-        I: IntoIterator<Item = (PathBuf, String)>,
+        I: IntoIterator<Item = (path::PathBuf, String)>,
     {
         let mut res = SourceTree {
             sources: HashMap::new(),
@@ -83,31 +83,29 @@ impl SourceTree {
         res
     }
 
-    pub fn insert(&mut self, path: PathBuf, content: String) {
+    pub fn insert(&mut self, path: path::PathBuf, content: String) {
         let last_id = self.source_ids.keys().max().cloned().unwrap_or(0);
         self.sources.insert(path.clone(), content);
         self.source_ids.insert(last_id + 1, path);
     }
 
-    pub fn replace(&mut self, path: &std::path::Path, content: String) -> Option<String> {
-        let Some(source) = self.sources.get_mut(path) else {
-            return None
-        };
+    pub fn replace(&mut self, path: &path::Path, content: String) -> Option<String> {
+        let source = self.sources.get_mut(path)?;
         Some(std::mem::replace(source, content))
     }
 
     pub fn get_source_ids(&self) -> impl Iterator<Item = &u16> {
         self.source_ids.keys()
     }
-    pub fn get_sources(&self) -> impl Iterator<Item = (&PathBuf, &String)> {
+    pub fn get_sources(&self) -> impl Iterator<Item = (&path::PathBuf, &String)> {
         self.sources.iter()
     }
 
-    pub fn get_files_paths(&self) -> impl Iterator<Item = PathBuf> {
+    pub fn get_files_paths(&self) -> impl Iterator<Item = path::PathBuf> {
         self.sources.keys().map(|path| self.get_absolute_path(path))
     }
 
-    pub fn get_absolute_path(&self, path: &std::path::Path) -> PathBuf {
+    pub fn get_absolute_path(&self, path: &path::Path) -> path::PathBuf {
         if path.as_os_str().is_empty() {
             self.root.to_path_buf()
         } else {
@@ -115,11 +113,18 @@ impl SourceTree {
         }
     }
 
-    pub fn get_path(&self, source_id: u16) -> Option<&std::path::Path> {
+    pub fn get_relative_path<'a>(
+        &self,
+        path: &'a path::Path,
+    ) -> Result<&'a path::Path, path::StripPrefixError> {
+        path.strip_prefix(&self.root)
+    }
+
+    pub fn get_path(&self, source_id: u16) -> Option<&path::Path> {
         self.source_ids.get(&source_id).map(|x| x.as_path())
     }
 
-    pub fn get_source(&self, path: &std::path::Path) -> Option<&str> {
+    pub fn get_source(&self, path: &path::Path) -> Option<&str> {
         self.sources.get(path).map(|s| s.as_str())
     }
 }
@@ -142,7 +147,7 @@ impl std::fmt::Display for SourceTree {
 pub struct SourceOverlay<'a> {
     tree: &'a SourceTree,
 
-    snippet_path: std::path::PathBuf,
+    snippet_path: path::PathBuf,
     snippet: &'a str,
 }
 
@@ -152,30 +157,30 @@ impl<'a> SourceOverlay<'a> {
             tree,
             snippet,
             snippet_path: snippet_path
-                .map(|s| std::path::PathBuf::from_str(s).unwrap())
+                .map(|s| path::PathBuf::from_str(s).unwrap())
                 .unwrap_or_default(),
         }
     }
 }
 
 pub(crate) trait SourceProvider {
-    fn get_path(&self, id: u16) -> Option<&std::path::Path>;
+    fn get_path(&self, id: u16) -> Option<&path::Path>;
 
-    fn get_source(&self, path: &std::path::Path) -> Option<&str>;
+    fn get_source(&self, path: &path::Path) -> Option<&str>;
 }
 
 impl SourceProvider for SourceTree {
-    fn get_path(&self, id: u16) -> Option<&std::path::Path> {
+    fn get_path(&self, id: u16) -> Option<&path::Path> {
         self.source_ids.get(&id).map(|x| x.as_path())
     }
 
-    fn get_source(&self, path: &std::path::Path) -> Option<&str> {
+    fn get_source(&self, path: &path::Path) -> Option<&str> {
         self.sources.get(path).map(|x| x.as_str())
     }
 }
 
 impl<'a> SourceProvider for SourceOverlay<'a> {
-    fn get_path(&self, id: u16) -> Option<&std::path::Path> {
+    fn get_path(&self, id: u16) -> Option<&path::Path> {
         if id == 0 {
             Some(self.snippet_path.as_path())
         } else {
@@ -183,7 +188,7 @@ impl<'a> SourceProvider for SourceOverlay<'a> {
         }
     }
 
-    fn get_source(&self, path: &std::path::Path) -> Option<&str> {
+    fn get_source(&self, path: &path::Path) -> Option<&str> {
         if path == self.snippet_path {
             Some(self.snippet)
         } else {

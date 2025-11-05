@@ -186,15 +186,23 @@ impl Backend {
 
         // update source tree
         {
+            let r_path = project_lock.source_tree.get_relative_path(&path).unwrap();
             let documents_lock = self.documents.lock().await;
             if let Some(doc) = documents_lock.get(&uri) {
-                project_lock.source_tree.replace(&path, doc.text.clone());
+                let r = project_lock.source_tree.replace(r_path, doc.text.clone());
+                assert!(r.is_some());
             }
         }
 
         // check
         self.client
-            .log_message(MessageType::INFO, "checking project..")
+            .log_message(
+                MessageType::INFO,
+                format!(
+                    "checking project: {}",
+                    debug_project_paths(&project_lock.source_tree)
+                ),
+            )
             .await;
         let res = lutra_compiler::check(project_lock.source_tree.clone(), Default::default());
         let diagnostics = match res {
@@ -234,7 +242,7 @@ impl Backend {
             let uri = source_id_to_uri(&project_lock.source_tree, source_id);
 
             let doc = documents_lock.get(&uri);
-            let version = doc.map(|d| d.version.clone());
+            let version = doc.map(|d| d.version);
 
             let diags = diagnostics.into_iter().map(to_proto::diagnostic).collect();
             self.client.publish_diagnostics(uri, diags, version).await;
@@ -247,7 +255,11 @@ impl Backend {
         for p in projects.iter() {
             let p_lock = p.lock().await;
 
-            if p_lock.source_tree.get_source(path).is_some() {
+            let Ok(r_path) = p_lock.source_tree.get_relative_path(path) else {
+                continue;
+            };
+
+            if p_lock.source_tree.get_source(r_path).is_some() {
                 return Some(Arc::clone(p));
             }
         }
@@ -286,14 +298,25 @@ impl Backend {
             for source_id in source_ids {
                 let uri = source_id_to_uri(&source_tree, &source_id);
                 if let Some(doc) = documents_lock.get(&uri) {
+                    self.client
+                        .log_message(MessageType::INFO, format!("overlaying doc: {}", *doc.uri))
+                        .await;
+
                     let path = source_tree.get_path(source_id).unwrap().to_path_buf();
                     source_tree.replace(&path, doc.text.clone());
                 }
             }
         }
 
+        self.client
+            .log_message(
+                MessageType::INFO,
+                format!("discovered project: {}", debug_project_paths(&source_tree)),
+            )
+            .await;
+
         let project = Arc::new(Mutex::new(Project {
-            source_tree: source_tree,
+            source_tree,
             source_id_to_uri: Default::default(),
             checked: None,
         }));
@@ -303,6 +326,14 @@ impl Backend {
 
         Some(project)
     }
+}
+
+fn debug_project_paths(source_tree: &SourceTree) -> String {
+    let paths_debug: Vec<_> = source_tree
+        .get_sources()
+        .map(|(p, _)| p.display().to_string())
+        .collect();
+    paths_debug.join(", ")
 }
 
 fn source_id_to_uri(source_tree: &SourceTree, source_id: &u16) -> Uri {
@@ -331,7 +362,7 @@ fn apply_changes(text: &mut String, changes: Vec<TextDocumentContentChangeEvent>
     // have to keep our line index updated.
     // Some clients (e.g. Code) sort the ranges in reverse. As an optimization, we
     // remember the last valid line in the index and only rebuild it if needed.
-    let mut line_numbers = codespan::LineNumbers::new(&text);
+    let mut line_numbers = codespan::LineNumbers::new(text);
     let mut index_valid = u32::MAX;
 
     for change in changes {
@@ -339,7 +370,7 @@ fn apply_changes(text: &mut String, changes: Vec<TextDocumentContentChangeEvent>
         let span = line_numbers.span_of_range(&range, 0);
 
         if range.end.line >= index_valid {
-            line_numbers = codespan::LineNumbers::new(&text);
+            line_numbers = codespan::LineNumbers::new(text);
         }
         index_valid = range.start.line;
 

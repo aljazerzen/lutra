@@ -152,10 +152,10 @@ fn display_path(ident: &Path) -> String {
 
 pub fn display_ident(s: &str) -> std::borrow::Cow<'_, str> {
     fn forbidden_start(c: char) -> bool {
-        !(c.is_ascii() || matches!(c, '_' | '$'))
+        !matches!(c, 'A'..='Z' | 'a'..='z' | '_')
     }
     fn forbidden_subsequent(c: char) -> bool {
-        !(c.is_ascii() || c.is_ascii_digit() || matches!(c, '_'))
+        !matches!(c, 'A'..='Z' | 'a'..='z' | '0'..='9' | '_')
     }
     let needs_escape = s.is_empty()
         || s.starts_with(forbidden_start)
@@ -166,4 +166,12 @@ pub fn display_ident(s: &str) -> std::borrow::Cow<'_, str> {
     } else {
         s.into()
     }
+}
+
+#[test]
+#[cfg(test)]
+fn test_display_ident() {
+    assert_eq!(display_ident("Key"), "Key");
+    assert_eq!(display_ident("Key No"), "`Key No`");
+    assert_eq!(display_ident("#"), "`#`");
 }

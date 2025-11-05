@@ -176,10 +176,14 @@ fn lexer() -> impl Parser<char, Vec<Token>, Error = LError> {
     .recover_with(skip_then_retry_until([]).skip_start())
     .map_with_span(|kind, span| Token { kind, span });
 
-    token
+    let tokens = token
         .separated_by(inline_whitespace())
         .allow_leading()
-        .allow_trailing()
+        .allow_trailing();
+
+    just('\u{feff}')
+        .or_not()
+        .ignore_then(tokens)
         .then_ignore(end())
 }
 
