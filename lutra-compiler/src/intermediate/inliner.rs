@@ -45,11 +45,15 @@ struct FuncInliner {
 
 impl fold::IrFold for FuncInliner {
     fn fold_binding(&mut self, binding: ir::Binding, ty: ir::Ty) -> Result<ir::Expr, ()> {
-        // bindings of type function
+        // bindings of the function type
         if binding.expr.ty.kind.is_function() {
             match binding.expr.kind {
                 // that are function definitions
                 ir::ExprKind::Function(func) => {
+                    // fold the function
+                    let func = self.fold_func(*func, binding.expr.ty)?;
+                    let func = func.kind.into_function().unwrap();
+
                     // store in self.bindings
                     self.bindings.insert(binding.id, *func);
 
