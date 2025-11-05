@@ -78,21 +78,21 @@ fn inline_02() {
       )[90m: {[int64], [int64]}[0m;
       (tuple
         (call
-          external.std::min[90m: func ([int64]) -> int64[0m,
+          external.std::min[90m: func ([int64]) -> enum {None, Some: int64}[0m,
           (tuple_lookup
             var.5[90m: {[int64], [int64]}[0m
             0
           )[90m: [int64][0m,
-        )[90m: int64[0m,
+        )[90m: enum {None, Some: int64}[0m,
         (call
-          external.std::min[90m: func ([int64]) -> int64[0m,
+          external.std::min[90m: func ([int64]) -> enum {None, Some: int64}[0m,
           (tuple_lookup
             var.5[90m: {[int64], [int64]}[0m
             1
           )[90m: [int64][0m,
-        )[90m: int64[0m,
-      )[90m: {int64, int64}[0m
-    )[90m: func ({}) -> {int64, int64}[0m
+        )[90m: enum {None, Some: int64}[0m,
+      )[90m: {enum {None, Some: int64}, enum {None, Some: int64}}[0m
+    )[90m: func ({}) -> {enum {None, Some: int64}, enum {None, Some: int64}}[0m
     ")
 }
 

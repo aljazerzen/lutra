@@ -240,9 +240,11 @@ where I, A
 
 # Aggregation functions
 
-func min(column: [int64]): int64
+func min(inputs: [T]): enum {None, Some: T}
+where T: number
 
-func max(column: [int64]): int64
+func max(inputs: [T]): enum {None, Some: T}
+where T: number
 
 func sum(column: [int64]): int64
 

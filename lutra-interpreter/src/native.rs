@@ -4,7 +4,7 @@ use crate::interpreter::{Cell, Interpreter};
 use crate::{Data, NativeModule};
 
 macro_rules! reduce_func {
-    ($name: ident, $item_decode: path, $reduce: expr, $default: literal) => {
+    ($name: ident, $item_decode: path, $reduce: expr, $finalize: path) => {
         pub fn $name(
             _: &mut Interpreter,
             layout_args: &[u32],
@@ -13,10 +13,9 @@ macro_rules! reduce_func {
             let [array] = assume::exactly_n(args);
             let array = assume::array(array, layout_args[0]);
 
-            let res = array
-                .map(|x| $item_decode(&x))
-                .reduce($reduce)
-                .unwrap_or($default);
+            let res = array.map(|x| $item_decode(&x)).reduce($reduce);
+
+            let res = $finalize(res);
 
             Ok(Cell::Data(encode(&res)))
         }
@@ -679,11 +678,21 @@ pub mod std {
             Ok(Cell::Data(outputs.finish()))
         }
 
-        reduce_func!(min, decode::int, |a, b| if a < b { a } else { b }, 0);
+        reduce_func!(
+            min,
+            decode::int,
+            |a, b| if a < b { a } else { b },
+            core::convert::identity
+        );
 
-        reduce_func!(max, decode::int, |a, b| if a > b { a } else { b }, 0);
+        reduce_func!(
+            max,
+            decode::int,
+            |a, b| if a > b { a } else { b },
+            core::convert::identity
+        );
 
-        reduce_func!(sum, decode::int, |a, b| a + b, 0);
+        reduce_func!(sum, decode::int, |a, b| a + b, Option::unwrap_or_default);
 
         pub fn count(
             _it: &mut Interpreter,
