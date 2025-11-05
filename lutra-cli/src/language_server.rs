@@ -1,9 +1,9 @@
 use lutra_compiler::DiscoverParams;
 use std::collections::HashMap;
 use std::path;
-use std::str::FromStr;
 use std::sync::Arc;
 use tokio::sync::{Mutex, RwLock};
+use tower_lsp_server::UriExt;
 use tower_lsp_server::jsonrpc::Result;
 use tower_lsp_server::lsp_types::*;
 
@@ -341,7 +341,7 @@ fn source_id_to_uri(source_tree: &SourceTree, source_id: &u16) -> Uri {
 
     let path = source_tree.get_path(*source_id).unwrap();
     let path = source_tree.get_absolute_path(path);
-    Uri::from_str(&format!("file://{}", path.to_str().unwrap())).unwrap()
+    Uri::from_file_path(path).unwrap()
 }
 
 fn document_to_source_tree(doc: TextDocumentItem) -> SourceTree {
@@ -367,12 +367,12 @@ fn apply_changes(text: &mut String, changes: Vec<TextDocumentContentChangeEvent>
 
     for change in changes {
         let range = from_proto::range(change.range.as_ref().unwrap());
-        let span = line_numbers.span_of_range(&range, 0);
-
         if range.end.line >= index_valid {
             line_numbers = codespan::LineNumbers::new(text);
         }
         index_valid = range.start.line;
+
+        let span = line_numbers.span_of_range(&range, 0);
 
         *text = codespan::apply_text_edits(
             text,
@@ -382,6 +382,7 @@ fn apply_changes(text: &mut String, changes: Vec<TextDocumentContentChangeEvent>
             }],
         );
     }
+    dbg!(text);
 }
 
 mod to_proto {
@@ -427,13 +428,11 @@ mod to_proto {
 }
 
 mod from_proto {
-    use std::str::FromStr;
-
     use lutra_compiler::codespan;
-    use tower_lsp_server::lsp_types::*;
+    use tower_lsp_server::{UriExt, lsp_types::*};
 
     pub fn path(uri: &Uri) -> std::path::PathBuf {
-        std::path::PathBuf::from_str(uri.path().as_str()).unwrap()
+        uri.to_file_path().unwrap().into_owned()
     }
     pub fn range(r: &Range) -> codespan::Range {
         codespan::Range {

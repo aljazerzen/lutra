@@ -14,9 +14,12 @@ pub fn apply_text_edits(text: &str, edits: &[TextEdit]) -> String {
             "[TextEdit]s are not ordered"
         );
 
-        out += &text[current_offset..edit.span.start as usize];
+        let start = (edit.span.start as usize).min(text.len());
+        let end = (edit.span.end() as usize).min(text.len());
+
+        out += &text[current_offset..start];
         out += &edit.new_text;
-        current_offset = edit.span.end() as usize;
+        current_offset = end;
     }
     out += &text[current_offset..];
     out
