@@ -14,7 +14,7 @@ pub struct Def {
 
     pub annotations: Vec<Annotation>,
 
-    pub doc_comment: Option<String>,
+    pub doc_comment: Option<DocComment>,
 }
 
 #[derive(Debug, EnumAsInner, PartialEq, Clone)]
@@ -56,6 +56,12 @@ pub struct ImportDef {
 #[derive(Debug, Clone, PartialEq)]
 pub struct Annotation {
     pub expr: Box<Expr>,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct DocComment {
+    pub content: String,
+    pub span: Span,
 }
 
 impl Def {

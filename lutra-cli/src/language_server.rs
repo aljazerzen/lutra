@@ -382,7 +382,6 @@ fn apply_changes(text: &mut String, changes: Vec<TextDocumentContentChangeEvent>
             }],
         );
     }
-    dbg!(text);
 }
 
 mod to_proto {

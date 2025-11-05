@@ -273,10 +273,13 @@ fn trivia_02() {
     ]
     "#), @r"
     const x = [
+
       # first
+
       1,
 
       # second
+
       2,
     ]
     "
@@ -336,6 +339,7 @@ fn trivia_05() {
       const x = 4 # inline
 
       # leading sub 2
+
       const y = 4 # inline 2
 
       # trailing sub
@@ -346,11 +350,14 @@ fn trivia_05() {
 
     "#), @r"
     # leading
+
     module db {
       # leading sub
+
       const x = 4 # inline
 
       # leading sub 2
+
       const y = 4 # inline 2
 
       # trailing sub
@@ -377,6 +384,7 @@ fn trivia_06() {
     }       # inline x
     "#), @r"
     const x = {
+
       # leading a
       a = {
         # leading b
@@ -444,6 +452,52 @@ fn trivia_08() {
 
       # TODO: add a few others
     }
+    ");
+}
+
+#[test]
+fn trivia_09() {
+    assert_snapshot!(_format(r#"
+    ## A doc comment
+    const a = true # trailing
+    # one
+
+    # two
+
+    # three
+    ## B doc comment
+    # four
+    const b = true # trailing
+    # five
+ "#), @r"
+    ## A doc comment
+    const a = true # trailing
+
+    # one
+
+    # two
+
+    # three
+    ## B doc comment
+    # four
+    const b = true # trailing
+
+    # five
+    ");
+}
+
+#[test]
+fn trivia_10() {
+    assert_snapshot!(_format(r#"
+# Utils
+
+func default(): T
+where T
+ "#), @r"
+    # Utils
+
+    func default(): T
+    where T
     ");
 }
 

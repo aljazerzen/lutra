@@ -245,16 +245,14 @@ impl<'c> Printer<'c> {
         self.consume(self.pending_suffix as usize)?;
         self.pending_suffix = 0;
 
-        if let Some(span) = span {
-            self.validate_no_comments(span.end())?;
-        }
+        self.validate_no_comments(span.map(|s| s.end()))?;
         Some(())
     }
 
     fn take_trivia(&mut self, until: u32) -> Option<&'c Token> {
         let trivia = self.trivia.as_mut()?;
 
-        let t = trivia.first().filter(|t| t.span.end() < until)?;
+        let t = trivia.first().filter(|t| t.span.end() <= until)?;
 
         *trivia = &trivia[1..];
         Some(t)
@@ -263,7 +261,7 @@ impl<'c> Printer<'c> {
     fn take_trivia_comment(&mut self, until: u32) -> Option<&'c str> {
         let trivia = self.trivia.as_mut()?;
 
-        let t = trivia.first().filter(|t| t.span.end() < until)?;
+        let t = trivia.first().filter(|t| t.span.end() <= until)?;
 
         let TokenKind::Comment(s) = &t.kind else {
             return None;
@@ -272,27 +270,37 @@ impl<'c> Printer<'c> {
         Some(s)
     }
 
-    fn inject_trivia_leading(&mut self, until: Option<u32>, empty_line: bool) {
+    fn take_trivia_new_line(&mut self, until: u32) -> Option<()> {
+        let trivia = self.trivia.as_mut()?;
+
+        let t = trivia.first().filter(|t| t.span.end() <= until)?;
+
+        let TokenKind::NewLine = &t.kind else {
+            return None;
+        };
+        *trivia = &trivia[1..];
+        Some(())
+    }
+
+    fn inject_trivia_leading(&mut self, until: Option<u32>) {
         let Some(until) = until else { return };
 
-        let mut had_comment = false;
         let mut nl_count = 0;
 
         while let Some(trivia) = self.take_trivia(until) {
             match &trivia.kind {
-                TokenKind::NewLine if !had_comment => {
-                    // print empty lines (only before comments)
+                TokenKind::NewLine => {
+                    // print double empty lines
                     nl_count += 1;
-                    if empty_line && nl_count == 2 {
+                    if nl_count == 2 {
                         self.new_line();
                     }
                 }
-                TokenKind::NewLine if !had_comment => {}
                 TokenKind::Comment(comment) => {
                     self.push_unchecked("# ");
                     self.push_unchecked(comment);
                     self.new_line();
-                    had_comment = true;
+                    nl_count = 0;
                 }
 
                 _ => (),
@@ -300,7 +308,7 @@ impl<'c> Printer<'c> {
         }
     }
 
-    fn inject_trivia_inline(&mut self, until: Option<u32>) {
+    fn inject_trivia_prev_inline(&mut self, until: Option<u32>) {
         let Some(until) = until else { return };
 
         while let Some(comment) = self.take_trivia_comment(until) {
@@ -312,24 +320,28 @@ impl<'c> Printer<'c> {
     fn inject_trivia_trailing(&mut self, until: Option<u32>) {
         let Some(until) = until else { return };
 
-        let mut had_new_line = false;
+        let mut had_empty_line = false;
         while let Some(token) = self.take_trivia(until) {
             let TokenKind::Comment(comment) = &token.kind else {
                 continue;
             };
 
-            if !had_new_line {
-                self.new_line();
-                had_new_line = true;
-            }
             self.new_line();
+            if !had_empty_line {
+                self.new_line();
+                had_empty_line = true;
+            }
 
             self.push_unchecked("# ");
             self.push_unchecked(comment);
         }
     }
 
-    fn validate_no_comments(&mut self, until: u32) -> Option<()> {
+    fn validate_no_comments(&mut self, until: Option<u32>) -> Option<()> {
+        let Some(until) = until else {
+            return Some(());
+        };
+
         while let Some(trivia) = self.take_trivia(until) {
             if let TokenKind::Comment(comment) = &trivia.kind {
                 return None;

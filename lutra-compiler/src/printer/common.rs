@@ -33,11 +33,11 @@ impl<'a, N: PrintSource> PrintSource for Separated<'a, N> {
         let suffix_width = self.sep_line_end.chars().count() as u16;
         for (i, node) in self.nodes.iter().enumerate() {
             if i > 0 {
-                p.inject_trivia_inline(node.span().map(|s| s.start));
+                p.inject_trivia_prev_inline(node.span().map(|s| s.start));
 
                 p.new_line();
 
-                p.inject_trivia_leading(node.span().map(|s| s.start), true);
+                p.inject_trivia_leading(node.span().map(|s| s.start));
             }
 
             p.pending_suffix += suffix_width;
@@ -111,18 +111,21 @@ impl<'a, N: PrintSource> PrintSource for Between<'a, N> {
         tracing::trace!("try separate line");
 
         // separate line
+        p.validate_no_comments(self.span.map(|s| s.start));
         p.push(self.prefix)?;
 
         p.indent();
         p.new_line();
-        p.inject_trivia_leading(self.node.span().map(|s| s.start), false);
+        p.inject_trivia_leading(self.node.span().map(|s| s.start));
 
         p.pending_suffix += self.suffix.chars().count() as u16;
         self.node.print(p)?;
 
-        p.inject_trivia_inline(self.span().map(|s| s.end()));
+        p.inject_trivia_prev_inline(self.span().map(|s| s.end()));
 
         p.inject_trivia_trailing(self.span().map(|s| s.end()));
+
+        p.validate_no_comments(self.span.map(|s| s.end()));
 
         p.dedent();
         p.new_line();

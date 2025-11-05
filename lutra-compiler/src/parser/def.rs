@@ -85,14 +85,17 @@ fn into_def(kind: DefKind, span: Span) -> Def {
     }
 }
 
-fn doc_comment() -> impl Parser<TokenKind, String, Error = PError> + Clone {
+fn doc_comment() -> impl Parser<TokenKind, DocComment, Error = PError> + Clone {
     select! {
         TokenKind::DocComment(text) => text,
     }
     .repeated()
     .at_least(1)
     .collect()
-    .map(|lines: Vec<String>| lines.join("\n"))
+    .map_with_span(|lines: Vec<String>, span| DocComment {
+        content: lines.join("\n"),
+        span,
+    })
     .labelled("doc comment")
 }
 
@@ -216,7 +219,10 @@ mod tests {
 
         "#, doc_comment()), @r#"
         Ok(
-            "doc comment\nanother line",
+            DocComment {
+                content: "doc comment\nanother line",
+                span: 0:9-47,
+            },
         )
         "#);
     }

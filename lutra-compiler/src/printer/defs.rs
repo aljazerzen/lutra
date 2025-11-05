@@ -32,7 +32,7 @@ impl PrintSource for (&pr::ModuleDef, Option<crate::Span>) {
         let mut last: Option<&pr::Def> = None;
         for (i, (name, def)) in self.0.defs.iter().enumerate() {
             if i > 0 {
-                p.inject_trivia_inline(def.span.map(|s| s.start()));
+                p.inject_trivia_prev_inline(def.span.map(|s| s.start()));
 
                 let condensed = matches!(def.kind, pr::DefKind::Import(_))
                     && last.is_some_and(|l| matches!(l.kind, pr::DefKind::Import(_)));
@@ -42,16 +42,13 @@ impl PrintSource for (&pr::ModuleDef, Option<crate::Span>) {
                     p.new_line();
                 }
             }
+            p.take_trivia_new_line(def.span.map(|s| s.start).unwrap_or_default());
 
             if let Some(doc_comment) = &def.doc_comment {
-                for line in doc_comment.lines() {
-                    p.push_unchecked("## ");
-                    p.push_unchecked(line);
-                    p.new_line();
-                }
+                doc_comment.print(p)?;
             }
 
-            p.inject_trivia_leading(def.span.map(|s| s.start), false);
+            p.inject_trivia_leading(def.span.map(|s| s.start));
 
             let named_def: NamedDef = (name.as_str(), def);
 
@@ -60,8 +57,25 @@ impl PrintSource for (&pr::ModuleDef, Option<crate::Span>) {
             last = Some(def);
         }
 
-        p.inject_trivia_inline(self.1.map(|s| s.end()));
+        p.inject_trivia_prev_inline(self.1.map(|s| s.end()));
         p.inject_trivia_trailing(self.1.map(|s| s.end()));
+        Some(())
+    }
+
+    fn span(&self) -> Option<crate::Span> {
+        unreachable!()
+    }
+}
+
+impl PrintSource for pr::DocComment {
+    fn print<'c>(&self, p: &mut Printer<'c>) -> Option<()> {
+        p.inject_trivia_leading(Some(self.span.start));
+        for line in self.content.lines() {
+            p.push_unchecked("## ");
+            p.push_unchecked(line);
+            p.new_line();
+        }
+        p.take_trivia_new_line(self.span.end());
         Some(())
     }
 
