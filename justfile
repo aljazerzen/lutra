@@ -17,6 +17,10 @@ test-fast FILTER_SET='all()' *NEXTEST_ARGS='':
     cargo clippy --all-targets
     cargo check -p lutra-bin --no-default-features
 
+test-ignored:
+    INSTA_FORCE_PASS=1 \
+    cargo nextest --profile=overview run --run-ignored=only
+
 [working-directory: 'lutra-bin/src/project']
 generate:
     cargo run -p lutra-cli -- codegen --lutra-bin-path="crate" . ./generated.rs
@@ -36,7 +40,7 @@ publish:
     cargo publish -p lutra-runner
     cargo publish -p lutra-runner-postgres
     cargo publish -p lutra-interpreter
-    cargo publish -p lutra-cli  
+    cargo publish -p lutra-cli
 
 py *ARGS='':
     cd lutra-bin/python && just {{ARGS}}

@@ -1,3 +1,5 @@
+use std::fmt::Write;
+
 use enum_as_inner::EnumAsInner;
 
 #[derive(Debug, EnumAsInner, PartialEq, Clone)]
@@ -6,9 +8,24 @@ pub enum Literal {
     Float(f64),
     Boolean(bool),
     Text(String),
-    Date(String),
-    Time(String),
-    Timestamp(String),
+    Date(Date),
+    Time(Time),
+    DateTime(Date, Time),
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub struct Date {
+    pub year: i32,
+    pub month: u8,
+    pub day: u8,
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub struct Time {
+    pub hours: u8,
+    pub min: u8,
+    pub sec: u8,
+    pub millis: Option<u16>,
 }
 
 impl std::fmt::Display for Literal {
@@ -23,10 +40,44 @@ impl std::fmt::Display for Literal {
 
             Literal::Boolean(b) => f.write_str(if *b { "true" } else { "false" }),
 
-            Literal::Date(inner) | Literal::Time(inner) | Literal::Timestamp(inner) => {
-                write!(f, "@{inner}")
+            Literal::Date(date) => {
+                f.write_char('@')?;
+                date.fmt(f)
+            }
+            Literal::Time(time) => {
+                f.write_char('@')?;
+                time.fmt(f)
+            }
+            Literal::DateTime(date, time) => {
+                f.write_char('@')?;
+                date.fmt(f)?;
+                f.write_char('T')?;
+                time.fmt(f)
             }
         }
+    }
+}
+
+impl std::fmt::Display for Date {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let Date { year, month, day } = self;
+        write!(f, "{year:04}-{month:02}-{day:02}")
+    }
+}
+
+impl std::fmt::Display for Time {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let Time {
+            hours: hour,
+            min,
+            sec,
+            millis,
+        } = self;
+        write!(f, "{hour:02}:{min:02}:{sec:02}")?;
+        if let Some(millis) = millis {
+            write!(f, ".{millis:03}")?;
+        }
+        Ok(())
     }
 }
 

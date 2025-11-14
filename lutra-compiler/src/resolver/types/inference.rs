@@ -2,6 +2,7 @@ use itertools::Itertools;
 
 use crate::diagnostic::WithErrorInfo;
 use crate::pr::{self, *};
+use crate::resolver::NS_STD;
 use crate::{Result, Span};
 
 use super::TypeResolver;
@@ -109,6 +110,17 @@ impl TypeResolver<'_> {
                     ]),
                     span.unwrap(),
                 );
+            }
+
+            Literal::Date(_) => {
+                let fq_path = pr::Path::new([NS_STD, "Date"]);
+                let mut ty = pr::Ty::new(fq_path.clone());
+                ty.span = span;
+                ty.target = Some(pr::Ref::FullyQualified {
+                    to_def: fq_path,
+                    within: Path::empty(),
+                });
+                return ty;
             }
 
             _ => todo!(),

@@ -50,6 +50,29 @@ where
         self.ty_defs.get(name).unwrap()
     }
 
+    fn visit(&mut self, buf: B, ty: &'t ir::Ty) -> Result<Self::Res, crate::Error> {
+        // special case
+        #[cfg(feature = "chrono")]
+        if let ir::TyKind::Ident(ty_ident) = &ty.kind
+            && ty_ident.0 == ["std", "Date"]
+        {
+            use crate::Decode;
+            let days = i32::decode(buf.chunk())?;
+
+            if let Some(date) = chrono::NaiveDate::from_epoch_days(days) {
+                return Ok(format!("@{date}"));
+            } else {
+                // fallback to printing integers
+                // (this might happen when date is out range)
+            }
+        }
+
+        // general case
+        let ty = Visitor::<B>::get_mat_ty(self, ty);
+
+        self.visit_concrete(buf, ty)
+    }
+
     fn visit_bool(&mut self, v: bool) -> Result<Self::Res, Error> {
         Ok(if v {
             "true".to_string()

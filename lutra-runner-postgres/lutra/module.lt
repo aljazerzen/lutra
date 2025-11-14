@@ -80,7 +80,7 @@ module pg_catalog {
 
   type PgIndexRow: {indexrelid: int32, indrelid: int32, indisunique: bool, indkey: [int16]}
   func from_pg_index(): [PgIndexRow] -> std::sql::expr(
-    "SELECT NULL::int4 as index, indexrelid as _0, indrelid as _1, indisunique as _2, to_jsonb(string_to_array(indkey::text, ' ')::int2[]) as _3 FROM pg_catalog.pg_index"
+    "SELECT indexrelid, indrelid, indisunique, to_jsonb(string_to_array(indkey::text, ' ')::int2[]) as indkey FROM pg_catalog.pg_index"
   )
 
   type PgNamespaceRow: {oid: int32, nspname: text, nspowner: int32}

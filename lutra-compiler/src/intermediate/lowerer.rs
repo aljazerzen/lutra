@@ -5,7 +5,7 @@ use indexmap::IndexMap;
 use itertools::Itertools;
 use lutra_bin::ir;
 
-use crate::diagnostic::Diagnostic;
+use crate::diagnostic::{Diagnostic, WithErrorInfo};
 use crate::pr;
 use crate::resolver::NS_STD;
 use crate::utils::{self, IdGenerator};
@@ -197,7 +197,9 @@ impl<'a> Lowerer<'a> {
         let ty = expr.ty.as_ref().unwrap();
 
         let kind = match &expr.kind {
-            pr::ExprKind::Literal(lit) => ir::ExprKind::Literal(self.lower_literal(lit, ty)?),
+            pr::ExprKind::Literal(lit) => {
+                ir::ExprKind::Literal(self.lower_literal(lit, ty).with_span(expr.span)?)
+            }
 
             pr::ExprKind::Tuple(fields) => ir::ExprKind::Tuple(
                 fields
@@ -437,7 +439,7 @@ impl<'a> Lowerer<'a> {
     }
 
     fn lower_literal(&mut self, literal: &pr::Literal, ty: &pr::Ty) -> Result<ir::Literal> {
-        let prim = ty.kind.as_primitive();
+        let prim = self.get_ty_mat_pr(ty).kind.as_primitive();
         let prim =
             prim.ok_or_else(|| Diagnostic::new_assert("expected literal to be of primitive type"))?;
 
@@ -464,9 +466,19 @@ impl<'a> Lowerer<'a> {
             },
             pr::Literal::Boolean(v) => ir::Literal::bool(*v),
             pr::Literal::Text(v) => ir::Literal::text(v.clone()),
-            pr::Literal::Date(_) => todo!(),
-            pr::Literal::Time(_) => todo!(),
-            pr::Literal::Timestamp(_) => todo!(),
+
+            pr::Literal::Date(date) => {
+                let Some(date) =
+                    chrono::NaiveDate::from_ymd_opt(date.year, date.month as u32, date.day as u32)
+                else {
+                    // TODO: this should have been validated earlier (probably resolver)
+                    return Err(Diagnostic::new_custom("invalid date"));
+                };
+
+                ir::Literal::int32(date.to_epoch_days())
+            }
+            pr::Literal::Time(..) => todo!(),
+            pr::Literal::DateTime(..) => todo!(),
         })
     }
 
@@ -515,7 +527,10 @@ impl<'a> Lowerer<'a> {
                 let subject_ty = self.get_ty_mat(subject.ty.clone());
                 let subject_ty_pr = pr::Ty::from(subject_ty.clone());
                 let lit = ir::Expr {
-                    kind: ir::ExprKind::Literal(self.lower_literal(lit, &subject_ty_pr)?),
+                    kind: ir::ExprKind::Literal(
+                        self.lower_literal(lit, &subject_ty_pr)
+                            .with_span(Some(pattern.span))?,
+                    ),
                     ty: subject_ty.clone(),
                 };
 
@@ -1084,18 +1099,30 @@ pub fn lower_type_defs(project: &Project) -> ir::Module {
 }
 
 fn order_ty_defs(mut by_name: HashMap<pr::Path, ir::Ty>, project: &Project) -> Vec<ir::TyDef> {
-    let mut r = Vec::with_capacity(by_name.len());
+    // apply project order needed types
+    let mut tys_proj = Vec::with_capacity(by_name.len());
     for group in &project.ordering {
         for p in group {
             if let Some(ty) = by_name.remove(p) {
-                r.push(ir::TyDef {
+                tys_proj.push(ir::TyDef {
                     name: ir::Path(p.clone().into_iter().collect()),
                     ty,
                 });
             }
         }
     }
-    r
+
+    // remaining types come from dependencies
+    // (they should preceed types from this project)
+    let tys_deps = by_name
+        .into_iter()
+        .sorted_by(|a, b| a.0.cmp(&b.0))
+        .map(|(p, ty)| ir::TyDef {
+            name: ir::Path(p.clone().into_iter().collect()),
+            ty,
+        });
+
+    tys_deps.chain(tys_proj).collect()
 }
 
 /// Get the entry point's input type.

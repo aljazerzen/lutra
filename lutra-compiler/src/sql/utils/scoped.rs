@@ -263,8 +263,8 @@ impl<'a> crate::sql::queries::Context<'a> {
         }
     }
 
-    pub fn node_into_rel(&mut self, scoped: Node, ty: &ir::Ty) -> sql_ast::RelNamed {
-        match scoped {
+    pub fn node_into_rel(&mut self, node: Node, ty: &ir::Ty) -> sql_ast::RelNamed {
+        match node {
             Node::Rel(rel) => rel,
             Node::Query(query) => self.query_into_rel(query),
             Node::Source(source) => {
@@ -272,7 +272,7 @@ impl<'a> crate::sql::queries::Context<'a> {
             }
             _ => {
                 let rel_name = self.rel_name_gen.next();
-                let select = self.node_into_select(scoped, ty);
+                let select = self.node_into_select(node, ty);
                 utils::sub_rel(utils::query_select(select), rel_name)
             }
         }
@@ -280,21 +280,21 @@ impl<'a> crate::sql::queries::Context<'a> {
 
     pub fn node_into_rel_var(
         &mut self,
-        scoped: Node,
+        node: Node,
         ty: &ir::Ty,
     ) -> (String, Option<sql_ast::RelNamed>) {
-        match scoped {
+        match node {
             Node::RelVar(name) => (name, None),
             _ => {
-                let rel = self.node_into_rel(scoped, ty);
+                let rel = self.node_into_rel(node, ty);
                 let name = utils::get_rel_alias(&rel).unwrap().to_string();
                 (name, Some(rel))
             }
         }
     }
 
-    pub fn node_into_select(&mut self, scoped: Node, ty: &ir::Ty) -> sql_ast::Select {
-        match scoped {
+    pub fn node_into_select(&mut self, node: Node, ty: &ir::Ty) -> sql_ast::Select {
+        match node {
             Node::Column {
                 expr,
                 rels: rel_vars,
@@ -333,28 +333,28 @@ impl<'a> crate::sql::queries::Context<'a> {
             }
             Node::Source(_) => {
                 // assume source is a query, wrap it into sub rel
-                let rel = self.node_into_rel(scoped, ty);
+                let rel = self.node_into_rel(node, ty);
                 self.rel_into_select(rel, ty, true)
             }
         }
     }
 
-    pub fn node_without_index(&mut self, scoped: Node, ty: &ir::Ty) -> sql_ast::Select {
-        match scoped {
-            Node::Column { .. } => self.node_into_select(scoped, ty),
+    pub fn node_without_index(&mut self, node: Node, ty: &ir::Ty) -> sql_ast::Select {
+        match node {
+            Node::Column { .. } => self.node_into_select(node, ty),
             Node::RelVar(rel_var) => self.rel_var_into_select(&rel_var, ty, false),
 
             _ => {
-                let rel = self.node_into_rel(scoped, ty);
+                let rel = self.node_into_rel(node, ty);
                 self.rel_into_select(rel, ty, false)
             }
         }
     }
 
-    pub fn node_into_query(&mut self, scoped: Node, ty: &ir::Ty) -> sql_ast::Query {
-        match scoped {
+    pub fn node_into_query(&mut self, node: Node, ty: &ir::Ty) -> sql_ast::Query {
+        match node {
             Node::Query(query) => query,
-            _ => utils::query_select(self.node_into_select(scoped, ty)),
+            _ => utils::query_select(self.node_into_select(node, ty)),
         }
     }
 }

@@ -26,6 +26,10 @@ where
     fn visit(&mut self, buf: B, ty: &'t ir::Ty) -> Result<Self::Res, crate::Error> {
         let ty = self.get_mat_ty(ty);
 
+        self.visit_concrete(buf, ty)
+    }
+
+    fn visit_concrete(&mut self, buf: B, ty: &'t ir::Ty) -> Result<Self::Res, crate::Error> {
         match &ty.kind {
             ir::TyKind::Primitive(ir::TyPrimitive::bool) => {
                 self.visit_bool(bool::decode(buf.chunk())?)

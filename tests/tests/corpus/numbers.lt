@@ -140,7 +140,6 @@ func main() -> 4: uint8 | std::to_int8
 4
 
 # === cast_uint16_to_int8
-# skip: postgres
 func main() -> 400: uint16 | std::to_int8
 # >
 -112
@@ -179,7 +178,6 @@ func main() -> -400: int16 | std::to_int16
 -400
 
 # === cast_int32_to_int16
-# skip: postgres
 func main() -> (
   [
     1,
@@ -333,7 +331,6 @@ func main() -> 4.4: float32 | std::to_int32
 4
 
 # === cast_float64_to_int32
-# skip: postgres
 func main() -> 125523.121231: float64 | std::to_int32
 # >
 125523
@@ -546,7 +543,6 @@ func main() -> 4.4: float32 | std::to_uint32
 4
 
 # === cast_float64_to_uint32
-# skip: postgres
 func main() -> 125523.121231: float64 | std::to_uint32
 # >
 125523

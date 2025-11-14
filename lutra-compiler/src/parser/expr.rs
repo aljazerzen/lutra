@@ -40,9 +40,8 @@ pub(crate) fn expr<'a>(
         .map_with_span(Expr::new_with_span)
         .boxed();
 
-        let term = type_annotation(term, ty);
-
         let term = field_lookup(term);
+        let term = type_annotation(term, ty);
         let term = unary(term);
 
         // Binary operators

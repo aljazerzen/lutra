@@ -373,3 +373,7 @@ module sql {
   func expr(const sql_source: text): R
   where R
 }
+
+## Elapsed days since Unix Epoch (1970-01-01).
+## Represented by a signed 32-bit integer, indicating number of days.
+type Date: int32

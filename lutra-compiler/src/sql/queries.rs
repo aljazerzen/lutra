@@ -14,12 +14,13 @@ pub fn compile(rel: cr::Expr, types: HashMap<&ir::Path, &ir::Ty>) -> sql_ast::Qu
     let query = ctx.compile_rel(&rel);
 
     if rel_ty.kind.is_array() {
-        // wrap into a top-level projection to remove array indexes & apply the order
-        let mut query = utils::query_select(ctx.node_without_index(query, &rel_ty));
-        query.order_by = Some(utils::order_by_one(utils::identifier(
-            None::<&str>,
-            COL_ARRAY_INDEX,
-        )));
+        // drop index column
+        let mut select = ctx.node_into_select(query, &rel_ty);
+        let index = select.projection.remove(0);
+
+        // apply the order
+        let mut query = utils::query_select(select);
+        query.order_by = Some(utils::order_by_one(index.expr));
         query
     } else {
         ctx.node_into_query(query, &rel_ty)
@@ -281,21 +282,9 @@ impl<'a> Context<'a> {
                     .from
                     .push(utils::new_table(translate_table_ident(table_ident), None));
 
-                let columns = itertools::chain(
-                    // index
-                    Some("NULL".to_string()),
-                    // table columns
-                    self.get_table_columns(ty).iter().map(|f| {
-                        let name = utils::identifier(None::<&str>, f.name.clone().unwrap());
-                        let ty = self.compile_ty_name(&f.ty);
-                        format!("{name}::{ty}")
-                    }),
-                )
-                .map(sql_ast::Expr::Source);
+                select.projection = self.pg_repr_import_projection(None, ty);
 
-                select.projection = self.projection(ty, columns);
-
-                Node::Query(utils::query_select(select))
+                Node::Select(select)
             }
 
             cr::From::Null => Node::from(self.null(ty)),
@@ -340,15 +329,71 @@ impl<'a> Context<'a> {
                 })
             }
 
-            cr::From::SQLSource(source) => Node::Source(source.clone()),
+            cr::From::SQLSource(source) => {
+                let node = Node::Source(source.clone());
+
+                let mut select = utils::select_empty();
+                let (rvar_name, rvar) = self.node_into_rel_var(node, ty);
+                select.from.extend(rvar);
+                select.projection = self.pg_repr_import_projection(Some(&rvar_name), ty);
+
+                Node::Select(select)
+            }
         }
     }
 
-    /// Returns columns of the table, described by a type.
+    /// Returns columns of the native pg repr, described by a type.
     /// This is used in FROM and INSERT, not the in-query relation repr.
-    fn get_table_columns<'t>(&'t self, ty: &'t ir::Ty) -> &'t [ir::TyTupleField] {
+    fn pg_repr_columns<'t>(&'t self, ty: &'t ir::Ty) -> &'t [ir::TyTupleField] {
         let ty_tuple = self.get_ty_mat(ty).kind.as_array().unwrap();
         self.get_ty_mat(ty_tuple).kind.as_tuple().unwrap()
+    }
+
+    /// Constructs a projection that imports from native pg repr.
+    fn pg_repr_import_projection(
+        &self,
+        rel_var: Option<&str>,
+        ty: &ir::Ty,
+    ) -> Vec<sql_ast::SelectItem> {
+        let values = itertools::chain(
+            // index
+            std::iter::once(sql_ast::Expr::Source("NULL::int4".to_string())),
+            // table columns
+            self.pg_repr_columns(ty).iter().map(move |f| {
+                let ident = utils::identifier(rel_var, f.name.clone().unwrap());
+                self.pg_repr_import(ident, &f.ty)
+            }),
+        );
+        self.projection(ty, values)
+    }
+
+    /// Imports a value from native pg repr into our repr.
+    /// For example, pg type `date` is coverted into `int4`.
+    fn pg_repr_import(&self, expr_pg: sql_ast::Expr, ty: &ir::Ty) -> sql_ast::Expr {
+        // special case: std::Date
+        if let ir::TyKind::Ident(ty_ident) = &ty.kind
+            && ty_ident.0 == ["std", "Date"]
+        {
+            return sql_ast::Expr::Source(format!("({expr_pg}::date - '1970-01-01'::date)"));
+        }
+
+        // general case: noop
+        // (but with a type cast, just to be safe)
+        sql_ast::Expr::Source(format!("{expr_pg}::{}", self.compile_ty_name(ty)))
+    }
+
+    /// Exports a value into native pg repr from our repr.
+    /// For example, type std::Date is exported from pg type `int4` into `date`.
+    fn pg_repr_export(&self, expr: sql_ast::Expr, ty: &ir::Ty) -> sql_ast::Expr {
+        // special case: std::Date
+        if let ir::TyKind::Ident(ty_ident) = &ty.kind
+            && ty_ident.0 == ["std", "Date"]
+        {
+            return sql_ast::Expr::Source(format!("('1970-01-01'::date + {expr})"));
+        }
+
+        // general case: noop
+        expr
     }
 
     fn compile_rel_transform(
@@ -487,12 +532,23 @@ impl<'a> Context<'a> {
             }
 
             cr::Transform::Insert(table_ident) => {
-                let source = self.node_without_index(scoped, input_ty);
+                let input_item_ty = self.get_ty_mat(input_ty).kind.as_array().unwrap();
+                let input_fields_ty = self.get_ty_mat(input_item_ty).kind.as_tuple().unwrap();
+
+                let mut source = self.node_into_select(scoped, input_ty);
+
+                let new_projection = (source.projection.into_iter())
+                    .skip(1) // first column will be index, discard it
+                    .zip(input_fields_ty)
+                    .map(|(p, f)| self.pg_repr_export(p.expr, &f.ty))
+                    .map(|expr| sql_ast::SelectItem { expr, alias: None })
+                    .collect();
+                source.projection = new_projection;
 
                 let table = translate_table_ident(table_ident);
 
                 let columns = self
-                    .get_table_columns(input_ty)
+                    .pg_repr_columns(input_ty)
                     .iter()
                     .map(|field| field.name.as_ref().unwrap())
                     .map(utils::new_ident)

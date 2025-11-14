@@ -363,7 +363,6 @@ func main() -> [
 ]
 
 # === enum_construction_09
-# skip: interpreter
 
 type Status: enum {
   Open: int16,
@@ -2157,3 +2156,18 @@ Node([
   ]),
   Leaf(21),
 ])
+
+# === date_00
+const main = @2025-11-14
+# >
+@2025-11-14
+
+# === date_01
+const main: std::Date = @-10000-11-14
+# >
+@-10000-11-14
+
+# === date_02
+const main: std::Date = @100000-11-14
+# >
+@+100000-11-14

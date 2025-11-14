@@ -26,7 +26,10 @@ pub enum Value {
     Prim16(u16),
     Prim32(u32),
     Prim64(u64),
+
+    // TODO: replace with Array<Prim8>
     Text(string::String),
+
     Tuple(vec::Vec<Value>),
     Array(vec::Vec<Value>),
     Enum(usize, boxed::Box<Value>),

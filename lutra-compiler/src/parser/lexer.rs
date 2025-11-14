@@ -2,6 +2,8 @@
 mod test;
 mod token;
 
+use std::str::FromStr;
+
 pub use token::{SpanInSource, Token, TokenKind};
 
 use chumsky::error::Cheap;
@@ -11,7 +13,7 @@ use chumsky::text::{Character, newline};
 use crate::diagnostic::{Diagnostic, DiagnosticCode};
 
 use crate::codespan::Span;
-use crate::pr::Literal;
+use crate::pr::{Date, Literal, Time};
 
 type LError = Cheap<char, SpanInSource>;
 
@@ -304,68 +306,60 @@ fn literal() -> impl Parser<char, Literal, Error = LError> {
         .then_ignore(non_ident())
         .map(Literal::Boolean);
 
-    let date_inner = digits(4)
-        .chain(just('-'))
-        .chain::<char, _, _>(digits(2))
-        .chain::<char, _, _>(just('-'))
-        .chain::<char, _, _>(digits(2))
+    let year = just('+')
+        .or(just('-'))
+        .or_not()
+        .chain(filter(|c: &char| c.is_ascii_digit()).repeated())
+        .map(str_parse::<i32>);
+    let date_part = year
+        .then_ignore(just('-'))
+        .then(digits(2).map(str_parse::<u8>))
+        .then_ignore(just('-'))
+        .then(digits(2).map(str_parse::<u8>))
+        .map(|((year, month), day)| Date { year, month, day })
         .boxed();
 
-    let time_inner = digits(2)
+    let time_part = (digits(2).map(str_parse::<u8>))
         // minutes
-        .chain::<char, _, _>(just(':').chain(digits(2)).or_not().flatten())
+        .then(just(':').ignore_then(digits(2)).map(str_parse::<u8>))
         // seconds
-        .chain::<char, _, _>(just(':').chain(digits(2)).or_not().flatten())
+        .then(just(':').ignore_then(digits(2)).map(str_parse::<u8>))
         // milliseconds
-        .chain::<char, _, _>(
+        .then(
             just('.')
-                .chain(
+                .ignore_then(
                     filter(|c: &char| c.is_ascii_digit())
                         .repeated()
                         .at_least(1)
-                        .at_most(6),
+                        .at_most(3),
                 )
-                .or_not()
-                .flatten(),
+                .map(|s| str_parse_fraction(s, 3))
+                .or_not(),
         )
-        // timezone offset
-        .chain::<char, _, _>(
-            choice((
-                // Either just `Z`
-                just('Z').map(|x| vec![x]),
-                // Or an offset, such as `-05:00` or `-0500`
-                one_of("-+").chain(
-                    digits(2)
-                        .then_ignore(just(':').or_not())
-                        .chain::<char, _, _>(digits(2)),
-                ),
-            ))
-            .or_not(),
-        )
+        .map(|(((hours, min), sec), millis)| Time {
+            hours,
+            min,
+            sec,
+            millis,
+        })
         .boxed();
 
-    // Not an annotation
-    let dt_prefix = just('@').then(just('{').not().rewind());
-
-    let date = dt_prefix
-        .ignore_then(date_inner.clone())
+    let date_or_datetime = just('@')
+        .ignore_then(date_part.clone())
+        .then(time_part.clone().or_not())
         .then_ignore(non_ident())
-        .collect::<String>()
-        .map(Literal::Date);
+        .map(|(date, time)| {
+            if let Some(time) = time {
+                Literal::DateTime(date, time)
+            } else {
+                Literal::Date(date)
+            }
+        });
 
-    let time = dt_prefix
-        .ignore_then(time_inner.clone())
+    let time = just('@')
+        .ignore_then(time_part.clone())
         .then_ignore(non_ident())
-        .collect::<String>()
         .map(Literal::Time);
-
-    let datetime = dt_prefix
-        .ignore_then(date_inner)
-        .chain(just('T'))
-        .chain::<char, _, _>(time_inner)
-        .then_ignore(non_ident())
-        .collect::<String>()
-        .map(Literal::Timestamp);
 
     choice((
         binary_notation,
@@ -375,8 +369,7 @@ fn literal() -> impl Parser<char, Literal, Error = LError> {
         raw_string,
         number,
         bool,
-        datetime,
-        date,
+        date_or_datetime,
         time,
     ))
 }
@@ -468,4 +461,19 @@ fn non_ident() -> impl Parser<char, (), Error = LError> {
         .ignored()
         .or(end())
         .rewind()
+}
+
+fn str_parse<T: FromStr>(x: Vec<char>) -> T {
+    let Ok(x) = String::from_iter(x).parse::<T>() else {
+        unreachable!()
+    };
+    x
+}
+
+fn str_parse_fraction<T: FromStr>(mut x: Vec<char>, precision: usize) -> T {
+    x.resize(precision, '0');
+    let Ok(x) = String::from_iter(x).parse::<T>() else {
+        unreachable!()
+    };
+    x
 }

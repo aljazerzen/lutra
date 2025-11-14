@@ -865,7 +865,7 @@ fn recursive_00() {
     // This test is skipped, because it fails in layouter, where we cannot throw a proper error.
     // That's because we don't have span in IR and I don't want to add it.
     // IR is supposed to be a valid program, we should error out earlier.
-    insta::assert_snapshot!(
+    assert_eq!(
         _test_err(
             r#"
             type Tree: {left: Tree, right: Tree}
@@ -877,7 +877,7 @@ fn recursive_00() {
             func main(): OptionalTree -> OptionalTree::None
             "#
         ),
-        @r#"
+        r#"
     Tree has infinite size.
     "#
     );
