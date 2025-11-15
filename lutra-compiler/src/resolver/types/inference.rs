@@ -116,10 +116,7 @@ impl TypeResolver<'_> {
                 let fq_path = pr::Path::new([NS_STD, "Date"]);
                 let mut ty = pr::Ty::new(fq_path.clone());
                 ty.span = span;
-                ty.target = Some(pr::Ref::FullyQualified {
-                    to_def: fq_path,
-                    within: Path::empty(),
-                });
+                ty.target = Some(pr::Ref::Global(pr::AbsoluteRef::new(fq_path)));
                 return ty;
             }
 

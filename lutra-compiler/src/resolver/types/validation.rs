@@ -709,14 +709,14 @@ impl std::fmt::Debug for DebugMapping<'_> {
         let mut m = f.debug_map();
         for (key, val) in self.0 {
             let key = match key {
-                Ref::FullyQualified { to_def, within } => {
+                pr::Ref::Global(pr::AbsoluteRef { to_def, within }) => {
                     if within.is_empty() {
                         format!("{to_def}")
                     } else {
                         format!("{to_def}.{within}")
                     }
                 }
-                Ref::Local { scope, offset } => format!("{scope}.{offset}"),
+                pr::Ref::Local { scope, offset } => format!("{scope}.{offset}"),
             };
             m.entry(&key, &printer::print_ty(val));
         }

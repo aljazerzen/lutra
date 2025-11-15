@@ -48,10 +48,7 @@ impl fold::PrFold for super::TypeResolver<'_> {
                         let ty = if let Some(ty_fq) = ty_fq {
                             // when possible, use ident as the type
                             pr::Ty {
-                                target: Some(pr::Ref::FullyQualified {
-                                    to_def: ty_fq,
-                                    within: pr::Path::empty(),
-                                }),
+                                target: Some(pr::Ref::Global(pr::AbsoluteRef::new(ty_fq))),
                                 span,
                                 ..pr::Ty::new(pr::TyKind::Ident(ident))
                             }
@@ -237,7 +234,7 @@ impl fold::PrFold for super::TypeResolver<'_> {
 
             // inline idents into types
             pr::TyKind::Ident(_) => {
-                if let Some(pr::Ref::FullyQualified { to_def, within }) = &ty.target
+                if let Some(pr::Ref::Global(pr::AbsoluteRef { to_def, within })) = &ty.target
                     && !within.is_empty()
                 {
                     // Things like `my_tuple::field` are "references into types".

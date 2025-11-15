@@ -22,7 +22,9 @@ pub fn lower_expr(project: &Project, main_pr: &pr::Expr) -> ir::Program {
     );
     lowerer.is_main_a_func = main_pr.ty.as_ref().unwrap().kind.is_func();
 
-    let main = if let Some(pr::Ref::FullyQualified { to_def, within }) = &main_pr.target {
+    let main = if let Some(pr::Ref::Global(pr::AbsoluteRef { to_def, within })) =
+        &main_pr.target
+    {
         // optimization: inline direct idents, don't bind them to vars
         assert!(within.is_empty());
         lowerer
@@ -327,10 +329,7 @@ impl<'a> Lowerer<'a> {
                     }
                 }
 
-                pr::Ref::FullyQualified {
-                    to_def,
-                    within: _within,
-                } => {
+                pr::Ref::Global(pr::AbsoluteRef { to_def, .. }) => {
                     let to_def = if let Some(dep_name) = self.in_dependency.last() {
                         Cow::Owned(pr::Path::from_name(dep_name) + to_def.clone())
                     } else {
@@ -620,11 +619,11 @@ impl<'a> Lowerer<'a> {
 
         if let Some(target) = ty.target {
             match target {
-                pr::Ref::FullyQualified { to_def, .. } => {
-                    self.type_defs_queue.push_back(to_def.clone());
-                    tracing::debug!("lower ty ident: {to_def}");
+                pr::Ref::Global(fq) => {
+                    self.type_defs_queue.push_back(fq.to_def.clone());
+                    tracing::debug!("lower ty ident: {}", fq.to_def);
                     return ir::Ty {
-                        kind: ir::TyKind::Ident(ir::Path(to_def.into_iter().collect_vec())),
+                        kind: ir::TyKind::Ident(ir::Path(fq.to_def.into_iter().collect_vec())),
                         layout: None,
                         name: ty.name,
                         variants_recursive: vec![],
@@ -768,7 +767,8 @@ impl<'a> Lowerer<'a> {
 
     fn get_ty_mat_pr(&self, ty: &'a pr::Ty) -> &'a pr::Ty {
         if let pr::TyKind::Ident(_) = &ty.kind {
-            let Some(pr::Ref::FullyQualified { to_def, within }) = &ty.target else {
+            let Some(pr::Ref::Global(pr::AbsoluteRef { to_def, within })) = &ty.target
+            else {
                 panic!();
             };
             assert!(within.is_empty());

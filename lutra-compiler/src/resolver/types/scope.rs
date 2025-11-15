@@ -233,7 +233,7 @@ impl<'a> TypeResolver<'a> {
         tracing::trace!("get_ident: {target:?}");
 
         match target {
-            pr::Ref::FullyQualified { to_def, within } => {
+            pr::Ref::Global(pr::AbsoluteRef { to_def, within }) => {
                 let def = self.root_mod.get(to_def);
                 match &def.unwrap_or_else(|| panic!("cannot find {to_def}")).kind {
                     pr::DefKind::Expr(expr) => {
@@ -414,7 +414,7 @@ impl<'a> TypeResolver<'a> {
                         .cloned()
                         .or_else(|| // fallback to ty.target
                             ty.target.as_ref().and_then(|r| match r {
-                                pr::Ref::FullyQualified { to_def, within } if within.is_empty() => {
+                                pr::Ref::Global(pr::AbsoluteRef {to_def, within }) if within.is_empty() => {
                                     Some(to_def.clone())
                                 }
                                 _ => None,

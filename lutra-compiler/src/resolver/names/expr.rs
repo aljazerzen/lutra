@@ -33,7 +33,7 @@ impl NameResolver<'_> {
         &mut self,
         import_def: pr::ImportDef,
     ) -> Result<pr::ImportDef, Diagnostic> {
-        let fq = self.lookup_in_root(self.def_module_path, &import_def.target)?;
+        let fq = self.lookup_in_mod_tree(self.def_module_path, &import_def.target)?;
         if !fq.within.is_empty() {
             todo!();
         }
@@ -194,8 +194,8 @@ impl fold::PrFold for NameResolver<'_> {
 }
 
 impl NameResolver<'_> {
-    /// Returns resolved fully-qualified ident
     fn lookup_ident(&mut self, ident: &pr::Path) -> Result<pr::Ref> {
+        // case 1: local name (param, local var)
         for scope in self.scopes.iter().rev() {
             if let Some((scope, offset, _)) = scope.get(ident.first()) {
                 // match: this ident references a locally-scoped name
@@ -210,19 +210,21 @@ impl NameResolver<'_> {
             }
         }
 
-        let fq = (self.lookup_in_root(self.def_module_path, ident)).inspect_err(|_| {
+        // case 2: name in module tree
+        let fq = (self.lookup_in_mod_tree(self.def_module_path, ident)).inspect_err(|_| {
             tracing::debug!("scopes: {:?}", self.scopes);
         })?;
         self.refs.push(fq.to_def.clone());
 
-        Ok(pr::Ref::FullyQualified {
-            to_def: fq.to_def,
-            within: fq.within,
-        })
+        Ok(pr::Ref::Global(fq))
     }
 
     #[tracing::instrument("lookup", skip_all, fields(from = pr::Path::new(def_mod_fq).to_string()))]
-    fn lookup_in_root(&self, def_mod_fq: &[String], ident: &pr::Path) -> Result<FullyQualified> {
+    fn lookup_in_mod_tree(
+        &self,
+        def_mod_fq: &[String],
+        ident: &pr::Path,
+    ) -> Result<pr::AbsoluteRef> {
         tracing::debug!("lookup for {ident}");
 
         // find lookup base
@@ -250,12 +252,9 @@ impl NameResolver<'_> {
         base_mod: &pr::ModuleDef,
         mut base_fq: pr::Path,
         mut steps: pr::Path,
-    ) -> Result<FullyQualified> {
+    ) -> Result<pr::AbsoluteRef> {
         let Some(first) = steps.pop_first() else {
-            return Ok(FullyQualified {
-                to_def: base_fq,
-                within: pr::Path::empty(),
-            });
+            return Ok(pr::AbsoluteRef::new(base_fq));
         };
 
         let Some(def) = base_mod.defs.get(&first) else {
@@ -275,7 +274,7 @@ impl NameResolver<'_> {
                 // use resolved fq ident and extend it with remaining steps
                 let mut new_path = import.target.clone();
                 new_path.extend(steps);
-                self.lookup_in_root(&[], &new_path)
+                self.lookup_in_mod_tree(&[], &new_path)
             }
 
             // unresolved imports
@@ -284,7 +283,7 @@ impl NameResolver<'_> {
 
                 // resolve import target
                 let import_fq = self
-                    .lookup_in_root(base_fq.parent(), &import.target)
+                    .lookup_in_mod_tree(base_fq.parent(), &import.target)
                     .with_span_fallback(def.span)?;
 
                 tracing::debug!("resolved import to {import_fq:?}, steps={steps}");
@@ -293,17 +292,14 @@ impl NameResolver<'_> {
                 let mut new_path = import_fq.to_def;
                 new_path.extend(import_fq.within);
                 new_path.extend(steps);
-                self.lookup_in_root(&[], &new_path)
+                self.lookup_in_mod_tree(&[], &new_path)
             }
 
             // recursive lookup into self (we take node out of Unresolved during name resolution)
             pr::DefKind::Unresolved(None) => {
                 if steps.is_empty() {
                     if self.allow_recursive {
-                        Ok(FullyQualified {
-                            to_def: base_fq,
-                            within: pr::Path::empty(),
-                        })
+                        Ok(pr::AbsoluteRef::new(base_fq))
                     } else {
                         Err(Diagnostic::new_custom("recursive path"))
                     }
@@ -320,7 +316,7 @@ impl NameResolver<'_> {
 
             // resolve refs into types
             pr::DefKind::Unresolved(Some(def_kind)) => lookup_in_def(def_kind, steps.as_steps())
-                .map(|_| FullyQualified {
+                .map(|_| pr::AbsoluteRef {
                     to_def: base_fq,
                     within: steps,
                 })
@@ -330,7 +326,7 @@ impl NameResolver<'_> {
 
             // resolve refs into already resolved stuff
             def_kind => lookup_in_def(def_kind, steps.as_steps())
-                .map(|_| FullyQualified {
+                .map(|_| pr::AbsoluteRef {
                     to_def: base_fq,
                     within: steps,
                 })
@@ -339,12 +335,6 @@ impl NameResolver<'_> {
                 }),
         }
     }
-}
-
-#[derive(Debug)]
-struct FullyQualified {
-    to_def: pr::Path,
-    within: pr::Path,
 }
 
 fn lookup_in_def(def: &pr::DefKind, steps: &[String]) -> Result<(), Option<String>> {

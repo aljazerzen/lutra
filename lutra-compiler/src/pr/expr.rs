@@ -5,32 +5,6 @@ use crate::pr::{BinOp, Literal, Ty, UnOp};
 
 use super::{Path, TyParam};
 
-impl Expr {
-    pub fn new<K: Into<ExprKind>>(kind: K) -> Self {
-        Expr {
-            kind: kind.into(),
-            span: None,
-            ty: None,
-            ty_args: Vec::new(),
-            target: None,
-            scope_id: None,
-        }
-    }
-
-    pub fn new_with_span<K: Into<ExprKind>>(kind: K, span: Span) -> Expr {
-        Expr {
-            kind: kind.into(),
-            span: Some(span),
-            ty: None,
-            ty_args: Vec::new(),
-            target: None,
-            scope_id: None,
-        }
-    }
-}
-
-// The following code is tested by the tests_misc crate to match expr.rs in prqlc.
-
 /// Expr is anything that has a value and thus a type.
 /// Most of these can contain other [Expr] themselves; literals should be [ExprKind::Literal].
 #[derive(Debug, Clone, PartialEq)]
@@ -58,12 +32,33 @@ pub struct Expr {
     pub target: Option<Ref>,
 }
 
+impl Expr {
+    pub fn new<K: Into<ExprKind>>(kind: K) -> Self {
+        Expr {
+            kind: kind.into(),
+            span: None,
+            ty: None,
+            ty_args: Vec::new(),
+            target: None,
+            scope_id: None,
+        }
+    }
+
+    pub fn new_with_span<K: Into<ExprKind>>(kind: K, span: Span) -> Expr {
+        Expr {
+            kind: kind.into(),
+            span: Some(span),
+            ty: None,
+            ty_args: Vec::new(),
+            target: None,
+            scope_id: None,
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Ref {
-    FullyQualified {
-        to_def: Path,
-        within: Path,
-    },
+    Global(AbsoluteRef),
     Local {
         /// scope id
         scope: usize,
@@ -71,6 +66,21 @@ pub enum Ref {
         /// position of the name within the scope
         offset: usize,
     },
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct AbsoluteRef {
+    pub to_def: Path,
+    pub within: Path,
+}
+
+impl AbsoluteRef {
+    pub fn new(to_def: Path) -> Self {
+        AbsoluteRef {
+            to_def,
+            within: Path::empty(),
+        }
+    }
 }
 
 #[derive(Debug, EnumAsInner, PartialEq, Clone, strum::AsRefStr)]

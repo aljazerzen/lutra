@@ -1,6 +1,7 @@
 use std::collections::HashSet;
 
-use crate::{Result, Span, pr};
+use crate::pr;
+use crate::{Result, Span};
 
 pub(super) struct ConstantValidator {
     constants: HashSet<pr::Path>,
@@ -23,7 +24,7 @@ impl ConstantValidator {
             pr::ExprKind::Literal(_) => Ok(()),
 
             pr::ExprKind::Ident(_) => match expr.target.as_ref().unwrap() {
-                pr::Ref::FullyQualified { to_def, within } => {
+                pr::Ref::Global(pr::AbsoluteRef { to_def, within }) => {
                     assert!(within.is_empty());
                     if self.constants.contains(to_def) {
                         Ok(())
