@@ -1672,11 +1672,11 @@ fn import_02() {
     func main() -> {}
     "#), @r"
     Error:
-       ╭─[:3:7]
+       ╭─[:3:14]
        │
      3 │       import project::a::b as b
-       │       ────────────┬────────────
-       │                   ╰────────────── recursive path
+       │              ─────────┬────────
+       │                       ╰────────── recursive path
     ───╯
     ");
 }
@@ -1721,4 +1721,31 @@ fn import_04() {
        │                  ╰── expected a type, found a module
     ───╯
     ");
+}
+
+#[test]
+fn import_05() {
+    insta::assert_snapshot!(_test_ty(r#"
+    module a {
+      const b = "b"
+      const c = false
+    }
+    import a::(b, c)
+    func main() -> {b, c}
+    "#), @"{text, bool}");
+}
+
+#[test]
+fn import_06() {
+    insta::assert_snapshot!(_test_ty(r#"
+    module a {
+      const b = "b"
+      module c {
+        const d: int16 = 3
+        const e = false
+      }
+    }
+    import a::(b, c::(d, e))
+    func main() -> {b, d, e}
+    "#), @"{text, int16, bool}");
 }

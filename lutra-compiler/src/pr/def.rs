@@ -50,7 +50,33 @@ pub struct TyDef {
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct ImportDef {
-    pub target: Path,
+    pub kind: ImportKind,
+    pub span: Span,
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub enum ImportKind {
+    /// Represents `std::sql::from as read_table`
+    Single(Path, Option<String>),
+
+    /// Represents `std::sql::{...}`
+    Many(Path, Vec<ImportDef>),
+}
+
+impl ImportDef {
+    pub fn new_simple(path: Path, span: Span) -> Self {
+        Self {
+            kind: ImportKind::Single(path, None),
+            span,
+        }
+    }
+
+    pub fn as_simple(&self) -> Option<&Path> {
+        let ImportKind::Single(path, _) = &self.kind else {
+            return None;
+        };
+        Some(path)
+    }
 }
 
 #[derive(Debug, Clone, PartialEq)]

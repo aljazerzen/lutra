@@ -22,9 +22,7 @@ pub fn lower_expr(project: &Project, main_pr: &pr::Expr) -> ir::Program {
     );
     lowerer.is_main_a_func = main_pr.ty.as_ref().unwrap().kind.is_func();
 
-    let main = if let Some(pr::Ref::Global(pr::AbsoluteRef { to_def, within })) =
-        &main_pr.target
-    {
+    let main = if let Some(pr::Ref::Global(pr::AbsoluteRef { to_def, within })) = &main_pr.target {
         // optimization: inline direct idents, don't bind them to vars
         assert!(within.is_empty());
         lowerer
@@ -767,8 +765,7 @@ impl<'a> Lowerer<'a> {
 
     fn get_ty_mat_pr(&self, ty: &'a pr::Ty) -> &'a pr::Ty {
         if let pr::TyKind::Ident(_) = &ty.kind {
-            let Some(pr::Ref::Global(pr::AbsoluteRef { to_def, within })) = &ty.target
-            else {
+            let Some(pr::Ref::Global(pr::AbsoluteRef { to_def, within })) = &ty.target else {
                 panic!();
             };
             assert!(within.is_empty());

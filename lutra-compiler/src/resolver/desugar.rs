@@ -1,3 +1,5 @@
+use indexmap::IndexMap;
+
 use crate::diagnostic::Diagnostic;
 use crate::pr::{self, Expr};
 use crate::resolver::NS_STD;
@@ -16,6 +18,21 @@ pub fn run_expr(expr: pr::Expr) -> Result<pr::Expr> {
 struct Desugarator;
 
 impl PrFold for Desugarator {
+    fn fold_module_def(&mut self, module_def: pr::ModuleDef) -> Result<pr::ModuleDef> {
+        let mut defs = IndexMap::with_capacity(module_def.defs.len());
+        for (name, def) in module_def.defs {
+            // special case: imports
+            if let pr::DefKind::Import(import) = def.kind {
+                defs.extend(self.desugar_import(import));
+                continue;
+            }
+
+            // base case
+            defs.insert(name, self.fold_def(def)?);
+        }
+        Ok(pr::ModuleDef { defs })
+    }
+
     fn fold_expr(&mut self, mut expr: pr::Expr) -> Result<pr::Expr> {
         expr.kind = match expr.kind {
             pr::ExprKind::Nested(p) => {
@@ -179,6 +196,38 @@ impl Desugarator {
             expr = new_binop(expr, &[NS_STD, "text", "concat"], item, op_span);
         }
         Ok(expr.kind)
+    }
+
+    /// Desugars `import x::{a, b as c} into:
+    /// ```lt
+    /// import x::a as a
+    /// import x::b as c
+    /// ```
+    fn desugar_import(&self, import: pr::ImportDef) -> Vec<(String, pr::Def)> {
+        desugar_import_re(&pr::Path::empty(), import)
+    }
+}
+
+fn desugar_import_re(prefix: &pr::Path, import: pr::ImportDef) -> Vec<(String, pr::Def)> {
+    match import.kind {
+        pr::ImportKind::Single(path, alias) => {
+            let name = alias.unwrap_or_else(|| path.last().to_string());
+            let mut def = pr::Def::new(pr::DefKind::Import(pr::ImportDef {
+                kind: pr::ImportKind::Single(path.prepend(prefix.clone()), None),
+                span: import.span,
+            }));
+            def.span = Some(import.span);
+            vec![(name, def)]
+        }
+        pr::ImportKind::Many(path, parts) => {
+            let mut r = Vec::with_capacity(parts.len());
+
+            let prefix = path.prepend(prefix.clone());
+            for i in parts {
+                r.extend(desugar_import_re(&prefix, i));
+            }
+            r
+        }
     }
 }
 

@@ -1,6 +1,7 @@
 use chumsky::Span;
 
 use crate::pr;
+use crate::printer::common::{Between, Separated};
 use crate::printer::expr::print_func;
 use crate::printer::types::print_ty_func;
 use crate::printer::{PrintSource, Printer};
@@ -154,12 +155,7 @@ impl PrintSource for NamedDef<'_> {
             }
             pr::DefKind::Import(import_def) => {
                 p.push("import ")?;
-                p.push(import_def.target.to_string())?;
-
-                if import_def.target.last() != self.0 {
-                    p.push(" as ")?;
-                    p.push(pr::display_ident(self.0))?;
-                }
+                import_def.print(p)?;
             }
             pr::DefKind::Unresolved(_) => unreachable!(),
         }
@@ -170,5 +166,40 @@ impl PrintSource for NamedDef<'_> {
 
     fn span(&self) -> Option<crate::Span> {
         self.1.span
+    }
+}
+
+impl PrintSource for pr::ImportDef {
+    fn print<'c>(&self, p: &mut Printer<'c>) -> Option<()> {
+        match &self.kind {
+            pr::ImportKind::Single(path, alias) => {
+                p.push(path.to_string())?;
+
+                if let Some(alias) = alias {
+                    p.push(" as ")?;
+                    p.push(pr::display_ident(alias))?;
+                }
+                Some(())
+            }
+            pr::ImportKind::Many(path, parts) => {
+                p.push(path.to_string())?;
+
+                Between {
+                    prefix: "(",
+                    node: &Separated {
+                        nodes: parts,
+                        sep_inline: ", ",
+                        sep_line_end: ",",
+                    },
+                    suffix: ")",
+                    span: None,
+                }
+                .print(p)
+            }
+        }
+    }
+
+    fn span(&self) -> Option<crate::Span> {
+        Some(self.span)
     }
 }

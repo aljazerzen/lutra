@@ -33,11 +33,16 @@ impl NameResolver<'_> {
         &mut self,
         import_def: pr::ImportDef,
     ) -> Result<pr::ImportDef, Diagnostic> {
-        let fq = self.lookup_in_mod_tree(self.def_module_path, &import_def.target)?;
-        if !fq.within.is_empty() {
+        let target = import_def.as_simple().unwrap();
+
+        let target_abs = self.lookup_in_mod_tree(self.def_module_path, target)?;
+        if !target_abs.within.is_empty() {
             todo!();
         }
-        Ok(pr::ImportDef { target: fq.to_def })
+        Ok(pr::ImportDef::new_simple(
+            target_abs.to_def,
+            import_def.span,
+        ))
     }
 }
 
@@ -272,7 +277,7 @@ impl NameResolver<'_> {
             // resolved imports
             pr::DefKind::Import(import) => {
                 // use resolved fq ident and extend it with remaining steps
-                let mut new_path = import.target.clone();
+                let mut new_path = import.as_simple().unwrap().clone();
                 new_path.extend(steps);
                 self.lookup_in_mod_tree(&[], &new_path)
             }
@@ -280,10 +285,11 @@ impl NameResolver<'_> {
             // unresolved imports
             pr::DefKind::Unresolved(Some(def_kind)) if def_kind.is_import() => {
                 let import = def_kind.as_import().unwrap();
+                let import_target = import.as_simple().unwrap();
 
                 // resolve import target
                 let import_fq = self
-                    .lookup_in_mod_tree(base_fq.parent(), &import.target)
+                    .lookup_in_mod_tree(base_fq.parent(), import_target)
                     .with_span_fallback(def.span)?;
 
                 tracing::debug!("resolved import to {import_fq:?}, steps={steps}");

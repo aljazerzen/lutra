@@ -65,7 +65,14 @@ pub fn source() -> impl Parser<TokenKind, Source, Error = PError> {
 
 fn into_module(def_vec: Vec<(String, Def)>, emit: &mut dyn FnMut(PError)) -> ModuleDef {
     let mut defs = IndexMap::with_capacity(def_vec.len());
-    for (name, def) in def_vec {
+    for (i, (name, def)) in def_vec.into_iter().enumerate() {
+        // hack that allows imports not to have names
+        let name = if name.is_empty() {
+            format!("_import{i}")
+        } else {
+            name
+        };
+
         let span = def.span.unwrap();
         let conflict = defs.insert(name, def);
         if let Some(conflict) = conflict {
@@ -192,15 +199,32 @@ fn type_def(
 }
 
 fn import_def() -> impl Parser<TokenKind, (String, DefKind), Error = PError> + Clone {
+    let import = recursive(|import_part| {
+        ident()
+            .then(choice((
+                just(TokenKind::PathSep)
+                    .ignore_then(
+                        import_part
+                            .separated_by(ctrl(','))
+                            .allow_trailing()
+                            .delimited_by(ctrl('('), ctrl(')')),
+                    )
+                    .map(|children| ImportKind::Many(Path::empty(), children)),
+                keyword("as")
+                    .ignore_then(ident_part())
+                    .or_not()
+                    .map(|alias| ImportKind::Single(Path::empty(), alias)),
+            )))
+            .map_with_span(|(path, mut kind), span| {
+                let (ImportKind::Single(p, ..) | ImportKind::Many(p, ..)) = &mut kind;
+                *p = path;
+                ImportDef { kind, span }
+            })
+    });
+
     keyword("import")
-        .ignore_then(ident())
-        .then(keyword("as").ignore_then(ident_part()).or_not())
-        .map(|(target, alias)| {
-            (
-                alias.unwrap_or_else(|| target.last().to_string()),
-                DefKind::Import(ImportDef { target }),
-            )
-        })
+        .ignore_then(import)
+        .map(|import| ("".into(), DefKind::Import(import)))
         .labelled("import statement")
 }
 
