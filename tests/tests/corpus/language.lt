@@ -2171,3 +2171,8 @@ const main: std::Date = @-10000-11-14
 const main: std::Date = @100000-11-14
 # >
 @+100000-11-14
+
+# === date_03
+const main = std::Date(0)
+# >
+@1970-01-01

@@ -74,6 +74,7 @@ impl super::TypeResolver<'_> {
                             let who = || Some(fq_ident.last().to_string());
                             self.validate_expr_type(&mut value, expected_ty, &who)
                                 .unwrap_or_else(self.push_diagnostic());
+                            value.ty = Some(expected_ty.clone());
                         }
 
                         // finalize scope
@@ -120,7 +121,10 @@ impl super::TypeResolver<'_> {
             pr::DefKind::Ty(ty_def) => {
                 let mut ty = self.fold_type(ty_def.ty)?;
                 ty.name = Some(fq_ident.last().to_string());
-                pr::DefKind::Ty(pr::TyDef { ty })
+                pr::DefKind::Ty(pr::TyDef {
+                    ty,
+                    is_nominal: ty_def.is_nominal,
+                })
             }
             pr::DefKind::Import(target) => pr::DefKind::Import(target),
         })

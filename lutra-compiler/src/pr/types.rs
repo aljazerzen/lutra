@@ -100,8 +100,12 @@ pub enum TyPrimitive {
 // Type of a function
 #[derive(Debug, Clone, PartialEq, Hash)]
 pub struct TyFunc {
+    /// Types of params and is_constant flag.
     pub params: Vec<(Option<Ty>, bool)>,
+
+    /// Type of the function body
     pub body: Option<Box<Ty>>,
+
     pub ty_params: Vec<TyParam>,
 }
 

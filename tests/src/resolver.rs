@@ -1749,3 +1749,124 @@ fn import_06() {
     func main() -> {b, d, e}
     "#), @"{text, int16, bool}");
 }
+
+#[test]
+fn nominal_00() {
+    insta::assert_snapshot!(_test_err(r#"
+    type MyInt(int32)
+    const x: MyInt = 4: int32
+    "#), @r"
+    [E0006] Error:
+       ╭─[:3:22]
+       │
+     3 │     const x: MyInt = 4: int32
+       │                      ────┬───
+       │                          ╰───── x expected type `MyInt`, but found type `int32`
+    ───╯
+    ");
+}
+
+#[test]
+fn nominal_01() {
+    insta::assert_snapshot!(_test_ty(r#"
+    type MyInt(int32)
+    const main = MyInt(4: int32)
+    "#), @"MyInt");
+}
+
+#[test]
+fn nominal_02() {
+    insta::assert_snapshot!(_test_err(r#"
+    type MyInt(int32)
+    const main = MyInt(4: int32, false)
+    "#), @r"
+    Error:
+       ╭─[:3:18]
+       │
+     3 │     const main = MyInt(4: int32, false)
+       │                  ───────────┬──────────
+       │                             ╰──────────── MyInt expected 1 arguments, but got 2
+    ───╯
+    ");
+}
+
+#[test]
+fn nominal_03() {
+    insta::assert_snapshot!(_test_err(r#"
+    type MyInt(int32)
+    const main = MyInt()
+    "#), @r"
+    Error:
+       ╭─[:3:18]
+       │
+     3 │     const main = MyInt()
+       │                  ───┬───
+       │                     ╰───── MyInt expected 1 arguments, but got 0
+    ───╯
+    ");
+}
+
+#[test]
+fn nominal_04() {
+    insta::assert_snapshot!(_test_err(r#"
+    type MyInt(int32)
+    const main = MyInt(false)
+    "#), @r"
+    [E0006] Error:
+       ╭─[:3:24]
+       │
+     3 │     const main = MyInt(false)
+       │                        ──┬──
+       │                          ╰──── function MyInt, one of the params expected type `MyInt`, but found type `bool`
+       │
+       │ Note:
+       │ type `MyInt` expands to `int32`
+    ───╯
+    ");
+}
+
+#[test]
+fn nominal_05() {
+    insta::assert_snapshot!(_test_ty(r#"
+    type MyInt(int32)
+    const main = MyInt(12).0
+    "#), @"int32");
+}
+
+#[test]
+fn nominal_06() {
+    insta::assert_snapshot!(_test_err(r#"
+    type MyInt(int32)
+    const main = MyInt(12).1
+    "#), @r"
+    [E0006] Error:
+       ╭─[:3:27]
+       │
+     3 │     const main = MyInt(12).1
+       │                           ─┬
+       │                            ╰── field .1 does not exist in type MyInt
+       │
+       │ Note:
+       │ MyInt is a framed type. Inner value can be accessed with `.0`
+    ───╯
+    ");
+}
+
+#[test]
+fn nominal_07() {
+    insta::assert_snapshot!(_test_err(r#"
+    type MyInt(int32)
+    const main = MyInt(12).inner
+    "#), @r"
+    [E0006] Error:
+       ╭─[:3:27]
+       │
+     3 │     const main = MyInt(12).inner
+       │                           ───┬──
+       │                              ╰──── field .inner does not exist in type MyInt
+       │
+       │ Note:
+       │ MyInt is a framed type. Inner value can be accessed with `.0`
+    ───╯
+    ");
+}

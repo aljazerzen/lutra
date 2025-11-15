@@ -1,9 +1,9 @@
-use crate::Result;
 use crate::diagnostic::{Diagnostic, WithErrorInfo};
 use crate::pr;
 use crate::resolver::names;
-use crate::resolver::types::{TypeResolver, scope};
+use crate::resolver::types::{TypeResolver, scope, tuple};
 use crate::utils::fold::{self, PrFold};
+use crate::{Result, printer};
 
 impl fold::PrFold for super::TypeResolver<'_> {
     #[tracing::instrument(name = "e", skip(self, node))]
@@ -16,21 +16,18 @@ impl fold::PrFold for super::TypeResolver<'_> {
                 tracing::debug!("resolving ident {ident:?}...");
 
                 let target = node.target.as_ref().unwrap();
-                let named = self.get_ident(target).with_span(span)?;
+                let named = self.get_ref(target).with_span(span)?;
 
                 tracing::debug!("... resolved to {}", named.as_ref());
 
                 let ty = match named {
-                    scope::Named::Expr(expr) => {
-                        // if the type contains generics, we need to instantiate those
-                        // generics into current function scope
-                        // let ty = self.instantiate_type(ty, id);
-                        expr.ty.clone().unwrap()
-                    }
+                    scope::Named::Expr(expr) => expr.ty.clone().unwrap(),
                     scope::Named::Module => {
                         return Err(scope::err_name_kind("a value", "a module").with_span(span));
                     }
-                    scope::Named::Ty(_, _) => {
+                    scope::Named::Ty {
+                        is_nominal: false, ..
+                    } => {
                         return Err(scope::err_name_kind("a value", "a type").with_span(span));
                     }
                     scope::Named::Scoped(scoped) => match scoped {
@@ -67,6 +64,28 @@ impl fold::PrFold for super::TypeResolver<'_> {
                         };
                         return Ok(r);
                     }
+                    scope::Named::Ty {
+                        is_nominal: true,
+                        ty,
+                    } => {
+                        // nominal types can be called like a function to act as a constructor
+
+                        let ty_nominal = pr::Ty {
+                            target: Some(target.clone()),
+                            ..pr::Ty::new(ident.clone())
+                        };
+                        let ty_framed = ty.clone();
+
+                        return Ok(pr::Expr {
+                            kind: pr::ExprKind::Ident(ident),
+                            ty: Some(pr::Ty::new(pr::TyFunc {
+                                params: vec![(Some(ty_framed), false)],
+                                body: Some(Box::new(ty_nominal)),
+                                ty_params: vec![],
+                            })),
+                            ..node
+                        });
+                    }
                 };
                 let (ty, ty_args) = self.introduce_ty_into_scope(ty, span.unwrap());
                 pr::Expr {
@@ -78,17 +97,36 @@ impl fold::PrFold for super::TypeResolver<'_> {
             }
 
             pr::ExprKind::TupleLookup { base, lookup } => {
-                let base = self.fold_expr(*base)?;
+                let base = Box::new(self.fold_expr(*base)?);
                 let base_ty = base.ty.as_ref().unwrap();
 
+                // special case: lookups into nominal types
+                let base_ty_target = base_ty.target.as_ref().map(|r| self.get_ref(r).unwrap());
+                if let Some(scope::Named::Ty {
+                    ty,
+                    is_nominal: true,
+                }) = base_ty_target
+                {
+                    if !matches!(lookup, pr::Lookup::Position(0)) {
+                        return Err(tuple::error_no_field(base_ty, &lookup)
+                            .with_span(span)
+                            .push_hint(format!(
+                                "{} is a framed type. Inner value can be accessed with `.0`",
+                                printer::print_ty(base_ty)
+                            )));
+                    }
+                    let mut r = *base;
+                    r.ty = Some(ty.clone());
+                    r.span = span;
+                    return Ok(r);
+                }
+
+                // general case: resolve lookup
                 let target_ty = self
                     .resolve_tuple_lookup(base_ty, &lookup, span.unwrap())
                     .with_span(span)?;
 
-                let kind = pr::ExprKind::TupleLookup {
-                    base: Box::new(base),
-                    lookup,
-                };
+                let kind = pr::ExprKind::TupleLookup { base, lookup };
                 pr::Expr {
                     ty: Some(target_ty),
                     kind,
@@ -118,7 +156,13 @@ impl fold::PrFold for super::TypeResolver<'_> {
                 // fold function name
                 let func = Box::new(self.fold_expr(*func)?);
 
-                if let pr::ExprKind::EnumVariant(mut variant) = func.kind {
+                let func_target = func.target.as_ref().map(|ref_| {
+                    // SAFETY: this was resolved already in fold_expr, ExprKind::Ident
+                    self.get_ref(ref_).unwrap()
+                });
+                let is_nominal_constructor = matches!(func_target, Some(scope::Named::Ty { .. }));
+
+                let resolved = if let pr::ExprKind::EnumVariant(mut variant) = func.kind {
                     // special case: enum variant construction
                     let ty = func.ty.as_ref().unwrap();
 
@@ -154,6 +198,18 @@ impl fold::PrFold for super::TypeResolver<'_> {
                 } else {
                     // general case
                     self.resolve_func_call(func, args, span)?
+                };
+
+                if is_nominal_constructor {
+                    // special case: nominal type constructor
+                    // just unwrap the func call and use the first arg
+                    let call = resolved.kind.into_func_call().unwrap();
+                    let mut inner = call.args.into_iter().next().unwrap();
+                    inner.ty = resolved.ty;
+                    inner
+                } else {
+                    // general case
+                    resolved
                 }
             }
 

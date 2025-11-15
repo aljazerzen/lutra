@@ -46,6 +46,7 @@ pub struct ExprDef {
 #[derive(Debug, PartialEq, Clone)]
 pub struct TyDef {
     pub ty: Ty,
+    pub is_nominal: bool,
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -104,11 +105,6 @@ impl Def {
 impl From<ModuleDef> for DefKind {
     fn from(value: ModuleDef) -> Self {
         DefKind::Module(value)
-    }
-}
-impl From<Ty> for DefKind {
-    fn from(ty: Ty) -> Self {
-        DefKind::Ty(TyDef { ty })
     }
 }
 impl From<Expr> for DefKind {

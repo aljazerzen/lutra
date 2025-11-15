@@ -48,6 +48,7 @@ pub trait PrFold {
     fn fold_type_def(&mut self, ty_def: TyDef) -> Result<TyDef> {
         Ok(TyDef {
             ty: self.fold_type(ty_def.ty)?,
+            is_nominal: ty_def.is_nominal,
         })
     }
     fn fold_module_def(&mut self, module_def: ModuleDef) -> Result<ModuleDef> {

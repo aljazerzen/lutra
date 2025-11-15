@@ -34,7 +34,7 @@ impl TypeResolver<'_> {
     }
 
     /// Validates that a type of a found node has an expected type.
-    /// Might infer type variable constraints, that need to be finalized later.
+    /// Might infer new type variable constraints that need to be finalized later.
     pub fn validate_type<F>(&mut self, found: &Ty, expected: &Ty, who: &F) -> Result<(), Diagnostic>
     where
         F: Fn() -> Option<String>,
@@ -109,14 +109,12 @@ impl TypeResolver<'_> {
     }
 
     /// Validate that an found type matches the expected type.
-    /// Both type are concrete: they cannot be identifiers, variables or parameters.
+    /// Both type are concrete: they cannot be variables or parameters.
     fn validate_type_concrete<F>(&mut self, found: Ty, expected: Ty, who: &F) -> crate::Result<()>
     where
         F: Fn() -> Option<String>,
     {
         match (&found.kind, &expected.kind) {
-            (TyKind::Ident(_), _) | (_, TyKind::Ident(_)) => unreachable!(),
-
             // base case
             (TyKind::Primitive(f), TyKind::Primitive(e)) if e == f => Ok(()),
 
@@ -245,6 +243,9 @@ impl TypeResolver<'_> {
                 }
                 Ok(())
             }
+
+            // concrete idents: they refer to nominal types: compare by name
+            (TyKind::Ident(_), TyKind::Ident(_)) if found.target == expected.target => Ok(()),
 
             _ => Err(compose_type_error(&found, &expected, who)),
         }

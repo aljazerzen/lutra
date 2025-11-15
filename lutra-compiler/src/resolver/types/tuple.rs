@@ -285,7 +285,7 @@ impl super::TypeResolver<'_> {
     }
 }
 
-fn error_no_field(base: &Ty, lookup: &pr::Lookup) -> Diagnostic {
+pub fn error_no_field(base: &Ty, lookup: &pr::Lookup) -> Diagnostic {
     Diagnostic::new(
         format!(
             "field {} does not exist in type {}",

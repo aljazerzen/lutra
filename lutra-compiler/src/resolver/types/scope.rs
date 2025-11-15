@@ -86,7 +86,7 @@ pub enum TyVarConstraint {
 #[derive(Debug, strum::AsRefStr)]
 pub enum Named<'a> {
     Expr(&'a pr::Expr),
-    Ty(&'a pr::Ty, bool),
+    Ty { ty: &'a pr::Ty, is_nominal: bool },
     Module,
     Scoped(&'a ScopedKind),
     EnumVariant(&'a pr::Ty, Option<pr::Path>, usize),
@@ -229,7 +229,7 @@ impl<'a> TypeResolver<'a> {
     /// Get definition from within the current scope.
     ///
     /// Does not mutate the current scope or module structure.
-    pub(super) fn get_ident(&'a self, target: &pr::Ref) -> Result<Named<'a>> {
+    pub(super) fn get_ref(&'a self, target: &pr::Ref) -> Result<Named<'a>> {
         tracing::trace!("get_ident: {target:?}");
 
         match target {
@@ -242,9 +242,11 @@ impl<'a> TypeResolver<'a> {
                         }
                         Ok(Named::Expr(expr.value.as_ref().unwrap()))
                     }
-                    pr::DefKind::Ty(def) => self
-                        .lookup_into_ty(&def.ty, Some(to_def), within.as_steps(), true)
-                        .ok_or_else(|| Diagnostic::new_custom("unknown name")),
+                    pr::DefKind::Ty(def) => {
+                        let within = within.as_steps();
+                        self.lookup_into_ty(&def.ty, Some(to_def), within, def.is_nominal)
+                            .ok_or_else(|| Diagnostic::new_custom("unknown name"))
+                    }
 
                     pr::DefKind::Module(_) => Ok(Named::Module),
 
@@ -282,10 +284,20 @@ impl<'a> TypeResolver<'a> {
         };
 
         let target = ty.target.as_ref().unwrap();
-        let named = self.get_ident(target).with_span(ty.span)?;
+        let named = self.get_ref(target).with_span(ty.span)?;
 
         match named {
-            Named::Ty(ty, _is_top_level) => {
+            Named::Ty {
+                is_nominal: true, ..
+            } => {
+                // reference to a nominal type: don't inline, return ident
+                Ok(TyRef::Ty(ty))
+            }
+
+            Named::Ty {
+                is_nominal: false,
+                ty,
+            } => {
                 // reference to a type: all ok
 
                 // but refed ty might be an ident too: recurse!
@@ -395,10 +407,10 @@ impl<'a> TypeResolver<'a> {
         ty: &'a pr::Ty,
         ty_fq: Option<&pr::Path>,
         steps: &[String],
-        top_level: bool,
+        is_nominal: bool,
     ) -> Option<Named<'a>> {
         if steps.is_empty() {
-            return Some(Named::Ty(ty, top_level));
+            return Some(Named::Ty { ty, is_nominal });
         }
         let TyRef::Ty(ty_mat) = self.get_ty_mat(ty).unwrap() else {
             todo!()

@@ -376,4 +376,4 @@ module sql {
 
 ## Elapsed days since Unix Epoch (1970-01-01).
 ## Represented by a signed 32-bit integer, indicating number of days.
-type Date: int32
+type Date(int32)

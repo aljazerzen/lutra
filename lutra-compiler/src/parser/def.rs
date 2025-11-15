@@ -193,8 +193,21 @@ fn type_def(
 ) -> impl Parser<TokenKind, (String, DefKind), Error = PError> + Clone {
     keyword("type")
         .ignore_then(ident_part())
-        .then(ctrl(':').ignore_then(ty))
-        .map(|(name, ty)| (name, DefKind::Ty(TyDef { ty })))
+        .then(
+            choice((
+                // type alias
+                ctrl(':').ignore_then(ty.clone()).map(|ty| TyDef {
+                    ty,
+                    is_nominal: false,
+                }),
+                // new type (nominal / framed type)
+                ty.delimited_by(ctrl('('), ctrl(')')).map(|ty| TyDef {
+                    ty,
+                    is_nominal: true,
+                }),
+            ))
+            .map(DefKind::Ty),
+        )
         .labelled("type definition")
 }
 
