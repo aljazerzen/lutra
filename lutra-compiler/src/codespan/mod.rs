@@ -2,7 +2,7 @@ mod edit;
 mod line_numbers;
 mod span;
 
-pub use edit::{TextEdit, apply_text_edits, minimize_text_edits};
+pub use edit::{TextEdit, apply_text_edits, minimize_text_edits, offset_text_edits};
 pub use line_numbers::LineNumbers;
 pub use span::Span;
 

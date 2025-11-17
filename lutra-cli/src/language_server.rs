@@ -87,6 +87,7 @@ impl tower_lsp_server::LanguageServer for Backend {
                     },
                 )),
                 document_formatting_provider: Some(OneOf::Left(true)),
+                document_range_formatting_provider: Some(OneOf::Left(true)),
 
                 ..Default::default()
             },
@@ -165,7 +166,47 @@ impl tower_lsp_server::LanguageServer for Backend {
 
         let edits = codespan::minimize_text_edits(source, edits);
 
-        Ok(Some(to_proto::text_edits(source, edits)))
+        let line_index = codespan::LineNumbers::new(source);
+        Ok(Some(to_proto::text_edits(&line_index, edits)))
+    }
+
+    async fn range_formatting(
+        &self,
+        params: DocumentRangeFormattingParams,
+    ) -> Result<Option<Vec<TextEdit>>> {
+        let mut doc = {
+            let docs = self.documents.lock().await;
+            let Some(doc) = docs.get(&params.text_document.uri) else {
+                return Ok(None);
+            };
+            doc.clone()
+        };
+
+        let range = from_proto::range(&params.range);
+
+        // extract the range to format
+        let index = codespan::LineNumbers::new(&doc.text);
+        let span = index.span_of_range(&range, 1);
+        doc.text = span.take_slice(doc.text);
+
+        // format
+        // TODO: this does not work if the range spans only a part of a def,
+        // even if it spans a valid expression.
+        // We should probably parse the whole document, discard any errors out
+        // of formatting range, extract the AST nodes that cover the selection
+        // and format them.
+        let source_tree = document_to_source_tree(doc);
+
+        let (err, edits) = lutra_compiler::format(&source_tree);
+        if err.is_some() {
+            // don't format syntactically invalid documents
+            return Ok(None);
+        }
+
+        // offset edits into index space of the original document
+        let edits = codespan::offset_text_edits(edits, span.start as i32);
+
+        Ok(Some(to_proto::text_edits(&index, edits)))
     }
 }
 
@@ -411,12 +452,13 @@ mod to_proto {
         }
     }
 
-    pub fn text_edits(source: &str, edits: Vec<codespan::TextEdit>) -> Vec<TextEdit> {
-        let line_numbers = codespan::LineNumbers::new(source);
-
+    pub fn text_edits(
+        line_index: &codespan::LineNumbers,
+        edits: Vec<codespan::TextEdit>,
+    ) -> Vec<TextEdit> {
         let mut res = Vec::with_capacity(edits.len());
         for edit in edits {
-            let rng = line_numbers.range_of_span(edit.span);
+            let rng = line_index.range_of_span(edit.span);
             res.push(TextEdit {
                 range: range(&rng),
                 new_text: edit.new_text,

@@ -30,8 +30,23 @@ pub fn minimize_text_edits(text: &str, edits: Vec<TextEdit>) -> Vec<TextEdit> {
     edits
         .into_iter()
         .filter(|e| {
-            let old_text = &text[e.span.start as usize..e.span.end() as usize];
+            let old_text = e.span.get_slice(text);
             old_text != e.new_text
+        })
+        .collect()
+}
+
+/// Apply an offset to span of each edit
+pub fn offset_text_edits(edits: Vec<TextEdit>, offset: i32) -> Vec<TextEdit> {
+    edits
+        .into_iter()
+        .map(|mut e| {
+            e.span.start = if 0 <= offset {
+                e.span.start.saturating_add(offset as u32)
+            } else {
+                e.span.start.saturating_sub((-offset) as u32)
+            };
+            e
         })
         .collect()
 }

@@ -26,6 +26,15 @@ impl Span {
     pub fn end(&self) -> u32 {
         self.start + self.len as u32
     }
+
+    pub fn get_slice<'s>(&self, text: &'s str) -> &'s str {
+        &text[self.start as usize..self.end() as usize]
+    }
+
+    pub fn take_slice(&self, mut text: String) -> String {
+        text.truncate(self.end() as usize);
+        text.split_off(self.start as usize)
+    }
 }
 
 impl From<Span> for std::ops::Range<usize> {
