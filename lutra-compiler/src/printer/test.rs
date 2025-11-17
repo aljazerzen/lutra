@@ -502,6 +502,21 @@ where T
 }
 
 #[test]
+fn trivia_11() {
+    assert_snapshot!(_format(r#"
+    ## This is a def
+    ## with a triple
+    ## doc comment
+    const x = false
+ "#), @r"
+    ## This is a def
+    ## with a triple
+    ## doc comment
+    const x = false
+    ");
+}
+
+#[test]
 fn source_00() {
     assert_snapshot!(_format(r"submodule const a = 3"), @r"
     submodule
@@ -531,5 +546,16 @@ const b = 5
     const a_name_that_is_too_long_to_fit_on_one_line_and_will_surly_fail_to_print = 4 # TODO: too long
 
     const b = 5
+    ");
+}
+
+#[test]
+fn source_02() {
+    // nominal type defs
+
+    assert_snapshot!(_format(r#"
+    type Date(int32)
+    "#), @r"
+    type Date(int32)
     ");
 }

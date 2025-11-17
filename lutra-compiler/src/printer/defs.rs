@@ -43,7 +43,10 @@ impl PrintSource for (&pr::ModuleDef, Option<crate::Span>) {
                     p.new_line();
                 }
             }
-            p.take_trivia_new_line(def.span.map(|s| s.start).unwrap_or_default());
+
+            if let Some(span) = &def.span {
+                while p.take_trivia_new_line(span.start).is_some() {}
+            }
 
             if let Some(doc_comment) = &def.doc_comment {
                 doc_comment.print(p)?;
@@ -76,7 +79,7 @@ impl PrintSource for pr::DocComment {
             p.push_unchecked(line);
             p.new_line();
         }
-        p.take_trivia_new_line(self.span.end());
+        while p.take_trivia_new_line(self.span.end()).is_some() {}
         Some(())
     }
 
@@ -150,8 +153,19 @@ impl PrintSource for NamedDef<'_> {
             pr::DefKind::Ty(ty_def) => {
                 p.push("type ")?;
                 p.push(pr::display_ident(self.0))?;
-                p.push(": ")?;
-                ty_def.ty.print(p)?;
+
+                if ty_def.is_nominal {
+                    Between {
+                        node: &ty_def.ty,
+                        prefix: "(",
+                        suffix: ")",
+                        span: self.1.span,
+                    }
+                    .print(p)?;
+                } else {
+                    p.push(": ")?;
+                    ty_def.ty.print(p)?;
+                }
             }
             pr::DefKind::Import(import_def) => {
                 p.push("import ")?;
