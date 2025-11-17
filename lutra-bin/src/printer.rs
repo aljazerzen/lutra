@@ -66,6 +66,23 @@ where
                 // (this might happen when date is out range)
             }
         }
+        if let ir::TyKind::Ident(ty_ident) = &ty.kind
+            && ty_ident.0 == ["std", "Time"]
+        {
+            use crate::Decode;
+            let micros_t = i64::decode(buf.chunk())?;
+
+            let micros = (micros_t % 1000000).abs();
+            let sec_t = micros_t / 1000000;
+
+            let sec = (sec_t % 60).abs();
+            let min_t = sec_t / 60;
+
+            let min = (min_t % 60).abs();
+            let h_t = min_t / 60;
+
+            return Ok(format!("@{h_t:02}:{min:02}:{sec:02}.{micros:06}"));
+        }
 
         // general case
         let ty = Visitor::<B>::get_mat_ty(self, ty);

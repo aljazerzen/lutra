@@ -113,11 +113,10 @@ impl TypeResolver<'_> {
             }
 
             Literal::Date(_) => {
-                let fq_path = pr::Path::new([NS_STD, "Date"]);
-                let mut ty = pr::Ty::new(fq_path.clone());
-                ty.span = span;
-                ty.target = Some(pr::Ref::Global(pr::AbsoluteRef::new(fq_path)));
-                return ty;
+                return new_ty_ident(pr::Path::new([NS_STD, "Date"]), span);
+            }
+            Literal::Time(_) => {
+                return new_ty_ident(pr::Path::new([NS_STD, "Time"]), span);
             }
 
             _ => todo!(),
@@ -126,6 +125,13 @@ impl TypeResolver<'_> {
         ty.span = span;
         ty
     }
+}
+
+fn new_ty_ident(fq_path: Path, span: Option<Span>) -> Ty {
+    let mut ty = pr::Ty::new(fq_path.clone());
+    ty.span = span;
+    ty.target = Some(pr::Ref::Global(pr::AbsoluteRef::new(fq_path)));
+    ty
 }
 
 #[allow(dead_code)]

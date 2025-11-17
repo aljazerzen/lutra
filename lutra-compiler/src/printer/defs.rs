@@ -183,6 +183,7 @@ impl PrintSource for pr::ImportDef {
             }
             pr::ImportKind::Many(path, parts) => {
                 p.push(path.to_string())?;
+                p.push("::")?;
 
                 Between {
                     prefix: "(",

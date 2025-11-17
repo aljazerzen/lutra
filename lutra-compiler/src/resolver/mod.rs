@@ -4,6 +4,7 @@ mod const_eval;
 mod desugar;
 mod module;
 mod names;
+mod prefixer;
 mod types;
 
 use crate::Project;
@@ -30,10 +31,10 @@ pub fn resolve(
 
     // inject dependencies
     for dep in &dependencies {
-        root_module.defs.insert(
-            dep.name.clone(),
-            pr::Def::new(dep.inner.root_module.clone()),
-        );
+        let dep_module = dep.inner.root_module.clone();
+        let dep_module = prefixer::prefix(dep_module, dep.name.clone());
+        let def = pr::Def::new(dep_module);
+        root_module.defs.insert(dep.name.clone(), def);
     }
 
     // resolve names

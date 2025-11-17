@@ -22,10 +22,10 @@ pub struct Date {
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct Time {
-    pub hours: u8,
+    pub hours: i32,
     pub min: u8,
     pub sec: u8,
-    pub millis: Option<u16>,
+    pub micros: Option<u32>,
 }
 
 impl std::fmt::Display for Literal {
@@ -65,17 +65,30 @@ impl std::fmt::Display for Date {
     }
 }
 
+impl Time {
+    pub fn to_microseconds(&self) -> i64 {
+        let h = self.hours.abs() as i64;
+        let min = h * 60 + self.min as i64;
+        let sec = min * 60 + self.sec as i64;
+        let mut micros = sec * 1000000 + self.micros.unwrap_or_default() as i64;
+        if self.hours < 0 {
+            micros *= -1;
+        }
+        micros
+    }
+}
+
 impl std::fmt::Display for Time {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let Time {
             hours: hour,
             min,
             sec,
-            millis,
+            micros: millis,
         } = self;
         write!(f, "{hour:02}:{min:02}:{sec:02}")?;
         if let Some(millis) = millis {
-            write!(f, ".{millis:03}")?;
+            write!(f, ".{millis:06}")?;
         }
         Ok(())
     }

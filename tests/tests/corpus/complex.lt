@@ -190,7 +190,7 @@ func main() -> (
 
 # === compounding_interest_00
 
-type Accumulator: {time: int32, repayment: float64, dept: float64}
+type Accumulator: {time: int32, repayment: float64, debt: float64}
 
 const payments: [{time: int32, amount: float64}] = [
   {3, 10_000.0}, # no fmt
@@ -203,13 +203,13 @@ const payments: [{time: int32, amount: float64}] = [
 func main() -> (
   payments
   | std::fold(
-    {time = 0, repayment = 0.0, dept = 50000.0},
+    {time = 0, repayment = 0.0, debt = 50000.0},
     func (acc: Accumulator, payment: {time: int32, amount: float64}) -> (
       {
         time = payment.time,
         repayment = payment.amount,
-        dept = (
-          acc.dept
+        debt = (
+          acc.debt
           * std::math::pow(1.0 + 0.05 / 12.0, payment.time - acc.time | std::to_float64)
           - payment.amount
         ),
@@ -221,7 +221,7 @@ func main() -> (
 {
   time = 13,
   repayment = 10000.0,
-  dept = 373.8299254002286,
+  debt = 373.8299254002286,
 }
 
 
@@ -230,7 +230,7 @@ func main() -> (
 type Payment: {time: int32, amount: float64}
 
 type State: {
-  time: int32, dept: float64, last_payment: Payment,
+  time: int32, debt: float64, last_payment: Payment,
 }
 
 const payments: [Payment] = [
@@ -243,22 +243,22 @@ const payments: [Payment] = [
 
 func apply_time(state: State, time: int32): State -> {
   time = time,
-  dept = (
-    state.dept
+  debt = (
+    state.debt
     * std::math::pow(1.0 + 0.05 / 12.0, time - state.time | std::to_float64)
   ),
   last_payment = state.last_payment,
 }
 
 func apply_payment(state: State, payment: Payment): State -> {
-  time = state.time, dept = state.dept - payment.amount, last_payment = payment,
+  time = state.time, debt = state.debt - payment.amount, last_payment = payment,
 }
 
-func simulate_dept(at_time: int32) -> (
+func simulate_debt(at_time: int32) -> (
   payments
   | std::filter(func (p: Payment) -> p.time <= at_time)
   | std::fold(
-    {time = 0, dept = 50000.0, last_payment = std::default()}: State,
+    {time = 0, debt = 50000.0, last_payment = std::default()}: State,
     func (state: State, payment: Payment) -> (
       state | apply_time(payment.time) | apply_payment(payment)
     ),
@@ -266,13 +266,13 @@ func simulate_dept(at_time: int32) -> (
   | apply_time(at_time)
 )
 
-func main() -> [10, 15] | std::map(func (x) -> simulate_dept(x))
+func main() -> [10, 15] | std::map(func (x) -> simulate_debt(x))
 
 # >
 [
   {
     time = 10,
-    dept = 10245.230201028651,
+    debt = 10245.230201028651,
     last_payment = {
       time = 9,
       amount = 11200.0,
@@ -280,10 +280,55 @@ func main() -> [10, 15] | std::map(func (x) -> simulate_dept(x))
   },
   {
     time = 15,
-    dept = 0.8368558536575957,
+    debt = 0.8368558536575957,
     last_payment = {
       time = 13,
       amount = 10373.0,
     },
   },
 ]
+
+# === compounding_interest_02
+
+import std::(Date, math::pow)
+
+type Payment: {date: Date, amount: float64}
+
+const payments: [Payment] = [
+  {@2025-03-01, 10000.0},
+  {@2025-05-01, 10000.0},
+  {@2025-07-01, 10000.0},
+  {@2025-09-01, 11200.0},
+  {@2025-12-01, 10000.0},
+]
+
+type State: {date: Date, debt: float64}
+
+const initial_state: State = {date = @2025-01-01, debt = 50000.0}
+
+func main() -> std::fold(
+  payments,
+  initial_state,
+  func (acc: State, payment: {date: Date, amount: float64}) -> {
+    date = payment.date,
+    debt = (
+      acc.debt
+      * pow(
+        # 1 + monthly rate
+        1.0 + 0.05 / 12.0,
+
+        # duration in months
+        payment.date.0 - acc.date.0
+        | std::to_float64
+        | std::div(30.0)
+      )
+      - payment.amount
+    ),
+  },
+)
+
+# >
+{
+  date = @2025-12-01,
+  debt = 123.00277292101055,
+}

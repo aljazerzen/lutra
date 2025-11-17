@@ -20,8 +20,8 @@ use lutra_bin::{rr, string, vec};
 
 // lutra-runner-postgres will be accessible:
 // - via using `Runner` trait,
-// - trough `runner::binary::Server`,
-// - trough `runner::posix::Server`,
+// - through `runner::binary::Server`,
+// - through `runner::posix::Server`,
 // - over HTTP, via `runner::http::Server`,
 
 /// Ability to execute a lutra program.

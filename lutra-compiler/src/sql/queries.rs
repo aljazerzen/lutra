@@ -344,9 +344,20 @@ impl<'a> Context<'a> {
 
     /// Returns columns of the native pg repr, described by a type.
     /// This is used in FROM and INSERT, not the in-query relation repr.
-    fn pg_repr_columns<'t>(&'t self, ty: &'t ir::Ty) -> &'t [ir::TyTupleField] {
-        let ty_tuple = self.get_ty_mat(ty).kind.as_array().unwrap();
-        self.get_ty_mat(ty_tuple).kind.as_tuple().unwrap()
+    fn pg_repr_columns<'t>(&'t self, ty: &'t ir::Ty) -> Vec<(String, &'t ir::Ty)> {
+        match &self.get_ty_mat(ty).kind {
+            ir::TyKind::Primitive(_) => vec![("value".into(), ty)],
+            ir::TyKind::Tuple(fields) => fields
+                .iter()
+                .map(|f| (f.name.clone().unwrap(), &f.ty))
+                .collect(),
+            ir::TyKind::Array(item) => {
+                // no index column
+                self.pg_repr_columns(item)
+            }
+            ir::TyKind::Enum(_) => todo!(),
+            ir::TyKind::Function(_) | ir::TyKind::Ident(_) => unreachable!(),
+        }
     }
 
     /// Constructs a projection that imports from native pg repr.
@@ -355,14 +366,21 @@ impl<'a> Context<'a> {
         rel_var: Option<&str>,
         ty: &ir::Ty,
     ) -> Vec<sql_ast::SelectItem> {
-        let values = itertools::chain(
-            // index
-            std::iter::once(sql_ast::Expr::Source("NULL::int4".to_string())),
-            // table columns
-            self.pg_repr_columns(ty).iter().map(move |f| {
-                let ident = utils::identifier(rel_var, f.name.clone().unwrap());
-                self.pg_repr_import(ident, &f.ty)
-            }),
+        let mut values = Vec::new();
+
+        // index
+        if self.get_ty_mat(ty).kind.is_array() {
+            values.push(sql_ast::Expr::Source("NULL::int4".to_string()));
+        }
+
+        // table columns
+        values.extend(
+            self.pg_repr_columns(ty)
+                .into_iter()
+                .map(move |(f_name, f_ty)| {
+                    let ident = utils::identifier(rel_var, f_name);
+                    self.pg_repr_import(ident, f_ty)
+                }),
         );
         self.projection(ty, values)
     }
@@ -375,6 +393,14 @@ impl<'a> Context<'a> {
             && ty_ident.0 == ["std", "Date"]
         {
             return sql_ast::Expr::Source(format!("({expr_pg}::date - '1970-01-01'::date)"));
+        }
+        // special case: std::Time
+        if let ir::TyKind::Ident(ty_ident) = &ty.kind
+            && ty_ident.0 == ["std", "Time"]
+        {
+            return sql_ast::Expr::Source(format!(
+                "(EXTRACT(EPOCH FROM {expr_pg}) * 1000000)::int8"
+            ));
         }
 
         // general case: noop
@@ -390,6 +416,14 @@ impl<'a> Context<'a> {
             && ty_ident.0 == ["std", "Date"]
         {
             return sql_ast::Expr::Source(format!("('1970-01-01'::date + {expr})"));
+        }
+        // special case: std::Time
+        if let ir::TyKind::Ident(ty_ident) = &ty.kind
+            && ty_ident.0 == ["std", "Time"]
+        {
+            return sql_ast::Expr::Source(format!(
+                "('00:00'::time + INTERVAL '1 microsecond' * {expr})"
+            ));
         }
 
         // general case: noop
@@ -550,7 +584,7 @@ impl<'a> Context<'a> {
                 let columns = self
                     .pg_repr_columns(input_ty)
                     .iter()
-                    .map(|field| field.name.as_ref().unwrap())
+                    .map(|(f_name, _f_ty)| f_name)
                     .map(utils::new_ident)
                     .collect();
 

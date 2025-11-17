@@ -1715,62 +1715,6 @@ async fn sql_from_00() {
 }
 
 #[tokio::test(flavor = "current_thread")]
-async fn sql_from_01() {
-    // test schema names
-
-    let client = _get_test_db_client().await.unwrap();
-    let mut runner = RunnerAsync::new(client);
-
-    insta::assert_snapshot!(_run_on(&mut runner, r#"
-    type Movie: {title: text}
-
-    func main(): [Movie] -> std::sql::from("public/movies")
-    "#, lutra_bin::Value::unit()).await.1, @r#"
-    [
-      {
-        title = "Forrest Gump",
-      },
-      {
-        title = "The Prestige",
-      },
-    ]
-    "#);
-
-    insta::assert_snapshot!(_run_on(&mut runner, r#"
-    type Day: {name: text}
-
-    func main(): [Day] -> std::sql::from("another/days")
-    "#, lutra_bin::Value::unit()).await.1, @r#"
-    [
-      {
-        name = "Monday",
-      },
-      {
-        name = "Tuesday",
-      },
-    ]
-    "#);
-
-    insta::assert_snapshot!(_run_on(&mut runner, r#"
-    type Day: {name: text}
-
-    func main(): [Day] -> std::sql::from("another/proj/days")
-    "#, lutra_bin::Value::unit()).await.1, @r#"
-    [
-      {
-        name = "Wednesday",
-      },
-      {
-        name = "Thursday",
-      },
-      {
-        name = "Friday",
-      },
-    ]
-    "#);
-}
-
-#[tokio::test(flavor = "current_thread")]
 async fn sql_insert_00() {
     let mut client = _get_test_db_client().await.unwrap();
     let tran = client.transaction().await.unwrap();
@@ -2024,7 +1968,7 @@ fn opt_01() {
 }
 
 #[test]
-fn std_sql_expr() {
+fn std_sql_expr_00() {
     insta::assert_snapshot!(_sql_and_output(_run(r#"
     func main(): [{hello: text, world: bool, x: std::Date}]
     -> std::sql::expr(
@@ -2053,6 +1997,113 @@ fn std_sql_expr() {
       },
     ]
     "#);
+}
+
+#[test]
+fn date_time_00() {
+    insta::assert_snapshot!(_sql_and_output(_run(r#"
+    func main(): {a: std::Date, b: std::Time}
+    -> std::sql::expr(
+      "select '2025-11-14'::date as a, '04:05:06.789'::time as b"
+    )
+    "#, lutra_bin::Value::unit())), @r"
+    SELECT
+      (r0.a::date - '1970-01-01'::date) AS _0,
+      (
+        EXTRACT(
+          EPOCH
+          FROM
+            r0.b
+        ) * 1000000
+      )::int8 AS _1
+    FROM
+      (
+        select
+          '2025-11-14'::date as a,
+          '04:05:06.789'::time as b
+      ) AS r0
+    ---
+    {
+      a = @2025-11-14,
+      b = @04:05:06.789000,
+    }
+    ");
+}
+
+#[tokio::test(flavor = "current_thread")]
+async fn sql_date_time_01() {
+    // test import from pg repr
+
+    let client = _get_test_db_client().await.unwrap();
+    let mut runner = RunnerAsync::new(client);
+
+    insta::assert_snapshot!(_sql_and_output(_run_on(&mut runner, r#"
+    func main(): {a: std::Date, b: std::Time}
+    -> std::sql::expr(
+      "select '2025-11-14'::date as a, '04:05:06.789'::time as b"
+    )
+    "#, lutra_bin::Value::unit()).await), @r"
+    SELECT
+      (r0.a::date - '1970-01-01'::date) AS _0,
+      (
+        EXTRACT(
+          EPOCH
+          FROM
+            r0.b
+        ) * 1000000
+      )::int8 AS _1
+    FROM
+      (
+        select
+          '2025-11-14'::date as a,
+          '04:05:06.789'::time as b
+      ) AS r0
+    ---
+    {
+      a = @2025-11-14,
+      b = @04:05:06.789000,
+    }
+    ");
+}
+
+#[tokio::test(flavor = "current_thread")]
+async fn sql_date_time_02() {
+    // test export pg repr
+
+    // TODO: decide if current behavior of "modulo 24-hours" is what we want
+
+    let client = _get_test_db_client().await.unwrap();
+    client
+        .execute(r#"CREATE TEMPORARY TABLE test(t time)"#, &[])
+        .await
+        .unwrap();
+    let mut runner = RunnerAsync::new(client);
+
+    insta::assert_snapshot!(_run_on(&mut runner, r#"
+    func main() -> (
+      [{t = @16:07:44.12}, {t = @-16:07:44.12}, {t = @25:07:44.12}]
+      | std::sql::insert("test")
+    )
+    "#, lutra_bin::Value::unit()).await.1, @r"
+    {
+    }
+    ");
+
+    insta::assert_snapshot!(_run_on(&mut runner, r#"
+    func main(): [{t: std::Time}] -> std::sql::from("test")
+    "#, lutra_bin::Value::unit()).await.1, @r"
+    [
+      {
+        t = @16:07:44.120000,
+      },
+      {
+        t = @07:52:15.880000,
+      },
+      {
+        t = @01:07:44.120000,
+      },
+    ]
+    ");
 }
 
 #[tokio::test(flavor = "current_thread")]

@@ -309,38 +309,40 @@ fn literal() -> impl Parser<char, Literal, Error = LError> {
     let year = just('+')
         .or(just('-'))
         .or_not()
-        .chain(filter(|c: &char| c.is_ascii_digit()).repeated())
+        .chain(digits().at_least(1))
         .map(str_parse::<i32>);
     let date_part = year
         .then_ignore(just('-'))
-        .then(digits(2).map(str_parse::<u8>))
+        .then(digits().exactly(2).map(str_parse::<u8>))
         .then_ignore(just('-'))
-        .then(digits(2).map(str_parse::<u8>))
+        .then(digits().exactly(2).map(str_parse::<u8>))
         .map(|((year, month), day)| Date { year, month, day })
         .boxed();
 
-    let time_part = (digits(2).map(str_parse::<u8>))
+    let hour = just('+')
+        .or(just('-'))
+        .or_not()
+        .chain(digits().at_least(1))
+        .map(str_parse::<i32>);
+    let time_part = hour
         // minutes
-        .then(just(':').ignore_then(digits(2)).map(str_parse::<u8>))
+        .then_ignore(just(':'))
+        .then(digits().exactly(2).map(str_parse::<u8>))
         // seconds
-        .then(just(':').ignore_then(digits(2)).map(str_parse::<u8>))
+        .then_ignore(just(':'))
+        .then(digits().exactly(2).map(str_parse::<u8>))
         // milliseconds
         .then(
             just('.')
-                .ignore_then(
-                    filter(|c: &char| c.is_ascii_digit())
-                        .repeated()
-                        .at_least(1)
-                        .at_most(3),
-                )
-                .map(|s| str_parse_fraction(s, 3))
+                .ignore_then(digits().at_least(1).at_most(6))
+                .map(|s| str_parse_fraction::<u32>(s, 6))
                 .or_not(),
         )
-        .map(|(((hours, min), sec), millis)| Time {
+        .map(|(((hours, min), sec), micros)| Time {
             hours,
             min,
             sec,
-            millis,
+            micros,
         })
         .boxed();
 
@@ -449,10 +451,8 @@ fn escaped_character() -> impl Parser<char, char, Error = LError> {
     )))
 }
 
-fn digits(count: usize) -> impl Parser<char, Vec<char>, Error = LError> {
-    filter(|c: &char| c.is_ascii_digit())
-        .repeated()
-        .exactly(count)
+fn digits() -> chumsky::combinator::Repeated<impl Parser<char, char, Error = LError>> {
+    filter(|c: &char| c.is_ascii_digit()).repeated()
 }
 
 fn non_ident() -> impl Parser<char, (), Error = LError> {
