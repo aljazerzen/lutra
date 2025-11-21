@@ -1,6 +1,5 @@
 ---
 title: Reference
-weight: 10
 ---
 
 Lutra is a statically typed programming language with a minimal

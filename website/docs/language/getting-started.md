@@ -1,6 +1,5 @@
 ---
 title: Getting started
-weight: 2
 ---
 
 Easiest way to try out the language is to run `.lt` files with the CLI. To do that, first install the CLI:

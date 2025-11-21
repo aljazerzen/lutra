@@ -2,9 +2,15 @@ _default:
     just --list
 
 serve:
-    zola serve
+    zola serve \
+        & zensical serve --dev-addr 127.0.0.1:8000
+
+build:
+    rm -rf public
+    zola build
+    zensical build
 
 publish:
-    zola build
+    just build
     cd public && git init && git remote add origin ssh://git@codeberg.org/lutra/pages.git
     cd public && git add . && git commit -m 'publish' && git push origin main --force

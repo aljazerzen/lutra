@@ -8,11 +8,11 @@
         "rust-analyzer-src": "rust-analyzer-src"
       },
       "locked": {
-        "lastModified": 1755499663,
-        "narHash": "sha256-OxHGov+A4qR4kpO3e1I3LFR78IAKvDFnWoWsDWvFhKU=",
+        "lastModified": 1763880175,
+        "narHash": "sha256-WfItZn6duisxCxyltbu7Hs7kxzNeylgZGOwCYwHe26g=",
         "owner": "nix-community",
         "repo": "fenix",
-        "rev": "d1ff4457857ad551e8d6c7c79324b44fac518b8b",
+        "rev": "a563f057979806c59da53070297502eb7af22f62",
         "type": "github"
       },
       "original": {
@@ -39,18 +39,42 @@
         "type": "github"
       }
     },
+    "lutra-pygments": {
+      "inputs": {
+        "flake-utils": [
+          "flake-utils"
+        ],
+        "nixpkgs": [
+          "nixpkgs"
+        ]
+      },
+      "locked": {
+        "lastModified": 1763744064,
+        "narHash": "sha256-wNzVLe//78LodrzWtu+FBCkKZGU4kxzV8JI0PM/B544=",
+        "ref": "main",
+        "rev": "f64b13c3b247e446d6191a38530ecdd370ce6e94",
+        "revCount": 3,
+        "type": "git",
+        "url": "https://codeberg.org/lutra/lutra-pygments.git"
+      },
+      "original": {
+        "ref": "main",
+        "type": "git",
+        "url": "https://codeberg.org/lutra/lutra-pygments.git"
+      }
+    },
     "nixpkgs": {
       "locked": {
-        "lastModified": 1748026580,
-        "narHash": "sha256-rWtXrcIzU5wm/C8F9LWvUfBGu5U5E7cFzPYT1pHIJaQ=",
-        "owner": "nixos",
+        "lastModified": 1763745798,
+        "narHash": "sha256-UsHwCUjxJlNEqocTtUt0F5Lt2ryajRyZFw4OgD7FpZU=",
+        "owner": "aljazerzen",
         "repo": "nixpkgs",
-        "rev": "11cb3517b3af6af300dd6c055aeda73c9bf52c48",
+        "rev": "bdf0b657d51c733d976aeb12755742c5d221fe11",
         "type": "github"
       },
       "original": {
-        "owner": "nixos",
-        "ref": "25.05",
+        "owner": "aljazerzen",
+        "ref": "init-zensical-prerelease",
         "repo": "nixpkgs",
         "type": "github"
       }
@@ -59,17 +83,18 @@
       "inputs": {
         "fenix": "fenix",
         "flake-utils": "flake-utils",
+        "lutra-pygments": "lutra-pygments",
         "nixpkgs": "nixpkgs"
       }
     },
     "rust-analyzer-src": {
       "flake": false,
       "locked": {
-        "lastModified": 1755004716,
-        "narHash": "sha256-TbhPR5Fqw5LjAeI3/FOPhNNFQCF3cieKCJWWupeZmiA=",
+        "lastModified": 1763846202,
+        "narHash": "sha256-f5PvQONttEQCjnQ52zAEVJvXDZ5l2gbItLfDyfcyGgk=",
         "owner": "rust-lang",
         "repo": "rust-analyzer",
-        "rev": "b2a58b8c6eff3c3a2c8b5c70dbf69ead78284194",
+        "rev": "50621856a594a357c3aff0c5176ba8db4118133d",
         "type": "github"
       },
       "original": {

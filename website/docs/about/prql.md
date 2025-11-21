@@ -1,6 +1,5 @@
 ---
 title: Relation to PRQL
-weight: 2
 ---
 
 PRQL is a pipelined relational query language, in some ways similar to Lutra. It was the

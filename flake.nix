@@ -1,10 +1,15 @@
 {
   inputs = {
-    nixpkgs.url = "github:nixos/nixpkgs/25.05";
+    nixpkgs.url = "github:aljazerzen/nixpkgs/init-zensical-prerelease";
     flake-utils.url = "github:numtide/flake-utils";
     fenix = {
       url = "github:nix-community/fenix";
       inputs.nixpkgs.follows = "nixpkgs";
+    };
+    lutra-pygments = {
+      url = "git+https://codeberg.org/lutra/lutra-pygments.git?ref=main";
+      inputs.nixpkgs.follows = "nixpkgs";
+      inputs.flake-utils.follows = "flake-utils";
     };
   };
 
@@ -14,11 +19,25 @@
       nixpkgs,
       flake-utils,
       fenix,
+      lutra-pygments,
     }:
     flake-utils.lib.eachDefaultSystem (
       system:
       let
-        pkgs = nixpkgs.legacyPackages.${system};
+        pkgs = import nixpkgs {
+          inherit system;
+          overlays = [
+            # overlay zensical to include lutra-pygments
+            (final: prev: {
+              zensical = prev.zensical.overridePythonAttrs (old: {
+                dependencies = old.dependencies ++ [
+                  lutra-pygments.packages.${system}.default
+                ];
+              });
+
+            })
+          ];
+        };
         fenix_pkgs = fenix.packages.${system};
       in
       {
@@ -59,6 +78,7 @@
             # website
             pkgs.zola
             pkgs.typos-lsp
+            pkgs.zensical
           ];
 
           venvDir = "./target/python";

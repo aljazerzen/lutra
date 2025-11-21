@@ -1,6 +1,5 @@
 ---
 title: 'Design decisions'
-weight: 1
 ---
 
 
@@ -41,6 +40,7 @@ The *interesting* representation is a consequence of Lutra's type system,
 which provides an algebraic and **composable** type system.
 Composable means that any "container" type (tuple, array or enum) can contain any other type.
 So we must support all of the following:
+
 - `[bool]`
 - `{text, bool}`
 - `{text, {text}, bool}`
@@ -51,6 +51,7 @@ To support all such types, it means to have a representation of these types with
 We try to use efficient representations, but then fallback to encoding values in JSON.
 
 Here are a few examples of query result representations:
+
 - `[bool]`: many rows, one column of type `bool`,
 - `{text, bool}`: one row, two columns of types `text` and `bool`,
 - `{text, {text}, bool}`: one row, three columns (the inner tuple is flattened into the parent),
@@ -66,3 +67,4 @@ Instead, `lutra-runner-postgres` can transcode between the Lutra binary format a
 
 The result is abstraction of PostgreSQL as the *runner* interface.
 It consumes inputs and produces outputs of arbitrary Lutra types, encoded in the Lutra binary format.
+

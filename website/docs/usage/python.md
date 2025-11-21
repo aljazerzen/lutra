@@ -1,6 +1,5 @@
 ---
 title: Python and PostgreSQL
-weight: 2
 ---
 
 Let's assume we have a Python application and a PostgreSQL database server were we want to
@@ -17,7 +16,7 @@ A basic modern Python project would have a `pyproject.toml` and either
 For lutra, we similarly need either a single `.lt` file or a directory.
 So let's name it `main.lt`, so we have following project structure.
 
-```lt
+```
 my_project/
   pyproject.toml
   main.py
@@ -68,7 +67,7 @@ provide serialization codecs and type hints for type checkers (mypy) and editors
 
 To do that, we will use lutra CLI:
 
-```lt
+```
 > lutra codegen main.lt generated.py
 ```
 
