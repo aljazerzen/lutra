@@ -51,8 +51,6 @@
               "rustfmt"
               "rust-analyzer"
             ])
-            pkgs.clang
-            pkgs.mold
 
             pkgs.just
             pkgs.cargo-nextest

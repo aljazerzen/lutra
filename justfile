@@ -6,10 +6,10 @@ show-deps-workspace:
     dot ./target/deps-workspace.dot -Tsvg -o ./target/graph.svg -Gnodesep=0.5
     xdg-open ./target/graph.svg 2> /dev/null
 
-test-fast FILTER_SET='all()' *NEXTEST_ARGS='':
+dev FILTER_SET='all()' *NEXTEST_ARGS='':
     # RUST_BACKTRACE=1
     RUST_LOG=debug INSTA_FORCE_PASS=1 \
-    cargo nextest run --no-fail-fast -E '{{FILTER_SET}}' {{NEXTEST_ARGS}}
+    cargo nextest run -E '{{FILTER_SET}}' {{NEXTEST_ARGS}}
     cargo insta review
 
     cargo fmt
@@ -31,6 +31,9 @@ generate-precompiled:
     # For when current code does not compile, but we still have an old cli binary
     ../../../target/debug/lutra codegen --lutra-bin-path="crate" . ./generated.rs
     cargo fmt -p lutra-bin
+
+test:
+    cargo nextest run --profile=overview
 
 publish:
     cargo publish -p lutra-bin

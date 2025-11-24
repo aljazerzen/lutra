@@ -9,7 +9,5 @@ crate-type = ["cdylib"]
 test = false
 
 [dependencies]
-lutra-bin = { version = "0.1.0", path = "..", default-features = false, features = [
-    "std",
-] }
+lutra-bin = { workspace = true, features = ["std"] }
 pyo3 = "0.25.0"

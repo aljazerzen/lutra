@@ -63,6 +63,10 @@ where
     pub fn new(client: C) -> Self {
         RunnerAsync { client }
     }
+
+    pub fn into_inner(self) -> C {
+        self.client
+    }
 }
 
 impl RunnerAsync<tokio_postgres::Client> {

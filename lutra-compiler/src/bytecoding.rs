@@ -501,7 +501,7 @@ fn pack_bytes_to_u32(mut input: Vec<u8>, output: &mut Vec<u32>) {
     let input_len = input.len();
 
     // pad
-    if input.len() % 4 != 0 {
+    if !input.len().is_multiple_of(4) {
         input.put_bytes(0, 4 - input.len() % 4);
     }
 

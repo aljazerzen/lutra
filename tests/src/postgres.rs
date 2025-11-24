@@ -21,7 +21,9 @@ pub async fn _run(source: &str, input: lutra_bin::Value) -> (String, String) {
     let tran = client.transaction().await.unwrap();
 
     let mut runner = RunnerAsync::new(tran);
-    _run_on(&mut runner, source, input).await
+    let r = _run_on(&mut runner, source, input).await;
+    runner.into_inner().rollback().await.unwrap();
+    r
 }
 
 pub async fn _run_on(
