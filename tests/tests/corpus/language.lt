@@ -2177,6 +2177,17 @@ const main = std::Date(0)
 # >
 @1970-01-01
 
+# === date_04
+const main = @2025-11-14.0
+# >
+20406
+
+# === date_05
+const x = {a = @2025-11-15}
+func main() -> x.a.0
+# >
+20407
+
 # === time_00
 const main = @16:07:44.123456
 # >

@@ -49,11 +49,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1763993391,
-        "narHash": "sha256-sQphL6iBcnPLRW4Ieq73CffkR++ctNY78eO1GSGZtBM=",
+        "lastModified": 1764010411,
+        "narHash": "sha256-zCY+dTIIEJdz4pWKstqOG1B/HaKqetIrlckHMDj0cXg=",
         "ref": "main",
-        "rev": "0a70140fde0f75bc97d07952d31bfa6c70b11f30",
-        "revCount": 4,
+        "rev": "c3d5c09e6dbc3e967fc90c76fb8342963e4285f4",
+        "revCount": 5,
         "type": "git",
         "url": "https://codeberg.org/lutra/lutra-pygments.git"
       },

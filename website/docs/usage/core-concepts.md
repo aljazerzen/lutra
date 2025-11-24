@@ -1,5 +1,5 @@
 ---
-title: "Overview"
+title: "Core concepts"
 ---
 
 ## Project
@@ -12,7 +12,7 @@ Usually, this is a directory of `.lt` files, which contain type definitions and 
 
 type Movie: {id: int32, title: text}
 
-let my_movies: [Movie] = [
+const my_movies: [Movie] = [
   {id = 3, title = "Forrest Gump"},
   {id = 7, title = "Conclave"},
 ]
@@ -25,7 +25,7 @@ func get_movie(param: int32) -> (
 func my_program() -> get_movie(3)
 ```
 
-The compiler can read these files, perform name resolution, type checking, and inference, and report any issues found in the code.
+The compiler can read these files, perform name resolution, type checking, inference, and report any issues found in the code.
 Once the project is successfully checked, it can then generate executable programs.
 
 ```

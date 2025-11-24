@@ -21,107 +21,84 @@ func get_album_by_id(album_id: int16): Album -> (
 It is minimal and designed to be extended to new execution targets.
 Currently, it can run on a reference-implementation interpreter and PostgreSQL.
 
-[More code examples](https://codeberg.org/lutra/lutra/src/branch/main/tests/tests/corpus/language.lt).
+```lt
+import std::(filter, sort, slice)
 
-
-## Why
-
-
-### Because query languages suck
-
-Most query languages are not designed as a programming language, but have started as a few very basic queries and then evolved by patching-in more and more features on top. This makes them hard to use for writing complex programs.
-SQL is the biggest offender (see
-[1](https://www.geldata.com/blog/we-can-do-better-than-sql),
-[2](https://carlineng.com/?postid=sql-critique#blog),
-[3](https://www.scattered-thoughts.net/writing/against-sql/),
-[4](https://aljaz.murerzen.eu/posts/sql-group-by-primary-key/),
-[5](https://aljaz.murerzen.eu/posts/sql-param-types/),
-[6](https://aljaz.murerzen.eu/posts/sql-edge-case-values/),
-[7](https://aljaz.murerzen.eu/posts/sql-column-names/),
-[8](https://ambitonline.com/nextrelease/2025/04/sql-the-worst-api-ever/),
-[9](https://dev.to/shaqq/10-things-i-hate-about-sql-a9e)
-), but many other languages are similarly problematic.
-
-Lutra aims to be a "proper" programming language, with user-defined functions, an algebraic type system, generic function type parameters, Hindley-Milner-like type inference and many small, "quality of life" features.
-
-That all compiles to a [minimal intermediate representation](https://codeberg.org/lutra/lutra/src/branch/main/lutra-bin/src/project/ir.lt) that *should* be easy to compile for different execution targets.
-The goal is to support SQL and most major relational databases, but also other *runners* like WebAssembly or [Polars](https://www.pola.rs/).
-
-Because a different compilation model, Lutra compiler can emit better error messages, provide better guarantees about
-compiled code and evolve the language without the need to change any database query language.
-
-Essentially, it is treating SQL as an instruction set instead of a user-facing API.
-
-### Because type safety
-
-Many challenges in modern programming arise from losing type information within a system. Often this is the fault of the programming language, but in many cases it is caused by passing data through type-erasing points.
-
-For example, API calls that return JSON, reading from files, or calling out to a database all lose type information.
-While these interfaces usually have a notion of *expected data format*, most tools fail to express this information in a way that can be used by the toolchain and the programmer.
-
-The Lutra Project aims to provide this tooling and establish a standardized interface for interaction between software operating across different machines, processes, or programming languages.
-
-
-
-## Core principles
-
-
-### Data should always carry type information
-
-The business logic of programs should be fully statically typed.
-Each variable should have an associated type, either annotated explicitly
-or preferably inferred from context.
-
-```rs
-# Without type information
-let result = request("GET", "http://my-app.com/v1/movies/" + str(movie_id))
-let movie_title = result["title"]
-
-# With type information
-let result: Movie = my_app::movies::get(movie_id)
-let movie_title = result.title
+# Load all the data at once
+func landing_page() -> {
+  user = get_current_user(),
+  posts = (
+    get_posts()
+    | filter(func (p) -> !p.is_draft)
+    | sort(func (p) -> -p.created_at)
+    | slice(0, 10)
+  ),
+}
 ```
 
-**Rationale**: types improve readability of the program and validate the author's assumptions
-about written code. They first guide the author when writing code, and also automate validation
-of these assumptions when program is changed in the future.
+It is verbose in exchange for type safety, readability and composability.
+```lt
+import std::(Date, find, filter, map, group, average, sum, count, sort, slice)
 
-**Lutra** achieves this by defining types and code in its own language,
-which serves as a common interface between different programming languages.
+# Constant
+const transaction_fees: float64 = 0.8
 
+# Type definition
+type Invoice: {
+  customer_id: int32,
+  invoice_date: Date,
+  total: float64,
+}
 
-### Type information should be available to the whole toolchain
+# Function that reads a table
+func get_invoices(): [Invoice] -> (
+  std::sql::from("invoices")
+)
 
-Development tools like compilers, editors, language servers and code explorers should all
-have access to complete type information.
+type Customer: {
+  id: int32,
+  first_name: text,
+  last_name: text,
+}
 
-**Rationale**: they should be able to assist development, suggest improvements, organize code and
-provide insights into the codebase.
+# Function that performs an index lookup
+func get_customer(id: int32): Customer -> (
+  std::sql::from("customers")
+  | find(func (c) -> c.id == id)
+  | std::or_default()
+)
 
-**Lutra** projects can be translated to languages (currently Rust and Python), by generating code for
-types and function interfaces.
+func main() -> (
+  get_invoices()
+  | filter(func (i) -> (i.invoice_date: Date).0 >= @1970-01-16.0)
+  | map(func (i: Invoice) -> {
+    ..i,
+    income = i.total - transaction_fees
+  })
+  | filter(func (i) -> i.income > 1.0)
+  | group(func (i) -> i.customer_id)
+  | map(func (group) -> {
+    customer_id = group.key,
+    total = group.values | map(func (i) -> i.total | std::to_int64) | average,
+    sum_income = group.values | map(func(i) -> i.income | std::to_int64) | sum,
+    ct = count(group.values),
+  })
+  | sort(func (i) -> -i.sum_income)
+  | slice(0, 10)
+  | map(func (i) -> {
+    i.customer_id,
+    customer = get_customer(i.customer_id), # customer is a tuple
+    i.sum_income,
+  })
+  | map(func (i) -> {
+    i.customer_id,
+    name = f"{i.customer.last_name}, {i.customer.first_name}",
+    sum_income = i.sum_income,
+  })
+)
+```
 
+Again, this all compiles to SQL and can be executed on PostgreSQL.
 
-### Type information should exist only at compile time
-
-Many data formats carry type information into runtime. For example, JSON stores
-field names alongside data: `{"id": 3, "title": "Gladiator"}`.
-Such runtime type information is inefficient and unnecessary.
-
-**Rationale**: in most situations program already makes assumptions about the value in a variable
-(e.g. `let x: Movie`). Additionally, runtime reflection increases the complexity of the codebase and moves
-operations that should have been done at compile time into runtime.
-
-**Lutra** defines a binary format, which does not carry type information.
-It focuses on simplicity and ease of use, but also provides partial decoding capabilities.
-
-
-
-## Project status
-
-Lutra is a personal passion project, currently in a proof-of-concept stage.
-It is not ready for production use.
-It works, but is not feature complete and will change in inconvenient ways.
-
-Feel free to try it out or come and chat with me at [Zulip](https://lutra.zulipchat.com/).
+[More code examples](https://codeberg.org/lutra/lutra/src/branch/main/tests/tests/corpus/complex.lt)
 

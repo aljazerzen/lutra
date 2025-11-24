@@ -6,6 +6,7 @@ PRQL is a pipelined relational query language, in some ways similar to Lutra. It
 language I was working on before starting Lutra.
 
 There is a few key differences:
+
 - Lutra requires database schema definitions and does not ever infer tables or columns.
   It allows fully typed queries, where each expression can be proven to have exactly one type.
 - Lutra generates SQL that is not meant to be readable.

@@ -2,8 +2,10 @@ _default:
     just --list
 
 serve:
-    zola serve \
-        & zensical serve --dev-addr 127.0.0.1:8000
+    mprocs \
+        'zola serve' \
+        'zensical serve --dev-addr 127.0.0.1:8000'
+
 
 build:
     rm -rf public

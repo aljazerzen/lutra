@@ -1,5 +1,5 @@
 ---
-title: Rust and PostgreSQL
+title: 'Via Rust'
 ---
 
 Lutra projects can be compiled to SQL and executed on relational databases.

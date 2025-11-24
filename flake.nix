@@ -57,6 +57,7 @@
             pkgs.cargo-insta
             pkgs.cargo-depgraph
             pkgs.graphviz
+            pkgs.mprocs
 
             pkgs.pgcli
 
