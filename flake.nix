@@ -57,7 +57,6 @@
             pkgs.cargo-insta
             pkgs.cargo-depgraph
             pkgs.graphviz
-            pkgs.mprocs
 
             pkgs.pgcli
 
@@ -75,6 +74,7 @@
             # to make mypy pick up packages from venv, run `uv pip install mypy`
 
             # website
+            pkgs.mprocs
             pkgs.zola
             pkgs.typos-lsp
             pkgs.zensical

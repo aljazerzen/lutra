@@ -8,6 +8,8 @@ pub use data::Data;
 pub use interpreter::{Cell, EvalError, Interpreter, NativeFunction, evaluate};
 pub use writer::{ArrayWriter, EnumWriter, TupleWriter};
 
+pub use lutra_runner::Run;
+
 pub trait NativeModule: Sync {
     fn lookup_native_symbol(&self, id: &str) -> Option<interpreter::NativeFunction>;
 }

@@ -1,0 +1,12 @@
+[package]
+name = "rust-interpreter"
+resolver = "2"
+edition = "2021"
+
+[build-dependencies]
+lutra-codegen = { path = "../../lutra-codegen" }
+
+[dependencies]
+lutra-bin = { path = "../../lutra-bin" }
+lutra-interpreter = { path = "../../lutra-interpreter" }
+tokio = { version = "1.48.0", features = ["macros", "rt"] }

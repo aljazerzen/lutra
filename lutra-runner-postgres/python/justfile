@@ -9,6 +9,6 @@ develop:
 
 test:
     just develop
-    cargo run -p lutra-cli -- codegen tests/lutra.lt tests/lutra_generated.py --sr-modules ''
+    cargo run -p lutra-cli -- codegen tests/lutra.lt tests/lutra_generated.py --programs-sql-pg ''
     python -m mypy python/lutra_runner_postgres tests
     python -m unittest tests/main.py

@@ -6,6 +6,7 @@ use std::path;
 use clap::{Args, Parser, Subcommand};
 
 use lutra_bin::Encode;
+use lutra_codegen::ProgramFormat;
 use lutra_compiler::{CheckParams, DiscoverParams, codespan};
 use lutra_runner::Run;
 
@@ -403,7 +404,9 @@ pub struct CodegenCommand {
     no_function_traits: bool,
 
     #[arg(long)]
-    sr_modules: Vec<String>,
+    programs_bytecode_lt: Vec<String>,
+    #[arg(long)]
+    programs_sql_pg: Vec<String>,
 
     #[arg(long)]
     lutra_bin_path: Option<String>,
@@ -419,10 +422,13 @@ pub fn codegen(cmd: CodegenCommand) -> anyhow::Result<()> {
         opts = opts.no_generate_encode_decode();
     }
     if cmd.no_function_traits {
-        opts = opts.no_generate_function_traits();
+        opts = opts.generate_function_traits();
     }
-    for mod_name in cmd.sr_modules {
-        opts = opts.generate_sr_in_module(mod_name);
+    for mod_name in cmd.programs_bytecode_lt {
+        opts = opts.generate_programs(mod_name, ProgramFormat::BytecodeLt);
+    }
+    for mod_name in cmd.programs_sql_pg {
+        opts = opts.generate_programs(mod_name, ProgramFormat::SqlPg);
     }
     if let Some(lutra_bin_path) = cmd.lutra_bin_path {
         opts = opts.with_lutra_bin_path(lutra_bin_path);

@@ -4,10 +4,11 @@ mod codegen_program;
 mod codegen_ty;
 mod python;
 
+pub use lutra_compiler::ProgramFormat;
 pub use python::generate as generate_python;
 
 use std::collections::HashMap;
-use std::path::PathBuf;
+use std::path;
 use std::{collections::VecDeque, fs};
 
 use lutra_bin::{Encode, ir};
@@ -15,10 +16,10 @@ use lutra_compiler::{CheckParams, DiscoverParams, Project};
 
 #[track_caller]
 pub fn generate(
-    project_dir: &std::path::Path,
-    out_file: &std::path::Path,
+    project_dir: impl AsRef<path::Path>,
+    out_file: impl AsRef<path::Path>,
     options: GenerateOptions,
-) -> Vec<PathBuf> {
+) -> Vec<path::PathBuf> {
     // tracing_subscriber::fmt::Subscriber::builder()
     //     .without_time()
     //     .with_target(false)
@@ -28,7 +29,7 @@ pub fn generate(
 
     // discover the project
     let source = lutra_compiler::discover(DiscoverParams {
-        project: Some(project_dir.into()),
+        project: Some(project_dir.as_ref().to_path_buf()),
     })
     .unwrap();
 
@@ -36,8 +37,8 @@ pub fn generate(
     let project = lutra_compiler::check(source, CheckParams {}).unwrap_or_else(|e| panic!("{e}"));
 
     // generate
-    let mut file = fs::File::create(out_file).unwrap();
-    let out_dir = out_file.parent().unwrap().to_path_buf();
+    let mut file = fs::File::create(&out_file).unwrap();
+    let out_dir = out_file.as_ref().parent().unwrap().to_path_buf();
     let generated = codegen_main(&project, &options, out_dir).unwrap();
     std::io::Write::write_all(&mut file, generated.as_bytes()).unwrap();
 
@@ -46,11 +47,7 @@ pub fn generate(
 }
 
 #[track_caller]
-pub fn generate_program_bytecode(
-    project_dir: &std::path::Path,
-    program: &str,
-    out_file: &std::path::Path,
-) {
+pub fn generate_program_bytecode(project_dir: &path::Path, program: &str, out_file: &path::Path) {
     // discover the project
     let source = lutra_compiler::discover(DiscoverParams {
         project: Some(project_dir.into()),
@@ -79,7 +76,7 @@ pub struct GenerateOptions {
     generate_encode_decode: bool,
     generate_function_traits: bool,
 
-    generate_sr_modules: Vec<String>,
+    include_programs: Vec<(String, ProgramFormat)>,
 
     lutra_bin_path: String,
 }
@@ -89,8 +86,8 @@ impl Default for GenerateOptions {
         Self {
             generate_types: true,
             generate_encode_decode: true,
-            generate_function_traits: true,
-            generate_sr_modules: Vec::new(),
+            generate_function_traits: false,
+            include_programs: Vec::new(),
             lutra_bin_path: "::lutra_bin".into(),
         }
     }
@@ -110,8 +107,8 @@ impl GenerateOptions {
     }
 
     /// Do not generate traits for functions
-    pub fn no_generate_function_traits(mut self) -> Self {
-        self.generate_function_traits = false;
+    pub fn generate_function_traits(mut self) -> Self {
+        self.generate_function_traits = true;
         self
     }
 
@@ -121,9 +118,9 @@ impl GenerateOptions {
         self
     }
 
-    /// Generates SR programs for all functions in a module
-    pub fn generate_sr_in_module(mut self, module_path: impl ToString) -> Self {
-        self.generate_sr_modules.push(module_path.to_string());
+    /// Generates programs for all functions in a module
+    pub fn generate_programs(mut self, module_path: impl ToString, fmt: ProgramFormat) -> Self {
+        self.include_programs.push((module_path.to_string(), fmt));
         self
     }
 }
@@ -140,7 +137,7 @@ pub struct Context<'a> {
     options: &'a GenerateOptions,
     ty_defs: &'a HashMap<ir::Path, &'a ir::Ty>,
     project: &'a Project,
-    out_dir: PathBuf,
+    out_dir: path::PathBuf,
 }
 
 impl<'a> Context<'a> {
@@ -161,7 +158,7 @@ impl<'a> Context<'a> {
 fn codegen_main(
     project: &Project,
     options: &GenerateOptions,
-    out_dir: PathBuf,
+    out_dir: path::PathBuf,
 ) -> Result<String, std::fmt::Error> {
     use std::fmt::Write;
 
@@ -246,8 +243,13 @@ fn codegen_module(
 
     // write traits for functions
     let module_path_str = module_path.as_slice().join("::");
-    if ctx.options.generate_sr_modules.contains(&module_path_str) {
-        codegen_program::write_sr_programs(w, &functions, ctx)?;
+    if let Some((_, format)) = ctx
+        .options
+        .include_programs
+        .iter()
+        .find(|(p, _)| p == &module_path_str)
+    {
+        codegen_program::write_sr_programs(w, &functions, *format, ctx)?;
 
         all_tys.extend(codegen_ty::write_tys_in_buffer(w, ctx)?);
     }

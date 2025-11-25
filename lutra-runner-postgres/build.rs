@@ -8,8 +8,8 @@ fn main() {
     let out_file = Path::new(&out_dir).join("lutra.rs");
 
     let options = lutra_codegen::GenerateOptions::default()
-        .generate_sr_in_module("")
-        .no_generate_function_traits();
+        .generate_programs("", lutra_codegen::ProgramFormat::SqlPg);
+
     let input_files = lutra_codegen::generate(project_dir, &out_file, options);
     for f in input_files {
         println!("cargo::rerun-if-changed={}", f.to_str().unwrap());

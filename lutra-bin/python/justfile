@@ -10,5 +10,5 @@ develop:
 test:
     just develop
     cargo run -p lutra-cli -- codegen tests/types.lt tests/types_generated.py
-    mypy tests python/lutra_bin
+    python -m mypy tests python/lutra_bin
     python -m unittest tests/main.py

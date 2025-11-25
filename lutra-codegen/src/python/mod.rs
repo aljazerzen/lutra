@@ -151,8 +151,13 @@ fn codegen_module(
 
     // write traits for functions
     let module_path_str = module_path.as_slice().join("::");
-    if ctx.options.generate_sr_modules.contains(&module_path_str) {
-        write_sr_programs(w, &functions, ctx)?;
+    if let Some((_, format)) = ctx
+        .options
+        .include_programs
+        .iter()
+        .find(|(p, _)| p == &module_path_str)
+    {
+        write_programs(w, &functions, *format, ctx)?;
 
         tys.extend(write_tys_in_buffer(w, ctx)?);
     }
@@ -566,9 +571,10 @@ fn ty_encode_body(ty: &ir::Ty, val_ref: &str, residual_ref: &str, ctx: &mut Cont
     format!("{codec}.encode_body({val_ref}, {residual_ref}, buf)")
 }
 
-fn write_sr_programs(
+fn write_programs(
     w: &mut impl Write,
     functions: &[(&String, ir::TyFunction)],
+    format: ProgramFormat,
     ctx: &mut Context,
 ) -> Result<(), std::fmt::Error> {
     if functions.is_empty() {
@@ -582,7 +588,7 @@ fn write_sr_programs(
 
         // compile
         let (program, mut ty) =
-            lutra_compiler::compile(ctx.project, &fq_path, None, ProgramFormat::SqlPg).unwrap();
+            lutra_compiler::compile(ctx.project, &fq_path, None, format).unwrap();
 
         // encode to base85
         let buf = program.encode();

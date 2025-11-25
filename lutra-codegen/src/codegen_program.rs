@@ -1,7 +1,7 @@
 use std::fmt::Write;
 
 use lutra_bin::{Encode, ir};
-use lutra_compiler::pr;
+use lutra_compiler::{ProgramFormat, pr};
 
 use crate::{Context, codegen_ty};
 
@@ -10,6 +10,7 @@ use crate::{Context, codegen_ty};
 pub fn write_sr_programs(
     w: &mut impl Write,
     functions: &[(&String, ir::TyFunction)],
+    format: ProgramFormat,
     ctx: &mut Context,
 ) -> Result<(), std::fmt::Error> {
     if functions.is_empty() {
@@ -23,13 +24,8 @@ pub fn write_sr_programs(
         let fq_path = fq_path.to_string();
 
         // compile
-        let (program, mut ty) = lutra_compiler::compile(
-            ctx.project,
-            &fq_path,
-            None,
-            lutra_compiler::ProgramFormat::SqlPg,
-        )
-        .unwrap();
+        let (program, mut ty) =
+            lutra_compiler::compile(ctx.project, &fq_path, None, format).unwrap();
 
         // encode and write to file
         let out_file = ctx.out_dir.join(format!("{fq_path}.sr.lb"));

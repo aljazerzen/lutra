@@ -16,4 +16,5 @@ perf.data
 
 /examples/*
 !/examples/python
-!/examples/rust
+!/examples/rust-interpreter
+!/examples/rust-postgres

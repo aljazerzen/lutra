@@ -26,7 +26,7 @@ pub use intermediate::{inline, layouter, lower_expr, lower_type_defs};
 pub use lutra_bin::{ir, rr};
 pub use project::{Project, SourceTree};
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 #[cfg_attr(feature = "clap", derive(clap::ValueEnum))]
 pub enum ProgramFormat {
     SqlPg,
