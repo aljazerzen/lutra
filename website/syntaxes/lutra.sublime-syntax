@@ -13,6 +13,7 @@ contexts:
   main:
     - include: comments
     - include: keywords
+    - include: namespaces
     - include: types
     - include: function-calls
     - include: strings
@@ -30,10 +31,14 @@ contexts:
     - match: '\b(true|false)\b'
       scope: constant.language.boolean.lutra
 
+  namespaces:
+    - match: '\b({{identifier}})::'
+      scope: variable.namespace.lutra
+
   types:
     - match: '\b(bool|text|int8|int16|int32|int64|uint8|uint16|uint32|uint64|float32|float64)\b'
       scope: storage.type.lutra
-    - match: '\b({{type_identifier}})(::({{type_identifier}}))*\b'
+    - match: '\b({{type_identifier}})\b'
       captures:
         1: entity.name.class.lutra
         3: entity.name.class.lutra
@@ -69,11 +74,10 @@ contexts:
       scope: punctuation.separator.lutra
 
   function-calls:
-    - match: '\b({{identifier}})(::({{identifier}}))*\s*(\()'
+    - match: '\b({{identifier}})*\s*(\()'
       captures:
         1: entity.name.function.lutra
-        3: entity.name.function.lutra
-        4: punctuation.separator.lutra
+        2: punctuation.separator.lutra
       push:
         - meta_scope: meta.function.call.lutra
         - match: '\)'
@@ -82,7 +86,6 @@ contexts:
         - include: main
 
   identifier:
-    - match: '\b({{identifier}})(::({{identifier}}))*\b'
+    - match: '\b({{identifier}})\b'
       captures:
-        1: variable.namespace.lutra
-        3: variable.identifier.lutra
+        1: variable.identifier.lutra
