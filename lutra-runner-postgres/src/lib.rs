@@ -26,7 +26,7 @@ use lutra_bin::{ir, rr};
 pub enum Error {
     #[error("bad result: {}", .0)]
     BadDatabaseResponse(&'static str),
-    #[error("postgres: {}", .0)]
+    #[error("postgres: {:?}", .0)]
     Postgres(#[from] PgError),
 }
 

@@ -9,7 +9,7 @@ use crate::diagnostic::{Diagnostic, DiagnosticCode};
 
 #[derive(thiserror::Error, Debug)]
 pub enum Error {
-    #[error("io error")]
+    #[error("io error: {0}")]
     Io(#[from] std::io::Error),
 
     #[error("invalid path: {path}")]

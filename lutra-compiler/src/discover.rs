@@ -19,8 +19,10 @@ pub fn discover(params: DiscoverParams) -> Result<project::SourceTree, Error> {
     let Some(mut root) = params.project else {
         return Ok(project);
     };
+    root = root.canonicalize()?;
 
     // walk up the module tree
+    tracing::debug!("searching for project root");
     let mut loaded_files = HashMap::new();
     if root.is_dir() {
         root.push("module.lt");
@@ -47,10 +49,14 @@ pub fn discover(params: DiscoverParams) -> Result<project::SourceTree, Error> {
         project.root = root.clone();
     }
 
+    tracing::debug!("project root: {}", root.display());
+
     // walk down the module tree
+    tracing::debug!("loading project files");
     let target_extension = Some(OsStr::new("lt"));
     let mut paths_to_load = vec![root];
     while let Some(path) = paths_to_load.pop() {
+        tracing::debug!("  path: {}", path.display());
         let content = if let Some(c) = loaded_files.remove(&path) {
             // use file that was read before
             c
@@ -71,7 +77,11 @@ pub fn discover(params: DiscoverParams) -> Result<project::SourceTree, Error> {
 
         // for module files, read the whole dir
         if path.ends_with("module.lt") {
-            for entry in fs::read_dir(path.parent().unwrap())? {
+            let Some(dir_path) = path.parent() else {
+                continue;
+            };
+            tracing::debug!("  reading dir: {}", dir_path.display());
+            for entry in fs::read_dir(dir_path)? {
                 let entry = entry?;
                 let entry_path = entry.path();
                 let metadata = entry.metadata()?;
