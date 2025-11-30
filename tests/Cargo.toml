@@ -8,7 +8,6 @@ version.workspace = true
 
 [dependencies]
 lutra-bin = { workspace = true }
-lutra-typed-data = { workspace = true }
 lutra-compiler = { workspace = true }
 lutra-interpreter = { workspace = true }
 lutra-ir = { workspace = true }

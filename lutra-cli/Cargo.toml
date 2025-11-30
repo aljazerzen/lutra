@@ -18,13 +18,20 @@ lutra-compiler = { workspace = true, features = ["clap", "debug"] }
 lutra-interpreter = { workspace = true }
 lutra-codegen = { workspace = true }
 lutra-runner = { workspace = true }
-lutra-runner-postgres = { workspace = true, features = ["tokio-postgres"]}
+lutra-runner-postgres = { workspace = true, features = ["tokio-postgres"] }
 
 tracing = { workspace = true }
 clap = { version = "4.4.18", features = ["derive"] }
 tracing-subscriber = { workspace = true }
 anyhow = { workspace = true }
 tokio-postgres = "0.7.13"
-tokio = { workspace = true, features = ["rt", "macros", "fs", "io-std", "sync"] }
+tokio = { workspace = true, features = [
+  "rt",
+  "macros",
+  "fs",
+  "io-std",
+  "sync",
+] }
+strum = {workspace = true}
 tower-lsp-server = "0.22.1"
 codespan-lsp = "0.13.0"

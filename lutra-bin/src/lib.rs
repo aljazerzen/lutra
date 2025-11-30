@@ -9,6 +9,7 @@ pub mod layout;
 mod printer;
 pub mod reader;
 pub mod rr;
+pub mod typed_data;
 mod value;
 mod visitor;
 

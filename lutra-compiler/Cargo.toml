@@ -35,7 +35,7 @@ itertools = { workspace = true }
 tracing = { workspace = true }
 ariadne = "0.4.1"
 enum-as-inner = { workspace = true }
-strum = { version = "0.26.3", features = ["std", "derive"] }
+strum = {workspace = true}
 indexmap = { workspace = true }
 append-only-vec = "0.1.7"
 lutra-bin = { workspace = true, features = ["std"] }

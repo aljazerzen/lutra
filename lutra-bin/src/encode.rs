@@ -165,6 +165,17 @@ impl Encode for string::String {
 impl<E: Encode> Encode for vec::Vec<E> {
     type HeadPtr = ReversePointer;
 
+    fn encode_head(&self, buf: &mut BytesMut) -> Self::HeadPtr {
+        self.as_slice().encode_head(buf)
+    }
+
+    fn encode_body(&self, head: Self::HeadPtr, buf: &mut BytesMut) {
+        self.as_slice().encode_body(head, buf)
+    }
+}
+impl<E: Encode> Encode for [E] {
+    type HeadPtr = ReversePointer;
+
     fn encode_head(&self, buf: &mut BytesMut) -> ReversePointer {
         let offset = ReversePointer::new(buf);
         buf.put_u32_le(self.len() as u32);

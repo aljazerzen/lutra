@@ -8,7 +8,6 @@ members = [
     "lutra-interpreter",
     "lutra-ir",
     "lutra-tui",
-    "lutra-typed-data",
     "tests",
     "lutra-runner",
     "lutra-runner-postgres",
@@ -40,6 +39,7 @@ indexmap = "2.6.0"
 tracing = "0.1"
 tracing-subscriber = "0.3.19"
 tokio = "1.42.0"
+strum = { version = "0.26.3", features = ["std", "derive"] }
 chrono = { version = "0.4.42", default-features = false }
 
 lutra-bin = { version = "0.2", registry = "codeberg-org", path = "lutra-bin", default-features = false }
@@ -50,7 +50,6 @@ lutra-compiler = { version = "0.2", registry = "codeberg-org", path = "lutra-com
 lutra-interpreter = { version = "0.2", registry = "codeberg-org", path = "lutra-interpreter" }
 lutra-ir = { version = "0.2", registry = "codeberg-org", path = "lutra-ir" }
 lutra-tui = { version = "0.2", registry = "codeberg-org", path = "lutra-tui" }
-lutra-typed-data = { version = "0.2", registry = "codeberg-org", path = "lutra-typed-data" }
 tests = { version = "0.2", registry = "codeberg-org", path = "tests" }
 lutra-runner = { version = "0.2", registry = "codeberg-org", path = "lutra-runner" }
 lutra-runner-postgres = { version = "0.2", registry = "codeberg-org", path = "lutra-runner-postgres", default-features = false }

@@ -5,7 +5,7 @@ use std::path;
 
 use clap::{Args, Parser, Subcommand};
 
-use lutra_bin::Encode;
+use lutra_bin::{Encode, typed_data};
 use lutra_codegen::ProgramFormat;
 use lutra_compiler::{CheckParams, DiscoverParams, codespan};
 use lutra_runner::Run;
@@ -271,6 +271,18 @@ pub struct RunCommand {
     /// When omitted, output is written to stdout in Lutra source format.
     #[clap(long)]
     output: Option<String>,
+
+    /// Output file format
+    #[clap(long, default_value = "ld")]
+    output_format: FileFormat,
+}
+
+#[derive(clap::ValueEnum, Clone, strum::AsRefStr)]
+enum FileFormat {
+    /// Lutra data (binary)
+    Ld,
+    /// Lutra typed data (binary)
+    Ltd,
 }
 
 #[tokio::main(flavor = "current_thread")]
@@ -328,15 +340,32 @@ pub async fn run(cmd: RunCommand) -> anyhow::Result<()> {
     // handle output
     if let Some(output_file) = cmd.output {
         let output_file = project.source.root.as_path().join(output_file);
+        let format = cmd.output_format;
 
         // write to file
         let mut writer = io::BufWriter::new(fs::File::create(&output_file).await?);
+
+        let size: usize;
+        match format {
+            FileFormat::Ld => {
+                writer.write_all(&output).await?;
+                size = output.len();
+            }
+            FileFormat::Ltd => {
+                let mut buf = lutra_bin::bytes::BytesMut::new();
+                typed_data::encode(&mut buf, &output, &ty.output, &ty.defs)?;
+                writer.write_all(&buf).await?;
+                size = buf.len();
+            }
+        }
+
         writer.write_all(&output).await?;
+
         writer.flush().await?;
         println!(
-            "Output written to {} ({} bytes)",
+            "Output written to {} ({}, {size} bytes)",
             output_file.display(),
-            output.len()
+            format.as_ref(),
         );
     } else {
         // print to stdout
