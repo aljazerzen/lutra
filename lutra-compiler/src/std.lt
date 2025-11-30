@@ -186,12 +186,11 @@ where T: {..}, O
   x | to_columnar | mapper
 )
 
-# func join<A, B>(
-#   with: [B],
-#   condition: bool,
-#   side: text,
-#   tbl: [A],
-# ): [{A, B}]
+# func zip(
+#   left: [L],
+#   right: [R],
+# ): [{L, R}]
+# where L, R
 
 func group(input: [I], key: func (I): K): [{key: K, values: [I]}]
 where I, K

@@ -20,6 +20,41 @@ impl Program {
     }
 }
 
+impl Expr {
+    pub fn new(kind: impl Into<ExprKind>, ty: Ty) -> Expr {
+        Expr {
+            kind: kind.into(),
+            ty,
+        }
+    }
+    pub fn new_lit_bool(value: bool) -> Self {
+        Expr {
+            kind: ExprKind::Literal(Literal::bool(value)),
+            ty: Ty::new(TyPrimitive::bool),
+        }
+    }
+}
+impl From<ParameterPtr> for ExprKind {
+    fn from(ptr: ParameterPtr) -> Self {
+        ExprKind::Pointer(Pointer::Parameter(ptr))
+    }
+}
+impl From<TupleLookup> for ExprKind {
+    fn from(v: TupleLookup) -> Self {
+        ExprKind::TupleLookup(boxed::Box::new(v))
+    }
+}
+impl From<Call> for ExprKind {
+    fn from(v: Call) -> Self {
+        ExprKind::Call(boxed::Box::new(v))
+    }
+}
+impl From<Function> for ExprKind {
+    fn from(v: Function) -> Self {
+        ExprKind::Function(boxed::Box::new(v))
+    }
+}
+
 impl PartialEq for Ty {
     fn eq(&self, other: &Self) -> bool {
         self.kind == other.kind

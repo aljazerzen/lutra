@@ -101,22 +101,24 @@ impl<'a> Lowerer<'a> {
         }
     }
 
+    /// Lowers a reference to native functions. If target function is not native, it returns None.
     #[tracing::instrument(name = "leed", skip_all)]
-    fn lower_external_expr_def(&mut self, path: &pr::Path) -> Result<Option<ir::ExprKind>> {
+    fn lower_ref_to_native(&mut self, path: &pr::Path) -> Result<Option<ir::ExprKind>> {
         if path.as_steps() == [NS_STD, "default"] {
             // special case: evaluate std::default in lowerer
             return Ok(None);
         }
 
+        // validate that it is an external defintion
         let def = self.root_module.get(path);
         let def = def.unwrap_or_else(|| panic!("{path} does not exist"));
         let expr = def.kind.as_expr().unwrap();
         let expr = expr.value.as_ref().unwrap();
-
-        if !matches!(expr.kind, pr::ExprKind::Internal) {
+        if !matches!(expr.kind, pr::ExprKind::Native) {
             return Ok(None);
         }
 
+        // return ptr to a native func
         let external_symbol_id = path.iter().join("::");
         Ok(Some(ir::ExprKind::Pointer(ir::Pointer::External(
             ir::ExternalPtr {
@@ -134,10 +136,11 @@ impl<'a> Lowerer<'a> {
 
         if path.as_steps() == [NS_STD, "default"] {
             // special case: evaluate std::default in lowerer
-            return Ok(self.impl_std_default(ty_args.into_iter().next().unwrap()));
+            let ty_arg = ty_args.into_iter().next().unwrap();
+            return Ok(self.impl_std_default(ty_arg));
         }
 
-        if matches!(expr.kind, pr::ExprKind::Internal) {
+        if matches!(expr.kind, pr::ExprKind::Native) {
             // Usually, this is lowered earlier, when lowering pointers.
             // But for top-level external symbols, we do it here.
 
@@ -313,23 +316,7 @@ impl<'a> Lowerer<'a> {
                     }
                 }
 
-                pr::Ref::Global(pr::AbsoluteRef { to_def, .. }) => {
-                    if let Some(ptr) = self.lower_external_expr_def(to_def)? {
-                        ptr
-                    } else {
-                        let reference = (to_def.clone(), expr.ty_args.clone());
-                        let entry = self.var_bindings.entry(reference);
-                        let binding_id = match entry {
-                            indexmap::map::Entry::Occupied(e) => *e.get(),
-                            indexmap::map::Entry::Vacant(e) => {
-                                let id = self.generator_var_binding.next() as u32;
-                                e.insert(id);
-                                id
-                            }
-                        };
-                        ir::ExprKind::Pointer(ir::Pointer::Binding(binding_id))
-                    }
-                }
+                pr::Ref::Global(ref_) => self.lower_ref_global(&ref_.to_def, &expr.ty_args)?,
             },
 
             pr::ExprKind::Match(match_) => {
@@ -400,7 +387,7 @@ impl<'a> Lowerer<'a> {
             pr::ExprKind::TypeAnnotation(_) => unreachable!(),
 
             // caught in lower_var_def
-            pr::ExprKind::Internal => unreachable!(),
+            pr::ExprKind::Native => unreachable!(),
 
             // desugared away
             pr::ExprKind::Nested(_) => unreachable!(),
@@ -413,6 +400,25 @@ impl<'a> Lowerer<'a> {
             kind,
             ty: self.lower_ty(expr.ty.clone().unwrap()),
         })
+    }
+
+    fn lower_ref_global(&mut self, ref_: &pr::Path, ty_args: &[pr::Ty]) -> Result<ir::ExprKind> {
+        // if native ref, return ir::Ptr::Native
+        if let Some(ptr) = self.lower_ref_to_native(ref_)? {
+            return Ok(ptr);
+        }
+
+        let reference = (ref_.clone(), ty_args.to_vec());
+        let entry = self.var_bindings.entry(reference);
+        let binding_id = match entry {
+            indexmap::map::Entry::Occupied(e) => *e.get(),
+            indexmap::map::Entry::Vacant(e) => {
+                let id = self.generator_var_binding.next() as u32;
+                e.insert(id);
+                id
+            }
+        };
+        Ok(ir::ExprKind::Pointer(ir::Pointer::Binding(binding_id)))
     }
 
     fn lower_literal(&mut self, literal: &pr::Literal, ty: &pr::Ty) -> Result<ir::Literal> {

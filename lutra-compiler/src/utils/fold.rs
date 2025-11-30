@@ -139,7 +139,7 @@ pub fn fold_expr_kind<T: ?Sized + PrFold>(fold: &mut T, expr_kind: ExprKind) -> 
         TypeAnnotation(annotation) => TypeAnnotation(fold.fold_type_annotation(annotation)?),
 
         // None of these capture variables, so we don't need to fold them.
-        Internal | Literal(_) => expr_kind,
+        Native | Literal(_) => expr_kind,
     })
 }
 

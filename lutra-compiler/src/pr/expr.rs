@@ -110,7 +110,7 @@ pub enum ExprKind {
     Match(Match),
     If(If),
 
-    Internal,
+    Native,
 }
 
 #[derive(Debug, EnumAsInner, PartialEq, Clone)]

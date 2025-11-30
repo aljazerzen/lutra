@@ -106,7 +106,7 @@ impl super::TypeResolver<'_> {
                         // finalize scope
                         self.finalize_type_vars()?;
 
-                        let mut expr = Box::new(pr::Expr::new(pr::ExprKind::Internal));
+                        let mut expr = Box::new(pr::Expr::new(pr::ExprKind::Native));
                         expr.ty = expected_ty;
                         pr::DefKind::Expr(pr::ExprDef {
                             value: Some(expr),

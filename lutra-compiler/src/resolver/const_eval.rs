@@ -65,7 +65,7 @@ impl ConstantValidator {
             | pr::ExprKind::Unary(_)
             | pr::ExprKind::Nested(_)
             | pr::ExprKind::FString(_)
-            | pr::ExprKind::Internal => unreachable!(),
+            | pr::ExprKind::Native => unreachable!(),
         };
         r.map_err(|s| s.or(expr.span))
     }

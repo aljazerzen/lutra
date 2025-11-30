@@ -159,7 +159,7 @@ impl PrintSource for pr::Expr {
                 print_block(&if_.els, p)?;
             }
 
-            pr::ExprKind::EnumVariant(_) | pr::ExprKind::Internal => unreachable!(),
+            pr::ExprKind::EnumVariant(_) | pr::ExprKind::Native => unreachable!(),
         }
         Some(())
     }
