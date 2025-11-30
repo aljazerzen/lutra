@@ -82,19 +82,19 @@ where
 
 func gt(left: T, right: T): bool
 where
-  T: number
+  T: primitive
 
 func lt(left: T, right: T): bool
 where
-  T: number
+  T: primitive
 
 func gte(left: T, right: T): bool
 where
-  T: number
+  T: primitive
 
 func lte(left: T, right: T): bool
 where
-  T: number
+  T: primitive
 
 func and(left: bool, right: bool): bool
 
@@ -163,8 +163,8 @@ where T
 func slice(array: [T], start: int64, end: int64): [T]
 where T
 
-func sort(array: [I], key: func (I): int64): [I]
-where I
+func sort(array: [I], key: func (I): K): [I]
+where I, K: primitive
 
 func to_columnar(rows: [T]): {for f: F in T do f: [F]}
 where T: {..}

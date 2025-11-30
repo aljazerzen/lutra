@@ -155,7 +155,7 @@ macro_rules! neg_arg {
 }
 
 pub mod std {
-    use ::std::{borrow::Cow, collections::HashMap};
+    use ::std::{borrow::Cow, cmp::Ordering, collections::HashMap};
 
     use crate::{ArrayWriter, Data, EnumWriter, EvalError, TupleWriter, native::*};
     use assume::LayoutArgsReader;
@@ -269,13 +269,13 @@ pub mod std {
 
         bin_prim_func!(ne, !=, bool);
 
-        bin_num_func!(gt, >, bool);
+        bin_prim_func!(gt, >, bool);
 
-        bin_num_func!(lt, <, bool);
+        bin_prim_func!(lt, <, bool);
 
-        bin_num_func!(gte, >=, bool);
+        bin_prim_func!(gte, >=, bool);
 
-        bin_num_func!(lte, <=, bool);
+        bin_prim_func!(lte, <=, bool);
 
         bin_func!(and, bool, &&, bool);
 
@@ -438,6 +438,8 @@ pub mod std {
             let item_head_bytes = layout_args.next_u32();
             let item_body_ptrs = layout_args.next_slice();
 
+            let key_ty = [layout_args.next_u32()];
+
             let [array, func] = assume::exactly_n(args);
 
             let input = assume::array(array, item_head_bytes);
@@ -447,11 +449,18 @@ pub mod std {
                 let cell = Cell::Data(item);
 
                 let key = it.evaluate_func_call(&func, vec![cell])?;
-                let key = assume::int64(&key)?;
 
                 keys.push((key, index));
             }
-            keys.sort();
+
+            // TODO: this is inefficient, extract cmp into a native rust function
+            keys.sort_by(|(a, _), (b, _)| {
+                let args = vec![a.clone(), b.clone()];
+                Module::lt(it, &key_ty, args)
+                    .and_then(|c| assume::bool(&c))
+                    .map(|x| if x { Ordering::Less } else { Ordering::Greater })
+                    .unwrap_or(Ordering::Equal)
+            });
 
             let mut output = ArrayWriter::new(item_head_bytes, item_body_ptrs);
             for (_key, index) in keys {

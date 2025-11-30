@@ -977,37 +977,6 @@ func main() -> (-10.0 / -6.0): float64
 # >
 1.6666666666666667
 
-# === std_eq_00
-func main() -> {30: int64 == 2, 30: int64 == 30}
-# >
-{
-  false,
-  true,
-}
-
-# === std_eq_01
-func main() -> {30.3: float64 == 2.2, 30.3: float64 == 30.3}
-# >
-{
-  false,
-  true,
-}
-
-# === std_eq_02
-func main() -> {false == true, false == false}
-# >
-{
-  false,
-  true,
-}
-
-# === std_eq_03
-func main() -> {"aa" == "b", "aa" == "aa"}
-# >
-{
-  false,
-  true,
-}
 
 # === std_filter_00
 func main() -> std::filter([5,3,65,3,2]: [int64], func (x: int64) -> x > 3)
@@ -1319,6 +1288,155 @@ func main() -> (
   },
 ]
 
+
+# === std_eq_00
+func main() -> {30: int64 == 2, 30: int64 == 30}
+# >
+{
+  false,
+  true,
+}
+
+# === std_eq_01
+func main() -> {30.3: float64 == 2.2, 30.3: float64 == 30.3}
+# >
+{
+  false,
+  true,
+}
+
+# === std_eq_02
+func main() -> {false == true, false == false}
+# >
+{
+  false,
+  true,
+}
+
+# === std_eq_03
+func main() -> {"aa" == "b", "aa" == "aa"}
+# >
+{
+  false,
+  true,
+}
+
+
+# === std_ne_00
+func main() -> {
+  30.3: float64 != 2.2,
+  30.3: float64 != 30.3
+}
+# >
+{
+  true,
+  false,
+}
+
+# === std_ne_01
+func main() -> {
+  30.3: float64 != 2.2,
+  30.3: float64 != 30.3
+}
+# >
+{
+  true,
+  false,
+}
+
+# === std_ne_02
+func main() -> {false != true, false != false}
+# >
+{
+  true,
+  false,
+}
+
+# === std_ne_03
+func main() -> {"aa" != "b", "aa" != "aa"}
+# >
+{
+  true,
+  false,
+}
+
+# === std_lt_00
+func main() -> {3 < 2: int64, 2 < 3: int64, 2 < 2: int64}
+# >
+{
+  false,
+  true,
+  false,
+}
+
+# === std_lt_01
+func main() -> {3.3 < 2.2: float64, 2.2 < 3.3: float64, 2.2 < 2.2: float64}
+# >
+{
+  false,
+  true,
+  false,
+}
+
+# === std_lt_02
+func main() -> {false < false, false < true, true < false, true < true}
+# >
+{
+  false,
+  true,
+  false,
+  false,
+}
+
+# === std_lt_03
+func main() -> {"aa" < "aa", "aa" < "ab", "ab" < "aa", "ab" < "ab"}
+# >
+{
+  false,
+  true,
+  false,
+  false,
+}
+
+
+# === std_lte_00
+func main() -> {3 <= 2: int64, 2 <= 3: int64, 2 <= 2: int64}
+# >
+{
+  false,
+  true,
+  true,
+}
+
+# === std_lte_01
+func main() -> {3.3 <= 2.2: float64, 2.2 <= 3.3: float64, 2.2 <= 2.2: float64}
+# >
+{
+  false,
+  true,
+  true,
+}
+
+# === std_lte_02
+func main() -> {false <= false, false <= true, true <= false, true <= true}
+# >
+{
+  true,
+  true,
+  false,
+  true,
+}
+
+# === std_lte_03
+func main() -> {"aa" <= "aa", "aa" <= "ab", "ab" <= "aa", "ab" <= "ab"}
+# >
+{
+  true,
+  true,
+  false,
+  true,
+}
+
 # === std_gt_00
 func main() -> {3 > 2: int64, 2 > 3: int64, 2 > 2: int64}
 # >
@@ -1337,6 +1455,26 @@ func main() -> {3.3 > 2.2: float64, 2.2 > 3.3: float64, 2.2 > 2.2: float64}
   false,
 }
 
+# === std_gt_02
+func main() -> {false > false, false > true, true > false, true > true}
+# >
+{
+  false,
+  false,
+  true,
+  false,
+}
+
+# === std_gt_03
+func main() -> {"aa" > "aa", "aa" > "ab", "ab" > "aa", "ab" > "ab"}
+# >
+{
+  false,
+  false,
+  true,
+  false,
+}
+
 # === std_gte_00
 func main() -> {3 >= 2: int64, 2 >= 3: int64, 2 >= 2: int64}
 # >
@@ -1352,6 +1490,26 @@ func main() -> {3.3 >= 2.2: float64, 2.2 >= 3.3: float64, 2.2 >= 2.2: float64}
 {
   true,
   false,
+  true,
+}
+
+# === std_gte_02
+func main() -> {false >= false, false >= true, true >= false, true >= true}
+# >
+{
+  true,
+  false,
+  true,
+  true,
+}
+
+# === std_gte_03
+func main() -> {"aa" >= "aa", "aa" >= "ab", "ab" >= "aa", "ab" >= "ab"}
+# >
+{
+  true,
+  false,
+  true,
   true,
 }
 
@@ -1461,42 +1619,6 @@ func main() -> std::lead([5,3,65,4], -2): [int64]
   5,
   3,
 ]
-
-# === std_lt_00
-func main() -> {3 < 2: int64, 2 < 3: int64, 2 < 2: int64}
-# >
-{
-  false,
-  true,
-  false,
-}
-
-# === std_lt_01
-func main() -> {3.3 < 2.2: float64, 2.2 < 3.3: float64, 2.2 < 2.2: float64}
-# >
-{
-  false,
-  true,
-  false,
-}
-
-# === std_lte_00
-func main() -> {3 <= 2: int64, 2 <= 3: int64, 2 <= 2: int64}
-# >
-{
-  false,
-  true,
-  true,
-}
-
-# === std_lte_01
-func main() -> {3.3 <= 2.2: float64, 2.2 <= 3.3: float64, 2.2 <= 2.2: float64}
-# >
-{
-  false,
-  true,
-  true,
-}
 
 # === std_map_00
 func main() -> std::map([5,3,65,3,2], func (x: int64) -> x + 1)
@@ -1652,44 +1774,6 @@ func main() -> (2.1 * 3.5): float64
 # >
 7.3500000000000005
 
-# === std_ne_00
-func main() -> {
-  30.3: float64 != 2.2,
-  30.3: float64 != 30.3
-}
-# >
-{
-  true,
-  false,
-}
-
-# === std_ne_01
-func main() -> {
-  30.3: float64 != 2.2,
-  30.3: float64 != 30.3
-}
-# >
-{
-  true,
-  false,
-}
-
-# === std_ne_02
-func main() -> {false != true, false != false}
-# >
-{
-  true,
-  false,
-}
-
-# === std_ne_03
-func main() -> {"aa" != "b", "aa" != "aa"}
-# >
-{
-  true,
-  false,
-}
-
 # === std_neg_00
 func main() -> {-2: int64, - (-3: int64)}
 # >
@@ -1841,6 +1925,17 @@ func main() -> std::sort(
     "!",
   },
 ]
+
+# === std_sort_02
+func main() -> std::sort(["ab", "a", "aa", "e"], func (x) -> x)
+# >
+[
+  "a",
+  "aa",
+  "ab",
+  "e",
+]
+
 
 # === std_sub_00
 func main() -> (30 - 2): int64

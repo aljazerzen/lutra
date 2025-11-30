@@ -286,12 +286,31 @@ impl ByteCoder {
                 r
             }
 
-            "std::filter" | "std::slice" | "std::sort" | "std::append" => {
+            "std::filter" | "std::slice" | "std::append" => {
                 let item_layout = as_layout_of_param_array(ty_mat);
 
                 let mut r = Vec::with_capacity(1 + 1 + item_layout.body_ptrs.len());
                 r.push(item_layout.head_size.div_ceil(8)); // item_head_size
                 r.extend(as_len_and_items(&item_layout.body_ptrs)); // item_body_ptrs
+                r
+            }
+            "std::sort" => {
+                let item_layout = as_layout_of_param_array(ty_mat);
+
+                let mut r = Vec::with_capacity(1 + 1 + item_layout.body_ptrs.len());
+                r.push(item_layout.head_size.div_ceil(8)); // item_head_size
+                r.extend(as_len_and_items(&item_layout.body_ptrs)); // item_body_ptrs
+
+                // ty of key
+                let ty_func = ty_mat.kind.as_function().unwrap();
+                let ty_key_extractor = self.get_ty_mat(&ty_func.params[1]);
+                let ty_key_extractor = ty_key_extractor.kind.as_function().unwrap();
+                let ty_key = self.get_ty_mat(&ty_key_extractor.body);
+                let ty_key = ty_key.kind.as_primitive().unwrap();
+                let mut buf = ty_key.encode();
+                buf.put_bytes(0, 3); // padding
+                r.push(u32::from_be_bytes(buf[0..4].try_into().unwrap()));
+
                 r
             }
 

@@ -1788,6 +1788,7 @@ async fn sql_insert_00() {
       },
     ]
     "#);
+    runner.into_inner().rollback().await.unwrap();
 }
 
 #[test]

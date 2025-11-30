@@ -102,7 +102,7 @@ fn parse_file(contents: &str) -> Vec<TestCase> {
 #[tokio::main(flavor = "current_thread")]
 async fn run_on_interpreter(case: TestCase) -> Result<(), libtest_mimic::Failed> {
     let runner = lutra_interpreter::InterpreterRunner::default();
-    run_program("interpreter", ProgramFormat::BytecodeLt, runner, case).await
+    run_program("interpreter", ProgramFormat::BytecodeLt, &runner, case).await
 }
 
 #[tokio::main(flavor = "current_thread")]
@@ -121,13 +121,15 @@ async fn run_on_pg(case: TestCase) -> Result<(), libtest_mimic::Failed> {
     let tran = client.transaction().await.unwrap();
 
     let runner = lutra_runner_postgres::RunnerAsync::new(tran);
-    run_program("pg", ProgramFormat::SqlPg, runner, case).await
+    let res = run_program("pg", ProgramFormat::SqlPg, &runner, case).await;
+    runner.into_inner().rollback().await.unwrap();
+    res
 }
 
 async fn run_program(
     runner_name: &'static str,
     program_format: ProgramFormat,
-    runner: impl lutra_runner::Run,
+    runner: &impl lutra_runner::Run,
     case: TestCase,
 ) -> Result<(), libtest_mimic::Failed> {
     crate::init_logger();
