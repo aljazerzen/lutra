@@ -134,9 +134,7 @@ where
         contents.copy_to_slice(&mut buf);
 
         let s = string::String::from_utf8(buf).map_err(|_| Error::InvalidData)?;
-
-        // TODO escape strings
-        Ok(format!("\"{s}\""))
+        Ok(quote_text(&s))
     }
 
     fn visit_tuple(
@@ -204,4 +202,26 @@ where
 
         Ok(r)
     }
+}
+
+fn quote_text(text: &str) -> String {
+    let mut result = String::new();
+    result.push('"');
+
+    for c in text.chars() {
+        match c {
+            '\n' => result.push_str("\\n"),
+            '\r' => result.push_str("\\r"),
+            '\t' => result.push_str("\\t"),
+            '\\' => result.push_str("\\\\"),
+            '"' => result.push_str("\\\""),
+            c if c.is_ascii_control() => {
+                let hex = format!("\\x{:02X}", c as u8);
+                result.push_str(&hex);
+            }
+            _ => result.push(c),
+        }
+    }
+    result.push('"');
+    result
 }

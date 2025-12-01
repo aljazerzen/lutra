@@ -325,6 +325,8 @@ module text {
   func starts_with(value: text, prefix: text): bool
   func contains(value: text, substr: text): bool
   func ends_with(value: text, suffix: text): bool
+
+  func from_ascii(ascii: uint8): text
 }
 
 module fs {

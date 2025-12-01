@@ -2044,6 +2044,16 @@ func main() -> std::text::length("Aljaž")
 # >
 5
 
+# === std_text_from_ascii_00
+func main() -> std::text::from_ascii(65)
+# >
+"A"
+
+# === std_text_from_ascii_01
+func main() -> std::text::from_ascii(10)
+# >
+"\n"
+
 # === std_math_abs_00
 func main() -> std::math::abs(-3: int16)
 # >

@@ -709,6 +709,10 @@ impl<'a> Context<'a> {
                 let [text] = unpack_args(args);
                 sql_ast::Expr::Source(format!("LENGTH({text})::int4"))
             }
+            "std::text::from_ascii" => {
+                let [ascii] = unpack_args(args);
+                sql_ast::Expr::Source(format!("CHR({ascii})"))
+            }
             "std::text::concat" => utils::new_bin_op("||", args),
 
             "std::math::abs" => {

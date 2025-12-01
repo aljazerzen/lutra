@@ -895,6 +895,7 @@ pub mod std_text {
             Some(match id {
                 "concat" => &Self::concat,
                 "length" => &Self::length,
+                "from_ascii" => &Self::from_ascii,
 
                 _ => return None,
             })
@@ -942,6 +943,18 @@ pub mod std_text {
             let length = string.chars().count() as u32;
 
             Ok(Cell::Data(encode(&length)))
+        }
+
+        pub fn from_ascii(
+            _it: &mut Interpreter,
+            _layout_args: &[u32],
+            args: Vec<Cell>,
+        ) -> Result<Cell, EvalError> {
+            let [ascii] = assume::exactly_n(args);
+            let ascii = assume::primitive::<u8>(&ascii)?;
+
+            let text = char::from(ascii).to_string();
+            Ok(Cell::Data(encode(&text)))
         }
     }
 }
