@@ -9,6 +9,7 @@ pub mod layout;
 mod printer;
 pub mod reader;
 pub mod rr;
+mod tabular;
 pub mod typed_data;
 mod value;
 mod visitor;
@@ -26,6 +27,8 @@ pub use visitor::Visitor;
 
 #[cfg(feature = "std")]
 pub use printer::print_source;
+#[cfg(feature = "std")]
+pub use tabular::{TableCell, Tabular};
 
 pub use bytes;
 

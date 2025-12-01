@@ -2,10 +2,11 @@ mod language_server;
 
 use std::collections::HashMap;
 use std::path;
+use std::str::FromStr;
 
 use clap::{Args, Parser, Subcommand};
 
-use lutra_bin::{Encode, typed_data};
+use lutra_bin::{Encode, ir, typed_data};
 use lutra_codegen::ProgramFormat;
 use lutra_compiler::{CheckParams, DiscoverParams, codespan};
 use lutra_runner::Run;
@@ -272,23 +273,30 @@ pub struct RunCommand {
     #[clap(long)]
     output: Option<String>,
 
-    /// Output file format
-    #[clap(long, default_value = "ld")]
-    output_format: FileFormat,
+    /// Output file format.
+    /// If omitted, it is inferred from output file extension.
+    /// Falls back to `lt`.
+    #[clap(long)]
+    output_format: Option<FileFormat>,
 }
 
-#[derive(clap::ValueEnum, Clone, strum::AsRefStr)]
+#[derive(Clone, Copy, clap::ValueEnum, strum::AsRefStr, strum::EnumString)]
+#[strum(serialize_all = "snake_case")]
 enum FileFormat {
+    /// Lutra source
+    Lt,
     /// Lutra data (binary)
     Ld,
     /// Lutra typed data (binary)
     Ltd,
+    /// Comma Separated Values
+    Csv,
 }
 
 #[tokio::main(flavor = "current_thread")]
 pub async fn run(cmd: RunCommand) -> anyhow::Result<()> {
     // compile
-    println!("Compiling...");
+    eprintln!("Compiling...");
     let project = lutra_compiler::discover(cmd.discover.clone())?;
 
     let project = lutra_compiler::check(project, cmd.check)?;
@@ -306,7 +314,7 @@ pub async fn run(cmd: RunCommand) -> anyhow::Result<()> {
     )?;
 
     // read input
-    println!("Reading input...");
+    eprintln!("Reading input...");
     let input = if let Some(input_file) = cmd.input {
         let input_file = project.source.root.as_path().join(input_file);
         fs::read(input_file).await?
@@ -322,7 +330,7 @@ pub async fn run(cmd: RunCommand) -> anyhow::Result<()> {
     };
 
     // execute
-    println!("Executing...");
+    eprintln!("Executing...");
     let output = if cmd.runner.interpreter {
         let runner =
             lutra_interpreter::InterpreterRunner::default().with_file_system(cmd.discover.project);
@@ -338,44 +346,92 @@ pub async fn run(cmd: RunCommand) -> anyhow::Result<()> {
     };
 
     // handle output
-    if let Some(output_file) = cmd.output {
-        let output_file = project.source.root.as_path().join(output_file);
-        let format = cmd.output_format;
-
-        // write to file
-        let mut writer = io::BufWriter::new(fs::File::create(&output_file).await?);
-
-        let size: usize;
-        match format {
-            FileFormat::Ld => {
-                writer.write_all(&output).await?;
-                size = output.len();
-            }
-            FileFormat::Ltd => {
-                let mut buf = lutra_bin::bytes::BytesMut::new();
-                typed_data::encode(&mut buf, &output, &ty.output, &ty.defs)?;
-                writer.write_all(&buf).await?;
-                size = buf.len();
-            }
-        }
-
-        writer.write_all(&output).await?;
-
-        writer.flush().await?;
-        println!(
-            "Output written to {} ({}, {size} bytes)",
-            output_file.display(),
-            format.as_ref(),
-        );
+    let output_path = cmd
+        .output
+        .as_ref()
+        .map(|o| project.source.root.as_path().join(o));
+    let format = (cmd.output_format)
+        // try to infer from output path extension
+        .or_else(|| {
+            output_path
+                .as_ref()
+                .and_then(|p| p.extension())
+                .and_then(|ex| ex.to_str())
+                .and_then(|ex| FileFormat::from_str(ex).ok())
+        })
+        // fallback to lt
+        .unwrap_or(FileFormat::Lt);
+    let mut writer: Box<dyn io::AsyncWrite + Unpin> = if let Some(output_path) = &output_path {
+        Box::new(io::BufWriter::new(fs::File::create(output_path).await?))
     } else {
-        // print to stdout
-        println!(
-            "{}",
-            lutra_bin::print_source(&output, &ty.output, &ty.defs).unwrap()
+        Box::new(io::BufWriter::new(io::stdout()))
+    };
+    let size = write_output(&mut writer, &output, format, &ty.output, &ty.defs).await?;
+    writer.flush().await?;
+    writer.shutdown().await?;
+
+    if let Some(output_path) = &output_path {
+        eprintln!(
+            "Output written to {} ({}, {size} bytes)",
+            output_path.display(),
+            format.as_ref(),
         );
     }
 
     Ok(())
+}
+
+async fn write_output(
+    w: &mut (impl io::AsyncWrite + Unpin),
+    data: &[u8],
+    format: FileFormat,
+    ty: &ir::Ty,
+    ty_defs: &[ir::TyDef],
+) -> anyhow::Result<usize> {
+    let mut size: usize = 0;
+    let s = &mut size;
+
+    async fn write(
+        w: &mut (impl io::AsyncWrite + Unpin),
+        s: &mut usize,
+        buf: &[u8],
+    ) -> io::Result<()> {
+        *s += buf.len();
+        w.write_all(buf).await
+    }
+
+    match format {
+        FileFormat::Ld => write(w, s, data).await?,
+
+        FileFormat::Lt => {
+            write(w, s, "const output = ".as_bytes()).await?;
+            let source = lutra_bin::print_source(data, ty, ty_defs)?;
+            write(w, s, source.as_bytes()).await?;
+            write(w, s, "\n".as_bytes()).await?;
+        }
+
+        FileFormat::Ltd => {
+            let mut buf = lutra_bin::bytes::BytesMut::new();
+            typed_data::encode(&mut buf, data, ty, ty_defs)?;
+            write(w, s, &buf).await?
+        }
+        FileFormat::Csv => {
+            let tabular = lutra_bin::Tabular::new(data, ty, ty_defs);
+            write(w, s, tabular.column_names().join(",").as_bytes()).await?;
+            write(w, s, "\n".as_bytes()).await?;
+            for row in tabular {
+                for (index, cell) in row.iter().enumerate() {
+                    if index > 0 {
+                        write(w, s, ",".as_bytes()).await?;
+                    }
+                    let source = lutra_bin::print_source(cell.data(), cell.ty(), cell.ty_defs())?;
+                    write(w, s, source.as_bytes()).await?;
+                }
+                write(w, s, "\n".as_bytes()).await?;
+            }
+        }
+    }
+    Ok(size)
 }
 
 async fn init_runner_postgres(url: &str) -> anyhow::Result<lutra_runner_postgres::RunnerAsync> {
