@@ -714,6 +714,10 @@ impl<'a> Context<'a> {
                 sql_ast::Expr::Source(format!("CHR({ascii})"))
             }
             "std::text::concat" => utils::new_bin_op("||", args),
+            "std::text::join" => {
+                let [parts, sep] = unpack_args(args);
+                sql_ast::Expr::Source(format!("COALESCE(STRING_AGG({parts}, {sep}), '')"))
+            }
 
             "std::math::abs" => {
                 let [text] = unpack_args(args);
@@ -878,7 +882,7 @@ impl<'a> Context<'a> {
             ir::Literal::float64(v) => format!("{v}::{}", self.compile_ty_name(ty)),
             ir::Literal::text(s) => {
                 let escaped = sql_ast::escape_string(s, '\'');
-                return sql_ast::Expr::Source(format!("'{escaped}'"));
+                return sql_ast::Expr::Source(format!("'{escaped}'::text"));
             }
         })
     }

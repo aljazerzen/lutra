@@ -310,8 +310,8 @@ fn array_enum() {
         SELECT
           1::int8 AS index,
           1::int2 AS _t,
-          'today' AS _1_0,
-          'me' AS _1_1,
+          'today'::text AS _1_0,
+          'me'::text AS _1_1,
           NULL::text AS _2
         UNION
         ALL
@@ -320,7 +320,7 @@ fn array_enum() {
           2::int2 AS _t,
           NULL::text AS _1_0,
           NULL::text AS _1_1,
-          'ok' AS _2
+          'ok'::text AS _2
       ) AS r0
     ORDER BY
       r0.index
@@ -348,7 +348,7 @@ fn enum_array() {
         }
     "#, lutra_bin::Value::unit())), @r#"
     SELECT
-      'statuses:' AS _0,
+      'statuses:'::text AS _0,
       (
         SELECT
           COALESCE(
@@ -390,12 +390,12 @@ fn enum_array() {
                   (
                     SELECT
                       0::int8 AS index,
-                      'today' AS value
+                      'today'::text AS value
                     UNION
                     ALL
                     SELECT
                       1::int8 AS index,
-                      'me' AS value
+                      'me'::text AS value
                   ) AS r0
               ) AS _1,
               NULL::text AS _2
@@ -405,7 +405,7 @@ fn enum_array() {
               2::int8 AS index,
               2::int2 AS _t,
               NULL::jsonb AS _1,
-              'ok' AS _2
+              'ok'::text AS _2
           ) AS r1
       ) AS _1
     ---
@@ -432,7 +432,7 @@ fn tuple_tuple_prim() {
       3::int2 AS _0,
       FALSE AS _1_0,
       TRUE AS _1_1,
-      'hello' AS _1_2_0,
+      'hello'::text AS _1_2_0,
       4::int4 AS _1_3
     ---
     {
@@ -529,7 +529,7 @@ fn tuple_array_enum() {
         }
     "#, lutra_bin::Value::unit())), @r#"
     SELECT
-      'statuses:' AS _0,
+      'statuses:'::text AS _0,
       (
         SELECT
           COALESCE(
@@ -558,8 +558,8 @@ fn tuple_array_enum() {
             SELECT
               1::int8 AS index,
               1::int2 AS _t,
-              'today' AS _1_0,
-              'me' AS _1_1,
+              'today'::text AS _1_0,
+              'me'::text AS _1_1,
               NULL::text AS _2
             UNION
             ALL
@@ -568,7 +568,7 @@ fn tuple_array_enum() {
               2::int2 AS _t,
               NULL::text AS _1_0,
               NULL::text AS _1_1,
-              'ok' AS _2
+              'ok'::text AS _2
           ) AS r0
       ) AS _1
     ---
@@ -744,7 +744,7 @@ fn array_array_array_tuple_prim() {
                         SELECT
                           0::int8 AS index,
                           1::int4 AS _0,
-                          'hello' AS _1,
+                          'hello'::text AS _1,
                           2::int2 AS _2
                       ) AS r0
                   ) AS value
@@ -889,7 +889,7 @@ fn tuple_array_tuple_prim() {
         }
     "#, lutra_bin::Value::unit())), @r#"
     SELECT
-      'hello' AS _0,
+      'hello'::text AS _0,
       (
         SELECT
           COALESCE(
@@ -1118,7 +1118,7 @@ fn param_07() {
     )
     )), @r#"
     SELECT
-      'hello' AS _0,
+      'hello'::text AS _0,
       $1::int2 AS _1_t,
       $2::text AS _1_1_0,
       $3::text AS _1_1_1,
@@ -1161,7 +1161,7 @@ fn param_08() {
     ])
     )), @r#"
     SELECT
-      'hello' AS _0,
+      'hello'::text AS _0,
       $1::jsonb AS _1
     ---
     {
@@ -1439,7 +1439,7 @@ fn json_pack_09() {
         lutra_bin::Value::Prim8(3),
     ]))), @r#"
     SELECT
-      'hello' AS _0,
+      'hello'::text AS _0,
       $1::jsonb AS _1
     ---
     {
@@ -1460,7 +1460,7 @@ fn json_pack_10() {
     "#,
     lutra_bin::Value::unit())), @r#"
     SELECT
-      'hello' AS _0,
+      'hello'::text AS _0,
       (
         SELECT
           COALESCE(
@@ -1510,7 +1510,7 @@ fn if_01() {
         WITH r0 AS (
           SELECT
             CASE
-              WHEN ('sl' = 'en') THEN 0::int2
+              WHEN ('sl'::text = 'en'::text) THEN 0::int2
               ELSE 1::int2
             END AS value
         )
@@ -1521,12 +1521,12 @@ fn if_01() {
           (
             SELECT
               0::int8 AS index,
-              'yes' AS value
+              'yes'::text AS value
             UNION
             ALL
             SELECT
               1::int8 AS index,
-              'no' AS value
+              'no'::text AS value
           ) AS r1
         WHERE
           (
@@ -1546,12 +1546,12 @@ fn if_01() {
           (
             SELECT
               0::int8 AS index,
-              'da' AS value
+              'da'::text AS value
             UNION
             ALL
             SELECT
               1::int8 AS index,
-              'ne' AS value
+              'ne'::text AS value
           ) AS r3
         WHERE
           (
@@ -1598,12 +1598,12 @@ fn match_04() {
       (
         SELECT
           CASE
-            WHEN (r1._t = 0::int2) THEN ('Hello ' || r1._0)
+            WHEN (r1._t = 0::int2) THEN ('Hello '::text || r1._0)
             WHEN (
               (r1._t = 1::int2)
               AND (r1._1_t = 1::int2)
-            ) THEN 'Who''s a good boy?'
-            ELSE ('Come here ' || r1._1_0)
+            ) THEN 'Who''s a good boy?'::text
+            ELSE ('Come here '::text || r1._1_0)
           END AS value
         FROM
           (
@@ -1619,7 +1619,7 @@ fn match_04() {
         SELECT
           0::int8 AS index,
           0::int2 AS _t,
-          'Whiskers' AS _0,
+          'Whiskers'::text AS _0,
           NULL::int2 AS _1_t,
           NULL::text AS _1_0
         UNION
@@ -1629,7 +1629,7 @@ fn match_04() {
           1::int2 AS _t,
           NULL::text AS _0,
           0::int2 AS _1_t,
-          'Belie' AS _1_0
+          'Belie'::text AS _1_0
         UNION
         ALL
         SELECT
@@ -1661,13 +1661,13 @@ fn match_05() {
     "#, lutra_bin::Value::unit())), @r#"
     SELECT
       CASE
-        WHEN (r0.value = 'world') THEN 'Hello world!'
-        ELSE ('Hello ' || r0.value)
+        WHEN (r0.value = 'world'::text) THEN 'Hello world!'::text
+        ELSE ('Hello '::text || r0.value)
       END AS value
     FROM
       (
         SELECT
-          'Tom' AS value
+          'Tom'::text AS value
       ) AS r0
     ---
     "Hello Tom"
@@ -1743,13 +1743,13 @@ async fn sql_insert_00() {
       (
         SELECT
           0::int8 AS index,
-          'Memento' AS _0,
+          'Memento'::text AS _0,
           11016::int4 AS _1
         UNION
         ALL
         SELECT
           1::int8 AS index,
-          'Inception' AS _0,
+          'Inception'::text AS _0,
           14894::int4 AS _1
       ) AS r0
     ---
@@ -1879,7 +1879,7 @@ fn opt_00() {
     }
     "#, lutra_bin::Value::unit())), @r#"
     SELECT
-      'hello' AS _0,
+      'hello'::text AS _0,
       NULL::text AS _1,
       (
         SELECT
@@ -1890,7 +1890,7 @@ fn opt_00() {
         FROM
           (
             SELECT
-              'hello' AS value
+              'hello'::text AS value
           ) AS r0
       ) AS _2,
       (
@@ -1902,7 +1902,7 @@ fn opt_00() {
         FROM
           (
             SELECT
-              'hello' AS value
+              'hello'::text AS value
           ) AS r1
       ) AS _3
     ---
@@ -1935,7 +1935,7 @@ fn opt_01() {
         SELECT
           CASE
             WHEN r1.value IS NOT NULL THEN r1.value
-            ELSE 'none'
+            ELSE 'none'::text
           END AS value
         FROM
           (
@@ -1947,7 +1947,7 @@ fn opt_01() {
       (
         SELECT
           0::int8 AS index,
-          'hello' AS value
+          'hello'::text AS value
         UNION
         ALL
         SELECT
@@ -1957,7 +1957,7 @@ fn opt_01() {
         ALL
         SELECT
           2::int8 AS index,
-          'world' AS value
+          'world'::text AS value
       ) AS r0
     ORDER BY
       r0.index

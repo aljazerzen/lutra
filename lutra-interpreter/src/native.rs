@@ -896,6 +896,7 @@ pub mod std_text {
                 "concat" => &Self::concat,
                 "length" => &Self::length,
                 "from_ascii" => &Self::from_ascii,
+                "join" => &Self::join,
 
                 _ => return None,
             })
@@ -955,6 +956,32 @@ pub mod std_text {
 
             let text = char::from(ascii).to_string();
             Ok(Cell::Data(encode(&text)))
+        }
+
+        pub fn join(
+            _it: &mut Interpreter,
+            _layout_args: &[u32],
+            args: Vec<Cell>,
+        ) -> Result<Cell, EvalError> {
+            let [parts, sep] = assume::exactly_n(args);
+            let mut parts = assume::array(parts, str::head_size().div_ceil(8) as u32);
+            let sep = assume::text(&sep)?;
+
+            let joined = match parts.next() {
+                None => String::new(),
+                Some(mut first) => {
+                    let (lower, _) = parts.size_hint();
+
+                    let mut result = String::with_capacity(sep.len() * lower);
+                    result.push_str(decode::text_ref(&mut first));
+                    for mut part in parts {
+                        result.push_str(&sep);
+                        result.push_str(decode::text_ref(&mut part));
+                    }
+                    result
+                }
+            };
+            Ok(Cell::Data(encode(&joined)))
         }
     }
 }

@@ -2054,6 +2054,21 @@ func main() -> std::text::from_ascii(10)
 # >
 "\n"
 
+# === std_text_join_00
+func main() -> std::text::join(["a", "b", "c"], ", ")
+# >
+"a, b, c"
+
+# === std_text_join_01
+func main() -> std::text::join(["a", "b", "c"], "")
+# >
+"abc"
+
+# === std_text_join_02
+func main() -> std::text::join([], ", ")
+# >
+""
+
 # === std_math_abs_00
 func main() -> std::math::abs(-3: int16)
 # >
