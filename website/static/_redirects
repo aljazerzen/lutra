@@ -1,0 +1,5 @@
+# Codeberg Pages redirects
+/docs /docs/usage/core-concepts 302
+/docs/usage /docs/usage/core-concepts 302
+/docs/language /docs/language/intro 302
+/docs/about /docs/about/status 302
