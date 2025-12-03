@@ -107,6 +107,29 @@ impl fold::PrFold for NameResolver<'_> {
                 }
             }
 
+            pr::ExprKind::VarBinding(binding) => {
+                let bound = Box::new(self.fold_expr(*binding.bound)?);
+
+                // main
+                let scope_id = self.scope_id_gen.next();
+                let mut scope = Scope::new_empty(scope_id);
+                scope.insert_local(binding.name.clone());
+                self.scopes.push(scope);
+
+                let main = Box::new(self.fold_expr(*binding.main)?);
+
+                self.scopes.pop();
+                pr::Expr {
+                    kind: pr::ExprKind::VarBinding(pr::VarBinding {
+                        name: binding.name,
+                        bound,
+                        main,
+                    }),
+                    scope_id: Some(scope_id),
+                    ..expr
+                }
+            }
+
             _ => pr::Expr {
                 kind: fold::fold_expr_kind(self, expr.kind)?,
                 ..expr

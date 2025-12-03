@@ -1,9 +1,9 @@
 use crate::diagnostic::{Diagnostic, WithErrorInfo};
-use crate::pr;
 use crate::resolver::names;
 use crate::resolver::types::{TypeResolver, scope, tuple};
 use crate::utils::fold::{self, PrFold};
 use crate::{Result, printer};
+use crate::{pr, utils};
 
 impl fold::PrFold for super::TypeResolver<'_> {
     #[tracing::instrument(name = "e", skip(self, node))]
@@ -247,6 +247,33 @@ impl fold::PrFold for super::TypeResolver<'_> {
             pr::ExprKind::If(_) => self.resolve_if(node)?,
 
             pr::ExprKind::Tuple(_) => self.resolve_tuple_constructor(node)?,
+
+            pr::ExprKind::VarBinding(binding) => {
+                let bound = Box::new(self.fold_expr(*binding.bound)?);
+                let bound_ty = bound.ty.as_ref().unwrap();
+
+                // populate scope
+                let mut scope = scope::Scope::new(node.scope_id.unwrap(), scope::ScopeKind::Nested);
+                scope.insert_local(bound_ty.clone());
+                self.scopes.push(scope);
+
+                // fold main
+                let main = self.fold_expr(*binding.main)?;
+
+                let mapping = self.finalize_type_vars()?;
+                let main = utils::TypeReplacer::on_expr(main, mapping);
+                self.scopes.pop().unwrap();
+
+                pr::Expr {
+                    ty: main.ty.clone(),
+                    kind: pr::ExprKind::VarBinding(pr::VarBinding {
+                        name: binding.name,
+                        bound,
+                        main: Box::new(main),
+                    }),
+                    ..node
+                }
+            }
 
             item => pr::Expr {
                 kind: fold::fold_expr_kind(self, item)?,

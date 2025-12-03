@@ -114,6 +114,11 @@ pub fn fold_expr_kind<T: ?Sized + PrFold>(fold: &mut T, expr_kind: ExprKind) -> 
         ),
         Match(match_) => Match(fold_match(fold, match_)?),
         If(if_else) => If(fold_if(fold, if_else)?),
+        VarBinding(binding) => VarBinding(pr::VarBinding {
+            name: binding.name,
+            bound: Box::new(fold.fold_expr(*binding.bound)?),
+            main: Box::new(fold.fold_expr(*binding.main)?),
+        }),
 
         FuncCall(func_call) => FuncCall(fold.fold_func_call(func_call)?),
         Func(func) => Func(Box::new(fold.fold_func(*func)?)),

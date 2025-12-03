@@ -25,7 +25,7 @@ impl TypeResolver<'_> {
             ExprKind::Array(items) => {
                 let mut items_ty = None;
                 for item in items {
-                    let item_ty = self.infer_type(item)?;
+                    let item_ty = item.ty.clone().unwrap();
                     if let Some(items_ty) = &items_ty {
                         self.validate_type(&item_ty, items_ty, &|| None)
                             .with_span_fallback(item.span)?;
@@ -63,7 +63,8 @@ impl TypeResolver<'_> {
             | ExprKind::EnumVariant(_)
             | ExprKind::Match(_)
             | ExprKind::TupleLookup { .. }
-            | ExprKind::If(_) => unreachable!(),
+            | ExprKind::If(_)
+            | ExprKind::VarBinding(_) => unreachable!(),
 
             // desugar-ed
             ExprKind::Nested(_)

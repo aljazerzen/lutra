@@ -159,6 +159,21 @@ impl PrintSource for pr::Expr {
                 print_block(&if_.els, p)?;
             }
 
+            pr::ExprKind::VarBinding(binding) => {
+                if p.single_line {
+                    return None;
+                }
+
+                p.push("let ")?;
+                p.push(pr::display_ident(&binding.name))?;
+                p.push(" = ")?;
+                binding.bound.print(p)?;
+                p.push(";")?;
+                p.new_line();
+
+                binding.main.print(p)?;
+            }
+
             pr::ExprKind::EnumVariant(_) | pr::ExprKind::Native => unreachable!(),
         }
         Some(())

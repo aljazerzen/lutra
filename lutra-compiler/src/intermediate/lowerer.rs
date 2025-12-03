@@ -383,6 +383,34 @@ impl<'a> Lowerer<'a> {
                 ir::ExprKind::Switch(vec![first, second])
             }
 
+            pr::ExprKind::VarBinding(binding) => {
+                let bound = self.lower_expr(&binding.bound)?;
+                let bound_id = self.generator_var_binding.next() as u32;
+                let bound_ref = ir::Expr {
+                    kind: ir::ExprKind::Pointer(ir::Pointer::Binding(bound_id)),
+                    ty: bound.ty.clone(),
+                };
+
+                // prepare scope
+                self.scopes.push(Scope {
+                    id: expr.scope_id.unwrap(),
+                    kind: ScopeKind::Local {
+                        values: vec![bound_ref],
+                    },
+                });
+
+                // compile value
+                let main = self.lower_expr(&binding.main)?;
+
+                self.scopes.pop();
+
+                ir::ExprKind::Binding(Box::new(ir::Binding {
+                    id: bound_id,
+                    expr: bound,
+                    main,
+                }))
+            }
+
             // consumed by type resolver
             pr::ExprKind::TypeAnnotation(_) => unreachable!(),
 

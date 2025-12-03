@@ -110,6 +110,8 @@ pub enum ExprKind {
     Match(Match),
     If(If),
 
+    VarBinding(VarBinding),
+
     Native,
 }
 
@@ -271,6 +273,13 @@ pub struct If {
     pub condition: Box<Expr>,
     pub then: Box<Expr>,
     pub els: Box<Expr>,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct VarBinding {
+    pub name: String,
+    pub bound: Box<Expr>,
+    pub main: Box<Expr>,
 }
 
 impl From<Literal> for ExprKind {

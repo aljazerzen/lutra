@@ -259,8 +259,29 @@ fn range<'a>(
 fn nested<'a>(
     expr: impl Parser<TokenKind, Expr, Error = PError> + Clone + 'a,
 ) -> impl Parser<TokenKind, ExprKind, Error = PError> + Clone + 'a {
-    expr.map(Box::new)
+    let var_bindings = keyword("let")
+        .ignore_then(ident_part())
+        .then_ignore(ctrl('='))
+        .then(expr.clone().map(Box::new))
+        .then_ignore(ctrl(';'))
+        .map_with_span(|stmt, span| (stmt, span));
+
+    let main = expr.map(Box::new);
+
+    let nested = var_bindings
+        .repeated()
+        .then(main)
+        .foldr(|((name, bound), binding_span), main| {
+            let mut span = binding_span;
+            span.set_end_of(main.span.as_ref().unwrap());
+
+            let kind = ExprKind::VarBinding(VarBinding { name, bound, main });
+            Box::new(Expr::new_with_span(kind, span))
+        });
+
+    nested
         .map(ExprKind::Nested)
+        .delimited_by(ctrl('('), ctrl(')'))
         .recover_with(nested_delimiters(
             TokenKind::Control('('),
             TokenKind::Control(')'),
@@ -270,7 +291,6 @@ fn nested<'a>(
             ],
             |_| ExprKind::Tuple(vec![]),
         ))
-        .delimited_by(ctrl('('), ctrl(')'))
 }
 
 fn binary_op_parser<'a, Term, Op>(

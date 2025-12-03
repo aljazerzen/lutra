@@ -200,8 +200,6 @@ pub struct CompileCommand {
 }
 
 pub fn compile(cmd: CompileCommand) -> anyhow::Result<()> {
-    let project_dir = cmd.discover.project.clone();
-
     // compile
     let project = lutra_compiler::discover(cmd.discover)?;
 
@@ -226,18 +224,16 @@ pub fn compile(cmd: CompileCommand) -> anyhow::Result<()> {
         }
     }
 
-    let project_dir = project_dir.unwrap_or_else(|| std::env::current_dir().unwrap());
-    let out_dir = project_dir.join("program.rr.lb");
+    let out_dir = project.source.get_project_dir().join("program.rr.lb");
 
     let program_lt = program.encode();
-    std::fs::write(&out_dir, &program_lt)?;
-
     println!();
     println!(
-        "Program written to {} ({} bytes)",
+        "Writing program to {} ({} bytes)",
         out_dir.display(),
         program_lt.len()
     );
+    std::fs::write(&out_dir, &program_lt)?;
     Ok(())
 }
 

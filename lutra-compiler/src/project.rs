@@ -39,6 +39,7 @@ pub struct Dependency {
 #[derive(Debug, Clone)]
 pub struct SourceTree {
     /// Path to the root of the source tree.
+    /// Can be a directory that contains module.lt or a .lt file.
     pub root: path::PathBuf,
 
     /// Mapping from file paths into into their contents.
@@ -126,6 +127,14 @@ impl SourceTree {
 
     pub fn get_source(&self, path: &path::Path) -> Option<&str> {
         self.sources.get(path).map(|s| s.as_str())
+    }
+
+    pub fn get_project_dir(&self) -> &path::Path {
+        if self.root.is_dir() {
+            &self.root
+        } else {
+            self.root.parent().unwrap()
+        }
     }
 }
 

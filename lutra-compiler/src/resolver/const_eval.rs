@@ -56,7 +56,8 @@ impl ConstantValidator {
             pr::ExprKind::FuncCall(_)
             | pr::ExprKind::Func(_)
             | pr::ExprKind::Match(_)
-            | pr::ExprKind::If(_) => Err(expr.span),
+            | pr::ExprKind::If(_)
+            | pr::ExprKind::VarBinding(_) => Err(expr.span),
 
             // resolved away
             pr::ExprKind::TypeAnnotation(_)

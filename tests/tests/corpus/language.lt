@@ -2344,3 +2344,47 @@ const main = std::Time(0)
 func main() -> std::add_duration(@116:07:44.12, @-4:00:00)
 # >
 @112:07:44.120000
+
+# === var_binding_00
+func main() -> (
+  let a = false;
+  {a, a, !a}
+)
+# >
+{
+  false,
+  false,
+  true,
+}
+
+# === var_binding_01
+func main() -> (
+  [1, 2, 3]: [int32]
+  | std::map(func (x) -> (
+    let a = x * 2;
+    a * a
+  ))
+)
+# >
+[
+  4,
+  16,
+  36,
+]
+
+# === var_binding_02
+func main() -> (
+  [1, 2, 3]: [int32]
+  | std::map(func (x) -> (
+    let a = x * 2;
+    let b = a * 2;
+    let c = -b;
+    c
+  ))
+)
+# >
+[
+  -4,
+  -8,
+  -12,
+]
