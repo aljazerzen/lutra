@@ -937,6 +937,13 @@ func main() -> std::count([]: [bool])
 # >
 0
 
+# === std_count_02
+type OptText: enum {None, Some: text}
+
+func main() -> std::count([OptText::Some("a"), OptText::None]: [OptText])
+# >
+2
+
 # === std_div_00
 func main() -> (10 / 6): int64
 # >

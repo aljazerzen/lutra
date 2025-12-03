@@ -672,7 +672,20 @@ impl<'a> Context<'a> {
                 let ty = self.compile_ty_name(ty);
                 sql_ast::Expr::Source(format!("AVG({arg})::{ty}"))
             }
-            "std::count" => sql_ast::Expr::Source("COUNT(*)".into()),
+            "std::count" => {
+                let [arg] = unpack_args(args);
+
+                sql_ast::Expr::Source(if let sql_ast::Expr::CompoundIdentifier(parts) = arg {
+                    let rvar = &parts[0];
+                    format!("COUNT({rvar}.*)")
+                } else {
+                    // We need to reference arg, so we get aggregation of correct cardinality.
+                    // But we cannot just use COUNT({arg}) because that will not count NULL values
+                    // (which are produced by enum {None, Some: T} type).
+                    // So we use IS NULL, which should be performant, but also always emit non-null values.
+                    format!("COUNT({arg} IS NULL)")
+                })
+            }
             "std::any" => sql_ast::Expr::Source(format!(
                 "COALESCE({}, FALSE)",
                 utils::new_func_call("BOOL_OR", args)
