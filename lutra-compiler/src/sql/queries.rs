@@ -648,12 +648,14 @@ impl<'a> Context<'a> {
             "std::sub" => utils::new_bin_op("-", args),
             "std::neg" => utils::new_un_op("-", args),
 
+            "std::cmp" => {
+                let [a, b] = unpack_args(args);
+                sql_ast::Expr::Source(format!(
+                    "(SELECT CASE WHEN a < b THEN 0 WHEN a > b THEN 2 ELSE 1 END::int2 FROM (VALUES ({a}, {b})) t(a,b))"
+                ))
+            }
             "std::eq" => utils::new_bin_op("=", args),
-            "std::ne" => utils::new_bin_op("<>", args),
-
-            "std::gt" => utils::new_bin_op(">", args),
             "std::lt" => utils::new_bin_op("<", args),
-            "std::gte" => utils::new_bin_op(">=", args),
             "std::lte" => utils::new_bin_op("<=", args),
 
             "std::and" => utils::new_bin_op("AND", args),

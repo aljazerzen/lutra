@@ -43,6 +43,12 @@ pub trait IrFold {
     fn fold_binding(&mut self, binding: Binding, ty: Ty) -> Result<Expr> {
         fold_binding(self, binding, ty)
     }
+    fn fold_switch(&mut self, branches: Vec<SwitchBranch>, ty: Ty) -> Result<Expr> {
+        fold_switch(self, branches, ty)
+    }
+    fn fold_enum_eq(&mut self, enum_eq: EnumEq, ty: Ty) -> Result<Expr> {
+        fold_enum_eq(self, enum_eq, ty)
+    }
     fn fold_ty(&mut self, ty: Ty) -> Result<Ty> {
         fold_ty(self, ty)
     }
@@ -58,11 +64,11 @@ pub fn fold_expr_kind<T: ?Sized + IrFold>(fold: &mut T, kind: ExprKind, ty: Ty) 
         Tuple(fields) => Tuple(fold_tuple_fields(fold, fields)?),
         Array(items) => Array(fold_exprs(fold, items)?),
         EnumVariant(variant) => EnumVariant(Box::new(fold_enum_variant(fold, *variant)?)),
-        EnumEq(eq) => EnumEq(Box::new(fold_enum_eq(fold, *eq)?)),
+        EnumEq(eq) => return fold.fold_enum_eq(*eq, ty),
         EnumUnwrap(unwrap) => EnumUnwrap(Box::new(fold_enum_unwrap(fold, *unwrap)?)),
         TupleLookup(lookup) => return fold.fold_lookup(*lookup, ty),
         Binding(binding) => return fold.fold_binding(*binding, ty),
-        Switch(branches) => return fold_switch(fold, branches, ty),
+        Switch(branches) => return fold.fold_switch(branches, ty),
     };
     Ok(Expr { kind, ty })
 }
@@ -123,11 +129,13 @@ pub fn fold_enum_variant<T: ?Sized + IrFold>(
     })
 }
 
-pub fn fold_enum_eq<T: ?Sized + IrFold>(fold: &mut T, variant: EnumEq) -> Result<EnumEq> {
-    Ok(EnumEq {
-        tag: variant.tag,
-        subject: fold.fold_expr(variant.subject)?,
-    })
+pub fn fold_enum_eq<T: ?Sized + IrFold>(fold: &mut T, eq: EnumEq, ty: Ty) -> Result<Expr> {
+    let eq = EnumEq {
+        tag: eq.tag,
+        subject: fold.fold_expr(eq.subject)?,
+    };
+
+    Ok(Expr::new(eq, ty))
 }
 
 pub fn fold_enum_unwrap<T: ?Sized + IrFold>(

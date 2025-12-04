@@ -195,13 +195,20 @@ fn match_(
 }
 
 fn unary<'a>(
-    expr: impl Parser<TokenKind, Expr, Error = PError> + Clone + 'a,
+    expr: impl Parser<TokenKind, Expr, Error = PError> + 'a,
 ) -> impl Parser<TokenKind, Expr, Error = PError> + Clone + 'a {
-    expr.clone()
-        .or(operator_unary()
-            .then(expr.map(Box::new))
-            .map(|(op, expr)| ExprKind::Unary(UnaryExpr { op, expr }))
-            .map_with_span(Expr::new_with_span))
+    operator_unary()
+        .map_with_span(|o, s| (o, s))
+        .repeated()
+        .then(expr)
+        .foldr(|(op, mut op_span), expr| {
+            op_span.set_end_of(expr.span.as_ref().unwrap());
+
+            let expr = Box::new(expr);
+            let kind = ExprKind::Unary(UnaryExpr { op, expr });
+
+            Expr::new_with_span(kind, op_span)
+        })
         .boxed()
 }
 

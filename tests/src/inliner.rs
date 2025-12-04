@@ -57,24 +57,22 @@ fn inline_02() {
     )
     "#), @r"
     let main = (func 2 ->
-      let 1 = [
-        (tuple
-          5[90m: int64[0m,
-          3[90m: int64[0m,
-        )[90m: {int64, int64}[0m,
-        (tuple
-          65[90m: int64[0m,
-          1[90m: int64[0m,
-        )[90m: {int64, int64}[0m,
-        (tuple
-          3[90m: int64[0m,
-          2[90m: int64[0m,
-        )[90m: {int64, int64}[0m,
-      ][90m: [{int64, int64}][0m;
-      let 3 = var.1[90m: [{int64, int64}][0m;
       let 5 = (call
         external.std::to_columnar[90m: func ([{int64, int64}]) -> {[int64], [int64]}[0m,
-        var.3[90m: [{int64, int64}][0m,
+        [
+          (tuple
+            5[90m: int64[0m,
+            3[90m: int64[0m,
+          )[90m: {int64, int64}[0m,
+          (tuple
+            65[90m: int64[0m,
+            1[90m: int64[0m,
+          )[90m: {int64, int64}[0m,
+          (tuple
+            3[90m: int64[0m,
+            2[90m: int64[0m,
+          )[90m: {int64, int64}[0m,
+        ][90m: [{int64, int64}][0m,
       )[90m: {[int64], [int64]}[0m;
       (tuple
         (call
@@ -117,45 +115,20 @@ fn inline_03() {
           "hello"[90m: text[0m
         )[90m: OptText[0m,
         (enum_variant 0)[90m: OptText[0m,
-        let 2 = (enum_variant 1
-          "hello"[90m: text[0m
-        )[90m: OptText[0m;
-        (
-          switch,
-          (
-            (enum_eq
-              var.2[90m: enum {None, Some: text}[0m
-              1
-            )[90m: bool[0m,
-            true[90m: bool[0m,
-          ),
-          (
-            (enum_eq
-              var.2[90m: enum {None, Some: text}[0m
-              0
-            )[90m: bool[0m,
-            false[90m: bool[0m,
-          ),
+        (enum_eq
+          (enum_variant 1
+            "hello"[90m: text[0m
+          )[90m: OptText[0m
+          1
         )[90m: bool[0m,
-        let 3 = (enum_variant 1
-          "hello"[90m: text[0m
-        )[90m: OptText[0m;
-        (
-          switch,
-          (
-            (enum_eq
-              var.3[90m: enum {None, Some: text}[0m
-              1
-            )[90m: bool[0m,
-            false[90m: bool[0m,
-          ),
-          (
-            (enum_eq
-              var.3[90m: enum {None, Some: text}[0m
-              0
-            )[90m: bool[0m,
-            true[90m: bool[0m,
-          ),
+        (call
+          external.std::not[90m: func (bool) -> bool[0m,
+          (enum_eq
+            (enum_variant 1
+              "hello"[90m: text[0m
+            )[90m: OptText[0m
+            1
+          )[90m: bool[0m,
         )[90m: bool[0m,
       )[90m: {OptText, OptText, bool, bool}[0m
     )[90m: func ({}) -> {OptText, OptText, bool, bool}[0m

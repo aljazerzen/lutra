@@ -48,58 +48,104 @@ where
 
 # Operators
 
+## Multiplies two numbers.
 func mul(left: T, right: T): T
 where
   T: number
 
+## Divides two numbers.
 func div(left: T, right: T): T
 where
   T: number
 
+## Division remainder.
 func mod(left: T, right: T): T
 where
   T: number
 
+## Adds two numbers.
 func add(left: T, right: T): T
 where
   T: number
 
+## Subtracts two numbers.
 func sub(left: T, right: T): T
 where
   T: number
 
+## Negates a number.
 func neg(x: T): T
 where
   T: int8 | int16 | int32 | int64 | float32 | float64
 
+## Compare two values to determine if the first is less, equal, or greater than
+## the second.
+func cmp(a: T, b: T): Ordering
+where T: primitive
+
+type Ordering: enum { Less, Equal, Greater }
+
+## Tests if values are equal. Used by `==` operator.
 func eq(left: T, right: T): bool
-where
-  T: primitive
+where T: primitive -> (
+  match cmp(left, right) {
+    .Equal => true,
+    _ => false,
+  }
+)
 
+## Tests if values are not equal. Used by `!=` operator.
 func ne(left: T, right: T): bool
-where
-  T: primitive
+where T: primitive  -> (
+  match cmp(left, right) {
+    .Equal => false,
+    _ => true,
+  }
+)
 
+## Tests if left value is greater than the right. Used by `>` operator.
 func gt(left: T, right: T): bool
-where
-  T: primitive
+where T: primitive -> (
+  match cmp(left, right) {
+    .Greater => true,
+    _ => false,
+  }
+)
 
+## Tests if left value is less than the right. Used by `<` operator.
 func lt(left: T, right: T): bool
-where
-  T: primitive
+where T: primitive -> (
+  match cmp(left, right) {
+    .Less => true,
+    _ => false,
+  }
+)
 
+## Tests if left value is greater or equal to the right. Used by `>=` operator.
 func gte(left: T, right: T): bool
-where
-  T: primitive
+where T: primitive -> (
+  match cmp(left, right) {
+    .Less => false,
+    _ => true,
+  }
+)
 
+## Tests if left value is less or equal to the right. Used by `<=` operator.
 func lte(left: T, right: T): bool
-where
-  T: primitive
+where T: primitive -> (
+  match cmp(left, right) {
+    .Greater => false,
+    _ => true,
+  }
+)
 
+## Tests if both values are true. Used by `&&` operator.
 func and(left: bool, right: bool): bool
 
+## Tests if either of the values is true. Used by `||` operator.
 func or(left: bool, right: bool): bool
 
+## Inverts a boolean. Used by `!` operator.
 func not(expr: bool): bool
 
 func regex_search(text: text, pattern: text): bool

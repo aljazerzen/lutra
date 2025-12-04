@@ -1052,9 +1052,9 @@ impl<'a> Context<'a> {
                 // filter out initial accumulator
                 let iteration = self.new_binding(iteration);
                 let filter_initial_acc = new_bin_op(
-                    self.new_rel_col(&iteration, 0, ir::Ty::new(ir::TyPrimitive::int64)),
-                    "std::gt",
                     new_int(0),
+                    "std::lt",
+                    self.new_rel_col(&iteration, 0, ir::Ty::new(ir::TyPrimitive::int64)),
                     ir::TyPrimitive::bool,
                 );
                 let iteration = cr::Expr::new_iso_transform(

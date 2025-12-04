@@ -1296,6 +1296,20 @@ func main() -> (
 ]
 
 
+# === std_cmp_00
+import std::cmp
+
+const a: int32 = 2
+const b: int32 = 30
+
+func main() -> {cmp(a, b), cmp(a, a), cmp(b, a)}
+# >
+{
+  Less,
+  Equal,
+  Greater,
+}
+
 # === std_eq_00
 func main() -> {30: int64 == 2, 30: int64 == 30}
 # >

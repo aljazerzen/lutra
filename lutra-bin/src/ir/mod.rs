@@ -39,6 +39,11 @@ impl From<ParameterPtr> for ExprKind {
         ExprKind::Pointer(Pointer::Parameter(ptr))
     }
 }
+impl From<ExternalPtr> for ExprKind {
+    fn from(ptr: ExternalPtr) -> Self {
+        ExprKind::Pointer(Pointer::External(ptr))
+    }
+}
 impl From<TupleLookup> for ExprKind {
     fn from(v: TupleLookup) -> Self {
         ExprKind::TupleLookup(boxed::Box::new(v))
@@ -52,6 +57,11 @@ impl From<Call> for ExprKind {
 impl From<Function> for ExprKind {
     fn from(v: Function) -> Self {
         ExprKind::Function(boxed::Box::new(v))
+    }
+}
+impl From<EnumEq> for ExprKind {
+    fn from(eq: EnumEq) -> Self {
+        ExprKind::EnumEq(boxed::Box::new(eq))
     }
 }
 

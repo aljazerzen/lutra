@@ -2,9 +2,8 @@ use std::collections::{HashMap, HashSet};
 
 use lutra_bin::ir;
 
-use crate::utils::IdGenerator;
-
 use super::fold::{self, IrFold};
+use crate::utils::IdGenerator;
 
 pub fn inline(program: ir::Program) -> ir::Program {
     let (mut program, id_counts) = IdCounter::run(program);
@@ -12,7 +11,6 @@ pub fn inline(program: ir::Program) -> ir::Program {
     // inline functions
     let mut inliner = FuncInliner {
         bindings: Default::default(),
-        binding_usage: Default::default(),
 
         currently_inlining: Default::default(),
 
@@ -22,10 +20,15 @@ pub fn inline(program: ir::Program) -> ir::Program {
 
     tracing::debug!("ir (funcs inlined):\n{}", ir::print(&program));
 
-    tracing::debug!("binding_usage = {:?}", inliner.binding_usage);
+    // count bindings usage
+    let mut counter = BindingUsageCounter {
+        usage: Default::default(),
+    };
+    program.main = counter.fold_expr(program.main).unwrap();
+    tracing::debug!("binding_usage = {:?}", counter.usage);
 
-    // inline vars
-    let mut inliner = VarInliner::new(inliner.binding_usage);
+    // inline bindings
+    let mut inliner = BindingInliner::new(counter.usage);
     program.main = inliner.fold_expr(program.main).unwrap();
 
     program
@@ -34,9 +37,6 @@ pub fn inline(program: ir::Program) -> ir::Program {
 struct FuncInliner {
     // bindings of functions
     bindings: HashMap<u32, ir::Function>,
-
-    // used later, for VarInliner
-    binding_usage: HashMap<u32, usize>,
 
     currently_inlining: HashSet<u32>,
 
@@ -67,7 +67,6 @@ impl fold::IrFold for FuncInliner {
             }
         }
 
-        self.binding_usage.insert(binding.id, 0);
         fold::fold_binding(self, binding, ty)
     }
 
@@ -80,10 +79,6 @@ impl fold::IrFold for FuncInliner {
                 if self.currently_inlining.contains(binding_id) {
                     panic!("recursive function cannot be inlined");
                 }
-
-                // count usage of bindings
-                *self.binding_usage.entry(*binding_id).or_default() += 1;
-
                 if let Some(func) = self.bindings.get(binding_id) {
                     let expr = self.substitute_function(func.clone(), args);
 
@@ -125,11 +120,63 @@ impl fold::IrFold for FuncInliner {
                     ty,
                 });
             }
-
-            // count usage of bindings
-            *self.binding_usage.entry(*binding_id).or_default() += 1;
         }
         fold::fold_ptr(ptr, ty)
+    }
+
+    // optimization: inline unneeded switch cases
+    fn fold_switch(&mut self, branches: Vec<ir::SwitchBranch>, ty: ir::Ty) -> Result<ir::Expr, ()> {
+        // detect cases:
+        // (switch
+        //    (...cond..., bool_then)
+        //    (.anything., bool_else)
+        // )
+        fn as_bool_literal(expr: &ir::Expr) -> Option<bool> {
+            expr.kind.as_literal().and_then(|l| l.as_bool().cloned())
+        }
+        if matches!(ty.kind, ir::TyKind::Primitive(ir::TyPrimitive::bool))
+            && branches.len() == 2
+            && let Some(value_then) = as_bool_literal(&branches[0].value)
+            && let Some(value_else) = as_bool_literal(&branches[1].value)
+        {
+            let cond = branches.into_iter().next().unwrap().condition;
+
+            match (value_then, value_else) {
+                (true, true) | (false, false) => {
+                    // pathological case, we don't need to compare
+                    return Ok(ir::Expr::new_lit_bool(value_then));
+                }
+                (true, false) => {
+                    // this just executes the cond
+                    return self.fold_expr(cond);
+                }
+                (false, true) => {
+                    // this just inverts the cond
+                    let cond = self.fold_expr(cond)?;
+
+                    let ty_bool = ir::Ty::new(ir::TyPrimitive::bool);
+                    let std_not = ir::Expr::new(
+                        ir::ExternalPtr {
+                            id: "std::not".into(),
+                        },
+                        ir::Ty::new(ir::TyFunction {
+                            params: vec![ty_bool.clone()],
+                            body: ty_bool.clone(),
+                        }),
+                    );
+
+                    return Ok(ir::Expr::new(
+                        ir::Call {
+                            function: std_not,
+                            args: vec![cond],
+                        },
+                        ty_bool,
+                    ));
+                }
+            }
+        }
+
+        fold::fold_switch(self, branches, ty)
     }
 }
 
@@ -166,13 +213,32 @@ impl FuncInliner {
     }
 }
 
-struct VarInliner {
+struct BindingUsageCounter {
+    usage: HashMap<u32, usize>,
+}
+
+impl fold::IrFold for BindingUsageCounter {
+    fn fold_binding(&mut self, binding: ir::Binding, ty: ir::Ty) -> Result<ir::Expr, ()> {
+        self.usage.insert(binding.id, 0);
+        fold::fold_binding(self, binding, ty)
+    }
+
+    fn fold_ptr(&mut self, ptr: ir::Pointer, ty: ir::Ty) -> Result<ir::Expr, ()> {
+        if let ir::Pointer::Binding(binding_id) = &ptr {
+            // count usage of bindings
+            *self.usage.entry(*binding_id).or_default() += 1;
+        }
+        fold::fold_ptr(ptr, ty)
+    }
+}
+
+struct BindingInliner {
     bindings: HashMap<u32, ir::Expr>,
 
     bindings_to_inline: HashSet<u32>,
 }
 
-impl VarInliner {
+impl BindingInliner {
     fn new(bindings_usage: HashMap<u32, usize>) -> Self {
         let bindings_to_inline = bindings_usage
             .into_iter()
@@ -183,14 +249,14 @@ impl VarInliner {
 
         tracing::debug!("inlining vars: {:?}", bindings_to_inline);
 
-        VarInliner {
+        BindingInliner {
             bindings: Default::default(),
             bindings_to_inline,
         }
     }
 }
 
-impl IrFold for VarInliner {
+impl IrFold for BindingInliner {
     fn fold_binding(&mut self, binding: ir::Binding, ty: ir::Ty) -> Result<ir::Expr, ()> {
         if self.bindings_to_inline.contains(&binding.id) {
             // store in self.bindings
@@ -213,6 +279,124 @@ impl IrFold for VarInliner {
             }
         }
         fold::fold_ptr(ptr, ty)
+    }
+
+    // optimization: simplify std::cmp
+    fn fold_enum_eq(&mut self, enum_eq: ir::EnumEq, ty: ir::Ty) -> Result<ir::Expr, ()> {
+        // normal fold
+        let enum_eq = ir::EnumEq {
+            tag: enum_eq.tag,
+            subject: self.fold_expr(enum_eq.subject)?,
+        };
+
+        // detect cases:
+        // (enum_eq
+        //   (call
+        //      external.std::cmp,
+        //      a,
+        //      b,
+        //   ),
+        //   tag
+        // )
+        if let ir::ExprKind::Call(call) = &enum_eq.subject.kind
+            && let ir::ExprKind::Pointer(ir::Pointer::External(func)) = &call.function.kind
+            && func.id == "std::cmp"
+        {
+            let (cmp_func, swap) = match enum_eq.tag {
+                0 => ("std::lt", false),
+                1 => ("std::eq", false),
+                2 => ("std::lt", true),
+                _ => unreachable!(),
+            };
+
+            let mut func_ty = call.function.ty.clone();
+            func_ty.kind.as_function_mut().unwrap().body = ir::Ty::new(ir::TyPrimitive::bool);
+
+            let function = ir::Expr::new(
+                ir::ExternalPtr {
+                    id: cmp_func.to_string(),
+                },
+                func_ty,
+            );
+
+            let mut args = call.args.clone();
+            if swap {
+                args.reverse();
+            }
+
+            return Ok(ir::Expr::new(ir::Call { function, args }, ty));
+        }
+
+        Ok(ir::Expr {
+            kind: ir::ExprKind::EnumEq(Box::new(enum_eq)),
+            ty,
+        })
+    }
+
+    // optimization: simplify call chains
+    fn fold_call(&mut self, call: ir::Call, ty: ir::Ty) -> Result<ir::Expr, ()> {
+        let expr = fold::fold_call(self, call, ty)?;
+
+        fn as_external(expr: &ir::Expr) -> Option<&str> {
+            expr.kind
+                .as_pointer()
+                .and_then(|p| p.as_external())
+                .map(|e| e.id.as_str())
+        }
+        fn as_external_mut(expr: &mut ir::Expr) -> Option<&mut String> {
+            expr.kind
+                .as_pointer_mut()
+                .and_then(|p| p.as_external_mut())
+                .map(|e| &mut e.id)
+        }
+
+        // detect:
+        // (call
+        //   external.outer_id,
+        //   (call
+        //     external.inner_id,
+        //     ..inner_args..
+        //   ),
+        //   ..outer_args..
+        // )
+        if let ir::ExprKind::Call(outer) = &expr.kind
+            && let Some(outer_id) = as_external(&outer.function)
+            && let ir::ExprKind::Call(inner) = &outer.args[0].kind
+            && let Some(inner_id) = as_external(&inner.function)
+        {
+            match (outer_id, inner_id) {
+                ("std::not", "std::not") => {
+                    // not(not(x)) --> x
+                    return Ok(inner.args[0].clone());
+                }
+
+                ("std::not", "std::lt") => {
+                    // not(lt(a, b)) --> lte(b, a)
+                    let mut call = *inner.clone();
+
+                    let func_id = as_external_mut(&mut call.function).unwrap();
+                    *func_id = "std::lte".to_string();
+
+                    call.args.reverse();
+
+                    return Ok(ir::Expr::new(call, expr.ty));
+                }
+                ("std::not", "std::lte") => {
+                    // not(lte(a, b)) --> lt(b, a)
+                    let mut call = *inner.clone();
+
+                    let func_id = as_external_mut(&mut call.function).unwrap();
+                    *func_id = "std::lt".to_string();
+
+                    call.args.reverse();
+
+                    return Ok(ir::Expr::new(call, expr.ty));
+                }
+                _ => {}
+            }
+        }
+
+        Ok(expr)
     }
 }
 

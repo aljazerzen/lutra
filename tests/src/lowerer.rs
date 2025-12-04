@@ -41,9 +41,31 @@ fn lower_01() {
       box_office::get_album_sales_by_id(album_id),
     }
     "#), @r"
+    type std::Ordering = enum {Less, Equal, Greater};
     type chinook::album = {id: int64, title: text};
     type box_office::AlbumSale = {id: int64, total: float64};
     let main = (func 1 ->
+      let 2 = (func 6 ->
+        let 3 = (call
+          external.std::cmp[90m: func (int64, int64) -> std::Ordering[0m,
+          fn.6+0[90m: int64[0m,
+          fn.6+1[90m: int64[0m,
+        )[90m: std::Ordering[0m;
+        (
+          switch,
+          (
+            (enum_eq
+              var.3[90m: std::Ordering[0m
+              1
+            )[90m: bool[0m,
+            true[90m: bool[0m,
+          ),
+          (
+            true[90m: bool[0m,
+            false[90m: bool[0m,
+          ),
+        )[90m: bool[0m
+      )[90m: func (int64, int64) -> bool[0m;
       let 1 = (func 4 ->
         (call
           external.std::index[90m: func ([{id: int64, total: float64}], int64) -> enum {None, Some: {id: int64, total: float64}}[0m,
@@ -54,7 +76,7 @@ fn lower_01() {
             )[90m: [box_office::AlbumSale][0m,
             (func 5 ->
               (call
-                external.std::eq[90m: func (int64, int64) -> bool[0m,
+                var.2[90m: func (int64, int64) -> bool[0m,
                 (tuple_lookup
                   fn.5+0[90m: box_office::AlbumSale[0m
                   0
@@ -76,7 +98,7 @@ fn lower_01() {
             )[90m: [chinook::album][0m,
             (func 3 ->
               (call
-                external.std::eq[90m: func (int64, int64) -> bool[0m,
+                var.2[90m: func (int64, int64) -> bool[0m,
                 (tuple_lookup
                   fn.3+0[90m: chinook::album[0m
                   0

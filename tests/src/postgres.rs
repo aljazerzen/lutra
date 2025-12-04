@@ -1674,6 +1674,102 @@ fn match_05() {
     "#);
 }
 
+#[test]
+fn cmp_00() {
+    insta::assert_snapshot!(_sql_and_output(_run(r#"
+    func compare(a: int16, b: int16) -> {
+        a == b,
+        a != b,
+        a < b,
+        a > b,
+        a <= b,
+        a >= b,
+    }
+    func main() -> (
+      [{3, 3}, {3, 5}, {5, 3}]
+      | std::map(func (x) -> compare(x.0, x.1))
+    )
+    "#, lutra_bin::Value::unit())), @r"
+    SELECT
+      r4._0 AS _0,
+      r4._1 AS _1,
+      r4._2 AS _2,
+      r4._3 AS _3,
+      r4._4 AS _4,
+      r4._5 AS _5
+    FROM
+      (
+        SELECT
+          0::int8 AS index,
+          3::int2 AS _0,
+          3::int2 AS _1
+        UNION
+        ALL
+        SELECT
+          1::int8 AS index,
+          3::int2 AS _0,
+          5::int2 AS _1
+        UNION
+        ALL
+        SELECT
+          2::int8 AS index,
+          5::int2 AS _0,
+          3::int2 AS _1
+      ) AS r0,
+      LATERAL (
+        SELECT
+          r0.index AS value
+      ) AS r1,
+      LATERAL (
+        SELECT
+          (r3.value = r2.value) AS _0,
+          (NOT (r3.value = r2.value)) AS _1,
+          (r3.value < r2.value) AS _2,
+          (r2.value < r3.value) AS _3,
+          (r3.value <= r2.value) AS _4,
+          (r2.value <= r3.value) AS _5
+        FROM
+          (
+            SELECT
+              r0._1 AS value
+          ) AS r2,
+          LATERAL (
+            SELECT
+              r0._0 AS value
+          ) AS r3
+      ) AS r4
+    ORDER BY
+      r1.value
+    ---
+    [
+      {
+        true,
+        false,
+        false,
+        false,
+        true,
+        true,
+      },
+      {
+        false,
+        true,
+        true,
+        false,
+        true,
+        false,
+      },
+      {
+        false,
+        true,
+        false,
+        true,
+        false,
+        true,
+      },
+    ]
+    ");
+}
+
 #[tokio::test(flavor = "current_thread")]
 async fn sql_from_00() {
     let client = _get_test_db_client().await.unwrap();
@@ -1881,30 +1977,8 @@ fn opt_00() {
     SELECT
       'hello'::text AS _0,
       NULL::text AS _1,
-      (
-        SELECT
-          CASE
-            WHEN r0.value IS NOT NULL THEN TRUE
-            ELSE FALSE
-          END AS value
-        FROM
-          (
-            SELECT
-              'hello'::text AS value
-          ) AS r0
-      ) AS _2,
-      (
-        SELECT
-          CASE
-            WHEN r1.value IS NOT NULL THEN FALSE
-            ELSE TRUE
-          END AS value
-        FROM
-          (
-            SELECT
-              'hello'::text AS value
-          ) AS r1
-      ) AS _3
+      'hello'::text IS NOT NULL AS _2,
+      (NOT 'hello'::text IS NOT NULL) AS _3
     ---
     {
       Some("hello"),

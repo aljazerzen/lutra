@@ -34,6 +34,12 @@ where
     });
 
     for schema in schemas {
+        // TODO: implement this in the Lutra query
+        if schema.schema_name.starts_with("pg_toast_") || schema.schema_name.starts_with("pg_temp_")
+        {
+            continue;
+        }
+
         let mut indent = "";
         if schema.schema_name != DEFAULT_SCHEMA_NAME {
             output += "\n";

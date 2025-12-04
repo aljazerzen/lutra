@@ -250,8 +250,8 @@ impl ByteCoder {
             "std::to_int8" | "std::to_int16" | "std::to_int32" | "std::to_int64"
             | "std::to_uint8" | "std::to_uint16" | "std::to_uint32" | "std::to_uint64"
             | "std::to_float32" | "std::to_float64" | "std::mul" | "std::div" | "std::mod"
-            | "std::add" | "std::sub" | "std::neg" | "std::eq" | "std::ne" | "std::gt"
-            | "std::lt" | "std::gte" | "std::lte" | "std::math::abs" | "std::math::pow" => {
+            | "std::add" | "std::sub" | "std::neg" | "std::cmp" | "std::eq" | "std::lt"
+            | "std::lte" | "std::math::abs" | "std::math::pow" => {
                 let param_ty = as_ty_of_param(ty_mat);
                 let primitive = param_ty.kind.as_primitive().unwrap();
 
