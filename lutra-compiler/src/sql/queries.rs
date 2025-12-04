@@ -523,12 +523,13 @@ impl<'a> Context<'a> {
 
                 // overwrite array index
                 let key = if let Some(key_in) = key {
-                    self.compile_column(key_in)
+                    let index = self.compile_column(key_in);
+                    format!("(ROW_NUMBER() OVER (ORDER BY {index}))::int4")
                 } else {
-                    sql_ast::Expr::Source("(ROW_NUMBER() OVER ())::int4".into())
+                    "(ROW_NUMBER() OVER ())::int4".into()
                 };
                 select.projection[0] = sql_ast::SelectItem {
-                    expr: key,
+                    expr: sql_ast::Expr::Source(key),
                     alias: Some(utils::new_ident(COL_ARRAY_INDEX)),
                 };
                 Node::Select(select)

@@ -397,6 +397,23 @@ impl ByteCoder {
                 r
             }
 
+            "std::zip" => {
+                let ty_func = ty_mat.kind.as_function().unwrap();
+
+                let a_item = self.get_ty_mat(&ty_func.params[0]).kind.as_array().unwrap();
+                let a_layout = a_item.layout.as_ref().unwrap();
+
+                let b_item = self.get_ty_mat(&ty_func.params[1]).kind.as_array().unwrap();
+                let b_layout = b_item.layout.as_ref().unwrap();
+
+                let mut r = Vec::new();
+                r.push(a_layout.head_size.div_ceil(8));
+                r.extend(as_len_and_items(&a_layout.body_ptrs));
+                r.push(b_layout.head_size.div_ceil(8));
+                r.extend(as_len_and_items(&b_layout.body_ptrs));
+                r
+            }
+
             "std::group" => {
                 let ty_func = ty_mat.kind.as_function().unwrap();
 

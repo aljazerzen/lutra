@@ -970,6 +970,34 @@ impl<'a> Context<'a> {
                 }
             }
 
+            "std::zip" => {
+                let a = self.compile_rel(&call.args[0]);
+                let a = self.new_binding(a);
+
+                let num_cols_a = self.rel_cols(&a.rel.ty, true).count();
+
+                let b = self.compile_rel(&call.args[1]);
+                let b = self.new_binding(b);
+
+                let a_index = self.new_rel_col(&a, 0, ty_index());
+                let b_index = self.new_rel_col(&b, 0, ty_index());
+                let condition = new_bin_op(a_index, "std::eq", b_index, ir::TyPrimitive::bool);
+
+                let join_ty = ty_zip(
+                    self.get_ty_mat(&a.rel.ty).clone(),
+                    self.get_ty_mat(&b.rel.ty).clone(),
+                );
+                let join = cr::Expr {
+                    kind: cr::ExprKind::Join(a, b, Some(Box::new(condition))),
+                    ty: join_ty,
+                };
+
+                cr::ExprKind::Transform(
+                    self.new_binding(join),
+                    cr::Transform::ProjectDiscard(vec![num_cols_a]), // discard b index
+                )
+            }
+
             "std::group" => {
                 let array = self.compile_rel(&call.args[0]);
                 let array = self.new_binding(array);
@@ -1374,4 +1402,31 @@ fn ty_concat_as_tuples(a: ir::Ty, b: ir::Ty) -> ir::Ty {
         fields.push(ir::TyTupleField { name: None, ty: b });
     }
     ir::Ty::new(ir::TyKind::Tuple(fields))
+}
+
+fn ty_zip(a: ir::Ty, b: ir::Ty) -> ir::Ty {
+    let mut fields = Vec::new();
+
+    fn ty_tuple_field(ty: ir::Ty) -> ir::TyTupleField {
+        ir::TyTupleField { name: None, ty }
+    }
+
+    let ir::TyKind::Array(a_item) = a.kind else {
+        unreachable!()
+    };
+    fields.push(ty_tuple_field(*a_item));
+
+    fields.push(ty_tuple_field(ty_index()));
+    let ir::TyKind::Array(b_item) = b.kind else {
+        unreachable!()
+    };
+    fields.push(ty_tuple_field(*b_item));
+
+    let tuple = ir::Ty::new(ir::TyKind::Tuple(fields));
+
+    ir::Ty::new(ir::TyKind::Array(Box::new(tuple)))
+}
+
+fn ty_index() -> ir::Ty {
+    ir::Ty::new(ir::TyPrimitive::int64)
 }

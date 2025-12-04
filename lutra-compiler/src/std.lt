@@ -242,11 +242,8 @@ where T: {..}, O
   x | to_columnar | mapper
 )
 
-# func zip(
-#   left: [L],
-#   right: [R],
-# ): [{L, R}]
-# where L, R
+func zip(left: [L], right: [R]): [{L, R}]
+where L, R
 
 func group(input: [I], key: func (I): K): [{key: K, values: [I]}]
 where I, K

@@ -1180,6 +1180,26 @@ func main() -> std::from_columnar({[false, true], ["no", "yes", "neither"], [1: 
   },
 ]
 
+# === std_zip_00
+func main() -> (
+  [1, 2, 3, 4: int16]
+  | std::zip(["one", "two", "three"])
+)
+# >
+[
+  {
+    1,
+    "one",
+  },
+  {
+    2,
+    "two",
+  },
+  {
+    3,
+    "three",
+  },
+]
 
 # === std_group_00
 func main() -> (

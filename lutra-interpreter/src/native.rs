@@ -199,6 +199,7 @@ pub mod std {
                 "sort" => &sort,
                 "to_columnar" => &to_columnar,
                 "from_columnar" => &from_columnar,
+                "zip" => &zip,
                 "group" => &group,
                 "append" => &append,
                 "fold" => &fold,
@@ -586,6 +587,38 @@ pub mod std {
                     break 'output;
                 }
             }
+            output.write_item(tuple.finish());
+        }
+        Ok(Cell::Data(output.finish()))
+    }
+
+    pub fn zip(
+        _it: &mut Interpreter,
+        layout_args: &[u32],
+        args: Vec<Cell>,
+    ) -> Result<Cell, EvalError> {
+        let mut layout_args = LayoutArgsReader::new(layout_args);
+        let l_head_bytes = layout_args.next_u32();
+        let l_body_ptrs = layout_args.next_slice();
+        let r_head_bytes = layout_args.next_u32();
+        let r_body_ptrs = layout_args.next_slice();
+
+        let output_head_bytes = l_head_bytes + r_head_bytes;
+        let mut output_body_ptrs = l_body_ptrs.to_vec();
+        output_body_ptrs.extend(r_body_ptrs.iter().map(|p| p + l_head_bytes));
+
+        let output_fields_layouts = [(l_head_bytes, l_body_ptrs), (r_head_bytes, r_body_ptrs)];
+
+        let [left, right] = assume::exactly_n(args);
+        let left = ArrayReader::new(assume::into_data(left)?, l_head_bytes as usize);
+        let right = ArrayReader::new(assume::into_data(right)?, r_head_bytes as usize);
+
+        let mut output = ArrayWriter::new(output_head_bytes, &output_body_ptrs);
+        for (l, r) in left.zip(right) {
+            let mut tuple = TupleWriter::new(Cow::from(&output_fields_layouts));
+            tuple.write_field(l);
+            tuple.write_field(r);
+
             output.write_item(tuple.finish());
         }
         Ok(Cell::Data(output.finish()))
