@@ -196,6 +196,11 @@ pub struct CompileCommand {
     #[clap(long, default_value = "main")]
     program: String,
 
+    /// Write compiled program to a `.rr.ld` file.
+    /// Relative to project root.
+    #[clap(long)]
+    output: Option<path::PathBuf>,
+
     #[clap(long, default_value = "bytecode-lt")]
     format: lutra_compiler::ProgramFormat,
 }
@@ -225,16 +230,18 @@ pub fn compile(cmd: CompileCommand) -> anyhow::Result<()> {
         }
     }
 
-    let out_dir = project.source.get_project_dir().join("program.rr.lb");
+    if let Some(out) = &cmd.output {
+        let out_file = project.source.get_project_dir().join(out);
 
-    let program_lt = program.encode();
-    println!();
-    println!(
-        "Writing program to {} ({} bytes)",
-        out_dir.display(),
-        program_lt.len()
-    );
-    std::fs::write(&out_dir, &program_lt)?;
+        let program_lt = program.encode();
+        println!();
+        println!(
+            "Writing program to {} ({} bytes)",
+            out_file.display(),
+            program_lt.len()
+        );
+        std::fs::write(&out_file, &program_lt)?;
+    }
     Ok(())
 }
 

@@ -210,7 +210,6 @@ pub mod std {
                 "average" => &average,
                 "all" => &all,
                 "any" => &any,
-                "contains" => &contains,
                 "concat_array" => &concat_array,
                 "count" => &count,
 
@@ -778,19 +777,6 @@ pub mod std {
         let mut array = assume::array(array, 1);
 
         let res = array.any(|x| decode::bool(&x));
-        Ok(Cell::Data(encode(&res)))
-    }
-
-    pub fn contains(
-        _it: &mut Interpreter,
-        layout_args: &[u32],
-        args: Vec<Cell>,
-    ) -> Result<Cell, EvalError> {
-        let [array, item] = assume::exactly_n(args);
-        let array = assume::array(array, layout_args[0]);
-        let item = assume::int64(&item)?;
-
-        let res = array.into_iter().any(|x| decode::int(&x) == item);
         Ok(Cell::Data(encode(&res)))
     }
 

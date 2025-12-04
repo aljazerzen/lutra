@@ -1,77 +1,80 @@
-# Utils
+# --- Utils ---
 
+## Constructs the usual "default" value
+##
+## For `bool` it is false.
+## For numbers, this is zero.
+## For `text` it is an empty text.
+## For tuples, it a tuple with every field set to default value.
+## For arrays, it is an empty array.
+## For enums, it the first variant.
 func default(): T
 where T
 
 
-# Casts
+# --- Casts ---
 
+## Converts a number to `int8`.
 func to_int8(x: T): int8
-where
-  T: number
+where T: number
 
+## Converts a number to `int16`.
 func to_int16(x: T): int16
-where
-  T: number
+where T: number
 
+## Converts a number to `int32`
 func to_int32(x: T): int32
-where
-  T: number
+where T: number
 
+## Converts a number to `int64`
 func to_int64(x: T): int64
-where
-  T: number
+where T: number
 
+## Converts a number to `uint8`
 func to_uint8(x: T): uint8
-where
-  T: number
+where T: number
 
+## Converts a number to `uint16`
 func to_uint16(x: T): uint16
-where
-  T: number
+where T: number
 
+## Converts a number to `uint32`
 func to_uint32(x: T): uint32
-where
-  T: number
+where T: number
 
+## Converts a number to `uint64`
 func to_uint64(x: T): uint64
-where
-  T: number
+where T: number
 
+## Converts a number to `float32`
 func to_float32(x: T): float32
-where
-  T: number
+where T: number
 
+## Converts a number to `float64`
 func to_float64(x: T): float64
-where
-  T: number
+where T: number
 
-# Operators
+# --- Operators ---
 
 ## Multiplies two numbers.
 func mul(left: T, right: T): T
-where
-  T: number
+where T: number
 
 ## Divides two numbers.
 func div(left: T, right: T): T
-where
-  T: number
+where T: number
 
 ## Division remainder.
 func mod(left: T, right: T): T
-where
-  T: number
+where T: number
 
 ## Adds two numbers.
 func add(left: T, right: T): T
-where
-  T: number
+where T: number
 
 ## Subtracts two numbers.
 func sub(left: T, right: T): T
-where
-  T: number
+where T: number
 
 ## Negates a number.
 func neg(x: T): T
@@ -148,7 +151,7 @@ func or(left: bool, right: bool): bool
 ## Inverts a boolean. Used by `!` operator.
 func not(expr: bool): bool
 
-func regex_search(text: text, pattern: text): bool
+# --- Option functions ---
 
 func or_else(value: enum { None, Some: T }, fallback: T): T
 where T
@@ -186,10 +189,17 @@ where T
   }
 )
 
-# Array functions
+# --- Array functions ---
 
 func index(array: [T], position: int64): enum { None, Some: T }
 where T
+
+func count(array: [T]): int64
+where T
+
+func is_empty(array: [T]): bool
+where T
+-> eq(count(array), 0)
 
 func map(array: [I], mapper: func (I): O): [O]
 where I, O
@@ -283,31 +293,41 @@ func scan(
 ): [A]
 where I, A
 
-# Aggregation functions
+# --- Aggregation functions ---
 
-func min(inputs: [T]): enum {None, Some: T}
+## Finds the minimum value in the array.
+## Returns `None` when array is empty.
+func min(array: [T]): enum {None, Some: T}
 where T: number
 
-func max(inputs: [T]): enum {None, Some: T}
+## Finds the maximum value in the array.
+## Returns `None` when array is empty.
+func max(array: [T]): enum {None, Some: T}
 where T: number
 
+## Computes sum of all number in an array.
+## Returns zero when array is empty.
 func sum(column: [int64]): int64
-
-func count(column: [T]): int64
-where T
 
 func average(column: [T]): float64
 where T: int64
 
-func all(column: [bool]): bool
+## Returns `true` if all items in the array are `true`.
+func all(values: [bool]): bool
 
-func any(column: [bool]): bool
+## Returns `true` if any value in the array is `true`.
+func any(values: [bool]): bool
 
-func contains(value: [int64], pattern: int64): bool
+## Returns `true` if the haystack array contains an item equal to `needle`.
+func contains(haystack: [T], needle: T): bool
+where T: primitive -> (
+  haystack | filter(func (x) -> eq(x, needle)) | is_empty | not
+)
 
-func join(column: [text], separator: text): text
+## Joins text parts, placing separator between each pair.
+func join(parts: [text], separator: text): text
 
-# Window functions
+# --- Window functions ---
 
 func lag(array: [T], offset: int64): [T]
 where T
@@ -378,6 +398,8 @@ module text {
 
   ## Joins parts together, placing separator between each pair.
   func join(parts: [text], delimiter: text): text
+
+  func regex_search(haystack: text, pattern: text): bool
 }
 
 module fs {
@@ -388,9 +410,11 @@ module fs {
   where R: {..}
 }
 
+## Module available only when targeting SQL databases.
+## Currently this includes only `sql-pg` format.
 module sql {
 
-  ## Reads data from a table.
+  ## Reads rows from a table.
   ##
   ## The order of table rows is unknown and might change over repeated invocations.
   ##
@@ -414,12 +438,12 @@ module sql {
   ## It should be used as a last resort, because it circumvents type checking
   ## and can cause program panic on malformed SQL or incorrect resulting type.
   ##
-  ## Resulting type of the expression must match the "SQL relational representation"
+  ## Resulting type of the expression must match the "SQL representation"
   ## of the Lutra type:
   ## - primitives expect a single column,
   ## - tuples expect one column for each tuple field,
   ## - nested tuples are unpacked into parent relation,
-  ## - arrays expect one index column, followed by columns of inner object,
+  ## - arrays expect columns of the inner object,
   ## - enums expect one tag columns, followed by columns of each of the possible variants,
   ## - enums that are the Maybe, expect one nullable column.
   func expr(const sql_source: text): R

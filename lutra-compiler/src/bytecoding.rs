@@ -262,8 +262,7 @@ impl ByteCoder {
 
             "std::count" => vec![],
 
-            "std::min" | "std::max" | "std::sum" | "std::average" | "std::contains"
-            | "std::fold" => {
+            "std::min" | "std::max" | "std::sum" | "std::average" | "std::fold" => {
                 let item_layout = as_layout_of_param_array(ty_mat);
                 vec![
                     item_layout.head_size.div_ceil(8), // item_head_size

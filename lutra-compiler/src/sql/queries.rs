@@ -696,10 +696,6 @@ impl<'a> Context<'a> {
                 "COALESCE({}, TRUE)",
                 utils::new_func_call("BOOL_AND", args)
             )),
-            "std::contains" => {
-                let [haystack, needle] = unpack_args(args);
-                sql_ast::Expr::Source(format!("COALESCE(BOOL_OR({needle} = {haystack}), FALSE)"))
-            }
 
             "std::row_number" => sql_ast::Expr::Source("(ROW_NUMBER() OVER () - 1)".to_string()),
             "std::lead" => {

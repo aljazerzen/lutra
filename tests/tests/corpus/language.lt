@@ -913,17 +913,27 @@ func main() -> std::average([5: int64,3,65,3,2,56,67])
 28.714285714285715
 
 # === std_contains_00
-func main() -> std::contains([5,3,65,3,2,56,67], 3)
+func main() -> std::contains([5,3,65,3,2,56,67], 3: int16)
 # >
 true
 
 # === std_contains_01
-func main() -> std::contains([5,3,65,3,2,56,67], 7)
+func main() -> std::contains([5,3,65,3,2,56,67], 7: int16)
 # >
 false
 
 # === std_contains_02
-func main() -> std::contains([], 2)
+func main() -> std::contains([], 2: int16)
+# >
+false
+
+# === std_contains_03
+func main() -> std::contains(["hello", "world"], "world")
+# >
+true
+
+# === std_contains_04
+func main() -> std::contains([false, false, false, false, false], true)
 # >
 false
 
