@@ -77,7 +77,7 @@ func my_program() -> {
     avg_priority = (
       task_ops::tasks
       | std::map(func (t) -> t.priority)
-      | std::average()
+      | std::mean()
     ),
     has_pending = (
       task_ops::tasks

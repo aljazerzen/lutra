@@ -673,10 +673,25 @@ impl<'a> Context<'a> {
                 let ty = self.compile_ty_name(ty);
                 sql_ast::Expr::Source(format!("COALESCE(SUM({arg}), 0)::{ty}"))
             }
-            "std::average" => {
+            "std::mean" => {
                 let [arg] = unpack_args(args);
-                let ty = self.compile_ty_name(ty);
-                sql_ast::Expr::Source(format!("AVG({arg})::{ty}"))
+                sql_ast::Expr::Source(
+                    if matches!(
+                        args_in[0].ty.kind,
+                        ir::TyKind::Primitive(ir::TyPrimitive::float32)
+                    ) {
+                        // case for: float4, int2, int4, int8
+                        // PostgreSQL does not have a specialized float4 avg, but just uses float8
+                        // This yields different results that it should.
+                        // It also has exact precision for integers via numeric type, which is
+                        // more precise, but slower than using floats for division.
+                        // So we implement our own AVG()
+                        format!("SUM({arg})/COUNT({arg})")
+                    } else {
+                        // case for: float8
+                        format!("COALESCE(AVG({arg})::float8, 'NaN')")
+                    },
+                )
             }
             "std::count" => {
                 let [arg] = unpack_args(args);

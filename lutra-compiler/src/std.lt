@@ -292,22 +292,24 @@ where I, A
 
 # --- Aggregation functions ---
 
-## Finds the minimum value in the array.
+## Find the minimum value in the array.
 ## Returns `None` when array is empty.
 func min(array: [T]): enum {None, Some: T}
 where T: number
 
-## Finds the maximum value in the array.
+## Find the maximum value in the array.
 ## Returns `None` when array is empty.
 func max(array: [T]): enum {None, Some: T}
 where T: number
 
-## Computes sum of all number in an array.
+## Compute sum of all number in an array.
 ## Returns zero when array is empty.
-func sum(column: [int64]): int64
+func sum(column: [T]): T
+where T: number
 
-func average(column: [T]): float64
-where T: int64
+## Compute arithmetic mean of an array of numbers.
+func mean(array: [T]): float64
+where T: number
 
 ## Returns `true` if all items in the array are `true`.
 func all(values: [bool]): bool

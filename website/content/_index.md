@@ -38,7 +38,7 @@ func landing_page() -> {
 
 It is verbose in exchange for type safety, readability and composability.
 ```lt
-import std::(Date, find, filter, map, group, average, sum, count, sort, slice)
+import std::(Date, find, filter, map, group, mean, sum, count, sort, slice)
 
 # Constant
 const transaction_fees: float64 = 0.8
@@ -79,7 +79,7 @@ func main() -> (
   | group(func (i) -> i.customer_id)
   | map(func (group) -> {
     customer_id = group.key,
-    total = group.values | map(func (i) -> i.total | std::to_int64) | average,
+    total = group.values | map(func (i) -> i.total | std::to_int64) | mean,
     sum_income = group.values | map(func(i) -> i.income | std::to_int64) | sum,
     ct = count(group.values),
   })

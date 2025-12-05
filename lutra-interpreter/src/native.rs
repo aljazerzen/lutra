@@ -208,7 +208,7 @@ pub mod std {
                 "min" => &min,
                 "max" => &max,
                 "sum" => &sum,
-                "average" => &average,
+                "mean" => &mean,
                 "all" => &all,
                 "any" => &any,
                 "concat_array" => &concat_array,
@@ -753,7 +753,39 @@ pub mod std {
         core::convert::identity
     );
 
-    reduce_func!(sum, decode::int, |a, b| a + b, Option::unwrap_or_default);
+    macro_rules! sum {
+        ($array: expr, $ty: ident) => {{
+            let s = $array
+                .map(|x| decode::primitive::<$ty>(&x))
+                .reduce(|a, b| a + b);
+            encode(&s.unwrap_or_default())
+        }};
+    }
+
+    pub fn sum(
+        _: &mut Interpreter,
+        layout_args: &[u32],
+        args: Vec<Cell>,
+    ) -> Result<Cell, EvalError> {
+        let [array] = assume::exactly_n(args);
+        let array = assume::array(array, layout_args[0]);
+        let ty_prim = decode::ty_primitive(layout_args[1]);
+
+        let res = match ty_prim {
+            ir::TyPrimitive::int8 => sum!(array, i8),
+            ir::TyPrimitive::int16 => sum!(array, i16),
+            ir::TyPrimitive::int32 => sum!(array, i32),
+            ir::TyPrimitive::int64 => sum!(array, i64),
+            ir::TyPrimitive::uint8 => sum!(array, u8),
+            ir::TyPrimitive::uint16 => sum!(array, u16),
+            ir::TyPrimitive::uint32 => sum!(array, u32),
+            ir::TyPrimitive::uint64 => sum!(array, u64),
+            ir::TyPrimitive::float32 => sum!(array, f32),
+            ir::TyPrimitive::float64 => sum!(array, f64),
+            _ => panic!(),
+        };
+        Ok(Cell::Data(res))
+    }
 
     pub fn count(
         _it: &mut Interpreter,
@@ -769,24 +801,40 @@ pub mod std {
         Ok(Cell::Data(encode(&res)))
     }
 
-    pub fn average(
+    macro_rules! mean {
+        ($array: expr, $ty: ident) => {{
+            let (sum, count) = $array
+                .map(|x| decode::primitive::<$ty>(&x))
+                .fold(($ty::default(), 0_u32), |(sum, count), item| {
+                    (sum + item, count + 1)
+                });
+            (sum as f64, count)
+        }};
+    }
+
+    pub fn mean(
         _it: &mut Interpreter,
         layout_args: &[u32],
         args: Vec<Cell>,
     ) -> Result<Cell, EvalError> {
         let [array] = assume::exactly_n(args);
         let array = assume::array(array, layout_args[0]);
+        let ty_prim = decode::ty_primitive(layout_args[1]);
 
-        let (sum, count) = array
-            .map(|x| decode::int(&x))
-            .fold((0, 0), |(sum, count), item| (sum + item, count + 1));
-
-        let res = if count == 0 {
-            0.0
-        } else {
-            sum as f64 / count as f64
+        let (sum, count) = match ty_prim {
+            ir::TyPrimitive::int8 => mean!(array, i8),
+            ir::TyPrimitive::int16 => mean!(array, i16),
+            ir::TyPrimitive::int32 => mean!(array, i32),
+            ir::TyPrimitive::int64 => mean!(array, i64),
+            ir::TyPrimitive::uint8 => mean!(array, u8),
+            ir::TyPrimitive::uint16 => mean!(array, u16),
+            ir::TyPrimitive::uint32 => mean!(array, u32),
+            ir::TyPrimitive::uint64 => mean!(array, u64),
+            ir::TyPrimitive::float32 => mean!(array, f32),
+            ir::TyPrimitive::float64 => mean!(array, f64),
+            _ => panic!(),
         };
-        Ok(Cell::Data(encode(&res)))
+        Ok(Cell::Data(encode(&(sum / (count as f64)))))
     }
 
     pub fn all(

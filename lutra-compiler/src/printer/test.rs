@@ -150,7 +150,7 @@ const stats = {
   avg_priority = (
     task_ops::tasks
     | std::map(func (t) -> std::to_int64(t.priority))
-    | std::average()
+    | std::mean()
   ),
 }
     "#), @r"
@@ -159,7 +159,7 @@ const stats = {
       avg_priority = (
         task_ops::tasks
         | std::map(func (t) -> std::to_int64(t.priority))
-        | std::average()
+        | std::mean()
       ),
     }
     "

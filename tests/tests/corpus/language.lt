@@ -907,10 +907,45 @@ func main() -> std::scan(
   },
 ]
 
-# === std_average_00
-func main() -> std::average([5: int64,3,65,3,2,56,67])
+# === std_mean_00
+func main() -> std::mean([]: [int64])
+# >
+NaN
+
+# === std_mean_01
+func main() -> std::mean([5,3,65,3,2,56,67: int64])
 # >
 28.714285714285715
+
+# === std_mean_02
+func main() -> std::mean([5,3,65,3,2,56,67: int32])
+# >
+28.714285714285715
+
+# === std_mean_03
+func main() -> std::mean([5,3,65,3,2,56,67: int16])
+# >
+28.714285714285715
+
+# === std_mean_04
+func main() -> std::mean([5,3,65,3,2: int8])
+# >
+15.6
+
+# === std_mean_05
+func main() -> std::mean([1.1, 1.3]: [float32])
+# >
+1.2000000476837158
+
+# === std_mean_06
+func main() -> std::mean([1.1, 1.3]: [float64])
+# >
+1.2000000000000002
+
+# === std_mean_07
+func main() -> std::mean([]: [float64])
+# >
+NaN
 
 # === std_contains_00
 func main() -> std::contains([5,3,65,3,2,56,67], 3: int16)
@@ -2009,14 +2044,24 @@ func main() -> (2.30 - 30.2): float64
 -27.9
 
 # === std_sum_00
-func main() -> std::sum([5,3,65,3,2,56,67])
+func main() -> std::sum([5,3,65,3,2,56,67: int32])
 # >
 201
 
 # === std_sum_01
-func main() -> std::sum([])
+func main() -> std::sum([]: [int16])
 # >
 0
+
+# === std_sum_02
+func main() -> std::sum([5,3,65,3,2,56,67: int64])
+# >
+201
+
+# === std_sum_03
+func main() -> std::sum([5.4, 3.2, 1.1: float32])
+# >
+9.700001
 
 # === std_to_columnar_00
 func main() -> std::to_columnar([{5,3},{65,1},{3, 2}]: [{int64, int64}])

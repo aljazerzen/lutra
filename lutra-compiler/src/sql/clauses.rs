@@ -819,7 +819,7 @@ impl<'a> Context<'a> {
             }
 
             // aggregation functions
-            "std::min" | "std::max" | "std::sum" | "std::average" | "std::count" | "std::any"
+            "std::min" | "std::max" | "std::sum" | "std::mean" | "std::count" | "std::any"
             | "std::all" | "std::text::join" => {
                 let array = self.compile_rel(&call.args[0]);
                 let array = self.new_binding(array);

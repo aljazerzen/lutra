@@ -255,17 +255,28 @@ impl ByteCoder {
                 let param_ty = as_ty_of_param(ty_mat);
                 let primitive = param_ty.kind.as_primitive().unwrap();
 
-                let mut buf = primitive.encode();
-                buf.put_bytes(0, 3); // padding
-                vec![u32::from_be_bytes(buf[0..4].try_into().unwrap())]
+                vec![encode_prim(primitive)]
             }
 
             "std::count" => vec![],
 
-            "std::min" | "std::max" | "std::sum" | "std::average" | "std::fold" => {
+            "std::min" | "std::max" | "std::fold" => {
                 let item_layout = as_layout_of_param_array(ty_mat);
                 vec![
                     item_layout.head_size.div_ceil(8), // item_head_size
+                ]
+            }
+
+            "std::sum" | "std::mean" => {
+                let param_ty = as_ty_of_param(ty_mat);
+                let item_ty = self.get_ty_mat(param_ty).kind.as_array().unwrap();
+
+                let item_layout = item_ty.layout.as_ref().unwrap();
+                let item_ty = item_ty.kind.as_primitive().unwrap();
+
+                vec![
+                    item_layout.head_size.div_ceil(8), // item_head_size
+                    encode_prim(item_ty),
                 ]
             }
 
@@ -305,10 +316,7 @@ impl ByteCoder {
                 let ty_key_extractor = self.get_ty_mat(&ty_func.params[1]);
                 let ty_key_extractor = ty_key_extractor.kind.as_function().unwrap();
                 let ty_key = self.get_ty_mat(&ty_key_extractor.body);
-                let ty_key = ty_key.kind.as_primitive().unwrap();
-                let mut buf = ty_key.encode();
-                buf.put_bytes(0, 3); // padding
-                r.push(u32::from_be_bytes(buf[0..4].try_into().unwrap()));
+                r.push(encode_prim(ty_key.kind.as_primitive().unwrap()));
 
                 r
             }
@@ -507,6 +515,13 @@ impl ByteCoder {
     }
 }
 
+fn encode_prim(primitive: &ir::TyPrimitive) -> u32 {
+    let mut buf = primitive.encode();
+    buf.put_bytes(0, 3);
+    // padding
+    u32::from_be_bytes(buf[0..4].try_into().unwrap())
+}
+
 fn as_len_and_items(items: &[u32]) -> impl Iterator<Item = u32> + '_ {
     Some(items.len() as u32)
         .into_iter()
@@ -517,14 +532,14 @@ fn as_layout_of_param_array(ty: &Ty) -> &ir::TyLayout {
     let ty_func = ty.kind.as_function().unwrap();
     let ty_array = ty_func.params[0].kind.as_array().unwrap();
 
-    (ty_array.layout.as_ref().unwrap()) as _
+    ty_array.layout.as_ref().unwrap()
 }
 
 fn as_layout_of_return_array(ty: &Ty) -> &ir::TyLayout {
     let ty_func = ty.kind.as_function().unwrap();
     let ty_array = ty_func.body.kind.as_array().unwrap();
 
-    (ty_array.layout.as_ref().unwrap()) as _
+    ty_array.layout.as_ref().unwrap()
 }
 
 fn as_ty_of_param(ty: &Ty) -> &ir::Ty {

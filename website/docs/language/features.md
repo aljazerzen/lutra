@@ -22,7 +22,7 @@ Functions:
 Standard Library:
 
 - Array operations: `map`, `filter`, `flat_map`, `slice`, `sort`
-- Aggregations: `min`, `max`, `sum`, `count`, `average`, `fold`
+- Aggregations: `min`, `max`, `sum`, `count`, `mean`, `fold`
 - Boolean ops: `all`, `any`, `contains`
 - Window functions: `lag`, `lead`, `row_number`
 
