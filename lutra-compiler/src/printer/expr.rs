@@ -169,7 +169,10 @@ impl PrintSource for pr::Expr {
                 p.push(" = ")?;
                 binding.bound.print(p)?;
                 p.push(";")?;
+                p.inject_trivia_prev_inline(binding.main.span.as_ref().map(|s| s.start));
                 p.new_line();
+
+                p.inject_trivia_leading(binding.main.span.as_ref().map(|s| s.start));
 
                 binding.main.print(p)?;
             }

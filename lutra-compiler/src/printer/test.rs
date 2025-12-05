@@ -517,6 +517,33 @@ fn trivia_11() {
 }
 
 #[test]
+fn trivia_12() {
+    assert_snapshot!(_format(r#"
+    func main() -> (
+      # this is a
+      let a = false; # trailing a
+
+      # this is b
+      let b = false; # trailing b
+
+      # this is main
+      true
+    )
+ "#), @r"
+    func main() -> (
+      # this is a
+      let a = false; # trailing a
+
+      # this is b
+      let b = false; # trailing b
+
+      # this is main
+      true
+    )
+    ");
+}
+
+#[test]
 fn source_00() {
     assert_snapshot!(_format(r"submodule const a = 3"), @r"
     submodule
