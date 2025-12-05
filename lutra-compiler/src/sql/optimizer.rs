@@ -14,8 +14,10 @@ struct Optimizer {}
 impl cr::CrFold for Optimizer {
     fn fold_expr(&mut self, expr: cr::Expr) -> Result<cr::Expr, ()> {
         let mut expr = cr::fold_expr(self, expr)?;
-        expr = simplify_retain(expr);
-        expr = simplify_discard(expr);
+        expr = simplify_pick_row(expr);
+        expr = simplify_discard_row(expr);
+        expr = simplify_pick_discard(expr);
+        expr = simplify_row_pick(expr);
         expr = unpack_pack(expr);
         expr = pack_unpack(expr);
 
@@ -92,18 +94,18 @@ fn pack_unpack(expr: cr::Expr) -> cr::Expr {
     *inner
 }
 
-fn simplify_retain(expr: cr::Expr) -> cr::Expr {
+fn simplify_pick_row(expr: cr::Expr) -> cr::Expr {
     // match
-    let cr::ExprKind::Transform(bound, cr::Transform::ProjectRetain(_)) = &expr.kind else {
+    let cr::ExprKind::Transform(bound, cr::Transform::ProjectPick(_)) = &expr.kind else {
         return expr;
     };
     let cr::ExprKind::From(cr::From::Row(_)) = &bound.rel.kind else {
         return expr;
     };
-    tracing::debug!("simplify_retain");
+    tracing::debug!("simplify_pick_row");
 
     // unpack
-    let cr::ExprKind::Transform(bound, cr::Transform::ProjectRetain(retain)) = expr.kind else {
+    let cr::ExprKind::Transform(bound, cr::Transform::ProjectPick(pick)) = expr.kind else {
         unreachable!();
     };
     let mut new_expr = bound.rel.kind;
@@ -111,14 +113,14 @@ fn simplify_retain(expr: cr::Expr) -> cr::Expr {
         unreachable!();
     };
 
-    utils::retain_by_position(row, &retain);
+    utils::pick_by_position(row, &pick);
     cr::Expr {
         kind: new_expr,
         ty: expr.ty,
     }
 }
 
-fn simplify_discard(expr: cr::Expr) -> cr::Expr {
+fn simplify_discard_row(expr: cr::Expr) -> cr::Expr {
     // match
     let cr::ExprKind::Transform(bound, cr::Transform::ProjectDiscard(_)) = &expr.kind else {
         return expr;
@@ -126,7 +128,7 @@ fn simplify_discard(expr: cr::Expr) -> cr::Expr {
     let cr::ExprKind::From(cr::From::Row(_)) = &bound.rel.kind else {
         return expr;
     };
-    tracing::debug!("simplify_discard");
+    tracing::debug!("simplify_discard_row");
 
     // unpack
     let cr::ExprKind::Transform(bound, cr::Transform::ProjectDiscard(discard)) = expr.kind else {
@@ -140,6 +142,84 @@ fn simplify_discard(expr: cr::Expr) -> cr::Expr {
     utils::drop_by_position(row, &discard);
     cr::Expr {
         kind: new_expr,
+        ty: expr.ty,
+    }
+}
+
+fn simplify_pick_discard(expr: cr::Expr) -> cr::Expr {
+    // match
+    let cr::ExprKind::Transform(bound, cr::Transform::ProjectPick(_)) = &expr.kind else {
+        return expr;
+    };
+    let cr::ExprKind::Transform(_, cr::Transform::ProjectDiscard(_)) = &bound.rel.kind else {
+        return expr;
+    };
+    tracing::debug!("simplify_pick_discard");
+
+    // unpack
+    let cr::ExprKind::Transform(bound, cr::Transform::ProjectPick(pick)) = expr.kind else {
+        unreachable!();
+    };
+    let cr::ExprKind::Transform(inner, cr::Transform::ProjectDiscard(discard)) = bound.rel.kind
+    else {
+        unreachable!();
+    };
+
+    let mut cols: Vec<_> = (0..256).collect(); // TODO: this works only for <256 cols
+    utils::drop_by_position(&mut cols, &discard);
+    utils::pick_by_position(&mut cols, &pick);
+    cr::Expr {
+        kind: cr::ExprKind::Transform(inner, cr::Transform::ProjectPick(cols)),
+        ty: expr.ty,
+    }
+}
+
+fn simplify_row_pick(expr: cr::Expr) -> cr::Expr {
+    // match
+    let cr::ExprKind::From(cr::From::Row(row)) = &expr.kind else {
+        return expr;
+    };
+
+    if row.is_empty() {
+        return expr;
+    }
+
+    let mut inner = None;
+    for item in row {
+        // validate that each row item is a Pick
+        let cr::ExprKind::Transform(i, cr::Transform::ProjectPick(_)) = &item.kind else {
+            return expr;
+        };
+
+        // ... and that they pick from the same inner value
+        if let Some(inner) = &inner {
+            if *inner != i {
+                return expr;
+            }
+        } else {
+            inner = Some(i);
+        }
+    }
+
+    tracing::debug!("simplify_row_pick");
+
+    // unpack
+    let cr::ExprKind::From(cr::From::Row(row)) = expr.kind else {
+        unreachable!();
+    };
+    let mut inner = None;
+    let mut pick = Vec::new();
+    for item in row {
+        let cr::ExprKind::Transform(i, cr::Transform::ProjectPick(r)) = item.kind else {
+            unreachable!()
+        };
+        inner = inner.or(Some(i));
+        pick.extend(r);
+    }
+    let inner = inner.unwrap();
+
+    cr::Expr {
+        kind: cr::ExprKind::Transform(inner, cr::Transform::ProjectPick(pick)),
         ty: expr.ty,
     }
 }
@@ -168,41 +248,39 @@ fn push_correlated_into_group(expr: cr::Expr) -> (cr::Expr, bool) {
     let cr::ExprKind::From(cr::From::Row(correlated)) = correlated.kind else {
         unreachable!()
     };
-    let mut new_expr = bound.rel;
-    let cr::ExprKind::Transform(_, cr::Transform::Group(_, values)) = &mut new_expr.kind else {
+    let mut group = bound.rel;
+    let cr::ExprKind::Transform(_, cr::Transform::Group(_, group_values)) = &mut group.kind else {
         unreachable!()
     };
-
-    let mut orig_values = std::mem::take(values);
 
     let mut correlated = correlated.into_iter();
     correlated.next().unwrap(); // remove index
 
-    // fake index
-    orig_values.insert(
-        0,
-        cr::Expr {
-            kind: cr::ExprKind::From(cr::From::Null),
-            ty: ir::Ty::new(ir::TyPrimitive::int64),
-        },
-    );
-    let orig_value = cr::Expr {
-        kind: cr::ExprKind::From(cr::From::Row(orig_values)),
-        ty: new_expr.ty,
+    // inline group values into the correlated row
+    // 1) construct bound_rel that we'll use in place of the original bound
+    // 2) replace refs to the bound rel
+    let mut group_outputs = std::mem::take(group_values);
+    group_outputs.insert(0, cr::Expr::null(ir::Ty::new(ir::TyPrimitive::int64))); // fake index
+    let bound_rel = cr::Expr {
+        kind: cr::ExprKind::From(cr::From::Row(group_outputs)),
+        ty: group.ty,
     };
+    let mut replacer = RelRefReplacer::new(bound.id, bound_rel);
 
-    let mut replacer = RelRefReplacer::new(bound.id, orig_value);
-    values.extend(correlated.map(|c| replacer.fold_expr(c).unwrap()));
-    new_expr.ty = expr.ty;
-    (new_expr, true)
+    // replace Group.values with the correlated row
+    group_values.extend(correlated.map(|c| replacer.fold_expr(c).unwrap()));
+
+    // return group with input and keys unchanged
+    group.ty = expr.ty;
+    (group, true)
 }
 
 fn is_rel_col(expr: &cr::Expr, rel_id: usize, col_pos: usize) -> bool {
-    let cr::ExprKind::Transform(bound, cr::Transform::ProjectRetain(retain)) = &expr.kind else {
+    let cr::ExprKind::Transform(bound, cr::Transform::ProjectPick(pick)) = &expr.kind else {
         return false;
     };
 
-    if retain != &[col_pos] {
+    if pick != &[col_pos] {
         return false;
     }
 

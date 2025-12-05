@@ -4,6 +4,8 @@ mod ast;
 mod projection;
 mod scoped;
 
+use std::rc::Rc;
+
 pub use ast::*;
 pub use projection::RelCols;
 pub use scoped::*;
@@ -20,17 +22,19 @@ pub fn is_maybe(variants: &[ir::TyEnumVariant]) -> bool {
     variants.len() == 2 && variants[0].ty.is_unit() && variants[1].ty.kind.is_primitive()
 }
 
-pub fn retain_by_position<T>(vec: &mut Vec<T>, to_keep: &[usize]) {
-    let mut to_keep = to_keep.to_vec();
-    to_keep.sort();
-    to_keep.dedup();
+pub fn pick_by_position<T: Clone>(vec: &mut Vec<T>, to_keep: &[usize]) {
+    let rc: Vec<_> = vec.drain(..).map(Rc::new).collect();
 
-    for (i, k) in to_keep.iter().enumerate() {
-        if i < *k {
-            vec.swap(i, *k);
-        }
+    let mut rc_picked = Vec::with_capacity(to_keep.len());
+    for k in to_keep {
+        rc_picked.push(rc[*k].clone());
     }
-    vec.truncate(to_keep.len());
+    drop(rc);
+
+    fn into_inner_or_clone<T: Clone>(r: Rc<T>) -> T {
+        Rc::try_unwrap(r).unwrap_or_else(|r| r.as_ref().clone())
+    }
+    vec.extend(rc_picked.into_iter().map(into_inner_or_clone));
 }
 
 pub fn drop_by_position<T>(vec: &mut Vec<T>, to_drop: &[usize]) {
@@ -65,4 +69,32 @@ fn drop_by_position_01() {
     let mut vec = vec!["a", "b", "c"];
     drop_by_position(&mut vec, &[0]);
     assert_eq!(vec, ["b", "c"])
+}
+
+#[test]
+fn pick_by_position_01() {
+    let mut vec = vec!["a", "b", "c"];
+    pick_by_position(&mut vec, &[1, 2]);
+    assert_eq!(vec, ["b", "c"])
+}
+
+#[test]
+fn pick_by_position_02() {
+    let mut vec = vec!["a", "b", "c"];
+    pick_by_position(&mut vec, &[0, 2]);
+    assert_eq!(vec, ["a", "c"])
+}
+
+#[test]
+fn pick_by_position_03() {
+    let mut vec = vec!["a", "b", "c"];
+    pick_by_position(&mut vec, &[2, 0]);
+    assert_eq!(vec, ["c", "a"])
+}
+
+#[test]
+fn pick_by_position_04() {
+    let mut vec = vec!["a", "b", "c"];
+    pick_by_position(&mut vec, &[0, 2, 0]);
+    assert_eq!(vec, ["a", "c", "a"])
 }

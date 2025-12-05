@@ -101,7 +101,7 @@ pub fn fold_from<T: ?Sized + CrFold>(fold: &mut T, from: From, ty: ir::Ty) -> Re
 
 pub fn fold_transform<T: ?Sized + CrFold>(fold: &mut T, transform: Transform) -> Result<Transform> {
     Ok(match transform {
-        Transform::ProjectRetain(cols) => Transform::ProjectRetain(cols),
+        Transform::ProjectPick(cols) => Transform::ProjectPick(cols),
         Transform::ProjectDiscard(cols) => Transform::ProjectDiscard(cols),
         Transform::Aggregate(exprs) => Transform::Aggregate(fold_exprs(fold, exprs)?),
         Transform::Limit(expr) => Transform::Limit(Box::new(fold.fold_expr(*expr)?)),

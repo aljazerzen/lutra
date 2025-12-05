@@ -432,16 +432,16 @@ impl<'a> Context<'a> {
 
     fn compile_rel_transform(
         &mut self,
-        scoped: Node,
+        input: Node,
         transform: &cr::Transform,
         input_ty: &ir::Ty,
-        ty: &ir::Ty,
+        output_ty: &ir::Ty,
     ) -> Node {
         let r = match transform {
-            cr::Transform::ProjectRetain(cols) => {
-                let (mut columns, rels) = self.node_into_columns_and_rels(scoped, input_ty);
+            cr::Transform::ProjectPick(cols) => {
+                let (mut columns, rels) = self.node_into_columns_and_rels(input, input_ty);
 
-                utils::retain_by_position(&mut columns, cols);
+                utils::pick_by_position(&mut columns, cols);
 
                 // apply new column names
                 Node::Columns {
@@ -451,7 +451,7 @@ impl<'a> Context<'a> {
             }
 
             cr::Transform::ProjectDiscard(cols) => {
-                let (mut columns, rels) = self.node_into_columns_and_rels(scoped, input_ty);
+                let (mut columns, rels) = self.node_into_columns_and_rels(input, input_ty);
 
                 utils::drop_by_position(&mut columns, cols);
 
@@ -463,25 +463,26 @@ impl<'a> Context<'a> {
             }
 
             cr::Transform::Aggregate(columns) => {
-                let mut select = self.node_into_select(scoped, input_ty);
+                let input_rel = self.node_into_rel(input, input_ty);
 
-                let (values, rel_vars) = self.compile_columns_scoped(columns);
-                select.projection = self.projection(ty, values);
-                select.from.extend(rel_vars.into_iter().map(utils::lateral));
-                Node::Select(select)
+                let (exprs, r) = self.compile_columns_scoped(columns);
+                let mut rels = Vec::with_capacity(r.len() + 1);
+                rels.insert(0, input_rel);
+                rels.extend(r.into_iter().map(utils::lateral));
+                Node::Columns { exprs, rels }
             }
 
             cr::Transform::Where(cond_in) => {
                 // wrap into a new query
-                let rel = self.node_into_rel(scoped, input_ty);
-                let mut select = self.rel_into_select(rel, ty, true);
+                let rel = self.node_into_rel(input, input_ty);
+                let mut select = self.rel_into_select(rel, output_ty, true);
 
                 let cond = self.compile_column(cond_in);
                 select.selection = Some(cond);
                 Node::Select(select)
             }
             cr::Transform::Limit(limit_in) => {
-                let mut query = self.node_into_query(scoped, input_ty);
+                let mut query = self.node_into_query(input, input_ty);
                 if query.limit.is_some() || query.offset.is_some() {
                     query = self.wrap_query(query, input_ty);
                 }
@@ -501,7 +502,7 @@ impl<'a> Context<'a> {
                 Node::Query(query)
             }
             cr::Transform::Offset(offset_in) => {
-                let mut query = self.node_into_query(scoped, input_ty);
+                let mut query = self.node_into_query(input, input_ty);
                 if query.limit.is_some() || query.offset.is_some() {
                     query = self.wrap_query(query, input_ty);
                 }
@@ -518,8 +519,8 @@ impl<'a> Context<'a> {
             }
             cr::Transform::IndexBy(key) => {
                 // wrap into a new query
-                let rel = self.node_into_rel(scoped, input_ty);
-                let mut select = self.rel_into_select(rel, ty, true);
+                let rel = self.node_into_rel(input, input_ty);
+                let mut select = self.rel_into_select(rel, output_ty, true);
 
                 // overwrite array index
                 let key = if let Some(key_in) = key {
@@ -535,7 +536,7 @@ impl<'a> Context<'a> {
                 Node::Select(select)
             }
             cr::Transform::Order => {
-                let mut query = self.node_into_query(scoped, input_ty);
+                let mut query = self.node_into_query(input, input_ty);
 
                 // overwrite ORDER BY
                 query.order_by = Some(utils::order_by_one(utils::identifier(
@@ -547,8 +548,8 @@ impl<'a> Context<'a> {
 
             cr::Transform::Group(key, values_in) => {
                 // wrap into a new query
-                let rel = self.node_into_rel(scoped, input_ty);
-                let mut select = self.rel_into_select(rel, ty, true);
+                let rel = self.node_into_rel(input, input_ty);
+                let mut select = self.rel_into_select(rel, output_ty, true);
 
                 let key = self.compile_columns(key);
 
@@ -557,11 +558,13 @@ impl<'a> Context<'a> {
                     sql_ast::Expr::Source("(ROW_NUMBER() OVER ())::int4".into()),
                 ];
 
-                // value
-                projection.extend(self.compile_columns(values_in));
+                // values
+                let (values, val_rels) = self.compile_columns_scoped(values_in);
+                projection.extend(values);
+                select.from.extend(val_rels.into_iter().map(utils::lateral));
 
                 select.group_by = sql_ast::GroupByExpr::Expressions(key, vec![]);
-                select.projection = self.projection(ty, projection);
+                select.projection = self.projection(output_ty, projection);
 
                 Node::Select(select)
             }
@@ -570,7 +573,7 @@ impl<'a> Context<'a> {
                 let input_item_ty = self.get_ty_mat(input_ty).kind.as_array().unwrap();
                 let input_fields_ty = self.get_ty_mat(input_item_ty).kind.as_tuple().unwrap();
 
-                let mut source = self.node_into_select(scoped, input_ty);
+                let mut source = self.node_into_select(input, input_ty);
 
                 let new_projection = (source.projection.into_iter())
                     .skip(1) // first column will be index, discard it

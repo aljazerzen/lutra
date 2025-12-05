@@ -77,7 +77,7 @@ impl<'a> Context<'a> {
         cr::Expr {
             kind: cr::ExprKind::Transform(
                 self.new_binding(cr::Expr::new_rel_ref(rel)),
-                cr::Transform::ProjectRetain(vec![col_position]),
+                cr::Transform::ProjectPick(vec![col_position]),
             ),
             ty: col_ty,
         }
@@ -348,7 +348,7 @@ impl<'a> Context<'a> {
                     let base = self.new_binding(base);
 
                     let tag = cr::Expr {
-                        kind: cr::ExprKind::Transform(base, cr::Transform::ProjectRetain(vec![0])),
+                        kind: cr::ExprKind::Transform(base, cr::Transform::ProjectPick(vec![0])),
                         ty: ir::Ty::new(ir::TyPrimitive::uint16),
                     };
 
@@ -387,7 +387,7 @@ impl<'a> Context<'a> {
 
                     cr::ExprKind::Transform(
                         base,
-                        cr::Transform::ProjectRetain((start..end).collect()),
+                        cr::Transform::ProjectPick((start..end).collect()),
                     )
                 }
             }
@@ -426,7 +426,7 @@ impl<'a> Context<'a> {
 
                 let mut rel = cr::ExprKind::Transform(
                     self.new_binding(base),
-                    cr::Transform::ProjectRetain((start..end).collect()),
+                    cr::Transform::ProjectPick((start..end).collect()),
                 );
 
                 if unpack {
@@ -872,7 +872,7 @@ impl<'a> Context<'a> {
                     aggregate_cols.push(cr::Expr::new_json_pack(cr::Expr {
                         kind: cr::ExprKind::Transform(
                             self.new_binding(cr::Expr::new_rel_ref(&array)),
-                            cr::Transform::ProjectRetain(vec![
+                            cr::Transform::ProjectPick(vec![
                                 0,         // index
                                 1 + index, // tuple field value
                             ]),
@@ -958,7 +958,7 @@ impl<'a> Context<'a> {
                         joined = cr::Expr {
                             kind: cr::ExprKind::Transform(
                                 self.new_binding(joined),
-                                cr::Transform::ProjectRetain(vec![0, 1]),
+                                cr::Transform::ProjectPick(vec![0, 1]),
                             ),
                             ty: expr.ty.clone(),
                         }

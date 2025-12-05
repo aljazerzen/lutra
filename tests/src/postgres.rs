@@ -1903,10 +1903,7 @@ fn group_00() {
     "#, lutra_bin::Value::unit())), @r"
     SELECT
       r0.value AS _0,
-      (
-        SELECT
-          COALESCE(SUM(r0.value), 0)::int8 AS value
-      ) AS _1
+      COALESCE(SUM(r0.value), 0)::int8 AS _1
     FROM
       (
         SELECT
@@ -1937,7 +1934,12 @@ fn group_00() {
         SELECT
           5::int8 AS index,
           3::int8 AS value
-      ) AS r0
+      ) AS r0,
+      LATERAL (
+        SELECT
+          r0.index,
+          r0.value
+      ) AS r1
     GROUP BY
       r0.value
     ORDER BY
@@ -1957,6 +1959,48 @@ fn group_00() {
         sum = 2,
       },
     ]
+    ");
+}
+
+#[test]
+fn group_01() {
+    insta::assert_snapshot!(_sql_and_output(_run(r#"
+    import std::(map, group, to_int64, sum)
+
+    const gifts: [{child_id: int32, price: float64}] = []
+
+    func main() -> (
+      gifts
+      | group(func (g) -> g.child_id)
+      | map(
+        func (p) -> {
+          p.values | map(func (g) -> g.price | to_int64) | sum()
+        },
+      )
+    )
+    "#, lutra_bin::Value::unit())), @r"
+    SELECT
+      COALESCE(SUM(r1.value), 0)::int8 AS _0
+    FROM
+      (
+        SELECT
+          0 AS index,
+          NULL::int4 AS _0,
+          NULL::float8 AS _1
+        WHERE
+          FALSE
+      ) AS r0,
+      LATERAL (
+        SELECT
+          r0.index AS index,
+          trunc(r0._1)::int8 AS value
+      ) AS r1
+    GROUP BY
+      r0._0
+    ORDER BY
+      (ROW_NUMBER() OVER ())::int4
+    ---
+    []
     ");
 }
 

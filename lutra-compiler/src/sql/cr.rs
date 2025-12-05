@@ -4,13 +4,13 @@ pub use fold::*;
 
 use lutra_bin::ir;
 
-#[derive(Clone)]
+#[derive(Clone, PartialEq)]
 pub struct Expr {
     pub kind: ExprKind,
     pub ty: ir::Ty,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum ExprKind {
     /// Expression without relational inputs.
     From(From),
@@ -41,13 +41,13 @@ pub enum ExprKind {
 
 /// An expression, bound to an identifier.
 /// Such relations can be referred to by From::RelRef.
-#[derive(Clone)]
+#[derive(Clone, PartialEq)]
 pub struct BoundExpr {
     pub id: usize,
     pub rel: Expr,
 }
 
-#[derive(Debug, Clone, strum::AsRefStr)]
+#[derive(Debug, Clone, strum::AsRefStr, PartialEq)]
 pub enum From {
     /// Relation with one row and many columns, where each cell can have
     /// a different expression.
@@ -87,10 +87,10 @@ pub enum From {
     SQLSource(String),
 }
 
-#[derive(Debug, Clone, strum::AsRefStr)]
+#[derive(Debug, Clone, strum::AsRefStr, PartialEq)]
 pub enum Transform {
-    /// Projection that retains columns by position
-    ProjectRetain(Vec<usize>),
+    /// Projection that picks columns by position
+    ProjectPick(Vec<usize>),
 
     /// Projection that discards columns by position
     ProjectDiscard(Vec<usize>),
