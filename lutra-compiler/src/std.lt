@@ -290,6 +290,25 @@ func scan(
 ): [A]
 where I, A
 
+# func apply(
+#   value: I,
+#   function: func (I): O
+# ): O
+# where I, O -> function(value)
+
+## Applies an operation to an array, until it returns an empty array.
+## First operation is supplied with the initial array.
+## Each following operation is supplied with result of previous operation.
+##
+## Returns all produced arrays concatenated together, including initial array.
+##
+## In SQL, this is known as "RECURSIVE CTE" or "recursive join".
+func apply_until_empty(
+  initial: [T],
+  operation: func ([T]): [T]
+): [T]
+where T
+
 # --- Aggregation functions ---
 
 ## Find the minimum value in the array.

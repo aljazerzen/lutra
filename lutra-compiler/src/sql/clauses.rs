@@ -1093,6 +1093,30 @@ impl<'a> Context<'a> {
                 cr::ExprKind::Bind(inputs, Box::new(iteration))
             }
 
+            "std::apply_until_empty" => {
+                // compute each rel and apply order to it
+                let initial = Box::new(self.compile_rel(&call.args[0]));
+                let operation = &call.args[1];
+
+                // prepare iterator
+                let step_id = self.scope_id_gen.next();
+                let iterator_ref = cr::ExprKind::From(cr::From::RelRef(step_id));
+
+                // compile step
+                let operation = self.as_function_or_wrap(operation);
+                self.functions
+                    .insert(operation.id, FuncProvider::Expr(vec![iterator_ref]));
+                let step = self.compile_rel(&operation.body);
+                self.functions.remove(&operation.id);
+
+                let step = Box::new(cr::BoundExpr {
+                    id: step_id,
+                    rel: step,
+                });
+
+                cr::ExprKind::Iteration(initial, step)
+            }
+
             "std::sql::from" => {
                 let table_ident = &call.args[0];
                 let ir::ExprKind::Literal(ir::Literal::text(table_ident)) = &table_ident.kind

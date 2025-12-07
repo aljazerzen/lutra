@@ -907,6 +907,30 @@ func main() -> std::scan(
   },
 ]
 
+# === std_apply_until_empty_00
+
+func main() -> (
+  [0: int16]
+  | std::apply_until_empty(func (v) ->
+    v
+    | std::map(func (i) -> i + 1)
+    | std::filter(func (i) -> i < 10)
+  )
+)
+# >
+[
+  0,
+  1,
+  2,
+  3,
+  4,
+  5,
+  6,
+  7,
+  8,
+  9,
+]
+
 # === std_mean_00
 func main() -> std::mean([]: [int64])
 # >

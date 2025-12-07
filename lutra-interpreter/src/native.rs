@@ -204,6 +204,7 @@ pub mod std {
                 "append" => &append,
                 "fold" => &fold,
                 "scan" => &scan,
+                "apply_until_empty" => &apply_until_empty,
 
                 "min" => &min,
                 "max" => &max,
@@ -735,6 +736,34 @@ pub mod std {
             let args = vec![Cell::Data(acc), Cell::Data(input)];
             acc = assume::into_data(it.evaluate_func_call(&operation, args)?)?;
             outputs.write_item(acc.clone());
+        }
+        Ok(Cell::Data(outputs.finish()))
+    }
+
+    pub fn apply_until_empty(
+        it: &mut Interpreter,
+        layout_args: &[u32],
+        args: Vec<Cell>,
+    ) -> Result<Cell, EvalError> {
+        let mut layout_args = LayoutArgsReader::new(layout_args);
+        let ty_head_bytes = layout_args.next_u32();
+        let ty_body_ptrs = layout_args.next_slice();
+
+        let [initial, function] = assume::exactly_n(args);
+
+        let mut value = initial;
+        let mut outputs = ArrayWriter::new(ty_head_bytes, ty_body_ptrs);
+        loop {
+            let values =
+                ArrayReader::new(assume::into_data(value.clone())?, ty_head_bytes as usize);
+            if values.remaining() == 0 {
+                break;
+            }
+            for v in values {
+                outputs.write_item(v);
+            }
+
+            value = it.evaluate_func_call(&function, vec![value])?;
         }
         Ok(Cell::Data(outputs.finish()))
     }
