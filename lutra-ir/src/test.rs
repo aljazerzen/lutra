@@ -13,13 +13,15 @@ pub fn _test_print(source: &str) -> String {
 fn print_01() {
     assert_snapshot!(_test_print(r#"
     let main = (func 0 ->
-      let 1 = (func 2 ->
-        [
-          fn.2+0: float64,
-          fn.2+0: float64,
-          fn.2+0: float64
-        ]: [float64]
-      ): func (float64) -> [float64];
+      let 1 =
+        let 0 = (func 2 ->
+          [
+            fn.2+0: float64,
+            fn.2+0: float64,
+            fn.2+0: float64
+          ]: [float64]
+        ): func (float64) -> [float64];
+        var.0: func (float64) -> [float64];
 
       let 2 = var.1: func (float64) -> [float64];
       (tuple_lookup
@@ -49,13 +51,15 @@ fn print_01() {
     ): func () -> [int64]
     "#), @r"
     let main = (func 0 ->
-      let 1 = (func 2 ->
-        [
-          fn.2+0[90m: float64[0m,
-          fn.2+0[90m: float64[0m,
-          fn.2+0[90m: float64[0m,
-        ][90m: [float64][0m
-      )[90m: func (float64) -> [float64][0m;
+      let 1 =
+        let 0 = (func 2 ->
+          [
+            fn.2+0[90m: float64[0m,
+            fn.2+0[90m: float64[0m,
+            fn.2+0[90m: float64[0m,
+          ][90m: [float64][0m
+        )[90m: func (float64) -> [float64][0m;
+        var.0[90m: func (float64) -> [float64][0m;
       let 2 = var.1[90m: func (float64) -> [float64][0m;
       (tuple_lookup
         (tuple

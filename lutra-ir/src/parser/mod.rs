@@ -14,6 +14,7 @@ pub fn parse(source: &str) -> (Option<ir::Program>, Vec<Error>) {
     let mut errors: Vec<_> = errors.into_iter().map(Error::from).collect();
 
     let ast = if let Some(tokens) = tokens {
+        dbg!(&tokens.semantic);
         let stream = prepare_stream(tokens.semantic);
         let (ast, parse_errors) = grammar::program().parse_recovery(stream);
 

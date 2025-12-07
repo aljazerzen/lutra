@@ -120,14 +120,16 @@ impl Printer {
             }
             ir::ExprKind::Array(items) => {
                 let mut r = "[".to_string();
-                self.indent();
-                for item in items {
+                if !items.is_empty() {
+                    self.indent();
+                    for item in items {
+                        r += &self.new_line();
+                        r += &self.print_expr(item);
+                        r += ",";
+                    }
+                    self.dedent();
                     r += &self.new_line();
-                    r += &self.print_expr(item);
-                    r += ",";
                 }
-                self.dedent();
-                r += &self.new_line();
                 r += "]";
                 r
             }
@@ -186,7 +188,6 @@ impl Printer {
             }
             ir::ExprKind::Binding(binding) => {
                 let mut r = String::new();
-
                 let mut binding = binding.as_ref();
 
                 loop {
@@ -194,8 +195,18 @@ impl Printer {
 
                     r += &binding.id.to_string();
 
-                    r += " = ";
-                    r += &self.print_expr(&binding.expr);
+                    r += " =";
+
+                    if let ir::ExprKind::Binding(_) = &binding.expr.kind {
+                        self.indent();
+                        r += &self.new_line();
+                        r += &self.print_expr(&binding.expr);
+                        self.dedent();
+                    } else {
+                        r += " ";
+                        r += &self.print_expr(&binding.expr);
+                    }
+
                     r += ";";
                     r += &self.new_line();
 

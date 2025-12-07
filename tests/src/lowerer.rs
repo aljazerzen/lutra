@@ -66,28 +66,6 @@ fn lower_01() {
           ),
         )[90m: bool[0m
       )[90m: func (int64, int64) -> bool[0m;
-      let 1 = (func 4 ->
-        (call
-          external.std::index[90m: func ([{id: int64, total: float64}], int64) -> enum {None, Some: {id: int64, total: float64}}[0m,
-          (call
-            external.std::filter[90m: func ([{id: int64, total: float64}], func ({id: int64, total: float64}) -> bool) -> [{id: int64, total: float64}][0m,
-            (call
-              external.box_office::get_album_sales[90m: func () -> [box_office::AlbumSale][0m,
-            )[90m: [box_office::AlbumSale][0m,
-            (func 5 ->
-              (call
-                var.2[90m: func (int64, int64) -> bool[0m,
-                (tuple_lookup
-                  fn.5+0[90m: box_office::AlbumSale[0m
-                  0
-                )[90m: int64[0m,
-                fn.4+0[90m: int64[0m,
-              )[90m: bool[0m
-            )[90m: func (box_office::AlbumSale) -> bool[0m,
-          )[90m: [{id: int64, total: float64}][0m,
-          0[90m: int64[0m,
-        )[90m: enum {None, Some: {id: int64, total: float64}}[0m
-      )[90m: func (int64) -> enum {None, Some: box_office::AlbumSale}[0m;
       let 0 = (func 2 ->
         (call
           external.std::index[90m: func ([{id: int64, title: text}], int64) -> enum {None, Some: {id: int64, title: text}}[0m,
@@ -110,6 +88,28 @@ fn lower_01() {
           0[90m: int64[0m,
         )[90m: enum {None, Some: {id: int64, title: text}}[0m
       )[90m: func (int64) -> enum {None, Some: chinook::album}[0m;
+      let 1 = (func 4 ->
+        (call
+          external.std::index[90m: func ([{id: int64, total: float64}], int64) -> enum {None, Some: {id: int64, total: float64}}[0m,
+          (call
+            external.std::filter[90m: func ([{id: int64, total: float64}], func ({id: int64, total: float64}) -> bool) -> [{id: int64, total: float64}][0m,
+            (call
+              external.box_office::get_album_sales[90m: func () -> [box_office::AlbumSale][0m,
+            )[90m: [box_office::AlbumSale][0m,
+            (func 5 ->
+              (call
+                var.2[90m: func (int64, int64) -> bool[0m,
+                (tuple_lookup
+                  fn.5+0[90m: box_office::AlbumSale[0m
+                  0
+                )[90m: int64[0m,
+                fn.4+0[90m: int64[0m,
+              )[90m: bool[0m
+            )[90m: func (box_office::AlbumSale) -> bool[0m,
+          )[90m: [{id: int64, total: float64}][0m,
+          0[90m: int64[0m,
+        )[90m: enum {None, Some: {id: int64, total: float64}}[0m
+      )[90m: func (int64) -> enum {None, Some: box_office::AlbumSale}[0m;
       (call
         (func 0 ->
           (tuple

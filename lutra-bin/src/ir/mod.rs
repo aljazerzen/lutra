@@ -49,6 +49,11 @@ impl From<TupleLookup> for ExprKind {
         ExprKind::TupleLookup(boxed::Box::new(v))
     }
 }
+impl From<Binding> for ExprKind {
+    fn from(v: Binding) -> Self {
+        ExprKind::Binding(boxed::Box::new(v))
+    }
+}
 impl From<Call> for ExprKind {
     fn from(v: Call) -> Self {
         ExprKind::Call(boxed::Box::new(v))

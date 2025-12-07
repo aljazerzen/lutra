@@ -33,7 +33,7 @@ pub fn lower_expr(project: &Project, main_pr: &pr::Expr) -> ir::Program {
     };
     let main = lowerer.prepare_entry_point(main);
 
-    let main = lowerer.lower_var_bindings(main).unwrap();
+    let main = lowerer.lower_def_dependencies(main, project).unwrap();
 
     lowerer.lower_ty_defs_queue();
     let defs = order_ty_defs(lowerer.type_defs, project);
@@ -51,10 +51,10 @@ struct Lowerer<'a> {
     /// Type of the program's input. Flag for when input is packed from multiple params.
     program_input_ty: Option<(ir::Ty, bool)>,
 
-    /// Depended expressions that are referenced from generated IR.
+    /// Expr defs that are referenced from generated IR.
     /// Contain FQ path and list of type arguments, pointing to id the should
     /// be accessible at.
-    var_bindings: IndexMap<(pr::Path, Vec<pr::Ty>), u32>,
+    def_dependencies: IndexMap<(pr::Path, Vec<pr::Ty>), u32>,
 
     type_defs_queue: VecDeque<pr::Path>,
     type_defs: HashMap<pr::Path, ir::Ty>,
@@ -92,7 +92,7 @@ impl<'a> Lowerer<'a> {
             program_input_ty: None,
 
             scopes: vec![],
-            var_bindings: Default::default(),
+            def_dependencies: Default::default(),
             type_defs: Default::default(),
             type_defs_queue: Default::default(),
 
@@ -437,7 +437,7 @@ impl<'a> Lowerer<'a> {
         }
 
         let reference = (ref_.clone(), ty_args.to_vec());
-        let entry = self.var_bindings.entry(reference);
+        let entry = self.def_dependencies.entry(reference);
         let binding_id = match entry {
             indexmap::map::Entry::Occupied(e) => *e.get(),
             indexmap::map::Entry::Vacant(e) => {
@@ -574,8 +574,8 @@ impl<'a> Lowerer<'a> {
         exprs.iter().map(|e| self.lower_expr(e)).collect()
     }
 
-    fn lower_var_bindings(&mut self, main: ir::Expr) -> Result<ir::Expr> {
-        if self.var_bindings.is_empty() {
+    fn lower_def_dependencies(&mut self, main: ir::Expr, project: &Project) -> Result<ir::Expr> {
+        if self.def_dependencies.is_empty() {
             return Ok(main);
         }
 
@@ -599,20 +599,37 @@ impl<'a> Lowerer<'a> {
         };
 
         // fold each of the bindings
+        let mut bindings = HashMap::new();
         let mut i = 0;
         loop {
-            let Some((reference, id)) = self.var_bindings.get_index(i) else {
+            let Some((reference, id)) = self.def_dependencies.get_index(i) else {
                 break;
             };
             i += 1;
             let reference = reference.clone();
             let id = *id;
 
+            // lower
             let expr = self.lower_expr_def(&reference.0, reference.1)?;
-            main = ir::Expr {
-                ty: main.ty.clone(),
-                kind: ir::ExprKind::Binding(Box::new(ir::Binding { id, expr, main })),
+
+            let entry: &mut Vec<_> = bindings.entry(reference.0).or_insert_with(Vec::new);
+            entry.push((id, expr));
+        }
+
+        // wrap the call into bindings, in resolution order
+        for o_group in project.ordering.iter().rev() {
+            assert_eq!(o_group.len(), 1);
+            let path = &o_group[0];
+
+            for (id, expr) in bindings.remove(path).unwrap_or_default() {
+                let ty = main.ty.clone();
+                main = ir::Expr::new(ir::Binding { id, expr, main }, ty);
             }
+        }
+        // same for remaining bindings that come from project dependencies
+        for (id, expr) in bindings.into_values().flatten() {
+            let ty = main.ty.clone();
+            main = ir::Expr::new(ir::Binding { id, expr, main }, ty);
         }
 
         // place bindings into function body

@@ -86,9 +86,10 @@ impl fold::IrFold for FuncInliner {
                     let expr = self.fold_expr(expr);
                     self.currently_inlining.remove(binding_id);
                     return expr;
+                } else {
+                    // panic!("binding not found: {binding_id}")
+                    call.function
                 }
-
-                call.function
             }
 
             // calls of lambda functions

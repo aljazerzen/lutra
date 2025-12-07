@@ -195,7 +195,12 @@ impl<'a> Context<'a> {
                 ir::ExprKind::Pointer(ir::Pointer::External(ptr)) => {
                     panic!("Function {} is not implemented", ptr.id)
                 }
-                ir::ExprKind::Pointer(_) => todo!(),
+                ir::ExprKind::Pointer(ir::Pointer::Parameter(_)) => {
+                    todo!("Call of a param")
+                }
+                ir::ExprKind::Pointer(ir::Pointer::Binding(id)) => {
+                    todo!("Call of a binding: id={id}")
+                }
                 ir::ExprKind::Call(_) => todo!(),
                 ir::ExprKind::Function(_) => todo!(),
 

@@ -6,11 +6,11 @@ fn parse_01() {
     assert_debug_snapshot!(super::_test_parse(r#"type a = int64;
 type b::c = text;
 let main =
-  let 1 = (
-    func 2 -> [
-        fn.2+0: float64,
-        fn.2+0: float64,
-        fn.2+0: float64
+  let 1 = (func 2 ->
+    [
+      fn.2+0: float64,
+      fn.2+0: float64,
+      fn.2+0: float64
     ]: [float64]
   ): func (float64) -> [float64];
 

@@ -71,12 +71,11 @@ fn expr() -> impl Parser<TokenKind, Expr, Error = PError> + Clone {
                 |_| ExprKind::Tuple(vec![]),
             ));
 
-        let term = choice((pointer, literal, tuple, array, wrapped))
+        let simple = choice((pointer, literal, tuple, array, wrapped))
             .then(ctrl(':').ignore_then(ty()))
-            .map(|(kind, ty)| Expr { kind, ty })
-            .boxed();
+            .map(|(kind, ty)| Expr { kind, ty });
 
-        binding(term.boxed())
+        binding(expr).or(simple)
     })
 }
 
@@ -253,18 +252,17 @@ fn binding<E>(expr: E) -> impl Parser<TokenKind, Expr, Error = PError>
 where
     E: Parser<TokenKind, Expr, Error = PError> + Clone,
 {
-    // func
+    // binding
     keyword("let")
         // symbol id
         .ignore_then(uint32())
         .then_ignore(ctrl('='))
         // expr
-        .then(expr.clone())
+        .then(expr.clone().labelled("bound"))
         .then_ignore(ctrl(';'))
-        .repeated()
         // main
-        .then(expr)
-        .foldr(|(id, expr), main| Expr {
+        .then(expr.labelled("main"))
+        .map(|((id, expr), main)| Expr {
             ty: main.ty.clone(),
             kind: ExprKind::Binding(Box::new(Binding { id, expr, main })),
         })

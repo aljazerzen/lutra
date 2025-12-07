@@ -332,3 +332,23 @@ func main() -> std::fold(
   date = @2025-12-01,
   debt = 123.00277292101055,
 }
+
+# === advent_of_sql_2024_08
+import std::(flat_map, filter, apply_until_empty)
+
+func main() -> (from_staff() | apply_until_empty(get_managers))
+
+type Iter: {id: int32, depth: int16}
+
+func get_managers(level: [Iter]): [Iter] -> (
+  level | flat_map(func (i) -> get_staff_by_id(i.id))
+)
+
+func get_staff_by_id(staff_id: int32): [Iter] -> (
+  from_staff() | filter(func (x) -> x.id == staff_id)
+)
+
+func from_staff(): [Iter] -> []
+
+# >
+[]
