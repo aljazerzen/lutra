@@ -1730,6 +1730,62 @@ func main() -> std::lead([5,3,65,4], -2): [int64]
   3,
 ]
 
+# === std_rolling_mean_00
+func main() -> [1, 2, 3, 4]: [int32] | std::rolling_mean(1, 1)
+# >
+[
+  1.5,
+  2.0,
+  3.0,
+  3.5,
+]
+
+# === std_rolling_mean_01
+func main() -> [1, 2, 3, 4]: [int8] | std::rolling_mean(1, 1)
+# >
+[
+  1.5,
+  2.0,
+  3.0,
+  3.5,
+]
+
+# === std_rolling_mean_02
+func main() -> [1, 2, 3, 4]: [int8] | std::rolling_mean(0, 2)
+# >
+[
+  2.0,
+  3.0,
+  3.5,
+  4.0,
+]
+
+# === std_rolling_mean_03
+func main() -> [1, 2, 3, 4]: [int8] | std::rolling_mean(2, 0)
+# >
+[
+  1.0,
+  1.5,
+  2.0,
+  3.0,
+]
+
+# === std_rolling_mean_04
+func main() -> [1, 2, 3, 4]: [int8] | std::rolling_mean(100, 100)
+# >
+[
+  2.5,
+  2.5,
+  2.5,
+  2.5,
+]
+
+# === std_rolling_mean_05
+func main() -> []: [int8] | std::rolling_mean(1, 1)
+# >
+[]
+
+
 # === std_map_00
 func main() -> std::map([5,3,65,3,2], func (x: int64) -> x + 1)
 # >

@@ -846,7 +846,7 @@ impl<'a> Context<'a> {
             }
 
             // window functions
-            "std::row_number" | "std::lead" | "std::lag" => {
+            "std::row_number" | "std::lead" | "std::lag" | "std::rolling_mean" => {
                 let array = self.compile_rel(&call.args[0]);
                 let array = self.new_binding(array);
 

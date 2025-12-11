@@ -218,6 +218,7 @@ pub mod std {
                 "lag" => &lag,
                 "lead" => &lead,
                 "row_number" => &row_number,
+                "rolling_mean" => &rolling_mean,
 
                 _ => return None,
             })
@@ -990,6 +991,83 @@ pub mod std {
         Ok(Cell::Data(out.finish()))
     }
 
+    pub fn rolling_mean(
+        _it: &mut Interpreter,
+        layout_args: &[u32],
+        args: Vec<Cell>,
+    ) -> Result<Cell, EvalError> {
+        let [array, trailing, leading] = assume::exactly_n(args);
+        let trailing: u32 = assume::primitive(&trailing)?;
+        let leading: u32 = assume::primitive(&leading)?;
+
+        let item_head_bytes = layout_args[0];
+        let array = assume::array(array, item_head_bytes);
+        let ty_prim = decode::ty_primitive(layout_args[1]);
+
+        match ty_prim {
+            ir::TyPrimitive::int8 => rolling_mean_impl::<i8>(array, trailing, leading),
+            ir::TyPrimitive::int16 => rolling_mean_impl::<i16>(array, trailing, leading),
+            ir::TyPrimitive::int32 => rolling_mean_impl::<i32>(array, trailing, leading),
+            ir::TyPrimitive::int64 => rolling_mean_impl::<i64>(array, trailing, leading),
+            ir::TyPrimitive::uint8 => rolling_mean_impl::<u8>(array, trailing, leading),
+            ir::TyPrimitive::uint16 => rolling_mean_impl::<u16>(array, trailing, leading),
+            ir::TyPrimitive::uint32 => rolling_mean_impl::<u32>(array, trailing, leading),
+            ir::TyPrimitive::uint64 => rolling_mean_impl::<u64>(array, trailing, leading),
+            ir::TyPrimitive::float32 => rolling_mean_impl::<f32>(array, trailing, leading),
+            ir::TyPrimitive::float64 => rolling_mean_impl::<f64>(array, trailing, leading),
+            _ => unreachable!(),
+        }
+    }
+
+    fn rolling_mean_impl<T>(
+        array: ArrayReader<Data>,
+        trailing: u32,
+        leading: u32,
+    ) -> Result<Cell, EvalError>
+    where
+        T: Decode + Default + ::std::ops::AddAssign + ::std::ops::SubAssign + Copy + ToF64,
+    {
+        let array_len = array.remaining();
+
+        let mut iter_add = array.map(|x| decode::primitive::<T>(&x));
+        let mut iter_remove = iter_add.clone();
+
+        let mut sum = T::default();
+        let mut count: usize = 0;
+        let mut out = ArrayWriter::new(f64::head_size().div_ceil(8) as u32, &[]);
+
+        // accumulate leading
+        for _ in 0..leading {
+            if let Some(l) = iter_add.next() {
+                sum += l;
+                count += 1;
+            }
+        }
+
+        // step trough windows that only increase
+        for _ in 0..(trailing + 1).min(array_len as u32) {
+            if let Some(l) = iter_add.next() {
+                sum += l;
+                count += 1;
+            }
+            out.write_item(encode(&(sum.to_f64() / count as f64)));
+        }
+
+        // step trough all remaining elements
+        for _ in 0..(array_len.saturating_sub(trailing as usize + 1)) {
+            if let Some(l) = iter_add.next() {
+                sum += l;
+                count += 1;
+            }
+            if let Some(t) = iter_remove.next() {
+                sum -= t;
+                count -= 1;
+            }
+            out.write_item(encode(&(sum.to_f64() / count as f64)));
+        }
+        Ok(Cell::Data(out.finish()))
+    }
+
     fn index_rel_to_abs(index: i64, array_len: usize) -> usize {
         if index < 0 {
             array_len.saturating_sub((-index) as usize)
@@ -997,6 +1075,29 @@ pub mod std {
             index as usize
         }
     }
+
+    trait ToF64 {
+        fn to_f64(self) -> f64;
+    }
+    macro_rules! impl_to_f64 {
+        ($t: ident) => {
+            impl ToF64 for $t {
+                fn to_f64(self) -> f64 {
+                    self as f64
+                }
+            }
+        };
+    }
+    impl_to_f64!(i8);
+    impl_to_f64!(i16);
+    impl_to_f64!(i32);
+    impl_to_f64!(i64);
+    impl_to_f64!(u8);
+    impl_to_f64!(u16);
+    impl_to_f64!(u32);
+    impl_to_f64!(u64);
+    impl_to_f64!(f32);
+    impl_to_f64!(f64);
 }
 
 pub mod std_text {

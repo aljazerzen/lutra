@@ -356,6 +356,8 @@ where T
 func row_number(array: [T]): [int64]
 where T
 
+func rolling_mean(array: [T], leading: uint32, trailing: uint32): [float64]
+where T: number
 
 ## Mathematical functions
 module math {

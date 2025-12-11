@@ -267,7 +267,7 @@ impl ByteCoder {
                 ]
             }
 
-            "std::sum" | "std::mean" => {
+            "std::sum" | "std::mean" | "std::rolling_mean" => {
                 let param_ty = as_ty_of_param(ty_mat);
                 let item_ty = self.get_ty_mat(param_ty).kind.as_array().unwrap();
 

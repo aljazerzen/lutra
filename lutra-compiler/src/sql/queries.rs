@@ -734,6 +734,13 @@ impl<'a> Context<'a> {
                     "COALESCE(LAG({arg}, {offset}::int4) OVER (ORDER BY index), {filler})"
                 ))
             }
+            "std::rolling_mean" => {
+                let [array, trailing, leading] = unpack_args(args);
+
+                sql_ast::Expr::Source(format!(
+                    "(AVG({array}) OVER (ORDER BY index ROWS BETWEEN {trailing} PRECEDING AND {leading} FOLLOWING))::float8"
+                ))
+            }
 
             "std::text::length" => {
                 let [text] = unpack_args(args);
