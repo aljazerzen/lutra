@@ -14,6 +14,7 @@ struct Optimizer {}
 impl cr::CrFold for Optimizer {
     fn fold_expr(&mut self, expr: cr::Expr) -> Result<cr::Expr, ()> {
         let mut expr = cr::fold_expr(self, expr)?;
+        expr = skip_offset_0(expr);
         expr = simplify_pick_row(expr);
         expr = simplify_discard_row(expr);
         expr = simplify_pick_discard(expr);
@@ -312,4 +313,21 @@ impl CrFold for RelRefReplacer {
             _ => cr::fold_from(self, from, ty),
         }
     }
+}
+
+fn skip_offset_0(expr: cr::Expr) -> cr::Expr {
+    // match
+    let cr::ExprKind::Transform(_, cr::Transform::Offset(offset)) = &expr.kind else {
+        return expr;
+    };
+    let cr::ExprKind::From(cr::From::Literal(ir::Literal::int64(0))) = &offset.kind else {
+        return expr;
+    };
+
+    // unpack
+    let cr::ExprKind::Transform(input, _) = expr.kind else {
+        unreachable!()
+    };
+
+    input.rel
 }
