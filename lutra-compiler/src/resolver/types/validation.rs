@@ -173,7 +173,11 @@ impl TypeResolver<'_> {
                     }
 
                     // lookup the field in the comprehended tuple
-                    let lookup = pr::Lookup::Position(position as i64);
+                    let lookup = if let Some(name) = &e_field.name {
+                        pr::Lookup::Name(name.clone())
+                    } else {
+                        pr::Lookup::Position(position as i64)
+                    };
                     let span = e_field.ty.span.unwrap();
                     let var_input = self.resolve_tuple_lookup(&comp.tuple, &lookup, span)?;
 
@@ -333,33 +337,51 @@ impl TypeResolver<'_> {
                 });
                 if let Some(tuple_len) = tuple_len {
                     let mut consolidated = vec![None; *tuple_len];
-                    for domain in domains {
-                        if let TyParamDomain::TupleHasFields(fields) = domain {
-                            for field in fields {
-                                match field.location {
-                                    Lookup::Position(p) => {
-                                        consolidated[p as usize] = Some(field.ty.clone());
-                                    }
-                                    Lookup::Name(_) => {}
-                                }
-                            }
+
+                    let fields = domains
+                        .iter()
+                        .filter_map(|d| match d {
+                            TyParamDomain::TupleHasFields(fields) => Some(fields),
+                            _ => None,
+                        })
+                        .flatten();
+
+                    // populate positional
+                    for field in fields.clone() {
+                        if let Lookup::Position(p) = field.location {
+                            consolidated[p as usize] = Some(pr::TyTupleField {
+                                ty: field.ty.clone(),
+                                name: None,
+                                unpack: false,
+                            });
                         }
                     }
+
+                    // populate named
+                    for field in fields {
+                        if let Lookup::Name(name) = &field.location {
+                            let Some((first_empty, _)) =
+                                consolidated.iter().find_position(|x| x.is_none())
+                            else {
+                                continue;
+                            };
+
+                            consolidated[first_empty] = Some(pr::TyTupleField {
+                                ty: field.ty.clone(),
+                                name: Some(name.clone()),
+                                unpack: false,
+                            });
+                        }
+                    }
+
                     if consolidated.iter().all(Option::is_some) {
                         // success, infer the type
                         let ty = pr::Ty::new(pr::TyKind::Tuple(
-                            consolidated
-                                .into_iter()
-                                .map(|x| pr::TyTupleField {
-                                    ty: x.unwrap(),
-                                    name: None,
-                                    unpack: false,
-                                })
-                                .collect(),
+                            consolidated.into_iter().map(|x| x.unwrap()).collect(),
                         ));
 
                         tracing::debug!(
-                            "consolidated domains to infer {id} is {}",
+                            "consolidated domain to infer {id} is {}",
                             printer::print_ty(&ty)
                         );
                         known_types.insert(*id, ty);

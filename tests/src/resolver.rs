@@ -1429,7 +1429,7 @@ fn ty_tuple_comprehension_06() {
        │
      8 │     func main(a: A): {id: bool, title: bool, release_year: bool} -> make_flags(a)
        │                                                                     ─────┬────
-       │                                                                          ╰────── field .2 does not exist in type {id: int64, title: text}
+       │                                                                          ╰────── field .release_year does not exist in type {id: int64, title: text}
     ───╯
     ");
 
@@ -1489,7 +1489,7 @@ fn ty_tuple_comprehension_09() {
       | func (x) -> {x.gift_id, x.gift_id}
       | from_columnar
     )
-    "#), @"[{int32, int32}]");
+    "#), @"[{gift_id: int32, gift_id: int32}]");
 
     // A few useful functions for writing tests:
 
@@ -1498,6 +1498,20 @@ fn ty_tuple_comprehension_09() {
 
     // func first(t: [T]): T
     // where T
+}
+
+#[test]
+fn ty_tuple_comprehension_10() {
+    // comprehension yields named fields
+
+    insta::assert_snapshot!(_test_ty(r#"
+    func from_columnar(columnar: {for f: F in T do f: [F]}): T
+    where T: {..}
+
+    func main() -> (
+      ({gift_id = []: [int32]} | from_columnar)
+    )
+    "#), @"{gift_id: int32}");
 }
 
 #[test]
