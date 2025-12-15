@@ -23,8 +23,8 @@ fn inline_00() {
       (tuple
         var.2[90m: [bool][0m,
         var.2[90m: [bool][0m,
-      )[90m: {[bool], [bool]}[0m
-    )[90m: func ({}) -> {[bool], [bool]}[0m
+      )[90m: {x: [bool], x: [bool]}[0m
+    )[90m: func ({}) -> {x: [bool], x: [bool]}[0m
     ")
 }
 
@@ -42,8 +42,8 @@ fn inline_01() {
           true[90m: bool[0m,
           false[90m: bool[0m,
         ][90m: [bool][0m,
-      )[90m: {[bool]}[0m
-    )[90m: func ({}) -> {[bool]}[0m
+      )[90m: {x: [bool]}[0m
+    )[90m: func ({}) -> {x: [bool]}[0m
     ")
 }
 
@@ -130,7 +130,7 @@ fn inline_03() {
             1
           )[90m: bool[0m,
         )[90m: bool[0m,
-      )[90m: {OptText, OptText, bool, bool}[0m
-    )[90m: func ({}) -> {OptText, OptText, bool, bool}[0m
+      )[90m: {OptText, None: OptText, bool, bool}[0m
+    )[90m: func ({}) -> {OptText, None: OptText, bool, bool}[0m
     "#)
 }

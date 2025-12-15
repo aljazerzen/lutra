@@ -961,8 +961,8 @@ fn param_01() {
     ])
     ).1, @r#"
     {
-      "hello",
-      3,
+      y = "hello",
+      x = 3,
     }
     "#);
 }
@@ -1087,7 +1087,7 @@ fn param_06() {
     ).1, @r#"
     {
       "hello",
-      [
+      x = [
         {
           5,
           {
@@ -1126,7 +1126,7 @@ fn param_07() {
     ---
     {
       "hello",
-      InProgress({
+      x = InProgress({
         started_at = "today",
         owner = "me",
       }),
@@ -1166,7 +1166,7 @@ fn param_08() {
     ---
     {
       "hello",
-      [
+      x = [
         InProgress({
           started_at = "today",
           owner = "me",
@@ -1444,7 +1444,7 @@ fn json_pack_09() {
     ---
     {
       "hello",
-      [
+      x = [
         1,
         2,
         3,
@@ -2026,7 +2026,7 @@ fn opt_00() {
     ---
     {
       Some("hello"),
-      None,
+      None = None,
       true,
       false,
     }

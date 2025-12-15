@@ -75,13 +75,13 @@ impl super::TypeResolver<'_> {
     }
 
     fn infer_tuple_field_name(&self, field: &pr::Expr) -> Option<String> {
-        let pr::ExprKind::TupleLookup { base: _, lookup } = &field.kind else {
-            return None;
-        };
-
-        match lookup {
-            pr::Lookup::Name(name) => Some(name.clone()),
-            pr::Lookup::Position(_) => None,
+        match &field.kind {
+            pr::ExprKind::TupleLookup { base: _, lookup } => match lookup {
+                pr::Lookup::Name(name) => Some(name.clone()),
+                pr::Lookup::Position(_) => None,
+            },
+            pr::ExprKind::Ident(ident) => Some(ident.last().to_string()),
+            _ => None,
         }
     }
 

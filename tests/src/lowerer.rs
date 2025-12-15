@@ -181,21 +181,21 @@ fn lower_03() {
         (tuple
           fn.2+0[90m: [bool][0m,
           fn.2+0[90m: [bool][0m,
-        )[90m: {[bool], [bool]}[0m
-      )[90m: func ([bool]) -> {[bool], [bool]}[0m;
+        )[90m: {x: [bool], x: [bool]}[0m
+      )[90m: func ([bool]) -> {x: [bool], x: [bool]}[0m;
       (call
         (func 0 ->
           (call
-            var.0[90m: func ([bool]) -> {[bool], [bool]}[0m,
+            var.0[90m: func ([bool]) -> {x: [bool], x: [bool]}[0m,
             [
               true[90m: bool[0m,
               true[90m: bool[0m,
               false[90m: bool[0m,
             ][90m: [bool][0m,
-          )[90m: {[bool], [bool]}[0m
-        )[90m: func ({}) -> {[bool], [bool]}[0m,
+          )[90m: {x: [bool], x: [bool]}[0m
+        )[90m: func ({}) -> {x: [bool], x: [bool]}[0m,
         fn.1+0[90m: {}[0m,
-      )[90m: {[bool], [bool]}[0m
-    )[90m: func ({}) -> {[bool], [bool]}[0m
+      )[90m: {x: [bool], x: [bool]}[0m
+    )[90m: func ({}) -> {x: [bool], x: [bool]}[0m
     ")
 }

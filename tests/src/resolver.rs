@@ -102,7 +102,7 @@ fn types_05() {
         -> mapper(x)
 
         func main() -> apply(false, twice)
-    "#), @"{bool, bool}");
+    "#), @"{x: bool, x: bool}");
 }
 #[test]
 fn types_06() {
@@ -124,7 +124,7 @@ fn types_07() {
         where I, O
 
         func main() -> map([false, true, true], twice)
-    "#), @"[{bool, bool}]");
+    "#), @"[{x: bool, x: bool}]");
 }
 #[test]
 fn types_08() {
@@ -1735,7 +1735,7 @@ fn import_03() {
     }
     import a as e
     func main() -> {e::d, e::b::c}
-    "#), @"{bool, text}");
+    "#), @"{d: bool, c: text}");
 }
 
 #[test]
@@ -1775,7 +1775,7 @@ fn import_05() {
     }
     import a::(b, c)
     func main() -> {b, c}
-    "#), @"{text, bool}");
+    "#), @"{b: text, c: bool}");
 }
 
 #[test]
@@ -1790,7 +1790,7 @@ fn import_06() {
     }
     import a::(b, c::(d, e))
     func main() -> {b, d, e}
-    "#), @"{text, int16, bool}");
+    "#), @"{b: text, d: int16, e: bool}");
 }
 
 #[test]
