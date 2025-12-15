@@ -2299,6 +2299,22 @@ func main() -> std::text::join([], ", ")
 # >
 ""
 
+# === std_text_split_00
+func main() -> std::text::split("1_two_3", "_")
+# >
+[
+  "1",
+  "two",
+  "3",
+]
+
+# === std_text_split_01
+func main() -> std::text::split("1_two_3", "a")
+# >
+[
+  "1_two_3",
+]
+
 # === std_math_abs_00
 func main() -> std::math::abs(-3: int16)
 # >

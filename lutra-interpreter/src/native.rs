@@ -212,7 +212,6 @@ pub mod std {
                 "mean" => &mean,
                 "all" => &all,
                 "any" => &any,
-                "concat_array" => &concat_array,
                 "count" => &count,
 
                 "lag" => &lag,
@@ -904,21 +903,6 @@ pub mod std {
         Ok(Cell::Data(encode(&res)))
     }
 
-    pub fn concat_array(
-        _it: &mut Interpreter,
-        _layout_args: &[u32],
-        args: Vec<Cell>,
-    ) -> Result<Cell, EvalError> {
-        let [array, separator] = assume::exactly_n(args);
-
-        let array = assume::array(array, 8); // text head = 8
-        let separator = assume::text(&separator)?;
-
-        let array: Vec<_> = array.map(|x| decode::text(&x)).collect();
-        let res = array.join(&separator);
-        Ok(Cell::Data(encode(&res)))
-    }
-
     pub fn lag(
         _it: &mut Interpreter,
         layout_args: &[u32],
@@ -1251,6 +1235,7 @@ pub mod std_text {
                 "length" => &length,
                 "from_ascii" => &from_ascii,
                 "join" => &join,
+                "split" => &split,
 
                 _ => return None,
             })
@@ -1335,6 +1320,24 @@ pub mod std_text {
             }
         };
         Ok(Cell::Data(encode(&joined)))
+    }
+
+    pub fn split(
+        _it: &mut Interpreter,
+        _layout_args: &[u32],
+        args: Vec<Cell>,
+    ) -> Result<Cell, EvalError> {
+        let [text, sep] = assume::exactly_n(args);
+        let mut text = assume::into_data(text)?;
+        let text = decode::text_ref(&mut text);
+        let mut sep = assume::into_data(sep)?;
+        let sep = decode::text_ref(&mut sep);
+
+        let mut output = crate::ArrayWriter::new(String::head_size().div_ceil(8) as u32, &[0]);
+        for part in text.split(sep) {
+            output.write_item(Data::new(part.encode()));
+        }
+        Ok(Cell::Data(output.finish()))
     }
 }
 

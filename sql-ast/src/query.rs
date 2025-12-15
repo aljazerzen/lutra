@@ -453,6 +453,12 @@ pub struct SelectItem {
     pub alias: Option<Ident>,
 }
 
+impl SelectItem {
+    pub fn unnamed(expr: Expr) -> Self {
+        SelectItem { expr, alias: None }
+    }
+}
+
 impl fmt::Display for SelectItem {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         self.expr.fmt(f)?;

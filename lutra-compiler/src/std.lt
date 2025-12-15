@@ -342,9 +342,6 @@ where T: primitive -> (
   haystack | filter(func (x) -> eq(x, needle)) | is_empty | not
 )
 
-## Joins text parts, placing separator between each pair.
-func join(parts: [text], separator: text): text
-
 # --- Window functions ---
 
 ## Shifts array items backwards by an offset.
@@ -362,6 +359,7 @@ func lead(array: [T], offset: int64): [T]
 where T
 
 ## Returns a sequence of numbers starting from 0, for each array item.
+# TODO: maybe remove this. It's equivalent to `sequence(0, n)`.
 func row_number(array: [T]): [int64]
 where T
 
@@ -428,10 +426,13 @@ module math {
   func abs(val: T): T
   where T: number
 
-  func sqrt(val: int64): int64
-  func ceil(val: int64): int64
-  func floor(val: int64): int64
-  func round(val: int64, n_digits: int64): int64
+  # func sqrt(val: int64): int64
+
+  # func ceil(val: int64): int64
+
+  # func floor(val: int64): int64
+
+  # func round(val: int64, n_digits: int64): int64
 
   const pi32: float32 = 3.1415927
   const pi64: float64 = 3.141592653589793
@@ -440,49 +441,63 @@ module math {
   func pow(val: T, exponent: T): T
   where T: int64 | float64
 
-  func exp(val: int64): int64
-  func ln(val: int64): int64
-  func log10(val: int64): int64
-  func log(base: int64, val: int64): int64
+  # func exp(val: int64): int64
 
-  func degrees(val: int64): int64
-  func radians(val: int64): int64
-  func cos(val: int64): int64
-  func acos(val: int64): int64
-  func sin(val: int64): int64
-  func asin(val: int64): int64
-  func tan(val: int64): int64
-  func atan(val: int64): int64
+  # func ln(val: int64): int64
+
+  # func log10(val: int64): int64
+
+  # func log(base: int64, val: int64): int64
+
+  # func degrees(val: int64): int64
+
+  # func radians(val: int64): int64
+
+  # func cos(val: int64): int64
+
+  # func acos(val: int64): int64
+
+  # func sin(val: int64): int64
+
+  # func asin(val: int64): int64
+
+  # func tan(val: int64): int64
+
+  # func atan(val: int64): int64
 }
 
 ## Text functions
 module text {
   func concat(left: text, right: text): text
 
-  func lower(value: text): text
-  func upper(value: text): text
-
-  func ltrim(value: text): text
-  func rtrim(value: text): text
-  func trim(value: text): text
-
   func length(value: text): uint32
-
-  func substring(value: text, offset: int64, length: int64): text
-  func replace(value: text, pattern: text, replacement: text): text
-
-  func starts_with(value: text, prefix: text): bool
-  func contains(value: text, substr: text): bool
-  func ends_with(value: text, suffix: text): bool
 
   ## Converts ASCII code to its corresponding Unicode character.
   ## This function always succeeds, because ASCII is a subset of Unicode.
   func from_ascii(ascii: uint8): text
 
   ## Joins parts together, placing separator between each pair.
-  func join(parts: [text], delimiter: text): text
+  func join(parts: [text], separator: text): text
 
-  func regex_search(haystack: text, pattern: text): bool
+  ## Splits text into substrings at every occurrence of a separator.
+  ##
+  ## For example, `split("1_two_3", "_")` is ["1", "two", "3"]`
+  func split(value: text, separator: text): [text]
+
+  # func lower(value: text): text
+  # func upper(value: text): text
+
+  # func ltrim(value: text): text
+  # func rtrim(value: text): text
+  # func trim(value: text): text
+
+  # func substring(value: text, offset: int64, length: int64): text
+  # func replace(value: text, pattern: text, replacement: text): text
+
+  # func starts_with(value: text, prefix: text): bool
+  # func contains(value: text, substr: text): bool
+  # func ends_with(value: text, suffix: text): bool
+  # func regex_search(haystack: text, pattern: text): bool
 }
 
 module fs {

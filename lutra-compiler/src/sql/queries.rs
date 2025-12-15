@@ -771,6 +771,31 @@ impl<'a> Context<'a> {
                 let [parts, sep] = unpack_args(args);
                 sql_ast::Expr::Source(format!("COALESCE(STRING_AGG({parts}, {sep}), '')"))
             }
+            "std::text::split" => {
+                let [text, sep] = unpack_args(args);
+
+                let mut select = utils::select_empty();
+
+                select.from.push(sql_ast::RelNamed {
+                    lateral: false,
+                    alias: Some(sql_ast::TableAlias {
+                        name: sql_ast::Ident::new("t"),
+                        columns: vec![sql_ast::Ident::new("value")],
+                    }),
+                    expr: sql_ast::RelExpr::Function {
+                        name: utils::new_object_name(["string_to_table"]),
+                        args: vec![text, sep],
+                    },
+                });
+                select.projection = vec![
+                    sql_ast::SelectItem {
+                        expr: sql_ast::Expr::Source("ROW_NUMBER() OVER ()".into()),
+                        alias: Some(COL_ARRAY_INDEX.into()),
+                    },
+                    sql_ast::SelectItem::unnamed(utils::identifier(Some("t"), "value")),
+                ];
+                return Node::Select(select);
+            }
 
             "std::math::abs" => {
                 let [text] = unpack_args(args);
