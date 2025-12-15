@@ -1473,6 +1473,34 @@ fn ty_tuple_comprehension_08() {
 }
 
 #[test]
+fn ty_tuple_comprehension_09() {
+    // validation of comprehension
+
+    // I'm not really sure why does this test case require the intermediate
+    // function. It was derived from a panic when dealing with to_columnar and
+    // from_columnar. It was fixed by adding `LocalTyInliner`.
+
+    insta::assert_snapshot!(_test_ty(r#"
+    func from_columnar(columnar: {for f: F in T do f: [F]}): [T]
+    where T: {..}
+
+    func main() -> (
+      {gift_id = []}: {gift_id: [int32]}
+      | func (x) -> {x.gift_id, x.gift_id}
+      | from_columnar
+    )
+    "#), @"[{int32, int32}]");
+
+    // A few useful functions for writing tests:
+
+    // func each_once(a: A): {for f: F in A do f: [F]}
+    // where A: {..}
+
+    // func first(t: [T]): T
+    // where T
+}
+
+#[test]
 fn tuple_00() {
     // tuples, named type validation
 

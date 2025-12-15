@@ -2,11 +2,12 @@ use indexmap::IndexMap;
 use itertools::Itertools;
 use std::collections::HashMap;
 
-use crate::Result;
 use crate::diagnostic::{Diagnostic, DiagnosticCode, WithErrorInfo};
 use crate::pr::{self, *};
 use crate::printer;
 use crate::resolver::types::scope;
+use crate::utils::fold::PrFold;
+use crate::{Result, utils};
 
 use super::TypeResolver;
 use super::scope::TyRef;
@@ -81,8 +82,10 @@ impl TypeResolver<'_> {
 
             // type vars
             (TyRef::Ty(ty), TyRef::Var(_, var_id)) | (TyRef::Var(_, var_id), TyRef::Ty(ty)) => {
+                let ty = LocalTyInliner::run(self, ty.clone());
+
                 let scope = self.get_ty_var_scope();
-                scope.infer_type_var(var_id, ty.clone());
+                scope.infer_type_var(var_id, ty);
             }
             (TyRef::Var(_, a_id), TyRef::Var(_, b_id)) => {
                 let scope = self.get_ty_var_scope();
@@ -722,5 +725,50 @@ impl std::fmt::Debug for DebugMapping<'_> {
             m.entry(&key, &printer::print_ty(val));
         }
         m.finish()
+    }
+}
+
+struct LocalTyInliner<'a> {
+    resolver: &'a TypeResolver<'a>,
+}
+
+impl<'a> LocalTyInliner<'a> {
+    fn run(resolver: &'a TypeResolver<'a>, ty: pr::Ty) -> pr::Ty {
+        LocalTyInliner { resolver }.fold_type(ty).unwrap()
+    }
+}
+
+impl<'a> utils::fold::PrFold for LocalTyInliner<'a> {
+    fn fold_type(&mut self, ty: pr::Ty) -> Result<pr::Ty> {
+        match ty.kind {
+            pr::TyKind::Ident(ref i) => {
+                tracing::debug!("i = {i}");
+
+                let target = ty.target.as_ref().unwrap();
+                let named = self.resolver.get_ref(target).with_span(ty.span)?;
+
+                if let scope::Named::Scoped(scope::ScopedKind::LocalTy { ty }) = named {
+                    tracing::debug!("ty = {ty:?}");
+                    self.fold_type(ty.clone())
+                } else {
+                    Ok(ty)
+                }
+            }
+            pr::TyKind::TupleComprehension(comp) => {
+                let kind = TyKind::TupleComprehension(TyTupleComprehension {
+                    tuple: Box::new(self.fold_type(*comp.tuple)?),
+                    variable_name: comp.variable_name,
+                    variable_ty: comp.variable_ty,
+                    body_name: comp.body_name,
+
+                    // TODO: this should also implement recurse in case there are
+                    // references to other local ty variables (not of this
+                    // comprehension) in comprehension body.
+                    body_ty: comp.body_ty,
+                });
+                Ok(pr::Ty { kind, ..ty })
+            }
+            _ => utils::fold::fold_type(self, ty),
+        }
     }
 }

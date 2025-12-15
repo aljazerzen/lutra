@@ -259,7 +259,7 @@ impl<'a> TypeResolver<'a> {
                     .scopes
                     .iter()
                     .find(|s| s.id == *scope)
-                    .ok_or_else(|| panic!("cannot find scope by id"))
+                    .ok_or_else(|| panic!("cannot find scope: {scope}"))
                     .unwrap();
                 Ok(Named::Scoped(&scope.names[*offset]))
             }
