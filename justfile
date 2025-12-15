@@ -6,6 +6,9 @@ show-deps-workspace:
     dot ./target/deps-workspace.dot -Tsvg -o ./target/graph.svg -Gnodesep=0.5
     xdg-open ./target/graph.svg 2> /dev/null
 
+pg-up:
+    podman run -e POSTGRES_PASSWORD=pass -p 5416:5432 docker.io/library/postgres:latest
+
 dev FILTER_SET='all()' *NEXTEST_ARGS='':
     # RUST_BACKTRACE=1
     RUST_LOG=debug INSTA_FORCE_PASS=1 \

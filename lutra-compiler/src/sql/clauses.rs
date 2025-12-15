@@ -846,7 +846,14 @@ impl<'a> Context<'a> {
             }
 
             // window functions
-            "std::row_number" | "std::lead" | "std::lag" | "std::rolling_mean" => {
+            "std::row_number"
+            | "std::lead"
+            | "std::lag"
+            | "std::rolling_mean"
+            | "std::rank"
+            | "std::rank_dense"
+            | "std::rank_percentile"
+            | "std::cume_dist" => {
                 let array = self.compile_rel(&call.args[0]);
                 let array = self.new_binding(array);
 

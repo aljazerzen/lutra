@@ -154,7 +154,7 @@ pub mod std {
     use ::std::cmp::Ordering;
     use ::std::collections::HashMap;
 
-    use crate::native::assume::LayoutArgsReader;
+    use crate::native::assume::{LayoutArgsReader, exactly_n};
     use crate::native::*;
     use crate::{ArrayWriter, Data, EnumWriter, EvalError, TupleWriter};
     use lutra_bin::{ArrayReader, Decode, TupleReader, ir};
@@ -219,6 +219,10 @@ pub mod std {
                 "lead" => &lead,
                 "row_number" => &row_number,
                 "rolling_mean" => &rolling_mean,
+                "rank" => &rank,
+                "rank_dense" => &rank_dense,
+                "rank_percentile" => &rank_percentile,
+                "cume_dist" => &cume_dist,
 
                 _ => return None,
             })
@@ -264,7 +268,10 @@ pub mod std {
         layout_args: &[u32],
         args: Vec<Cell>,
     ) -> Result<Cell, EvalError> {
-        let tag: u8 = match cmp_raw(layout_args[0], &args)? {
+        let [a, b] = exactly_n(args);
+        let a = assume::into_data(a)?;
+        let b = assume::into_data(b)?;
+        let tag: u8 = match cmp_raw(layout_args[0], &a, &b) {
             Ordering::Less => 0,
             Ordering::Equal => 1,
             Ordering::Greater => 2,
@@ -272,30 +279,38 @@ pub mod std {
         Ok(encode_cell(&tag))
     }
 
-    fn cmp_raw(ty_arg: u32, args: &[Cell]) -> Result<Ordering, EvalError> {
+    macro_rules! cmp_op {
+        ($a: ident, $b: ident, $prim: ty, $op: ident) => {{
+            let left = decode::primitive::<$prim>($a);
+            let right = decode::primitive::<$prim>($b);
+            left.$op(&right)
+        }};
+    }
+
+    fn cmp_raw(ty_arg: u32, a: &Data, b: &Data) -> Ordering {
         let ty_prim = decode::ty_primitive(ty_arg);
-        Ok(match ty_prim {
-            ir::TyPrimitive::bool => primitive_op!(args, bool, cmp),
-            ir::TyPrimitive::int8 => primitive_op!(args, i8, cmp),
-            ir::TyPrimitive::int16 => primitive_op!(args, i16, cmp),
-            ir::TyPrimitive::int32 => primitive_op!(args, i32, cmp),
-            ir::TyPrimitive::int64 => primitive_op!(args, i64, cmp),
-            ir::TyPrimitive::uint8 => primitive_op!(args, u8, cmp),
-            ir::TyPrimitive::uint16 => primitive_op!(args, u16, cmp),
-            ir::TyPrimitive::uint32 => primitive_op!(args, u32, cmp),
-            ir::TyPrimitive::uint64 => primitive_op!(args, u64, cmp),
-            ir::TyPrimitive::float32 => primitive_op!(args, f32, total_cmp),
-            ir::TyPrimitive::float64 => primitive_op!(args, f64, total_cmp),
+        match ty_prim {
+            ir::TyPrimitive::bool => cmp_op!(a, b, bool, cmp),
+            ir::TyPrimitive::int8 => cmp_op!(a, b, i8, cmp),
+            ir::TyPrimitive::int16 => cmp_op!(a, b, i16, cmp),
+            ir::TyPrimitive::int32 => cmp_op!(a, b, i32, cmp),
+            ir::TyPrimitive::int64 => cmp_op!(a, b, i64, cmp),
+            ir::TyPrimitive::uint8 => cmp_op!(a, b, u8, cmp),
+            ir::TyPrimitive::uint16 => cmp_op!(a, b, u16, cmp),
+            ir::TyPrimitive::uint32 => cmp_op!(a, b, u32, cmp),
+            ir::TyPrimitive::uint64 => cmp_op!(a, b, u64, cmp),
+            ir::TyPrimitive::float32 => cmp_op!(a, b, f32, total_cmp),
+            ir::TyPrimitive::float64 => cmp_op!(a, b, f64, total_cmp),
             ir::TyPrimitive::text => {
-                let mut left = assume::as_data(&args[0])?.clone();
+                let mut left = a.clone();
                 let left = decode::text_ref(&mut left);
-                let mut right = assume::as_data(&args[1])?.clone();
+                let mut right = b.clone();
                 let right = decode::text_ref(&mut right);
 
                 // TODO: this compares bytes, not Unicode comparisons
                 left.cmp(right)
             }
-        })
+        }
     }
 
     bin_prim_func!(eq, eq, bool);
@@ -477,12 +492,10 @@ pub mod std {
 
             let key = it.evaluate_func_call(&func, vec![cell])?;
 
-            keys.push((key, index));
+            keys.push((assume::into_data(key)?, index));
         }
 
-        keys.sort_by(|(a, _), (b, _)| {
-            cmp_raw(key_ty, &[a.clone(), b.clone()]).unwrap_or(Ordering::Equal)
-        });
+        keys.sort_by(|(a, _), (b, _)| cmp_raw(key_ty, a, b));
 
         let mut output = ArrayWriter::new(item_head_bytes, item_body_ptrs);
         for (_key, index) in keys {
@@ -1068,6 +1081,131 @@ pub mod std {
         Ok(Cell::Data(out.finish()))
     }
 
+    pub fn rank(
+        _it: &mut Interpreter,
+        layout_args: &[u32],
+        args: Vec<Cell>,
+    ) -> Result<Cell, EvalError> {
+        let [array] = assume::exactly_n(args);
+
+        let item_head_bytes = layout_args[0];
+        let array = assume::array(array, item_head_bytes);
+        let ty_arg = layout_args[1];
+
+        fn get_rank(start: usize, _end: usize, _group: usize) -> usize {
+            start + 1
+        }
+
+        let ranks = rank_impl(array, ty_arg, get_rank)?;
+
+        Ok(Cell::Data(encode_primitives(
+            ranks.into_iter().map(|r| r as i32),
+        )))
+    }
+
+    pub fn rank_dense(
+        _it: &mut Interpreter,
+        layout_args: &[u32],
+        args: Vec<Cell>,
+    ) -> Result<Cell, EvalError> {
+        let [array] = assume::exactly_n(args);
+
+        let item_head_bytes = layout_args[0];
+        let array = assume::array(array, item_head_bytes);
+        let ty_arg = layout_args[1];
+
+        fn get_rank(_start: usize, _end: usize, group: usize) -> usize {
+            group + 1
+        }
+
+        let ranks = rank_impl(array, ty_arg, get_rank)?;
+
+        Ok(Cell::Data(encode_primitives(
+            ranks.into_iter().map(|r| r as i32),
+        )))
+    }
+
+    pub fn rank_percentile(
+        _it: &mut Interpreter,
+        layout_args: &[u32],
+        args: Vec<Cell>,
+    ) -> Result<Cell, EvalError> {
+        let [array] = assume::exactly_n(args);
+
+        let item_head_bytes = layout_args[0];
+        let array = assume::array(array, item_head_bytes);
+        let ty_arg = layout_args[1];
+
+        fn get_rank(start: usize, _end: usize, _group: usize) -> usize {
+            start
+        }
+        let n = (array.remaining() - 1) as f64;
+
+        let ranks = rank_impl(array, ty_arg, get_rank)?;
+
+        Ok(Cell::Data(encode_primitives(
+            ranks.into_iter().map(|r| r as f64 / n),
+        )))
+    }
+
+    pub fn cume_dist(
+        _it: &mut Interpreter,
+        layout_args: &[u32],
+        args: Vec<Cell>,
+    ) -> Result<Cell, EvalError> {
+        let [array] = assume::exactly_n(args);
+
+        let item_head_bytes = layout_args[0];
+        let array = assume::array(array, item_head_bytes);
+        let ty_arg = layout_args[1];
+
+        fn get_rank(_start: usize, end: usize, _group: usize) -> usize {
+            end
+        }
+        let n = array.remaining() as f64;
+
+        let ranks = rank_impl(array, ty_arg, get_rank)?;
+
+        Ok(Cell::Data(encode_primitives(
+            ranks.into_iter().map(|r| r as f64 / n),
+        )))
+    }
+
+    fn rank_impl(
+        array: ArrayReader<Data>,
+        ty_arg: u32,
+        get_rank: impl Fn(usize, usize, usize) -> usize,
+    ) -> Result<Vec<usize>, EvalError> {
+        let array_len = array.remaining();
+
+        // sort by using std::cmp
+        let mut indexed: Vec<(usize, Data)> = array.enumerate().collect();
+        indexed.sort_by(|(_, a), (_, b)| cmp_raw(ty_arg, a, b));
+
+        // iterate over groups
+        let mut ranks = vec![0; array_len];
+        let mut i = 0;
+        let mut groups = 0;
+        while i < array_len {
+            // find group of equal values
+            let start = i;
+            let value = &indexed[i].1;
+            while i < array_len && cmp_raw(ty_arg, &indexed[i].1, value).is_eq() {
+                i += 1;
+            }
+            let end = i; // exclusive
+
+            // assign ranks to group
+            let r = get_rank(start, end, groups);
+            for (idx, _) in indexed.iter().take(end).skip(start) {
+                ranks[*idx] = r;
+            }
+            groups += 1;
+        }
+
+        Ok(ranks)
+    }
+
     fn index_rel_to_abs(index: i64, array_len: usize) -> usize {
         if index < 0 {
             array_len.saturating_sub((-index) as usize)
@@ -1575,6 +1713,14 @@ mod decode {
 
 pub fn encode<T: Encode + Layout + ?Sized>(value: &T) -> Data {
     Data::new(value.encode())
+}
+
+pub fn encode_primitives<T: Encode + Layout + Sized>(values: impl Iterator<Item = T>) -> Data {
+    let mut out = crate::ArrayWriter::new(T::head_size().div_ceil(8) as u32, &[]);
+    for v in values {
+        out.write_item(Data::new(v.encode()));
+    }
+    out.finish()
 }
 
 pub fn encode_cell<T: Encode + Layout + ?Sized>(value: &T) -> Cell {

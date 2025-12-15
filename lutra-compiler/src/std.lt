@@ -347,17 +347,80 @@ func join(parts: [text], separator: text): text
 
 # --- Window functions ---
 
+## Shifts array items backwards by an offset.
+## Items in front are set to their default value.
+##
+## For example, `lag(["a", "b", "c"], 1)` is `["", "a", "b"]`.
 func lag(array: [T], offset: int64): [T]
 where T
 
+## Shifts array items forwards by an offset.
+## Items in back are set to their default value.
+##
+## For example, `lead(["a", "b", "c"], 1)` is `["b", "c", ""]`.
 func lead(array: [T], offset: int64): [T]
 where T
 
+## Returns a sequence of numbers starting from 0, for each array item.
 func row_number(array: [T]): [int64]
 where T
 
-func rolling_mean(array: [T], leading: uint32, trailing: uint32): [float64]
+## Computes rolling arithmetic mean over an array of numbers.
+## Also known as moving average.
+##
+## Returns an array of same length as the input,
+## where each item is the mean of the corresponding input item and
+## a number of preceding and following items.
+##
+## For example, `rolling_mean(..., 1, 2)` computes mean of each item, along with
+## 1 preceding and 2 following items, which is 4 items total.
+func rolling_mean(array: [T], preceding: uint32, following: uint32): [float64]
 where T: number
+
+## Computes rank of each array item.
+##
+## Rank is the number of items that are less than current item, plus one.
+##
+## The values range from `1` to `n` (number of items).
+## Also known as "min rank".
+##
+## For example, `rank(["a", "b", "b", "c"])` is `[1, 2, 2, 4]`.
+func rank(array: [T]): [int32]
+where T: primitive
+
+## Computes dense rank of each array item.
+##
+## Dense rank is the number of unique items that are less than current item,
+## plus one.
+##
+## The values range from `1` to `n` (number of unique items).
+##
+## For example, `rank_dense(["a", "b", "b", "c"])` is `[1, 2, 2, 3]`.
+func rank_dense(array: [T]): [int32]
+where T: primitive
+
+## Computes percentile rank of each array item.
+##
+## Percentile rank is the item rank rescaled to range from 0.0 to 1.0.
+##
+## The values range from 0.0 to 1.0.
+##
+## For example, `rank_percentile(["a", "b", "b", "c"])` is
+## `[0.0, 0.33333, 0.25, 1.0]`.
+func rank_percentile(array: [T]): [float64]
+where T: primitive
+
+## Computes ECDF (Empirical Cumulative Density Function) of array items.
+##
+## Value of each item i is the number of items that are less than or equal to i,
+## divided by the total number of items.
+##
+## The values range from `1.0/n` to `1.0`.
+##
+## For example, `cume_dist(["a", "b", "b", "c"])` is
+## `[0.25, 0.75, 0.75, 1.0]`.
+func cume_dist(array: [T]): [float64]
+where T: primitive
 
 ## Mathematical functions
 module math {

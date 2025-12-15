@@ -741,6 +741,22 @@ impl<'a> Context<'a> {
                     "(AVG({array}) OVER (ORDER BY index ROWS BETWEEN {trailing} PRECEDING AND {leading} FOLLOWING))::float8"
                 ))
             }
+            "std::rank" => {
+                let [array] = unpack_args(args);
+                sql_ast::Expr::Source(format!("(RANK() OVER (ORDER BY {array}))::int4"))
+            }
+            "std::rank_dense" => {
+                let [array] = unpack_args(args);
+                sql_ast::Expr::Source(format!("(DENSE_RANK() OVER (ORDER BY {array}))::int4"))
+            }
+            "std::rank_percentile" => {
+                let [array] = unpack_args(args);
+                sql_ast::Expr::Source(format!("PERCENT_RANK() OVER (ORDER BY {array})"))
+            }
+            "std::cume_dist" => {
+                let [array] = unpack_args(args);
+                sql_ast::Expr::Source(format!("CUME_DIST() OVER (ORDER BY {array})"))
+            }
 
             "std::text::length" => {
                 let [text] = unpack_args(args);
