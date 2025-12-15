@@ -184,6 +184,7 @@ pub fn type_params<'a>(
             .then_ignore(ctrl(':'))
             .or_not()
             .then(ty)
+            .map_with_span(|t, s| (t, s))
             .separated_by(ctrl(','))
             .at_least(1)
             .then_ignore(ctrl(',').then(just(TokenKind::Range))),
@@ -200,10 +201,10 @@ pub fn type_params<'a>(
         ],
         |_| vec![],
     ))
-    .try_map(|mut positional, span| {
+    .try_map(|mut positional, _| {
         let first_named = positional
             .iter()
-            .position(|p| p.0.is_some())
+            .position(|((n, _), _)| n.is_some())
             .unwrap_or(positional.len());
 
         let named = positional.split_off(first_named);
@@ -211,15 +212,16 @@ pub fn type_params<'a>(
         let mut fields = Vec::new();
 
         // positional
-        for (i, (_, ty)) in positional.into_iter().enumerate() {
+        for (i, ((_, ty), span)) in positional.into_iter().enumerate() {
             fields.push(TyDomainTupleField {
                 location: Lookup::Position(i as i64),
+                span,
                 ty,
             });
         }
 
         // named
-        for (name, ty) in named {
+        for ((name, ty), span) in named {
             let Some(name) = name else {
                 return Err(PError::custom(
                     span,
@@ -228,6 +230,7 @@ pub fn type_params<'a>(
             };
             fields.push(TyDomainTupleField {
                 location: Lookup::Name(name),
+                span,
                 ty,
             });
         }

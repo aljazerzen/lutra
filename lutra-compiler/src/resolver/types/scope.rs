@@ -168,13 +168,20 @@ impl Scope {
         &self,
         name_hint: Option<String>,
         span: Span,
-        domain: pr::TyParamDomain,
+        mut domain: pr::TyParamDomain,
     ) -> usize {
         let type_arg = TyVar {
             name_hint,
             span: Some(span),
         };
         let var_id = self.names.push(ScopedKind::TyVar(type_arg));
+
+        // overwrite span to point to this var instead of the original domain
+        if let pr::TyParamDomain::TupleHasFields(fields) = &mut domain {
+            for f in fields {
+                f.span = span;
+            }
+        }
 
         if !matches!(domain, pr::TyParamDomain::Open) {
             self.ty_var_constraints
@@ -368,7 +375,7 @@ impl<'a> TypeResolver<'a> {
             };
 
             let mut ty_arg_ident = pr::Ty::new(
-                // path does matter here, it is just for error messages
+                // name does not matter here, it is just for error messages
                 pr::Path::new(vec![gtp.name.clone()]),
             );
             let offset = scope.insert_type_var(Some(gtp.name), span, gtp.domain);

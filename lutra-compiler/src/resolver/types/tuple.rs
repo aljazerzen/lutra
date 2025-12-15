@@ -110,6 +110,7 @@ impl super::TypeResolver<'_> {
                 let domain = pr::TyParamDomain::TupleHasFields(vec![pr::TyDomainTupleField {
                     location: lookup.clone(),
                     ty: field_ty.clone(),
+                    span,
                 }]);
                 let scope = self.get_ty_var_scope();
                 scope.infer_type_var_in_domain(o, domain);
@@ -136,11 +137,11 @@ impl super::TypeResolver<'_> {
                         .lookup_position_in_tuple(fields, *pos as usize, 0)
                         .map(|x| x.ok())?,
                 };
-                r.ok_or_else(|| error_no_field(base, lookup))
+                r.ok_or_else(|| error_no_field(base, lookup).with_span(Some(span)))
             }
             pr::TyKind::TupleComprehension(comp) => {
                 if comp.body_name.is_none() && lookup.is_name() {
-                    return Err(error_no_field(base, lookup));
+                    return Err(error_no_field(base, lookup).with_span(Some(span)));
                 }
 
                 // lookup in comp input

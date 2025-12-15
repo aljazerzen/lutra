@@ -141,6 +141,8 @@ pub enum TyParamDomain {
 pub struct TyDomainTupleField {
     pub location: super::Lookup,
     pub ty: Ty,
+
+    pub span: Span,
 }
 
 #[derive(Debug, Clone)]
@@ -240,7 +242,7 @@ impl std::fmt::Debug for TyDomainTupleField {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("TyDomainTupleField")
             .field("location", &self.location)
-            .field("ty", &crate::printer::print_ty(&self.ty))
+            .field("ty", &self.ty)
             .finish()
     }
 }

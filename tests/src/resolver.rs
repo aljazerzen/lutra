@@ -193,6 +193,7 @@ fn types_12() {
         func main() -> a.total
     "#), @"float64");
 }
+
 #[test]
 fn types_13() {
     insta::assert_snapshot!(_test_ty(r#"
@@ -492,31 +493,31 @@ fn types_21() {
     // error messages on bad lookups into type vars
 
     insta::assert_snapshot!(_test_err(r#"
-        func main() -> (
-          {a = false, "hello", c = "world"}
-          | func (x) -> x.b
-        )
+    func main() -> (
+      {a = false, "hello", c = "world"}
+      | func (x) -> x.b
+    )
     "#), @r"
     [E0006] Error:
-       ╭─[:4:19]
+       ╭─[:4:22]
        │
-     4 │           | func (x) -> x.b
-       │                   ┬
-       │                   ╰── field .b does not exist in type {a: bool, text, c: text}
+     4 │       | func (x) -> x.b
+       │                      ─┬
+       │                       ╰── field .b does not exist in type {a: bool, text, c: text}
     ───╯
     ");
     insta::assert_snapshot!(_test_err(r#"
-        func main() -> (
-          {a = false, "hello", c = "world"}
-          | func (x) -> x.3
-        )
+    func main() -> (
+      {a = false, "hello", c = "world"}
+      | func (x) -> x.3
+    )
     "#), @r"
     [E0006] Error:
-       ╭─[:4:19]
+       ╭─[:4:22]
        │
-     4 │           | func (x) -> x.3
-       │                   ┬
-       │                   ╰── field .3 does not exist in type {a: bool, text, c: text}
+     4 │       | func (x) -> x.3
+       │                      ─┬
+       │                       ╰── field .3 does not exist in type {a: bool, text, c: text}
     ───╯
     ");
 }
@@ -1425,11 +1426,11 @@ fn ty_tuple_comprehension_06() {
     func main(a: A): {id: bool, title: bool, release_year: bool} -> make_flags(a)
     "#), @r"
     [E0006] Error:
-       ╭─[:8:69]
+       ╭─[:8:60]
        │
      8 │     func main(a: A): {id: bool, title: bool, release_year: bool} -> make_flags(a)
-       │                                                                     ─────┬────
-       │                                                                          ╰────── field .release_year does not exist in type {id: int64, title: text}
+       │                                                            ──┬─
+       │                                                              ╰─── field .release_year does not exist in type {id: int64, title: text}
     ───╯
     ");
 

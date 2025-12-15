@@ -194,7 +194,7 @@ impl TypeResolver<'_> {
 
                 // b) the number of fields matches between the two tuples.
                 let domain = pr::TyParamDomain::TupleLen { n: fields.len() };
-                self.validate_type_domain(&comp.tuple, &domain, None)?;
+                self.validate_type_domain(&comp.tuple, &domain, None, found.span)?;
                 Ok(())
             }
             (TyKind::TupleComprehension(found_comp), TyKind::TupleComprehension(expected_comp)) => {
@@ -308,9 +308,11 @@ impl TypeResolver<'_> {
             for (id, ty) in &known_types {
                 if let Some(domains) = domains.shift_remove(id) {
                     let var = self.get_ty_var(*id).clone();
+                    let span = var.span;
+
                     for domain in domains {
-                        self.validate_type_domain(ty, &domain, var.name_hint.as_deref())
-                            .with_span_fallback(var.span)?;
+                        self.validate_type_domain(ty, &domain, var.name_hint.as_deref(), span)
+                            .with_span_fallback(span)?;
                     }
                 }
             }
@@ -482,11 +484,15 @@ impl TypeResolver<'_> {
     /// This does two things:
     /// - returns an error if the type is not in the domain,
     /// - infers ty var constraints such that the type is in the domain.
+    ///
+    /// Span is of the "found" expression, not "expected".
+    /// This might sometimes represent the ty or the domain.
     pub fn validate_type_domain(
         &mut self,
         ty: &Ty,
         domain: &TyParamDomain,
         arg_name: Option<&str>,
+        span: Option<crate::Span>,
     ) -> Result<(), Diagnostic> {
         let ty_ref = self.get_ty_mat(ty)?;
         let ty = match ty_ref {
@@ -494,7 +500,7 @@ impl TypeResolver<'_> {
             TyRef::Param(param_id) => {
                 let (found_name, found) = self.get_ty_param(param_id);
                 let (found_name, found) = (found_name.clone(), found.clone());
-                self.validate_type_domains(&found, domain, &found_name, arg_name)?;
+                self.validate_type_domains(&found, domain, &found_name, arg_name, span)?;
                 return Ok(());
             }
             TyRef::Var(_, id) => {
@@ -533,7 +539,7 @@ impl TypeResolver<'_> {
                 let ty = ty.clone();
 
                 for domain_field in domain_fields {
-                    let span = domain_field.ty.span.unwrap();
+                    let span = domain_field.span;
                     let target_ty = self.lookup_in_tuple(&ty, &domain_field.location, span)?;
 
                     self.validate_type(&target_ty, &domain_field.ty, &|| None)
@@ -592,12 +598,16 @@ impl TypeResolver<'_> {
     }
 
     /// Validates that found domain is subset of expected domain.
+    ///
+    /// Span is of the "found" expression, not "expected".
+    /// This might sometimes represent the ty or the domain.
     pub fn validate_type_domains(
         &mut self,
         found: &TyParamDomain,
         expected: &TyParamDomain,
         found_name: &str,
         expected_name: Option<&str>,
+        span: Option<crate::Span>,
     ) -> Result<(), Diagnostic> {
         match (found, expected) {
             // if expected is open, any found domain is ok
@@ -617,7 +627,7 @@ impl TypeResolver<'_> {
             (TyParamDomain::OneOf(found_tys), expected_domain) => {
                 for found_ty in found_tys {
                     let ty = Ty::new(found_ty.clone());
-                    self.validate_type_domain(&ty, expected_domain, Some(found_name))?;
+                    self.validate_type_domain(&ty, expected_domain, Some(found_name), span)?;
                 }
                 Ok(())
             }
