@@ -83,6 +83,19 @@ where
 
             return Ok(format!("@{h_t:02}:{min:02}:{sec:02}.{micros:06}"));
         }
+        if let ir::TyKind::Ident(ty_ident) = &ty.kind
+            && ty_ident.0 == ["std", "Timestamp"]
+        {
+            use crate::Decode;
+            let micros = i64::decode(buf.chunk())?;
+
+            if let Some(dt) = chrono::DateTime::from_timestamp_micros(micros) {
+                let dt = dt.to_rfc3339_opts(chrono::SecondsFormat::Micros, true);
+                return Ok(format!("@{}", dt.trim_end_matches('Z')));
+            } else {
+                // fallback
+            }
+        }
 
         // general case
         let ty = Visitor::<B>::get_mat_ty(self, ty);

@@ -877,6 +877,15 @@ impl<'a> Context<'a> {
                 sql_ast::Expr::Source(format!("{arg}::{ty}"))
             }
 
+            "std::date_to_timestamp" => {
+                let [date, tz] = unpack_args(args);
+
+                let timestamp =
+                    format!("('1970-01-01'::date + {date})::timestamp AT TIME ZONE {tz}");
+
+                sql_ast::Expr::Source(format!("(EXTRACT(EPOCH FROM {timestamp}) * 1000000)::int8"))
+            }
+
             _ => todo!("sql impl for {id}"),
         };
         Node::from(expr)

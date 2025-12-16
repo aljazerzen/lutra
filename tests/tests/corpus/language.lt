@@ -2622,9 +2622,24 @@ const main = std::Time(0)
 @00:00:00.000000
 
 # === time_05
-func main() -> std::add_duration(@116:07:44.12, @-4:00:00)
+func main() -> std::add_time(@116:07:44.12, @-4:00:00)
 # >
 @112:07:44.120000
+
+# === std_date_to_timestamp_00
+func main() -> std::date_to_timestamp(@2025-12-16, "UTC")
+# >
+@2025-12-16T00:00:00.000000
+
+# === std_date_to_timestamp_01
+func main() -> std::date_to_timestamp(@2025-12-16, "Europe/Ljubljana")
+# >
+@2025-12-15T23:00:00.000000
+
+# === std_date_to_timestamp_02
+func main() -> std::date_to_timestamp(@2025-12-16, "America/New_York")
+# >
+@2025-12-16T05:00:00.000000
 
 # === var_binding_00
 func main() -> (

@@ -549,10 +549,10 @@ module sql {
   where R
 }
 
-## A timestamp without a timezone.
+## An instant in time. Timestamp without a timezone.
 ##
 ## Backed by a signed 64-bit integer, indicating microseconds since the Unix
-## epoch (1970-01-01T00:00:00.000), excluding leap seconds.
+## epoch (1970-01-01T00:00:00.000 UTC), excluding leap seconds.
 # TODO: support for timezone and other time units.
 type Timestamp(int64)
 
@@ -587,6 +587,7 @@ type Date(int32)
 # type Time64Millisecond(int64)
 
 ## Length of time, unrelated to calendar events.
+## Can be interpreted as duration or offset from the midnight.
 ##
 ## Backed by a signed 64-bit integer, representing number of microseconds.
 type Time(int64)
@@ -622,6 +623,19 @@ func sub_date(a: Date, b: Date): Time -> (
 # where D: Time64Millisecond -> x.0 | div(1000) | Time64Microsecond
 # where D: Time64Microsecond -> x
 
-func add_duration(a: Time, b: Time): Time -> (
+func date_to_timestamp(date: Date, time_zone: text): Timestamp
+
+func add_time(a: Time, b: Time): Time -> (
   add(a.0, b.0) | Time
+)
+
+func sub_timestamp(a: Timestamp, b: Timestamp): Time -> (
+  sub(a.0, b.0) | Time
+)
+
+func timezone_offset(time_zone: text, date: Date): Time -> (
+  sub_timestamp(
+    date_to_timestamp(date, time_zone),
+    date_to_timestamp(date, "UTC"),
+  )
 )

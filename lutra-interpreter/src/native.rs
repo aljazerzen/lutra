@@ -223,6 +223,8 @@ pub mod std {
                 "rank_percentile" => &rank_percentile,
                 "cume_dist" => &cume_dist,
 
+                "date_to_timestamp" => &date_to_timestamp,
+
                 _ => return None,
             })
         }
@@ -1202,6 +1204,39 @@ pub mod std {
         }
 
         Ok(ranks)
+    }
+
+    pub fn date_to_timestamp(
+        _it: &mut Interpreter,
+        _layout_args: &[u32],
+        args: Vec<Cell>,
+    ) -> Result<Cell, EvalError> {
+        let [date, time_zone] = assume::exactly_n(args);
+
+        let date: i32 = assume::primitive(&date)?;
+
+        let mut time_zone = assume::into_data(time_zone)?;
+        let time_zone = decode::text_ref(&mut time_zone);
+
+        // convert date to timestamp
+        let timestamp = {
+            use chrono::{NaiveDate, NaiveDateTime, NaiveTime, TimeZone};
+
+            // TODO: handle bad timezone
+            let tz: chrono_tz::Tz = time_zone.parse().unwrap();
+
+            // TODO: handle unwrap
+            let date = NaiveDate::from_epoch_days(date).unwrap();
+            let t = NaiveTime::from_hms_opt(0, 0, 0).unwrap();
+            let datetime = NaiveDateTime::new(date, t);
+
+            // TODO: handle bad conversion
+            let datetime = tz.from_local_datetime(&datetime).unwrap();
+
+            datetime.timestamp_micros()
+        };
+
+        Ok(Cell::Data(encode(&timestamp)))
     }
 
     fn index_rel_to_abs(index: i64, array_len: usize) -> usize {
