@@ -1793,7 +1793,7 @@ async fn sql_from_00() {
     FROM
       movies
     ORDER BY
-      NULL::int4
+      (ROW_NUMBER() OVER () - 1)::int4
     ---
     [
       {
@@ -1943,7 +1943,7 @@ fn group_00() {
     GROUP BY
       r0.value
     ORDER BY
-      (ROW_NUMBER() OVER ())::int4
+      (ROW_NUMBER() OVER () - 1)::int4
     ---
     [
       {
@@ -1998,7 +1998,7 @@ fn group_01() {
     GROUP BY
       r0._0
     ORDER BY
-      (ROW_NUMBER() OVER ())::int4
+      (ROW_NUMBER() OVER () - 1)::int4
     ---
     []
     ");
@@ -2108,7 +2108,7 @@ fn std_sql_expr_00() {
           '2025-11-14'::date as x
       ) AS r0
     ORDER BY
-      NULL::int4
+      (ROW_NUMBER() OVER () - 1)::int4
     ---
     [
       {
@@ -2118,6 +2118,85 @@ fn std_sql_expr_00() {
       },
     ]
     "#);
+}
+
+#[test]
+fn std_sql_expr_01() {
+    insta::assert_snapshot!(_sql_and_output(_run(r#"
+    func sequence(): [int32] -> std::sql::expr("(
+      SELECT 2 as value UNION SELECT 3 UNION SELECT 4 ORDER BY value
+    )")
+
+    func main() -> sequence() | std::scan(1, func (a, c) -> a * c)
+    "#, lutra_bin::Value::unit())), @r"
+    SELECT
+      r7.value
+    FROM
+      (
+        WITH r0 AS (
+          SELECT
+            (ROW_NUMBER() OVER () - 1)::int4 AS index,
+            r1.value::int4 AS value
+          FROM
+            (
+              (
+                SELECT
+                  2 as value
+                UNION
+                SELECT
+                  3
+                UNION
+                SELECT
+                  4
+                ORDER BY
+                  value
+              )
+            ) AS r1
+        )
+        SELECT
+          r6.index,
+          r6.value
+        FROM
+          (
+            WITH RECURSIVE r2 AS (
+              SELECT
+                0::int8 AS index,
+                1::int4 AS value
+              UNION
+              ALL
+              SELECT
+                (r3.index + 1::int8) AS index,
+                (r3.value * r5.value) AS value
+              FROM
+                r2 AS r3,
+                LATERAL (
+                  SELECT
+                    r4.index,
+                    r4.value
+                  FROM
+                    r0 AS r4
+                  WHERE
+                    (r4.index = r3.index)
+                ) AS r5
+            )
+            SELECT
+              index,
+              value
+            FROM
+              r2
+          ) AS r6
+        WHERE
+          (0::int8 < r6.index)
+      ) AS r7
+    ORDER BY
+      r7.index
+    ---
+    [
+      2,
+      6,
+      24,
+    ]
+    ");
 }
 
 #[test]

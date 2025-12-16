@@ -370,7 +370,7 @@ impl<'a> Context<'a> {
 
         // index
         if self.get_ty_mat(ty).kind.is_array() {
-            values.push(sql_ast::Expr::Source("NULL::int4".to_string()));
+            values.push(utils::new_index(None));
         }
 
         // table columns
@@ -523,14 +523,10 @@ impl<'a> Context<'a> {
                 let mut select = self.rel_into_select(rel, output_ty, true);
 
                 // overwrite array index
-                let key = if let Some(key_in) = key {
-                    let index = self.compile_column(key_in);
-                    format!("(ROW_NUMBER() OVER (ORDER BY {index}))::int4")
-                } else {
-                    "(ROW_NUMBER() OVER ())::int4".into()
-                };
+                let new_index = utils::new_index(key.as_ref().map(|k| self.compile_column(k)));
+
                 select.projection[0] = sql_ast::SelectItem {
-                    expr: sql_ast::Expr::Source(key),
+                    expr: new_index,
                     alias: Some(utils::new_ident(COL_ARRAY_INDEX)),
                 };
                 Node::Select(select)
@@ -555,7 +551,7 @@ impl<'a> Context<'a> {
 
                 let mut projection = vec![
                     // index
-                    sql_ast::Expr::Source("(ROW_NUMBER() OVER ())::int4".into()),
+                    utils::new_index(None),
                 ];
 
                 // values
@@ -666,6 +662,38 @@ impl<'a> Context<'a> {
             "std::or" => utils::new_bin_op("OR", args),
             "std::not" => utils::new_un_op("NOT", args),
 
+            "std::sequence" => {
+                let [start, end] = unpack_args(args);
+
+                // generate_series
+                let generate_series = sql_ast::RelExpr::Function {
+                    name: utils::new_object_name(["generate_series"]),
+                    args: vec![start.clone(), sql_ast::Expr::Source(format!("({end} - 1)"))],
+                };
+
+                // select index, value from generate_series()
+                let mut select = utils::select_empty();
+                select.from.push(sql_ast::RelNamed {
+                    lateral: false,
+                    expr: generate_series,
+                    alias: Some(sql_ast::TableAlias {
+                        name: sql_ast::Ident::new("t"),
+                        columns: vec![sql_ast::Ident::new("value")],
+                    }),
+                });
+                let out_cast_ty = self.compile_ty_name(&args_in[0].ty);
+                select.projection = vec![
+                    sql_ast::SelectItem {
+                        expr: sql_ast::Expr::Source(format!("(t.value - {start})::int4")),
+                        alias: Some(COL_ARRAY_INDEX.into()),
+                    },
+                    sql_ast::SelectItem::unnamed(sql_ast::Expr::Source(format!(
+                        "t.value::{out_cast_ty}"
+                    ))),
+                ];
+                return Node::Select(select);
+            }
+
             "std::min" => utils::new_func_call("MIN", args),
             "std::max" => utils::new_func_call("MAX", args),
             "std::sum" => {
@@ -716,13 +744,12 @@ impl<'a> Context<'a> {
                 utils::new_func_call("BOOL_AND", args)
             )),
 
-            "std::row_number" => sql_ast::Expr::Source("(ROW_NUMBER() OVER () - 1)".to_string()),
             "std::lead" => {
                 let [arg, offset] = unpack_args(args);
 
                 let filler = get_default_value_for_ty(ty);
                 sql_ast::Expr::Source(format!(
-                    "COALESCE(LEAD({arg}, {offset}::int4) OVER (ORDER BY index), {filler})"
+                    "COALESCE(LEAD({arg}, {offset}::int4) OVER (ORDER BY {COL_ARRAY_INDEX}), {filler})"
                 ))
             }
             "std::lag" => {
@@ -731,14 +758,14 @@ impl<'a> Context<'a> {
                 let filler = get_default_value_for_ty(ty);
 
                 sql_ast::Expr::Source(format!(
-                    "COALESCE(LAG({arg}, {offset}::int4) OVER (ORDER BY index), {filler})"
+                    "COALESCE(LAG({arg}, {offset}::int4) OVER (ORDER BY {COL_ARRAY_INDEX}), {filler})"
                 ))
             }
             "std::rolling_mean" => {
                 let [array, trailing, leading] = unpack_args(args);
 
                 sql_ast::Expr::Source(format!(
-                    "(AVG({array}) OVER (ORDER BY index ROWS BETWEEN {trailing} PRECEDING AND {leading} FOLLOWING))::float8"
+                    "(AVG({array}) OVER (ORDER BY {COL_ARRAY_INDEX} ROWS BETWEEN {trailing} PRECEDING AND {leading} FOLLOWING))::float8"
                 ))
             }
             "std::rank" => {
@@ -789,7 +816,7 @@ impl<'a> Context<'a> {
                 });
                 select.projection = vec![
                     sql_ast::SelectItem {
-                        expr: sql_ast::Expr::Source("ROW_NUMBER() OVER ()".into()),
+                        expr: utils::new_index(None),
                         alias: Some(COL_ARRAY_INDEX.into()),
                     },
                     sql_ast::SelectItem::unnamed(utils::identifier(Some("t"), "value")),

@@ -11,7 +11,6 @@
 func default(): T
 where T
 
-
 # --- Casts ---
 
 ## Converts a number to `int8`.
@@ -309,6 +308,13 @@ func apply_until_empty(
 ): [T]
 where T
 
+## Returns an array of sequential integers
+## from start (inclusive) to end (exclusive).
+##
+## For example: `sequence(0, 3) == [0, 1, 2]`
+func sequence(start: N, end: N): [N]
+where N: int8 | int16 | int32 | int64 | uint8 | uint16 | uint32 | uint64
+
 # --- Aggregation functions ---
 
 ## Find the minimum value in the array.
@@ -356,11 +362,6 @@ where T
 ##
 ## For example, `lead(["a", "b", "c"], 1)` is `["b", "c", ""]`.
 func lead(array: [T], offset: int64): [T]
-where T
-
-## Returns a sequence of numbers starting from 0, for each array item.
-# TODO: maybe remove this. It's equivalent to `sequence(0, n)`.
-func row_number(array: [T]): [int64]
 where T
 
 ## Computes rolling arithmetic mean over an array of numbers.

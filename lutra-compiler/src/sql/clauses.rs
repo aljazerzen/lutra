@@ -846,8 +846,7 @@ impl<'a> Context<'a> {
             }
 
             // window functions
-            "std::row_number"
-            | "std::lead"
+            "std::lead"
             | "std::lag"
             | "std::rolling_mean"
             | "std::rank"

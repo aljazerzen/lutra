@@ -205,6 +205,7 @@ pub mod std {
                 "fold" => &fold,
                 "scan" => &scan,
                 "apply_until_empty" => &apply_until_empty,
+                "sequence" => &sequence,
 
                 "min" => &min,
                 "max" => &max,
@@ -216,7 +217,6 @@ pub mod std {
 
                 "lag" => &lag,
                 "lead" => &lead,
-                "row_number" => &row_number,
                 "rolling_mean" => &rolling_mean,
                 "rank" => &rank,
                 "rank_dense" => &rank_dense,
@@ -781,6 +781,37 @@ pub mod std {
         Ok(Cell::Data(outputs.finish()))
     }
 
+    macro_rules! sequence {
+        ($ty: ident, $start: expr, $end: expr) => {{
+            let start: $ty = decode::primitive(&$start);
+            let end: $ty = decode::primitive(&$end);
+            encode_primitives(start..end)
+        }};
+    }
+
+    pub fn sequence(
+        _it: &mut Interpreter,
+        layout_args: &[u32],
+        args: Vec<Cell>,
+    ) -> Result<Cell, EvalError> {
+        let [start, end] = assume::exactly_n(args);
+        let start = assume::into_data(start)?;
+        let end = assume::into_data(end)?;
+
+        let ty_prim = decode::ty_primitive(layout_args[0]);
+        Ok(Cell::Data(match ty_prim {
+            ir::TyPrimitive::int8 => sequence!(i8, start, end),
+            ir::TyPrimitive::int16 => sequence!(i16, start, end),
+            ir::TyPrimitive::int32 => sequence!(i32, start, end),
+            ir::TyPrimitive::int64 => sequence!(i64, start, end),
+            ir::TyPrimitive::uint8 => sequence!(u8, start, end),
+            ir::TyPrimitive::uint16 => sequence!(u16, start, end),
+            ir::TyPrimitive::uint32 => sequence!(u32, start, end),
+            ir::TyPrimitive::uint64 => sequence!(u64, start, end),
+            _ => panic!(),
+        }))
+    }
+
     reduce_func!(
         min,
         decode::int,
@@ -968,23 +999,6 @@ pub mod std {
             out.write_item(default_val.clone());
         }
 
-        Ok(Cell::Data(out.finish()))
-    }
-
-    pub fn row_number(
-        _it: &mut Interpreter,
-        _layout_args: &[u32],
-        args: Vec<Cell>,
-    ) -> Result<Cell, EvalError> {
-        let [array] = assume::exactly_n(args);
-        let array = assume::into_data(array)?;
-
-        let (_offset, len) = lutra_bin::ArrayReader::<&[u8]>::read_head(array.chunk());
-
-        let mut out = ArrayWriter::new(8, &[]); // uint64 head = 8
-        for index in 0..len {
-            out.write_item(encode(&(index as u64)));
-        }
         Ok(Cell::Data(out.finish()))
     }
 

@@ -168,6 +168,14 @@ pub fn cte(name: String, val: sql_ast::Query) -> sql_ast::Cte {
     }
 }
 
+pub fn new_index(order_by: Option<sql_ast::Expr>) -> sql_ast::Expr {
+    sql_ast::Expr::Source(if let Some(order_by) = order_by {
+        format!("(ROW_NUMBER() OVER (ORDER BY {order_by}) - 1)::int4")
+    } else {
+        "(ROW_NUMBER() OVER () - 1)::int4".into()
+    })
+}
+
 pub fn new_ident<S: Into<String>>(name: S) -> sql_ast::Ident {
     let name: String = name.into();
 

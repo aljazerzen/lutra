@@ -105,8 +105,8 @@ impl<'a> queries::Context<'a> {
                 )));
 
                 result.projection = vec![sql_ast::SelectItem {
-                    expr: sql_ast::Expr::Source("(ROW_NUMBER() OVER ())::int4".into()),
-                    alias: Some(utils::new_ident("index")),
+                    expr: utils::new_index(None),
+                    alias: Some(utils::new_ident(COL_ARRAY_INDEX)),
                 }];
 
                 let values = self.deserialize_json_nested("j.value".into(), ty_item);

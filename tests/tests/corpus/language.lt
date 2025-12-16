@@ -908,7 +908,6 @@ func main() -> std::scan(
 ]
 
 # === std_apply_until_empty_00
-
 func main() -> (
   [0: int16]
   | std::apply_until_empty(func (v) ->
@@ -929,6 +928,67 @@ func main() -> (
   7,
   8,
   9,
+]
+
+# === std_sequence_00
+func main() -> std::sequence(0: int32, 3)
+# >
+[
+  0,
+  1,
+  2,
+]
+
+# === std_sequence_01
+func main() -> std::sequence(10: int8, 12)
+# >
+[
+  10,
+  11,
+]
+
+# === std_sequence_02
+func main() -> std::sequence(10: int32, 8)
+# >
+[]
+
+# === std_sequence_03
+func main() -> std::sequence(0: uint16, 3)
+# >
+[
+  0,
+  1,
+  2,
+]
+
+# === std_sequence_04
+func main() -> std::sequence(1000000000: int64, 1000000003)
+# >
+[
+  1000000000,
+  1000000001,
+  1000000002,
+]
+
+# === std_sequence_05
+func main() -> std::sequence(std::sum([1: int32, 2, 3]), 8)
+# >
+[
+  6,
+  7,
+]
+
+# === std_sequence_06
+func main() -> (
+  std::sequence(1: int32, 5)
+  | std::scan(1, func (a, c) -> a * c)
+)
+# >
+[
+  1,
+  2,
+  6,
+  24,
 ]
 
 # === std_mean_00
@@ -2027,24 +2087,6 @@ func main() -> {false || false, false || true, true || false, true || true}
   true,
   true,
 }
-
-# === std_row_number_00
-func main() -> std::row_number([5,3,65,3,2,56,67]: [int64])
-# >
-[
-  0,
-  1,
-  2,
-  3,
-  4,
-  5,
-  6,
-]
-
-# === std_row_number_01
-func main() -> std::row_number([]: [text])
-# >
-[]
 
 # === std_slice_00
 func main() -> std::slice([5,3,65,3,2]: [int64], 1, 3)
