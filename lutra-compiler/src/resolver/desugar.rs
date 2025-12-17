@@ -41,6 +41,16 @@ impl PrFold for Desugarator {
             }
             pr::ExprKind::Range(r) => self.desugar_range(r)?,
             pr::ExprKind::Unary(unary) => self.desugar_unary(unary, expr.span.unwrap())?,
+
+            pr::ExprKind::Binary(pr::BinaryExpr {
+                op: pr::BinOp::Pipe,
+                left,
+                right,
+            }) => {
+                expr.span = right.span;
+                expr.kind = self.desugar_pipeline(*left, *right)?;
+                return Ok(expr);
+            }
             pr::ExprKind::Binary(binary) => self.desugar_binary(binary, expr.span.unwrap())?,
             pr::ExprKind::FString(items) => self.desugar_f_string(items, expr.span.unwrap())?,
             k => fold::fold_expr_kind(self, k)?,

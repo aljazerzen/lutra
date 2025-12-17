@@ -1913,3 +1913,20 @@ fn nominal_07() {
     ───╯
     ");
 }
+
+#[test]
+fn call_00() {
+    // calls desugar-ed from pipelines should have span on the right operand
+
+    insta::assert_snapshot!(_test_err(r#"
+    const a = true | std::and(false, false)
+    "#), @r"
+    Error:
+       ╭─[:2:22]
+       │
+     2 │     const a = true | std::and(false, false)
+       │                      ───────────┬──────────
+       │                                 ╰──────────── std::and expected 2 arguments, but got 3
+    ───╯
+    ");
+}
