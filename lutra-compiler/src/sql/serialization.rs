@@ -1,7 +1,7 @@
 use lutra_bin::ir;
 
 use crate::sql::COL_ARRAY_INDEX;
-use crate::sql::utils::{Node, RelCols};
+use crate::sql::utils::{Node, RelCols, is_maybe};
 use crate::sql::{queries, utils};
 
 impl<'a> queries::Context<'a> {
@@ -32,6 +32,7 @@ impl<'a> queries::Context<'a> {
     }
 
     fn serialize_json_nested(&self, input_rel: &str, input_cols: &[String], ty: &ir::Ty) -> String {
+        dbg!(input_cols, ty);
         let ty_mat = self.get_ty_mat(ty);
         match &ty_mat.kind {
             ir::TyKind::Primitive(_) => {
@@ -54,6 +55,29 @@ impl<'a> queries::Context<'a> {
                 // array will be serialized already
                 format!("{input_rel}.{}", input_cols[0])
             }
+            ir::TyKind::Enum(variants) if is_maybe(variants) => {
+                // maybe enum is a nullable column in SQL repr, but in json repr
+                // it is an object with one of the two possible properties 0 and 1.
+                let col = &input_cols[0];
+
+                let mut r = "CASE".to_string();
+
+                // case: none
+                r += &format!(" WHEN {input_rel}.{col} IS NULL THEN jsonb '{{\"0\": []}}'");
+
+                // case: some
+                r += " ELSE jsonb_build_object('1', ";
+                let is_recursive =
+                    lutra_bin::layout::does_enum_variant_contain_recursive(ty_mat, 1_u16);
+                if is_recursive {
+                    r += &format!("{input_rel}.{col}");
+                } else {
+                    r += &self.serialize_json_nested(input_rel, input_cols, &variants[1].ty);
+                }
+
+                r += ") END";
+                r
+            }
             ir::TyKind::Enum(variants) => {
                 let tag = &input_cols[0];
                 let mut input_cols = &input_cols[1..]; // remove tag
@@ -62,7 +86,7 @@ impl<'a> queries::Context<'a> {
                 for (tag, variant) in variants.iter().enumerate() {
                     cases += "WHEN ";
                     cases += &tag.to_string();
-                    cases += " THEN json_build_object('";
+                    cases += " THEN jsonb_build_object('";
                     cases += &tag.to_string();
                     cases += "', ";
 
@@ -167,14 +191,24 @@ impl<'a> queries::Context<'a> {
 
                 r
             }
-            ir::TyKind::Enum(variant) => {
+            ir::TyKind::Enum(variants) if is_maybe(variants) => {
+                let cols =
+                    self.deserialize_json_nested(format!("({json_ref}->'1')"), &variants[1].ty);
+                assert_eq!(cols.len(), 1);
+                let col = &cols[0];
+
+                vec![format!(
+                    "(CASE WHEN ({json_ref}->'1') IS NULL THEN NULL ELSE {col} END)",
+                )]
+            }
+            ir::TyKind::Enum(variants) => {
                 let mut r = Vec::new();
 
                 r.push(format!(
                     "(SELECT jsonb_object_keys({json_ref}) LIMIT 1)::int::int2"
                 ));
 
-                for (tag, f) in variant.iter().enumerate() {
+                for (tag, f) in variants.iter().enumerate() {
                     r.extend(self.deserialize_json_nested(format!("({json_ref}->'{tag}')"), &f.ty))
                 }
 

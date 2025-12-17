@@ -355,9 +355,9 @@ fn enum_array() {
             jsonb_agg(
               CASE
                 r1._t
-                WHEN 0 THEN json_build_object('0', jsonb_build_array())
-                WHEN 1 THEN json_build_object('1', r1._1)
-                WHEN 2 THEN json_build_object('2', r1._2)
+                WHEN 0 THEN jsonb_build_object('0', jsonb_build_array())
+                WHEN 1 THEN jsonb_build_object('1', r1._1)
+                WHEN 2 THEN jsonb_build_object('2', r1._2)
               END
               ORDER BY
                 r1.index
@@ -536,9 +536,9 @@ fn tuple_array_enum() {
             jsonb_agg(
               CASE
                 r0._t
-                WHEN 0 THEN json_build_object('0', jsonb_build_array())
-                WHEN 1 THEN json_build_object('1', jsonb_build_array(r0._1_0, r0._1_1))
-                WHEN 2 THEN json_build_object('2', r0._2)
+                WHEN 0 THEN jsonb_build_object('0', jsonb_build_array())
+                WHEN 1 THEN jsonb_build_object('1', jsonb_build_array(r0._1_0, r0._1_1))
+                WHEN 2 THEN jsonb_build_object('2', r0._2)
               END
               ORDER BY
                 r0.index
@@ -581,6 +581,53 @@ fn tuple_array_enum() {
           owner = "me",
         }),
         Done("ok"),
+      ],
+    }
+    "#);
+}
+
+#[test]
+fn tuple_array_maybe() {
+    insta::assert_snapshot!(_sql_and_output(_run(r#"
+        type OptInt: enum { None, Some: int32 }
+        const main = {
+          "ids:",
+          [OptInt::None, OptInt::Some(5)],
+        }
+    "#, lutra_bin::Value::unit())), @r#"
+    SELECT
+      'ids:'::text AS _0,
+      (
+        SELECT
+          COALESCE(
+            jsonb_agg(
+              CASE
+                WHEN r0.value IS NULL THEN jsonb '{"0": []}'
+                ELSE jsonb_build_object('1', r0.value)
+              END
+              ORDER BY
+                r0.index
+            ),
+            '[]'::jsonb
+          ) AS value
+        FROM
+          (
+            SELECT
+              0::int8 AS index,
+              NULL::int4 AS value
+            UNION
+            ALL
+            SELECT
+              1::int8 AS index,
+              5::int4 AS value
+          ) AS r0
+      ) AS _1
+    ---
+    {
+      "ids:",
+      [
+        None,
+        Some(5),
       ],
     }
     "#);
@@ -1208,6 +1255,25 @@ fn param_10() {
     "#,
     lutra_bin::Value::Prim32(10000)
     ).1, @"@1997-05-19");
+}
+
+#[test]
+fn param_11() {
+    // maybe enum
+    insta::assert_snapshot!(_run(r#"
+    type OptInt: enum { None, Some: int32 }
+    func main(x: [OptInt]) -> x
+    "#,
+    lutra_bin::Value::Array(vec![
+        lutra_bin::Value::Enum(0, Box::new(lutra_bin::Value::Tuple(vec![]))),
+        lutra_bin::Value::Enum(1, Box::new(lutra_bin::Value::Prim32(5))),
+    ])
+    ).1, @r"
+    [
+      None,
+      Some(5),
+    ]
+    ");
 }
 
 #[test]
