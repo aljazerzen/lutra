@@ -373,3 +373,16 @@ impl std::fmt::Debug for Printer<'_> {
             .finish()
     }
 }
+
+impl<T> PrintSource for &T
+where
+    T: PrintSource,
+{
+    fn print<'c>(&self, p: &mut Printer<'c>) -> Option<()> {
+        T::print(self, p)
+    }
+
+    fn span(&self) -> Option<crate::Span> {
+        T::span(self)
+    }
+}

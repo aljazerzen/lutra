@@ -78,6 +78,13 @@ impl ImportDef {
         };
         Some(path)
     }
+
+    pub fn path(&self) -> &Path {
+        match &self.kind {
+            ImportKind::Single(path, _) => path,
+            ImportKind::Many(path, _) => path,
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq)]

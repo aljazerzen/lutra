@@ -1,6 +1,6 @@
 use chumsky::Span;
 
-use crate::pr;
+use crate::pr::{self, ImportDef};
 use crate::printer::common::{Between, Separated};
 use crate::printer::expr::print_func;
 use crate::printer::types::print_ty_func;
@@ -199,10 +199,13 @@ impl PrintSource for pr::ImportDef {
                 p.push(path.to_string())?;
                 p.push("::")?;
 
+                let mut parts: Vec<&ImportDef> = parts.iter().collect();
+                parts.sort_by(|a, b| a.path().cmp(b.path()));
+
                 Between {
                     prefix: "(",
                     node: &Separated {
-                        nodes: parts,
+                        nodes: &parts,
                         sep_inline: ", ",
                         sep_line_end: ",",
                     },
