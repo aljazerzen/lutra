@@ -31,15 +31,18 @@ impl fmt::Display for Query {
         }
         self.body.fmt(f)?;
         if let Some(ref order_by) = self.order_by {
-            f.write_str(" ")?;
+            SpaceOrNewline.fmt(f)?;
             order_by.fmt(f)?;
         }
+
         if let Some(ref offset) = self.offset {
-            f.write_str(" OFFSET ")?;
+            SpaceOrNewline.fmt(f)?;
+            f.write_str("OFFSET ")?;
             offset.fmt(f)?;
         }
         if let Some(ref limit) = self.limit {
-            f.write_str(" LIMIT ")?;
+            SpaceOrNewline.fmt(f)?;
+            f.write_str("LIMIT ")?;
             limit.fmt(f)?;
         }
         Ok(())
@@ -188,22 +191,17 @@ impl fmt::Display for SetExpr {
                 op,
                 set_quantifier,
             } => {
-                left.fmt(f)?;
                 SpaceOrNewline.fmt(f)?;
+                Indent(left).fmt(f)?;
+                SpaceOrNewline.fmt(f)?;
+
                 op.fmt(f)?;
-                match set_quantifier {
-                    SetQuantifier::All
-                    | SetQuantifier::Distinct
-                    | SetQuantifier::ByName
-                    | SetQuantifier::AllByName
-                    | SetQuantifier::DistinctByName => {
-                        f.write_str(" ")?;
-                        set_quantifier.fmt(f)?;
-                    }
-                    SetQuantifier::None => {}
-                }
+                f.write_str(" ")?;
+                set_quantifier.fmt(f)?;
+
                 SpaceOrNewline.fmt(f)?;
-                right.fmt(f)?;
+                Indent(right).fmt(f)?;
+                SpaceOrNewline.fmt(f)?;
                 Ok(())
             }
             SetExpr::Source(s) => f.write_str(s),
@@ -231,8 +229,6 @@ impl fmt::Display for SetOperator {
 }
 
 /// A quantifier for [SetOperator].
-// TODO: Restrict parsing specific SetQuantifier in some specific dialects.
-// For example, BigQuery does not support `DISTINCT` for `EXCEPT` and `INTERSECT`
 #[derive(Debug, Copy, Clone, PartialEq, PartialOrd, Eq, Ord, Hash)]
 pub enum SetQuantifier {
     All,
@@ -240,7 +236,6 @@ pub enum SetQuantifier {
     ByName,
     AllByName,
     DistinctByName,
-    None,
 }
 
 impl fmt::Display for SetQuantifier {
@@ -251,7 +246,6 @@ impl fmt::Display for SetQuantifier {
             SetQuantifier::ByName => write!(f, "BY NAME"),
             SetQuantifier::AllByName => write!(f, "ALL BY NAME"),
             SetQuantifier::DistinctByName => write!(f, "DISTINCT BY NAME"),
-            SetQuantifier::None => Ok(()),
         }
     }
 }
@@ -261,75 +255,74 @@ impl fmt::Display for SetQuantifier {
 /// to a set operation like `UNION`.
 #[derive(Debug, Clone, PartialEq, PartialOrd, Eq, Ord, Hash)]
 pub struct Select {
-    /// `SELECT [DISTINCT] ...`
-    pub distinct: Option<Distinct>,
-    /// projection expressions
-    pub projection: Vec<SelectItem>,
-    /// INTO
-    pub into: Option<SelectInto>,
     /// FROM
     pub from: Vec<RelNamed>,
     /// WHERE
     pub selection: Option<Expr>,
     /// GROUP BY
-    pub group_by: GroupByExpr,
-    /// SORT BY (Hive)
-    pub sort_by: Vec<OrderByExpr>,
+    pub group_by: Vec<Expr>,
+    /// `SELECT [DISTINCT] ...`
+    pub distinct: Option<Distinct>,
+    /// projection expressions
+    pub projection: Vec<SelectItem>,
     /// HAVING
     pub having: Option<Expr>,
 }
 
 impl fmt::Display for Select {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "SELECT")?;
-
-        if let Some(ref distinct) = self.distinct {
-            f.write_str(" ")?;
-            distinct.fmt(f)?;
+        let mut is_first = true;
+        fn space_or_nl(f: &mut fmt::Formatter<'_>, is_first: &mut bool) -> fmt::Result {
+            if *is_first {
+                *is_first = false;
+                return Ok(());
+            }
+            SpaceOrNewline.fmt(f)
         }
 
-        if !self.projection.is_empty() {
-            indented_list(f, &self.projection)?;
-        }
-
-        if let Some(ref into) = self.into {
-            f.write_str(" ")?;
-            into.fmt(f)?;
+        if !f.alternate() {
+            space_or_nl(f, &mut is_first)?;
+            f.write_str("SELECT")?;
+            if let Some(ref distinct) = self.distinct {
+                f.write_str(" ")?;
+                distinct.fmt(f)?;
+            }
+            if !self.projection.is_empty() {
+                indented_list(f, &self.projection)?;
+            }
         }
 
         if !self.from.is_empty() {
-            SpaceOrNewline.fmt(f)?;
+            space_or_nl(f, &mut is_first)?;
             f.write_str("FROM")?;
             indented_list(f, &self.from)?;
         }
         if let Some(ref selection) = self.selection {
-            SpaceOrNewline.fmt(f)?;
-            f.write_str("WHERE")?;
-            SpaceOrNewline.fmt(f)?;
-            Indent(selection).fmt(f)?;
+            space_or_nl(f, &mut is_first)?;
+            f.write_str("WHERE ")?;
+            selection.fmt(f)?;
         }
-        match &self.group_by {
-            GroupByExpr::All(_) => {
-                SpaceOrNewline.fmt(f)?;
-                self.group_by.fmt(f)?;
-            }
-            GroupByExpr::Expressions(exprs, _) => {
-                if !exprs.is_empty() {
-                    SpaceOrNewline.fmt(f)?;
-                    self.group_by.fmt(f)?;
-                }
-            }
+
+        if !self.group_by.is_empty() {
+            space_or_nl(f, &mut is_first)?;
+            f.write_str("GROUP BY ")?;
+            Indent(display_comma_separated(&self.group_by)).fmt(f)?;
         }
-        if !self.sort_by.is_empty() {
-            SpaceOrNewline.fmt(f)?;
-            f.write_str("SORT BY")?;
-            SpaceOrNewline.fmt(f)?;
-            Indent(display_comma_separated(&self.sort_by)).fmt(f)?;
+
+        if f.alternate() {
+            space_or_nl(f, &mut is_first)?;
+            write!(f, "SELECT")?;
+            if let Some(ref distinct) = self.distinct {
+                f.write_str(" ")?;
+                distinct.fmt(f)?;
+            }
+            if !self.projection.is_empty() {
+                indented_list(f, &self.projection)?;
+            }
         }
         if let Some(ref having) = self.having {
-            SpaceOrNewline.fmt(f)?;
+            space_or_nl(f, &mut is_first)?;
             f.write_str("HAVING")?;
-            SpaceOrNewline.fmt(f)?;
             Indent(having).fmt(f)?;
         }
         Ok(())
@@ -422,26 +415,17 @@ pub struct Cte {
 
 impl fmt::Display for Cte {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match self.materialized.as_ref() {
-            None => {
-                self.alias.fmt(f)?;
-                f.write_str(" AS (")?;
-                NewLine.fmt(f)?;
-                Indent(&self.query).fmt(f)?;
-                NewLine.fmt(f)?;
-                f.write_str(")")?;
-            }
-            Some(materialized) => {
-                self.alias.fmt(f)?;
-                f.write_str(" AS ")?;
-                materialized.fmt(f)?;
-                f.write_str(" (")?;
-                NewLine.fmt(f)?;
-                Indent(&self.query).fmt(f)?;
-                NewLine.fmt(f)?;
-                f.write_str(")")?;
-            }
+        self.alias.fmt(f)?;
+        f.write_str(" AS")?;
+        if let Some(materialized) = self.materialized.as_ref() {
+            f.write_str(" ")?;
+            materialized.fmt(f)?;
         };
+        f.write_str(" (")?;
+        NewLine.fmt(f)?;
+        Indent(&self.query).fmt(f)?;
+        NewLine.fmt(f)?;
+        f.write_str(")")?;
         Ok(())
     }
 }
@@ -461,8 +445,17 @@ impl SelectItem {
 
 impl fmt::Display for SelectItem {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        if f.alternate()
+            && let Some(alias) = &self.alias
+        {
+            write!(f, "{:05} = ", &alias.value)?;
+        }
+
         self.expr.fmt(f)?;
-        if let Some(alias) = &self.alias {
+
+        if !f.alternate()
+            && let Some(alias) = &self.alias
+        {
             f.write_str(" AS ")?;
             alias.fmt(f)?;
         }
@@ -503,60 +496,9 @@ pub struct RelNamed {
 
 #[derive(Debug, Clone, PartialEq, PartialOrd, Eq, Ord, Hash)]
 pub enum RelExpr {
-    Table {
-        name: ObjectName,
-    },
-    Subquery {
-        subquery: Box<Query>,
-    },
-    Function {
-        name: ObjectName,
-        args: Vec<Expr>,
-    },
-    /// ```sql
-    /// SELECT * FROM UNNEST ([10,20,30]) as numbers WITH OFFSET;
-    /// +---------+--------+
-    /// | numbers | offset |
-    /// +---------+--------+
-    /// | 10      | 0      |
-    /// | 20      | 1      |
-    /// | 30      | 2      |
-    /// +---------+--------+
-    /// ```
-    UNNEST {
-        array_exprs: Vec<Expr>,
-        with_offset: bool,
-        with_offset_alias: Option<Ident>,
-        with_ordinality: bool,
-    },
-
-    /// Represents PIVOT operation on a table.
-    /// For example `FROM monthly_sales PIVOT(sum(amount) FOR MONTH IN ('JAN', 'FEB'))`
-    ///
-    /// [BigQuery](https://cloud.google.com/bigquery/docs/reference/standard-sql/query-syntax#pivot_operator)
-    /// [Snowflake](https://docs.snowflake.com/en/sql-reference/constructs/pivot)
-    Pivot {
-        table: Box<RelNamed>,
-        aggregate_functions: Vec<ExprWithAlias>, // Function expression
-        value_column: Vec<Expr>,
-        value_source: PivotValueSource,
-        default_on_null: Option<Expr>,
-    },
-    /// An UNPIVOT operation on a table.
-    ///
-    /// Syntax:
-    /// ```sql
-    /// table UNPIVOT [ { INCLUDE | EXCLUDE } NULLS ] (value FOR name IN (column1, [ column2, ... ])) [ alias ]
-    /// ```
-    ///
-    /// See <https://docs.snowflake.com/en/sql-reference/constructs/unpivot>.
-    /// See <https://docs.databricks.com/aws/en/sql/language-manual/sql-ref-syntax-qry-select-unpivot>.
-    Unpivot {
-        table: Box<RelNamed>,
-        value: Expr,
-        name: Ident,
-        columns: Vec<ExprWithAlias>,
-    },
+    Table { name: ObjectName },
+    Subquery { subquery: Box<Query> },
+    Function { name: ObjectName, args: Vec<Expr> },
 }
 
 /// The source of values in a `PIVOT` operation.
@@ -597,13 +539,14 @@ impl fmt::Display for RelNamed {
         if self.lateral {
             write!(f, "LATERAL ")?;
         }
+        if f.alternate()
+            && let Some(alias) = &self.alias
+        {
+            write!(f, "{alias} = ")?;
+        }
         match &self.expr {
             RelExpr::Table { name } => {
                 name.fmt(f)?;
-                if let Some(alias) = &self.alias {
-                    write!(f, " AS {alias}")?;
-                }
-                Ok(())
             }
             RelExpr::Subquery { subquery } => {
                 f.write_str("(")?;
@@ -611,88 +554,17 @@ impl fmt::Display for RelNamed {
                 Indent(subquery).fmt(f)?;
                 NewLine.fmt(f)?;
                 f.write_str(")")?;
-                if let Some(alias) = &self.alias {
-                    write!(f, " AS {alias}")?;
-                }
-                Ok(())
             }
             RelExpr::Function { name, args } => {
                 write!(f, "{name}({})", display_comma_separated(args))?;
-                if let Some(alias) = &self.alias {
-                    write!(f, " AS {alias}")?;
-                }
-                Ok(())
-            }
-            RelExpr::UNNEST {
-                array_exprs,
-                with_offset,
-                with_offset_alias,
-                with_ordinality,
-            } => {
-                write!(f, "UNNEST({})", display_comma_separated(array_exprs))?;
-
-                if *with_ordinality {
-                    write!(f, " WITH ORDINALITY")?;
-                }
-
-                if let Some(alias) = &self.alias {
-                    write!(f, " AS {alias}")?;
-                }
-                if *with_offset {
-                    write!(f, " WITH OFFSET")?;
-                }
-                if let Some(alias) = with_offset_alias {
-                    write!(f, " AS {alias}")?;
-                }
-                Ok(())
-            }
-            RelExpr::Pivot {
-                table,
-                aggregate_functions,
-                value_column,
-                value_source,
-                default_on_null,
-            } => {
-                write!(
-                    f,
-                    "{table} PIVOT({} FOR ",
-                    display_comma_separated(aggregate_functions),
-                )?;
-                if value_column.len() == 1 {
-                    write!(f, "{}", value_column[0])?;
-                } else {
-                    write!(f, "({})", display_comma_separated(value_column))?;
-                }
-                write!(f, " IN ({value_source})")?;
-                if let Some(expr) = default_on_null {
-                    write!(f, " DEFAULT ON NULL ({expr})")?;
-                }
-                write!(f, ")")?;
-                if let Some(alias) = &self.alias {
-                    write!(f, " AS {alias}")?;
-                }
-                Ok(())
-            }
-            RelExpr::Unpivot {
-                table,
-                value,
-                name,
-                columns,
-            } => {
-                write!(f, "{table} UNPIVOT")?;
-                write!(
-                    f,
-                    "({} FOR {} IN ({}))",
-                    value,
-                    name,
-                    display_comma_separated(columns)
-                )?;
-                if let Some(alias) = &self.alias {
-                    write!(f, " AS {alias}")?;
-                }
-                Ok(())
             }
         }
+        if !f.alternate()
+            && let Some(alias) = &self.alias
+        {
+            write!(f, " AS {alias}")?;
+        }
+        Ok(())
     }
 }
 
@@ -1032,75 +904,6 @@ impl fmt::Display for SelectInto {
         let table = if self.table { " TABLE" } else { "" };
 
         write!(f, "INTO{}{}{} {}", temporary, unlogged, table, self.name)
-    }
-}
-
-/// ClickHouse supports GROUP BY WITH modifiers(includes ROLLUP|CUBE|TOTALS).
-/// e.g. GROUP BY year WITH ROLLUP WITH TOTALS
-///
-/// [ClickHouse]: <https://clickhouse.com/docs/en/sql-reference/statements/select/group-by#rollup-modifier>
-#[derive(Debug, Clone, PartialEq, PartialOrd, Eq, Ord, Hash)]
-pub enum GroupByWithModifier {
-    Rollup,
-    Cube,
-    Totals,
-    /// Hive supports GROUP BY GROUPING SETS syntax.
-    /// e.g. GROUP BY year , month GROUPING SETS((year,month),(year),(month))
-    ///
-    /// [Hive]: <https://cwiki.apache.org/confluence/pages/viewpage.action?pageId=30151323#EnhancedAggregation,Cube,GroupingandRollup-GROUPINGSETSclause>
-    GroupingSets(Expr),
-}
-
-impl fmt::Display for GroupByWithModifier {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match self {
-            GroupByWithModifier::Rollup => write!(f, "WITH ROLLUP"),
-            GroupByWithModifier::Cube => write!(f, "WITH CUBE"),
-            GroupByWithModifier::Totals => write!(f, "WITH TOTALS"),
-            GroupByWithModifier::GroupingSets(expr) => {
-                write!(f, "{expr}")
-            }
-        }
-    }
-}
-
-#[derive(Debug, Clone, PartialEq, PartialOrd, Eq, Ord, Hash)]
-pub enum GroupByExpr {
-    /// ALL syntax of [Snowflake], [DuckDB] and [ClickHouse].
-    ///
-    /// [Snowflake]: <https://docs.snowflake.com/en/sql-reference/constructs/group-by#label-group-by-all-columns>
-    /// [DuckDB]:  <https://duckdb.org/docs/sql/query_syntax/groupby.html>
-    /// [ClickHouse]: <https://clickhouse.com/docs/en/sql-reference/statements/select/group-by#group-by-all>
-    ///
-    /// ClickHouse also supports WITH modifiers after GROUP BY ALL and expressions.
-    ///
-    /// [ClickHouse]: <https://clickhouse.com/docs/en/sql-reference/statements/select/group-by#rollup-modifier>
-    All(Vec<GroupByWithModifier>),
-
-    /// Expressions
-    Expressions(Vec<Expr>, Vec<GroupByWithModifier>),
-}
-
-impl fmt::Display for GroupByExpr {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match self {
-            GroupByExpr::All(modifiers) => {
-                write!(f, "GROUP BY ALL")?;
-                if !modifiers.is_empty() {
-                    write!(f, " {}", display_separated(modifiers, " "))?;
-                }
-                Ok(())
-            }
-            GroupByExpr::Expressions(col_names, modifiers) => {
-                f.write_str("GROUP BY")?;
-                SpaceOrNewline.fmt(f)?;
-                Indent(display_comma_separated(col_names)).fmt(f)?;
-                if !modifiers.is_empty() {
-                    write!(f, " {}", display_separated(modifiers, " "))?;
-                }
-                Ok(())
-            }
-        }
     }
 }
 

@@ -60,9 +60,7 @@ impl Node {
                 if select.distinct.is_none()
                     && select.from.is_empty()
                     && select.having.is_none()
-                    && select.selection.is_none()
-                    && select.sort_by.is_empty()
-                    && select.into.is_none() =>
+                    && select.selection.is_none() =>
             {
                 Some(select.projection.as_slice())
             }

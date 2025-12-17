@@ -62,26 +62,22 @@ pub fn rel_func(
 
 pub fn select_empty() -> sql_ast::Select {
     sql_ast::Select {
-        distinct: Default::default(),
-        projection: Default::default(),
-        into: Default::default(),
         from: Default::default(),
         selection: Default::default(),
-        group_by: sql_ast::GroupByExpr::Expressions(vec![], vec![]),
-        sort_by: Default::default(),
+        group_by: Default::default(),
+        distinct: Default::default(),
+        projection: Default::default(),
         having: Default::default(),
     }
 }
 
 pub fn select_from(rel: sql_ast::RelNamed) -> sql_ast::Select {
     sql_ast::Select {
-        distinct: Default::default(),
-        projection: Default::default(),
-        into: Default::default(),
         from: vec![rel],
         selection: Default::default(),
-        group_by: sql_ast::GroupByExpr::Expressions(vec![], vec![]),
-        sort_by: Default::default(),
+        group_by: Default::default(),
+        distinct: Default::default(),
+        projection: Default::default(),
         having: Default::default(),
     }
 }

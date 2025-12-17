@@ -547,7 +547,7 @@ impl<'a> Context<'a> {
                 let rel = self.node_into_rel(input, input_ty);
                 let mut select = self.rel_into_select(rel, output_ty, true);
 
-                let key = self.compile_columns(key);
+                let group_by = self.compile_columns(key);
 
                 let mut projection = vec![
                     // index
@@ -559,7 +559,7 @@ impl<'a> Context<'a> {
                 projection.extend(values);
                 select.from.extend(val_rels.into_iter().map(utils::lateral));
 
-                select.group_by = sql_ast::GroupByExpr::Expressions(key, vec![]);
+                select.group_by = group_by;
                 select.projection = self.projection(output_ty, projection);
 
                 Node::Select(select)

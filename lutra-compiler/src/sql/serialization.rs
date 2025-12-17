@@ -32,7 +32,6 @@ impl<'a> queries::Context<'a> {
     }
 
     fn serialize_json_nested(&self, input_rel: &str, input_cols: &[String], ty: &ir::Ty) -> String {
-        dbg!(input_cols, ty);
         let ty_mat = self.get_ty_mat(ty);
         match &ty_mat.kind {
             ir::TyKind::Primitive(_) => {

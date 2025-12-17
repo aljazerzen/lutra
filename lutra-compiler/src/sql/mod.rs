@@ -15,29 +15,15 @@ pub fn compile_ir(program: &ir::Program) -> rr::SqlProgram {
     let (clauses, types) = clauses::compile(program);
 
     let clauses = optimizer::optimize(clauses);
-
     tracing::debug!("cr: {clauses:#?}");
 
     // compile to queries
     let query = queries::compile(clauses, types);
-
     tracing::trace!("sql ast: {query:?}");
 
     // serialize to SQL source
     let sql_source = query.to_string();
-
-    if tracing::enabled!(tracing::Level::DEBUG) {
-        // format sql
-        #[cfg(feature = "debug")]
-        {
-            let options = sqlformat::FormatOptions::default();
-            let formatted_sql =
-                sqlformat::format(&sql_source, &sqlformat::QueryParams::None, &options);
-            tracing::debug!("sql:\n{formatted_sql}");
-        };
-        #[cfg(not(feature = "debug"))]
-        tracing::debug!("sql:\n{sql_source}");
-    }
+    tracing::debug!("sql:\n{query:#}");
 
     rr::SqlProgram {
         sql: sql_source,

@@ -14,7 +14,6 @@
 #    <output>
 
 # === chinook_00
-
 module chinook {
   import std::filter
   import std::index
@@ -23,18 +22,16 @@ module chinook {
   type Album: {id: int64, title: text}
 
   func get_albums(): [Album] -> [
-    {id = 3, title = "Hello world!"},
-    {id = 5, title = "Foo"},
+    {id = 3, title = "Hello world!"}, {id = 5, title = "Foo"}
   ]
 
   func get_album_by_id(album_id: int64): Album -> (
-      get_albums()
-      | filter(func (this: Album) -> this.id == album_id)
-      | index(0)
-      | or_default()
-    )
-  }
-
+    get_albums()
+    | filter(func (this: Album) -> this.id == album_id)
+    | index(0)
+    | or_default()
+  )
+}
 module box_office {
   import std::filter
   import std::index
@@ -43,9 +40,7 @@ module box_office {
   type Invoice: {id: int64, total: float64}
 
   func get_album_sales(): [Invoice] -> [
-    {id = 3, total = 3.6},
-    {id = 3, total = 3.1},
-    {id = 5, total = 5.2},
+    {id = 3, total = 3.6}, {id = 3, total = 3.1}, {id = 5, total = 5.2}
   ]
 
   func get_album_sales_by_id(album_id: int64): Invoice -> (
