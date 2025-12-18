@@ -174,6 +174,7 @@ pub mod std {
                 "to_uint64" => &to_uint64,
                 "to_float32" => &to_float32,
                 "to_float64" => &to_float64,
+                "to_text" => &to_text,
 
                 "mul" => &mul,
                 "div" => &div,
@@ -238,6 +239,30 @@ pub mod std {
     number_cast!(to_uint64, u64);
     number_cast!(to_float32, f32);
     number_cast!(to_float64, f64);
+
+    pub fn to_text(
+        _: &mut Interpreter,
+        layout_args: &[u32],
+        args: Vec<Cell>,
+    ) -> Result<Cell, EvalError> {
+        let input_ty = decode::ty_primitive(layout_args[0]);
+        let [x] = assume::exactly_n(args);
+        let x = match input_ty {
+            ir::TyPrimitive::bool => assume::primitive::<bool>(&x)?.to_string(),
+            ir::TyPrimitive::int8 => assume::primitive::<i8>(&x)?.to_string(),
+            ir::TyPrimitive::int16 => assume::primitive::<i16>(&x)?.to_string(),
+            ir::TyPrimitive::int32 => assume::primitive::<i32>(&x)?.to_string(),
+            ir::TyPrimitive::int64 => assume::primitive::<i64>(&x)?.to_string(),
+            ir::TyPrimitive::uint8 => assume::primitive::<u8>(&x)?.to_string(),
+            ir::TyPrimitive::uint16 => assume::primitive::<u16>(&x)?.to_string(),
+            ir::TyPrimitive::uint32 => assume::primitive::<u32>(&x)?.to_string(),
+            ir::TyPrimitive::uint64 => assume::primitive::<u64>(&x)?.to_string(),
+            ir::TyPrimitive::float32 => assume::primitive::<f32>(&x)?.to_string(),
+            ir::TyPrimitive::float64 => assume::primitive::<f64>(&x)?.to_string(),
+            ir::TyPrimitive::text => return Ok(x),
+        };
+        Ok(Cell::Data(encode(&x)))
+    }
 
     bin_num_func!(add, +);
     bin_num_func!(sub, -);

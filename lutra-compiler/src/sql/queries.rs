@@ -871,10 +871,10 @@ impl<'a> Context<'a> {
                 }
             }
 
-            "std::to_float32" | "std::to_float64" => {
+            "std::to_float32" | "std::to_float64" | "std::to_text" => {
                 let [arg] = unpack_args(args);
                 let ty = self.compile_ty_name(ty);
-                sql_ast::Expr::Source(format!("{arg}::{ty}"))
+                sql_ast::Expr::Source(format!("({arg})::{ty}"))
             }
 
             "std::date::to_timestamp" => {

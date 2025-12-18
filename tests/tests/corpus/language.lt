@@ -121,7 +121,7 @@ func main() -> {
     x
     | std::map(func (y: int16) -> y + 1)
     | std::filter(func (y: int16) -> !(y > 3))
-    # | std::sort(func (x: int16) -> x)
+    | std::sort(func (x: int16) -> x)
     | std::map(func (y: int16) -> y % 3)
   )
 }
@@ -139,9 +139,9 @@ func main() -> {
   },
   hello = [
     2,
-    0,
-    0,
     2,
+    0,
+    0,
     0,
   ],
 }
@@ -661,6 +661,31 @@ type OptText: enum {
 func main() -> OptText::None | std::or_default()
 # >
 ""
+
+# === std_to_text_00
+func main() -> std::to_text(20: uint8)
+# >
+"20"
+
+# === std_to_text_01
+func main() -> std::to_text(-20: int8)
+# >
+"-20"
+
+# === std_to_text_02
+func main() -> std::to_text(1.10: float32)
+# >
+"1.1"
+
+# === std_to_text_03
+func main() -> std::to_text(-1121121221.0: float64)
+# >
+"-1121121221"
+
+# === std_to_text_04
+func main() -> std::to_text(false)
+# >
+"false"
 
 # === std_add_float64_00
 func main() -> (30.2 + 2.30): float64

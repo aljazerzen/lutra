@@ -13,11 +13,11 @@ where T
 
 # --- Casts ---
 
-## Converts a number to `int8`.
+## Converts a number to `int8`
 func to_int8(x: T): int8
 where T: number
 
-## Converts a number to `int16`.
+## Converts a number to `int16`
 func to_int16(x: T): int16
 where T: number
 
@@ -52,6 +52,10 @@ where T: number
 ## Converts a number to `float64`
 func to_float64(x: T): float64
 where T: number
+
+## Converts a value to `text`
+func to_text(x: T): text
+where T: primitive
 
 # --- Operators ---
 
