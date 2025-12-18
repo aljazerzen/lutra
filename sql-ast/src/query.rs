@@ -536,7 +536,7 @@ impl fmt::Display for PivotValueSource {
 
 impl fmt::Display for RelNamed {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        if self.lateral {
+        if self.lateral && !matches!(self.expr, RelExpr::Table { .. }) {
             write!(f, "LATERAL ")?;
         }
         if f.alternate()

@@ -656,24 +656,26 @@ pub mod std {
         for field_head_bytes in output_field_head_bytes {
             output_fields_layouts.push((*field_head_bytes, layout_args.next_slice()));
         }
+        let key_head_bytes = layout_args.next_u32() as usize;
 
         let [input, key_getter] = assume::exactly_n(args);
         let input = ArrayReader::new(assume::into_data(input)?, input_head_bytes as usize);
 
-        let mut partitions: HashMap<Vec<u8>, Vec<Data>> = HashMap::new();
+        let mut groups: HashMap<Vec<u8>, Vec<Data>> = HashMap::new();
         for item in input {
             let item_cell = Cell::Data(item.clone());
 
             let key = it.evaluate_func_call(&key_getter, vec![item_cell])?;
-            let key = assume::into_data(key)?.chunk().to_vec();
+            let key = assume::into_data(key)?.chunk()[..key_head_bytes].to_vec();
+            dbg!(&key);
 
-            let partition = partitions.entry(key).or_default();
+            let partition = groups.entry(key).or_default();
             partition.push(item);
         }
 
         // init output array
         let mut output = ArrayWriter::new(output_head_bytes, output_body_ptrs);
-        for (key, values) in partitions {
+        for (key, values) in groups {
             let mut tuple = TupleWriter::new(Cow::from(&output_fields_layouts));
             tuple.write_field(Data::new(key));
 

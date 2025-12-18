@@ -244,8 +244,27 @@ where T: {..}, O
 func zip(left: [L], right: [R]): [{L, R}]
 where L, R
 
-func group(input: [I], key: func (I): K): [{key: K, values: [I]}]
+## Groups array items by a key.
+## Returns groups, which contain the key and an array of values in this group.
+func group(input: [I], get_key: func (I): K): [{key: K, values: [I]}]
 where I, K
+
+## Groups array items by a key.
+## Returns groups, which contain the key and an array of values in this group.
+func group_map(
+  input: [I],
+  get_key: func (I): K,
+  mapper: func (key: K, values: [I]): O
+): [O]
+where I, K, O
+-> (
+  input | group(get_key) | map(func (x) -> mapper(x.key, x.values))
+)
+
+## Deduplicates array items.
+func distinct(array: [T]): [T]
+where T
+-> (array | group(func (x) -> x) | map(func (x) -> x.key))
 
 func append(top: [T], bottom: [T]): [T]
 where T

@@ -1915,8 +1915,7 @@ async fn sql_insert_00() {
           14894::int4 AS _1
       ) AS r0
     ---
-    {
-    }
+    {}
     ");
 
     insta::assert_snapshot!(_run_on(&mut runner, r#"
@@ -2350,10 +2349,7 @@ async fn sql_date_time_02() {
       [{t = @16:07:44.12}, {t = @-16:07:44.12}, {t = @25:07:44.12}]
       | std::sql::insert("test")
     )
-    "#, lutra_bin::Value::unit()).await.1, @r"
-    {
-    }
-    ");
+    "#, lutra_bin::Value::unit()).await.1, @"{}");
 
     insta::assert_snapshot!(_run_on(&mut runner, r#"
     func main(): [{t: std::Time}] -> std::sql::from("test")

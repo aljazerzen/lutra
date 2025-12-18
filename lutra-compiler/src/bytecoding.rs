@@ -431,11 +431,14 @@ impl ByteCoder {
             "std::group" => {
                 let ty_func = ty_mat.kind.as_function().unwrap();
 
-                let input_item = &ty_func.params[0].kind.as_array().unwrap();
+                let input_item = self.get_ty_mat(&ty_func.params[0]).kind.as_array().unwrap();
                 let input_layout = input_item.layout.as_ref().unwrap();
 
-                let output_item = ty_func.body.kind.as_array().unwrap();
+                let output_item = self.get_ty_mat(&ty_func.body).kind.as_array().unwrap();
                 let output_layout = output_item.layout.as_ref().unwrap();
+
+                let key = &self.get_ty_mat(output_item).kind.as_tuple().unwrap()[0].ty;
+                let key_layout = key.layout.as_ref().unwrap();
 
                 let mut r = Vec::new();
                 r.push(input_layout.head_size.div_ceil(8)); // input_head_bytes
@@ -457,6 +460,8 @@ impl ByteCoder {
                     let field_layout = field.ty.layout.as_ref().unwrap();
                     r.extend(as_len_and_items(&field_layout.body_ptrs));
                 }
+
+                r.push(key_layout.head_size.div_ceil(8)); // key_head_bytes
 
                 r
             }

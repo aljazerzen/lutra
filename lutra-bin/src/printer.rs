@@ -155,8 +155,10 @@ where
         fields: impl Iterator<Item = (B, &'t ir::TyTupleField)>,
     ) -> Result<Self::Res, Error> {
         let mut r = "{".to_string();
+        let mut had_a_field = false;
         self.indent();
         for (field, ty) in fields {
+            had_a_field = true;
             r += &self.new_line();
 
             if let Some(name) = &ty.name {
@@ -168,7 +170,9 @@ where
             r += ",";
         }
         self.deindent();
-        r += &self.new_line();
+        if had_a_field {
+            r += &self.new_line();
+        }
         r += "}";
         Ok(r)
     }

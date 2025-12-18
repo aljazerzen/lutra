@@ -1409,25 +1409,24 @@ func main() -> (
 
 # === std_group_02
 func main() -> (
-      [
-        {1, false, 10},
-        {2, false, 21},
-        {2, false, 22},
-        {1, true, 10}
-      ]: [{int64, bool, int64}]
-      | std::group(
-        func (x: {int64, bool, int64}) -> {x.0, x.2}
-      )
-      | std::sort(func (x) -> x.key.0 + x.key.1)
-      | std::map(func (partition) -> {
-        k = partition.key.0,
-        v = std::sum(std::map(
-          partition.values,
-          func (x: {int64, bool, int64}) -> x.2
-        )),
-      })
-    )
-
+  [
+    {1, false, 10},
+    {2, false, 21},
+    {2, false, 22},
+    {1, true, 10}
+  ]: [{int64, bool, int64}]
+  | std::group(
+    func (x: {int64, bool, int64}) -> {x.0, x.2}
+  )
+  | std::sort(func (x) -> x.key.0 + x.key.1)
+  | std::map(func (partition) -> {
+    k = partition.key.0,
+    v = std::sum(std::map(
+      partition.values,
+      func (x: {int64, bool, int64}) -> x.2
+    )),
+  })
+)
 # >
 [
   {
@@ -1444,6 +1443,42 @@ func main() -> (
   },
 ]
 
+# === std_group_map_00
+func main() -> (
+  [1, 2, 2, 2, 5: int64, 5]
+  | std::group_map(
+    func (x) -> x, func (key, values) -> {key, std::count(values)}
+  )
+  | std::sort(func (x) -> x.key)
+)
+# >
+[
+  {
+    key = 1,
+    1,
+  },
+  {
+    key = 2,
+    3,
+  },
+  {
+    key = 5,
+    2,
+  },
+]
+
+# === std_distinct_00
+func main() -> (
+  [1, 2, 2, 2, 5: int64, 5]
+  | std::distinct()
+  | std::sort(func (x) -> x)
+)
+# >
+[
+  1,
+  2,
+  5,
+]
 
 # === std_cmp_00
 import std::cmp
@@ -2303,8 +2338,7 @@ func main() -> std::to_columnar([
   {},
 ])
 # >
-{
-}
+{}
 
 # === std_text_length_00
 func main() -> std::text::length("Hello world\n")
