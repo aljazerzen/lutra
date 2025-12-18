@@ -611,13 +611,6 @@ type Date(int32)
 ## Backed by a signed 64-bit integer, representing number of microseconds.
 type Time(int64)
 
-## Compute time duration between two dates.
-## Dates are assumed to be in the same timezone, and duration is measured from
-## one midnight to another.
-func sub_date(a: Date, b: Date): Time -> (
-  sub(a.0, b.0) | to_int64 | mul(86400000000) | Time
-)
-
 # func to_time64_second(x: D): Time64Second
 # where D: Time32Second -> x.0 | to_int64 | Time64Second
 # where D: Time32Millisecond -> x.0 | to_int64 | mul(1000) | Time64Second
@@ -642,8 +635,6 @@ func sub_date(a: Date, b: Date): Time -> (
 # where D: Time64Millisecond -> x.0 | div(1000) | Time64Microsecond
 # where D: Time64Microsecond -> x
 
-func date_to_timestamp(date: Date, time_zone: text): Timestamp
-
 func add_time(a: Time, b: Time): Time -> (
   add(a.0, b.0) | Time
 )
@@ -652,9 +643,29 @@ func sub_timestamp(a: Timestamp, b: Timestamp): Time -> (
   sub(a.0, b.0) | Time
 )
 
-func timezone_offset(time_zone: text, date: Date): Time -> (
+## Returns offset of a time zone from UTC on a given date.
+func timezone_offset(time_zone: text, d: Date): Time -> (
   sub_timestamp(
-    date_to_timestamp(date, time_zone),
-    date_to_timestamp(date, "UTC"),
+    date::to_timestamp(d, time_zone),
+    date::to_timestamp(d, "UTC"),
   )
 )
+
+module date {
+  ## Computes time duration between two dates.
+  ##
+  ## Dates are assumed to be in the same timezone.
+  ## Duration is measured from one midnight to another.
+  func sub(a: super::Date, b: super::Date): super::Time -> (
+    super::sub(a.0, b.0) | super::to_int64 | super::mul(86400000000) | super::Time
+  )
+
+  ## Computes the timestamp of a local date at a timezone.
+  func to_timestamp(date: super::Date, time_zone: text): super::Timestamp
+
+  ## Converts a date into year, month, and day numbers.
+  ## Month and day start with 1.
+  func to_year_month_day(
+    date: super::Date,
+  ): {year: int32, month: uint8, day: uint8}
+}

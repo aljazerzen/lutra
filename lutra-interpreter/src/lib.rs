@@ -19,6 +19,7 @@ pub static BUILTIN_MODULES: &[(&str, &dyn NativeModule)] = &[
     ("std::text", &native::std_text::Module),
     ("std::math", &native::std_math::Module),
     ("std::fs", &native::std_fs::Module),
+    ("std::date", &native::std_date::Module),
     ("interpreter", &native::interpreter::Module),
 ];
 

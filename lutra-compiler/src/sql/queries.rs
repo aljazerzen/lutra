@@ -877,13 +877,37 @@ impl<'a> Context<'a> {
                 sql_ast::Expr::Source(format!("{arg}::{ty}"))
             }
 
-            "std::date_to_timestamp" => {
+            "std::date::to_timestamp" => {
                 let [date, tz] = unpack_args(args);
 
                 let timestamp =
                     format!("('1970-01-01'::date + {date})::timestamp AT TIME ZONE {tz}");
 
                 sql_ast::Expr::Source(format!("(EXTRACT(EPOCH FROM {timestamp}) * 1000000)::int8"))
+            }
+            "std::date::to_year_month_day" => {
+                let [date] = unpack_args(args);
+
+                let mut input_select = utils::select_empty();
+                input_select.projection = vec![sql_ast::SelectItem {
+                    expr: sql_ast::Expr::Source(format!("'1970-01-01'::date + {date}")),
+                    alias: Some("x".into()),
+                }];
+                let input_query = utils::query_select(input_select);
+
+                let mut select = utils::select_empty();
+                select.from.push(utils::sub_rel(input_query, "t".into()));
+
+                let values = [
+                    "date_part('YEAR', t.x)::int4",
+                    "date_part('MONTH', t.x)::int2",
+                    "date_part('DAY', t.x)::int2",
+                ]
+                .into_iter()
+                .map(str::to_string)
+                .map(sql_ast::Expr::Source);
+                select.projection = self.projection(ty, values);
+                return Node::Select(select);
             }
 
             _ => todo!("sql impl for {id}"),

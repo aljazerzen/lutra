@@ -496,8 +496,8 @@ pub struct RelNamed {
 
 #[derive(Debug, Clone, PartialEq, PartialOrd, Eq, Ord, Hash)]
 pub enum RelExpr {
-    Table { name: ObjectName },
-    Subquery { subquery: Box<Query> },
+    Table(ObjectName),
+    Subquery(Box<Query>),
     Function { name: ObjectName, args: Vec<Expr> },
 }
 
@@ -536,7 +536,7 @@ impl fmt::Display for PivotValueSource {
 
 impl fmt::Display for RelNamed {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        if self.lateral && !matches!(self.expr, RelExpr::Table { .. }) {
+        if self.lateral && !matches!(self.expr, RelExpr::Table(..)) {
             write!(f, "LATERAL ")?;
         }
         if f.alternate()
@@ -545,10 +545,10 @@ impl fmt::Display for RelNamed {
             write!(f, "{alias} = ")?;
         }
         match &self.expr {
-            RelExpr::Table { name } => {
+            RelExpr::Table(name) => {
                 name.fmt(f)?;
             }
-            RelExpr::Subquery { subquery } => {
+            RelExpr::Subquery(subquery) => {
                 f.write_str("(")?;
                 NewLine.fmt(f)?;
                 Indent(subquery).fmt(f)?;

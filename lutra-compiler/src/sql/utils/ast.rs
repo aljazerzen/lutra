@@ -10,21 +10,21 @@ pub fn get_rel_alias(rel: &sql_ast::RelNamed) -> Option<&str> {
 
 pub fn as_sub_rel(rel: &sql_ast::RelNamed) -> Option<&sql_ast::Query> {
     match &rel.expr {
-        sql_ast::RelExpr::Subquery { subquery, .. } => Some(subquery),
+        sql_ast::RelExpr::Subquery(subquery) => Some(subquery),
         _ => None,
     }
 }
 
 pub fn as_mut_sub_rel(rel: &mut sql_ast::RelNamed) -> Option<&mut sql_ast::Query> {
     match &mut rel.expr {
-        sql_ast::RelExpr::Subquery { subquery, .. } => Some(subquery),
+        sql_ast::RelExpr::Subquery(subquery) => Some(subquery),
         _ => None,
     }
 }
 
 pub fn new_table(name: sql_ast::ObjectName, alias: Option<String>) -> sql_ast::RelNamed {
     sql_ast::RelNamed {
-        expr: sql_ast::RelExpr::Table { name },
+        expr: sql_ast::RelExpr::Table(name),
         lateral: false,
         alias: alias.map(new_table_alias),
     }
@@ -33,9 +33,7 @@ pub fn new_table(name: sql_ast::ObjectName, alias: Option<String>) -> sql_ast::R
 pub fn sub_rel(query: sql_ast::Query, alias: String) -> sql_ast::RelNamed {
     sql_ast::RelNamed {
         lateral: false,
-        expr: sql_ast::RelExpr::Subquery {
-            subquery: Box::new(query),
-        },
+        expr: sql_ast::RelExpr::Subquery(Box::new(query)),
         alias: Some(new_table_alias(alias)),
     }
 }

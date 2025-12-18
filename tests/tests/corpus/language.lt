@@ -2661,19 +2661,28 @@ func main() -> std::add_time(@116:07:44.12, @-4:00:00)
 @112:07:44.120000
 
 # === std_date_to_timestamp_00
-func main() -> std::date_to_timestamp(@2025-12-16, "UTC")
+func main() -> std::date::to_timestamp(@2025-12-16, "UTC")
 # >
 @2025-12-16T00:00:00.000000
 
 # === std_date_to_timestamp_01
-func main() -> std::date_to_timestamp(@2025-12-16, "Europe/Ljubljana")
+func main() -> std::date::to_timestamp(@2025-12-16, "Europe/Ljubljana")
 # >
 @2025-12-15T23:00:00.000000
 
 # === std_date_to_timestamp_02
-func main() -> std::date_to_timestamp(@2025-12-16, "America/New_York")
+func main() -> std::date::to_timestamp(@2025-12-16, "America/New_York")
 # >
 @2025-12-16T05:00:00.000000
+
+# === std_date_to_year_month_day_00
+func main() -> std::date::to_year_month_day(@2025-12-16)
+# >
+{
+  year = 2025,
+  month = 12,
+  day = 16,
+}
 
 # === var_binding_00
 func main() -> (
