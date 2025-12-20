@@ -135,8 +135,16 @@ pub fn identifier(first: Option<impl Into<String>>, second: impl Into<String>) -
     }
 }
 
-pub fn order_by_one(expr: sql_ast::Expr) -> sql_ast::OrderBy {
-    sql_ast::OrderBy {
+pub fn order_by_one(mut expr: sql_ast::Expr) -> Option<sql_ast::OrderBy> {
+    if let sql_ast::Expr::IndexBy(order_by) = expr {
+        if let Some(order_by) = order_by {
+            expr = *order_by;
+        } else {
+            return None;
+        }
+    }
+
+    Some(sql_ast::OrderBy {
         exprs: vec![sql_ast::OrderByExpr {
             expr,
             options: sql_ast::OrderByOptions {
@@ -144,7 +152,7 @@ pub fn order_by_one(expr: sql_ast::Expr) -> sql_ast::OrderBy {
                 nulls_first: None,
             },
         }],
-    }
+    })
 }
 
 pub fn with() -> sql_ast::With {
@@ -163,11 +171,7 @@ pub fn cte(name: String, val: sql_ast::Query) -> sql_ast::Cte {
 }
 
 pub fn new_index(order_by: Option<sql_ast::Expr>) -> sql_ast::Expr {
-    sql_ast::Expr::Source(if let Some(order_by) = order_by {
-        format!("(ROW_NUMBER() OVER (ORDER BY {order_by}) - 1)::int4")
-    } else {
-        "(ROW_NUMBER() OVER () - 1)::int4".into()
-    })
+    sql_ast::Expr::IndexBy(order_by.map(Box::new))
 }
 
 pub fn new_ident<S: Into<String>>(name: S) -> sql_ast::Ident {

@@ -1858,8 +1858,6 @@ async fn sql_from_00() {
       director_id::int2 AS _3
     FROM
       movies
-    ORDER BY
-      (ROW_NUMBER() OVER () - 1)::int4
     ---
     [
       {
@@ -1965,7 +1963,7 @@ fn group_00() {
         sum = std::sum(this.values),
       })
     )
-    "#, lutra_bin::Value::unit())), @r"
+    "#, lutra_bin::Value::unit())), @"
     SELECT
       r0.value AS _0,
       COALESCE(SUM(r0.value), 0)::int8 AS _1
@@ -2007,8 +2005,6 @@ fn group_00() {
       ) AS r1
     GROUP BY
       r0.value
-    ORDER BY
-      (ROW_NUMBER() OVER () - 1)::int4
     ---
     [
       {
@@ -2043,7 +2039,7 @@ fn group_01() {
         },
       )
     )
-    "#, lutra_bin::Value::unit())), @r"
+    "#, lutra_bin::Value::unit())), @"
     SELECT
       COALESCE(SUM(r1.value), 0)::int8 AS _0
     FROM
@@ -2062,8 +2058,6 @@ fn group_01() {
       ) AS r1
     GROUP BY
       r0._0
-    ORDER BY
-      (ROW_NUMBER() OVER () - 1)::int4
     ---
     []
     ");
@@ -2172,8 +2166,6 @@ fn std_sql_expr_00() {
           TRUE as world,
           '2025-11-14'::date as x
       ) AS r0
-    ORDER BY
-      (ROW_NUMBER() OVER () - 1)::int4
     ---
     [
       {
@@ -2193,14 +2185,14 @@ fn std_sql_expr_01() {
     )")
 
     func main() -> sequence() | std::scan(1, func (a, c) -> a * c)
-    "#, lutra_bin::Value::unit())), @r"
+    "#, lutra_bin::Value::unit())), @"
     SELECT
       r7.value
     FROM
       (
         WITH r0 AS (
           SELECT
-            (ROW_NUMBER() OVER () - 1)::int4 AS index,
+            (ROW_NUMBER() OVER () -1)::int4 AS index,
             r1.value::int4 AS value
           FROM
             (

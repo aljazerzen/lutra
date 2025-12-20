@@ -20,7 +20,7 @@ pub fn compile(rel: cr::Expr, types: HashMap<&ir::Path, &ir::Ty>) -> sql_ast::Qu
 
         // apply the order
         let mut query = utils::query_select(select);
-        query.order_by = Some(utils::order_by_one(index.expr));
+        query.order_by = utils::order_by_one(index.expr);
         query
     } else {
         ctx.node_into_query(query, &rel_ty)
@@ -494,10 +494,8 @@ impl<'a> Context<'a> {
                 if input_ty.kind.is_array() {
                     // apply order from index column
                     if query.order_by.is_none() {
-                        query.order_by = Some(utils::order_by_one(utils::identifier(
-                            None::<&str>,
-                            COL_ARRAY_INDEX,
-                        )));
+                        query.order_by =
+                            utils::order_by_one(utils::identifier(None::<&str>, COL_ARRAY_INDEX));
                     }
                 }
                 Node::Query(query)
@@ -511,10 +509,8 @@ impl<'a> Context<'a> {
                 let offset = self.compile_column(offset_in);
                 query.offset = Some(offset);
                 if query.order_by.is_none() {
-                    query.order_by = Some(utils::order_by_one(utils::identifier(
-                        None::<&str>,
-                        COL_ARRAY_INDEX,
-                    )));
+                    query.order_by =
+                        utils::order_by_one(utils::identifier(None::<&str>, COL_ARRAY_INDEX));
                 }
                 Node::Query(query)
             }
@@ -536,10 +532,8 @@ impl<'a> Context<'a> {
                 let mut query = self.node_into_query(input, input_ty);
 
                 // overwrite ORDER BY
-                query.order_by = Some(utils::order_by_one(utils::identifier(
-                    None::<&str>,
-                    COL_ARRAY_INDEX,
-                )));
+                query.order_by =
+                    utils::order_by_one(utils::identifier(None::<&str>, COL_ARRAY_INDEX));
                 Node::Query(query)
             }
 

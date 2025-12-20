@@ -244,7 +244,7 @@ pub enum Expr {
     Source(String),
     Identifier(Ident),
     CompoundIdentifier(Vec<Ident>),
-
+    IndexBy(Option<Box<Expr>>),
     Case {
         operand: Option<Box<Expr>>,
         cases: Vec<CaseWhen>,
@@ -259,6 +259,14 @@ impl fmt::Display for Expr {
             Expr::Source(s) => f.write_str(s),
             Expr::Identifier(s) => write!(f, "{s}"),
             Expr::CompoundIdentifier(s) => write!(f, "{}", display_separated(s, ".")),
+
+            Expr::IndexBy(Some(order_by)) => {
+                f.write_str("(ROW_NUMBER() OVER (ORDER BY ")?;
+                order_by.fmt(f)?;
+                f.write_str(")-1)::int4")
+            }
+            Expr::IndexBy(None) => f.write_str("(ROW_NUMBER() OVER ()-1)::int4"),
+
             Expr::Case {
                 operand,
                 cases,
