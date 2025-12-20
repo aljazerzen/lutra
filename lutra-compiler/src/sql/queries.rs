@@ -2,8 +2,8 @@ use std::collections::HashMap;
 
 use lutra_bin::ir;
 
-use crate::sql::COL_ARRAY_INDEX;
 use crate::sql::utils::{Node, RelCols};
+use crate::sql::{COL_ARRAY_INDEX, COL_VALUE};
 use crate::sql::{cr, utils};
 use crate::utils::NameGenerator;
 
@@ -128,10 +128,11 @@ impl<'a> Context<'a> {
             cr::ExprKind::BindCorrelated(bound_in, main_in) => {
                 tracing::debug!("BindCorrelated");
 
-                // compile inner-to-outer
+                // compile bound
                 let bound = self.compile_rel(&bound_in.rel);
                 let (bound_name, bound_rels) = self.node_into_rel_var(bound, &bound_in.rel.ty);
 
+                // compile correlated
                 self.register_rel_var(bound_in, bound_name);
                 let main = self.compile_rel(main_in);
                 self.unregister_rel_var(bound_in);
@@ -157,7 +158,7 @@ impl<'a> Context<'a> {
                     cr::Transform::Aggregate(_)
                         | cr::Transform::Where(_)
                         | cr::Transform::IndexBy(_)
-                        | cr::Transform::Group(..)
+                        | cr::Transform::Group { .. }
                         | cr::Transform::Insert(_)
                 );
                 if needs_input_rel {
@@ -542,20 +543,23 @@ impl<'a> Context<'a> {
                 Node::Query(query)
             }
 
-            cr::Transform::Group(key, values_in) => {
+            cr::Transform::Group {
+                key,
+                values: values_in,
+            } => {
                 // wrap into a new query
                 let rel = self.node_into_rel(input, input_ty);
                 let mut select = self.rel_into_select(rel, output_ty, true);
 
-                let group_by = self.compile_columns(key);
+                let group_by = self.compile_columns(core::slice::from_ref(key));
 
                 let mut projection = vec![
-                    // index
-                    utils::new_index(None),
+                    utils::new_index(None), // index
                 ];
 
                 // values
                 let (values, val_rels) = self.compile_columns_scoped(values_in);
+
                 projection.extend(values);
                 select.from.extend(val_rels.into_iter().map(utils::lateral));
 
@@ -608,9 +612,9 @@ impl<'a> Context<'a> {
         let mut exprs = Vec::with_capacity(columns.len());
         let mut relations = Vec::new();
         for col in columns {
-            let scoped = self.compile_rel(col);
-            let (expr, rels) = self.node_into_column_and_rels(scoped, &col.ty);
-            exprs.push(expr);
+            let node = self.compile_rel(col);
+            let (expr, rels) = self.node_into_columns_and_rels(node, &col.ty);
+            exprs.extend(expr);
             relations.extend(rels);
         }
         (exprs, relations)
@@ -678,17 +682,17 @@ impl<'a> Context<'a> {
                     expr: generate_series,
                     alias: Some(sql_ast::TableAlias {
                         name: sql_ast::Ident::new("t"),
-                        columns: vec![sql_ast::Ident::new("value")],
+                        columns: vec![sql_ast::Ident::new(COL_VALUE)],
                     }),
                 });
                 let out_cast_ty = self.compile_ty_name(&args_in[0].ty);
                 select.projection = vec![
                     sql_ast::SelectItem {
-                        expr: sql_ast::Expr::Source(format!("(t.value - {start})::int4")),
+                        expr: sql_ast::Expr::Source(format!("(t.{COL_VALUE} - {start})::int4")),
                         alias: Some(COL_ARRAY_INDEX.into()),
                     },
                     sql_ast::SelectItem::unnamed(sql_ast::Expr::Source(format!(
-                        "t.value::{out_cast_ty}"
+                        "t.{COL_VALUE}::{out_cast_ty}"
                     ))),
                 ];
                 return Node::Select(select);
@@ -807,7 +811,7 @@ impl<'a> Context<'a> {
                     lateral: false,
                     alias: Some(sql_ast::TableAlias {
                         name: sql_ast::Ident::new("t"),
-                        columns: vec![sql_ast::Ident::new("value")],
+                        columns: vec![sql_ast::Ident::new(COL_VALUE)],
                     }),
                     expr: sql_ast::RelExpr::Function {
                         name: utils::new_object_name(["string_to_table"]),
@@ -819,7 +823,7 @@ impl<'a> Context<'a> {
                         expr: utils::new_index(None),
                         alias: Some(COL_ARRAY_INDEX.into()),
                     },
-                    sql_ast::SelectItem::unnamed(utils::identifier(Some("t"), "value")),
+                    sql_ast::SelectItem::unnamed(utils::identifier(Some("t"), COL_VALUE)),
                 ];
                 return Node::Select(select);
             }

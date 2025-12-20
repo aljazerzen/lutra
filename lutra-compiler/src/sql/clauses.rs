@@ -68,6 +68,8 @@ impl<'a> Context<'a> {
         })
     }
 
+    /// Constructs a reference to a column of a bound relational expr.
+    /// !! Can only be used when reference really is exactly one column !!
     pub fn new_rel_col(
         &mut self,
         rel: &cr::BoundExpr,
@@ -80,6 +82,32 @@ impl<'a> Context<'a> {
                 cr::Transform::ProjectPick(vec![col_position]),
             ),
             ty: col_ty,
+        }
+    }
+
+    /// Constructs a reference to an array item.
+    /// If needed, the reference is also deserialized.
+    pub fn new_array_item_ref(&mut self, rel: &cr::BoundExpr) -> cr::Expr {
+        let array_ty = self.get_ty_mat(&rel.rel.ty);
+        let item_ty = self.get_ty_mat(array_ty.kind.as_array().unwrap());
+        let item_ty = item_ty.clone();
+
+        let mut item_ref = cr::ExprKind::Transform(
+            self.new_binding(cr::Expr::new_rel_ref(rel)),
+            cr::Transform::ProjectDiscard(vec![0]),
+        );
+
+        // deserialize from JSON if needed
+        if item_ty.kind.is_array() {
+            item_ref = cr::ExprKind::From(cr::From::JsonUnpack(Box::new(cr::Expr {
+                kind: item_ref,
+                ty: ir::Ty::new(ir::TyPrimitive::text),
+            })));
+        }
+
+        cr::Expr {
+            kind: item_ref,
+            ty: item_ty,
         }
     }
 
@@ -693,7 +721,6 @@ impl<'a> Context<'a> {
             "std::map" => {
                 let array = self.compile_rel(&call.args[0]);
                 let array = self.new_binding(array);
-                let item_ty = array.rel.ty.kind.as_array().unwrap().clone();
                 let func = &call.args[1];
 
                 // index
@@ -701,17 +728,7 @@ impl<'a> Context<'a> {
 
                 // compile func body
                 let func = self.as_function_or_wrap(func);
-                let mut item_ref = cr::ExprKind::Transform(
-                    self.new_binding(cr::Expr::new_rel_ref(&array)),
-                    cr::Transform::ProjectDiscard(vec![0]), // discard index
-                );
-
-                if item_ty.kind.is_array() {
-                    item_ref = cr::ExprKind::From(cr::From::JsonUnpack(Box::new(cr::Expr {
-                        kind: item_ref,
-                        ty: ir::Ty::new(ir::TyPrimitive::text),
-                    })));
-                }
+                let item_ref = self.new_array_item_ref(&array).kind;
 
                 self.functions
                     .insert(func.id, FuncProvider::Expr(vec![item_ref]));
@@ -731,7 +748,6 @@ impl<'a> Context<'a> {
             "std::flat_map" => {
                 let array = self.compile_rel(&call.args[0]);
                 let array = self.new_binding(array);
-                let item_ty = array.rel.ty.kind.as_array().unwrap().clone();
                 let func = &call.args[1];
 
                 let output_item_ty = *expr.ty.kind.clone().into_array().unwrap();
@@ -742,17 +758,7 @@ impl<'a> Context<'a> {
 
                 // compile func body
                 let func = func.kind.as_function().unwrap();
-                let mut item_ref = cr::ExprKind::Transform(
-                    self.new_binding(cr::Expr::new_rel_ref(&array)),
-                    cr::Transform::ProjectDiscard(vec![0]), // discard index
-                );
-
-                if item_ty.kind.is_array() {
-                    item_ref = cr::ExprKind::From(cr::From::JsonUnpack(Box::new(cr::Expr {
-                        kind: item_ref,
-                        ty: ir::Ty::new(ir::TyPrimitive::text),
-                    })));
-                }
+                let item_ref = self.new_array_item_ref(&array).kind;
 
                 self.functions
                     .insert(func.id, FuncProvider::Expr(vec![item_ref]));
@@ -791,13 +797,10 @@ impl<'a> Context<'a> {
                 let func = &call.args[1];
                 let func = func.kind.as_function().unwrap();
 
-                let item_ref = cr::ExprKind::Transform(
-                    self.new_binding(cr::Expr::new_rel_ref(&array)),
-                    cr::Transform::ProjectDiscard(vec![0]), // discard index
-                );
+                let item = self.new_array_item_ref(&array);
 
                 self.functions
-                    .insert(func.id, FuncProvider::Expr(vec![item_ref]));
+                    .insert(func.id, FuncProvider::Expr(vec![item.kind]));
                 let cond = self.compile_column(&func.body);
                 self.functions.remove(&func.id);
 
@@ -810,13 +813,10 @@ impl<'a> Context<'a> {
                 let func = &call.args[1];
                 let func = func.kind.as_function().unwrap();
 
-                let item_ref = cr::ExprKind::Transform(
-                    self.new_binding(cr::Expr::new_rel_ref(&array)),
-                    cr::Transform::ProjectDiscard(vec![0]), // discard index
-                );
+                let item = self.new_array_item_ref(&array);
 
                 self.functions
-                    .insert(func.id, FuncProvider::Expr(vec![item_ref]));
+                    .insert(func.id, FuncProvider::Expr(vec![item.kind]));
                 let key = self.compile_column(&func.body);
                 self.functions.remove(&func.id);
 
@@ -829,9 +829,7 @@ impl<'a> Context<'a> {
                 let array = self.compile_rel(&call.args[0]);
                 let array = self.new_binding(array);
 
-                let item_ty = call.args[0].ty.kind.as_array().unwrap();
-
-                let item = self.new_rel_col(&array, 1, *item_ty.clone());
+                let item = self.new_array_item_ref(&array);
 
                 let mut args = vec![item];
                 args.extend(call.args[1..].iter().map(|a| self.compile_column(a)));
@@ -856,8 +854,7 @@ impl<'a> Context<'a> {
                 let array = self.compile_rel(&call.args[0]);
                 let array = self.new_binding(array);
 
-                let item_ty = expr.ty.kind.as_array().unwrap();
-                let item = self.new_rel_col(&array, 1, *item_ty.clone());
+                let item = self.new_array_item_ref(&array);
 
                 let mut args = vec![item];
                 args.extend(call.args[1..].iter().map(|a| self.compile_column(a)));
@@ -1023,13 +1020,14 @@ impl<'a> Context<'a> {
 
                 self.functions
                     .insert(func.id, FuncProvider::Expr(vec![item_ref.clone()]));
-                let key = self.compile_column_list(&func.body).unwrap_columns();
+                let key = self.compile_rel(&func.body);
                 self.functions.remove(&func.id);
 
-                let mut values = key.clone();
-                values.push(cr::Expr::new_json_pack(cr::Expr::new_rel_ref(&array)));
+                let values = cr::Expr::new_json_pack(cr::Expr::new_rel_ref(&array));
+                let values = vec![key.clone(), values];
 
-                cr::ExprKind::Transform(array, cr::Transform::Group(key, values))
+                let key = Box::new(key);
+                cr::ExprKind::Transform(array, cr::Transform::Group { key, values })
             }
 
             "std::append" => {
@@ -1387,7 +1385,7 @@ impl ColumnsOrUnpack {
     fn unwrap_columns(self) -> Vec<cr::Expr> {
         match self {
             ColumnsOrUnpack::Columns(cols) => cols,
-            ColumnsOrUnpack::Unpack(rel) => panic!("{rel:?}"),
+            ColumnsOrUnpack::Unpack(rel) => panic!("expected columns, found: {rel:?}"),
         }
     }
 }

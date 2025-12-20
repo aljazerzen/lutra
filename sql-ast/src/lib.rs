@@ -23,7 +23,7 @@ use core::{
     hash,
 };
 
-use display_utils::{Indent, NewLine, SpaceOrNewline};
+use display_utils::{NewLine, SpaceOrNewline};
 
 pub use self::dml::{Delete, Insert};
 pub use self::query::{
@@ -34,6 +34,7 @@ pub use self::query::{
 };
 
 pub use self::string::escape as escape_string;
+pub use display_utils::{DisplayCommaSeparated, Indent};
 
 pub struct DisplaySeparated<'a, T>
 where
@@ -281,7 +282,13 @@ impl fmt::Display for Expr {
                 SpaceOrNewline.fmt(f)?;
                 f.write_str("END")
             }
-            Expr::Subquery(s) => write!(f, "({s})"),
+            Expr::Subquery(s) => {
+                f.write_str("(")?;
+                SpaceOrNewline.fmt(f)?;
+                Indent(s).fmt(f)?;
+                SpaceOrNewline.fmt(f)?;
+                f.write_str(")")
+            }
         }
     }
 }

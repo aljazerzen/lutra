@@ -7,7 +7,7 @@
 use core::fmt::{self, Display, Write};
 
 /// A wrapper around a value that adds an indent to the value when displayed with {:#}.
-pub(crate) struct Indent<T>(pub T);
+pub struct Indent<T>(pub T);
 
 const INDENT: &str = "  ";
 
@@ -68,7 +68,7 @@ impl Display for SpaceOrNewline {
 
 /// A value that displays a comma-separated list of values.
 /// When pretty-printed (using {:#}), it displays each value on a new line.
-pub(crate) struct DisplayCommaSeparated<'a, T: fmt::Display>(pub(crate) &'a [T]);
+pub struct DisplayCommaSeparated<'a, T: fmt::Display>(pub &'a [T]);
 
 impl<T: fmt::Display> fmt::Display for DisplayCommaSeparated<'_, T> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {

@@ -177,8 +177,8 @@ impl<'a> queries::Context<'a> {
             assert_eq!(
                 rel_cols.len(),
                 values.len(),
-                "expected columns: {rel_cols:?}, got: {:?}, ty: {}",
-                values,
+                "\n  expected columns: {rel_cols:?},\n  got: [\n{:#}\n  ],\n  ty: {}",
+                sql_ast::Indent(sql_ast::Indent(sql_ast::DisplayCommaSeparated(&values))),
                 ir::print_ty(ty)
             );
             (values, rel_cols)

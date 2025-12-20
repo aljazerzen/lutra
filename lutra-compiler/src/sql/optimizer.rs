@@ -19,6 +19,7 @@ impl cr::CrFold for Optimizer {
         expr = simplify_discard_row(expr);
         expr = simplify_pick_discard(expr);
         expr = simplify_row_pick(expr);
+        expr = simplify_pick_pick(expr);
         expr = unpack_pack(expr);
         expr = pack_unpack(expr);
 
@@ -175,6 +176,29 @@ fn simplify_pick_discard(expr: cr::Expr) -> cr::Expr {
     }
 }
 
+fn simplify_pick_pick(expr: cr::Expr) -> cr::Expr {
+    // match
+    let cr::ExprKind::Transform(bound, cr::Transform::ProjectPick(_)) = &expr.kind else {
+        return expr;
+    };
+    let cr::ExprKind::Transform(_, cr::Transform::ProjectPick(_)) = &bound.rel.kind else {
+        return expr;
+    };
+    tracing::debug!("simplify_pick_pick");
+
+    // unpack
+    let cr::ExprKind::Transform(bound, cr::Transform::ProjectPick(pick_outer)) = expr.kind else {
+        unreachable!();
+    };
+    let mut rel = bound.rel;
+    let cr::ExprKind::Transform(_, cr::Transform::ProjectPick(pick_inner)) = &mut rel.kind else {
+        unreachable!();
+    };
+
+    utils::pick_by_position(pick_inner, &pick_outer);
+    rel
+}
+
 fn simplify_row_pick(expr: cr::Expr) -> cr::Expr {
     // match
     let cr::ExprKind::From(cr::From::Row(row)) = &expr.kind else {
@@ -230,7 +254,7 @@ fn push_correlated_into_group(expr: cr::Expr) -> (cr::Expr, bool) {
     let cr::ExprKind::BindCorrelated(bound, correlated) = &expr.kind else {
         return (expr, false);
     };
-    let cr::ExprKind::Transform(_, cr::Transform::Group(_, _)) = &bound.rel.kind else {
+    let cr::ExprKind::Transform(_, cr::Transform::Group { .. }) = &bound.rel.kind else {
         return (expr, false);
     };
     let cr::ExprKind::From(cr::From::Row(correlated)) = &correlated.kind else {
@@ -240,7 +264,7 @@ fn push_correlated_into_group(expr: cr::Expr) -> (cr::Expr, bool) {
     if !is_rel_col(&correlated[0], bound.id, 0) {
         return (expr, false);
     }
-    tracing::debug!("push_correlated_into_group");
+    tracing::debug!("push_correlated_into_group: {expr:#?}");
 
     // unpack
     let cr::ExprKind::BindCorrelated(bound, correlated) = expr.kind else {
@@ -250,7 +274,7 @@ fn push_correlated_into_group(expr: cr::Expr) -> (cr::Expr, bool) {
         unreachable!()
     };
     let mut group = bound.rel;
-    let cr::ExprKind::Transform(_, cr::Transform::Group(_, group_values)) = &mut group.kind else {
+    let cr::ExprKind::Transform(_, cr::Transform::Group { values, .. }) = &mut group.kind else {
         unreachable!()
     };
 
@@ -260,8 +284,10 @@ fn push_correlated_into_group(expr: cr::Expr) -> (cr::Expr, bool) {
     // inline group values into the correlated row
     // 1) construct bound_rel that we'll use in place of the original bound
     // 2) replace refs to the bound rel
-    let mut group_outputs = std::mem::take(group_values);
-    group_outputs.insert(0, cr::Expr::null(ir::Ty::new(ir::TyPrimitive::int64))); // fake index
+    let mut group_outputs = vec![
+        cr::Expr::null(ir::Ty::new(ir::TyPrimitive::int64)), // fake index
+    ];
+    group_outputs.append(values); // values
     let bound_rel = cr::Expr {
         kind: cr::ExprKind::From(cr::From::Row(group_outputs)),
         ty: group.ty,
@@ -269,7 +295,7 @@ fn push_correlated_into_group(expr: cr::Expr) -> (cr::Expr, bool) {
     let mut replacer = RelRefReplacer::new(bound.id, bound_rel);
 
     // replace Group.values with the correlated row
-    group_values.extend(correlated.map(|c| replacer.fold_expr(c).unwrap()));
+    values.extend(correlated.map(|c| replacer.fold_expr(c).unwrap()));
 
     // return group with input and keys unchanged
     group.ty = expr.ty;

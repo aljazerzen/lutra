@@ -109,9 +109,10 @@ pub fn fold_transform<T: ?Sized + CrFold>(fold: &mut T, transform: Transform) ->
         Transform::Where(expr) => Transform::Where(Box::new(fold.fold_expr(*expr)?)),
         Transform::IndexBy(expr) => Transform::IndexBy(fold_option(fold, expr)?),
         Transform::Order => Transform::Order,
-        Transform::Group(keys, values) => {
-            Transform::Group(fold_exprs(fold, keys)?, fold_exprs(fold, values)?)
-        }
+        Transform::Group { key, values } => Transform::Group {
+            key: Box::new(fold.fold_expr(*key)?),
+            values: fold_exprs(fold, values)?,
+        },
         Transform::Insert(name) => Transform::Insert(name),
     })
 }

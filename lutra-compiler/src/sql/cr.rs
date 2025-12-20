@@ -114,8 +114,13 @@ pub enum Transform {
     /// Applies the order from index column to rows of relation.
     Order,
 
-    /// Groups rows into partitions by a given key
-    Group(Vec<Expr>, Vec<Expr>),
+    /// Groups rows by a given key and computes a value for each partition.
+    /// Returns a row for each key.
+    /// Columns include the index, followed by columns of the value expr.
+    Group {
+        key: Box<Expr>,
+        values: Vec<Expr>,
+    },
 
     /// Inserts rows into a table
     Insert(String),

@@ -65,16 +65,16 @@
     },
     "nixpkgs": {
       "locked": {
-        "lastModified": 1763745798,
-        "narHash": "sha256-UsHwCUjxJlNEqocTtUt0F5Lt2ryajRyZFw4OgD7FpZU=",
+        "lastModified": 1766160881,
+        "narHash": "sha256-ABOSYif/z8uBooQvtltukBDEs82GbusX1dhQGJm7om8=",
         "owner": "aljazerzen",
         "repo": "nixpkgs",
-        "rev": "bdf0b657d51c733d976aeb12755742c5d221fe11",
+        "rev": "f64b2d7b482c9150206aac9ecffa910b080bc2c9",
         "type": "github"
       },
       "original": {
         "owner": "aljazerzen",
-        "ref": "init-zensical-prerelease",
+        "ref": "init-zensical",
         "repo": "nixpkgs",
         "type": "github"
       }

@@ -1,6 +1,6 @@
 {
   inputs = {
-    nixpkgs.url = "github:aljazerzen/nixpkgs/init-zensical-prerelease";
+    nixpkgs.url = "github:aljazerzen/nixpkgs/init-zensical";
     flake-utils.url = "github:numtide/flake-utils";
     fenix = {
       url = "github:nix-community/fenix";

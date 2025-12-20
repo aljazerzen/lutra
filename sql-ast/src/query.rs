@@ -191,7 +191,6 @@ impl fmt::Display for SetExpr {
                 op,
                 set_quantifier,
             } => {
-                SpaceOrNewline.fmt(f)?;
                 Indent(left).fmt(f)?;
                 SpaceOrNewline.fmt(f)?;
 
@@ -201,7 +200,6 @@ impl fmt::Display for SetExpr {
 
                 SpaceOrNewline.fmt(f)?;
                 Indent(right).fmt(f)?;
-                SpaceOrNewline.fmt(f)?;
                 Ok(())
             }
             SetExpr::Source(s) => f.write_str(s),
@@ -306,7 +304,7 @@ impl fmt::Display for Select {
         if !self.group_by.is_empty() {
             space_or_nl(f, &mut is_first)?;
             f.write_str("GROUP BY ")?;
-            Indent(display_comma_separated(&self.group_by)).fmt(f)?;
+            display_comma_separated(&self.group_by).fmt(f)?;
         }
 
         if f.alternate() {
