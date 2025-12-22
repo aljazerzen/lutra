@@ -286,10 +286,7 @@ impl NameResolver<'_> {
         };
 
         let Some(def) = base_mod.defs.get(&first) else {
-            return Err(Diagnostic::new_custom("name does not exist".to_string())
-                .push_hint(format!("base_fq: {base_fq}"))
-                .push_hint(format!("first: {first}"))
-                .push_hint(format!("steps: {steps}")));
+            return Err(Diagnostic::new_custom("name does not exist".to_string()));
         };
         base_fq.push(first);
 

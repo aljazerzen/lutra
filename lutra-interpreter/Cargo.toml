@@ -10,14 +10,17 @@ version.workspace = true
 test = false
 
 [dependencies]
-arrow = "55.1.0"
 lutra-bin = { workspace = true }
 lutra-runner = { workspace = true }
-parquet = { version = "55.1.0" }
-thiserror.workspace = true
-tracing.workspace = true
-chrono.workspace = true
-chrono-tz.workspace = true
+
+lutra-arrow = { workspace = true }
+parquet = { workspace = true }
+arrow = { workspace = true }
+
+thiserror = { workspace = true }
+tracing = { workspace = true }
+chrono = { workspace = true }
+chrono-tz = { workspace = true }
 
 [dev-dependencies]
 insta = { workspace = true }

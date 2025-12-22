@@ -1,6 +1,7 @@
 [workspace]
 members = [
     "lutra-bin",
+    "lutra-arrow",
     "lutra-bin/python",
     "lutra-cli",
     "lutra-codegen",
@@ -42,7 +43,10 @@ tokio = "1.42.0"
 strum = { version = "0.26.3", features = ["std", "derive"] }
 chrono = { version = "0.4.42", default-features = false }
 chrono-tz = { version = "0.10.4", default-features = false }
+arrow = "55.1.0"
+parquet = "55.1.0"
 
+lutra-arrow = { version = "0.2", registry = "codeberg-org", path = "lutra-arrow" }
 lutra-bin = { version = "0.2", registry = "codeberg-org", path = "lutra-bin", default-features = false }
 lutra-bin-python = { version = "0.2", registry = "codeberg-org", path = "lutra-bin/python" }
 lutra-cli = { version = "0.2", registry = "codeberg-org", path = "lutra-cli" }

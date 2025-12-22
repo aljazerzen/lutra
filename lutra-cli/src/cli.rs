@@ -1,18 +1,15 @@
+mod io;
 mod language_server;
 
 use std::collections::HashMap;
 use std::path;
-use std::str::FromStr;
 
 use clap::{Args, Parser, Subcommand};
 
-use lutra_bin::{Encode, ir, typed_data};
+use lutra_bin::Encode;
 use lutra_codegen::ProgramFormat;
 use lutra_compiler::{CheckParams, DiscoverParams, codespan};
 use lutra_runner::Run;
-
-use tokio::fs;
-use tokio::io::{self, AsyncWriteExt};
 
 fn main() {
     let action = Command::parse();
@@ -75,7 +72,7 @@ pub enum Action {
     Run(RunCommand),
 
     /// Pull interface from the runner
-    Pull(PullSchemaPostgresCommand),
+    Pull(PullInterfaceCommand),
 
     /// Compile the project and generate bindings code
     Codegen(CodegenCommand),
@@ -262,6 +259,12 @@ pub struct RunCommand {
     #[clap(long)]
     input: Option<String>,
 
+    /// Output file format.
+    /// If omitted, it is inferred from input file extension.
+    /// Falls back to `lb`.
+    #[clap(long)]
+    input_format: Option<DataFormat>,
+
     /// Program to execute.
     ///
     /// Usually this is a path to an expression in the project, but it can be
@@ -271,7 +274,7 @@ pub struct RunCommand {
     #[clap(long, default_value = "main")]
     program: String,
 
-    /// Write output to `.lb` file.
+    /// Write output to a file.
     ///
     /// When omitted, output is written to stdout in Lutra source format.
     #[clap(long)]
@@ -281,12 +284,12 @@ pub struct RunCommand {
     /// If omitted, it is inferred from output file extension.
     /// Falls back to `lt`.
     #[clap(long)]
-    output_format: Option<FileFormat>,
+    output_format: Option<DataFormat>,
 }
 
 #[derive(Clone, Copy, clap::ValueEnum, strum::AsRefStr, strum::EnumString)]
 #[strum(serialize_all = "snake_case")]
-enum FileFormat {
+enum DataFormat {
     /// Lutra source
     Lt,
     /// Lutra data (binary)
@@ -295,6 +298,8 @@ enum FileFormat {
     Ltd,
     /// Comma Separated Values
     Csv,
+    /// Parquet
+    Parquet,
 }
 
 #[tokio::main(flavor = "current_thread")]
@@ -304,6 +309,7 @@ pub async fn run(cmd: RunCommand) -> anyhow::Result<()> {
     let project = lutra_compiler::discover(cmd.discover.clone())?;
 
     let project = lutra_compiler::check(project, cmd.check)?;
+    let to_project_path = |p: &str| project.source.get_absolute_path(p);
 
     let mut program = cmd.program;
     if cmd.input.is_some() {
@@ -318,26 +324,15 @@ pub async fn run(cmd: RunCommand) -> anyhow::Result<()> {
     )?;
 
     // read input
-    eprintln!("Reading input...");
-    let input = if let Some(input_file) = cmd.input {
-        let input_file = project.source.root.as_path().join(input_file);
-        fs::read(input_file).await?
-    } else {
-        if !ty.input.is_unit() {
-            return Err(anyhow::anyhow!(
-                "Missing --input. Expected type {}",
-                lutra_bin::ir::print_ty(&ty.input)
-            ));
-        }
-
-        Vec::new()
-    };
+    // eprintln!("Reading input...");
+    let input_path = cmd.input.as_deref().map(to_project_path);
+    let input = io::read_input(input_path, cmd.input_format, &ty).await?;
 
     // execute
     eprintln!("Executing...");
     let output = if cmd.runner.interpreter {
-        let runner =
-            lutra_interpreter::InterpreterRunner::default().with_file_system(cmd.discover.project);
+        let runner = lutra_interpreter::InterpreterRunner::default()
+            .with_file_system(Some(project.source.get_root_dir().to_path_buf()));
 
         let handle = runner.prepare(program).await?;
         runner.execute(&handle, &input).await?
@@ -350,92 +345,10 @@ pub async fn run(cmd: RunCommand) -> anyhow::Result<()> {
     };
 
     // handle output
-    let output_path = cmd
-        .output
-        .as_ref()
-        .map(|o| project.source.root.as_path().join(o));
-    let format = (cmd.output_format)
-        // try to infer from output path extension
-        .or_else(|| {
-            output_path
-                .as_ref()
-                .and_then(|p| p.extension())
-                .and_then(|ex| ex.to_str())
-                .and_then(|ex| FileFormat::from_str(ex).ok())
-        })
-        // fallback to lt
-        .unwrap_or(FileFormat::Lt);
-    let mut writer: Box<dyn io::AsyncWrite + Unpin> = if let Some(output_path) = &output_path {
-        Box::new(io::BufWriter::new(fs::File::create(output_path).await?))
-    } else {
-        Box::new(io::BufWriter::new(io::stdout()))
-    };
-    let size = write_output(&mut writer, &output, format, &ty.output, &ty.defs).await?;
-    writer.flush().await?;
-    writer.shutdown().await?;
-
-    if let Some(output_path) = &output_path {
-        eprintln!(
-            "Output written to {} ({}, {size} bytes)",
-            output_path.display(),
-            format.as_ref(),
-        );
-    }
+    let output_path = cmd.output.as_deref().map(to_project_path);
+    io::write_output(&output, output_path, cmd.output_format, &ty).await?;
 
     Ok(())
-}
-
-async fn write_output(
-    w: &mut (impl io::AsyncWrite + Unpin),
-    data: &[u8],
-    format: FileFormat,
-    ty: &ir::Ty,
-    ty_defs: &[ir::TyDef],
-) -> anyhow::Result<usize> {
-    let mut size: usize = 0;
-    let s = &mut size;
-
-    async fn write(
-        w: &mut (impl io::AsyncWrite + Unpin),
-        s: &mut usize,
-        buf: &[u8],
-    ) -> io::Result<()> {
-        *s += buf.len();
-        w.write_all(buf).await
-    }
-
-    match format {
-        FileFormat::Ld => write(w, s, data).await?,
-
-        FileFormat::Lt => {
-            write(w, s, "const output = ".as_bytes()).await?;
-            let source = lutra_bin::print_source(data, ty, ty_defs)?;
-            write(w, s, source.as_bytes()).await?;
-            write(w, s, "\n".as_bytes()).await?;
-        }
-
-        FileFormat::Ltd => {
-            let mut buf = lutra_bin::bytes::BytesMut::new();
-            typed_data::encode(&mut buf, data, ty, ty_defs)?;
-            write(w, s, &buf).await?
-        }
-        FileFormat::Csv => {
-            let tabular = lutra_bin::Tabular::new(data, ty, ty_defs);
-            write(w, s, tabular.column_names().join(",").as_bytes()).await?;
-            write(w, s, "\n".as_bytes()).await?;
-            for row in tabular {
-                for (index, cell) in row.iter().enumerate() {
-                    if index > 0 {
-                        write(w, s, ",".as_bytes()).await?;
-                    }
-                    let source = lutra_bin::print_source(cell.data(), cell.ty(), cell.ty_defs())?;
-                    write(w, s, source.as_bytes()).await?;
-                }
-                write(w, s, "\n".as_bytes()).await?;
-            }
-        }
-    }
-    Ok(size)
 }
 
 async fn init_runner_postgres(url: &str) -> anyhow::Result<lutra_runner_postgres::RunnerAsync> {
@@ -453,15 +366,19 @@ async fn init_runner_postgres(url: &str) -> anyhow::Result<lutra_runner_postgres
 }
 
 #[derive(clap::Parser)]
-pub struct PullSchemaPostgresCommand {
+pub struct PullInterfaceCommand {
     #[clap(flatten)]
     runner: RunnerParams,
+
+    /// Path to project directory
+    #[clap(long)]
+    project: Option<path::PathBuf>,
 }
 
 #[tokio::main(flavor = "current_thread")]
-pub async fn pull_interface(cmd: PullSchemaPostgresCommand) -> anyhow::Result<()> {
+pub async fn pull_interface(cmd: PullInterfaceCommand) -> anyhow::Result<()> {
     let interface = if cmd.runner.interpreter {
-        let runner = lutra_interpreter::InterpreterRunner::default();
+        let runner = lutra_interpreter::InterpreterRunner::default().with_file_system(cmd.project);
         runner.get_interface().await?
     } else if let Some(pg_url) = cmd.runner.postgres {
         let runner = init_runner_postgres(&pg_url).await?;

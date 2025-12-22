@@ -45,6 +45,7 @@ publish:
     cargo publish -p lutra-codegen
     cargo publish -p lutra-runner
     cargo publish -p lutra-runner-postgres
+    cargo publish -p lutra-arrow
     cargo publish -p lutra-interpreter
     cargo publish -p lutra-cli
 

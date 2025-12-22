@@ -18,14 +18,11 @@ pub enum Error {
     #[error("cannot find project root")]
     CannotFindProjectRoot,
 
-    #[error("cannot read source file {file}: {io:?}")]
+    #[error("cannot read source file at {file}:\n  {io}")]
     CannotReadSourceFile {
         file: std::path::PathBuf,
         io: std::io::Error,
     },
-
-    #[error("invalid source structure: {problem}")]
-    InvalidSourceStructure { problem: String },
 
     #[error("{}", DisplayMessages(.diagnostics))]
     Compile { diagnostics: Vec<DiagnosticMessage> },

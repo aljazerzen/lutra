@@ -106,11 +106,20 @@ impl SourceTree {
         self.sources.keys().map(|path| self.get_absolute_path(path))
     }
 
-    pub fn get_absolute_path(&self, path: &path::Path) -> path::PathBuf {
+    pub fn get_absolute_path(&self, path: impl AsRef<path::Path>) -> path::PathBuf {
+        let path = path.as_ref();
         if path.as_os_str().is_empty() {
             self.root.to_path_buf()
         } else {
-            self.root.join(path)
+            self.get_root_dir().join(path)
+        }
+    }
+
+    pub fn get_root_dir(&self) -> &path::Path {
+        if self.root.extension().is_some_and(|e| e == "lt") {
+            self.root.parent().unwrap()
+        } else {
+            &self.root
         }
     }
 

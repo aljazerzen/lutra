@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::ffi::OsStr;
-use std::fs;
 use std::path::{Path, PathBuf};
+use std::{fs, io};
 
 use crate::error::Error;
 use crate::project;
@@ -9,7 +9,7 @@ use crate::project;
 #[cfg_attr(feature = "clap", derive(clap::Parser))]
 #[derive(Clone)]
 pub struct DiscoverParams {
-    /// Path to the project directory
+    /// Path to a project file
     #[cfg_attr(feature = "clap", arg(long))]
     pub project: Option<PathBuf>,
 }
@@ -62,7 +62,19 @@ pub fn discover(params: DiscoverParams) -> Result<project::SourceTree, Error> {
             c
         } else {
             // read the file
-            let content = fs::read_to_string(&path)?;
+            let content = match fs::read_to_string(&path) {
+                Ok(c) => c,
+                Err(e) if path.ends_with("module.lt") && e.kind() == io::ErrorKind::NotFound => {
+                    // subdir/module.lt is allowed not to exist
+                    continue;
+                }
+                Err(e) => {
+                    return Err(Error::CannotReadSourceFile {
+                        file: path.to_path_buf(),
+                        io: e,
+                    });
+                }
+            };
 
             // but include it only if it is a submodule
             let is_submodule = crate::parser::is_submodule(&content).unwrap_or(true);

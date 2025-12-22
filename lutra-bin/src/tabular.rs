@@ -4,7 +4,7 @@ use std::collections::HashMap;
 use crate::{TupleReader, ir};
 use crate::{string::ToString, vec};
 
-/// Utiliy for iterating over arbitrary data in tabular manner (as rows and columns).
+/// Utility for iterating over arbitrary data in tabular manner (as rows and columns).
 pub struct Tabular<'d, 't> {
     inner: TableCell<'d, 't>,
 

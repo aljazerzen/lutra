@@ -1537,24 +1537,27 @@ pub mod std_fs {
         let mut layout_args = assume::LayoutArgsReader::new(layout_args);
         let ty_item = assume::bytes(layout_args.next_slice());
         let ty_item = ir::Ty::decode(&ty_item).map_err(|_| EvalError::BadProgram)?;
+        let ty = ir::Ty::new(ir::TyKind::Array(Box::new(ty_item)));
 
         // init parquet reader
         let file = match fs::File::open(&file_path) {
             Ok(file) => file,
             Err(e) => {
-                return Err(EvalError::ExternalError(format!("read_parquet: {e}")));
+                return Err(EvalError::ExternalError(format!(
+                    "read_parquet({}): {e}",
+                    file_path.display()
+                )));
             }
         };
         let builder = ParquetRecordBatchReaderBuilder::try_new(file).unwrap();
 
         let reader = builder.build().unwrap();
 
-        crate::arrow::validate_schema(&reader.schema(), &ty_item).unwrap();
+        lutra_arrow::validate_schema(&reader.schema(), &ty, &[]).unwrap();
 
-        let data =
-            crate::arrow::arrow_to_lutra(reader, &ty_item).map_err(|_| EvalError::BadProgram)?;
+        let data = lutra_arrow::arrow_to_lutra(reader, &ty, &[]).ok_or(EvalError::BadProgram)?;
 
-        Ok(Cell::Data(data))
+        Ok(Cell::Data(Data::new(data.to_vec())))
     }
 
     pub fn write_parquet(
@@ -1576,7 +1579,7 @@ pub mod std_fs {
         let ty_item = ir::Ty::decode(&ty_item).map_err(|_| EvalError::BadProgram)?;
 
         // convert lutra to arrow
-        let data = crate::arrow::lutra_to_arrow(data, &ty_item);
+        let data = lutra_arrow::lutra_to_arrow(data, &ty_item);
 
         // write to parquet
         let file = match fs::File::create(&file_path) {

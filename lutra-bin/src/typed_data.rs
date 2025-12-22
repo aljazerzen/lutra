@@ -11,6 +11,14 @@ use crate::ir;
 use crate::vec;
 use crate::{ArrayReader, Decode, Encode, Layout, Result};
 
+pub fn data_offset() -> usize {
+    let ty_size = ir::Ty::head_size().div_ceil(8);
+
+    let ty_defs_size = <vec::Vec<ir::TyDef> as Layout>::head_size().div_ceil(8);
+
+    ty_size + ty_defs_size
+}
+
 pub fn decode(buffer: &[u8]) -> Result<(&[u8], ir::Ty, vec::Vec<ir::TyDef>)> {
     let ty = ir::Ty::decode(buffer)?;
     let field_size = ir::Ty::head_size().div_ceil(8);

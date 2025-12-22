@@ -3,198 +3,15 @@ use std::borrow::Cow;
 use std::sync::Arc;
 
 use arrow::array::{self as arrow_array};
-use arrow::datatypes::{self as arrow_datatypes, DataType, Field, Schema, SchemaRef};
+use arrow::datatypes::{DataType, Field, Schema, SchemaRef};
 
-use lutra_bin::{Decode, ir};
+use lutra_bin::{ArrayReader, bytes, ir};
 
-use crate::{ArrayWriter, Data, TupleWriter};
-
-pub fn validate_schema(schema: &arrow_datatypes::Schema, item_ty: &ir::Ty) -> Result<(), String> {
-    let ty_fields = item_ty.kind.as_tuple().unwrap();
-
-    for (index, (ty_f, f)) in std::iter::zip(ty_fields, schema.fields()).enumerate() {
-        let field_name = ty_f
-            .name
-            .clone()
-            .unwrap_or_else(|| format!("field {index}"));
-
-        validate_field(ty_f, f).map_err(|m| format!("{field_name}: {m}"))?;
-    }
-    Ok(())
-}
-
-fn validate_field(
-    ty_f: &ir::TyTupleField,
-    f: &std::sync::Arc<arrow_datatypes::Field>,
-) -> Result<(), String> {
-    match &ty_f.ty.kind {
-        ir::TyKind::Primitive(prim) => {
-            let expected: &[arrow_datatypes::DataType] = match prim {
-                ir::TyPrimitive::bool => &[arrow_datatypes::DataType::Boolean],
-                ir::TyPrimitive::int8 => &[arrow_datatypes::DataType::Int8],
-                ir::TyPrimitive::int16 => &[arrow_datatypes::DataType::Int16],
-                ir::TyPrimitive::int32 => &[arrow_datatypes::DataType::Int32],
-                ir::TyPrimitive::int64 => &[arrow_datatypes::DataType::Int64],
-                ir::TyPrimitive::uint8 => &[arrow_datatypes::DataType::UInt8],
-                ir::TyPrimitive::uint16 => &[arrow_datatypes::DataType::UInt16],
-                ir::TyPrimitive::uint32 => &[arrow_datatypes::DataType::UInt32],
-                ir::TyPrimitive::uint64 => &[arrow_datatypes::DataType::UInt64],
-                ir::TyPrimitive::float32 => &[arrow_datatypes::DataType::Float32],
-                ir::TyPrimitive::float64 => &[arrow_datatypes::DataType::Float64],
-                ir::TyPrimitive::text => &[
-                    arrow_datatypes::DataType::Utf8,
-                    arrow_datatypes::DataType::LargeUtf8,
-                ],
-            };
-            validate_data_type(expected, f)?;
-        }
-
-        ir::TyKind::Tuple(_) => unimplemented!(),
-        ir::TyKind::Array(_) => unimplemented!(),
-        ir::TyKind::Enum(_) => unimplemented!(),
-
-        ir::TyKind::Function(_) | ir::TyKind::Ident(_) => panic!(),
-    };
-    Ok(())
-}
-
-fn validate_data_type(
-    expected: &[arrow_datatypes::DataType],
-    found: &arrow_datatypes::Field,
-) -> Result<(), String> {
-    for e in expected {
-        if e == found.data_type() {
-            return Ok(());
-        }
-    }
-    let nullable = if found.is_nullable() { "nullable " } else { "" };
-    let expected: Vec<_> = expected.iter().map(|f| f.to_string()).collect();
-    let expected = expected.join(" ,");
-    Err(format!(
-        "expected {expected}, found {nullable}{}",
-        found.data_type()
-    ))
-}
-
-pub fn arrow_to_lutra(
-    reader: impl arrow_array::RecordBatchReader,
-    item_ty: &ir::Ty,
-) -> Result<Data, ()> {
-    let ty_fields = item_ty.kind.as_tuple().ok_or(())?;
-
-    let mut output = ArrayWriter::new_for_item_ty(item_ty);
-    for batch in reader {
-        let batch = batch.unwrap();
-
-        for row_index in 0..batch.num_rows() {
-            let mut tuple = TupleWriter::new_for_ty(item_ty);
-            for (col_index, ty_field) in ty_fields.iter().enumerate() {
-                let array = batch.column(col_index).as_any();
-
-                let value = match ty_field.ty.kind {
-                    ir::TyKind::Primitive(ir::TyPrimitive::bool) => encode(
-                        &array
-                            .downcast_ref::<arrow_array::BooleanArray>()
-                            .unwrap()
-                            .value(row_index),
-                    ),
-                    ir::TyKind::Primitive(ir::TyPrimitive::int8) => encode(
-                        &array
-                            .downcast_ref::<arrow_array::Int8Array>()
-                            .unwrap()
-                            .value(row_index),
-                    ),
-                    ir::TyKind::Primitive(ir::TyPrimitive::int16) => encode(
-                        &array
-                            .downcast_ref::<arrow_array::Int16Array>()
-                            .unwrap()
-                            .value(row_index),
-                    ),
-                    ir::TyKind::Primitive(ir::TyPrimitive::int32) => encode(
-                        &array
-                            .downcast_ref::<arrow_array::Int32Array>()
-                            .unwrap()
-                            .value(row_index),
-                    ),
-                    ir::TyKind::Primitive(ir::TyPrimitive::int64) => encode(
-                        &array
-                            .downcast_ref::<arrow_array::Int64Array>()
-                            .unwrap()
-                            .value(row_index),
-                    ),
-                    ir::TyKind::Primitive(ir::TyPrimitive::uint8) => encode(
-                        &array
-                            .downcast_ref::<arrow_array::UInt8Array>()
-                            .unwrap()
-                            .value(row_index),
-                    ),
-                    ir::TyKind::Primitive(ir::TyPrimitive::uint16) => encode(
-                        &array
-                            .downcast_ref::<arrow_array::UInt16Array>()
-                            .unwrap()
-                            .value(row_index),
-                    ),
-                    ir::TyKind::Primitive(ir::TyPrimitive::uint32) => encode(
-                        &array
-                            .downcast_ref::<arrow_array::UInt32Array>()
-                            .unwrap()
-                            .value(row_index),
-                    ),
-                    ir::TyKind::Primitive(ir::TyPrimitive::uint64) => encode(
-                        &array
-                            .downcast_ref::<arrow_array::UInt64Array>()
-                            .unwrap()
-                            .value(row_index),
-                    ),
-                    ir::TyKind::Primitive(ir::TyPrimitive::float32) => encode(
-                        &array
-                            .downcast_ref::<arrow_array::Float32Array>()
-                            .unwrap()
-                            .value(row_index),
-                    ),
-                    ir::TyKind::Primitive(ir::TyPrimitive::float64) => encode(
-                        &array
-                            .downcast_ref::<arrow_array::Float64Array>()
-                            .unwrap()
-                            .value(row_index),
-                    ),
-                    ir::TyKind::Primitive(ir::TyPrimitive::text) => encode(
-                        Option::or(
-                            array
-                                .downcast_ref::<arrow_array::StringArray>()
-                                .map(|array| array.value(row_index)),
-                            array
-                                .downcast_ref::<arrow_array::LargeStringArray>()
-                                .map(|array| array.value(row_index)),
-                        )
-                        .unwrap(),
-                    ),
-
-                    ir::TyKind::Tuple(_) | ir::TyKind::Array(_) | ir::TyKind::Enum(_) => {
-                        todo!()
-                    }
-                    ir::TyKind::Function(_) | ir::TyKind::Ident(_) => {
-                        return Err(());
-                    }
-                };
-
-                tuple.write_field(value);
-            }
-            output.write_item(tuple.finish());
-        }
-    }
-    Ok(output.finish())
-}
-
-fn encode<T: lutra_bin::Encode + ?Sized>(value: &T) -> Data {
-    Data::new(value.encode())
-}
-
-fn decode<T: lutra_bin::Decode>(data: Data) -> T {
+fn decode_prim<T: lutra_bin::Decode>(data: impl bytes::Buf) -> T {
     T::decode(data.chunk()).unwrap()
 }
 
-pub(crate) fn lutra_to_arrow(data: Data, ty_item: &ir::Ty) -> arrow_array::RecordBatch {
+pub fn lutra_to_arrow(data: impl bytes::Buf + Clone, ty_item: &ir::Ty) -> arrow_array::RecordBatch {
     let ir::TyKind::Tuple(ty_fields) = &ty_item.kind else {
         panic!()
     };
@@ -216,84 +33,88 @@ pub(crate) fn lutra_to_arrow(data: Data, ty_item: &ir::Ty) -> arrow_array::Recor
                         .next_builder()
                         .downcast_mut::<arrow_array::BooleanBuilder>()
                         .unwrap()
-                        .append_value(decode::<bool>(tuple_reader.get_field(i)));
+                        .append_value(decode_prim::<bool>(tuple_reader.get_field(i)));
                 }
                 ir::TyKind::Primitive(ir::TyPrimitive::int8) => {
                     writer
                         .next_builder()
                         .downcast_mut::<arrow_array::Int8Builder>()
                         .unwrap()
-                        .append_value(decode::<i8>(tuple_reader.get_field(i)));
+                        .append_value(decode_prim::<i8>(tuple_reader.get_field(i)));
                 }
                 ir::TyKind::Primitive(ir::TyPrimitive::int16) => {
                     writer
                         .next_builder()
                         .downcast_mut::<arrow_array::Int16Builder>()
                         .unwrap()
-                        .append_value(decode::<i16>(tuple_reader.get_field(i)));
+                        .append_value(decode_prim::<i16>(tuple_reader.get_field(i)));
                 }
                 ir::TyKind::Primitive(ir::TyPrimitive::int32) => {
                     writer
                         .next_builder()
                         .downcast_mut::<arrow_array::Int32Builder>()
                         .unwrap()
-                        .append_value(decode::<i32>(tuple_reader.get_field(i)));
+                        .append_value(decode_prim::<i32>(tuple_reader.get_field(i)));
                 }
                 ir::TyKind::Primitive(ir::TyPrimitive::int64) => {
                     writer
                         .next_builder()
                         .downcast_mut::<arrow_array::Int64Builder>()
                         .unwrap()
-                        .append_value(decode::<i64>(tuple_reader.get_field(i)));
+                        .append_value(decode_prim::<i64>(tuple_reader.get_field(i)));
                 }
                 ir::TyKind::Primitive(ir::TyPrimitive::uint8) => {
                     writer
                         .next_builder()
                         .downcast_mut::<arrow_array::UInt8Builder>()
                         .unwrap()
-                        .append_value(decode::<u8>(tuple_reader.get_field(i)));
+                        .append_value(decode_prim::<u8>(tuple_reader.get_field(i)));
                 }
                 ir::TyKind::Primitive(ir::TyPrimitive::uint16) => {
                     writer
                         .next_builder()
                         .downcast_mut::<arrow_array::UInt16Builder>()
                         .unwrap()
-                        .append_value(decode::<u16>(tuple_reader.get_field(i)));
+                        .append_value(decode_prim::<u16>(tuple_reader.get_field(i)));
                 }
                 ir::TyKind::Primitive(ir::TyPrimitive::uint32) => {
                     writer
                         .next_builder()
                         .downcast_mut::<arrow_array::UInt32Builder>()
                         .unwrap()
-                        .append_value(decode::<u32>(tuple_reader.get_field(i)));
+                        .append_value(decode_prim::<u32>(tuple_reader.get_field(i)));
                 }
                 ir::TyKind::Primitive(ir::TyPrimitive::uint64) => {
                     writer
                         .next_builder()
                         .downcast_mut::<arrow_array::UInt64Builder>()
                         .unwrap()
-                        .append_value(decode::<u64>(tuple_reader.get_field(i)));
+                        .append_value(decode_prim::<u64>(tuple_reader.get_field(i)));
                 }
                 ir::TyKind::Primitive(ir::TyPrimitive::float32) => {
                     writer
                         .next_builder()
                         .downcast_mut::<arrow_array::Float32Builder>()
                         .unwrap()
-                        .append_value(decode::<f32>(tuple_reader.get_field(i)));
+                        .append_value(decode_prim::<f32>(tuple_reader.get_field(i)));
                 }
                 ir::TyKind::Primitive(ir::TyPrimitive::float64) => {
                     writer
                         .next_builder()
                         .downcast_mut::<arrow_array::Float64Builder>()
                         .unwrap()
-                        .append_value(decode::<f64>(tuple_reader.get_field(i)));
+                        .append_value(decode_prim::<f64>(tuple_reader.get_field(i)));
                 }
                 ir::TyKind::Primitive(ir::TyPrimitive::text) => {
-                    let d = tuple_reader.get_field(i);
+                    let mut d = tuple_reader.get_field(i);
 
-                    // TODO: this is potentially very expensive
-                    let d = d.flatten();
-                    let s = String::decode(&d).unwrap();
+                    // decode string
+                    let (offset, len) = ArrayReader::<&[u8]>::read_head(d.chunk());
+                    d.advance(offset);
+                    let mut bytes = vec![0; len];
+                    d.copy_to_slice(&mut bytes);
+
+                    let s = String::from_utf8(bytes).unwrap();
 
                     writer
                         .next_builder()

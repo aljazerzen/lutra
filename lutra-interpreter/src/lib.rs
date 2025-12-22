@@ -1,4 +1,3 @@
-mod arrow;
 mod data;
 mod interpreter;
 mod native;
@@ -53,6 +52,15 @@ impl<'a> lutra_runner::Run for InterpreterRunner<'a> {
             self.modules,
             self.file_system.clone(),
         )
+    }
+
+    async fn get_interface(&self) -> Result<std::string::String, Self::Error> {
+        let Some(fs) = &self.file_system else {
+            return Ok(String::new());
+        };
+
+        // TODO: error
+        Ok(lutra_arrow::get_interface(fs).unwrap())
     }
 }
 
