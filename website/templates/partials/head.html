@@ -139,7 +139,6 @@
     }
 
     @media (max-width: 1216px) {
-
         .sidebar-start,
         .sidebar-end {
             flex: 0 1 800px;
@@ -149,5 +148,28 @@
         ul.navigation {
             position: relative;
         }
+    }
+
+    ul.card-list {
+        padding: 0;
+
+        display: flex;
+        flex-direction: row;
+        flex-wrap: wrap;
+        gap: 1rem;
+    }
+    ul.card-list>li {
+        display: block;
+        flex: calc(50% - 1rem) 0 0;
+    }
+    li.card>header {
+        display: flex;
+    }
+    li.card>header>a {
+        flex-grow: 1;
+        text-align: start;
+    }
+    li.card>header>label {
+        color: var(--text-muted);
     }
 </style>

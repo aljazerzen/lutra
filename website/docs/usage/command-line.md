@@ -1,5 +1,5 @@
 ---
-title: "Via command line"
+title: "Use from command line"
 ---
 
 ## Installation
@@ -16,7 +16,7 @@ cargo install --index 'https://codeberg.org/lutra/_cargo-index.git' lutra-cli
 
 !!! note
 
-    While Lutra (the project) is in a pre-release state, none of the packages are yet published to crates.io. Instead, we use a custom registry at [codeberg.org](https://codeberg.org/lutra/_cargo-index) to host the packages. This is why we need to use the `--index` flag to tell `cargo` to use this registry.
+    While Lutra (the project) is in a pre-release state, none of the packages are yet published to crates.io. Instead, I use a custom registry at [codeberg.org](https://codeberg.org/lutra/_cargo-index) to host the packages. This is why we need to use the `--index` flag to tell `cargo` to use this registry.
 
 ## Command `run`
 

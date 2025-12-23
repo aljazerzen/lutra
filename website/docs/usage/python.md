@@ -1,5 +1,5 @@
 ---
-title: 'Via Python'
+title: 'Use from Python'
 ---
 
 Let's assume we have a Python application and a PostgreSQL database server were we want to

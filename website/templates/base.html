@@ -31,7 +31,7 @@
 
   <div class="container">
 
-    <div class="sidebar-start">
+    <aside class="sidebar-start">
       {% if self and self.ancestors[1] %}
       {% set index = get_section(path=self.ancestors[1]) %}
       {% endif %}
@@ -78,7 +78,7 @@
         {% endfor %}
       </ul>
       {% endif %}
-    </div>
+    </aside>
 
     <div class="content">
       <details>
@@ -99,17 +99,16 @@
       {% endblock main_content %}
     </div>
 
-
-    <div class="sidebar-end">
-      {% if self.toc %}
+    <aside class="sidebar-end">
+      <!-- {% if self.toc %}
       <ul class="toc">
         <li class="muted">On this page</li>
         {% for h1 in self.toc %}
         <li><a href="{{ h1.permalink | safe }}">{{ h1.title }}</a></li>
         {% endfor %}
       </ul>
-      {% endif %}
-    </div>
+      {% endif %} -->
+    </aside>
   </div>
 
   <div class="container">

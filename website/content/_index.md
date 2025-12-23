@@ -100,5 +100,28 @@ func main() -> (
 
 Again, this all compiles to SQL and can be executed on PostgreSQL.
 
-[More code examples](https://codeberg.org/lutra/lutra/src/branch/main/tests/tests/corpus/complex.lt)
+## See more
 
+<ul class="card-list">
+
+{% card(title="Core concepts", href="/docs/usage/core-concepts/", label="Docs") %}
+    How can Lutra be used? How does it interact with other tools?
+{% end %}
+
+{% card(title="Try it out", href="/docs/usage/command-line/", label="Docs") %}
+    Install CLI that can check, compile and run Lutra programs.
+{% end %}
+
+{% card(title="Advent of SQL 2024", href="https://codeberg.org/lutra/advent-of-sql", label="Examples") %}
+    In December of 2025 I've been solving Advent of SQL 2024 in Lutra. See many examples there.
+{% end %}
+
+{% card(title="Language test corpus", href="https://codeberg.org/lutra/lutra/src/branch/main/tests/tests/corpus/complex.lt", label="Examples") %}
+    Test suite covers all that is possible with the Lutra language.
+{% end %}
+
+{% card(title="Zulip Chat", href="https://lutra.zulipchat.com/", label="Community") %}
+    If you want to get involved or just have feedback join the Zulip workspace I've created.
+{% end %}
+
+</ul>

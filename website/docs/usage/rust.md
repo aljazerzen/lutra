@@ -1,5 +1,5 @@
 ---
-title: 'Via Rust'
+title: 'Use from Rust'
 ---
 
 Lutra projects can be invoked from Rust, by hooking Lutra compiler into `build.rs`, where it checks the project and generates bindings that can then be called from Rust code.
@@ -16,7 +16,7 @@ There is few Rust crates that provide different functionality:
 
 !!! note
 
-    While Lutra (the project) is in a pre-release state, none of the packages are yet published to crates.io. Instead, we use a custom registry at [codeberg.org](https://codeberg.org/lutra/_cargo-index) to host the packages.
+    While Lutra (the project) is in a pre-release state, none of the packages are yet published to crates.io. Instead, I use a custom registry at [codeberg.org](https://codeberg.org/lutra/_cargo-index) to host the packages.
 
 
 ## Basic setup
