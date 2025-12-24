@@ -14,5 +14,5 @@ build:
 
 publish:
     just build
-    cd public && git init && git remote add origin ssh://git@codeberg.org/lutra/pages.git
-    cd public && git add . && git commit -m 'publish' && git push origin main --force
+    rsync --human-readable --progress --recursive --delete \
+        public/ lutra-lang.org:/data/http

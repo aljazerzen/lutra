@@ -75,6 +75,7 @@
 
             # website
             pkgs.mprocs
+            pkgs.rsync
             pkgs.zola
             pkgs.typos-lsp
             pkgs.zensical
