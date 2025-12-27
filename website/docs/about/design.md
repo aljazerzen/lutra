@@ -5,8 +5,9 @@ title: 'Design decisions'
 
 ## Core principles
 
+!!! note ""
 
-### Data should always carry type information
+    Data should always carry type information
 
 The business logic of programs should be fully statically typed. Each variable
 should have an associated type, either annotated explicitly or preferably
@@ -30,8 +31,9 @@ changed in the future.
 **Lutra** achieves this by defining types and code in its own language, which
 serves as a common interface between different programming languages.
 
+!!! note ""
 
-### Type information should be available to the whole toolchain
+    Type information should be available to the whole toolchain
 
 Development tools like compilers, editors, language servers and code explorers
 should all have access to complete type information.
@@ -42,8 +44,9 @@ organize code and provide insights into the codebase.
 **Lutra** projects can be translated to languages (currently Rust and Python),
 by generating code for types and function interfaces.
 
+!!! note ""
 
-### Type information should exist only at compile time
+    Type information should exist only at compile time
 
 Many data formats carry type information into runtime. For example, JSON stores
 field names alongside data: `{"id": 3, "title": "Gladiator"}`.
@@ -81,8 +84,9 @@ interpreters that have access to the native function.
 In essence, Lutra provides access to native functions (which also includes SQL
 tables) and the means to compose and manipulate the results of those functions.
 
+## Frequently Asked Auestions
 
-## Where is `print` function?
+### Where is `print` function?
 
 When programming in C, one would use POSIX process arguments or read from stdin
 to retrieve program inputs. To output something, one would write to stdout or
@@ -96,7 +100,7 @@ a new execution target. For example, PostgreSQL as an execution target of SQL
 queries, does not provide any way to print/log from within SQL queries.
 
 
-## Why the binary format?
+### Why the binary format?
 
 Lutra programs executed on SQL databases consume and produce an *interesting*
 relational data representation. The binary format is a way to unify these
@@ -141,3 +145,47 @@ The result is abstraction of PostgreSQL as the *runner* interface. It consumes
 inputs and produces outputs of arbitrary Lutra types, encoded in the Lutra
 binary format.
 
+### Is `from | filter` an index lookup?
+
+Asked on [programming.dev](https://programming.dev/post/42892331/21229256).
+
+To use a database index in Lutra, one would write:
+
+```lt
+func get_albums_by_id(id: int16): [Album] -> (
+  sql::from("albums")
+  | filter(func (this) -> this.id == id)
+)
+```
+
+It might seem like this will read all data from table `albums` and only then
+discard some of the array items. But in reality, this is translated to SQL as:
+
+```sql
+SELECT a.* FROM albums a WHERE a.id = $1
+```
+
+... which will use the index on `albums.id`.
+
+This aspect of Lutra could be described as it being "declarative" or as a clever
+compiler optimization. In any case, I would prefer to have explicit
+`std::from_index(table, key, value)` function that would guarantee index usage.
+Unfortunately, "index hinting" does not exist in PostgreSQL and "guaranteed
+index lookup" is not a thing in SQL databases.
+
+
+### Is Lutra an ORM?
+
+Asked on [programming.dev](https://programming.dev/post/42892331/21213617).
+
+It does solve the same problems as an ORM:
+
+- it does map relations to "objects",
+- it does provide a type-safe database interface.
+
+However:
+
+- it does not handle migrations or DDL (Data Definition Language),
+- it does not model relation rows as identifiable objects
+  (which would have a simple `.save()` method),
+- it does not model links between objects in any other way than foreign keys.
