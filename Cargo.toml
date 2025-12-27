@@ -22,7 +22,7 @@ resolver = "2"
 edition = "2024"
 license = "MIT or Apache 2.0"
 repository = "https://code.murerzen.eu/lutra-data"
-rust-version = "1.88"
+rust-version = "1.91"
 version = "0.2.0"
 
 [workspace.dependencies]

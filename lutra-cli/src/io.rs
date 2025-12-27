@@ -33,7 +33,7 @@ pub async fn write_output(
         // file
         let mut writer = io::BufWriter::new(fs::File::create(output_path).await?);
 
-        let size = write_format(&mut writer, &data, format, &ty.output, &ty.defs).await?;
+        let size = write_format(&mut writer, data, format, &ty.output, &ty.defs).await?;
         writer.flush().await?;
         writer.shutdown().await?;
         eprintln!(
@@ -45,7 +45,7 @@ pub async fn write_output(
         // stdout
         let mut writer = io::BufWriter::new(io::stdout());
 
-        write_format(&mut writer, &data, format, &ty.output, &ty.defs).await?;
+        write_format(&mut writer, data, format, &ty.output, &ty.defs).await?;
         writer.flush().await?;
         writer.shutdown().await?;
     };
@@ -98,7 +98,7 @@ async fn write_format(
 
             let ty_item = ty.kind.as_array().unwrap(); // TODO
 
-            let data = lutra_arrow::lutra_to_arrow(data, &ty_item);
+            let data = lutra_arrow::lutra_to_arrow(data, ty_item);
 
             let mut builder = AsyncArrowWriter::try_new(&mut w, data.schema(), None).unwrap();
             builder.write(&data).await.unwrap();

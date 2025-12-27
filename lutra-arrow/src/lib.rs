@@ -1,12 +1,12 @@
+mod interface;
 mod to_arrow;
 mod to_lutra;
 mod validate;
-mod interface;
 
+pub use interface::get_interface;
 pub use to_arrow::lutra_to_arrow;
 pub use to_lutra::arrow_to_lutra;
 pub use validate::validate_schema;
-pub use interface::get_interface;
 
 use lutra_bin::ir;
 use std::collections::HashMap;
