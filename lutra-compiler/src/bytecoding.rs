@@ -258,16 +258,16 @@ impl ByteCoder {
                 vec![encode_prim(primitive)]
             }
 
-            "std::count" => vec![],
-
-            "std::min" | "std::max" | "std::fold" => {
+            "std::fold" => {
                 let item_layout = as_layout_of_param_array(ty_mat);
                 vec![
                     item_layout.head_size.div_ceil(8), // item_head_size
                 ]
             }
 
-            "std::sum"
+            "std::min"
+            | "std::max"
+            | "std::sum"
             | "std::mean"
             | "std::rolling_mean"
             | "std::rank"

@@ -343,12 +343,12 @@ where N: int8 | int16 | int32 | int64 | uint8 | uint16 | uint32 | uint64
 ## Find the minimum value in the array.
 ## Returns `None` when array is empty.
 func min(array: [T]): enum {None, Some: T}
-where T: number
+where T: primitive
 
 ## Find the maximum value in the array.
 ## Returns `None` when array is empty.
 func max(array: [T]): enum {None, Some: T}
-where T: number
+where T: primitive
 
 ## Compute sum of all number in an array.
 ## Returns zero when array is empty.

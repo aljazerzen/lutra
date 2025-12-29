@@ -3,25 +3,6 @@ use lutra_bin::{Encode, Layout};
 use crate::interpreter::{Cell, Interpreter};
 use crate::{Data, NativeModule};
 
-macro_rules! reduce_func {
-    ($name: ident, $item_decode: path, $reduce: expr, $finalize: path) => {
-        pub fn $name(
-            _: &mut Interpreter,
-            layout_args: &[u32],
-            args: Vec<Cell>,
-        ) -> Result<Cell, EvalError> {
-            let [array] = assume::exactly_n(args);
-            let array = assume::array(array, layout_args[0]);
-
-            let res = array.map(|x| $item_decode(&x)).reduce($reduce);
-
-            let res = $finalize(res);
-
-            Ok(Cell::Data(encode(&res)))
-        }
-    };
-}
-
 macro_rules! number_cast {
     ($func_name: ident, $res_ty: ty) => {
         pub fn $func_name(
@@ -839,19 +820,43 @@ pub mod std {
         }))
     }
 
-    reduce_func!(
-        min,
-        decode::int,
-        |a, b| if a < b { a } else { b },
-        core::convert::identity
-    );
+    pub fn min(
+        _: &mut Interpreter,
+        layout_args: &[u32],
+        args: Vec<Cell>,
+    ) -> Result<Cell, EvalError> {
+        let [array] = assume::exactly_n(args);
+        let array = assume::array(array, layout_args[0]);
 
-    reduce_func!(
-        max,
-        decode::int,
-        |a, b| if a > b { a } else { b },
-        core::convert::identity
-    );
+        let res = array.reduce(|a, b| {
+            if cmp_raw(layout_args[1], &a, &b).is_lt() {
+                a
+            } else {
+                b
+            }
+        });
+
+        Ok(Cell::Data(encode_maybe(res, layout_args[0])))
+    }
+
+    pub fn max(
+        _: &mut Interpreter,
+        layout_args: &[u32],
+        args: Vec<Cell>,
+    ) -> Result<Cell, EvalError> {
+        let [array] = assume::exactly_n(args);
+        let array = assume::array(array, layout_args[0]);
+
+        let res = array.reduce(|a, b| {
+            if cmp_raw(layout_args[1], &a, &b).is_gt() {
+                a
+            } else {
+                b
+            }
+        });
+
+        Ok(Cell::Data(encode_maybe(res, layout_args[0])))
+    }
 
     macro_rules! sum {
         ($array: expr, $ty: ident) => {{
@@ -1793,10 +1798,6 @@ mod decode {
         T::decode(data.chunk()).unwrap()
     }
 
-    pub fn int(data: &Data) -> i64 {
-        i64::decode(data.chunk()).unwrap()
-    }
-
     pub fn bool(data: &Data) -> bool {
         bool::decode(data.chunk()).unwrap()
     }
@@ -1834,6 +1835,22 @@ mod decode {
 
 pub fn encode<T: Encode + Layout + ?Sized>(value: &T) -> Data {
     Data::new(value.encode())
+}
+
+pub fn encode_maybe(value: Option<Data>, inner_head_bytes: u32) -> Data {
+    let has_ptr = inner_head_bytes > 4;
+    if has_ptr {
+        match value {
+            None => Data::new(vec![0; 5]),
+            Some(x) => Data::new(vec![1, 4, 0, 0, 0]).combine(x),
+        }
+    } else {
+        // inline
+        match value {
+            None => Data::new(vec![0; inner_head_bytes as usize + 1]),
+            Some(x) => Data::new(vec![1]).combine(x),
+        }
+    }
 }
 
 pub fn encode_primitives<T: Encode + Layout + Sized>(values: impl Iterator<Item = T>) -> Data {

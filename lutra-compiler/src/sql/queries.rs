@@ -692,8 +692,38 @@ impl<'a> Context<'a> {
                 return Node::Select(select);
             }
 
-            "std::min" => utils::new_func_call("MIN", args),
-            "std::max" => utils::new_func_call("MAX", args),
+            "std::min" => {
+                let ty_item = self.get_ty_mat(&args_in[0].ty);
+
+                let is_bool = ty_item
+                    .kind
+                    .as_primitive()
+                    .is_some_and(|p| *p == ir::TyPrimitive::bool);
+
+                if is_bool {
+                    // special case: bool
+                    utils::new_func_call("BOOL_AND", args)
+                } else {
+                    // base case
+                    utils::new_func_call("MIN", args)
+                }
+            }
+            "std::max" => {
+                let ty_item = self.get_ty_mat(&args_in[0].ty);
+
+                let is_bool = ty_item
+                    .kind
+                    .as_primitive()
+                    .is_some_and(|p| *p == ir::TyPrimitive::bool);
+
+                if is_bool {
+                    // special case: bool
+                    utils::new_func_call("BOOL_OR", args)
+                } else {
+                    // base case
+                    utils::new_func_call("MAX", args)
+                }
+            }
             "std::sum" => {
                 let [arg] = unpack_args(args);
                 let ty = self.compile_ty_name(ty);

@@ -2054,6 +2054,31 @@ func main() -> std::max([]: [uint32])
 # >
 None
 
+# === std_max_02
+func main() -> std::max(["b", "d", "c"])
+# >
+Some("d")
+
+# === std_max_03
+func main() -> std::max([false, true, true, false])
+# >
+Some(true)
+
+# === std_max_04
+func main() -> std::max([]: [bool])
+# >
+None
+
+# === std_max_05
+func main() -> std::max([false, false])
+# >
+Some(false)
+
+# === std_max_06
+func main() -> std::max([true, true])
+# >
+Some(true)
+
 # === std_min_00
 func main() -> std::min([5,3,65,3,2,56,67]: [uint64])
 # >
@@ -2063,6 +2088,31 @@ Some(2)
 func main() -> std::min([]: [uint32])
 # >
 None
+
+# === std_min_02
+func main() -> std::min(["b", "d", "c"])
+# >
+Some("b")
+
+# === std_min_03
+func main() -> std::min([false, true, true, false])
+# >
+Some(false)
+
+# === std_min_04
+func main() -> std::min([]: [bool])
+# >
+None
+
+# === std_min_05
+func main() -> std::min([false, false])
+# >
+Some(false)
+
+# === std_min_06
+func main() -> std::min([true, true])
+# >
+Some(true)
 
 # === std_mod_00
 func main() -> (10 % 6): int64
