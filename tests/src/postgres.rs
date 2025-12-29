@@ -2259,11 +2259,14 @@ fn std_sql_expr_01() {
 #[test]
 fn date_time_00() {
     insta::assert_snapshot!(_sql_and_output(_run(r#"
-    func main(): {a: std::Date, b: std::Time}
+    func main(): {a: std::Date, b: std::Time, c: std::Timestamp}
     -> std::sql::expr(
-      "select '2025-11-14'::date as a, '04:05:06.789'::time as b"
+      "select
+        '2025-11-14'::date as a,
+        '04:05:06.789'::time as b,
+        '2025-11-14T04:05:06.789'::timestamp as c"
     )
-    "#, lutra_bin::Value::unit())), @r"
+    "#, lutra_bin::Value::unit())), @"
     SELECT
       (r0.a::date - '1970-01-01'::date) AS _0,
       (
@@ -2272,89 +2275,77 @@ fn date_time_00() {
           FROM
             r0.b
         ) * 1000000
-      )::int8 AS _1
-    FROM
-      (
-        select
-          '2025-11-14'::date as a,
-          '04:05:06.789'::time as b
-      ) AS r0
-    ---
-    {
-      a = @2025-11-14,
-      b = @04:05:06.789000,
-    }
-    ");
-}
-
-#[tokio::test(flavor = "current_thread")]
-async fn sql_date_time_01() {
-    // test import from pg repr
-
-    let client = _get_test_db_client().await.unwrap();
-    let mut runner = RunnerAsync::new(client);
-
-    insta::assert_snapshot!(_sql_and_output(_run_on(&mut runner, r#"
-    func main(): {a: std::Date, b: std::Time}
-    -> std::sql::expr(
-      "select '2025-11-14'::date as a, '04:05:06.789'::time as b"
-    )
-    "#, lutra_bin::Value::unit()).await), @r"
-    SELECT
-      (r0.a::date - '1970-01-01'::date) AS _0,
+      )::int8 AS _1,
       (
         EXTRACT(
           EPOCH
           FROM
-            r0.b
+            r0.c
         ) * 1000000
-      )::int8 AS _1
+      )::int8 AS _2
     FROM
       (
         select
           '2025-11-14'::date as a,
-          '04:05:06.789'::time as b
+          '04:05:06.789'::time as b,
+          '2025-11-14T04:05:06.789'::timestamp as c
       ) AS r0
     ---
     {
       a = @2025-11-14,
       b = @04:05:06.789000,
+      c = @2025-11-14T04:05:06.789000,
     }
     ");
 }
 
 #[tokio::test(flavor = "current_thread")]
-async fn sql_date_time_02() {
+async fn date_time_01() {
     // test export pg repr
 
     // TODO: decide if current behavior of "modulo 24-hours" is what we want
 
     let client = _get_test_db_client().await.unwrap();
     client
-        .execute(r#"CREATE TEMPORARY TABLE test(t time)"#, &[])
+        .execute(
+            r#"CREATE TEMPORARY TABLE test(d date, t time, ts timestamp)"#,
+            &[],
+        )
         .await
         .unwrap();
     let mut runner = RunnerAsync::new(client);
 
     insta::assert_snapshot!(_run_on(&mut runner, r#"
     func main() -> (
-      [{t = @16:07:44.12}, {t = @-16:07:44.12}, {t = @25:07:44.12}]
+      [
+        {@2025-12-29, @16:07:44.12, @2025-12-22T16:07:44.12},
+        {@-100-12-29, @-16:07:44.12, @-100-12-29T-16:07:44.12},
+        {@10000-12-29, @25:07:44.12, @10000-12-29T25:07:44.12},
+      ]: [{d: std::Date, t: std::Time, ts: std::Timestamp}]
       | std::sql::insert("test")
     )
     "#, lutra_bin::Value::unit()).await.1, @"{}");
 
     insta::assert_snapshot!(_run_on(&mut runner, r#"
-    func main(): [{t: std::Time}] -> std::sql::from("test")
-    "#, lutra_bin::Value::unit()).await.1, @r"
+    func main() -> (
+      std::sql::from("test"): [{d: std::Date, t: std::Time, ts: std::Timestamp}]
+    )
+    "#, lutra_bin::Value::unit()).await.1, @"
     [
       {
+        d = @2025-12-29,
         t = @16:07:44.120000,
+        ts = @2025-12-22T16:07:44.120000,
       },
       {
+        d = @-0100-12-29,
         t = @07:52:15.880000,
+        ts = @-0100-12-28T07:52:15.880000,
       },
       {
+        d = @+10000-12-29,
         t = @01:07:44.120000,
+        ts = @+10000-12-30T01:07:44.120000,
       },
     ]
     ");

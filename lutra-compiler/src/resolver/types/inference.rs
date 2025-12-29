@@ -119,8 +119,9 @@ impl TypeResolver<'_> {
             Literal::Time(_) => {
                 return new_ty_ident(pr::Path::new([NS_STD, "Time"]), span);
             }
-
-            _ => todo!(),
+            Literal::DateTime(..) => {
+                return new_ty_ident(pr::Path::new([NS_STD, "Timestamp"]), span);
+            }
         };
         let mut ty = Ty::new(kind);
         ty.span = span;

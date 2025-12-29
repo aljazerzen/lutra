@@ -58,6 +58,13 @@ impl std::fmt::Display for Literal {
     }
 }
 
+impl Date {
+    pub fn to_epoch_days(&self) -> Option<i32> {
+        chrono::NaiveDate::from_ymd_opt(self.year, self.month as u32, self.day as u32)
+            .map(|d| d.to_epoch_days())
+    }
+}
+
 impl std::fmt::Display for Date {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let Date { year, month, day } = self;

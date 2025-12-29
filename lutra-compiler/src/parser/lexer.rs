@@ -348,7 +348,7 @@ fn literal() -> impl Parser<char, Literal, Error = LError> {
 
     let date_or_datetime = just('@')
         .ignore_then(date_part.clone())
-        .then(time_part.clone().or_not())
+        .then(just('T').ignore_then(time_part.clone()).or_not())
         .then_ignore(non_ident())
         .map(|(date, time)| {
             if let Some(time) = time {
@@ -359,7 +359,7 @@ fn literal() -> impl Parser<char, Literal, Error = LError> {
         });
 
     let time = just('@')
-        .ignore_then(time_part.clone())
+        .ignore_then(time_part)
         .then_ignore(non_ident())
         .map(Literal::Time);
 

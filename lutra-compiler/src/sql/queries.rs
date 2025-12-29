@@ -387,7 +387,7 @@ impl<'a> Context<'a> {
     }
 
     /// Imports a value from native pg repr into our repr.
-    /// For example, pg type `date` is coverted into `int4`.
+    /// For example, pg type `date` is converted into `int4`.
     fn pg_repr_import(&self, expr_pg: sql_ast::Expr, ty: &ir::Ty) -> sql_ast::Expr {
         // special case: std::Date
         if let ir::TyKind::Ident(ty_ident) = &ty.kind
@@ -395,13 +395,11 @@ impl<'a> Context<'a> {
         {
             return sql_ast::Expr::Source(format!("({expr_pg}::date - '1970-01-01'::date)"));
         }
-        // special case: std::Time
+        // special case: std::Time & std::Timestamp
         if let ir::TyKind::Ident(ty_ident) = &ty.kind
-            && ty_ident.0 == ["std", "Time"]
+            && (ty_ident.0 == ["std", "Time"] || ty_ident.0 == ["std", "Timestamp"])
         {
-            return sql_ast::Expr::Source(format!(
-                "(EXTRACT(EPOCH FROM {expr_pg}) * 1000000)::int8"
-            ));
+            return sql_ast::Expr::Source(format!("(EXTRACT(EPOCH FROM {expr_pg})*1000000)::int8"));
         }
 
         // general case: noop
@@ -425,6 +423,12 @@ impl<'a> Context<'a> {
             return sql_ast::Expr::Source(format!(
                 "('00:00'::time + INTERVAL '1 microsecond' * {expr})"
             ));
+        }
+        // special case: std::Timestamp
+        if let ir::TyKind::Ident(ty_ident) = &ty.kind
+            && ty_ident.0 == ["std", "Timestamp"]
+        {
+            return sql_ast::Expr::Source(format!("to_timestamp({expr}::float8/1000000.0)"));
         }
 
         // general case: noop

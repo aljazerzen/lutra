@@ -479,17 +479,25 @@ impl<'a> Lowerer<'a> {
             pr::Literal::Text(v) => ir::Literal::text(v.clone()),
 
             pr::Literal::Date(date) => {
-                let Some(date) =
-                    chrono::NaiveDate::from_ymd_opt(date.year, date.month as u32, date.day as u32)
-                else {
+                let Some(epoch_days) = date.to_epoch_days() else {
                     // TODO: this should have been validated earlier (probably resolver)
                     return Err(Diagnostic::new_custom("invalid date"));
                 };
 
-                ir::Literal::int32(date.to_epoch_days())
+                ir::Literal::int32(epoch_days)
             }
             pr::Literal::Time(time) => ir::Literal::int64(time.to_microseconds()),
-            pr::Literal::DateTime(..) => todo!(),
+
+            pr::Literal::DateTime(date, time) => {
+                let Some(epoch_days) = date.to_epoch_days() else {
+                    // TODO: this should have been validated earlier (probably resolver)
+                    return Err(Diagnostic::new_custom("invalid date"));
+                };
+
+                // convert to timestamp (at UTC, excluding leap seconds)
+                let date_micros = epoch_days as i64 * 24 * 60 * 60 * 1000 * 1000;
+                ir::Literal::int64(date_micros + time.to_microseconds())
+            }
         })
     }
 
