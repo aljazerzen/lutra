@@ -518,9 +518,15 @@ module text {
   # func substring(value: text, offset: int64, length: int64): text
   # func replace(value: text, pattern: text, replacement: text): text
 
-  # func starts_with(value: text, prefix: text): bool
-  # func contains(value: text, substr: text): bool
-  # func ends_with(value: text, suffix: text): bool
+  ## Tests if a text starts with a prefix.
+  func starts_with(value: text, prefix: text): bool
+
+  ## Tests if a text contains a pattern.
+  func contains(value: text, pattern: text): bool
+
+  ## Tests if a text ends with a suffix.
+  func ends_with(value: text, suffix: text): bool
+
   # func regex_search(haystack: text, pattern: text): bool
 }
 

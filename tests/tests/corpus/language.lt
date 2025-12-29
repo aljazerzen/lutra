@@ -2466,6 +2466,46 @@ func main() -> std::text::split("1_two_3", "a")
   "1_two_3",
 ]
 
+# === std_text_starts_with_00
+func main() -> {
+  std::text::starts_with("bananas", "bana"),
+  std::text::starts_with("bananas", "nana"),
+}
+# >
+{
+  true,
+  false,
+}
+
+# === std_text_starts_with_01
+const na = "na"
+
+func main() -> std::text::starts_with("bananas", f"ba{na}")
+# >
+true
+
+# === std_text_contains_00
+func main() -> {
+  std::text::contains("bananas", "nana"),
+  std::text::contains("bananas", "apples"),
+}
+# >
+{
+  true,
+  false,
+}
+
+# === std_text_ends_with_00
+func main() -> {
+  std::text::ends_with("bananas", "anas"),
+  std::text::ends_with("bananas", "nana"),
+}
+# >
+{
+  true,
+  false,
+}
+
 # === std_math_abs_00
 func main() -> std::math::abs(-3: int16)
 # >

@@ -851,6 +851,15 @@ impl<'a> Context<'a> {
                 ];
                 return Node::Select(select);
             }
+            "std::text::starts_with" => utils::new_func_call("STARTS_WITH", args),
+            "std::text::ends_with" => {
+                let [text, suffix] = unpack_args(args);
+                sql_ast::Expr::Source(format!("({text} LIKE '%' || {suffix})"))
+            }
+            "std::text::contains" => {
+                let [text, pattern] = unpack_args(args);
+                sql_ast::Expr::Source(format!("({text} LIKE '%' || {pattern} || '%')"))
+            }
 
             "std::math::abs" => {
                 let [text] = unpack_args(args);

@@ -109,12 +109,10 @@ macro_rules! bin_prim_func {
                 ir::TyPrimitive::float32 => encode::<$res_ty>(&primitive_op!(args, f32, $op)),
                 ir::TyPrimitive::float64 => encode::<$res_ty>(&primitive_op!(args, f64, $op)),
                 ir::TyPrimitive::text => {
-                    let mut left = assume::as_data(&args[0])?.clone();
-                    let left = decode::text_ref(&mut left);
-                    let mut right = assume::as_data(&args[1])?.clone();
-                    let right = decode::text_ref(&mut right);
+                    let left = assume::text_ref(args[0].clone())?;
+                    let right = assume::text_ref(args[1].clone())?;
 
-                    let res = left.$op(right);
+                    let res = left.as_str().$op(right.as_str());
                     encode::<$res_ty>(&res)
                 }
             }))
@@ -307,13 +305,11 @@ pub mod std {
             ir::TyPrimitive::float32 => cmp_op!(a, b, f32, total_cmp),
             ir::TyPrimitive::float64 => cmp_op!(a, b, f64, total_cmp),
             ir::TyPrimitive::text => {
-                let mut left = a.clone();
-                let left = decode::text_ref(&mut left);
-                let mut right = b.clone();
-                let right = decode::text_ref(&mut right);
+                let a = decode::text_ref(a.clone());
+                let b = decode::text_ref(b.clone());
 
-                // TODO: this compares bytes, not Unicode comparisons
-                left.cmp(right)
+                // TODO: this does byte comparison, not Unicode comparisons
+                a.as_str().cmp(b.as_str())
             }
         }
     }
@@ -1282,6 +1278,9 @@ pub mod std_text {
                 "from_ascii" => &from_ascii,
                 "join" => &join,
                 "split" => &split,
+                "starts_with" => &starts_with,
+                "contains" => &contains,
+                "ends_with" => &ends_with,
 
                 _ => return None,
             })
@@ -1323,9 +1322,9 @@ pub mod std_text {
     ) -> Result<Cell, EvalError> {
         let [text] = assume::exactly_n(args);
 
-        let mut data = assume::into_data(text)?;
-        let string = decode::text_ref(&mut data);
-        let length = string.chars().count() as u32;
+        let data = assume::into_data(text)?;
+        let string = decode::text_ref(data);
+        let length = string.as_str().chars().count() as u32;
 
         Ok(Cell::Data(encode(&length)))
     }
@@ -1353,14 +1352,14 @@ pub mod std_text {
 
         let joined = match parts.next() {
             None => String::new(),
-            Some(mut first) => {
+            Some(first) => {
                 let (lower, _) = parts.size_hint();
 
                 let mut result = String::with_capacity(sep.len() * lower);
-                result.push_str(decode::text_ref(&mut first));
-                for mut part in parts {
+                result.push_str(decode::text_ref(first).as_str());
+                for part in parts {
                     result.push_str(&sep);
-                    result.push_str(decode::text_ref(&mut part));
+                    result.push_str(decode::text_ref(part).as_str());
                 }
                 result
             }
@@ -1374,16 +1373,59 @@ pub mod std_text {
         args: Vec<Cell>,
     ) -> Result<Cell, EvalError> {
         let [text, sep] = assume::exactly_n(args);
-        let mut text = assume::into_data(text)?;
-        let text = decode::text_ref(&mut text);
-        let mut sep = assume::into_data(sep)?;
-        let sep = decode::text_ref(&mut sep);
+        let text = assume::text_ref(text)?;
+        let sep = assume::text_ref(sep)?;
 
         let mut output = crate::ArrayWriter::new(String::head_size().div_ceil(8) as u32, &[0]);
-        for part in text.split(sep) {
+        for part in text.as_str().split(sep.as_str()) {
             output.write_item(Data::new(part.encode()));
         }
         Ok(Cell::Data(output.finish()))
+    }
+
+    pub fn starts_with(
+        _it: &mut Interpreter,
+        _layout_args: &[u32],
+        args: Vec<Cell>,
+    ) -> Result<Cell, EvalError> {
+        let [text, prefix] = assume::exactly_n(args);
+
+        let text = assume::text_ref(text)?;
+        let prefix = assume::text_ref(prefix)?;
+
+        let res = text.as_str().starts_with(prefix.as_str());
+
+        Ok(Cell::Data(encode(&res)))
+    }
+
+    pub fn contains(
+        _it: &mut Interpreter,
+        _layout_args: &[u32],
+        args: Vec<Cell>,
+    ) -> Result<Cell, EvalError> {
+        let [text, pattern] = assume::exactly_n(args);
+
+        let text = assume::text_ref(text)?;
+        let pattern = assume::text_ref(pattern)?;
+
+        let res = text.as_str().contains(pattern.as_str());
+
+        Ok(Cell::Data(encode(&res)))
+    }
+
+    pub fn ends_with(
+        _it: &mut Interpreter,
+        _layout_args: &[u32],
+        args: Vec<Cell>,
+    ) -> Result<Cell, EvalError> {
+        let [text, suffix] = assume::exactly_n(args);
+
+        let text = assume::text_ref(text)?;
+        let suffix = assume::text_ref(suffix)?;
+
+        let res = text.as_str().ends_with(suffix.as_str());
+
+        Ok(Cell::Data(encode(&res)))
     }
 }
 
@@ -1628,15 +1670,14 @@ pub mod std_date {
 
         let date: i32 = assume::primitive(&date)?;
 
-        let mut time_zone = assume::into_data(time_zone)?;
-        let time_zone = decode::text_ref(&mut time_zone);
+        let time_zone = assume::text_ref(time_zone)?;
 
         // convert date to timestamp
         let timestamp = {
             use chrono::{NaiveDate, NaiveDateTime, NaiveTime, TimeZone};
 
             // TODO: handle bad timezone
-            let tz: chrono_tz::Tz = time_zone.parse().unwrap();
+            let tz: chrono_tz::Tz = time_zone.as_str().parse().unwrap();
 
             // TODO: handle unwrap
             let date = NaiveDate::from_epoch_days(date).unwrap();
@@ -1751,6 +1792,10 @@ mod assume {
         Ok(decode::text(as_data(cell)?))
     }
 
+    pub fn text_ref(cell: Cell) -> Result<decode::TextData, EvalError> {
+        Ok(decode::text_ref(into_data(cell)?))
+    }
+
     pub fn array(cell: Cell, item_head_bytes: u32) -> ArrayReader<Data> {
         ArrayReader::new(into_data(cell).unwrap(), item_head_bytes as usize)
     }
@@ -1806,11 +1851,23 @@ mod decode {
         String::decode(&data.flatten()).unwrap()
     }
 
-    pub fn text_ref(data: &mut Data) -> &str {
+    pub fn text_ref(mut data: Data) -> TextData {
         let (offset, len) = ArrayReader::<&[u8]>::read_head(data.chunk());
         data.advance(offset);
 
-        str::from_utf8(&data.chunk()[..len]).unwrap()
+        let body = data;
+        TextData { body, len }
+    }
+
+    pub struct TextData {
+        body: Data,
+        len: usize,
+    }
+
+    impl TextData {
+        pub fn as_str(&self) -> &str {
+            str::from_utf8(&self.body.chunk()[..self.len]).unwrap()
+        }
     }
 
     pub fn ty_primitive(ty_arg: u32) -> ir::TyPrimitive {
