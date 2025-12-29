@@ -9,7 +9,7 @@ Lutra can be used in different ways, given that it is a general-purpose query la
 It is most useful in data engineering, where is can replace data frame libraries
 (Pandas, Polars, dplyr) and SQL engines (currently only PostgreSQL).
 
-![](./python-overview.drawio.svg)
+![](./python-overview.drawio.svg){width="100%"}
 
 ### Project
 
@@ -173,5 +173,5 @@ we are only looking at source code, without knowledge of the database schema.
 Before running the Python script, we have to compile the Lutra project and generate `generated_project.py`, which will be imported into Python:
 
 ```sh
-> lutra codegen main.lt generated_project.py
+$ lutra codegen main.lt generated_project.py
 ```

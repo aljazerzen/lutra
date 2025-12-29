@@ -8,7 +8,7 @@
 
 [project]
 
-site_dir = "public/docs"
+site_dir = "output/docs"
 
 # The site_name is shown in the page header and the browser window title
 #
@@ -227,16 +227,7 @@ scheme = "slate"
 media = "(prefers-color-scheme: dark)"
 toggle.icon = "lucide/moon"
 toggle.name = "Switch to light mode"
-
-# ----------------------------------------------------------------------------
-# In the "font" subsection you can configure the fonts used. By default, fonts
-# are loaded from Google Fonts, giving you a wide range of choices from a set
-# of suitably licensed fonts. There are options for a normal text font and for
-# a monospaced font used in code blocks.
-# ----------------------------------------------------------------------------
-#[project.theme.font]
-#text = "Inter"
-#code = "Jetbrains Mono"
+accent = "blue"
 
 [[project.nav]]
 Home = "https://lutra-lang.org"
@@ -258,7 +249,11 @@ Language = [
 ]
 
 [[project.nav]]
-Runner = ["runner/format.md", "runner/format-specification.md"]
+Runner = [
+    "runner/runner.md",
+    "runner/format.md",
+    "runner/format-specification.md",
+]
 
 [[project.nav]]
 About = [
@@ -270,3 +265,13 @@ About = [
 
 [project.extra]
 homepage = "https://lutra-lang.org"
+
+[[project.extra.social]]
+icon = "simple/git"
+link = "https://codeberg.org/lutra/lutra"
+name = "Source code in git repository at Codeberg"
+
+[[project.extra.social]]
+icon = "simple/zulip"
+link = "https://lutra.zulipchat.com/"
+name = "Zulip chat"

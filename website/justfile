@@ -4,15 +4,14 @@ _default:
 serve:
     mprocs \
         'zola serve' \
-        'zensical serve --dev-addr 127.0.0.1:8000'
-
+        'zensical serve'
 
 build:
-    rm -rf public
+    rm -rf public output
     zola build
     zensical build
 
 publish:
     just build
     rsync --human-readable --progress --recursive --delete \
-        public/ lutra-lang.org:/data/http
+        output/ lutra-lang.org:/data/http

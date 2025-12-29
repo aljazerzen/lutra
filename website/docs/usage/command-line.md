@@ -6,12 +6,12 @@ title: "Use from command line"
 
 Prerequisites:
 
-- Rust toolchain
+- [Rust toolchain](https://rust-lang.org/learn/get-started/)
 
 To install the CLI, run:
 
 ```sh
-cargo install --index 'https://codeberg.org/lutra/_cargo-index.git' lutra-cli
+$ cargo install --index 'https://codeberg.org/lutra/_cargo-index.git' lutra-cli
 ```
 
 !!! note

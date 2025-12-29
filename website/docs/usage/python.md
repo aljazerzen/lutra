@@ -107,7 +107,7 @@ For that we will need two dependencies:
 - `lutra-runner-postgres`, for connecting to the PostgreSQL.
 
 ```sh
-> uv add lutra-bin lutra-runner-postgres
+$ uv add lutra-bin lutra-runner-postgres
 ```
 
 We can now initialize the runner in our `main.py` file:
@@ -137,7 +137,7 @@ When we place this snippet into the main function, we can run the Python script,
 see something like this:
 
 ```sh
-> python main.py
+$ python main.py
 [Movie(id=1, title="...", release_year=2009), ...]
 ```
 

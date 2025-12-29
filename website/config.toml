@@ -13,6 +13,8 @@ compile_sass = false
 
 minify_html = true
 
+output_dir = "output"
+
 [markdown]
 # Whether to do syntax highlighting
 # Theme can be customised by setting the `highlight_theme` variable to a theme supported by Zola
