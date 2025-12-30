@@ -7,7 +7,7 @@
   --md-default-bg-color--light: #202b38;
   --md-default-bg-color--dark: #202b38;
 
-  --md-code-fg-color: #d6cea2;
+  --md-code-fg-color: #d0cdbb;
   --md-code-bg-color: #161f27;
   --md-code-hl-color: #1a242f;
 
@@ -21,7 +21,7 @@
   --md-code-hl-operator-color: #fe8019;
   --md-code-hl-punctuation-color: #b8bb26;
   --md-code-hl-comment-color: #928374;
-  --md-code-hl-generic-color: #d6cea2;
+  --md-code-hl-generic-color: #d0cdbb;
   --md-code-hl-variable-color: #fffadf;
 }
 

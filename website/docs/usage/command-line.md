@@ -18,6 +18,8 @@ $ cargo install --index 'https://codeberg.org/lutra/_cargo-index.git' lutra-cli
 
     While Lutra (the project) is in a pre-release state, none of the packages are yet published to crates.io. Instead, I use a custom registry at [codeberg.org](https://codeberg.org/lutra/_cargo-index) to host the packages. This is why we need to use the `--index` flag to tell `cargo` to use this registry.
 
+---
+
 ## Command `run`
 
 The most basic command is `run`, which executes a Lutra program.
@@ -94,6 +96,8 @@ $ lutra run \
 "Hello, world!"
 ```
 
+---
+
 ## Command `check`
 
 Validates a Lutra project. Parses all files and resolves all names and types.
@@ -110,6 +114,8 @@ Validate a project file:
 ```console
 $ lutra check --project ./project.lt
 ```
+
+---
 
 ## Command `codegen`
 
@@ -133,6 +139,8 @@ Used files:
 Output written to lutra.rs
 Done.
 ```
+
+---
 
 ## Other commands
 
