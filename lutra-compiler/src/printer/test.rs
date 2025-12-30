@@ -220,6 +220,26 @@ fn format_12() {
 }
 
 #[test]
+fn format_13() {
+    // func calls with single arg
+
+    assert_snapshot!(_format(r#"
+    func main() -> my_func([
+        something_long_so_the_array_must_be_split,
+        over_multiple_lines,
+        but_the_func_call_is_not,
+    ])
+    "#), @"
+    func main() -> my_func([
+      something_long_so_the_array_must_be_split,
+      over_multiple_lines,
+      but_the_func_call_is_not,
+    ])
+    "
+    )
+}
+
+#[test]
 fn trivia_00() {
     assert_snapshot!(_format(r#"
     # TODO

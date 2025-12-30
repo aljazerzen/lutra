@@ -91,17 +91,32 @@ impl PrintSource for pr::Expr {
             pr::ExprKind::FuncCall(call) => {
                 call.func.print(p)?;
 
-                Between {
-                    prefix: "(",
-                    node: &Separated {
-                        nodes: &call.args,
-                        sep_inline: ", ",
-                        sep_line_end: ",",
-                    },
-                    suffix: ")",
-                    span: self.span,
+                if call.args.len() <= 1 {
+                    // special case: when there is only one arg, allow it to
+                    // span multiples lines, without adding extra newlines at
+                    // the start or end of parenthesis. For example:
+                    //   map(x -> [
+                    //     ... # many lines
+                    //   ])
+                    p.push("(")?;
+                    if let Some(arg) = call.args.first() {
+                        arg.print(p)?;
+                    }
+                    p.push(")")?;
+                } else {
+                    // general case
+                    Between {
+                        prefix: "(",
+                        node: &Separated {
+                            nodes: &call.args,
+                            sep_inline: ", ",
+                            sep_line_end: ",",
+                        },
+                        suffix: ")",
+                        span: self.span,
+                    }
+                    .print(p)?;
                 }
-                .print(p)?;
             }
 
             pr::ExprKind::Func(func) => return print_func(func, None, p),
