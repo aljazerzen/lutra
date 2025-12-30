@@ -53,6 +53,7 @@ impl PrFold for Desugarator {
             }
             pr::ExprKind::Binary(binary) => self.desugar_binary(binary, expr.span.unwrap())?,
             pr::ExprKind::FString(items) => self.desugar_f_string(items, expr.span.unwrap())?,
+            pr::ExprKind::FuncShort(func) => self.desugar_func_short(*func)?,
             k => fold::fold_expr_kind(self, k)?,
         };
         Ok(expr)
@@ -215,6 +216,15 @@ impl Desugarator {
     /// ```
     fn desugar_import(&self, import: pr::ImportDef) -> Vec<(String, pr::Def)> {
         desugar_import_re(&pr::Path::empty(), import)
+    }
+
+    fn desugar_func_short(&mut self, func: pr::FuncShort) -> Result<pr::ExprKind> {
+        Ok(pr::ExprKind::Func(Box::new(pr::Func {
+            params: vec![func.param],
+            return_ty: None,
+            body: Box::new(self.fold_expr(*func.body)?),
+            ty_params: vec![],
+        })))
     }
 }
 

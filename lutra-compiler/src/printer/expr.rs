@@ -105,6 +105,13 @@ impl PrintSource for pr::Expr {
             }
 
             pr::ExprKind::Func(func) => return print_func(func, None, p),
+
+            pr::ExprKind::FuncShort(func) => {
+                p.push(&func.param.name)?;
+                p.push(" -> ")?;
+                func.body.print(p)?;
+            }
+
             pr::ExprKind::FString(interpolate_items) => {
                 p.push("f\"")?;
                 for item in interpolate_items {

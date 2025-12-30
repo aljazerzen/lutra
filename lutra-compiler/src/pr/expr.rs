@@ -106,6 +106,7 @@ pub enum ExprKind {
     Unary(UnaryExpr),
     FuncCall(FuncCall),
     Func(Box<Func>),
+    FuncShort(Box<FuncShort>),
     FString(Vec<InterpolateItem>),
     Match(Match),
     If(If),
@@ -143,20 +144,30 @@ pub struct FuncCall {
     pub args: Vec<Expr>,
 }
 
-/// Function called with possibly missing positional arguments.
-/// May also contain environment that is needed to evaluate the body.
+/// Function. `func (p1: P1, p2: P2): B where T -> b`
 #[derive(Debug, PartialEq, Clone)]
 pub struct Func {
-    /// Type requirement for the function body expression.
-    pub return_ty: Option<Ty>,
-
-    /// Expression containing parameter (and environment) references.
-    pub body: Box<Expr>,
-
     /// Function parameters.
     pub params: Vec<FuncParam>,
 
+    /// Type requirement for the function body expression.
+    pub return_ty: Option<Ty>,
+
+    /// Expression containing parameter references.
+    pub body: Box<Expr>,
+
+    /// Parameters of the types within this function (where clause).
     pub ty_params: Vec<TyParam>,
+}
+
+/// Short function. `x -> b`
+#[derive(Debug, PartialEq, Clone)]
+pub struct FuncShort {
+    /// Function parameter.
+    pub param: FuncParam,
+
+    /// Expression containing parameter (and environment) references.
+    pub body: Box<Expr>,
 }
 
 #[derive(Debug, PartialEq, Clone)]

@@ -439,6 +439,15 @@ func main() -> my_func(1)
 # >
 6
 
+# === functions_03
+func main() -> (
+  4: int32
+  | x -> x + 1
+  | x -> x * 2
+)
+# >
+10
+
 # === if_00
 func bool_to_text(x: bool) -> if x then (
   "yes"

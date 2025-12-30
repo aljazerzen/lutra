@@ -122,10 +122,10 @@ pub fn fold_expr_kind<T: ?Sized + PrFold>(fold: &mut T, expr_kind: ExprKind) -> 
 
         FuncCall(func_call) => FuncCall(fold.fold_func_call(func_call)?),
         Func(func) => Func(Box::new(fold.fold_func(*func)?)),
-        // FuncApplication(func_app) => FuncApplication(super::expr::FuncApplication {
-        //     func: Box::new(fold.fold_expr(*func_app.func)?),
-        //     args: fold.fold_exprs(func_app.args)?,
-        // }),
+        FuncShort(func) => FuncShort(Box::new(pr::FuncShort {
+            param: fold_func_param(fold, func.param)?,
+            body: Box::new(fold.fold_expr(*func.body)?),
+        })),
         Nested(inner) => Nested(Box::new(fold.fold_expr(*inner)?)),
         Range(range) => Range(pr::Range {
             start: fold_optional_box(fold, range.start)?,
@@ -261,15 +261,17 @@ pub fn fold_func_params<T: ?Sized + PrFold>(
 ) -> Result<Vec<FuncParam>> {
     params
         .into_iter()
-        .map(|param| {
-            Ok(FuncParam {
-                constant: param.constant,
-                name: param.name,
-                ty: fold_type_opt(fold, param.ty)?,
-                span: param.span,
-            })
-        })
-        .try_collect()
+        .map(|p| fold_func_param(fold, p))
+        .collect()
+}
+
+pub fn fold_func_param<T: ?Sized + PrFold>(fold: &mut T, param: FuncParam) -> Result<FuncParam> {
+    Ok(FuncParam {
+        constant: param.constant,
+        name: param.name,
+        ty: fold_type_opt(fold, param.ty)?,
+        span: param.span,
+    })
 }
 
 pub fn fold_pattern<T: ?Sized + PrFold>(fold: &mut T, pattern: Pattern) -> Result<Pattern> {

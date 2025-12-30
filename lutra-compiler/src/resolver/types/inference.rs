@@ -71,7 +71,8 @@ impl TypeResolver<'_> {
             | ExprKind::Range(_)
             | ExprKind::Binary(_)
             | ExprKind::Unary(_)
-            | ExprKind::Native => unreachable!(),
+            | ExprKind::FuncShort(_)
+            | ExprKind::Native => unreachable!("{}", expr.kind.as_ref()),
         };
         let mut ty = Ty::new(kind);
         ty.span = expr.span;

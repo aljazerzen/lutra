@@ -15,7 +15,8 @@ pub(crate) fn expr<'a>(
 
         let ident_kind = ident().map(ExprKind::Ident);
 
-        let func = lambda_func(expr.clone(), ty.clone());
+        let func = func(expr.clone(), ty.clone());
+        let func_short = func_short(expr.clone());
         let call = func_call(expr.clone());
 
         let tuple = tuple(expr.clone());
@@ -32,6 +33,7 @@ pub(crate) fn expr<'a>(
             array,
             interpolation,
             call,
+            func_short,
             ident_kind,
             match_,
             if_else,
@@ -406,7 +408,7 @@ where
         .labelled("function call")
 }
 
-fn lambda_func<'a>(
+fn func<'a>(
     expr: impl Parser<TokenKind, Expr, Error = PError> + Clone + 'a,
     ty: impl Parser<TokenKind, Ty, Error = PError> + Clone + 'a,
 ) -> impl Parser<TokenKind, ExprKind, Error = PError> + Clone + 'a {
@@ -443,7 +445,25 @@ fn lambda_func<'a>(
             })
         })
         .map(ExprKind::Func)
-        .labelled("function definition")
+        .labelled("function")
+}
+
+fn func_short<'a>(
+    expr: impl Parser<TokenKind, Expr, Error = PError> + 'a,
+) -> impl Parser<TokenKind, ExprKind, Error = PError> + 'a {
+    ident_part()
+        .then_ignore(just(TokenKind::ArrowThin))
+        .map_with_span(|name, span| FuncParam {
+            constant: false,
+            name,
+            ty: None,
+            span,
+        })
+        .then(expr.map(Box::new))
+        .map(|(param, body)| FuncShort { param, body })
+        .map(Box::new)
+        .map(ExprKind::FuncShort)
+        .labelled("function")
 }
 
 pub(crate) fn ident() -> impl Parser<TokenKind, Path, Error = PError> + Clone {

@@ -126,6 +126,7 @@ fn parse_03() {
     Expr {
         kind: Func(
             Func {
+                params: [],
                 return_ty: None,
                 body: Expr {
                     kind: Literal(
@@ -141,7 +142,6 @@ fn parse_03() {
                     scope_id: None,
                     target: None,
                 },
-                params: [],
                 ty_params: [
                     TyParam {
                         name: "A",
@@ -181,6 +181,7 @@ fn parse_04() {
     Expr {
         kind: Func(
             Func {
+                params: [],
                 return_ty: None,
                 body: Expr {
                     kind: Literal(
@@ -196,7 +197,6 @@ fn parse_04() {
                     scope_id: None,
                     target: None,
                 },
-                params: [],
                 ty_params: [
                     TyParam {
                         name: "T",
@@ -768,6 +768,14 @@ fn parse_10() {
             right: Expr {
                 kind: Func(
                     Func {
+                        params: [
+                            FuncParam {
+                                constant: false,
+                                name: "x",
+                                ty: None,
+                                span: 0:10-11,
+                            },
+                        ],
                         return_ty: None,
                         body: Expr {
                             kind: Binary(
@@ -807,14 +815,6 @@ fn parse_10() {
                             scope_id: None,
                             target: None,
                         },
-                        params: [
-                            FuncParam {
-                                constant: false,
-                                name: "x",
-                                ty: None,
-                                span: 0:10-11,
-                            },
-                        ],
                         ty_params: [],
                     },
                 ),

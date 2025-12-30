@@ -418,11 +418,12 @@ impl<'a> Lowerer<'a> {
             pr::ExprKind::Native => unreachable!(),
 
             // desugared away
-            pr::ExprKind::Nested(_) => unreachable!(),
-            pr::ExprKind::Binary(_) => unreachable!(),
-            pr::ExprKind::Unary(_) => unreachable!(),
-            pr::ExprKind::Range(_) => unreachable!(),
-            pr::ExprKind::FString(_) => unreachable!(),
+            pr::ExprKind::Nested(_)
+            | pr::ExprKind::Binary(_)
+            | pr::ExprKind::Unary(_)
+            | pr::ExprKind::Range(_)
+            | pr::ExprKind::FString(_)
+            | pr::ExprKind::FuncShort(_) => unreachable!(),
         };
         Ok(ir::Expr {
             kind,
