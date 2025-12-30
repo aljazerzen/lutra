@@ -240,6 +240,38 @@ fn format_13() {
 }
 
 #[test]
+fn format_14() {
+    // binary expr that span multiple lines
+
+    assert_snapshot!(_format(r#"
+    func main() -> some_long_value
+    | some_function_that_has_a_long_name | another_function
+    "#), @"
+    func main() -> (
+      some_long_value | some_function_that_has_a_long_name | another_function
+    )
+    "
+    )
+}
+
+#[test]
+fn format_15() {
+    // binary expr that span multiple lines
+
+    assert_snapshot!(_format(r#"
+    func main() -> some_long_value
+    | function_that_has_a_long_name | another_function_that_has_even_long_name
+    "#), @"
+    func main() -> (
+      some_long_value
+      | function_that_has_a_long_name
+      | another_function_that_has_even_long_name
+    )
+    "
+    )
+}
+
+#[test]
 fn trivia_00() {
     assert_snapshot!(_format(r#"
     # TODO

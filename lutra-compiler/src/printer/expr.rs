@@ -34,18 +34,29 @@ impl PrintSource for pr::Expr {
                 }
             }
             pr::ExprKind::Binary(binary) => {
-                let (first, operations) = flatten_binary(binary);
-
-                let mut nodes = Vec::with_capacity(operations.len() + 1);
-                nodes.push((None, first));
-                nodes.extend(operations.into_iter().map(|(o, e)| (Some(o), e)));
-
-                return Separated {
+                let nodes = flatten_binary(binary);
+                let nodes = Separated {
                     nodes: &nodes,
                     sep_inline: " ",
                     sep_line_end: "",
+                };
+
+                // try printing without parenthesis
+                let mut inline = p.fork();
+                inline.require_single_line(self.span)?;
+                if nodes.print(&mut inline).is_some() {
+                    p.merge(inline);
+                    return Some(());
                 }
-                .print(p);
+
+                // inject parenthesis
+                p.push("(")?;
+                p.indent();
+                p.new_line();
+                nodes.print(p)?;
+                p.dedent();
+                p.new_line();
+                p.push(")")?;
             }
             pr::ExprKind::Unary(unary) => {
                 p.push(unary.op.to_string())?;
@@ -53,6 +64,27 @@ impl PrintSource for pr::Expr {
             }
 
             pr::ExprKind::Nested(expr) => {
+                // special case
+                if let pr::ExprKind::Binary(binary) = &expr.kind {
+                    // when inner binary op, don't do a normal pass,
+                    // because that might inject parenthesis
+
+                    let nodes = flatten_binary(binary);
+                    let nodes = Separated {
+                        nodes: &nodes,
+                        sep_inline: " ",
+                        sep_line_end: "",
+                    };
+                    return Between {
+                        prefix: "(",
+                        node: &nodes,
+                        suffix: ")",
+                        span: self.span,
+                    }
+                    .print(p);
+                }
+
+                // general case
                 return Between {
                     prefix: "(",
                     node: expr.as_ref(),
@@ -209,7 +241,9 @@ impl PrintSource for pr::Expr {
     }
 }
 
-fn flatten_binary(binary: &pr::BinaryExpr) -> (&pr::Expr, Vec<(pr::BinOp, &pr::Expr)>) {
+/// Converts a possible deeply nested tree of binary operations into a flat list
+/// of nodes.
+fn flatten_binary(binary: &pr::BinaryExpr) -> Vec<(Option<pr::BinOp>, &pr::Expr)> {
     let mut first = binary.left.as_ref();
     let mut operations = vec![(binary.op, binary.right.as_ref())];
 
@@ -229,7 +263,10 @@ fn flatten_binary(binary: &pr::BinaryExpr) -> (&pr::Expr, Vec<(pr::BinOp, &pr::E
         }
     }
 
-    (first, operations)
+    let mut nodes = Vec::with_capacity(operations.len() + 1);
+    nodes.push((None, first));
+    nodes.extend(operations.into_iter().map(|(o, e)| (Some(o), e)));
+    nodes
 }
 
 fn print_if_inline<'c>(if_: &pr::If, span: Option<crate::Span>, p: &mut Printer<'c>) -> Option<()> {
