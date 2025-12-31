@@ -14,6 +14,7 @@ pub(crate) fn expr<'a>(
         let literal = literal().map(ExprKind::Literal);
 
         let ident_kind = ident().map(ExprKind::Ident);
+        let variant = variant(expr.clone()).map(ExprKind::Variant);
 
         let func = func(expr.clone(), ty.clone());
         let func_short = func_short(expr.clone());
@@ -38,6 +39,7 @@ pub(crate) fn expr<'a>(
             match_,
             if_else,
             nested,
+            variant,
         ))
         .map_with_span(Expr::new_with_span)
         .boxed();
@@ -230,7 +232,7 @@ fn field_lookup<'a>(
     )
     .foldl(|base, (lookup, span)| {
         let base = Box::new(base);
-        let kind = ExprKind::TupleLookup { base, lookup };
+        let kind = ExprKind::Lookup { base, lookup };
         Expr::new_with_span(kind, span)
     })
 }
@@ -404,7 +406,12 @@ where
                     |_| vec![],
                 )),
         )
-        .map(|(name, args)| ExprKind::FuncCall(FuncCall { func: name, args }))
+        .map(|(name, args)| {
+            ExprKind::Call(Call {
+                subject: name,
+                args,
+            })
+        })
         .labelled("function call")
 }
 
@@ -471,6 +478,19 @@ pub(crate) fn ident() -> impl Parser<TokenKind, Path, Error = PError> + Clone {
         .separated_by(just(TokenKind::PathSep))
         .at_least(1)
         .map(Path::new::<String, Vec<String>>)
+}
+
+pub fn variant(
+    expr: impl Parser<TokenKind, Expr, Error = PError> + Clone,
+) -> impl Parser<TokenKind, Variant, Error = PError> + Clone {
+    ctrl('.')
+        .ignore_then(ident_part())
+        .then(
+            expr.delimited_by(ctrl('('), ctrl(')'))
+                .map(Box::new)
+                .or_not(),
+        )
+        .map(|(name, inner)| Variant { name, inner })
 }
 
 fn operator_unary() -> impl Parser<TokenKind, UnOp, Error = PError> + Clone {

@@ -1,8 +1,6 @@
 use std::cell::RefCell;
 use std::collections::HashMap;
 
-use itertools::Itertools;
-
 use crate::diagnostic::{Diagnostic, DiagnosticCode, WithErrorInfo};
 use crate::pr;
 use crate::{Result, Span};
@@ -52,7 +50,7 @@ pub enum ScopedKind {
     /// ```
     TyParam {
         name: String,
-        domain: pr::TyParamDomain,
+        domain: pr::TyDomain,
     },
 
     /// Type variable - something that we don't yet know the type of,
@@ -80,16 +78,15 @@ pub struct TyVar {
 pub enum TyVarConstraint {
     IsTy(TyVarId, pr::Ty),
     Equals(TyVarId, TyVarId),
-    InDomain(TyVarId, pr::TyParamDomain),
+    InDomain(TyVarId, pr::TyDomain),
 }
 
 #[derive(Debug, strum::AsRefStr)]
 pub enum Named<'a> {
     Expr(&'a pr::Expr),
-    Ty { ty: &'a pr::Ty, is_nominal: bool },
+    Ty { ty: &'a pr::Ty, is_framed: bool },
     Module,
     Scoped(&'a ScopedKind),
-    EnumVariant(&'a pr::Ty, Option<pr::Path>, usize),
 }
 
 /// A reference to a type-like objects
@@ -168,7 +165,7 @@ impl Scope {
         &self,
         name_hint: Option<String>,
         span: Span,
-        mut domain: pr::TyParamDomain,
+        mut domain: pr::TyDomain,
     ) -> usize {
         let type_arg = TyVar {
             name_hint,
@@ -177,13 +174,13 @@ impl Scope {
         let var_id = self.names.push(ScopedKind::TyVar(type_arg));
 
         // overwrite span to point to this var instead of the original domain
-        if let pr::TyParamDomain::TupleHasFields(fields) = &mut domain {
+        if let pr::TyDomain::TupleHasFields(fields) = &mut domain {
             for f in fields {
                 f.span = span;
             }
         }
 
-        if !matches!(domain, pr::TyParamDomain::Open) {
+        if !matches!(domain, pr::TyDomain::Open) {
             self.ty_var_constraints
                 .borrow_mut()
                 .push(TyVarConstraint::InDomain(var_id, domain));
@@ -208,7 +205,7 @@ impl Scope {
         constraints.push(TyVarConstraint::IsTy(id, ty));
     }
 
-    pub fn infer_type_var_in_domain(&self, id: TyVarId, domain: pr::TyParamDomain) {
+    pub fn infer_type_var_in_domain(&self, id: TyVarId, domain: pr::TyDomain) {
         tracing::debug!("inferring {id:?} in domain {domain:?}");
 
         let mut constraints = self.ty_var_constraints.borrow_mut();
@@ -240,20 +237,14 @@ impl<'a> TypeResolver<'a> {
         tracing::trace!("get_ident: {target:?}");
 
         match target {
-            pr::Ref::Global(pr::AbsoluteRef { to_def, within }) => {
-                let def = self.root_mod.get(to_def);
-                match &def.unwrap_or_else(|| panic!("cannot find {to_def}")).kind {
-                    pr::DefKind::Expr(expr) => {
-                        if !within.is_empty() {
-                            unreachable!()
-                        }
-                        Ok(Named::Expr(expr.value.as_ref().unwrap()))
-                    }
-                    pr::DefKind::Ty(def) => {
-                        let within = within.as_steps();
-                        self.lookup_into_ty(&def.ty, Some(to_def), within, def.is_nominal)
-                            .ok_or_else(|| Diagnostic::new_custom("unknown name"))
-                    }
+            pr::Ref::Global(tgt_fq) => {
+                let def = self.root_mod.get(tgt_fq);
+                match &def.unwrap_or_else(|| panic!("cannot find {tgt_fq}")).kind {
+                    pr::DefKind::Expr(expr) => Ok(Named::Expr(expr.value.as_ref().unwrap())),
+                    pr::DefKind::Ty(def) => Ok(Named::Ty {
+                        ty: &def.ty,
+                        is_framed: def.is_framed,
+                    }),
 
                     pr::DefKind::Module(_) => Ok(Named::Module),
 
@@ -273,7 +264,7 @@ impl<'a> TypeResolver<'a> {
         }
     }
 
-    pub fn get_ty_param(&self, param_id: usize) -> (&String, &pr::TyParamDomain) {
+    pub fn get_ty_param(&self, param_id: usize) -> (&String, &pr::TyDomain) {
         let scope = self.scopes.last().unwrap();
         let scoped = &scope.names[param_id];
         scoped.as_ty_param().unwrap()
@@ -286,7 +277,7 @@ impl<'a> TypeResolver<'a> {
 
     /// Resolves type identifiers. Does not resolve identifiers in contained types.
     pub fn get_ty_mat<'t>(&'t self, ty: &'t pr::Ty) -> Result<TyRef<'t>> {
-        let pr::TyKind::Ident(ident) = &ty.kind else {
+        let pr::TyKind::Ident(_) = &ty.kind else {
             return Ok(TyRef::Ty(ty));
         };
 
@@ -295,14 +286,14 @@ impl<'a> TypeResolver<'a> {
 
         match named {
             Named::Ty {
-                is_nominal: true, ..
+                is_framed: true, ..
             } => {
-                // reference to a nominal type: don't inline, return ident
+                // reference to a framed type: don't inline, return ident
                 Ok(TyRef::Ty(ty))
             }
 
             Named::Ty {
-                is_nominal: false,
+                is_framed: false,
                 ty,
             } => {
                 // reference to a type: all ok
@@ -334,10 +325,6 @@ impl<'a> TypeResolver<'a> {
             }
             Named::Expr(_) => Err(err_name_kind("a type", "a value").with_span(ty.span)),
             Named::Module => Err(err_name_kind("a type", "a module").with_span(ty.span)),
-            Named::EnumVariant(..) => Err(err_name_kind("a type", "a value")
-                .with_span(ty.span)
-                .push_hint(format!("{ident} is an enum variant"))
-                .with_span(ty.span)),
         }
     }
 
@@ -395,7 +382,7 @@ impl<'a> TypeResolver<'a> {
         (utils::TypeReplacer::on_ty(ty, mapping), ty_args)
     }
 
-    pub fn introduce_ty_var(&self, domain: pr::TyParamDomain, span: Span) -> pr::Ty {
+    pub fn introduce_ty_var(&self, domain: pr::TyDomain, span: Span) -> pr::Ty {
         let scope = self.get_ty_var_scope();
         let var_id = scope.insert_type_var(None, span, domain);
 
@@ -406,54 +393,6 @@ impl<'a> TypeResolver<'a> {
                 offset: var_id,
             }),
             ..pr::Ty::new(pr::TyKind::Ident(pr::Path::from_name("_")))
-        }
-    }
-
-    fn lookup_into_ty(
-        &'a self,
-        ty: &'a pr::Ty,
-        ty_fq: Option<&pr::Path>,
-        steps: &[String],
-        is_nominal: bool,
-    ) -> Option<Named<'a>> {
-        if steps.is_empty() {
-            return Some(Named::Ty { ty, is_nominal });
-        }
-        let TyRef::Ty(ty_mat) = self.get_ty_mat(ty).unwrap() else {
-            todo!()
-        };
-        match &ty_mat.kind {
-            pr::TyKind::Enum(variants) => {
-                // path into enum
-                let (position, variant) = variants.iter().find_position(|v| v.name == steps[0])?;
-
-                if steps.len() == 1 {
-                    // find fully qualified path to the type of enum being referenced
-                    let ty_fq = ty_fq // when provided by caller, use that
-                        .cloned()
-                        .or_else(|| // fallback to ty.target
-                            ty.target.as_ref().and_then(|r| match r {
-                                pr::Ref::Global(pr::AbsoluteRef {to_def, within }) if within.is_empty() => {
-                                    Some(to_def.clone())
-                                }
-                                _ => None,
-                            }));
-
-                    Some(Named::EnumVariant(ty, ty_fq, position))
-                } else {
-                    self.lookup_into_ty(&variant.ty, None, &steps[1..], false)
-                }
-            }
-            pr::TyKind::Tuple(fields) => {
-                // path into tuple
-
-                let field = fields
-                    .iter()
-                    .find(|f| f.name.as_ref().is_some_and(|n| n == &steps[0]))?;
-
-                self.lookup_into_ty(&field.ty, None, &steps[1..], false)
-            }
-            _ => None,
         }
     }
 }

@@ -667,7 +667,6 @@ pub mod std {
 
             let key = it.evaluate_func_call(&key_getter, vec![item_cell])?;
             let key = assume::into_data(key)?.chunk()[..key_head_bytes].to_vec();
-            dbg!(&key);
 
             let partition = groups.entry(key).or_default();
             partition.push(item);

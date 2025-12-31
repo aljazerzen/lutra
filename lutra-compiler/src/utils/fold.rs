@@ -48,13 +48,13 @@ pub trait PrFold {
     fn fold_type_def(&mut self, ty_def: TyDef) -> Result<TyDef> {
         Ok(TyDef {
             ty: self.fold_type(ty_def.ty)?,
-            is_nominal: ty_def.is_nominal,
+            is_framed: ty_def.is_framed,
         })
     }
     fn fold_module_def(&mut self, module_def: ModuleDef) -> Result<ModuleDef> {
         fold_module_def(self, module_def)
     }
-    fn fold_func_call(&mut self, func_call: FuncCall) -> Result<FuncCall> {
+    fn fold_func_call(&mut self, func_call: Call) -> Result<Call> {
         fold_func_call(self, func_call)
     }
     fn fold_func(&mut self, func: Func) -> Result<Func> {
@@ -81,11 +81,7 @@ pub fn fold_expr_kind<T: ?Sized + PrFold>(fold: &mut T, expr_kind: ExprKind) -> 
     use ExprKind::*;
     Ok(match expr_kind {
         Ident(ident) => Ident(ident),
-        // All { within, except } => All {
-        //     within: Box::new(fold.fold_expr(*within)?),
-        //     except: Box::new(fold.fold_expr(*except)?),
-        // },
-        TupleLookup { base, lookup } => TupleLookup {
+        Lookup { base, lookup } => Lookup {
             base: Box::new(fold.fold_expr(*base)?),
             lookup,
         },
@@ -102,8 +98,8 @@ pub fn fold_expr_kind<T: ?Sized + PrFold>(fold: &mut T, expr_kind: ExprKind) -> 
                 .try_collect()?,
         ),
         Array(items) => Array(fold.fold_exprs(items)?),
-        EnumVariant(variant) => EnumVariant(pr::EnumVariant {
-            tag: variant.tag,
+        Variant(variant) => Variant(pr::Variant {
+            name: variant.name,
             inner: fold_optional_box(fold, variant.inner)?,
         }),
         FString(items) => FString(
@@ -120,7 +116,7 @@ pub fn fold_expr_kind<T: ?Sized + PrFold>(fold: &mut T, expr_kind: ExprKind) -> 
             main: Box::new(fold.fold_expr(*binding.main)?),
         }),
 
-        FuncCall(func_call) => FuncCall(fold.fold_func_call(func_call)?),
+        Call(func_call) => Call(fold.fold_func_call(func_call)?),
         Func(func) => Func(Box::new(fold.fold_func(*func)?)),
         FuncShort(func) => FuncShort(Box::new(pr::FuncShort {
             param: fold_func_param(fold, func.param)?,
@@ -239,9 +235,9 @@ fn fold_if<F: ?Sized + PrFold>(fold: &mut F, if_else: If) -> Result<If> {
     })
 }
 
-pub fn fold_func_call<T: ?Sized + PrFold>(fold: &mut T, func_call: FuncCall) -> Result<FuncCall> {
-    Ok(FuncCall {
-        func: Box::new(fold.fold_expr(*func_call.func)?),
+pub fn fold_func_call<T: ?Sized + PrFold>(fold: &mut T, func_call: Call) -> Result<Call> {
+    Ok(Call {
+        subject: Box::new(fold.fold_expr(*func_call.subject)?),
         args: fold.fold_exprs(func_call.args)?,
     })
 }

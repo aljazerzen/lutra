@@ -59,7 +59,7 @@ fn interpolated_parser() -> impl Parser<char, Vec<InterpolateItem>, Error = Chum
 
             for (part, span) in parts {
                 let lookup = Lookup::Name(part);
-                let kind = ExprKind::TupleLookup { base, lookup };
+                let kind = ExprKind::Lookup { base, lookup };
                 base = Box::new(Expr::new_with_span(kind, span));
             }
             base

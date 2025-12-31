@@ -22,11 +22,10 @@ pub fn lower_expr(project: &Project, main_pr: &pr::Expr) -> ir::Program {
     );
     lowerer.is_main_a_func = main_pr.ty.as_ref().unwrap().kind.is_func();
 
-    let main = if let Some(pr::Ref::Global(pr::AbsoluteRef { to_def, within })) = &main_pr.target {
+    let main = if let Some(pr::Ref::Global(target_fq)) = &main_pr.target {
         // optimization: inline direct idents, don't bind them to vars
-        assert!(within.is_empty());
         lowerer
-            .lower_expr_def(to_def, main_pr.ty_args.clone())
+            .lower_expr_def(target_fq, main_pr.ty_args.clone())
             .unwrap()
     } else {
         lowerer.lower_expr(main_pr).unwrap()
@@ -109,7 +108,7 @@ impl<'a> Lowerer<'a> {
             return Ok(None);
         }
 
-        // validate that it is an external defintion
+        // validate that it is an external definition
         let def = self.root_module.get(path);
         let def = def.unwrap_or_else(|| panic!("{path} does not exist"));
         let expr = def.kind.as_expr().unwrap();
@@ -202,21 +201,28 @@ impl<'a> Lowerer<'a> {
                     .try_collect()?,
             ),
             pr::ExprKind::Array(items) => ir::ExprKind::Array(self.lower_exprs(items)?),
-            pr::ExprKind::EnumVariant(variant) => {
+            pr::ExprKind::Variant(variant) => {
+                let inner = if let Some(inner) = &variant.inner {
+                    self.lower_expr(inner)?
+                } else {
+                    ir::Expr {
+                        kind: ir::ExprKind::Tuple(vec![]),
+                        ty: ir::Ty::new(ir::TyKind::Tuple(vec![])),
+                    }
+                };
+                let ty = self.get_ty_mat_pr(ty);
+                let variants = ty.kind.as_enum().unwrap();
+                let (tag, _) = variants
+                    .iter()
+                    .find_position(|v| v.name == variant.name)
+                    .unwrap();
+
                 ir::ExprKind::EnumVariant(Box::new(ir::EnumVariant {
-                    tag: variant.tag as u64,
-                    inner: variant
-                        .inner
-                        .as_ref()
-                        .map(|x| self.lower_expr(x))
-                        .transpose()?
-                        .unwrap_or_else(|| ir::Expr {
-                            kind: ir::ExprKind::Tuple(vec![]),
-                            ty: ir::Ty::new(ir::TyKind::Tuple(vec![])),
-                        }),
+                    tag: tag as u64,
+                    inner,
                 }))
             }
-            pr::ExprKind::TupleLookup { base, lookup } => {
+            pr::ExprKind::Lookup { base, lookup } => {
                 // At this stage, ty vars and ty params should have all been compiled away
                 // and we can expect the base to be a concrete tuple.
                 // This means we can iterate over the fields and find the correct tuple offset that way.
@@ -237,8 +243,8 @@ impl<'a> Lowerer<'a> {
                 ir::ExprKind::TupleLookup(Box::new(ir::TupleLookup { base, position }))
             }
 
-            pr::ExprKind::FuncCall(call) => ir::ExprKind::Call(Box::new(ir::Call {
-                function: self.lower_expr(&call.func)?,
+            pr::ExprKind::Call(call) => ir::ExprKind::Call(Box::new(ir::Call {
+                function: self.lower_expr(&call.subject)?,
                 args: self.lower_exprs(&call.args)?,
             })),
             pr::ExprKind::Func(func) => {
@@ -316,7 +322,7 @@ impl<'a> Lowerer<'a> {
                     }
                 }
 
-                pr::Ref::Global(ref_) => self.lower_ref_global(&ref_.to_def, &expr.ty_args)?,
+                pr::Ref::Global(ref_) => self.lower_ref_global(ref_, &expr.ty_args)?,
             },
 
             pr::ExprKind::Match(match_) => {
@@ -437,6 +443,7 @@ impl<'a> Lowerer<'a> {
             return Ok(ptr);
         }
 
+        // for other refs, return ir::Ptr::Binding and remember to lower them later
         let reference = (ref_.clone(), ty_args.to_vec());
         let entry = self.def_dependencies.entry(reference);
         let binding_id = match entry {
@@ -658,10 +665,10 @@ impl<'a> Lowerer<'a> {
         if let Some(target) = ty.target {
             match target {
                 pr::Ref::Global(fq) => {
-                    self.type_defs_queue.push_back(fq.to_def.clone());
-                    tracing::debug!("lower ty ident: {}", fq.to_def);
+                    self.type_defs_queue.push_back(fq.clone());
+                    tracing::debug!("lower ty ident: {}", fq);
                     return ir::Ty {
-                        kind: ir::TyKind::Ident(ir::Path(fq.to_def.into_iter().collect_vec())),
+                        kind: ir::TyKind::Ident(ir::Path(fq.into_iter().collect_vec())),
                         layout: None,
                         name: ty.name,
                         variants_recursive: vec![],
@@ -805,11 +812,10 @@ impl<'a> Lowerer<'a> {
 
     fn get_ty_mat_pr(&self, ty: &'a pr::Ty) -> &'a pr::Ty {
         if let pr::TyKind::Ident(_) = &ty.kind {
-            let Some(pr::Ref::Global(pr::AbsoluteRef { to_def, within })) = &ty.target else {
+            let Some(pr::Ref::Global(target_fq)) = &ty.target else {
                 panic!();
             };
-            assert!(within.is_empty());
-            let def = self.root_module.get(to_def).unwrap();
+            let def = self.root_module.get(target_fq).unwrap();
             let def = def.kind.as_ty().unwrap();
 
             self.get_ty_mat_pr(&def.ty)

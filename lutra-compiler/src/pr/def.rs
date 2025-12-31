@@ -46,7 +46,7 @@ pub struct ExprDef {
 #[derive(Debug, PartialEq, Clone)]
 pub struct TyDef {
     pub ty: Ty,
-    pub is_nominal: bool,
+    pub is_framed: bool,
 }
 
 #[derive(Debug, PartialEq, Clone)]

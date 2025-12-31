@@ -21,8 +21,8 @@ impl Prefixer {
         };
 
         let mut prefixed = pr::Path::from_name(self.prefix.clone());
-        prefixed.extend(absolute_ref.to_def);
-        absolute_ref.to_def = prefixed;
+        prefixed.extend(absolute_ref);
+        absolute_ref = prefixed;
 
         Some(pr::Ref::Global(absolute_ref))
     }

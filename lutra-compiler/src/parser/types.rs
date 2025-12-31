@@ -234,11 +234,11 @@ pub fn type_params<'a>(
                 ty,
             });
         }
-        Ok(TyParamDomain::TupleHasFields(fields))
+        Ok(TyDomain::TupleHasFields(fields))
     })
     .labelled("tuple domain");
 
-    let one_of_numbers = ident_keyword("number").to(TyParamDomain::OneOf(vec![
+    let one_of_numbers = ident_keyword("number").to(TyDomain::OneOf(vec![
         TyPrimitive::int8,
         TyPrimitive::int16,
         TyPrimitive::int32,
@@ -251,7 +251,7 @@ pub fn type_params<'a>(
         TyPrimitive::float64,
     ]));
 
-    let one_of_primitives = ident_keyword("primitive").to(TyParamDomain::OneOf(vec![
+    let one_of_primitives = ident_keyword("primitive").to(TyDomain::OneOf(vec![
         TyPrimitive::bool,
         TyPrimitive::int8,
         TyPrimitive::int16,
@@ -276,10 +276,10 @@ pub fn type_params<'a>(
             primitive_set()
                 .separated_by(ctrl('|'))
                 .at_least(1)
-                .map(TyParamDomain::OneOf),
+                .map(TyDomain::OneOf),
         )))
         .or_not()
-        .map(|x| x.unwrap_or(TyParamDomain::Open))
+        .map(|x| x.unwrap_or(TyDomain::Open))
         .labelled("type parameter domain");
 
     // param name

@@ -173,8 +173,8 @@ impl PrintSource for pr::TyParam {
     fn print<'c>(&self, p: &mut Printer<'c>) -> Option<()> {
         p.push(pr::display_ident(&self.name))?;
         match &self.domain {
-            pr::TyParamDomain::Open => {}
-            pr::TyParamDomain::OneOf(tys) => {
+            pr::TyDomain::Open => {}
+            pr::TyDomain::OneOf(tys) => {
                 p.push(": ")?;
                 for (i, ty) in tys.iter().enumerate() {
                     if i > 0 {
@@ -183,7 +183,7 @@ impl PrintSource for pr::TyParam {
                     p.push(ty.to_string())?;
                 }
             }
-            pr::TyParamDomain::TupleHasFields(fields) => {
+            pr::TyDomain::TupleHasFields(fields) => {
                 p.push(": {")?;
                 for (i, field) in fields.iter().enumerate() {
                     match &field.location {
@@ -200,13 +200,13 @@ impl PrintSource for pr::TyParam {
                 }
                 p.push("..}")?;
             }
-            pr::TyParamDomain::TupleLen { n } => {
+            pr::TyDomain::TupleLen { n } => {
                 // not an actual Lutra syntax (there is no syntax for this)
                 p.push(": {.. ")?;
                 p.push(n.to_string())?;
                 p.push(" ..}")?;
             }
-            pr::TyParamDomain::EnumVariants(variants) => {
+            pr::TyDomain::EnumVariants(variants) => {
                 p.push(": enum {")?;
                 for (i, variant) in variants.iter().enumerate() {
                     if i > 0 {

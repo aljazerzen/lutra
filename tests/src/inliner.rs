@@ -102,10 +102,10 @@ fn inline_03() {
       Some: text,
     }
     func main() -> {
-      OptText::Some("hello"),
-      OptText::None,
-      std::is_some(OptText::Some("hello")),
-      std::is_none(OptText::Some("hello")),
+      .Some("hello"): OptText,
+      .None: OptText,
+      std::is_some(.Some("hello"): OptText),
+      std::is_none(.Some("hello"): OptText),
     }
     "#), @r#"
     type OptText = enum {None, Some: text};
@@ -130,7 +130,7 @@ fn inline_03() {
             1
           )[90m: bool[0m,
         )[90m: bool[0m,
-      )[90m: {OptText, None: OptText, bool, bool}[0m
-    )[90m: func ({}) -> {OptText, None: OptText, bool, bool}[0m
+      )[90m: {OptText, OptText, bool, bool}[0m
+    )[90m: func ({}) -> {OptText, OptText, bool, bool}[0m
     "#)
 }

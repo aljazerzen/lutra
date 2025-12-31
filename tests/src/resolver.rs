@@ -478,7 +478,7 @@ fn types_20() {
         type Status: enum {Done, Pending: int16, Cancelled: text}
 
         func main() -> (
-          Status::Done
+          .Done: Status
           | func (x) -> match x {
             .Done => "done",
             .Cancelled(reason) => f"pending {reason}",
@@ -807,7 +807,7 @@ fn enums_00() {
             "
             type Status: enum { Open, Done, Pending: text }
 
-            func main() -> Status::Done
+            func main() -> .Done: Status
             "
         ),
         @"Status"
@@ -821,45 +821,12 @@ fn enums_01() {
             r#"
             type Status: enum { Open, Done, Pending: text }
 
-            func main() -> Status::Pending("hello")
+            func main() -> .Pending("hello"): Status
             "#
         ),
         @"Status"
     );
 }
-#[test]
-fn enums_02() {
-    insta::assert_snapshot!(
-        _test_ty(
-            r#"
-            type X: { a: int64 }
-
-            func main(): X::a -> 5
-            "#
-        ),
-        @"int64"
-    );
-}
-#[test]
-fn enums_03() {
-    insta::assert_snapshot!(
-        _test_err(
-            r#"
-            type X: { a: int64, b: X::a }
-            "#
-        ),
-        @r"
-    Error:
-       ╭─[:2:36]
-       │
-     2 │             type X: { a: int64, b: X::a }
-       │                                    ──┬─
-       │                                      ╰─── recursive paths into self are not allowed
-    ───╯
-    "
-    );
-}
-
 #[test]
 #[ignore] // TODO
 fn recursive_00() {
@@ -873,9 +840,9 @@ fn recursive_00() {
 
             type OptionalTree: enum {
                 None,
-                Some = Tree,
+                Some: Tree,
             }
-            func main(): OptionalTree -> OptionalTree::None
+            func main(): OptionalTree -> .None
             "#
         ),
         r#"
@@ -889,7 +856,7 @@ fn match_00() {
     insta::assert_snapshot!(_test_ty(r#"
         type Status: enum {Done, Pending: int16, Cancelled: text}
 
-        func main() -> match Status::Done {
+        func main() -> match .Done: Status {
           .Done => "done",
           .Pending => "pending",
           .Cancelled => "cancelled",
@@ -903,7 +870,7 @@ fn match_01() {
     insta::assert_snapshot!(_test_err(r#"
         type Status: enum {Done, Pending: int16, Cancelled: text}
 
-        func main() -> match Status::Done {
+        func main() -> match .Done: Status {
           .Done => "done",
           .Cancelled => "cancelled",
         }
@@ -918,7 +885,7 @@ fn match_02() {
         type Status: enum {Done, Pending: int16, Cancelled: text}
         type Color: enum {Red, Green, Blue}
 
-        func main() -> match Status::Done {
+        func main() -> match .Done: Status {
           .Red => "red",
           .Green => "green",
           .Blue => "blue",
@@ -939,7 +906,7 @@ fn match_03() {
     insta::assert_snapshot!(_test_err(r#"
         type Color: enum {Red, Green, Blue}
 
-        func main() -> match Color::Green {
+        func main() -> match .Green: Color {
           .Red => "red",
           .Green => 1,
           .Blue => false,
@@ -960,7 +927,7 @@ fn match_04() {
     insta::assert_snapshot!(_test_ty(r#"
         type Status: enum {Pending: bool}
 
-        func main() -> match Status::Pending(false) {
+        func main() -> match .Pending(false): Status {
           .Pending(x) => x,
         }
     "#), @"bool");
@@ -971,7 +938,7 @@ fn match_05() {
     insta::assert_snapshot!(_test_ty(r#"
         type Status: enum {Pending: int32}
 
-        func main() -> match Status::Pending(4) {
+        func main() -> match .Pending(4): Status {
           .Pending(x) => x,
         }
     "#), @"int32");
@@ -985,7 +952,7 @@ fn match_06() {
           Dog: bool,
         }
 
-        func main(): [text] -> match Animal::Cat {
+        func main(): [text] -> match .Cat: Animal {
           .Cat(name) | .Dog(is_vaccinated) => true,
         }
     "#), @r"
@@ -1007,7 +974,7 @@ fn match_07() {
           Dog: bool,
         }
 
-        func main(): text -> match Animal::Cat {
+        func main(): text -> match .Cat: Animal {
           .Cat(name) | .Dog(name) => name,
         }
     "#), @r"
@@ -1794,7 +1761,7 @@ fn import_06() {
 }
 
 #[test]
-fn nominal_00() {
+fn framed_00() {
     insta::assert_snapshot!(_test_err(r#"
     type MyInt(int32)
     const x: MyInt = 4: int32
@@ -1810,7 +1777,7 @@ fn nominal_00() {
 }
 
 #[test]
-fn nominal_01() {
+fn framed_01() {
     insta::assert_snapshot!(_test_ty(r#"
     type MyInt(int32)
     const main = MyInt(4: int32)
@@ -1818,7 +1785,7 @@ fn nominal_01() {
 }
 
 #[test]
-fn nominal_02() {
+fn framed_02() {
     insta::assert_snapshot!(_test_err(r#"
     type MyInt(int32)
     const main = MyInt(4: int32, false)
@@ -1834,7 +1801,7 @@ fn nominal_02() {
 }
 
 #[test]
-fn nominal_03() {
+fn framed_03() {
     insta::assert_snapshot!(_test_err(r#"
     type MyInt(int32)
     const main = MyInt()
@@ -1850,7 +1817,7 @@ fn nominal_03() {
 }
 
 #[test]
-fn nominal_04() {
+fn framed_04() {
     insta::assert_snapshot!(_test_err(r#"
     type MyInt(int32)
     const main = MyInt(false)
@@ -1869,7 +1836,7 @@ fn nominal_04() {
 }
 
 #[test]
-fn nominal_05() {
+fn framed_05() {
     insta::assert_snapshot!(_test_ty(r#"
     type MyInt(int32)
     const main = MyInt(12).0
@@ -1877,7 +1844,7 @@ fn nominal_05() {
 }
 
 #[test]
-fn nominal_06() {
+fn framed_06() {
     insta::assert_snapshot!(_test_err(r#"
     type MyInt(int32)
     const main = MyInt(12).1
@@ -1896,7 +1863,7 @@ fn nominal_06() {
 }
 
 #[test]
-fn nominal_07() {
+fn framed_07() {
     insta::assert_snapshot!(_test_err(r#"
     type MyInt(int32)
     const main = MyInt(12).inner
@@ -1911,6 +1878,23 @@ fn nominal_07() {
        │ Note:
        │ MyInt is a framed type. Inner value can be accessed with `.0`
     ───╯
+    ");
+}
+
+#[test]
+#[ignore] // Issue #88
+fn framed_08() {
+    insta::assert_snapshot!(_test_ty(r#"
+    type Status(enum {Pending: text, Done})
+    
+    func main() -> (
+      let s = Status(.Pending("hello"));
+      match s {
+        Status(.Pending(x)) => x,
+        Status(.Done) => "",
+      }
+    )
+    "#), @r"
     ");
 }
 

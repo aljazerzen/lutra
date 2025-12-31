@@ -290,7 +290,7 @@ fn array_enum() {
         type Status: enum {
           Pending, InProgress: {started_at: text, owner: text}, Done: text
         }
-        const main = [Status::Pending, Status::InProgress({"today", "me"}), Status::Done("ok")]
+        const main: [Status] = [.Pending, .InProgress({"today", "me"}), .Done("ok")]
     "#, lutra_bin::Value::unit())), @r#"
     SELECT
       r0._t,
@@ -344,7 +344,7 @@ fn enum_array() {
         }
         const main = {
           "statuses:",
-          [Status::Pending, Status::InProgress(["today", "me"]), Status::Done("ok")],
+          [.Pending, .InProgress(["today", "me"]), .Done("ok"): Status],
         }
     "#, lutra_bin::Value::unit())), @r#"
     SELECT
@@ -525,7 +525,7 @@ fn tuple_array_enum() {
         }
         const main = {
           "statuses:",
-          [Status::Pending, Status::InProgress({"today", "me"}), Status::Done("ok")],
+          [.Pending, .InProgress({"today", "me"}), .Done("ok")]: [Status],
         }
     "#, lutra_bin::Value::unit())), @r#"
     SELECT
@@ -589,10 +589,9 @@ fn tuple_array_enum() {
 #[test]
 fn tuple_array_maybe() {
     insta::assert_snapshot!(_sql_and_output(_run(r#"
-        type OptInt: enum { None, Some: int32 }
         const main = {
           "ids:",
-          [OptInt::None, OptInt::Some(5)],
+          [.None, .Some(5)]: [enum { None, Some: int32 }],
         }
     "#, lutra_bin::Value::unit())), @r#"
     SELECT
@@ -1649,9 +1648,9 @@ fn match_04() {
 
     func main() -> (
       [
-        Animal::Cat("Whiskers"),
-        Animal::Dog(Animal::Dog::Collie("Belie")),
-        Animal::Dog(Animal::Dog::Generic),
+        .Cat("Whiskers"),
+        .Dog(.Collie("Belie")),
+        .Dog(.Generic),
       ]
       | std::map(func (animal: Animal) -> match animal {
         .Cat(name) => f"Hello {name}",
@@ -2071,10 +2070,10 @@ fn opt_00() {
       Some: text,
     }
     func main() -> {
-      OptText::Some("hello"),
-      OptText::None,
-      std::is_some(OptText::Some("hello")),
-      std::is_none(OptText::Some("hello")),
+      .Some("hello"): OptText,
+      .None: OptText,
+      std::is_some(.Some("hello"): OptText),
+      std::is_none(.Some("hello"): OptText),
     }
     "#, lutra_bin::Value::unit())), @r#"
     SELECT
@@ -2085,7 +2084,7 @@ fn opt_00() {
     ---
     {
       Some("hello"),
-      None = None,
+      None,
       true,
       false,
     }
@@ -2100,7 +2099,7 @@ fn opt_01() {
       Some: text,
     }
     func main() -> (
-      [OptText::Some("hello"), OptText::None, OptText::Some("world")]
+      [.Some("hello"), .None, .Some("world")]: [OptText]
       | std::map(func (x) -> match x {
           .Some(x) => x,
           .None => "none",

@@ -123,7 +123,7 @@ impl super::TypeResolver<'_> {
                 ty.name = Some(fq_ident.last().to_string());
                 pr::DefKind::Ty(pr::TyDef {
                     ty,
-                    is_nominal: ty_def.is_nominal,
+                    is_framed: ty_def.is_framed,
                 })
             }
             pr::DefKind::Import(target) => pr::DefKind::Import(target),

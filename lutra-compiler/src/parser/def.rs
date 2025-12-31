@@ -198,12 +198,12 @@ fn type_def(
                 // type alias
                 ctrl(':').ignore_then(ty.clone()).map(|ty| TyDef {
                     ty,
-                    is_nominal: false,
+                    is_framed: false,
                 }),
                 // new type (nominal / framed type)
                 ty.delimited_by(ctrl('('), ctrl(')')).map(|ty| TyDef {
                     ty,
-                    is_nominal: true,
+                    is_framed: true,
                 }),
             ))
             .map(DefKind::Ty),

@@ -37,7 +37,7 @@ impl TypeResolver<'_> {
 
             for param in func.params.iter_mut() {
                 if param.ty.is_none() {
-                    param.ty = Some(self.introduce_ty_var(pr::TyParamDomain::Open, param.span));
+                    param.ty = Some(self.introduce_ty_var(pr::TyDomain::Open, param.span));
                 }
             }
         }
@@ -120,8 +120,8 @@ impl TypeResolver<'_> {
         Ok(Expr {
             ty: fn_ty.body.clone().map(|x| *x),
             span,
-            ..Expr::new(ExprKind::FuncCall(FuncCall {
-                func,
+            ..Expr::new(ExprKind::Call(Call {
+                subject: func,
                 args: args_resolved,
             }))
         })

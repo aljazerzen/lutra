@@ -37,7 +37,7 @@ impl TypeResolver<'_> {
                     t
                 } else {
                     // no items, so we must infer the type
-                    self.introduce_ty_var(pr::TyParamDomain::Open, expr.span.unwrap())
+                    self.introduce_ty_var(pr::TyDomain::Open, expr.span.unwrap())
                 };
                 TyKind::Array(Box::new(items_ty))
             }
@@ -59,10 +59,10 @@ impl TypeResolver<'_> {
             // type computed in the main pass
             ExprKind::Ident(_)
             | ExprKind::Tuple(_)
-            | ExprKind::FuncCall(_)
-            | ExprKind::EnumVariant(_)
+            | ExprKind::Call(_)
+            | ExprKind::Variant(_)
             | ExprKind::Match(_)
-            | ExprKind::TupleLookup { .. }
+            | ExprKind::Lookup { .. }
             | ExprKind::If(_)
             | ExprKind::VarBinding(_) => unreachable!(),
 
@@ -90,7 +90,7 @@ impl TypeResolver<'_> {
                 // integer type. So we have leave the type to be figured out later.
                 // This is done with a new type param, constraint to integer types.
                 return self.introduce_ty_var(
-                    pr::TyParamDomain::OneOf(vec![
+                    pr::TyDomain::OneOf(vec![
                         pr::TyPrimitive::int8,
                         pr::TyPrimitive::int16,
                         pr::TyPrimitive::int32,
@@ -106,10 +106,7 @@ impl TypeResolver<'_> {
             Literal::Float(_) => {
                 // similar as integers
                 return self.introduce_ty_var(
-                    pr::TyParamDomain::OneOf(vec![
-                        pr::TyPrimitive::float32,
-                        pr::TyPrimitive::float64,
-                    ]),
+                    pr::TyDomain::OneOf(vec![pr::TyPrimitive::float32, pr::TyPrimitive::float64]),
                     span.unwrap(),
                 );
             }
@@ -133,7 +130,7 @@ impl TypeResolver<'_> {
 fn new_ty_ident(fq_path: Path, span: Option<Span>) -> Ty {
     let mut ty = pr::Ty::new(fq_path.clone());
     ty.span = span;
-    ty.target = Some(pr::Ref::Global(pr::AbsoluteRef::new(fq_path)));
+    ty.target = Some(pr::Ref::Global(fq_path));
     ty
 }
 

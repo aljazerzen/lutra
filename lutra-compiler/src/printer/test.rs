@@ -630,7 +630,7 @@ const b = 5
 
 #[test]
 fn source_02() {
-    // nominal type defs
+    // framed type defs
 
     assert_snapshot!(_format(r#"
     type Date(int32)

@@ -154,7 +154,7 @@ impl PrintSource for NamedDef<'_> {
                 p.push("type ")?;
                 p.push(pr::display_ident(self.0))?;
 
-                if ty_def.is_nominal {
+                if ty_def.is_framed {
                     Between {
                         node: &ty_def.ty,
                         prefix: "(",

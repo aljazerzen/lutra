@@ -24,9 +24,8 @@ impl ConstantValidator {
             pr::ExprKind::Literal(_) => Ok(()),
 
             pr::ExprKind::Ident(_) => match expr.target.as_ref().unwrap() {
-                pr::Ref::Global(pr::AbsoluteRef { to_def, within }) => {
-                    assert!(within.is_empty());
-                    if self.constants.contains(to_def) {
+                pr::Ref::Global(target_fq) => {
+                    if self.constants.contains(target_fq) {
                         Ok(())
                     } else {
                         Err(expr.span)
@@ -35,7 +34,7 @@ impl ConstantValidator {
                 pr::Ref::Local { .. } => Err(expr.span),
             },
 
-            pr::ExprKind::TupleLookup { base, .. } => self.validate_is_const(base),
+            pr::ExprKind::Lookup { base, .. } => self.validate_is_const(base),
 
             pr::ExprKind::Tuple(fields) => fields
                 .iter()
@@ -47,13 +46,13 @@ impl ConstantValidator {
                 .find_map(|i| self.validate_is_const(i).err())
                 .map(Err)
                 .unwrap_or(Ok(())),
-            pr::ExprKind::EnumVariant(variant) => variant
+            pr::ExprKind::Variant(variant) => variant
                 .inner
                 .as_ref()
                 .map(|i| self.validate_is_const(i))
                 .unwrap_or(Ok(())),
 
-            pr::ExprKind::FuncCall(_)
+            pr::ExprKind::Call(_)
             | pr::ExprKind::Func(_)
             | pr::ExprKind::Match(_)
             | pr::ExprKind::If(_)

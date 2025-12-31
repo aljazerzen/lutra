@@ -1,5 +1,4 @@
-use crate::diagnostic::{Diagnostic, WithErrorInfo};
-use crate::resolver::names;
+use crate::diagnostic::WithErrorInfo;
 use crate::resolver::types::{TypeResolver, scope, tuple};
 use crate::utils::fold::{self, PrFold};
 use crate::{Result, printer};
@@ -26,7 +25,7 @@ impl fold::PrFold for super::TypeResolver<'_> {
                         return Err(scope::err_name_kind("a value", "a module").with_span(span));
                     }
                     scope::Named::Ty {
-                        is_nominal: false, ..
+                        is_framed: false, ..
                     } => {
                         return Err(scope::err_name_kind("a value", "a type").with_span(span));
                     }
@@ -41,46 +40,23 @@ impl fold::PrFold for super::TypeResolver<'_> {
                                 .with_span(span));
                         }
                     },
-                    scope::Named::EnumVariant(ty, ty_fq, tag) => {
-                        let ty = if let Some(ty_fq) = ty_fq {
-                            // when possible, use ident as the type
-                            pr::Ty {
-                                target: Some(pr::Ref::Global(pr::AbsoluteRef::new(ty_fq))),
-                                span,
-                                ..pr::Ty::new(pr::TyKind::Ident(ident))
-                            }
-                        } else {
-                            // fallback to concrete enum type
-                            ty.clone()
-                        };
-
-                        let r = pr::Expr {
-                            span,
-                            ty: Some(ty),
-                            ..pr::Expr::new(pr::ExprKind::EnumVariant(pr::EnumVariant {
-                                tag,
-                                inner: None,
-                            }))
-                        };
-                        return Ok(r);
-                    }
                     scope::Named::Ty {
-                        is_nominal: true,
+                        is_framed: true,
                         ty,
                     } => {
-                        // nominal types can be called like a function to act as a constructor
+                        // framed types can be called like a function to act as a constructor
 
-                        let ty_nominal = pr::Ty {
+                        let ty_framed = pr::Ty {
                             target: Some(target.clone()),
                             ..pr::Ty::new(ident.clone())
                         };
-                        let ty_framed = ty.clone();
+                        let ty_inner = ty.clone();
 
                         return Ok(pr::Expr {
                             kind: pr::ExprKind::Ident(ident),
                             ty: Some(pr::Ty::new(pr::TyFunc {
-                                params: vec![(Some(ty_framed), false)],
-                                body: Some(Box::new(ty_nominal)),
+                                params: vec![(Some(ty_inner), false)],
+                                body: Some(Box::new(ty_framed)),
                                 ty_params: vec![],
                             })),
                             ..node
@@ -96,15 +72,15 @@ impl fold::PrFold for super::TypeResolver<'_> {
                 }
             }
 
-            pr::ExprKind::TupleLookup { base, lookup } => {
+            pr::ExprKind::Lookup { base, lookup } => {
                 let base = Box::new(self.fold_expr(*base)?);
                 let base_ty = base.ty.as_ref().unwrap();
 
-                // special case: lookups into nominal types
+                // special case: lookups into framed types
                 let base_ty_target = base_ty.target.as_ref().map(|r| self.get_ref(r).unwrap());
                 if let Some(scope::Named::Ty {
                     ty,
-                    is_nominal: true,
+                    is_framed: true,
                 }) = base_ty_target
                 {
                     if !matches!(lookup, pr::Lookup::Position(0)) {
@@ -126,84 +102,57 @@ impl fold::PrFold for super::TypeResolver<'_> {
                     .resolve_tuple_lookup(base_ty, &lookup, span.unwrap())
                     .with_span(span)?;
 
-                let kind = pr::ExprKind::TupleLookup { base, lookup };
+                let kind = pr::ExprKind::Lookup { base, lookup };
                 pr::Expr {
                     ty: Some(target_ty),
                     kind,
                     ..node
                 }
-
-                // tuple::BaseKind::Array => {
-                //     let std_index = pr::Path::new(vec![NS_STD, "index"]);
-                //     let mut std_index_expr = pr::Expr::new(std_index.clone());
-                //     std_index_expr.span = span;
-                //     std_index_expr.target = Some(pr::Ref::FullyQualified {
-                //         to_def: std_index,
-                //         within: pr::Path::empty(),
-                //     });
-
-                //     let position = field.into_position().unwrap();
-                //     let mut position = pr::Expr::new(pr::Literal::Integer(position));
-                //     position.span = span;
-
-                //     let func = Box::new(self.fold_expr(std_index_expr)?);
-
-                //     self.resolve_func_call(func, vec![base, position], span)?
-                // }
             }
 
-            pr::ExprKind::FuncCall(pr::FuncCall { func, args }) => {
-                // fold function name
-                let func = Box::new(self.fold_expr(*func)?);
+            pr::ExprKind::Variant(mut variant) => {
+                let inner_ty = if let Some(inner) = variant.inner {
+                    // inner specified -> this is a enum variant
 
-                let func_target = func.target.as_ref().map(|ref_| {
+                    // resolve inner
+                    let inner = self.fold_expr(*inner)?;
+                    let inner_ty = inner.ty.clone().unwrap();
+                    variant.inner = Some(Box::new(inner));
+
+                    inner_ty
+                } else {
+                    pr::Ty::new(pr::TyKind::Tuple(vec![]))
+                };
+
+                // new ty var for enum
+                let enum_domain = pr::TyDomain::EnumVariants(vec![pr::TyDomainEnumVariant {
+                    name: variant.name.clone(),
+                    ty: inner_ty,
+                }]);
+                let ty = self.introduce_ty_var(enum_domain, span.unwrap());
+
+                pr::Expr {
+                    ty: Some(ty),
+                    ..pr::Expr::new(variant)
+                }
+            }
+
+            pr::ExprKind::Call(pr::Call { subject, args }) => {
+                // fold function name
+                let subject = Box::new(self.fold_expr(*subject)?);
+
+                let subject_target = subject.target.as_ref().map(|ref_| {
                     // SAFETY: this was resolved already in fold_expr, ExprKind::Ident
                     self.get_ref(ref_).unwrap()
                 });
-                let is_nominal_constructor = matches!(func_target, Some(scope::Named::Ty { .. }));
+                let is_framing = matches!(subject_target, Some(scope::Named::Ty { .. }));
 
-                let resolved = if let pr::ExprKind::EnumVariant(mut variant) = func.kind {
-                    // special case: enum variant construction
-                    let ty = func.ty.as_ref().unwrap();
+                let resolved = self.resolve_func_call(subject, args, span)?;
 
-                    if args.len() != 1 {
-                        return Err(Diagnostic::new_custom(format!(
-                            "{}expected exactly one argument, but got {}",
-                            ty.name.clone().unwrap_or_default(),
-                            args.len(),
-                        ))
-                        .with_span(span));
-                    }
-
-                    let inner = args.into_iter().next().unwrap();
-                    let mut inner = self.fold_expr(inner)?;
-
-                    // validate type of inner
-                    let ty_enum = self.get_ty_mat(ty).unwrap();
-                    let scope::TyRef::Ty(ty_enum) = ty_enum else {
-                        panic!()
-                    };
-                    let ty_variants = ty_enum.kind.as_enum().unwrap();
-                    let ty_variant = ty_variants.get(variant.tag).unwrap().clone();
-                    self.validate_expr_type(&mut inner, &ty_variant.ty, &|| {
-                        Some(ty_variant.name.clone())
-                    })?;
-
-                    variant.inner = Some(Box::new(inner));
-
-                    pr::Expr {
-                        kind: pr::ExprKind::EnumVariant(variant),
-                        ..*func
-                    }
-                } else {
-                    // general case
-                    self.resolve_func_call(func, args, span)?
-                };
-
-                if is_nominal_constructor {
-                    // special case: nominal type constructor
+                if is_framing {
+                    // special case: framed type constructor
                     // just unwrap the func call and use the first arg
-                    let call = resolved.kind.into_func_call().unwrap();
+                    let call = resolved.kind.into_call().unwrap();
                     let mut inner = call.args.into_iter().next().unwrap();
                     inner.ty = resolved.ty;
                     inner
@@ -300,12 +249,12 @@ impl fold::PrFold for super::TypeResolver<'_> {
             pr::TyKind::Func(mut ty_func) => {
                 for (p, _) in &mut ty_func.params {
                     if p.is_none() {
-                        *p = Some(self.introduce_ty_var(pr::TyParamDomain::Open, ty.span.unwrap()))
+                        *p = Some(self.introduce_ty_var(pr::TyDomain::Open, ty.span.unwrap()))
                     }
                 }
                 if ty_func.body.is_none() {
                     ty_func.body = Some(Box::new(
-                        self.introduce_ty_var(pr::TyParamDomain::Open, ty.span.unwrap()),
+                        self.introduce_ty_var(pr::TyDomain::Open, ty.span.unwrap()),
                     ));
                 }
 
@@ -313,29 +262,6 @@ impl fold::PrFold for super::TypeResolver<'_> {
                     kind: pr::TyKind::Func(ty_func),
                     ..ty
                 }
-            }
-
-            // inline idents into types
-            pr::TyKind::Ident(_) => {
-                if let Some(pr::Ref::Global(pr::AbsoluteRef { to_def, within })) = &ty.target
-                    && !within.is_empty()
-                {
-                    // Things like `my_tuple::field` are "references into types".
-                    // They are needed for constructing enums and are useful in general.
-                    // But they are inconvenient to work with in IR, because in addition
-                    // to the code that finds the def, we need code to look into the def
-                    // as well/
-                    // So instead, we inline these references during resolving.
-                    // This is possible, because they are restricted to be non-recursive.
-                    tracing::debug!("inlining a 'path into type' for: {to_def:?}.{within:?}");
-
-                    let def = self.root_mod.get(to_def).unwrap();
-                    let def = def.kind.as_ty().unwrap();
-                    let referenced = names::lookup_in_ty(&def.ty, within.as_steps()).unwrap();
-
-                    return self.fold_type(referenced.clone());
-                }
-                ty
             }
 
             // normal fold

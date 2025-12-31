@@ -4,7 +4,10 @@ use insta::assert_snapshot;
 fn _test_compile_and_print(source: &str) -> String {
     crate::init_logger();
 
-    let program = lutra_compiler::_test_compile_main(source).unwrap_or_else(|e| panic!("{e}"));
+    let program = match lutra_compiler::_test_compile_main(source) {
+        Ok(t) => t,
+        Err(e) => panic!("{e}"),
+    };
     lutra_bin::ir::print(&program)
 }
 
@@ -136,18 +139,20 @@ fn lower_01() {
 fn lower_02() {
     assert_snapshot!(_test_compile_and_print(r#"
     type Status: enum {
-        Open,
-        Closed: text,
+      Open,
+      Closed: text,
     }
 
-    func main() -> match Status::Closed {
-        .Open => "open",
-        .Closed => "closed",
+    func main() -> match .Closed("x"): Status {
+      .Open => "open",
+      .Closed => "closed",
     }
     "#), @r#"
     type Status = enum {Open, Closed: text};
     let main = (func 0 ->
-      let 0 = (enum_variant 1)[90m: Status[0m;
+      let 0 = (enum_variant 1
+        "x"[90m: text[0m
+      )[90m: Status[0m;
       (
         switch,
         (

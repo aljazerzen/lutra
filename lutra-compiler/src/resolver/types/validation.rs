@@ -193,7 +193,7 @@ impl TypeResolver<'_> {
                 }
 
                 // b) the number of fields matches between the two tuples.
-                let domain = pr::TyParamDomain::TupleLen { n: fields.len() };
+                let domain = pr::TyDomain::TupleLen { n: fields.len() };
                 self.validate_type_domain(&comp.tuple, &domain, None, found.span)?;
                 Ok(())
             }
@@ -251,7 +251,7 @@ impl TypeResolver<'_> {
                 Ok(())
             }
 
-            // concrete idents: they refer to nominal types: compare by name
+            // concrete idents: they refer to framed types: compare by name
             (TyKind::Ident(_), TyKind::Ident(_)) if found.target == expected.target => Ok(()),
 
             _ => Err(compose_type_error(&found, &expected, who)),
@@ -260,7 +260,7 @@ impl TypeResolver<'_> {
 
     pub fn finalize_type_vars(&mut self) -> crate::Result<HashMap<pr::Ref, pr::Ty>> {
         let mut known_types = IndexMap::new();
-        let mut domains: IndexMap<usize, Vec<pr::TyParamDomain>> = Default::default();
+        let mut domains: IndexMap<usize, Vec<pr::TyDomain>> = Default::default();
         let mut constraints = {
             let scope = self.scopes.last_mut().unwrap();
             scope.ty_var_constraints.take()
@@ -289,7 +289,7 @@ impl TypeResolver<'_> {
                             }
                         }
 
-                        scope::TyVarConstraint::InDomain(_, pr::TyParamDomain::Open) => {}
+                        scope::TyVarConstraint::InDomain(_, pr::TyDomain::Open) => {}
                         scope::TyVarConstraint::InDomain(id, domain) => {
                             let domains = domains.entry(id).or_default();
                             domains.push(domain);
@@ -334,7 +334,7 @@ impl TypeResolver<'_> {
             for (id, domains) in &domains {
                 // option 1: tuple
                 let tuple_len = domains.iter().find_map(|d| match d {
-                    TyParamDomain::TupleLen { n } => Some(n),
+                    TyDomain::TupleLen { n } => Some(n),
                     _ => None,
                 });
                 if let Some(tuple_len) = tuple_len {
@@ -343,7 +343,7 @@ impl TypeResolver<'_> {
                     let fields = domains
                         .iter()
                         .filter_map(|d| match d {
-                            TyParamDomain::TupleHasFields(fields) => Some(fields),
+                            TyDomain::TupleHasFields(fields) => Some(fields),
                             _ => None,
                         })
                         .flatten();
@@ -490,7 +490,7 @@ impl TypeResolver<'_> {
     pub fn validate_type_domain(
         &mut self,
         ty: &Ty,
-        domain: &TyParamDomain,
+        domain: &TyDomain,
         arg_name: Option<&str>,
         span: Option<crate::Span>,
     ) -> Result<(), Diagnostic> {
@@ -511,9 +511,9 @@ impl TypeResolver<'_> {
         };
 
         match domain {
-            TyParamDomain::Open => Ok(()),
+            TyDomain::Open => Ok(()),
 
-            TyParamDomain::OneOf(possible_tys) => {
+            TyDomain::OneOf(possible_tys) => {
                 let is_match = ty
                     .kind
                     .as_primitive()
@@ -535,7 +535,7 @@ impl TypeResolver<'_> {
                 Ok(())
             }
 
-            TyParamDomain::TupleHasFields(domain_fields) => {
+            TyDomain::TupleHasFields(domain_fields) => {
                 let ty = ty.clone();
 
                 for domain_field in domain_fields {
@@ -550,7 +550,7 @@ impl TypeResolver<'_> {
                 // all ok
                 Ok(())
             }
-            TyParamDomain::TupleLen { n } => {
+            TyDomain::TupleLen { n } => {
                 fn diagnostic(n: usize, ty: &pr::Ty) -> Diagnostic {
                     Diagnostic::new(
                         format!(
@@ -570,7 +570,7 @@ impl TypeResolver<'_> {
                 Ok(())
             }
 
-            TyParamDomain::EnumVariants(domain_variants) => {
+            TyDomain::EnumVariants(domain_variants) => {
                 let TyKind::Enum(ty_variants) = &ty.kind else {
                     return Err(Diagnostic::new(
                         format!(
@@ -603,18 +603,18 @@ impl TypeResolver<'_> {
     /// This might sometimes represent the ty or the domain.
     pub fn validate_type_domains(
         &mut self,
-        found: &TyParamDomain,
-        expected: &TyParamDomain,
+        found: &TyDomain,
+        expected: &TyDomain,
         found_name: &str,
         expected_name: Option<&str>,
         span: Option<crate::Span>,
     ) -> Result<(), Diagnostic> {
         match (found, expected) {
             // if expected is open, any found domain is ok
-            (_, TyParamDomain::Open) => Ok(()),
+            (_, TyDomain::Open) => Ok(()),
 
             // if found is open, expected must be open too (but that was matched above)
-            (TyParamDomain::Open, _) => Err(Diagnostic::new(
+            (TyDomain::Open, _) => Err(Diagnostic::new(
                 if let Some(expected_name) = expected_name {
                     format!("{found_name} can be any type, but {expected_name} has restrictions")
                 } else {
@@ -624,7 +624,7 @@ impl TypeResolver<'_> {
             )),
 
             // each found must be in expected domain
-            (TyParamDomain::OneOf(found_tys), expected_domain) => {
+            (TyDomain::OneOf(found_tys), expected_domain) => {
                 for found_ty in found_tys {
                     let ty = Ty::new(found_ty.clone());
                     self.validate_type_domain(&ty, expected_domain, Some(found_name), span)?;
@@ -632,10 +632,7 @@ impl TypeResolver<'_> {
                 Ok(())
             }
 
-            (
-                TyParamDomain::TupleHasFields(found_fields),
-                TyParamDomain::TupleHasFields(expected_fields),
-            ) => {
+            (TyDomain::TupleHasFields(found_fields), TyDomain::TupleHasFields(expected_fields)) => {
                 for expected_field in expected_fields {
                     let target_ty =
                         Self::lookup_in_tuple_domain(found_fields, &expected_field.location)?;
@@ -648,10 +645,7 @@ impl TypeResolver<'_> {
                 Ok(())
             }
 
-            (
-                TyParamDomain::EnumVariants(found_variants),
-                TyParamDomain::EnumVariants(expected_variants),
-            ) => {
+            (TyDomain::EnumVariants(found_variants), TyDomain::EnumVariants(expected_variants)) => {
                 for expected_variant in expected_variants {
                     let (_, found_variant) = super::pattern::lookup_variant_in_domain(
                         found_variants,
@@ -745,13 +739,7 @@ impl std::fmt::Debug for DebugMapping<'_> {
         let mut m = f.debug_map();
         for (key, val) in self.0 {
             let key = match key {
-                pr::Ref::Global(pr::AbsoluteRef { to_def, within }) => {
-                    if within.is_empty() {
-                        format!("{to_def}")
-                    } else {
-                        format!("{to_def}.{within}")
-                    }
-                }
+                pr::Ref::Global(fq) => fq.to_string(),
                 pr::Ref::Local { scope, offset } => format!("{scope}.{offset}"),
             };
             m.entry(&key, &printer::print_ty(val));

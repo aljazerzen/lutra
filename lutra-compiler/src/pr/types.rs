@@ -114,26 +114,29 @@ pub struct TyParam {
     /// Assigned name of this generic type param
     pub name: String,
 
-    pub domain: TyParamDomain,
+    pub domain: TyDomain,
 
     pub span: Option<Span>,
 }
 
+/// Type domain.
+/// Given some unknown type, domain describes restrictions that this type must
+/// adhere to, for the program to be valid.
 #[derive(Debug, Clone)]
-pub enum TyParamDomain {
-    /// This param can be any type
+pub enum TyDomain {
+    /// Can be any type
     Open,
 
-    /// This param must be one of the following
+    /// Must be one of the following
     OneOf(Vec<TyPrimitive>),
 
-    /// This param must be a tuple with following fields
+    /// Must be a tuple with following fields
     TupleHasFields(Vec<TyDomainTupleField>),
 
-    /// This param must be a tuple with exactly N fields
+    /// Must be a tuple with exactly N fields
     TupleLen { n: usize },
 
-    /// This param must be an enum with following variants
+    /// Must be an enum with following variants
     EnumVariants(Vec<TyDomainEnumVariant>),
 }
 

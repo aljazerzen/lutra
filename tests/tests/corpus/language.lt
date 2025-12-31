@@ -280,67 +280,58 @@ func main() -> ident([])
 # === enum_construction_00
 
 type Status: enum {Done, Pending: int64, Cancelled: text}
-const main = Status::Done
+const main: Status = .Done
 # >
 Done
 
 # === enum_construction_01
 
 type Status: enum {Done, Pending: int64, Cancelled: text}
-const main = Status::Pending(513)
+const main: Status = .Pending(513)
 # >
 Pending(513)
 
 # === enum_construction_02
 
 type Status: enum {Done, Pending: int64, Cancelled: text}
-const main = Status::Cancelled("I don't like it")
+const main: Status = .Cancelled("I don't like it")
 # >
 Cancelled("I don't like it")
 
 # === enum_construction_03
 
 type Color: enum {Red, Green: bool, Blue: bool}
-const main = Color::Red
+const main: Color = .Red
 # >
 Red
 
 # === enum_construction_04
 
 type Color: enum {Red, Green: int16, Blue: bool}
-const main = Color::Green(12312)
+const main: Color = .Green(12312)
 # >
 Green(12312)
 
 # === enum_construction_05
 
 type Color: enum {Red, Green: bool, Blue: bool}
-const main = Color::Blue(false)
+const main: Color = .Blue(false)
 # >
 Blue(false)
 
 # === enum_construction_06
-
 type Item: {
   id: int64,
   color: enum {Red, Green: bool, Blue: bool},
 }
-const main = Item::color::Green(true)
-# >
-Green(true)
-
-# === enum_construction_07
-
-type X: {
-  a: int64,
-  b: {c: bool, d: text},
+const main: Item = {
+  id = 4,
+  color = .Green(true)
 }
-func main(): X::b -> {c = true, d = "d"}
-
 # >
 {
-  c = true,
-  d = "d",
+  id = 4,
+  color = Green(true),
 }
 
 # === enum_construction_08
@@ -350,10 +341,10 @@ type Animal: enum {
   Dog: enum {Collie: text, Generic},
 }
 
-func main() -> [
-  Animal::Cat("Whiskers"),
-  Animal::Dog(Animal::Dog::Collie("Belie")),
-  Animal::Dog(Animal::Dog::Generic),
+func main(): [Animal] -> [
+  .Cat("Whiskers"),
+  .Dog(.Collie("Belie")),
+  .Dog(.Generic),
 ]
 # >
 [
@@ -368,7 +359,7 @@ type Status: enum {
   Open: int16,
   Closed: bool,
 }
-func main(): [Status] -> [Status::Open(0), Status::Open(0)]
+func main(): [Status] -> [.Open(0), .Open(0)]
 # >
 [
   Open(0),
@@ -377,14 +368,9 @@ func main(): [Status] -> [Status::Open(0), Status::Open(0)]
 
 # === enum_construction_10
 
-type OptText: enum {
-  None,
-  Some: text,
-}
-
-func main() -> [
-  OptText::None,
-  OptText::Some("Whiskers"),
+func main(): [enum {None, Some: text}] -> [
+  .None,
+  .Some("Whiskers"),
 ]
 # >
 [
@@ -400,9 +386,9 @@ type Animal: enum {
 }
 
 func main() -> [
-  Animal::Cat("Whiskers"),
-  Animal::Dog(Animal::Dog::Some("Belie")),
-  Animal::Dog(Animal::Dog::None),
+  .Cat("Whiskers"): Animal,
+  .Dog(.Some("Belie")),
+  .Dog(.None),
 ]
 # >
 [
@@ -482,7 +468,7 @@ func main() -> if lang == "en" then en else sl
 
 # === match_00
 type Status: enum {Done, Pending: int64, Cancelled: text}
-func main() -> match Status::Pending(4) {
+func main() -> match .Pending(4): Status {
   .Pending => "pending",
   .Cancelled => "cancelled",
 }
@@ -491,11 +477,11 @@ func main() -> match Status::Pending(4) {
 "pending"
 
 # === match_01
-type Status: enum {Done, Pending: int32, Cancelled: text}
-func main(): int32 -> match Status::Pending(4) {
-  .Done => 0,
-  .Pending(x) => x,
-  .Cancelled => 0,
+type Status: enum {done, pending: int32, cancelled: text}
+func main(): int32 -> match .pending(4): Status {
+  .done => 0,
+  .pending(x) => x,
+  .cancelled => 0,
 }
 
 # >
@@ -507,7 +493,7 @@ type Animal: enum {
   Dog: enum {Collie: text, Generic},
 }
 func main() -> (
-  Animal::Dog(Animal::Dog::Collie("Belie"))
+  .Dog(.Collie("Belie"))
   | func (animal: Animal) -> match animal {
     .Cat(name) => f"Hello {name}",
     .Dog(.Generic) => "Who's a good boy?",
@@ -527,8 +513,8 @@ type Animal: enum {
 
 func main() -> (
   [
-    Animal::Cat("Whiskers"),
-    Animal::Dog("Belie"),
+    .Cat("Whiskers"),
+    .Dog("Belie"),
   ]
   | std::map(func (animal: Animal) -> match animal {
     .Cat(name) => f"Hello {name}",
@@ -550,9 +536,9 @@ type Animal: enum {
 }
 func main() -> (
   [
-    Animal::Cat("Whiskers"),
-    Animal::Dog(Animal::Dog::Collie("Belie")),
-    Animal::Dog(Animal::Dog::Generic),
+    .Cat("Whiskers"),
+    .Dog(.Collie("Belie")),
+    .Dog(.Generic),
   ]
   | std::map(func (animal: Animal) -> match animal {
     .Cat(name) => f"Hello {name}",
@@ -600,7 +586,7 @@ type Animal: enum {
 }
 
 func main() -> (
-  [Animal::Cat, Animal::Dog, Animal::Hamster, Animal::Dog]
+  [.Cat, .Dog, .Hamster, .Dog]: [Animal]
   | std::map(func (a) -> match a {
     .Cat | .Hamster => false,
     _ => true
@@ -622,9 +608,9 @@ type Animal: enum {
 
 func main(): [text] -> (
   [
-    Animal::Cat("Whiskers"),
-    Animal::Dog(Animal::Dog::Generic),
-    Animal::Dog(Animal::Dog::Collie("Jessie")),
+    .Cat("Whiskers"),
+    .Dog(.Generic),
+    .Dog(.Collie("Jessie")),
   ]
   | std::map(func (a: Animal): text -> match a {
     .Cat(name) | .Dog(.Collie(name)) => name,
@@ -639,35 +625,17 @@ func main(): [text] -> (
 ]
 
 # === or_else_00
-
-type OptText: enum {
-  None,
-  Some: text
-}
-
-func main() -> OptText::Some("hello") | std::or_else("world")
+func main() -> .Some("hello") | std::or_else("world")
 # >
 "hello"
 
 # === or_else_01
-
-type OptText: enum {
-  None,
-  Some: text
-}
-
-func main() -> OptText::None | std::or_else("fallback")
+func main() -> .None | std::or_else("fallback")
 # >
 "fallback"
 
 # === or_else_02
-
-type OptText: enum {
-  None,
-  Some: text
-}
-
-func main() -> OptText::None | std::or_default()
+func main() -> .None: enum {None, Some: text} | std::or_default()
 # >
 ""
 
@@ -1101,9 +1069,7 @@ func main() -> std::count([]: [bool])
 0
 
 # === std_count_02
-type OptText: enum {None, Some: text}
-
-func main() -> std::count([OptText::Some("a"), OptText::None]: [OptText])
+func main() -> std::count([.Some("a"), .None]: [enum {None, Some: text}])
 # >
 2
 
@@ -2655,9 +2621,9 @@ type Tree: enum {
   Leaf: int8,
   Node: {left: Tree, right: Tree},
 }
-const main = [
-  Tree::Leaf(10),
-  Tree::Leaf(12),
+const main: [Tree] = [
+  .Leaf(10),
+  .Leaf(12),
 ]
 # >
 [
@@ -2670,15 +2636,15 @@ type Tree: enum {
   Leaf: int8,
   Node: {left: Tree, right: Tree},
 }
-const main = Tree::Node({
-  left = Tree::Leaf(10),
-  right = Tree::Node({
-    left = Tree::Node({
-      left = Tree::Leaf(12),
-      right = Tree::Leaf(18),
+const main: Tree = .Node({
+  left = .Leaf(10): Tree,
+  right = .Node({
+    left = .Node({
+      left = .Leaf(12): Tree,
+      right = .Leaf(18): Tree,
     }),
-    right = Tree::Leaf(20),
-  }),
+    right = .Leaf(20): Tree,
+  }): Tree,
 })
 # >
 Node({
@@ -2697,17 +2663,17 @@ type Tree: enum {
   Leaf: int8,
   Node: [Tree],
 }
-const main = Tree::Node([
-  Tree::Leaf(10),
-  Tree::Node([
-    Tree::Node([
-      Tree::Leaf(12),
-      Tree::Leaf(15),
-      Tree::Leaf(18),
+const main: Tree = .Node([
+  .Leaf(10),
+  .Node([
+    .Node([
+      .Leaf(12),
+      .Leaf(15),
+      .Leaf(18),
     ]),
-    Tree::Leaf(20),
+    .Leaf(20),
   ]),
-  Tree::Leaf(21),
+  .Leaf(21),
 ])
 # >
 Node([

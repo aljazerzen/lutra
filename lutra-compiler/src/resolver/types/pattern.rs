@@ -105,7 +105,7 @@ impl<'a> super::TypeResolver<'a> {
                     TyRef::Var(_, id) => {
                         let variant_ty = if inner.is_some() {
                             // introduce a new type var for the type of this variant
-                            self.introduce_ty_var(pr::TyParamDomain::Open, pattern.span)
+                            self.introduce_ty_var(pr::TyDomain::Open, pattern.span)
                         } else {
                             // there is no inner pattern, it must be a unit type
                             pr::Ty::new(pr::TyKind::Tuple(vec![]))
@@ -113,7 +113,7 @@ impl<'a> super::TypeResolver<'a> {
 
                         // restrict existing ty var
                         let restriction =
-                            pr::TyParamDomain::EnumVariants(vec![pr::TyDomainEnumVariant {
+                            pr::TyDomain::EnumVariants(vec![pr::TyDomainEnumVariant {
                                 name: variant_name.clone(),
                                 ty: variant_ty.clone(),
                             }]);

@@ -9,7 +9,7 @@ impl PrintSource for pr::Expr {
 
         match &self.kind {
             pr::ExprKind::Ident(path) => p.push(path.to_string())?,
-            pr::ExprKind::TupleLookup { base, lookup } => {
+            pr::ExprKind::Lookup { base, lookup } => {
                 base.print(p)?;
                 p.push(".")?;
                 match lookup {
@@ -120,8 +120,8 @@ impl PrintSource for pr::Expr {
                 .print(p);
             }
 
-            pr::ExprKind::FuncCall(call) => {
-                call.func.print(p)?;
+            pr::ExprKind::Call(call) => {
+                call.subject.print(p)?;
 
                 if call.args.len() <= 1 {
                     // special case: when there is only one arg, allow it to
@@ -231,7 +231,7 @@ impl PrintSource for pr::Expr {
                 binding.main.print(p)?;
             }
 
-            pr::ExprKind::EnumVariant(_) | pr::ExprKind::Native => unreachable!(),
+            pr::ExprKind::Variant(_) | pr::ExprKind::Native => unreachable!(),
         }
         Some(())
     }

@@ -58,7 +58,7 @@ impl Expr {
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Ref {
-    Global(AbsoluteRef),
+    Global(Path),
     Local {
         /// scope id
         scope: usize,
@@ -68,28 +68,13 @@ pub enum Ref {
     },
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct AbsoluteRef {
-    pub to_def: Path,
-    pub within: Path,
-}
-
-impl AbsoluteRef {
-    pub fn new(to_def: Path) -> Self {
-        AbsoluteRef {
-            to_def,
-            within: Path::empty(),
-        }
-    }
-}
-
 #[derive(Debug, EnumAsInner, PartialEq, Clone, strum::AsRefStr)]
 pub enum ExprKind {
     Ident(Path),
 
     /// A lookup into an object by name or position.
     /// Currently, this includes only tuple field lookups, primarily by name.
-    TupleLookup {
+    Lookup {
         base: Box<Expr>,
         lookup: Lookup,
     },
@@ -99,12 +84,12 @@ pub enum ExprKind {
 
     Tuple(Vec<TupleField>),
     Array(Vec<Expr>),
-    EnumVariant(EnumVariant),
+    Variant(Variant),
 
     Range(Range),
     Binary(BinaryExpr),
     Unary(UnaryExpr),
-    FuncCall(FuncCall),
+    Call(Call),
     Func(Box<Func>),
     FuncShort(Box<FuncShort>),
     FString(Vec<InterpolateItem>),
@@ -137,10 +122,10 @@ pub struct UnaryExpr {
     pub expr: Box<Expr>,
 }
 
-/// Function call.
+/// Call of either a function, enum variant, or framed type constructor.
 #[derive(Debug, PartialEq, Clone)]
-pub struct FuncCall {
-    pub func: Box<Expr>,
+pub struct Call {
+    pub subject: Box<Expr>,
     pub args: Vec<Expr>,
 }
 
@@ -193,6 +178,8 @@ pub struct TypeAnnotation {
     pub expr: Box<Expr>,
     pub ty: Box<Ty>,
 }
+
+/// Tuple field. `name = expr` or `..expr`
 #[derive(Debug, PartialEq, Clone)]
 pub struct TupleField {
     pub name: Option<String>,
@@ -200,9 +187,10 @@ pub struct TupleField {
     pub expr: Expr,
 }
 
+/// Enum variant. `.name(inner)`
 #[derive(Debug, PartialEq, Clone)]
-pub struct EnumVariant {
-    pub tag: usize,
+pub struct Variant {
+    pub name: String,
     pub inner: Option<Box<Expr>>,
 }
 
@@ -314,5 +302,11 @@ impl From<Path> for ExprKind {
 impl From<Range> for ExprKind {
     fn from(value: Range) -> Self {
         ExprKind::Range(value)
+    }
+}
+
+impl From<Variant> for ExprKind {
+    fn from(value: Variant) -> Self {
+        ExprKind::Variant(value)
     }
 }

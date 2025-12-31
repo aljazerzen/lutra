@@ -44,13 +44,13 @@ pub fn compile(
 
     // lower
     let program_ir = intermediate::lower_expr(project, &program_pr);
-    tracing::debug!("ir:\n{}", lutra_bin::ir::print(&program_ir));
+    tracing::debug!("ir:\n{}\n", lutra_bin::ir::print(&program_ir));
 
     // intermediate optimizations
     let program_ir = intermediate::inline(program_ir);
-    tracing::debug!("ir (inlined): {}", lutra_bin::ir::print(&program_ir));
+    tracing::debug!("ir (inlined):\n{}\n", lutra_bin::ir::print(&program_ir));
     let program_ir = intermediate::layouter::on_program(program_ir);
-    tracing::debug!("ir (layout): {}", lutra_bin::ir::print(&program_ir));
+    tracing::debug!("ir (layout):\n{}\n", lutra_bin::ir::print(&program_ir));
 
     let program = match format {
         ProgramFormat::SqlPg => rr::Program::SqlPg(Box::new(sql::compile_ir(&program_ir))),
