@@ -139,8 +139,7 @@ pub fn fold_expr_kind<T: ?Sized + PrFold>(fold: &mut T, expr_kind: ExprKind) -> 
 
         TypeAnnotation(annotation) => TypeAnnotation(fold.fold_type_annotation(annotation)?),
 
-        // None of these capture variables, so we don't need to fold them.
-        Native | Literal(_) => expr_kind,
+        Literal(_) => expr_kind,
     })
 }
 
@@ -170,7 +169,7 @@ fn fold_module_def<F: ?Sized + PrFold>(fold: &mut F, module_def: ModuleDef) -> R
 
 pub fn fold_expr_def<F: ?Sized + PrFold>(fold: &mut F, expr_def: ExprDef) -> Result<ExprDef> {
     Ok(pr::ExprDef {
-        value: fold_optional_box(fold, expr_def.value)?,
+        value: Box::new(fold.fold_expr(*expr_def.value)?),
         ty: expr_def.ty.map(|x| fold.fold_type(x)).transpose()?,
         constant: expr_def.constant,
     })
@@ -244,7 +243,7 @@ pub fn fold_func_call<T: ?Sized + PrFold>(fold: &mut T, func_call: Call) -> Resu
 
 pub fn fold_func<T: ?Sized + PrFold>(fold: &mut T, func: Func) -> Result<Func> {
     Ok(Func {
-        body: Box::new(fold.fold_expr(*func.body)?),
+        body: fold_optional_box(fold, func.body)?,
         return_ty: fold_type_opt(fold, func.return_ty)?,
         params: fold_func_params(fold, func.params)?,
         ty_params: func.ty_params, // recurse into this too?

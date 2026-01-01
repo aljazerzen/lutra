@@ -51,7 +51,7 @@ impl TypeResolver<'_> {
                 body: func
                     .return_ty
                     .clone()
-                    .or_else(|| func.body.ty.clone())
+                    .or_else(|| func.body.as_ref().and_then(|b| b.ty.clone()))
                     .map(Box::new),
                 ty_params: func.ty_params.clone(),
             }),
@@ -71,8 +71,7 @@ impl TypeResolver<'_> {
             | ExprKind::Range(_)
             | ExprKind::Binary(_)
             | ExprKind::Unary(_)
-            | ExprKind::FuncShort(_)
-            | ExprKind::Native => unreachable!("{}", expr.kind.as_ref()),
+            | ExprKind::FuncShort(_) => unreachable!("{}", expr.kind.as_ref()),
         };
         let mut ty = Ty::new(kind);
         ty.span = expr.span;

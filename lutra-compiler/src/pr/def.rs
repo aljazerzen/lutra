@@ -37,7 +37,7 @@ pub struct ModuleDef {
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct ExprDef {
-    pub value: Option<Box<Expr>>,
+    pub value: Box<Expr>,
 
     pub constant: bool,
     pub ty: Option<Ty>,
@@ -117,7 +117,7 @@ impl From<ModuleDef> for DefKind {
 impl From<Expr> for DefKind {
     fn from(expr: Expr) -> Self {
         DefKind::Expr(ExprDef {
-            value: Some(Box::new(expr)),
+            value: Box::new(expr),
             ty: None,
             constant: false,
         })

@@ -81,15 +81,14 @@ where T: number
 
 ## Negates a number.
 func neg(x: T): T
-where
-  T: int8 | int16 | int32 | int64 | float32 | float64
+where T: int8 | int16 | int32 | int64 | float32 | float64
 
 ## Compare two values to determine if the first is less, equal, or greater than
 ## the second.
 func cmp(a: T, b: T): Ordering
 where T: primitive
 
-type Ordering: enum { Less, Equal, Greater }
+type Ordering: enum {Less, Equal, Greater}
 
 ## Tests if values are equal. Used by `==` operator.
 func eq(left: T, right: T): bool
@@ -156,7 +155,7 @@ func not(expr: bool): bool
 
 # --- Option functions ---
 
-func or_else(value: enum { None, Some: T }, fallback: T): T
+func or_else(value: enum {None, Some: T}, fallback: T): T
 where T
 -> (
   match value {
@@ -165,7 +164,7 @@ where T
   }
 )
 
-func or_default(value: enum { None, Some: T }): T
+func or_default(value: enum {None, Some: T}): T
 where T
 -> (
   match value {
@@ -174,7 +173,7 @@ where T
   }
 )
 
-func is_some(value: enum { None, Some: T }): bool
+func is_some(value: enum {None, Some: T}): bool
 where T
 -> (
   match value {
@@ -183,7 +182,7 @@ where T
   }
 )
 
-func is_none(value: enum { None, Some: T }): bool
+func is_none(value: enum {None, Some: T}): bool
 where T
 -> (
   match value {
@@ -194,7 +193,7 @@ where T
 
 # --- Array functions ---
 
-func index(array: [T], position: int64): enum { None, Some: T }
+func index(array: [T], position: int64): enum {None, Some: T}
 where T
 
 func count(array: [T]): int64
@@ -213,11 +212,9 @@ where I, O
 func filter(array: [T], condition: func (T): bool): [T]
 where T
 
-func find(array: [T], condition: func (T): bool): enum { None, Some: T }
+func find(array: [T], condition: func (T): bool): enum {None, Some: T}
 where T
--> (
-  array | filter(condition) | index(0)
-)
+-> (array | filter(condition) | index(0))
 
 func slice(array: [T], start: int64, end: int64): [T]
 where T
@@ -235,15 +232,11 @@ func map_columnar(
   x: [I], mapper: func ({for f: F in I do f: [F]}): {for f: F in O do f: [F]}
 ): [O]
 where I: {..}, O: {..}
--> (
-  x | to_columnar | mapper | from_columnar
-)
+-> (x | to_columnar | mapper | from_columnar)
 
 func aggregate(x: [T], mapper: func ({for f: F in T do f: [F]}): O): O
 where T: {..}, O
--> (
-  x | to_columnar | mapper
-)
+-> (x | to_columnar | mapper)
 
 func zip(left: [L], right: [R]): [{L, R}]
 where L, R
@@ -255,15 +248,9 @@ where I, K
 
 ## Groups array items by a key.
 ## Returns groups, which contain the key and an array of values in this group.
-func group_map(
-  input: [I],
-  get_key: func (I): K,
-  mapper: func (key: K, values: [I]): O
-): [O]
+func group_map(input: [I], get_key: func (I): K, mapper: func (K, [I]): O): [O]
 where I, K, O
--> (
-  input | group(get_key) | map(func (x) -> mapper(x.key, x.values))
-)
+-> (input | group(get_key) | map(func (x) -> mapper(x.key, x.values)))
 
 ## Deduplicates array items.
 func distinct(array: [T]): [T]
@@ -286,11 +273,7 @@ where T
 ## This function is sometimes also called "reduce" or "inject".
 ## This function is similar to [std::scan], but it returns only the final
 ## accumulator.
-func fold(
-  inputs: [I],
-  initial: A,
-  operation: func (A, I): A,
-): A
+func fold(inputs: [I], initial: A, operation: func (A, I): A): A
 where I, A
 
 ## Applies an operation to each input, using the output from the previous
@@ -305,11 +288,7 @@ where I, A
 ##
 ## This function is similar to [std::fold], but it returns all accumulators,
 ## instead of only the final one.
-func scan(
-  inputs: [I],
-  initial: A,
-  operation: func (A, I): A,
-): [A]
+func scan(inputs: [I], initial: A, operation: func (A, I): A): [A]
 where I, A
 
 # func apply(
@@ -325,10 +304,7 @@ where I, A
 ## Returns all produced arrays concatenated together, including initial array.
 ##
 ## In SQL, this is known as "RECURSIVE CTE" or "recursive join".
-func apply_until_empty(
-  initial: [T],
-  operation: func ([T]): [T]
-): [T]
+func apply_until_empty(initial: [T], operation: func ([T]): [T]): [T]
 where T
 
 ## Returns an array of sequential integers
@@ -459,6 +435,7 @@ module math {
   # func round(val: int64, n_digits: int64): int64
 
   const pi32: float32 = 3.1415927
+
   const pi64: float64 = 3.141592653589793
 
   # TODO: exponent should probably always be uint32
@@ -466,27 +443,16 @@ module math {
   where T: int64 | float64
 
   # func exp(val: int64): int64
-
   # func ln(val: int64): int64
-
   # func log10(val: int64): int64
-
   # func log(base: int64, val: int64): int64
-
   # func degrees(val: int64): int64
-
   # func radians(val: int64): int64
-
   # func cos(val: int64): int64
-
   # func acos(val: int64): int64
-
   # func sin(val: int64): int64
-
   # func asin(val: int64): int64
-
   # func tan(val: int64): int64
-
   # func atan(val: int64): int64
 }
 
@@ -541,7 +507,6 @@ module fs {
 ## Module available only when targeting SQL databases.
 ## Currently this includes only `sql-pg` format.
 module sql {
-
   ## Reads rows from a table.
   ##
   ## The order of table rows is unknown and might change over repeated invocations.
@@ -645,20 +610,13 @@ type Time(int64)
 # where D: Time64Millisecond -> x.0 | div(1000) | Time64Microsecond
 # where D: Time64Microsecond -> x
 
-func add_time(a: Time, b: Time): Time -> (
-  add(a.0, b.0) | Time
-)
+func add_time(a: Time, b: Time): Time -> (add(a.0, b.0) | Time)
 
-func sub_timestamp(a: Timestamp, b: Timestamp): Time -> (
-  sub(a.0, b.0) | Time
-)
+func sub_timestamp(a: Timestamp, b: Timestamp): Time -> (sub(a.0, b.0) | Time)
 
 ## Returns offset of a time zone from UTC on a given date.
 func timezone_offset(time_zone: text, d: Date): Time -> (
-  sub_timestamp(
-    date::to_timestamp(d, time_zone),
-    date::to_timestamp(d, "UTC"),
-  )
+  sub_timestamp(date::to_timestamp(d, time_zone), date::to_timestamp(d, "UTC"))
 )
 
 module date {
@@ -667,7 +625,10 @@ module date {
   ## Dates are assumed to be in the same timezone.
   ## Duration is measured from one midnight to another.
   func sub(a: super::Date, b: super::Date): super::Time -> (
-    super::sub(a.0, b.0) | super::to_int64 | super::mul(86400000000) | super::Time
+    super::sub(a.0, b.0)
+    | super::to_int64
+    | super::mul(86400000000)
+    | super::Time
   )
 
   ## Computes the timestamp of a local date at a timezone.
@@ -675,7 +636,7 @@ module date {
 
   ## Converts a date into year, month, and day numbers.
   ## Month and day start with 1.
-  func to_year_month_day(
-    date: super::Date,
-  ): {year: int32, month: uint8, day: uint8}
+  func to_year_month_day(date: super::Date): {
+    year: int32, month: uint8, day: uint8
+  }
 }

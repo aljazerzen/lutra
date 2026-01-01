@@ -442,7 +442,7 @@ fn func<'a>(
         // arrow
         .then_ignore(just(TokenKind::ArrowThin))
         // body
-        .then(expr.map(Box::new))
+        .then(expr.map(Box::new).map(Some))
         .map(|((params, return_ty), body)| {
             Box::new(Func {
                 params,

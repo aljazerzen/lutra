@@ -71,7 +71,7 @@ pub fn resolve_overlay_expr(
         var_name.to_string(),
         pr::Def::new(pr::DefKind::Unresolved(Some(Box::new(pr::DefKind::Expr(
             pr::ExprDef {
-                value: Some(Box::new(expr)),
+                value: Box::new(expr),
                 ty: None,
                 constant: false,
             },
@@ -87,7 +87,7 @@ pub fn resolve_overlay_expr(
     types::run(&mut root_module, &resolution_order)?;
 
     let def = root_module.defs.swap_remove(var_name).unwrap();
-    let expr = *def.kind.into_expr().unwrap().value.unwrap();
+    let expr = *def.kind.into_expr().unwrap().value;
 
     Ok(expr)
 }

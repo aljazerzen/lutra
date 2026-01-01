@@ -286,6 +286,36 @@ fn format_16() {
 }
 
 #[test]
+fn format_17() {
+    // formatting of native functions
+
+    assert_snapshot!(_format(r#"
+    func index(array: [T], position: int64): enum { None, Some: T }
+    where T
+    "#), @"
+    func index(array: [T], position: int64): enum {None, Some: T}
+    where T
+    "
+    )
+}
+
+#[test]
+fn format_18() {
+    // variant
+
+    assert_snapshot!(_format(r#"
+    const a = .None
+    const b = .Some(
+      a_value_that_is_long)
+    "#), @"
+    const a = .None
+
+    const b = .Some(a_value_that_is_long)
+    "
+    )
+}
+
+#[test]
 fn trivia_00() {
     assert_snapshot!(_format(r#"
     # TODO

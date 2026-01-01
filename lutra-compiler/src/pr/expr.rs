@@ -97,8 +97,6 @@ pub enum ExprKind {
     If(If),
 
     VarBinding(VarBinding),
-
-    Native,
 }
 
 #[derive(Debug, EnumAsInner, PartialEq, Clone)]
@@ -139,13 +137,13 @@ pub struct Func {
     pub return_ty: Option<Ty>,
 
     /// Expression containing parameter references.
-    pub body: Box<Expr>,
+    pub body: Option<Box<Expr>>,
 
     /// Parameters of the types within this function (where clause).
     pub ty_params: Vec<TyParam>,
 }
 
-/// Short function. `x -> b`
+/// Function, short notation. `x -> b`
 #[derive(Debug, PartialEq, Clone)]
 pub struct FuncShort {
     /// Function parameter.

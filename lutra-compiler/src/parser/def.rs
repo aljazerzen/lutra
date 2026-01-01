@@ -113,7 +113,7 @@ fn const_def(
     keyword("const")
         .ignore_then(ident_part())
         .then(ctrl(':').ignore_then(ty).or_not())
-        .then(ctrl('=').ignore_then(expr.clone()).map(Box::new).map(Some))
+        .then(ctrl('=').ignore_then(expr.clone()).map(Box::new))
         .map(|((name, ty), value)| {
             (
                 name,
@@ -146,41 +146,33 @@ fn func_def<'a>(
         .allow_trailing()
         .delimited_by(ctrl('('), ctrl(')'));
 
+    let return_ty = ctrl(':').ignore_then(ty.clone()).or_not();
+
     let ty_params = keyword("where")
         .ignore_then(types::type_params(ty.clone()).boxed())
         .or_not()
         .map(|x| x.unwrap_or_default());
 
+    let body = just(TokenKind::ArrowThin)
+        .ignore_then(expr.map(Box::new))
+        .or_not();
+
     head.then(params)
-        .then(ctrl(':').ignore_then(ty.clone()).or_not())
+        .then(return_ty)
         .then(ty_params)
-        .then(just(TokenKind::ArrowThin).ignore_then(expr).or_not())
+        .then(body)
         .map_with_span(|((((name, params), return_ty), ty_params), body), span| {
-            let def = DefKind::Expr(if let Some(body) = body {
-                let func = Func {
-                    return_ty,
-                    body: Box::new(body),
-                    params,
-                    ty_params,
-                };
-                let value = Expr::new_with_span(ExprKind::Func(Box::new(func)), span);
-                ExprDef {
-                    ty: None,
-                    value: Some(Box::new(value)),
-                    constant: false,
-                }
-            } else {
-                let ty_func = TyFunc {
-                    params: params.into_iter().map(|p| (p.ty, p.constant)).collect(),
-                    body: return_ty.map(Box::new),
-                    ty_params,
-                };
-                let ty = Some(Ty::new_with_span(TyKind::Func(ty_func), span));
-                ExprDef {
-                    ty,
-                    value: None,
-                    constant: false,
-                }
+            let func = Func {
+                return_ty,
+                body,
+                params,
+                ty_params,
+            };
+            let value = Expr::new_with_span(ExprKind::Func(Box::new(func)), span);
+            let def = DefKind::Expr(ExprDef {
+                ty: None,
+                value: Box::new(value),
+                constant: false,
             });
             (name, def)
         })

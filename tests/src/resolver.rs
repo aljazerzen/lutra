@@ -614,27 +614,39 @@ fn types_23() {
 
     insta::assert_snapshot!(_test_err(r#"
         func main()
-    "#), @r"
+    "#), @"
     Error:
        ╭─[:2:9]
        │
      2 │         func main()
        │         ─────┬─────
-       │              ╰─────── cannot infer type
+       │              ╰─────── missing return type
     ───╯
     ");
 
     insta::assert_snapshot!(_test_err(r#"
         func main(name): {}
-    "#), @r"
+    "#), @"
     Error:
-       ╭─[:2:9]
+       ╭─[:2:19]
        │
      2 │         func main(name): {}
-       │         ─────────┬─────────
-       │                  ╰─────────── cannot infer type
+       │                   ──┬─
+       │                     ╰─── cannot infer type
     ───╯
     ");
+
+    insta::assert_snapshot!(_test_err(r#"
+        func main() -> "hello" | func (x: text): text
+    "#), @r#"
+    [E0003] Error:
+       ╭─[:2:54]
+       │
+     2 │         func main() -> "hello" | func (x: text): text
+       │                                                      │
+       │                                                      ╰─ function expected ->, but encountered the end of the file.
+    ───╯
+    "#);
 }
 
 #[test]
@@ -1886,7 +1898,7 @@ fn framed_07() {
 fn framed_08() {
     insta::assert_snapshot!(_test_ty(r#"
     type Status(enum {Pending: text, Done})
-    
+
     func main() -> (
       let s = Status(.Pending("hello"));
       match s {

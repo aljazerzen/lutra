@@ -112,8 +112,8 @@ impl<'a> Lowerer<'a> {
         let def = self.root_module.get(path);
         let def = def.unwrap_or_else(|| panic!("{path} does not exist"));
         let expr = def.kind.as_expr().unwrap();
-        let expr = expr.value.as_ref().unwrap();
-        if !matches!(expr.kind, pr::ExprKind::Native) {
+        let expr = &expr.value;
+        if !is_native_func(expr) {
             return Ok(None);
         }
 
@@ -131,7 +131,7 @@ impl<'a> Lowerer<'a> {
         let def = self.root_module.get(path);
         let def = def.unwrap_or_else(|| panic!("{path} does not exist"));
         let expr = def.kind.as_expr().unwrap();
-        let expr = *expr.value.as_ref().unwrap().clone();
+        let expr = *expr.value.clone();
 
         if path.as_steps() == [NS_STD, "default"] {
             // special case: evaluate std::default in lowerer
@@ -139,7 +139,7 @@ impl<'a> Lowerer<'a> {
             return Ok(self.impl_std_default(ty_arg));
         }
 
-        if matches!(expr.kind, pr::ExprKind::Native) {
+        if is_native_func(&expr) {
             // Usually, this is lowered earlier, when lowering pointers.
             // But for top-level external symbols, we do it here.
 
@@ -260,7 +260,7 @@ impl<'a> Lowerer<'a> {
 
                 self.scopes.push(scope);
                 self.is_main_a_func = false;
-                let body = self.lower_expr(&func.body)?;
+                let body = self.lower_expr(func.body.as_ref().unwrap())?;
                 self.scopes.pop();
 
                 let func = ir::Function {
@@ -419,9 +419,6 @@ impl<'a> Lowerer<'a> {
 
             // consumed by type resolver
             pr::ExprKind::TypeAnnotation(_) => unreachable!(),
-
-            // caught in lower_var_def
-            pr::ExprKind::Native => unreachable!(),
 
             // desugared away
             pr::ExprKind::Nested(_)
@@ -1117,7 +1114,7 @@ pub fn lower_type_defs(project: &Project) -> ir::Module {
             }
 
             pr::DefKind::Expr(expr) => {
-                let expr = expr.value.as_ref().unwrap();
+                let expr = &expr.value;
                 let ty = lowerer.lower_ty(expr.ty.clone().unwrap());
 
                 module.insert(name.as_steps(), ir::Decl::Var(ty));
@@ -1192,4 +1189,8 @@ fn get_entry_point_input(expr: &pr::Expr) -> (pr::Ty, bool) {
             .collect(),
     ));
     (ty, true)
+}
+
+fn is_native_func(expr: &pr::Expr) -> bool {
+    expr.kind.as_func().is_some_and(|x| x.body.is_none())
 }

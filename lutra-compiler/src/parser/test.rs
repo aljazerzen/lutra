@@ -45,14 +45,14 @@ fn parse_expr(source: &str) -> pr::Expr {
 fn parse_func(source: &str) -> pr::Expr {
     let source = parse_with_parser(source, def::source()).unwrap();
     let (_, def) = source.root.defs.into_iter().next().unwrap();
-    *def.kind.into_expr().unwrap().value.unwrap()
+    *def.kind.into_expr().unwrap().value
 }
 
 #[test]
 fn parse_01() {
     assert!(parse_expr("func () -> 4").kind.is_func());
     assert!(parse_expr("func() -> 4").kind.is_func());
-    assert_debug_snapshot!(parse_expr("func() -> false").kind.as_func().unwrap().body, @r"
+    assert_debug_snapshot!(parse_expr("func() -> false").kind.as_func().unwrap().body.as_ref().unwrap(), @r"
     Expr {
         kind: Literal(
             Boolean(
@@ -128,20 +128,22 @@ fn parse_03() {
             Func {
                 params: [],
                 return_ty: None,
-                body: Expr {
-                    kind: Literal(
-                        Integer(
-                            1,
+                body: Some(
+                    Expr {
+                        kind: Literal(
+                            Integer(
+                                1,
+                            ),
                         ),
-                    ),
-                    span: Some(
-                        0:37-38,
-                    ),
-                    ty: None,
-                    ty_args: [],
-                    scope_id: None,
-                    target: None,
-                },
+                        span: Some(
+                            0:37-38,
+                        ),
+                        ty: None,
+                        ty_args: [],
+                        scope_id: None,
+                        target: None,
+                    },
+                ),
                 ty_params: [
                     TyParam {
                         name: "A",
@@ -183,20 +185,22 @@ fn parse_04() {
             Func {
                 params: [],
                 return_ty: None,
-                body: Expr {
-                    kind: Literal(
-                        Integer(
-                            1,
+                body: Some(
+                    Expr {
+                        kind: Literal(
+                            Integer(
+                                1,
+                            ),
                         ),
-                    ),
-                    span: Some(
-                        0:36-37,
-                    ),
-                    ty: None,
-                    ty_args: [],
-                    scope_id: None,
-                    target: None,
-                },
+                        span: Some(
+                            0:36-37,
+                        ),
+                        ty: None,
+                        ty_args: [],
+                        scope_id: None,
+                        target: None,
+                    },
+                ),
                 ty_params: [
                     TyParam {
                         name: "T",
@@ -777,44 +781,46 @@ fn parse_10() {
                             },
                         ],
                         return_ty: None,
-                        body: Expr {
-                            kind: Binary(
-                                BinaryExpr {
-                                    left: Expr {
-                                        kind: Ident(
-                                            x,
-                                        ),
-                                        span: Some(
-                                            0:16-17,
-                                        ),
-                                        ty: None,
-                                        ty_args: [],
-                                        scope_id: None,
-                                        target: None,
+                        body: Some(
+                            Expr {
+                                kind: Binary(
+                                    BinaryExpr {
+                                        left: Expr {
+                                            kind: Ident(
+                                                x,
+                                            ),
+                                            span: Some(
+                                                0:16-17,
+                                            ),
+                                            ty: None,
+                                            ty_args: [],
+                                            scope_id: None,
+                                            target: None,
+                                        },
+                                        op: Pipe,
+                                        right: Expr {
+                                            kind: Ident(
+                                                to_int32,
+                                            ),
+                                            span: Some(
+                                                0:20-28,
+                                            ),
+                                            ty: None,
+                                            ty_args: [],
+                                            scope_id: None,
+                                            target: None,
+                                        },
                                     },
-                                    op: Pipe,
-                                    right: Expr {
-                                        kind: Ident(
-                                            to_int32,
-                                        ),
-                                        span: Some(
-                                            0:20-28,
-                                        ),
-                                        ty: None,
-                                        ty_args: [],
-                                        scope_id: None,
-                                        target: None,
-                                    },
-                                },
-                            ),
-                            span: Some(
-                                0:16-28,
-                            ),
-                            ty: None,
-                            ty_args: [],
-                            scope_id: None,
-                            target: None,
-                        },
+                                ),
+                                span: Some(
+                                    0:16-28,
+                                ),
+                                ty: None,
+                                ty_args: [],
+                                scope_id: None,
+                                target: None,
+                            },
+                        ),
                         ty_params: [],
                     },
                 ),

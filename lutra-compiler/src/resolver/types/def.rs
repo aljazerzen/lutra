@@ -60,63 +60,45 @@ impl super::TypeResolver<'_> {
                 self.scopes.push(scope);
 
                 // resolve
+                self.allow_native_functions = true;
                 let expr_def = self.fold_expr_def(expr_def)?;
                 let expected_ty = expr_def.ty;
 
                 tracing::trace!("def done");
 
-                let def = match expr_def.value {
-                    Some(mut value) => {
-                        // value is provided
+                let mut value = expr_def.value;
 
-                        // validate type
-                        if let Some(expected_ty) = &expected_ty {
-                            let who = || Some(fq_ident.last().to_string());
-                            self.validate_expr_type(&mut value, expected_ty, &who)
-                                .unwrap_or_else(self.push_diagnostic());
-                            value.ty = Some(expected_ty.clone());
-                        }
+                // validate type
+                if let Some(expected_ty) = &expected_ty {
+                    let who = || Some(fq_ident.last().to_string());
+                    self.validate_expr_type(&mut value, expected_ty, &who)
+                        .unwrap_or_else(self.push_diagnostic());
+                    value.ty = Some(expected_ty.clone());
+                }
 
-                        // finalize scope
-                        let mapping = self.finalize_type_vars()?;
-                        let value = utils::TypeReplacer::on_expr(*value, mapping);
+                // finalize scope
+                let mapping = self.finalize_type_vars()?;
+                let value = utils::TypeReplacer::on_expr(*value, mapping);
 
-                        // validate const
-                        if expr_def.constant {
-                            self.const_validator
-                                .validate_is_const(&value)
-                                .map_err(|span| {
-                                    Diagnostic::new_custom("non-constant expression")
-                                        .with_span(span.or(value.span))
-                                        .push_hint("use `func` instead of `const`")
-                                })
-                                .unwrap_or_else(self.push_diagnostic());
-                            self.const_validator.save_const(fq_ident.clone());
-                        }
-
-                        pr::DefKind::Expr(pr::ExprDef {
-                            value: Some(Box::new(value)),
-                            ty: None,
-                            constant: expr_def.constant,
+                // validate const
+                if expr_def.constant {
+                    self.const_validator
+                        .validate_is_const(&value)
+                        .map_err(|span| {
+                            Diagnostic::new_custom("non-constant expression")
+                                .with_span(span.or(value.span))
+                                .push_hint("use `func` instead of `const`")
                         })
-                    }
-                    None => {
-                        // var value is not provided: treat this def as a value provided by the runtime
-
-                        // finalize scope
-                        self.finalize_type_vars()?;
-
-                        let mut expr = Box::new(pr::Expr::new(pr::ExprKind::Native));
-                        expr.ty = expected_ty;
-                        pr::DefKind::Expr(pr::ExprDef {
-                            value: Some(expr),
-                            ty: None,
-                            constant: expr_def.constant,
-                        })
-                    }
-                };
+                        .unwrap_or_else(self.push_diagnostic());
+                    self.const_validator.save_const(fq_ident.clone());
+                }
                 self.scopes.pop().unwrap();
-                def
+
+                pr::DefKind::Expr(pr::ExprDef {
+                    value: Box::new(value),
+                    ty: None,
+                    constant: expr_def.constant,
+                })
             }
             pr::DefKind::Ty(ty_def) => {
                 let mut ty = self.fold_type(ty_def.ty)?;

@@ -235,7 +235,19 @@ impl PrintSource for pr::Expr {
                 binding.main.print(p)?;
             }
 
-            pr::ExprKind::Variant(_) | pr::ExprKind::Native => unreachable!(),
+            pr::ExprKind::Variant(variant) => {
+                p.push(".")?;
+                p.push(pr::display_ident(&variant.name))?;
+                if let Some(inner) = &variant.inner {
+                    Between {
+                        node: inner.as_ref(),
+                        prefix: "(",
+                        suffix: ")",
+                        span: self.span,
+                    }
+                    .print(p)?;
+                }
+            }
         }
         Some(())
     }
@@ -364,14 +376,17 @@ pub(super) fn print_func<'c>(
         .print(p)?;
 
         p.dedent();
-
-        p.new_line();
-        p.push("-> ")?;
-    } else {
-        p.push(" -> ")?;
     }
 
-    func.body.print(p)?;
+    if let Some(body) = &func.body {
+        if func.ty_params.is_empty() {
+            p.push(" -> ")?;
+        } else {
+            p.new_line();
+            p.push("-> ")?;
+        }
+        body.print(p)?;
+    }
     Some(())
 }
 

@@ -3,7 +3,6 @@ use chumsky::Span;
 use crate::pr::{self, ImportDef};
 use crate::printer::common::{Between, Separated};
 use crate::printer::expr::print_func;
-use crate::printer::types::print_ty_func;
 use crate::printer::{PrintSource, Printer};
 
 impl PrintSource for pr::Source {
@@ -134,21 +133,14 @@ impl PrintSource for NamedDef<'_> {
                     p.push(": ")?;
                     ty.print(p)?;
                 }
-                if let Some(value) = &expr_def.value {
-                    p.push(" = ")?;
-                    value.print(p)?;
-                }
+
+                p.push(" = ")?;
+                expr_def.value.print(p)?;
             }
             pr::DefKind::Expr(expr_def) => {
                 // func
-                if let Some(value) = &expr_def.value {
-                    let func = value.kind.as_func().unwrap();
-
-                    print_func(func, Some(self.0), p)?;
-                } else {
-                    let func = expr_def.ty.as_ref().unwrap().kind.as_func().unwrap();
-                    print_ty_func(func, Some(self.0), p)?;
-                }
+                let func = expr_def.value.kind.as_func().unwrap();
+                print_func(func, Some(self.0), p)?;
             }
             pr::DefKind::Ty(ty_def) => {
                 p.push("type ")?;

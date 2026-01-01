@@ -240,7 +240,7 @@ impl<'a> TypeResolver<'a> {
             pr::Ref::Global(tgt_fq) => {
                 let def = self.root_mod.get(tgt_fq);
                 match &def.unwrap_or_else(|| panic!("cannot find {tgt_fq}")).kind {
-                    pr::DefKind::Expr(expr) => Ok(Named::Expr(expr.value.as_ref().unwrap())),
+                    pr::DefKind::Expr(expr) => Ok(Named::Expr(&expr.value)),
                     pr::DefKind::Ty(def) => Ok(Named::Ty {
                         ty: &def.ty,
                         is_framed: def.is_framed,
