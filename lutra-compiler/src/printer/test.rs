@@ -229,13 +229,13 @@ fn format_13() {
         over_multiple_lines,
         but_the_func_call_is_not,
     ])
-    "#), @"
+    "#), @r#"
     func main() -> my_func([
       something_long_so_the_array_must_be_split,
       over_multiple_lines,
       but_the_func_call_is_not,
     ])
-    "
+    "#
     )
 }
 
@@ -246,11 +246,11 @@ fn format_14() {
     assert_snapshot!(_format(r#"
     func main() -> some_long_value
     | some_function_that_has_a_long_name | another_function
-    "#), @"
+    "#), @r#"
     func main() -> (
       some_long_value | some_function_that_has_a_long_name | another_function
     )
-    "
+    "#
     )
 }
 
@@ -261,11 +261,25 @@ fn format_15() {
     assert_snapshot!(_format(r#"
     func main() -> some_long_value
     | function_that_has_a_long_name | another_function_that_has_even_long_name
-    "#), @"
+    "#), @r#"
     func main() -> (
       some_long_value
       | function_that_has_a_long_name
       | another_function_that_has_even_long_name
+    )
+    "#
+    )
+}
+
+#[test]
+fn format_16() {
+    // don't inject parenthesis in single lines
+
+    assert_snapshot!(_format(r#"
+    func get_song_by_id() -> (from_songs | find(aaaaaaa == bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb) | or_default)
+    "#), @"
+    func get_song_by_id() -> (
+      from_songs | find(aaaaaaa == bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb) | or_default
     )
     "
     )

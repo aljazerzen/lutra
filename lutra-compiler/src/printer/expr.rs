@@ -49,6 +49,10 @@ impl PrintSource for pr::Expr {
                     return Some(());
                 }
 
+                if p.single_line {
+                    return None;
+                }
+
                 // inject parenthesis
                 p.push("(")?;
                 p.indent();
