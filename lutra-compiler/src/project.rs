@@ -46,7 +46,7 @@ pub struct SourceTree {
     /// Paths are relative to the root.
     pub(crate) sources: HashMap<path::PathBuf, String>,
 
-    /// Index of source ids to paths. Used to keep [crate::codespan::Span] lean.
+    /// Index of source ids to paths. Used to keep [crate::Span] lean.
     pub(crate) source_ids: HashMap<u16, path::PathBuf>,
 }
 
@@ -182,12 +182,17 @@ impl<'a> SourceOverlay<'a> {
 }
 
 pub(crate) trait SourceProvider {
+    fn get_root(&self) -> &path::Path;
+
     fn get_path(&self, id: u16) -> Option<&path::Path>;
 
     fn get_source(&self, path: &path::Path) -> Option<&str>;
 }
 
 impl SourceProvider for SourceTree {
+    fn get_root(&self) -> &path::Path {
+        &self.root
+    }
     fn get_path(&self, id: u16) -> Option<&path::Path> {
         self.source_ids.get(&id).map(|x| x.as_path())
     }
@@ -198,6 +203,10 @@ impl SourceProvider for SourceTree {
 }
 
 impl<'a> SourceProvider for SourceOverlay<'a> {
+    fn get_root(&self) -> &path::Path {
+        &self.tree.root
+    }
+
     fn get_path(&self, id: u16) -> Option<&path::Path> {
         if id == 0 {
             Some(self.snippet_path.as_path())

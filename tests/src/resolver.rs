@@ -72,9 +72,9 @@ fn types_03() {
         func floor(x: T) where T -> floor_64(x)
 
         func main() -> floor(4.4)
-    "#), @r"
+    "#), @"
     [E0006] Error:
-       ╭─[:4:46]
+       ╭─[<unknown>:4:46]
        │
      4 │         func floor(x: T) where T -> floor_64(x)
        │                                              ┬
@@ -151,9 +151,9 @@ fn types_09() {
     insta::assert_snapshot!(_test_err(r#"
         func peek(array: [T], condition: func <R> (T): R): [T]
         where T
-    "#), @r"
+    "#), @"
     [E0003] Error:
-       ╭─[:2:47]
+       ╭─[<unknown>:2:47]
        │
      2 │         func peek(array: [T], condition: func <R> (T): R): [T]
        │                                               ┬
@@ -208,9 +208,9 @@ fn types_13() {
         where T: float32 | float64
 
         func main() -> floor(false)
-    "#), @r"
+    "#), @"
     [E0007] Error:
-       ╭─[:5:24]
+       ╭─[<unknown>:5:24]
        │
      5 │         func main() -> floor(false)
        │                        ──┬──
@@ -231,9 +231,9 @@ fn types_14() {
             floor_64(x)
         )
         func main() -> floor(2.3)
-    "#), @r"
+    "#), @"
     [E0006] Error:
-       ╭─[:7:22]
+       ╭─[<unknown>:7:22]
        │
      7 │             floor_64(x)
        │                      ┬
@@ -272,9 +272,9 @@ fn types_14() {
         -> {floor(x), floor(x)}
 
         func main() -> twice_floored(2.3)
-    "#), @r"
+    "#), @"
     [E0007] Error:
-       ╭─[:7:13]
+       ╭─[<unknown>:7:13]
        │
      7 │         -> {floor(x), floor(x)}
        │             ──┬──
@@ -297,9 +297,9 @@ fn types_15() {
         where T: {b: int64, ..}
 
         func main() -> get_b({a = false, b = 4.6: float64})
-    "#), @r"
+    "#), @"
     [E0006] Error:
-       ╭─[:5:46]
+       ╭─[<unknown>:5:46]
        │
      5 │         func main() -> get_b({a = false, b = 4.6: float64})
        │                                              ──────┬─────
@@ -311,9 +311,9 @@ fn types_15() {
         where T: {b: int64, ..}
 
         func main() -> get_b({a = false, c = 4})
-    "#), @r"
+    "#), @"
     [E0006] Error:
-       ╭─[:5:24]
+       ╭─[<unknown>:5:24]
        │
      5 │         func main() -> get_b({a = false, c = 4})
        │                        ──┬──
@@ -338,7 +338,7 @@ fn types_16() {
         func main() -> get_b({a = "7", 4: int64, c = 5.7})
     "#), @r#"
     [E0006] Error:
-       ╭─[:5:35]
+       ╭─[<unknown>:5:35]
        │
      5 │         func main() -> get_b({a = "7", 4: int64, c = 5.7})
        │                                   ─┬─
@@ -351,9 +351,9 @@ fn types_16() {
         where T: {bool, int64, a: bool, ..}
 
         func main() -> get_b({a = false})
-    "#), @r"
+    "#), @"
     [E0006] Error:
-       ╭─[:5:24]
+       ╭─[<unknown>:5:24]
        │
      5 │         func main() -> get_b({a = false})
        │                        ──┬──
@@ -380,9 +380,9 @@ fn types_17() {
         -> get_int(x)
 
         func main() -> get({4})
-    "#), @r"
+    "#), @"
     [E0006] Error:
-       ╭─[:6:20]
+       ╭─[<unknown>:6:20]
        │
      6 │         -> get_int(x)
        │                    ┬
@@ -398,9 +398,9 @@ fn types_17() {
         -> get_int(x)
 
         func main() -> get({4})
-    "#), @r"
+    "#), @"
     [E0006] Error:
-       ╭─[:6:20]
+       ╭─[<unknown>:6:20]
        │
      6 │         -> get_int(x)
        │                    ┬
@@ -417,9 +417,9 @@ fn types_17() {
         -> needs_two(x)
 
         func main() -> needs_one({4})
-    "#), @r"
+    "#), @"
     [E0006] Error:
-       ╭─[:7:12]
+       ╭─[<unknown>:7:12]
        │
      7 │         -> needs_two(x)
        │            ────┬────
@@ -459,9 +459,9 @@ fn types_18() {
 fn types_19() {
     insta::assert_snapshot!(_test_err(r#"
         func f(x) where T -> x + 1
-    "#), @r"
+    "#), @"
     Error:
-       ╭─[:2:16]
+       ╭─[<unknown>:2:16]
        │
      2 │         func f(x) where T -> x + 1
        │                ┬
@@ -497,9 +497,9 @@ fn types_21() {
       {a = false, "hello", c = "world"}
       | func (x) -> x.b
     )
-    "#), @r"
+    "#), @"
     [E0006] Error:
-       ╭─[:4:22]
+       ╭─[<unknown>:4:22]
        │
      4 │       | func (x) -> x.b
        │                      ─┬
@@ -511,9 +511,9 @@ fn types_21() {
       {a = false, "hello", c = "world"}
       | func (x) -> x.3
     )
-    "#), @r"
+    "#), @"
     [E0006] Error:
-       ╭─[:4:22]
+       ╭─[<unknown>:4:22]
        │
      4 │       | func (x) -> x.3
        │                      ─┬
@@ -528,9 +528,9 @@ fn types_22() {
 
     insta::assert_snapshot!(_test_err(r#"
         func main() -> [true, false].a
-    "#), @r"
+    "#), @"
     [E0006] Error:
-       ╭─[:2:37]
+       ╭─[<unknown>:2:37]
        │
      2 │         func main() -> [true, false].a
        │                                     ─┬
@@ -541,7 +541,7 @@ fn types_22() {
         func main() -> "hello".a
     "#), @r#"
     [E0006] Error:
-       ╭─[:2:31]
+       ╭─[<unknown>:2:31]
        │
      2 │         func main() -> "hello".a
        │                               ─┬
@@ -550,9 +550,9 @@ fn types_22() {
     "#);
     insta::assert_snapshot!(_test_err(r#"
         func main(x: T) where T: int32 | text -> x.a
-    "#), @r"
+    "#), @"
     Error:
-       ╭─[:2:51]
+       ╭─[<unknown>:2:51]
        │
      2 │         func main(x: T) where T: int32 | text -> x.a
        │                                                   ─┬
@@ -565,9 +565,9 @@ fn types_22() {
     ");
     insta::assert_snapshot!(_test_err(r#"
         func main(x: T) where T -> x.a
-    "#), @r"
+    "#), @"
     Error:
-       ╭─[:2:37]
+       ╭─[<unknown>:2:37]
        │
      2 │         func main(x: T) where T -> x.a
        │                                     ─┬
@@ -581,9 +581,9 @@ fn types_22() {
     insta::assert_snapshot!(_test_err(r#"
         type t: text
         func main(x: t) -> x.a
-    "#), @r"
+    "#), @"
     [E0006] Error:
-       ╭─[:3:29]
+       ╭─[<unknown>:3:29]
        │
      3 │         func main(x: t) -> x.a
        │                             ─┬
@@ -602,9 +602,9 @@ fn types_23() {
 
     insta::assert_snapshot!(_test_err(r#"
         func main(a: int32, b) -> a + 1
-    "#), @r"
+    "#), @"
     Error:
-       ╭─[:2:29]
+       ╭─[<unknown>:2:29]
        │
      2 │         func main(a: int32, b) -> a + 1
        │                             ┬
@@ -616,7 +616,7 @@ fn types_23() {
         func main()
     "#), @"
     Error:
-       ╭─[:2:9]
+       ╭─[<unknown>:2:9]
        │
      2 │         func main()
        │         ─────┬─────
@@ -628,7 +628,7 @@ fn types_23() {
         func main(name): {}
     "#), @"
     Error:
-       ╭─[:2:19]
+       ╭─[<unknown>:2:19]
        │
      2 │         func main(name): {}
        │                   ──┬─
@@ -640,7 +640,7 @@ fn types_23() {
         func main() -> "hello" | func (x: text): text
     "#), @r#"
     [E0003] Error:
-       ╭─[:2:54]
+       ╭─[<unknown>:2:54]
        │
      2 │         func main() -> "hello" | func (x: text): text
        │                                                      │
@@ -655,9 +655,9 @@ fn array_00() {
         _test_err(
             "func main() -> []"
         ),
-        @r"
+        @"
     Error:
-       ╭─[:1:16]
+       ╭─[<unknown>:1:16]
        │
      1 │ func main() -> []
        │                ─┬
@@ -673,9 +673,9 @@ fn array_01() {
         _test_err(
             "func main() -> std::lag([], 1)"
         ),
-        @r"
+        @"
     Error:
-       ╭─[:1:16]
+       ╭─[<unknown>:1:16]
        │
      1 │ func main() -> std::lag([], 1)
        │                ────┬───
@@ -701,9 +701,9 @@ fn array_03() {
         _test_err(
             "const main = {false, [], true}"
         ),
-        @r"
+        @"
     Error:
-       ╭─[:1:22]
+       ╭─[<unknown>:1:22]
        │
      1 │ const main = {false, [], true}
        │                      ─┬
@@ -739,7 +739,7 @@ fn array_06() {
         const main = [false, "true", false]"#
     ), @r#"
     [E0006] Error:
-       ╭─[:2:30]
+       ╭─[<unknown>:2:30]
        │
      2 │         const main = [false, "true", false]
        │                              ───┬──
@@ -764,9 +764,9 @@ fn type_annotation_01() {
         _test_err(
             "const main = 5: text"
         ),
-        @r"
+        @"
     [E0007] Error:
-       ╭─[:1:14]
+       ╭─[<unknown>:1:14]
        │
      1 │ const main = 5: text
        │              ┬
@@ -904,7 +904,7 @@ fn match_02() {
         }
     "#), @r#"
     Error:
-       ╭─[:6:11]
+       ╭─[<unknown>:6:11]
        │
      6 │           .Red => "red",
        │           ──┬─
@@ -923,9 +923,9 @@ fn match_03() {
           .Green => 1,
           .Blue => false,
         }
-    "#), @r"
+    "#), @"
     [E0006] Error:
-       ╭─[:7:20]
+       ╭─[<unknown>:7:20]
        │
      7 │           .Blue => false,
        │                    ──┬──
@@ -967,9 +967,9 @@ fn match_06() {
         func main(): [text] -> match .Cat: Animal {
           .Cat(name) | .Dog(is_vaccinated) => true,
         }
-    "#), @r"
+    "#), @"
     Error:
-       ╭─[:8:24]
+       ╭─[<unknown>:8:24]
        │
      8 │           .Cat(name) | .Dog(is_vaccinated) => true,
        │                        ─────────┬─────────
@@ -989,9 +989,9 @@ fn match_07() {
         func main(): text -> match .Cat: Animal {
           .Cat(name) | .Dog(name) => name,
         }
-    "#), @r"
+    "#), @"
     [E0006] Error:
-       ╭─[:8:29]
+       ╭─[<unknown>:8:29]
        │
      8 │           .Cat(name) | .Dog(name) => name,
        │                             ──┬─
@@ -1042,16 +1042,16 @@ fn defs_00() {
     insta::assert_snapshot!(_test_err(r#"
         const a = 3
         const a = 6
-    "#), @r"
+    "#), @"
     [E0003] Error:
-       ╭─[:3:9]
+       ╭─[<unknown>:3:9]
        │
      3 │         const a = 6
        │         ─────┬─────
        │              ╰─────── duplicate name
     ───╯
     [E0003] Error:
-       ╭─[:2:9]
+       ╭─[<unknown>:2:9]
        │
      2 │         const a = 3
        │         ─────┬─────
@@ -1064,16 +1064,16 @@ fn defs_01() {
     insta::assert_snapshot!(_test_err(r#"
         func a() -> 3
         func a() -> 6
-    "#), @r"
+    "#), @"
     [E0003] Error:
-       ╭─[:3:9]
+       ╭─[<unknown>:3:9]
        │
      3 │         func a() -> 6
        │         ──────┬──────
        │               ╰──────── duplicate name
     ───╯
     [E0003] Error:
-       ╭─[:2:9]
+       ╭─[<unknown>:2:9]
        │
      2 │         func a() -> 3
        │         ──────┬──────
@@ -1088,9 +1088,9 @@ fn constants_00() {
         const b = [6: int64, 2 + 6]
         const c = 5: int64
         const d = [1, c]
-    "#), @r"
+    "#), @"
     Error:
-       ╭─[:2:27]
+       ╭─[<unknown>:2:27]
        │
      2 │         const a = {false, true || false}
        │                           ──────┬──────
@@ -1100,7 +1100,7 @@ fn constants_00() {
        │ use `func` instead of `const`
     ───╯
     Error:
-       ╭─[:3:30]
+       ╭─[<unknown>:3:30]
        │
      3 │         const b = [6: int64, 2 + 6]
        │                              ──┬──
@@ -1115,9 +1115,9 @@ fn constants_00() {
 fn constants_01() {
     insta::assert_snapshot!(_test_err(r#"
         const a = func () -> true
-    "#), @r"
+    "#), @"
     Error:
-       ╭─[:2:19]
+       ╭─[<unknown>:2:19]
        │
      2 │         const a = func () -> true
        │                   ───────┬───────
@@ -1132,9 +1132,9 @@ fn constants_01() {
 fn constants_02() {
     insta::assert_snapshot!(_test_err(r#"
         func main(table_name: text): [{bool}] -> std::sql::from(table_name)
-    "#), @r"
+    "#), @"
     Error:
-       ╭─[:2:65]
+       ╭─[<unknown>:2:65]
        │
      2 │         func main(table_name: text): [{bool}] -> std::sql::from(table_name)
        │                                                                 ─────┬────
@@ -1155,7 +1155,7 @@ fn unpack_01() {
         const main = {false, ..true, "hello"}
     "#), @r#"
     [E0006] Error:
-       ╭─[:2:32]
+       ╭─[<unknown>:2:32]
        │
      2 │         const main = {false, ..true, "hello"}
        │                                ──┬─
@@ -1223,7 +1223,7 @@ fn unpack_06() {
       )
     "#), @r#"
     Error:
-       ╭─[:4:47]
+       ╭─[<unknown>:4:47]
        │
      4 │         | func (x) -> {4: int32, ..x, "hello"}.x2
        │                                               ─┬─
@@ -1242,7 +1242,7 @@ fn unpack_11() {
     func main() -> {4: int32, ..identity({true, false}), "hello"}.2
     "#), @r#"
     Error:
-       ╭─[:3:66]
+       ╭─[<unknown>:3:66]
        │
      3 │     func main() -> {4: int32, ..identity({true, false}), "hello"}.2
        │                                                                  ─┬
@@ -1267,9 +1267,9 @@ fn unpack_13() {
     insta::assert_snapshot!(_test_err(r#"
     func false_x_false(x: T) where T: {x2: text, ..} -> {false, ..x, false}.2
     func main() -> false_x_false({true, x2 = "hello"})
-    "#), @r"
+    "#), @"
     Error:
-       ╭─[:2:76]
+       ╭─[<unknown>:2:76]
        │
      2 │     func false_x_false(x: T) where T: {x2: text, ..} -> {false, ..x, false}.2
        │                                                                            ─┬
@@ -1319,9 +1319,9 @@ fn ty_tuple_comprehension_01a() {
 
     func main(): {for f: F in A do g: bool}
     -> std::default()
-    "#), @r"
+    "#), @"
     Error:
-       ╭─[:4:5]
+       ╭─[<unknown>:4:5]
        │
      4 │ ╭─▶     func main(): {for f: F in A do g: bool}
      5 │ ├─▶     -> std::default()
@@ -1403,9 +1403,9 @@ fn ty_tuple_comprehension_06() {
     type A: {id: int64, title: text}
 
     func main(a: A): {id: bool, title: bool, release_year: bool} -> make_flags(a)
-    "#), @r"
+    "#), @"
     [E0006] Error:
-       ╭─[:8:60]
+       ╭─[<unknown>:8:60]
        │
      8 │     func main(a: A): {id: bool, title: bool, release_year: bool} -> make_flags(a)
        │                                                            ──┬─
@@ -1421,9 +1421,9 @@ fn ty_tuple_comprehension_06() {
     type A: {id: int64, title: text, release_year: int16}
 
     func main(a: A): {id: bool, title: bool} -> make_flags(a)
-    "#), @r"
+    "#), @"
     [E0007] Error:
-       ╭─[:8:49]
+       ╭─[<unknown>:8:49]
        │
      8 │     func main(a: A): {id: bool, title: bool} -> make_flags(a)
        │                                                 ─────┬────
@@ -1506,7 +1506,7 @@ fn tuple_00() {
     func main(): {title: text, is_released: bool} -> {title = "hello"}
     "#), @r#"
     [E0006] Error:
-       ╭─[:2:54]
+       ╭─[<unknown>:2:54]
        │
      2 │     func main(): {title: text, is_released: bool} -> {title = "hello"}
        │                                                      ────────┬────────
@@ -1518,7 +1518,7 @@ fn tuple_00() {
     func main(): {title: text} -> {title = "hello", is_released = true}
     "#), @r#"
     [E0006] Error:
-       ╭─[:2:35]
+       ╭─[<unknown>:2:35]
        │
      2 │     func main(): {title: text} -> {title = "hello", is_released = true}
        │                                   ──────────────────┬──────────────────
@@ -1539,7 +1539,7 @@ fn tuple_01() {
     func main(): {text, bool} -> {"hello"}
     "#), @r#"
     [E0006] Error:
-       ╭─[:2:34]
+       ╭─[<unknown>:2:34]
        │
      2 │     func main(): {text, bool} -> {"hello"}
        │                                  ────┬────
@@ -1551,7 +1551,7 @@ fn tuple_01() {
     func main(): {text} -> {"hello", true}
     "#), @r#"
     [E0006] Error:
-       ╭─[:2:28]
+       ╭─[<unknown>:2:28]
        │
      2 │     func main(): {text} -> {"hello", true}
        │                            ───────┬───────
@@ -1572,7 +1572,7 @@ fn tuple_02() {
     func main(): {text, bool} -> {title = "hello"}
     "#), @r#"
     [E0006] Error:
-       ╭─[:2:34]
+       ╭─[<unknown>:2:34]
        │
      2 │     func main(): {text, bool} -> {title = "hello"}
        │                                  ────────┬────────
@@ -1584,7 +1584,7 @@ fn tuple_02() {
     func main(): {text} -> {title = "hello", is_released = true}
     "#), @r#"
     [E0006] Error:
-       ╭─[:2:28]
+       ╭─[<unknown>:2:28]
        │
      2 │     func main(): {text} -> {title = "hello", is_released = true}
        │                            ──────────────────┬──────────────────
@@ -1605,7 +1605,7 @@ fn tuple_03() {
     func main(): {title: text, is_released: bool} -> {"hello"}
     "#), @r#"
     [E0006] Error:
-       ╭─[:2:54]
+       ╭─[<unknown>:2:54]
        │
      2 │     func main(): {title: text, is_released: bool} -> {"hello"}
        │                                                      ────┬────
@@ -1617,7 +1617,7 @@ fn tuple_03() {
     func main(): {title: text} -> {"hello", true}
     "#), @r#"
     [E0006] Error:
-       ╭─[:2:35]
+       ╭─[<unknown>:2:35]
        │
      2 │     func main(): {title: text} -> {"hello", true}
        │                                   ───────┬───────
@@ -1634,14 +1634,14 @@ fn tuple_04() {
     func main(): {title: bool, is_released: bool} -> {"hello", "world"}
     "#), @r#"
     [E0006] Error:
-       ╭─[:2:55]
+       ╭─[<unknown>:2:55]
        │
      2 │     func main(): {title: bool, is_released: bool} -> {"hello", "world"}
        │                                                       ───┬───
        │                                                          ╰───── expected type `bool`, but found type `text`
     ───╯
     [E0006] Error:
-       ╭─[:2:64]
+       ╭─[<unknown>:2:64]
        │
      2 │     func main(): {title: bool, is_released: bool} -> {"hello", "world"}
        │                                                                ───┬───
@@ -1692,9 +1692,9 @@ fn import_02() {
       import project::a::b as b
     }
     func main() -> {}
-    "#), @r"
+    "#), @"
     Error:
-       ╭─[:3:14]
+       ╭─[<unknown>:3:14]
        │
      3 │       import project::a::b as b
        │              ─────────┬────────
@@ -1722,9 +1722,9 @@ fn import_04() {
     insta::assert_snapshot!(_test_err(r#"
     module a {}
     func main() -> a
-    "#), @r"
+    "#), @"
     [E0005] Error:
-       ╭─[:3:20]
+       ╭─[<unknown>:3:20]
        │
      3 │     func main() -> a
        │                    ┬
@@ -1734,9 +1734,9 @@ fn import_04() {
     insta::assert_snapshot!(_test_err(r#"
     module a {}
     func main(): a -> 1
-    "#), @r"
+    "#), @"
     [E0005] Error:
-       ╭─[:3:18]
+       ╭─[<unknown>:3:18]
        │
      3 │     func main(): a -> 1
        │                  ┬
@@ -1777,9 +1777,9 @@ fn framed_00() {
     insta::assert_snapshot!(_test_err(r#"
     type MyInt(int32)
     const x: MyInt = 4: int32
-    "#), @r"
+    "#), @"
     [E0006] Error:
-       ╭─[:3:22]
+       ╭─[<unknown>:3:22]
        │
      3 │     const x: MyInt = 4: int32
        │                      ────┬───
@@ -1801,9 +1801,9 @@ fn framed_02() {
     insta::assert_snapshot!(_test_err(r#"
     type MyInt(int32)
     const main = MyInt(4: int32, false)
-    "#), @r"
+    "#), @"
     Error:
-       ╭─[:3:18]
+       ╭─[<unknown>:3:18]
        │
      3 │     const main = MyInt(4: int32, false)
        │                  ───────────┬──────────
@@ -1817,9 +1817,9 @@ fn framed_03() {
     insta::assert_snapshot!(_test_err(r#"
     type MyInt(int32)
     const main = MyInt()
-    "#), @r"
+    "#), @"
     Error:
-       ╭─[:3:18]
+       ╭─[<unknown>:3:18]
        │
      3 │     const main = MyInt()
        │                  ───┬───
@@ -1833,9 +1833,9 @@ fn framed_04() {
     insta::assert_snapshot!(_test_err(r#"
     type MyInt(int32)
     const main = MyInt(false)
-    "#), @r"
+    "#), @"
     [E0006] Error:
-       ╭─[:3:24]
+       ╭─[<unknown>:3:24]
        │
      3 │     const main = MyInt(false)
        │                        ──┬──
@@ -1860,9 +1860,9 @@ fn framed_06() {
     insta::assert_snapshot!(_test_err(r#"
     type MyInt(int32)
     const main = MyInt(12).1
-    "#), @r"
+    "#), @"
     [E0006] Error:
-       ╭─[:3:27]
+       ╭─[<unknown>:3:27]
        │
      3 │     const main = MyInt(12).1
        │                           ─┬
@@ -1879,9 +1879,9 @@ fn framed_07() {
     insta::assert_snapshot!(_test_err(r#"
     type MyInt(int32)
     const main = MyInt(12).inner
-    "#), @r"
+    "#), @"
     [E0006] Error:
-       ╭─[:3:27]
+       ╭─[<unknown>:3:27]
        │
      3 │     const main = MyInt(12).inner
        │                           ───┬──
@@ -1916,9 +1916,9 @@ fn call_00() {
 
     insta::assert_snapshot!(_test_err(r#"
     const a = true | std::and(false, false)
-    "#), @r"
+    "#), @"
     Error:
-       ╭─[:2:22]
+       ╭─[<unknown>:2:22]
        │
      2 │     const a = true | std::and(false, false)
        │                      ───────────┬──────────

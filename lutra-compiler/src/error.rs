@@ -199,9 +199,12 @@ impl<'a, S: crate::project::SourceProvider> ariadne::Cache<&Path> for FileTreeCa
     }
 
     fn display<'b>(&self, id: &&'b Path) -> Option<Box<dyn fmt::Display + 'b>> {
-        match id.as_os_str().to_str() {
-            Some(s) => Some(Box::new(s)),
-            None => None,
+        if id.as_os_str().is_empty() {
+            Some(Box::new(
+                self.provider.get_root().file_name()?.display().to_string(),
+            ))
+        } else {
+            Some(Box::new(id.display()))
         }
     }
 }
