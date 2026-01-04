@@ -867,6 +867,30 @@ fn enums_01() {
         @"Status"
     );
 }
+
+#[test]
+fn enums_02() {
+    // TODO: this error message is confusing, because it is backwards
+    // It does make *some* amount of sense: we constructed a value that has the
+    // type `enum {.Pending: {}, ..}`. What's failing is applying type
+    // annotation to it. So, our value expected annotation to have type text.
+    insta::assert_snapshot!(_test_err(
+        r#"
+        type Status: enum { Open, Done, Pending: text }
+
+        func main() -> .Pending: Status
+        "#
+    ), @"
+    [E0006] Error:
+       ╭─[<unknown>:4:24]
+       │
+     4 │         func main() -> .Pending: Status
+       │                        ────┬───
+       │                            ╰───── expected type `{}`, but found type `text`
+    ───╯
+    ");
+}
+
 #[test]
 #[ignore] // TODO
 fn recursive_00() {
