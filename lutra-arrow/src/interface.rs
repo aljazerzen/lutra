@@ -7,7 +7,7 @@ use parquet::schema::types as pq_types;
 
 #[derive(thiserror::Error, Debug)]
 pub enum Error {
-    #[error("{0}: {1}")]
+    #[error("{}: {}", .0.display(), .1)]
     Io(std::path::PathBuf, std::io::Error),
 
     #[error("invalid non-unicode path: {}", .0.display())]
