@@ -106,6 +106,7 @@ impl super::TypeResolver<'_> {
                 pr::DefKind::Ty(pr::TyDef {
                     ty,
                     is_framed: ty_def.is_framed,
+                    framed_label: ty_def.framed_label,
                 })
             }
             pr::DefKind::Import(target) => pr::DefKind::Import(target),

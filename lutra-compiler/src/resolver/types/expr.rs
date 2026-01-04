@@ -43,6 +43,7 @@ impl fold::PrFold for super::TypeResolver<'_> {
                     scope::Named::Ty {
                         is_framed: true,
                         ty,
+                        framed_label,
                     } => {
                         // framed types can be called like a function to act as a constructor
 
@@ -55,7 +56,11 @@ impl fold::PrFold for super::TypeResolver<'_> {
                         return Ok(pr::Expr {
                             kind: pr::ExprKind::Ident(ident),
                             ty: Some(pr::Ty::new(pr::TyFunc {
-                                params: vec![pr::TyFuncParam::simple(Some(ty_inner))],
+                                params: vec![pr::TyFuncParam {
+                                    constant: false,
+                                    ty: Some(ty_inner),
+                                    label: framed_label.map(str::to_string),
+                                }],
                                 body: Some(Box::new(ty_framed)),
                                 ty_params: vec![],
                             })),
@@ -81,16 +86,25 @@ impl fold::PrFold for super::TypeResolver<'_> {
                 if let Some(scope::Named::Ty {
                     ty,
                     is_framed: true,
+                    framed_label,
                 }) = base_ty_target
                 {
-                    if !matches!(lookup, pr::Lookup::Position(0)) {
-                        return Err(tuple::error_no_field(base_ty, &lookup)
-                            .with_span(span)
-                            .push_hint(format!(
-                                "{} is a framed type. Inner value can be accessed with `.0`",
-                                printer::print_ty(base_ty)
-                            )));
+                    match lookup {
+                        pr::Lookup::Name(n) if Some(n.as_str()) == framed_label => {}
+                        pr::Lookup::Position(0) => {}
+                        _ => {
+                            let label_hint = framed_label
+                                .map(|l| format!("`.{l}` or "))
+                                .unwrap_or_default();
+                            return Err(tuple::error_no_field(base_ty, &lookup)
+                                .with_span(span)
+                                .push_hint(format!(
+                                    "{} is a framed type. Inner value can be accessed with {label_hint}`.0`",
+                                    printer::print_ty(base_ty)
+                                )));
+                        }
                     }
+
                     let mut r = *base;
                     r.ty = Some(ty.clone());
                     r.span = span;

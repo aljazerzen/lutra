@@ -1939,6 +1939,88 @@ fn framed_08() {
 }
 
 #[test]
+fn framed_09() {
+    // framed labelled type, construction
+
+    insta::assert_snapshot!(_test_ty(r#"
+    type Date(days_since_epoch: int32)
+
+    func main() -> {
+      Date(12),
+      Date(days_since_epoch = 12),
+    }
+    "#), @"{Date, Date}");
+}
+
+#[test]
+fn framed_10() {
+    // framed labelled type, lookup
+
+    insta::assert_snapshot!(_test_ty(r#"
+    type Date(days_since_epoch: int32)
+
+    func main() -> {
+      Date(12).0,
+      Date(12).days_since_epoch,
+    }
+    "#), @"{int32, days_since_epoch: int32}");
+}
+
+#[test]
+fn framed_11() {
+    // framed labelled type, err messages
+
+    insta::assert_snapshot!(_test_err(r#"
+    type Date(days_since_epoch: int32)
+
+    func main() -> {
+      Date(wrong = 12),
+      Date(days_since_epoch = false),
+      Date(12).1,
+      Date(12).wrong,
+    }
+    "#), @"
+    Error:
+       ╭─[<unknown>:5:12]
+       │
+     5 │       Date(wrong = 12),
+       │            ─────┬────
+       │                 ╰────── unknown parameter `wrong`
+    ───╯
+    [E0006] Error:
+       ╭─[<unknown>:6:31]
+       │
+     6 │       Date(days_since_epoch = false),
+       │                               ──┬──
+       │                                 ╰──── func Date expected type `Date`, but found type `bool`
+       │
+       │ Note:
+       │ type `Date` expands to `int32`
+    ───╯
+    [E0006] Error:
+       ╭─[<unknown>:7:15]
+       │
+     7 │       Date(12).1,
+       │               ─┬
+       │                ╰── field .1 does not exist in type Date
+       │
+       │ Note:
+       │ Date is a framed type. Inner value can be accessed with `.days_since_epoch` or `.0`
+    ───╯
+    [E0006] Error:
+       ╭─[<unknown>:8:15]
+       │
+     8 │       Date(12).wrong,
+       │               ───┬──
+       │                  ╰──── field .wrong does not exist in type Date
+       │
+       │ Note:
+       │ Date is a framed type. Inner value can be accessed with `.days_since_epoch` or `.0`
+    ───╯
+    ");
+}
+
+#[test]
 fn call_00() {
     // calls desugar-ed from pipelines should have span on the right operand
 

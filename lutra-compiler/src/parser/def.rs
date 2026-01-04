@@ -185,14 +185,18 @@ fn type_def(
                 ctrl(':').ignore_then(ty.clone()).map(|ty| TyDef {
                     ty,
                     is_framed: false,
+                    framed_label: None,
                 }),
-                // new type (nominal / framed type)
-                delimited_by_parenthesis(ty, |p| Ty::new_with_span(TyKind::Tuple(vec![]), p)).map(
-                    |ty| TyDef {
-                        ty,
-                        is_framed: true,
-                    },
-                ),
+                // framed type (nominal / new type)
+                delimited_by_parenthesis(
+                    ident_part().then_ignore(ctrl(':')).or_not().then(ty),
+                    |p| (None, Ty::new_with_span(TyKind::Tuple(vec![]), p)),
+                )
+                .map(|(framed_label, ty)| TyDef {
+                    ty,
+                    is_framed: true,
+                    framed_label,
+                }),
             ))
             .map(DefKind::Ty),
         )

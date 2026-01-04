@@ -15,11 +15,18 @@ impl super::TypeResolver<'_> {
 
         let mut fields = Vec::with_capacity(fields_in.len());
         let mut ty_fields: Vec<pr::TyTupleField> = Vec::with_capacity(fields_in.len());
+        let mut diag = None;
 
         for f in fields_in {
             let name = (f.name.clone()).or_else(|| self.infer_tuple_field_name(&f.expr));
 
-            let expr = self.fold_expr(f.expr)?;
+            let expr = match self.fold_expr(f.expr) {
+                Ok(e) => e,
+                Err(d) => {
+                    self.collect_diag(&mut diag, d);
+                    continue;
+                }
+            };
             let ty = expr.ty.clone().unwrap();
 
             if f.unpack {
@@ -28,18 +35,26 @@ impl super::TypeResolver<'_> {
                 match ty_ref {
                     scope::TyRef::Ty(t) => {
                         if !t.kind.is_tuple() {
-                            return Err(Diagnostic::new(
-                                "only tuples can be unpacked",
-                                DiagnosticCode::TYPE,
-                            )
-                            .with_span(expr.span)
-                            .push_hint(format!("got type {}", printer::print_ty(t))));
+                            self.collect_diag(
+                                &mut diag,
+                                Diagnostic::new(
+                                    "only tuples can be unpacked",
+                                    DiagnosticCode::TYPE,
+                                )
+                                .with_span(expr.span)
+                                .push_hint(format!("got type {}", printer::print_ty(t))),
+                            );
+                            continue;
                         }
                     }
                     scope::TyRef::Param(id) => {
                         let (param_name, domain) = self.get_ty_param(id);
                         let pr::TyDomain::TupleHasFields(_) = domain else {
-                            return Err(error_lookup_into_unpack_of_ty_param(param_name));
+                            self.collect_diag(
+                                &mut diag,
+                                error_lookup_into_unpack_of_ty_param(param_name),
+                            );
+                            continue;
                         };
 
                         // ok
@@ -65,6 +80,11 @@ impl super::TypeResolver<'_> {
                 ty,
             });
         }
+
+        if let Some(d) = diag {
+            return Err(d);
+        }
+
         let kind = pr::ExprKind::Tuple(fields);
         let ty = pr::Ty::new(pr::TyKind::Tuple(ty_fields));
         Ok(pr::Expr {

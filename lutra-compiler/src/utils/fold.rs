@@ -49,6 +49,7 @@ pub trait PrFold {
         Ok(TyDef {
             ty: self.fold_type(ty_def.ty)?,
             is_framed: ty_def.is_framed,
+            framed_label: ty_def.framed_label,
         })
     }
     fn fold_module_def(&mut self, module_def: ModuleDef) -> Result<ModuleDef> {

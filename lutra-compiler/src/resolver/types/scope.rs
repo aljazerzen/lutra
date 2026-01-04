@@ -84,7 +84,11 @@ pub enum TyVarConstraint {
 #[derive(Debug, strum::AsRefStr)]
 pub enum Named<'a> {
     Expr(&'a pr::Expr),
-    Ty { ty: &'a pr::Ty, is_framed: bool },
+    Ty {
+        ty: &'a pr::Ty,
+        is_framed: bool,
+        framed_label: Option<&'a str>,
+    },
     Module,
     Scoped(&'a ScopedKind),
 }
@@ -244,6 +248,7 @@ impl<'a> TypeResolver<'a> {
                     pr::DefKind::Ty(def) => Ok(Named::Ty {
                         ty: &def.ty,
                         is_framed: def.is_framed,
+                        framed_label: def.framed_label.as_deref(),
                     }),
 
                     pr::DefKind::Module(_) => Ok(Named::Module),
@@ -295,6 +300,7 @@ impl<'a> TypeResolver<'a> {
             Named::Ty {
                 is_framed: false,
                 ty,
+                ..
             } => {
                 // reference to a type: all ok
 

@@ -548,12 +548,12 @@ module sql {
 ## Backed by a signed 64-bit integer, indicating microseconds since the Unix
 ## epoch (1970-01-01T00:00:00.000 UTC), excluding leap seconds.
 # TODO: support for timezone and other time units.
-type Timestamp(int64)
+type Timestamp(microseconds: int64)
 
 ## Elapsed days since Unix Epoch (1970-01-01).
 ##
 ## Backed by a signed 32-bit integer, representing number of days.
-type Date(int32)
+type Date(days_epoch: int32)
 
 # ## Length of time, unrelated to calendar events.
 # ##
@@ -584,7 +584,7 @@ type Date(int32)
 ## Can be interpreted as duration or offset from the midnight.
 ##
 ## Backed by a signed 64-bit integer, representing number of microseconds.
-type Time(int64)
+type Time(microseconds: int64)
 
 # func to_time64_second(x: D): Time64Second
 # where D: Time32Second -> x.0 | to_int64 | Time64Second
@@ -625,7 +625,7 @@ module date {
   ## Dates are assumed to be in the same timezone.
   ## Duration is measured from one midnight to another.
   func sub(a: super::Date, b: super::Date): super::Time -> (
-    super::sub(a.0, b.0)
+    super::sub(a.days_epoch, b.days_epoch)
     | super::to_int64
     | super::mul(86400000000)
     | super::Time

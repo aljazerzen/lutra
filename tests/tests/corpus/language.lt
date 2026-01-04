@@ -2720,6 +2720,17 @@ func main() -> x.a.0
 # >
 20407
 
+# === date_06
+const main = @2025-11-14.days_epoch
+# >
+20406
+
+# === date_07
+const x = {a = @2025-11-15}
+func main() -> x.a.days_epoch
+# >
+20407
+
 # === time_00
 const main = @16:07:44.123456
 # >

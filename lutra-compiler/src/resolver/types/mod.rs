@@ -61,6 +61,14 @@ impl TypeResolver<'_> {
         }
     }
 
+    /// Store diagnostic in a slot. Existing diagnostic is pushed into [Self::diagnostics].
+    fn collect_diag(&mut self, slot: &mut Option<Diagnostic>, d: Diagnostic) {
+        if let Some(existing) = slot.take() {
+            self.diagnostics.push(existing);
+        }
+        *slot = Some(d);
+    }
+
     /// If diagnostic has span, push it to buffer.
     /// If it does not, return it back so it can be propagated up the stack where is should find the span.
     fn try_push_diagnostic(&self) -> impl FnOnce(Diagnostic) -> Result<(), Diagnostic> {

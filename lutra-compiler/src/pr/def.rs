@@ -47,6 +47,7 @@ pub struct ExprDef {
 pub struct TyDef {
     pub ty: Ty,
     pub is_framed: bool,
+    pub framed_label: Option<String>,
 }
 
 #[derive(Debug, PartialEq, Clone)]
