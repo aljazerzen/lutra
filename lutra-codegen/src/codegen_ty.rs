@@ -58,7 +58,7 @@ pub fn write_ty_def(
     });
     if let Some(derive_annotation) = derive_annotation {
         let c = derive_annotation.expr.kind.as_call().unwrap();
-        let values = c.args[0].kind.as_array().unwrap();
+        let values = c.args[0].expr.kind.as_array().unwrap();
         derive_traits.extend(
             values
                 .iter()

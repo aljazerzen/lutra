@@ -234,10 +234,20 @@ fn fold_if<F: ?Sized + PrFold>(fold: &mut F, if_else: If) -> Result<If> {
     })
 }
 
-pub fn fold_func_call<T: ?Sized + PrFold>(fold: &mut T, func_call: Call) -> Result<Call> {
+pub fn fold_func_call<T: ?Sized + PrFold>(fold: &mut T, call: Call) -> Result<Call> {
     Ok(Call {
-        subject: Box::new(fold.fold_expr(*func_call.subject)?),
-        args: fold.fold_exprs(func_call.args)?,
+        subject: Box::new(fold.fold_expr(*call.subject)?),
+        args: call
+            .args
+            .into_iter()
+            .map(|a| -> Result<_> {
+                Ok(CallArg {
+                    label: a.label,
+                    expr: fold.fold_expr(a.expr)?,
+                    span: a.span,
+                })
+            })
+            .try_collect()?,
     })
 }
 
@@ -263,6 +273,7 @@ pub fn fold_func_params<T: ?Sized + PrFold>(
 pub fn fold_func_param<T: ?Sized + PrFold>(fold: &mut T, param: FuncParam) -> Result<FuncParam> {
     Ok(FuncParam {
         constant: param.constant,
+        label: param.label,
         name: param.name,
         ty: fold_type_opt(fold, param.ty)?,
         span: param.span,
@@ -335,7 +346,11 @@ pub fn fold_type<T: ?Sized + PrFold>(fold: &mut T, ty: Ty) -> Result<Ty> {
 
 pub fn fold_ty_func<F: ?Sized + PrFold>(fold: &mut F, f: TyFunc) -> Result<TyFunc> {
     Ok(TyFunc {
-        params: fold_ty_func_params(fold, f.params)?,
+        params: f
+            .params
+            .into_iter()
+            .map(|p| fold_ty_func_param(fold, p))
+            .try_collect()?,
         body: f
             .body
             .map(|t| fold.fold_type(*t).map(Box::new))
@@ -344,14 +359,15 @@ pub fn fold_ty_func<F: ?Sized + PrFold>(fold: &mut F, f: TyFunc) -> Result<TyFun
     })
 }
 
-pub fn fold_ty_func_params<F: ?Sized + PrFold>(
+pub fn fold_ty_func_param<F: ?Sized + PrFold>(
     fold: &mut F,
-    params: Vec<(Option<pr::Ty>, bool)>,
-) -> Result<Vec<(Option<Ty>, bool)>> {
-    params
-        .into_iter()
-        .map(|(ty, c)| Ok((fold_type_opt(fold, ty)?, c)))
-        .try_collect()
+    p: pr::TyFuncParam,
+) -> Result<pr::TyFuncParam> {
+    Ok(pr::TyFuncParam {
+        constant: p.constant,
+        label: p.label,
+        ty: fold_type_opt(fold, p.ty)?,
+    })
 }
 
 pub fn fold_ty_tuple_fields<F: ?Sized + PrFold>(

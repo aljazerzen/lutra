@@ -775,6 +775,7 @@ fn parse_10() {
                         params: [
                             FuncParam {
                                 constant: false,
+                                label: None,
                                 name: "x",
                                 ty: None,
                                 span: 0:10-11,

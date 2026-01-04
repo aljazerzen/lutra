@@ -208,16 +208,14 @@ impl TypeResolver<'_> {
             (TyKind::Func(f_func), TyKind::Func(e_func))
                 if f_func.params.len() == e_func.params.len() =>
             {
-                for ((f_p_ty, f_p_const), (e_p_ty, e_p_const)) in
-                    std::iter::zip(&f_func.params, &e_func.params)
-                {
+                for (f_p, e_p) in std::iter::zip(&f_func.params, &e_func.params) {
                     // if we expect a const param, validate that found param is const
-                    if *e_p_const && !*f_p_const {
+                    if e_p.constant && !f_p.constant {
                         return Err(compose_type_error(&found, &expected, who));
                     }
 
                     // validate param types
-                    if let Some((f_param, e_param)) = Option::zip(f_p_ty.as_ref(), e_p_ty.as_ref())
+                    if let Some((f_param, e_param)) = Option::zip(f_p.ty.as_ref(), e_p.ty.as_ref())
                     {
                         // contra-variant contained types
                         self.validate_type(e_param, f_param, who)?;
@@ -691,12 +689,7 @@ where
         }
     }
 
-    let who = who();
-    let is_join = who
-        .as_ref()
-        .map(|x| x.contains("std.join"))
-        .unwrap_or_default();
-    let who = who.map(|x| format!("{x} ")).unwrap_or_default();
+    let who = who().map(|x| format!("{x} ")).unwrap_or_default();
 
     let mut e = Diagnostic::new(
         format!(
@@ -706,16 +699,6 @@ where
         ),
         DiagnosticCode::TYPE,
     );
-
-    if found.kind.is_func() && !expected.kind.is_func() {
-        let to_what = "in this function call?";
-
-        e = e.push_hint(format!("Have you forgotten an argument {to_what}?"));
-    }
-
-    if is_join && found.kind.is_tuple() && !expected.kind.is_tuple() {
-        e = e.push_hint("Try using `(...)` instead of `{...}`");
-    }
 
     if let Some(expected_name) = &expected.name {
         e = e.push_hint(format!(

@@ -1,6 +1,6 @@
 use enum_as_inner::EnumAsInner;
 
-use crate::codespan::Span;
+use crate::Span;
 use crate::pr::path::Path;
 
 use super::Ref;
@@ -100,8 +100,8 @@ pub enum TyPrimitive {
 // Type of a function
 #[derive(Debug, Clone, PartialEq, Hash)]
 pub struct TyFunc {
-    /// Types of params and is_constant flag.
-    pub params: Vec<(Option<Ty>, bool)>,
+    /// Types of func params
+    pub params: Vec<TyFuncParam>,
 
     /// Type of the function body
     pub body: Option<Box<Ty>>,
@@ -109,6 +109,25 @@ pub struct TyFunc {
     pub ty_params: Vec<TyParam>,
 }
 
+/// Parameter of type of a function
+#[derive(Debug, Clone, PartialEq, Hash)]
+pub struct TyFuncParam {
+    pub constant: bool,
+    pub label: Option<String>,
+    pub ty: Option<Ty>,
+}
+
+impl TyFuncParam {
+    pub fn simple(ty: Option<Ty>) -> Self {
+        TyFuncParam {
+            constant: false,
+            label: None,
+            ty,
+        }
+    }
+}
+
+// Type parameter
 #[derive(Debug, Clone)]
 pub struct TyParam {
     /// Assigned name of this generic type param

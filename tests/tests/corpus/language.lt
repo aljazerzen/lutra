@@ -2827,3 +2827,25 @@ func main() -> (
   -8,
   -12,
 ]
+
+# === labelled_args_00
+func main() -> {
+  # Without using labels
+  calculate(1, 2, 3),
+
+  # Using the labels
+  calculate(1, add = 2, multiply = 3),
+
+  # Using the labels in a different order
+  calculate(1, multiply = 3, add = 2),
+}
+
+func calculate(value: int32, add addend: int32, multiply multiplier: int32) -> (
+  value * multiplier + addend
+)
+# >
+{
+  5,
+  5,
+  5,
+}

@@ -117,13 +117,18 @@ pub(super) fn print_ty_func<'c>(
     Some(())
 }
 
-impl PrintSource for (Option<pr::Ty>, bool) {
+impl PrintSource for pr::TyFuncParam {
     fn print<'c>(&self, p: &mut Printer<'c>) -> Option<()> {
-        if self.1 {
+        if self.constant {
             p.push("const ")?;
         }
 
-        if let Some(ty) = &self.0 {
+        if let Some(label) = &self.label {
+            p.push(pr::display_ident(label))?;
+            p.push(": ")?;
+        }
+
+        if let Some(ty) = &self.ty {
             ty.print(p)?;
         }
 
@@ -131,7 +136,7 @@ impl PrintSource for (Option<pr::Ty>, bool) {
     }
 
     fn span(&self) -> Option<crate::Span> {
-        self.0.as_ref().and_then(|t| t.span)
+        self.ty.as_ref().and_then(|t| t.span)
     }
 }
 

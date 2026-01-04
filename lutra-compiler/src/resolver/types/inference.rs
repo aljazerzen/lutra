@@ -46,7 +46,11 @@ impl TypeResolver<'_> {
                 params: func
                     .params
                     .iter()
-                    .map(|p| (p.ty.clone(), p.constant))
+                    .map(|p| pr::TyFuncParam {
+                        constant: p.constant,
+                        label: p.label.clone(),
+                        ty: p.ty.clone(),
+                    })
                     .collect_vec(),
                 body: func
                     .return_ty

@@ -55,7 +55,7 @@ impl fold::PrFold for super::TypeResolver<'_> {
                         return Ok(pr::Expr {
                             kind: pr::ExprKind::Ident(ident),
                             ty: Some(pr::Ty::new(pr::TyFunc {
-                                params: vec![(Some(ty_inner), false)],
+                                params: vec![pr::TyFuncParam::simple(Some(ty_inner))],
                                 body: Some(Box::new(ty_framed)),
                                 ty_params: vec![],
                             })),
@@ -153,7 +153,12 @@ impl fold::PrFold for super::TypeResolver<'_> {
                     // special case: framed type constructor
                     // just unwrap the func call and use the first arg
                     let call = resolved.kind.into_call().unwrap();
-                    let mut inner = call.args.into_iter().next().unwrap();
+                    let arg = call.args.into_iter().next();
+
+                    let mut inner = arg.map(|a| a.expr).unwrap_or_else(|| {
+                        // no arg: this has emitted an error before, just try to recover
+                        pr::Expr::new(pr::ExprKind::Tuple(vec![]))
+                    });
                     inner.ty = resolved.ty;
                     inner
                 } else {
@@ -247,9 +252,9 @@ impl fold::PrFold for super::TypeResolver<'_> {
             // introduce new ty vars for missing type annotations
             // (this is needed to find non-inferable params)
             pr::TyKind::Func(mut ty_func) => {
-                for (p, _) in &mut ty_func.params {
-                    if p.is_none() {
-                        *p = Some(self.introduce_ty_var(pr::TyDomain::Open, ty.span.unwrap()))
+                for p in &mut ty_func.params {
+                    if p.ty.is_none() {
+                        p.ty = Some(self.introduce_ty_var(pr::TyDomain::Open, ty.span.unwrap()));
                     }
                 }
                 if ty_func.body.is_none() {

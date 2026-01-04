@@ -1,6 +1,6 @@
 use enum_as_inner::EnumAsInner;
 
-use crate::codespan::Span;
+use crate::Span;
 use crate::pr::{BinOp, Literal, Ty, UnOp};
 
 use super::{Path, TyParam};
@@ -124,7 +124,24 @@ pub struct UnaryExpr {
 #[derive(Debug, PartialEq, Clone)]
 pub struct Call {
     pub subject: Box<Expr>,
-    pub args: Vec<Expr>,
+    pub args: Vec<CallArg>,
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub struct CallArg {
+    pub label: Option<String>,
+    pub expr: Expr,
+    pub span: Option<Span>,
+}
+
+impl CallArg {
+    pub fn simple(expr: Expr) -> Self {
+        CallArg {
+            label: None,
+            span: expr.span,
+            expr,
+        }
+    }
 }
 
 /// Function. `func (p1: P1, p2: P2): B where T -> b`
@@ -155,10 +172,16 @@ pub struct FuncShort {
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct FuncParam {
+    /// When true, arg used for this param must be a const value.
     pub constant: bool,
 
+    /// Public name of the paramater, that can be specified in function calls.
+    pub label: Option<String>,
+
+    /// Parameter name that can be referenced in the function.
     pub name: String,
 
+    /// Type requirement for this param.
     pub ty: Option<Ty>,
 
     pub span: Span,

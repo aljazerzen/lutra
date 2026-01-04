@@ -11,7 +11,7 @@ use chumsky::{Stream, prelude::*};
 use self::lexer::{Token, TokenKind};
 use self::perror::PError;
 
-use crate::codespan::Span;
+use crate::Span;
 use crate::diagnostic::Diagnostic;
 use crate::pr;
 
@@ -126,4 +126,24 @@ where
     O: 'a,
 {
     parser.separated_by(ctrl(',')).allow_trailing()
+}
+
+fn delimited_by_parenthesis<P, O>(
+    parser: P,
+    fallback: impl Fn(crate::Span) -> O + Clone,
+) -> impl Parser<TokenKind, O, Error = PError> + Clone
+where
+    P: Parser<TokenKind, O, Error = PError> + Clone,
+{
+    parser
+        .delimited_by(ctrl('('), ctrl(')'))
+        .recover_with(nested_delimiters(
+            TokenKind::Control('('),
+            TokenKind::Control(')'),
+            [
+                (TokenKind::Control('['), TokenKind::Control(']')),
+                (TokenKind::Control('('), TokenKind::Control(')')),
+            ],
+            fallback,
+        ))
 }

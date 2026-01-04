@@ -1,7 +1,7 @@
 use chumsky::prelude::*;
 use itertools::Itertools;
 
-use crate::codespan::Span;
+use crate::Span;
 use crate::parser::lexer::TokenKind;
 use crate::parser::perror::{ChumError, PError};
 use crate::pr::*;

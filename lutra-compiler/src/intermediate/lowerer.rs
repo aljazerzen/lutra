@@ -245,7 +245,9 @@ impl<'a> Lowerer<'a> {
 
             pr::ExprKind::Call(call) => ir::ExprKind::Call(Box::new(ir::Call {
                 function: self.lower_expr(&call.subject)?,
-                args: self.lower_exprs(&call.args)?,
+                args: (call.args.iter())
+                    .map(|a| self.lower_expr(&a.expr))
+                    .try_collect()?,
             })),
             pr::ExprKind::Func(func) => {
                 let function_id = self.generator_function_scope.next() as u32;
@@ -737,7 +739,7 @@ impl<'a> Lowerer<'a> {
                 params: func
                     .params
                     .into_iter()
-                    .map(|(p_ty, _)| self.lower_ty(p_ty.unwrap()))
+                    .map(|p| self.lower_ty(p.ty.unwrap()))
                     .collect(),
                 body: self.lower_ty(*func.body.clone().unwrap()),
             })),
@@ -1174,15 +1176,15 @@ fn get_entry_point_input(expr: &pr::Expr) -> (pr::Ty, bool) {
     };
 
     if ty_func.params.len() == 1 {
-        return (ty_func.params[0].clone().0.unwrap(), false);
+        return (ty_func.params[0].ty.clone().unwrap(), false);
     }
 
     let ty = pr::Ty::new(pr::TyKind::Tuple(
         ty_func
             .params
             .iter()
-            .map(|ty| pr::TyTupleField {
-                ty: ty.clone().0.unwrap(),
+            .map(|p| pr::TyTupleField {
+                ty: p.ty.clone().unwrap(),
                 unpack: false,
                 name: None,
             })

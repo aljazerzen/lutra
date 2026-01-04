@@ -12,7 +12,7 @@ use chumsky::text::{Character, newline};
 
 use crate::diagnostic::{Diagnostic, DiagnosticCode};
 
-use crate::codespan::Span;
+use crate::Span;
 use crate::pr::{Date, Literal, Time};
 
 type LError = Cheap<char, SpanInSource>;

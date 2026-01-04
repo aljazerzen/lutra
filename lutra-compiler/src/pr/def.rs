@@ -2,7 +2,7 @@ use enum_as_inner::EnumAsInner;
 use indexmap::IndexMap;
 use itertools::Itertools;
 
-use crate::codespan::Span;
+use crate::Span;
 use crate::pr::path::Path;
 use crate::pr::{Expr, Ty};
 

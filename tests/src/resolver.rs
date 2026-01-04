@@ -78,7 +78,14 @@ fn types_03() {
        │
      4 │         func floor(x: T) where T -> floor_64(x)
        │                                              ┬
-       │                                              ╰── function floor_64, one of the params expected type `float64`, but found type `T`
+       │                                              ╰── func floor_64 expected type `float64`, but found type `T`
+    ───╯
+    Error:
+       ╭─[<unknown>:6:24]
+       │
+     6 │         func main() -> floor(4.4)
+       │                        ──┬──
+       │                          ╰──── cannot infer type of T
     ───╯
     ");
 }
@@ -237,7 +244,14 @@ fn types_14() {
        │
      7 │             floor_64(x)
        │                      ┬
-       │                      ╰── function floor_64, one of the params expected type `float64`, but found type `T`
+       │                      ╰── func floor_64 expected type `float64`, but found type `T`
+    ───╯
+    [E0006] Error:
+       ╭─[<unknown>:7:13]
+       │
+     7 │             floor_64(x)
+       │             ─────┬─────
+       │                  ╰─────── expected type `T`, but found type `float64`
     ───╯
     ");
 
@@ -386,7 +400,14 @@ fn types_17() {
        │
      6 │         -> get_int(x)
        │                    ┬
-       │                    ╰── function get_int, one of the params expected type `{int64}`, but found type `T`
+       │                    ╰── func get_int expected type `{int64}`, but found type `T`
+    ───╯
+    [E0006] Error:
+       ╭─[<unknown>:6:12]
+       │
+     6 │         -> get_int(x)
+       │            ─────┬────
+       │                 ╰────── expected type `T`, but found type `int64`
     ───╯
     ");
 
@@ -404,7 +425,14 @@ fn types_17() {
        │
      6 │         -> get_int(x)
        │                    ┬
-       │                    ╰── function get_int, one of the params expected type `{a: int64}`, but found type `T`
+       │                    ╰── func get_int expected type `{a: int64}`, but found type `T`
+    ───╯
+    [E0006] Error:
+       ╭─[<unknown>:6:12]
+       │
+     6 │         -> get_int(x)
+       │            ─────┬────
+       │                 ╰────── expected type `T`, but found type `int64`
     ───╯
     ");
 
@@ -1807,7 +1835,7 @@ fn framed_02() {
        │
      3 │     const main = MyInt(4: int32, false)
        │                  ───────────┬──────────
-       │                             ╰──────────── MyInt expected 1 arguments, but got 2
+       │                             ╰──────────── func MyInt expected 1 arguments, but got 2
     ───╯
     ");
 }
@@ -1823,7 +1851,7 @@ fn framed_03() {
        │
      3 │     const main = MyInt()
        │                  ───┬───
-       │                     ╰───── MyInt expected 1 arguments, but got 0
+       │                     ╰───── func MyInt expected 1 arguments, but got 0
     ───╯
     ");
 }
@@ -1839,7 +1867,7 @@ fn framed_04() {
        │
      3 │     const main = MyInt(false)
        │                        ──┬──
-       │                          ╰──── function MyInt, one of the params expected type `MyInt`, but found type `bool`
+       │                          ╰──── func MyInt expected type `MyInt`, but found type `bool`
        │
        │ Note:
        │ type `MyInt` expands to `int32`
@@ -1922,7 +1950,108 @@ fn call_00() {
        │
      2 │     const a = true | std::and(false, false)
        │                      ───────────┬──────────
-       │                                 ╰──────────── std::and expected 2 arguments, but got 3
+       │                                 ╰──────────── func std::and expected 2 arguments, but got 3
+    ───╯
+    Error:
+       ╭─[<unknown>:2:22]
+       │
+     2 │     const a = true | std::and(false, false)
+       │                      ───────────┬──────────
+       │                                 ╰──────────── non-constant expression
+       │
+       │ Note:
+       │ use `func` instead of `const`
     ───╯
     ");
+}
+
+#[test]
+fn call_01() {
+    // labelled call
+
+    insta::assert_snapshot!(_test_ty(r#"
+    func noop(a x: int32) -> x
+
+    func main() -> noop(a = 4)
+    "#), @r"
+    int32
+    ");
+}
+
+#[test]
+fn call_02() {
+    // call, bad arg label
+
+    insta::assert_snapshot!(_test_err(r#"
+    func noop(a x: int32, y: bool) -> x
+
+    func main() -> noop(true, z = false)
+    "#), @"
+    Error:
+       ╭─[<unknown>:4:31]
+       │
+     4 │     func main() -> noop(true, z = false)
+       │                               ────┬────
+       │                                   ╰────── unknown parameter `z`
+    ───╯
+    [E0006] Error:
+       ╭─[<unknown>:4:25]
+       │
+     4 │     func main() -> noop(true, z = false)
+       │                         ──┬─
+       │                           ╰─── func noop expected type `int32`, but found type `bool`
+    ───╯
+    ");
+}
+
+#[test]
+fn call_03() {
+    // call, not enough args
+
+    insta::assert_snapshot!(_test_err(r#"
+    func noop(a x: int32, y: bool) -> x
+
+    func main() -> noop(true)
+    "#), @"
+    Error:
+       ╭─[<unknown>:4:20]
+       │
+     4 │     func main() -> noop(true)
+       │                    ─────┬────
+       │                         ╰────── func noop expected 2 arguments, but got 1
+    ───╯
+    [E0006] Error:
+       ╭─[<unknown>:4:25]
+       │
+     4 │     func main() -> noop(true)
+       │                         ──┬─
+       │                           ╰─── func noop expected type `int32`, but found type `bool`
+    ───╯
+    ");
+}
+
+#[test]
+fn call_04() {
+    // call, too many args
+
+    insta::assert_snapshot!(_test_err(r#"
+    func noop(a x: int32, y: bool) -> x
+
+    func main() -> noop(3, "hello", false)
+    "#), @r#"
+    Error:
+       ╭─[<unknown>:4:20]
+       │
+     4 │     func main() -> noop(3, "hello", false)
+       │                    ───────────┬───────────
+       │                               ╰───────────── func noop expected 2 arguments, but got 3
+    ───╯
+    [E0006] Error:
+       ╭─[<unknown>:4:28]
+       │
+     4 │     func main() -> noop(3, "hello", false)
+       │                            ───┬───
+       │                               ╰───── func noop expected type `bool`, but found type `text`
+    ───╯
+    "#);
 }

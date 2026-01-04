@@ -48,7 +48,7 @@ impl From<ir::Ty> for super::Ty {
                     .params
                     .into_iter()
                     .map(super::Ty::from)
-                    .map(|ty| (Some(ty), false))
+                    .map(|ty| super::TyFuncParam::simple(Some(ty)))
                     .collect(),
                 body: Some(Box::new(super::Ty::from(func.body))),
                 ty_params: Vec::new(),
@@ -114,7 +114,7 @@ impl From<super::Ty> for ir::Ty {
                 params: func
                     .params
                     .into_iter()
-                    .map(|(ty, _)| ir::Ty::from(ty.unwrap()))
+                    .map(|p| ir::Ty::from(p.ty.unwrap()))
                     .collect(),
                 body: ir::Ty::from(*func.body.clone().unwrap()),
             })),

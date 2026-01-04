@@ -92,13 +92,13 @@ impl Desugarator {
         let func = self.fold_expr(right)?;
         match func.kind {
             pr::ExprKind::Call(mut func_call) => {
-                func_call.args.insert(0, value);
+                func_call.args.insert(0, pr::CallArg::simple(value));
 
                 Ok(pr::ExprKind::Call(func_call))
             }
             pr::ExprKind::Func(_) | pr::ExprKind::Ident(_) => Ok(pr::ExprKind::Call(pr::Call {
                 subject: Box::new(func),
-                args: vec![value],
+                args: vec![pr::CallArg::simple(value)],
             })),
             _ => Err(
                 Diagnostic::new_custom("pipe operator requires function calls or functions")
@@ -126,7 +126,7 @@ impl Desugarator {
         op_func.span = Some(span);
         Ok(pr::ExprKind::Call(pr::Call {
             subject: Box::new(op_func),
-            args: vec![expr],
+            args: vec![pr::CallArg::simple(expr)],
         }))
     }
 
@@ -255,6 +255,6 @@ fn new_binop(left: pr::Expr, op_name: &[&str], right: pr::Expr, op_span: Option<
 
     pr::Expr::new(pr::ExprKind::Call(pr::Call {
         subject: Box::new(op),
-        args: vec![left, right],
+        args: vec![pr::CallArg::simple(left), pr::CallArg::simple(right)],
     }))
 }

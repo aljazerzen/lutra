@@ -2,7 +2,7 @@ use chumsky::prelude::*;
 use indexmap::IndexMap;
 
 use super::expr::{expr, ident};
-use super::{ctrl, ident_part, keyword};
+use super::{ctrl, delimited_by_parenthesis, ident_part, keyword};
 use crate::Span;
 use crate::parser::lexer::TokenKind;
 use crate::parser::perror::PError;
@@ -133,18 +133,12 @@ fn func_def<'a>(
 ) -> impl Parser<TokenKind, (String, DefKind), Error = PError> + Clone + 'a {
     let head = keyword("func").ignore_then(ident_part());
 
-    let params = (keyword("const").or_not().map(|x| x.is_some()))
-        .then(ident_part())
-        .then(ctrl(':').ignore_then(ty.clone()).or_not())
-        .map_with_span(|((constant, name), ty), span| FuncParam {
-            constant,
-            name,
-            ty,
-            span,
-        })
-        .separated_by(ctrl(','))
-        .allow_trailing()
-        .delimited_by(ctrl('('), ctrl(')'));
+    let params = delimited_by_parenthesis(
+        super::expr::func_param(ty.clone())
+            .separated_by(ctrl(','))
+            .allow_trailing(),
+        |_| vec![],
+    );
 
     let return_ty = ctrl(':').ignore_then(ty.clone()).or_not();
 
@@ -193,10 +187,12 @@ fn type_def(
                     is_framed: false,
                 }),
                 // new type (nominal / framed type)
-                ty.delimited_by(ctrl('('), ctrl(')')).map(|ty| TyDef {
-                    ty,
-                    is_framed: true,
-                }),
+                delimited_by_parenthesis(ty, |p| Ty::new_with_span(TyKind::Tuple(vec![]), p)).map(
+                    |ty| TyDef {
+                        ty,
+                        is_framed: true,
+                    },
+                ),
             ))
             .map(DefKind::Ty),
         )
@@ -208,12 +204,10 @@ fn import_def() -> impl Parser<TokenKind, (String, DefKind), Error = PError> + C
         ident()
             .then(choice((
                 just(TokenKind::PathSep)
-                    .ignore_then(
-                        import_part
-                            .separated_by(ctrl(','))
-                            .allow_trailing()
-                            .delimited_by(ctrl('('), ctrl(')')),
-                    )
+                    .ignore_then(delimited_by_parenthesis(
+                        import_part.separated_by(ctrl(',')).allow_trailing(),
+                        |_| vec![],
+                    ))
                     .map(|children| ImportKind::Many(Path::empty(), children)),
                 keyword("as")
                     .ignore_then(ident_part())

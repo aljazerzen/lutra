@@ -82,7 +82,7 @@ impl TypeResolver<'_> {
     pub fn resolve_func_call(
         &mut self,
         func: Box<Expr>,
-        args: Vec<Expr>,
+        args: Vec<CallArg>,
         span: Option<Span>,
     ) -> Result<Expr> {
         let metadata = self.gather_func_metadata(&func);
@@ -92,43 +92,32 @@ impl TypeResolver<'_> {
         let fn_ty = func.ty.as_ref().unwrap();
         let fn_ty = fn_ty.kind.as_func().unwrap().clone();
 
-        let args_match_params = args.len() == fn_ty.params.len();
-        if !args_match_params {
-            return Err(Diagnostic::new_custom(format!(
-                "{}expected {} arguments, but got {}",
-                metadata
-                    .name_hint
-                    .map(|x| format!("{x} "))
-                    .unwrap_or_default(),
-                fn_ty.params.len(),
-                args.len(),
-            ))
-            .with_span(span));
-        }
+        let args = self.match_args_to_params(args, &fn_ty.params, &metadata, span);
 
-        let mut args_resolved = Vec::with_capacity(args.len());
-        for ((param_ty, param_const), arg) in std::iter::zip(&fn_ty.params, args) {
+        let mut args_resolved = Vec::with_capacity(fn_ty.params.len());
+        for (param, arg) in std::iter::zip(&fn_ty.params, args) {
+            let Some(mut arg) = arg else {
+                continue;
+            };
+
             // fold
-            let mut arg = self.fold_expr(arg)?;
+            arg.expr = self.fold_expr(arg.expr)?;
 
             // validate type
-            let who = || {
-                metadata
-                    .name_hint
-                    .as_ref()
-                    .map(|n| format!("function {n}, one of the params")) // TODO: param name
-            };
-            if let Some(param_ty) = param_ty {
-                self.validate_expr_type(&mut arg, param_ty, &who)?;
+            let who = || metadata.as_who();
+            if let Some(param_ty) = &param.ty {
+                self.validate_expr_type(&mut arg.expr, param_ty, &who)
+                    .unwrap_or_else(self.push_diagnostic());
             }
 
-            if *param_const {
+            if param.constant {
                 self.const_validator
-                    .validate_is_const(&arg)
+                    .validate_is_const(&arg.expr)
                     .map_err(|span| {
                         Diagnostic::new_custom("non-constant expression")
                             .with_span(span.or(arg.span))
-                    })?;
+                    })
+                    .unwrap_or_else(self.push_diagnostic())
             }
 
             args_resolved.push(arg);
@@ -142,6 +131,79 @@ impl TypeResolver<'_> {
                 args: args_resolved,
             }))
         })
+    }
+
+    /// For each given arg, finds the func param that it should pass the value to.
+    /// Takes care of labelled args. Returns args in the same order as func params.
+    /// An arg might be None, which means that it was not supplied and we have pushed
+    /// an error onto [Self::diagnostics].
+    fn match_args_to_params(
+        &self,
+        mut args: Vec<pr::CallArg>,
+        params: &[pr::TyFuncParam],
+        metadata: &FuncMetadata,
+        span: Option<Span>,
+    ) -> Vec<Option<pr::CallArg>> {
+        if args.len() != params.len() {
+            let who = metadata
+                .as_who()
+                .map(|n| format!("{n} "))
+                .unwrap_or_default();
+            let message = format!(
+                "{who}expected {} arguments, but got {}",
+                params.len(),
+                args.len()
+            );
+            self.diagnostics
+                .push(Diagnostic::new_custom(message).with_span(span));
+        }
+
+        let mut args_reordered = vec![None; args.len()];
+
+        // find first labelled arg
+        let first_labelled = args
+            .iter()
+            .find_position(|p| p.label.is_some())
+            .map(|(p, _)| p)
+            .unwrap_or(args.len());
+
+        // match labelled args
+        let labelled = args.split_off(first_labelled);
+        for arg in labelled {
+            if arg.label.is_none() {
+                self.diagnostics.push(
+                    Diagnostic::new_custom("positional arg must come before labelled arg")
+                        .with_span(arg.span),
+                );
+                continue;
+            }
+
+            let Some((param_pos, _)) = params.iter().find_position(|p| p.label == arg.label) else {
+                self.diagnostics.push(
+                    Diagnostic::new_custom(format!(
+                        "unknown parameter `{}`",
+                        arg.label.as_ref().unwrap()
+                    ))
+                    .with_span(arg.span),
+                );
+                continue;
+            };
+            args_reordered[param_pos] = Some(arg);
+        }
+
+        // now fill-in non-labelled args
+        for arg in args {
+            assert!(arg.label.is_none());
+
+            // find first non-populated
+            let Some((pos, _)) = args_reordered.iter().find_position(|a| a.is_none()) else {
+                // this happens when there is too much args
+                // (we have pushed an error into self.diagnostics already)
+                continue;
+            };
+            args_reordered[pos] = Some(arg);
+        }
+        args_reordered
     }
 
     /// In Lutra, func is just an expression and does not have a name (the same way
@@ -167,9 +229,13 @@ pub struct FuncMetadata {
 }
 
 impl FuncMetadata {
-    pub(crate) fn as_debug_name(&self) -> &str {
+    fn as_debug_name(&self) -> &str {
         let ident = self.name_hint.as_ref();
 
         ident.map(|n| n.last()).unwrap_or("<anonymous>")
+    }
+
+    fn as_who(&self) -> Option<String> {
+        self.name_hint.as_ref().map(|n| format!("func {n}"))
     }
 }

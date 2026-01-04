@@ -1,10 +1,10 @@
 use chumsky::prelude::*;
 
-use crate::codespan::Span;
-use crate::parser::interpolation;
+use crate::Span;
 use crate::parser::lexer::TokenKind;
 use crate::parser::perror::PError;
 use crate::parser::{ctrl, ident_part, keyword, sequence};
+use crate::parser::{delimited_by_parenthesis, interpolation};
 use crate::pr::*;
 
 pub(crate) fn expr<'a>(
@@ -151,10 +151,11 @@ fn match_(
         let variant = ctrl('.')
             .ignore_then(ident_part())
             .then(
-                pattern
-                    .delimited_by(ctrl('('), ctrl(')'))
-                    .map(Box::new)
-                    .or_not(),
+                delimited_by_parenthesis(pattern, |s| {
+                    Pattern::new_with_span(PatternKind::AnyOf(vec![]), s)
+                })
+                .map(Box::new)
+                .or_not(),
             )
             .map(|(path, inner)| PatternKind::Enum(path, inner));
 
@@ -290,18 +291,7 @@ fn nested<'a>(
             Box::new(Expr::new_with_span(kind, span))
         });
 
-    nested
-        .map(ExprKind::Nested)
-        .delimited_by(ctrl('('), ctrl(')'))
-        .recover_with(nested_delimiters(
-            TokenKind::Control('('),
-            TokenKind::Control(')'),
-            [
-                (TokenKind::Control('['), TokenKind::Control(']')),
-                (TokenKind::Control('('), TokenKind::Control(')')),
-            ],
-            |_| ExprKind::Tuple(vec![]),
-        ))
+    delimited_by_parenthesis(nested.map(ExprKind::Nested), |_| ExprKind::Tuple(vec![]))
 }
 
 fn binary_op_parser<'a, Term, Op>(
@@ -390,22 +380,21 @@ where
         .map_with_span(Expr::new_with_span)
         .map(Box::new);
 
+    let arg = ident_part()
+        .then_ignore(ctrl('='))
+        .or_not()
+        .then(expr)
+        .map_with_span(|(label, expr), span| CallArg {
+            label,
+            expr,
+            span: Some(span),
+        });
+
     func_name
-        .then(
-            expr.separated_by(ctrl(','))
-                .allow_trailing()
-                .delimited_by(ctrl('('), ctrl(')'))
-                .recover_with(nested_delimiters(
-                    TokenKind::Control('('),
-                    TokenKind::Control(')'),
-                    [
-                        (TokenKind::Control('{'), TokenKind::Control('}')),
-                        (TokenKind::Control('('), TokenKind::Control(')')),
-                        (TokenKind::Control('['), TokenKind::Control(']')),
-                    ],
-                    |_| vec![],
-                )),
-        )
+        .then(delimited_by_parenthesis(
+            arg.separated_by(ctrl(',')).allow_trailing(),
+            |_| vec![],
+        ))
         .map(|(name, args)| {
             ExprKind::Call(Call {
                 subject: name,
@@ -418,25 +407,15 @@ where
 fn func<'a>(
     expr: impl Parser<TokenKind, Expr, Error = PError> + Clone + 'a,
     ty: impl Parser<TokenKind, Ty, Error = PError> + Clone + 'a,
-) -> impl Parser<TokenKind, ExprKind, Error = PError> + Clone + 'a {
-    let param = ident_part()
-        .then(ctrl(':').ignore_then(ty.clone()).or_not())
-        .map_with_span(|(name, ty), span| FuncParam {
-            constant: false,
-            name,
-            ty,
-            span,
-        });
-
+) -> impl Parser<TokenKind, ExprKind, Error = PError> + Clone {
     // func
     keyword("func")
-        .ignore_then(
-            param
-                .clone()
+        .ignore_then(delimited_by_parenthesis(
+            func_param(ty.clone())
                 .separated_by(ctrl(','))
-                .allow_trailing()
-                .delimited_by(ctrl('('), ctrl(')')),
-        )
+                .allow_trailing(),
+            |_| vec![],
+        ))
         // return type
         .then(ctrl(':').ignore_then(ty.clone()).or_not())
         // arrow
@@ -455,6 +434,28 @@ fn func<'a>(
         .labelled("function")
 }
 
+pub fn func_param(
+    ty: impl Parser<TokenKind, Ty, Error = PError> + Clone,
+) -> impl Parser<TokenKind, FuncParam, Error = PError> + Clone {
+    (keyword("const").or_not().map(|x| x.is_some()))
+        .then(
+            ident_part()
+                .then(ident_part().or_not())
+                .map(|(a, b)| match b {
+                    Some(b) => (Some(a), b),
+                    None => (None, a),
+                }),
+        )
+        .then(ctrl(':').ignore_then(ty.clone()).or_not())
+        .map_with_span(|((constant, (label, name)), ty), span| FuncParam {
+            constant,
+            label,
+            name,
+            ty,
+            span,
+        })
+}
+
 fn func_short<'a>(
     expr: impl Parser<TokenKind, Expr, Error = PError> + 'a,
 ) -> impl Parser<TokenKind, ExprKind, Error = PError> + 'a {
@@ -462,6 +463,7 @@ fn func_short<'a>(
         .then_ignore(just(TokenKind::ArrowThin))
         .map_with_span(|name, span| FuncParam {
             constant: false,
+            label: None,
             name,
             ty: None,
             span,
@@ -486,7 +488,7 @@ pub fn variant(
     ctrl('.')
         .ignore_then(ident_part())
         .then(
-            expr.delimited_by(ctrl('('), ctrl(')'))
+            delimited_by_parenthesis(expr, |s| Expr::new_with_span(ExprKind::Tuple(vec![]), s))
                 .map(Box::new)
                 .or_not(),
         )

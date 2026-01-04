@@ -390,6 +390,20 @@ pub(super) fn print_func<'c>(
     Some(())
 }
 
+impl PrintSource for pr::CallArg {
+    fn print<'c>(&self, p: &mut Printer<'c>) -> Option<()> {
+        if let Some(label) = &self.label {
+            p.push(pr::display_ident(label))?;
+            p.push(" = ")?;
+        }
+        self.expr.print(p)
+    }
+
+    fn span(&self) -> Option<crate::Span> {
+        self.span
+    }
+}
+
 impl PrintSource for pr::TupleField {
     fn print<'c>(&self, p: &mut Printer<'c>) -> Option<()> {
         if let Some(name) = &self.name {
