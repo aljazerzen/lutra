@@ -401,6 +401,12 @@ impl<'a> Context<'a> {
         {
             return sql_ast::Expr::Source(format!("(EXTRACT(EPOCH FROM {expr_pg})*1000000)::int8"));
         }
+        // special case: std::Decimal
+        if let ir::TyKind::Ident(ty_ident) = &ty.kind
+            && ty_ident.0 == ["std", "Decimal"]
+        {
+            return sql_ast::Expr::Source(format!("({expr_pg}*100)::int8"));
+        }
 
         // general case: noop
         // (but with a type cast, just to be safe)
@@ -429,6 +435,12 @@ impl<'a> Context<'a> {
             && ty_ident.0 == ["std", "Timestamp"]
         {
             return sql_ast::Expr::Source(format!("to_timestamp({expr}::float8/1000000.0)"));
+        }
+        // special case: std::Timestamp
+        if let ir::TyKind::Ident(ty_ident) = &ty.kind
+            && ty_ident.0 == ["std", "Decimal"]
+        {
+            return sql_ast::Expr::Source(format!("({expr}::decimal(20, 0)/100)"));
         }
 
         // general case: noop

@@ -512,13 +512,11 @@ impl TypeResolver<'_> {
             TyDomain::Open => Ok(()),
 
             TyDomain::OneOf(possible_tys) => {
-                let is_match = ty
-                    .kind
-                    .as_primitive()
-                    .is_some_and(|t| possible_tys.iter().any(|p| t == p));
+                // TODO: this match is too naive
+                let is_match = possible_tys.iter().any(|p| p.kind == ty.kind);
 
                 if !is_match {
-                    let possible_tys = possible_tys.iter().map(|t| t.to_string()).join(", ");
+                    let possible_tys = possible_tys.iter().map(printer::print_ty).join(", ");
 
                     return Err(Diagnostic::new(
                         format!(
@@ -624,8 +622,8 @@ impl TypeResolver<'_> {
             // each found must be in expected domain
             (TyDomain::OneOf(found_tys), expected_domain) => {
                 for found_ty in found_tys {
-                    let ty = Ty::new(found_ty.clone());
-                    self.validate_type_domain(&ty, expected_domain, Some(found_name), span)?;
+                    // let ty = Ty::new(found_ty.clone());
+                    self.validate_type_domain(found_ty, expected_domain, Some(found_name), span)?;
                 }
                 Ok(())
             }

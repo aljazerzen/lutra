@@ -316,6 +316,24 @@ fn format_18() {
 }
 
 #[test]
+fn format_19() {
+    // literals
+
+    assert_snapshot!(_format(r#"
+    const a = 1_000
+    const b = 0xff_de
+    const c = 10e+10
+    "#), @"
+    const a = 1_000
+
+    const b = 0xff_de
+
+    const c = 10e+10
+    "
+    )
+}
+
+#[test]
 fn trivia_00() {
     assert_snapshot!(_format(r#"
     # TODO

@@ -39,7 +39,7 @@ impl PrFold for Desugarator {
                 // unwrap the Expr
                 return self.fold_expr(*p);
             }
-            pr::ExprKind::Range(r) => self.desugar_range(r)?,
+            pr::ExprKind::Range(r) => self.desugar_range(r, expr.span.unwrap())?,
             pr::ExprKind::Unary(unary) => self.desugar_unary(unary, expr.span.unwrap())?,
 
             pr::ExprKind::Binary(pr::BinaryExpr {
@@ -62,27 +62,46 @@ impl PrFold for Desugarator {
 
 impl Desugarator {
     /// De-sugars range `a..b` into `{start=a, end=b}`.
-    ///
-    /// TODO: open bounds should be mapped into `null`.
-    fn desugar_range(&mut self, v: pr::Range) -> Result<pr::ExprKind> {
-        let start = fold::fold_optional_box(self, v.start)?
-            .map(|b| *b)
-            .unwrap_or_else(|| pr::Expr::new(pr::Literal::Integer(0))); // TODO
+    fn desugar_range(&mut self, v: pr::Range, span: Span) -> Result<pr::ExprKind> {
+        let start = fold::fold_optional_box(self, v.start)?.map(|b| *b);
+        let end = fold::fold_optional_box(self, v.end)?.map(|b| *b);
 
-        let end = fold::fold_optional_box(self, v.end)?
-            .map(|b| *b)
-            .unwrap_or_else(|| pr::Expr::new(pr::Literal::Integer(10000))); // TODO
+        fn into_opt(inner: Option<pr::Expr>, span: Span) -> pr::Expr {
+            let span = inner.as_ref().and_then(|x| x.span).unwrap_or(span);
+            let expr = Box::new(pr::Expr::new_with_span(
+                pr::Variant {
+                    name: String::from(if inner.is_some() { "some" } else { "none" }),
+                    inner: inner.map(Box::new),
+                },
+                span,
+            ));
+
+            let ty = Box::new(pr::Ty::new_with_span(
+                pr::TyKind::Enum(vec![
+                    pr::TyEnumVariant {
+                        name: "none".into(),
+                        ty: pr::Ty::new_with_span(pr::TyKind::Tuple(vec![]), span),
+                    },
+                    pr::TyEnumVariant {
+                        name: "some".into(),
+                        ty: pr::Ty::new_with_span(pr::TyPrimitive::int64, span),
+                    },
+                ]),
+                span,
+            ));
+            pr::Expr::new_with_span(pr::TypeAnnotation { expr, ty }, span)
+        }
 
         Ok(pr::ExprKind::Tuple(vec![
             pr::TupleField {
                 name: Some("start".into()),
                 unpack: false,
-                expr: start,
+                expr: into_opt(start, span),
             },
             pr::TupleField {
                 name: Some("end".into()),
                 unpack: false,
-                expr: end,
+                expr: into_opt(end, span),
             },
         ]))
     }

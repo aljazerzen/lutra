@@ -147,7 +147,7 @@ pub enum TyDomain {
     Open,
 
     /// Must be one of the following
-    OneOf(Vec<TyPrimitive>),
+    OneOf(Vec<Ty>),
 
     /// Must be a tuple with following fields
     TupleHasFields(Vec<TyDomainTupleField>),

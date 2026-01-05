@@ -184,13 +184,13 @@ fn primitive_set() -> impl Parser<TokenKind, TyPrimitive, Error = PError> {
 }
 
 pub fn type_params<'a>(
-    ty: impl Parser<TokenKind, Ty, Error = PError> + 'a,
+    ty: impl Parser<TokenKind, Ty, Error = PError> + Clone + 'a,
 ) -> impl Parser<TokenKind, Vec<TyParam>, Error = PError> + 'a {
     let tuple = choice((
         ident_part()
             .then_ignore(ctrl(':'))
             .or_not()
-            .then(ty)
+            .then(ty.clone())
             .map_with_span(|t, s| (t, s))
             .separated_by(ctrl(','))
             .at_least(1)
@@ -245,33 +245,37 @@ pub fn type_params<'a>(
     })
     .labelled("tuple domain");
 
-    let one_of_numbers = ident_keyword("number").to(TyDomain::OneOf(vec![
-        TyPrimitive::int8,
-        TyPrimitive::int16,
-        TyPrimitive::int32,
-        TyPrimitive::int64,
-        TyPrimitive::uint8,
-        TyPrimitive::uint16,
-        TyPrimitive::uint32,
-        TyPrimitive::uint64,
-        TyPrimitive::float32,
-        TyPrimitive::float64,
-    ]));
+    let one_of_numbers = ident_keyword("number").map_with_span(|_, s| {
+        TyDomain::OneOf(vec![
+            Ty::new_with_span(TyPrimitive::int8, s),
+            Ty::new_with_span(TyPrimitive::int16, s),
+            Ty::new_with_span(TyPrimitive::int32, s),
+            Ty::new_with_span(TyPrimitive::int64, s),
+            Ty::new_with_span(TyPrimitive::uint8, s),
+            Ty::new_with_span(TyPrimitive::uint16, s),
+            Ty::new_with_span(TyPrimitive::uint32, s),
+            Ty::new_with_span(TyPrimitive::uint64, s),
+            Ty::new_with_span(TyPrimitive::float32, s),
+            Ty::new_with_span(TyPrimitive::float64, s),
+        ])
+    });
 
-    let one_of_primitives = ident_keyword("primitive").to(TyDomain::OneOf(vec![
-        TyPrimitive::bool,
-        TyPrimitive::int8,
-        TyPrimitive::int16,
-        TyPrimitive::int32,
-        TyPrimitive::int64,
-        TyPrimitive::uint8,
-        TyPrimitive::uint16,
-        TyPrimitive::uint32,
-        TyPrimitive::uint64,
-        TyPrimitive::float32,
-        TyPrimitive::float64,
-        TyPrimitive::text,
-    ]));
+    let one_of_primitives = ident_keyword("primitive").map_with_span(|_, s| {
+        TyDomain::OneOf(vec![
+            Ty::new_with_span(TyPrimitive::bool, s),
+            Ty::new_with_span(TyPrimitive::int8, s),
+            Ty::new_with_span(TyPrimitive::int16, s),
+            Ty::new_with_span(TyPrimitive::int32, s),
+            Ty::new_with_span(TyPrimitive::int64, s),
+            Ty::new_with_span(TyPrimitive::uint8, s),
+            Ty::new_with_span(TyPrimitive::uint16, s),
+            Ty::new_with_span(TyPrimitive::uint32, s),
+            Ty::new_with_span(TyPrimitive::uint64, s),
+            Ty::new_with_span(TyPrimitive::float32, s),
+            Ty::new_with_span(TyPrimitive::float64, s),
+            Ty::new_with_span(TyPrimitive::text, s),
+        ])
+    });
 
     // domain
     let domain = ctrl(':')
@@ -280,10 +284,7 @@ pub fn type_params<'a>(
             tuple,
             one_of_primitives,
             one_of_numbers,
-            primitive_set()
-                .separated_by(ctrl('|'))
-                .at_least(1)
-                .map(TyDomain::OneOf),
+            ty.separated_by(ctrl('|')).at_least(1).map(TyDomain::OneOf),
         )))
         .or_not()
         .map(|x| x.unwrap_or(TyDomain::Open))

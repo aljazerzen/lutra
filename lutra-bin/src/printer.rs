@@ -96,6 +96,13 @@ where
                 // fallback
             }
         }
+        if let ir::TyKind::Ident(ty_ident) = &ty.kind
+            && ty_ident.0 == ["std", "Decimal"]
+        {
+            use crate::Decode;
+            let val = i64::decode(buf.chunk())?;
+            return Ok(format!("{}.{:02}", val / 100, (val % 100).abs()));
+        }
 
         // general case
         let ty = Visitor::<B>::get_mat_ty(self, ty);

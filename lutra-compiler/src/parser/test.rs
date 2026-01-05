@@ -87,8 +87,8 @@ fn parse_02() {
             start: Some(
                 Expr {
                     kind: Literal(
-                        Integer(
-                            4,
+                        Number(
+                            "4",
                         ),
                     ),
                     span: Some(
@@ -103,8 +103,8 @@ fn parse_02() {
             end: Some(
                 Expr {
                     kind: Literal(
-                        Integer(
-                            5,
+                        Number(
+                            "5",
                         ),
                     ),
                     span: Some(
@@ -131,8 +131,8 @@ fn parse_03() {
                 body: Some(
                     Expr {
                         kind: Literal(
-                            Integer(
-                                1,
+                            Number(
+                                "1",
                             ),
                         ),
                         span: Some(
@@ -156,8 +156,28 @@ fn parse_03() {
                         name: "B",
                         domain: OneOf(
                             [
-                                int8,
-                                int16,
+                                Ty {
+                                    kind: Primitive(
+                                        int8,
+                                    ),
+                                    span: Some(
+                                        0:21-25,
+                                    ),
+                                    name: None,
+                                    scope_id: None,
+                                    target: None,
+                                },
+                                Ty {
+                                    kind: Primitive(
+                                        int16,
+                                    ),
+                                    span: Some(
+                                        0:28-33,
+                                    ),
+                                    name: None,
+                                    scope_id: None,
+                                    target: None,
+                                },
                             ],
                         ),
                         span: Some(
@@ -188,8 +208,8 @@ fn parse_04() {
                 body: Some(
                     Expr {
                         kind: Literal(
-                            Integer(
-                                1,
+                            Number(
+                                "1",
                             ),
                         ),
                         span: Some(
@@ -291,8 +311,8 @@ fn parse_05() {
                     },
                     value: Expr {
                         kind: Literal(
-                            Integer(
-                                5,
+                            Number(
+                                "5",
                             ),
                         ),
                         span: Some(
@@ -326,8 +346,8 @@ fn parse_05() {
                             BinaryExpr {
                                 left: Expr {
                                     kind: Literal(
-                                        Integer(
-                                            6,
+                                        Number(
+                                            "6",
                                         ),
                                     ),
                                     span: Some(
@@ -341,8 +361,8 @@ fn parse_05() {
                                 op: Add,
                                 right: Expr {
                                     kind: Literal(
-                                        Integer(
-                                            7,
+                                        Number(
+                                            "7",
                                         ),
                                     ),
                                     span: Some(
@@ -374,8 +394,8 @@ fn parse_05() {
                     },
                     value: Expr {
                         kind: Literal(
-                            Integer(
-                                0,
+                            Number(
+                                "0",
                             ),
                         ),
                         span: Some(
@@ -405,8 +425,8 @@ fn parse_06() {
         Match {
             subject: Expr {
                 kind: Literal(
-                    Integer(
-                        1,
+                    Number(
+                        "1",
                     ),
                 ),
                 span: Some(
@@ -437,8 +457,8 @@ fn parse_06() {
                     },
                     value: Expr {
                         kind: Literal(
-                            Integer(
-                                1,
+                            Number(
+                                "1",
                             ),
                         ),
                         span: Some(
@@ -478,8 +498,8 @@ fn parse_06() {
                     },
                     value: Expr {
                         kind: Literal(
-                            Integer(
-                                1,
+                            Number(
+                                "1",
                             ),
                         ),
                         span: Some(
@@ -499,18 +519,18 @@ fn parse_06() {
 
 #[test]
 fn parse_07() {
-    assert_debug_snapshot!(parse_expr(r"-1").kind, @r"
+    assert_debug_snapshot!(parse_expr(r"-1").kind, @r#"
     Literal(
-        Integer(
-            -1,
+        Number(
+            "-1",
         ),
     )
-    ");
+    "#);
 }
 
 #[test]
 fn parse_09() {
-    assert_debug_snapshot!(parse_expr(r"{1, ..x, 2}").kind, @r"
+    assert_debug_snapshot!(parse_expr(r"{1, ..x, 2}").kind, @r#"
     Tuple(
         [
             TupleField {
@@ -518,8 +538,8 @@ fn parse_09() {
                 unpack: false,
                 expr: Expr {
                     kind: Literal(
-                        Integer(
-                            1,
+                        Number(
+                            "1",
                         ),
                     ),
                     span: Some(
@@ -552,8 +572,8 @@ fn parse_09() {
                 unpack: false,
                 expr: Expr {
                     kind: Literal(
-                        Integer(
-                            2,
+                        Number(
+                            "2",
                         ),
                     ),
                     span: Some(
@@ -567,12 +587,12 @@ fn parse_09() {
             },
         ],
     )
-    ");
+    "#);
 }
 
 #[test]
 fn parse_10() {
-    assert_debug_snapshot!(parse_expr(r"{1 | to_int32}"), @r"
+    assert_debug_snapshot!(parse_expr(r"{1 | to_int32}"), @r#"
     Expr {
         kind: Tuple(
             [
@@ -584,8 +604,8 @@ fn parse_10() {
                             BinaryExpr {
                                 left: Expr {
                                     kind: Literal(
-                                        Integer(
-                                            1,
+                                        Number(
+                                            "1",
                                         ),
                                     ),
                                     span: Some(
@@ -630,8 +650,8 @@ fn parse_10() {
         scope_id: None,
         target: None,
     }
-    ");
-    assert_debug_snapshot!(parse_expr(r"1 + 2 | std::to_int32").kind, @r"
+    "#);
+    assert_debug_snapshot!(parse_expr(r"1 + 2 | std::to_int32").kind, @r#"
     Binary(
         BinaryExpr {
             left: Expr {
@@ -639,8 +659,8 @@ fn parse_10() {
                     BinaryExpr {
                         left: Expr {
                             kind: Literal(
-                                Integer(
-                                    1,
+                                Number(
+                                    "1",
                                 ),
                             ),
                             span: Some(
@@ -654,8 +674,8 @@ fn parse_10() {
                         op: Add,
                         right: Expr {
                             kind: Literal(
-                                Integer(
-                                    2,
+                                Number(
+                                    "2",
                                 ),
                             ),
                             span: Some(
@@ -691,8 +711,8 @@ fn parse_10() {
             },
         },
     )
-    ");
-    assert_debug_snapshot!(parse_expr(r"1 | to_int32 | to_int32").kind, @r"
+    "#);
+    assert_debug_snapshot!(parse_expr(r"1 | to_int32 | to_int32").kind, @r#"
     Binary(
         BinaryExpr {
             left: Expr {
@@ -700,8 +720,8 @@ fn parse_10() {
                     BinaryExpr {
                         left: Expr {
                             kind: Literal(
-                                Integer(
-                                    1,
+                                Number(
+                                    "1",
                                 ),
                             ),
                             span: Some(
@@ -750,14 +770,14 @@ fn parse_10() {
             },
         },
     )
-    ");
+    "#);
     assert_debug_snapshot!(parse_expr(r"1 | func (x) -> x | to_int32").kind, @r#"
     Binary(
         BinaryExpr {
             left: Expr {
                 kind: Literal(
-                    Integer(
-                        1,
+                    Number(
+                        "1",
                     ),
                 ),
                 span: Some(

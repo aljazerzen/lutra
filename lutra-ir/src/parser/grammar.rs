@@ -26,8 +26,16 @@ pub fn program() -> impl Parser<TokenKind, Program, Error = PError> {
 fn expr() -> impl Parser<TokenKind, Expr, Error = PError> + Clone {
     recursive(|expr| {
         let literal = select! {
-            TokenKind::Literal(pr::Literal::Integer(i)) => ExprKind::Literal(Literal::int64(i)),
-            TokenKind::Literal(pr::Literal::Float(i)) => ExprKind::Literal(Literal::float64(i)),
+            TokenKind::Literal(pr::Literal::Number(n)) => {
+                let lit = pr::Literal::Number(n);
+                if let Some(i) = lit.as_integer() {
+                    ExprKind::Literal(Literal::int64(i as i64))
+                } else if let Some(f) = lit.as_float() {
+                    ExprKind::Literal(Literal::float64(f))
+                } else {
+                    todo!()
+                }
+            },
             TokenKind::Literal(pr::Literal::Boolean(i)) => ExprKind::Literal(Literal::bool(i)),
             TokenKind::Literal(pr::Literal::Text(i)) => ExprKind::Literal(Literal::text(i)),
         };
@@ -160,7 +168,7 @@ fn ty() -> impl Parser<TokenKind, Ty, Error = PError> {
 }
 
 fn uint32() -> impl Parser<TokenKind, u32, Error = PError> {
-    select! { TokenKind::Literal(pr::Literal::Integer(i)) => i as u32 }
+    select! { TokenKind::Literal(pr::Literal::Number(i)) => i.parse::<u32>().unwrap() }
 }
 
 fn tuple<'a>(
@@ -215,7 +223,7 @@ where
     ident_keyword("tuple_lookup")
         .ignore_then(expr)
         .then(select! {
-            TokenKind::Literal(pr::Literal::Integer(i)) => i as u16
+            TokenKind::Literal(pr::Literal::Number(i)) => i.parse().unwrap()
         })
         .map(|(base, position)| ExprKind::TupleLookup(Box::new(TupleLookup { base, position })))
         .labelled("tuple lookup")

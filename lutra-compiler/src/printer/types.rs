@@ -185,7 +185,7 @@ impl PrintSource for pr::TyParam {
                     if i > 0 {
                         p.push(" | ")?;
                     }
-                    p.push(ty.to_string())?;
+                    ty.print(p)?;
                 }
             }
             pr::TyDomain::TupleHasFields(fields) => {

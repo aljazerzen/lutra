@@ -640,3 +640,12 @@ module date {
     year: int32, month: uint8, day: uint8
   }
 }
+
+## Exact decimal value with a fixed `SCALE`, which is the number of digits past
+## the decimal point.
+## Currently, `SCALE` is 2. This will be configurable in the future.
+## Can hold values from `-10**(19-SCALE)` to `10**(19-SCALE)`.
+##
+## Backed by a signed 64-bit integer.
+# TODO: implement const type param for SCALE.
+type Decimal(int64)

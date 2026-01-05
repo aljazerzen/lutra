@@ -331,3 +331,9 @@ impl From<Variant> for ExprKind {
         ExprKind::Variant(value)
     }
 }
+
+impl From<TypeAnnotation> for ExprKind {
+    fn from(value: TypeAnnotation) -> Self {
+        ExprKind::TypeAnnotation(value)
+    }
+}

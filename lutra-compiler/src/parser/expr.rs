@@ -225,7 +225,7 @@ fn field_lookup<'a>(
             .ignore_then(choice((
                 ident_part().map(Lookup::Name),
                 select! {
-                    TokenKind::Literal(Literal::Integer(i)) => Lookup::Position(i)
+                    TokenKind::Literal(Literal::Number(i)) if i.parse::<u32>().is_ok() => Lookup::Position(i.parse::<i64>().unwrap())
                 },
             )))
             .map_with_span(|f, s| (f, s))

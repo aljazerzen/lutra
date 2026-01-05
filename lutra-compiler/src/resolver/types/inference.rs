@@ -83,54 +83,50 @@ impl TypeResolver<'_> {
     }
 
     pub fn infer_type_of_literal(&mut self, literal: &pr::Literal, span: Option<Span>) -> pr::Ty {
-        let kind = match literal {
-            Literal::Boolean(_) => TyKind::Primitive(TyPrimitive::bool),
+        match literal {
+            Literal::Boolean(_) => Ty::new_with_span(TyPrimitive::bool, span.unwrap()),
 
-            Literal::Text(_) => TyKind::Primitive(TyPrimitive::text),
+            Literal::Text(_) => Ty::new_with_span(TyPrimitive::text, span.unwrap()),
 
-            Literal::Integer(_) => {
-                // int literal (e.g. `4`) can be of type `int64` or `u8` or any other
+            Literal::Number(_) => {
+                // number literals (e.g. `4`) can be of type `int64` or `u8` or any other
                 // integer type. So we have leave the type to be figured out later.
-                // This is done with a new type param, constraint to integer types.
-                return self.introduce_ty_var(
-                    pr::TyDomain::OneOf(vec![
-                        pr::TyPrimitive::int8,
-                        pr::TyPrimitive::int16,
-                        pr::TyPrimitive::int32,
-                        pr::TyPrimitive::int64,
-                        pr::TyPrimitive::uint8,
-                        pr::TyPrimitive::uint16,
-                        pr::TyPrimitive::uint32,
-                        pr::TyPrimitive::uint64,
-                    ]),
-                    span.unwrap(),
-                );
-            }
-            Literal::Float(_) => {
-                // similar as integers
-                return self.introduce_ty_var(
-                    pr::TyDomain::OneOf(vec![pr::TyPrimitive::float32, pr::TyPrimitive::float64]),
-                    span.unwrap(),
-                );
+                // This is done with a new type param, constrained to integer types.
+
+                let mut candidates = Vec::new();
+                if literal.as_integer().is_some() {
+                    candidates.extend([
+                        Ty::new(pr::TyPrimitive::int8),
+                        Ty::new(pr::TyPrimitive::int16),
+                        Ty::new(pr::TyPrimitive::int32),
+                        Ty::new(pr::TyPrimitive::int64),
+                        Ty::new(pr::TyPrimitive::uint8),
+                        Ty::new(pr::TyPrimitive::uint16),
+                        Ty::new(pr::TyPrimitive::uint32),
+                        Ty::new(pr::TyPrimitive::uint64),
+                    ]);
+                }
+                if literal.as_float().is_some() {
+                    candidates.extend([
+                        Ty::new(pr::TyPrimitive::float32),
+                        Ty::new(pr::TyPrimitive::float64),
+                    ]);
+                }
+                if literal.as_decimal().is_some() {
+                    candidates.push(new_ty_ident([NS_STD, "Decimal"], None));
+                }
+                self.introduce_ty_var(pr::TyDomain::OneOf(candidates), span.unwrap())
             }
 
-            Literal::Date(_) => {
-                return new_ty_ident(pr::Path::new([NS_STD, "Date"]), span);
-            }
-            Literal::Time(_) => {
-                return new_ty_ident(pr::Path::new([NS_STD, "Time"]), span);
-            }
-            Literal::DateTime(..) => {
-                return new_ty_ident(pr::Path::new([NS_STD, "Timestamp"]), span);
-            }
-        };
-        let mut ty = Ty::new(kind);
-        ty.span = span;
-        ty
+            Literal::Date(_) => new_ty_ident([NS_STD, "Date"], span),
+            Literal::Time(_) => new_ty_ident([NS_STD, "Time"], span),
+            Literal::DateTime(..) => new_ty_ident([NS_STD, "Timestamp"], span),
+        }
     }
 }
 
-fn new_ty_ident(fq_path: Path, span: Option<Span>) -> Ty {
+fn new_ty_ident<S: ToString, I: IntoIterator<Item = S>>(fq_path: I, span: Option<Span>) -> Ty {
+    let fq_path = pr::Path::new(fq_path);
     let mut ty = pr::Ty::new(fq_path.clone());
     ty.span = span;
     ty.target = Some(pr::Ref::Global(fq_path));

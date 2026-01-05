@@ -217,53 +217,26 @@ pub(crate) fn ident_part() -> impl Parser<char, String, Error = LError> + Clone 
 }
 
 fn literal() -> impl Parser<char, Literal, Error = LError> {
-    let binary_notation = just("0b")
-        .then_ignore(just("_").or_not())
-        .ignore_then(
-            filter(|c: &char| *c == '0' || *c == '1')
-                .repeated()
-                .at_least(1)
-                .at_most(64)
-                .collect::<String>()
-                .try_map(|digits, _| {
-                    Ok(Literal::Integer(
-                        u64::from_str_radix(&digits, 2).unwrap() as i64
-                    ))
-                }),
-        )
-        .labelled("number");
+    let hexadecimal_notation = just("0x").map(|x| x.to_string()).chain::<char, _, _>(
+        filter(|c: &char| c.is_ascii_hexdigit() || *c == '_')
+            .repeated()
+            .at_least(1)
+            .at_most(16),
+    );
 
-    let hexadecimal_notation = just("0x")
-        .then_ignore(just("_").or_not())
-        .ignore_then(
-            filter(|c: &char| c.is_ascii_hexdigit())
-                .repeated()
-                .at_least(1)
-                .at_most(16)
-                .collect::<String>()
-                .try_map(|digits, _| {
-                    Ok(Literal::Integer(
-                        u64::from_str_radix(&digits, 16).unwrap() as i64
-                    ))
-                }),
-        )
-        .labelled("number");
+    let octal_notation = just("0o").map(|x| x.to_string()).chain::<char, _, _>(
+        filter(|c| ('0'..='7').contains(c) || *c == '_')
+            .repeated()
+            .at_least(1)
+            .at_most(22),
+    );
 
-    let octal_notation = just("0o")
-        .then_ignore(just("_").or_not())
-        .ignore_then(
-            filter(|&c| ('0'..='7').contains(&c))
-                .repeated()
-                .at_least(1)
-                .at_most(16)
-                .collect::<String>()
-                .try_map(|digits, _| {
-                    Ok(Literal::Integer(
-                        u64::from_str_radix(&digits, 8).unwrap() as i64
-                    ))
-                }),
-        )
-        .labelled("number");
+    let binary_notation = just("0b").map(|x| x.to_string()).chain::<char, _, _>(
+        filter(|c: &char| *c == '0' || *c == '1' || *c == '_')
+            .repeated()
+            .at_least(1)
+            .at_most(64),
+    );
 
     let exp = one_of("eE").chain(one_of("+-").or_not().chain::<char, _, _>(text::digits(10)));
 
@@ -277,23 +250,17 @@ fn literal() -> impl Parser<char, Literal, Error = LError> {
         .chain::<char, _, _>(filter(|c: &char| c.is_ascii_digit()))
         .chain::<char, _, _>(filter(|c: &char| c.is_ascii_digit() || *c == '_').repeated());
 
-    let number = integer
-        .chain::<char, _, _>(frac.or_not().flatten())
-        .chain::<char, _, _>(exp.or_not().flatten())
-        .try_map(|chars, span| {
-            let str = chars.into_iter().filter(|c| *c != '_').collect::<String>();
-
-            if let Ok(i) = str.parse::<i64>() {
-                Ok(Literal::Integer(i))
-            } else if let Ok(i) = str.parse::<u64>() {
-                Ok(Literal::Integer(i as i64))
-            } else if let Ok(f) = str.parse::<f64>() {
-                Ok(Literal::Float(f))
-            } else {
-                Err(Cheap::expected_input_found(span, None, None))
-            }
-        })
-        .labelled("number");
+    let number = choice((
+        hexadecimal_notation,
+        octal_notation,
+        binary_notation,
+        integer
+            .chain::<char, _, _>(frac.or_not().flatten())
+            .chain::<char, _, _>(exp.or_not().flatten()),
+    ))
+    .collect::<String>()
+    .map(Literal::Number)
+    .labelled("number");
 
     let string = quoted_string(true).map(Literal::Text);
 
@@ -363,17 +330,7 @@ fn literal() -> impl Parser<char, Literal, Error = LError> {
         .then_ignore(non_ident())
         .map(Literal::Time);
 
-    choice((
-        binary_notation,
-        hexadecimal_notation,
-        octal_notation,
-        string,
-        raw_string,
-        number,
-        bool,
-        date_or_datetime,
-        time,
-    ))
+    choice((string, raw_string, number, bool, date_or_datetime, time))
 }
 
 fn quoted_string(escaped: bool) -> impl Parser<char, String, Error = LError> {

@@ -210,7 +210,7 @@ impl<'a> Lowerer<'a> {
                         ty: ir::Ty::new(ir::TyKind::Tuple(vec![])),
                     }
                 };
-                let ty = self.get_ty_mat_pr(ty);
+                let (ty, _) = self.get_ty_mat_pr(ty);
                 let variants = ty.kind.as_enum().unwrap();
                 let (tag, _) = variants
                     .iter()
@@ -456,32 +456,43 @@ impl<'a> Lowerer<'a> {
         Ok(ir::ExprKind::Pointer(ir::Pointer::Binding(binding_id)))
     }
 
-    fn lower_literal(&mut self, literal: &pr::Literal, ty: &pr::Ty) -> Result<ir::Literal> {
-        let prim = self.get_ty_mat_pr(ty).kind.as_primitive();
-        let prim =
-            prim.ok_or_else(|| Diagnostic::new_assert("expected literal to be of primitive type"))?;
+    fn lower_literal(&mut self, lit: &pr::Literal, ty: &pr::Ty) -> Result<ir::Literal> {
+        Ok(match lit {
+            pr::Literal::Number(_) => {
+                let (ty_mat, frame_name) = self.get_ty_mat_pr(ty);
 
-        Ok(match literal {
-            pr::Literal::Integer(v) => match prim {
-                pr::TyPrimitive::int8 => ir::Literal::int8(*v as i8),
-                pr::TyPrimitive::int16 => ir::Literal::int16(*v as i16),
-                pr::TyPrimitive::int32 => ir::Literal::int32(*v as i32),
-                pr::TyPrimitive::int64 => ir::Literal::int64(*v),
-                pr::TyPrimitive::uint8 => ir::Literal::uint8(*v as u8),
-                pr::TyPrimitive::uint16 => ir::Literal::uint16(*v as u16),
-                pr::TyPrimitive::uint32 => ir::Literal::uint32(*v as u32),
-                pr::TyPrimitive::uint64 => ir::Literal::uint64(*v as u64),
-                _ => return Err(Diagnostic::new_assert("int literal is not of int type?")),
-            },
-            pr::Literal::Float(v) => match prim {
-                pr::TyPrimitive::float32 => ir::Literal::float32(*v as f32),
-                pr::TyPrimitive::float64 => ir::Literal::float64(*v),
-                _ => {
-                    return Err(Diagnostic::new_assert(
-                        "float literal is not of float type?",
-                    ));
+                if frame_name.is_some_and(|n| n.as_steps() == [NS_STD, "Decimal"]) {
+                    return Ok(ir::Literal::int64(lit.as_decimal().unwrap()));
                 }
-            },
+
+                let prim = ty_mat.kind.as_primitive().ok_or_else(|| {
+                    Diagnostic::new_assert("expected literal to be of primitive type")
+                })?;
+
+                match prim {
+                    pr::TyPrimitive::int8 => ir::Literal::int8(lit.as_integer().unwrap() as i8),
+                    pr::TyPrimitive::int16 => ir::Literal::int16(lit.as_integer().unwrap() as i16),
+                    pr::TyPrimitive::int32 => ir::Literal::int32(lit.as_integer().unwrap() as i32),
+                    pr::TyPrimitive::int64 => ir::Literal::int64(lit.as_integer().unwrap() as i64),
+                    pr::TyPrimitive::uint8 => ir::Literal::uint8(lit.as_integer().unwrap() as u8),
+                    pr::TyPrimitive::uint16 => {
+                        ir::Literal::uint16(lit.as_integer().unwrap() as u16)
+                    }
+                    pr::TyPrimitive::uint32 => {
+                        ir::Literal::uint32(lit.as_integer().unwrap() as u32)
+                    }
+                    pr::TyPrimitive::uint64 => ir::Literal::uint64(lit.as_integer().unwrap()),
+                    pr::TyPrimitive::float32 => {
+                        ir::Literal::float32(lit.as_float().unwrap() as f32)
+                    }
+                    pr::TyPrimitive::float64 => ir::Literal::float64(lit.as_float().unwrap()),
+                    _ => {
+                        return Err(Diagnostic::new_assert(
+                            "number literal is not of a number type?",
+                        ));
+                    }
+                }
+            }
             pr::Literal::Boolean(v) => ir::Literal::bool(*v),
             pr::Literal::Text(v) => ir::Literal::text(v.clone()),
 
@@ -809,25 +820,29 @@ impl<'a> Lowerer<'a> {
         }
     }
 
-    fn get_ty_mat_pr(&self, ty: &'a pr::Ty) -> &'a pr::Ty {
-        if let pr::TyKind::Ident(_) = &ty.kind {
-            let Some(pr::Ref::Global(target_fq)) = &ty.target else {
-                panic!();
-            };
-            let def = self.root_module.get(target_fq).unwrap();
-            let def = def.kind.as_ty().unwrap();
+    /// Returns material type and the named of it's inner-most frame.
+    fn get_ty_mat_pr(&self, ty: &'a pr::Ty) -> (&'a pr::Ty, Option<&'a pr::Path>) {
+        let pr::TyKind::Ident(_) = &ty.kind else {
+            return (ty, None);
+        };
+        let Some(pr::Ref::Global(target_fq)) = &ty.target else {
+            panic!();
+        };
+        let def = self.root_module.get(target_fq).unwrap();
+        let def = def.kind.as_ty().unwrap();
 
-            self.get_ty_mat_pr(&def.ty)
-        } else {
-            ty
-        }
+        let (ty, frame_name) = self.get_ty_mat_pr(&def.ty);
+
+        let frame_name = frame_name.or(if def.is_framed { Some(target_fq) } else { None });
+
+        (ty, frame_name)
     }
 
     fn tuple_iter_fields(
         &'a self,
         ty: &'a pr::Ty,
     ) -> Box<dyn Iterator<Item = Cow<'a, pr::TyTupleField>> + 'a> {
-        let base_ty = self.get_ty_mat_pr(ty);
+        let (base_ty, _) = self.get_ty_mat_pr(ty);
         match &base_ty.kind {
             pr::TyKind::Tuple(ty_fields) => Box::new(ty_fields.iter().flat_map(|f| {
                 if f.unpack {

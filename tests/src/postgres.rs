@@ -2343,6 +2343,85 @@ async fn date_time_01() {
     ");
 }
 
+#[test]
+fn decimal_00() {
+    // import pg repr for std::Decimal
+
+    insta::assert_snapshot!(_sql_and_output(_run(r#"
+    func main(): {a: std::Decimal}
+    -> std::sql::expr(
+      "select
+        '123123.05'::decimal(10, 2) as a"
+    )
+    "#, lutra_bin::Value::unit())), @"
+    SELECT
+      (r0.a * 100)::int8 AS _0
+    FROM
+      (
+        select
+          '123123.05'::decimal(10, 2) as a
+      ) AS r0
+    ---
+    {
+      a = 123123.05,
+    }
+    ");
+}
+
+#[tokio::test(flavor = "current_thread")]
+async fn decimal_01() {
+    // export pg repr for std::Decimal
+
+    // TODO: decide if current behavior of "modulo 24-hours" is what we want
+
+    let client = _get_test_db_client().await.unwrap();
+    client
+        .execute(
+            r#"CREATE TEMPORARY TABLE test(a decimal(10, 2), b decimal(19, 3))"#,
+            &[],
+        )
+        .await
+        .unwrap();
+    let mut runner = RunnerAsync::new(client);
+
+    insta::assert_snapshot!(_run_on(&mut runner, r#"
+    func main() -> (
+      [
+        {1234567.89, 1234567.89},
+        {0.09, 0.9},
+        {1, -987643210987654.32},
+        {2, 987643210987654.32},
+      ]: [{a: std::Decimal, b: std::Decimal}]
+      | std::sql::insert("test")
+    )
+    "#, lutra_bin::Value::unit()).await.1, @"{}");
+
+    insta::assert_snapshot!(_run_on(&mut runner, r#"
+    func main() -> (
+      std::sql::from("test"): [{a: std::Decimal, b: std::Decimal}]
+    )
+    "#, lutra_bin::Value::unit()).await.1, @"
+    [
+      {
+        a = 1234567.89,
+        b = 1234567.89,
+      },
+      {
+        a = 0.09,
+        b = 0.90,
+      },
+      {
+        a = 1.00,
+        b = -987643210987654.32,
+      },
+      {
+        a = 2.00,
+        b = 987643210987654.32,
+      },
+    ]
+    ");
+}
+
 #[tokio::test(flavor = "current_thread")]
 async fn pull_interface() {
     let client = _get_test_db_client().await.unwrap();

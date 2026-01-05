@@ -173,8 +173,8 @@ fn types_10() {
     // range
 
     insta::assert_snapshot!(_test_ty(r#"
-        func main() -> (3: int64)..(5: int64)
-    "#), @"{start: int64, end: int64}");
+        func main() -> 3..5
+    "#), @"{start: enum {none, some: int64}, end: enum {none, some: int64}}");
 }
 #[test]
 fn types_11() {
@@ -798,7 +798,7 @@ fn type_annotation_01() {
        │
      1 │ const main = 5: text
        │              ┬
-       │              ╰── restricted to one of int8, int16, int32, int64, uint8, uint16, uint32, uint64, found text
+       │              ╰── restricted to one of int8, int16, int32, int64, uint8, uint16, uint32, uint64, float32, float64, std::Decimal, found text
     ───╯
     "
     );

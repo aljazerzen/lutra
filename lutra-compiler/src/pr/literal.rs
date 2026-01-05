@@ -4,8 +4,7 @@ use enum_as_inner::EnumAsInner;
 
 #[derive(Debug, EnumAsInner, PartialEq, Clone)]
 pub enum Literal {
-    Integer(i64),
-    Float(f64),
+    Number(String),
     Boolean(bool),
     Text(String),
     Date(Date),
@@ -28,11 +27,80 @@ pub struct Time {
     pub micros: Option<u32>,
 }
 
+impl Literal {
+    pub fn as_integer(&self) -> Option<u64> {
+        let mut number = self.as_number()?.clone();
+        number.retain(|c| c != '_');
+
+        if let Some(digits) = number.strip_prefix("0x") {
+            return u64::from_str_radix(digits, 16).ok();
+        }
+        if let Some(digits) = number.strip_prefix("0o") {
+            return u64::from_str_radix(digits, 8).ok();
+        }
+        if let Some(digits) = number.strip_prefix("0b") {
+            return u64::from_str_radix(digits, 2).ok();
+        }
+        if let Ok(unsigned) = number.parse::<u64>() {
+            return Some(unsigned);
+        }
+        if let Ok(signed) = number.parse::<i64>() {
+            return Some(signed as u64);
+        }
+        None
+    }
+    pub fn as_float(&self) -> Option<f64> {
+        let mut number = self.as_number()?.clone();
+        number.retain(|c| c != '_');
+        number.parse::<f64>().ok()
+    }
+    pub fn as_decimal(&self) -> Option<i64> {
+        let number = self.as_number()?;
+        if number.contains(|c: char| !(c.is_ascii_digit() || c == '_' || c == '.')) {
+            return None;
+        }
+
+        // detach minus
+        let (minus, digits) = number
+            .strip_prefix("-")
+            .map(|n| (true, n))
+            .unwrap_or((false, number));
+
+        // determine scale
+        let scale = digits
+            .bytes()
+            .skip_while(|c| *c != b'.')
+            .skip(1)
+            .filter(|c| *c != b'_')
+            .count();
+        if scale > 2 {
+            return None;
+        }
+
+        // parse digits
+        let mut r = digits
+            .bytes()
+            .filter(|c| *c != b'_' && *c != b'.')
+            .try_fold(0_i64, |v, d| {
+                v.checked_mul(10)?.checked_add((d - b'0') as i64)
+            })?;
+
+        // bring to scale 2
+        r = r.checked_mul(10_i64.pow(2 - scale as u32))?;
+
+        // apply minus
+        if minus {
+            r = r.checked_neg()?
+        }
+
+        Some(r)
+    }
+}
+
 impl std::fmt::Display for Literal {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Literal::Integer(i) => write!(f, "{i}"),
-            Literal::Float(n) => std::fmt::Debug::fmt(n, f),
+            Literal::Number(i) => write!(f, "{i}"),
 
             Literal::Text(s) => {
                 write!(f, "{}", quote_string(escape_all_except_quotes(s).as_str()))
@@ -135,19 +203,4 @@ pub fn escape_all_except_quotes(s: &str) -> String {
         }
     }
     result
-}
-
-#[test]
-#[cfg(test)]
-fn test_display_literal() {
-    assert_eq!(
-        Literal::Integer(i64::MAX).to_string(),
-        "9223372036854775807"
-    );
-    assert_eq!(
-        Literal::Integer(i64::MIN).to_string(),
-        "-9223372036854775808"
-    );
-    assert_eq!(Literal::Float(10.00000).to_string(), "10.0");
-    assert_eq!(Literal::Float(004.0232323).to_string(), "4.0232323");
 }
