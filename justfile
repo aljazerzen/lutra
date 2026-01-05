@@ -1,14 +1,17 @@
 _default:
     just --list
 
+# Show crate dependencies within the workspace
 show-deps-workspace:
     cargo depgraph --workspace-only --hide tests,lutra-cli,lutra-tui > ./target/deps-workspace.dot
     dot ./target/deps-workspace.dot -Tsvg -o ./target/graph.svg -Gnodesep=0.5
     xdg-open ./target/graph.svg 2> /dev/null
 
+# Start PostgreSQL
 pg-up:
     podman run -e POSTGRES_PASSWORD=pass -p 5416:5432 docker.io/library/postgres:latest
 
+# Run tests, insta review, fmt, clippy
 dev FILTER_SET='all()' *NEXTEST_ARGS='':
     # RUST_BACKTRACE=1
     RUST_LOG=debug INSTA_FORCE_PASS=1 \
@@ -20,10 +23,12 @@ dev FILTER_SET='all()' *NEXTEST_ARGS='':
     cargo clippy --all-targets
     cargo check -p lutra-bin --no-default-features
 
+# Run ignored tests
 test-ignored:
     INSTA_FORCE_PASS=1 \
     cargo nextest --profile=overview run --run-ignored=only
 
+# Re-generate committed generated files
 [working-directory: 'lutra-bin/src/project']
 generate:
     cargo run -p lutra-cli -- codegen --lutra-bin-path="crate" . ./generated.rs
@@ -35,9 +40,11 @@ generate-precompiled:
     ../../../target/debug/lutra codegen --lutra-bin-path="crate" . ./generated.rs
     cargo fmt -p lutra-bin
 
+# Test (this should pass for every commit)
 test:
     cargo nextest run --profile=overview
 
+# Publish crates
 publish:
     cargo publish -p lutra-bin
     cargo publish -p sql-ast
@@ -49,6 +56,7 @@ publish:
     cargo publish -p lutra-interpreter
     cargo publish -p lutra-cli
 
+# Run a command for each Python package
 py *ARGS='':
     cd lutra-bin/python && just {{ARGS}}
     cd lutra-runner-postgres/python && just {{ARGS}}

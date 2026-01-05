@@ -503,13 +503,13 @@ fn types_20() {
     // matching patterns into type vars
 
     insta::assert_snapshot!(_test_ty(r#"
-        type Status: enum {Done, Pending: int16, Cancelled: text}
+        type Status: enum {done, pending: int16, cancelled: text}
 
         func main() -> (
-          .Done: Status
+          .done: Status
           | func (x) -> match x {
-            .Done => "done",
-            .Cancelled(reason) => f"pending {reason}",
+            .done => "done",
+            .cancelled(reason) => f"pending {reason}",
             _ => f"something else",
           }
         )
@@ -845,9 +845,9 @@ fn enums_00() {
     insta::assert_snapshot!(
         _test_ty(
             "
-            type Status: enum { Open, Done, Pending: text }
+            type Status: enum { Open, done, pending: text }
 
-            func main() -> .Done: Status
+            func main() -> .done: Status
             "
         ),
         @"Status"
@@ -859,9 +859,9 @@ fn enums_01() {
     insta::assert_snapshot!(
         _test_ty(
             r#"
-            type Status: enum { Open, Done, Pending: text }
+            type Status: enum { Open, done, pending: text }
 
-            func main() -> .Pending("hello"): Status
+            func main() -> .pending("hello"): Status
             "#
         ),
         @"Status"
@@ -872,19 +872,19 @@ fn enums_01() {
 fn enums_02() {
     // TODO: this error message is confusing, because it is backwards
     // It does make *some* amount of sense: we constructed a value that has the
-    // type `enum {.Pending: {}, ..}`. What's failing is applying type
+    // type `enum {.pending: {}, ..}`. What's failing is applying type
     // annotation to it. So, our value expected annotation to have type text.
     insta::assert_snapshot!(_test_err(
         r#"
-        type Status: enum { Open, Done, Pending: text }
+        type Status: enum { Open, done, pending: text }
 
-        func main() -> .Pending: Status
+        func main() -> .pending: Status
         "#
     ), @"
     [E0006] Error:
        ╭─[<unknown>:4:24]
        │
-     4 │         func main() -> .Pending: Status
+     4 │         func main() -> .pending: Status
        │                        ────┬───
        │                            ╰───── expected type `{}`, but found type `text`
     ───╯
@@ -902,11 +902,9 @@ fn recursive_00() {
             r#"
             type Tree: {left: Tree, right: Tree}
 
-            type OptionalTree: enum {
-                None,
-                Some: Tree,
-            }
-            func main(): OptionalTree -> .None
+            type OptionalTree: enum {none, some: Tree}
+
+            func main(): OptionalTree -> .none
             "#
         ),
         r#"
@@ -918,12 +916,12 @@ fn recursive_00() {
 #[test]
 fn match_00() {
     insta::assert_snapshot!(_test_ty(r#"
-        type Status: enum {Done, Pending: int16, Cancelled: text}
+        type Status: enum {done, pending: int16, cancelled: text}
 
-        func main() -> match .Done: Status {
-          .Done => "done",
-          .Pending => "pending",
-          .Cancelled => "cancelled",
+        func main() -> match .done: Status {
+          .done => "done",
+          .pending => "pending",
+          .cancelled => "cancelled",
         }
     "#), @"text");
 }
@@ -932,33 +930,33 @@ fn match_00() {
 #[ignore] // TODO
 fn match_01() {
     insta::assert_snapshot!(_test_err(r#"
-        type Status: enum {Done, Pending: int16, Cancelled: text}
+        type Status: enum {done, pending: int16, cancelled: text}
 
-        func main() -> match .Done: Status {
-          .Done => "done",
-          .Cancelled => "cancelled",
+        func main() -> match .done: Status {
+          .done => "done",
+          .cancelled => "cancelled",
         }
     "#), @r#"
-        Variant Status::Pending not covered.
+        Variant .pending not covered.
     "#);
 }
 
 #[test]
 fn match_02() {
     insta::assert_snapshot!(_test_err(r#"
-        type Status: enum {Done, Pending: int16, Cancelled: text}
-        type Color: enum {Red, Green, Blue}
+        type Status: enum {done, pending: int16, cancelled: text}
+        type Color: enum {red, green, blue}
 
-        func main() -> match .Done: Status {
-          .Red => "red",
-          .Green => "green",
-          .Blue => "blue",
+        func main() -> match .done: Status {
+          .red => "red",
+          .green => "green",
+          .blue => "blue",
         }
     "#), @r#"
     Error:
        ╭─[<unknown>:6:11]
        │
-     6 │           .Red => "red",
+     6 │           .red => "red",
        │           ──┬─
        │             ╰─── variant does not exist
     ───╯
@@ -968,18 +966,18 @@ fn match_02() {
 #[test]
 fn match_03() {
     insta::assert_snapshot!(_test_err(r#"
-        type Color: enum {Red, Green, Blue}
+        type Color: enum {red, green, blue}
 
-        func main() -> match .Green: Color {
-          .Red => "red",
-          .Green => 1,
-          .Blue => false,
+        func main() -> match .green: Color {
+          .red => "red",
+          .green => 1,
+          .blue => false,
         }
     "#), @"
     [E0006] Error:
        ╭─[<unknown>:7:20]
        │
-     7 │           .Blue => false,
+     7 │           .blue => false,
        │                    ──┬──
        │                      ╰──── match expected type `text`, but found type `bool`
     ───╯
@@ -989,10 +987,10 @@ fn match_03() {
 #[test]
 fn match_04() {
     insta::assert_snapshot!(_test_ty(r#"
-        type Status: enum {Pending: bool}
+        type Status: enum {pending: bool}
 
-        func main() -> match .Pending(false): Status {
-          .Pending(x) => x,
+        func main() -> match .pending(false): Status {
+          .pending(x) => x,
         }
     "#), @"bool");
 }
@@ -1000,10 +998,10 @@ fn match_04() {
 #[test]
 fn match_05() {
     insta::assert_snapshot!(_test_ty(r#"
-        type Status: enum {Pending: int32}
+        type Status: enum {pending: int32}
 
-        func main() -> match .Pending(4): Status {
-          .Pending(x) => x,
+        func main() -> match .pending(4): Status {
+          .pending(x) => x,
         }
     "#), @"int32");
 }
@@ -1011,19 +1009,16 @@ fn match_05() {
 #[test]
 fn match_06() {
     insta::assert_snapshot!(_test_err(r#"
-        type Animal: enum {
-          Cat: text,
-          Dog: bool,
-        }
+        type Animal: enum {cat: text, dog: bool}
 
-        func main(): [text] -> match .Cat: Animal {
-          .Cat(name) | .Dog(is_vaccinated) => true,
+        func main(): [text] -> match .cat: Animal {
+          .cat(name) | .dog(is_vaccinated) => true,
         }
     "#), @"
     Error:
-       ╭─[<unknown>:8:24]
+       ╭─[<unknown>:5:24]
        │
-     8 │           .Cat(name) | .Dog(is_vaccinated) => true,
+     5 │           .cat(name) | .dog(is_vaccinated) => true,
        │                        ─────────┬─────────
        │                                 ╰─────────── patterns introduce different variable names
     ───╯
@@ -1034,18 +1029,18 @@ fn match_06() {
 fn match_07() {
     insta::assert_snapshot!(_test_err(r#"
         type Animal: enum {
-          Cat: text,
-          Dog: bool,
+          cat: text,
+          dog: bool,
         }
 
-        func main(): text -> match .Cat: Animal {
-          .Cat(name) | .Dog(name) => name,
+        func main(): text -> match .cat: Animal {
+          .cat(name) | .dog(name) => name,
         }
     "#), @"
     [E0006] Error:
        ╭─[<unknown>:8:29]
        │
-     8 │           .Cat(name) | .Dog(name) => name,
+     8 │           .cat(name) | .dog(name) => name,
        │                             ──┬─
        │                               ╰─── expected type `text`, but found type `bool`
     ───╯
@@ -1949,13 +1944,13 @@ fn framed_07() {
 #[ignore] // Issue #88
 fn framed_08() {
     insta::assert_snapshot!(_test_ty(r#"
-    type Status(enum {Pending: text, Done})
+    type Status(enum {pending: text, done})
 
     func main() -> (
-      let s = Status(.Pending("hello"));
+      let s = Status(.pending("hello"));
       match s {
-        Status(.Pending(x)) => x,
-        Status(.Done) => "",
+        Status(.pending(x)) => x,
+        Status(.done) => "",
       }
     )
     "#), @r"

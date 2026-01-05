@@ -19,7 +19,7 @@ fn lower_01() {
 
       func get_albums(): [album]
 
-      func get_album_by_id(album_id: int64): enum { None, Some: album } -> (
+      func get_album_by_id(album_id: int64): enum { none, some: album } -> (
         get_albums()
         | std::filter(func (this: album) -> this.id == album_id)
         | std::index(0)
@@ -31,7 +31,7 @@ fn lower_01() {
 
       func get_album_sales(): [AlbumSale]
 
-      func get_album_sales_by_id(album_id: int64): enum { None, Some: AlbumSale } -> (
+      func get_album_sales_by_id(album_id: int64): enum { none, some: AlbumSale } -> (
         get_album_sales()
         | std::filter(func (this: AlbumSale) -> this.id == album_id)
         | std::index(0)
@@ -43,8 +43,8 @@ fn lower_01() {
       chinook::get_album_by_id(album_id),
       box_office::get_album_sales_by_id(album_id),
     }
-    "#), @r"
-    type std::Ordering = enum {Less, Equal, Greater};
+    "#), @"
+    type std::Ordering = enum {less, equal, greater};
     type chinook::album = {id: int64, title: text};
     type box_office::AlbumSale = {id: int64, total: float64};
     let main = (func 1 ->
@@ -71,7 +71,7 @@ fn lower_01() {
       )[90m: func (int64, int64) -> bool[0m;
       let 0 = (func 2 ->
         (call
-          external.std::index[90m: func ([{id: int64, title: text}], int64) -> enum {None, Some: {id: int64, title: text}}[0m,
+          external.std::index[90m: func ([{id: int64, title: text}], int64) -> enum {none, some: {id: int64, title: text}}[0m,
           (call
             external.std::filter[90m: func ([{id: int64, title: text}], func ({id: int64, title: text}) -> bool) -> [{id: int64, title: text}][0m,
             (call
@@ -89,11 +89,11 @@ fn lower_01() {
             )[90m: func (chinook::album) -> bool[0m,
           )[90m: [{id: int64, title: text}][0m,
           0[90m: int64[0m,
-        )[90m: enum {None, Some: {id: int64, title: text}}[0m
-      )[90m: func (int64) -> enum {None, Some: chinook::album}[0m;
+        )[90m: enum {none, some: {id: int64, title: text}}[0m
+      )[90m: func (int64) -> enum {none, some: chinook::album}[0m;
       let 1 = (func 4 ->
         (call
-          external.std::index[90m: func ([{id: int64, total: float64}], int64) -> enum {None, Some: {id: int64, total: float64}}[0m,
+          external.std::index[90m: func ([{id: int64, total: float64}], int64) -> enum {none, some: {id: int64, total: float64}}[0m,
           (call
             external.std::filter[90m: func ([{id: int64, total: float64}], func ({id: int64, total: float64}) -> bool) -> [{id: int64, total: float64}][0m,
             (call
@@ -111,8 +111,8 @@ fn lower_01() {
             )[90m: func (box_office::AlbumSale) -> bool[0m,
           )[90m: [{id: int64, total: float64}][0m,
           0[90m: int64[0m,
-        )[90m: enum {None, Some: {id: int64, total: float64}}[0m
-      )[90m: func (int64) -> enum {None, Some: box_office::AlbumSale}[0m;
+        )[90m: enum {none, some: {id: int64, total: float64}}[0m
+      )[90m: func (int64) -> enum {none, some: box_office::AlbumSale}[0m;
       (call
         (func 0 ->
           (tuple
@@ -120,18 +120,18 @@ fn lower_01() {
               external.chinook::get_albums[90m: func () -> [chinook::album][0m,
             )[90m: [chinook::album][0m,
             (call
-              var.0[90m: func (int64) -> enum {None, Some: chinook::album}[0m,
+              var.0[90m: func (int64) -> enum {none, some: chinook::album}[0m,
               fn.0+0[90m: int64[0m,
-            )[90m: enum {None, Some: chinook::album}[0m,
+            )[90m: enum {none, some: chinook::album}[0m,
             (call
-              var.1[90m: func (int64) -> enum {None, Some: box_office::AlbumSale}[0m,
+              var.1[90m: func (int64) -> enum {none, some: box_office::AlbumSale}[0m,
               fn.0+0[90m: int64[0m,
-            )[90m: enum {None, Some: box_office::AlbumSale}[0m,
-          )[90m: {[chinook::album], enum {None, Some: chinook::album}, enum {None, Some: box_office::AlbumSale}}[0m
-        )[90m: func (int64) -> {[chinook::album], enum {None, Some: chinook::album}, enum {None, Some: box_office::AlbumSale}}[0m,
+            )[90m: enum {none, some: box_office::AlbumSale}[0m,
+          )[90m: {[chinook::album], enum {none, some: chinook::album}, enum {none, some: box_office::AlbumSale}}[0m
+        )[90m: func (int64) -> {[chinook::album], enum {none, some: chinook::album}, enum {none, some: box_office::AlbumSale}}[0m,
         fn.1+0[90m: int64[0m,
-      )[90m: {[chinook::album], enum {None, Some: chinook::album}, enum {None, Some: box_office::AlbumSale}}[0m
-    )[90m: func (int64) -> {[chinook::album], enum {None, Some: chinook::album}, enum {None, Some: box_office::AlbumSale}}[0m
+      )[90m: {[chinook::album], enum {none, some: chinook::album}, enum {none, some: box_office::AlbumSale}}[0m
+    )[90m: func (int64) -> {[chinook::album], enum {none, some: chinook::album}, enum {none, some: box_office::AlbumSale}}[0m
     ")
 }
 
@@ -139,16 +139,16 @@ fn lower_01() {
 fn lower_02() {
     assert_snapshot!(_test_compile_and_print(r#"
     type Status: enum {
-      Open,
-      Closed: text,
+      open,
+      closed: text,
     }
 
-    func main() -> match .Closed("x"): Status {
-      .Open => "open",
-      .Closed => "closed",
+    func main() -> match .closed("x"): Status {
+      .open => "open",
+      .closed => "closed",
     }
     "#), @r#"
-    type Status = enum {Open, Closed: text};
+    type Status = enum {open, closed: text};
     let main = (func 0 ->
       let 0 = (enum_variant 1
         "x"[90m: text[0m

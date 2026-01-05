@@ -88,13 +88,13 @@ where T: int8 | int16 | int32 | int64 | float32 | float64
 func cmp(a: T, b: T): Ordering
 where T: primitive
 
-type Ordering: enum {Less, Equal, Greater}
+type Ordering: enum {less, equal, greater}
 
 ## Tests if values are equal. Used by `==` operator.
 func eq(left: T, right: T): bool
 where T: primitive -> (
   match cmp(left, right) {
-    .Equal => true,
+    .equal => true,
     _ => false,
   }
 )
@@ -103,7 +103,7 @@ where T: primitive -> (
 func ne(left: T, right: T): bool
 where T: primitive  -> (
   match cmp(left, right) {
-    .Equal => false,
+    .equal => false,
     _ => true,
   }
 )
@@ -112,7 +112,7 @@ where T: primitive  -> (
 func gt(left: T, right: T): bool
 where T: primitive -> (
   match cmp(left, right) {
-    .Greater => true,
+    .greater => true,
     _ => false,
   }
 )
@@ -121,7 +121,7 @@ where T: primitive -> (
 func lt(left: T, right: T): bool
 where T: primitive -> (
   match cmp(left, right) {
-    .Less => true,
+    .less => true,
     _ => false,
   }
 )
@@ -130,7 +130,7 @@ where T: primitive -> (
 func gte(left: T, right: T): bool
 where T: primitive -> (
   match cmp(left, right) {
-    .Less => false,
+    .less => false,
     _ => true,
   }
 )
@@ -139,7 +139,7 @@ where T: primitive -> (
 func lte(left: T, right: T): bool
 where T: primitive -> (
   match cmp(left, right) {
-    .Greater => false,
+    .greater => false,
     _ => true,
   }
 )
@@ -155,45 +155,45 @@ func not(expr: bool): bool
 
 # --- Option functions ---
 
-func or_else(value: enum {None, Some: T}, fallback: T): T
+func or_else(value: enum {none, some: T}, fallback: T): T
 where T
 -> (
   match value {
-    .Some(x) => x,
-    .None => fallback,
+    .some(x) => x,
+    .none => fallback,
   }
 )
 
-func or_default(value: enum {None, Some: T}): T
+func or_default(value: enum {none, some: T}): T
 where T
 -> (
   match value {
-    .Some(x) => x,
-    .None => default(),
+    .some(x) => x,
+    .none => default(),
   }
 )
 
-func is_some(value: enum {None, Some: T}): bool
+func is_some(value: enum {none, some: T}): bool
 where T
 -> (
   match value {
-    .Some => true,
-    .None => false,
+    .some => true,
+    .none => false,
   }
 )
 
-func is_none(value: enum {None, Some: T}): bool
+func is_none(value: enum {none, some: T}): bool
 where T
 -> (
   match value {
-    .Some => false,
-    .None => true,
+    .some => false,
+    .none => true,
   }
 )
 
 # --- Array functions ---
 
-func index(array: [T], position: int64): enum {None, Some: T}
+func index(array: [T], position: int64): enum {none, some: T}
 where T
 
 func count(array: [T]): int64
@@ -212,7 +212,7 @@ where I, O
 func filter(array: [T], condition: func (T): bool): [T]
 where T
 
-func find(array: [T], condition: func (T): bool): enum {None, Some: T}
+func find(array: [T], condition: func (T): bool): enum {none, some: T}
 where T
 -> (array | filter(condition) | index(0))
 
@@ -317,13 +317,13 @@ where N: int8 | int16 | int32 | int64 | uint8 | uint16 | uint32 | uint64
 # --- Aggregation functions ---
 
 ## Find the minimum value in the array.
-## Returns `None` when array is empty.
-func min(array: [T]): enum {None, Some: T}
+## Returns `none` when array is empty.
+func min(array: [T]): enum {none, some: T}
 where T: primitive
 
 ## Find the maximum value in the array.
-## Returns `None` when array is empty.
-func max(array: [T]): enum {None, Some: T}
+## Returns `none` when array is empty.
+func max(array: [T]): enum {none, some: T}
 where T: primitive
 
 ## Compute sum of all number in an array.

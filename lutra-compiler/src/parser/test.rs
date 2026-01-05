@@ -246,8 +246,8 @@ fn parse_04() {
 fn parse_05() {
     assert_debug_snapshot!(parse_expr(r#"
         match item.status {
-            .Open => 5,
-            .Closed(reason) => 6 + 7,
+            .open => 5,
+            .closed(reason) => 6 + 7,
             anything_else => 0,
         }
     "#).kind, @r#"
@@ -283,7 +283,7 @@ fn parse_05() {
                 MatchBranch {
                     pattern: Pattern {
                         kind: Enum(
-                            "Open",
+                            "open",
                             None,
                         ),
                         span: 0:41-46,
@@ -307,7 +307,7 @@ fn parse_05() {
                 MatchBranch {
                     pattern: Pattern {
                         kind: Enum(
-                            "Closed",
+                            "closed",
                             Some(
                                 Pattern {
                                     kind: Bind(
@@ -397,8 +397,8 @@ fn parse_05() {
 fn parse_06() {
     assert_debug_snapshot!(parse_expr(r#"
         match 1 {
-            .Open(timestamp) => 1,
-            .Closed(.Other(inner)) => 1,
+            .open(timestamp) => 1,
+            .closed(.Other(inner)) => 1,
         }
     "#).kind, @r#"
     Match(
@@ -421,7 +421,7 @@ fn parse_06() {
                 MatchBranch {
                     pattern: Pattern {
                         kind: Enum(
-                            "Open",
+                            "open",
                             Some(
                                 Pattern {
                                     kind: Bind(
@@ -453,7 +453,7 @@ fn parse_06() {
                 MatchBranch {
                     pattern: Pattern {
                         kind: Enum(
-                            "Closed",
+                            "closed",
                             Some(
                                 Pattern {
                                     kind: Enum(

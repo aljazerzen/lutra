@@ -304,13 +304,13 @@ fn format_18() {
     // variant
 
     assert_snapshot!(_format(r#"
-    const a = .None
-    const b = .Some(
+    const a = .none
+    const b = .some(
       a_value_that_is_long)
     "#), @"
-    const a = .None
+    const a = .none
 
-    const b = .Some(a_value_that_is_long)
+    const b = .some(a_value_that_is_long)
     "
     )
 }

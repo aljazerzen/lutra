@@ -329,7 +329,7 @@ impl NameResolver<'_> {
 }
 
 /// Traverses a pattern and returns the set of all bound names.
-/// For example `.Cat(name) | .Dog(name)` would return `[name]`.
+/// For example `.cat(name) | .dog(name)` would return `[name]`.
 fn collect_pattern_binds(pattern: &pr::Pattern) -> Result<Vec<String>> {
     match &pattern.kind {
         pr::PatternKind::Literal(_) => Ok(vec![]),

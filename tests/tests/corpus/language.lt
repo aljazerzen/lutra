@@ -103,7 +103,7 @@ func main() -> {
 # >
 {
   true,
-  Some(4),
+  some(4),
   false,
 }
 
@@ -182,12 +182,12 @@ func main(): {int8, text, [bool]} -> std::default()
 
 # === default_06
 type Status: enum {
-  Open: int16,
-  Closed: bool,
+  open: int16,
+  closed: bool,
 }
 func main(): Status -> std::default()
 # >
-Open(0)
+open(0)
 
 # === default_10
 func main(): [bool] -> std::lag([std::default(), std::default()], 1)
@@ -251,14 +251,14 @@ func main(): [{int8, text, [bool]}] -> std::lag([std::default(), std::default()]
 # skip: postgres
 
 type Status: enum {
-  Open: int64,
-  Closed: bool,
+  open: int64,
+  closed: bool,
 }
 func main(): [Status] -> std::lag([std::default(), std::default()], 1)
 # >
 [
-  Open(0),
-  Open(0),
+  open(0),
+  open(0),
 ]
 
 # === empty_array_00
@@ -279,122 +279,122 @@ func main() -> ident([])
 
 # === enum_construction_00
 
-type Status: enum {Done, Pending: int64, Cancelled: text}
-const main: Status = .Done
+type Status: enum {done, pending: int64, cancelled: text}
+const main: Status = .done
 # >
-Done
+done
 
 # === enum_construction_01
 
-type Status: enum {Done, Pending: int64, Cancelled: text}
-const main: Status = .Pending(513)
+type Status: enum {done, pending: int64, cancelled: text}
+const main: Status = .pending(513)
 # >
-Pending(513)
+pending(513)
 
 # === enum_construction_02
 
-type Status: enum {Done, Pending: int64, Cancelled: text}
-const main: Status = .Cancelled("I don't like it")
+type Status: enum {done, pending: int64, cancelled: text}
+const main: Status = .cancelled("I don't like it")
 # >
-Cancelled("I don't like it")
+cancelled("I don't like it")
 
 # === enum_construction_03
 
-type Color: enum {Red, Green: bool, Blue: bool}
-const main: Color = .Red
+type Color: enum {red, green: bool, blue: bool}
+const main: Color = .red
 # >
-Red
+red
 
 # === enum_construction_04
 
-type Color: enum {Red, Green: int16, Blue: bool}
-const main: Color = .Green(12312)
+type Color: enum {red, green: int16, blue: bool}
+const main: Color = .green(12312)
 # >
-Green(12312)
+green(12312)
 
 # === enum_construction_05
 
-type Color: enum {Red, Green: bool, Blue: bool}
-const main: Color = .Blue(false)
+type Color: enum {red, green: bool, blue: bool}
+const main: Color = .blue(false)
 # >
-Blue(false)
+blue(false)
 
 # === enum_construction_06
 type Item: {
   id: int64,
-  color: enum {Red, Green: bool, Blue: bool},
+  color: enum {red, green: bool, blue: bool},
 }
 const main: Item = {
   id = 4,
-  color = .Green(true)
+  color = .green(true)
 }
 # >
 {
   id = 4,
-  color = Green(true),
+  color = green(true),
 }
 
 # === enum_construction_08
 
 type Animal: enum {
-  Cat: text,
-  Dog: enum {Collie: text, Generic},
+  cat: text,
+  dog: enum {collie: text, generic},
 }
 
 func main(): [Animal] -> [
-  .Cat("Whiskers"),
-  .Dog(.Collie("Belie")),
-  .Dog(.Generic),
+  .cat("Whiskers"),
+  .dog(.collie("Belie")),
+  .dog(.generic),
 ]
 # >
 [
-  Cat("Whiskers"),
-  Dog(Collie("Belie")),
-  Dog(Generic),
+  cat("Whiskers"),
+  dog(collie("Belie")),
+  dog(generic),
 ]
 
 # === enum_construction_09
 
 type Status: enum {
-  Open: int16,
-  Closed: bool,
+  open: int16,
+  closed: bool,
 }
-func main(): [Status] -> [.Open(0), .Open(0)]
+func main(): [Status] -> [.open(0), .open(0)]
 # >
 [
-  Open(0),
-  Open(0),
+  open(0),
+  open(0),
 ]
 
 # === enum_construction_10
 
-func main(): [enum {None, Some: text}] -> [
-  .None,
-  .Some("Whiskers"),
+func main(): [enum {none, some: text}] -> [
+  .none,
+  .some("Whiskers"),
 ]
 # >
 [
-  None,
-  Some("Whiskers"),
+  none,
+  some("Whiskers"),
 ]
 
 # === enum_construction_11
 
 type Animal: enum {
-  Cat: text,
-  Dog: enum {None, Some: text},
+  cat: text,
+  dog: enum {none, some: text},
 }
 
 func main() -> [
-  .Cat("Whiskers"): Animal,
-  .Dog(.Some("Belie")),
-  .Dog(.None),
+  .cat("Whiskers"): Animal,
+  .dog(.some("Belie")),
+  .dog(.none),
 ]
 # >
 [
-  Cat("Whiskers"),
-  Dog(Some("Belie")),
-  Dog(None),
+  cat("Whiskers"),
+  dog(some("Belie")),
+  dog(none),
 ]
 
 
@@ -467,10 +467,10 @@ func main() -> if lang == "en" then en else sl
 ]
 
 # === match_00
-type Status: enum {Done, Pending: int64, Cancelled: text}
-func main() -> match .Pending(4): Status {
-  .Pending => "pending",
-  .Cancelled => "cancelled",
+type Status: enum {done, pending: int64, cancelled: text}
+func main() -> match .pending(4): Status {
+  .pending => "pending",
+  .cancelled => "cancelled",
 }
 
 # >
@@ -489,15 +489,15 @@ func main(): int32 -> match .pending(4): Status {
 
 # === match_02
 type Animal: enum {
-  Cat: text,
-  Dog: enum {Collie: text, Generic},
+  cat: text,
+  dog: enum {collie: text, generic},
 }
 func main() -> (
-  .Dog(.Collie("Belie"))
+  .dog(.collie("Belie"))
   | func (animal: Animal) -> match animal {
-    .Cat(name) => f"Hello {name}",
-    .Dog(.Generic) => "Who's a good boy?",
-    .Dog(.Collie(name)) => f"Come here {name}",
+    .cat(name) => f"Hello {name}",
+    .dog(.generic) => "Who's a good boy?",
+    .dog(.collie(name)) => f"Come here {name}",
   }
 )
 
@@ -507,18 +507,18 @@ func main() -> (
 # === match_03
 
 type Animal: enum {
-  Cat: text,
-  Dog: text,
+  cat: text,
+  dog: text,
 }
 
 func main() -> (
   [
-    .Cat("Whiskers"),
-    .Dog("Belie"),
+    .cat("Whiskers"),
+    .dog("Belie"),
   ]
   | std::map(func (animal: Animal) -> match animal {
-    .Cat(name) => f"Hello {name}",
-    .Dog(name) => "Who's a good boy?",
+    .cat(name) => f"Hello {name}",
+    .dog(name) => "Who's a good boy?",
   })
 )
 
@@ -531,19 +531,19 @@ func main() -> (
 
 # === match_04
 type Animal: enum {
-  Cat: text,
-  Dog: enum {Collie: text, Generic},
+  cat: text,
+  dog: enum {collie: text, generic},
 }
 func main() -> (
   [
-    .Cat("Whiskers"),
-    .Dog(.Collie("Belie")),
-    .Dog(.Generic),
+    .cat("Whiskers"),
+    .dog(.collie("Belie")),
+    .dog(.generic),
   ]
   | std::map(func (animal: Animal) -> match animal {
-    .Cat(name) => f"Hello {name}",
-    .Dog(.Generic) => "Who's a good boy?",
-    .Dog(.Collie(name)) => f"Come here {name}",
+    .cat(name) => f"Hello {name}",
+    .dog(.generic) => "Who's a good boy?",
+    .dog(.collie(name)) => f"Come here {name}",
   })
 )
 # >
@@ -580,15 +580,15 @@ func main() -> (
 
 # === match_07
 type Animal: enum {
-  Cat,
-  Dog,
-  Hamster,
+  cat,
+  dog,
+  hamster,
 }
 
 func main() -> (
-  [.Cat, .Dog, .Hamster, .Dog]: [Animal]
+  [.cat, .dog, .hamster, .dog]: [Animal]
   | std::map(func (a) -> match a {
-    .Cat | .Hamster => false,
+    .cat | .hamster => false,
     _ => true
   })
 )
@@ -602,18 +602,18 @@ func main() -> (
 
 # === match_08
 type Animal: enum {
-  Cat: text,
-  Dog: enum {Collie: text, Generic},
+  cat: text,
+  dog: enum {collie: text, generic},
 }
 
 func main(): [text] -> (
   [
-    .Cat("Whiskers"),
-    .Dog(.Generic),
-    .Dog(.Collie("Jessie")),
+    .cat("Whiskers"),
+    .dog(.generic),
+    .dog(.collie("Jessie")),
   ]
   | std::map(func (a: Animal): text -> match a {
-    .Cat(name) | .Dog(.Collie(name)) => name,
+    .cat(name) | .dog(.collie(name)) => name,
     _ => "<unnamed>"
   })
 )
@@ -625,17 +625,17 @@ func main(): [text] -> (
 ]
 
 # === or_else_00
-func main() -> .Some("hello") | std::or_else("world")
+func main() -> .some("hello") | std::or_else("world")
 # >
 "hello"
 
 # === or_else_01
-func main() -> .None | std::or_else("fallback")
+func main() -> .none | std::or_else("fallback")
 # >
 "fallback"
 
 # === or_else_02
-func main() -> .None: enum {None, Some: text} | std::or_default()
+func main() -> .none: enum {none, some: text} | std::or_default()
 # >
 ""
 
@@ -750,8 +750,8 @@ const my_rel: [{int64, int64}] = [{5,3},{65,1},{3, 2}]
 func main() -> std::aggregate(my_rel, func (x: {[int64], [int64]}) -> {std::min(x.0), std::min(x.1)})
 # >
 {
-  Some(3),
-  Some(1),
+  some(3),
+  some(1),
 }
 
 # === std_aggregate_01
@@ -760,8 +760,8 @@ func main() -> std::aggregate(
   func (x: {[bool], [text]}) -> {std::index(x.0, 0), std::index(x.1, 2)})
 # >
 {
-  Some(false),
-  Some("!"),
+  some(false),
+  some("!"),
 }
 
 # === std_all_00
@@ -1069,7 +1069,7 @@ func main() -> std::count([]: [bool])
 0
 
 # === std_count_02
-func main() -> std::count([.Some("a"), .None]: [enum {None, Some: text}])
+func main() -> std::count([.some("a"), .none]: [enum {none, some: text}])
 # >
 2
 
@@ -1165,12 +1165,12 @@ func main() -> std::filter(
 # === std_find_00
 func main() -> std::find([5,3,65,11,2]: [int64], func (x) -> x > 10)
 # >
-Some(65)
+some(65)
 
 # === std_find_01
 func main() -> std::find([5,3,65,3,2]: [int64], func (x) -> x < 0)
 # >
-None
+none
 
 
 # === std_flat_map_00
@@ -1489,9 +1489,9 @@ const b: int32 = 30
 func main() -> {cmp(a, b), cmp(a, a), cmp(b, a)}
 # >
 {
-  Less,
-  Equal,
-  Greater,
+  less,
+  equal,
+  greater,
 }
 
 # === std_eq_00
@@ -1721,27 +1721,27 @@ func main() -> {"aa" >= "aa", "aa" >= "ab", "ab" >= "aa", "ab" >= "ab"}
 # === std_index_00
 func main() -> std::index([5,3,65,3,2]: [int64], 3)
 # >
-Some(3)
+some(3)
 
 # === std_index_01
 func main() -> std::index([5,3,65,3,2]: [int64], 10)
 # >
-None
+none
 
 # === std_index_02
-func main() -> std::index([5.3,3.2,65.4,3.1,2.0], 3): enum { None, Some: float64 }
+func main() -> std::index([5.3,3.2,65.4,3.1,2.0], 3): enum { none, some: float64 }
 # >
-Some(3.1)
+some(3.1)
 
 # === std_index_04
 func main() -> std::index([false, false, false, true, false], 3)
 # >
-Some(true)
+some(true)
 
 # === std_index_06
 func main() -> std::index(["hello", "world", "!"], 2)
 # >
-Some("!")
+some("!")
 
 # === std_lag_00
 func main() -> std::lag([5,3,65,3,2,56,67]: [int8], 2)
@@ -2022,72 +2022,72 @@ func main() -> std::map_columnar(
 # === std_max_00
 func main() -> std::max([5,3,65,3,2,56,67]: [uint64])
 # >
-Some(67)
+some(67)
 
 # === std_max_01
 func main() -> std::max([]: [uint32])
 # >
-None
+none
 
 # === std_max_02
 func main() -> std::max(["b", "d", "c"])
 # >
-Some("d")
+some("d")
 
 # === std_max_03
 func main() -> std::max([false, true, true, false])
 # >
-Some(true)
+some(true)
 
 # === std_max_04
 func main() -> std::max([]: [bool])
 # >
-None
+none
 
 # === std_max_05
 func main() -> std::max([false, false])
 # >
-Some(false)
+some(false)
 
 # === std_max_06
 func main() -> std::max([true, true])
 # >
-Some(true)
+some(true)
 
 # === std_min_00
 func main() -> std::min([5,3,65,3,2,56,67]: [uint64])
 # >
-Some(2)
+some(2)
 
 # === std_min_01
 func main() -> std::min([]: [uint32])
 # >
-None
+none
 
 # === std_min_02
 func main() -> std::min(["b", "d", "c"])
 # >
-Some("b")
+some("b")
 
 # === std_min_03
 func main() -> std::min([false, true, true, false])
 # >
-Some(false)
+some(false)
 
 # === std_min_04
 func main() -> std::min([]: [bool])
 # >
-None
+none
 
 # === std_min_05
 func main() -> std::min([false, false])
 # >
-Some(false)
+some(false)
 
 # === std_min_06
 func main() -> std::min([true, true])
 # >
-Some(true)
+some(true)
 
 # === std_mod_00
 func main() -> (10 % 6): int64
@@ -2618,75 +2618,75 @@ func main() -> false_x_false({true, "hello"})
 
 # === recursive_type_00
 type Tree: enum {
-  Leaf: int8,
-  Node: {left: Tree, right: Tree},
+  leaf: int8,
+  node: {left: Tree, right: Tree},
 }
 const main: [Tree] = [
-  .Leaf(10),
-  .Leaf(12),
+  .leaf(10),
+  .leaf(12),
 ]
 # >
 [
-  Leaf(10),
-  Leaf(12),
+  leaf(10),
+  leaf(12),
 ]
 
 # === recursive_type_01
 type Tree: enum {
-  Leaf: int8,
-  Node: {left: Tree, right: Tree},
+  leaf: int8,
+  node: {left: Tree, right: Tree},
 }
-const main: Tree = .Node({
-  left = .Leaf(10): Tree,
-  right = .Node({
-    left = .Node({
-      left = .Leaf(12): Tree,
-      right = .Leaf(18): Tree,
+const main: Tree = .node({
+  left = .leaf(10): Tree,
+  right = .node({
+    left = .node({
+      left = .leaf(12): Tree,
+      right = .leaf(18): Tree,
     }),
-    right = .Leaf(20): Tree,
+    right = .leaf(20): Tree,
   }): Tree,
 })
 # >
-Node({
-  left = Leaf(10),
-  right = Node({
-    left = Node({
-      left = Leaf(12),
-      right = Leaf(18),
+node({
+  left = leaf(10),
+  right = node({
+    left = node({
+      left = leaf(12),
+      right = leaf(18),
     }),
-    right = Leaf(20),
+    right = leaf(20),
   }),
 })
 
 # === recursive_type_02
 type Tree: enum {
-  Leaf: int8,
-  Node: [Tree],
+  leaf: int8,
+  node: [Tree],
 }
-const main: Tree = .Node([
-  .Leaf(10),
-  .Node([
-    .Node([
-      .Leaf(12),
-      .Leaf(15),
-      .Leaf(18),
+const main: Tree = .node([
+  .leaf(10),
+  .node([
+    .node([
+      .leaf(12),
+      .leaf(15),
+      .leaf(18),
     ]),
-    .Leaf(20),
+    .leaf(20),
   ]),
-  .Leaf(21),
+  .leaf(21),
 ])
 # >
-Node([
-  Leaf(10),
-  Node([
-    Node([
-      Leaf(12),
-      Leaf(15),
-      Leaf(18),
+node([
+  leaf(10),
+  node([
+    node([
+      leaf(12),
+      leaf(15),
+      leaf(18),
     ]),
-    Leaf(20),
+    leaf(20),
   ]),
-  Leaf(21),
+  leaf(21),
 ])
 
 # === date_00

@@ -55,7 +55,7 @@ fn inline_02() {
       my_rel
       | std::aggregate(func (x: {[int64], [int64]}) -> {std::min(x.0), std::min(x.1)})
     )
-    "#), @r"
+    "#), @"
     let main = (func 2 ->
       let 5 = (call
         external.std::to_columnar[90m: func ([{int64, int64}]) -> {[int64], [int64]}[0m,
@@ -76,21 +76,21 @@ fn inline_02() {
       )[90m: {[int64], [int64]}[0m;
       (tuple
         (call
-          external.std::min[90m: func ([int64]) -> enum {None, Some: int64}[0m,
+          external.std::min[90m: func ([int64]) -> enum {none, some: int64}[0m,
           (tuple_lookup
             var.5[90m: {[int64], [int64]}[0m
             0
           )[90m: [int64][0m,
-        )[90m: enum {None, Some: int64}[0m,
+        )[90m: enum {none, some: int64}[0m,
         (call
-          external.std::min[90m: func ([int64]) -> enum {None, Some: int64}[0m,
+          external.std::min[90m: func ([int64]) -> enum {none, some: int64}[0m,
           (tuple_lookup
             var.5[90m: {[int64], [int64]}[0m
             1
           )[90m: [int64][0m,
-        )[90m: enum {None, Some: int64}[0m,
-      )[90m: {enum {None, Some: int64}, enum {None, Some: int64}}[0m
-    )[90m: func ({}) -> {enum {None, Some: int64}, enum {None, Some: int64}}[0m
+        )[90m: enum {none, some: int64}[0m,
+      )[90m: {enum {none, some: int64}, enum {none, some: int64}}[0m
+    )[90m: func ({}) -> {enum {none, some: int64}, enum {none, some: int64}}[0m
     ")
 }
 
@@ -98,17 +98,17 @@ fn inline_02() {
 fn inline_03() {
     assert_snapshot!(_test_compile_and_print(r#"
     type OptText: enum {
-      None,
-      Some: text,
+      none,
+      some: text,
     }
     func main() -> {
-      .Some("hello"): OptText,
-      .None: OptText,
-      std::is_some(.Some("hello"): OptText),
-      std::is_none(.Some("hello"): OptText),
+      .some("hello"): OptText,
+      .none: OptText,
+      std::is_some(.some("hello")),
+      std::is_none(.some("hello")),
     }
     "#), @r#"
-    type OptText = enum {None, Some: text};
+    type OptText = enum {none, some: text};
     let main = (func 1 ->
       (tuple
         (enum_variant 1
@@ -118,7 +118,7 @@ fn inline_03() {
         (enum_eq
           (enum_variant 1
             "hello"[90m: text[0m
-          )[90m: OptText[0m
+          )[90m: enum {none, some: text}[0m
           1
         )[90m: bool[0m,
         (call
@@ -126,7 +126,7 @@ fn inline_03() {
           (enum_eq
             (enum_variant 1
               "hello"[90m: text[0m
-            )[90m: OptText[0m
+            )[90m: enum {none, some: text}[0m
             1
           )[90m: bool[0m,
         )[90m: bool[0m,

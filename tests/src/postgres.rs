@@ -288,9 +288,9 @@ fn array_empty() {
 fn array_enum() {
     insta::assert_snapshot!(_sql_and_output(_run(r#"
         type Status: enum {
-          Pending, InProgress: {started_at: text, owner: text}, Done: text
+          pending, in_progress: {started_at: text, owner: text}, done: text
         }
-        const main: [Status] = [.Pending, .InProgress({"today", "me"}), .Done("ok")]
+        const main: [Status] = [.pending, .in_progress({"today", "me"}), .done("ok")]
     "#, lutra_bin::Value::unit())), @r#"
     SELECT
       r0._t,
@@ -326,12 +326,12 @@ fn array_enum() {
       r0.index
     ---
     [
-      Pending,
-      InProgress({
+      pending,
+      in_progress({
         started_at = "today",
         owner = "me",
       }),
-      Done("ok"),
+      done("ok"),
     ]
     "#);
 }
@@ -340,11 +340,11 @@ fn array_enum() {
 fn enum_array() {
     insta::assert_snapshot!(_sql_and_output(_run(r#"
         type Status: enum {
-          Pending, InProgress: [text], Done: text
+          pending, in_progress: [text], done: text
         }
         const main = {
           "statuses:",
-          [.Pending, .InProgress(["today", "me"]), .Done("ok"): Status],
+          [.pending, .in_progress(["today", "me"]), .done("ok"): Status],
         }
     "#, lutra_bin::Value::unit())), @r#"
     SELECT
@@ -412,12 +412,12 @@ fn enum_array() {
     {
       "statuses:",
       [
-        Pending,
-        InProgress([
+        pending,
+        in_progress([
           "today",
           "me",
         ]),
-        Done("ok"),
+        done("ok"),
       ],
     }
     "#);
@@ -521,11 +521,11 @@ fn tuple_array_prim() {
 fn tuple_array_enum() {
     insta::assert_snapshot!(_sql_and_output(_run(r#"
         type Status: enum {
-          Pending, InProgress: {started_at: text, owner: text}, Done: text
+          pending, in_progress: {started_at: text, owner: text}, done: text
         }
         const main = {
           "statuses:",
-          [.Pending, .InProgress({"today", "me"}), .Done("ok")]: [Status],
+          [.pending, .in_progress({"today", "me"}), .done("ok")]: [Status],
         }
     "#, lutra_bin::Value::unit())), @r#"
     SELECT
@@ -575,12 +575,12 @@ fn tuple_array_enum() {
     {
       "statuses:",
       [
-        Pending,
-        InProgress({
+        pending,
+        in_progress({
           started_at = "today",
           owner = "me",
         }),
-        Done("ok"),
+        done("ok"),
       ],
     }
     "#);
@@ -591,7 +591,7 @@ fn tuple_array_maybe() {
     insta::assert_snapshot!(_sql_and_output(_run(r#"
         const main = {
           "ids:",
-          [.None, .Some(5)]: [enum { None, Some: int32 }],
+          [.none, .some(5)]: [enum { none, some: int32 }],
         }
     "#, lutra_bin::Value::unit())), @r#"
     SELECT
@@ -625,8 +625,8 @@ fn tuple_array_maybe() {
     {
       "ids:",
       [
-        None,
-        Some(5),
+        none,
+        some(5),
       ],
     }
     "#);
@@ -1079,7 +1079,7 @@ fn param_04() {
         ]),
     ])
     ).1, @r#"
-    Some({
+    some({
       7,
       "world",
     })
@@ -1151,7 +1151,7 @@ fn param_06() {
 fn param_07() {
     insta::assert_snapshot!(_sql_and_output(_run(r#"
     type Status: enum {
-      Pending, InProgress: {started_at: text, owner: text}, Done: text
+      pending, in_progress: {started_at: text, owner: text}, done: text
     }
     func main(x: Status) -> {"hello", x}
     "#,
@@ -1172,7 +1172,7 @@ fn param_07() {
     ---
     {
       "hello",
-      x = InProgress({
+      x = in_progress({
         started_at = "today",
         owner = "me",
       }),
@@ -1184,7 +1184,7 @@ fn param_07() {
 fn param_08() {
     insta::assert_snapshot!(_sql_and_output(_run(r#"
     type Status: enum {
-      Pending, InProgress: {started_at: text, owner: text}, Done: text
+      pending, in_progress: {started_at: text, owner: text}, done: text
     }
     func main(x: [Status]) -> {"hello", x}
     "#,
@@ -1213,12 +1213,12 @@ fn param_08() {
     {
       "hello",
       x = [
-        InProgress({
+        in_progress({
           started_at = "today",
           owner = "me",
         }),
-        Pending,
-        Done("ok"),
+        pending,
+        done("ok"),
       ],
     }
     "#);
@@ -1228,7 +1228,7 @@ fn param_08() {
 fn param_09() {
     insta::assert_snapshot!(_run(r#"
     type Status: enum {
-      Pending, InProgress: {started_at: text, owner: text}, Done: text
+      pending, in_progress: {started_at: text, owner: text}, done: text
     }
     func main(x: {text, Status}) -> x
     "#,
@@ -1242,7 +1242,7 @@ fn param_09() {
     ).1, @r#"
     {
       "hello",
-      Done("ok"),
+      done("ok"),
     }
     "#);
 }
@@ -1260,7 +1260,7 @@ fn param_10() {
 fn param_11() {
     // maybe enum
     insta::assert_snapshot!(_run(r#"
-    type OptInt: enum { None, Some: int32 }
+    type OptInt: enum { none, some: int32 }
     func main(x: [OptInt]) -> x
     "#,
     lutra_bin::Value::Array(vec![
@@ -1269,8 +1269,8 @@ fn param_11() {
     ])
     ).1, @r"
     [
-      None,
-      Some(5),
+      none,
+      some(5),
     ]
     ");
 }
@@ -1287,7 +1287,7 @@ fn tuple_unpacking_00() {
     ).1, @r#"
     {
       4,
-      Some({
+      some({
         id = 3,
         title = "Hello world!",
       }),
@@ -1359,10 +1359,10 @@ fn json_pack_02() {
         std::index(y, 1)
       ))
     )
-    "#, lutra_bin::Value::unit()).1, @r"
+    "#, lutra_bin::Value::unit()).1, @"
     [
-      Some(2),
-      Some(5),
+      some(2),
+      some(5),
     ]
     ");
 }
@@ -1485,7 +1485,7 @@ fn json_pack_08() {
       std::index([["hello"]], 0)
     )
     "#, lutra_bin::Value::unit()).1, @r#"
-    Some([
+    some([
       "hello",
     ])
     "#);
@@ -1642,20 +1642,20 @@ fn if_01() {
 fn match_04() {
     insta::assert_snapshot!(_sql_and_output(_run(r#"
     type Animal: enum {
-      Cat: text,
-      Dog: enum {Collie: text, Generic},
+      cat: text,
+      dog: enum {collie: text, generic},
     }
 
     func main() -> (
       [
-        .Cat("Whiskers"),
-        .Dog(.Collie("Belie")),
-        .Dog(.Generic),
+        .cat("Whiskers"),
+        .dog(.collie("Belie")),
+        .dog(.generic),
       ]
       | std::map(func (animal: Animal) -> match animal {
-        .Cat(name) => f"Hello {name}",
-        .Dog(.Generic) => "Who's a good boy?",
-        .Dog(.Collie(name)) => f"Come here {name}",
+        .cat(name) => f"Hello {name}",
+        .dog(.generic) => "Who's a good boy?",
+        .dog(.collie(name)) => f"Come here {name}",
       })
     )
     "#, lutra_bin::Value::unit())), @r#"
@@ -1845,7 +1845,7 @@ async fn sql_from_00() {
       id: int32,
       title: text,
       premiere_date: std::Date,
-      director_id: enum {None, Some: int16},
+      director_id: enum {none, some: int16},
     }
 
     func main(): [Movie] -> std::sql::from("movies")
@@ -1863,13 +1863,13 @@ async fn sql_from_00() {
         id = 1,
         title = "Forrest Gump",
         premiere_date = @1994-04-22,
-        director_id = Some(3),
+        director_id = some(3),
       },
       {
         id = 2,
         title = "The Prestige",
         premiere_date = @2006-06-14,
-        director_id = None,
+        director_id = none,
       },
     ]
     "#);
@@ -2065,15 +2065,11 @@ fn group_01() {
 #[test]
 fn opt_00() {
     insta::assert_snapshot!(_sql_and_output(_run(r#"
-    type OptText: enum {
-      None,
-      Some: text,
-    }
     func main() -> {
-      .Some("hello"): OptText,
-      .None: OptText,
-      std::is_some(.Some("hello"): OptText),
-      std::is_none(.Some("hello"): OptText),
+      .some("hello"): enum {none, some: text},
+      .none: enum {none, some: text},
+      std::is_some(.some("hello")),
+      std::is_none(.some("hello")),
     }
     "#, lutra_bin::Value::unit())), @r#"
     SELECT
@@ -2083,8 +2079,8 @@ fn opt_00() {
       (NOT 'hello'::text IS NOT NULL) AS _3
     ---
     {
-      Some("hello"),
-      None,
+      some("hello"),
+      none,
       true,
       false,
     }
@@ -2094,16 +2090,13 @@ fn opt_00() {
 #[test]
 fn opt_01() {
     insta::assert_snapshot!(_sql_and_output(_run(r#"
-    type OptText: enum {
-      None,
-      Some: text,
-    }
+    type OptText: enum {none, some: text}
     func main() -> (
-      [.Some("hello"), .None, .Some("world")]: [OptText]
+      [.some("hello"), .none, .some("world")]: [OptText]
       | std::map(func (x) -> match x {
-          .Some(x) => x,
-          .None => "none",
-        })
+        .some(x) => x,
+        .none => "none",
+      })
     )
     "#, lutra_bin::Value::unit())), @r#"
     SELECT
