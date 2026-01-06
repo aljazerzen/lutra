@@ -431,8 +431,12 @@ impl PrintSource for pr::FuncParam {
             p.push("const ")?;
         }
 
-        let name = pr::display_ident(&self.name);
-        p.push(name)?;
+        if let Some(label) = &self.label {
+            p.push(pr::display_ident(label))?;
+            p.push(" ")?;
+        }
+
+        p.push(pr::display_ident(&self.name))?;
 
         if let Some(ty) = &self.ty {
             p.push(": ")?;
