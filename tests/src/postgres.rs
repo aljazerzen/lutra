@@ -1752,7 +1752,7 @@ fn cmp_00() {
     }
     func main() -> (
       [{3, 3}, {3, 5}, {5, 3}]
-      | std::map(func (x) -> compare(x.0, x.1))
+      | std::map(x -> compare(x.0, x.1))
     )
     "#, lutra_bin::Value::unit())), @r"
     SELECT
@@ -1923,8 +1923,8 @@ async fn sql_insert_00() {
     }
     func main() -> (
       (std::sql::from("movies"): [Movie])
-      | std::sort(func (m) -> m.id | std::to_int64)
-      | std::map(func (m) -> {m.title, m.premiere_date: std::Date})
+      | std::sort(m -> m.id | std::to_int64)
+      | std::map(m -> {m.title, m.premiere_date: std::Date})
     )
     "#, lutra_bin::Value::unit()).await.1, @r#"
     [
@@ -1956,8 +1956,8 @@ fn group_00() {
 
     func main() -> (
       values
-      | std::group(func (x) -> x)
-      | std::map(func (this) -> {
+      | std::group(x -> x)
+      | std::map(this -> {
         value = this.key,
         sum = std::sum(this.values),
       })
@@ -2031,10 +2031,10 @@ fn group_01() {
 
     func main() -> (
       gifts
-      | group(func (g) -> g.child_id)
+      | group(g -> g.child_id)
       | map(
-        func (p) -> {
-          p.values | map(func (g) -> g.price | to_int64) | sum()
+        p -> {
+          p.values | map(g -> g.price | to_int64) | sum()
         },
       )
     )
@@ -2093,7 +2093,7 @@ fn opt_01() {
     type OptText: enum {none, some: text}
     func main() -> (
       [.some("hello"), .none, .some("world")]: [OptText]
-      | std::map(func (x) -> match x {
+      | std::map(x -> match x {
         .some(x) => x,
         .none => "none",
       })
@@ -2434,7 +2434,7 @@ async fn pull_interface() {
 
     ## Lookup Person using persons_pkey index
     func get_persons_by_id(id: int32): Person -> (
-      from_persons() | std::find(func (x) -> x.id == id)
+      from_persons() | std::find(x -> x.id == id)
     )
 
     type Movie: {id: int32, title: text, premiere_date: std::Date, director_id: int16}
@@ -2443,12 +2443,12 @@ async fn pull_interface() {
 
     ## Lookup Movie using movies_pkey index
     func get_movies_by_id(id: int32): Movie -> (
-      from_movies() | std::find(func (x) -> x.id == id)
+      from_movies() | std::find(x -> x.id == id)
     )
 
     ## Lookup Movie using movies_premiere_date_idx index
     func get_movies_by_premiere_date(premiere_date: int32): [Movie] -> (
-      from_movies() | std::filter(func (x) -> x.premiere_date == premiere_date)
+      from_movies() | std::filter(x -> x.premiere_date == premiere_date)
     )
 
     type MovieActor: {source: int32, target: int32, role: text}
@@ -2463,7 +2463,7 @@ async fn pull_interface() {
 
       ## Lookup Day using days_pkey index
       func get_days_by_id(id: int32): Day -> (
-        from_days() | std::find(func (x) -> x.id == id)
+        from_days() | std::find(x -> x.id == id)
       )
 
       type Proj/day: {id: int32, name: text}
@@ -2472,7 +2472,7 @@ async fn pull_interface() {
 
       ## Lookup Proj/day using proj/days_pkey index
       func get_proj/days_by_id(id: int32): Proj/day -> (
-        from_proj/days() | std::find(func (x) -> x.id == id)
+        from_proj/days() | std::find(x -> x.id == id)
       )
     }
     "#);

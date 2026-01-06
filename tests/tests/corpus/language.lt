@@ -566,7 +566,7 @@ func main() -> match name {
 # === match_06
 func main() -> (
   ["Tom", "world", "Alice"]
-  | std::map(func (n) -> match n {
+  | std::map(n -> match n {
     "world" => "Hello world!",
     n => f"Hello, {n}!"
   })
@@ -587,7 +587,7 @@ type Animal: enum {
 
 func main() -> (
   [.cat, .dog, .hamster, .dog]: [Animal]
-  | std::map(func (a) -> match a {
+  | std::map(a -> match a {
     .cat | .hamster => false,
     _ => true
   })
@@ -912,10 +912,10 @@ func main() -> std::scan(
 # === std_apply_until_empty_00
 func main() -> (
   [0: int16]
-  | std::apply_until_empty(func (v) ->
+  | std::apply_until_empty(v ->
     v
-    | std::map(func (i) -> i + 1)
-    | std::filter(func (i) -> i < 10)
+    | std::map(i -> i + 1)
+    | std::filter(i -> i < 10)
   )
 )
 # >
@@ -1163,18 +1163,18 @@ func main() -> std::filter(
 
 
 # === std_find_00
-func main() -> std::find([5,3,65,11,2]: [int64], func (x) -> x > 10)
+func main() -> std::find([5,3,65,11,2]: [int64], x -> x > 10)
 # >
 some(65)
 
 # === std_find_01
-func main() -> std::find([5,3,65,3,2]: [int64], func (x) -> x < 0)
+func main() -> std::find([5,3,65,3,2]: [int64], x -> x < 0)
 # >
 none
 
 
 # === std_flat_map_00
-func main() -> std::flat_map([1, 2, 3]: [int64], func (x) -> [x, x])
+func main() -> std::flat_map([1, 2, 3]: [int64], x -> [x, x])
 # >
 [
   1,
@@ -1188,7 +1188,7 @@ func main() -> std::flat_map([1, 2, 3]: [int64], func (x) -> [x, x])
 # === std_flat_map_01
 func main() -> (
   [{1: int64, false}, {2, true}]
-  | std::flat_map(func (x) -> [x, x])
+  | std::flat_map(x -> [x, x])
 )
 # >
 [
@@ -1322,8 +1322,8 @@ func main() -> (
 
 # === std_group_00
 func main() -> (
-  std::group([1, 2, 5, 1, 2, 4, 6, 12]: [int64], func (x) -> x % 2)
-  | std::sort(func (x) -> x.key)
+  std::group([1, 2, 5, 1, 2, 4, 6, 12]: [int64], x -> x % 2)
+  | std::sort(x -> x.key)
 )
 # >
 [
@@ -1356,7 +1356,7 @@ func main() -> (
     {1, true, 10}
   ]: [{int64, bool, int64}]
   | std::group(func (x: {int64, bool, int64}) -> {x.0, x.2})
-  | std::sort(func (x) -> x.key.0 + x.key.1)
+  | std::sort(x -> x.key.0 + x.key.1)
 )
 
 # >
@@ -1418,8 +1418,8 @@ func main() -> (
   | std::group(
     func (x: {int64, bool, int64}) -> {x.0, x.2}
   )
-  | std::sort(func (x) -> x.key.0 + x.key.1)
-  | std::map(func (partition) -> {
+  | std::sort(x -> x.key.0 + x.key.1)
+  | std::map(partition -> {
     k = partition.key.0,
     v = std::sum(std::map(
       partition.values,
@@ -1447,9 +1447,9 @@ func main() -> (
 func main() -> (
   [1, 2, 2, 2, 5: int64, 5]
   | std::group_map(
-    func (x) -> x, func (key, values) -> {key, std::count(values)}
+    x -> x, func (key, values) -> {key, std::count(values)}
   )
-  | std::sort(func (x) -> x.key)
+  | std::sort(x -> x.key)
 )
 # >
 [
@@ -1471,7 +1471,7 @@ func main() -> (
 func main() -> (
   [1, 2, 2, 2, 5: int64, 5]
   | std::distinct()
-  | std::sort(func (x) -> x)
+  | std::sort(x -> x)
 )
 # >
 [
@@ -2274,7 +2274,7 @@ func main() -> std::sort(
 ]
 
 # === std_sort_02
-func main() -> std::sort(["ab", "a", "aa", "e"], func (x) -> x)
+func main() -> std::sort(["ab", "a", "aa", "e"], x -> x)
 # >
 [
   "a",
@@ -2574,7 +2574,7 @@ const main = {a = 4: int32, ..x, b = false}.x2
 # === unpack_06
 func main() -> (
   {x1 = true, x2 = false}
-  | func (x) -> {4: int32, ..x: {x1: bool, x2: bool}, "hello"}.x2
+  | x -> {4: int32, ..x: {x1: bool, x2: bool}, "hello"}.x2
 )
 # >
 false
@@ -2604,7 +2604,7 @@ const main = {a = 4: int32, ..x, b = false}.2
 # === unpack_12
 func main() -> (
   {true, false}
-  | func (x) -> {4: int32, ..x: {bool, bool}, "hello"}.2
+  | x -> {4: int32, ..x: {bool, bool}, "hello"}.2
 )
 # >
 false
@@ -2810,7 +2810,7 @@ func main() -> (
 # === var_binding_01
 func main() -> (
   [1, 2, 3]: [int32]
-  | std::map(func (x) -> (
+  | std::map(x -> (
     let a = x * 2;
     a * a
   ))
@@ -2825,7 +2825,7 @@ func main() -> (
 # === var_binding_02
 func main() -> (
   [1, 2, 3]: [int32]
-  | std::map(func (x) -> (
+  | std::map(x -> (
     let a = x * 2;
     let b = a * 2;
     let c = -b;

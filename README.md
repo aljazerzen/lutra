@@ -32,7 +32,7 @@ func get_albums(): [Album] -> std::sql::from("albums")
 
 func get_album_by_id(album_id: int16): Album -> (
   get_albums()
-  | find(func (this) -> this.id == album_id)
+  | find(this -> this.id == album_id)
 )
 ```
 

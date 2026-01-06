@@ -9,7 +9,7 @@ import pg_catalog as pg
 
 func pull_interface() -> (
   pg::from_pg_namespace()
-  | filter(func (n) -> (
+  | filter(n -> (
     n.nspname != "pg_catalog"
     && n.nspname != "pg_toast"
     && n.nspname != "information_schema"
@@ -26,10 +26,10 @@ func pull_interface() -> (
         table_name = t.relname,
         columns = (
           pg::from_pg_attribute()
-          | filter(func (a) -> a.attrelid == t.oid)
-          | filter(func (a) -> a.attnum > 0 && a.atttypid > 0)
-          | sort(func (a) -> (a.attnum | to_int64))
-          | map(func (a) -> {
+          | filter(a -> a.attrelid == t.oid)
+          | filter(a -> a.attnum > 0 && a.atttypid > 0)
+          | sort(a -> (a.attnum | to_int64))
+          | map(a -> {
             name = a.attname,
             typ_id = (a.atttypid | to_int32),
             is_nullable = !a.attnotnull,
@@ -37,26 +37,26 @@ func pull_interface() -> (
         ),
         indexes = (
           pg::from_pg_index()
-          | filter(func (i) -> i.indrelid == t.oid)
-          | map(func (i) -> (
+          | filter(i -> i.indrelid == t.oid)
+          | map(i -> (
             pg::from_pg_class()
-            | find(func (ci) -> ci.oid == i.indexrelid)
+            | find(ci -> ci.oid == i.indexrelid)
             | or_default()
-            | func (ci) -> {i = i, ci = ci}
+            | ci -> {i = i, ci = ci}
           ))
-          | map(func (this) -> {
+          | map(this -> {
             index_name = this.ci.relname,
             is_unique = this.i.indisunique,
             columns = (
               this.i.indkey
-              | map(func (ik) -> (
+              | map(ik -> (
                 pg::from_pg_attribute()
-                | find(func (a) ->
+                | find(a ->
                   a.attrelid == this.i.indrelid && a.attnum == ik
                 )
                 | or_default()
               ))
-              | map(func (a) -> a.attname)
+              | map(a -> a.attname)
             ),
           })
         ),

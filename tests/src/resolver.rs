@@ -507,7 +507,7 @@ fn types_20() {
 
         func main() -> (
           .done: Status
-          | func (x) -> match x {
+          | x -> match x {
             .done => "done",
             .cancelled(reason) => f"pending {reason}",
             _ => f"something else",
@@ -523,29 +523,29 @@ fn types_21() {
     insta::assert_snapshot!(_test_err(r#"
     func main() -> (
       {a = false, "hello", c = "world"}
-      | func (x) -> x.b
+      | x -> x.b
     )
     "#), @"
     [E0006] Error:
-       ╭─[<unknown>:4:22]
+       ╭─[<unknown>:4:15]
        │
-     4 │       | func (x) -> x.b
-       │                      ─┬
-       │                       ╰── field .b does not exist in type {a: bool, text, c: text}
+     4 │       | x -> x.b
+       │               ─┬
+       │                ╰── field .b does not exist in type {a: bool, text, c: text}
     ───╯
     ");
     insta::assert_snapshot!(_test_err(r#"
     func main() -> (
       {a = false, "hello", c = "world"}
-      | func (x) -> x.3
+      | x -> x.3
     )
     "#), @"
     [E0006] Error:
-       ╭─[<unknown>:4:22]
+       ╭─[<unknown>:4:15]
        │
-     4 │       | func (x) -> x.3
-       │                      ─┬
-       │                       ╰── field .3 does not exist in type {a: bool, text, c: text}
+     4 │       | x -> x.3
+       │               ─┬
+       │                ╰── field .3 does not exist in type {a: bool, text, c: text}
     ───╯
     ");
 }
@@ -1051,7 +1051,7 @@ fn match_07() {
 fn func_param_00() {
     insta::assert_snapshot!(_test_ty(r#"
         func main() -> (
-            false | func (a) -> !a
+            false | a -> !a
         )
     "#), @"bool");
 }
@@ -1060,7 +1060,7 @@ fn func_param_00() {
 fn func_param_01() {
     insta::assert_snapshot!(_test_ty(r#"
         func main(): int16 -> (
-            3 | func (x) -> x * x
+            3 | x -> x * x
         )
     "#), @"int16");
 }
@@ -1070,7 +1070,7 @@ fn func_param_02() {
     insta::assert_snapshot!(_test_ty(r#"
         func main(): [int16] -> (
             [3, 2, 4, 1, 5, -3, 1]
-            | std::map(func (x) -> -x)
+            | std::map(x -> -x)
         )
     "#), @"[int16]");
 }
@@ -1079,7 +1079,7 @@ fn func_param_02() {
 fn func_param_03() {
     insta::assert_snapshot!(_test_ty(r#"
         func main() -> (
-            {a = 3, b = 5: int16} | func (x) -> x.a + x.b
+            {a = 3, b = 5: int16} | x -> x.a + x.b
         )
     "#), @"int16");
 }
@@ -1266,15 +1266,15 @@ fn unpack_06() {
     insta::assert_snapshot!(_test_err(r#"
       func main() -> (
         {x1 = true, x2 = false}
-        | func (x) -> {4: int32, ..x, "hello"}.x2
+        | x -> {4: int32, ..x, "hello"}.x2
       )
     "#), @r#"
     Error:
-       ╭─[<unknown>:4:47]
+       ╭─[<unknown>:4:40]
        │
-     4 │         | func (x) -> {4: int32, ..x, "hello"}.x2
-       │                                               ─┬─
-       │                                                ╰─── ambiguous lookup into unpack of an unknown type
+     4 │         | x -> {4: int32, ..x, "hello"}.x2
+       │                                        ─┬─
+       │                                         ╰─── ambiguous lookup into unpack of an unknown type
        │
        │ Note:
        │ consider annotating the unpacked expression
@@ -1513,7 +1513,7 @@ fn ty_tuple_comprehension_09() {
 
     func main() -> (
       {gift_id = []}: {gift_id: [int32]}
-      | func (x) -> {x.gift_id, x.gift_id}
+      | x -> {x.gift_id, x.gift_id}
       | from_columnar
     )
     "#), @"[{gift_id: int32, gift_id: int32}]");

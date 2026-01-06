@@ -261,7 +261,7 @@ func simulate_debt(at_time: int32) -> (
   | apply_time(at_time)
 )
 
-func main() -> [10, 15] | std::map(func (x) -> simulate_debt(x))
+func main() -> [10, 15] | std::map(x -> simulate_debt(x))
 
 # >
 [
@@ -336,11 +336,11 @@ func main() -> (from_staff() | apply_until_empty(get_managers))
 type Iter: {id: int32, depth: int16}
 
 func get_managers(level: [Iter]): [Iter] -> (
-  level | flat_map(func (i) -> get_staff_by_id(i.id))
+  level | flat_map(i -> get_staff_by_id(i.id))
 )
 
 func get_staff_by_id(staff_id: int32): [Iter] -> (
-  from_staff() | filter(func (x) -> x.id == staff_id)
+  from_staff() | filter(x -> x.id == staff_id)
 )
 
 func from_staff(): [Iter] -> []

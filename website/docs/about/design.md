@@ -154,7 +154,7 @@ To use a database index in Lutra, one would write:
 ```lt
 func get_albums_by_id(id: int16): [Album] -> (
   sql::from("albums")
-  | filter(func (this) -> this.id == id)
+  | filter(this -> this.id == id)
 )
 ```
 

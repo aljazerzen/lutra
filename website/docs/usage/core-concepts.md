@@ -142,12 +142,12 @@ type Transaction: {category: text, amount: Decimal, created_at: Date}
 
 func compute_breakdown(since: Date): [Breakdown] -> (
   from_transactions()
-  | filter(func (t) -> t.created_at >= since)
+  | filter(t -> t.created_at >= since)
   | group_map(
-    func (t) -> t.category,
+    t -> t.category,
     func (key, transactions) -> {
       category = key,
-      total_amount = transactions | map(func (t) -> t.amount) | sum,
+      total_amount = transactions | map(t -> t.amount) | sum,
     }
   )
 )
@@ -157,8 +157,8 @@ type Breakdown: {category: text, total_amount: Decimal}
 ## Local part: write breakdown to Parquet file
 func write_breakdown(breakdown: [Breakdown]) -> (
   breakdown
-  | sort(func (x) -> x.total_breakdown)
-  | map(func (x) -> {
+  | sort(x -> x.total_breakdown)
+  | map(x -> {
     ..x,
     total_amount_usd = x.total_amount * 1.1,
   })

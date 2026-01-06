@@ -771,7 +771,7 @@ fn parse_10() {
         },
     )
     "#);
-    assert_debug_snapshot!(parse_expr(r"1 | func (x) -> x | to_int32").kind, @r#"
+    assert_debug_snapshot!(parse_expr(r"1 | x -> x | to_int32").kind, @r#"
     Binary(
         BinaryExpr {
             left: Expr {
@@ -790,63 +790,57 @@ fn parse_10() {
             },
             op: Pipe,
             right: Expr {
-                kind: Func(
-                    Func {
-                        params: [
-                            FuncParam {
-                                constant: false,
-                                label: None,
-                                name: "x",
-                                ty: None,
-                                span: 0:10-11,
-                            },
-                        ],
-                        return_ty: None,
-                        body: Some(
-                            Expr {
-                                kind: Binary(
-                                    BinaryExpr {
-                                        left: Expr {
-                                            kind: Ident(
-                                                x,
-                                            ),
-                                            span: Some(
-                                                0:16-17,
-                                            ),
-                                            ty: None,
-                                            ty_args: [],
-                                            scope_id: None,
-                                            target: None,
-                                        },
-                                        op: Pipe,
-                                        right: Expr {
-                                            kind: Ident(
-                                                to_int32,
-                                            ),
-                                            span: Some(
-                                                0:20-28,
-                                            ),
-                                            ty: None,
-                                            ty_args: [],
-                                            scope_id: None,
-                                            target: None,
-                                        },
+                kind: FuncShort(
+                    FuncShort {
+                        param: FuncParam {
+                            constant: false,
+                            label: None,
+                            name: "x",
+                            ty: None,
+                            span: 0:4-8,
+                        },
+                        body: Expr {
+                            kind: Binary(
+                                BinaryExpr {
+                                    left: Expr {
+                                        kind: Ident(
+                                            x,
+                                        ),
+                                        span: Some(
+                                            0:9-10,
+                                        ),
+                                        ty: None,
+                                        ty_args: [],
+                                        scope_id: None,
+                                        target: None,
                                     },
-                                ),
-                                span: Some(
-                                    0:16-28,
-                                ),
-                                ty: None,
-                                ty_args: [],
-                                scope_id: None,
-                                target: None,
-                            },
-                        ),
-                        ty_params: [],
+                                    op: Pipe,
+                                    right: Expr {
+                                        kind: Ident(
+                                            to_int32,
+                                        ),
+                                        span: Some(
+                                            0:13-21,
+                                        ),
+                                        ty: None,
+                                        ty_args: [],
+                                        scope_id: None,
+                                        target: None,
+                                    },
+                                },
+                            ),
+                            span: Some(
+                                0:9-21,
+                            ),
+                            ty: None,
+                            ty_args: [],
+                            scope_id: None,
+                            target: None,
+                        },
                     },
                 ),
                 span: Some(
-                    0:4-28,
+                    0:4-21,
                 ),
                 ty: None,
                 ty_args: [],

@@ -149,17 +149,15 @@ const stats = {
   total_tasks = std::count(task_ops::tasks),
   avg_priority = (
     task_ops::tasks
-    | std::map(func (t) -> std::to_int64(t.priority))
+    | std::map(t -> std::to_int64(t.priority))
     | std::mean()
   ),
 }
-    "#), @r"
+    "#), @"
     const stats = {
       total_tasks = std::count(task_ops::tasks),
       avg_priority = (
-        task_ops::tasks
-        | std::map(func (t) -> std::to_int64(t.priority))
-        | std::mean()
+        task_ops::tasks | std::map(t -> std::to_int64(t.priority)) | std::mean()
       ),
     }
     "

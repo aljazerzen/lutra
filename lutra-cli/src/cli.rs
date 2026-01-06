@@ -189,7 +189,7 @@ pub struct CompileCommand {
     /// Usually this is a path to an expression in the project, but it can be
     /// any lutra expression.
     ///
-    /// When --input is supplied, the program is wrapped into `func (input) -> ...`.
+    /// When --input is supplied, the program is wrapped into `input -> ...`.
     #[clap(long, default_value = "main")]
     program: String,
 
@@ -255,7 +255,7 @@ pub struct RunCommand {
 
     /// Read input from `.lb` file.
     ///
-    /// When supplied, the program is wrapped into `func (input) -> ...`.
+    /// When supplied, the program is wrapped into `input -> ...`.
     #[clap(long)]
     input: Option<String>,
 
@@ -270,7 +270,7 @@ pub struct RunCommand {
     /// Usually this is a path to an expression in the project, but it can be
     /// any lutra expression.
     ///
-    /// When --input is supplied, the program is wrapped into `func (input) -> ...`.
+    /// When --input is supplied, the program is wrapped into `input -> ...`.
     #[clap(long, default_value = "main")]
     program: String,
 
@@ -313,7 +313,7 @@ pub async fn run(cmd: RunCommand) -> anyhow::Result<()> {
 
     let mut program = cmd.program;
     if cmd.input.is_some() {
-        program = format!("func (input) -> {program}");
+        program = format!("input -> {program}");
     }
 
     let (program, ty) = lutra_compiler::compile(

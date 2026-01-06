@@ -250,12 +250,12 @@ where I, K
 ## Returns groups, which contain the key and an array of values in this group.
 func group_map(input: [I], get_key: func (I): K, mapper: func (K, [I]): O): [O]
 where I, K, O
--> (input | group(get_key) | map(func (x) -> mapper(x.key, x.values)))
+-> (input | group(get_key) | map(x -> mapper(x.key, x.values)))
 
 ## Deduplicates array items.
 func distinct(array: [T]): [T]
 where T
--> (array | group(func (x) -> x) | map(func (x) -> x.key))
+-> (array | group(x -> x) | map(x -> x.key))
 
 func append(top: [T], bottom: [T]): [T]
 where T
@@ -344,7 +344,7 @@ func any(values: [bool]): bool
 ## Returns `true` if the haystack array contains an item equal to `needle`.
 func contains(haystack: [T], needle: T): bool
 where T: primitive -> (
-  haystack | filter(func (x) -> eq(x, needle)) | is_empty | not
+  haystack | filter(x -> eq(x, needle)) | is_empty | not
 )
 
 # --- Window functions ---

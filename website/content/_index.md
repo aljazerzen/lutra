@@ -14,7 +14,7 @@ func get_albums(): [Album] -> std::sql::from("albums")
 
 func get_album_by_id(album_id: int16): Album -> (
   get_albums()
-  | find(func (this) -> this.id == album_id)
+  | find(this -> this.id == album_id)
 )
 ```
 
@@ -29,8 +29,8 @@ func landing_page() -> {
   user = get_current_user(),
   posts = (
     get_posts()
-    | filter(func (p) -> !p.is_draft)
-    | sort(func (p) -> -p.created_at)
+    | filter(p -> !p.is_draft)
+    | sort(p -> -p.created_at)
     | slice(0, 10)
   ),
 }
@@ -64,33 +64,33 @@ type Customer: {
 # Function that performs an index lookup
 func get_customer(id: int32): Customer -> (
   std::sql::from("customers")
-  | find(func (c) -> c.id == id)
+  | find(c -> c.id == id)
   | std::or_default()
 )
 
 func main() -> (
   get_invoices()
-  | filter(func (i) -> (i.invoice_date: Date).0 >= @1970-01-16.0)
+  | filter(i -> (i.invoice_date: Date).0 >= @1970-01-16.0)
   | map(func (i: Invoice) -> {
     ..i,
     income = i.total - transaction_fees
   })
-  | filter(func (i) -> i.income > 1.0)
-  | group(func (i) -> i.customer_id)
-  | map(func (group) -> {
+  | filter(i -> i.income > 1.0)
+  | group(i -> i.customer_id)
+  | map(group -> {
     customer_id = group.key,
-    total = group.values | map(func (i) -> i.total | std::to_int64) | mean,
+    total = group.values | map(i -> i.total | std::to_int64) | mean,
     sum_income = group.values | map(func(i) -> i.income | std::to_int64) | sum,
     ct = count(group.values),
   })
-  | sort(func (i) -> -i.sum_income)
+  | sort(i -> -i.sum_income)
   | slice(0, 10)
-  | map(func (i) -> {
+  | map(i -> {
     i.customer_id,
     customer = get_customer(i.customer_id), # customer is a tuple
     i.sum_income,
   })
-  | map(func (i) -> {
+  | map(i -> {
     i.customer_id,
     name = f"{i.customer.last_name}, {i.customer.first_name}",
     sum_income = i.sum_income,

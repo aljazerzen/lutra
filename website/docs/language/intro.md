@@ -43,8 +43,8 @@ module task_ops {
   # Function to get tasks by priority
   func get_by_priority(min_priority: int8): [Task] -> (
     tasks
-    | std::filter(func (t) -> t.priority >= min_priority)
-    | std::sort(func (t) -> t.priority)
+    | std::filter(t -> t.priority >= min_priority)
+    | std::sort(t -> t.priority)
   )
 }
 
@@ -53,7 +53,7 @@ func my_program() -> {
   # Get high priority tasks
   high_priority = (
     task_ops::get_by_priority(2)
-    | std::map(func (t) -> {
+    | std::map(t -> {
       id = t.id,
       title = t.title,
       status = project::task_ops::get_status_text(t.status),
@@ -72,11 +72,11 @@ func my_program() -> {
   stats = {
     total_tasks = std::count(task_ops::tasks),
     avg_priority = (
-      task_ops::tasks | std::map(func (t) -> t.priority) | std::mean()
+      task_ops::tasks | std::map(t -> t.priority) | std::mean()
     ),
     has_pending = (
       task_ops::tasks
-      | std::map(func (t) -> match t.status {
+      | std::map(t -> match t.status {
         .pending => true,
         _ => false,
       })

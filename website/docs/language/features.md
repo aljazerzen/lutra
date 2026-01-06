@@ -31,7 +31,7 @@ Piping:
 - Pipe operator `|`, transforms `value | function` into `function(value)`.
 - Can chain many functions:
   ```lt
-  (5 | func (x) -> [x, x] | filter(func (x) -> x > 3))`
+  (5 | x -> [x, x] | filter(x -> x > 3))`
   ```
 
 Pattern Matching:

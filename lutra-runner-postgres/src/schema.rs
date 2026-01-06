@@ -185,11 +185,11 @@ fn generate_index_lookup(
         );
         if index.is_unique {
             *output += &format!("{indent}func get_{snake}_by_{by}({params}): {ty_name} -> (\n");
-            *output += &format!("{indent}  from_{snake}() | std::find(func (x) -> {cond})\n");
+            *output += &format!("{indent}  from_{snake}() | std::find(x -> {cond})\n");
             *output += &format!("{indent})\n");
         } else {
             *output += &format!("{indent}func get_{snake}_by_{by}({params}): [{ty_name}] -> (\n");
-            *output += &format!("{indent}  from_{snake}() | std::filter(func (x) -> {cond})\n");
+            *output += &format!("{indent}  from_{snake}() | std::filter(x -> {cond})\n");
             *output += &format!("{indent})\n");
         };
     }
