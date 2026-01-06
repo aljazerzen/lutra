@@ -56,7 +56,7 @@ impl Literal {
     }
     pub fn as_decimal(&self) -> Option<i64> {
         let number = self.as_number()?;
-        if number.contains(|c: char| !(c.is_ascii_digit() || c == '_' || c == '.')) {
+        if number.contains(|c: char| !(c.is_ascii_digit() || matches!(c, '-' | '_' | '.'))) {
             return None;
         }
 
