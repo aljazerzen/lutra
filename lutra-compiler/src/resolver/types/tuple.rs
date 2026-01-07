@@ -117,11 +117,12 @@ impl super::TypeResolver<'_> {
         span: Span,
     ) -> Result<pr::Ty> {
         let base_ref = self.get_ty_mat(base)?;
-        let base = match base_ref {
-            scope::TyRef::Ty(b) => b,
-            scope::TyRef::Param(id) => {
-                return self.lookup_name_in_ty_param(lookup, id);
+        match base_ref {
+            scope::TyRef::Ty(b) => {
+                let base = b.clone();
+                self.lookup_in_tuple(&base, lookup, span)
             }
+            scope::TyRef::Param(id) => Ok(self.lookup_name_in_ty_param(lookup, id)?),
             scope::TyRef::Var(_, o) => {
                 // introduce a new type var for the field
                 let field_ty = self.introduce_ty_var(pr::TyDomain::Open, span);
@@ -135,14 +136,13 @@ impl super::TypeResolver<'_> {
                 let scope = self.get_ty_var_scope();
                 scope.infer_type_var_in_domain(o, domain);
 
-                return Ok(field_ty);
+                Ok(field_ty)
             }
-        };
-        let base = base.clone();
-        self.lookup_in_tuple(&base, lookup, span)
+        }
     }
 
     /// Takes a concrete tuple and finds the field identifier by [pr::Lookup].
+    /// Returns target type and is_framed boolean.
     pub fn lookup_in_tuple(
         &mut self,
         base: &Ty,
@@ -173,7 +173,43 @@ impl super::TypeResolver<'_> {
                     offset: 0,
                 };
                 let mapping = HashMap::from_iter(Some((var_ref, var_input)));
+
                 Ok(utils::TypeReplacer::on_ty(*comp.body_ty.clone(), mapping))
+            }
+
+            pr::TyKind::Ident(_) => {
+                // concrete ident: this is a framed type
+
+                // lookup the ty def
+                let target = base.target.as_ref().unwrap();
+                let scope::Named::Ty {
+                    ty,
+                    is_framed,
+                    framed_label,
+                } = self.get_ref(target).unwrap()
+                else {
+                    unreachable!();
+                };
+                assert!(is_framed);
+
+                // validate lookup
+                match lookup {
+                    pr::Lookup::Name(n) if Some(n.as_str()) == framed_label => {}
+                    pr::Lookup::Position(0) => {}
+                    _ => {
+                        let label_hint = framed_label
+                            .map(|l| format!("`.{l}` or "))
+                            .unwrap_or_default();
+                        return Err(error_no_field(base, lookup)
+                                .with_span(Some(span))
+                                .push_hint(format!(
+                                    "{} is a framed type. Inner value can be accessed with {label_hint}`.0`",
+                                    printer::print_ty(base)
+                                )));
+                    }
+                }
+
+                Ok(ty.clone())
             }
             _ => Err(Diagnostic::new(
                 format!("lookup expected a tuple, found {}", printer::print_ty(base)),

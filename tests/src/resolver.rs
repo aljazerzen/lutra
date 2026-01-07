@@ -2040,6 +2040,19 @@ fn framed_11() {
 }
 
 #[test]
+fn framed_12() {
+    // framed type, as type var
+
+    insta::assert_snapshot!(_test_ty(r#"
+    type Date(days_since_epoch: int32)
+
+    func main() -> {
+      Date(12) | x -> x.0,
+    }
+    "#), @"{int32}");
+}
+
+#[test]
 fn call_00() {
     // calls desugar-ed from pipelines should have span on the right operand
 

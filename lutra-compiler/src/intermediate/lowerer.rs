@@ -223,6 +223,16 @@ impl<'a> Lowerer<'a> {
                 }))
             }
             pr::ExprKind::Lookup { base, lookup } => {
+                let (base_ty, frame_name) = self.get_ty_mat_pr(base.ty.as_ref().unwrap());
+
+                if frame_name.is_some() {
+                    // this is un-framing (i.e. noop)
+                    return Ok(ir::Expr {
+                        kind: self.lower_expr(base)?.kind,
+                        ty: self.lower_ty(expr.ty.clone().unwrap()),
+                    });
+                }
+
                 // At this stage, ty vars and ty params should have all been compiled away
                 // and we can expect the base to be a concrete tuple.
                 // This means we can iterate over the fields and find the correct tuple offset that way.
@@ -230,7 +240,6 @@ impl<'a> Lowerer<'a> {
                     pr::Lookup::Position(position) => *position as u16,
 
                     pr::Lookup::Name(name) => {
-                        let base_ty = base.ty.as_ref().unwrap();
                         let mut fields = self.tuple_iter_fields(base_ty).enumerate();
 
                         let res = fields.find(|(_, f)| f.matches_name(name));

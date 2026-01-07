@@ -1,7 +1,7 @@
+use crate::Result;
 use crate::diagnostic::WithErrorInfo;
-use crate::resolver::types::{TypeResolver, scope, tuple};
+use crate::resolver::types::{TypeResolver, scope};
 use crate::utils::fold::{self, PrFold};
-use crate::{Result, printer};
 use crate::{pr, utils};
 
 impl fold::PrFold for super::TypeResolver<'_> {
@@ -81,37 +81,6 @@ impl fold::PrFold for super::TypeResolver<'_> {
                 let base = Box::new(self.fold_expr(*base)?);
                 let base_ty = base.ty.as_ref().unwrap();
 
-                // special case: lookups into framed types
-                let base_ty_target = base_ty.target.as_ref().map(|r| self.get_ref(r).unwrap());
-                if let Some(scope::Named::Ty {
-                    ty,
-                    is_framed: true,
-                    framed_label,
-                }) = base_ty_target
-                {
-                    match lookup {
-                        pr::Lookup::Name(n) if Some(n.as_str()) == framed_label => {}
-                        pr::Lookup::Position(0) => {}
-                        _ => {
-                            let label_hint = framed_label
-                                .map(|l| format!("`.{l}` or "))
-                                .unwrap_or_default();
-                            return Err(tuple::error_no_field(base_ty, &lookup)
-                                .with_span(span)
-                                .push_hint(format!(
-                                    "{} is a framed type. Inner value can be accessed with {label_hint}`.0`",
-                                    printer::print_ty(base_ty)
-                                )));
-                        }
-                    }
-
-                    let mut r = *base;
-                    r.ty = Some(ty.clone());
-                    r.span = span;
-                    return Ok(r);
-                }
-
-                // general case: resolve lookup
                 let target_ty = self
                     .resolve_tuple_lookup(base_ty, &lookup, span.unwrap())
                     .with_span(span)?;
