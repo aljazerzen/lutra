@@ -41,10 +41,9 @@ impl Error {
 #[derive(Debug)]
 pub struct DiagnosticMessage {
     diagnostic: Diagnostic,
-
     display: String,
-
     range: codespan::Range,
+    additional_ranges: Vec<Option<codespan::Range>>,
 }
 
 impl DiagnosticMessage {
@@ -60,6 +59,18 @@ impl DiagnosticMessage {
         &self.diagnostic.span
     }
 
+    pub fn additional(&self) -> Vec<Additional<'_>> {
+        self.diagnostic
+            .additional
+            .iter()
+            .enumerate()
+            .map(|(i, additional)| Additional {
+                additional,
+                range: self.additional_ranges.get(i).and_then(|x| x.as_ref()),
+            })
+            .collect()
+    }
+
     pub fn display(&self) -> &str {
         &self.display
     }
@@ -69,47 +80,64 @@ impl DiagnosticMessage {
     }
 }
 
+#[derive(Debug)]
+pub struct Additional<'d> {
+    additional: &'d crate::diagnostic::Additional,
+    range: Option<&'d codespan::Range>,
+}
+
+impl<'d> Additional<'d> {
+    pub fn message(&self) -> &'d str {
+        &self.additional.message
+    }
+
+    pub fn span(&self) -> Option<codespan::Span> {
+        self.additional.span
+    }
+
+    pub fn range(&self) -> Option<&'d codespan::Range> {
+        self.range
+    }
+}
+
 fn compose_diagnostic_messages(
     diagnostics: Vec<Diagnostic>,
     sources: &impl crate::project::SourceProvider,
 ) -> Vec<DiagnosticMessage> {
-    use ariadne::Cache;
-
     let mut cache = FileTreeCache::new(sources);
 
     let mut messages = Vec::with_capacity(diagnostics.len());
     for diagnostic in diagnostics {
-        if let Some(span) = diagnostic.span {
-            let source_path = sources.get_path(span.source_id).unwrap();
-
-            let source = cache.fetch(&source_path).unwrap();
-            let Some(range) = compose_range(&diagnostic, source) else {
-                panic!(
-                    "span {:?} is out of bounds of the source (len = {})",
-                    diagnostic.span,
-                    source.len()
-                );
-            };
-
-            let display = compose_display(&diagnostic, source_path, &mut cache);
-            messages.push(DiagnosticMessage {
-                diagnostic,
-                display,
-                range,
-            });
-        } else {
+        let Some(span) = diagnostic.span else {
             panic!(
                 "missing diagnostic span: [{:?}] {}, {:#?}",
                 diagnostic.code, diagnostic.message, diagnostic.additional
-            )
+            );
+        };
+
+        let range = compose_range(span, sources, &mut cache);
+
+        let display = compose_display(&diagnostic, sources, &mut cache);
+
+        let mut additional_ranges = Vec::with_capacity(diagnostic.additional.len());
+        for a in &diagnostic.additional {
+            let range = a.span.map(|s| compose_range(s, sources, &mut cache));
+            additional_ranges.push(range);
         }
+
+        messages.push(DiagnosticMessage {
+            diagnostic,
+            display,
+            range,
+            additional_ranges,
+        });
     }
     messages
 }
 
 fn compose_display<S>(
     diagnostic: &Diagnostic,
-    source_path: &Path,
+    sources: &impl crate::project::SourceProvider,
     cache: &mut FileTreeCache<S>,
 ) -> String
 where
@@ -119,7 +147,9 @@ where
 
     let config = Config::default().with_color(false);
 
-    let span = std::ops::Range::from(diagnostic.span.unwrap());
+    let span = diagnostic.span.unwrap();
+    let source_path = sources.get_path(span.source_id).unwrap();
+    let span = std::ops::Range::from(span);
 
     let kind = match diagnostic.code.get_severity() {
         crate::diagnostic::Severity::Warning => ReportKind::Warning,
@@ -154,21 +184,36 @@ where
     out.lines().map(|l| l.trim_end()).join("\n")
 }
 
-fn compose_range(diagnostic: &Diagnostic, source: &ariadne::Source) -> Option<codespan::Range> {
-    let span = diagnostic.span?;
+fn compose_range<S>(
+    span: codespan::Span,
+    sources: &impl crate::project::SourceProvider,
+    cache: &mut FileTreeCache<S>,
+) -> codespan::Range
+where
+    S: crate::project::SourceProvider,
+{
+    use ariadne::Cache;
 
-    let start = source.get_byte_line(span.start as usize)?;
+    let source_path = sources.get_path(span.source_id).unwrap();
+    let source = cache.fetch(&source_path).unwrap();
+    let source_len = source.len();
+
+    let Some(start) = source.get_byte_line(span.start as usize) else {
+        panic!("span {span:?} is out of bounds of the source (len = {source_len})",);
+    };
     let start = codespan::LineColumn {
         line: start.1 as u32,
         column: start.2 as u32,
     };
 
-    let end = source.get_byte_line(span.start as usize + span.len as usize)?;
+    let Some(end) = source.get_byte_line(span.start as usize + span.len as usize) else {
+        panic!("span {span:?} is out of bounds of the source (len = {source_len})",);
+    };
     let end = codespan::LineColumn {
         line: end.1 as u32,
         column: end.2 as u32,
     };
-    Some(codespan::Range { start, end })
+    codespan::Range { start, end }
 }
 
 struct FileTreeCache<'a, S: crate::project::SourceProvider> {

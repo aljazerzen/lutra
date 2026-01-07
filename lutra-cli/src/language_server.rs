@@ -3,7 +3,6 @@ use std::collections::HashMap;
 use std::path;
 use std::sync::Arc;
 use tokio::sync::{Mutex, RwLock};
-use tower_lsp_server::UriExt;
 use tower_lsp_server::jsonrpc::Result;
 use tower_lsp_server::lsp_types::*;
 
@@ -280,12 +279,15 @@ impl Backend {
         for source_id in project_lock.source_tree.get_source_ids() {
             let diagnostics = diagnostics_by_source.remove(source_id).unwrap_or_default();
 
-            let uri = source_id_to_uri(&project_lock.source_tree, source_id);
+            let uri = to_proto::source_id(&project_lock.source_tree, *source_id);
 
             let doc = documents_lock.get(&uri);
             let version = doc.map(|d| d.version);
 
-            let diags = diagnostics.into_iter().map(to_proto::diagnostic).collect();
+            let diags = diagnostics
+                .into_iter()
+                .map(|d| to_proto::diagnostic(&project_lock.source_tree, d))
+                .collect();
             self.client.publish_diagnostics(uri, diags, version).await;
         }
     }
@@ -337,7 +339,7 @@ impl Backend {
             let documents_lock = self.documents.lock().await;
             let source_ids: Vec<_> = source_tree.get_source_ids().cloned().collect();
             for source_id in source_ids {
-                let uri = source_id_to_uri(&source_tree, &source_id);
+                let uri = to_proto::source_id(&source_tree, source_id);
                 if let Some(doc) = documents_lock.get(&uri) {
                     self.client
                         .log_message(MessageType::INFO, format!("overlaying doc: {}", *doc.uri))
@@ -375,14 +377,6 @@ fn debug_project_paths(source_tree: &SourceTree) -> String {
         .map(|(p, _)| p.display().to_string())
         .collect();
     paths_debug.join(", ")
-}
-
-fn source_id_to_uri(source_tree: &SourceTree, source_id: &u16) -> Uri {
-    // TODO: this feels wrong, we should rethink identifiers in SourceTree
-
-    let path = source_tree.get_path(*source_id).unwrap();
-    let path = source_tree.get_absolute_path(path);
-    Uri::from_file_path(path).unwrap()
 }
 
 fn document_to_source_tree(doc: TextDocumentItem) -> SourceTree {
@@ -427,7 +421,15 @@ fn apply_changes(text: &mut String, changes: Vec<TextDocumentContentChangeEvent>
 
 mod to_proto {
     use lutra_compiler::codespan;
-    use tower_lsp_server::lsp_types::*;
+    use tower_lsp_server::{UriExt, lsp_types::*};
+
+    pub fn source_id(source_tree: &lutra_compiler::SourceTree, source_id: u16) -> Uri {
+        // TODO: this feels wrong, we should rethink identifiers in SourceTree
+
+        let path = source_tree.get_path(source_id).unwrap();
+        let path = source_tree.get_absolute_path(path);
+        Uri::from_file_path(path).unwrap()
+    }
 
     pub fn range(r: &codespan::Range) -> Range {
         Range {
@@ -441,13 +443,43 @@ mod to_proto {
             character: lc.column,
         }
     }
+    pub fn location(uri: Uri, r: &codespan::Range) -> Location {
+        Location {
+            uri,
+            range: range(r),
+        }
+    }
 
-    pub fn diagnostic(d: lutra_compiler::error::DiagnosticMessage) -> Diagnostic {
+    pub fn diagnostic(
+        source: &lutra_compiler::SourceTree,
+        d: lutra_compiler::error::DiagnosticMessage,
+    ) -> Diagnostic {
+        let additional: Vec<_> = d
+            .additional()
+            .iter()
+            .map(|a| {
+                let span = a.span().unwrap_or(d.span().unwrap());
+                DiagnosticRelatedInformation {
+                    location: location(
+                        source_id(source, span.source_id),
+                        a.range().unwrap_or_else(|| d.range()),
+                    ),
+                    message: a.message().to_string(),
+                }
+            })
+            .collect();
+
         Diagnostic {
             message: d.message().to_string(),
             severity: Some(DiagnosticSeverity::ERROR),
+            source: Some("lutra".into()),
             code: Some(NumberOrString::String(d.code().to_string())),
             range: range(d.range()),
+            related_information: if additional.is_empty() {
+                None
+            } else {
+                Some(additional)
+            },
             ..Default::default()
         }
     }
