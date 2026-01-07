@@ -32,7 +32,7 @@ This file contains a single function called `main`, which returns text `Hello wo
 
 Now run it:
 
-```sh
+```console
 $ lutra run --project example.lt --interpreter
 const output = "Hello world!"
 ```
@@ -41,7 +41,7 @@ This command has compiled the project, found the `main` function and executed it
 Throughout this guide we will see many code snippets that must be placed into the `example.lt` file and executed with `lutra run`.
 The easiest way to do this is to repeatedly running lutra with watch command:
 
-```sh
+```console
 $ watch lutra run --project example.lt --interpreter
 Every 2,0s: lutra run ...
 Compiling...

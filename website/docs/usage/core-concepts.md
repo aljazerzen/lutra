@@ -9,16 +9,19 @@ Lutra can be used in different ways, given that it is a general-purpose query la
 It is most useful in data engineering, where is can replace data frame libraries
 (Pandas, Polars, dplyr) and SQL engines (currently only PostgreSQL).
 
-![](./python-overview.drawio.svg){width="100%"}
+<figure markdown="1" style="width: 100%">
+  ![](./python-overview.drawio.svg){width="100%"}
+  <figcaption markdown="span">
+  Example usage with Python, PostgreSQL and Parquet.<br/>
+  See code for this example [below](#usage-example).</figcaption>
+</figure>
 
 ### Project
 
 The starting point for Lutra is a **project**.
 Usually, this is a directory of `.lt` files, which contain type definitions and the code of the functions.
 
-```lt
-# project.lt
-
+```lt title="project.lt"
 type Movie: {id: int32, title: text}
 
 const my_movies: [Movie] = [
@@ -36,8 +39,8 @@ func my_program() -> get_movie(3)
 
 The compiler can read these files, perform name resolution, type checking, inference, and report any issues found in the code.
 
-```
-> lutra check project.lt
+```console
+$ lutra check project.lt
 All good.
 ```
 
@@ -62,8 +65,8 @@ Currently, there are two runners available:
 - `lutra-interpreter`: a local interpreter that executes programs in the same process,
 - `lutra-runner-postgres`: a runner that executes SQL programs in as a query in PostgreSQL database.
 
-```
-> lutra run --project project.lt --interpreter --program my_program
+```console
+$ lutra run --project project.lt --interpreter --program my_program
 {
   id = 3,
   title = "Forrest Gump",
@@ -75,7 +78,7 @@ Currently, there are two runners available:
 Let's start with Python and a data-engineering task of reading data from PostgreSQL
 and writing it to a local Parquet file.
 
-```py
+```py title="old.py"
 import pandas as pd
 import sqlalchemy
 
@@ -103,7 +106,7 @@ df.to_parquet("breakdown.parquet", index=False)
 
 Now, let's replace SQL and Pandas with Lutra programs:
 
-```py
+```py title="new.py"
 import lutra_runner_postgres as l_pg
 import lutra_runner_interpreter as l_int
 
@@ -132,9 +135,9 @@ runner.execute(
 
 The script calls two Lutra programs: one is executed on PostgreSQL
 and the other locally.
-Both programs are written in `main.lt` file:
+Both programs are written in an `.lt` file:
 
-```lt
+```lt title="project.lt"
 ## PostgreSQL part: read transactions table
 func from_transactions(): [Transaction] -> sql::from("transactions")
 
@@ -172,6 +175,6 @@ we are only looking at source code, without knowledge of the database schema.
 
 Before running the Python script, we have to compile the Lutra project and generate `generated_project.py`, which will be imported into Python:
 
-```sh
+```console
 $ lutra codegen main.lt generated_project.py
 ```

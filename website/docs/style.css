@@ -28,3 +28,9 @@
 .md-nav .md-ellipsis {
   line-height: initial;
 }
+
+.highlight .gp {
+    /* console prompt */
+    user-select: none;
+    color: var(--md-code-hl-comment-color) !important;
+}

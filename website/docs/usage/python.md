@@ -40,9 +40,7 @@ validate our code and generate Python models.
 First, we define the type of the table row and then define a function that
 provides the table values.
 
-```lt
-# main.lt
-
+```lt title="main.lt"
 # the type definition of table row
 type Movie: {
   id: int32,
@@ -67,8 +65,8 @@ provide serialization codecs and type hints for type checkers (mypy) and editors
 
 To do that, we will use lutra CLI:
 
-```
-> lutra codegen main.lt generated.py
+```console
+$ lutra codegen main.lt generated.py
 ```
 
 This will compile `main.lt`, check it for errors and output python code into
@@ -106,7 +104,7 @@ For that we will need two dependencies:
 - `lutra-bin`, for endocing and decoding, and
 - `lutra-runner-postgres`, for connecting to the PostgreSQL.
 
-```sh
+```console
 $ uv add lutra-bin lutra-runner-postgres
 ```
 
@@ -136,7 +134,7 @@ print(movies)
 When we place this snippet into the main function, we can run the Python script, and we should
 see something like this:
 
-```sh
+```console
 $ python main.py
 [Movie(id=1, title="...", release_year=2009), ...]
 ```

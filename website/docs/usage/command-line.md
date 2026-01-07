@@ -10,7 +10,7 @@ Prerequisites:
 
 To install the CLI, run:
 
-```sh
+```console
 $ cargo install --index 'https://codeberg.org/lutra/_cargo-index.git' lutra-cli
 ```
 
