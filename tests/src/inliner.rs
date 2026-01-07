@@ -104,8 +104,8 @@ fn inline_03() {
     func main() -> {
       .some("hello"): OptText,
       .none: OptText,
-      std::is_some(.some("hello")),
-      std::is_none(.some("hello")),
+      std::option::is_some(.some("hello")),
+      std::option::is_none(.some("hello")),
     }
     "#), @r#"
     type OptText = enum {none, some: text};

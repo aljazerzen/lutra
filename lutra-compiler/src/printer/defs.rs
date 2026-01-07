@@ -148,7 +148,7 @@ impl PrintSource for NamedDef<'_> {
 
                 if ty_def.is_framed {
                     Between {
-                        node: &ty_def.ty,
+                        node: &(&ty_def.framed_label, &ty_def.ty),
                         prefix: "(",
                         suffix: ")",
                         span: self.1.span,
@@ -211,5 +211,19 @@ impl PrintSource for pr::ImportDef {
 
     fn span(&self) -> Option<crate::Span> {
         Some(self.span)
+    }
+}
+
+impl PrintSource for (&Option<String>, &pr::Ty) {
+    fn print<'c>(&self, p: &mut Printer<'c>) -> Option<()> {
+        if let Some(label) = &self.0 {
+            p.push(label)?;
+            p.push(": ")?;
+        }
+        self.1.print(p)
+    }
+
+    fn span(&self) -> Option<crate::Span> {
+        self.1.span()
     }
 }

@@ -17,7 +17,7 @@
 module chinook {
   import std::filter
   import std::index
-  import std::or_default
+  import std::option::or_default
 
   type Album: {id: int64, title: text}
 
@@ -35,7 +35,7 @@ module chinook {
 module box_office {
   import std::filter
   import std::index
-  import std::or_default
+  import std::option::or_default
 
   type Invoice: {id: int64, total: float64}
 
@@ -117,7 +117,7 @@ module chinook {
     get_albums()
     | std::filter(func (this: Album) -> this.id == album_id)
     | std::index(0)
-    | std::or_default()
+    | std::option::or_default()
   )
 }
 

@@ -154,42 +154,94 @@ func or(left: bool, right: bool): bool
 func not(expr: bool): bool
 
 # --- Option functions ---
+module option {
+  func is_some(value: enum {none, some: T}): bool
+  where T
+  -> (
+    match value {
+      .some => true,
+      .none => false,
+    }
+  )
 
-func or_else(value: enum {none, some: T}, fallback: T): T
-where T
--> (
-  match value {
-    .some(x) => x,
-    .none => fallback,
-  }
-)
+  func is_none(value: enum {none, some: T}): bool
+  where T
+  -> (
+    match value {
+      .some => false,
+      .none => true,
+    }
+  )
 
-func or_default(value: enum {none, some: T}): T
-where T
--> (
-  match value {
-    .some(x) => x,
-    .none => default(),
-  }
-)
+  ## When value is `.none`, returns a fallback value instead.
+  func or_else(value: enum {none, some: T}, fallback: T): T
+  where T
+  -> (
+    match value {
+      .some(x) => x,
+      .none => fallback,
+    }
+  )
 
-func is_some(value: enum {none, some: T}): bool
-where T
--> (
-  match value {
-    .some => true,
-    .none => false,
-  }
-)
+  ## When value is `.none`, returns the default value instead.
+  ##
+  ## Default value depends on the type. See [super::default].
+  ## For numbers it is 0, for booleans it is false.
+  func or_default(value: enum {none, some: T}): T
+  where T
+  -> (
+    match value {
+      .some(x) => x,
+      .none => super::default(),
+    }
+  )
 
-func is_none(value: enum {none, some: T}): bool
-where T
--> (
-  match value {
-    .some => false,
-    .none => true,
-  }
-)
+  ## Zips two options together into an option of a tuple.
+  ## Returns `.some({a, b})` only if both `a` and `b` are `.some`.
+  # TODO: maybe merge this into std::zip?
+  func zip(
+    a: enum {none, some: A},
+    b: enum {none, some: B},
+  ): enum {none, some: {A, B}}
+  where A, B
+  -> (
+    match a {
+      .none => .none,
+      .some(a) => match b {
+        .none => .none,
+        .some(b) => .some({a, b}),
+      }
+    }
+  )
+
+  ## Maps value in `.some`. Does nothing if the value is `.none`.
+  # TODO: maybe merge this into std::map?
+  func map(
+    value: enum {none, some: I},
+    mapper: func (I): O
+  ): enum {none, some: O}
+  where I, O
+  -> (
+    match value {
+      .none => .none,
+      .some(v) => .some(mapper(v))
+    }
+  )
+
+  ## Maps value in `.some`. Does nothing if the value is `.none`.
+  # TODO: maybe merge this into std::flat_map?
+  func flat_map(
+    value: enum {none, some: I},
+    mapper: func (I): enum {none, some: O}
+  ): enum {none, some: O}
+  where I, O
+  -> (
+    match value {
+      .none => .none,
+      .some(v) => mapper(v)
+    }
+  )
+}
 
 # --- Array functions ---
 

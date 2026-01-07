@@ -2068,8 +2068,8 @@ fn opt_00() {
     func main() -> {
       .some("hello"): enum {none, some: text},
       .none: enum {none, some: text},
-      std::is_some(.some("hello")),
-      std::is_none(.some("hello")),
+      std::option::is_some(.some("hello")),
+      std::option::is_none(.some("hello")),
     }
     "#, lutra_bin::Value::unit())), @r#"
     SELECT

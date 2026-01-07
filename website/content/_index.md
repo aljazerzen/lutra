@@ -65,7 +65,7 @@ type Customer: {
 func get_customer(id: int32): Customer -> (
   std::sql::from("customers")
   | find(c -> c.id == id)
-  | std::or_default()
+  | std::option::or_default()
 )
 
 func main() -> (

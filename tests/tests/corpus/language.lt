@@ -59,12 +59,12 @@ func main() -> [{a.0, a.1}, {a.0 + 1, !a.1}]
 const a: [int16] = [1, 2]
 func main() -> [
   {
-    a | std::index(0) | std::or_default,
-    a | std::index(1) | std::or_default,
+    a | std::index(0) | std::option::or_default,
+    a | std::index(1) | std::option::or_default,
   },
   {
-    a | std::index(0) | std::or_default | std::add(1),
-    a | std::index(1) | std::or_default | std::add(1),
+    a | std::index(0) | std::option::or_default | std::add(1),
+    a | std::index(1) | std::option::or_default | std::add(1),
   }
 ]
 # >
@@ -623,21 +623,6 @@ func main(): [text] -> (
   "<unnamed>",
   "Jessie",
 ]
-
-# === or_else_00
-func main() -> .some("hello") | std::or_else("world")
-# >
-"hello"
-
-# === or_else_01
-func main() -> .none | std::or_else("fallback")
-# >
-"fallback"
-
-# === or_else_02
-func main() -> .none: enum {none, some: text} | std::or_default()
-# >
-""
 
 # === std_to_text_00
 func main() -> std::to_text(20: uint8)
@@ -2878,3 +2863,48 @@ func main(): [std::Decimal] -> [
   -3112212123123123.11,
 ]
 
+# === std_option_or_else_00
+func main() -> .some("hello") | std::option::or_else("world")
+# >
+"hello"
+
+# === std_option_or_else_01
+func main() -> .none | std::option::or_else("fallback")
+# >
+"fallback"
+
+# === std_option_or_else_02
+func main() -> .none: enum {none, some: text} | std::option::or_default()
+# >
+""
+
+# === std_option_map_00
+func main() -> .some("world") | std::option::map(x -> f"Hello {x}!")
+# >
+some("Hello world!")
+
+# === std_option_flat_map_00
+func main() -> (
+  .some("world")
+  | std::option::flat_map(x -> .none: enum {none, some: int32})
+)
+# >
+none
+
+# === std_option_zip_00
+func main() -> [
+  {.some("hello"), .some("world")},
+  {.none, .some("world")},
+  {.some("hello"), .none},
+  {.none, .none},
+] | std::map(x -> std::option::zip(x.0, x.1))
+# >
+[
+  some({
+    "hello",
+    "world",
+  }),
+  none,
+  none,
+  none,
+]
