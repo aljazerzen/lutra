@@ -6,6 +6,9 @@ serve:
         'zola serve' \
         'zensical serve'
 
+test:
+    zola check
+
 build:
     rm -rf public output
     zola build

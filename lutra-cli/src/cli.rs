@@ -332,7 +332,7 @@ pub async fn run(cmd: RunCommand) -> anyhow::Result<()> {
     eprintln!("Executing...");
     let output = if cmd.runner.interpreter {
         let runner = lutra_interpreter::InterpreterRunner::default()
-            .with_file_system(Some(project.source.get_root_dir().to_path_buf()));
+            .with_file_system(Some(project.source.get_project_dir().to_path_buf()));
 
         let handle = runner.prepare(program).await?;
         runner.execute(&handle, &input).await?
@@ -397,7 +397,12 @@ pub async fn pull_interface(cmd: PullInterfaceCommand) -> anyhow::Result<()> {
 
 #[derive(clap::Parser)]
 pub struct CodegenCommand {
-    project_dir: std::path::PathBuf,
+    #[clap(flatten)]
+    discover: lutra_compiler::DiscoverParams,
+
+    #[clap(flatten)]
+    check: CheckParams,
+
     output_file: std::path::PathBuf,
 
     #[arg(long)]
@@ -419,6 +424,10 @@ pub struct CodegenCommand {
 }
 
 pub fn codegen(cmd: CodegenCommand) -> anyhow::Result<()> {
+    let project_dir = (cmd.discover.project)
+        .as_ref()
+        .ok_or(anyhow::anyhow!("--project is required for codegen"))?;
+
     let mut opts = lutra_codegen::GenerateOptions::default();
 
     if cmd.no_types {
@@ -440,11 +449,13 @@ pub fn codegen(cmd: CodegenCommand) -> anyhow::Result<()> {
         opts = opts.with_lutra_bin_path(lutra_bin_path);
     }
 
-    let input_files = if cmd.output_file.extension().is_some_and(|x| x == "py") {
-        lutra_codegen::generate_python(&cmd.project_dir, &cmd.output_file, opts)
+    let target = if cmd.output_file.extension().is_some_and(|x| x == "py") {
+        lutra_codegen::Target::Python
     } else {
-        lutra_codegen::generate(&cmd.project_dir, &cmd.output_file, opts)
+        lutra_codegen::Target::Rust
     };
+
+    let input_files = lutra_codegen::generate(&project_dir, target, &cmd.output_file, opts);
 
     println!("Used files:");
     for input_file in input_files {

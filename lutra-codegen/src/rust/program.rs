@@ -3,7 +3,8 @@ use std::fmt::Write;
 use lutra_bin::{Encode, ir};
 use lutra_compiler::{ProgramFormat, pr};
 
-use crate::{Context, codegen_ty};
+use crate::rust::Context;
+use crate::rust::types;
 
 #[rustfmt::skip::macros(writeln)]
 #[rustfmt::skip::macros(write)]
@@ -32,12 +33,12 @@ pub fn write_sr_programs(
         let buf = program.encode();
         std::fs::write(out_file, buf).unwrap();
 
-        super::infer_names_of_program_ty(&mut ty, name);
+        crate::infer_names_of_program_ty(&mut ty, name);
 
         write!(w, "pub fn {name}() -> {lutra_bin}::rr::TypedProgram<")?;
-        codegen_ty::write_ty_ref(w, &ty.input, false, ctx)?;
+        types::write_ty_ref(w, &ty.input, false, ctx)?;
         write!(w, ", ")?;
-        codegen_ty::write_ty_ref(w, &ty.output, false, ctx)?;
+        types::write_ty_ref(w, &ty.output, false, ctx)?;
         writeln!(w, "> {{")?;
 
         writeln!(w, "    use {lutra_bin}::Decode;")?;

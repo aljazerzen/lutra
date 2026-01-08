@@ -66,7 +66,7 @@ provide serialization codecs and type hints for type checkers (mypy) and editors
 To do that, we will use lutra CLI:
 
 ```console
-$ lutra codegen main.lt generated.py
+$ lutra codegen --project=main.lt generated.py
 ```
 
 This will compile `main.lt`, check it for errors and output python code into

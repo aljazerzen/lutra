@@ -7,10 +7,11 @@ fn main() {
     let out_dir = env::var_os("OUT_DIR").unwrap();
     let out_file = Path::new(&out_dir).join("lutra.rs");
 
-    let options = lutra_codegen::GenerateOptions::default()
+    let opts = lutra_codegen::GenerateOptions::default()
         .generate_programs("", lutra_codegen::ProgramFormat::SqlPg);
 
-    let input_files = lutra_codegen::generate(project_dir, &out_file, options);
+    let input_files =
+        lutra_codegen::generate(project_dir, lutra_codegen::Target::Rust, &out_file, opts);
     for f in input_files {
         println!("cargo::rerun-if-changed={}", f.to_str().unwrap());
     }

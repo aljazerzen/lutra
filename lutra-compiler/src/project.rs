@@ -102,20 +102,36 @@ impl SourceTree {
         self.sources.iter()
     }
 
-    pub fn get_files_paths(&self) -> impl Iterator<Item = path::PathBuf> {
-        self.sources.keys().map(|path| self.get_absolute_path(path))
+    pub fn get_source_display_paths<'a>(&'a self) -> impl Iterator<Item = &'a path::Path> {
+        self.sources
+            .keys()
+            .map(|path| self.get_display_path(path).unwrap())
     }
 
+    /// Converts a "project path" into an absolute path in the file-system.
     pub fn get_absolute_path(&self, path: impl AsRef<path::Path>) -> path::PathBuf {
         let path = path.as_ref();
         if path.as_os_str().is_empty() {
             self.root.to_path_buf()
         } else {
-            self.get_root_dir().join(path)
+            self.get_project_dir().join(path)
         }
     }
 
-    pub fn get_root_dir(&self) -> &path::Path {
+    /// Converts an absolute path into a path relative to the root.
+    /// Not that this is not relative to "project dir".
+    pub fn get_relative_path<'a>(
+        &self,
+        absolute_path: &'a path::Path,
+    ) -> Result<&'a path::Path, path::StripPrefixError> {
+        absolute_path.strip_prefix(&self.root)
+    }
+
+    /// Returns project dir: the directory in which the project files reside.
+    /// For example,
+    /// - if root is `/some_path/project/`, then that is also the project dir,
+    /// - if root is `/some_path/my_file.lt`, then project dir is `/some_path/`.
+    pub fn get_project_dir(&self) -> &path::Path {
         if self.root.extension().is_some_and(|e| e == "lt") {
             self.root.parent().unwrap()
         } else {
@@ -123,11 +139,18 @@ impl SourceTree {
         }
     }
 
-    pub fn get_relative_path<'a>(
-        &self,
-        path: &'a path::Path,
-    ) -> Result<&'a path::Path, path::StripPrefixError> {
-        path.strip_prefix(&self.root)
+    /// Converts a path (either absolute or relative to project root) into a
+    /// "display path", which is path relative to "project dir".
+    /// This is equivalent to "relative path", except for single-file projects,
+    /// where root is a file and "project dir" is its parent directory.
+    pub fn get_display_path<'a>(&'a self, path: &'a path::Path) -> Option<&'a path::Path> {
+        if path.is_absolute() {
+            path.strip_prefix(self.get_project_dir()).ok()
+        } else if path.as_os_str().is_empty() {
+            self.root.file_name().map(|p| path::Path::new(p))
+        } else {
+            Some(path)
+        }
     }
 
     pub fn get_path(&self, source_id: u16) -> Option<&path::Path> {
@@ -136,14 +159,6 @@ impl SourceTree {
 
     pub fn get_source(&self, path: &path::Path) -> Option<&str> {
         self.sources.get(path).map(|s| s.as_str())
-    }
-
-    pub fn get_project_dir(&self) -> &path::Path {
-        if self.root.is_dir() {
-            &self.root
-        } else {
-            self.root.parent().unwrap()
-        }
     }
 }
 

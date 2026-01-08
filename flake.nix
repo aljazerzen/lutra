@@ -59,6 +59,7 @@
             pkgs.graphviz
 
             pkgs.pgcli
+            pkgs.postgresql # for psql only (lutra-runner-python tests need it)
 
             # python
             pkgs.python312Packages.python

@@ -1,9 +1,9 @@
-use std::{borrow::Cow, fmt::Write, iter::zip};
+use std::{fmt::Write, iter::zip};
 
 use lutra_bin::{ir, layout};
 use lutra_compiler::pr;
 
-use crate::Context;
+use crate::rust::Context;
 
 pub fn write_tys(
     w: &mut impl Write,
@@ -89,7 +89,7 @@ pub fn write_ty_def(
             writeln!(w, "pub struct {name} {{")?;
 
             for (index, field) in fields.iter().enumerate() {
-                let name = tuple_field_name(&field.name, index);
+                let name = crate::tuple_field_name(&field.name, index);
 
                 write!(w, "    pub {name}: ")?;
                 write_ty_ref(w, &field.ty, false, ctx)?;
@@ -139,12 +139,6 @@ pub fn variant_needs_box(ty: &ir::Ty, index: usize) -> bool {
         return true;
     }
     layout::does_enum_variant_contain_recursive(ty, index as u16)
-}
-
-pub fn tuple_field_name(name: &Option<String>, index: usize) -> Cow<'_, str> {
-    (name.as_ref())
-        .map(|x| Cow::Borrowed(x.as_str()))
-        .unwrap_or_else(|| format!("field{index}").into())
 }
 
 /// Generates a reference to a type.

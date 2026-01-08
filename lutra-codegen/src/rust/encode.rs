@@ -2,10 +2,8 @@ use std::fmt::Write;
 
 use lutra_bin::{ir, layout};
 
-use crate::Context;
-use crate::codegen_ty::{
-    is_option_enum, is_unit_variant, tuple_field_name, variant_needs_box, write_ty_ref,
-};
+use crate::rust::Context;
+use crate::rust::types::{is_option_enum, is_unit_variant, variant_needs_box, write_ty_ref};
 
 pub fn write_encode_impls(
     w: &mut impl Write,
@@ -95,13 +93,13 @@ fn write_ty_def_impl(
             // encode head
             writeln!(w, "    fn encode_head(&self, buf: &mut {lutra_bin}::bytes::BytesMut) -> Self::HeadPtr {{")?;
             for (index, field) in fields.iter().enumerate() {
-                let field_name = tuple_field_name(&field.name, index);
+                let field_name = crate::tuple_field_name(&field.name, index);
 
                 writeln!(w, "        let {field_name} = self.{field_name}.encode_head(buf);")?;
             }
             writeln!(w, "        {name}HeadPtr {{")?;
             for (index, field) in fields.iter().enumerate() {
-                let field_name = tuple_field_name(&field.name, index);
+                let field_name = crate::tuple_field_name(&field.name, index);
 
                 writeln!(w, "            {field_name},")?;
             }
@@ -112,7 +110,7 @@ fn write_ty_def_impl(
             writeln!(w, "    fn encode_body(&self, head: Self::HeadPtr, buf: &mut {lutra_bin}::bytes::BytesMut) {{")?;
 
             for (index, field) in fields.iter().enumerate() {
-                let field_name = tuple_field_name(&field.name, index);
+                let field_name = crate::tuple_field_name(&field.name, index);
 
                 writeln!(w, "        self.{field_name}.encode_body(head.{field_name}, buf);")?;
             }
@@ -125,7 +123,7 @@ fn write_ty_def_impl(
             writeln!(w, "#[allow(non_camel_case_types)]")?;
             writeln!(w, "pub struct {name}HeadPtr {{")?;
             for (index, field) in fields.iter().enumerate() {
-                let field_name = tuple_field_name(&field.name, index);
+                let field_name = crate::tuple_field_name(&field.name, index);
 
                 write!(w, "    {field_name}: <")?;
 
@@ -305,7 +303,7 @@ fn write_ty_def_impl(
 
             let field_offsets = layout::tuple_field_offsets(ty);
             for (index, (field, offset)) in fields.iter().zip(field_offsets).enumerate() {
-                let field_name = tuple_field_name(&field.name, index);
+                let field_name = crate::tuple_field_name(&field.name, index);
                 let field_ty = &field.ty;
 
                 write!(w, "        let {field_name} = ")?;
@@ -317,7 +315,7 @@ fn write_ty_def_impl(
 
             writeln!(w, "        Ok({name} {{")?;
             for (index, field) in fields.iter().enumerate() {
-                let field_name = tuple_field_name(&field.name, index);
+                let field_name = crate::tuple_field_name(&field.name, index);
                 writeln!(w, "            {field_name},")?;
             }
             writeln!(w, "        }})")?;

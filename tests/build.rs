@@ -9,7 +9,8 @@ fn main() {
 
     let opts = lutra_codegen::GenerateOptions::default().generate_function_traits();
 
-    let input_files = lutra_codegen::generate(project_dir, &out_file, opts);
+    let input_files =
+        lutra_codegen::generate(project_dir, lutra_codegen::Target::Rust, &out_file, opts);
     for f in input_files {
         println!("cargo::rerun-if-changed={}", f.to_str().unwrap());
     }

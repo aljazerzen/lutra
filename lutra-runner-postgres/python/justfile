@@ -8,7 +8,15 @@ develop:
     maturin develop
 
 test:
-    just develop
-    cargo run -p lutra-cli -- codegen tests/lutra.lt tests/lutra_generated.py --programs-sql-pg ''
+    maturin develop
+
+    # lutra codegen
+    cargo run -p lutra-cli -- \
+      codegen --project=tests/lutra.lt tests/lutra_generated.py --programs-sql-pg ''
+
+    # mypy
     python -m mypy python/lutra_runner_postgres tests
+
+    # tests
+    psql postgres://postgres:pass@localhost:5416 -f tests/init.sql
     python -m unittest tests/main.py

@@ -8,7 +8,8 @@ develop:
     maturin develop
 
 test:
-    just develop
-    cargo run -p lutra-cli -- codegen tests/types.lt tests/types_generated.py
+    maturin develop
+    cargo run -p lutra-cli -- \
+        codegen --project=tests/types.lt tests/types_generated.py
     python -m mypy tests python/lutra_bin
     python -m unittest tests/main.py

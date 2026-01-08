@@ -1,40 +1,14 @@
 use std::collections::{HashMap, HashSet, VecDeque};
-use std::fs;
 use std::path::PathBuf;
 use std::{borrow::Cow, fmt::Write};
 
 use lutra_bin::{Encode, ir, layout};
-use lutra_compiler::{CheckParams, DiscoverParams, ProgramFormat, Project, pr};
+use lutra_compiler::{ProgramFormat, Project, pr};
 
 use crate::camel_to_snake;
 
-#[track_caller]
-pub fn generate(
-    project_dir: &std::path::Path,
-    out_file: &std::path::Path,
-    options: super::GenerateOptions,
-) -> Vec<PathBuf> {
-    // discover the project
-    let source = lutra_compiler::discover(DiscoverParams {
-        project: Some(project_dir.into()),
-    })
-    .unwrap();
-
-    // compile
-    let project = lutra_compiler::check(source, CheckParams {}).unwrap_or_else(|e| panic!("{e}"));
-
-    // generate
-    let mut file = fs::File::create(out_file).unwrap();
-    let out_dir = out_file.parent().unwrap().to_path_buf();
-    let generated = codegen_main(&project, out_dir, &options).unwrap();
-    std::io::Write::write_all(&mut file, generated.as_bytes()).unwrap();
-
-    // return vec of input files
-    project.source.get_files_paths().collect()
-}
-
 #[derive(Debug)]
-pub struct Context<'a> {
+struct Context<'a> {
     current_rust_mod: Vec<String>,
 
     /// Buffer for types that don't have their own Lutra decl, but need their own Rust decl.
@@ -66,10 +40,10 @@ impl<'a> Context<'a> {
     }
 }
 
-fn codegen_main(
+pub(crate) fn run(
     project: &Project,
-    out_dir: PathBuf,
     options: &super::GenerateOptions,
+    out_dir: PathBuf,
 ) -> Result<String, std::fmt::Error> {
     use std::fmt::Write;
 
@@ -181,7 +155,7 @@ fn codegen_module(
     Ok(())
 }
 
-pub fn write_tys(
+fn write_tys(
     w: &mut impl Write,
     tys: Vec<(ir::Ty, &[pr::Annotation])>,
     ctx: &mut Context,
@@ -197,7 +171,7 @@ pub fn write_tys(
     Ok(all_tys)
 }
 
-pub fn write_tys_in_buffer(
+fn write_tys_in_buffer(
     w: &mut impl Write,
     ctx: &mut Context<'_>,
 ) -> Result<Vec<ir::Ty>, std::fmt::Error> {
@@ -217,7 +191,7 @@ pub fn write_tys_in_buffer(
 /// Generates a type definition, implementing Encodable
 #[rustfmt::skip::macros(writeln)]
 #[rustfmt::skip::macros(write)]
-pub fn write_ty_def(
+fn write_ty_def(
     w: &mut impl Write,
     ty: &ir::Ty,
     _annotations: &[pr::Annotation],
@@ -306,7 +280,7 @@ pub fn write_ty_def(
 /// Generates a code impl for a type
 #[rustfmt::skip::macros(writeln)]
 #[rustfmt::skip::macros(write)]
-pub fn write_ty_def_codec(
+fn write_ty_def_codec(
     w: &mut impl Write,
     ty: &ir::Ty,
     ctx: &mut Context,

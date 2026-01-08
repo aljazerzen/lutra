@@ -31,18 +31,20 @@ test-ignored:
 # Re-generate committed generated files
 [working-directory: 'lutra-bin/src/project']
 generate:
-    cargo run -p lutra-cli -- codegen --lutra-bin-path="crate" . ./generated.rs
+    cargo run -p lutra-cli -- codegen --lutra-bin-path="crate" --project=. ./generated.rs
     cargo fmt -p lutra-bin
 
 [working-directory: 'lutra-bin/src/project']
 generate-precompiled:
     # For when current code does not compile, but we still have an old cli binary
-    ../../../target/debug/lutra codegen --lutra-bin-path="crate" . ./generated.rs
+    ../../../target/debug/lutra codegen --lutra-bin-path="crate" --project=. ./generated.rs
     cargo fmt -p lutra-bin
 
 # Test (this should pass for every commit)
 test:
     cargo nextest run --profile=overview
+    just py test
+    just website/test
 
 # Publish crates
 publish:
@@ -58,6 +60,6 @@ publish:
 
 # Run a command for each Python package
 py *ARGS='':
-    cd lutra-bin/python && just {{ARGS}}
-    cd lutra-runner-postgres/python && just {{ARGS}}
+    just lutra-bin/python/{{ARGS}}
+    just lutra-runner-postgres/python/{{ARGS}}
 

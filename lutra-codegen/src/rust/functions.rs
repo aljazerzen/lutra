@@ -2,7 +2,8 @@ use std::fmt::Write;
 
 use lutra_bin::ir;
 
-use crate::{Context, codegen_ty};
+use crate::rust::Context;
+use crate::rust::types;
 
 #[rustfmt::skip::macros(writeln)]
 #[rustfmt::skip::macros(write)]
@@ -21,13 +22,13 @@ pub fn write_functions(
         writeln!(w, "    fn {name}(")?;
         for (param_i, param) in func.params.iter().enumerate() {
             write!(w, "        arg{param_i}: ")?;
-            codegen_ty::write_ty_ref(w, param, false, ctx)?;
+            types::write_ty_ref(w, param, false, ctx)?;
             writeln!(w, ",")?;
         }
 
         let body = &func.body;
         write!(w, "    ) -> ")?;
-        codegen_ty::write_ty_ref(w, body, false, ctx)?;
+        types::write_ty_ref(w, body, false, ctx)?;
         writeln!(w, ";")?;
     }
     writeln!(w, "}}\n")?;
@@ -66,7 +67,7 @@ pub fn write_functions(
                 writeln!(w, "        let arg{param_i} = args.next().unwrap();")?;
                 writeln!(w, "        let arg{param_i} = arg{param_i}.into_data().unwrap_or_else(|_| panic!());")?;
                 write!(w, "        let arg{param_i} = ")?;
-                codegen_ty::write_ty_ref(w, param, true, ctx)?;
+                types::write_ty_ref(w, param, true, ctx)?;
                 writeln!(w, "::decode(&arg{param_i}.flatten()).unwrap();")?;
                 writeln!(w)?;
             }

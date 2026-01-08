@@ -176,5 +176,5 @@ we are only looking at source code, without knowledge of the database schema.
 Before running the Python script, we have to compile the Lutra project and generate `generated_project.py`, which will be imported into Python:
 
 ```console
-$ lutra codegen main.lt generated_project.py
+$ lutra codegen --project=main.lt generated_project.py
 ```
