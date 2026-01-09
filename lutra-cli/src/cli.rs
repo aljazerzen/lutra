@@ -455,7 +455,7 @@ pub fn codegen(cmd: CodegenCommand) -> anyhow::Result<()> {
         lutra_codegen::Target::Rust
     };
 
-    let input_files = lutra_codegen::generate(&project_dir, target, &cmd.output_file, opts);
+    let input_files = lutra_codegen::generate(project_dir, target, &cmd.output_file, opts);
 
     println!("Used files:");
     for input_file in input_files {
@@ -485,7 +485,7 @@ pub fn format(cmd: FormatCommand) -> anyhow::Result<()> {
 
     let mut edits_by_source: HashMap<&path::Path, Vec<_>> = HashMap::new();
     for edit in edits {
-        let Some(path) = source_tree.get_path(edit.span.source_id) else {
+        let Some((path, _content)) = source_tree.get_by_id(edit.span.source_id) else {
             continue;
         };
         let vec = edits_by_source.entry(path).or_default();

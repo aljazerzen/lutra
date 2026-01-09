@@ -15,46 +15,46 @@ pub struct DiscoverParams {
 }
 
 pub fn discover(params: DiscoverParams) -> Result<project::SourceTree, Error> {
-    let mut project = project::SourceTree::empty();
-    let Some(mut root) = params.project else {
-        return Ok(project);
+    let Some(a_project_file) = params.project else {
+        return Ok(project::SourceTree::empty());
     };
-    root = root.canonicalize()?;
 
     // walk up the module tree
     tracing::debug!("searching for project root");
-    let mut loaded_files = HashMap::new();
-    if root.is_dir() {
-        root.push("module.lt");
+    let mut root_file = a_project_file.canonicalize()?;
+    if root_file.is_dir() {
+        root_file.push("module.lt");
     }
+    let mut loaded_files = HashMap::new();
     loop {
         let file_contents =
-            fs::read_to_string(&root).map_err(|io| Error::CannotReadSourceFile {
-                file: root.clone(),
+            fs::read_to_string(&root_file).map_err(|io| Error::CannotReadSourceFile {
+                file: root_file.clone(),
                 io,
             })?;
 
         let is_submodule = crate::parser::is_submodule(&file_contents).unwrap_or(false);
 
-        loaded_files.insert(root.clone(), file_contents);
+        loaded_files.insert(root_file.clone(), file_contents);
         if is_submodule {
-            root = parent_module(&root).ok_or(Error::CannotFindProjectRoot)?;
+            root_file = parent_module(&root_file).ok_or(Error::CannotFindProjectRoot)?;
         } else {
             break;
         }
     }
-    if root.ends_with("module.lt") {
-        project.root = root.parent().unwrap().to_path_buf();
-    } else {
-        project.root = root.clone();
-    }
 
+    let root = if root_file.ends_with("module.lt") {
+        root_file.parent().unwrap().to_path_buf()
+    } else {
+        root_file.clone()
+    };
     tracing::debug!("project root: {}", root.display());
+    let mut project = project::SourceTree::new([], root.clone());
 
     // walk down the module tree
     tracing::debug!("loading project files");
     let target_extension = Some(OsStr::new("lt"));
-    let mut paths_to_load = vec![root];
+    let mut paths_to_load = vec![root_file];
     while let Some(path) = paths_to_load.pop() {
         tracing::debug!("  path: {}", path.display());
         let content = if let Some(c) = loaded_files.remove(&path) {
@@ -84,7 +84,7 @@ pub fn discover(params: DiscoverParams) -> Result<project::SourceTree, Error> {
             content
         };
 
-        let relative_path = path.strip_prefix(&project.root).unwrap().to_path_buf();
+        let relative_path = project.get_relative_path(&path).unwrap().to_path_buf();
         project.insert(relative_path, content);
 
         // for module files, read the whole dir
@@ -93,20 +93,23 @@ pub fn discover(params: DiscoverParams) -> Result<project::SourceTree, Error> {
                 continue;
             };
             tracing::debug!("  reading dir: {}", dir_path.display());
+            let mut new_paths = Vec::new();
             for entry in fs::read_dir(dir_path)? {
                 let entry = entry?;
                 let entry_path = entry.path();
                 let metadata = entry.metadata()?;
 
                 if metadata.is_dir() {
-                    paths_to_load.push(entry.path().join("module.lt"));
+                    new_paths.push(entry.path().join("module.lt"));
                 } else if metadata.is_file()
                     && entry.file_name() != "module.lt" // we've already read that
                     && entry_path.extension() == target_extension
                 {
-                    paths_to_load.push(entry.path());
+                    new_paths.push(entry.path());
                 }
             }
+            new_paths.sort();
+            paths_to_load.extend(new_paths);
         }
     }
 

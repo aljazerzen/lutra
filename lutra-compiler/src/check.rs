@@ -1,4 +1,3 @@
-use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
 use itertools::Itertools;
@@ -21,7 +20,7 @@ pub fn check(
     mut source: project::SourceTree,
     _: CheckParams,
 ) -> Result<project::Project, error::Error> {
-    if source.sources.is_empty() {
+    if source.is_empty() {
         source.insert(PathBuf::from(""), "".into());
     }
 
@@ -50,9 +49,6 @@ pub fn check_overlay(
 }
 
 fn parse(tree: &SourceTree) -> Result<Result<pr::ModuleDef, Vec<Diagnostic>>, error::Error> {
-    // reverse the id->file_path map
-    let ids: HashMap<_, _> = tree.source_ids.iter().map(|(a, b)| (b, a)).collect();
-
     // init the root module def
     let mut root = pr::ModuleDef {
         defs: Default::default(),
@@ -60,15 +56,12 @@ fn parse(tree: &SourceTree) -> Result<Result<pr::ModuleDef, Vec<Diagnostic>>, er
 
     // parse and insert into the root
     let mut diags = Vec::new();
-    for (file_path, content) in tree.get_sources() {
-        let id = ids
-            .get(&file_path)
-            .map(|x| **x)
-            .expect("source tree has malformed ids");
+    for source_id in tree.get_ids() {
+        let (path, content) = tree.get_by_id(source_id).unwrap();
 
-        let module_path = os_path_to_mod_path(file_path)?;
+        let module_path = os_path_to_mod_path(path)?;
 
-        let (parsed, errs, _) = crate::parser::parse_source(content, id);
+        let (parsed, errs, _) = crate::parser::parse_source(content, source_id);
         diags.extend(errs);
         if let Some(parsed) = parsed {
             // TODO: improve these error messages
@@ -79,9 +72,9 @@ fn parse(tree: &SourceTree) -> Result<Result<pr::ModuleDef, Vec<Diagnostic>>, er
                         .with_span(Some(Span {
                             start: 0,
                             len: 1,
-                            source_id: id,
+                            source_id,
                         }))
-                        .push_hint(format!("file {} is a submodule", file_path.display())),
+                        .push_hint(format!("file {} is a submodule", path.display())),
                 );
             }
             let included = module_path.is_empty() || parsed.is_submodule;
@@ -98,8 +91,9 @@ fn parse(tree: &SourceTree) -> Result<Result<pr::ModuleDef, Vec<Diagnostic>>, er
 }
 
 fn parse_overlay(overlay: &SourceOverlay) -> Result<pr::Expr, Vec<Diagnostic>> {
-    let snippet = overlay.get_source(overlay.get_path(0).unwrap()).unwrap();
-    let (ast, diagnostics) = crate::parser::parse_expr(snippet, 0);
+    let id = SourceOverlay::overlay_id();
+    let (_path, content) = overlay.get_by_id(id).unwrap();
+    let (ast, diagnostics) = crate::parser::parse_expr(content, id);
     if diagnostics.is_empty() {
         Ok(ast.unwrap())
     } else {

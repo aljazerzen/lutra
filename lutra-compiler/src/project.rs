@@ -1,7 +1,7 @@
-use std::collections::HashMap;
 use std::path;
 use std::str::FromStr;
 
+use indexmap::IndexMap;
 use itertools::Itertools;
 
 use crate::pr;
@@ -40,21 +40,17 @@ pub struct Dependency {
 pub struct SourceTree {
     /// Path to the root of the source tree.
     /// Can be a directory that contains module.lt or a .lt file.
-    pub root: path::PathBuf,
+    root: path::PathBuf,
 
     /// Mapping from file paths into into their contents.
     /// Paths are relative to the root.
-    pub(crate) sources: HashMap<path::PathBuf, String>,
-
-    /// Index of source ids to paths. Used to keep [crate::Span] lean.
-    pub(crate) source_ids: HashMap<u16, path::PathBuf>,
+    sources: IndexMap<path::PathBuf, String>,
 }
 
 impl SourceTree {
     pub fn empty() -> Self {
         SourceTree {
             sources: Default::default(),
-            source_ids: Default::default(),
             root: path::PathBuf::new(),
         }
     }
@@ -62,7 +58,6 @@ impl SourceTree {
     pub fn single(path: path::PathBuf, content: String) -> Self {
         SourceTree {
             sources: [(path.clone(), content)].into(),
-            source_ids: [(1, path)].into(),
             root: path::PathBuf::new(),
         }
     }
@@ -71,23 +66,18 @@ impl SourceTree {
     where
         I: IntoIterator<Item = (path::PathBuf, String)>,
     {
-        let mut res = SourceTree {
-            sources: HashMap::new(),
-            source_ids: HashMap::new(),
+        SourceTree {
+            sources: IndexMap::from_iter(iter),
             root,
-        };
-
-        for (index, (path, content)) in iter.into_iter().enumerate() {
-            res.sources.insert(path.clone(), content);
-            res.source_ids.insert((index + 1) as u16, path);
         }
-        res
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.sources.len() == 0
     }
 
     pub fn insert(&mut self, path: path::PathBuf, content: String) {
-        let last_id = self.source_ids.keys().max().cloned().unwrap_or(0);
-        self.sources.insert(path.clone(), content);
-        self.source_ids.insert(last_id + 1, path);
+        self.sources.insert(path, content);
     }
 
     pub fn replace(&mut self, path: &path::Path, content: String) -> Option<String> {
@@ -95,14 +85,26 @@ impl SourceTree {
         Some(std::mem::replace(source, content))
     }
 
-    pub fn get_source_ids(&self) -> impl Iterator<Item = &u16> {
-        self.source_ids.keys()
+    pub fn get_ids(&self) -> impl Iterator<Item = u16> {
+        0..self.sources.len() as u16
     }
     pub fn get_sources(&self) -> impl Iterator<Item = (&path::PathBuf, &String)> {
         self.sources.iter()
     }
 
-    pub fn get_source_display_paths<'a>(&'a self) -> impl Iterator<Item = &'a path::Path> {
+    pub fn get_by_id(&self, source_id: u16) -> Option<(&path::Path, &str)> {
+        self.sources
+            .get_index(source_id as usize)
+            .map(|(p, c)| (p.as_path(), c.as_str()))
+    }
+
+    pub fn get_by_path(&self, path: &path::Path) -> Option<(u16, &str)> {
+        self.sources
+            .get_full(path)
+            .map(|(i, _, content)| (i as u16, content.as_str()))
+    }
+
+    pub fn get_source_display_paths(&self) -> impl Iterator<Item = &path::Path> {
         self.sources
             .keys()
             .map(|path| self.get_display_path(path).unwrap())
@@ -147,18 +149,10 @@ impl SourceTree {
         if path.is_absolute() {
             path.strip_prefix(self.get_project_dir()).ok()
         } else if path.as_os_str().is_empty() {
-            self.root.file_name().map(|p| path::Path::new(p))
+            self.root.file_name().map(path::Path::new)
         } else {
             Some(path)
         }
-    }
-
-    pub fn get_path(&self, source_id: u16) -> Option<&path::Path> {
-        self.source_ids.get(&source_id).map(|x| x.as_path())
-    }
-
-    pub fn get_source(&self, path: &path::Path) -> Option<&str> {
-        self.sources.get(path).map(|s| s.as_str())
     }
 }
 
@@ -194,26 +188,30 @@ impl<'a> SourceOverlay<'a> {
                 .unwrap_or_default(),
         }
     }
+
+    pub const fn overlay_id() -> u16 {
+        u16::MAX
+    }
 }
 
 pub(crate) trait SourceProvider {
     fn get_root(&self) -> &path::Path;
 
-    fn get_path(&self, id: u16) -> Option<&path::Path>;
+    fn get_by_id(&self, id: u16) -> Option<(&path::Path, &str)>;
 
-    fn get_source(&self, path: &path::Path) -> Option<&str>;
+    fn get_by_path(&self, path: &path::Path) -> Option<(u16, &str)>;
 }
 
 impl SourceProvider for SourceTree {
     fn get_root(&self) -> &path::Path {
         &self.root
     }
-    fn get_path(&self, id: u16) -> Option<&path::Path> {
-        self.source_ids.get(&id).map(|x| x.as_path())
+    fn get_by_id(&self, id: u16) -> Option<(&path::Path, &str)> {
+        SourceTree::get_by_id(self, id)
     }
 
-    fn get_source(&self, path: &path::Path) -> Option<&str> {
-        self.sources.get(path).map(|x| x.as_str())
+    fn get_by_path(&self, path: &path::Path) -> Option<(u16, &str)> {
+        SourceTree::get_by_path(self, path)
     }
 }
 
@@ -222,19 +220,19 @@ impl<'a> SourceProvider for SourceOverlay<'a> {
         &self.tree.root
     }
 
-    fn get_path(&self, id: u16) -> Option<&path::Path> {
-        if id == 0 {
-            Some(self.snippet_path.as_path())
+    fn get_by_id(&self, id: u16) -> Option<(&path::Path, &str)> {
+        if id == SourceOverlay::overlay_id() {
+            Some((self.snippet_path.as_path(), self.snippet))
         } else {
-            self.tree.get_path(id)
+            self.tree.get_by_id(id)
         }
     }
 
-    fn get_source(&self, path: &path::Path) -> Option<&str> {
+    fn get_by_path(&self, path: &path::Path) -> Option<(u16, &str)> {
         if path == self.snippet_path {
-            Some(self.snippet)
+            Some((SourceOverlay::overlay_id(), self.snippet))
         } else {
-            self.tree.get_source(path)
+            self.tree.get_by_path(path)
         }
     }
 }

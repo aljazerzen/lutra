@@ -6,10 +6,10 @@ pub fn format(source_tree: &SourceTree) -> (Option<error::Error>, Vec<codespan::
     let mut edits = Vec::new();
     let mut diagnostics = Vec::new();
 
-    for (id, path) in &source_tree.source_ids {
-        let content = source_tree.sources.get(path).unwrap();
+    for id in source_tree.get_ids() {
+        let (_path, content) = source_tree.get_by_id(id).unwrap();
 
-        let (parsed, diags, trivia) = crate::parser::parse_source(content, *id);
+        let (parsed, diags, trivia) = crate::parser::parse_source(content, id);
 
         if diagnostics.is_empty()
             && let Some(parsed) = parsed

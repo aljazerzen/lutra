@@ -276,10 +276,10 @@ impl Backend {
 
         let documents_lock = self.documents.lock().await;
 
-        for source_id in project_lock.source_tree.get_source_ids() {
-            let diagnostics = diagnostics_by_source.remove(source_id).unwrap_or_default();
+        for source_id in project_lock.source_tree.get_ids() {
+            let diagnostics = diagnostics_by_source.remove(&source_id).unwrap_or_default();
 
-            let uri = to_proto::source_id(&project_lock.source_tree, *source_id);
+            let uri = to_proto::source_id(&project_lock.source_tree, source_id);
 
             let doc = documents_lock.get(&uri);
             let version = doc.map(|d| d.version);
@@ -302,7 +302,7 @@ impl Backend {
                 continue;
             };
 
-            if p_lock.source_tree.get_source(r_path).is_some() {
+            if p_lock.source_tree.get_by_path(r_path).is_some() {
                 return Some(Arc::clone(p));
             }
         }
@@ -337,7 +337,7 @@ impl Backend {
 
         {
             let documents_lock = self.documents.lock().await;
-            let source_ids: Vec<_> = source_tree.get_source_ids().cloned().collect();
+            let source_ids: Vec<_> = source_tree.get_ids().collect();
             for source_id in source_ids {
                 let uri = to_proto::source_id(&source_tree, source_id);
                 if let Some(doc) = documents_lock.get(&uri) {
@@ -345,7 +345,7 @@ impl Backend {
                         .log_message(MessageType::INFO, format!("overlaying doc: {}", *doc.uri))
                         .await;
 
-                    let path = source_tree.get_path(source_id).unwrap().to_path_buf();
+                    let path = source_tree.get_by_id(source_id).unwrap().0.to_path_buf();
                     source_tree.replace(&path, doc.text.clone());
                 }
             }
@@ -426,7 +426,7 @@ mod to_proto {
     pub fn source_id(source_tree: &lutra_compiler::SourceTree, source_id: u16) -> Uri {
         // TODO: this feels wrong, we should rethink identifiers in SourceTree
 
-        let path = source_tree.get_path(source_id).unwrap();
+        let (path, _) = source_tree.get_by_id(source_id).unwrap();
         let path = source_tree.get_absolute_path(path);
         Uri::from_file_path(path).unwrap()
     }

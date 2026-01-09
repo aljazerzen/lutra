@@ -148,7 +148,7 @@ where
     let config = Config::default().with_color(false);
 
     let span = diagnostic.span.unwrap();
-    let source_path = sources.get_path(span.source_id).unwrap();
+    let (source_path, _) = sources.get_by_id(span.source_id).unwrap();
     let span = std::ops::Range::from(span);
 
     let kind = match diagnostic.code.get_severity() {
@@ -194,7 +194,7 @@ where
 {
     use ariadne::Cache;
 
-    let source_path = sources.get_path(span.source_id).unwrap();
+    let (source_path, _content) = sources.get_by_id(span.source_id).unwrap();
     let source = cache.fetch(&source_path).unwrap();
     let source_len = source.len();
 
@@ -232,7 +232,7 @@ impl<'a, S: crate::project::SourceProvider> FileTreeCache<'a, S> {
 impl<'a, S: crate::project::SourceProvider> ariadne::Cache<&Path> for FileTreeCache<'a, S> {
     type Storage = String;
     fn fetch(&mut self, path: &&Path) -> Result<&ariadne::Source, Box<dyn fmt::Debug + '_>> {
-        let file_contents = match self.provider.get_source(path) {
+        let (_, content) = match self.provider.get_by_path(path) {
             Some(v) => v,
             None => return Err(Box::new(format!("Unknown file `{path:?}`"))),
         };
@@ -240,7 +240,7 @@ impl<'a, S: crate::project::SourceProvider> ariadne::Cache<&Path> for FileTreeCa
         Ok(self
             .cache
             .entry((*path).to_owned())
-            .or_insert_with(|| ariadne::Source::from(file_contents.to_string())))
+            .or_insert_with(|| ariadne::Source::from(content.to_string())))
     }
 
     fn display<'b>(&self, id: &&'b Path) -> Option<Box<dyn fmt::Display + 'b>> {
