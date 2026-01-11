@@ -15,14 +15,14 @@ fn main() {
 fn get_ty() -> ir::Ty {
     let source = r#"
         {
-          ime = text,
-          style = enum { Default, Dead = { reason = text }, Bored, Surprised },
-          dimensions = [text],
-          subcommand = {
-            param1 = text,
+          ime: text,
+          style: enum { Default, Dead: { reason: text }, Bored, Surprised },
+          dimensions: [text],
+          subcommand: {
+            param1: text,
             text,
           },
-          hello = bool,
+          hello: bool,
         }
     "#;
 

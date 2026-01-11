@@ -1,11 +1,10 @@
 use layout::Offset;
 use lutra_bin::ir;
-use lutra_compiler::pr;
 use ratatui::prelude::*;
 
 use crate::terminal::{Action, EventResult};
 
-pub fn prompt_for_def(project: &lutra_compiler::Project) -> anyhow::Result<ir::Path> {
+pub fn prompt_for_def(project: &ir::Module) -> anyhow::Result<ir::Path> {
     let mut app = ExploreApp::new(project);
 
     crate::terminal::within_alternate_screen(|term| crate::terminal::run_app(&mut app, term))??;
@@ -20,10 +19,10 @@ struct ExploreApp {
 }
 
 impl ExploreApp {
-    fn new(project: &lutra_compiler::Project) -> Self {
+    fn new(project: &ir::Module) -> Self {
         let root_def = Decl {
             name: "".into(),
-            kind: DeclKind::Module(ModuleDecl::new(&project.root_module)),
+            kind: DeclKind::Module(ModuleDecl::new(project)),
             focus: false,
         };
 
@@ -93,22 +92,17 @@ struct Decl {
 }
 
 impl Decl {
-    fn new(name: &str, decl: &pr::Def) -> Option<Self> {
-        let kind = match &decl.kind {
-            pr::DefKind::Module(module) => DeclKind::Module(ModuleDecl::new(module)),
-            pr::DefKind::Expr(e) => {
-                let ty = ir::Ty::from(e.ty.clone().unwrap());
+    fn new(name: &str, decl: &ir::Decl) -> Option<Self> {
+        let kind = match decl {
+            ir::Decl::Module(module) => DeclKind::Module(ModuleDecl::new(module)),
+            ir::Decl::Var(ty) => {
                 if ty.kind.is_function() {
                     DeclKind::Function(FunctionDecl::new(ty))
                 } else {
-                    DeclKind::Value(ValueDecl::new(ty))
+                    DeclKind::Value(ValueDecl::new(ty.clone()))
                 }
             }
-            pr::DefKind::Ty(ty) => {
-                let ty = ir::Ty::from(ty.ty.clone());
-                DeclKind::Ty(TypeDecl::new(ty))
-            }
-            _ => return None,
+            ir::Decl::Type(ty) => DeclKind::Ty(TypeDecl::new(ty.clone())),
         };
         Some(Decl {
             kind,
@@ -220,11 +214,12 @@ struct ModuleDecl {
     decls: Vec<Decl>,
 }
 impl ModuleDecl {
-    fn new(module: &pr::ModuleDef) -> Self {
+    fn new(module: &ir::Module) -> Self {
         let decls = module
-            .iter_defs()
-            .filter(|(n, _)| *n != "std")
-            .flat_map(|(n, d)| Decl::new(n, d))
+            .decls
+            .iter()
+            .filter(|item| item.name != "std")
+            .flat_map(|item| Decl::new(&item.name, &item.decl))
             .collect();
         Self { decls }
     }
@@ -254,7 +249,7 @@ impl ModuleDecl {
 struct FunctionDecl {}
 
 impl FunctionDecl {
-    fn new(_ty: ir::Ty) -> Self {
+    fn new(_ty: &ir::Ty) -> Self {
         Self {}
     }
 

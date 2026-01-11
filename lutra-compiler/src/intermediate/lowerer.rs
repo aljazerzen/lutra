@@ -571,7 +571,10 @@ impl<'a> Lowerer<'a> {
             // match a literal value
             pr::PatternKind::Literal(lit) => {
                 let subject_ty = self.get_ty_mat(subject.ty.clone());
+
+                // TODO: this is hack, we shouldn't be converting back to pr repe
                 let subject_ty_pr = pr::Ty::from(subject_ty.clone());
+
                 let lit = ir::Expr {
                     kind: ir::ExprKind::Literal(
                         self.lower_literal(lit, &subject_ty_pr)

@@ -2,8 +2,9 @@ use lutra_compiler::ProgramFormat;
 
 fn main() {
     let project = get_project();
+    let defs = lutra_compiler::lower_type_defs(&project);
 
-    let path = lutra_tui::prompt_for_def(&project).unwrap();
+    let path = lutra_tui::prompt_for_def(&defs).unwrap();
     execute_program(&project, &path.0.join("::"));
 }
 
@@ -22,18 +23,20 @@ fn execute_program(project: &lutra_compiler::Project, program: &str) {
         lutra_interpreter::evaluate(&program, input, lutra_interpreter::BUILTIN_MODULES, None)
             .unwrap();
 
-    lutra_tui::show_value(&ty.output, &result).unwrap();
+    lutra_tui::show_value(&result, &ty.output, &ty.defs).unwrap();
 }
 
 fn get_project() -> lutra_compiler::Project {
     let source = r#"
-        func is_even(a: int): bool -> a % 2 == 0
+        func is_even(a: int64): bool -> a % 2 == 0
 
-        func square(a: int): int -> a * a
+        func square(a: int64): int64 -> a * a
 
-        type MyRel = {a = int, b = text}
+        type MyRel: {a: int64, b: text}
 
-        let x = 1 + 2
+        func get_my_rel(): [MyRel] -> [{12, "blah"}, {10, "foo"}]
+
+        const x: int64 = 10
 
         module hello {
             func say_hello(a: text): text -> f"Hello {a}"

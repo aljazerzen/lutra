@@ -342,6 +342,8 @@ pub fn fold_type<T: ?Sized + PrFold>(fold: &mut T, ty: Ty) -> Result<Ty> {
         name: ty.name,
         scope_id: ty.scope_id,
         target: ty.target,
+        layout: ty.layout,
+        variants_recursive: ty.variants_recursive,
     })
 }
 

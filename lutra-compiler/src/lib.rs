@@ -86,13 +86,16 @@ pub fn _test_compile_ty(ty_source: &str) -> ir::Ty {
     let source = SourceTree::single("".into(), source);
     let project = check(source, CheckParams {}).unwrap_or_else(|e| panic!("{e}"));
 
-    let name = pr::Path::from_name("t");
-    let type_def = project.root_module.get(&name);
+    let module = intermediate::lower_type_defs(&project);
 
-    let mut ty = type_def.unwrap().kind.as_ty().unwrap().ty.clone();
+    let item = module.decls.into_iter().next().unwrap();
+    assert_eq!(item.name, "t");
+    let ir::Decl::Type(mut ty) = item.decl else {
+        panic!()
+    };
+
     ty.name = None;
-
-    layouter::on_ty(ir::Ty::from(ty))
+    layouter::on_ty(ty)
 }
 
 pub fn _test_compile_main(source: &str) -> Result<ir::Program, error::Error> {

@@ -166,6 +166,8 @@ fn parse_03() {
                                     name: None,
                                     scope_id: None,
                                     target: None,
+                                    layout: None,
+                                    variants_recursive: [],
                                 },
                                 Ty {
                                     kind: Primitive(
@@ -177,6 +179,8 @@ fn parse_03() {
                                     name: None,
                                     scope_id: None,
                                     target: None,
+                                    layout: None,
+                                    variants_recursive: [],
                                 },
                             ],
                         ),
@@ -240,6 +244,8 @@ fn parse_04() {
                                         name: None,
                                         scope_id: None,
                                         target: None,
+                                        layout: None,
+                                        variants_recursive: [],
                                     },
                                 },
                             ],
