@@ -892,24 +892,64 @@ fn enums_02() {
 }
 
 #[test]
-#[ignore] // TODO
 fn recursive_00() {
-    // This test is skipped, because it fails in layouter, where we cannot throw a proper error.
-    // That's because we don't have span in IR and I don't want to add it.
-    // IR is supposed to be a valid program, we should error out earlier.
-    assert_eq!(
-        _test_err(
-            r#"
-            type Tree: {left: Tree, right: Tree}
-
-            type OptionalTree: enum {none, some: Tree}
-
-            func main(): OptionalTree -> .none
-            "#
-        ),
+    insta::assert_snapshot!(_test_err(
         r#"
-    Tree has infinite size.
-    "#
+        type Tree1: {left: Tree1, right: Tree1}
+
+        type Tree2: [Tree2]
+
+        type Tree3: Tree3
+
+        type Tree4: enum {none, some: Tree4}
+        "#
+    ), @"
+    Error:
+       ╭─[<unknown>:2:9]
+       │
+     2 │         type Tree1: {left: Tree1, right: Tree1}
+       │         ───────────────────┬───────────────────
+       │                            ╰───────────────────── type has infinite size
+       │
+       │ Note:
+       │ self references are allowed only from within arrays or enums
+    ───╯
+    Error:
+       ╭─[<unknown>:6:9]
+       │
+     6 │         type Tree3: Tree3
+       │         ────────┬────────
+       │                 ╰────────── type has infinite size
+       │
+       │ Note:
+       │ self references are allowed only from within arrays or enums
+    ───╯
+    "
+    );
+}
+
+#[test]
+fn recursive_01() {
+    insta::assert_snapshot!(_test_err(
+        r#"
+        type Tree1: enum {leaf: int32, fork: Branches1}
+        type Branches1: {left: Tree1, right: Tree1}
+
+        type Tree2: {Branches2}
+        type Branches2: {left: Tree2, right: Tree2}
+        "#
+    ), @"
+    Error:
+       ╭─[<unknown>:5:9]
+       │
+     5 │         type Tree2: {Branches2}
+       │         ───────────┬───────────
+       │                    ╰───────────── type has infinite size
+       │
+       │ Note:
+       │ recursive references are allowed only from within arrays or enums
+    ───╯
+    "
     );
 }
 

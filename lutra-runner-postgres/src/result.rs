@@ -60,12 +60,12 @@ impl<'a> super::Context<'a> {
             }),
 
             ir::TyKind::Enum(variants) if is_maybe(variants) => Box::new(OptEncoder::new(
-                variants,
+                ty_mat,
                 self.construct_row_encoder(&variants[1].ty),
             )),
 
             ir::TyKind::Enum(variants) => Box::new(EnumEncoder::new(
-                variants,
+                ty_mat,
                 variants
                     .iter()
                     .enumerate()
@@ -139,7 +139,7 @@ impl<'a> super::Context<'a> {
                 inner: self.construct_json_encoder(item, json_ctx),
             }),
             ir::TyKind::Enum(variants) => Box::new(JsonEnumEncoder {
-                format: lutra_bin::layout::enum_format(variants),
+                format: lutra_bin::layout::enum_format(variants, &ty.variants_recursive),
                 inner: variants
                     .iter()
                     .map(|v| self.construct_json_encoder(&v.ty, json_ctx))
@@ -365,8 +365,9 @@ struct EnumEncoder {
 }
 
 impl EnumEncoder {
-    fn new(variants: &[ir::TyEnumVariant], inner: Vec<Box<dyn EncodeRow>>) -> Self {
-        let format = lutra_bin::layout::enum_format(variants);
+    fn new(ty: &ir::Ty, inner: Vec<Box<dyn EncodeRow>>) -> Self {
+        let variants = ty.kind.as_enum().unwrap();
+        let format = lutra_bin::layout::enum_format(variants, &ty.variants_recursive);
         Self { format, inner }
     }
 }
@@ -452,8 +453,9 @@ struct OptEncoder {
 }
 
 impl OptEncoder {
-    fn new(variants: &[ir::TyEnumVariant], inner: Box<dyn EncodeRow>) -> Self {
-        let format = lutra_bin::layout::enum_format(variants);
+    fn new(ty: &ir::Ty, inner: Box<dyn EncodeRow>) -> Self {
+        let variants = ty.kind.as_enum().unwrap();
+        let format = lutra_bin::layout::enum_format(variants, &ty.variants_recursive);
         Self { format, inner }
     }
 }

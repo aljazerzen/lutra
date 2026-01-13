@@ -158,11 +158,12 @@ impl ByteCoder {
     }
 
     fn compile_enum_variant(&mut self, ty: Ty, v: ir::EnumVariant) -> EnumVariant {
-        let ir::TyKind::Enum(ty_variants) = &self.get_ty_mat(&ty).kind else {
+        let ty_mat = self.get_ty_mat(&ty);
+        let ir::TyKind::Enum(ty_variants) = &ty_mat.kind else {
             panic!()
         };
         let ty_variant = ty_variants.get(v.tag as usize).unwrap();
-        let head_format = lutra_bin::layout::enum_head_format(ty_variants);
+        let head_format = lutra_bin::layout::enum_head_format(ty_variants, &ty.variants_recursive);
         let variant_format = lutra_bin::layout::enum_variant_format(&head_format, &ty_variant.ty);
 
         EnumVariant {
@@ -175,8 +176,12 @@ impl ByteCoder {
     }
 
     fn compile_enum_eq(&mut self, v: ir::EnumEq) -> EnumEq {
-        let ty_variants = self.get_ty_mat(&v.subject.ty).kind.as_enum().unwrap();
-        let head_format = lutra_bin::layout::enum_head_format(ty_variants);
+        let ty_mat = self.get_ty_mat(&v.subject.ty);
+        let ir::TyKind::Enum(ty_variants) = &ty_mat.kind else {
+            panic!()
+        };
+        let head_format =
+            lutra_bin::layout::enum_head_format(ty_variants, &ty_mat.variants_recursive);
 
         let tag = v.tag.to_le_bytes()[0..head_format.tag_bytes as usize].to_vec();
         EnumEq {
@@ -186,8 +191,13 @@ impl ByteCoder {
     }
 
     fn compile_enum_unwrap(&mut self, v: ir::EnumUnwrap) -> Expr {
-        let ty_variants = self.get_ty_mat(&v.subject.ty).kind.as_enum().unwrap();
-        let head_format = lutra_bin::layout::enum_head_format(ty_variants);
+        let ty_mat = self.get_ty_mat(&v.subject.ty);
+        let ir::TyKind::Enum(ty_variants) = &ty_mat.kind else {
+            panic!()
+        };
+
+        let head_format =
+            lutra_bin::layout::enum_head_format(ty_variants, &ty_mat.variants_recursive);
 
         let mut expr = self.compile_expr(v.subject);
 
@@ -291,7 +301,10 @@ impl ByteCoder {
 
                 let ty_func = ty_mat.kind.as_function().unwrap();
                 let ty_out_variants = ty_func.body.kind.as_enum().unwrap();
-                let ty_out_format = lutra_bin::layout::enum_format(ty_out_variants);
+                let ty_out_format = lutra_bin::layout::enum_format(
+                    ty_out_variants,
+                    &ty_func.body.variants_recursive,
+                );
                 let ty_out_format = ty_out_format.encode();
 
                 let mut r = vec![

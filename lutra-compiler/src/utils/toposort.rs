@@ -198,4 +198,18 @@ mod tests {
 
         assert_eq!(order, vec![vec![&"b"], vec![&"a"], vec![&"c"], vec![&"d"]]);
     }
+
+    #[test]
+    fn self_reference() {
+        let dependencies = vec![
+            ("a", vec!["b"]),
+            ("b", vec!["b"]),
+            ("c", vec!["b"]),
+            ("d", vec!["b"]),
+        ];
+
+        let order = toposort(&dependencies);
+
+        assert_eq!(order, vec![vec![&"b"], vec![&"a"], vec![&"c"], vec![&"d"]]);
+    }
 }

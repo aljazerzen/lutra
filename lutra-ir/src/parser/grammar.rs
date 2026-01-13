@@ -160,7 +160,7 @@ fn ty() -> impl Parser<TokenKind, Ty, Error = PError> {
 
         choice((primitive, array, tuple, enum_, func, ident)).map(|kind| {
             let mut ty = Ty::new(kind);
-            ty.layout = lutra_bin::layout::get_layout_simple(&ty);
+            ty.layout = lutra_bin::layout::compute(&ty);
             ty
         })
     })

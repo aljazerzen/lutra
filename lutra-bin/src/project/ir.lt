@@ -116,7 +116,7 @@ type Ty: {
   kind: TyKind,
   layout: enum { None, Some: TyLayout },
   name: enum { None, Some: text },
-  variants_recursive: [uint16]
+  variants_recursive: [uint16],
 }
 
 @derive(["Debug", "Clone", "PartialEq", "enum_as_inner::EnumAsInner"])

@@ -134,6 +134,10 @@ pub fn write_ty_def(
 pub fn variant_needs_box(ty: &ir::Ty, index: usize) -> bool {
     let variants = ty.kind.as_enum().unwrap();
 
+    if variants[index].ty.layout.is_none() {
+        panic!("missing layout: {}\n{ty:#?}", lutra_bin::ir::print_ty(ty));
+    }
+
     let layout = variants[index].ty.layout.as_ref().unwrap();
     if layout.head_size > 200 {
         return true;

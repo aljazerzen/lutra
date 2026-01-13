@@ -2,7 +2,7 @@ use lutra_compiler::ProgramFormat;
 
 fn main() {
     let project = get_project();
-    let defs = lutra_compiler::lower_type_defs(&project);
+    let defs = lutra_compiler::project_to_types(&project);
 
     let path = lutra_tui::prompt_for_def(&defs).unwrap();
     execute_program(&project, &path.0.join("::"));

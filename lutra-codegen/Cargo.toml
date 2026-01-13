@@ -13,5 +13,5 @@ bytes = { workspace = true }
 lutra-compiler = { workspace = true }
 lutra-bin = { workspace = true, features = ["std"] }
 base85 = "2.0.0"
-# tracing = { workspace = true }
+tracing = { workspace = true }
 # tracing-subscriber = { workspace = true }

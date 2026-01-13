@@ -86,7 +86,7 @@ where
                 self.visit_array(reader, ty_items)
             }
             ir::TyKind::Enum(variants) => {
-                let head = layout::enum_head_format(variants);
+                let head = layout::enum_head_format(variants, &ty.variants_recursive);
 
                 let mut buf = buf;
 

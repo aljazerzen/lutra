@@ -47,8 +47,7 @@ pub(crate) fn run(
 ) -> Result<String, std::fmt::Error> {
     use std::fmt::Write;
 
-    let module = lutra_compiler::lower_type_defs(project);
-    let module = lutra_compiler::layouter::on_root_module(module);
+    let module = lutra_compiler::project_to_types(project);
 
     let ty_defs = module.iter_types_re().collect();
 
@@ -293,7 +292,7 @@ fn write_ty_def_codec(
 
     if let ir::TyKind::Enum(variants) = &ty.kind {
         // for enums, we init the EnumCodecHelper
-        let enum_format = lutra_bin::layout::enum_format(variants);
+        let enum_format = lutra_bin::layout::enum_format(variants, &ty.variants_recursive);
         let buf = enum_format.encode();
         let format_base85 = base85::encode(&buf);
         writeln!(w, "    helper = lutra_bin.EnumCodecHelper(")?;
@@ -361,7 +360,7 @@ fn write_ty_def_codec(
 
         ir::TyKind::Enum(variants) => {
             // decode
-            let head = lutra_bin::layout::enum_head_format(variants);
+            let head = lutra_bin::layout::enum_head_format(variants, &ty.variants_recursive);
 
             writeln!(w)?;
             writeln!(w, "    def decode(self, buf: bytes) -> {name}:")?;

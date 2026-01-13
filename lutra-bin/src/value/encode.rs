@@ -82,7 +82,8 @@ fn encode_head<'t>(
         TyClass::Enum(ty_variants) => {
             let (tag, inner) = value.expect_enum()?;
 
-            let (head, variant, tag, variant_ty) = enum_params_encode(tag, ty_variants)?;
+            let (head, variant, tag, variant_ty) =
+                enum_params_encode(tag, ty_variants, &ty.variants_recursive)?;
 
             let tag_bytes = &(tag as u64).to_le_bytes()[0..head.tag_bytes as usize];
             buf.put_slice(tag_bytes);
@@ -165,7 +166,8 @@ fn encode_body<'t>(
         TyClass::Enum(variants) => {
             let (tag, inner) = value.expect_enum()?;
 
-            let (head_format, _, _, variant_ty) = enum_params_encode(tag, variants)?;
+            let (head_format, _, _, variant_ty) =
+                enum_params_encode(tag, variants, &ty.variants_recursive)?;
 
             if head_format.has_ptr {
                 match head_ptr {
@@ -189,13 +191,14 @@ fn encode_body<'t>(
     Ok(())
 }
 
-fn enum_params_encode(
+fn enum_params_encode<'a>(
     tag: usize,
-    ty_variants: &[ir::TyEnumVariant],
-) -> Result<(EnumHeadFormat, EnumVariantFormat, usize, &ir::Ty)> {
-    let head_format = layout::enum_head_format(ty_variants);
+    variants: &'a [ir::TyEnumVariant],
+    variants_recursive: &[u16],
+) -> Result<(EnumHeadFormat, EnumVariantFormat, usize, &'a ir::Ty)> {
+    let head_format = layout::enum_head_format(variants, variants_recursive);
 
-    let variant = ty_variants.get(tag).ok_or(Error::InvalidData)?;
+    let variant = variants.get(tag).ok_or(Error::InvalidData)?;
 
     let variant_format = layout::enum_variant_format(&head_format, &variant.ty);
     Ok((head_format, variant_format, tag, &variant.ty))

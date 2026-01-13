@@ -5,6 +5,7 @@ mod desugar;
 mod module;
 mod names;
 mod prefixer;
+mod recursive;
 mod types;
 
 use crate::Project;
@@ -40,8 +41,6 @@ pub fn resolve(
     // resolve names
     let resolution_order = names::run(&mut root_module).map_err(|d| vec![d])?;
 
-    // tracing::debug!("{:#?}", root_module);
-
     // resolve types
     types::run(&mut root_module, &resolution_order)?;
 
@@ -51,6 +50,9 @@ pub fn resolve(
         ordering: resolution_order,
         dependencies,
     };
+
+    // resolve layout
+    let project = recursive::check(project)?;
 
     Ok(project)
 }
@@ -87,7 +89,5 @@ pub fn resolve_overlay_expr(
     types::run(&mut root_module, &resolution_order)?;
 
     let def = root_module.defs.swap_remove(var_name).unwrap();
-    let expr = *def.kind.into_expr().unwrap().value;
-
-    Ok(expr)
+    Ok(*def.kind.into_expr().unwrap().value)
 }

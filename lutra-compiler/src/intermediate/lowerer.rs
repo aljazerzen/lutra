@@ -688,12 +688,16 @@ impl<'a> Lowerer<'a> {
             match target {
                 pr::Ref::Global(fq) => {
                     self.type_defs_queue.push_back(fq.clone());
+
+                    let def = self.root_module.get(&fq).unwrap();
+                    let ty_def = def.kind.as_ty().unwrap();
+
                     tracing::debug!("lower ty ident: {}", fq);
                     return ir::Ty {
                         kind: ir::TyKind::Ident(ir::Path(fq.into_iter().collect_vec())),
                         layout: None,
                         name: ty.name,
-                        variants_recursive: vec![],
+                        variants_recursive: ty_def.ty.variants_force_ptr.clone(),
                     };
                 }
                 pr::Ref::Local { scope, offset } => {
@@ -811,7 +815,7 @@ impl<'a> Lowerer<'a> {
             kind,
             name: ty.name,
             layout: None,
-            variants_recursive: vec![],
+            variants_recursive: ty.variants_force_ptr,
         }
     }
 
@@ -1127,7 +1131,7 @@ fn get_pattern_enum_eq_tag(subject: &ir::Expr, pattern: &pr::Pattern, variant_na
     }
 }
 
-pub fn lower_type_defs(project: &Project) -> ir::Module {
+pub(crate) fn lower_type_defs(project: &Project) -> ir::Module {
     let mut lowerer = Lowerer::new(&project.root_module);
 
     let mut module = ir::Module { decls: Vec::new() };
@@ -1164,7 +1168,8 @@ pub fn lower_type_defs(project: &Project) -> ir::Module {
     for ty in types {
         module.insert(&ty.name.0, ir::Decl::Type(ty.ty));
     }
-    module
+
+    crate::intermediate::layouter::on_root_module(module)
 }
 
 fn order_ty_defs(mut by_name: HashMap<pr::Path, ir::Ty>, project: &Project) -> Vec<ir::TyDef> {
@@ -1182,7 +1187,7 @@ fn order_ty_defs(mut by_name: HashMap<pr::Path, ir::Ty>, project: &Project) -> V
     }
 
     // remaining types come from dependencies
-    // (they should preceed types from this project)
+    // (they should precede types from this project)
     let tys_deps = by_name
         .into_iter()
         .sorted_by(|a, b| a.0.cmp(&b.0))

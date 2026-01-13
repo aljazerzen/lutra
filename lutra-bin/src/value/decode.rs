@@ -62,7 +62,7 @@ fn decode_inner<'t>(
         }
 
         TyClass::Enum(variants) => {
-            let head = layout::enum_head_format(variants);
+            let head = layout::enum_head_format(variants, &ty.variants_recursive);
 
             let mut tag_bytes = vec![0; 8];
             r.copy_to_slice(&mut tag_bytes[0..head.tag_bytes as usize]);

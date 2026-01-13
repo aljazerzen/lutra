@@ -14,7 +14,7 @@ impl EnumWriter {
         let ir::TyKind::Enum(variants) = &ty.kind else {
             panic!()
         };
-        Self::new(layout::enum_format(variants))
+        Self::new(layout::enum_format(variants, &ty.variants_recursive))
     }
 
     pub fn new(format: layout::EnumFormat) -> Self {

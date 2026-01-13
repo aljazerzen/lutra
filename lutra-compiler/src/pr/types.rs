@@ -23,9 +23,7 @@ pub struct Ty {
     /// what is being referenced by the ident.
     pub target: Option<Ref>,
 
-    pub layout: Option<lutra_bin::ir::TyLayout>,
-
-    pub variants_recursive: Vec<u16>,
+    pub variants_force_ptr: Vec<u16>,
 }
 
 /// Memory layout of a type.
@@ -196,8 +194,7 @@ impl Ty {
             name: None,
             target: None,
             scope_id: None,
-            layout: None,
-            variants_recursive: Vec::new(),
+            variants_force_ptr: Vec::new(),
         }
     }
 
@@ -208,8 +205,7 @@ impl Ty {
             name: None,
             target: None,
             scope_id: None,
-            layout: None,
-            variants_recursive: Vec::new(),
+            variants_force_ptr: Vec::new(),
         }
     }
 }

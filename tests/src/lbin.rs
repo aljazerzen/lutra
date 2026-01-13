@@ -46,8 +46,7 @@ fn _test_get_type(name: &'static str) -> &'static ir::Ty {
         let project = lutra_compiler::check(source, lutra_compiler::CheckParams {})
             .unwrap_or_else(|e| panic!("{e}"));
 
-        let module = lutra_compiler::lower_type_defs(&project);
-        let module = lutra_compiler::layouter::on_root_module(module);
+        let module = lutra_compiler::project_to_types(&project);
         module
             .iter_types_re()
             .map(|(name, ty)| ir::TyDef {

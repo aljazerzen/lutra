@@ -48,8 +48,7 @@ pub(crate) fn run(
 ) -> Result<String, std::fmt::Error> {
     use std::fmt::Write;
 
-    let module = lutra_compiler::lower_type_defs(project);
-    let module = lutra_compiler::layouter::on_root_module(module);
+    let module = lutra_compiler::project_to_types(project);
 
     let ty_defs = module.iter_types_re().collect();
 

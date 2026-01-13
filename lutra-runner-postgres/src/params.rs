@@ -47,7 +47,7 @@ impl<'a> Context<'a> {
                 }
             }
             ir::TyKind::Enum(variants) => {
-                let format = lutra_bin::layout::enum_format(variants);
+                let format = lutra_bin::layout::enum_format(variants, &ty_mat.variants_recursive);
 
                 let (tag, inner) =
                     lutra_bin::decode_enum_head(input, format.tag_bytes, format.has_ptr);

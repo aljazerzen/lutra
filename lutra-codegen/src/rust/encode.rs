@@ -135,7 +135,7 @@ fn write_ty_def_impl(
         }
 
         ir::TyKind::Enum(variants) => {
-            let head = layout::enum_head_format(variants);
+            let head = layout::enum_head_format(variants, &ty.variants_recursive);
 
             let needs_head_ptr = head.has_ptr;
             let head_ptr_name = if needs_head_ptr {
@@ -331,7 +331,7 @@ fn write_ty_def_impl(
                 "    fn decode(buf: &[u8]) -> {lutra_bin}::Result<Self> {{"
             )?;
 
-            let head = layout::enum_head_format(variants);
+            let head = layout::enum_head_format(variants, &ty.variants_recursive);
 
             // tag
             writeln!(w, "        let mut tag_bytes = buf.read_n({}).to_vec();", head.tag_bytes)?;

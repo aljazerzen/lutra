@@ -22,7 +22,7 @@ pub use check::{CheckParams, check, check_overlay};
 pub use codespan::Span;
 pub use discover::{DiscoverParams, discover};
 pub use format::format;
-pub use intermediate::{inline, layouter, lower_expr, lower_type_defs};
+pub use intermediate::inline;
 pub use lutra_bin::{ir, rr};
 pub use project::{Project, SourceTree};
 
@@ -43,15 +43,15 @@ pub fn compile(
     let program_pr = self::check::check_overlay(project, program, name_hint)?;
 
     // lower
-    let program_ir = intermediate::lower_expr(project, &program_pr);
+    let program_ir = intermediate::lowerer::lower_expr(project, &program_pr);
     tracing::debug!("ir:\n{}\n", lutra_bin::ir::print(&program_ir));
 
     // intermediate optimizations
     let program_ir = intermediate::inline(program_ir);
     tracing::debug!("ir (inlined):\n{}\n", lutra_bin::ir::print(&program_ir));
     let program_ir = intermediate::layouter::on_program(program_ir);
-    tracing::debug!("ir (layout):\n{}\n", lutra_bin::ir::print(&program_ir));
 
+    // backend (sql or bytecode)
     let program = match format {
         ProgramFormat::SqlPg => rr::Program::SqlPg(Box::new(sql::compile_ir(&program_ir))),
         ProgramFormat::BytecodeLt => {
@@ -70,6 +70,12 @@ pub fn compile(
     Ok((program, ty))
 }
 
+pub fn project_to_types(project: &Project) -> ir::Module {
+    let module = intermediate::lowerer::lower_type_defs(project);
+
+    intermediate::layouter::on_root_module(module)
+}
+
 /// Internal implementation detail, do not use.
 // Only exposed because I don't want to maintain a separate lexer for IR parser.
 pub mod _lexer {
@@ -86,7 +92,7 @@ pub fn _test_compile_ty(ty_source: &str) -> ir::Ty {
     let source = SourceTree::single("".into(), source);
     let project = check(source, CheckParams {}).unwrap_or_else(|e| panic!("{e}"));
 
-    let module = intermediate::lower_type_defs(&project);
+    let module = project_to_types(&project);
 
     let item = module.decls.into_iter().next().unwrap();
     assert_eq!(item.name, "t");
@@ -95,7 +101,7 @@ pub fn _test_compile_ty(ty_source: &str) -> ir::Ty {
     };
 
     ty.name = None;
-    layouter::on_ty(ty)
+    ty
 }
 
 pub fn _test_compile_main(source: &str) -> Result<ir::Program, error::Error> {
@@ -103,6 +109,6 @@ pub fn _test_compile_main(source: &str) -> Result<ir::Program, error::Error> {
     let project = check(source, CheckParams {})?;
 
     let main = check_overlay(&project, "main", None)?;
-    let program = lower_expr(&project, &main);
-    Ok(layouter::on_program(program))
+    let program = intermediate::lowerer::lower_expr(&project, &main);
+    Ok(intermediate::layouter::on_program(program))
 }

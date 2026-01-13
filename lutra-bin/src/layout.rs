@@ -104,77 +104,75 @@ impl Layout for () {
     }
 }
 
-// Keep in sync with [pr::TyKind::get_layout_simple]
+/// Computes layout of a type, iff all inner types have their layout computed.
 // Does not recurse.
-pub fn get_layout_simple(ty: &ir::Ty) -> Option<ir::TyLayout> {
-    let head_size = match &ty.kind {
-        ir::TyKind::Primitive(prim) => match prim {
-            ir::TyPrimitive::int8 => 8,
-            ir::TyPrimitive::int16 => 16,
-            ir::TyPrimitive::int32 => 32,
-            ir::TyPrimitive::int64 => 64,
-            ir::TyPrimitive::uint8 => 8,
-            ir::TyPrimitive::uint16 => 16,
-            ir::TyPrimitive::uint32 => 32,
-            ir::TyPrimitive::uint64 => 64,
-            ir::TyPrimitive::float32 => 32,
-            ir::TyPrimitive::float64 => 64,
-            ir::TyPrimitive::bool => 8,
-            ir::TyPrimitive::text => 64,
+pub fn compute(ty: &ir::Ty) -> Option<ir::TyLayout> {
+    Some(match &ty.kind {
+        ir::TyKind::Array(_) | ir::TyKind::Primitive(ir::TyPrimitive::text) => ir::TyLayout {
+            head_size: 64,
+            body_ptrs: vec![0],
         },
-        ir::TyKind::Array(_) => 64,
+
+        ir::TyKind::Primitive(prim) => {
+            let head_size = match prim {
+                ir::TyPrimitive::int8 => 8,
+                ir::TyPrimitive::int16 => 16,
+                ir::TyPrimitive::int32 => 32,
+                ir::TyPrimitive::int64 => 64,
+                ir::TyPrimitive::uint8 => 8,
+                ir::TyPrimitive::uint16 => 16,
+                ir::TyPrimitive::uint32 => 32,
+                ir::TyPrimitive::uint64 => 64,
+                ir::TyPrimitive::float32 => 32,
+                ir::TyPrimitive::float64 => 64,
+                ir::TyPrimitive::bool => 8,
+                ir::TyPrimitive::text => unreachable!(),
+            };
+            ir::TyLayout {
+                head_size,
+                body_ptrs: vec![],
+            }
+        }
 
         ir::TyKind::Tuple(fields) => {
-            let mut size = 0;
+            let mut head_size: u32 = 0;
+            let mut body_ptrs = vec::Vec::new();
             for f in fields {
-                if let Some(layout) = &f.ty.layout {
-                    size += layout.head_size;
-                } else {
+                let Some(layout) = &f.ty.layout else {
                     return None;
-                }
+                };
+
+                let field_offset = head_size.div_ceil(8);
+                head_size += layout.head_size;
+                body_ptrs.extend(layout.body_ptrs.iter().map(|p| p + field_offset));
             }
-            size
-        }
-        ir::TyKind::Enum(variants) => {
-            let head = enum_head_format(variants);
 
-            (head.tag_bytes + head.inner_bytes) * 8
+            ir::TyLayout {
+                head_size,
+                body_ptrs,
+            }
         }
-        _ => return None,
-    };
-    let body_ptrs: vec::Vec<u32> = match &ty.kind {
-        ir::TyKind::Primitive(ir::TyPrimitive::text) => vec![0],
-        ir::TyKind::Primitive(_) => vec![],
 
-        ir::TyKind::Array(_) => vec![0],
         ir::TyKind::Enum(variants) => {
-            let head = enum_head_format(variants);
-            if head.has_ptr {
+            let head = enum_head_format(variants, &ty.variants_recursive);
+
+            let head_size = (head.tag_bytes + head.inner_bytes) * 8;
+
+            let body_ptrs = if head.has_ptr {
                 vec![head.tag_bytes]
             } else {
                 // here we should include body_ptrs in the head of inner type,
                 // but no type with a ptr fits into 4 bytes, so we can just skip
                 // that and assume there are no body_ptrs
                 vec![]
+            };
+
+            ir::TyLayout {
+                head_size,
+                body_ptrs,
             }
         }
-
-        ir::TyKind::Tuple(fields) => {
-            let mut r = vec::Vec::new();
-            let mut field_start = 0;
-            for f in fields {
-                let layout = f.ty.layout.as_ref().unwrap();
-                r.extend(layout.body_ptrs.iter().map(|p| p + field_start));
-                field_start += layout.head_size.div_ceil(8);
-            }
-            r
-        }
-
         _ => return None,
-    };
-    Some(ir::TyLayout {
-        head_size,
-        body_ptrs,
     })
 }
 
@@ -204,8 +202,8 @@ pub fn does_enum_variant_contain_recursive(enum_ty: &ir::Ty, variant_index: u16)
 
 pub use crate::generated::layout::EnumFormat;
 
-pub fn enum_format(variants: &[ir::TyEnumVariant]) -> EnumFormat {
-    let head = enum_head_format(variants);
+pub fn enum_format(variants: &[ir::TyEnumVariant], variants_recursive: &[u16]) -> EnumFormat {
+    let head = enum_head_format(variants, variants_recursive);
     let variants = variants
         .iter()
         .map(|v| enum_variant_format(&head, &v.ty))
@@ -225,10 +223,19 @@ pub struct EnumHeadFormat {
     pub has_ptr: bool,
 }
 
-pub fn enum_head_format(variants: &[ir::TyEnumVariant]) -> EnumHeadFormat {
+pub fn enum_head_format(
+    variants: &[ir::TyEnumVariant],
+    variants_recursive: &[u16],
+) -> EnumHeadFormat {
     let t = enum_tag_size(variants.len());
 
-    let max_head = enum_max_variant_head_size(variants);
+    let force_ptr = !variants_recursive.is_empty();
+
+    let max_head = if force_ptr {
+        u32::MAX
+    } else {
+        enum_max_variant_head_size(variants)
+    };
 
     let mut has_ptr = false;
     let inner = if max_head > 32 {
@@ -273,12 +280,10 @@ pub fn enum_variant_format(head: &EnumHeadFormat, variant_ty: &ir::Ty) -> EnumVa
 
 fn enum_max_variant_head_size(variants: &[ir::TyEnumVariant]) -> u32 {
     let mut i = 0;
-    for variant in variants {
-        let ty_layout = variant
-            .ty
-            .layout
-            .as_ref()
-            .unwrap_or_else(|| panic!("missing layout: {:?}", variant.ty));
+    for v in variants {
+        let Some(ty_layout) = &v.ty.layout else {
+            panic!("missing layout: {:?}", v.ty)
+        };
         let size = ty_layout.head_size;
         i = i.max(size);
     }
