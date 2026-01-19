@@ -698,3 +698,28 @@ fn source_02() {
     type Date(int32)
     ");
 }
+
+#[test]
+fn source_03() {
+    // annotations
+
+    assert_snapshot!(_format(r#"
+    # before
+    ## Doc comment
+    # after doc
+    @Debug("Clone", "Debug")
+    # after annotation
+    type Date: int32 # trailing
+
+    # after
+    "#), @r#"
+    # before
+    ## Doc comment
+    # after doc
+    @Debug("Clone", "Debug")
+    # after annotation
+    type Date: int32 # trailing
+
+    # after
+    "#);
+}

@@ -32,8 +32,10 @@ impl PrintSource for (&pr::ModuleDef, Option<crate::Span>) {
         let mut last: Option<&pr::Def> = None;
         for (i, (name, def)) in self.0.defs.iter().enumerate() {
             if i > 0 {
+                // inject trailing comments of the prev def
                 p.inject_trivia_prev_inline(def.span.map(|s| s.start()));
 
+                // inject new-lines
                 let condensed = matches!(def.kind, pr::DefKind::Import(_))
                     && last.is_some_and(|l| matches!(l.kind, pr::DefKind::Import(_)));
 
@@ -43,22 +45,19 @@ impl PrintSource for (&pr::ModuleDef, Option<crate::Span>) {
                 }
             }
 
+            // consume all new-lines before the def
             if let Some(span) = &def.span {
                 while p.take_trivia_new_line(span.start).is_some() {}
             }
 
-            if let Some(doc_comment) = &def.doc_comment {
-                doc_comment.print(p)?;
-            }
-
-            p.inject_trivia_leading(def.span.map(|s| s.start));
-
+            // print the def
             let named_def: NamedDef = (name.as_str(), def);
-
-            print_or_not(&named_def, p);
+            print_or_skip(&named_def, p);
 
             last = Some(def);
         }
+
+        dbg!(&self.1);
 
         p.inject_trivia_prev_inline(self.1.map(|s| s.end()));
         p.inject_trivia_trailing(self.1.map(|s| s.end()));
@@ -87,7 +86,7 @@ impl PrintSource for pr::DocComment {
     }
 }
 
-fn print_or_not<T: PrintSource>(t: &T, p: &mut Printer) {
+fn print_or_skip<T: PrintSource>(t: &T, p: &mut Printer) {
     let span = t.span().unwrap();
     p.mark_printed_up_to(span.start);
 
@@ -111,6 +110,22 @@ type NamedDef<'a> = (&'a str, &'a pr::Def);
 impl PrintSource for NamedDef<'_> {
     #[tracing::instrument(name = "d", skip_all)]
     fn print<'c>(&self, p: &mut Printer<'c>) -> Option<()> {
+        if let Some(doc_comment) = &self.1.doc_comment {
+            doc_comment.print(p)?;
+        }
+
+        if let Some(a) = self.1.annotations.first() {
+            p.inject_trivia_leading(a.expr.span.map(|s| s.start));
+        }
+
+        for ann in &self.1.annotations {
+            p.push("@")?;
+            ann.expr.print(p)?;
+            p.new_line();
+        }
+
+        p.inject_trivia_leading(self.1.span_name.map(|s| s.start));
+
         match &self.1.kind {
             pr::DefKind::Module(module_def) => {
                 p.push("module ")?;

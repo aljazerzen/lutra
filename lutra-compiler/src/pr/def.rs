@@ -10,11 +10,16 @@ use crate::pr::{Expr, Ty};
 #[derive(Debug, Clone, PartialEq)]
 pub struct Def {
     pub kind: DefKind,
-    pub span: Option<Span>,
 
     pub annotations: Vec<Annotation>,
 
     pub doc_comment: Option<DocComment>,
+
+    /// Code span of the whole definition (including doc comments and annotations)
+    pub span: Option<Span>,
+
+    /// Code span of definition name
+    pub span_name: Option<Span>,
 }
 
 #[derive(Debug, EnumAsInner, PartialEq, Clone)]
@@ -103,9 +108,11 @@ impl Def {
     pub fn new<K: Into<DefKind>>(kind: K) -> Def {
         Def {
             kind: kind.into(),
-            span: None,
             annotations: Vec::new(),
             doc_comment: None,
+
+            span: None,
+            span_name: None,
         }
     }
 }
