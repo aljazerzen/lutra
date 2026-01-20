@@ -221,12 +221,12 @@ Enums are containers that contain exactly one of the named variants.
 
 ```lt
 type Color: enum {
-  Red,
-  Blue,
-  Green,
+  red,
+  blue,
+  green,
 }
 
-const colors = [Color::Blue, Color::Blue, Color::Green, Color::Red]
+const colors: [Color] = [.blue, .blue, .green, .red]
 
 func main() -> colors
 ```
@@ -236,24 +236,24 @@ value only applied to one variant, but not that others.
 
 ```lt
 type Status: enum {
-  Pending,
-  InTransit: text,
-  Arrived: Date,
-  Cancelled: {reason: text, is_refunded: bool},
+  pending,
+  in_transit: text,
+  arrived: Date,
+  cancelled: {reason: text, is_refunded: bool},
 }
 
-const orders = [
-  Status::Pending,
-  Status::InTransit("warehouse 1"),
-  Status::Arrived(@2025-12-24),
-  Status::Cancelled({reason = "lost", is_refunded = true}),
+const orders: [Status] = [
+  .pending,
+  .in_transit("warehouse 1"),
+  .arrived(@2025-12-24),
+  .cancelled({reason = "lost", is_refunded = true}),
 ]
 
 func main() -> orders
 ```
 
-Here, `enum Status` can be exactly one of its variants: `Pending`, `InTransit`,
-`Arrived`, or `Cancelled`.
+Here, `enum Status` can be exactly one of its variants: `pending`, `in_transit`,
+`arrived`, or `cancelled`.
 When order is in transit, it must also contain some textual value.
 It is not clear what this text means, so it is recommended to use nested tuples,
 as they are used for cancelled orders.
@@ -262,7 +262,7 @@ as they are used for cancelled orders.
 ### Null
 
 Lutra does not have `NULL` or `NA` values.
-Instead, we use a *maybe* enum (sometimes also called *option* or *optional*):
+Instead, we use a *option* enum (sometimes also called *maybe* or *optional*):
 
 <!-- TODO: make this example use Some and None without prefix. -->
 <!-- TODO: don't use type defs (we have not introduced this yet) -->
@@ -273,14 +273,11 @@ type Movie: {
   title: text,
 
   # unreleased movies don't have a release_year
-  release_year: enum {
-    None,
-    Some: int16,
-  }
+  release_year: enum {none, some: int16}
 }
 
-const movie1: Movie = {5, "Prestige", Movie::release_year::Some(2006)}
-const movie2: Movie = {9, "Silmarillion", Movie::release_year::None}
+const movie1: Movie = {5, "Prestige", .some(2006)}
+const movie2: Movie = {9, "Silmarillion", .none}
 
 func main() -> [movie1, movie2]
 ```

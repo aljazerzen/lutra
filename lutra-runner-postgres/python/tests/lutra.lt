@@ -1,9 +1,7 @@
-type Movie: {
-  id: int32,
-  title: text,
-  is_released: bool,
-}
+import std::sql
 
-func from_movies(): [Movie] -> std::sql::from("movies")
+type Movie: {id: int32, title: text, is_released: bool}
 
-func insert_movie(id: int32, title: text, is_released: bool): {} -> std::sql::insert([{id=id, title=title, is_released=is_released}], "movies")
+func from_movies(): [Movie] -> sql::from("movies")
+
+func insert_movie(movie: Movie): {} -> sql::insert([movie], "movies")

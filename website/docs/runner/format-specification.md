@@ -5,16 +5,23 @@ title: Format specification
 The data format operates on byte arrays.
 Each byte array is associated with a type which is not stored in the byte array itself.
 
-For example, array `[0x01, 0x94]` could represent a two byte integer of type `Prim16`.
+For example, array `[0x01, 0x94]` could represent a two-byte integer of type `Prim16`.
 
-The type dictates the encoding of value. Each type has a head and an optional body.
-Head has static size, known in advance. Body has dynamic size.
+## Head and body
+
+The type dictates the encoding of value. Each type has:
+
+- a head, which has a static size, known in advance, and
+- an optional body, which has a dynamic size.
 
 Given an array that contains the encoded type, the head is encoded at the beginning of the array.
 If there is a body, head contains a pointer to the body.
 Head and body might not be adjacent in the buffer - they might be separated by data belonging to other types.
 
-For example, `Prim16` only has a head, while `Array of Prim16` has pointer and length in the head and all array items encoded in the body.
+For example:
+
+- `Prim16` only has a head and no body,
+- `Array of Prim16` has a head, which contains a pointer to the body and array length, and a body which contains encoded array items.
 
 ## Primitives
 
@@ -22,7 +29,7 @@ For example, `Prim16` only has a head, while `Array of Prim16` has pointer and l
 - `Prim16` - 16 bits as 2 bytes in the head,
 - `Prim32` - 32 bits as 4 bytes in the head,
 - `Prim64` - 64 bits as 8 bytes in the head,
-- `text` - head contains offset & len, body contains the text encoded as UTF8,
+- `text` - head contains offset & len, body contains the text encoded as UTF8.
 
 ## Tuple
 

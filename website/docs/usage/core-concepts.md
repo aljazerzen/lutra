@@ -113,28 +113,19 @@ import lutra_runner_interpreter as l_int
 import generated_project as p
 
 # query PostgreSQL
-runner = l_pg.Runner('postgres://localhost:5432').await
-breakdown = runner.execute(
-    p.compute_breakdown(),  # compiled program
-    p.ComputeBreakdownInput(  # program inputs
-        since='2025-12-23'
-    ),
+conn = l_pg.Runner('postgres://localhost:5432').await
+breakdown = conn.run(
+    p.compute_breakdown(), # compiled program
+    p.ComputeBreakdownInput(since='2025-12-23'), # program inputs
 ).await
-
-# print results
-for b in breakdown:
-    print(b)  # b is p.Breakdown data class
 
 # transform and write using a local interpreter
-runner = l_int.Runner('./').await
-runner.execute(
-    p.write_breakdown(),
-    breakdown,
-).await
+local = l_int.Runner('./').await
+local.run(p.write_breakdown(), breakdown).await
 ```
 
-The script calls two Lutra programs: one is executed on PostgreSQL
-and the other locally.
+The script calls two Lutra programs: one is executed on PostgreSQL and the other
+is executed locally.
 Both programs are written in an `.lt` file:
 
 ```lt title="project.lt"

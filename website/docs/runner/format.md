@@ -2,9 +2,19 @@
 title: Binary format
 ---
 
-Lutra binary format is a method of serializing structured data. It can be used to transfer data between programming languages, processes or devices.
+Lutra binary format is a method of serializing structured data.
+It it used in the interface of Lutra runners to encode inputs and outputs of programs.
 
-Schema of the data structures is defined with the Lutra language. This schema is used to generate code in the desired language.
+Schema of the data structures is defined with the Lutra language.
+This schema is used to generate code in the desired language.
+
+<figure markdown="1">
+  ![Data flow diagram](./data-format-flow.drawio.svg)
+  <figcaption markdown="span">
+  Data flow from runners (databases) to target languages.<br/>
+  Binary format is the common interface between them.
+  </figcaption>
+</figure>
 
 The format supports partial decoding, i.e. reading only a part of the encoded data structure.
 

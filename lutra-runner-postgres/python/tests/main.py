@@ -1,7 +1,6 @@
 import unittest
 
 import lutra_runner_postgres
-import lutra_bin
 
 # generated
 from . import lutra_generated as l
@@ -16,9 +15,8 @@ class TestCase(unittest.IsolatedAsyncioTestCase):
         movie1 = l.Movie(id=2, title="Forrest Gump", is_released=True)
         movie2 = l.Movie(id=9, title="Prestige", is_released=False)
 
-        insert_movie = await pg.prepare(l.insert_movie().program_bin)
-        await pg.execute(insert_movie, lutra_bin.encode(movie1))
-        await pg.execute(insert_movie, lutra_bin.encode(movie2))
+        await pg.run(l.insert_movie(), movie1)
+        await pg.run(l.insert_movie(), movie2)
 
         movies = await pg.run(l.from_movies(), ())
 

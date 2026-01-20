@@ -13,16 +13,22 @@
 
   --md-code-hl-number-color: #d3869b;
   --md-code-hl-special-color: #fa5c4b;
-  --md-code-hl-function-color: #fffadf;
+  --md-code-hl-function-color: #8ec07c;
+  --md-code-hl-class-color: #fabd2f;
   --md-code-hl-constant-color: #d3869b;
   --md-code-hl-keyword-color: #fa5c4b;
   --md-code-hl-string-color: #b8bb26;
-  --md-code-hl-name-color: #fffadf;
+  --md-code-hl-name-color: #d0cdbb;
   --md-code-hl-operator-color: #fe8019;
   --md-code-hl-punctuation-color: #b8bb26;
   --md-code-hl-comment-color: #928374;
   --md-code-hl-generic-color: #d0cdbb;
-  --md-code-hl-variable-color: #fffadf;
+  --md-code-hl-variable-color: #d0cdbb;
+}
+
+.highlight .nc {
+    /* color for Name.Class (Zensical does not support this by default) */
+    color: var(--md-code-hl-class-color);
 }
 
 .md-nav .md-ellipsis {

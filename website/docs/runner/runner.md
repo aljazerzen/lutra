@@ -6,10 +6,18 @@ Lutra runner interface is an abstraction of the execution target of Lutra
 programs. It defines functions to pass a program from the caller to the callee,
 provide program inputs and return outputs.
 
+<figure markdown="1" style="width: 100%">
+  ![Sequence diagram of the runner interface](./runner.drawio.svg){width="100%"}
+  <figcaption markdown="span">
+  Sequence diagram of the runner interface.<br/>
+  </figcaption>
+</figure>
+
+
 All data passed trough the interface is encoded in
 [Lutra binary format](./format).
 
-![Sequence diagram of the runner interface](./runner.drawio.svg){width="100%"}
+## Interface
 
 Trimmed down for brevity, this the the interface (found in lutra-runner crate):
 
