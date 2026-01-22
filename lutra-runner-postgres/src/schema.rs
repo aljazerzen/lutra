@@ -49,19 +49,22 @@ where
 
         for table in schema.tables {
             let t_name = &table.table_name;
-            let table_ty = table_ty_from_introspection(&table)?;
+            let table_ty = tuple_ty_from_introspection(&table.columns, "")?;
 
             let ty_name = table_type_name(t_name);
             let snake = crate::case::to_snake_case(t_name);
 
             output += "\n";
+            output += &format!("{indent}## Row of table {t_name}\n");
             output += &format!(
                 "{indent}type {ty_name}: {}\n",
                 lutra_bin::ir::print_ty(&table_ty)
             );
+            output += &format!("{indent}## Read from table {t_name}\n");
             output += &format!(
                 "{indent}func from_{snake}(): [{ty_name}] -> std::sql::from(\"{t_name}\")\n",
             );
+            output += &format!("{indent}## Write into table {t_name}\n");
             output += &format!(
                 "{indent}func insert_{snake}(values: [{ty_name}]) -> std::sql::insert(values, \"{t_name}\")\n"
             );
@@ -75,44 +78,74 @@ where
     Ok(output)
 }
 
-fn table_ty_from_introspection(
-    table: &lutra::PullInterfaceOutputItemstablesItems,
+fn tuple_ty_from_introspection(
+    columns: &[lutra::PullInterfaceOutputItemstablesItemscolumnsItems],
+    strip_prefix: &str,
 ) -> Result<ir::Ty, Error> {
-    let fields: Vec<_> = table
-        .columns
-        .iter()
-        .map(|c| -> _ {
-            let ty = match c.typ_id {
-                // special cases
-                13226 => pg_ty::Type::INT4,        // cardinal number
-                13229 => pg_ty::Type::TEXT,        // character_data
-                13231 => pg_ty::Type::TEXT,        // sql_identifier
-                13237 => pg_ty::Type::TIMESTAMPTZ, // time_stamp
-                13239 => pg_ty::Type::TEXT,        // yes_or_no
-                10029 => pg_ty::Type::TEXT,        // pg_statistic
+    let mut fields = Vec::new();
 
-                // general case
-                _ => pg_ty::Type::from_oid(c.typ_id as u32)
-                    .unwrap_or_else(|| panic!("unknown type with oid: {}", c.typ_id)),
-            };
-            let ty = col_ty_from_introspection(ty.name())
-                .unwrap_or_else(|| panic!("cannot translate SQL type {ty} to a Lutra type"));
+    let mut i = 0;
+    while i < columns.len() {
+        let c = &columns[i];
+        let c_name = c.name.strip_prefix(strip_prefix).unwrap();
 
-            // TODO: arrays
-            // if is_array {
-            // ty = ir::Ty::new(ir::TyKind::Array(Box::new(ty)));
-            // }
+        if let Some((prefix, _)) = c_name.split_once('.') {
+            // group columns for a nested tuple
 
-            // TODO: nullable
-
-            ir::TyTupleField {
-                name: Some(c.name.clone()),
-                ty,
+            // find group end
+            let mut end = i + 1;
+            while end < columns.len() {
+                if !columns[end].name.contains('.') {
+                    break;
+                }
+                end += 1;
             }
-        })
-        .collect();
+
+            let strip_prefix = format!("{strip_prefix}{prefix}.");
+            fields.push(ir::TyTupleField {
+                name: Some(prefix.to_string()),
+                ty: tuple_ty_from_introspection(&columns[i..end], &strip_prefix)?,
+            });
+            i = end;
+        } else {
+            fields.push(tuple_field_from_introspection(c, strip_prefix));
+            i += 1;
+        }
+    }
 
     Ok(ir::Ty::new(ir::TyKind::Tuple(fields)))
+}
+
+fn tuple_field_from_introspection(
+    c: &lutra::PullInterfaceOutputItemstablesItemscolumnsItems,
+    strip_prefix: &str,
+) -> ir::TyTupleField {
+    let ty = match c.typ_id {
+        // special cases
+        13226 => pg_ty::Type::INT4,        // cardinal number
+        13229 => pg_ty::Type::TEXT,        // character_data
+        13231 => pg_ty::Type::TEXT,        // sql_identifier
+        13237 => pg_ty::Type::TIMESTAMPTZ, // time_stamp
+        13239 => pg_ty::Type::TEXT,        // yes_or_no
+        10029 => pg_ty::Type::TEXT,        // pg_statistic
+
+        // general case
+        _ => pg_ty::Type::from_oid(c.typ_id as u32)
+            .unwrap_or_else(|| panic!("unknown type with oid: {}", c.typ_id)),
+    };
+    let ty = col_ty_from_introspection(ty.name())
+        .unwrap_or_else(|| panic!("cannot translate SQL type {ty} to a Lutra type"));
+
+    // TODO: arrays
+    // if is_array {
+    // ty = ir::Ty::new(ir::TyKind::Array(Box::new(ty)));
+    // }
+
+    // TODO: nullable
+
+    let name = Some(c.name.strip_prefix(strip_prefix).unwrap().to_string());
+
+    ir::TyTupleField { name, ty }
 }
 
 fn col_ty_from_introspection(ty: &str) -> Option<ir::Ty> {
@@ -125,8 +158,15 @@ fn col_ty_from_introspection(ty: &str) -> Option<ir::Ty> {
         "double precision" | "float8" => ir::TyPrimitive::float64,
 
         "date" => return Some(ir::Ty::new(ir::Path(vec!["std".into(), "Date".into()]))),
-        // "timestamp" | "timestamp without time zone" => return None,
-        // "time" | "time without time zone" => return None,
+        "timestamp" | "timestamp without time zone" => {
+            return Some(ir::Ty::new(ir::Path(vec![
+                "std".into(),
+                "Timestamp".into(),
+            ])));
+        }
+        "time" | "time without time zone" => {
+            return Some(ir::Ty::new(ir::Path(vec!["std".into(), "Time".into()])));
+        }
         // "interval" => return None,
 
         // "bytea" => return None,
@@ -137,7 +177,9 @@ fn col_ty_from_introspection(ty: &str) -> Option<ir::Ty> {
         _ if ty.starts_with("varchar") | ty.starts_with("char") | ty.starts_with("bpchar") => {
             ir::TyPrimitive::text
         }
-        // _ if ty.starts_with("decimal") | ty.starts_with("numeric") => return None,
+        _ if ty.starts_with("decimal") | ty.starts_with("numeric") => {
+            return Some(ir::Ty::new(ir::Path(vec!["std".into(), "Decimal".into()])));
+        }
 
         // _ => return None,
         _ => ir::TyPrimitive::text,
@@ -178,17 +220,18 @@ fn generate_index_lookup(
             cond += &format!("x.{c} == {c}");
         }
 
-        *output += "\n";
         *output += &format!(
-            "{indent}## Lookup {ty_name} using {} index\n",
-            index.index_name
+            "{indent}## Lookup in {} by index {}\n",
+            table.table_name, index.index_name
         );
         if index.is_unique {
-            *output += &format!("{indent}func get_{snake}_by_{by}({params}): {ty_name} -> (\n");
+            *output += &format!(
+                "{indent}func from_{snake}_by_{by}({params}): enum {{none, some: {ty_name}}} -> (\n"
+            );
             *output += &format!("{indent}  from_{snake}() | std::find(x -> {cond})\n");
             *output += &format!("{indent})\n");
         } else {
-            *output += &format!("{indent}func get_{snake}_by_{by}({params}): [{ty_name}] -> (\n");
+            *output += &format!("{indent}func from_{snake}_by_{by}({params}): [{ty_name}] -> (\n");
             *output += &format!("{indent}  from_{snake}() | std::filter(x -> {cond})\n");
             *output += &format!("{indent})\n");
         };

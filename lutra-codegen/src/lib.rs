@@ -1,5 +1,6 @@
 mod python;
 mod rust;
+mod sql;
 
 pub use lutra_compiler::ProgramFormat;
 
@@ -9,13 +10,16 @@ use std::{fs, path};
 use lutra_bin::{Encode, ir};
 use lutra_compiler::DiscoverParams;
 
+/// Wrapper for [generate], designed to play well with Cargo's `build.rs`.
+///
+/// Writes into `OUT_DIR/lutra.rs`.
+/// Prints cargo::rerun-if-changed directives.
+/// Panics on error.
 #[track_caller]
-pub fn generate(
-    project_dir: impl AsRef<path::Path>,
-    target: Target,
-    out_file: impl AsRef<path::Path>,
-    options: GenerateOptions,
-) -> Vec<path::PathBuf> {
+pub fn check_and_generate(project_dir: impl AsRef<path::Path>, options: GenerateOptions) {
+    let out_dir = path::PathBuf::from(std::env::var_os("OUT_DIR").unwrap());
+    let out_path = out_dir.join("lutra.rs");
+
     // tracing_subscriber::fmt::Subscriber::builder()
     //     .without_time()
     //     .with_target(false)
@@ -23,38 +27,58 @@ pub fn generate(
     //     .with_writer(std::io::stderr)
     //     .init();
 
-    // discover the project
+    // discover
     let source = lutra_compiler::discover(DiscoverParams {
         project: Some(project_dir.as_ref().to_path_buf()),
-    })
-    .unwrap();
-
-    // compile
-    let project =
-        lutra_compiler::check(source, Default::default()).unwrap_or_else(|e| panic!("{e}"));
-
-    // generate
-    let mut file = fs::File::create(&out_file).unwrap();
-    let out_dir = out_file.as_ref().parent().unwrap().to_path_buf();
-
-    let generated = match target {
-        Target::Rust => rust::run(&project, &options, out_dir).unwrap(),
-        Target::Python => python::run(&project, &options, out_dir).unwrap(),
+    });
+    let source = match source {
+        Ok(s) => s,
+        Err(e) => panic!("{e}"),
     };
 
-    std::io::Write::write_all(&mut file, generated.as_bytes()).unwrap();
+    // compile
+    let project = lutra_compiler::check(source, Default::default());
+    let project = match project {
+        Ok(p) => p,
+        Err(e) => panic!("{e}"),
+    };
 
-    // return vec of input files
-    project
-        .source
-        .get_source_display_paths()
-        .map(|p| p.to_path_buf())
-        .collect()
+    // generate
+    let code = rust::run(&project, &options, out_dir).unwrap();
+    fs::write(out_path, code).unwrap();
+
+    // print directives
+    for f in project.source.get_source_display_paths() {
+        println!("cargo::rerun-if-changed={}", f.to_str().unwrap());
+    }
+}
+
+#[track_caller]
+pub fn generate(
+    project: &lutra_compiler::Project,
+    target: Target,
+    out_path: impl AsRef<path::Path>,
+    options: GenerateOptions,
+) -> Result<(), lutra_compiler::error::Error> {
+    let out_path = out_path.as_ref();
+    let out_dir = out_path.parent().unwrap().to_path_buf();
+
+    // generate
+    let code = match target {
+        Target::Rust => rust::run(project, &options, out_dir).unwrap(),
+        Target::Python => python::run(project, &options, out_dir).unwrap(),
+        Target::Sql => sql::run(project, &options, out_dir).unwrap(),
+    };
+
+    fs::write(out_path, code)?;
+
+    Ok(())
 }
 
 pub enum Target {
     Rust,
     Python,
+    Sql,
 }
 
 #[track_caller]

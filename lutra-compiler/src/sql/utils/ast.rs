@@ -1,8 +1,6 @@
 //! Utils for constructing SQL AST nodes
 
-use std::sync::OnceLock;
-
-use regex::Regex;
+// TODO: these things should probably be moved into sql-ast crate
 
 pub fn get_rel_alias(rel: &sql_ast::RelNamed) -> Option<&str> {
     rel.alias.as_ref().map(|r| r.name.value.as_str())
@@ -175,26 +173,7 @@ pub fn new_index(order_by: Option<sql_ast::Expr>) -> sql_ast::Expr {
 }
 
 pub fn new_ident<S: Into<String>>(name: S) -> sql_ast::Ident {
-    let name: String = name.into();
-
-    if valid_ident_regex().is_match(&name) {
-        sql_ast::Ident::new(name)
-    } else {
-        sql_ast::Ident::with_quote('"', name)
-    }
-}
-
-pub(crate) fn valid_ident_regex() -> &'static Regex {
-    static VALID_IDENT: OnceLock<Regex> = OnceLock::new();
-    VALID_IDENT.get_or_init(|| {
-        // One of:
-        // - `*`
-        // - An ident starting with `a-z_\$` and containing other characters `a-z0-9_\$`
-        //
-        // We could replace this with pomsky (regex<>pomsky : sql<>prql)
-        // ^ ('*' | [ascii_lower '_$'] [ascii_lower ascii_digit '_$']* ) $
-        Regex::new(r"^((\*)|(^[a-z_\$][a-z0-9_\$]*))$").unwrap()
-    })
+    sql_ast::Ident::with_quote_if_needed('"', name)
 }
 
 pub fn new_object_name<S, I>(parts: I) -> sql_ast::ObjectName

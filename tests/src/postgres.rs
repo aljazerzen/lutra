@@ -113,19 +113,12 @@ pub async fn _get_test_db_client() -> Result<tokio_postgres::Client, tokio_postg
         client_main
             .execute(&format!("CREATE DATABASE \"{db_name}\""), &[])
             .await?;
-
-        let client_test = run_connection(config_test.connect(tokio_postgres::NoTls).await?);
-        client_test.batch_execute(MOVIES_SETUP).await?;
-
-        drop(client_main); // this will release the lock
-        Ok(client_test)
-    } else {
-        drop(client_main);
-
-        Ok(run_connection(
-            config_test.connect(tokio_postgres::NoTls).await?,
-        ))
     }
+    drop(client_main); // this will release the lock
+
+    Ok(run_connection(
+        config_test.connect(tokio_postgres::NoTls).await?,
+    ))
 }
 
 pub fn run_connection<S, T>(
@@ -1837,8 +1830,10 @@ fn cmp_00() {
 
 #[tokio::test(flavor = "current_thread")]
 async fn sql_from_00() {
-    let client = _get_test_db_client().await.unwrap();
-    let mut runner = RunnerAsync::new(client);
+    let mut client = _get_test_db_client().await.unwrap();
+    let tran = client.transaction().await.unwrap();
+    tran.batch_execute(MOVIES_SETUP).await.unwrap();
+    let mut runner = RunnerAsync::new(tran);
 
     insta::assert_snapshot!(_sql_and_output(_run_on(&mut runner, r#"
     type Movie: {
@@ -1873,12 +1868,15 @@ async fn sql_from_00() {
       },
     ]
     "#);
+
+    runner.into_inner().rollback().await.unwrap();
 }
 
 #[tokio::test(flavor = "current_thread")]
 async fn sql_insert_00() {
     let mut client = _get_test_db_client().await.unwrap();
     let tran = client.transaction().await.unwrap();
+    tran.batch_execute(MOVIES_SETUP).await.unwrap();
     let mut runner = RunnerAsync::new(tran);
 
     insta::assert_snapshot!(_sql_and_output(_run_on(&mut runner, r#"
@@ -2424,56 +2422,221 @@ async fn decimal_01() {
 
 #[tokio::test(flavor = "current_thread")]
 async fn pull_interface() {
-    let client = _get_test_db_client().await.unwrap();
-    let runner = RunnerAsync::new(client);
+    let mut client = _get_test_db_client().await.unwrap();
+    let tran = client.transaction().await.unwrap();
+    tran.batch_execute(MOVIES_SETUP).await.unwrap();
+    let runner = RunnerAsync::new(tran);
 
     insta::assert_snapshot!(runner.get_interface().await.unwrap(), @r#"
+    ## Row of table persons
     type Person: {id: int32, first_name: text, last_name: text}
+    ## Read from table persons
     func from_persons(): [Person] -> std::sql::from("persons")
+    ## Write into table persons
     func insert_persons(values: [Person]) -> std::sql::insert(values, "persons")
-
-    ## Lookup Person using persons_pkey index
-    func get_persons_by_id(id: int32): Person -> (
+    ## Lookup in persons by index persons_pkey
+    func from_persons_by_id(id: int32): enum {none, some: Person} -> (
       from_persons() | std::find(x -> x.id == id)
     )
 
+    ## Row of table movies
     type Movie: {id: int32, title: text, premiere_date: std::Date, director_id: int16}
+    ## Read from table movies
     func from_movies(): [Movie] -> std::sql::from("movies")
+    ## Write into table movies
     func insert_movies(values: [Movie]) -> std::sql::insert(values, "movies")
-
-    ## Lookup Movie using movies_pkey index
-    func get_movies_by_id(id: int32): Movie -> (
+    ## Lookup in movies by index movies_pkey
+    func from_movies_by_id(id: int32): enum {none, some: Movie} -> (
       from_movies() | std::find(x -> x.id == id)
     )
-
-    ## Lookup Movie using movies_premiere_date_idx index
-    func get_movies_by_premiere_date(premiere_date: int32): [Movie] -> (
+    ## Lookup in movies by index movies_premiere_date_idx
+    func from_movies_by_premiere_date(premiere_date: int32): [Movie] -> (
       from_movies() | std::filter(x -> x.premiere_date == premiere_date)
     )
 
+    ## Row of table movie_actors
     type MovieActor: {source: int32, target: int32, role: text}
+    ## Read from table movie_actors
     func from_movie_actors(): [MovieActor] -> std::sql::from("movie_actors")
+    ## Write into table movie_actors
     func insert_movie_actors(values: [MovieActor]) -> std::sql::insert(values, "movie_actors")
 
     module another {
 
+      ## Row of table days
       type Day: {id: int32, name: text}
+      ## Read from table days
       func from_days(): [Day] -> std::sql::from("days")
+      ## Write into table days
       func insert_days(values: [Day]) -> std::sql::insert(values, "days")
-
-      ## Lookup Day using days_pkey index
-      func get_days_by_id(id: int32): Day -> (
+      ## Lookup in days by index days_pkey
+      func from_days_by_id(id: int32): enum {none, some: Day} -> (
         from_days() | std::find(x -> x.id == id)
       )
 
+      ## Row of table proj/days
       type Proj/day: {id: int32, name: text}
+      ## Read from table proj/days
       func from_proj/days(): [Proj/day] -> std::sql::from("proj/days")
+      ## Write into table proj/days
       func insert_proj/days(values: [Proj/day]) -> std::sql::insert(values, "proj/days")
-
-      ## Lookup Proj/day using proj/days_pkey index
-      func get_proj/days_by_id(id: int32): Proj/day -> (
+      ## Lookup in proj/days by index proj/days_pkey
+      func from_proj/days_by_id(id: int32): enum {none, some: Proj/day} -> (
         from_proj/days() | std::find(x -> x.id == id)
       )
     }
     "#);
+}
+
+/// Tests round trip of types:
+/// 0. send as param <--> retrieve as relational result
+/// 1. code gen SQL and apply to postgres <--> pull interface from ostgres
+/// 2. write to table <--> read from table
+async fn _type_round_trip(ty: &str, value: lutra_bin::Value) {
+    crate::init_logger();
+
+    // --- [ 0 ] ---
+
+    let client = _get_test_db_client().await.unwrap();
+    let runner = RunnerAsync::new(client);
+
+    // compile
+    let source = SourceTree::single("".into(), format!("func main(x: {ty}) -> x"));
+    let project = lutra_compiler::check(source, Default::default()).unwrap();
+    let (program, p_ty) =
+        lutra_compiler::compile(&project, "main", None, ProgramFormat::SqlPg).unwrap();
+
+    // execute
+    let input = value.encode(&p_ty.input, &p_ty.defs).unwrap();
+    let p = runner.prepare(program).await.unwrap();
+    let output = runner.execute(&p, &input).await.unwrap();
+
+    similar_asserts::assert_eq!(
+        lutra_bin::print_source(&input, &p_ty.input, &p_ty.defs).unwrap(),
+        lutra_bin::print_source(&output, &p_ty.output, &p_ty.defs).unwrap(),
+    );
+
+    let mut client = runner.into_inner();
+
+    // --- [ 1 ] ---
+
+    // compile
+    let ty_def = format!("type Row: {ty}");
+    let source = SourceTree::single("".into(), ty_def.to_string());
+    let project = match lutra_compiler::check(source, Default::default()) {
+        Ok(p) => p,
+        Err(e) => panic!("check: {e}"),
+    };
+
+    // code gen SQL
+    let code_dir = temp_dir::TempDir::new().unwrap();
+    let code_path = code_dir.path().join("schema.sql");
+    lutra_codegen::generate(
+        &project,
+        lutra_codegen::Target::Sql,
+        &code_path,
+        Default::default(),
+    )
+    .unwrap();
+    let sql_schema = std::fs::read_to_string(&code_path).unwrap();
+    tracing::debug!("sql_schema:\n{sql_schema}");
+
+    // apply to PostgreSQL
+    let tran = client.transaction().await.unwrap();
+    tran.batch_execute(&sql_schema).await.unwrap();
+
+    // pull
+    let runner = RunnerAsync::new(tran);
+    let interface = runner.get_interface().await.unwrap();
+    tracing::debug!("interface:\n{interface}");
+
+    // compare with original type
+    let interface_ty_def = interface.lines().find(|l| l.starts_with("type ")).unwrap();
+    let interface_ty = interface_ty_def.strip_prefix("type Row: ").unwrap();
+    similar_asserts::assert_eq!(ty, interface_ty);
+
+    // --- [ 2 ] ---
+
+    let source = SourceTree::single("".into(), interface);
+    let project = match lutra_compiler::check(source, Default::default()) {
+        Ok(p) => p,
+        Err(e) => panic!("check: {e}"),
+    };
+
+    let (insert, insert_ty) = lutra_compiler::compile(
+        &project,
+        "x -> insert_rows([x])",
+        None,
+        ProgramFormat::SqlPg,
+    )
+    .unwrap_or_else(|e| panic!("{e}"));
+
+    let input = value.encode(&insert_ty.input, &insert_ty.defs).unwrap();
+    let p = runner.prepare(insert).await.unwrap();
+    runner.execute(&p, &input).await.unwrap();
+
+    let (from, from_ty) = lutra_compiler::compile(
+        &project,
+        "from_rows() | std::index(0) | std::option::or_default()",
+        None,
+        ProgramFormat::SqlPg,
+    )
+    .unwrap();
+
+    let p = runner.prepare(from).await.unwrap();
+    let output = runner.execute(&p, &[]).await.unwrap();
+
+    similar_asserts::assert_eq!(
+        lutra_bin::print_source(&input, &insert_ty.input, &insert_ty.defs).unwrap(),
+        lutra_bin::print_source(&output, &from_ty.output, &from_ty.defs).unwrap(),
+    );
+
+    runner.into_inner().rollback().await.unwrap();
+}
+
+#[tokio::test(flavor = "current_thread")]
+async fn type_round_trip_00() {
+    // basic tuple
+
+    _type_round_trip(
+        "{id: int32, is_online: bool}",
+        lutra_bin::Value::Tuple(vec![
+            lutra_bin::Value::Prim32(10),
+            lutra_bin::Value::Prim8(1),
+        ]),
+    )
+    .await;
+}
+
+#[tokio::test(flavor = "current_thread")]
+#[ignore] // TODO: import & export not working yet
+async fn type_round_trip_01() {
+    // nested tuple
+
+    _type_round_trip(
+        "{id: int32, address: {street: text, number: int16}}",
+        lutra_bin::Value::Tuple(vec![
+            lutra_bin::Value::Prim32(10),
+            lutra_bin::Value::Tuple(vec![
+                lutra_bin::Value::Text("Grand Ave".into()),
+                lutra_bin::Value::Prim16(22),
+            ]),
+        ]),
+    )
+    .await;
+}
+
+#[tokio::test(flavor = "current_thread")]
+async fn type_round_trip_02() {
+    // date, time, timestamp
+
+    _type_round_trip(
+        "{d: std::Date, t: std::Time, ts: std::Timestamp}",
+        lutra_bin::Value::Tuple(vec![
+            lutra_bin::Value::Prim32(0),
+            lutra_bin::Value::Prim64(0),
+            lutra_bin::Value::Prim64(0),
+        ]),
+    )
+    .await;
 }

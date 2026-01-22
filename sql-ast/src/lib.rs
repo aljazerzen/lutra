@@ -151,16 +151,31 @@ impl Ident {
 
     /// Create a new quoted identifier with the given quote and value. This function
     /// panics if the given quote is not a valid quote character.
-    pub fn with_quote<S>(quote: char, value: S) -> Self
+    pub fn with_quote_if_needed<S>(quote: char, value: S) -> Self
     where
         S: Into<String>,
     {
-        assert!(quote == '\'' || quote == '"' || quote == '`' || quote == '[');
-        Ident {
-            value: value.into(),
-            quote_style: Some(quote),
-        }
+        let value = value.into();
+        let quote_style = if valid_ident_regex().is_match(&value) {
+            None
+        } else {
+            Some(quote)
+        };
+        Ident { value, quote_style }
     }
+}
+
+fn valid_ident_regex() -> &'static regex::Regex {
+    static VALID_IDENT: std::sync::OnceLock<regex::Regex> = std::sync::OnceLock::new();
+    VALID_IDENT.get_or_init(|| {
+        // One of:
+        // - `*`
+        // - An ident starting with `a-z_\$` and containing other characters `a-z0-9_\$`
+        //
+        // We could replace this with pomsky (regex<>pomsky : sql<>prql)
+        // ^ ('*' | [ascii_lower '_$'] [ascii_lower ascii_digit '_$']* ) $
+        regex::Regex::new(r"^((\*)|(^[a-z_\$][a-z0-9_\$]*))$").unwrap()
+    })
 }
 
 impl From<&str> for Ident {
