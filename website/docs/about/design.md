@@ -189,3 +189,62 @@ However:
 - it does not model relation rows as identifiable objects
   (which would have a simple `.save()` method),
 - it does not model links between objects in any other way than foreign keys.
+
+### Why are tuples ordered?
+
+Lutra language supports tuples with unnamed fields (e.g. `{"hello", false}`)
+and such fields can only be accessed by position (e.g. `my_tuple.0`).
+
+Unnamed fields are needed because sometimes there just isn't a good name for
+every field (for example segments of an IPv4 address) or because the tuple might
+be an unimportant internal detail.
+
+```lt
+# Example 1: no good name for ipv4 segments
+type Device: {
+  name: text,
+  ip_addr: {uint16, uint16, uint16, uint16},
+}
+
+# Example 2: we don't bother assigning names to `bounds`
+func main() -> (
+  let bounds = (
+    from_invoices()
+    | aggregate(i -> {min(i.amount), max(i.amount)})
+  );
+  f"Invoice amounts range from {bounds.0} to {bounds.1}"
+)
+```
+
+Unfortunately, they do have an unwanted property: field position is a part of
+"public interface" of the type. When a function refers to a field by position,
+and the tuple fields are re-ordered, the reference breaks.
+
+The is why is it recommended to always name fields of tuples that are exposed as
+"public" interface (anything that can be referenced from multiple locations).
+
+---
+
+If we approach this question from "physical" angle, we can wonder why Lutra
+binary format encodes tuples without names. It stores fields one after another,
+without any delimiter, field name or any other annotation.
+
+```lt
+const x = {a = 3: int8, b = true}
+
+# x is encoded with two bytes: [3, 1]
+```
+
+Such encoding has the property of being minimal: the size of the encoding is
+exactly the size of the carried information.
+
+This property is especially useful when encoding arrays of tuples. If encoding
+of tuples would include field names or identifiers, they would have to be
+repeated for every array item.
+
+---
+
+This data model decision is in conflict with some formulations of relational
+algebra, where tuple fields are referenced by labels. It is a compromise between
+mathematical rigidity, modern language ergonomics and efficient data layout.
+
