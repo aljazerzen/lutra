@@ -3,10 +3,16 @@ title: 'Motivation'
 ---
 
 
-### Query languages suck
+### Language design
 
-Most query languages are not designed as a programming language, but have started as a few very basic queries and then evolved by patching-in more and more features on top. This makes them hard to use for writing complex programs.
-SQL is the biggest offender (see
+The term "query language" implies that the language is meant for querying a
+database and is tailored to its data model. It is often the case that query
+languages are very limited and cover only a specific domain.
+
+That's because most query languages are not designed as a programming language,
+but have started as a few very basic queries and then evolved by patching-in
+more and more features on top. This makes them hard to use for writing complex
+programs. SQL is the biggest offender (see
 [1](https://www.geldata.com/blog/we-can-do-better-than-sql),
 [2](https://carlineng.com/?postid=sql-critique#blog),
 [3](https://www.scattered-thoughts.net/writing/against-sql/),
@@ -18,7 +24,12 @@ SQL is the biggest offender (see
 [9](https://dev.to/shaqq/10-things-i-hate-about-sql-a9e)
 ), but many other languages are similarly problematic.
 
-Lutra aims to be a "proper" programming language, with user-defined functions, an algebraic type system, generic function type parameters, Hindley-Milner-like type inference and many small, "quality of life" features.
+But it doesn't have to be this way if we spend enough time on language design
+and keep the data model as general as possible.
+
+Lutra aims to be a "proper" programming language, with user-defined functions,
+an algebraic type system, generic function type parameters, Hindley-Milner-like
+type inference and many small, "quality of life" features.
 
 That all compiles to a [minimal intermediate representation](https://codeberg.org/lutra/lutra/src/branch/main/lutra-bin/src/project/ir.lt) that *should* be easy to compile for different execution targets.
 The goal is to support SQL and most major relational databases, but also other *runners* like WebAssembly or [Polars](https://www.pola.rs/).

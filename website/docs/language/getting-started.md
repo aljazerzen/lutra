@@ -335,17 +335,258 @@ Right side of pipe operator can either be an identifier of a function
 
 ## Tabular data
 
-This section is a Work In Progress.
+One can get most out of Lutra language in the domain of tabular data (i.e. tables, relations, data frames).
+That's because pipelines express natural flow of data from inputs to computation to results, and type checking and inference
+make sure that every step of the pipelines is correct and makes sense. 
 
-Here is an overview of what I intend to show:
+This section will show how Lutra can be used on tabular data on the example of chinook database.
 
-- chinook database,
-- slice,
-- map,
-- filter,
-- sort,
-- group,
-- joins (map / flat_map),
+
+### Setup
+
+The data is available in the [lutra/chinook](https://codeberg.org/lutra/chinook) repository.
+Chinook is an imaginary store which sells music albums.
+We will load it into PostgreSQL and query it from there.
+To set it up, follow the instructions in the [README](https://codeberg.org/lutra/chinook#readme). 
+
+If all is setup correctly, you should be able to run this command:
+
+```console
+$ lutra run --postgres postgres://postgres:pass@localhost \
+    --project . \
+    --program pg::from_albums
+```
+
+This is quite verbose, so the justfile provides a shorthand:
+
+```console
+$ just pg-run pg::from_albums
+```
+  
+```lt
+const output = [
+  {
+    album_id = 1,
+    title = "For Those About To Rock We Salute You",
+    artist_id = 1,
+  },
+  ...
+]
+```
+
+For this guide, we will create a submodule in file `tutorial.lt`, where we can experiment and explore.
+
+
+```lt title="tutorial.lt"
+submodule 
+
+func main() -> project::pg::from_albums()
+```
+
+!!! note
+
+    In the first line, `submodule` connects this file to the parent `module.lt`.
+    This is needed to access `project::pg`, which contains type definitions of
+    tables in PostgreSQL.
+
+To invoke our new main function, we use this command:
+
+```console
+$ just pg-run tutorial::main
+```
+  
+```lt
+const output = [
+  {
+    album_id = 1,
+    title = "For Those About To Rock We Salute You",
+    artist_id = 1,
+  },
+  ...
+]
+```
+
+### Slice
+
+To limit the number of table rows, we can use `std::slice`.
+It takes start and end params and returns a subrange of all items in the array.
+
+```lt
+import project::pg
+import std::slice
+
+func main() -> (
+  pg::from_albums()
+  | slice(0, 5)
+)
+```
+
+Here, we:
+
+1. used imports to make the main program shorter,
+1. used `|` to pipe albums into the `slice` function,
+1. picked positions `[0, 5)`, or in other words, first 5 albums.
+
+### Filter
+
+If slice selects items based on position, filter selects based on a predicate.
+
+```lt
+import std::(filter, text)
+
+func main() -> (
+  pg::from_albums()
+  | filter(a -> text::starts_with(a.title, "The Best Of"))
+)
+```
+  
+The predicate is specified as a function, that is given each album in parameter `a`.
+It checks that album's title starts with `"The Best Of"`.
+
+We could also use the pipe operator here, to make it read from left-to-right:
+
+```lt
+...
+  | filter(a -> a.title | text::starts_with("The Best Of"))
+...
+```
+
+### Map
+
+Map is used to, well, map each array item into something else.
+When working with tabular data, items are generally tuples, so we are mapping
+an input tuple to an output tuple.
+
+```lt
+import std::(map, slice, text)
+
+func main() -> (
+  pg::from_albums()
+  | slice(0, 2)
+  | map(a -> { # curly braces mean we return a new tuple
+    album_id = a.id, # rename id to album_id
+    title_len = a.title | text::length(), # compute title length
+  })
+)
+```
+
+```lt
+const output = [
+  {
+    album_id = 1,
+    title_len = 37,
+  },
+  {
+    album_id = 2,
+    title_len = 17,
+  },
+]
+```
+
+### Joining
+
+To join data from another table, Lutra has no special syntax or function.
+Instead, this is accomplisheed with a normal mapping operation.
+
+```lt
+import std::(map, slice)
+
+func main() -> (
+  pg::from_albums()
+  | slice(0, 2)
+  | map(a -> {
+    a.title,
+
+    # this function find artist by the primary key
+    artist = pg::from_artists_by_id(a.artist_id), 
+  })
+)
+```
+
+```lt
+const output = [
+  {
+    title = "For Those About To Rock We Salute You",
+    artist = some({
+      id = 1,
+      name = "AC/DC",
+    }),
+  },
+  {
+    title = "Balls to the Wall",
+    artist = some({
+      id = 2,
+      name = "Accept",
+    }),
+  },
+]
+```
+
+There is a few interesting things happening here:
+
+1. Each result item is a tuple that contains a nested `artist` tuple.
+   This groups related fields together and allows handling the whole `artist` as one value.
+1. `artist` is wrapped into a option, which would be `none` if the artist would not exist.
+   In this case, that is not really needed, because we have a foreign key on `artist_id` and there will
+   always be an artist for each album. To get rid of the option, let's use `option::or_default()`.
+   
+```lt hl_lines="1 8"
+import std::(map, slice, option)
+
+func main() -> (
+  pg::from_albums()
+  | slice(0, 2)
+  | map(a -> {
+    a.title,
+    artist = pg::from_artists_by_id(a.artist_id) | option::or_default, 
+  })
+)
+```
+
+```lt
+const output = [
+  {
+    title = "For Those About To Rock We Salute You",
+    artist = {
+      id = 1,
+      name = "AC/DC",
+    },
+  },
+  {
+    title = "Balls to the Wall",
+    artist = {
+      id = 2,
+      name = "Accept",
+    },
+  },
+]
+```
+
+In Lutra, each type has a *default* value, which 0 or empty string or false.
+We used `option::or_default()`, which would inject default value for the artist
+in the case it was missing. We can see that in action here:
+
+```lt
+import std::option
+
+func main() -> {
+  pg::from_artists_by_id(1) | option::or_default(),
+  pg::from_artists_by_id(666) | option::or_default(),
+}
+```
+
+```lt
+const output = {
+  {
+    id = 1,
+    name = "AC/DC",
+  },
+  {
+    id = 0,
+    name = "",
+  },
+}
+```
 
 <div style="height: 5em"></div>
 
@@ -356,6 +597,9 @@ Here is an overview of what I intend to show:
 This guide is currently lacking in depth.
 I would still want to cover more topics, such as:
 
+- sort,
+- group,
+- flat_map,
 - control flow (match, if),
 - SQL guide (from, insert, expr),
 - interpreter guide (fs module & Parquet)
