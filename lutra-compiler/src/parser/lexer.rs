@@ -163,7 +163,7 @@ fn lexer() -> impl Parser<char, Vec<Token>, Error = LError> {
         .then(quoted_string(true))
         .map(|(c, s)| TokenKind::Interpolation(c, s));
 
-    let new_lines = just('\n').to(TokenKind::NewLine);
+    let new_lines = just('\r').or_not().then(just('\n')).to(TokenKind::NewLine);
 
     let token = choice((
         control_multi,
