@@ -79,7 +79,7 @@ module pg_catalog {
   func from_pg_constraint(): [PgConstraintRow] -> std::sql::from("pg_catalog/pg_constraint")
 
   type PgIndexRow: {indexrelid: int32, indrelid: int32, indisunique: bool, indkey: [int16]}
-  func from_pg_index(): [PgIndexRow] -> std::sql::expr(
+  func from_pg_index(): [PgIndexRow] -> std::sql::raw(
     "SELECT indexrelid, indrelid, indisunique, to_jsonb(string_to_array(indkey::text, ' ')::int2[]) as indkey FROM pg_catalog.pg_index"
   )
 

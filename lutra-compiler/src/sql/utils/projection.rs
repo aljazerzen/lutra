@@ -5,10 +5,10 @@ use lutra_bin::ir;
 use crate::sql::{COL_ARRAY_INDEX, COL_VALUE};
 use crate::sql::{clauses, queries, utils};
 
-/// Compute relational columns of a type.
-/// Basically, mapping of IR types to SQL relations.
+/// Compute relational columns of a type in "query representation".
+/// Basically, mapping of IR types to SQL relations we use in generated queries.
 ///
-/// This is a trait, so it can work for both "clauses" and "queries" stage.
+/// This is a trait, so it can work for both [clauses] and [queries] stage.
 pub trait RelCols<'a> {
     fn get_ty_mat(&self, ty: &'a ir::Ty) -> &'a ir::Ty;
 

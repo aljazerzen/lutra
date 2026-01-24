@@ -193,7 +193,7 @@ impl<'a> Printer<'a> {
             ir::TyKind::Enum(variants) => {
                 r.push(Col {
                     name: get_name_terminal(prefix).into(),
-                    ty: "SMALLINT".into(),
+                    ty: "TEXT".into(),
                     nullable: false,
                 });
 

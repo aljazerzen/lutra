@@ -1,5 +1,6 @@
-create table movies (
-    id int8 not null,
-    title text not null,
-    is_released bool not null
+DROP TABLE IF EXISTS movies;
+CREATE TABLE movies (
+    id int8 NOT NULL,
+    title text NOT NULL,
+    is_released bool NOT NULL
 );

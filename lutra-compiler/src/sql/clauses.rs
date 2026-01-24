@@ -1147,7 +1147,7 @@ impl<'a> Context<'a> {
 
                 cr::ExprKind::Transform(rows, cr::Transform::Insert(table_ident.clone()))
             }
-            "std::sql::expr" => {
+            "std::sql::raw" => {
                 let source = &call.args[0];
                 let ir::ExprKind::Literal(ir::Literal::text(source)) = &source.kind else {
                     panic!("sql_source must be const")

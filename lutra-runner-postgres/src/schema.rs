@@ -49,7 +49,7 @@ where
 
         for table in schema.tables {
             let t_name = &table.table_name;
-            let table_ty = tuple_ty_from_introspection(&table.columns, "")?;
+            let table_ty = tuple_from_pg_columns(&table.columns, "")?;
 
             let ty_name = table_type_name(t_name);
             let snake = crate::case::to_snake_case(t_name);
@@ -78,37 +78,41 @@ where
     Ok(output)
 }
 
-fn tuple_ty_from_introspection(
+/// Translates a slice of columns into a Lutra type.
+/// Before column name is considered, it must be stripped of `namespace`.
+fn tuple_from_pg_columns(
     columns: &[lutra::PullInterfaceOutputItemstablesItemscolumnsItems],
-    strip_prefix: &str,
+    namespace: &str,
 ) -> Result<ir::Ty, Error> {
     let mut fields = Vec::new();
 
     let mut i = 0;
     while i < columns.len() {
         let c = &columns[i];
-        let c_name = c.name.strip_prefix(strip_prefix).unwrap();
 
-        if let Some((prefix, _)) = c_name.split_once('.') {
+        if let Some((name, len)) = group_tuple_columns(&columns[i..], namespace) {
             // group columns for a nested tuple
 
-            // find group end
-            let mut end = i + 1;
-            while end < columns.len() {
-                if !columns[end].name.contains('.') {
-                    break;
-                }
-                end += 1;
-            }
+            // recurse
+            let strip_prefix = format!("{namespace}{name}.");
+            let ty = tuple_from_pg_columns(&columns[i..i + len], &strip_prefix)?;
 
-            let strip_prefix = format!("{strip_prefix}{prefix}.");
             fields.push(ir::TyTupleField {
-                name: Some(prefix.to_string()),
-                ty: tuple_ty_from_introspection(&columns[i..end], &strip_prefix)?,
+                name: Some(name.to_string()),
+                ty,
             });
-            i = end;
+            i += len;
         } else {
-            fields.push(tuple_field_from_introspection(c, strip_prefix));
+            // no group, add a single field
+
+            let name = c.name.strip_prefix(namespace).unwrap().to_string();
+
+            let ty = ty_from_pg_column(c);
+
+            fields.push(ir::TyTupleField {
+                name: Some(name),
+                ty,
+            });
             i += 1;
         }
     }
@@ -116,11 +120,29 @@ fn tuple_ty_from_introspection(
     Ok(ir::Ty::new(ir::TyKind::Tuple(fields)))
 }
 
-fn tuple_field_from_introspection(
-    c: &lutra::PullInterfaceOutputItemstablesItemscolumnsItems,
-    strip_prefix: &str,
-) -> ir::TyTupleField {
-    let ty = match c.typ_id {
+/// Given a slice of columns, finds a consecutive group of columns that share a prefix.
+/// For example, in slice `[hello.a, hello.b, world]`, we would find prefix `hello` and group of length 2.
+fn group_tuple_columns<'a>(
+    columns: &'a [lutra::PullInterfaceOutputItemstablesItemscolumnsItems],
+    namespace: &str,
+) -> Option<(&'a str, usize)> {
+    let c_name = columns[0].name.strip_prefix(namespace).unwrap();
+    let (prefix, _) = c_name.split_once('.')?;
+
+    // find group end
+    let mut len = 1;
+    while len < columns.len() {
+        let c_name = columns[len].name.strip_prefix(namespace).unwrap();
+        if !c_name.contains('.') {
+            break;
+        }
+        len += 1;
+    }
+    Some((prefix, len))
+}
+
+fn ty_from_pg_column(c: &lutra::PullInterfaceOutputItemstablesItemscolumnsItems) -> ir::Ty {
+    let pg_ty = match c.typ_id {
         // special cases
         13226 => pg_ty::Type::INT4,        // cardinal number
         13229 => pg_ty::Type::TEXT,        // character_data
@@ -133,58 +155,40 @@ fn tuple_field_from_introspection(
         _ => pg_ty::Type::from_oid(c.typ_id as u32)
             .unwrap_or_else(|| panic!("unknown type with oid: {}", c.typ_id)),
     };
-    let ty = col_ty_from_introspection(ty.name())
-        .unwrap_or_else(|| panic!("cannot translate SQL type {ty} to a Lutra type"));
+    let tn = pg_ty.name();
 
-    // TODO: arrays
-    // if is_array {
-    // ty = ir::Ty::new(ir::TyKind::Array(Box::new(ty)));
-    // }
+    match tn {
+        "boolean" | "bool" => ir::Ty::new(ir::TyPrimitive::bool),
+        "smallint" | "int2" => ir::Ty::new(ir::TyPrimitive::int16),
+        "integer" | "int4" | "oid" => ir::Ty::new(ir::TyPrimitive::int32),
+        "bigint" | "int8" => ir::Ty::new(ir::TyPrimitive::int64),
+        "real" | "float4" => ir::Ty::new(ir::TyPrimitive::float32),
+        "double precision" | "float8" => ir::Ty::new(ir::TyPrimitive::float64),
 
-    // TODO: nullable
-
-    let name = Some(c.name.strip_prefix(strip_prefix).unwrap().to_string());
-
-    ir::TyTupleField { name, ty }
-}
-
-fn col_ty_from_introspection(ty: &str) -> Option<ir::Ty> {
-    let prim = match ty {
-        "boolean" | "bool" => ir::TyPrimitive::bool,
-        "smallint" | "int2" => ir::TyPrimitive::int16,
-        "integer" | "int4" | "oid" => ir::TyPrimitive::int32,
-        "bigint" | "int8" => ir::TyPrimitive::int64,
-        "real" | "float4" => ir::TyPrimitive::float32,
-        "double precision" | "float8" => ir::TyPrimitive::float64,
-
-        "date" => return Some(ir::Ty::new(ir::Path(vec!["std".into(), "Date".into()]))),
+        "date" => ir::Ty::new(ir::Path(vec!["std".into(), "Date".into()])),
         "timestamp" | "timestamp without time zone" => {
-            return Some(ir::Ty::new(ir::Path(vec![
-                "std".into(),
-                "Timestamp".into(),
-            ])));
+            ir::Ty::new(ir::Path(vec!["std".into(), "Timestamp".into()]))
         }
         "time" | "time without time zone" => {
-            return Some(ir::Ty::new(ir::Path(vec!["std".into(), "Time".into()])));
+            ir::Ty::new(ir::Path(vec!["std".into(), "Time".into()]))
         }
-        // "interval" => return None,
+        // "interval" => None,
 
-        // "bytea" => return None,
-        // "bit" | "bit varying" | "varbit" => return None,
-        "text" | "varchar" | "char" | "bpchar" | "name" => ir::TyPrimitive::text,
+        // "bytea" => None,
+        // "bit" | "bit varying" | "varbit" => None,
+        "text" | "varchar" | "char" | "bpchar" | "name" => ir::Ty::new(ir::TyPrimitive::text),
 
-        _ if ty.starts_with("bit") => return None,
-        _ if ty.starts_with("varchar") | ty.starts_with("char") | ty.starts_with("bpchar") => {
-            ir::TyPrimitive::text
+        // _ if ty.starts_with("bit") => None,
+        _ if tn.starts_with("varchar") | tn.starts_with("char") | tn.starts_with("bpchar") => {
+            ir::Ty::new(ir::TyPrimitive::text)
         }
-        _ if ty.starts_with("decimal") | ty.starts_with("numeric") => {
-            return Some(ir::Ty::new(ir::Path(vec!["std".into(), "Decimal".into()])));
+        _ if tn.starts_with("decimal") | tn.starts_with("numeric") => {
+            ir::Ty::new(ir::Path(vec!["std".into(), "Decimal".into()]))
         }
 
-        // _ => return None,
-        _ => ir::TyPrimitive::text,
-    };
-    Some(ir::Ty::new(prim))
+        // _ => None,
+        _ => ir::Ty::new(ir::TyPrimitive::text),
+    }
 }
 
 fn table_type_name(table_name: &str) -> String {

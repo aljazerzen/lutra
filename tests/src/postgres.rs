@@ -2138,10 +2138,10 @@ fn opt_01() {
 }
 
 #[test]
-fn std_sql_expr_00() {
+fn std_sql_raw_00() {
     insta::assert_snapshot!(_sql_and_output(_run(r#"
     func main(): [{hello: text, world: bool, x: std::Date}]
-    -> std::sql::expr(
+    -> std::sql::raw(
       "select 'a' as hello, TRUE as world, '2025-11-14'::date as x"
     )
     "#, lutra_bin::Value::unit())), @r#"
@@ -2168,9 +2168,9 @@ fn std_sql_expr_00() {
 }
 
 #[test]
-fn std_sql_expr_01() {
+fn std_sql_raw_01() {
     insta::assert_snapshot!(_sql_and_output(_run(r#"
-    func sequence(): [int32] -> std::sql::expr("(
+    func sequence(): [int32] -> std::sql::raw("(
       SELECT 2 as value UNION SELECT 3 UNION SELECT 4 ORDER BY value
     )")
 
@@ -2250,7 +2250,7 @@ fn std_sql_expr_01() {
 fn date_time_00() {
     insta::assert_snapshot!(_sql_and_output(_run(r#"
     func main(): {a: std::Date, b: std::Time, c: std::Timestamp}
-    -> std::sql::expr(
+    -> std::sql::raw(
       "select
         '2025-11-14'::date as a,
         '04:05:06.789'::time as b,
@@ -2347,7 +2347,7 @@ fn decimal_00() {
 
     insta::assert_snapshot!(_sql_and_output(_run(r#"
     func main(): {a: std::Decimal}
-    -> std::sql::expr(
+    -> std::sql::raw(
       "select
         '123123.05'::decimal(10, 2) as a"
     )
@@ -2490,9 +2490,9 @@ async fn pull_interface() {
 
 /// Tests round trip of types:
 /// 0. send as param <--> retrieve as relational result
-/// 1. code gen SQL and apply to postgres <--> pull interface from ostgres
+/// 1. code gen SQL and apply to postgres <--> pull interface from postgres
 /// 2. write to table <--> read from table
-async fn _type_round_trip(ty: &str, value: lutra_bin::Value) {
+async fn _type_round_trip(ty: &str, ty_reflected: &str, value: lutra_bin::Value) {
     crate::init_logger();
 
     // --- [ 0 ] ---
@@ -2553,39 +2553,39 @@ async fn _type_round_trip(ty: &str, value: lutra_bin::Value) {
     // compare with original type
     let interface_ty_def = interface.lines().find(|l| l.starts_with("type ")).unwrap();
     let interface_ty = interface_ty_def.strip_prefix("type Row: ").unwrap();
-    similar_asserts::assert_eq!(ty, interface_ty);
+    similar_asserts::assert_eq!(ty_reflected, interface_ty);
 
     // --- [ 2 ] ---
 
-    let source = SourceTree::single("".into(), interface);
+    let source = SourceTree::single(
+        "".into(),
+        format!(
+            r#"func insert_row(x: {ty}) -> std::sql::insert([x], "rows")
+               func from_row() -> (
+                 std::sql::from("rows"): [{ty}] | std::index(0) | std::option::or_default()
+               )"#
+        ),
+    );
     let project = match lutra_compiler::check(source, Default::default()) {
         Ok(p) => p,
         Err(e) => panic!("check: {e}"),
     };
 
-    let (insert, insert_ty) = lutra_compiler::compile(
-        &project,
-        "x -> insert_rows([x])",
-        None,
-        ProgramFormat::SqlPg,
-    )
-    .unwrap_or_else(|e| panic!("{e}"));
-
+    // insert
+    let (insert, insert_ty) =
+        lutra_compiler::compile(&project, "x -> insert_row(x)", None, ProgramFormat::SqlPg)
+            .unwrap_or_else(|e| panic!("{e}"));
     let input = value.encode(&insert_ty.input, &insert_ty.defs).unwrap();
     let p = runner.prepare(insert).await.unwrap();
     runner.execute(&p, &input).await.unwrap();
 
-    let (from, from_ty) = lutra_compiler::compile(
-        &project,
-        "from_rows() | std::index(0) | std::option::or_default()",
-        None,
-        ProgramFormat::SqlPg,
-    )
-    .unwrap();
-
+    // from
+    let (from, from_ty) =
+        lutra_compiler::compile(&project, "from_row", None, ProgramFormat::SqlPg).unwrap();
     let p = runner.prepare(from).await.unwrap();
     let output = runner.execute(&p, &[]).await.unwrap();
 
+    // compare
     similar_asserts::assert_eq!(
         lutra_bin::print_source(&input, &insert_ty.input, &insert_ty.defs).unwrap(),
         lutra_bin::print_source(&output, &from_ty.output, &from_ty.defs).unwrap(),
@@ -2600,6 +2600,7 @@ async fn type_round_trip_00() {
 
     _type_round_trip(
         "{id: int32, is_online: bool}",
+        "{id: int32, is_online: bool}",
         lutra_bin::Value::Tuple(vec![
             lutra_bin::Value::Prim32(10),
             lutra_bin::Value::Prim8(1),
@@ -2609,11 +2610,11 @@ async fn type_round_trip_00() {
 }
 
 #[tokio::test(flavor = "current_thread")]
-#[ignore] // TODO: import & export not working yet
 async fn type_round_trip_01() {
     // nested tuple
 
     _type_round_trip(
+        "{id: int32, address: {street: text, number: int16}}",
         "{id: int32, address: {street: text, number: int16}}",
         lutra_bin::Value::Tuple(vec![
             lutra_bin::Value::Prim32(10),
@@ -2632,11 +2633,30 @@ async fn type_round_trip_02() {
 
     _type_round_trip(
         "{d: std::Date, t: std::Time, ts: std::Timestamp}",
+        "{d: std::Date, t: std::Time, ts: std::Timestamp}",
         lutra_bin::Value::Tuple(vec![
             lutra_bin::Value::Prim32(0),
             lutra_bin::Value::Prim64(0),
             lutra_bin::Value::Prim64(0),
         ]),
+    )
+    .await;
+}
+
+#[tokio::test(flavor = "current_thread")]
+async fn type_round_trip_03() {
+    // enum
+
+    _type_round_trip(
+        "{status: enum {pending, in_progress: int16, done: text}}",
+        // enums get reflected as:
+        // - tag column of type text
+        // - inner fields, but optional and without unit fields
+        "{status: text, status: {in_progress: int16, done: text}}",
+        lutra_bin::Value::Tuple(vec![lutra_bin::Value::Enum(
+            1,
+            Box::new(lutra_bin::Value::Prim16(22)),
+        )]),
     )
     .await;
 }

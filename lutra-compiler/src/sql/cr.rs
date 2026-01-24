@@ -83,7 +83,7 @@ pub enum From {
     /// Does not evaluate values whose conditions are false.
     Case(Vec<(Expr, Expr)>),
 
-    /// Direct SQL source. Should be used for std::sql::expr only.
+    /// Direct SQL source. Should be used for std::sql::raw only.
     SQLSource(String),
 }
 

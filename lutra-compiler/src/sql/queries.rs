@@ -343,110 +343,6 @@ impl<'a> Context<'a> {
         }
     }
 
-    /// Returns columns of the native pg repr, described by a type.
-    /// This is used in FROM and INSERT, not the in-query relation repr.
-    fn pg_repr_columns<'t>(&'t self, ty: &'t ir::Ty) -> Vec<(String, &'t ir::Ty)> {
-        match &self.get_ty_mat(ty).kind {
-            ir::TyKind::Primitive(_) => vec![("value".into(), ty)],
-            ir::TyKind::Tuple(fields) => fields
-                .iter()
-                .map(|f| (f.name.clone().unwrap(), &f.ty))
-                .collect(),
-            ir::TyKind::Array(item) => {
-                // no index column
-                self.pg_repr_columns(item)
-            }
-            ir::TyKind::Enum(_) => todo!(),
-            ir::TyKind::Function(_) | ir::TyKind::Ident(_) => unreachable!(),
-        }
-    }
-
-    /// Constructs a projection that imports from native pg repr.
-    fn pg_repr_import_projection(
-        &self,
-        rel_var: Option<&str>,
-        ty: &ir::Ty,
-    ) -> Vec<sql_ast::SelectItem> {
-        let mut values = Vec::new();
-
-        // index
-        if self.get_ty_mat(ty).kind.is_array() {
-            values.push(utils::new_index(None));
-        }
-
-        // table columns
-        values.extend(
-            self.pg_repr_columns(ty)
-                .into_iter()
-                .map(move |(f_name, f_ty)| {
-                    let ident = utils::identifier(rel_var, f_name);
-                    self.pg_repr_import(ident, f_ty)
-                }),
-        );
-        self.projection(ty, values)
-    }
-
-    /// Imports a value from native pg repr into our repr.
-    /// For example, pg type `date` is converted into `int4`.
-    fn pg_repr_import(&self, expr_pg: sql_ast::Expr, ty: &ir::Ty) -> sql_ast::Expr {
-        // special case: std::Date
-        if let ir::TyKind::Ident(ty_ident) = &ty.kind
-            && ty_ident.0 == ["std", "Date"]
-        {
-            return sql_ast::Expr::Source(format!("({expr_pg}::date - '1970-01-01'::date)"));
-        }
-        // special case: std::Time & std::Timestamp
-        if let ir::TyKind::Ident(ty_ident) = &ty.kind
-            && (ty_ident.0 == ["std", "Time"] || ty_ident.0 == ["std", "Timestamp"])
-        {
-            return sql_ast::Expr::Source(format!("(EXTRACT(EPOCH FROM {expr_pg})*1000000)::int8"));
-        }
-        // special case: std::Decimal
-        if let ir::TyKind::Ident(ty_ident) = &ty.kind
-            && ty_ident.0 == ["std", "Decimal"]
-        {
-            return sql_ast::Expr::Source(format!("({expr_pg}*100)::int8"));
-        }
-
-        // general case: noop
-        // (but with a type cast, just to be safe)
-        sql_ast::Expr::Source(format!("{expr_pg}::{}", self.compile_ty_name(ty)))
-    }
-
-    /// Exports a value into native pg repr from our repr.
-    /// For example, type std::Date is exported from pg type `int4` into `date`.
-    fn pg_repr_export(&self, expr: sql_ast::Expr, ty: &ir::Ty) -> sql_ast::Expr {
-        // special case: std::Date
-        if let ir::TyKind::Ident(ty_ident) = &ty.kind
-            && ty_ident.0 == ["std", "Date"]
-        {
-            return sql_ast::Expr::Source(format!("('1970-01-01'::date + {expr})"));
-        }
-        // special case: std::Time
-        if let ir::TyKind::Ident(ty_ident) = &ty.kind
-            && ty_ident.0 == ["std", "Time"]
-        {
-            return sql_ast::Expr::Source(format!(
-                "('00:00'::time + INTERVAL '1 microsecond' * {expr})"
-            ));
-        }
-        // special case: std::Timestamp
-        if let ir::TyKind::Ident(ty_ident) = &ty.kind
-            && ty_ident.0 == ["std", "Timestamp"]
-        {
-            return sql_ast::Expr::Source(format!("to_timestamp({expr}::float8/1000000.0)"));
-        }
-        // special case: std::Timestamp
-        if let ir::TyKind::Ident(ty_ident) = &ty.kind
-            && ty_ident.0 == ["std", "Decimal"]
-        {
-            return sql_ast::Expr::Source(format!("({expr}::decimal(20, 0)/100)"));
-        }
-
-        // general case: noop
-        expr
-    }
-
     fn compile_rel_transform(
         &mut self,
         input: Node,
@@ -580,24 +476,22 @@ impl<'a> Context<'a> {
             }
 
             cr::Transform::Insert(table_ident) => {
-                let input_item_ty = self.get_ty_mat(input_ty).kind.as_array().unwrap();
-                let input_fields_ty = self.get_ty_mat(input_item_ty).kind.as_tuple().unwrap();
-
                 let mut source = self.node_into_select(input, input_ty);
+
+                let pg_repr = self.pg_repr_columns(input_ty);
 
                 let new_projection = (source.projection.into_iter())
                     .skip(1) // first column will be index, discard it
-                    .zip(input_fields_ty)
-                    .map(|(p, f)| self.pg_repr_export(p.expr, &f.ty))
+                    .zip(&pg_repr)
+                    .map(|(p, (_, ty))| self.pg_repr_export(p.expr, ty.as_ref()))
                     .map(|expr| sql_ast::SelectItem { expr, alias: None })
                     .collect();
                 source.projection = new_projection;
 
                 let table = translate_table_ident(table_ident);
 
-                let columns = self
-                    .pg_repr_columns(input_ty)
-                    .iter()
+                let columns = pg_repr
+                    .into_iter()
                     .map(|(f_name, _f_ty)| f_name)
                     .map(utils::new_ident)
                     .collect();

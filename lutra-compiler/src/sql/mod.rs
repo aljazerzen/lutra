@@ -1,6 +1,7 @@
 mod clauses;
 mod cr;
 mod optimizer;
+mod pg_repr;
 mod queries;
 mod serialization;
 mod utils;
