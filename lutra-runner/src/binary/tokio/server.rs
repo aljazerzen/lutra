@@ -14,7 +14,7 @@ where
     stream: C,
     runner: R,
 
-    prepared_programs: HashMap<u32, R::Prepared>,
+    prepared_programs: HashMap<u32, Result<R::Prepared, messages::Error>>,
 }
 
 impl<C, R> Server<C, R>
@@ -43,12 +43,25 @@ where
     ) -> Result<(), std::io::Error> {
         match message {
             messages::ClientMessage::Prepare(prepare) => {
-                let program = lutra_bin::rr::Program::decode(&prepare.program).unwrap();
                 tracing::trace!("prepare");
 
-                let handle = self.runner.prepare(program).await.unwrap();
+                let result = match lutra_bin::rr::Program::decode(&prepare.program) {
+                    Ok(program) => {
+                        self.runner
+                            .prepare(program)
+                            .await
+                            .map_err(|e| messages::Error {
+                                message: format!("{:?}", e),
+                                code: Some(crate::error_codes::PREPARE_ERROR.to_string()),
+                            })
+                    }
+                    Err(e) => Err(messages::Error {
+                        message: format!("{:?}", e),
+                        code: Some(crate::error_codes::DECODE_ERROR.to_string()),
+                    }),
+                };
 
-                self.prepared_programs.insert(prepare.program_id, handle);
+                self.prepared_programs.insert(prepare.program_id, result);
                 // maybe send some kind of successful prepare response?
             }
             messages::ClientMessage::Execute(messages::Execute {
@@ -83,11 +96,19 @@ where
     }
 
     async fn handle_execute(&mut self, program_id: u32, input: &[u8]) -> messages::Result {
-        let Some(program) = self.prepared_programs.get(&program_id) else {
-            return messages::Result::Err(messages::Error {});
-        };
-
-        let output = self.runner.execute(program, input).await.unwrap();
-        messages::Result::Ok(output)
+        match self.prepared_programs.get(&program_id) {
+            Some(Ok(program)) => match self.runner.execute(program, input).await {
+                Ok(output) => messages::Result::Ok(output),
+                Err(e) => messages::Result::Err(messages::Error {
+                    message: format!("{:?}", e),
+                    code: Some(crate::error_codes::EXECUTION_ERROR.to_string()),
+                }),
+            },
+            Some(Err(err)) => messages::Result::Err(err.clone()),
+            None => messages::Result::Err(messages::Error {
+                message: format!("Program {} not prepared", program_id),
+                code: Some(crate::error_codes::PROGRAM_NOT_FOUND.to_string()),
+            }),
+        }
     }
 }

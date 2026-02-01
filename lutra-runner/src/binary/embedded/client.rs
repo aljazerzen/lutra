@@ -100,7 +100,10 @@ where
                 }
             }
         }
-        panic!();
+        panic!(
+            "recv_response: connection closed before receiving response for request_id {}",
+            request_id
+        );
     }
 
     pub fn destruct(self) -> C {

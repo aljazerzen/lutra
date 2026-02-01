@@ -1,9 +1,16 @@
-mod explore;
 mod input;
+mod interactive;
+mod layout;
+mod panels;
+mod project;
+mod runner;
+mod style;
 mod terminal;
+mod watcher;
 
-pub use explore::prompt_for_def;
 pub use input::prompt_for_ty;
+pub use interactive::run_interactive;
+pub use runner::RunnerConfig;
 
 pub fn show_value(
     value: &[u8],
@@ -16,20 +23,18 @@ pub fn show_value(
 
     let text = lutra_bin::print_source(value, ty, ty_defs).unwrap();
 
-    crate::terminal::within_alternate_screen(|term| -> std::io::Result<()> {
-        term.draw(|frame| {
-            frame.render_widget(
-                Paragraph::new(text).wrap(Wrap { trim: false }),
-                frame.area(),
-            );
-        })?;
+    let mut term = ratatui::init();
 
-        // wait for an event
-        event::read()?;
+    term.draw(|frame| {
+        frame.render_widget(
+            Paragraph::new(text).wrap(Wrap { trim: false }),
+            frame.area(),
+        );
+    })?;
 
-        // close
-        Ok(())
-    })??;
+    // wait for an event
+    event::read()?;
 
+    ratatui::restore();
     Ok(())
 }

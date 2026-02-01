@@ -10,7 +10,12 @@ version.workspace = true
 anyhow = { workspace = true }
 itertools = { workspace = true }
 crossterm = "0.28.0"
-ratatui = "0.29.0"
+ratatui = "0.30.0"
 lutra-compiler = { workspace = true }
 lutra-bin = { workspace = true }
 lutra-interpreter = { workspace = true }
+lutra-runner = { workspace = true, features = ["channel"] }
+lutra-runner-postgres = { workspace = true, features = ["tokio-postgres"] }
+notify = "6.0"
+notify-debouncer-mini = "0.4"
+tokio = { workspace = true, features = ["rt"] }

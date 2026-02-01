@@ -29,6 +29,7 @@ fn main() {
         Action::Check(cmd) => check(cmd),
         Action::Compile(cmd) => compile(cmd),
         Action::Run(cmd) => run(cmd),
+        Action::Interactive(cmd) => interactive(cmd),
         Action::Pull(cmd) => pull_interface(cmd),
         Action::Codegen(cmd) => codegen(cmd),
         Action::Format(cmd) => format(cmd),
@@ -70,6 +71,9 @@ pub enum Action {
 
     /// Compile a program and run it
     Run(RunCommand),
+
+    /// Interactive project environment with live recompilation
+    Interactive(InteractiveCommand),
 
     /// Pull interface from the runner
     Pull(PullInterfaceCommand),
@@ -335,6 +339,36 @@ pub async fn run(cmd: RunCommand) -> anyhow::Result<()> {
     io::write_output(&output, output_path, cmd.output_format, &ty).await?;
 
     Ok(())
+}
+
+#[derive(clap::Parser)]
+pub struct InteractiveCommand {
+    #[clap(flatten)]
+    discover: DiscoverParams,
+
+    #[clap(flatten)]
+    runner: RunnerParams,
+}
+
+pub fn interactive(cmd: InteractiveCommand) -> anyhow::Result<()> {
+    let project_path = cmd
+        .discover
+        .project
+        .unwrap_or_else(|| std::env::current_dir().unwrap());
+
+    let runner = if cmd.runner.interpreter {
+        lutra_tui::RunnerConfig::Interpreter {
+            fs_root: Some(project_path.clone()),
+        }
+    } else if let Some(pg_url) = cmd.runner.postgres {
+        lutra_tui::RunnerConfig::Postgres {
+            connection_string: pg_url,
+        }
+    } else {
+        unreachable!()
+    };
+
+    lutra_tui::run_interactive(project_path, runner)
 }
 
 async fn init_runner_postgres(url: &str) -> anyhow::Result<lutra_runner_postgres::RunnerAsync> {

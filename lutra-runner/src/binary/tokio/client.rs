@@ -131,10 +131,17 @@ where
     ) -> Result<std::vec::Vec<u8>, Self::Error> {
         let request_id = self.send_execute(*program, input).await;
         let res = self.recv_response(request_id).await?;
-        let messages::Result::Ok(res) = res else {
-            todo!()
-        };
-        Ok(res)
+
+        match res {
+            messages::Result::Ok(output) => Ok(output),
+            messages::Result::Err(err) => {
+                let msg = match &err.code {
+                    Some(code) => format!("{}: {}", code, err.message),
+                    None => err.message.clone(),
+                };
+                Err(io::Error::other(msg))
+            }
+        }
     }
 
     async fn get_interface(&self) -> Result<std::string::String, Self::Error> {

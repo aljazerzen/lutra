@@ -6,7 +6,7 @@ fn main() {
 
     let initial = get_value();
 
-    let result = lutra_tui::prompt_for_ty(&ty, Some(initial)).unwrap();
+    let result = lutra_tui::prompt_for_ty(&ty, &[], Some(initial)).unwrap();
     let result = result.encode(&ty, &[]).unwrap();
 
     println!("{}", lutra_bin::print_source(&result, &ty, &[]).unwrap());

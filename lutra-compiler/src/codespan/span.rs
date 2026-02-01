@@ -35,6 +35,10 @@ impl Span {
         text.truncate(self.end() as usize);
         text.split_off(self.start as usize)
     }
+
+    pub fn overlap(&self, other: &Self) -> bool {
+        self.start >= other.start && self.start < other.start + other.len as u32
+    }
 }
 
 impl From<Span> for std::ops::Range<usize> {

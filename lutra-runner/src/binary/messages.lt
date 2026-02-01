@@ -37,4 +37,10 @@ type Result: enum {
 ## - invalid program,
 ## - invalid inputs,
 ## - invalid responses from native functions.
-type Error: {}
+type Error: {
+    message: text,
+    code: enum {
+        none,
+        some: text,
+    },
+}

@@ -2,6 +2,9 @@
 
 pub mod binary;
 
+#[cfg(feature = "channel")]
+pub mod channel;
+
 use lutra_bin::{rr, string, vec};
 
 // Runner Posix Interface:
@@ -87,4 +90,12 @@ pub trait Run {
     fn shutdown(&self) -> impl Future<Output = Result<(), Self::Error>> {
         async { Ok(()) }
     }
+}
+
+/// Standard error codes used in runner protocol
+pub mod error_codes {
+    pub const DECODE_ERROR: &str = "DECODE_ERROR";
+    pub const PROGRAM_NOT_FOUND: &str = "PROGRAM_NOT_FOUND";
+    pub const EXECUTION_ERROR: &str = "EXECUTION_ERROR";
+    pub const PREPARE_ERROR: &str = "PREPARE_ERROR";
 }

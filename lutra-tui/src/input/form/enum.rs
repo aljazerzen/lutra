@@ -1,14 +1,15 @@
 use lutra_bin::ir;
-use ratatui::{layout::Offset, prelude::*};
+use ratatui::prelude::*;
 
-use super::{Action, Form, FormKind, FormName};
+use super::{Action, Form, FormKind, FormName, FormResult, TyDefs};
+use crate::input::form::{clip_left, clip_top};
 
 pub struct EnumForm {
     pub selected: usize,
     pub variants: Vec<Form>,
 }
 impl EnumForm {
-    pub fn new(variants: &[ir::TyEnumVariant]) -> EnumForm {
+    pub fn new(variants: &[ir::TyEnumVariant], ty_defs: TyDefs) -> EnumForm {
         let variants = variants
             .iter()
             .enumerate()
@@ -18,7 +19,7 @@ impl EnumForm {
                     position: Some(pos),
                 };
 
-                Form::new(&variant.ty, name)
+                Form::new(&variant.ty, name, ty_defs.clone())
             })
             .collect();
 
@@ -36,7 +37,7 @@ impl EnumForm {
         let value_area = super::render_name_colon(form, frame, area);
 
         if let Some(selected) = self.variants.get(self.selected) {
-            if !form.focus {
+            if !form.cursor {
                 let value = selected.get_name();
                 frame.render_widget(value.white(), value_area);
             } else {
@@ -46,21 +47,20 @@ impl EnumForm {
                     let is_selected = pos == self.selected;
                     let name = variant.get_name();
                     if is_selected {
-                        frame.render_widget(name.black().on_white(), area);
+                        frame.render_widget(name.as_ref().black().on_white(), area);
                     } else {
-                        frame.render_widget(name.white(), area);
+                        frame.render_widget(name.as_ref().white(), area);
                     }
                     const SPACING: u16 = 1;
                     let width = name.len() as u16 + SPACING;
                     if area.width <= width {
                         break;
                     }
-                    area.x += width;
-                    area.width -= width;
+                    area = clip_left(area, width);
                 }
             }
 
-            let mut inner_area = area.offset(Offset { x: 2, y: 1 });
+            let mut inner_area = clip_left(clip_top(area, 1), 2);
             if let FormKind::Tuple(tuple) = &selected.kind {
                 for field in &tuple.fields {
                     inner_area = field.render(frame, inner_area);
@@ -74,23 +74,23 @@ impl EnumForm {
             return inner_area;
         }
 
-        area.offset(Offset { x: 0, y: 1 })
+        clip_top(area, 1)
     }
 
-    pub fn update(&mut self, action: &Action) -> bool {
+    pub fn update(&mut self, action: &Action) -> FormResult {
         match action {
             Action::MoveLeft => {
                 self.selected = self.selected.saturating_sub(1);
-                true
+                FormResult::Redraw
             }
             Action::MoveRight => {
                 self.selected = self.selected.saturating_add(1);
                 if self.selected >= self.variants.len() {
                     self.selected = self.variants.len() - 1;
                 }
-                true
+                FormResult::Redraw
             }
-            _ => false,
+            _ => FormResult::None,
         }
     }
 

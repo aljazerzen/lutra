@@ -1,13 +1,14 @@
 use lutra_bin::ir;
-use ratatui::{layout::Offset, prelude::*};
+use ratatui::prelude::*;
 
-use super::{Action, Form, FormName};
+use crate::input::form::{clip_left, clip_top};
+
+use super::{Action, Form, FormName, FormResult, TyDefs};
 
 const ACTIONS: [ArrayAction; 2] = [ArrayAction::Push, ArrayAction::Pop];
 
 pub struct ArrayForm {
     focused_action: usize,
-
     pub items: Vec<Form>,
 }
 
@@ -37,7 +38,7 @@ impl ArrayForm {
     pub fn render(&self, form: &Form, frame: &mut Frame, area: Rect) -> Rect {
         let focus_area = super::render_name_colon(form, frame, area);
 
-        if form.focus {
+        if form.cursor {
             let mut area = focus_area;
             area.x -= 1;
             for (index, action) in [ArrayAction::Push, ArrayAction::Pop].iter().enumerate() {
@@ -49,34 +50,28 @@ impl ArrayForm {
                 } else {
                     action_str.white()
                 };
-                frame.render_widget(widget, area.offset(Offset { x: 1, y: 0 }));
-                area = area.offset(Offset {
-                    x: action_str.len() as i32 + 1,
-                    y: 0,
-                });
+                frame.render_widget(widget, clip_left(area, 1));
+                area = clip_left(area, action_str.len() as u16 + 1);
             }
         }
 
-        let mut area = area;
-        area.y += 1;
-        area.height -= 1;
+        let mut area = clip_top(area, 1);
 
         for item in &self.items {
             frame.render_widget("-".white(), area);
 
-            let area_item = area.offset(Offset { x: 2, y: 0 });
-            let area_item = item.render(frame, area_item);
-            area.height -= area_item.y - area.y;
-            area.y = area_item.y;
+            let area_item = clip_left(area, 2);
+            let after_item = item.render(frame, area_item);
+            area = clip_top(area, after_item.y - area.y)
         }
         area
     }
 
-    pub fn update(&mut self, action: &Action, self_ty: &ir::Ty) -> bool {
+    pub fn update(&mut self, action: &Action, self_ty: &ir::Ty, ty_defs: &TyDefs) -> FormResult {
         match action {
             Action::MoveLeft => {
                 self.focused_action = self.focused_action.saturating_sub(1);
-                true
+                FormResult::Redraw
             }
             Action::MoveRight => {
                 self.focused_action = self.focused_action.saturating_add(1);
@@ -84,40 +79,39 @@ impl ArrayForm {
                 if self.focused_action >= ACTIONS.len() {
                     self.focused_action = ACTIONS.len() - 1;
                 }
-                true
+                FormResult::Redraw
             }
             Action::Select => {
                 if let Some(action) = ACTIONS.get(self.focused_action) {
                     match action {
                         ArrayAction::Push => {
-                            self.push(self_ty);
+                            self.push(self_ty, ty_defs);
                         }
                         ArrayAction::Pop => {
                             self.items.pop();
                         }
                     }
                 }
-                true
+                FormResult::Redraw
             }
-            _ => false,
+            _ => FormResult::None,
         }
     }
 
-    fn push(&mut self, self_ty: &ir::Ty) {
-        let items_ty = self_ty.kind.as_array().unwrap().clone();
-
+    fn push(&mut self, self_ty: &ir::Ty, ty_defs: &TyDefs) {
+        let items_ty = self_ty.kind.as_array().unwrap();
         let name = FormName {
             name: None,
             position: Some(self.items.len()),
         };
-        self.items.push(Form::new(&items_ty, name));
+        self.items.push(Form::new(items_ty, name, ty_defs.clone()));
     }
 
-    fn set_length(&mut self, len: usize, self_ty: &ir::Ty) {
+    fn set_length(&mut self, len: usize, self_ty: &ir::Ty, ty_defs: &TyDefs) {
         let curr_len = self.items.len();
         if curr_len < len {
             for _ in curr_len..len {
-                self.push(self_ty);
+                self.push(self_ty, ty_defs);
             }
         } else {
             self.items.drain(len..);
@@ -128,11 +122,16 @@ impl ArrayForm {
         lutra_bin::Value::Array(self.items.iter().map(|f| f.get_value()).collect())
     }
 
-    pub(crate) fn set_value(&mut self, value: lutra_bin::Value, self_ty: &ir::Ty) {
+    pub(crate) fn set_value(
+        &mut self,
+        value: lutra_bin::Value,
+        self_ty: &ir::Ty,
+        ty_defs: &TyDefs,
+    ) {
         let lutra_bin::Value::Array(values) = value else {
             panic!()
         };
-        self.set_length(values.len(), self_ty);
+        self.set_length(values.len(), self_ty, ty_defs);
         for (item, value) in std::iter::zip(&mut self.items, values) {
             item.set_value(value);
         }

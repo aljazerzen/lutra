@@ -1,6 +1,8 @@
 use ratatui::{layout::Offset, prelude::*};
 
-use super::{Action, Form};
+use crate::input::form::clip_top;
+
+use super::{Action, Form, FormResult};
 
 pub struct TextForm {
     value: String,
@@ -25,7 +27,7 @@ impl TextForm {
             frame.render_widget(value_text.white(), area_value);
         };
 
-        if form.focus {
+        if form.cursor {
             let cursor_pos = self.value.len();
             let cursor_char = value_text.chars().nth(cursor_pos).unwrap_or(' ');
 
@@ -37,20 +39,20 @@ impl TextForm {
             frame.render_widget(cursor_char.to_string().black().on_white(), area_cursor);
         }
 
-        area.offset(Offset { x: 0, y: 1 })
+        clip_top(area, 1)
     }
 
-    pub fn update(&mut self, action: &Action) -> bool {
+    pub fn update(&mut self, action: &Action) -> FormResult {
         match action {
             Action::Write(text) => {
                 self.value.push_str(text);
-                true
+                FormResult::Redraw
             }
             Action::Erase => {
                 self.value.pop();
-                true
+                FormResult::Redraw
             }
-            _ => false,
+            _ => FormResult::None,
         }
     }
 

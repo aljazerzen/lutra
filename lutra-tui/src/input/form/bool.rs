@@ -1,6 +1,8 @@
-use ratatui::{layout::Offset, prelude::*};
+use ratatui::prelude::*;
 
-use super::{Action, Form};
+use crate::input::form::{clip_left, clip_top};
+
+use super::{Action, Form, FormResult};
 
 pub struct BoolForm {
     value: bool,
@@ -14,24 +16,24 @@ impl BoolForm {
     pub fn render(&self, form: &Form, frame: &mut Frame<'_>, area: Rect) -> Rect {
         let area_value = super::render_name_colon(form, frame, area);
 
-        if form.focus {
+        if form.cursor {
             frame.render_widget("[ ]".black().on_white(), area_value);
         } else {
             frame.render_widget("[ ]".white(), area_value);
         };
         if self.value {
-            let area_x = area_value.offset(Offset { x: 1, y: 0 });
-            if form.focus {
+            let area_x = clip_left(area_value, 1);
+            if form.cursor {
                 frame.render_widget("x".black(), area_x);
             } else {
                 frame.render_widget("x".white(), area_x);
             }
         }
 
-        area.offset(Offset { x: 0, y: 1 })
+        clip_top(area, 1)
     }
 
-    pub fn update(&mut self, action: &Action) -> bool {
+    pub fn update(&mut self, action: &Action) -> FormResult {
         match action {
             Action::Write(text) => {
                 for char in text.chars() {
@@ -41,17 +43,17 @@ impl BoolForm {
                         _ => {}
                     }
                 }
-                true
+                FormResult::Redraw
             }
             Action::Erase => {
                 self.value = false;
-                true
+                FormResult::Redraw
             }
             Action::Select => {
                 self.value = !self.value;
-                true
+                FormResult::Redraw
             }
-            _ => false,
+            _ => FormResult::None,
         }
     }
 

@@ -57,8 +57,6 @@ impl PrintSource for (&pr::ModuleDef, Option<crate::Span>) {
             last = Some(def);
         }
 
-        dbg!(&self.1);
-
         p.inject_trivia_prev_inline(self.1.map(|s| s.end()));
         p.inject_trivia_trailing(self.1.map(|s| s.end()));
         Some(())

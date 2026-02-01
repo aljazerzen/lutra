@@ -10,6 +10,7 @@ version.workspace = true
 std = ["lutra-bin/std"]
 binary-tokio = ["tokio", "std"]
 binary-embedded = ["embedded-io-async"]
+channel = ["tokio", "tokio/rt", "std"]
 
 [dependencies]
 embedded-io-async = { version = "0.6.1", optional = true }

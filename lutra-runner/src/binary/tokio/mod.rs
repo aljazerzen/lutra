@@ -36,7 +36,12 @@ async fn read_message<D: lutra_bin::Decode + Sized>(
     rx.read_exact(&mut buf).await?;
 
     tracing::trace!(".. decode");
-    let r = D::decode(&buf).unwrap();
+    let r = D::decode(&buf).map_err(|e| {
+        std::io::Error::new(
+            std::io::ErrorKind::InvalidData,
+            format!("Failed to decode message: {:?}", e),
+        )
+    })?;
 
     tracing::trace!(".. done");
     Ok(r)
