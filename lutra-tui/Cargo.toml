@@ -16,6 +16,7 @@ lutra-bin = { workspace = true }
 lutra-interpreter = { workspace = true }
 lutra-runner = { workspace = true, features = ["channel"] }
 lutra-runner-postgres = { workspace = true, features = ["tokio-postgres"] }
+lutra-runner-duckdb = { workspace = true }
 notify = "6.0"
 notify-debouncer-mini = "0.4"
 tokio = { workspace = true, features = ["rt"] }

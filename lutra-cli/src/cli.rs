@@ -99,14 +99,21 @@ struct RunnerParams {
     /// Use PostgreSQL runner. Requires a postgres:// URL or a libpq-style connection config.
     #[arg(long, name = "DSN")]
     postgres: Option<String>,
+
+    /// Use DuckDB runner. Provide path to database file or ":memory:" for in-memory database.
+    #[arg(long, name = "PATH")]
+    duckdb: Option<String>,
 }
 
 impl RunnerParams {
     /// Returns the program format needed for this runner
     fn get_program_format(&self) -> lutra_compiler::ProgramFormat {
+        #[allow(clippy::if_same_then_else)]
         if self.interpreter {
             lutra_compiler::ProgramFormat::BytecodeLt
         } else if self.postgres.is_some() {
+            lutra_compiler::ProgramFormat::SqlPg
+        } else if self.duckdb.is_some() {
             lutra_compiler::ProgramFormat::SqlPg
         } else {
             unreachable!()
@@ -330,6 +337,10 @@ pub async fn run(cmd: RunCommand) -> anyhow::Result<()> {
         let runner = init_runner_postgres(&pg_url).await?;
         let handle = runner.prepare(program).await?;
         runner.execute(&handle, &input).await?
+    } else if let Some(duckdb_path) = cmd.runner.duckdb {
+        let runner = init_runner_duckdb(&duckdb_path).await?;
+        let handle = runner.prepare(program).await?;
+        runner.execute(&handle, &input).await?
     } else {
         unreachable!()
     };
@@ -364,6 +375,8 @@ pub fn interactive(cmd: InteractiveCommand) -> anyhow::Result<()> {
         lutra_tui::RunnerConfig::Postgres {
             connection_string: pg_url,
         }
+    } else if let Some(path) = cmd.runner.duckdb {
+        lutra_tui::RunnerConfig::DuckDB { path }
     } else {
         unreachable!()
     };
@@ -385,6 +398,12 @@ async fn init_runner_postgres(url: &str) -> anyhow::Result<lutra_runner_postgres
     Ok(lutra_runner_postgres::RunnerAsync::new(client))
 }
 
+async fn init_runner_duckdb(path: &str) -> anyhow::Result<lutra_runner_duckdb::Runner> {
+    lutra_runner_duckdb::Runner::open(path)
+        .await
+        .map_err(Into::into)
+}
+
 #[derive(clap::Parser)]
 pub struct PullInterfaceCommand {
     #[clap(flatten)]
@@ -402,6 +421,9 @@ pub async fn pull_interface(cmd: PullInterfaceCommand) -> anyhow::Result<()> {
         runner.get_interface().await?
     } else if let Some(pg_url) = cmd.runner.postgres {
         let runner = init_runner_postgres(&pg_url).await?;
+        runner.get_interface().await?
+    } else if let Some(duckdb_path) = cmd.runner.duckdb {
+        let runner = init_runner_duckdb(&duckdb_path).await?;
         runner.get_interface().await?
     } else {
         unreachable!()

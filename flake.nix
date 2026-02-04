@@ -60,6 +60,7 @@
 
             pkgs.pgcli
             pkgs.postgresql # for psql only (lutra-runner-python tests need it)
+            pkgs.duckdb # for lutra-runner-duckdb (system library)
 
             # python
             pkgs.python312Packages.python
@@ -81,7 +82,7 @@
             pkgs.typos-lsp
             pkgs.zensical
           ];
-
+          LD_LIBRARY_PATH = "${pkgs.lib.makeLibraryPath [ pkgs.duckdb ]}";
           venvDir = "./target/python";
         };
       }

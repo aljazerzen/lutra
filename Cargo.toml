@@ -13,6 +13,7 @@ members = [
     "lutra-runner",
     "lutra-runner-postgres",
     "lutra-runner-postgres/python",
+    "lutra-runner-duckdb",
     "sql-ast",
 ]
 exclude = ["examples"]
@@ -59,4 +60,5 @@ tests = { version = "0.3", registry = "codeberg-org", path = "tests" }
 lutra-runner = { version = "0.3", registry = "codeberg-org", path = "lutra-runner" }
 lutra-runner-postgres = { version = "0.3", registry = "codeberg-org", path = "lutra-runner-postgres", default-features = false }
 lutra-runner-postgres-python = { version = "0.3", registry = "codeberg-org", path = "lutra-runner-postgres/python", default-features = false }
+lutra-runner-duckdb = { version = "0.3", registry = "codeberg-org", path = "lutra-runner-duckdb" }
 sql-ast = { version = "0.3", registry = "codeberg-org", path = "sql-ast" }

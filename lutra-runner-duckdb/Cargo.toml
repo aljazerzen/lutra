@@ -1,0 +1,24 @@
+[package]
+name = "lutra-runner-duckdb"
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+version.workspace = true
+
+[dependencies]
+async-duckdb = { version = "0.3.1", default-features = false }
+
+bytes = { workspace = true }
+tokio = { workspace = true, features = ["rt"] }
+tracing = { workspace = true }
+thiserror = { workspace = true }
+tinyjson = "2"
+lutra-bin = { workspace = true, features = ["std"] }
+lutra-runner = { workspace = true }
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["rt", "macros"] }
+
+[features]
+default = []

@@ -27,6 +27,7 @@ impl StatusBar {
         let runner_name = match runner {
             RunnerConfig::Interpreter { .. } => "interpreter",
             RunnerConfig::Postgres { .. } => "postgres",
+            RunnerConfig::DuckDB { .. } => "duckdb",
         };
 
         Self {
