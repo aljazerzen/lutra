@@ -1533,7 +1533,6 @@ pub mod std_math {
 pub mod std_fs {
     use ::std::{fs, io, path};
 
-    use arrow::array::RecordBatchReader;
     use lutra_bin::{Decode, ir};
     use parquet::arrow::arrow_reader::ParquetRecordBatchReaderBuilder;
     use parquet::arrow::arrow_writer::ArrowWriter;
@@ -1571,19 +1570,14 @@ pub mod std_fs {
 
     pub fn read_parquet(
         it: &mut Interpreter,
-        layout_args: &[u32],
+        _layout_args: &[u32], // No longer used - type is inferred from Arrow schema
         args: Vec<Cell>,
     ) -> Result<Cell, EvalError> {
         // unpack args
         let [file_path] = assume::exactly_n(args);
+
         let file_path = assume::text(&file_path)?;
         let file_path = it.resolve_path(&file_path)?;
-
-        // decode item ty from layout args
-        let mut layout_args = assume::LayoutArgsReader::new(layout_args);
-        let ty_item = assume::bytes(layout_args.next_slice());
-        let ty_item = ir::Ty::decode(&ty_item).map_err(|_| EvalError::BadProgram)?;
-        let ty = ir::Ty::new(ir::TyKind::Array(Box::new(ty_item)));
 
         // init parquet reader
         let file = match fs::File::open(&file_path) {
@@ -1599,9 +1593,7 @@ pub mod std_fs {
 
         let reader = builder.build().unwrap();
 
-        lutra_arrow::validate_schema(&reader.schema(), &ty, &[]).unwrap();
-
-        let data = lutra_arrow::arrow_to_lutra(reader, &ty, &[]).ok_or(EvalError::BadProgram)?;
+        let data = lutra_arrow::arrow_to_lutra(reader);
 
         Ok(Cell::Data(Data::new(data.to_vec())))
     }

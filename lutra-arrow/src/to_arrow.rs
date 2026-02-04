@@ -2,7 +2,7 @@ use std::any::Any;
 use std::borrow::Cow;
 use std::sync::Arc;
 
-use arrow::array::{self as arrow_array};
+use arrow::array as aa;
 use arrow::datatypes::{DataType, Field, Schema, SchemaRef};
 
 use lutra_bin::{ArrayReader, bytes, ir};
@@ -11,7 +11,7 @@ fn decode_prim<T: lutra_bin::Decode>(data: impl bytes::Buf) -> T {
     T::decode(data.chunk()).unwrap()
 }
 
-pub fn lutra_to_arrow(data: impl bytes::Buf + Clone, ty_item: &ir::Ty) -> arrow_array::RecordBatch {
+pub fn lutra_to_arrow(data: impl bytes::Buf + Clone, ty_item: &ir::Ty) -> aa::RecordBatch {
     let ir::TyKind::Tuple(ty_fields) = &ty_item.kind else {
         panic!()
     };
@@ -29,81 +29,48 @@ pub fn lutra_to_arrow(data: impl bytes::Buf + Clone, ty_item: &ir::Ty) -> arrow_
         for (i, ty_field) in ty_fields.iter().enumerate() {
             match &ty_field.ty.kind {
                 ir::TyKind::Primitive(ir::TyPrimitive::bool) => {
-                    writer
-                        .next_builder()
-                        .downcast_mut::<arrow_array::BooleanBuilder>()
-                        .unwrap()
-                        .append_value(decode_prim::<bool>(tuple_reader.get_field(i)));
+                    let v = decode_prim::<bool>(tuple_reader.get_field(i));
+                    writer.next_as::<aa::BooleanBuilder>().append_value(v);
                 }
                 ir::TyKind::Primitive(ir::TyPrimitive::int8) => {
-                    writer
-                        .next_builder()
-                        .downcast_mut::<arrow_array::Int8Builder>()
-                        .unwrap()
-                        .append_value(decode_prim::<i8>(tuple_reader.get_field(i)));
+                    let v = decode_prim::<i8>(tuple_reader.get_field(i));
+                    writer.next_as::<aa::Int8Builder>().append_value(v);
                 }
                 ir::TyKind::Primitive(ir::TyPrimitive::int16) => {
-                    writer
-                        .next_builder()
-                        .downcast_mut::<arrow_array::Int16Builder>()
-                        .unwrap()
-                        .append_value(decode_prim::<i16>(tuple_reader.get_field(i)));
+                    let v = decode_prim::<i16>(tuple_reader.get_field(i));
+                    writer.next_as::<aa::Int16Builder>().append_value(v);
                 }
                 ir::TyKind::Primitive(ir::TyPrimitive::int32) => {
-                    writer
-                        .next_builder()
-                        .downcast_mut::<arrow_array::Int32Builder>()
-                        .unwrap()
-                        .append_value(decode_prim::<i32>(tuple_reader.get_field(i)));
+                    let v = decode_prim::<i32>(tuple_reader.get_field(i));
+                    writer.next_as::<aa::Int32Builder>().append_value(v);
                 }
                 ir::TyKind::Primitive(ir::TyPrimitive::int64) => {
-                    writer
-                        .next_builder()
-                        .downcast_mut::<arrow_array::Int64Builder>()
-                        .unwrap()
-                        .append_value(decode_prim::<i64>(tuple_reader.get_field(i)));
+                    let v = decode_prim::<i64>(tuple_reader.get_field(i));
+                    writer.next_as::<aa::Int64Builder>().append_value(v);
                 }
                 ir::TyKind::Primitive(ir::TyPrimitive::uint8) => {
-                    writer
-                        .next_builder()
-                        .downcast_mut::<arrow_array::UInt8Builder>()
-                        .unwrap()
-                        .append_value(decode_prim::<u8>(tuple_reader.get_field(i)));
+                    let v = decode_prim::<u8>(tuple_reader.get_field(i));
+                    writer.next_as::<aa::UInt8Builder>().append_value(v);
                 }
                 ir::TyKind::Primitive(ir::TyPrimitive::uint16) => {
-                    writer
-                        .next_builder()
-                        .downcast_mut::<arrow_array::UInt16Builder>()
-                        .unwrap()
-                        .append_value(decode_prim::<u16>(tuple_reader.get_field(i)));
+                    let v = decode_prim::<u16>(tuple_reader.get_field(i));
+                    writer.next_as::<aa::UInt16Builder>().append_value(v);
                 }
                 ir::TyKind::Primitive(ir::TyPrimitive::uint32) => {
-                    writer
-                        .next_builder()
-                        .downcast_mut::<arrow_array::UInt32Builder>()
-                        .unwrap()
-                        .append_value(decode_prim::<u32>(tuple_reader.get_field(i)));
+                    let v = decode_prim::<u32>(tuple_reader.get_field(i));
+                    writer.next_as::<aa::UInt32Builder>().append_value(v);
                 }
                 ir::TyKind::Primitive(ir::TyPrimitive::uint64) => {
-                    writer
-                        .next_builder()
-                        .downcast_mut::<arrow_array::UInt64Builder>()
-                        .unwrap()
-                        .append_value(decode_prim::<u64>(tuple_reader.get_field(i)));
+                    let v = decode_prim::<u64>(tuple_reader.get_field(i));
+                    writer.next_as::<aa::UInt64Builder>().append_value(v);
                 }
                 ir::TyKind::Primitive(ir::TyPrimitive::float32) => {
-                    writer
-                        .next_builder()
-                        .downcast_mut::<arrow_array::Float32Builder>()
-                        .unwrap()
-                        .append_value(decode_prim::<f32>(tuple_reader.get_field(i)));
+                    let v = decode_prim::<f32>(tuple_reader.get_field(i));
+                    writer.next_as::<aa::Float32Builder>().append_value(v);
                 }
                 ir::TyKind::Primitive(ir::TyPrimitive::float64) => {
-                    writer
-                        .next_builder()
-                        .downcast_mut::<arrow_array::Float64Builder>()
-                        .unwrap()
-                        .append_value(decode_prim::<f64>(tuple_reader.get_field(i)));
+                    let v = decode_prim::<f64>(tuple_reader.get_field(i));
+                    writer.next_as::<aa::Float64Builder>().append_value(v);
                 }
                 ir::TyKind::Primitive(ir::TyPrimitive::text) => {
                     let mut d = tuple_reader.get_field(i);
@@ -116,11 +83,7 @@ pub fn lutra_to_arrow(data: impl bytes::Buf + Clone, ty_item: &ir::Ty) -> arrow_
 
                     let s = String::from_utf8(bytes).unwrap();
 
-                    writer
-                        .next_builder()
-                        .downcast_mut::<arrow_array::StringBuilder>()
-                        .unwrap()
-                        .append_value(s);
+                    writer.next_as::<aa::StringBuilder>().append_value(s);
                 }
 
                 _ => unreachable!(),
@@ -180,13 +143,13 @@ fn get_schema(ty_fields: &[ir::TyTupleField]) -> Result<SchemaRef, String> {
 pub struct ArrowRowWriter {
     schema: SchemaRef,
     min_batch_size: usize,
-    data: Vec<arrow_array::RecordBatch>,
+    data: Vec<aa::RecordBatch>,
 
     /// Determines into which column the next stream value should go.
     receiver: Organizer,
 
     /// Array buffers.
-    builders: Option<Vec<Box<dyn arrow_array::ArrayBuilder>>>,
+    builders: Option<Vec<Box<dyn aa::ArrayBuilder>>>,
     /// Number of rows reserved to be written in by [ArrowPartitionWriter::prepare_for_batch]
     rows_reserved: usize,
     /// Number of rows allocated within builders.
@@ -229,7 +192,7 @@ impl ArrowRowWriter {
 
         let to_allocate = usize::max(row_count, self.min_batch_size);
 
-        let builders: Vec<Box<dyn arrow_array::ArrayBuilder>> = self
+        let builders: Vec<Box<dyn aa::ArrayBuilder>> = self
             .schema
             .fields
             .iter()
@@ -246,16 +209,16 @@ impl ArrowRowWriter {
         let Some(mut builders) = self.builders.take() else {
             return Ok(());
         };
-        let columns: Vec<arrow_array::ArrayRef> = builders
+        let columns: Vec<aa::ArrayRef> = builders
             .iter_mut()
             .map(|builder| builder.finish().slice(0, self.rows_reserved))
             .collect();
-        let rb = arrow_array::RecordBatch::try_new(self.schema.clone(), columns)?;
+        let rb = aa::RecordBatch::try_new(self.schema.clone(), columns)?;
         self.data.push(rb);
         Ok(())
     }
 
-    pub fn finish(mut self) -> Result<Vec<arrow_array::RecordBatch>, arrow::error::ArrowError> {
+    pub fn finish(mut self) -> Result<Vec<aa::RecordBatch>, arrow::error::ArrowError> {
         self.flush()?;
         Ok(self.data)
     }
@@ -265,6 +228,10 @@ impl ArrowRowWriter {
         // this is safe, because prepare_for_batch must have been called earlier
         let builders = self.builders.as_mut().unwrap();
         builders[col].as_any_mut()
+    }
+
+    fn next_as<T: 'static>(&mut self) -> &mut T {
+        self.next_builder().downcast_mut().unwrap()
     }
 }
 
