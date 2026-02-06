@@ -1,4 +1,6 @@
-mod pg_repr;
+mod repr;
+mod repr_duckdb;
+mod repr_pg;
 mod serialization;
 mod types;
 
@@ -298,7 +300,7 @@ impl<'a> Context<'a> {
                     .from
                     .push(utils::new_table(translate_table_ident(table_ident), None));
 
-                select.projection = self.pg_repr_import_projection(None, ty);
+                select.projection = self.repr_import_projection(None, ty);
 
                 Node::Select(select)
             }
@@ -351,7 +353,7 @@ impl<'a> Context<'a> {
                 let mut select = utils::select_empty();
                 let (rvar_name, rvar) = self.node_into_rel_var(node, ty);
                 select.from.extend(rvar);
-                select.projection = self.pg_repr_import_projection(Some(&rvar_name), ty);
+                select.projection = self.repr_import_projection(Some(&rvar_name), ty);
 
                 Node::Select(select)
             }
@@ -493,19 +495,19 @@ impl<'a> Context<'a> {
             cr::Transform::Insert(table_ident) => {
                 let mut source = self.node_into_select(input, input_ty);
 
-                let pg_repr = self.pg_repr_columns(input_ty);
+                let table_columns = self.repr_columns(input_ty);
 
                 let new_projection = (source.projection.into_iter())
                     .skip(1) // first column will be index, discard it
-                    .zip(&pg_repr)
-                    .map(|(p, (_, ty))| self.pg_repr_export(p.expr, ty.as_ref()))
+                    .zip(&table_columns)
+                    .map(|(p, (_, ty))| self.repr_export(p.expr, ty.as_ref()))
                     .map(|expr| sql_ast::SelectItem { expr, alias: None })
                     .collect();
                 source.projection = new_projection;
 
                 let table = translate_table_ident(table_ident);
 
-                let columns = pg_repr
+                let columns = table_columns
                     .into_iter()
                     .map(|(f_name, _f_ty)| f_name)
                     .map(utils::new_ident)
