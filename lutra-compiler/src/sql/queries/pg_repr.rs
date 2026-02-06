@@ -14,9 +14,10 @@ use std::borrow::Cow;
 
 use lutra_bin::ir;
 
+use crate::sql::queries;
 use crate::sql::utils;
 
-impl<'a> super::queries::Context<'a> {
+impl<'a> queries::Context<'a> {
     /// Constructs a projection that imports from postgres repr into query repr.
     pub(super) fn pg_repr_import_projection(
         &self,

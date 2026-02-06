@@ -1,10 +1,7 @@
 mod clauses;
 mod cr;
 mod optimizer;
-mod pg_repr;
 mod queries;
-mod serialization;
-mod types;
 mod utils;
 
 use lutra_bin::{ir, rr};

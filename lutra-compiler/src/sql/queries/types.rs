@@ -1,4 +1,5 @@
-use super::{Dialect, queries::Context};
+use crate::sql::Dialect;
+use crate::sql::queries::Context;
 use lutra_bin::ir;
 
 impl<'p> Context<'p> {

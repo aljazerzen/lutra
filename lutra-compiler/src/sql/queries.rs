@@ -1,3 +1,7 @@
+mod pg_repr;
+mod serialization;
+mod types;
+
 use std::collections::HashMap;
 
 use lutra_bin::ir;
