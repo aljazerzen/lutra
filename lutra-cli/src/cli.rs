@@ -114,7 +114,7 @@ impl RunnerParams {
         } else if self.postgres.is_some() {
             lutra_compiler::ProgramFormat::SqlPg
         } else if self.duckdb.is_some() {
-            lutra_compiler::ProgramFormat::SqlPg
+            lutra_compiler::ProgramFormat::SqlDuckdb
         } else {
             unreachable!()
         }

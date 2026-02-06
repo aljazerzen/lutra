@@ -97,7 +97,7 @@ where
     type Prepared = PreparedProgram;
 
     async fn prepare(&self, program: rr::Program) -> Result<Self::Prepared, Self::Error> {
-        let program = *program.into_sql_pg().unwrap();
+        let program = *program.into_sql_postgres().unwrap();
 
         let stmt = self.client.prepare(&program.sql).await?;
 

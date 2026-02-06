@@ -7,7 +7,7 @@ rust-version.workspace = true
 version.workspace = true
 
 [dependencies]
-async-duckdb = { version = "0.3.1", default-features = false }
+async-duckdb = { workspace = true }
 
 bytes = { workspace = true }
 tokio = { workspace = true, features = ["rt"] }
@@ -16,6 +16,8 @@ thiserror = { workspace = true }
 tinyjson = "2"
 lutra-bin = { workspace = true, features = ["std"] }
 lutra-runner = { workspace = true }
+lutra-arrow = { workspace = true }
+arrow = { workspace = true }
 
 [dev-dependencies]
 tokio = { workspace = true, features = ["rt", "macros"] }

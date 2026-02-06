@@ -84,8 +84,8 @@ pub fn fold_from<T: ?Sized + CrFold>(fold: &mut T, from: From, ty: ir::Ty) -> Re
         From::Literal(lit) => From::Literal(lit),
         From::Param(i) => From::Param(i),
         From::FuncCall(name, args) => From::FuncCall(name, fold_exprs(fold, args)?),
-        From::JsonUnpack(expr) => From::JsonUnpack(Box::new(fold.fold_expr(*expr)?)),
-        From::JsonPack(expr) => From::JsonPack(Box::new(fold.fold_expr(*expr)?)),
+        From::Deserialize(expr) => From::Deserialize(Box::new(fold.fold_expr(*expr)?)),
+        From::Serialize(expr) => From::Serialize(Box::new(fold.fold_expr(*expr)?)),
         From::Case(arms) => From::Case(
             arms.into_iter()
                 .map(|(c, v)| Ok((fold.fold_expr(c)?, fold.fold_expr(v)?)))

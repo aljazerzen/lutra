@@ -7,8 +7,12 @@ use crate::sql::{COL_ARRAY_INDEX, COL_VALUE};
 use crate::sql::{cr, utils};
 use crate::utils::NameGenerator;
 
-pub fn compile(rel: cr::Expr, types: HashMap<&ir::Path, &ir::Ty>) -> sql_ast::Query {
-    let mut ctx = Context::new(types);
+pub fn compile(
+    rel: cr::Expr,
+    types: HashMap<&ir::Path, &ir::Ty>,
+    dialect: super::Dialect,
+) -> sql_ast::Query {
+    let mut ctx = Context::new(types, dialect);
 
     let rel_ty = rel.ty.clone();
     let query = ctx.compile_rel(&rel);
@@ -33,6 +37,8 @@ pub(super) struct Context<'a> {
     pub(super) rel_name_gen: NameGenerator,
 
     rel_vars: HashMap<usize, RelRef>,
+
+    dialect: super::Dialect,
 }
 
 struct RelRef {
@@ -44,11 +50,12 @@ struct RelRef {
 }
 
 impl<'a> Context<'a> {
-    pub(super) fn new(types: HashMap<&'a ir::Path, &'a ir::Ty>) -> Self {
+    pub(super) fn new(types: HashMap<&'a ir::Path, &'a ir::Ty>, dialect: super::Dialect) -> Self {
         Self {
             types,
             rel_name_gen: NameGenerator::new("r"),
             rel_vars: Default::default(),
+            dialect,
         }
     }
 
@@ -57,6 +64,10 @@ impl<'a> Context<'a> {
             ir::TyKind::Ident(path) => self.types.get(path).unwrap(),
             _ => ty,
         }
+    }
+
+    pub(super) fn dialect(&self) -> super::Dialect {
+        self.dialect
     }
 
     fn find_rel_var(&self, id: usize) -> &RelRef {
@@ -299,14 +310,14 @@ impl<'a> Context<'a> {
                 self.compile_ty_name(ty)
             )),
 
-            cr::From::JsonUnpack(input_in) => {
+            cr::From::Deserialize(input_in) => {
                 let input = self.compile_rel(input_in);
-                self.deserialize_json(input, &input_in.ty, ty)
+                self.deserialize(input, &input_in.ty, ty)
             }
 
-            cr::From::JsonPack(expr_in) => {
+            cr::From::Serialize(expr_in) => {
                 let expr = self.compile_rel(expr_in);
-                self.serialize_json(expr, &expr_in.ty)
+                self.serialize(expr, &expr_in.ty)
             }
 
             cr::From::Case(cases) => {
@@ -864,43 +875,6 @@ impl<'a> Context<'a> {
 
     fn null(&self, ty: &ir::Ty) -> sql_ast::Expr {
         sql_ast::Expr::Source(format!("NULL::{}", self.compile_ty_name(ty)))
-    }
-
-    pub(super) fn compile_ty_name(&self, ty: &ir::Ty) -> &'static str {
-        match &self.get_ty_mat(ty).kind {
-            ir::TyKind::Primitive(prim) => match prim {
-                ir::TyPrimitive::bool => "bool",
-
-                ir::TyPrimitive::int8 => "int2",
-                ir::TyPrimitive::uint8 => "int2",
-                ir::TyPrimitive::int16 => "int2",
-                ir::TyPrimitive::uint16 => "int2",
-
-                ir::TyPrimitive::int32 => "int4",
-                ir::TyPrimitive::uint32 => "int4",
-
-                ir::TyPrimitive::int64 => "int8",
-                ir::TyPrimitive::uint64 => "int8",
-
-                ir::TyPrimitive::float32 => "float4",
-                ir::TyPrimitive::float64 => "float8",
-                ir::TyPrimitive::text => "text",
-            },
-            ir::TyKind::Tuple(fields) if fields.is_empty() => {
-                // unit type (holds no data) does not exist in sql so we use a type with
-                // the least amount of data
-                "bool"
-            }
-            ir::TyKind::Enum(variants) if utils::is_maybe(variants) => {
-                self.compile_ty_name(&variants[1].ty)
-            }
-
-            // serialize as json
-            ir::TyKind::Tuple(_) | ir::TyKind::Array(_) | ir::TyKind::Enum(_) => "jsonb",
-
-            ir::TyKind::Function(_) => todo!(),
-            ir::TyKind::Ident(_) => todo!(),
-        }
     }
 
     fn compile_literal(&self, lit: &ir::Literal, ty: &ir::Ty) -> sql_ast::Expr {

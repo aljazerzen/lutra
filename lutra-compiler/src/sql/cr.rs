@@ -72,10 +72,10 @@ pub enum From {
     FuncCall(String, Vec<Expr>),
 
     /// Converts a JSON-encoded value into a relation
-    JsonUnpack(Box<Expr>),
+    Deserialize(Box<Expr>),
 
     /// Converts a relation into a JSON-encoded value
-    JsonPack(Box<Expr>),
+    Serialize(Box<Expr>),
 
     /// List of conditions and values.
     /// Evaluates to first value whose condition is true.
@@ -163,16 +163,16 @@ impl Expr {
     }
 
     #[allow(dead_code)]
-    pub fn new_json_unpack(rel: Expr) -> Self {
+    pub fn new_deserialize(rel: Expr) -> Self {
         Expr {
             ty: rel.ty.clone(),
-            kind: ExprKind::From(From::JsonUnpack(Box::new(rel))),
+            kind: ExprKind::From(From::Deserialize(Box::new(rel))),
         }
     }
-    pub fn new_json_pack(rel: Expr) -> Self {
+    pub fn new_serialize(rel: Expr) -> Self {
         Expr {
             ty: ir::Ty::new(ir::TyPrimitive::text),
-            kind: ExprKind::From(From::JsonPack(Box::new(rel))),
+            kind: ExprKind::From(From::Serialize(Box::new(rel))),
         }
     }
 

@@ -222,12 +222,12 @@ mod rel_repr {
     use itertools::Itertools;
     use lutra_bin::ir;
 
-    use crate::sql::queries;
     use crate::sql::utils::RelCols;
+    use crate::sql::{Dialect, queries};
 
     /// return list of relation columns for a given type
     fn r(ty: &ir::Ty) -> String {
-        let ctx = queries::Context::new(Default::default());
+        let ctx = queries::Context::new(Default::default(), Dialect::Postgres);
 
         ctx.rel_cols(ty, true).join(", ")
     }

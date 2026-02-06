@@ -1591,9 +1591,14 @@ pub mod std_fs {
         };
         let builder = ParquetRecordBatchReaderBuilder::try_new(file).unwrap();
 
-        let reader = builder.build().unwrap();
+        let reader = builder
+            .build()
+            .map_err(|e| EvalError::ExternalError(e.to_string()))?;
+        let batches = reader
+            .collect::<Result<_, _>>()
+            .map_err(|e| EvalError::ExternalError(e.to_string()))?;
 
-        let data = lutra_arrow::arrow_to_lutra(reader);
+        let data = lutra_arrow::arrow_to_lutra(batches);
 
         Ok(Cell::Data(Data::new(data.to_vec())))
     }

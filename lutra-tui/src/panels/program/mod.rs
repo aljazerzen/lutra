@@ -115,7 +115,7 @@ impl ProgramPane {
         let format = match runner {
             RunnerConfig::Interpreter { .. } => lutra_compiler::ProgramFormat::BytecodeLt,
             RunnerConfig::Postgres { .. } => lutra_compiler::ProgramFormat::SqlPg,
-            RunnerConfig::DuckDB { .. } => lutra_compiler::ProgramFormat::SqlPg,
+            RunnerConfig::DuckDB { .. } => lutra_compiler::ProgramFormat::SqlDuckdb,
         };
 
         let (program, ty) =

@@ -99,7 +99,7 @@ impl<'a> Context<'a> {
 
         // deserialize from JSON if needed
         if item_ty.kind.is_array() {
-            item_ref = cr::ExprKind::From(cr::From::JsonUnpack(Box::new(cr::Expr {
+            item_ref = cr::ExprKind::From(cr::From::Deserialize(Box::new(cr::Expr {
                 kind: item_ref,
                 ty: ir::Ty::new(ir::TyPrimitive::text),
             })));
@@ -276,7 +276,7 @@ impl<'a> Context<'a> {
 
                             ir::TyKind::Array(_) => {
                                 // param will be encoded as JSON
-                                cr::ExprKind::From(cr::From::JsonUnpack(Box::new(cr::Expr {
+                                cr::ExprKind::From(cr::From::Deserialize(Box::new(cr::Expr {
                                     kind: cr::ExprKind::From(cr::From::Param(0)),
                                     ty: expr.ty.clone(),
                                 })))
@@ -351,7 +351,7 @@ impl<'a> Context<'a> {
                     );
                     if is_recursive {
                         let inner = self.compile_rel(&variant.inner);
-                        row.push(cr::Expr::new_json_pack(inner));
+                        row.push(cr::Expr::new_serialize(inner));
                     } else {
                         row.extend(self.compile_column_list(&variant.inner).unwrap_columns());
                     }
@@ -463,7 +463,7 @@ impl<'a> Context<'a> {
                 );
 
                 if unpack {
-                    rel = cr::ExprKind::From(cr::From::JsonUnpack(Box::new(cr::Expr {
+                    rel = cr::ExprKind::From(cr::From::Deserialize(Box::new(cr::Expr {
                         kind: rel,
                         ty: ir::Ty::new(ir::TyPrimitive::text),
                     })));
@@ -877,7 +877,7 @@ impl<'a> Context<'a> {
 
                 let mut aggregate_cols = Vec::with_capacity(ty_out_fields.len());
                 for (index, ty_out_field) in ty_out_fields.iter().enumerate() {
-                    aggregate_cols.push(cr::Expr::new_json_pack(cr::Expr {
+                    aggregate_cols.push(cr::Expr::new_serialize(cr::Expr {
                         kind: cr::ExprKind::Transform(
                             self.new_binding(cr::Expr::new_rel_ref(&array)),
                             cr::Transform::ProjectPick(vec![
@@ -908,7 +908,7 @@ impl<'a> Context<'a> {
                         self.new_rel_col(&tuple, pos, ir::Ty::new(ir::TyPrimitive::text));
                     fields.push(cr::Expr {
                         ty: ty_in_field.ty.clone(),
-                        kind: cr::ExprKind::From(cr::From::JsonUnpack(Box::new(input_col))),
+                        kind: cr::ExprKind::From(cr::From::Deserialize(Box::new(input_col))),
                     });
                 }
                 let fields_len = fields.len();
@@ -1023,7 +1023,7 @@ impl<'a> Context<'a> {
                 let key = self.compile_rel(&func.body);
                 self.functions.remove(&func.id);
 
-                let values = cr::Expr::new_json_pack(cr::Expr::new_rel_ref(&array));
+                let values = cr::Expr::new_serialize(cr::Expr::new_rel_ref(&array));
                 let values = vec![key.clone(), values];
 
                 let key = Box::new(key);
@@ -1291,7 +1291,7 @@ impl<'a> Context<'a> {
                         // arrays need to packed to JSON
                         ColumnsOrUnpack::Columns(vec![cr::Expr {
                             ty: ir::Ty::new(ir::TyPrimitive::text),
-                            kind: cr::ExprKind::From(cr::From::JsonPack(Box::new(rel))),
+                            kind: cr::ExprKind::From(cr::From::Serialize(Box::new(rel))),
                         }])
                     }
                     ir::TyKind::Tuple(_) => {

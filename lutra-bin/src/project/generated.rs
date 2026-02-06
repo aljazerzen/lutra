@@ -4,7 +4,8 @@ pub mod rr {
     #[derive(Debug, Clone, enum_as_inner::EnumAsInner)]
     #[allow(non_camel_case_types)]
     pub enum Program {
-        SqlPg(crate::boxed::Box<SqlProgram>),
+        SqlPostgres(crate::boxed::Box<SqlProgram>),
+        SqlDuckDB(crate::boxed::Box<SqlProgram>),
         BytecodeLt(super::br::Program),
     }
 
@@ -37,14 +38,20 @@ pub mod rr {
             type HeadPtr = ProgramHeadPtr;
             fn encode_head(&self, w: &mut crate::bytes::BytesMut) -> ProgramHeadPtr {
                 match self {
-                    Self::SqlPg(inner) => {
+                    Self::SqlPostgres(inner) => {
                         w.put_slice(&[0]);
                         let head_ptr = crate::ReversePointer::new(w);
-                        let r = ProgramHeadPtr::SqlPg(head_ptr);
+                        let r = ProgramHeadPtr::SqlPostgres(head_ptr);
+                        r
+                    }
+                    Self::SqlDuckDB(inner) => {
+                        w.put_slice(&[1]);
+                        let head_ptr = crate::ReversePointer::new(w);
+                        let r = ProgramHeadPtr::SqlDuckDB(head_ptr);
                         r
                     }
                     Self::BytecodeLt(inner) => {
-                        w.put_slice(&[1]);
+                        w.put_slice(&[2]);
                         let head_ptr = crate::ReversePointer::new(w);
                         let r = ProgramHeadPtr::BytecodeLt(head_ptr);
                         r
@@ -53,8 +60,16 @@ pub mod rr {
             }
             fn encode_body(&self, head: ProgramHeadPtr, w: &mut crate::bytes::BytesMut) {
                 match self {
-                    Self::SqlPg(inner) => {
-                        let ProgramHeadPtr::SqlPg(offset_ptr) = head else {
+                    Self::SqlPostgres(inner) => {
+                        let ProgramHeadPtr::SqlPostgres(offset_ptr) = head else {
+                            unreachable!()
+                        };
+                        offset_ptr.write_cur_len(w);
+                        let inner_head_ptr = inner.encode_head(w);
+                        inner.encode_body(inner_head_ptr, w);
+                    }
+                    Self::SqlDuckDB(inner) => {
+                        let ProgramHeadPtr::SqlDuckDB(offset_ptr) = head else {
                             unreachable!()
                         };
                         offset_ptr.write_cur_len(w);
@@ -75,7 +90,8 @@ pub mod rr {
         #[allow(non_camel_case_types, dead_code)]
         pub enum ProgramHeadPtr {
             None,
-            SqlPg(crate::ReversePointer),
+            SqlPostgres(crate::ReversePointer),
+            SqlDuckDB(crate::ReversePointer),
             BytecodeLt(crate::ReversePointer),
         }
         impl crate::Layout for Program {
@@ -94,9 +110,14 @@ pub mod rr {
                     0 => {
                         let offset = u32::from_le_bytes(buf.read_const::<4>());
                         let inner = super::SqlProgram::decode(buf.skip(offset as usize))?;
-                        Program::SqlPg(crate::boxed::Box::new(inner))
+                        Program::SqlPostgres(crate::boxed::Box::new(inner))
                     }
                     1 => {
+                        let offset = u32::from_le_bytes(buf.read_const::<4>());
+                        let inner = super::SqlProgram::decode(buf.skip(offset as usize))?;
+                        Program::SqlDuckDB(crate::boxed::Box::new(inner))
+                    }
+                    2 => {
                         let offset = u32::from_le_bytes(buf.read_const::<4>());
                         let inner = super::super::br::Program::decode(buf.skip(offset as usize))?;
                         Program::BytecodeLt(inner)

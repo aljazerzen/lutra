@@ -176,10 +176,12 @@ async fn read_format(
             // init parquet-to-arrow reader
             use parquet::arrow::arrow_reader::ParquetRecordBatchReaderBuilder;
             let builder = ParquetRecordBatchReaderBuilder::try_new(buf)?;
-            let reader = builder.build()?;
+
+            // read
+            let batches = builder.build()?.collect::<Result<_, _>>()?;
 
             // convert arrow to lutra
-            let res = lutra_arrow::arrow_to_lutra(reader);
+            let res = lutra_arrow::arrow_to_lutra(batches);
             Ok(res.to_vec())
         }
     }

@@ -49,7 +49,7 @@ pub async fn _run_on(
 
     // format sql
     let formatted_sql = {
-        let program = program.as_sql_pg().unwrap();
+        let program = program.as_sql_postgres().unwrap();
         let options = sqlformat::FormatOptions::default();
         sqlformat::format(&program.sql, &sqlformat::QueryParams::None, &options)
     };

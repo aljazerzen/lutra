@@ -44,9 +44,10 @@ impl lutra_runner::Run for Runner {
     type Prepared = PreparedProgram;
 
     async fn prepare(&self, program: rr::Program) -> Result<Self::Prepared, Self::Error> {
-        // Validate format
+        // Accept both SqlDuckDB (preferred) and SqlPg (backward compatibility)
         let program = program
-            .into_sql_pg()
+            .into_sql_duck_db()
+            .or_else(|p| p.into_sql_postgres())
             .map_err(|_| Error::UnsupportedFormat)?;
 
         // Don't prepare a statement, because we cannot cache it for later anyway.
@@ -73,12 +74,12 @@ impl lutra_runner::Run for Runner {
                     Err(e) => return Ok(Err(e)),
                 };
 
-                // Execute query using async-duckdb
+                // Execute query and get Arrow RecordBatches
                 let mut stmt = conn.prepare(&program.sql)?;
-                let rows = stmt.query(args.as_params())?;
+                let arrow = stmt.query_arrow(args.as_params())?;
 
-                // Convert result to Lutra format
-                Ok(result::from_duckdb(rows, &program.output_ty, &ctx))
+                // Convert Arrow to Lutra format
+                Ok(result::from_arrow(arrow, &program.output_ty))
             })
             .await?
     }
@@ -102,6 +103,7 @@ pub enum Error {
 }
 
 impl Error {
+    #[allow(dead_code)]
     pub(crate) fn from_duck(e: async_duckdb::duckdb::Error) -> Self {
         Self::DuckDB(async_duckdb::Error::Duckdb(e))
     }

@@ -7,6 +7,7 @@ mod lutra {
 /// URL of a PostgreSQL database with permissions to create new databases.
 const POSTGRES_URL_SHARED: &str = "postgresql://postgres:pass@localhost:5416";
 
+mod duckdb;
 mod fuzz;
 mod inliner;
 mod interpreter;

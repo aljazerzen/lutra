@@ -36,7 +36,7 @@ impl cr::CrFold for Optimizer {
 
 fn unpack_pack(expr: cr::Expr) -> cr::Expr {
     // match
-    let cr::ExprKind::From(cr::From::JsonUnpack(packed)) = &expr.kind else {
+    let cr::ExprKind::From(cr::From::Deserialize(packed)) = &expr.kind else {
         return expr;
     };
     let mut packed = packed.as_ref();
@@ -45,20 +45,20 @@ fn unpack_pack(expr: cr::Expr) -> cr::Expr {
     {
         packed = &row[0];
     };
-    let cr::ExprKind::From(cr::From::JsonPack(_)) = &packed.kind else {
+    let cr::ExprKind::From(cr::From::Serialize(_)) = &packed.kind else {
         return expr;
     };
     tracing::debug!("unpack_pack");
 
     // unpack
-    let cr::ExprKind::From(cr::From::JsonUnpack(packed)) = expr.kind else {
+    let cr::ExprKind::From(cr::From::Deserialize(packed)) = expr.kind else {
         unreachable!()
     };
     let mut packed = *packed;
     if let cr::ExprKind::From(cr::From::Row(row)) = packed.kind {
         packed = row.into_iter().next().unwrap();
     }
-    let cr::ExprKind::From(cr::From::JsonPack(inner)) = packed.kind else {
+    let cr::ExprKind::From(cr::From::Serialize(inner)) = packed.kind else {
         unreachable!()
     };
 
@@ -67,7 +67,7 @@ fn unpack_pack(expr: cr::Expr) -> cr::Expr {
 
 fn pack_unpack(expr: cr::Expr) -> cr::Expr {
     // match
-    let cr::ExprKind::From(cr::From::JsonPack(unpacked)) = &expr.kind else {
+    let cr::ExprKind::From(cr::From::Serialize(unpacked)) = &expr.kind else {
         return expr;
     };
     let mut unpacked = unpacked.as_ref();
@@ -76,20 +76,20 @@ fn pack_unpack(expr: cr::Expr) -> cr::Expr {
     {
         unpacked = &row[0];
     };
-    let cr::ExprKind::From(cr::From::JsonUnpack(_)) = &unpacked.kind else {
+    let cr::ExprKind::From(cr::From::Deserialize(_)) = &unpacked.kind else {
         return expr;
     };
     tracing::debug!("unpack_pack");
 
     // unpack
-    let cr::ExprKind::From(cr::From::JsonPack(unpacked)) = expr.kind else {
+    let cr::ExprKind::From(cr::From::Serialize(unpacked)) = expr.kind else {
         unreachable!()
     };
     let mut unpacked = *unpacked;
     if let cr::ExprKind::From(cr::From::Row(row)) = unpacked.kind {
         unpacked = row.into_iter().next().unwrap();
     }
-    let cr::ExprKind::From(cr::From::JsonUnpack(inner)) = unpacked.kind else {
+    let cr::ExprKind::From(cr::From::Deserialize(inner)) = unpacked.kind else {
         unreachable!()
     };
 

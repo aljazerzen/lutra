@@ -30,6 +30,7 @@ pub use project::{Project, SourceTree};
 #[cfg_attr(feature = "clap", derive(clap::ValueEnum))]
 pub enum ProgramFormat {
     SqlPg,
+    SqlDuckdb,
     BytecodeLt,
 }
 
@@ -53,7 +54,13 @@ pub fn compile(
 
     // backend (sql or bytecode)
     let program = match format {
-        ProgramFormat::SqlPg => rr::Program::SqlPg(Box::new(sql::compile_ir(&program_ir))),
+        ProgramFormat::SqlPg => rr::Program::SqlPostgres(Box::new(sql::compile_ir(
+            &program_ir,
+            sql::Dialect::Postgres,
+        ))),
+        ProgramFormat::SqlDuckdb => {
+            rr::Program::SqlDuckDB(Box::new(sql::compile_ir(&program_ir, sql::Dialect::DuckDB)))
+        }
         ProgramFormat::BytecodeLt => {
             rr::Program::BytecodeLt(bytecoding::compile_program(program_ir.clone()))
         }
