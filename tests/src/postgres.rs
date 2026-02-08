@@ -197,7 +197,7 @@ INSERT INTO another."proj/days" (name) VALUES ('Wednesday'), ('Thursday'), ('Fri
 fn prim() {
     insta::assert_snapshot!(_sql_and_output(_run(r#"
         const main = 3: int16
-    "#, lutra_bin::Value::unit())), @r"
+    "#, lutra_bin::Value::unit())), @"
     SELECT
       3::int2 AS value
     ---
@@ -209,7 +209,7 @@ fn prim() {
 fn tuple_prim() {
     insta::assert_snapshot!(_sql_and_output(_run(r#"
         const main = {3: int16, false}
-    "#, lutra_bin::Value::unit())), @r"
+    "#, lutra_bin::Value::unit())), @"
     SELECT
       3::int2 AS _0,
       FALSE AS _1
@@ -225,7 +225,7 @@ fn tuple_prim() {
 fn array_prim() {
     insta::assert_snapshot!(_sql_and_output(_run(r#"
         const main = [3, 6, 12]: [int16]
-    "#, lutra_bin::Value::unit())), @r"
+    "#, lutra_bin::Value::unit())), @"
     SELECT
       r0.value
     FROM
@@ -259,19 +259,11 @@ fn array_prim() {
 fn array_empty() {
     insta::assert_snapshot!(_sql_and_output(_run(r#"
         const main = []: [bool]
-    "#, lutra_bin::Value::unit())), @r"
+    "#, lutra_bin::Value::unit())), @"
     SELECT
-      r0.value
-    FROM
-      (
-        SELECT
-          0 AS index,
-          NULL::bool AS value
-        WHERE
-          FALSE
-      ) AS r0
-    ORDER BY
-      r0.index
+      NULL::bool AS value
+    WHERE
+      FALSE
     ---
     []
     ");
@@ -446,7 +438,7 @@ fn tuple_tuple_prim() {
 fn tuple_array_prim() {
     insta::assert_snapshot!(_sql_and_output(_run(r#"
         const main = {true, [1, 2, 3]: [int64], [4]: [int32], false}
-    "#, lutra_bin::Value::unit())), @r"
+    "#, lutra_bin::Value::unit())), @"
     SELECT
       TRUE AS _0,
       (
@@ -580,7 +572,7 @@ fn tuple_array_enum() {
 }
 
 #[test]
-fn tuple_array_maybe() {
+fn tuple_array_option() {
     insta::assert_snapshot!(_sql_and_output(_run(r#"
         const main = {
           "ids:",
@@ -629,7 +621,7 @@ fn tuple_array_maybe() {
 fn tuple_array_empty() {
     insta::assert_snapshot!(_sql_and_output(_run(r#"
         const main = {true, []: [int64], false}
-    "#, lutra_bin::Value::unit())), @r"
+    "#, lutra_bin::Value::unit())), @"
     SELECT
       TRUE AS _0,
       (
@@ -665,7 +657,7 @@ fn tuple_array_empty() {
 fn array_array_prim() {
     insta::assert_snapshot!(_sql_and_output(_run(r#"
         const main = [[1, 2, 3], [4, 5]]: [[int64]]
-    "#, lutra_bin::Value::unit())), @r"
+    "#, lutra_bin::Value::unit())), @"
     SELECT
       r2.value
     FROM
@@ -749,49 +741,43 @@ fn array_array_array_tuple_prim() {
         const main = [[[{1: int32, "hello", 2: int16}]]]
     "#, lutra_bin::Value::unit())), @r#"
     SELECT
-      r2.value
-    FROM
       (
         SELECT
-          0::int8 AS index,
+          COALESCE(
+            jsonb_agg(
+              r1.value
+              ORDER BY
+                r1.index
+            ),
+            '[]'::jsonb
+          ) AS value
+        FROM
           (
             SELECT
-              COALESCE(
-                jsonb_agg(
-                  r1.value
-                  ORDER BY
-                    r1.index
-                ),
-                '[]'::jsonb
-              ) AS value
-            FROM
+              0::int8 AS index,
               (
                 SELECT
-                  0::int8 AS index,
+                  COALESCE(
+                    jsonb_agg(
+                      jsonb_build_array(r0._0, r0._1, r0._2)
+                      ORDER BY
+                        r0.index
+                    ),
+                    '[]'::jsonb
+                  ) AS value
+                FROM
                   (
                     SELECT
-                      COALESCE(
-                        jsonb_agg(
-                          jsonb_build_array(r0._0, r0._1, r0._2)
-                          ORDER BY
-                            r0.index
-                        ),
-                        '[]'::jsonb
-                      ) AS value
-                    FROM
-                      (
-                        SELECT
-                          0::int8 AS index,
-                          1::int4 AS _0,
-                          'hello'::text AS _1,
-                          2::int2 AS _2
-                      ) AS r0
-                  ) AS value
-              ) AS r1
-          ) AS value
-      ) AS r2
+                      0::int8 AS index,
+                      1::int4 AS _0,
+                      'hello'::text AS _1,
+                      2::int2 AS _2
+                  ) AS r0
+              ) AS value
+          ) AS r1
+      ) AS value
     ORDER BY
-      r2.index
+      0::int8
     ---
     [
       [
@@ -824,7 +810,7 @@ fn tuple_array_tuple_tuple_prim() {
             ],
             2: int16
           }
-    "#, lutra_bin::Value::unit())), @r"
+    "#, lutra_bin::Value::unit())), @"
     SELECT
       1::int4 AS _0,
       (
@@ -876,7 +862,7 @@ fn tuple_array_tuple_tuple_prim() {
 fn array_tuple_prim() {
     insta::assert_snapshot!(_sql_and_output(_run(r#"
         const main = [{3: int64, false}, {6, true}, {12, false}]
-    "#, lutra_bin::Value::unit())), @r"
+    "#, lutra_bin::Value::unit())), @"
     SELECT
       r0._0,
       r0._1
@@ -1251,7 +1237,7 @@ fn param_10() {
 
 #[test]
 fn param_11() {
-    // maybe enum
+    // option enum
     insta::assert_snapshot!(_run(r#"
     type OptInt: enum { none, some: int32 }
     func main(x: [OptInt]) -> x
@@ -1289,7 +1275,7 @@ fn tuple_unpacking_00() {
 }
 
 #[test]
-fn json_pack_00() {
+fn serialize_00() {
     // Having array in a tuple forces serialization to JSON.
     // Applying an operation of that array then forces deserialization.
 
@@ -1313,7 +1299,7 @@ fn json_pack_00() {
 }
 
 #[test]
-fn json_pack_01() {
+fn serialize_01() {
     // Having array in a tuple forces serialization to JSON.
     // Applying an operation of that array then forces deserialization.
 
@@ -1343,7 +1329,7 @@ fn json_pack_01() {
 }
 
 #[test]
-fn json_pack_02() {
+fn serialize_02() {
     insta::assert_snapshot!(_run(r#"
     func get_data() -> [[1: int16, 2, 3], [4, 5, 6]]
 
@@ -1361,7 +1347,7 @@ fn json_pack_02() {
 }
 
 #[test]
-fn json_pack_03() {
+fn serialize_03() {
     insta::assert_snapshot!(_run(r#"
     func get_data() -> [[1: int64, 2, 3], [4, 5, 6]]
 
@@ -1388,7 +1374,7 @@ fn json_pack_03() {
 }
 
 #[test]
-fn json_pack_04() {
+fn serialize_04() {
     insta::assert_snapshot!(_run(r#"
     func get_data() -> {a = [false, true, true]}
 
@@ -1406,7 +1392,7 @@ fn json_pack_04() {
 }
 
 #[test]
-fn json_pack_05() {
+fn serialize_05() {
     insta::assert_snapshot!(_run(r#"
     func get_data() -> {a = ["no", "yes", "neither"]}
 
@@ -1424,7 +1410,7 @@ fn json_pack_05() {
 }
 
 #[test]
-fn json_pack_06() {
+fn serialize_06() {
     insta::assert_snapshot!(_run(r#"
     func main() -> (
       {"hello", [[true]]}.1
@@ -1439,7 +1425,7 @@ fn json_pack_06() {
 }
 
 #[test]
-fn json_pack_07() {
+fn serialize_07() {
     insta::assert_snapshot!(_run(r#"
     func main() -> (
       {
@@ -1472,7 +1458,7 @@ fn json_pack_07() {
 }
 
 #[test]
-fn json_pack_08() {
+fn serialize_08() {
     insta::assert_snapshot!(_run(r#"
     func main() -> (
       std::index([["hello"]], 0)
@@ -1485,7 +1471,7 @@ fn json_pack_08() {
 }
 
 #[test]
-fn json_pack_09() {
+fn serialize_09() {
     // JsonUnpack(JsonPack(_)) should be optimized away
 
     insta::assert_snapshot!(_sql_and_output(_run(r#"
@@ -1512,7 +1498,7 @@ fn json_pack_09() {
 }
 
 #[test]
-fn json_pack_10() {
+fn serialize_10() {
     insta::assert_snapshot!(_sql_and_output(_run(r#"
     func main() -> {"hello", [1: int8, 2]}
     "#,
@@ -1747,7 +1733,7 @@ fn cmp_00() {
       [{3, 3}, {3, 5}, {5, 3}]
       | std::map(x -> compare(x.0, x.1))
     )
-    "#, lutra_bin::Value::unit())), @r"
+    "#, lutra_bin::Value::unit())), @"
     SELECT
       r4._0 AS _0,
       r4._1 AS _1,
@@ -1890,7 +1876,7 @@ async fn sql_insert_00() {
     ]
 
     func main(): {} -> std::sql::insert(two_movies, "movies")
-    "#, lutra_bin::Value::unit()).await), @r"
+    "#, lutra_bin::Value::unit()).await), @"
     INSERT INTO
       movies (title, premiere_date)
     SELECT
@@ -2146,9 +2132,9 @@ fn std_sql_raw_00() {
     )
     "#, lutra_bin::Value::unit())), @r#"
     SELECT
-      r0.hello::text AS _0,
-      r0.world::bool AS _1,
-      (r0.x::date - '1970-01-01'::date) AS _2
+      hello::text AS _0,
+      world::bool AS _1,
+      (x::date - '1970-01-01'::date) AS _2
     FROM
       (
         select
@@ -2183,7 +2169,7 @@ fn std_sql_raw_01() {
         WITH r0 AS (
           SELECT
             (ROW_NUMBER() OVER () -1)::int4 AS index,
-            r1.value::int4 AS value
+            value::int4 AS value
           FROM
             (
               (
@@ -2258,19 +2244,19 @@ fn date_time_00() {
     )
     "#, lutra_bin::Value::unit())), @"
     SELECT
-      (r0.a::date - '1970-01-01'::date) AS _0,
+      (a::date - '1970-01-01'::date) AS _0,
       (
         EXTRACT(
           EPOCH
           FROM
-            r0.b
+            b
         ) * 1000000
       )::int8 AS _1,
       (
         EXTRACT(
           EPOCH
           FROM
-            r0.c
+            c
         ) * 1000000
       )::int8 AS _2
     FROM
@@ -2353,7 +2339,7 @@ fn decimal_00() {
     )
     "#, lutra_bin::Value::unit())), @"
     SELECT
-      (r0.a * 100)::int8 AS _0
+      (a * 100)::int8 AS _0
     FROM
       (
         select

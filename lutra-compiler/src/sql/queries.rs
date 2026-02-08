@@ -1,7 +1,6 @@
 mod repr;
 mod repr_duckdb;
 mod repr_pg;
-mod serialization;
 mod types;
 
 use std::collections::HashMap;
@@ -9,7 +8,7 @@ use std::collections::HashMap;
 use lutra_bin::ir;
 
 use crate::sql::utils::{Node, RelCols};
-use crate::sql::{COL_ARRAY_INDEX, COL_VALUE};
+use crate::sql::{COL_ARRAY_INDEX, COL_VALUE, Dialect};
 use crate::sql::{cr, utils};
 use crate::utils::NameGenerator;
 
@@ -20,21 +19,31 @@ pub fn compile(
 ) -> sql_ast::Query {
     let mut ctx = Context::new(types, dialect);
 
-    let rel_ty = rel.ty.clone();
-    let query = ctx.compile_rel(&rel);
+    let rel_ty = ctx.get_ty_mat(&rel.ty);
+    let node = ctx.compile_rel(&rel);
 
-    if rel_ty.kind.is_array() {
+    // array special handling
+    let node = if rel_ty.kind.is_array() {
+        let mut select = ctx.node_into_select(node, rel_ty);
+
         // drop index column
-        let mut select = ctx.node_into_select(query, &rel_ty);
         let index = select.projection.remove(0);
 
         // apply the order
         let mut query = utils::query_select(select);
         query.order_by = utils::order_by_one(index.expr);
-        query
+        Node::Query(query)
     } else {
-        ctx.node_into_query(query, &rel_ty)
-    }
+        node
+    };
+
+    // convert to correct repr
+    let node = match dialect {
+        super::Dialect::Postgres => node,
+        super::Dialect::DuckDB => ctx.duck_export(node, rel_ty),
+    };
+
+    ctx.node_into_query(node, &rel.ty)
 }
 
 pub(super) struct Context<'a> {
@@ -294,15 +303,9 @@ impl<'a> Context<'a> {
             }
 
             cr::From::Table(table_ident) => {
-                let mut select = utils::select_empty();
+                let node = Node::Rel(utils::new_table(translate_table_ident(table_ident), None));
 
-                select
-                    .from
-                    .push(utils::new_table(translate_table_ident(table_ident), None));
-
-                select.projection = self.repr_import_projection(None, ty);
-
-                Node::Select(select)
+                self.native_import(node, ty)
             }
 
             cr::From::Null => Node::from(self.null(ty)),
@@ -350,12 +353,7 @@ impl<'a> Context<'a> {
             cr::From::SQLSource(source) => {
                 let node = Node::Source(source.clone());
 
-                let mut select = utils::select_empty();
-                let (rvar_name, rvar) = self.node_into_rel_var(node, ty);
-                select.from.extend(rvar);
-                select.projection = self.repr_import_projection(Some(&rvar_name), ty);
-
-                Node::Select(select)
+                self.native_import(node, ty)
             }
         }
     }
@@ -493,28 +491,20 @@ impl<'a> Context<'a> {
             }
 
             cr::Transform::Insert(table_ident) => {
-                let mut source = self.node_into_select(input, input_ty);
-
-                let table_columns = self.repr_columns(input_ty);
-
-                let new_projection = (source.projection.into_iter())
-                    .skip(1) // first column will be index, discard it
-                    .zip(&table_columns)
-                    .map(|(p, (_, ty))| self.repr_export(p.expr, ty.as_ref()))
-                    .map(|expr| sql_ast::SelectItem { expr, alias: None })
-                    .collect();
-                source.projection = new_projection;
+                let source = self.native_export(input, input_ty);
+                let source = self.node_into_query(source, input_ty);
 
                 let table = translate_table_ident(table_ident);
 
-                let columns = table_columns
+                let columns = self
+                    .native_cols(input_ty)
                     .into_iter()
                     .map(|(f_name, _f_ty)| f_name)
                     .map(utils::new_ident)
                     .collect();
 
                 let insert = sql_ast::Insert {
-                    source: Box::new(utils::query_select(source)),
+                    source: Box::new(source),
                     table,
                     columns,
                 };
@@ -742,7 +732,10 @@ impl<'a> Context<'a> {
 
             "std::text::length" => {
                 let [text] = unpack_args(args);
-                sql_ast::Expr::Source(format!("LENGTH({text})::int4"))
+                sql_ast::Expr::Source(format!(
+                    "LENGTH({text})::{}",
+                    self.compile_ty_name(&ir::Ty::new(ir::TyPrimitive::uint32))
+                ))
             }
             "std::text::from_ascii" => {
                 let [ascii] = unpack_args(args);
@@ -916,28 +909,28 @@ impl<'a> Context<'a> {
                 }
             }
             ir::Literal::uint8(v) => {
-                if *v < 0x80 {
+                if self.dialect == Dialect::DuckDB || *v < 0x80 {
                     format!("{v}::{}", self.compile_ty_name(ty))
                 } else {
                     format!("{}::{}", *v as i8, self.compile_ty_name(ty))
                 }
             }
             ir::Literal::uint16(v) => {
-                if *v < 0x8000 {
+                if self.dialect == Dialect::DuckDB || *v < 0x8000 {
                     format!("{v}::{}", self.compile_ty_name(ty))
                 } else {
                     format!("{}::{}", *v as i16, self.compile_ty_name(ty))
                 }
             }
             ir::Literal::uint32(v) => {
-                if *v < 0x80000000 {
+                if self.dialect == Dialect::DuckDB || *v < 0x80000000 {
                     format!("{v}::{}", self.compile_ty_name(ty))
                 } else {
                     format!("{}::{}", *v as i32, self.compile_ty_name(ty))
                 }
             }
             ir::Literal::uint64(v) => {
-                if *v < 0x8000000000000000 {
+                if self.dialect == Dialect::DuckDB || *v < 0x8000000000000000 {
                     format!("{v}::{}", self.compile_ty_name(ty))
                 } else {
                     format!("{}::{}", *v as i64, self.compile_ty_name(ty))

@@ -135,11 +135,15 @@ pub fn identifier(first: Option<impl Into<String>>, second: impl Into<String>) -
 
 pub fn order_by_one(mut expr: sql_ast::Expr) -> Option<sql_ast::OrderBy> {
     if let sql_ast::Expr::IndexBy(order_by) = expr {
-        if let Some(order_by) = order_by {
-            expr = *order_by;
-        } else {
-            return None;
-        }
+        let Some(order_by) = order_by else {
+            return None; // we are ordering by an arbitrary index
+        };
+        expr = *order_by;
+    }
+    if let sql_ast::Expr::Source(s) = &expr
+        && s == "0"
+    {
+        return None; // we are ordering by a constant index (only one row)
     }
 
     Some(sql_ast::OrderBy {

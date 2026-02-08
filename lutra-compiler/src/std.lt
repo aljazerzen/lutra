@@ -585,12 +585,12 @@ module sql {
   ##
   ## Resulting type of the expression must match the "SQL representation"
   ## of the Lutra type:
-  ## - primitives expect a single column,
-  ## - tuples expect one column for each tuple field,
-  ## - nested tuples are unpacked into parent relation,
-  ## - arrays expect columns of the inner object,
-  ## - enums expect one tag columns, followed by columns of each of the possible variants,
-  ## - enums that are the Maybe, expect one nullable column.
+  ## - primitives -> a single column,
+  ## - tuples -> one column for each tuple field,
+  ## - nested tuples -> unpacked into parent relation,
+  ## - arrays -> columns of the inner object,
+  ## - enums -> one tag column, followed by columns of each of the variants,
+  ## - enums that are the option -> one nullable column.
   func raw(const sql_source: text): R
   where R
 }

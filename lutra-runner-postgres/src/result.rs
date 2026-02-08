@@ -9,7 +9,7 @@ use postgres::Row;
 #[cfg(feature = "tokio-postgres")]
 use tokio_postgres::Row;
 
-use crate::{Context, Error, is_maybe};
+use crate::{Context, Error, is_option};
 
 pub fn from_sql(program: &rr::SqlProgram, rows: &[Row], ctx: &Context) -> Result<Vec<u8>, Error> {
     // write rows to buffer
@@ -59,7 +59,7 @@ impl<'a> super::Context<'a> {
                     .collect(),
             }),
 
-            ir::TyKind::Enum(variants) if is_maybe(variants) => Box::new(OptEncoder::new(
+            ir::TyKind::Enum(variants) if is_option(variants) => Box::new(OptEncoder::new(
                 ty_mat,
                 self.construct_row_encoder(&variants[1].ty),
             )),
@@ -296,6 +296,8 @@ struct PrimEncoder {
 
 impl EncodeCell for PrimEncoder {
     fn encode_head(&self, buf: &mut BytesMut, cell: &RowIter) -> HeadResidual {
+        // PostgreSQL uses same-sized signed types for unsigned values.
+        // Large unsigned values wrap to negative in PostgreSQL, we cast back here.
         match self.prim {
             ir::TyPrimitive::bool => cell.get::<bool>().encode_head(buf),
             ir::TyPrimitive::int8 => (cell.get::<i16>() as i8).encode_head(buf),

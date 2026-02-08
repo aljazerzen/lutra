@@ -1,7 +1,6 @@
 //! DuckDB Lutra runner
 
 mod params;
-mod result;
 
 pub use lutra_runner::Run;
 
@@ -77,9 +76,16 @@ impl lutra_runner::Run for Runner {
                 // Execute query and get Arrow RecordBatches
                 let mut stmt = conn.prepare(&program.sql)?;
                 let arrow = stmt.query_arrow(args.as_params())?;
+                let batches: Vec<_> = arrow.collect();
 
                 // Convert Arrow to Lutra format
-                Ok(result::from_arrow(arrow, &program.output_ty))
+                let output =
+                    match lutra_arrow::arrow_to_lutra(batches, &program.output_ty, &program.defs) {
+                        Ok(o) => o,
+                        Err(e) => return Ok(Err(Error::ArrowConversion(e.to_string()))),
+                    };
+
+                Ok(Ok(output.to_vec()))
             })
             .await?
     }
@@ -100,6 +106,8 @@ pub enum Error {
     UnsupportedFormat,
     #[error("unsupported data type: {}", .0)]
     UnsupportedDataType(&'static str),
+    #[error("arrow conversion: {}", .0)]
+    ArrowConversion(String),
 }
 
 impl Error {

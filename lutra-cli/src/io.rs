@@ -128,7 +128,7 @@ pub async fn read_input(
     if let Some(input_path) = input_path {
         eprintln!("Reading input...");
         let mut reader = io::BufReader::new(fs::File::open(input_path).await?);
-        read_format(&mut reader, format).await
+        read_format(&mut reader, format, &ty.input, &ty.defs).await
     } else {
         // don't allow reading from stdin (a common mistake)
         // we can implement it when it's needed
@@ -146,6 +146,8 @@ pub async fn read_input(
 async fn read_format(
     r: &mut (impl io::AsyncRead + io::AsyncSeek + Send + Unpin),
     format: DataFormat,
+    ty: &ir::Ty,
+    ty_defs: &[ir::TyDef],
 ) -> anyhow::Result<Vec<u8>> {
     match format {
         DataFormat::Ld => {
@@ -181,7 +183,7 @@ async fn read_format(
             let batches = builder.build()?.collect::<Result<_, _>>()?;
 
             // convert arrow to lutra
-            let res = lutra_arrow::arrow_to_lutra(batches);
+            let res = lutra_arrow::arrow_to_lutra(batches, ty, ty_defs)?;
             Ok(res.to_vec())
         }
     }

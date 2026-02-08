@@ -1,25 +1,29 @@
 #![allow(dead_code)]
 
 mod ast;
+mod node;
 mod projection;
-mod scoped;
 
 use std::rc::Rc;
 
 pub use ast::*;
+pub use node::*;
 pub use projection::RelCols;
-pub use scoped::*;
 
 use lutra_bin::ir;
 
-/// Checks if an enum is a "maybe" enum:
+/// Checks if an enum is a "option" enum:
 /// - does it have exactly two variants?
 /// - is the first variant unit?
-/// - is the second variant a primitive?
+/// - is the second variant a primitive or an array?
 ///
-/// If yes, then it can be compiled to a nullable value.
-pub fn is_maybe(variants: &[ir::TyEnumVariant]) -> bool {
-    variants.len() == 2 && variants[0].ty.is_unit() && variants[1].ty.kind.is_primitive()
+/// If yes, then it can be compiled to a nullable value (single column).
+pub fn is_option(variants: &[ir::TyEnumVariant]) -> bool {
+    if variants.len() != 2 || !variants[0].ty.is_unit() {
+        return false;
+    }
+    let some_ty = &variants[1].ty.kind;
+    some_ty.is_primitive() || some_ty.is_array()
 }
 
 pub fn pick_by_position<T: Clone>(vec: &mut Vec<T>, to_keep: &[usize]) {

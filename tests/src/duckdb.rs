@@ -13,14 +13,19 @@ pub async fn _run(source: &str, input: lutra_bin::Value) -> (String, String) {
 /// Helper function to run a Lutra program on DuckDB with setup SQL
 #[track_caller]
 #[tokio::main(flavor = "current_thread")]
-pub async fn _run_with_setup(setup: &str, source: &str, input: lutra_bin::Value) -> (String, String) {
+pub async fn _run_with_setup(
+    setup: &str,
+    source: &str,
+    input: lutra_bin::Value,
+) -> (String, String) {
     // Create in-memory DuckDB instance and execute setup
     let client = async_duckdb::ClientBuilder::new().open().await.unwrap();
     let setup = setup.to_string();
-    client.conn(move |conn| {
-        Ok(conn.execute_batch(&setup)?)
-    }).await.unwrap();
-    
+    client
+        .conn(move |conn| conn.execute_batch(&setup))
+        .await
+        .unwrap();
+
     let runner = Runner::new(client);
     _run_on(&runner, source, input).await
 }
@@ -81,7 +86,7 @@ fn prim() {
         lutra_bin::Value::unit()
     )), @"
     SELECT
-      3::int2 AS value
+      3::INT2 AS value
     ---
     3
     ");
@@ -94,7 +99,7 @@ fn prim_int64() {
         lutra_bin::Value::unit()
     )), @"
     SELECT
-      12345::int8 AS value
+      12345::INT8 AS value
     ---
     12345
     ");
@@ -133,9 +138,374 @@ fn prim_float64() {
         lutra_bin::Value::unit()
     )), @"
     SELECT
-      3.14::float8 AS value
+      3.14::FLOAT8 AS value
     ---
     3.14
+    ");
+}
+
+#[test]
+fn prim_float32() {
+    insta::assert_snapshot!(_sql_and_output(_run(
+        r#"const main = 2.5: float32"#,
+        lutra_bin::Value::unit()
+    )), @"
+    SELECT
+      2.5::FLOAT4 AS value
+    ---
+    2.5
+    ");
+}
+
+#[test]
+fn prim_int32() {
+    insta::assert_snapshot!(_sql_and_output(_run(
+        r#"const main = 123456: int32"#,
+        lutra_bin::Value::unit()
+    )), @"
+    SELECT
+      123456::INT4 AS value
+    ---
+    123456
+    ");
+}
+
+#[test]
+fn prim_int8() {
+    insta::assert_snapshot!(_sql_and_output(_run(
+        r#"const main = 42: int8"#,
+        lutra_bin::Value::unit()
+    )), @"
+    SELECT
+      42::INT1 AS value
+    ---
+    42
+    ");
+}
+
+#[test]
+fn prim_uint8() {
+    insta::assert_snapshot!(_sql_and_output(_run(
+        r#"const main = 200: uint8"#,
+        lutra_bin::Value::unit()
+    )), @"
+    SELECT
+      200::UINT8 AS value
+    ---
+    200
+    ");
+}
+
+#[test]
+fn prim_uint16() {
+    insta::assert_snapshot!(_sql_and_output(_run(
+        r#"const main = 50000: uint16"#,
+        lutra_bin::Value::unit()
+    )), @"
+    SELECT
+      50000::UINT16 AS value
+    ---
+    50000
+    ");
+}
+
+#[test]
+fn prim_uint32() {
+    insta::assert_snapshot!(_sql_and_output(_run(
+        r#"const main = 3000000000: uint32"#,
+        lutra_bin::Value::unit()
+    )), @"
+    SELECT
+      3000000000::UINT32 AS value
+    ---
+    3000000000
+    ");
+}
+
+#[test]
+fn prim_uint64() {
+    insta::assert_snapshot!(_sql_and_output(_run(
+        r#"const main = 10000000000: uint64"#,
+        lutra_bin::Value::unit()
+    )), @"
+    SELECT
+      10000000000::UINT64 AS value
+    ---
+    10000000000
+    ");
+}
+
+// ============================================================================
+// Option Enum Tests
+// ============================================================================
+
+#[test]
+fn option_none() {
+    insta::assert_snapshot!(_sql_and_output(_run(
+        r#"const main = .none: enum {none, some: int32}"#,
+        lutra_bin::Value::unit()
+    )), @"
+    SELECT
+      NULL::INT4 AS value
+    ---
+    none
+    ");
+}
+
+#[test]
+fn option_some() {
+    insta::assert_snapshot!(_sql_and_output(_run(
+        r#"const main = .some(42): enum {none, some: int32}"#,
+        lutra_bin::Value::unit()
+    )), @"
+    SELECT
+      42::INT4 AS value
+    ---
+    some(42)
+    ");
+}
+
+#[test]
+fn option_some_text() {
+    insta::assert_snapshot!(_sql_and_output(_run(
+        r#"const main = .some("hello"): enum {none, some: text}"#,
+        lutra_bin::Value::unit()
+    )), @r#"
+    SELECT
+      'hello'::text AS value
+    ---
+    some("hello")
+    "#);
+}
+
+#[test]
+fn option_array() {
+    // Array of options
+    insta::assert_snapshot!(_sql_and_output(_run(
+        r#"const main = [.none, .some(1), .some(2), .none]: [enum {none, some: int32}]"#,
+        lutra_bin::Value::unit()
+    )), @"
+    SELECT
+      r0.value
+    FROM
+      (
+        SELECT
+          0::INT8 AS index,
+          NULL::INT4 AS value
+        UNION
+        ALL
+        SELECT
+          1::INT8 AS index,
+          1::INT4 AS value
+        UNION
+        ALL
+        SELECT
+          2::INT8 AS index,
+          2::INT4 AS value
+        UNION
+        ALL
+        SELECT
+          3::INT8 AS index,
+          NULL::INT4 AS value
+      ) AS r0
+    ORDER BY
+      r0.index
+    ---
+    [
+      none,
+      some(1),
+      some(2),
+      none,
+    ]
+    ");
+}
+
+#[test]
+fn tuple_with_option() {
+    // Option within a tuple works (nullable column)
+    insta::assert_snapshot!(_sql_and_output(_run(
+        r#"const main = {name = "Alice", age = .some(30): enum {none, some: int32}}"#,
+        lutra_bin::Value::unit()
+    )), @r#"
+    SELECT
+      r0._0 AS name,
+      r0._1 AS age
+    FROM
+      (
+        SELECT
+          'Alice'::text AS _0,
+          30::INT4 AS _1
+      ) AS r0
+    ---
+    {
+      name = "Alice",
+      age = some(30),
+    }
+    "#);
+}
+
+#[test]
+fn tuple_with_option_none() {
+    // Option with none value within a tuple
+    insta::assert_snapshot!(_sql_and_output(_run(
+        r#"const main = {name = "Bob", age = .none: enum {none, some: int32}}"#,
+        lutra_bin::Value::unit()
+    )), @r#"
+    SELECT
+      r0._0 AS name,
+      r0._1 AS age
+    FROM
+      (
+        SELECT
+          'Bob'::text AS _0,
+          NULL::INT4 AS _1
+      ) AS r0
+    ---
+    {
+      name = "Bob",
+      age = none,
+    }
+    "#);
+}
+
+// ============================================================================
+// General Enum Tests (non-option enums with payloads)
+// ============================================================================
+
+#[test]
+fn enum_with_payloads() {
+    // General enum with various payload types
+    insta::assert_snapshot!(_sql_and_output(_run(
+        r#"
+        type Status: enum {
+            pending,
+            in_progress: int32,
+            done: text
+        }
+        const main = .in_progress(42): Status
+        "#,
+        lutra_bin::Value::unit()
+    )), @"
+    SELECT
+      CASE
+        r0._t::int2
+        WHEN 0 THEN union_value(pending := NULL)::
+        UNION
+    (pending BOOL, in_progress INT4, done TEXT)
+        WHEN 1 THEN union_value(in_progress := r0._1)
+        WHEN 2 THEN union_value(done := r0._2)
+      END AS value
+    FROM
+      (
+        SELECT
+          1::INT2 AS _t,
+          42::INT4 AS _1,
+          NULL::TEXT AS _2
+      ) AS r0
+    ---
+    in_progress(42)
+    ");
+}
+
+#[test]
+fn enum_array_with_payloads() {
+    insta::assert_snapshot!(_sql_and_output(_run(
+        r#"
+        type Status: enum {
+            pending,
+            in_progress: int32,
+            done: text
+        }
+        const main = [.pending, .in_progress(50), .done("finished")]: [Status]
+        "#,
+        lutra_bin::Value::unit()
+    )), @r#"
+    SELECT
+      CASE
+        r1._t::int2
+        WHEN 0 THEN union_value(pending := NULL)::
+        UNION
+    (pending BOOL, in_progress INT4, done TEXT)
+        WHEN 1 THEN union_value(in_progress := r1._1)
+        WHEN 2 THEN union_value(done := r1._2)
+      END AS value
+    FROM
+      (
+        SELECT
+          r0._t,
+          r0._1,
+          r0._2
+        FROM
+          (
+            SELECT
+              0::INT8 AS index,
+              0::INT2 AS _t,
+              NULL::INT4 AS _1,
+              NULL::TEXT AS _2
+            UNION
+            ALL
+            SELECT
+              1::INT8 AS index,
+              1::INT2 AS _t,
+              50::INT4 AS _1,
+              NULL::TEXT AS _2
+            UNION
+            ALL
+            SELECT
+              2::INT8 AS index,
+              2::INT2 AS _t,
+              NULL::INT4 AS _1,
+              'finished'::text AS _2
+          ) AS r0
+        ORDER BY
+          r0.index
+      ) AS r1
+    ---
+    [
+      pending,
+      in_progress(50),
+      done("finished"),
+    ]
+    "#);
+}
+
+#[test]
+fn tuple_with_enum() {
+    // Enum within a tuple
+    insta::assert_snapshot!(_sql_and_output(_run(
+        r#"
+        type Status: enum {
+            pending,
+            in_progress: int32,
+            done: text
+        }
+        const main = {id = 1: int32, status = .in_progress(42): Status}
+        "#,
+        lutra_bin::Value::unit()
+    )), @"
+    SELECT
+      r0._0 AS id,
+      CASE
+        r0._1_t::int2
+        WHEN 0 THEN union_value(pending := NULL)::
+        UNION
+    (pending BOOL, in_progress INT4, done TEXT)
+        WHEN 1 THEN union_value(in_progress := r0._1_1)
+        WHEN 2 THEN union_value(done := r0._1_2)
+      END AS status
+    FROM
+      (
+        SELECT
+          1::INT4 AS _0,
+          1::INT2 AS _1_t,
+          42::INT4 AS _1_1,
+          NULL::TEXT AS _1_2
+      ) AS r0
+    ---
+    {
+      id = 1,
+      status = in_progress(42),
+    }
     ");
 }
 
@@ -150,8 +520,14 @@ fn tuple_prim() {
         lutra_bin::Value::unit()
     )), @"
     SELECT
-      1::int4 AS _0,
-      2::int2 AS _1
+      r0._0 AS x,
+      r0._1 AS y
+    FROM
+      (
+        SELECT
+          1::INT4 AS _0,
+          2::INT2 AS _1
+      ) AS r0
     ---
     {
       x = 1,
@@ -167,9 +543,16 @@ fn tuple_mixed() {
         lutra_bin::Value::unit()
     )), @r#"
     SELECT
-      'Alice'::text AS _0,
-      30::int4 AS _1,
-      TRUE AS _2
+      r0._0 AS name,
+      r0._1 AS age,
+      r0._2 AS active
+    FROM
+      (
+        SELECT
+          'Alice'::text AS _0,
+          30::INT4 AS _1,
+          TRUE AS _2
+      ) AS r0
     ---
     {
       name = "Alice",
@@ -186,9 +569,15 @@ fn tuple_tuple_prim() {
         lutra_bin::Value::unit()
     )), @"
     SELECT
-      1::int4 AS _0_0,
-      2::int2 AS _0_1,
-      3::int8 AS _1
+      struct_pack(x := r0._0_0, y := r0._0_1) AS a,
+      r0._1 AS b
+    FROM
+      (
+        SELECT
+          1::INT4 AS _0_0,
+          2::INT2 AS _0_1,
+          3::INT8 AS _1
+      ) AS r0
     ---
     {
       a = {
@@ -215,18 +604,18 @@ fn array_prim() {
     FROM
       (
         SELECT
-          0::int8 AS index,
-          1::int8 AS value
+          0::INT8 AS index,
+          1::INT8 AS value
         UNION
         ALL
         SELECT
-          1::int8 AS index,
-          2::int8 AS value
+          1::INT8 AS index,
+          2::INT8 AS value
         UNION
         ALL
         SELECT
-          2::int8 AS index,
-          3::int8 AS value
+          2::INT8 AS index,
+          3::INT8 AS value
       ) AS r0
     ORDER BY
       r0.index
@@ -246,17 +635,9 @@ fn array_empty() {
         lutra_bin::Value::unit()
     )), @"
     SELECT
-      r0.value
-    FROM
-      (
-        SELECT
-          0 AS index,
-          NULL::int8 AS value
-        WHERE
-          FALSE
-      ) AS r0
-    ORDER BY
-      r0.index
+      NULL::INT8 AS value
+    WHERE
+      FALSE
     ---
     []
     ");
@@ -269,23 +650,29 @@ fn array_tuple() {
         lutra_bin::Value::unit()
     )), @"
     SELECT
-      r0._0,
-      r0._1
+      r1._0 AS x,
+      r1._1 AS y
     FROM
       (
         SELECT
-          0::int8 AS index,
-          1::int4 AS _0,
-          2::int2 AS _1
-        UNION
-        ALL
-        SELECT
-          1::int8 AS index,
-          3::int4 AS _0,
-          4::int2 AS _1
-      ) AS r0
-    ORDER BY
-      r0.index
+          r0._0,
+          r0._1
+        FROM
+          (
+            SELECT
+              0::INT8 AS index,
+              1::INT4 AS _0,
+              2::INT2 AS _1
+            UNION
+            ALL
+            SELECT
+              1::INT8 AS index,
+              3::INT4 AS _0,
+              4::INT2 AS _1
+          ) AS r0
+        ORDER BY
+          r0.index
+      ) AS r1
     ---
     [
       {
@@ -312,53 +699,61 @@ fn tuple_array_prim() {
         lutra_bin::Value::unit()
     )), @r#"
     SELECT
-      TRUE AS _0,
+      r2._0 AS field0,
+      r2._1 AS field1,
+      r2._2 AS field2,
+      r2._3 AS field3
+    FROM
       (
         SELECT
-          COALESCE(
-            list(
-              r0.value
-              ORDER BY
-                r0.index
-            ),
-            CAST([] AS int8 [])
-          ) AS value
-        FROM
+          TRUE AS _0,
           (
             SELECT
-              0::int8 AS index,
-              1::int8 AS value
-            UNION
-            ALL
-            SELECT
-              1::int8 AS index,
-              2::int8 AS value
-            UNION
-            ALL
-            SELECT
-              2::int8 AS index,
-              3::int8 AS value
-          ) AS r0
-      ) AS _1,
-      (
-        SELECT
-          COALESCE(
-            list(
-              struct_pack(_0 := r1._0, _1 := r1._1)
-              ORDER BY
-                r1.index
-            ),
-            CAST([] AS STRUCT(_0 int4, _1 text) [])
-          ) AS value
-        FROM
+              COALESCE(
+                list(
+                  r0.value
+                  ORDER BY
+                    r0.index
+                ),
+                CAST([] AS INT8 [])
+              ) AS value
+            FROM
+              (
+                SELECT
+                  0::INT8 AS index,
+                  1::INT8 AS value
+                UNION
+                ALL
+                SELECT
+                  1::INT8 AS index,
+                  2::INT8 AS value
+                UNION
+                ALL
+                SELECT
+                  2::INT8 AS index,
+                  3::INT8 AS value
+              ) AS r0
+          ) AS _1,
           (
             SELECT
-              0::int8 AS index,
-              4::int4 AS _0,
-              'hello'::text AS _1
-          ) AS r1
-      ) AS _2,
-      FALSE AS _3
+              COALESCE(
+                list(
+                  struct_pack(field0 := r1._0, field1 := r1._1)
+                  ORDER BY
+                    r1.index
+                ),
+                CAST([] AS STRUCT(field0 INT4, field1 TEXT) [])
+              ) AS value
+            FROM
+              (
+                SELECT
+                  0::INT8 AS index,
+                  4::INT4 AS _0,
+                  'hello'::text AS _1
+              ) AS r1
+          ) AS _2,
+          FALSE AS _3
+      ) AS r2
     ---
     {
       true,
@@ -389,7 +784,7 @@ fn array_array_prim() {
     FROM
       (
         SELECT
-          0::int8 AS index,
+          0::INT8 AS index,
           (
             SELECT
               COALESCE(
@@ -398,24 +793,24 @@ fn array_array_prim() {
                   ORDER BY
                     r0.index
                 ),
-                CAST([] AS int8 [])
+                CAST([] AS INT8 [])
               ) AS value
             FROM
               (
                 SELECT
-                  0::int8 AS index,
-                  1::int8 AS value
+                  0::INT8 AS index,
+                  1::INT8 AS value
                 UNION
                 ALL
                 SELECT
-                  1::int8 AS index,
-                  2::int8 AS value
+                  1::INT8 AS index,
+                  2::INT8 AS value
               ) AS r0
           ) AS value
         UNION
         ALL
         SELECT
-          1::int8 AS index,
+          1::INT8 AS index,
           (
             SELECT
               COALESCE(
@@ -424,24 +819,24 @@ fn array_array_prim() {
                   ORDER BY
                     r1.index
                 ),
-                CAST([] AS int8 [])
+                CAST([] AS INT8 [])
               ) AS value
             FROM
               (
                 SELECT
-                  0::int8 AS index,
-                  3::int8 AS value
+                  0::INT8 AS index,
+                  3::INT8 AS value
                 UNION
                 ALL
                 SELECT
-                  1::int8 AS index,
-                  4::int8 AS value
+                  1::INT8 AS index,
+                  4::INT8 AS value
               ) AS r1
           ) AS value
         UNION
         ALL
         SELECT
-          2::int8 AS index,
+          2::INT8 AS index,
           (
             SELECT
               COALESCE(
@@ -450,13 +845,13 @@ fn array_array_prim() {
                   ORDER BY
                     r2.index
                 ),
-                CAST([] AS int8 [])
+                CAST([] AS INT8 [])
               ) AS value
             FROM
               (
                 SELECT
-                  0::int8 AS index,
-                  5::int8 AS value
+                  0::INT8 AS index,
+                  5::INT8 AS value
               ) AS r2
           ) AS value
       ) AS r3
@@ -490,7 +885,7 @@ fn input_prim() {
         lutra_bin::Value::Prim64(5)
     )), @"
     SELECT
-      ($1::int8 + 10::int8) AS value
+      ($1::INT8 + 10::INT8) AS value
     ---
     15
     ");
@@ -506,7 +901,7 @@ fn input_tuple() {
         ])
     )), @"
     SELECT
-      ($1::int8 + $2::int8) AS value
+      ($1::INT8 + $2::INT8) AS value
     ---
     7
     ");
@@ -519,7 +914,7 @@ fn input_text() {
         lutra_bin::Value::Text("World".to_string())
     )), @r#"
     SELECT
-      ('Hello, '::text || $1::text) AS value
+      ('Hello, '::text || $1::TEXT) AS value
     ---
     "Hello, World"
     "#);
@@ -536,9 +931,9 @@ fn input_array_prim() {
         ])
     )), @"
     SELECT
-      (u.unnest)::int8 AS value
+      u.unnest AS value
     FROM
-      LATERAL unnest($1::int8 []) AS u
+      LATERAL unnest($1::INT8 []) AS u
     ---
     [
       10,
@@ -558,9 +953,9 @@ fn input_array_text() {
         ])
     )), @r#"
     SELECT
-      (u.unnest)::text AS value
+      u.unnest AS value
     FROM
-      LATERAL unnest($1::text []) AS u
+      LATERAL unnest($1::TEXT []) AS u
     ---
     [
       "hello",
@@ -582,8 +977,14 @@ fn input_nested_tuple_array() {
         ])
     )), @"
     SELECT
-      $1::int8 [] AS _0,
-      $2::int4 AS _1
+      r0._0 AS items,
+      r0._1 AS count
+    FROM
+      (
+        SELECT
+          $1::INT8 [] AS _0,
+          $2::INT4 AS _1
+      ) AS r0
     ---
     {
       items = [
@@ -606,7 +1007,7 @@ fn input_array_tuple() {
     // This is a limitation of using JSON for input serialization.
     // Arrays of primitives work because DuckDB can cast JSON arrays to native arrays.
     insta::assert_snapshot!(_sql_and_output(_run(
-        r#"func main(points: [{x: int32, y: int32}]): [{x: int32, y: int32}] -> points"#,
+        r#"func main(points: [{x: int16, y: int32}]) -> points"#,
         lutra_bin::Value::Array(vec![
             lutra_bin::Value::Tuple(vec![
                 lutra_bin::Value::Prim16(3),
@@ -633,7 +1034,7 @@ fn comparison() {
         lutra_bin::Value::unit()
     )), @"
     SELECT
-      (3::int4 < 5::int4) AS value
+      (3::INT4 < 5::INT4) AS value
     ---
     true
     ");
@@ -671,10 +1072,16 @@ fn sql_from_primitive_table() {
         lutra_bin::Value::unit()
     )), @r#"
     SELECT
-      id::int4 AS _0,
-      name::text AS _1
+      r1._0 AS id,
+      r1._1 AS name
     FROM
-      users
+      (
+        SELECT
+          r0.id AS _0,
+          r0.name AS _1
+        FROM
+          users AS r0
+      ) AS r1
     ---
     [
       {
@@ -704,12 +1111,20 @@ fn sql_from_flat_tuple() {
         lutra_bin::Value::unit()
     )), @r#"
     SELECT
-      id::int4 AS _0,
-      name::text AS _1,
-      price::float8 AS _2,
-      in_stock::bool AS _3
+      r1._0 AS id,
+      r1._1 AS name,
+      r1._2 AS price,
+      r1._3 AS in_stock
     FROM
-      products
+      (
+        SELECT
+          r0.id AS _0,
+          r0.name AS _1,
+          r0.price AS _2,
+          r0.in_stock AS _3
+        FROM
+          products AS r0
+      ) AS r1
     ---
     [
       {
@@ -737,7 +1152,7 @@ fn sql_from_nested_tuple() {
             id int4,
             data STRUCT(user_id int4, items int4[])
         );
-        INSERT INTO events VALUES 
+        INSERT INTO events VALUES
             (1, {'user_id': 100, 'items': [1, 2, 3]}),
             (2, {'user_id': 200, 'items': [4, 5]});
         "#,
@@ -748,10 +1163,17 @@ fn sql_from_nested_tuple() {
         lutra_bin::Value::unit()
     )), @"
     SELECT
-      id::int4 AS _0,
-      data::STRUCT(user_id int4, items int4 []) AS _1_0
+      r1._0 AS id,
+      struct_pack(user_id := r1._1_0, items := r1._1_1) AS data
     FROM
-      events
+      (
+        SELECT
+          r0.id AS _0,
+          r0.data.user_id AS _1_0,
+          r0.data.items AS _1_1
+        FROM
+          events AS r0
+      ) AS r1
     ---
     [
       {
@@ -794,10 +1216,16 @@ fn sql_from_array_column() {
         lutra_bin::Value::unit()
     )), @r#"
     SELECT
-      id::int4 AS _0,
-      tags::text [] AS _1
+      r1._0 AS id,
+      r1._1 AS tags
     FROM
-      items
+      (
+        SELECT
+          r0.id AS _0,
+          r0.tags AS _1
+        FROM
+          items AS r0
+      ) AS r1
     ---
     [
       {
@@ -819,8 +1247,9 @@ fn sql_from_array_column() {
 }
 
 #[test]
-fn sql_from_maybe_column() {
-    // Test reading nullable columns (Maybe/Option)
+fn sql_from_option_column() {
+    // Test reading nullable columns
+    // Lutra type uses option for nullable columns, Arrow nulls are wrapped accordingly
     insta::assert_snapshot!(_sql_and_output(_run_with_setup(
         r#"
         CREATE TABLE people (id int4, name text, age int4);
@@ -831,7 +1260,34 @@ fn sql_from_maybe_column() {
         func main(): [Person] -> std::sql::from("people")
         "#,
         lutra_bin::Value::unit()
-    )), @"");
+    )), @r#"
+    SELECT
+      r1._0 AS id,
+      r1._1 AS name,
+      r1._2 AS age
+    FROM
+      (
+        SELECT
+          r0.id AS _0,
+          r0.name AS _1,
+          r0.age AS _2
+        FROM
+          people AS r0
+      ) AS r1
+    ---
+    [
+      {
+        id = 1,
+        name = "Alice",
+        age = some(30),
+      },
+      {
+        id = 2,
+        name = "Bob",
+        age = none,
+      },
+    ]
+    "#);
 }
 
 #[test]
@@ -849,10 +1305,16 @@ fn sql_from_date_column() {
         lutra_bin::Value::unit()
     )), @"
     SELECT
-      id::int4 AS _0,
-      (event_date::date - '1970-01-01'::date) AS _1
+      r1._0 AS id,
+      ('1970-01-01'::date + r1._1) AS event_date
     FROM
-      events
+      (
+        SELECT
+          r0.id AS _0,
+          (r0.event_date::date - '1970-01-01'::date)::int4 AS _1
+        FROM
+          events AS r0
+      ) AS r1
     ---
     [
       {
@@ -860,8 +1322,8 @@ fn sql_from_date_column() {
         event_date = @2024-01-15,
       },
       {
-        id = 0,
-        event_date = @1970-01-03,
+        id = 2,
+        event_date = @2024-12-25,
       },
     ]
     ");
@@ -884,19 +1346,19 @@ fn sql_insert_primitives() {
     INSERT INTO
       users (id, name)
     SELECT
-      r0._0,
-      r0._1
+      r0._0 AS id,
+      r0._1 AS name
     FROM
       (
         SELECT
-          0::int8 AS index,
-          3::int4 AS _0,
+          0::INT8 AS index,
+          3::INT4 AS _0,
           'Charlie'::text AS _1
         UNION
         ALL
         SELECT
-          1::int8 AS index,
-          4::int4 AS _0,
+          1::INT8 AS index,
+          4::INT4 AS _0,
           'Diana'::text AS _1
       ) AS r0
     ---
@@ -924,25 +1386,25 @@ fn sql_insert_flat_tuple() {
     INSERT INTO
       products (id, name, price, in_stock)
     SELECT
-      r0._0,
-      r0._1,
-      r0._2,
-      r0._3
+      r0._0 AS id,
+      r0._1 AS name,
+      r0._2 AS price,
+      r0._3 AS in_stock
     FROM
       (
         SELECT
-          0::int8 AS index,
-          1::int4 AS _0,
+          0::INT8 AS index,
+          1::INT4 AS _0,
           'Widget'::text AS _1,
-          9.99::float8 AS _2,
+          9.99::FLOAT8 AS _2,
           TRUE AS _3
         UNION
         ALL
         SELECT
-          1::int8 AS index,
-          2::int4 AS _0,
+          1::INT8 AS index,
+          2::INT4 AS _0,
           'Gadget'::text AS _1,
-          19.99::float8 AS _2,
+          19.99::FLOAT8 AS _2,
           FALSE AS _3
       ) AS r0
     ---
@@ -951,8 +1413,8 @@ fn sql_insert_flat_tuple() {
 }
 
 #[test]
-fn sql_insert_maybe() {
-    // Test inserting Maybe/Option values
+fn sql_insert_option() {
+    // Test inserting option values
     insta::assert_snapshot!(_sql_and_output(_run_with_setup(
         r#"
         CREATE TABLE people (id int4, name text, age int4);
@@ -970,23 +1432,23 @@ fn sql_insert_maybe() {
     INSERT INTO
       people (id, name, age)
     SELECT
-      r0._0,
-      r0._1,
-      r0._2
+      r0._0 AS id,
+      r0._1 AS name,
+      r0._2 AS age
     FROM
       (
         SELECT
-          0::int8 AS index,
-          1::int4 AS _0,
+          0::INT8 AS index,
+          1::INT4 AS _0,
           'Alice'::text AS _1,
-          30::int4 AS _2
+          30::INT4 AS _2
         UNION
         ALL
         SELECT
-          1::int8 AS index,
-          2::int4 AS _0,
+          1::INT8 AS index,
+          2::INT4 AS _0,
           'Bob'::text AS _1,
-          NULL::int4 AS _2
+          NULL::INT4 AS _2
       ) AS r0
     ---
     {}
@@ -1013,22 +1475,857 @@ fn sql_insert_date() {
     INSERT INTO
       events (id, event_date)
     SELECT
-      r0._0,
-      ('1970-01-01'::date + r0._1)
+      r0._0 AS id,
+      ('1970-01-01'::date + r0._1) AS event_date
     FROM
       (
         SELECT
-          0::int8 AS index,
-          1::int4 AS _0,
-          19737::int4 AS _1
+          0::INT8 AS index,
+          1::INT4 AS _0,
+          19737::INT4 AS _1
         UNION
         ALL
         SELECT
-          1::int8 AS index,
-          2::int4 AS _0,
-          20082::int4 AS _1
+          1::INT8 AS index,
+          2::INT4 AS _0,
+          20082::INT4 AS _1
       ) AS r0
     ---
     {}
     ");
+}
+
+// ============================================================================
+// Serialize Tests (Array in tuple forces serialization to LIST/STRUCT)
+// ============================================================================
+
+#[test]
+fn serialize_array_in_tuple() {
+    // Having array in a tuple forces serialization to LIST.
+    // Applying an operation on that array then forces deserialization.
+    insta::assert_snapshot!(_sql_and_output(_run(
+        r#"
+        func get_data() -> {a = [2, 5, 4, 3, 1, 2]: [int32]}
+
+        func main() -> (
+          get_data().a
+          | std::map(func (y: int32) -> -y)
+        )
+        "#,
+        lutra_bin::Value::unit()
+    )), @"
+    SELECT
+      (- r0.value) AS value
+    FROM
+      (
+        SELECT
+          0::INT8 AS index,
+          2::INT4 AS value
+        UNION
+        ALL
+        SELECT
+          1::INT8 AS index,
+          5::INT4 AS value
+        UNION
+        ALL
+        SELECT
+          2::INT8 AS index,
+          4::INT4 AS value
+        UNION
+        ALL
+        SELECT
+          3::INT8 AS index,
+          3::INT4 AS value
+        UNION
+        ALL
+        SELECT
+          4::INT8 AS index,
+          1::INT4 AS value
+        UNION
+        ALL
+        SELECT
+          5::INT8 AS index,
+          2::INT4 AS value
+      ) AS r0
+    ORDER BY
+      r0.index
+    ---
+    [
+      -2,
+      -5,
+      -4,
+      -3,
+      -1,
+      -2,
+    ]
+    ");
+}
+
+#[test]
+fn serialize_array_of_tuples_in_tuple() {
+    // Array of tuples serialized to LIST of STRUCT
+    insta::assert_snapshot!(_sql_and_output(_run(
+        r#"
+        func get_data() -> {a = [{2: int32, false}, {5, true}, {4, false}]}
+
+        func main() -> (
+          get_data().a
+          | std::map(func (y: {int32, bool}) -> {-y.0, !y.1})
+        )
+        "#,
+        lutra_bin::Value::unit()
+    )), @"
+    SELECT
+      r1._0 AS field0,
+      r1._1 AS field1
+    FROM
+      (
+        SELECT
+          (- r0._0) AS _0,
+          (NOT r0._1) AS _1
+        FROM
+          (
+            SELECT
+              0::INT8 AS index,
+              2::INT4 AS _0,
+              FALSE AS _1
+            UNION
+            ALL
+            SELECT
+              1::INT8 AS index,
+              5::INT4 AS _0,
+              TRUE AS _1
+            UNION
+            ALL
+            SELECT
+              2::INT8 AS index,
+              4::INT4 AS _0,
+              FALSE AS _1
+          ) AS r0
+        ORDER BY
+          r0.index
+      ) AS r1
+    ---
+    [
+      {
+        -2,
+        true,
+      },
+      {
+        -5,
+        false,
+      },
+      {
+        -4,
+        true,
+      },
+    ]
+    ");
+}
+
+#[test]
+fn serialize_nested_array() {
+    // Nested arrays: [[int16]]
+    insta::assert_snapshot!(_sql_and_output(_run(
+        r#"
+        func get_data() -> [[1: int16, 2, 3], [4, 5, 6]]
+
+        func main() -> (
+          get_data() | std::map(func (y: [int16]) -> (
+            std::index(y, 1)
+          ))
+        )
+        "#,
+        lutra_bin::Value::unit()
+    )), @"
+    SELECT
+      (
+        SELECT
+          r4.value AS value
+        FROM
+          (
+            SELECT
+              r3.index,
+              r3.value
+            FROM
+              (
+                SELECT
+                  (ROW_NUMBER() OVER () -1)::int4 AS index,
+                  u.unnest AS value
+                FROM
+                  LATERAL unnest(r2.value) AS u
+                ORDER BY
+                  index OFFSET 1::INT8
+              ) AS r3
+            ORDER BY
+              index
+            LIMIT
+              1::INT8
+          ) AS r4
+        UNION
+        ALL
+        SELECT
+          NULL::INT2 AS value
+        LIMIT
+          1::INT8
+      ) AS value
+    FROM
+      (
+        SELECT
+          0::INT8 AS index,
+          (
+            SELECT
+              COALESCE(
+                list(
+                  r0.value
+                  ORDER BY
+                    r0.index
+                ),
+                CAST([] AS INT2 [])
+              ) AS value
+            FROM
+              (
+                SELECT
+                  0::INT8 AS index,
+                  1::INT2 AS value
+                UNION
+                ALL
+                SELECT
+                  1::INT8 AS index,
+                  2::INT2 AS value
+                UNION
+                ALL
+                SELECT
+                  2::INT8 AS index,
+                  3::INT2 AS value
+              ) AS r0
+          ) AS value
+        UNION
+        ALL
+        SELECT
+          1::INT8 AS index,
+          (
+            SELECT
+              COALESCE(
+                list(
+                  r1.value
+                  ORDER BY
+                    r1.index
+                ),
+                CAST([] AS INT2 [])
+              ) AS value
+            FROM
+              (
+                SELECT
+                  0::INT8 AS index,
+                  4::INT2 AS value
+                UNION
+                ALL
+                SELECT
+                  1::INT8 AS index,
+                  5::INT2 AS value
+                UNION
+                ALL
+                SELECT
+                  2::INT8 AS index,
+                  6::INT2 AS value
+              ) AS r1
+          ) AS value
+      ) AS r2
+    ORDER BY
+      r2.index
+    ---
+    [
+      none,
+      none,
+    ]
+    ");
+}
+
+#[test]
+fn serialize_nested_array_map() {
+    // Map over nested arrays
+    insta::assert_snapshot!(_sql_and_output(_run(
+        r#"
+        func get_data() -> [[1: int64, 2, 3], [4, 5, 6]]
+
+        func main() -> (
+          get_data()
+          | std::map(func (y: [int64]) -> (
+            y | std::map(func (z: int64) -> 6-z)
+          ))
+        )
+        "#,
+        lutra_bin::Value::unit()
+    )), @"
+    SELECT
+      (
+        SELECT
+          COALESCE(
+            list(
+              r4.value
+              ORDER BY
+                r4.index
+            ),
+            CAST([] AS INT8 [])
+          ) AS value
+        FROM
+          (
+            SELECT
+              r3.index AS index,
+              (6::INT8 - r3.value) AS value
+            FROM
+              (
+                SELECT
+                  (ROW_NUMBER() OVER () -1)::int4 AS index,
+                  u.unnest AS value
+                FROM
+                  LATERAL unnest(r2.value) AS u
+              ) AS r3
+          ) AS r4
+      ) AS value
+    FROM
+      (
+        SELECT
+          0::INT8 AS index,
+          (
+            SELECT
+              COALESCE(
+                list(
+                  r0.value
+                  ORDER BY
+                    r0.index
+                ),
+                CAST([] AS INT8 [])
+              ) AS value
+            FROM
+              (
+                SELECT
+                  0::INT8 AS index,
+                  1::INT8 AS value
+                UNION
+                ALL
+                SELECT
+                  1::INT8 AS index,
+                  2::INT8 AS value
+                UNION
+                ALL
+                SELECT
+                  2::INT8 AS index,
+                  3::INT8 AS value
+              ) AS r0
+          ) AS value
+        UNION
+        ALL
+        SELECT
+          1::INT8 AS index,
+          (
+            SELECT
+              COALESCE(
+                list(
+                  r1.value
+                  ORDER BY
+                    r1.index
+                ),
+                CAST([] AS INT8 [])
+              ) AS value
+            FROM
+              (
+                SELECT
+                  0::INT8 AS index,
+                  4::INT8 AS value
+                UNION
+                ALL
+                SELECT
+                  1::INT8 AS index,
+                  5::INT8 AS value
+                UNION
+                ALL
+                SELECT
+                  2::INT8 AS index,
+                  6::INT8 AS value
+              ) AS r1
+          ) AS value
+      ) AS r2
+    ORDER BY
+      r2.index
+    ---
+    [
+      [
+        5,
+        4,
+        3,
+      ],
+      [
+        2,
+        1,
+        0,
+      ],
+    ]
+    ");
+}
+
+#[test]
+fn serialize_bool_array() {
+    insta::assert_snapshot!(_sql_and_output(_run(
+        r#"
+        func get_data() -> {a = [false, true, true]}
+
+        func main() -> (
+          get_data().a
+          | std::map(func (y: bool) -> !y)
+        )
+        "#,
+        lutra_bin::Value::unit()
+    )), @"
+    SELECT
+      (NOT r0.value) AS value
+    FROM
+      (
+        SELECT
+          0::INT8 AS index,
+          FALSE AS value
+        UNION
+        ALL
+        SELECT
+          1::INT8 AS index,
+          TRUE AS value
+        UNION
+        ALL
+        SELECT
+          2::INT8 AS index,
+          TRUE AS value
+      ) AS r0
+    ORDER BY
+      r0.index
+    ---
+    [
+      true,
+      false,
+      false,
+    ]
+    ");
+}
+
+#[test]
+fn serialize_text_array() {
+    insta::assert_snapshot!(_sql_and_output(_run(
+        r#"
+        func get_data() -> {a = ["no", "yes", "neither"]}
+
+        func main() -> (
+          get_data().a
+          | std::map(func (y: text) -> y)
+        )
+        "#,
+        lutra_bin::Value::unit()
+    )), @r#"
+    SELECT
+      r0.value AS value
+    FROM
+      (
+        SELECT
+          0::INT8 AS index,
+          'no'::text AS value
+        UNION
+        ALL
+        SELECT
+          1::INT8 AS index,
+          'yes'::text AS value
+        UNION
+        ALL
+        SELECT
+          2::INT8 AS index,
+          'neither'::text AS value
+      ) AS r0
+    ORDER BY
+      r0.index
+    ---
+    [
+      "no",
+      "yes",
+      "neither",
+    ]
+    "#);
+}
+
+#[test]
+fn serialize_deeply_nested() {
+    // Access deeply nested serialized data
+    insta::assert_snapshot!(_sql_and_output(_run(
+        r#"
+        func main() -> (
+          {"hello", [[true]]}.1
+        )
+        "#,
+        lutra_bin::Value::unit()
+    )), @"
+    SELECT
+      (
+        SELECT
+          COALESCE(
+            list(
+              r0.value
+              ORDER BY
+                r0.index
+            ),
+            CAST([] AS BOOL [])
+          ) AS value
+        FROM
+          (
+            SELECT
+              0::INT8 AS index,
+              TRUE AS value
+          ) AS r0
+      ) AS value
+    ORDER BY
+      0::INT8
+    ---
+    [
+      [
+        true,
+      ],
+    ]
+    ");
+}
+
+#[test]
+fn serialize_complex_nested() {
+    // Complex deeply nested structure
+    insta::assert_snapshot!(_sql_and_output(_run(
+        r#"
+        func main() -> (
+          {
+            "hello",
+            [
+              {
+                "hello",
+                [{1: int32, {1: int32, [5: int32], 2: int16}, 2: int16}]
+              }.1
+            ]
+          }.1
+        )
+        "#,
+        lutra_bin::Value::unit()
+    )), @"
+    SELECT
+      (
+        SELECT
+          COALESCE(
+            list(
+              struct_pack(
+                field0 := r1._0,
+                field1 := struct_pack(
+                  field0 := r1._1_0,
+                  field1 := r1._1_1,
+                  field2 := r1._1_2
+                ),
+                field2 := r1._2
+              )
+              ORDER BY
+                r1.index
+            ),
+            CAST(
+              [] AS STRUCT(
+                field0 INT4,
+                field1 STRUCT(field0 INT4, field1 INT4 [], field2 INT2),
+                field2 INT2
+              ) []
+            )
+          ) AS value
+        FROM
+          (
+            SELECT
+              0::INT8 AS index,
+              1::INT4 AS _0,
+              1::INT4 AS _1_0,
+              (
+                SELECT
+                  COALESCE(
+                    list(
+                      r0.value
+                      ORDER BY
+                        r0.index
+                    ),
+                    CAST([] AS INT4 [])
+                  ) AS value
+                FROM
+                  (
+                    SELECT
+                      0::INT8 AS index,
+                      5::INT4 AS value
+                  ) AS r0
+              ) AS _1_1,
+              2::INT2 AS _1_2,
+              2::INT2 AS _2
+          ) AS r1
+      ) AS value
+    ORDER BY
+      0::INT8
+    ---
+    [
+      [
+        {
+          1,
+          {
+            1,
+            [
+              5,
+            ],
+            2,
+          },
+          2,
+        },
+      ],
+    ]
+    ");
+}
+
+#[test]
+fn serialize_index_nested_array() {
+    // Index into nested array
+    insta::assert_snapshot!(_sql_and_output(_run(
+        r#"
+        func main() -> (
+          std::index([["hello"]], 0)
+        )
+        "#,
+        lutra_bin::Value::unit()
+    )), @r#"
+    SELECT
+      r1.value AS value
+    FROM
+      (
+        SELECT
+          0::INT8 AS index,
+          (
+            SELECT
+              COALESCE(
+                list(
+                  r0.value
+                  ORDER BY
+                    r0.index
+                ),
+                CAST([] AS TEXT [])
+              ) AS value
+            FROM
+              (
+                SELECT
+                  0::INT8 AS index,
+                  'hello'::text AS value
+              ) AS r0
+          ) AS value
+        ORDER BY
+          index
+        LIMIT
+          1::INT8
+      ) AS r1
+    UNION
+    ALL
+    SELECT
+      NULL::TEXT [] AS index
+    LIMIT
+      1::INT8
+    ---
+    some([
+      "hello",
+    ])
+    "#);
+}
+
+#[test]
+fn serialize_input_array_in_tuple() {
+    // Input array directly placed in tuple (should avoid unnecessary serialize/deserialize)
+    insta::assert_snapshot!(_sql_and_output(_run(
+        r#"
+        func main(x: [int32]) -> {"hello", x}
+        "#,
+        lutra_bin::Value::Array(vec![
+            lutra_bin::Value::Prim32(1),
+            lutra_bin::Value::Prim32(2),
+            lutra_bin::Value::Prim32(3),
+        ])
+    )), @r#"
+    SELECT
+      r0._0 AS field0,
+      r0._1 AS x
+    FROM
+      (
+        SELECT
+          'hello'::text AS _0,
+          $1::INT4 [] AS _1
+      ) AS r0
+    ---
+    {
+      "hello",
+      x = [
+        1,
+        2,
+        3,
+      ],
+    }
+    "#);
+}
+
+#[test]
+fn serialize_literal_array_in_tuple() {
+    // Literal array in tuple
+    insta::assert_snapshot!(_sql_and_output(_run(
+        r#"
+        func main() -> {"hello", [1: int32, 2]}
+        "#,
+        lutra_bin::Value::unit()
+    )), @r#"
+    SELECT
+      r1._0 AS field0,
+      r1._1 AS field1
+    FROM
+      (
+        SELECT
+          'hello'::text AS _0,
+          (
+            SELECT
+              COALESCE(
+                list(
+                  r0.value
+                  ORDER BY
+                    r0.index
+                ),
+                CAST([] AS INT4 [])
+              ) AS value
+            FROM
+              (
+                SELECT
+                  0::INT8 AS index,
+                  1::INT4 AS value
+                UNION
+                ALL
+                SELECT
+                  1::INT8 AS index,
+                  2::INT4 AS value
+              ) AS r0
+          ) AS _1
+      ) AS r1
+    ---
+    {
+      "hello",
+      [
+        1,
+        2,
+      ],
+    }
+    "#);
+}
+
+// ============================================================================
+// Serialize with Options
+// ============================================================================
+
+#[test]
+fn serialize_option_in_array() {
+    // Array of options in a tuple
+    insta::assert_snapshot!(_sql_and_output(_run(
+        r#"
+        func main() -> {
+          data = [.none, .some(5)]: [enum { none, some: int32 }]
+        }
+        "#,
+        lutra_bin::Value::unit()
+    )), @"
+    SELECT
+      r1._0 AS data
+    FROM
+      (
+        SELECT
+          (
+            SELECT
+              COALESCE(
+                list(
+                  r0.value
+                  ORDER BY
+                    r0.index
+                ),
+                CAST([] AS INT4 [])
+              ) AS value
+            FROM
+              (
+                SELECT
+                  0::INT8 AS index,
+                  NULL::INT4 AS value
+                UNION
+                ALL
+                SELECT
+                  1::INT8 AS index,
+                  5::INT4 AS value
+              ) AS r0
+          ) AS _0
+      ) AS r1
+    ---
+    {
+      data = [
+        none,
+        some(5),
+      ],
+    }
+    ");
+}
+
+#[test]
+fn serialize_tuple_with_option_array() {
+    // Tuple containing both primitive and option array
+    insta::assert_snapshot!(_sql_and_output(_run(
+        r#"
+        func main() -> {
+          name = "test",
+          values = [.some(1), .none, .some(3)]: [enum {none, some: int32}]
+        }
+        "#,
+        lutra_bin::Value::unit()
+    )), @r#"
+    SELECT
+      r1._0 AS name,
+      r1._1 AS
+    values
+    FROM
+      (
+        SELECT
+          'test'::text AS _0,
+          (
+            SELECT
+              COALESCE(
+                list(
+                  r0.value
+                  ORDER BY
+                    r0.index
+                ),
+                CAST([] AS INT4 [])
+              ) AS value
+            FROM
+              (
+                SELECT
+                  0::INT8 AS index,
+                  1::INT4 AS value
+                UNION
+                ALL
+                SELECT
+                  1::INT8 AS index,
+                  NULL::INT4 AS value
+                UNION
+                ALL
+                SELECT
+                  2::INT8 AS index,
+                  3::INT4 AS value
+              ) AS r0
+          ) AS _1
+      ) AS r1
+    ---
+    {
+      name = "test",
+      values = [
+        some(1),
+        none,
+        some(3),
+      ],
+    }
+    "#);
 }

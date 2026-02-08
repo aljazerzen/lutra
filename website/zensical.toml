@@ -252,7 +252,8 @@ Language = [
 Runner = [
     "runner/runner.md",
     "runner/format.md",
-    "runner/format-specification.md",
+    "runner/format-spec.md",
+    "runner/repr.md",
 ]
 
 [[project.nav]]

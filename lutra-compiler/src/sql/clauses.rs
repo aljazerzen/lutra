@@ -297,7 +297,7 @@ impl<'a> Context<'a> {
                     panic!("invalid program");
                 };
 
-                if utils::is_maybe(ty_variants) {
+                if utils::is_option(ty_variants) {
                     // special case: nullable column
 
                     if variant.tag == 0 {
@@ -320,10 +320,10 @@ impl<'a> Context<'a> {
                     // tag
                     cols.next().unwrap();
                     row.push(cr::Expr {
-                        kind: cr::ExprKind::From(cr::From::Literal(ir::Literal::uint16(
-                            variant.tag as u16,
+                        kind: cr::ExprKind::From(cr::From::Literal(ir::Literal::int16(
+                            variant.tag as i16,
                         ))),
-                        ty: ir::Ty::new(ir::TyPrimitive::uint16),
+                        ty: ir::Ty::new(ir::TyPrimitive::int16),
                     });
 
                     let inner_name = format!("_{}", variant.tag);
@@ -367,7 +367,7 @@ impl<'a> Context<'a> {
                 let ir::TyKind::Enum(variants) = &self.get_ty_mat(&enum_eq.subject.ty).kind else {
                     panic!("invalid program");
                 };
-                if utils::is_maybe(variants) {
+                if utils::is_option(variants) {
                     // a nullable column
                     let op = if enum_eq.tag == 0 {
                         "is_null"
@@ -382,10 +382,10 @@ impl<'a> Context<'a> {
 
                     let tag = cr::Expr {
                         kind: cr::ExprKind::Transform(base, cr::Transform::ProjectPick(vec![0])),
-                        ty: ir::Ty::new(ir::TyPrimitive::uint16),
+                        ty: ir::Ty::new(ir::TyPrimitive::int16),
                     };
 
-                    let args = vec![tag, new_uint16(enum_eq.tag as u16)];
+                    let args = vec![tag, new_int16(enum_eq.tag as i16)];
                     cr::ExprKind::From(cr::From::FuncCall("std::eq".to_string(), args))
                 }
             }
@@ -397,7 +397,7 @@ impl<'a> Context<'a> {
                     panic!("invalid program");
                 };
 
-                if utils::is_maybe(variants) {
+                if utils::is_option(variants) {
                     // a nullable column
                     return base;
                 } else {
@@ -660,20 +660,20 @@ impl<'a> Context<'a> {
                     ty: if item_ty.kind.is_array() {
                         ir::Ty::new(ir::TyPrimitive::text)
                     } else {
-                        *item_ty
+                        *item_ty.clone()
                     },
                 };
 
                 let ty_variants = expr.ty.kind.as_enum().unwrap();
 
-                if utils::is_maybe(ty_variants) {
+                if utils::is_option(ty_variants) {
                     // construct Option::Some
                     let some = item;
 
                     // construct Option::None
                     let none = cr::Expr {
                         kind: cr::ExprKind::From(cr::From::Null),
-                        ty: some.ty.clone(),
+                        ty: *item_ty, // use original type, so casts work
                     };
 
                     // union both variants and take first
@@ -686,7 +686,7 @@ impl<'a> Context<'a> {
                     )
                 } else {
                     // construct Option::Some
-                    let some_tag = new_uint16(1);
+                    let some_tag = new_int16(1);
                     let some = cr::Expr {
                         kind: cr::ExprKind::Join(
                             self.new_binding(some_tag),
@@ -697,7 +697,7 @@ impl<'a> Context<'a> {
                     };
 
                     // construct Option::None
-                    let none_tag = new_uint16(0);
+                    let none_tag = new_int16(0);
                     let mut none_cols = vec![none_tag];
                     none_cols.extend(self.rel_cols_ty_nested(&expr.ty).skip(1).map(|t| cr::Expr {
                         kind: cr::ExprKind::From(cr::From::Null),
@@ -1414,11 +1414,14 @@ fn new_int(int: i64) -> cr::Expr {
     }
 }
 
-fn new_uint16(int: u16) -> cr::Expr {
-    let kind = cr::ExprKind::From(cr::From::Literal(ir::Literal::uint16(int)));
+/// Creates an int16 literal expression, used for enum tags.
+/// Note: we use int16 instead of uint16 for PostgreSQL compatibility,
+/// since PostgreSQL doesn't have unsigned types and uint16 would map to int4.
+fn new_int16(int: i16) -> cr::Expr {
+    let kind = cr::ExprKind::From(cr::From::Literal(ir::Literal::int16(int)));
     cr::Expr {
         kind,
-        ty: ir::Ty::new(ir::TyPrimitive::uint16),
+        ty: ir::Ty::new(ir::TyPrimitive::int16),
     }
 }
 

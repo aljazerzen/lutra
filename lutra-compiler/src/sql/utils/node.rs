@@ -284,7 +284,11 @@ impl<'a> crate::sql::queries::Context<'a> {
         match node {
             Node::RelVar(name) => (name, None),
             _ => {
-                let rel = self.node_into_rel(node, ty);
+                let mut rel = self.node_into_rel(node, ty);
+                if rel.alias.is_none() {
+                    rel.alias = Some(utils::new_table_alias(self.rel_name_gen.next()));
+                }
+
                 let name = utils::get_rel_alias(&rel).unwrap().to_string();
                 (name, Some(rel))
             }
@@ -316,10 +320,10 @@ impl<'a> crate::sql::queries::Context<'a> {
             Node::Select(select) => select,
             Node::Query(query) => {
                 // try unwrapping Query
-                if query.limit.is_some()
-                    && query.offset.is_some()
-                    && query.order_by.is_some()
-                    && query.with.is_some()
+                if query.limit.is_none()
+                    && query.offset.is_none()
+                    && query.order_by.is_none()
+                    && query.with.is_none()
                     && let sql_ast::SetExpr::Select(select) = *query.body
                 {
                     return *select;

@@ -1,5 +1,5 @@
 ---
-title: Format specification
+title: Format spec
 ---
 
 The data format operates on byte arrays.

@@ -831,7 +831,7 @@ pub mod std {
             }
         });
 
-        Ok(Cell::Data(encode_maybe(res, layout_args[0])))
+        Ok(Cell::Data(encode_option(res, layout_args[0])))
     }
 
     pub fn max(
@@ -850,7 +850,7 @@ pub mod std {
             }
         });
 
-        Ok(Cell::Data(encode_maybe(res, layout_args[0])))
+        Ok(Cell::Data(encode_option(res, layout_args[0])))
     }
 
     macro_rules! sum {
@@ -1570,7 +1570,7 @@ pub mod std_fs {
 
     pub fn read_parquet(
         it: &mut Interpreter,
-        _layout_args: &[u32], // No longer used - type is inferred from Arrow schema
+        layout_args: &[u32],
         args: Vec<Cell>,
     ) -> Result<Cell, EvalError> {
         // unpack args
@@ -1578,6 +1578,11 @@ pub mod std_fs {
 
         let file_path = assume::text(&file_path)?;
         let file_path = it.resolve_path(&file_path)?;
+
+        // decode item ty from layout args
+        let mut layout_args = assume::LayoutArgsReader::new(layout_args);
+        let ty = assume::bytes(layout_args.next_slice());
+        let ty = ir::Ty::decode(&ty).map_err(|_| EvalError::BadProgram)?;
 
         // init parquet reader
         let file = match fs::File::open(&file_path) {
@@ -1598,7 +1603,8 @@ pub mod std_fs {
             .collect::<Result<_, _>>()
             .map_err(|e| EvalError::ExternalError(e.to_string()))?;
 
-        let data = lutra_arrow::arrow_to_lutra(batches);
+        let data = lutra_arrow::arrow_to_lutra(batches, &ty, &[])
+            .map_err(|e| EvalError::ExternalError(e.to_string()))?;
 
         Ok(Cell::Data(Data::new(data.to_vec())))
     }
@@ -1890,7 +1896,7 @@ pub fn encode<T: Encode + Layout + ?Sized>(value: &T) -> Data {
     Data::new(value.encode())
 }
 
-pub fn encode_maybe(value: Option<Data>, inner_head_bytes: u32) -> Data {
+pub fn encode_option(value: Option<Data>, inner_head_bytes: u32) -> Data {
     let has_ptr = inner_head_bytes > 4;
     if has_ptr {
         match value {

@@ -1,203 +1,240 @@
 //! DuckDB representation of Lutra values.
 //!
 //! When using sql::from, sql::insert or sql::raw with DuckDB, this module
-//! handles conversion between DuckDB's native types and Lutra's query representation.
-//!
-//! DuckDB table representation:
-//! - Arrays: LIST[] (native DuckDB list type)
-//! - Nested tuples: STRUCT() (native DuckDB struct type)
-//! - Flat tuples: Flattened columns (same as query repr)
-//! - Enums: UNION(variant1 T1, variant2 T2, ...) (DuckDB native union type)
-//! - Maybe: Nullable column (NULL = none, value = some)
-//!
-//! Query representation (computation):
-//! - Arrays: Multiple rows with index column
-//! - Tuples: Flattened columns
-//! - Enums: int2 tag column + flattened variant payload columns
-//! - Maybe: Nullable column (same as table repr)
+//! handles conversion between DuckDB's native types and the "query repr".
 
 use std::borrow::Cow;
 
 use lutra_bin::ir;
 
+use crate::sql::COL_ARRAY_INDEX;
 use crate::sql::queries;
-use crate::sql::utils;
+use crate::sql::utils::RelCols;
+use crate::sql::utils::{self, Node};
 
 impl<'a> queries::Context<'a> {
-    /// Constructs a projection that imports from DuckDB repr into query repr.
-    pub(super) fn duck_repr_import_projection(
-        &self,
-        rel_var: Option<&str>,
-        ty: &ir::Ty,
-    ) -> Vec<sql_ast::SelectItem> {
-        let mut values = Vec::new();
-
-        // index column for arrays
-        if self.get_ty_mat(ty).kind.is_array() {
-            values.push(utils::new_index(None));
-        }
-
-        // table columns
-        values.extend(
-            self.duck_repr_columns(ty)
-                .into_iter()
-                .map(move |(f_name, f_ty)| {
-                    let ident = utils::identifier(rel_var, f_name);
-                    self.duck_repr_import(ident, f_ty.as_ref())
-                }),
-        );
-        self.projection(ty, values)
-    }
-
     /// Returns columns of ty in the DuckDB repr.
-    /// This is the top-level entry point for determining table columns.
-    pub(super) fn duck_repr_columns<'t>(&'t self, ty: &'t ir::Ty) -> Vec<(String, Cow<'t, ir::Ty>)> {
+    pub fn duck_cols<'t>(&'t self, ty: &'t ir::Ty) -> Vec<(String, Cow<'t, ir::Ty>)> {
         match &self.get_ty_mat(ty).kind {
-            ir::TyKind::Primitive(_) | ir::TyKind::Enum(_) => {
-                self.duck_repr_columns_nested(ty, "".into())
-            }
-
             ir::TyKind::Array(item) => {
-                // Arrays from tables are represented as multiple rows, not a LIST column
-                // So we look at the item type to determine columns
-                self.duck_repr_columns(item)
+                // Top-level array has columns of it's inner type
+                self.duck_cols_row(item)
             }
 
-            ir::TyKind::Tuple(fields) => {
-                // Top-level tuples always flatten to columns
-                // Nested fields (arrays, tuples, enums) become STRUCT/LIST/UNION columns
-                fields
-                    .iter()
-                    .enumerate()
-                    .flat_map(|(i, f)| {
-                        let name = if let Some(n) = &f.name {
-                            n.clone()
-                        } else {
-                            format!("c{i}")
-                        };
-                        self.duck_repr_columns_nested(&f.ty, name)
-                    })
-                    .collect()
-            }
-
-            ir::TyKind::Function(_) | ir::TyKind::Ident(_) => unreachable!(),
+            _ => self.duck_cols_row(ty),
         }
     }
 
-    /// Returns columns of ty in the DuckDB repr,
-    /// for a type that is nested within another type.
-    /// When called, the type should always be represented as a single column
-    /// (STRUCT for tuples, LIST for arrays, UNION for enums, or primitive).
-    fn duck_repr_columns_nested<'t>(
-        &'t self,
-        ty: &'t ir::Ty,
-        prefix: String,
-    ) -> Vec<(String, Cow<'t, ir::Ty>)> {
-        fn terminal(prefix: String) -> String {
-            if prefix.is_empty() {
-                "value".to_string()
-            } else {
-                prefix
-            }
-        }
-
-        if is_special_framed(ty) {
-            return vec![(terminal(prefix), Cow::Borrowed(ty))];
-        }
-
+    fn duck_cols_row<'t>(&'t self, ty: &'t ir::Ty) -> Vec<(String, Cow<'t, ir::Ty>)> {
         let ty_mat = self.get_ty_mat(ty);
         match &ty_mat.kind {
-            ir::TyKind::Primitive(_) => {
-                // Primitives are a single column
-                vec![(terminal(prefix), Cow::Borrowed(ty))]
-            }
+            // each field is one column (either primitive or STRUCT/LIST/UNION)
+            ir::TyKind::Tuple(fields) => fields
+                .iter()
+                .enumerate()
+                .map(|(position, field)| (field_name(field, position), Cow::Borrowed(&field.ty)))
+                .collect(),
 
-            ir::TyKind::Array(_) => {
-                // Nested arrays stored as LIST[] - single column
-                vec![(terminal(prefix), Cow::Borrowed(ty))]
-            }
-
-            ir::TyKind::Tuple(_) => {
-                // Nested tuples are always stored as STRUCT - single column
-                vec![(terminal(prefix), Cow::Borrowed(ty))]
-            }
-
-            ir::TyKind::Enum(variants) if utils::is_maybe(variants) => {
-                // Maybe/Option - nullable column, unwrap to inner type
-                self.duck_repr_columns_nested(&variants[1].ty, prefix)
-            }
-
-            ir::TyKind::Enum(_) => {
-                // Enums stored as UNION - single column
-                vec![(terminal(prefix), Cow::Borrowed(ty))]
-            }
-
-            ir::TyKind::Function(_) | ir::TyKind::Ident(_) => unreachable!(),
+            // a single column
+            _ => vec![("value".into(), Cow::Borrowed(ty))],
         }
     }
 
-    /// Imports a value from DuckDB repr into query repr.
-    /// For example, UNION type is converted into int2 tag + variant columns.
-    pub(super) fn duck_repr_import(&self, expr_duck: sql_ast::Expr, ty: &ir::Ty) -> sql_ast::Expr {
+    /// Convert a relation in "duckdb repr" into a relation in "query repr".
+    pub fn duck_import(&mut self, node: Node, ty: &ir::Ty) -> Node {
+        let (rel_var, rel) = self.node_into_rel_var(node, ty);
+
+        // construct new column expressions (in query repr)
+        let mut values = Vec::new();
+        let ty_mat = self.get_ty_mat(ty);
+        match &ty_mat.kind {
+            ir::TyKind::Array(ty_item) => {
+                values.push(utils::new_index(None)); // index
+                values.extend(self.duckdb_col_import(rel_var, ty_item));
+            }
+            _ => {
+                values.extend(self.duckdb_col_import(rel_var, ty));
+            }
+        }
+
+        let mut select = utils::select_empty();
+        select.from.extend(rel);
+        select.projection = self.projection(ty, values);
+        Node::Select(select)
+    }
+
+    /// Convert a column in "duckdb repr" into a relation in "query repr".
+    pub fn duck_deserialize(&mut self, input: Node, ty: &ir::Ty) -> Node {
+        match &self.get_ty_mat(ty).kind {
+            ir::TyKind::Array(ty_item) => {
+                let (input_expr, input_rels) = self.node_into_column_and_rels(input, ty);
+
+                let mut result = utils::select_empty();
+                result.from.extend(input_rels);
+
+                // Expand LIST to rows using unnest(list)
+                // unnest generates a single column named 'unnest'
+                result.from.push(utils::lateral(utils::rel_func(
+                    utils::new_ident("unnest"),
+                    vec![input_expr],
+                    Some("u".into()),
+                )));
+
+                // Add index column (row_number starting from 0)
+                result.projection = vec![sql_ast::SelectItem {
+                    expr: utils::new_index(None),
+                    alias: Some(utils::new_ident(COL_ARRAY_INDEX)),
+                }];
+
+                // Deserialize array items
+                let value_ref = "u.unnest".to_string();
+                let values = self.duckdb_col_import(value_ref, ty_item);
+                result.projection.extend(self.projection(ty_item, values));
+
+                Node::Select(result)
+            }
+            ir::TyKind::Tuple(_) => {
+                let (rel_var, rel) = self.node_into_rel_var(input, ty);
+
+                let values = self.duckdb_col_import(rel_var, ty);
+
+                let mut result = utils::select_empty();
+                result.from.extend(rel);
+                result.projection = self.projection(ty, values);
+                Node::Select(result)
+            }
+            ir::TyKind::Enum(_) => {
+                panic!("Enum deserialization not yet supported for DuckDB native types")
+            }
+            _ => unreachable!("{:?}", ty),
+        }
+    }
+
+    /// Convert a column in "duckdb repr" into columns in "query repr".
+    /// For example, STRUCT type is converted into columns of its fields.
+    fn duckdb_col_import(&self, ser_ref: String, ty: &ir::Ty) -> Vec<sql_ast::Expr> {
         // special case: std::Date
         if let ir::TyKind::Ident(ty_ident) = &ty.kind
             && ty_ident.0 == ["std", "Date"]
         {
-            return sql_ast::Expr::Source(format!("({expr_duck}::date - '1970-01-01'::date)"));
+            let r = format!("({ser_ref}::date - '1970-01-01'::date)::int4");
+            return vec![sql_ast::Expr::Source(r)];
         }
         // special case: std::Time & std::Timestamp
         if let ir::TyKind::Ident(ty_ident) = &ty.kind
             && (ty_ident.0 == ["std", "Time"] || ty_ident.0 == ["std", "Timestamp"])
         {
-            return sql_ast::Expr::Source(format!("(EXTRACT(EPOCH FROM {expr_duck})*1000000)::int8"));
+            let r = format!("(EXTRACT(EPOCH FROM {ser_ref})*1000000)::int8");
+            return vec![sql_ast::Expr::Source(r)];
         }
         // special case: std::Decimal
         if let ir::TyKind::Ident(ty_ident) = &ty.kind
             && ty_ident.0 == ["std", "Decimal"]
         {
-            return sql_ast::Expr::Source(format!("({expr_duck}*100)::int8"));
+            let r = format!("({ser_ref}*100)::int8");
+            return vec![sql_ast::Expr::Source(r)];
         }
 
-        // import of an enum tag from UNION type
-        if let ir::TyKind::Enum(variants) = &ty.kind {
-            // Get tag from UNION as ENUM, then convert to int2
-            let tag_enum = format!("union_tag({expr_duck})");
-            let operand = Some(Box::new(sql_ast::Expr::Source(format!("{tag_enum}::text"))));
-            let mut cases = Vec::with_capacity(variants.len());
-            for (tag, v) in variants.iter().enumerate() {
-                let variant_name = sql_ast::escape_string(&v.name, '\'');
-                cases.push(sql_ast::CaseWhen {
-                    condition: sql_ast::Expr::Source(format!("'{variant_name}'")),
-                    result: sql_ast::Expr::Source(format!("{tag}")),
-                });
+        let ty_mat = self.get_ty_mat(ty);
+        match &ty_mat.kind {
+            ir::TyKind::Primitive(_) | ir::TyKind::Array(_) => {
+                vec![sql_ast::Expr::Source(ser_ref)]
             }
+            ir::TyKind::Tuple(fields) => {
+                // extract each struct field using dot notation
+                let mut result = Vec::new();
+                for (position, field) in fields.iter().enumerate() {
+                    let name = field_name(field, position);
 
-            let case = sql_ast::Expr::Case {
-                operand,
-                cases,
-                else_result: None,
-            };
-            return sql_ast::Expr::Source(format!("{case}::int2"));
+                    let ser_ref = format!("{ser_ref}.{name}");
+                    result.extend(self.duckdb_col_import(ser_ref, &field.ty));
+                }
+                result
+            }
+            ir::TyKind::Enum(variants) if utils::is_option(variants) => {
+                // in both reprs, the field is a nullable column
+                vec![sql_ast::Expr::Source(ser_ref)]
+            }
+            ir::TyKind::Enum(variants) => {
+                // Get tag from UNION as ENUM, then convert to int2
+                let tag_enum = format!("union_tag({ser_ref})");
+                let operand = Some(Box::new(sql_ast::Expr::Source(format!("{tag_enum}::text"))));
+                let mut cases = Vec::with_capacity(variants.len());
+                for (tag, v) in variants.iter().enumerate() {
+                    let variant_name = sql_ast::escape_string(&v.name, '\'');
+                    cases.push(sql_ast::CaseWhen {
+                        condition: sql_ast::Expr::Source(format!("'{variant_name}'")),
+                        result: sql_ast::Expr::Source(format!("{tag}")),
+                    });
+                }
+
+                let case = sql_ast::Expr::Case {
+                    operand,
+                    cases,
+                    else_result: None,
+                };
+                let r = format!("{case}::int2");
+                vec![sql_ast::Expr::Source(r)]
+            }
+            _ => unreachable!("Unexpected nested type: {:?}", ty_mat.kind),
         }
-
-        // Arrays and nested tuples are handled at the FROM level, not here
-        // Just pass through with type cast
-        sql_ast::Expr::Source(format!("{expr_duck}::{}", self.compile_ty_name(ty)))
     }
 
-    /// Exports a value into DuckDB repr from query repr.
-    /// For example, int2 tag is converted to UNION type.
-    pub(super) fn duck_repr_export(&self, expr: sql_ast::Expr, ty: &ir::Ty) -> sql_ast::Expr {
+    /// Converts columns "query repr" into a column in "duckdb repr".
+    /// For example, two columns are converted to STRUCT type.
+    pub fn duck_serialize(&mut self, node: Node, ty: &ir::Ty) -> Node {
+        let (input, input_rels) = self.node_into_rel_var(node, ty);
+
+        let ty_mat = self.get_ty_mat(ty);
+        let expr = match &ty_mat.kind {
+            ir::TyKind::Primitive(_) => {
+                // pass through
+                sql_ast::Expr::Source(format!("{input}.value"))
+            }
+            ir::TyKind::Tuple(_) => {
+                // pack into STRUCT
+                let cols: Vec<_> = self.rel_cols_nested(ty_mat, "".into()).collect();
+                self.duck_col_export(&input, &cols, ty_mat)
+            }
+            ir::TyKind::Array(ty_item) => {
+                // aggregate into LIST
+                let item_cols: Vec<_> = self.rel_cols_nested(ty_item, "".into()).collect();
+                let item_serialized = self.duck_col_export(&input, &item_cols, ty_item);
+
+                let list_agg =
+                    format!("list({item_serialized} ORDER BY {input}.{COL_ARRAY_INDEX})");
+
+                // empty array needs explicit type cast for DuckDB
+                let empty_list = format!("CAST([] AS {}[])", self.duck_compile_ty_name(ty_item));
+
+                sql_ast::Expr::Source(format!("COALESCE({list_agg}, {empty_list})"))
+            }
+            ir::TyKind::Enum(_) => {
+                panic!("Enum serialization not yet supported for DuckDB native types")
+            }
+            _ => unreachable!("{:?}", ty),
+        };
+
+        Node::Column {
+            expr: Box::new(expr),
+            rels: input_rels.into_iter().collect(),
+        }
+    }
+
+    /// Convert columns in "query repr" to "duckdb repr".
+    fn duck_col_export(&self, rel_var: &str, cols: &[String], ty: &ir::Ty) -> sql_ast::Expr {
         // special case: std::Date
         if let ir::TyKind::Ident(ty_ident) = &ty.kind
             && ty_ident.0 == ["std", "Date"]
         {
+            let expr = format!("{rel_var}.{}", cols[0]);
             return sql_ast::Expr::Source(format!("('1970-01-01'::date + {expr})"));
         }
         // special case: std::Time
         if let ir::TyKind::Ident(ty_ident) = &ty.kind
             && ty_ident.0 == ["std", "Time"]
         {
+            let expr = format!("{rel_var}.{}", cols[0]);
             return sql_ast::Expr::Source(format!(
                 "('00:00'::time + INTERVAL '1 microsecond' * {expr})"
             ));
@@ -206,56 +243,192 @@ impl<'a> queries::Context<'a> {
         if let ir::TyKind::Ident(ty_ident) = &ty.kind
             && ty_ident.0 == ["std", "Timestamp"]
         {
+            let expr = format!("{rel_var}.{}", cols[0]);
             return sql_ast::Expr::Source(format!("to_timestamp({expr}::float8/1000000.0)"));
         }
         // special case: std::Decimal
         if let ir::TyKind::Ident(ty_ident) = &ty.kind
             && ty_ident.0 == ["std", "Decimal"]
         {
+            let expr = format!("{rel_var}.{}", cols[0]);
             return sql_ast::Expr::Source(format!("({expr}::decimal(20, 0)/100)"));
         }
 
-        // export of an enum tag to UNION type from int2
-        if let ir::TyKind::Enum(variants) = &ty.kind {
-            let operand = Some(Box::new(sql_ast::Expr::Source(format!("{expr}::int2"))));
+        let ty_mat = self.get_ty_mat(ty);
 
-            let mut cases = Vec::with_capacity(variants.len());
-            for (tag, v) in variants.iter().enumerate() {
-                let variant_name = sql_ast::escape_string(&v.name, '\'');
-                // Create UNION value using union_value(tag := payload)
-                // For now, we need the payload expression - this will be expanded in the full implementation
-                // TODO: This needs to extract the payload from variant columns
-                cases.push(sql_ast::CaseWhen {
-                    condition: sql_ast::Expr::Source(format!("{tag}")),
-                    result: sql_ast::Expr::Source(format!("union_value({variant_name} := NULL)")),
-                });
-            }
-
-            let case = sql_ast::Expr::Case {
-                operand,
-                cases,
-                else_result: None,
-            };
-            return case;
+        // Handle unit type (empty tuple) - no columns, return NULL
+        if ty_mat.is_unit() {
+            // TODO: this is probably not ok, it will break `enum {none, some: ()}`
+            return sql_ast::Expr::Source("NULL".to_string());
         }
 
-        // general case: noop
-        expr
+        match &ty_mat.kind {
+            ir::TyKind::Primitive(_) | ir::TyKind::Array(_) => {
+                // single column value - pass through
+                // nested array - already serialized as LIST in a single column
+                sql_ast::Expr::Source(format!("{rel_var}.{}", cols[0]))
+            }
+            ir::TyKind::Enum(variants) if utils::is_option(variants) => {
+                sql_ast::Expr::Source(format!("{rel_var}.{}", cols[0]))
+            }
+            ir::TyKind::Tuple(fields) => {
+                // Construct STRUCT using struct_pack(field1 := val1, field2 := val2, ...)
+                let mut parts = Vec::new();
+                let mut col_idx = 0;
+
+                for (position, field) in fields.iter().enumerate() {
+                    // Use field name if present, otherwise use positional name (_0, _1, etc.)
+                    let field_name = field_name(field, position);
+
+                    let field_col_count = self.rel_cols_ty_nested(&field.ty).count();
+
+                    let field_expr = self.duck_col_export(
+                        rel_var,
+                        &cols[col_idx..col_idx + field_col_count],
+                        &field.ty,
+                    );
+
+                    parts.push(format!("{field_name} := {field_expr}"));
+                    col_idx += field_col_count;
+                }
+
+                sql_ast::Expr::Source(format!("struct_pack({})", parts.join(", ")))
+            }
+
+            ir::TyKind::Enum(variants) => {
+                // enum - convert {tag, ..variant columns..} into UNION
+                // Columns layout: [tag, variant0_cols..., variant1_cols..., ...]
+
+                let tag_expr = format!("{rel_var}.{}", cols[0]);
+                let operand = Some(Box::new(sql_ast::Expr::Source(format!("{tag_expr}::int2"))));
+
+                let union_ty = self.duck_compile_ty_name(ty);
+
+                let mut cases = Vec::with_capacity(variants.len());
+                let mut col_idx = 1; // skip tag column
+
+                for (position, v) in variants.iter().enumerate() {
+                    let variant_col_count = self.rel_cols_ty_nested(&v.ty).count();
+                    let variant_cols = &cols[col_idx..col_idx + variant_col_count];
+
+                    let inner = self.duck_col_export(rel_var, variant_cols, &v.ty);
+
+                    let variant_name = utils::new_ident(&v.name);
+
+                    // cast first variant to union type, all others will infer
+                    let cast = if position == 0 {
+                        format!("::{union_ty}")
+                    } else {
+                        "".into()
+                    };
+
+                    cases.push(sql_ast::CaseWhen {
+                        condition: sql_ast::Expr::Source(format!("{position}")),
+                        result: sql_ast::Expr::Source(format!(
+                            "union_value({variant_name} := {inner}){cast}"
+                        )),
+                    });
+
+                    col_idx += variant_col_count;
+                }
+
+                sql_ast::Expr::Case {
+                    operand,
+                    cases,
+                    else_result: None,
+                }
+            }
+            _ => unreachable!("Unexpected nested type: {:?}", ty_mat.kind),
+        }
+    }
+
+    /// Converts a relation from "query repr" to "arrow repr".
+    pub fn duck_export(&mut self, node: Node, ty: &ir::Ty) -> Node {
+        let ty_mat = self.get_ty_mat(ty);
+
+        match &ty_mat.kind {
+            ir::TyKind::Primitive(_) => node,
+            ir::TyKind::Tuple(f) if f.is_empty() => node,
+            ir::TyKind::Tuple(_) => self.duck_export_row(node, ty),
+            ir::TyKind::Array(ty_item) => self.duck_export_row(node, ty_item),
+            ir::TyKind::Enum(variants) if utils::is_option(variants) => {
+                // Option enum is a single nullable column - no transformation needed
+                node
+            }
+            ir::TyKind::Enum(_) => {
+                // General enum: convert to single UNION column
+                self.duck_export_row(node, ty)
+            }
+            ir::TyKind::Function(_) | ir::TyKind::Ident(_) => unreachable!(),
+        }
+    }
+
+    /// Converts a row from "query repr" to "arrow repr".
+    fn duck_export_row(&mut self, node: Node, ty: &ir::Ty) -> Node {
+        let ty_mat = self.get_ty_mat(ty);
+
+        match &ty_mat.kind {
+            ir::TyKind::Primitive(_) => node,
+            ir::TyKind::Tuple(ty_fields) => {
+                // convert {_0, _1_0, _1_1} into {id, address: STRUCT[street, number]}
+
+                let (rel_var, rel) = self.node_into_rel_var(node, ty);
+                let mut columns: Vec<_> = self.rel_cols(ty_mat, true).collect();
+
+                let mut res_projection = Vec::with_capacity(ty_fields.len() + 1);
+
+                for (position, field) in ty_fields.iter().enumerate() {
+                    let f_ty = &field.ty;
+
+                    // take columns for this field
+                    let col_count = self.rel_cols_ty_nested(f_ty).count();
+                    let rem = columns.split_off(col_count);
+                    let f_cols = std::mem::replace(&mut columns, rem);
+
+                    let expr = self.duck_col_export(&rel_var, &f_cols, f_ty);
+
+                    res_projection.push(sql_ast::SelectItem {
+                        expr,
+                        alias: Some(utils::new_ident(field_name(field, position))),
+                    });
+                }
+
+                let mut select = utils::select_empty();
+                select.projection = res_projection;
+                select.from.extend(rel);
+                Node::Select(select)
+            }
+            ir::TyKind::Array(_) => {
+                // for nested arrays, query repr will already contain serialized items
+                node
+            }
+            ir::TyKind::Enum(variants) if utils::is_option(variants) => {
+                // Option enum is a single nullable column - no transformation needed
+                node
+            }
+            ir::TyKind::Enum(_) => {
+                // General enum: convert query repr columns to single UNION column
+                let (rel_var, rel) = self.node_into_rel_var(node, ty);
+                let cols: Vec<_> = self.rel_cols(ty_mat, true).collect();
+
+                let expr = self.duck_col_export(&rel_var, &cols, ty_mat);
+
+                let mut select = utils::select_empty();
+                select.projection = vec![sql_ast::SelectItem {
+                    expr,
+                    alias: Some(utils::new_ident("value")),
+                }];
+                select.from.extend(rel);
+                Node::Select(select)
+            }
+            ir::TyKind::Function(_) | ir::TyKind::Ident(_) => unreachable!(),
+        }
     }
 }
 
-/// Framed types for which there is a "specialized" DuckDB repr.
-const SPECIAL_FRAMED_TYPES: &[&[&str]] = &[
-    &["std", "Date"],
-    &["std", "Time"],
-    &["std", "Timestamp"],
-    &["std", "Decimal"],
-];
-
-fn is_special_framed(ty: &ir::Ty) -> bool {
-    let ir::TyKind::Ident(name) = &ty.kind else {
-        return false;
-    };
-
-    SPECIAL_FRAMED_TYPES.iter().any(|f| name.0 == *f)
+pub(crate) fn field_name(field: &ir::TyTupleField, position: usize) -> String {
+    match &field.name {
+        Some(x) => x.clone(),
+        None => format!("field{position}"),
+    }
 }

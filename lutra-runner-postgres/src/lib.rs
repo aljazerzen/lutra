@@ -144,7 +144,11 @@ impl<'a> Context<'a> {
     }
 }
 
-/// Checks if an enum is a "maybe" enum. Must match [lutra_compiler::sql::utils::is_maybe].
-pub fn is_maybe(variants: &[ir::TyEnumVariant]) -> bool {
-    variants.len() == 2 && variants[0].ty.is_unit() && variants[1].ty.kind.is_primitive()
+/// Checks if an enum is an "option" enum. Must match [lutra_compiler::sql::utils::is_option].
+pub fn is_option(variants: &[ir::TyEnumVariant]) -> bool {
+    if variants.len() != 2 || !variants[0].ty.is_unit() {
+        return false;
+    }
+    let some_ty = &variants[1].ty.kind;
+    some_ty.is_primitive() || some_ty.is_array()
 }

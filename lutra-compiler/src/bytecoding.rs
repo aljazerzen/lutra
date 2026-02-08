@@ -480,7 +480,14 @@ impl ByteCoder {
             }
 
             "std::fs::read_parquet" => {
-                vec![] // No layout args needed - type is inferred from Arrow schema
+                // Pass the output array item type so interpreter can validate nullability
+                let ty_func = ty_mat.kind.as_function().unwrap();
+                let ty_return = &ty_func.body;
+
+                let ty_return_buf = ty_return.encode();
+                let mut r = Vec::new();
+                pack_bytes_to_u32(ty_return_buf, &mut r);
+                r
             }
             "std::fs::write_parquet" => {
                 let array = self.get_ty_mat(as_ty_of_param(ty_mat));

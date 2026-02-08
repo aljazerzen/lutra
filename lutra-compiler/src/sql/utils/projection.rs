@@ -69,7 +69,7 @@ pub trait RelCols<'a> {
                 }))
             }
 
-            ir::TyKind::Enum(variants) if utils::is_maybe(variants) => {
+            ir::TyKind::Enum(variants) if utils::is_option(variants) => {
                 let name = if name_prefix.is_empty() {
                     COL_VALUE.to_string()
                 } else {
@@ -123,7 +123,7 @@ pub trait RelCols<'a> {
                 Box::new(fields.iter().flat_map(|f| self.rel_cols_ty_nested(&f.ty)))
             }
 
-            ir::TyKind::Enum(variants) if utils::is_maybe(variants) => {
+            ir::TyKind::Enum(variants) if utils::is_option(variants) => {
                 Box::new(variants.iter().flat_map(|v| self.rel_cols_ty_nested(&v.ty)))
             }
 
