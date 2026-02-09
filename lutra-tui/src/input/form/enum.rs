@@ -2,7 +2,7 @@ use lutra_bin::ir;
 use ratatui::prelude::*;
 
 use super::{Action, Form, FormKind, FormName, FormResult, TyDefs};
-use crate::input::form::{clip_left, clip_top};
+use crate::utils::{clip_left, clip_top};
 
 pub struct EnumForm {
     pub selected: usize,

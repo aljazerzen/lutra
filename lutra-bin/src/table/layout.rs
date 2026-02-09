@@ -12,17 +12,20 @@ use super::{Config, Table};
 /// Computed layout for table rendering.
 #[derive(Debug, Clone)]
 pub struct Layout {
+    /// Height of the names section of the header (column names)
+    pub names_height: usize,
     /// Hierarchical column groups (for multi-row headers).
     pub column_groups: Vec<ColumnGroup>,
     /// Flat list of leaf columns.
     pub columns: Vec<Column>,
+
+    /// Width for the index column.
+    pub col_index_width: usize,
     /// Width for each leaf column.
     pub col_widths: Vec<usize>,
-    /// Width for the row index column.
-    pub row_index_width: usize,
     /// Visual height for each logical row (due to array expansion).
     pub row_heights: Vec<usize>,
-    /// Total logical rows scanned.
+    /// Number of table rows
     pub total_rows: usize,
 }
 
@@ -79,6 +82,12 @@ impl<'d, 't> Table<'d, 't> {
         let column_groups = self.build_column_groups(self.row_ty());
         let columns = self.flatten_columns(&column_groups, self.row_ty());
 
+        let names_height = max_column_depth(&column_groups);
+
+        // Compute row index width based on total rows
+        let total_rows = self.remaining();
+        let col_index_width = total_rows.saturating_sub(1).to_string().len();
+
         // Initialize widths from headers
         let mut col_widths: Vec<usize> = columns
             .iter()
@@ -111,20 +120,14 @@ impl<'d, 't> Table<'d, 't> {
             }
         }
 
-        // Compute row index width based on total rows
-        let row_index_width = if rows_scanned == 0 {
-            1
-        } else {
-            (rows_scanned - 1).to_string().len()
-        };
-
         Layout {
+            names_height,
             column_groups,
             columns,
             col_widths,
-            row_index_width,
+            col_index_width,
             row_heights,
-            total_rows: rows_scanned,
+            total_rows,
         }
     }
 
@@ -240,4 +243,8 @@ impl<'d, 't> Table<'d, 't> {
             }
         }
     }
+}
+
+fn max_column_depth(column_groups: &[ColumnGroup]) -> usize {
+    column_groups.iter().map(|c| c.depth()).max().unwrap_or(0)
 }

@@ -1,6 +1,6 @@
 use ratatui::prelude::*;
 
-use crate::input::form::{clip_left, clip_top};
+use crate::utils::{clip_left, clip_top};
 
 use super::{Action, Form, FormResult};
 

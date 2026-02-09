@@ -2,10 +2,8 @@ use lutra_bin::ir;
 use ratatui::prelude::*;
 
 use super::{Form, FormName, FormResult, TyDefs};
-use crate::{
-    input::form::{clip_left, clip_top},
-    terminal::Action,
-};
+use crate::terminal::Action;
+use crate::utils::{clip_left, clip_top};
 
 pub struct TupleForm {
     pub fields: Vec<Form>,

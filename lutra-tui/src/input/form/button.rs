@@ -1,7 +1,8 @@
 use ratatui::prelude::*;
 
-use crate::input::form::{Form, FormResult, clip_top};
+use crate::input::form::{Form, FormResult};
 use crate::terminal::Action;
+use crate::utils::clip_top;
 
 /// A form and a button after.
 pub struct ButtonForm {

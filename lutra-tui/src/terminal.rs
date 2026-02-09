@@ -26,6 +26,8 @@ pub enum Action {
     MoveDown,
     MoveRight,
     MoveLeft,
+    MovePageUp,
+    MovePageDown,
     Select,
 
     // InteractiveApp-specific actions
@@ -181,6 +183,8 @@ fn process_terminal_event(event: event::Event) -> EventResult {
                 KeyCode::Right => Action::MoveRight,
                 KeyCode::Down => Action::MoveDown,
                 KeyCode::Up => Action::MoveUp,
+                KeyCode::PageUp => Action::MovePageUp,
+                KeyCode::PageDown => Action::MovePageDown,
                 KeyCode::Enter => Action::Select,
                 KeyCode::Tab => Action::CycleFocus,
                 KeyCode::Backspace => Action::Erase,

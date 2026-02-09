@@ -7,7 +7,7 @@
 
 mod format;
 mod iterate;
-mod layout;
+pub mod layout;
 mod render;
 
 use crate::ir;
@@ -52,19 +52,35 @@ impl<'d, 't> Table<'d, 't> {
     }
 
     pub fn render_with_config(self, config: &Config) -> String {
-        // Pass 1: compute layout (sampling)
+        // Pass 1: compute layout
         let layout = self.clone().compute_layout(config);
-
-        if layout.total_rows == 0 {
-            return String::new();
-        }
 
         // Pass 2: render
         render::render(self, &layout, config)
     }
 
+    /// Render a window of rows (for scrolling/pagination) using a pre-computed layout.
+    ///
+    /// - `skip_rows`: Number of rows to skip from the beginning
+    /// - `height`: Stop after rendering height number of lines
+    ///
+    /// The header is always included in the output.
+    pub fn render_window(
+        self,
+        layout: &layout::Layout,
+        config: &Config,
+        skip_rows: usize,
+        height: usize,
+    ) -> (String, usize) {
+        render::render_window(self, layout, config, skip_rows, height)
+    }
+
     fn ty(&self) -> &'t ir::Ty {
         self.reader.ty()
+    }
+
+    fn remaining(&self) -> usize {
+        self.reader.remaining()
     }
 
     /// Resolve type identifiers to their definitions.

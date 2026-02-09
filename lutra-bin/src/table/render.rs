@@ -12,17 +12,13 @@ use super::{Config, Table};
 
 /// Render a FlatTabular as ASCII using precomputed layout.
 pub fn render(mut tabular: Table, layout: &Layout, config: &Config) -> String {
-    if layout.total_rows == 0 {
-        return String::new();
-    }
-
     let mut out = String::new();
 
     // Render hierarchical headers (with row index column space)
     render_headers(&mut out, layout);
 
     // Divider (including row index column)
-    let total_width: usize = layout.row_index_width
+    let total_width: usize = layout.col_index_width
         + 1  // space after row index
         + layout.col_widths.iter().sum::<usize>()
         + layout.col_widths.len().saturating_sub(1);
@@ -39,16 +35,61 @@ pub fn render(mut tabular: Table, layout: &Layout, config: &Config) -> String {
     out
 }
 
-fn render_headers(out: &mut String, layout: &Layout) {
-    let max_depth = max_column_depth(&layout.column_groups).max(1);
+/// Render a window of rows from the table (for scrolling/pagination).
+///
+/// This function renders only a subset of rows starting from `skip_rows` and
+/// rendering until `height` lines are rendered. The header is always included.
+///
+/// Returns an empty string if `skip_rows` is beyond the available data.
+pub fn render_window(
+    mut tabular: Table,
+    layout: &Layout,
+    config: &Config,
+    skip_rows: usize,
+    height: usize,
+) -> (String, usize) {
+    let mut out = String::new();
 
+    // Always render headers
+    let mut height_rendered = render_headers(&mut out, layout);
+
+    // Divider (including row index column)
+    let total_width: usize = layout.col_index_width
+        + 1  // space after row index
+        + layout.col_widths.iter().sum::<usize>()
+        + layout.col_widths.len().saturating_sub(1);
+    out += &"─".repeat(total_width);
+    out += "\n";
+    height_rendered += 1;
+
+    // Skip to the starting row
+    for _ in 0..skip_rows {
+        tabular.next();
+    }
+
+    // Render the requested window of rows
+    let mut row_rendered = 0;
+    while height_rendered < height {
+        let Some(row) = tabular.next() else {
+            break;
+        };
+
+        let row_idx = skip_rows + row_rendered;
+        height_rendered += render_data_row(&mut out, row_idx, &row, layout, config, &tabular);
+        row_rendered += 1;
+    }
+
+    (out, row_rendered)
+}
+
+fn render_headers(out: &mut String, layout: &Layout) -> usize {
     // If no nested columns, max_depth is 1, so we only render leaf names and types
     // If nested, we render parent rows first
     if layout.column_groups.is_empty() {
         // Single value case - render leaf names directly
         render_leaf_names(out, layout);
         render_type_names(out, layout);
-        return;
+        return 2;
     }
 
     // Render header name rows (one row per depth level)
@@ -56,17 +97,18 @@ fn render_headers(out: &mut String, layout: &Layout) {
     // - Parent column names (centered over their children)
     // - Leaf column names (for leaves at top level, shown in first row; for
     //   leaves with parents, shown at their parent's depth + 1)
-    for level in 0..max_depth {
+    for level in 0..layout.names_height {
         render_header_name_row(out, layout, level);
     }
 
     // Type names row
     render_type_names(out, layout);
+    layout.names_height + 1
 }
 
 fn render_header_name_row(out: &mut String, layout: &Layout, level: usize) {
     // Empty space for row index column
-    out.push_str(&" ".repeat(layout.row_index_width + 1));
+    out.push_str(&" ".repeat(layout.col_index_width + 1));
 
     let mut col_idx = 0;
     render_header_name_row_impl(
@@ -177,7 +219,7 @@ fn calculate_span_width(widths: &[usize], start: usize, count: usize) -> usize {
 
 fn render_leaf_names(out: &mut String, layout: &Layout) {
     // Empty space for row index column
-    out.push_str(&" ".repeat(layout.row_index_width + 1));
+    out.push_str(&" ".repeat(layout.col_index_width + 1));
 
     for (i, (col, width)) in layout.columns.iter().zip(&layout.col_widths).enumerate() {
         let padded = format_aligned(&col.name, *width, col.align);
@@ -192,7 +234,7 @@ fn render_leaf_names(out: &mut String, layout: &Layout) {
 
 fn render_type_names(out: &mut String, layout: &Layout) {
     // Empty space for row index column
-    out.push_str(&" ".repeat(layout.row_index_width + 1));
+    out.push_str(&" ".repeat(layout.col_index_width + 1));
 
     for (i, (col, width)) in layout.columns.iter().zip(&layout.col_widths).enumerate() {
         let padded = format_aligned(&col.ty_name, *width, col.align);
@@ -212,7 +254,7 @@ fn render_data_row(
     layout: &Layout,
     config: &Config,
     tabular: &Table,
-) {
+) -> usize {
     let row_height = layout.row_heights.get(row_idx).copied().unwrap_or(1);
 
     // Expand each cell into visual rows
@@ -228,10 +270,10 @@ fn render_data_row(
             out.push_str(&format!(
                 "{:>width$} ",
                 row_idx,
-                width = layout.row_index_width
+                width = layout.col_index_width
             ));
         } else {
-            out.push_str(&" ".repeat(layout.row_index_width + 1));
+            out.push_str(&" ".repeat(layout.col_index_width + 1));
         }
 
         for (i, ((values, width), col)) in expanded
@@ -253,6 +295,8 @@ fn render_data_row(
         *out = out.trim_end().to_string();
         out.push('\n');
     }
+
+    row_height
 }
 
 fn expand_cell(
@@ -319,8 +363,4 @@ fn format_aligned(content: &str, width: usize, align: Align) -> String {
             Align::Right => format!("{:>width$}", content, width = width),
         }
     }
-}
-
-fn max_column_depth(column_groups: &[ColumnGroup]) -> usize {
-    column_groups.iter().map(|c| c.depth()).max().unwrap_or(0)
 }

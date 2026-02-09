@@ -29,7 +29,7 @@ pub use visitor::Visitor;
 #[cfg(feature = "std")]
 pub use printer::print_source;
 #[cfg(feature = "std")]
-pub use table::{Config as TableConfig, Table};
+pub use table::{Config as TableConfig, Table, layout::Layout as TableLayout};
 #[cfg(feature = "std")]
 pub use tabular::{TableCell, TabularReader};
 

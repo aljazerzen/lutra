@@ -12,6 +12,8 @@ use std::borrow::Cow;
 use std::collections::HashMap;
 use std::rc::Rc;
 
+use crate::utils::clip_left;
+
 use super::Action;
 
 use self::array::ArrayForm;
@@ -407,17 +409,4 @@ pub fn render_name_colon(form: &Form, frame: &mut Frame, area: Rect) -> Rect {
     frame.render_widget(":".white(), area_colon);
 
     clip_left(area_colon, 2)
-}
-
-fn clip_left(mut area: Rect, left: u16) -> Rect {
-    let left = left.min(area.width);
-    area.x += left;
-    area.width -= left;
-    area
-}
-fn clip_top(mut area: Rect, top: u16) -> Rect {
-    let top = top.min(area.height);
-    area.y += top;
-    area.height -= top;
-    area
 }

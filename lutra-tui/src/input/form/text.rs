@@ -1,8 +1,7 @@
 use ratatui::{layout::Offset, prelude::*};
 
-use crate::input::form::clip_top;
-
 use super::{Action, Form, FormResult};
+use crate::utils::clip_top;
 
 pub struct TextForm {
     value: String,

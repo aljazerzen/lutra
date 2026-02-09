@@ -6,6 +6,7 @@ mod project;
 mod runner;
 mod style;
 mod terminal;
+mod utils;
 mod watcher;
 
 pub use input::prompt_for_ty;

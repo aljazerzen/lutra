@@ -204,7 +204,13 @@ fn test_text_truncation() {
 fn test_empty_array() {
     let result = _table("[{a: int32}]", Value::Array(vec![]));
 
-    assert_eq!(result, "");
+    assert_eq!(
+        result,
+        r#"      a
+  int32
+───────
+"#
+    );
 }
 
 #[test]
