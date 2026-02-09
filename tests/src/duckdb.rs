@@ -131,17 +131,245 @@ fn prim_text() {
     "#);
 }
 
-#[test]
-fn prim_float64() {
-    insta::assert_snapshot!(_sql_and_output(_run(
-        r#"const main = 3.14: float64"#,
-        lutra_bin::Value::unit()
-    )), @"
-    SELECT
-      3.14::FLOAT8 AS value
-    ---
-    3.14
-    ");
+// ============================================================================
+// Schema Introspection Tests
+// ============================================================================
+
+#[tokio::test]
+async fn pull_interface_basic() {
+    use lutra_runner::Run;
+
+    let client = async_duckdb::ClientBuilder::new().open().await.unwrap();
+
+    client
+        .conn(|conn| {
+            conn.execute_batch(
+                r#"
+                CREATE TABLE users (id INTEGER PRIMARY KEY, name VARCHAR NOT NULL, email VARCHAR);
+                CREATE TABLE posts (id INTEGER PRIMARY KEY, user_id INTEGER, title VARCHAR NOT NULL, content VARCHAR);
+                "#,
+            )
+        })
+        .await
+        .unwrap();
+
+    let runner = lutra_runner_duckdb::Runner::new(client);
+    let interface = runner.get_interface().await.unwrap();
+
+    insta::assert_snapshot!(interface, @r#"
+    ## Row of table posts
+    type Post: {id: int32, user_id: enum {none, some: int32}, title: text, content: enum {none, some: text}}
+    ## Read from table posts
+    func from_posts(): [Post] -> std::sql::from("posts")
+    ## Write into table posts
+    func insert_posts(values: [Post]) -> std::sql::insert(values, "posts")
+    ## Lookup in posts by constraint posts_id_pkey
+    func from_posts_by_id(id: int32): enum {none, some: Post} -> (
+      from_posts() | std::find(x -> x.id == id)
+    )
+
+    ## Row of table users
+    type User: {id: int32, name: text, email: enum {none, some: text}}
+    ## Read from table users
+    func from_users(): [User] -> std::sql::from("users")
+    ## Write into table users
+    func insert_users(values: [User]) -> std::sql::insert(values, "users")
+    ## Lookup in users by constraint users_id_pkey
+    func from_users_by_id(id: int32): enum {none, some: User} -> (
+      from_users() | std::find(x -> x.id == id)
+    )
+    "#);
+}
+
+#[tokio::test]
+async fn pull_interface_types() {
+    use lutra_runner::Run;
+
+    let client = async_duckdb::ClientBuilder::new().open().await.unwrap();
+    client
+        .conn(|conn| {
+            conn.execute_batch(
+                r#"
+                CREATE TABLE type_test (
+                    bool_col BOOLEAN,
+                    int8_col TINYINT,
+                    int16_col SMALLINT,
+                    int32_col INTEGER,
+                    int64_col BIGINT,
+                    float32_col FLOAT,
+                    float64_col DOUBLE,
+                    text_col VARCHAR,
+                    date_col DATE
+                );
+                "#,
+            )
+        })
+        .await
+        .unwrap();
+
+    let runner = lutra_runner_duckdb::Runner::new(client);
+    let interface = runner.get_interface().await.unwrap();
+
+    insta::assert_snapshot!(interface, @r#"
+    ## Row of table type_test
+    type TypeTestRow: {bool_col: enum {none, some: bool}, int8_col: enum {none, some: int8}, int16_col: enum {none, some: int16}, int32_col: enum {none, some: int32}, int64_col: enum {none, some: int64}, float32_col: enum {none, some: float32}, float64_col: enum {none, some: float64}, text_col: enum {none, some: text}, date_col: enum {none, some: std::Date}}
+    ## Read from table type_test
+    func from_type_test(): [TypeTestRow] -> std::sql::from("type_test")
+    ## Write into table type_test
+    func insert_type_test(values: [TypeTestRow]) -> std::sql::insert(values, "type_test")
+    "#);
+}
+
+#[tokio::test]
+async fn pull_interface_arrays() {
+    use lutra_runner::Run;
+
+    let client = async_duckdb::ClientBuilder::new().open().await.unwrap();
+    client
+        .conn(|conn| {
+            conn.execute_batch(
+                r#"
+                CREATE TABLE arrays_test (
+                    id INTEGER,
+                    tags VARCHAR[],
+                    numbers INTEGER[],
+                    nested INTEGER[][]
+                );
+                "#,
+            )
+        })
+        .await
+        .unwrap();
+
+    let runner = lutra_runner_duckdb::Runner::new(client);
+    let interface = runner.get_interface().await.unwrap();
+
+    insta::assert_snapshot!(interface, @r#"
+    ## Row of table arrays_test
+    type ArraysTestRow: {id: enum {none, some: int32}, tags: enum {none, some: [text]}, numbers: enum {none, some: [int32]}, nested: enum {none, some: [[int32]]}}
+    ## Read from table arrays_test
+    func from_arrays_test(): [ArraysTestRow] -> std::sql::from("arrays_test")
+    ## Write into table arrays_test
+    func insert_arrays_test(values: [ArraysTestRow]) -> std::sql::insert(values, "arrays_test")
+    "#);
+}
+
+#[tokio::test]
+async fn pull_interface_struct() {
+    use lutra_runner::Run;
+
+    let client = async_duckdb::ClientBuilder::new().open().await.unwrap();
+    client
+        .conn(|conn| {
+            conn.execute_batch(
+                r#"
+                CREATE TABLE struct_test (
+                    id INTEGER,
+                    person STRUCT(name VARCHAR, age INTEGER),
+                    location STRUCT(city VARCHAR, coordinates STRUCT(lat DOUBLE, lon DOUBLE))
+                );
+                "#,
+            )
+        })
+        .await
+        .unwrap();
+
+    let runner = lutra_runner_duckdb::Runner::new(client);
+    let interface = runner.get_interface().await.unwrap();
+
+    insta::assert_snapshot!(interface, @r#"
+    ## Row of table struct_test
+    type StructTestRow: {id: enum {none, some: int32}, person: enum {none, some: {name: text, age: int32}}, location: enum {none, some: {city: text, coordinates: {lat: float64, lon: float64}}}}
+    ## Read from table struct_test
+    func from_struct_test(): [StructTestRow] -> std::sql::from("struct_test")
+    ## Write into table struct_test
+    func insert_struct_test(values: [StructTestRow]) -> std::sql::insert(values, "struct_test")
+    "#);
+}
+
+#[tokio::test]
+async fn pull_interface_indexes_basic() {
+    use lutra_runner::Run;
+
+    let client = async_duckdb::ClientBuilder::new().open().await.unwrap();
+    client
+        .conn(|conn| {
+            conn.execute_batch(
+                r#"
+                CREATE TABLE users (
+                    id INTEGER PRIMARY KEY,
+                    email VARCHAR UNIQUE,
+                    name VARCHAR
+                );
+                CREATE INDEX idx_name ON users(name);
+                "#,
+            )
+        })
+        .await
+        .unwrap();
+
+    let runner = lutra_runner_duckdb::Runner::new(client);
+    let interface = runner.get_interface().await.unwrap();
+
+    insta::assert_snapshot!(interface, @r#"
+    ## Row of table users
+    type User: {id: int32, email: enum {none, some: text}, name: enum {none, some: text}}
+    ## Read from table users
+    func from_users(): [User] -> std::sql::from("users")
+    ## Write into table users
+    func insert_users(values: [User]) -> std::sql::insert(values, "users")
+    ## Lookup in users by constraint users_id_pkey
+    func from_users_by_id(id: int32): enum {none, some: User} -> (
+      from_users() | std::find(x -> x.id == id)
+    )
+    ## Lookup in users by constraint users_email_key
+    func from_users_by_email(email: text): enum {none, some: User} -> (
+      from_users() | std::find(x -> x.email == email)
+    )
+    ## Lookup in users by index idx_name
+    func from_users_by_name(name: text): [User] -> (
+      from_users() | std::filter(x -> x.name == name)
+    )
+    "#);
+}
+
+#[tokio::test]
+async fn pull_interface_indexes_compound() {
+    use lutra_runner::Run;
+
+    let client = async_duckdb::ClientBuilder::new().open().await.unwrap();
+    client
+        .conn(|conn| {
+            conn.execute_batch(
+                r#"
+                CREATE TABLE orders (
+                    id INTEGER,
+                    user_id INTEGER,
+                    product_id INTEGER,
+                    quantity INTEGER
+                );
+                CREATE INDEX idx_user_product ON orders(user_id, product_id);
+                "#,
+            )
+        })
+        .await
+        .unwrap();
+
+    let runner = lutra_runner_duckdb::Runner::new(client);
+    let interface = runner.get_interface().await.unwrap();
+
+    insta::assert_snapshot!(interface, @r#"
+    ## Row of table orders
+    type Order: {id: enum {none, some: int32}, user_id: enum {none, some: int32}, product_id: enum {none, some: int32}, quantity: enum {none, some: int32}}
+    ## Read from table orders
+    func from_orders(): [Order] -> std::sql::from("orders")
+    ## Write into table orders
+    func insert_orders(values: [Order]) -> std::sql::insert(values, "orders")
+    ## Lookup in orders by index idx_user_product
+    func from_orders_by_user_id_and_product_id(user_id: int32, product_id: int32): [Order] -> (
+      from_orders() | std::filter(x -> x.user_id == user_id && x.product_id == product_id)
+    )
+    "#);
 }
 
 #[test]

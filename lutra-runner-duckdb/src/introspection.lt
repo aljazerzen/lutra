@@ -1,0 +1,91 @@
+import std::filter
+import std::sort
+import std::map
+import std::to_int64
+
+module duckdb_catalog {
+  type SchemaRow: {schema_name: text, internal: bool}
+  func from_schemas(): [SchemaRow] -> std::sql::raw(
+    "SELECT DISTINCT schema_name, internal FROM duckdb_schemas()"
+  )
+
+  type TableRow: {schema_name: text, table_name: text, table_oid: int64}
+  func from_tables(): [TableRow] -> std::sql::raw(
+    "SELECT schema_name, table_name, table_oid FROM duckdb_tables() WHERE internal = false"
+  )
+
+  type ColumnRow: {
+    table_oid: int64,
+    column_name: text,
+    column_index: int32,
+    data_type: text,
+    is_nullable: bool
+  }
+  func from_columns(): [ColumnRow] -> std::sql::raw(
+    "SELECT table_oid, column_name, column_index, data_type, is_nullable FROM duckdb_columns()"
+  )
+
+  type IndexRow: {
+    table_oid: int64,
+    index_name: text,
+    is_unique: bool,
+    sql: text
+  }
+  func from_indexes(): [IndexRow] -> std::sql::raw(
+    "SELECT table_oid, index_name, is_unique, sql FROM duckdb_indexes()"
+  )
+
+  type ConstraintRow: {
+    table_oid: int64,
+    constraint_type: text,
+    constraint_column_names: [text],
+    constraint_name: text
+  }
+  func from_constraints(): [ConstraintRow] -> std::sql::raw(
+    "SELECT table_oid, constraint_type, constraint_column_names, constraint_name FROM duckdb_constraints()"
+  )
+}
+
+func pull_interface() -> (
+  duckdb_catalog::from_schemas()
+  | filter(s -> s.schema_name == "main" || (!s.internal && s.schema_name != "information_schema"))
+  | map(s -> {
+    schema_name = s.schema_name,
+    tables = (
+      duckdb_catalog::from_tables()
+      | filter(t -> t.schema_name == s.schema_name)
+      | map(t -> {
+        table_name = t.table_name,
+        columns = (
+          duckdb_catalog::from_columns()
+          | filter(c -> c.table_oid == t.table_oid)
+          | sort(c -> c.column_index | to_int64)
+          | map(c -> {
+            name = c.column_name,
+            data_type = c.data_type,
+            is_nullable = c.is_nullable,
+          })
+        ),
+        indexes = (
+          duckdb_catalog::from_indexes()
+          | filter(i -> i.table_oid == t.table_oid)
+          | map(i -> {
+            index_name = i.index_name,
+            is_unique = i.is_unique,
+            sql = i.sql,
+          })
+        ),
+        constraints = (
+          duckdb_catalog::from_constraints()
+          | filter(c -> c.table_oid == t.table_oid)
+          | filter(c -> c.constraint_type == "PRIMARY KEY" || c.constraint_type == "UNIQUE")
+          | map(c -> {
+            constraint_name = c.constraint_name,
+            constraint_type = c.constraint_type,
+            columns = c.constraint_column_names,
+          })
+        ),
+      })
+    ),
+  })
+)

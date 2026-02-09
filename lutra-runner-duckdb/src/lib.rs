@@ -1,6 +1,8 @@
 //! DuckDB Lutra runner
 
+mod case;
 mod params;
+mod schema;
 
 pub use lutra_runner::Run;
 
@@ -91,8 +93,7 @@ impl lutra_runner::Run for Runner {
     }
 
     async fn get_interface(&self) -> Result<String, Self::Error> {
-        // TODO
-        Ok(String::new())
+        schema::pull_interface(self).await
     }
 }
 
