@@ -297,6 +297,8 @@ enum DataFormat {
     Csv,
     /// Parquet
     Parquet,
+    /// ASCII table
+    Table,
 }
 
 #[tokio::main(flavor = "current_thread")]

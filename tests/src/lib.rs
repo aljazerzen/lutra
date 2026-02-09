@@ -17,6 +17,7 @@ mod native_functions;
 mod postgres;
 mod resolver;
 mod runner;
+mod table;
 mod typed_data;
 
 fn init_logger() {

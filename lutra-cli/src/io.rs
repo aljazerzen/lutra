@@ -78,7 +78,7 @@ async fn write_format(
             w.write_all(&buf).await?
         }
         DataFormat::Csv => {
-            let tabular = lutra_bin::Tabular::new(data, ty, ty_defs);
+            let tabular = lutra_bin::TabularReader::new(data, ty, ty_defs);
             w.write_all(tabular.column_names().join(",").as_bytes())
                 .await?;
             w.write_all("\n".as_bytes()).await?;
@@ -103,6 +103,11 @@ async fn write_format(
             let mut builder = AsyncArrowWriter::try_new(&mut w, data.schema(), None).unwrap();
             builder.write(&data).await.unwrap();
             builder.finish().await.unwrap();
+        }
+        DataFormat::Table => {
+            let table = lutra_bin::Table::new(data, ty, ty_defs);
+            let rendered = table.render();
+            w.write_all(rendered.as_bytes()).await?;
         }
     }
     Ok(w.get_bytes_written())
@@ -185,6 +190,10 @@ async fn read_format(
             // convert arrow to lutra
             let res = lutra_arrow::arrow_to_lutra(batches, ty, ty_defs)?;
             Ok(res.to_vec())
+        }
+        DataFormat::Table => {
+            // Table format is output-only
+            Err(anyhow::anyhow!("Table format is not supported for input"))
         }
     }
 }

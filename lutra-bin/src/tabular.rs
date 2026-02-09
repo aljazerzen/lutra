@@ -1,17 +1,25 @@
 #![cfg(feature = "std")]
-use std::collections::HashMap;
 
-use crate::{TupleReader, ir};
-use crate::{string::ToString, vec};
+//! Low-level tabular data reader.
+
+use std::collections::HashMap;
+use std::rc::Rc;
+
+use crate::TupleReader;
+use crate::ir;
+
+use crate::string::ToString;
+use crate::vec;
 
 /// Utility for iterating over arbitrary data in tabular manner (as rows and columns).
-pub struct Tabular<'d, 't> {
+#[derive(Clone)]
+pub struct TabularReader<'d, 't> {
     inner: TableCell<'d, 't>,
 
     rem_items: usize,
     array_item_size: usize,
 
-    types: HashMap<&'t ir::Path, &'t ir::Ty>,
+    types: Rc<HashMap<&'t ir::Path, &'t ir::Ty>>,
 }
 
 #[derive(Clone, Copy)]
@@ -22,6 +30,10 @@ pub struct TableCell<'d, 't> {
 }
 
 impl<'d, 't> TableCell<'d, 't> {
+    pub fn new(data: &'d [u8], ty: &'t ir::Ty, ty_defs: &'t [ir::TyDef]) -> Self {
+        Self { data, ty, ty_defs }
+    }
+
     pub fn data(&self) -> &'d [u8] {
         self.data
     }
@@ -35,13 +47,13 @@ impl<'d, 't> TableCell<'d, 't> {
     }
 }
 
-impl<'d, 't> Tabular<'d, 't> {
+impl<'d, 't> TabularReader<'d, 't> {
     pub fn new(data: &'d [u8], ty: &'t ir::Ty, ty_defs: &'t [ir::TyDef]) -> Self {
-        let mut r = Tabular {
+        let mut r = TabularReader {
             inner: TableCell { data, ty, ty_defs },
             rem_items: 0,
             array_item_size: 0,
-            types: HashMap::from_iter(ty_defs.iter().map(|d| (&d.name, &d.ty))),
+            types: Rc::new(HashMap::from_iter(ty_defs.iter().map(|d| (&d.name, &d.ty)))),
         };
 
         match &r.get_ty_mat(ty).kind {
@@ -55,22 +67,27 @@ impl<'d, 't> Tabular<'d, 't> {
                 r.rem_items = len;
                 r.array_item_size = item.layout.as_ref().unwrap().head_size.div_ceil(8) as usize;
             }
-            ir::TyKind::Function(_) => unreachable!(),
-            ir::TyKind::Ident(_) => todo!(),
+            ir::TyKind::Function(_) | ir::TyKind::Ident(_) => unreachable!(),
         }
         r
     }
 
-    fn get_ty_mat(&self, ty: &'t ir::Ty) -> &'t ir::Ty {
-        match &ty.kind {
-            ir::TyKind::Ident(path) => self.types.get(path).unwrap(),
-            _ => ty,
+    pub(crate) fn ty(&self) -> &'t ir::Ty {
+        self.inner.ty()
+    }
+
+    pub(super) fn get_ty_mat(&self, ty: &'t ir::Ty) -> &'t ir::Ty {
+        let mut ty = ty;
+        while let ir::TyKind::Ident(path) = &ty.kind {
+            ty = self.types.get(path).unwrap();
         }
+        ty
     }
 
     pub fn column_names(&self) -> Vec<String> {
         self.column_names_of_ty(self.inner.ty)
     }
+
     fn column_names_of_ty(&self, ty: &ir::Ty) -> Vec<String> {
         match &self.get_ty_mat(ty).kind {
             // arrays are iterated over, columns come from inner type
@@ -104,7 +121,7 @@ impl<'d, 't> Tabular<'d, 't> {
     }
 }
 
-impl<'d, 't> Iterator for Tabular<'d, 't> {
+impl<'d, 't> Iterator for TabularReader<'d, 't> {
     type Item = vec::Vec<TableCell<'d, 't>>;
 
     fn next(&mut self) -> Option<Self::Item> {
