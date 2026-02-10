@@ -76,7 +76,7 @@ impl TupleForm {
         }
     }
 
-    pub(crate) fn update(&mut self, action: &Action) -> FormResult {
+    pub(crate) fn handle(&mut self, action: &Action) -> FormResult {
         let Some(key) = action.as_key() else {
             return FormResult::None;
         };

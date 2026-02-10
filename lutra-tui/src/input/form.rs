@@ -156,16 +156,16 @@ impl Form {
         }
     }
 
-    pub fn update(&mut self, action: &Action) -> FormResult {
+    pub fn handle(&mut self, action: &Action) -> FormResult {
         match &mut self.kind {
-            FormKind::Bool(form) => form.update(action),
-            FormKind::Text(form) => form.update(action),
-            FormKind::Number(form) => form.update(action),
-            FormKind::Tuple(form) => form.update(action),
+            FormKind::Bool(form) => form.handle(action),
+            FormKind::Text(form) => form.handle(action),
+            FormKind::Number(form) => form.handle(action),
+            FormKind::Tuple(form) => form.handle(action),
             FormKind::TupleUnit => FormResult::None,
-            FormKind::Enum(form) => form.update(action),
-            FormKind::Array(form) => form.update(action, &self.ty, &self.ty_defs),
-            FormKind::Button(form) => form.update(action),
+            FormKind::Enum(form) => form.handle(action),
+            FormKind::Array(form) => form.handle(action, &self.ty, &self.ty_defs),
+            FormKind::Button(form) => form.handle(action),
         }
     }
 

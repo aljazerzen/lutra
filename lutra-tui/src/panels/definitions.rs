@@ -62,6 +62,50 @@ pub enum DefKind {
     Type,
 }
 
+impl DefKind {
+    /// Get the icon character for this definition kind.
+    pub fn icon(self, collapsed: bool) -> &'static str {
+        match self {
+            DefKind::Module => {
+                if collapsed {
+                    "▸ " // Right arrow - collapsed
+                } else {
+                    "▾ " // Down arrow - expanded
+                }
+            }
+            DefKind::Function => "ƒ ",
+            DefKind::Constant => "c ",
+            DefKind::Type => "t ",
+        }
+    }
+
+    /// Get the icon character for search results (modules always show as collapsed).
+    pub fn search_icon(self) -> &'static str {
+        match self {
+            DefKind::Module => "▸",
+            DefKind::Function => "ƒ",
+            DefKind::Constant => "c",
+            DefKind::Type => "t",
+        }
+    }
+
+    /// Determine the DefKind from a parser definition.
+    pub fn from_def(def: &pr::Def) -> Option<Self> {
+        match &def.kind {
+            pr::DefKind::Module(_) => Some(DefKind::Module),
+            pr::DefKind::Expr(expr_def) => {
+                if expr_def.constant {
+                    Some(DefKind::Constant)
+                } else {
+                    Some(DefKind::Function)
+                }
+            }
+            pr::DefKind::Ty(_) => Some(DefKind::Type),
+            pr::DefKind::Import(_) | pr::DefKind::Unresolved(_) => None,
+        }
+    }
+}
+
 impl DefinitionsPanel {
     /// Creates a new empty definitions panel.
     pub fn new() -> Self {
@@ -108,6 +152,40 @@ impl DefinitionsPanel {
         self.items
             .get(self.cursor)
             .map(|item| path_to_ir(&item.path))
+    }
+
+    /// Select a definition by path. Expands parent modules if needed.
+    /// Returns true if the path was found and selected.
+    pub fn select_path(&mut self, target_path: &ir::Path) -> bool {
+        // Convert IR path to PR path for comparison
+        let target_pr = pr::Path::new(&target_path.0);
+
+        // Find the item with matching path
+        let Some(index) = self.items.iter().position(|item| item.path == target_pr) else {
+            return false;
+        };
+
+        // Expand all parent modules to make this item visible
+        let target_depth = self.items[index].depth;
+        for i in 0..=index {
+            let item = &mut self.items[i];
+            // If this is a module that's an ancestor of our target, expand it
+            if item.kind == DefKind::Module && item.depth < target_depth && item.collapsed {
+                // Check if target is descendant of this module
+                if target_pr.as_steps().starts_with(item.path.as_steps()) {
+                    item.collapsed = false;
+                }
+            }
+        }
+
+        // Update visibility after expanding
+        self.update_visibility();
+
+        // Set cursor to the target item
+        self.cursor = index;
+        self.ensure_visible();
+
+        true
     }
 
     /// Handle a key event. Returns an action if the panel requests app-level behavior.
@@ -248,7 +326,7 @@ impl DefinitionsPanel {
 
     /// Render the panel to the given area.
     pub fn render(&self, frame: &mut Frame, area: Rect) {
-        let block = crate::style::panel_secondary(" Definitions ", self.focused);
+        let block = crate::style::panel_secondary("  Definitions ", self.focused);
         let inner = block.inner(area);
         frame.render_widget(block, area);
 
@@ -297,18 +375,7 @@ impl DefinitionsPanel {
         panel_focused: bool,
     ) {
         let indent = "  ".repeat(item.depth);
-        let icon = match item.kind {
-            DefKind::Module => {
-                if item.collapsed {
-                    "▸ " // Right arrow - collapsed
-                } else {
-                    "▾ " // Down arrow - expanded
-                }
-            }
-            DefKind::Function => "ƒ ",
-            DefKind::Constant => "c ",
-            DefKind::Type => "t ",
-        };
+        let icon = item.kind.icon(item.collapsed);
 
         let text_style = if is_selected && panel_focused {
             Style::default().bg(Color::White).fg(Color::Black)
@@ -338,7 +405,8 @@ impl DefinitionsPanel {
     }
 }
 
-fn path_to_ir(path: &pr::Path) -> ir::Path {
+/// Convert a parser path to an IR path.
+pub fn path_to_ir(path: &pr::Path) -> ir::Path {
     ir::Path(path.clone().into_iter().collect())
 }
 
@@ -355,40 +423,28 @@ fn flatten_module(module: &pr::ModuleDef, path: &[String], depth: usize) -> Vec<
         let mut path = pr::Path::new(path);
         path.push(name.to_string());
 
+        // Determine kind - skip imports and unresolved
+        let Some(kind) = DefKind::from_def(def) else {
+            continue;
+        };
+
         match &def.kind {
             pr::DefKind::Module(inner_module) => {
                 let children = flatten_module(inner_module, path.as_steps(), depth + 1);
 
                 // Add module itself
-                let mut item = DefItem::new(path, DefKind::Module, depth);
+                let mut item = DefItem::new(path, kind, depth);
                 item.span = def.span;
                 items.push(item);
 
                 // Add children
                 items.extend(children);
             }
-            pr::DefKind::Expr(expr_def) => {
-                // Distinguish function vs constant
-                let kind = if expr_def.constant {
-                    DefKind::Constant
-                } else {
-                    DefKind::Function
-                };
-
+            _ => {
+                // Add non-module definition
                 let mut item = DefItem::new(path, kind, depth);
                 item.span = def.span;
                 items.push(item);
-            }
-            pr::DefKind::Ty(_) => {
-                let mut item = DefItem::new(path, DefKind::Type, depth);
-                item.span = def.span;
-                items.push(item);
-            }
-            pr::DefKind::Import(_) => {
-                // Skip imports - not currently shown in UI
-            }
-            pr::DefKind::Unresolved(_) => {
-                // Skip unresolved definitions - shouldn't exist in resolved modules
             }
         }
     }

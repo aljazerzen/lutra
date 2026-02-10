@@ -150,6 +150,11 @@ impl Tabs {
             .map(|p| p.is_form_field_focused())
             .unwrap_or(false)
     }
+
+    /// Get the path of the currently active tab (if any).
+    pub fn active_path(&self) -> Option<&ir::Path> {
+        self.active_panel().map(|p| p.path())
+    }
 }
 
 impl Component for Tabs {

@@ -6,7 +6,7 @@ use ratatui::prelude::*;
 
 use crate::keybindings::{KeyBindings, KeyContext};
 use crate::layout::{CenterPanel, Layout, PanelFocus};
-use crate::panels::{DefinitionsPanel, DiagnosticsPanel, StatusBar, Tabs};
+use crate::panels::{DefinitionsPanel, DiagnosticsPanel, SearchModal, StatusBar, Tabs};
 use crate::project::{CompileResult, ProjectState};
 use crate::runner;
 use crate::terminal::{Action, ActionResult, Component};
@@ -79,6 +79,9 @@ pub struct InteractiveApp {
 
     /// Status bar.
     pub status: StatusBar,
+
+    /// Search modal (shown when active).
+    search: SearchModal,
 }
 
 impl InteractiveApp {
@@ -100,6 +103,7 @@ impl InteractiveApp {
             diagnostics: DiagnosticsPanel::new(),
             run_panels: Tabs::new(runner_client),
             status,
+            search: SearchModal::new(),
         };
 
         // Initial compilation
@@ -120,6 +124,7 @@ impl InteractiveApp {
         self.status.update(&self.project.compilation);
         self.definitions.update(&self.project);
         self.diagnostics.update(&self.project);
+        self.search.update(&self.project);
 
         // Update error indicators in definitions panel
         if let crate::project::CompileResult::Failed { diagnostics } = &self.project.compilation {
@@ -138,6 +143,10 @@ impl InteractiveApp {
         self.diagnostics.focused = matches!(self.layout.focus, PanelFocus::Diagnostics);
         self.run_panels
             .set_focused(matches!(self.layout.focus, PanelFocus::Run));
+
+        if let Some(path) = self.run_panels.active_path() {
+            self.definitions.select_path(path);
+        }
     }
 
     /// Start running a specific definition.
@@ -176,34 +185,6 @@ impl InteractiveApp {
             PanelFocus::Diagnostics => KeyContext::Diagnostics,
         }
     }
-
-    /// Process a terminal event with focus-aware keybindings.
-    fn process_terminal_event(&mut self, event: event::Event) -> ActionResult {
-        match event {
-            event::Event::Resize(_, _) => ActionResult::redraw(),
-            event::Event::Key(key) => {
-                let context = self.get_key_context();
-                if let Some(command) = self.keybindings.process_key_event(key, context) {
-                    // Keybinding matched - recursively handle the command
-                    return self.handle(command);
-                }
-                // No keybinding matched - pass raw terminal event to focused component
-                match self.layout.focus {
-                    PanelFocus::Definitions => self.definitions.handle(Action::Terminal(event)),
-                    PanelFocus::Diagnostics => self.diagnostics.handle(Action::Terminal(event)),
-                    PanelFocus::Run => self.run_panels.handle(Action::Terminal(event)),
-                }
-            }
-            _ => {
-                // Other events (mouse, focus, paste) - pass to focused component
-                match self.layout.focus {
-                    PanelFocus::Definitions => self.definitions.handle(Action::Terminal(event)),
-                    PanelFocus::Diagnostics => self.diagnostics.handle(Action::Terminal(event)),
-                    PanelFocus::Run => self.run_panels.handle(Action::Terminal(event)),
-                }
-            }
-        }
-    }
 }
 
 impl Component for InteractiveApp {
@@ -225,16 +206,48 @@ impl Component for InteractiveApp {
 
         // Render status bar
         self.status.render(frame, areas.status);
+
+        // Render search modal on top if active
+        if self.search.active {
+            self.search.render(frame, area);
+        }
     }
 
     fn handle(&mut self, action: Action) -> ActionResult {
         match action {
             // Terminal events - process with focus-aware keybindings
-            Action::Terminal(event) => self.process_terminal_event(event),
+            Action::Terminal(event::Event::Resize(_, _)) => ActionResult::redraw(),
+            Action::Terminal(event) => {
+                // If search modal is active, handle all input there
+                if self.search.active {
+                    return self.search.handle(Action::Terminal(event));
+                }
+
+                // Try to map keybindings
+                if let event::Event::Key(key) = &event {
+                    let context = self.get_key_context();
+                    if let Some(command) = self.keybindings.process_key_event(*key, context) {
+                        return ActionResult::action(command);
+                    }
+                }
+
+                // Pass to focused sub-component
+                let action = Action::Terminal(event);
+                match self.layout.focus {
+                    PanelFocus::Definitions => self.definitions.handle(action),
+                    PanelFocus::Diagnostics => self.diagnostics.handle(action),
+                    PanelFocus::Run => self.run_panels.handle(action),
+                }
+            }
 
             // Global commands
             Action::Exit => ActionResult::shutdown(),
             Action::RunDefinition(path) => {
+                // Close search modal if open
+                if self.search.active {
+                    self.search.active = false;
+                    self.search.clear();
+                }
                 self.action_open_program(&path);
                 ActionResult::redraw()
             }
@@ -289,6 +302,15 @@ impl Component for InteractiveApp {
             Action::ReturnToInput => {
                 // Delegate to run panels
                 self.run_panels.handle(action)
+            }
+            Action::DefSearchOpen => {
+                self.search.active = true;
+                ActionResult::redraw()
+            }
+            Action::DefSearchClose => {
+                self.search.active = false;
+                self.search.clear();
+                ActionResult::redraw()
             }
         }
     }

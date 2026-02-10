@@ -22,7 +22,7 @@ impl NumberForm {
         self.inner.render(form, frame, area)
     }
 
-    pub fn update(&mut self, action: &Action) -> FormResult {
+    pub fn handle(&mut self, action: &Action) -> FormResult {
         let Some(key) = action.as_key() else {
             return FormResult::None;
         };
@@ -55,12 +55,12 @@ impl NumberForm {
                 };
 
                 if allowed {
-                    self.inner.update(action)
+                    self.inner.handle(action)
                 } else {
                     FormResult::None
                 }
             }
-            KeyCode::Backspace => self.inner.update(action),
+            KeyCode::Backspace => self.inner.handle(action),
             _ => FormResult::None,
         }
     }

@@ -68,7 +68,7 @@ impl ArrayForm {
         area
     }
 
-    pub fn update(&mut self, action: &Action, self_ty: &ir::Ty, ty_defs: &TyDefs) -> FormResult {
+    pub fn handle(&mut self, action: &Action, self_ty: &ir::Ty, ty_defs: &TyDefs) -> FormResult {
         let Some(key) = action.as_key() else {
             return FormResult::None;
         };

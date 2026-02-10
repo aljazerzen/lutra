@@ -34,7 +34,7 @@ impl BoolForm {
         clip_top(area, 1)
     }
 
-    pub fn update(&mut self, action: &Action) -> FormResult {
+    pub fn handle(&mut self, action: &Action) -> FormResult {
         let Some(key) = action.as_key() else {
             return FormResult::None;
         };

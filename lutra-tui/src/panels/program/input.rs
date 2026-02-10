@@ -96,7 +96,7 @@ impl Component for InputPane {
         // Try to handle with form
         let focused = self.form.get_mut(&self.cursor);
         if let Some(focused) = focused {
-            match focused.update(&action) {
+            match focused.handle(&action) {
                 FormResult::Redraw => return ActionResult::redraw(),
                 FormResult::Submit => return ActionResult::action(Action::ExecuteProgram),
                 FormResult::None => {}
@@ -110,7 +110,7 @@ impl Component for InputPane {
                     self.update_cursor_position(|p| p.saturating_sub(1));
                     return ActionResult::redraw();
                 }
-                KeyCode::Down => {
+                KeyCode::Down | KeyCode::Enter => {
                     self.update_cursor_position(|p| p.saturating_add(1));
                     return ActionResult::redraw();
                 }

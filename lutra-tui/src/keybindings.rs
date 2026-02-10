@@ -25,13 +25,8 @@ impl KeyBindings {
     ///
     /// Returns `None` if the key should instead be passed through to the focused component.
     pub fn process_key_event(&self, key: KeyEvent, context: KeyContext) -> Option<Action> {
-        // Global bindings (work in all contexts)
-        if let Some(action) = self.process_global_bindings(key) {
-            return Some(action);
-        }
-
         // Context-specific bindings
-        match context {
+        let action = match context {
             KeyContext::Definitions => None,
             KeyContext::Diagnostics => None,
             KeyContext::Run | KeyContext::RunInput => match key.code {
@@ -41,7 +36,17 @@ impl KeyBindings {
                 }
                 _ => None,
             },
+        };
+        if let Some(action) = action {
+            return Some(action);
         }
+
+        // Global bindings
+        if let Some(action) = self.process_global_bindings(key) {
+            return Some(action);
+        }
+
+        None
     }
 
     /// Global keybindings that work in all contexts.
@@ -49,7 +54,7 @@ impl KeyBindings {
         match key.code {
             // Exit
             KeyCode::Esc => Some(Action::Exit),
-            KeyCode::Char('c') if key.modifiers.contains(KeyModifiers::CONTROL) => {
+            KeyCode::Char('q') if key.modifiers.contains(KeyModifiers::CONTROL) => {
                 Some(Action::Exit)
             }
 
@@ -60,6 +65,11 @@ impl KeyBindings {
             KeyCode::Left if key.modifiers.contains(KeyModifiers::CONTROL) => Some(Action::PrevTab),
             KeyCode::Right if key.modifiers.contains(KeyModifiers::CONTROL) => {
                 Some(Action::NextTab)
+            }
+
+            // Search (Ctrl+P)
+            KeyCode::Char('p') if key.modifiers.contains(KeyModifiers::CONTROL) => {
+                Some(Action::DefSearchOpen)
             }
 
             _ => None,

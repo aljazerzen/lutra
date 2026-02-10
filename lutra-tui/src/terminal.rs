@@ -35,6 +35,8 @@ pub enum Action {
     NextTab,
     PrevTab,
     SwitchToTab(usize),
+    DefSearchOpen,
+    DefSearchClose,
 }
 
 impl Action {
