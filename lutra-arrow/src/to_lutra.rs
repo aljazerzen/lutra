@@ -25,7 +25,7 @@ pub fn arrow_to_lutra(
     ty_defs: &[ir::TyDef],
 ) -> Result<bytes::BytesMut, Error> {
     let ctx = Context::new(ty_defs);
-    let ty = ctx.get_ty_mat(ty);
+    let ty = ctx.get_ty_mat(ty)?;
 
     // Case 1: Unit type - return empty
     if ty.is_unit() {
@@ -55,6 +55,9 @@ pub enum Error {
 
     #[error("unexpected null value for non-option type")]
     UnexpectedNull,
+
+    #[error("provided type is invalid")]
+    BadType,
 }
 
 /// Context for resolving type identifiers
@@ -69,11 +72,12 @@ impl<'a> Context<'a> {
         }
     }
 
-    fn get_ty_mat(&self, ty: &'a ir::Ty) -> &'a ir::Ty {
-        match &ty.kind {
-            ir::TyKind::Ident(path) => self.types.get(path).unwrap(),
-            _ => ty,
+    fn get_ty_mat(&self, ty: &'a ir::Ty) -> Result<&'a ir::Ty, Error> {
+        let mut ty = ty;
+        while let ir::TyKind::Ident(path) = &ty.kind {
+            ty = self.types.get(path).ok_or(Error::BadType)?;
         }
+        Ok(ty)
     }
 }
 
@@ -101,7 +105,7 @@ fn encode_array(
     }
 
     // Validate column count
-    let item_ty = ctx.get_ty_mat(item_ty);
+    let item_ty = ctx.get_ty_mat(item_ty)?;
     let expected_cols = expected_column_count(item_ty);
     validate_column_count(&batches, expected_cols)?;
 
@@ -123,7 +127,7 @@ fn encode_single_value(
     }
 
     // Validate column count
-    let ty = ctx.get_ty_mat(ty);
+    let ty = ctx.get_ty_mat(ty)?;
     let expected_cols = expected_column_count(ty);
     validate_column_count(&batches, expected_cols)?;
 
@@ -171,7 +175,7 @@ fn validate_type_match(
     lutra_ty: &ir::Ty,
     ctx: &Context,
 ) -> Result<(), Error> {
-    let lutra_ty = ctx.get_ty_mat(lutra_ty);
+    let lutra_ty = ctx.get_ty_mat(lutra_ty)?;
 
     // option types: validation happens on inner type when we recurse
     if let ir::TyKind::Enum(variants) = &lutra_ty.kind
@@ -303,7 +307,7 @@ impl<'a> Encoder<'a> {
         row_idx: usize,
         ty: &ir::Ty,
     ) -> Result<HeadResidual, Error> {
-        let ty = self.ctx.get_ty_mat(ty);
+        let ty = self.ctx.get_ty_mat(ty)?;
 
         match &ty.kind {
             ir::TyKind::Tuple(fields) => {
@@ -331,7 +335,7 @@ impl<'a> Encoder<'a> {
         row_idx: usize,
         ty: &ir::Ty,
     ) -> Result<(), Error> {
-        let ty = self.ctx.get_ty_mat(ty);
+        let ty = self.ctx.get_ty_mat(ty)?;
 
         match &ty.kind {
             ir::TyKind::Tuple(fields) => {
@@ -358,7 +362,7 @@ impl<'a> Encoder<'a> {
         idx: usize,
         ty: &ir::Ty,
     ) -> Result<HeadResidual, Error> {
-        let ty = self.ctx.get_ty_mat(ty);
+        let ty = self.ctx.get_ty_mat(ty)?;
 
         // Handle option enum: {none, some: T}
         if let ir::TyKind::Enum(variants) = &ty.kind
@@ -604,7 +608,7 @@ impl<'a> Encoder<'a> {
         idx: usize,
         ty: &ir::Ty,
     ) -> Result<(), Error> {
-        let ty = self.ctx.get_ty_mat(ty);
+        let ty = self.ctx.get_ty_mat(ty)?;
 
         // Handle option: if null, head already encoded .none with no body
         if let ir::TyKind::Enum(variants) = &ty.kind

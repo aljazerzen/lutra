@@ -8,9 +8,16 @@ use std::path::PathBuf;
 /// Runner configuration for execution.
 #[derive(Debug, Clone)]
 pub enum RunnerConfig {
-    Interpreter { fs_root: Option<PathBuf> },
-    Postgres { connection_string: String },
-    DuckDB { path: String },
+    Interpreter {
+        fs_root: Option<PathBuf>,
+    },
+    Postgres {
+        connection_string: String,
+    },
+    DuckDB {
+        path: String,
+        file_system: Option<PathBuf>,
+    },
 }
 
 impl Default for RunnerConfig {
@@ -69,15 +76,16 @@ impl Runner {
                     })?;
                 (client, _runner_thread)
             }
-            RunnerConfig::DuckDB { path } => {
+            RunnerConfig::DuckDB { path, file_system } => {
                 // Create tokio runtime for async duckdb connection
                 let path = path.clone();
                 let rt = tokio::runtime::Builder::new_current_thread()
                     .enable_all()
                     .build()?;
 
-                let runner =
-                    rt.block_on(async { lutra_runner_duckdb::Runner::open(&path).await })?;
+                let runner = rt.block_on(async {
+                    lutra_runner_duckdb::Runner::open(&path, file_system.clone()).await
+                })?;
 
                 let (client, server) = lutra_runner::channel::new_pair(runner);
 

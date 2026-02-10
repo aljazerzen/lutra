@@ -834,6 +834,42 @@ impl<'a> Context<'a> {
                 sql_ast::Expr::Source(format!("({arg})::{ty}"))
             }
 
+            "std::fs::read_parquet" => match self.dialect {
+                Dialect::DuckDB => {
+                    // Only DuckDB supports read_parquet
+                    let [file_name] = unpack_args(args);
+                    let node = Node::Rel(sql_ast::RelNamed::unnamed(sql_ast::RelExpr::Function {
+                        name: utils::new_object_name(["read_parquet"]),
+                        args: vec![file_name],
+                    }));
+                    return self.native_import(node, ty);
+                }
+                Dialect::Postgres => {
+                    panic!("read_parquet is not supported on PostgreSQL")
+                }
+            },
+            "std::fs::write_parquet" => match self.dialect {
+                Dialect::DuckDB => {
+                    // Only DuckDB supports write_parquet
+                    let [data, file_name] = unpack_args(args);
+
+                    // For write_parquet, we need to export the data and then write it
+                    let data = self.native_export(Node::from(data), &args_in[0].ty);
+                    let data = self.node_into_query(data, &args_in[0].ty);
+
+                    return Node::Query(utils::query_new(sql_ast::SetExpr::Copy(Box::new(
+                        sql_ast::Copy {
+                            source: sql_ast::SetExpr::Query(Box::new(data)),
+                            target: file_name,
+                            options: "FORMAT parquet, COMPRESSION zstd".into(),
+                        },
+                    ))));
+                }
+                Dialect::Postgres => {
+                    panic!("write_parquet is not supported on PostgreSQL")
+                }
+            },
+
             "std::date::to_timestamp" => {
                 let [date, tz] = unpack_args(args);
 

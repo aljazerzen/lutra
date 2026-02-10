@@ -2,8 +2,6 @@ use lutra_codegen as codegen;
 use std::{env, path};
 
 fn main() {
-    println!("cargo::rerun-if-changed=build.rs");
-
     // generated file should reside in $OUT_DIR (./target/.../out)
     let out_file = path::Path::new(&env::var("OUT_DIR").unwrap()).join("generated.rs");
 

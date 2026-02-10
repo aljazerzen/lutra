@@ -6,7 +6,7 @@ use lutra_runner_duckdb::Runner;
 #[tokio::main(flavor = "current_thread")]
 pub async fn _run(source: &str, input: lutra_bin::Value) -> (String, String) {
     // Create in-memory DuckDB instance for each test
-    let runner = Runner::in_memory().await.unwrap();
+    let runner = Runner::in_memory(None).await.unwrap();
     _run_on(&runner, source, input).await
 }
 
@@ -26,7 +26,7 @@ pub async fn _run_with_setup(
         .await
         .unwrap();
 
-    let runner = Runner::new(client);
+    let runner = Runner::new(client, None).await.unwrap();
     _run_on(&runner, source, input).await
 }
 
@@ -38,25 +38,9 @@ pub async fn _run_on(
 ) -> (String, String) {
     crate::init_logger();
 
-    // compile
-    let source = SourceTree::single("".into(), source.to_string());
-    let project = match lutra_compiler::check(source, Default::default()) {
-        Ok(p) => p,
-        Err(e) => return (String::new(), format!("check error:\n{e}")),
-    };
-
-    // compile to sql using DuckDB dialect (tests use DuckDB runner)
-    let res = lutra_compiler::compile(&project, "main", None, ProgramFormat::SqlDuckdb);
-    let (program, ty) = match res {
-        Ok(x) => x,
-        Err(e) => return (String::new(), format!("compile error:\n{e}")),
-    };
-
-    // format sql
-    let formatted_sql = {
-        let program = program.as_sql_duck_db().unwrap();
-        let options = sqlformat::FormatOptions::default();
-        sqlformat::format(&program.sql, &sqlformat::QueryParams::None, &options)
+    let (program, ty, formatted_sql) = match _compile(source) {
+        Ok(r) => r,
+        Err(e) => return ("".into(), e),
     };
 
     let input = input.encode(&ty.input, &ty.defs).unwrap();
@@ -69,6 +53,33 @@ pub async fn _run_on(
     let output = lutra_bin::print_source(&output, &ty.output, &ty.defs).unwrap();
 
     (formatted_sql, output)
+}
+
+#[track_caller]
+fn _compile(
+    source: &str,
+) -> Result<(lutra_bin::rr::Program, lutra_bin::rr::ProgramType, String), String> {
+    // check
+    let source = SourceTree::single("".into(), source.to_string());
+    let project = match lutra_compiler::check(source, Default::default()) {
+        Ok(p) => p,
+        Err(e) => return Err(format!("check error:\n{e}")),
+    };
+
+    // compile
+    let res = lutra_compiler::compile(&project, "main", None, ProgramFormat::SqlDuckdb);
+    let (program, ty) = match res {
+        Ok(x) => x,
+        Err(e) => return Err(format!("compile error:\n{e}")),
+    };
+
+    // format_sql
+    let formatted_sql = {
+        let program = program.as_sql_duck_db().unwrap();
+        let options = sqlformat::FormatOptions::default();
+        sqlformat::format(&program.sql, &sqlformat::QueryParams::None, &options)
+    };
+    Ok((program, ty, formatted_sql))
 }
 
 pub fn _sql_and_output((sql, output): (String, String)) -> String {
@@ -153,7 +164,9 @@ async fn pull_interface_basic() {
         .await
         .unwrap();
 
-    let runner = lutra_runner_duckdb::Runner::new(client);
+    let runner = lutra_runner_duckdb::Runner::new(client, None)
+        .await
+        .unwrap();
     let interface = runner.get_interface().await.unwrap();
 
     insta::assert_snapshot!(interface, @r#"
@@ -207,7 +220,9 @@ async fn pull_interface_types() {
         .await
         .unwrap();
 
-    let runner = lutra_runner_duckdb::Runner::new(client);
+    let runner = lutra_runner_duckdb::Runner::new(client, None)
+        .await
+        .unwrap();
     let interface = runner.get_interface().await.unwrap();
 
     insta::assert_snapshot!(interface, @r#"
@@ -241,7 +256,9 @@ async fn pull_interface_arrays() {
         .await
         .unwrap();
 
-    let runner = lutra_runner_duckdb::Runner::new(client);
+    let runner = lutra_runner_duckdb::Runner::new(client, None)
+        .await
+        .unwrap();
     let interface = runner.get_interface().await.unwrap();
 
     insta::assert_snapshot!(interface, @r#"
@@ -274,7 +291,9 @@ async fn pull_interface_struct() {
         .await
         .unwrap();
 
-    let runner = lutra_runner_duckdb::Runner::new(client);
+    let runner = lutra_runner_duckdb::Runner::new(client, None)
+        .await
+        .unwrap();
     let interface = runner.get_interface().await.unwrap();
 
     insta::assert_snapshot!(interface, @r#"
@@ -308,7 +327,9 @@ async fn pull_interface_indexes_basic() {
         .await
         .unwrap();
 
-    let runner = lutra_runner_duckdb::Runner::new(client);
+    let runner = lutra_runner_duckdb::Runner::new(client, None)
+        .await
+        .unwrap();
     let interface = runner.get_interface().await.unwrap();
 
     insta::assert_snapshot!(interface, @r#"
@@ -355,7 +376,9 @@ async fn pull_interface_indexes_compound() {
         .await
         .unwrap();
 
-    let runner = lutra_runner_duckdb::Runner::new(client);
+    let runner = lutra_runner_duckdb::Runner::new(client, None)
+        .await
+        .unwrap();
     let interface = runner.get_interface().await.unwrap();
 
     insta::assert_snapshot!(interface, @r#"
@@ -2556,4 +2579,51 @@ fn serialize_tuple_with_option_array() {
       ],
     }
     "#);
+}
+
+// ============================================================================
+// Parquet Tests
+// ============================================================================
+
+#[test]
+fn fs_read_parquet() {
+    crate::init_logger();
+
+    insta::assert_snapshot!(_compile(
+    r#"func main(): [{id: int32, name: text}] -> std::fs::read_parquet("test.parquet")"#,
+    ).unwrap().2, @"
+    SELECT
+      r1._0 AS id,
+      r1._1 AS name
+    FROM
+      (
+        SELECT
+          r0.id AS _0,
+          r0.name AS _1
+        FROM
+          read_parquet('test.parquet'::text) AS r0
+      ) AS r1
+    ");
+}
+
+#[test]
+fn fs_write_parquet() {
+    crate::init_logger();
+
+    insta::assert_snapshot!(_compile(
+    r#"func main(x: [{id: int32, name: text}]) -> std::fs::write_parquet(x, "test.parquet")"#,
+    ).unwrap().2, @"
+    COPY(
+      (
+        SELECT
+          r0._0 AS id,
+          r0._1 AS name
+        FROM
+          (
+            SELECT
+              $1::STRUCT(id INT4, name TEXT) [] AS _0
+          ) AS r0
+      )
+    ) TO 'test.parquet'::text (FORMAT parquet, COMPRESSION zstd)
+    ");
 }

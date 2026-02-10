@@ -98,6 +98,7 @@ pub enum SetExpr {
         output: Option<OutputClause>,
     },
     Source(String),
+    Copy(Box<Copy>),
 }
 
 impl SetExpr {
@@ -203,7 +204,28 @@ impl fmt::Display for SetExpr {
                 Ok(())
             }
             SetExpr::Source(s) => f.write_str(s),
+            SetExpr::Copy(c) => c.fmt(f),
         }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, PartialOrd, Eq, Ord, Hash)]
+pub struct Copy {
+    pub source: SetExpr,
+    pub target: Expr,
+    pub options: String,
+}
+
+impl fmt::Display for Copy {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str("COPY(")?;
+        self.source.fmt(f)?;
+        f.write_str(") TO ")?;
+        self.target.fmt(f)?;
+        f.write_str(" (")?;
+        f.write_str(&self.options)?;
+        f.write_str(")")?;
+        Ok(())
     }
 }
 
@@ -490,6 +512,16 @@ pub struct RelNamed {
     pub lateral: bool,
     pub alias: Option<TableAlias>,
     pub expr: RelExpr,
+}
+
+impl RelNamed {
+    pub fn unnamed(expr: RelExpr) -> Self {
+        Self {
+            expr,
+            alias: None,
+            lateral: false,
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, PartialOrd, Eq, Ord, Hash)]

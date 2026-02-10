@@ -329,9 +329,10 @@ pub async fn run(cmd: RunCommand) -> anyhow::Result<()> {
 
     // execute
     eprintln!("Executing...");
+    let execution_dir = Some(project.source.get_project_dir().to_path_buf());
     let output = if cmd.runner.interpreter {
-        let runner = lutra_interpreter::InterpreterRunner::default()
-            .with_file_system(Some(project.source.get_project_dir().to_path_buf()));
+        let runner =
+            lutra_interpreter::InterpreterRunner::default().with_file_system(execution_dir);
 
         let handle = runner.prepare(program).await?;
         runner.execute(&handle, &input).await?
@@ -340,7 +341,7 @@ pub async fn run(cmd: RunCommand) -> anyhow::Result<()> {
         let handle = runner.prepare(program).await?;
         runner.execute(&handle, &input).await?
     } else if let Some(duckdb_path) = cmd.runner.duckdb {
-        let runner = init_runner_duckdb(&duckdb_path).await?;
+        let runner = init_runner_duckdb(&duckdb_path, execution_dir).await?;
         let handle = runner.prepare(program).await?;
         runner.execute(&handle, &input).await?
     } else {
@@ -371,14 +372,17 @@ pub fn interactive(cmd: InteractiveCommand) -> anyhow::Result<()> {
 
     let runner = if cmd.runner.interpreter {
         lutra_tui::RunnerConfig::Interpreter {
-            fs_root: Some(project_path.clone()),
+            fs_root: Some(project_path.clone()), // this is wrong
         }
     } else if let Some(pg_url) = cmd.runner.postgres {
         lutra_tui::RunnerConfig::Postgres {
             connection_string: pg_url,
         }
     } else if let Some(path) = cmd.runner.duckdb {
-        lutra_tui::RunnerConfig::DuckDB { path }
+        lutra_tui::RunnerConfig::DuckDB {
+            path,
+            file_system: Some(project_path.clone()), // this is wrong
+        }
     } else {
         unreachable!()
     };
@@ -400,8 +404,11 @@ async fn init_runner_postgres(url: &str) -> anyhow::Result<lutra_runner_postgres
     Ok(lutra_runner_postgres::RunnerAsync::new(client))
 }
 
-async fn init_runner_duckdb(path: &str) -> anyhow::Result<lutra_runner_duckdb::Runner> {
-    lutra_runner_duckdb::Runner::open(path)
+async fn init_runner_duckdb(
+    path: &str,
+    file_system: Option<path::PathBuf>,
+) -> anyhow::Result<lutra_runner_duckdb::Runner> {
+    lutra_runner_duckdb::Runner::open(path, file_system)
         .await
         .map_err(Into::into)
 }
@@ -425,7 +432,7 @@ pub async fn pull_interface(cmd: PullInterfaceCommand) -> anyhow::Result<()> {
         let runner = init_runner_postgres(&pg_url).await?;
         runner.get_interface().await?
     } else if let Some(duckdb_path) = cmd.runner.duckdb {
-        let runner = init_runner_duckdb(&duckdb_path).await?;
+        let runner = init_runner_duckdb(&duckdb_path, cmd.project).await?;
         runner.get_interface().await?
     } else {
         unreachable!()

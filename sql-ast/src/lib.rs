@@ -27,7 +27,7 @@ use display_utils::{NewLine, SpaceOrNewline};
 
 pub use self::dml::{Delete, Insert};
 pub use self::query::{
-    Cte, CteAsMaterialized, Distinct, ExprWithAlias, Join, JoinConstraint, JoinOperator,
+    Copy, Cte, CteAsMaterialized, Distinct, ExprWithAlias, Join, JoinConstraint, JoinOperator,
     LateralView, OrderBy, OrderByExpr, OrderByKind, OrderByOptions, PivotValueSource, Query,
     RelExpr, RelNamed, Select, SelectInto, SelectItem, SetExpr, SetOperator, SetQuantifier,
     TableAlias, TableVersion, Values, With,

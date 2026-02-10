@@ -47,9 +47,10 @@ pub fn check_and_generate(project_dir: impl AsRef<path::Path>, options: Generate
     let code = rust::run(&project, &options, out_dir).unwrap();
     fs::write(out_path, code).unwrap();
 
-    // print directives
-    for f in project.source.get_source_display_paths() {
-        println!("cargo::rerun-if-changed={}", f.to_str().unwrap());
+    // print directives with absolute paths for reliability
+    for (p, _) in project.source.get_sources() {
+        let abs_path = project.source.get_absolute_path(p);
+        println!("cargo::rerun-if-changed={}", abs_path.display());
     }
 }
 

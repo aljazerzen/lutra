@@ -7,7 +7,7 @@ mod schema;
 pub use lutra_runner::Run;
 
 use lutra_bin::{ir, rr};
-use std::{collections::HashMap, sync::Arc};
+use std::{collections::HashMap, path, sync::Arc};
 use thiserror::Error;
 
 /// DuckDB runner for executing Lutra programs
@@ -19,20 +19,31 @@ pub struct Runner {
 }
 
 impl Runner {
-    pub fn new(client: async_duckdb::Client) -> Self {
-        Self { client }
+    pub async fn new(
+        client: async_duckdb::Client,
+        file_system: Option<path::PathBuf>,
+    ) -> Result<Self, Error> {
+        if let Some(fs_path) = file_system {
+            client
+                .conn(move |c| {
+                    let set_fs_access = format!("SET file_search_path = \'{}\'", fs_path.display());
+                    c.execute(&set_fs_access, [])
+                })
+                .await?;
+        }
+        Ok(Self { client })
     }
 
     /// Open a file-based DuckDB database
-    pub async fn open(path: &str) -> Result<Self, Error> {
+    pub async fn open(path: &str, file_system: Option<path::PathBuf>) -> Result<Self, Error> {
         let client = async_duckdb::ClientBuilder::new().path(path).open().await?;
-        Ok(Self::new(client))
+        Self::new(client, file_system).await
     }
 
     /// Create an in-memory DuckDB database
-    pub async fn in_memory() -> Result<Self, Error> {
+    pub async fn in_memory(file_system: Option<path::PathBuf>) -> Result<Self, Error> {
         let client = async_duckdb::ClientBuilder::new().open().await?;
-        Ok(Self::new(client))
+        Self::new(client, file_system).await
     }
 }
 
@@ -143,14 +154,14 @@ mod tests {
 
     #[tokio::test]
     async fn test_in_memory() {
-        let _runner = Runner::in_memory().await.unwrap();
+        let _runner = Runner::in_memory(None).await.unwrap();
         // Basic smoke test
     }
 
     #[tokio::test]
     async fn test_file_based() {
         let temp = std::env::temp_dir().join("test_lutra_duckdb.duckdb");
-        let _runner = Runner::open(temp.to_str().unwrap()).await.unwrap();
+        let _runner = Runner::open(temp.to_str().unwrap(), None).await.unwrap();
         // Test persistence
         std::fs::remove_file(temp).ok();
     }
