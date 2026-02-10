@@ -1,3 +1,4 @@
+use crossterm::event::KeyCode;
 use ratatui::prelude::*;
 
 use crate::utils::{clip_left, clip_top};
@@ -34,22 +35,24 @@ impl BoolForm {
     }
 
     pub fn update(&mut self, action: &Action) -> FormResult {
-        match action {
-            Action::Write(text) => {
-                for char in text.chars() {
-                    match char {
-                        'x' => self.value = true,
-                        ' ' => self.value = !self.value,
-                        _ => {}
-                    }
-                }
+        let Some(key) = action.as_key() else {
+            return FormResult::None;
+        };
+
+        match key.code {
+            KeyCode::Char('x') => {
+                self.value = true;
                 FormResult::Redraw
             }
-            Action::Erase => {
+            KeyCode::Char(' ') => {
+                self.value = !self.value;
+                FormResult::Redraw
+            }
+            KeyCode::Backspace => {
                 self.value = false;
                 FormResult::Redraw
             }
-            Action::Select => {
+            KeyCode::Enter => {
                 self.value = !self.value;
                 FormResult::Redraw
             }

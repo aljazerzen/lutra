@@ -1,3 +1,4 @@
+use crossterm::event::KeyCode;
 use ratatui::prelude::*;
 
 use crate::input::form::{Form, FormResult};
@@ -37,10 +38,13 @@ impl ButtonForm {
     }
 
     pub fn update(&self, action: &Action) -> FormResult {
-        if let Action::Select = action {
-            FormResult::Submit
-        } else {
-            FormResult::None
+        let Some(key) = action.as_key() else {
+            return FormResult::None;
+        };
+
+        match key.code {
+            KeyCode::Enter => FormResult::Submit,
+            _ => FormResult::None,
         }
     }
 }

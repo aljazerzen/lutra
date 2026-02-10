@@ -27,7 +27,7 @@ pub fn prompt_for_ty(
     let _event_thread = crate::terminal::spawn_event_reader(action_tx);
 
     // Run
-    let r = crate::terminal::run_app(&mut app, &mut term, action_rx);
+    let r = crate::terminal::run_action_loop(&mut app, &mut term, action_rx);
 
     // Restore terminal
     ratatui::restore();
@@ -41,9 +41,9 @@ struct InputApp {
 }
 
 impl Component for InputApp {
-    fn handle(&mut self, action: Action) -> crate::terminal::EventResult {
+    fn handle(&mut self, action: Action) -> crate::terminal::ActionResult {
         if let Action::ExecuteProgram = action {
-            crate::terminal::EventResult::shutdown()
+            crate::terminal::ActionResult::shutdown()
         } else {
             self.pane.handle(action)
         }

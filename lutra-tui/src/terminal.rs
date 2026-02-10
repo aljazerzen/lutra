@@ -1,6 +1,6 @@
 use std::collections::VecDeque;
 
-use crossterm::event::{self, KeyCode, KeyModifiers};
+use crossterm::event;
 use lutra_bin::ir;
 use ratatui::prelude::*;
 
@@ -9,52 +9,52 @@ use ratatui::prelude::*;
 /// Other components should always have similar functions for rendering and handling actions,
 /// but with additional parameters (additional state from the parent).
 pub trait Component {
-    fn handle(&mut self, action: Action) -> EventResult;
+    fn handle(&mut self, action: Action) -> ActionResult;
 
     fn render(&self, frame: &mut Frame, area: Rect);
 }
 
 #[derive(Debug)]
+#[allow(dead_code)]
 pub enum Action {
-    // Terminal events (from event reader thread)
+    /// Terminal event (raw, uninterpreted)
     Terminal(event::Event),
 
-    // Generic UI actions
-    Write(String),
-    Erase,
-    MoveUp,
-    MoveDown,
-    MoveRight,
-    MoveLeft,
-    MovePageUp,
-    MovePageDown,
-    Select,
-
-    // InteractiveApp-specific actions
-    RunDefinition(ir::Path),
-    ExecuteProgram,
-    RunSelected,
-    CycleFocus,
-    Exit,
-    Recompile,
-    ReturnToInput,
+    /// Runner responses
     RunnerMessage(lutra_runner::channel::messages::ServerMessage),
 
-    // Tab management
+    // App-level commands (high-level)
+    Exit,
+    Recompile,
+    CycleFocus,
+    ExecuteProgram,
+    RunSelected,
+    RunDefinition(ir::Path),
+    ReturnToInput,
     CloseTab,
     NextTab,
     PrevTab,
     SwitchToTab(usize),
 }
 
-#[derive(Default)]
-pub struct EventResult {
-    pub redraw: bool,
-    pub shutdown: bool,
-    pub actions: Vec<Action>,
+impl Action {
+    /// Extract a key event from a Terminal action.
+    pub fn as_key(&self) -> Option<event::KeyEvent> {
+        match self {
+            Action::Terminal(event::Event::Key(key)) => Some(*key),
+            _ => None,
+        }
+    }
 }
 
-impl EventResult {
+#[derive(Default)]
+pub struct ActionResult {
+    redraw: bool,
+    shutdown: bool,
+    actions: Vec<Action>,
+}
+
+impl ActionResult {
     pub fn redraw() -> Self {
         Self {
             redraw: true,
@@ -111,7 +111,7 @@ pub(super) fn spawn_event_reader(
 /// All events (terminal, file watcher, etc.) flow through the action channel.
 /// The caller should spawn an event reader thread and any other action sources
 /// before calling this function.
-pub(super) fn run_app<R: ratatui::backend::Backend>(
+pub(super) fn run_action_loop<R: ratatui::backend::Backend>(
     app: &mut impl Component,
     terminal: &mut Terminal<R>,
     action_rx: std::sync::mpsc::Receiver<Action>,
@@ -130,7 +130,7 @@ where
 
         // Process actions
         while let Some(action) = queue.pop_front() {
-            let res = process_action(app, action);
+            let res = app.handle(action);
             if res.shutdown {
                 return Ok(());
             }
@@ -146,62 +146,4 @@ where
     }
 
     Ok(())
-}
-
-/// Process an action by either handling it as a terminal event or passing to app.update().
-fn process_action(app: &mut impl Component, action: Action) -> EventResult {
-    match action {
-        Action::Terminal(event) => process_terminal_event(event),
-        _ => {
-            // All other actions go directly to app.update()
-            app.handle(action)
-        }
-    }
-}
-
-fn process_terminal_event(event: event::Event) -> EventResult {
-    match event {
-        event::Event::Resize(_, _) => EventResult::redraw(),
-        event::Event::Key(key_event) => {
-            // Generic quit handling (for simple apps)
-            if matches!(key_event.code, KeyCode::Esc)
-                || (key_event.code == KeyCode::Char('c')
-                    && key_event.modifiers.contains(KeyModifiers::CONTROL))
-            {
-                return EventResult::action(Action::Exit);
-            }
-
-            // Fall back to generic mapping
-            EventResult::action(match key_event.code {
-                KeyCode::Left if key_event.modifiers.contains(KeyModifiers::CONTROL) => {
-                    Action::PrevTab
-                }
-                KeyCode::Right if key_event.modifiers.contains(KeyModifiers::CONTROL) => {
-                    Action::NextTab
-                }
-                KeyCode::Left => Action::MoveLeft,
-                KeyCode::Right => Action::MoveRight,
-                KeyCode::Down => Action::MoveDown,
-                KeyCode::Up => Action::MoveUp,
-                KeyCode::PageUp => Action::MovePageUp,
-                KeyCode::PageDown => Action::MovePageDown,
-                KeyCode::Enter => Action::Select,
-                KeyCode::Tab => Action::CycleFocus,
-                KeyCode::Backspace => Action::Erase,
-                KeyCode::Char('x') => Action::CloseTab,
-                KeyCode::Char(c @ '1'..='9') => {
-                    // Convert '1' -> 0, '2' -> 1, etc.
-                    let index = (c as usize) - ('1' as usize);
-                    Action::SwitchToTab(index)
-                }
-                KeyCode::Char(c) => Action::Write(c.to_string()),
-                KeyCode::F(5) => Action::RunSelected,
-                _ => return EventResult::default(),
-            })
-        }
-        event::Event::FocusGained => EventResult::default(),
-        event::Event::FocusLost => EventResult::default(),
-        event::Event::Mouse(_) => EventResult::default(),
-        event::Event::Paste(text) => EventResult::action(Action::Write(text)),
-    }
 }

@@ -18,7 +18,7 @@ use std::time::Instant;
 use crate::RunnerConfig;
 use crate::panels::program::source::SourcePane;
 use crate::style;
-use crate::terminal::{Action, Component, EventResult};
+use crate::terminal::{Action, ActionResult, Component};
 
 /// Center panel for executing a selected definition.
 pub struct ProgramPane {
@@ -153,6 +153,11 @@ impl ProgramPane {
         }
     }
 
+    /// Check if a form input field currently has cursor focus.
+    pub fn is_form_field_focused(&self) -> bool {
+        self.focused && matches!(self.stage, RunStage::Input)
+    }
+
     /// Clears the current program.
     pub fn clear(&mut self) {
         // Release prepared program (ignore errors)
@@ -251,11 +256,11 @@ impl ProgramPane {
 }
 
 impl Component for ProgramPane {
-    fn handle(&mut self, action: Action) -> EventResult {
+    fn handle(&mut self, action: Action) -> ActionResult {
         // Special handling for ReturnToInput action
         if matches!(action, Action::ReturnToInput) {
             self.stage = RunStage::Input;
-            return EventResult::redraw();
+            return ActionResult::redraw();
         }
 
         // Delegate to current stage component
@@ -275,7 +280,7 @@ impl Component for ProgramPane {
                 .as_mut()
                 .map(|s| s.handle(action))
                 .unwrap_or_default(),
-            _ => EventResult::default(),
+            _ => ActionResult::default(),
         }
     }
 

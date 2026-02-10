@@ -1,3 +1,4 @@
+use crossterm::event::KeyCode;
 use lutra_bin::ir;
 use ratatui::prelude::*;
 
@@ -68,12 +69,16 @@ impl ArrayForm {
     }
 
     pub fn update(&mut self, action: &Action, self_ty: &ir::Ty, ty_defs: &TyDefs) -> FormResult {
-        match action {
-            Action::MoveLeft => {
+        let Some(key) = action.as_key() else {
+            return FormResult::None;
+        };
+
+        match key.code {
+            KeyCode::Left => {
                 self.focused_action = self.focused_action.saturating_sub(1);
                 FormResult::Redraw
             }
-            Action::MoveRight => {
+            KeyCode::Right => {
                 self.focused_action = self.focused_action.saturating_add(1);
 
                 if self.focused_action >= ACTIONS.len() {
@@ -81,7 +86,7 @@ impl ArrayForm {
                 }
                 FormResult::Redraw
             }
-            Action::Select => {
+            KeyCode::Enter => {
                 if let Some(action) = ACTIONS.get(self.focused_action) {
                     match action {
                         ArrayAction::Push => {

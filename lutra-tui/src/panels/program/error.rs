@@ -1,7 +1,8 @@
+use crossterm::event::KeyCode;
 use ratatui::prelude::*;
 use ratatui::widgets::{Block, Borders, Padding, Paragraph};
 
-use crate::terminal::{Action, Component, EventResult};
+use crate::terminal::{Action, ActionResult, Component};
 
 /// Error stage component - displays execution errors
 pub struct ErrorPane {
@@ -32,18 +33,22 @@ impl Component for ErrorPane {
         frame.render_widget(paragraph, inner);
     }
 
-    fn handle(&mut self, action: Action) -> EventResult {
-        match action {
-            Action::MoveUp => {
+    fn handle(&mut self, action: Action) -> ActionResult {
+        let Some(key) = action.as_key() else {
+            return ActionResult::default();
+        };
+
+        match key.code {
+            KeyCode::Up => {
                 self.scroll = self.scroll.saturating_sub(1);
-                EventResult::redraw()
+                ActionResult::redraw()
             }
-            Action::MoveDown => {
+            KeyCode::Down => {
                 self.scroll = self.scroll.saturating_add(1);
-                EventResult::redraw()
+                ActionResult::redraw()
             }
-            Action::Select => EventResult::action(Action::ReturnToInput),
-            _ => EventResult::default(),
+            KeyCode::Enter => ActionResult::action(Action::ReturnToInput),
+            _ => ActionResult::default(),
         }
     }
 }

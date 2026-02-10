@@ -1,11 +1,12 @@
 use std::rc::Rc;
 
+use crossterm::event::KeyCode;
 use lutra_compiler::error::DiagnosticMessage;
 use ratatui::prelude::*;
 use ratatui::widgets::Paragraph;
 
 use crate::project::{CompileResult, ProjectState};
-use crate::terminal::{Action, Component, EventResult};
+use crate::terminal::{Action, ActionResult, Component};
 
 /// Center panel displaying compilation errors and warnings.
 pub struct DiagnosticsPanel {
@@ -47,25 +48,30 @@ impl DiagnosticsPanel {
 
 impl Component for DiagnosticsPanel {
     /// Handle a key event. Returns an action if the panel requests app-level behavior.
-    fn handle(&mut self, action: Action) -> EventResult {
-        match action {
-            Action::MoveUp => {
+    fn handle(&mut self, action: Action) -> ActionResult {
+        // Extract key event from terminal action
+        let Some(key) = action.as_key() else {
+            return ActionResult::default();
+        };
+
+        match key.code {
+            KeyCode::Up => {
                 if self.selected > 0 {
                     self.selected -= 1;
                     self.scroll = 0;
-                    return EventResult::redraw();
+                    return ActionResult::redraw();
                 }
             }
-            Action::MoveDown => {
+            KeyCode::Down => {
                 if self.selected + 1 < self.diagnostics.len() {
                     self.selected += 1;
                     self.scroll = 0;
-                    return EventResult::redraw();
+                    return ActionResult::redraw();
                 }
             }
             _ => {}
         }
-        EventResult::default()
+        ActionResult::default()
     }
 
     /// Render the panel to the given area.

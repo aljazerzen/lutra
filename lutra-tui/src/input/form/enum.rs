@@ -1,3 +1,4 @@
+use crossterm::event::KeyCode;
 use lutra_bin::ir;
 use ratatui::prelude::*;
 
@@ -78,12 +79,16 @@ impl EnumForm {
     }
 
     pub fn update(&mut self, action: &Action) -> FormResult {
-        match action {
-            Action::MoveLeft => {
+        let Some(key) = action.as_key() else {
+            return FormResult::None;
+        };
+
+        match key.code {
+            KeyCode::Left => {
                 self.selected = self.selected.saturating_sub(1);
                 FormResult::Redraw
             }
-            Action::MoveRight => {
+            KeyCode::Right => {
                 self.selected = self.selected.saturating_add(1);
                 if self.selected >= self.variants.len() {
                     self.selected = self.variants.len() - 1;

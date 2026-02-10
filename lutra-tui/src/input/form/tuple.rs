@@ -1,3 +1,4 @@
+use crossterm::event::KeyCode;
 use lutra_bin::ir;
 use ratatui::prelude::*;
 
@@ -76,11 +77,16 @@ impl TupleForm {
     }
 
     pub(crate) fn update(&mut self, action: &Action) -> FormResult {
-        if let Action::Select = action {
-            self.is_folded = !self.is_folded;
-            FormResult::Redraw
-        } else {
-            FormResult::None
+        let Some(key) = action.as_key() else {
+            return FormResult::None;
+        };
+
+        match key.code {
+            KeyCode::Enter => {
+                self.is_folded = !self.is_folded;
+                FormResult::Redraw
+            }
+            _ => FormResult::None,
         }
     }
 }

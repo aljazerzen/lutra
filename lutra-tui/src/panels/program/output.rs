@@ -2,12 +2,13 @@ use std::cell::Cell;
 use std::rc::Rc;
 use std::time::Duration;
 
+use crossterm::event::KeyCode;
 use lutra_bin::rr;
 use lutra_bin::{Table, TableConfig, TableLayout};
 use ratatui::prelude::*;
 use ratatui::widgets::{Block, Borders, Padding, Paragraph};
 
-use crate::terminal::{Action, Component, EventResult};
+use crate::terminal::{Action, ActionResult, Component};
 use crate::utils::clip_top;
 
 /// Output stage component - displays execution results
@@ -78,37 +79,41 @@ impl Component for OutputPane {
         frame.render_widget(Paragraph::new(styled_lines), area);
     }
 
-    fn handle(&mut self, action: Action) -> EventResult {
-        match action {
-            Action::MoveUp => {
+    fn handle(&mut self, action: Action) -> ActionResult {
+        let Some(key) = action.as_key() else {
+            return ActionResult::default();
+        };
+
+        match key.code {
+            KeyCode::Up => {
                 self.scroll = self.scroll.saturating_sub(1);
-                EventResult::redraw()
+                ActionResult::redraw()
             }
-            Action::MoveDown => {
+            KeyCode::Down => {
                 // Prevent scrolling beyond available rows
                 if self.scroll + 1 < self.layout.total_rows {
                     self.scroll += 1;
                 }
-                EventResult::redraw()
+                ActionResult::redraw()
             }
-            Action::MovePageUp => {
+            KeyCode::PageUp => {
                 // Scroll up by viewport height, but at least 1 row
                 let page_size = self.viewport_rows.get().max(1);
                 self.scroll = self.scroll.saturating_sub(page_size);
-                EventResult::redraw()
+                ActionResult::redraw()
             }
-            Action::MovePageDown => {
+            KeyCode::PageDown => {
                 // Scroll down by viewport height
                 let page_size = self.viewport_rows.get().max(1);
                 let max_scroll = self.layout.total_rows.saturating_sub(1);
                 self.scroll = (self.scroll + page_size).min(max_scroll);
-                EventResult::redraw()
+                ActionResult::redraw()
             }
-            Action::Select => {
+            KeyCode::Enter => {
                 // Return to input state
-                EventResult::action(Action::ReturnToInput)
+                ActionResult::action(Action::ReturnToInput)
             }
-            _ => EventResult::default(),
+            _ => ActionResult::default(),
         }
     }
 }

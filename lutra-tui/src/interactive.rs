@@ -1,13 +1,15 @@
 use std::path::PathBuf;
 use std::sync::mpsc;
 
+use crossterm::event;
 use ratatui::prelude::*;
 
+use crate::keybindings::{KeyBindings, KeyContext};
 use crate::layout::{CenterPanel, Layout, PanelFocus};
 use crate::panels::{DefinitionsPanel, DiagnosticsPanel, StatusBar, Tabs};
 use crate::project::{CompileResult, ProjectState};
 use crate::runner;
-use crate::terminal::{Action, Component, EventResult};
+use crate::terminal::{Action, ActionResult, Component};
 use crate::watcher::FileWatcher;
 
 /// Starts the interactive project environment.
@@ -33,7 +35,7 @@ pub fn run_interactive(
     let _event_thread = crate::terminal::spawn_event_reader(action_tx);
 
     // Run the app
-    let r = crate::terminal::run_app(&mut app, &mut term, action_rx);
+    let r = crate::terminal::run_action_loop(&mut app, &mut term, action_rx);
 
     // Restore terminal
     ratatui::restore();
@@ -57,6 +59,9 @@ pub struct InteractiveApp {
 
     /// Runner configuration.
     pub runner: runner::RunnerConfig,
+
+    /// Keybindings configuration.
+    keybindings: KeyBindings,
 
     // -- handles --
     #[allow(dead_code)]
@@ -89,6 +94,7 @@ impl InteractiveApp {
             project: ProjectState::new(project_path),
             layout: Layout::new(),
             runner,
+            keybindings: KeyBindings::new(),
             runner_client: runner_client.clone(),
             definitions: DefinitionsPanel::new(),
             diagnostics: DiagnosticsPanel::new(),
@@ -155,6 +161,49 @@ impl InteractiveApp {
         };
         self.action_open_program(&path);
     }
+
+    /// Get the current key binding context based on focus state.
+    fn get_key_context(&self) -> KeyContext {
+        match self.layout.focus {
+            PanelFocus::Run => {
+                if self.run_panels.is_form_field_focused() {
+                    KeyContext::RunInput
+                } else {
+                    KeyContext::Run
+                }
+            }
+            PanelFocus::Definitions => KeyContext::Definitions,
+            PanelFocus::Diagnostics => KeyContext::Diagnostics,
+        }
+    }
+
+    /// Process a terminal event with focus-aware keybindings.
+    fn process_terminal_event(&mut self, event: event::Event) -> ActionResult {
+        match event {
+            event::Event::Resize(_, _) => ActionResult::redraw(),
+            event::Event::Key(key) => {
+                let context = self.get_key_context();
+                if let Some(command) = self.keybindings.process_key_event(key, context) {
+                    // Keybinding matched - recursively handle the command
+                    return self.handle(command);
+                }
+                // No keybinding matched - pass raw terminal event to focused component
+                match self.layout.focus {
+                    PanelFocus::Definitions => self.definitions.handle(Action::Terminal(event)),
+                    PanelFocus::Diagnostics => self.diagnostics.handle(Action::Terminal(event)),
+                    PanelFocus::Run => self.run_panels.handle(Action::Terminal(event)),
+                }
+            }
+            _ => {
+                // Other events (mouse, focus, paste) - pass to focused component
+                match self.layout.focus {
+                    PanelFocus::Definitions => self.definitions.handle(Action::Terminal(event)),
+                    PanelFocus::Diagnostics => self.diagnostics.handle(Action::Terminal(event)),
+                    PanelFocus::Run => self.run_panels.handle(Action::Terminal(event)),
+                }
+            }
+        }
+    }
 }
 
 impl Component for InteractiveApp {
@@ -178,14 +227,16 @@ impl Component for InteractiveApp {
         self.status.render(frame, areas.status);
     }
 
-    fn handle(&mut self, action: Action) -> EventResult {
+    fn handle(&mut self, action: Action) -> ActionResult {
         match action {
+            // Terminal events - process with focus-aware keybindings
+            Action::Terminal(event) => self.process_terminal_event(event),
+
             // Global commands
-            Action::Exit => {
-                return EventResult::shutdown();
-            }
+            Action::Exit => ActionResult::shutdown(),
             Action::RunDefinition(path) => {
                 self.action_open_program(&path);
+                ActionResult::redraw()
             }
             Action::ExecuteProgram => {
                 // ProgramPane has its own sender, just trigger execution
@@ -194,42 +245,51 @@ impl Component for InteractiveApp {
                 {
                     panel.set_error(e);
                 }
+                ActionResult::redraw()
             }
             Action::RunSelected => {
                 self.action_open_selected();
+                ActionResult::redraw()
             }
             Action::CycleFocus => {
                 self.layout.cycle_focus();
                 self.update_panel_focus();
+                ActionResult::redraw()
             }
             Action::Recompile => {
                 self.recompile();
+                ActionResult::redraw()
             }
             Action::RunnerMessage(msg) => {
                 self.run_panels.handle_runner_message(msg);
+                ActionResult::redraw()
             }
             Action::CloseTab => {
                 self.run_panels.close_active_tab();
+                ActionResult::redraw()
             }
             Action::NextTab => {
                 self.run_panels.next_tab();
+                self.layout.focus = PanelFocus::Run;
+                self.update_panel_focus();
+                ActionResult::redraw()
             }
             Action::PrevTab => {
                 self.run_panels.prev_tab();
+                self.layout.focus = PanelFocus::Run;
+                self.update_panel_focus();
+                ActionResult::redraw()
             }
             Action::SwitchToTab(index) => {
                 self.run_panels.switch_to_tab(index);
+                self.layout.focus = PanelFocus::Run;
+                self.update_panel_focus();
+                ActionResult::redraw()
             }
-
-            // Fallback to focused components
-            _ => {
-                return match self.layout.focus {
-                    PanelFocus::Definitions => self.definitions.handle(action),
-                    PanelFocus::Diagnostics => self.diagnostics.handle(action),
-                    PanelFocus::Run => self.run_panels.handle(action),
-                };
+            Action::ReturnToInput => {
+                // Delegate to run panels
+                self.run_panels.handle(action)
             }
         }
-        EventResult::redraw()
     }
 }

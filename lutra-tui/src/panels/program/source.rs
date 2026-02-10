@@ -3,7 +3,7 @@ use lutra_compiler::pr;
 use ratatui::prelude::*;
 use ratatui::widgets::{Block, Borders, Padding, Paragraph};
 
-use crate::terminal::{Action, Component, EventResult};
+use crate::terminal::{Action, ActionResult, Component};
 
 /// Source code pane showing the function definition.
 pub struct SourcePane {
@@ -67,9 +67,9 @@ impl SourcePane {
 }
 
 impl Component for SourcePane {
-    fn handle(&mut self, _action: Action) -> EventResult {
+    fn handle(&mut self, _action: Action) -> ActionResult {
         // Source pane is read-only, no interaction
-        EventResult::default()
+        ActionResult::default()
     }
 
     fn render(&self, frame: &mut Frame, area: Rect) {

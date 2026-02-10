@@ -1,3 +1,4 @@
+use crossterm::event::KeyCode;
 use lutra_bin::ir;
 use ratatui::prelude::*;
 use ratatui::widgets::{Block, Borders, Padding};
@@ -5,7 +6,7 @@ use std::collections::HashMap;
 use std::rc::Rc;
 
 use crate::input::form::{Form, FormName, FormResult};
-use crate::terminal::{Action, Component, EventResult};
+use crate::terminal::{Action, ActionResult, Component};
 
 /// Input stage component - displays a form for a given type and a submit button.
 pub struct InputPane {
@@ -91,29 +92,31 @@ impl Component for InputPane {
         frame.render_widget(block, area);
     }
 
-    fn handle(&mut self, action: Action) -> EventResult {
+    fn handle(&mut self, action: Action) -> ActionResult {
         // Try to handle with form
         let focused = self.form.get_mut(&self.cursor);
         if let Some(focused) = focused {
             match focused.update(&action) {
-                FormResult::Redraw => return EventResult::redraw(),
-                FormResult::Submit => return EventResult::action(Action::ExecuteProgram),
+                FormResult::Redraw => return ActionResult::redraw(),
+                FormResult::Submit => return ActionResult::action(Action::ExecuteProgram),
                 FormResult::None => {}
             }
         }
 
-        // Handle navigation
-        match action {
-            Action::MoveUp => {
-                self.update_cursor_position(|p| p.saturating_sub(1));
-                return EventResult::redraw();
+        // Handle navigation with arrow keys
+        if let Some(key) = action.as_key() {
+            match key.code {
+                KeyCode::Up => {
+                    self.update_cursor_position(|p| p.saturating_sub(1));
+                    return ActionResult::redraw();
+                }
+                KeyCode::Down => {
+                    self.update_cursor_position(|p| p.saturating_add(1));
+                    return ActionResult::redraw();
+                }
+                _ => {}
             }
-            Action::MoveDown | Action::Select => {
-                self.update_cursor_position(|p| p.saturating_add(1));
-                return EventResult::redraw();
-            }
-            _ => {}
         }
-        EventResult::default()
+        ActionResult::default()
     }
 }

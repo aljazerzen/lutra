@@ -1,3 +1,4 @@
+use crossterm::event::KeyCode;
 use lutra_bin::ir;
 use ratatui::prelude::*;
 
@@ -22,43 +23,45 @@ impl NumberForm {
     }
 
     pub fn update(&mut self, action: &Action) -> FormResult {
-        match action {
-            Action::Write(text) => {
+        let Some(key) = action.as_key() else {
+            return FormResult::None;
+        };
+
+        match key.code {
+            KeyCode::Char(c) => {
                 // Filter characters based on primitive type
-                let filtered = match self.primitive {
+                let allowed = match self.primitive {
                     // Signed integers: allow minus sign and digits
                     ir::TyPrimitive::int8
                     | ir::TyPrimitive::int16
                     | ir::TyPrimitive::int32
-                    | ir::TyPrimitive::int64 => text
-                        .chars()
-                        .filter(|c| c.is_ascii_digit() || *c == '-')
-                        .collect(),
+                    | ir::TyPrimitive::int64 => c.is_ascii_digit() || c == '-',
 
                     // Unsigned integers: only digits
                     ir::TyPrimitive::uint8
                     | ir::TyPrimitive::uint16
                     | ir::TyPrimitive::uint32
-                    | ir::TyPrimitive::uint64 => {
-                        text.chars().filter(|c| c.is_ascii_digit()).collect()
-                    }
+                    | ir::TyPrimitive::uint64 => c.is_ascii_digit(),
 
                     // Floats: allow digits, decimal point, minus, and scientific notation
-                    ir::TyPrimitive::float32 | ir::TyPrimitive::float64 => text
-                        .chars()
-                        .filter(|c| {
-                            c.is_ascii_digit() || *c == '.' || *c == '-' || *c == 'e' || *c == 'E'
-                        })
-                        .collect(),
+                    ir::TyPrimitive::float32 | ir::TyPrimitive::float64 => {
+                        c.is_ascii_digit() || c == '.' || c == '-' || c == 'e' || c == 'E'
+                    }
 
                     _ => panic!(
                         "NumberForm used with non-numeric primitive: {:?}",
                         self.primitive
                     ),
                 };
-                self.inner.update(&Action::Write(filtered))
+
+                if allowed {
+                    self.inner.update(action)
+                } else {
+                    FormResult::None
+                }
             }
-            _ => self.inner.update(action),
+            KeyCode::Backspace => self.inner.update(action),
+            _ => FormResult::None,
         }
     }
 

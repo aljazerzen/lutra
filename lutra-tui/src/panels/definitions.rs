@@ -1,3 +1,4 @@
+use crossterm::event::KeyCode;
 use lutra_bin::ir;
 use lutra_compiler::pr;
 use ratatui::prelude::*;
@@ -5,7 +6,7 @@ use ratatui::widgets::Paragraph;
 
 use crate::project::{CompileResult, ProjectState};
 use crate::style;
-use crate::terminal::{Action, EventResult};
+use crate::terminal::{Action, ActionResult};
 
 /// Left sidebar displaying project structure as a navigable tree.
 pub struct DefinitionsPanel {
@@ -110,34 +111,39 @@ impl DefinitionsPanel {
     }
 
     /// Handle a key event. Returns an action if the panel requests app-level behavior.
-    pub fn handle(&mut self, action: Action) -> EventResult {
-        match action {
-            Action::MoveUp => {
+    pub fn handle(&mut self, action: Action) -> ActionResult {
+        // Extract key event from terminal action
+        let Some(key) = action.as_key() else {
+            return ActionResult::default();
+        };
+
+        match key.code {
+            KeyCode::Up => {
                 if let Some(new_cursor) = self.find_prev_visible(self.cursor) {
                     self.cursor = new_cursor;
                     self.ensure_visible();
-                    return EventResult::redraw();
+                    return ActionResult::redraw();
                 }
             }
-            Action::MoveDown => {
+            KeyCode::Down => {
                 if let Some(new_cursor) = self.find_next_visible(self.cursor) {
                     self.cursor = new_cursor;
                     self.ensure_visible();
-                    return EventResult::redraw();
+                    return ActionResult::redraw();
                 }
             }
-            Action::Select => {
+            KeyCode::Enter => {
                 if let Some(item) = self.items.get_mut(self.cursor) {
                     match item.kind {
                         DefKind::Module => {
                             // Toggle collapse state
                             item.collapsed = !item.collapsed;
                             self.update_visibility();
-                            return EventResult::redraw();
+                            return ActionResult::redraw();
                         }
                         DefKind::Function | DefKind::Constant => {
                             // Run
-                            return EventResult::action(Action::RunDefinition(path_to_ir(
+                            return ActionResult::action(Action::RunDefinition(path_to_ir(
                                 &item.path,
                             )));
                         }
@@ -147,7 +153,7 @@ impl DefinitionsPanel {
                     }
                 }
             }
-            Action::MoveRight => {
+            KeyCode::Right => {
                 // Expand module
                 if let Some(item) = self.items.get_mut(self.cursor)
                     && let DefKind::Module = item.kind
@@ -155,10 +161,10 @@ impl DefinitionsPanel {
                     // Toggle collapse state
                     item.collapsed = false;
                     self.update_visibility();
-                    return EventResult::redraw();
+                    return ActionResult::redraw();
                 }
             }
-            Action::MoveLeft => {
+            KeyCode::Left => {
                 // Try to collapse, if this is a un-collapsed module
                 if let Some(item) = self.items.get_mut(self.cursor)
                     && item.kind == DefKind::Module
@@ -166,19 +172,19 @@ impl DefinitionsPanel {
                 {
                     item.collapsed = true;
                     self.update_visibility();
-                    return EventResult::redraw();
+                    return ActionResult::redraw();
                 }
 
                 // Fallback: navigate to parent module
                 if let Some(parent_idx) = self.find_parent_module(self.cursor) {
                     self.cursor = parent_idx;
                     self.ensure_visible();
-                    return EventResult::redraw();
+                    return ActionResult::redraw();
                 }
             }
             _ => {}
         }
-        EventResult::default()
+        ActionResult::default()
     }
 
     /// Ensure the cursor is visible within the scroll window.

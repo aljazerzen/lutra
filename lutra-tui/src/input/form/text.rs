@@ -1,3 +1,4 @@
+use crossterm::event::KeyCode;
 use ratatui::{layout::Offset, prelude::*};
 
 use super::{Action, Form, FormResult};
@@ -42,12 +43,16 @@ impl TextForm {
     }
 
     pub fn update(&mut self, action: &Action) -> FormResult {
-        match action {
-            Action::Write(text) => {
-                self.value.push_str(text);
+        let Some(key) = action.as_key() else {
+            return FormResult::None;
+        };
+
+        match key.code {
+            KeyCode::Char(c) => {
+                self.value.push(c);
                 FormResult::Redraw
             }
-            Action::Erase => {
+            KeyCode::Backspace => {
                 self.value.pop();
                 FormResult::Redraw
             }

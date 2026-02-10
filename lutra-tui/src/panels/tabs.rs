@@ -6,7 +6,7 @@ use ratatui::widgets::{Block, Padding, Paragraph};
 use crate::RunnerConfig;
 use crate::panels::ProgramPane;
 use crate::style;
-use crate::terminal::{Action, Component, EventResult};
+use crate::terminal::{Action, ActionResult, Component};
 
 /// Tabbed interface for managing multiple program panes.
 pub struct Tabs {
@@ -143,15 +143,22 @@ impl Tabs {
     pub fn tab_count(&self) -> usize {
         self.panels.len()
     }
+
+    /// Check if a form input field in the active panel currently has cursor focus.
+    pub fn is_form_field_focused(&self) -> bool {
+        self.active_panel()
+            .map(|p| p.is_form_field_focused())
+            .unwrap_or(false)
+    }
 }
 
 impl Component for Tabs {
-    fn handle(&mut self, action: Action) -> EventResult {
+    fn handle(&mut self, action: Action) -> ActionResult {
         // Delegate to active panel
         if let Some(panel) = self.active_panel_mut() {
             panel.handle(action)
         } else {
-            EventResult::default()
+            ActionResult::default()
         }
     }
 
