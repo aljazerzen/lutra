@@ -1,0 +1,178 @@
+{
+    "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+    "name": "Lutra",
+    "scopeName": "source.lutra",
+    "patterns": [
+        {
+            "include": "#comments"
+        },
+        {
+            "include": "#keywords"
+        },
+        {
+            "include": "#types"
+        },
+        {
+            "include": "#namespace"
+        },
+        {
+            "include": "#variants"
+        },
+        {
+            "include": "#function-calls"
+        },
+        {
+            "include": "#strings"
+        },
+        {
+            "include": "#numbers"
+        },
+        {
+            "include": "#operators"
+        },
+        {
+            "include": "#ident"
+        }
+    ],
+    "repository": {
+        "comments": {
+            "patterns": [
+                {
+                    "match": "#.*$",
+                    "name": "comment.line.number-sign.lutra"
+                }
+            ]
+        },
+        "keywords": {
+            "patterns": [
+                {
+                    "match": "\\b(const|enum|func|import|let|match|module|type|where|if|then|else|submodule)\\b",
+                    "name": "keyword.control.lutra"
+                },
+                {
+                    "match": "\\b(true|false)\\b",
+                    "name": "constant.language.lutra"
+                }
+            ]
+        },
+        "types": {
+            "patterns": [
+                {
+                    "match": "\\b(bool|text|int8|int16|int32|int64|uint8|uint16|uint32|uint64|float32|float64)\\b",
+                    "name": "storage.type.lutra"
+                },
+                {
+                    "match": "\\b[A-Z][A-Za-z0-9_]*\\b",
+                    "name": "storage.type.lutra"
+                }
+            ]
+        },
+        "strings": {
+            "patterns": [
+                {
+                    "begin": "\"",
+                    "end": "\"",
+                    "name": "string.quoted.double.lutra",
+                    "patterns": [
+                        {
+                            "match": "\\\\.",
+                            "name": "constant.character.escape.lutra"
+                        }
+                    ]
+                },
+                {
+                    "begin": "f\"",
+                    "end": "\"",
+                    "name": "string.quoted.double.format.lutra",
+                    "patterns": [
+                        {
+                            "match": "\\{[^}]*\\}",
+                            "name": "variable.parameter.format.lutra"
+                        },
+                        {
+                            "match": "\\\\.",
+                            "name": "constant.character.escape.lutra"
+                        }
+                    ]
+                }
+            ]
+        },
+        "numbers": {
+            "patterns": [
+                {
+                    "match": "\\b\\d+\\.\\d+\\b",
+                    "name": "constant.numeric.float.lutra"
+                },
+                {
+                    "match": "\\b\\d+\\b",
+                    "name": "constant.numeric.integer.lutra"
+                }
+            ]
+        },
+        "operators": {
+            "patterns": [
+                {
+                    "match": "(->|\\||\\+|-|\\*|/|%|==|!=|>=|<=|>|<|&&|\\|\\||!|=)",
+                    "name": "keyword.operator.lutra"
+                },
+                {
+                    "match": "[\\[\\]\\{\\}\\(\\):,\\.]",
+                    "name": "punctuation.separator.lutra"
+                }
+            ]
+        },
+        "variants": {
+            "patterns": [
+                {
+                    "match": "(\\.)([A-Za-z_][A-Za-z0-9_]*)",
+                    "captures": {
+                        "1": {
+                            "name": "punctuation.separator.lutra"
+                        },
+                        "2": {
+                            "name": "variable.identifier.lutra"
+                        }
+                    }
+                }
+            ]
+        },
+        "function-calls": {
+            "name": "meta.function.call.lutra",
+            "begin": "([A-Za-z_][A-Za-z0-9_]*)\\s*(\\()",
+            "beginCaptures": {
+                "1": {
+                    "name": "entity.name.function.lutra"
+                },
+                "2": {
+                    "name": "punctuation.separator.lutra"
+                }
+            },
+            "patterns": [
+                {
+                    "include": "$self"
+                }
+            ],
+            "end": "\\)",
+            "endCaptures": {
+                "0": {
+                    "name": "punctuation.separator.lutra"
+                }
+            }
+        },
+        "ident": {
+            "name": "variable.identifier.lutra",
+            "match": "[A-Za-z_][A-Za-z0-9_]*"
+        },
+        "namespace": {
+            "match": "\\b([A-Za-z_][A-Za-z0-9_]*)(::)",
+            "captures": {
+                "1": {
+                    "name": "entity.name.namespace.lutra"
+                },
+                "2": {
+                    "name": "punctuation.separator.lutra"
+                }
+            }
+        }
+    }
+}

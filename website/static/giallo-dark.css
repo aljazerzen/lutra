@@ -7,6 +7,14 @@
  background-color: #282828;
 }
 
+.z-hl {
+  /* background-color: #EBDBB260; */
+}
+
+.giallo-ln {
+  /* color: #BDAE93; */
+}
+
 .z-punctuation.z-definition.z-tag {
  color: #83a598;
 }
@@ -32,7 +40,7 @@
  color: #fa5c4b;
 }
 .z-storage {
- color: #fa5c4b;
+ color: #fabd2f;
 }
 .z-string, .z-string.z-unquoted.z-heredoc .z-string {
  color: #b8bb26;

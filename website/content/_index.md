@@ -7,7 +7,7 @@ Lutra is a language for preserving type information between different software c
 It is a high-level, statically typed language, designed for querying data
 and expressing data structures.
 
-```lt
+```lutra
 type Album: {id: int16, title: text}
 
 func get_albums(): [Album] -> std::sql::from("albums")
@@ -21,7 +21,7 @@ func get_album_by_id(album_id: int16): Album -> (
 It is minimal and designed to be extended to new execution targets.
 Currently, it can run on a reference-implementation interpreter and PostgreSQL.
 
-```lt
+```lutra
 import std::(filter, sort, slice)
 
 # Load all the data at once
@@ -37,7 +37,7 @@ func landing_page() -> {
 ```
 
 It is verbose in exchange for type safety, readability and composability.
-```lt
+```lutra
 import std::(Date, find, filter, map, group, mean, sum, count, sort, slice)
 
 # Constant

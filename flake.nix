@@ -1,6 +1,6 @@
 {
   inputs = {
-    nixpkgs.url = "github:aljazerzen/nixpkgs/init-zensical";
+    nixpkgs.url = "github:NixOS/nixpkgs/master";
     flake-utils.url = "github:numtide/flake-utils";
     fenix = {
       url = "github:nix-community/fenix";
@@ -71,8 +71,8 @@
             pkgs.mypy
 
             pkgs.python312Packages.python-lsp-server
-            pkgs.python312Packages.python-lsp-ruff
-            pkgs.python312Packages.pylsp-mypy
+            # pkgs.python312Packages.python-lsp-ruff
+            # pkgs.python312Packages.pylsp-mypy
             # to make mypy pick up packages from venv, run `uv pip install mypy`
 
             # website
