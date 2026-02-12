@@ -1,4 +1,3 @@
-use std::collections::HashMap;
 use std::sync::Arc;
 
 use arrow::array as aa;
@@ -6,7 +5,8 @@ use arrow::datatypes as ad;
 use lutra_bin::Encode;
 use lutra_bin::bytes::{self, BufMut};
 use lutra_bin::ir;
-use thiserror::Error;
+
+use crate::context::{Context, Error};
 
 /// Converts Arrow RecordBatches to Lutra binary format.
 ///
@@ -39,46 +39,6 @@ pub fn arrow_to_lutra(
 
     // Case 3: Non-array type (single row expected)
     encode_single_value(&ctx, batches, ty)
-}
-
-/// Error type for Arrow to Lutra conversion
-#[derive(Debug, Error)]
-pub enum Error {
-    #[error("type mismatch: Arrow has {arrow_ty}, but Lutra expects {lutra_ty}")]
-    TypeMismatch { arrow_ty: String, lutra_ty: String },
-
-    #[error("expected single row, got {got}")]
-    ExpectedSingleRow { got: usize },
-
-    #[error("expected {expected} columns, got {got}")]
-    ColumnCountMismatch { expected: usize, got: usize },
-
-    #[error("unexpected null value for non-option type")]
-    UnexpectedNull,
-
-    #[error("provided type is invalid")]
-    BadType,
-}
-
-/// Context for resolving type identifiers
-struct Context<'a> {
-    types: HashMap<&'a ir::Path, &'a ir::Ty>,
-}
-
-impl<'a> Context<'a> {
-    fn new(ty_defs: &'a [ir::TyDef]) -> Self {
-        Context {
-            types: ty_defs.iter().map(|def| (&def.name, &def.ty)).collect(),
-        }
-    }
-
-    fn get_ty_mat(&self, ty: &'a ir::Ty) -> Result<&'a ir::Ty, Error> {
-        let mut ty = ty;
-        while let ir::TyKind::Ident(path) = &ty.kind {
-            ty = self.types.get(path).ok_or(Error::BadType)?;
-        }
-        Ok(ty)
-    }
 }
 
 /// Checks if enum is option pattern: enum {none, some: T} where T is primitive or array.

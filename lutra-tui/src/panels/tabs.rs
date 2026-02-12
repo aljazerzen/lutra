@@ -130,14 +130,6 @@ impl Tabs {
         }
     }
 
-    /// Clear all tabs.
-    pub fn clear_all(&mut self) {
-        for mut panel in self.panels.drain(..) {
-            panel.clear();
-        }
-        self.active_tab = 0;
-    }
-
     /// Get number of open tabs.
     #[allow(dead_code)]
     pub fn tab_count(&self) -> usize {
@@ -154,6 +146,26 @@ impl Tabs {
     /// Get the path of the currently active tab (if any).
     pub fn active_path(&self) -> Option<&ir::Path> {
         self.active_panel().map(|p| p.path())
+    }
+
+    /// Recompile all programs and trigger auto-run where applicable.
+    pub fn recompile_and_auto_run(&mut self, project: &Project, runner_cfg: &RunnerConfig) {
+        for panel in &mut self.panels {
+            match panel.recompile(project, runner_cfg) {
+                Ok(should_auto_run) => {
+                    if should_auto_run {
+                        // Trigger execution
+                        if let Err(e) = panel.prepare_and_execute() {
+                            panel.set_error(e);
+                        }
+                    }
+                }
+                Err(e) => {
+                    // Compilation failed for this program
+                    panel.set_error(e);
+                }
+            }
+        }
     }
 }
 

@@ -98,10 +98,10 @@ async fn write_format(
 
             let ty_item = ty.kind.as_array().unwrap(); // TODO
 
-            let data = lutra_arrow::lutra_to_arrow(data, ty_item);
+            let batch = lutra_arrow::lutra_to_arrow(data, ty_item, ty_defs)?;
 
-            let mut builder = AsyncArrowWriter::try_new(&mut w, data.schema(), None).unwrap();
-            builder.write(&data).await.unwrap();
+            let mut builder = AsyncArrowWriter::try_new(&mut w, batch.schema(), None).unwrap();
+            builder.write(&batch).await.unwrap();
             builder.finish().await.unwrap();
         }
         DataFormat::Table => {

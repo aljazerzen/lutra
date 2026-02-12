@@ -37,6 +37,7 @@ pub enum Action {
     SwitchToTab(usize),
     DefSearchOpen,
     DefSearchClose,
+    ToggleAutoRun,
 }
 
 impl Action {

@@ -131,8 +131,11 @@ impl InteractiveApp {
             self.definitions.update_from_diagnostics(diagnostics);
         }
 
-        // Clear all program panes on recompile (programs may have changed)
-        self.run_panels.clear_all();
+        // Recompile programs and trigger auto-run if enabled
+        if let CompileResult::Success { project, .. } = &self.project.compilation {
+            self.run_panels
+                .recompile_and_auto_run(project, &self.runner);
+        }
 
         self.layout.update(&self.project);
     }
@@ -310,6 +313,12 @@ impl Component for InteractiveApp {
             Action::DefSearchClose => {
                 self.search.active = false;
                 self.search.clear();
+                ActionResult::redraw()
+            }
+            Action::ToggleAutoRun => {
+                if let Some(panel) = self.run_panels.active_panel_mut() {
+                    panel.toggle_auto_run();
+                }
                 ActionResult::redraw()
             }
         }

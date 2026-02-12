@@ -72,6 +72,11 @@ impl KeyBindings {
                 Some(Action::DefSearchOpen)
             }
 
+            // Toggle auto-run (Ctrl+R)
+            KeyCode::Char('r') if key.modifiers.contains(KeyModifiers::CONTROL) => {
+                Some(Action::ToggleAutoRun)
+            }
+
             _ => None,
         }
     }

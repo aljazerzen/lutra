@@ -1,3 +1,6 @@
+use std::cell::Cell;
+use std::collections::HashSet;
+
 use crossterm::event::KeyCode;
 use lutra_bin::ir;
 use lutra_compiler::pr;
@@ -18,6 +21,8 @@ pub struct DefinitionsPanel {
     cursor: usize,
     /// Scroll offset for large projects.
     scroll: usize,
+    /// Last known viewport height (for ensure_visible).
+    viewport_height: Cell<usize>,
 }
 
 /// A single item in the definitions tree.
@@ -114,6 +119,7 @@ impl DefinitionsPanel {
             cursor: 0,
             scroll: 0,
             focused: false,
+            viewport_height: Cell::new(10), // Default, will be updated on first render
         }
     }
 
@@ -122,7 +128,26 @@ impl DefinitionsPanel {
         let CompileResult::Success { project: proj } = &project.compilation else {
             return;
         };
+
+        // Preserve collapsed state before updating
+        let old_items = std::mem::take(&mut self.items);
+        let collapsed_paths: HashSet<&pr::Path> = (old_items.iter())
+            .filter(|item| item.kind == DefKind::Module && item.collapsed)
+            .map(|item| &item.path)
+            .collect();
+
+        // Create new items from updated project
         self.items = flatten_module(&proj.root_module, &[], 0);
+
+        // Restore collapsed status
+        for item in &mut self.items {
+            if item.kind == DefKind::Module && collapsed_paths.contains(&item.path) {
+                item.collapsed = true;
+            }
+        }
+
+        // Update visibility based on restored collapsed state
+        self.update_visibility();
 
         // Ensure cursor is valid
         if self.cursor >= self.items.len() && !self.items.is_empty() {
@@ -267,7 +292,30 @@ impl DefinitionsPanel {
 
     /// Ensure the cursor is visible within the scroll window.
     fn ensure_visible(&mut self) {
-        // This will be implemented when we know the viewport height
+        // Find the cursor's position in the visible items list
+        let visible_items: Vec<usize> = self
+            .items
+            .iter()
+            .enumerate()
+            .filter(|(_, item)| item.is_visible)
+            .map(|(idx, _)| idx)
+            .collect();
+
+        // Find cursor position in visible list
+        let Some(cursor_pos) = visible_items.iter().position(|&idx| idx == self.cursor) else {
+            return;
+        };
+
+        let viewport_height = self.viewport_height.get();
+
+        // Adjust scroll to keep cursor visible
+        if cursor_pos < self.scroll {
+            // Cursor is above viewport - scroll up
+            self.scroll = cursor_pos;
+        } else if cursor_pos >= self.scroll + viewport_height {
+            // Cursor is below viewport - scroll down
+            self.scroll = cursor_pos.saturating_sub(viewport_height - 1);
+        }
     }
 
     /// Update is_visible flags based on collapsed state of modules.
@@ -335,6 +383,9 @@ impl DefinitionsPanel {
             frame.render_widget(empty, inner);
             return;
         }
+
+        // Update viewport height for ensure_visible
+        self.viewport_height.set(inner.height as usize);
 
         // Filter to visible items only
         let visible_items: Vec<(usize, &DefItem)> = self

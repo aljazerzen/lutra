@@ -7,23 +7,35 @@ use arrow::datatypes::{DataType, Field, Schema, SchemaRef};
 
 use lutra_bin::{ArrayReader, bytes, ir};
 
+use crate::context::{Context, Error};
+
 fn decode_prim<T: lutra_bin::Decode>(data: impl bytes::Buf) -> T {
     T::decode(data.chunk()).unwrap()
 }
 
-pub fn lutra_to_arrow(data: impl bytes::Buf + Clone, ty_item: &ir::Ty) -> aa::RecordBatch {
+pub fn lutra_to_arrow(
+    data: impl bytes::Buf + Clone,
+    ty_item: &ir::Ty,
+    ty_defs: &[ir::TyDef],
+) -> Result<aa::RecordBatch, Error> {
+    let ctx = Context::new(ty_defs);
+    let ty_item = ctx.get_ty_mat(ty_item)?;
+
     let ir::TyKind::Tuple(ty_fields) = &ty_item.kind else {
-        panic!()
+        return Err(Error::UnsupportedType(format!(
+            "expected tuple type for record batch, got {:?}",
+            ty_item.kind
+        )));
     };
 
-    let schema = get_schema(ty_fields).unwrap();
+    let schema = get_schema(ty_fields, &ctx)?;
 
     let mut writer = ArrowRowWriter::new(schema, 0);
 
     let item_head_size = ty_item.layout.as_ref().unwrap().head_size as usize;
     let item_field_offsets = lutra_bin::layout::tuple_field_offsets(ty_item);
     let array_reader = lutra_bin::ArrayReader::new(data, item_head_size.div_ceil(8));
-    writer.prepare_for_batch(array_reader.remaining()).unwrap();
+    writer.prepare_for_batch(array_reader.remaining())?;
     for item in array_reader {
         let tuple_reader = lutra_bin::TupleReader::new(item, Cow::Borrowed(&item_field_offsets));
         for (i, ty_field) in ty_fields.iter().enumerate() {
@@ -86,54 +98,89 @@ pub fn lutra_to_arrow(data: impl bytes::Buf + Clone, ty_item: &ir::Ty) -> aa::Re
                     writer.next_as::<aa::StringBuilder>().append_value(s);
                 }
 
-                _ => unreachable!(),
+                // Composite types not yet supported
+                _ => {
+                    return Err(Error::UnsupportedType(format!(
+                        "composite types not yet supported in to_arrow for field encoding: {:?}",
+                        ty_field.ty.kind
+                    )));
+                }
             }
         }
     }
 
-    let batches = writer.finish().unwrap();
+    let batches = writer.finish()?;
     assert_eq!(batches.len(), 1);
-    batches.into_iter().next().unwrap()
+    Ok(batches.into_iter().next().unwrap())
 }
 
-fn get_schema(ty_fields: &[ir::TyTupleField]) -> Result<SchemaRef, String> {
+fn get_schema(ty_fields: &[ir::TyTupleField], ctx: &Context) -> Result<SchemaRef, Error> {
     let mut fields = Vec::new();
     for (index, ty_field) in ty_fields.iter().enumerate() {
-        let name = ty_field
-            .name
-            .clone()
-            .unwrap_or_else(|| format!("field{index}"));
+        let name = ty_field.name.clone().unwrap_or_else(|| format!("_{index}"));
 
-        let data_type = match &ty_field.ty.kind {
-            ir::TyKind::Primitive(ir::TyPrimitive::bool) => DataType::Boolean,
-            ir::TyKind::Primitive(ir::TyPrimitive::int8) => DataType::Int8,
-            ir::TyKind::Primitive(ir::TyPrimitive::int16) => DataType::Int16,
-            ir::TyKind::Primitive(ir::TyPrimitive::int32) => DataType::Int32,
-            ir::TyKind::Primitive(ir::TyPrimitive::int64) => DataType::Int64,
-            ir::TyKind::Primitive(ir::TyPrimitive::uint8) => DataType::UInt8,
-            ir::TyKind::Primitive(ir::TyPrimitive::uint16) => DataType::UInt16,
-            ir::TyKind::Primitive(ir::TyPrimitive::uint32) => DataType::UInt32,
-            ir::TyKind::Primitive(ir::TyPrimitive::uint64) => DataType::UInt64,
-            ir::TyKind::Primitive(ir::TyPrimitive::float32) => DataType::Float32,
-            ir::TyKind::Primitive(ir::TyPrimitive::float64) => DataType::Float64,
-            ir::TyKind::Primitive(ir::TyPrimitive::text) => DataType::Utf8,
-
-            ir::TyKind::Function(_) => {
-                return Err(format!(
-                    "Cannot serialize functions to arrow (field {name})"
-                ));
-            }
-            ir::TyKind::Ident(_)
-            | ir::TyKind::Tuple(_)
-            | ir::TyKind::Array(_)
-            | ir::TyKind::Enum(_) => {
-                todo!()
-            }
-        };
-
+        let data_type = get_data_type(&ty_field.ty, ctx)?;
         fields.push(Field::new(name, data_type, false));
     }
     Ok(Arc::new(Schema::new(fields)))
+}
+
+fn get_data_type(ty: &ir::Ty, ctx: &Context) -> Result<DataType, Error> {
+    let ty = ctx.get_ty_mat(ty)?;
+
+    match &ty.kind {
+        // Primitives
+        ir::TyKind::Primitive(ir::TyPrimitive::bool) => Ok(DataType::Boolean),
+        ir::TyKind::Primitive(ir::TyPrimitive::int8) => Ok(DataType::Int8),
+        ir::TyKind::Primitive(ir::TyPrimitive::int16) => Ok(DataType::Int16),
+        ir::TyKind::Primitive(ir::TyPrimitive::int32) => Ok(DataType::Int32),
+        ir::TyKind::Primitive(ir::TyPrimitive::int64) => Ok(DataType::Int64),
+        ir::TyKind::Primitive(ir::TyPrimitive::uint8) => Ok(DataType::UInt8),
+        ir::TyKind::Primitive(ir::TyPrimitive::uint16) => Ok(DataType::UInt16),
+        ir::TyKind::Primitive(ir::TyPrimitive::uint32) => Ok(DataType::UInt32),
+        ir::TyKind::Primitive(ir::TyPrimitive::uint64) => Ok(DataType::UInt64),
+        ir::TyKind::Primitive(ir::TyPrimitive::float32) => Ok(DataType::Float32),
+        ir::TyKind::Primitive(ir::TyPrimitive::float64) => Ok(DataType::Float64),
+        ir::TyKind::Primitive(ir::TyPrimitive::text) => Ok(DataType::Utf8),
+
+        // Arrays
+        ir::TyKind::Array(item_ty) => {
+            let item_ty = ctx.get_ty_mat(item_ty)?;
+            let item_data_type = get_data_type(item_ty, ctx)?;
+            let item_field = Arc::new(Field::new("item", item_data_type, false));
+            Ok(DataType::List(item_field))
+        }
+
+        // Nested Tuples
+        ir::TyKind::Tuple(nested_fields) => {
+            let struct_fields: Result<Vec<_>, Error> = nested_fields
+                .iter()
+                .enumerate()
+                .map(|(i, f)| {
+                    let name = f.name.clone().unwrap_or_else(|| format!("_{i}"));
+                    let data_type = get_data_type(&f.ty, ctx)?;
+                    Ok(Arc::new(Field::new(name, data_type, false)))
+                })
+                .collect();
+            Ok(DataType::Struct(struct_fields?.into()))
+        }
+
+        // Enums
+        ir::TyKind::Enum(_variants) => {
+            // For now, return error - Union encoding is complex
+            Err(Error::UnsupportedType(
+                "enum types not yet supported in to_arrow schema generation".to_string(),
+            ))
+        }
+
+        ir::TyKind::Function(_) => Err(Error::UnsupportedType(
+            "cannot serialize functions to Arrow".to_string(),
+        )),
+
+        ir::TyKind::Ident(_) => {
+            unreachable!("should have been resolved by get_ty_mat")
+        }
+    }
 }
 
 /// Receives values row-by-row and passes them to [ArrayBuilder]s,

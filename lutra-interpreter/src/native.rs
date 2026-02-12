@@ -1628,7 +1628,8 @@ pub mod std_fs {
         let ty_item = ir::Ty::decode(&ty_item).map_err(|_| EvalError::BadProgram)?;
 
         // convert lutra to arrow
-        let data = lutra_arrow::lutra_to_arrow(data, &ty_item);
+        let batch = lutra_arrow::lutra_to_arrow(data, &ty_item, &[])
+            .map_err(|e| EvalError::ExternalError(format!("lutra_to_arrow: {e}")))?;
 
         // write to parquet
         let file = match fs::File::create(&file_path) {
@@ -1638,8 +1639,8 @@ pub mod std_fs {
             }
         };
         let mut writer = io::BufWriter::new(file);
-        let mut builder = ArrowWriter::try_new(&mut writer, data.schema(), None).unwrap();
-        builder.write(&data).unwrap();
+        let mut builder = ArrowWriter::try_new(&mut writer, batch.schema(), None).unwrap();
+        builder.write(&batch).unwrap();
         builder.finish().unwrap();
 
         Ok(Cell::Data(Data::new(vec![])))
