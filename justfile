@@ -56,7 +56,9 @@ publish:
     cargo publish -p lutra-runner
     cargo publish -p lutra-runner-postgres
     cargo publish -p lutra-arrow
+    cargo publish -p lutra-runner-duckdb
     cargo publish -p lutra-interpreter
+    cargo publish -p lutra-tui
     cargo publish -p lutra-cli
 
 # Run a command for each Python package

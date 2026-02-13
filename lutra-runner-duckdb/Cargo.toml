@@ -20,7 +20,7 @@ lutra-arrow = { workspace = true }
 arrow = { workspace = true }
 
 [build-dependencies]
-lutra-codegen = { path = "../lutra-codegen" }
+lutra-codegen = { workspace = true }
 
 [dev-dependencies]
 tokio = { workspace = true, features = ["rt", "macros"] }
