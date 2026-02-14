@@ -81,12 +81,19 @@ impl TypeResolver<'_> {
             }
 
             // type vars
-            (TyRef::Ty(ty), TyRef::Var(_, var_id)) | (TyRef::Var(_, var_id), TyRef::Ty(ty)) => {
-                let ty = LocalTyInliner::run(self, ty.clone());
+            (TyRef::Ty(_), TyRef::Var(_, var_id)) => {
+                let ty = LocalTyInliner::run(self, found.clone());
 
                 let scope = self.get_ty_var_scope();
                 scope.infer_type_var(var_id, ty);
             }
+            (TyRef::Var(_, var_id), TyRef::Ty(_)) => {
+                let ty = LocalTyInliner::run(self, expected.clone());
+
+                let scope = self.get_ty_var_scope();
+                scope.infer_type_var(var_id, ty);
+            }
+
             (TyRef::Var(_, a_id), TyRef::Var(_, b_id)) => {
                 let scope = self.get_ty_var_scope();
                 scope.infer_type_vars_equal(a_id, b_id);
@@ -742,9 +749,7 @@ impl<'a> LocalTyInliner<'a> {
 impl<'a> utils::fold::PrFold for LocalTyInliner<'a> {
     fn fold_type(&mut self, ty: pr::Ty) -> Result<pr::Ty> {
         match ty.kind {
-            pr::TyKind::Ident(ref i) => {
-                tracing::debug!("i = {i}");
-
+            pr::TyKind::Ident(_) => {
                 let target = ty.target.as_ref().unwrap();
                 let named = self.resolver.get_ref(target).with_span(ty.span)?;
 

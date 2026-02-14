@@ -1,3 +1,5 @@
+#![allow(unused_assignments)]
+
 use enum_as_inner::EnumAsInner;
 
 use crate::Span;

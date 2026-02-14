@@ -1008,12 +1008,8 @@ impl<'a> Lowerer<'a> {
         if let ir::TyKind::Function(func) = &mut main.ty.kind {
             // change type from `func (a, b, c): d` into `func ({a, b, c}): d`
             if func.params.len() != 1 {
-                let fields = func
-                    .params
-                    .drain(..)
-                    .map(|ty| ir::TyTupleField { ty, name: None })
-                    .collect();
-                func.params = vec![ir::Ty::new(ir::TyKind::Tuple(fields))];
+                let (input_ty, _) = self.program_input_ty.clone().unwrap();
+                func.params = vec![input_ty];
             }
             main
         } else {
@@ -1218,7 +1214,7 @@ fn get_entry_point_input(expr: &pr::Expr) -> (pr::Ty, bool) {
             .map(|p| pr::TyTupleField {
                 ty: p.ty.clone().unwrap(),
                 unpack: false,
-                name: None,
+                name: p.label.clone(),
             })
             .collect(),
     ));

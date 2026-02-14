@@ -30,7 +30,7 @@ pub enum ScopeKind {
     Nested,
 }
 
-#[derive(Debug, Clone, enum_as_inner::EnumAsInner)]
+#[derive(Debug, Clone)]
 pub enum ScopedKind {
     Param {
         ty: pr::Ty,
@@ -272,12 +272,18 @@ impl<'a> TypeResolver<'a> {
     pub fn get_ty_param(&self, param_id: usize) -> (&String, &pr::TyDomain) {
         let scope = self.scopes.last().unwrap();
         let scoped = &scope.names[param_id];
-        scoped.as_ty_param().unwrap()
+        let ScopedKind::TyParam { name, domain } = scoped else {
+            panic!()
+        };
+        (name, domain)
     }
 
     pub fn get_ty_var(&self, id: TyVarId) -> &TyVar {
         let scoped = &self.get_ty_var_scope().names[id];
-        scoped.as_ty_var().unwrap()
+        let ScopedKind::TyVar(var) = scoped else {
+            panic!()
+        };
+        var
     }
 
     /// Resolves type identifiers. Does not resolve identifiers in contained types.
@@ -320,11 +326,9 @@ impl<'a> TypeResolver<'a> {
                     }
 
                     ScopedKind::Param { ty, .. } => Err(err_name_kind("a type", "a value")
-                        .with_span(ty.span)
                         .push_hint(format!("got param of type `{}`", printer::print_ty(ty)))
                         .with_span(ty.span)),
                     ScopedKind::Local { ty, .. } => Err(err_name_kind("a type", "a value")
-                        .with_span(ty.span)
                         .push_hint(format!("got local var of type `{}`", printer::print_ty(ty)))
                         .with_span(ty.span)),
                 }

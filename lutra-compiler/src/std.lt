@@ -241,6 +241,20 @@ module option {
       .some(v) => mapper(v)
     }
   )
+
+  ## When value is `.none` returns fallback, otherwise maps value in `.some`.
+  func map_or(
+    value: enum {none, some: I},
+    fallback: O,
+    mapper: func (I): O
+  ): O
+  where I, O
+  -> (
+    match value {
+      .none => fallback,
+      .some(v) => mapper(v)
+    }
+  )
 }
 
 # --- Array functions ---
