@@ -1905,20 +1905,16 @@ fn serialize_nested_array() {
                   u.unnest AS value
                 FROM
                   LATERAL unnest(r2.value) AS u
-                ORDER BY
-                  index OFFSET 1::INT8
               ) AS r3
-            ORDER BY
-              index
-            LIMIT
-              1::INT8
+            WHERE
+              (r3.index = 1::INT8)
           ) AS r4
         UNION
         ALL
         SELECT
           NULL::INT2 AS value
         LIMIT
-          1::INT8
+          1
       ) AS value
     FROM
       (
@@ -2344,39 +2340,43 @@ fn serialize_index_nested_array() {
         lutra_bin::Value::unit()
     )), @r#"
     SELECT
-      r1.value AS value
+      r2.value AS value
     FROM
       (
         SELECT
-          0::INT8 AS index,
+          r1.index,
+          r1.value
+        FROM
           (
             SELECT
-              COALESCE(
-                list(
-                  r0.value
-                  ORDER BY
-                    r0.index
-                ),
-                CAST([] AS TEXT [])
-              ) AS value
-            FROM
+              0::INT8 AS index,
               (
                 SELECT
-                  0::INT8 AS index,
-                  'hello'::text AS value
-              ) AS r0
-          ) AS value
-        ORDER BY
-          index
-        LIMIT
-          1::INT8
-      ) AS r1
+                  COALESCE(
+                    list(
+                      r0.value
+                      ORDER BY
+                        r0.index
+                    ),
+                    CAST([] AS TEXT [])
+                  ) AS value
+                FROM
+                  (
+                    SELECT
+                      0::INT8 AS index,
+                      'hello'::text AS value
+                  ) AS r0
+              ) AS value
+          ) AS r1
+        WHERE
+          (r1.index = 0::INT8)
+      ) AS r2
     UNION
     ALL
     SELECT
       NULL::TEXT [] AS index
     LIMIT
-      1::INT8
+      1
     ---
     some([
       "hello",

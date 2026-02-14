@@ -50,10 +50,10 @@ impl<'a> queries::Context<'a> {
         match &ty_mat.kind {
             ir::TyKind::Array(ty_item) => {
                 values.push(utils::new_index(None)); // index
-                values.extend(self.duckdb_col_import(rel_var, ty_item));
+                values.extend(self.duck_col_import(rel_var, ty_item));
             }
             _ => {
-                values.extend(self.duckdb_col_import(rel_var, ty));
+                values.extend(self.duck_col_import(rel_var, ty));
             }
         }
 
@@ -88,7 +88,7 @@ impl<'a> queries::Context<'a> {
 
                 // Deserialize array items
                 let value_ref = "u.unnest".to_string();
-                let values = self.duckdb_col_import(value_ref, ty_item);
+                let values = self.duck_col_import(value_ref, ty_item);
                 result.projection.extend(self.projection(ty_item, values));
 
                 Node::Select(result)
@@ -96,7 +96,7 @@ impl<'a> queries::Context<'a> {
             ir::TyKind::Tuple(_) => {
                 let (rel_var, rel) = self.node_into_rel_var(input, ty);
 
-                let values = self.duckdb_col_import(rel_var, ty);
+                let values = self.duck_col_import(rel_var, ty);
 
                 let mut result = utils::select_empty();
                 result.from.extend(rel);
@@ -112,7 +112,7 @@ impl<'a> queries::Context<'a> {
 
     /// Convert a column in "duckdb repr" into columns in "query repr".
     /// For example, STRUCT type is converted into columns of its fields.
-    fn duckdb_col_import(&self, ser_ref: String, ty: &ir::Ty) -> Vec<sql_ast::Expr> {
+    fn duck_col_import(&self, ser_ref: String, ty: &ir::Ty) -> Vec<sql_ast::Expr> {
         // special case: std::Date
         if let ir::TyKind::Ident(ty_ident) = &ty.kind
             && ty_ident.0 == ["std", "Date"]
@@ -147,11 +147,11 @@ impl<'a> queries::Context<'a> {
                     let name = field_name(field, position);
 
                     let ser_ref = format!("{ser_ref}.{name}");
-                    result.extend(self.duckdb_col_import(ser_ref, &field.ty));
+                    result.extend(self.duck_col_import(ser_ref, &field.ty));
                 }
                 result
             }
-            ir::TyKind::Enum(variants) if utils::is_option(variants) => {
+            ir::TyKind::Enum(variants) if self.is_option(variants) => {
                 // in both reprs, the field is a nullable column
                 vec![sql_ast::Expr::Source(ser_ref)]
             }
@@ -268,7 +268,7 @@ impl<'a> queries::Context<'a> {
                 // nested array - already serialized as LIST in a single column
                 sql_ast::Expr::Source(format!("{rel_var}.{}", cols[0]))
             }
-            ir::TyKind::Enum(variants) if utils::is_option(variants) => {
+            ir::TyKind::Enum(variants) if self.is_option(variants) => {
                 sql_ast::Expr::Source(format!("{rel_var}.{}", cols[0]))
             }
             ir::TyKind::Tuple(fields) => {
@@ -278,7 +278,7 @@ impl<'a> queries::Context<'a> {
 
                 for (position, field) in fields.iter().enumerate() {
                     // Use field name if present, otherwise use positional name (_0, _1, etc.)
-                    let field_name = field_name(field, position);
+                    let name = utils::new_ident(field_name(field, position));
 
                     let field_col_count = self.rel_cols_ty_nested(&field.ty).count();
 
@@ -288,7 +288,7 @@ impl<'a> queries::Context<'a> {
                         &field.ty,
                     );
 
-                    parts.push(format!("{field_name} := {field_expr}"));
+                    parts.push(format!("{name} := {field_expr}"));
                     col_idx += field_col_count;
                 }
 
@@ -351,7 +351,7 @@ impl<'a> queries::Context<'a> {
             ir::TyKind::Tuple(f) if f.is_empty() => node,
             ir::TyKind::Tuple(_) => self.duck_export_row(node, ty),
             ir::TyKind::Array(ty_item) => self.duck_export_row(node, ty_item),
-            ir::TyKind::Enum(variants) if utils::is_option(variants) => {
+            ir::TyKind::Enum(variants) if self.is_option(variants) => {
                 // Option enum is a single nullable column - no transformation needed
                 node
             }
@@ -402,7 +402,7 @@ impl<'a> queries::Context<'a> {
                 // for nested arrays, query repr will already contain serialized items
                 node
             }
-            ir::TyKind::Enum(variants) if utils::is_option(variants) => {
+            ir::TyKind::Enum(variants) if self.is_option(variants) => {
                 // Option enum is a single nullable column - no transformation needed
                 node
             }

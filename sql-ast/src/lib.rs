@@ -156,7 +156,7 @@ impl Ident {
         S: Into<String>,
     {
         let value = value.into();
-        let quote_style = if valid_ident_regex().is_match(&value) {
+        let quote_style = if valid_ident_regex().is_match(&value) && !is_keyword(&value) {
             None
         } else {
             Some(quote)
@@ -176,6 +176,14 @@ fn valid_ident_regex() -> &'static regex::Regex {
         // ^ ('*' | [ascii_lower '_$'] [ascii_lower ascii_digit '_$']* ) $
         regex::Regex::new(r"^((\*)|(^[a-z_\$][a-z0-9_\$]*))$").unwrap()
     })
+}
+
+fn is_keyword(ident: &str) -> bool {
+    const KEYWORDS: &[&str] = &[
+        "select", "from", "where", "group", "by", "limit", "offset", "distinct", "on", "none",
+        "some", "end",
+    ];
+    KEYWORDS.contains(&ident)
 }
 
 impl From<&str> for Ident {

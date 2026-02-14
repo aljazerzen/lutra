@@ -98,10 +98,7 @@ pub enum Transform {
     Aggregate(Vec<Expr>),
 
     /// Filters by retaining only first N rows
-    Limit(Box<Expr>),
-
-    /// Filters by discarding first N rows
-    Offset(Box<Expr>),
+    Limit(usize),
 
     /// Filtering (also known as selection)
     Where(Box<Expr>),

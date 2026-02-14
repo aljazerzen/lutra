@@ -224,3 +224,11 @@ pub fn new_func_call(
     r += ")";
     sql_ast::Expr::Source(r)
 }
+
+pub fn set_or_bin_op(target: &mut Option<sql_ast::Expr>, op: &str, value: sql_ast::Expr) {
+    *target = Some(if let Some(existing) = target.take() {
+        new_bin_op(op, [existing, value])
+    } else {
+        value
+    });
+}

@@ -76,7 +76,7 @@ impl<'a> queries::Context<'a> {
                 })
                 .collect(),
 
-            ir::TyKind::Enum(variants) if utils::is_option(variants) => {
+            ir::TyKind::Enum(variants) if self.is_option(variants) => {
                 // nullable column
                 self.pg_cols_nested(&variants[1].ty, prefix)
             }
@@ -290,7 +290,7 @@ impl<'a> queries::Context<'a> {
                 // array will be serialized already
                 format!("{input_rel}.{}", input_cols[0])
             }
-            ir::TyKind::Enum(variants) if utils::is_option(variants) => {
+            ir::TyKind::Enum(variants) if self.is_option(variants) => {
                 // option enum is a nullable column in SQL repr, but in json repr
                 // it is an object with one of the two possible properties 0 and 1.
                 let col = &input_cols[0];
@@ -425,7 +425,7 @@ impl<'a> queries::Context<'a> {
 
                 r
             }
-            ir::TyKind::Enum(variants) if utils::is_option(variants) => {
+            ir::TyKind::Enum(variants) if self.is_option(variants) => {
                 let cols =
                     self.pg_deserialize_nested(format!("({json_ref}->'1')"), &variants[1].ty);
                 assert_eq!(cols.len(), 1);

@@ -402,21 +402,16 @@ impl<'a> Context<'a> {
 
             cr::Transform::Where(cond_in) => {
                 // wrap into a new query
-                let rel = self.node_into_rel(input, input_ty);
-                let mut select = self.rel_into_select(rel, output_ty, true);
+                let mut select = self.node_into_select(input, input_ty);
 
                 let cond = self.compile_column(cond_in);
-                select.selection = Some(cond);
+                utils::set_or_bin_op(&mut select.selection, "AND", cond);
                 Node::Select(select)
             }
             cr::Transform::Limit(limit_in) => {
                 let mut query = self.node_into_query(input, input_ty);
-                if query.limit.is_some() || query.offset.is_some() {
-                    query = self.wrap_query(query, input_ty);
-                }
 
-                let limit = self.compile_column(limit_in);
-                query.limit = Some(limit);
+                query.limit = Some(utils::number(limit_in.to_string()));
 
                 if input_ty.kind.is_array() {
                     // apply order from index column
@@ -424,20 +419,6 @@ impl<'a> Context<'a> {
                         query.order_by =
                             utils::order_by_one(utils::identifier(None::<&str>, COL_ARRAY_INDEX));
                     }
-                }
-                Node::Query(query)
-            }
-            cr::Transform::Offset(offset_in) => {
-                let mut query = self.node_into_query(input, input_ty);
-                if query.limit.is_some() || query.offset.is_some() {
-                    query = self.wrap_query(query, input_ty);
-                }
-
-                let offset = self.compile_column(offset_in);
-                query.offset = Some(offset);
-                if query.order_by.is_none() {
-                    query.order_by =
-                        utils::order_by_one(utils::identifier(None::<&str>, COL_ARRAY_INDEX));
                 }
                 Node::Query(query)
             }

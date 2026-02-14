@@ -1,8 +1,8 @@
 use std::{borrow::Cow, collections::HashMap};
 
 use crate::intermediate;
+use crate::sql::cr;
 use crate::sql::utils::RelCols;
-use crate::sql::{cr, utils};
 use crate::utils::IdGenerator;
 use itertools::Itertools;
 use lutra_bin::ir;
@@ -297,7 +297,7 @@ impl<'a> Context<'a> {
                     panic!("invalid program");
                 };
 
-                if utils::is_option(ty_variants) {
+                if self.is_option(ty_variants) {
                     // special case: nullable column
 
                     if variant.tag == 0 {
@@ -367,7 +367,7 @@ impl<'a> Context<'a> {
                 let ir::TyKind::Enum(variants) = &self.get_ty_mat(&enum_eq.subject.ty).kind else {
                     panic!("invalid program");
                 };
-                if utils::is_option(variants) {
+                if self.is_option(variants) {
                     // a nullable column
                     let op = if enum_eq.tag == 0 {
                         "is_null"
@@ -397,7 +397,7 @@ impl<'a> Context<'a> {
                     panic!("invalid program");
                 };
 
-                if utils::is_option(variants) {
+                if self.is_option(variants) {
                     // a nullable column
                     return base;
                 } else {
@@ -608,30 +608,23 @@ impl<'a> Context<'a> {
                 let start = self.compile_column(&call.args[1]);
                 let end = self.compile_column(&call.args[2]);
 
-                let start_clamped = new_bin_op(
-                    start.clone(),
-                    "greatest",
-                    new_int(0),
-                    ir::TyPrimitive::int64,
-                );
-                let length = new_bin_op(
-                    end,
-                    "std::sub",
-                    start_clamped.clone(),
-                    ir::TyPrimitive::int64,
-                );
-                let length_clamped =
-                    new_bin_op(length, "greatest", new_int(0), ir::TyPrimitive::int64);
+                let array = self.new_binding(array);
+                let index_col = self.new_rel_col(&array, 0, ty_index());
 
-                let rel_offset = cr::Expr::new_iso_transform(
-                    self.new_binding(array),
-                    cr::Transform::Offset(Box::new(start_clamped)),
+                let filtered = cr::Expr::new_iso_transform(
+                    array,
+                    cr::Transform::Where(Box::new(new_bin_op(
+                        new_bin_op(start, "std::lte", index_col.clone(), ir::TyPrimitive::bool),
+                        "std::and",
+                        new_bin_op(index_col, "std::lt", end, ir::TyPrimitive::bool),
+                        ir::TyPrimitive::bool,
+                    ))),
                 );
 
-                cr::ExprKind::Transform(
-                    self.new_binding(rel_offset),
-                    cr::Transform::Limit(Box::new(length_clamped)),
-                )
+                // reindex
+                let filtered = self.new_binding(filtered);
+                let index_col = self.new_rel_col(&filtered, 0, ty_index());
+                cr::ExprKind::Transform(filtered, cr::Transform::IndexBy(Some(Box::new(index_col))))
             }
             "std::index" => {
                 let array = self.compile_rel(&call.args[0]);
@@ -639,19 +632,22 @@ impl<'a> Context<'a> {
 
                 let item_ty = array.ty.kind.as_array().unwrap().clone();
 
-                let rel_offset = cr::Expr::new_iso_transform(
-                    self.new_binding(array),
-                    cr::Transform::Offset(Box::new(index)),
-                );
+                let array = self.new_binding(array);
+                let index_col = self.new_rel_col(&array, 0, ty_index());
 
-                let rel_limit = cr::Expr::new_iso_transform(
-                    self.new_binding(rel_offset),
-                    cr::Transform::Limit(Box::new(new_int(1))),
+                let item_row = cr::Expr::new_iso_transform(
+                    array,
+                    cr::Transform::Where(Box::new(new_bin_op(
+                        index_col,
+                        "std::eq",
+                        index,
+                        ir::TyPrimitive::bool,
+                    ))),
                 );
 
                 // drop index column
                 let item = cr::ExprKind::Transform(
-                    self.new_binding(rel_limit),
+                    self.new_binding(item_row),
                     cr::Transform::ProjectDiscard(vec![0]),
                 );
 
@@ -666,7 +662,7 @@ impl<'a> Context<'a> {
 
                 let ty_variants = expr.ty.kind.as_enum().unwrap();
 
-                if utils::is_option(ty_variants) {
+                if self.is_option(ty_variants) {
                     // construct Option::Some
                     let some = item;
 
@@ -682,7 +678,7 @@ impl<'a> Context<'a> {
                             kind: cr::ExprKind::Union(vec![some, none]),
                             ty: expr.ty.clone(),
                         }),
-                        cr::Transform::Limit(Box::new(new_int(1))),
+                        cr::Transform::Limit(1),
                     )
                 } else {
                     // construct Option::Some
@@ -714,7 +710,7 @@ impl<'a> Context<'a> {
                             kind: cr::ExprKind::Union(vec![some, none]),
                             ty: expr.ty.clone(),
                         }),
-                        cr::Transform::Limit(Box::new(new_int(1))),
+                        cr::Transform::Limit(1),
                     )
                 }
             }
@@ -804,7 +800,13 @@ impl<'a> Context<'a> {
                 let cond = self.compile_column(&func.body);
                 self.functions.remove(&func.id);
 
-                cr::ExprKind::Transform(array, cr::Transform::Where(Box::new(cond)))
+                let filtered =
+                    cr::Expr::new_iso_transform(array, cr::Transform::Where(Box::new(cond)));
+
+                // reindex
+                let filtered = self.new_binding(filtered);
+                let index_col = self.new_rel_col(&filtered, 0, ty_index());
+                cr::ExprKind::Transform(filtered, cr::Transform::IndexBy(Some(Box::new(index_col))))
             }
             "std::sort" => {
                 let array = self.compile_rel(&call.args[0]);
@@ -1068,7 +1070,7 @@ impl<'a> Context<'a> {
                 // limit 1
                 let iteration = cr::Expr::new_iso_transform(
                     self.new_binding(iteration),
-                    cr::Transform::Limit(Box::new(new_int(1))),
+                    cr::Transform::Limit(1),
                 );
 
                 // drop index
