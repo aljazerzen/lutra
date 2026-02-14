@@ -21,6 +21,16 @@ impl<'a> Context<'a> {
         }
         Ok(ty)
     }
+
+    /// Checks if enum is option pattern: enum {none, some: T} where T is primitive or array.
+    /// These can be represented as nullable values (single column).
+    pub fn is_option(&self, variants: &[ir::TyEnumVariant]) -> Result<bool, Error> {
+        if variants.len() != 2 || !variants[0].ty.is_unit() {
+            return Ok(false);
+        }
+        let some_ty = self.get_ty_mat(&variants[1].ty)?;
+        Ok(some_ty.kind.is_primitive() || some_ty.kind.is_array())
+    }
 }
 
 /// Common error type for Arrow conversion operations

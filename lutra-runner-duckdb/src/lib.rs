@@ -146,6 +146,15 @@ impl<'a> Context<'a> {
             _ => ty,
         }
     }
+
+    /// Checks if an enum is an "option" enum. Must match [lutra_compiler::sql::utils::is_option].
+    fn is_option(&self, variants: &[ir::TyEnumVariant]) -> bool {
+        if variants.len() != 2 || !variants[0].ty.is_unit() {
+            return false;
+        }
+        let some_ty = self.get_ty_mat(&variants[1].ty);
+        some_ty.kind.is_primitive() || some_ty.kind.is_array()
+    }
 }
 
 #[cfg(test)]

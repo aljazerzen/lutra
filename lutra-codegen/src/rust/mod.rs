@@ -126,7 +126,7 @@ fn codegen_module(
         all_tys.extend(types::write_tys_in_buffer(w, ctx)?);
     }
 
-    // write traits for functions
+    // write programs
     let module_path_str = module_path.as_slice().join("::");
     if let Some((_, format)) = ctx
         .options
@@ -134,7 +134,7 @@ fn codegen_module(
         .iter()
         .find(|(p, _)| p == &module_path_str)
     {
-        program::write_sr_programs(w, &functions, *format, ctx)?;
+        program::write_rr_programs(w, &functions, *format, ctx)?;
 
         all_tys.extend(types::write_tys_in_buffer(w, ctx)?);
     }

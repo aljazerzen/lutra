@@ -10,22 +10,6 @@ pub use ast::*;
 pub use node::*;
 pub use projection::RelCols;
 
-use lutra_bin::ir;
-
-/// Checks if an enum is a "option" enum:
-/// - does it have exactly two variants?
-/// - is the first variant unit?
-/// - is the second variant a primitive or an array?
-///
-/// If yes, then it can be compiled to a nullable value (single column).
-pub fn is_option(variants: &[ir::TyEnumVariant]) -> bool {
-    if variants.len() != 2 || !variants[0].ty.is_unit() {
-        return false;
-    }
-    let some_ty = &variants[1].ty.kind;
-    some_ty.is_primitive() || some_ty.is_array()
-}
-
 pub fn pick_by_position<T: Clone>(vec: &mut Vec<T>, to_keep: &[usize]) {
     let rc: Vec<_> = vec.drain(..).map(Rc::new).collect();
 

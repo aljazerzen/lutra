@@ -9,7 +9,7 @@ use postgres::Row;
 #[cfg(feature = "tokio-postgres")]
 use tokio_postgres::Row;
 
-use crate::{Context, Error, is_option};
+use crate::{Context, Error};
 
 pub fn from_sql(program: &rr::SqlProgram, rows: &[Row], ctx: &Context) -> Result<Vec<u8>, Error> {
     // write rows to buffer
@@ -59,7 +59,7 @@ impl<'a> super::Context<'a> {
                     .collect(),
             }),
 
-            ir::TyKind::Enum(variants) if is_option(variants) => Box::new(OptEncoder::new(
+            ir::TyKind::Enum(variants) if self.is_option(variants) => Box::new(OptEncoder::new(
                 ty_mat,
                 self.construct_row_encoder(&variants[1].ty),
             )),

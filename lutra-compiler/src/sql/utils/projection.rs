@@ -12,6 +12,20 @@ use crate::sql::{clauses, queries, utils};
 pub trait RelCols<'a> {
     fn get_ty_mat(&self, ty: &'a ir::Ty) -> &'a ir::Ty;
 
+    /// Checks if an enum is a "option" enum:
+    /// - does it have exactly two variants?
+    /// - is the first variant unit?
+    /// - is the second variant a primitive or an array?
+    ///
+    /// If yes, then it can be compiled to a nullable value (single column).
+    fn is_option(&self, variants: &'a [ir::TyEnumVariant]) -> bool {
+        if variants.len() != 2 || !variants[0].ty.is_unit() {
+            return false;
+        }
+        let some_ty = self.get_ty_mat(&variants[1].ty);
+        some_ty.kind.is_primitive() || some_ty.kind.is_array()
+    }
+
     /// Names of relational columns for a given type.
     /// If include_index is false, top-level arrays does not produce index column.
     fn rel_cols(
@@ -69,7 +83,7 @@ pub trait RelCols<'a> {
                 }))
             }
 
-            ir::TyKind::Enum(variants) if utils::is_option(variants) => {
+            ir::TyKind::Enum(variants) if self.is_option(variants) => {
                 let name = if name_prefix.is_empty() {
                     COL_VALUE.to_string()
                 } else {
@@ -123,7 +137,7 @@ pub trait RelCols<'a> {
                 Box::new(fields.iter().flat_map(|f| self.rel_cols_ty_nested(&f.ty)))
             }
 
-            ir::TyKind::Enum(variants) if utils::is_option(variants) => {
+            ir::TyKind::Enum(variants) if self.is_option(variants) => {
                 Box::new(variants.iter().flat_map(|v| self.rel_cols_ty_nested(&v.ty)))
             }
 

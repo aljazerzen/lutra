@@ -41,16 +41,6 @@ pub fn arrow_to_lutra(
     encode_single_value(&ctx, batches, ty)
 }
 
-/// Checks if enum is option pattern: enum {none, some: T} where T is primitive or array.
-/// These can be represented as nullable values (single column).
-fn is_option(variants: &[ir::TyEnumVariant]) -> bool {
-    if variants.len() != 2 || !variants[0].ty.is_unit() {
-        return false;
-    }
-    let some_ty = &variants[1].ty.kind;
-    some_ty.is_primitive() || some_ty.is_array()
-}
-
 /// Encode an array of values
 fn encode_array(
     ctx: &Context,
@@ -139,7 +129,7 @@ fn validate_type_match(
 
     // option types: validation happens on inner type when we recurse
     if let ir::TyKind::Enum(variants) = &lutra_ty.kind
-        && is_option(variants)
+        && ctx.is_option(variants)?
     {
         return Ok(());
     }
@@ -326,7 +316,7 @@ impl<'a> Encoder<'a> {
 
         // Handle option enum: {none, some: T}
         if let ir::TyKind::Enum(variants) = &ty.kind
-            && is_option(variants)
+            && self.ctx.is_option(variants)?
         {
             let inner_ty = &variants[1].ty;
             let head_format = lutra_bin::layout::enum_head_format(variants, &ty.variants_recursive);
@@ -572,7 +562,7 @@ impl<'a> Encoder<'a> {
 
         // Handle option: if null, head already encoded .none with no body
         if let ir::TyKind::Enum(variants) = &ty.kind
-            && is_option(variants)
+            && self.ctx.is_option(variants)?
         {
             if array.is_null(idx) {
                 return Ok(());
