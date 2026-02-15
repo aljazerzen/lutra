@@ -4,9 +4,20 @@ title: "Use from command line"
 
 ## Installation
 
+### Using Nix
+
+If you have [Nix](https://nixos.org/), you can install Lutra CLI with:
+
+```console
+$ nix profile install 'git+https://codeberg.org/lutra/lutra-data.git'
+```
+
+### Using Cargo
+
 Prerequisites:
 
 - [Rust toolchain](https://rust-lang.org/learn/get-started/)
+- [DuckDB](https://duckdb.org/) library installed on your system
 
 To install the CLI, run:
 
@@ -17,6 +28,10 @@ $ cargo install --index 'https://codeberg.org/lutra/_cargo-index.git' lutra-cli
 !!! note
 
     While Lutra (the project) is in a pre-release state, none of the packages are yet published to crates.io. Instead, I use a custom registry at [codeberg.org](https://codeberg.org/lutra/_cargo-index) to host the packages. This is why we need to use the `--index` flag to tell `cargo` to use this registry.
+
+!!! note
+
+    The CLI depends on DuckDB. Make sure you have the DuckDB library installed on your system. On most Linux distributions, you can install it via your package manager (e.g., `apt install libduckdb-dev` on Debian/Ubuntu). On macOS, you can use `brew install duckdb`.
 
 ---
 

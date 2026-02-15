@@ -39,8 +39,44 @@
           ];
         };
         fenix_pkgs = fenix.packages.${system};
+
+        # Build lutra-cli binary
+        lutra-cli = pkgs.rustPlatform.buildRustPackage {
+          pname = "lutra-cli";
+          version = "0.4.0";
+
+          src = ./.;
+
+          cargoLock = {
+            lockFile = ./Cargo.lock;
+          };
+
+          buildInputs = [
+            pkgs.duckdb.lib
+          ];
+
+          # Build only the lutra-cli binary from workspace
+          cargoBuildFlags = [
+            "-p"
+            "lutra-cli"
+          ];
+
+          # Skip tests - they require a running PostgreSQL instance
+          doCheck = false;
+
+          meta = with pkgs.lib; {
+            description = "Lutra query language CLI";
+            homepage = "https://lutra-lang.org";
+            mainProgram = "lutra";
+          };
+        };
       in
       {
+        packages = {
+          default = lutra-cli;
+          lutra = lutra-cli;
+        };
+
         devShells.default = pkgs.mkShell {
           buildInputs = [
             (fenix_pkgs.stable.withComponents [

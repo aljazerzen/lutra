@@ -1,13 +1,10 @@
 target/
-Cargo.lock
+result
 
 .idea/
 .vscode
 .aider*
 .helix
-
-.envrc
-.direnv/
 
 *.pending-snap
 
