@@ -9,28 +9,32 @@ use lutra_bin::ir;
 pub fn compile_program(value: ir::Program) -> Program {
     let mut b = ByteCoder {
         externals: Default::default(),
-        defs: value
-            .defs
-            .into_iter()
-            .map(|def| (def.name, def.ty))
-            .collect(),
+        include_defs: false,
+
+        defs: &value.defs,
+        def_map: value.defs.iter().map(|def| (&def.name, &def.ty)).collect(),
     };
 
     Program {
         main: b.compile_expr(value.main),
         externals: b.externals.into_iter().collect(),
+        defs: if b.include_defs { value.defs } else { vec![] },
     }
 }
 
-struct ByteCoder {
+struct ByteCoder<'t> {
     externals: IndexSet<ExternalSymbol>,
-    defs: HashMap<ir::Path, ir::Ty>,
+    defs: &'t [ir::TyDef],
+    def_map: HashMap<&'t ir::Path, &'t ir::Ty>,
+
+    // Some externals need defs (read_parquet), but most of the time, skip them.
+    include_defs: bool,
 }
 
-impl ByteCoder {
-    fn get_ty_mat<'a>(&'a self, ty: &'a ir::Ty) -> &'a ir::Ty {
+impl<'t> ByteCoder<'t> {
+    fn get_ty_mat<'a: 't>(&self, ty: &'a ir::Ty) -> &'t ir::Ty {
         match &ty.kind {
-            TyKind::Ident(path) => self.defs.get(path).unwrap(),
+            TyKind::Ident(path) => self.def_map.get(path).unwrap(),
             _ => ty,
         }
     }
@@ -255,7 +259,7 @@ impl ByteCoder {
         }
     }
 
-    fn compile_external_symbol(&self, id: String, ty_mat: &ir::Ty) -> ExternalSymbol {
+    fn compile_external_symbol(&mut self, id: String, ty_mat: &ir::Ty) -> ExternalSymbol {
         let layout_args: Vec<u32> = match id.as_str() {
             "std::to_int8" | "std::to_int16" | "std::to_int32" | "std::to_int64"
             | "std::to_uint8" | "std::to_uint16" | "std::to_uint32" | "std::to_uint64"
@@ -351,7 +355,7 @@ impl ByteCoder {
                 let ty_func = ty_mat.kind.as_function().unwrap();
                 let ty_item = ty_func.body.kind.as_array().unwrap();
                 let default_val = self.construct_default_for_ty(ty_item);
-                let default_val = default_val.encode(ty_item, &[]).unwrap(); // TODO: ty_defs
+                let default_val = default_val.encode(ty_item, self.defs).unwrap();
                 pack_bytes_to_u32(default_val, &mut r);
 
                 r
@@ -484,18 +488,18 @@ impl ByteCoder {
                 let ty_func = ty_mat.kind.as_function().unwrap();
                 let ty_return = &ty_func.body;
 
-                let ty_return_buf = ty_return.encode();
+                self.include_defs = true;
+
                 let mut r = Vec::new();
-                pack_bytes_to_u32(ty_return_buf, &mut r);
+                pack_bytes_to_u32(ty_return.encode(), &mut r);
                 r
             }
             "std::fs::write_parquet" => {
                 let array = self.get_ty_mat(as_ty_of_param(ty_mat));
                 let array_item = array.kind.as_array().unwrap();
 
-                let array_item_buf = array_item.encode();
                 let mut r = Vec::new();
-                pack_bytes_to_u32(array_item_buf, &mut r);
+                pack_bytes_to_u32(array_item.encode(), &mut r);
                 r
             }
 

@@ -16,6 +16,7 @@ pub struct Interpreter {
     scopes: HashMap<br::Sid, Vec<Addr>>,
 
     pub(crate) file_system: Option<std::path::PathBuf>,
+    pub(crate) defs: Vec<lutra_bin::ir::TyDef>,
 }
 
 #[derive(Clone)]
@@ -57,6 +58,7 @@ pub fn evaluate(
         scopes: HashMap::new(),
 
         file_system,
+        defs: program.defs.clone(),
     };
 
     // load external symbols

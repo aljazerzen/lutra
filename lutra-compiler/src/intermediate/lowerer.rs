@@ -536,7 +536,7 @@ impl<'a> Lowerer<'a> {
         match &pattern.kind {
             // match a enum variant
             pr::PatternKind::Enum(variant_name, inner) => {
-                let tag = get_pattern_enum_eq_tag(subject, pattern, variant_name);
+                let tag = self.get_pattern_enum_eq_tag(subject, pattern, variant_name);
 
                 let mut expr = ir::Expr {
                     kind: ir::ExprKind::EnumEq(Box::new(ir::EnumEq {
@@ -977,7 +977,7 @@ impl<'a> Lowerer<'a> {
             }
 
             pr::PatternKind::Enum(variant_name, inner) => {
-                let tag = get_pattern_enum_eq_tag(&subject_ref, pattern, variant_name);
+                let tag = self.get_pattern_enum_eq_tag(&subject_ref, pattern, variant_name);
 
                 if let Some(inner) = inner {
                     let subject_ty = self.get_ty_mat(subject_ref.ty.clone());
@@ -1089,6 +1089,28 @@ impl<'a> Lowerer<'a> {
 
         ir::Expr { kind, ty }
     }
+
+    fn get_pattern_enum_eq_tag(
+        &mut self,
+        subject: &ir::Expr,
+        pattern: &pr::Pattern,
+        variant_name: &str,
+    ) -> usize {
+        if let Some(tag) = pattern.variant_tag {
+            tag
+        } else {
+            // this happens when subject of the pattern is a type var
+            // and we cannot determine the position of the variant until the
+            // concrete type is known. Which is now, after instantiating all type params.
+            let subject_ty = self.get_ty_mat(subject.ty.clone());
+            let variants = subject_ty.kind.as_enum().unwrap();
+            let (tag, _) = variants
+                .iter()
+                .find_position(|v| v.name == variant_name)
+                .unwrap();
+            tag
+        }
+    }
 }
 
 fn new_bool_bin_func(func_id: &str, left: ir::Expr, right: ir::Expr) -> ir::Expr {
@@ -1107,23 +1129,6 @@ fn new_bool_bin_func(func_id: &str, left: ir::Expr, right: ir::Expr) -> ir::Expr
             args: vec![left, right],
         })),
         ty: bool_ty,
-    }
-}
-
-fn get_pattern_enum_eq_tag(subject: &ir::Expr, pattern: &pr::Pattern, variant_name: &str) -> usize {
-    if let Some(tag) = pattern.variant_tag {
-        tag
-    } else {
-        // this happens when subject of the pattern is a type var
-        // and we cannot determine the position of the variant until the
-        // concrete type is known. Which is now, after instantiating all type params.
-        let variants = subject.ty.kind.as_enum().unwrap();
-        let (tag, _) = variants
-            .iter()
-            .enumerate()
-            .find(|(_, v)| v.name == variant_name)
-            .unwrap();
-        tag
     }
 }
 

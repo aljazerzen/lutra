@@ -71,9 +71,9 @@ fn lower_01() {
       )[90m: func (int64, int64) -> bool[0m;
       let 0 = (func 2 ->
         (call
-          external.std::index[90m: func ([{id: int64, title: text}], int64) -> enum {none, some: {id: int64, title: text}}[0m,
+          external.std::index[90m: func ([chinook::album], int64) -> enum {none, some: chinook::album}[0m,
           (call
-            external.std::filter[90m: func ([{id: int64, title: text}], func ({id: int64, title: text}) -> bool) -> [{id: int64, title: text}][0m,
+            external.std::filter[90m: func ([chinook::album], func (chinook::album) -> bool) -> [chinook::album][0m,
             (call
               external.chinook::get_albums[90m: func () -> [chinook::album][0m,
             )[90m: [chinook::album][0m,
@@ -87,15 +87,15 @@ fn lower_01() {
                 fn.2+0[90m: int64[0m,
               )[90m: bool[0m
             )[90m: func (chinook::album) -> bool[0m,
-          )[90m: [{id: int64, title: text}][0m,
+          )[90m: [chinook::album][0m,
           0[90m: int64[0m,
-        )[90m: enum {none, some: {id: int64, title: text}}[0m
+        )[90m: enum {none, some: chinook::album}[0m
       )[90m: func (int64) -> enum {none, some: chinook::album}[0m;
       let 1 = (func 4 ->
         (call
-          external.std::index[90m: func ([{id: int64, total: float64}], int64) -> enum {none, some: {id: int64, total: float64}}[0m,
+          external.std::index[90m: func ([box_office::AlbumSale], int64) -> enum {none, some: box_office::AlbumSale}[0m,
           (call
-            external.std::filter[90m: func ([{id: int64, total: float64}], func ({id: int64, total: float64}) -> bool) -> [{id: int64, total: float64}][0m,
+            external.std::filter[90m: func ([box_office::AlbumSale], func (box_office::AlbumSale) -> bool) -> [box_office::AlbumSale][0m,
             (call
               external.box_office::get_album_sales[90m: func () -> [box_office::AlbumSale][0m,
             )[90m: [box_office::AlbumSale][0m,
@@ -109,9 +109,9 @@ fn lower_01() {
                 fn.4+0[90m: int64[0m,
               )[90m: bool[0m
             )[90m: func (box_office::AlbumSale) -> bool[0m,
-          )[90m: [{id: int64, total: float64}][0m,
+          )[90m: [box_office::AlbumSale][0m,
           0[90m: int64[0m,
-        )[90m: enum {none, some: {id: int64, total: float64}}[0m
+        )[90m: enum {none, some: box_office::AlbumSale}[0m
       )[90m: func (int64) -> enum {none, some: box_office::AlbumSale}[0m;
       (call
         (func 0 ->

@@ -2280,6 +2280,7 @@ pub mod br {
     pub struct Program {
         pub externals: crate::vec::Vec<ExternalSymbol>,
         pub main: Expr,
+        pub defs: crate::vec::Vec<super::ir::TyDef>,
     }
 
     #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -2415,21 +2416,28 @@ pub mod br {
             fn encode_head(&self, buf: &mut crate::bytes::BytesMut) -> Self::HeadPtr {
                 let externals = self.externals.encode_head(buf);
                 let main = self.main.encode_head(buf);
-                ProgramHeadPtr { externals, main }
+                let defs = self.defs.encode_head(buf);
+                ProgramHeadPtr {
+                    externals,
+                    main,
+                    defs,
+                }
             }
             fn encode_body(&self, head: Self::HeadPtr, buf: &mut crate::bytes::BytesMut) {
                 self.externals.encode_body(head.externals, buf);
                 self.main.encode_body(head.main, buf);
+                self.defs.encode_body(head.defs, buf);
             }
         }
         #[allow(non_camel_case_types)]
         pub struct ProgramHeadPtr {
             externals: <crate::vec::Vec<super::ExternalSymbol> as crate::Encode>::HeadPtr,
             main: <super::Expr as crate::Encode>::HeadPtr,
+            defs: <crate::vec::Vec<super::super::ir::TyDef> as crate::Encode>::HeadPtr,
         }
         impl crate::Layout for Program {
             fn head_size() -> usize {
-                104
+                168
             }
         }
 
@@ -2437,7 +2445,12 @@ pub mod br {
             fn decode(buf: &[u8]) -> crate::Result<Self> {
                 let externals = crate::vec::Vec::<super::ExternalSymbol>::decode(buf.skip(0))?;
                 let main = super::Expr::decode(buf.skip(8))?;
-                Ok(Program { externals, main })
+                let defs = crate::vec::Vec::<super::super::ir::TyDef>::decode(buf.skip(13))?;
+                Ok(Program {
+                    externals,
+                    main,
+                    defs,
+                })
             }
         }
 

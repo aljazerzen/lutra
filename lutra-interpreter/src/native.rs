@@ -1603,7 +1603,7 @@ pub mod std_fs {
             .collect::<Result<_, _>>()
             .map_err(|e| EvalError::ExternalError(e.to_string()))?;
 
-        let data = lutra_arrow::arrow_to_lutra(batches, &ty, &[])
+        let data = lutra_arrow::arrow_to_lutra(batches, &ty, &it.defs)
             .map_err(|e| EvalError::ExternalError(e.to_string()))?;
 
         Ok(Cell::Data(Data::new(data.to_vec())))
@@ -1628,7 +1628,7 @@ pub mod std_fs {
         let ty_item = ir::Ty::decode(&ty_item).map_err(|_| EvalError::BadProgram)?;
 
         // convert lutra to arrow
-        let batch = lutra_arrow::lutra_to_arrow(data, &ty_item, &[])
+        let batch = lutra_arrow::lutra_to_arrow(data, &ty_item, &it.defs)
             .map_err(|e| EvalError::ExternalError(format!("lutra_to_arrow: {e}")))?;
 
         // write to parquet

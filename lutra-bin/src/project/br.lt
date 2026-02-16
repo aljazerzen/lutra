@@ -3,6 +3,7 @@ submodule
 type Program: {
   externals: [ExternalSymbol],
   main: Expr,
+  defs: [project::ir::TyDef],
 }
 
 @derive(["Debug", "Clone", "PartialEq", "Eq", "Hash"])

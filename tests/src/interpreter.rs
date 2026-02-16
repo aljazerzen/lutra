@@ -200,10 +200,10 @@ fn func_call_size() {
     let program_lt = program.encode();
 
     // ideally, we'd bring that down to 30
-    const MAX_SIZE: usize = 40;
+    const MAX_SIZE: usize = 47;
 
     assert!(
-        program_lt.len() < MAX_SIZE,
+        program_lt.len() <= MAX_SIZE,
         "plain func call should be less than MAX_SIZE bytes, it is {} bytes",
         program_lt.len()
     );
