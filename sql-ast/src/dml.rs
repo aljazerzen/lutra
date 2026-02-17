@@ -8,7 +8,7 @@ use alloc::{
 
 use core::fmt::{self, Display};
 
-use crate::{RelNamed, SelectInto, Values};
+use crate::{RelNamed, SelectInto, TableAlias, Values};
 
 use super::display_utils::{Indent, SpaceOrNewline, indented_list};
 use super::{Expr, Ident, ObjectName, OrderByExpr, Query, SelectItem, display_comma_separated};
@@ -128,7 +128,63 @@ impl Display for FromTable {
     }
 }
 
-/// SQL assignment `foo = expr` as used in SQLUpdate
+#[allow(clippy::large_enum_variant)]
+#[derive(Debug, Clone, PartialEq, PartialOrd, Eq, Ord, Hash)]
+pub struct Update {
+    /// TABLE
+    pub table: ObjectName,
+    /// AS
+    pub alias: Option<TableAlias>,
+    /// Column assignments
+    pub assignments: Vec<Assignment>,
+    /// Relations which provide value to be set
+    pub from: Vec<RelNamed>,
+    /// WHERE
+    pub selection: Option<Expr>,
+    /// RETURNING
+    pub returning: Option<Vec<SelectItem>>,
+    /// LIMIT
+    pub limit: Option<Expr>,
+}
+
+impl fmt::Display for Update {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str("UPDATE ")?;
+        self.table.fmt(f)?;
+        if let Some(alias) = &self.alias {
+            f.write_str(" AS ")?;
+            alias.fmt(f)?;
+        }
+        if !self.assignments.is_empty() {
+            SpaceOrNewline.fmt(f)?;
+            f.write_str("SET")?;
+            indented_list(f, &self.assignments)?;
+        }
+        if !self.from.is_empty() {
+            SpaceOrNewline.fmt(f)?;
+            f.write_str("FROM")?;
+            indented_list(f, &self.from)?;
+        }
+        if let Some(selection) = &self.selection {
+            SpaceOrNewline.fmt(f)?;
+            f.write_str("WHERE")?;
+            SpaceOrNewline.fmt(f)?;
+            Indent(selection).fmt(f)?;
+        }
+        if let Some(returning) = &self.returning {
+            SpaceOrNewline.fmt(f)?;
+            f.write_str("RETURNING")?;
+            indented_list(f, returning)?;
+        }
+        if let Some(limit) = &self.limit {
+            SpaceOrNewline.fmt(f)?;
+            write!(f, "LIMIT {limit}")?;
+        }
+        Ok(())
+    }
+}
+
+/// SQL assignment `foo = expr` as used in Update
 #[derive(Debug, Clone, PartialEq, PartialOrd, Eq, Ord, Hash)]
 pub struct Assignment {
     pub target: AssignmentTarget,

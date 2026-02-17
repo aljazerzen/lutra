@@ -37,6 +37,14 @@ pub enum ExprKind {
     /// Fixed-point iteration. Has initial value and an update step.
     /// Update step expression can refer to its own id.
     Iteration(Box<Expr>, Box<BoundExpr>),
+
+    /// Updates rows in a table
+    Update {
+        table: String,
+        /// Relation that contains all rows that need to be updated.
+        /// Index is row id.
+        updates: Box<Expr>,
+    },
 }
 
 /// An expression, bound to an identifier.
@@ -54,7 +62,10 @@ pub enum From {
     Row(Vec<Expr>),
 
     /// Read from a table (in Table representation)
-    Table(String),
+    Table {
+        name: String,
+        use_row_id: bool,
+    },
 
     /// Reference to a relation variable in scope.
     RelRef(usize),
@@ -186,5 +197,19 @@ impl Expr {
             ty: correlated.ty.clone(),
             kind: ExprKind::BindCorrelated(bound, Box::new(correlated)),
         }
+    }
+
+    #[allow(dead_code)]
+    pub fn as_literal(&self) -> Option<&ir::Literal> {
+        let ExprKind::From(From::Literal(lit)) = &self.kind else {
+            return None;
+        };
+        Some(lit)
+    }
+
+    #[allow(dead_code)]
+    pub fn is_true(&self) -> bool {
+        self.as_literal()
+            .is_some_and(|l| matches!(l, ir::Literal::bool(true)))
     }
 }

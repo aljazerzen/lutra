@@ -64,6 +64,10 @@ pub fn fold_expr_kind<T: ?Sized + CrFold>(
             Box::new(fold.fold_expr(*initial)?),
             Box::new(fold.fold_bound_expr(*step)?),
         ),
+        ExprKind::Update { table, updates } => ExprKind::Update {
+            table,
+            updates: Box::new(fold.fold_expr(*updates)?),
+        },
     };
     Ok(Expr { kind, ty })
 }
@@ -78,7 +82,7 @@ pub fn fold_bound_expr<T: ?Sized + CrFold>(fold: &mut T, bound: BoundExpr) -> Re
 pub fn fold_from<T: ?Sized + CrFold>(fold: &mut T, from: From, ty: ir::Ty) -> Result<Expr> {
     let from = match from {
         From::Row(exprs) => From::Row(fold_exprs(fold, exprs)?),
-        From::Table(name) => From::Table(name),
+        From::Table { name, use_row_id } => From::Table { name, use_row_id },
         From::RelRef(id) => From::RelRef(id),
         From::Null => From::Null,
         From::Literal(lit) => From::Literal(lit),

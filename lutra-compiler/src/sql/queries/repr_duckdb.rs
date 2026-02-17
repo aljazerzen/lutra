@@ -343,14 +343,32 @@ impl<'a> queries::Context<'a> {
     }
 
     /// Converts a relation from "query repr" to "arrow repr".
-    pub fn duck_export(&mut self, node: Node, ty: &ir::Ty) -> Node {
+    pub fn duck_export(&mut self, node: Node, ty: &ir::Ty, keep_index: bool) -> Node {
         let ty_mat = self.get_ty_mat(ty);
 
         match &ty_mat.kind {
             ir::TyKind::Primitive(_) => node,
             ir::TyKind::Tuple(f) if f.is_empty() => node,
             ir::TyKind::Tuple(_) => self.duck_export_row(node, ty),
-            ir::TyKind::Array(ty_item) => self.duck_export_row(node, ty_item),
+            ir::TyKind::Array(ty_item) => {
+                // arrays export the inner type as a row
+                let mut r = self.duck_export_row(node, ty_item);
+
+                if keep_index {
+                    // special case: retain the index column
+                    let mut select = self.node_into_select(r, ty_item);
+                    select.projection.insert(
+                        0,
+                        sql_ast::SelectItem::unnamed(utils::identifier(
+                            None::<&str>,
+                            COL_ARRAY_INDEX,
+                        )),
+                    );
+                    r = Node::Select(select);
+                }
+
+                r
+            }
             ir::TyKind::Enum(variants) if self.is_option(variants) => {
                 // Option enum is a single nullable column - no transformation needed
                 node

@@ -591,6 +591,34 @@ module sql {
   func insert(rows: [R], const table_identifier: text): {}
   where R: {..}
 
+  ## Updates rows in a table.
+  ##
+  ## The `updater` function is applied to each row in the table. When it returns
+  ## `.none` the row is not updated, and when it return `.some(new_value)` it is
+  ## updated to the new value.
+  ##
+  ## The function receives the current row values and can use them to decide
+  ## whether to update and what the new values should be.
+  ##
+  ## Example:
+  ## ```lt
+  ## std::sql::update(
+  ##   "users",
+  ##   func (u: User) -> if u.age > 65 then (
+  ##     .some({status = "senior", ..u})
+  ##   ) else (
+  ##     .none
+  ##   )
+  ## )
+  ## ```
+  ##
+  ## For table identifier format, see documentation of [std::sql::from].
+  func update(
+    const table: text,
+    updater: func (R): enum {none, some: R},
+  ): {}
+  where R: {..}
+
   ## Evaluates raw SQL.
   ##
   ## This function is an escape hatch for accessing SQL directly.

@@ -21,15 +21,26 @@ use crate::sql::{COL_ARRAY_INDEX, queries};
 
 impl<'a> queries::Context<'a> {
     /// Returns columns of ty in the postgres repr.
-    pub fn pg_cols<'t>(&'t self, ty: &'t ir::Ty) -> Vec<(String, Cow<'t, ir::Ty>)> {
+    pub fn pg_cols<'t>(
+        &'t self,
+        ty: &'t ir::Ty,
+        include_index: bool,
+    ) -> Vec<(String, Cow<'t, ir::Ty>)> {
         match &self.get_ty_mat(ty).kind {
             ir::TyKind::Primitive(_) | ir::TyKind::Tuple(_) | ir::TyKind::Enum(_) => {
                 self.pg_cols_nested(ty, "".into())
             }
 
             ir::TyKind::Array(item) => {
-                // no index column
-                self.pg_cols_nested(item, "".into())
+                // just inner item cols
+                let mut r = self.pg_cols_nested(item, "".into());
+
+                if include_index {
+                    let ty_index = Cow::Owned(ir::Ty::new(ir::TyPrimitive::int64));
+                    r.insert(0, (COL_ARRAY_INDEX.into(), ty_index));
+                }
+
+                r
             }
 
             ir::TyKind::Function(_) | ir::TyKind::Ident(_) => unreachable!(),
@@ -102,7 +113,7 @@ impl<'a> queries::Context<'a> {
 
     /// Converts a relation from "postgres repr" into "query repr".
     pub fn pg_import(&mut self, node: Node, ty: &ir::Ty) -> Node {
-        let rel = self.node_into_rel(node, ty);
+        let (rel_var, rel) = self.node_into_rel_var(node, ty);
 
         let mut values = Vec::new();
 
@@ -112,13 +123,13 @@ impl<'a> queries::Context<'a> {
         }
 
         // table columns
-        values.extend(self.pg_cols(ty).into_iter().map(|(f_name, f_ty)| {
-            let ident = utils::identifier(None::<&str>, f_name);
+        values.extend(self.pg_cols(ty, false).into_iter().map(|(f_name, f_ty)| {
+            let ident = utils::identifier(Some(&rel_var), f_name);
             self.pg_col_import(ident, f_ty.as_ref())
         }));
 
         let mut select = utils::select_empty();
-        select.from.push(rel);
+        select.from.extend(rel);
         select.projection = self.projection(ty, values);
         Node::Select(select)
     }
@@ -171,15 +182,21 @@ impl<'a> queries::Context<'a> {
     }
 
     /// Convert a relation from "postgres repr" from "query repr".
-    pub fn pg_export(&mut self, node: Node, ty: &ir::Ty) -> Node {
+    pub fn pg_export(&mut self, node: Node, ty: &ir::Ty, keep_index: bool) -> Node {
         let mut select = self.node_into_select(node, ty);
 
-        // first column will be index, discard it
-        let old_projection = select.projection.into_iter().skip(1);
+        let mut old_projection = select.projection.into_iter();
 
-        select.projection = Iterator::zip(old_projection, self.pg_cols(ty))
-            .map(|(p, (_, ty))| self.pg_col_export(p.expr, ty.as_ref()))
-            .map(|expr| sql_ast::SelectItem { expr, alias: None })
+        if ty.kind.is_array() && !keep_index {
+            // first column will be index, discard it
+            old_projection.next();
+        }
+
+        select.projection = Iterator::zip(old_projection, self.pg_cols(ty, keep_index))
+            .map(|(p, (col, ty))| sql_ast::SelectItem {
+                expr: self.pg_col_export(p.expr, ty.as_ref()),
+                alias: Some(utils::new_ident(col)),
+            })
             .collect();
 
         Node::Select(select)

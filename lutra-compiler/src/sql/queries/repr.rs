@@ -26,17 +26,17 @@ impl<'a> Context<'a> {
     /// Returns columns in the native repr.
     pub fn native_cols<'t>(&'t self, ty: &'t ir::Ty) -> Vec<(String, Cow<'t, ir::Ty>)> {
         match self.dialect() {
-            Dialect::Postgres => self.pg_cols(ty),
+            Dialect::Postgres => self.pg_cols(ty, false),
             Dialect::DuckDB => self.duck_cols(ty),
         }
     }
 
     /// Converts a relation from "query repr" to "native repr".
     /// Native repr is either the postgres repr or duckdb repr.
-    pub fn native_export(&mut self, node: Node, ty: &ir::Ty) -> Node {
+    pub fn native_export(&mut self, node: Node, ty: &ir::Ty, keep_index: bool) -> Node {
         match self.dialect() {
-            Dialect::Postgres => self.pg_export(node, ty),
-            Dialect::DuckDB => self.duck_export(node, ty),
+            Dialect::Postgres => self.pg_export(node, ty, keep_index),
+            Dialect::DuckDB => self.duck_export(node, ty, keep_index),
         }
     }
 
@@ -61,6 +61,17 @@ impl<'a> Context<'a> {
         match self.dialect() {
             Dialect::Postgres => self.pg_deserialize(input, input_ty, ty),
             Dialect::DuckDB => self.duck_deserialize(input, ty),
+        }
+    }
+
+    /// Returns the name that provides a "row identifier". This value must:
+    /// - uniquely identify a row in a table,
+    /// - be stable within a transaction,
+    /// - exist for every row in every table.
+    pub fn row_id(&self) -> &str {
+        match self.dialect {
+            Dialect::Postgres => "ctid",
+            Dialect::DuckDB => "rowid",
         }
     }
 }

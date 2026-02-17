@@ -2,10 +2,8 @@
 use alloc::{boxed::Box, vec::Vec};
 
 use super::display_utils::{SpaceOrNewline, indented_list};
-use crate::{
-    dml::{Assignment, MergeClause, OutputClause},
-    *,
-};
+use crate::dml::{MergeClause, OutputClause, Update};
+use crate::*;
 
 /// The most complete variant of a `SELECT` query expression, optionally
 /// including `WITH`, `UNION` / other set operations, and `ORDER BY`.
@@ -68,20 +66,7 @@ pub enum SetExpr {
     },
     Values(Values),
     Insert(Insert),
-    Update {
-        /// TABLE
-        table: RelNamed,
-        /// Column assignments
-        assignments: Vec<Assignment>,
-        /// Table which provide value to be set
-        from: Option<UpdateTableFromKind>,
-        /// WHERE
-        selection: Option<Expr>,
-        /// RETURNING
-        returning: Option<Vec<SelectItem>>,
-        /// LIMIT
-        limit: Option<Expr>,
-    },
+    Update(Update),
     Delete(Delete),
     Merge {
         /// optional INTO keyword
@@ -123,48 +108,7 @@ impl fmt::Display for SetExpr {
             }
             SetExpr::Values(v) => v.fmt(f),
             SetExpr::Insert(v) => v.fmt(f),
-            SetExpr::Update {
-                table,
-                assignments,
-                from,
-                selection,
-                returning,
-                limit,
-            } => {
-                f.write_str("UPDATE ")?;
-                table.fmt(f)?;
-                if let Some(UpdateTableFromKind::BeforeSet(from)) = from {
-                    SpaceOrNewline.fmt(f)?;
-                    f.write_str("FROM")?;
-                    indented_list(f, from)?;
-                }
-                if !assignments.is_empty() {
-                    SpaceOrNewline.fmt(f)?;
-                    f.write_str("SET")?;
-                    indented_list(f, assignments)?;
-                }
-                if let Some(UpdateTableFromKind::AfterSet(from)) = from {
-                    SpaceOrNewline.fmt(f)?;
-                    f.write_str("FROM")?;
-                    indented_list(f, from)?;
-                }
-                if let Some(selection) = selection {
-                    SpaceOrNewline.fmt(f)?;
-                    f.write_str("WHERE")?;
-                    SpaceOrNewline.fmt(f)?;
-                    Indent(selection).fmt(f)?;
-                }
-                if let Some(returning) = returning {
-                    SpaceOrNewline.fmt(f)?;
-                    f.write_str("RETURNING")?;
-                    indented_list(f, returning)?;
-                }
-                if let Some(limit) = limit {
-                    SpaceOrNewline.fmt(f)?;
-                    write!(f, "LIMIT {limit}")?;
-                }
-                Ok(())
-            }
+            SetExpr::Update(v) => v.fmt(f),
             SetExpr::Delete(v) => v.fmt(f),
             SetExpr::Merge {
                 into,
@@ -935,15 +879,4 @@ impl fmt::Display for SelectInto {
 
         write!(f, "INTO{}{}{} {}", temporary, unlogged, table, self.name)
     }
-}
-
-/// The `FROM` clause of an `UPDATE TABLE` statement
-#[derive(Debug, Clone, PartialEq, PartialOrd, Eq, Ord, Hash)]
-pub enum UpdateTableFromKind {
-    /// Update Statement where the 'FROM' clause is before the 'SET' keyword (Supported by Snowflake)
-    /// For Example: `UPDATE FROM t1 SET t1.name='aaa'`
-    BeforeSet(Vec<RelNamed>),
-    /// Update Statement where the 'FROM' clause is after the 'SET' keyword (Which is the standard way)
-    /// For Example: `UPDATE SET t1.name='aaa' FROM t1`
-    AfterSet(Vec<RelNamed>),
 }

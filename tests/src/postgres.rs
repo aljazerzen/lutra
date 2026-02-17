@@ -1832,12 +1832,12 @@ async fn sql_from_00() {
     func main(): [Movie] -> std::sql::from("movies")
     "#, lutra_bin::Value::unit()).await), @r#"
     SELECT
-      id::int4 AS _0,
-      title::text AS _1,
-      (premiere_date::date - '1970-01-01'::date) AS _2,
-      director_id::int2 AS _3
+      r0.id::int4 AS _0,
+      r0.title::text AS _1,
+      (r0.premiere_date::date - '1970-01-01'::date) AS _2,
+      r0.director_id::int2 AS _3
     FROM
-      movies
+      movies AS r0
     ---
     [
       {
@@ -1880,8 +1880,8 @@ async fn sql_insert_00() {
     INSERT INTO
       movies (title, premiere_date)
     SELECT
-      r0._0,
-      ('1970-01-01'::date + r0._1)
+      r0._0 AS title,
+      ('1970-01-01'::date + r0._1) AS premiere_date
     FROM
       (
         SELECT
@@ -1930,6 +1930,292 @@ async fn sql_insert_00() {
       },
     ]
     "#);
+    runner.into_inner().rollback().await.unwrap();
+}
+
+#[tokio::test(flavor = "current_thread")]
+async fn update_basic() {
+    let mut client = _get_test_db_client().await.unwrap();
+    let tran = client.transaction().await.unwrap();
+
+    tran.batch_execute(
+        "
+            CREATE TABLE users (id int4, name text, age int4);
+            INSERT INTO users VALUES (1, 'Alice', 30), (2, 'Bob', 25), (3, 'Charlie', 35);
+            ",
+    )
+    .await
+    .unwrap();
+
+    let mut runner = RunnerAsync::new(tran);
+
+    // Test basic UPDATE
+    insta::assert_snapshot!(_sql_and_output(_run_on(&mut runner, r#"
+    type User: {
+      id: int32,
+      name: text,
+      age: int32,
+    }
+
+    func main(): {} -> std::sql::update(
+      "users",
+      func (u: User) -> (
+        if u.id == 2
+        then .some({id = 2, name = "Bobby", age = 26})
+        else .none
+      )
+    )
+    "#, lutra_bin::Value::unit()).await), @"
+    UPDATE
+      users
+    SET
+      id = r11.id,
+      name = r11.name,
+      age = r11.age
+    FROM
+      (
+        SELECT
+          r2.value AS index,
+          r10._0 AS id,
+          r10._1 AS name,
+          r10._2 AS age
+        FROM
+          (
+            SELECT
+              ctid AS index,
+              r0.id::int4 AS _0,
+              r0.name::text AS _1,
+              r0.age::int4 AS _2
+            FROM
+              users AS r0
+          ) AS r1,
+          LATERAL (
+            SELECT
+              r1.index AS value
+          ) AS r2,
+          LATERAL (
+            SELECT
+              r9._1_0 AS _0,
+              r9._1_1 AS _1,
+              r9._1_2 AS _2
+            FROM
+              (
+                SELECT
+                  r8._t,
+                  r8._1_0,
+                  r8._1_1,
+                  r8._1_2
+                FROM
+                  (
+                    WITH r3 AS (
+                      SELECT
+                        CASE
+                          WHEN (r1._0 = 2::int4) THEN 0::int2
+                          ELSE 1::int2
+                        END AS value
+                    )
+                    SELECT
+                      r4._t,
+                      r4._1_0,
+                      r4._1_1,
+                      r4._1_2
+                    FROM
+                      (
+                        SELECT
+                          1::int2 AS _t,
+                          2::int4 AS _1_0,
+                          'Bobby'::text AS _1_1,
+                          26::int4 AS _1_2
+                      ) AS r4
+                    WHERE
+                      (
+                        (
+                          SELECT
+                            r5.value AS value
+                          FROM
+                            r3 AS r5
+                        ) = 0::int2
+                      )
+                    UNION
+                    ALL
+                    SELECT
+                      r6._t,
+                      r6._1_0,
+                      r6._1_1,
+                      r6._1_2
+                    FROM
+                      (
+                        SELECT
+                          0::int2 AS _t,
+                          NULL::int4 AS _1_0,
+                          NULL::text AS _1_1,
+                          NULL::int4 AS _1_2
+                      ) AS r6
+                    WHERE
+                      (
+                        (
+                          SELECT
+                            r7.value AS value
+                          FROM
+                            r3 AS r7
+                        ) = 1::int2
+                      )
+                  ) AS r8
+                WHERE
+                  (r8._t = 1::int2)
+              ) AS r9
+          ) AS r10
+      ) AS r11
+    WHERE
+      (r11.index = users.ctid)
+    ---
+    {}
+    ");
+
+    // Verify the update worked
+    insta::assert_snapshot!(_run_on(&mut runner, r#"
+    type User: {
+      id: int32,
+      name: text,
+      age: int32,
+    }
+    func main() -> (
+      (std::sql::from("users"): [User])
+      | std::sort(u -> u.id | std::to_int64)
+    )
+    "#, lutra_bin::Value::unit()).await.1, @r#"
+    [
+      {
+        id = 1,
+        name = "Alice",
+        age = 30,
+      },
+      {
+        id = 2,
+        name = "Bobby",
+        age = 26,
+      },
+      {
+        id = 3,
+        name = "Charlie",
+        age = 35,
+      },
+    ]
+    "#);
+
+    runner.into_inner().rollback().await.unwrap();
+}
+
+#[tokio::test(flavor = "current_thread")]
+async fn update_multiple_rows() {
+    let mut client = _get_test_db_client().await.unwrap();
+    let tran = client.transaction().await.unwrap();
+
+    tran.batch_execute(
+        "
+            CREATE TABLE products (id int4, name text, price float8, active bool);
+            INSERT INTO products VALUES
+                (1, 'Widget', 10.0, true),
+                (2, 'Gadget', 20.0, true),
+                (3, 'Doohickey', 15.0, false);
+            ",
+    )
+    .await
+    .unwrap();
+
+    let mut runner = RunnerAsync::new(tran);
+
+    // Test UPDATE that affects multiple rows
+    insta::assert_snapshot!(_run_on(&mut runner, r#"
+    type Product: {
+      id: int32,
+      name: text,
+      price: float64,
+      active: bool,
+    }
+
+    func main(): {} -> std::sql::update(
+      "products",
+      func (p: Product) -> (
+        if p.active
+        then .some({id = 0, name = "DISCONTINUED", price = 0.0, active = false})
+        else .none
+      )
+    )
+    "#, lutra_bin::Value::unit()).await.1, @"{}");
+
+    // Verify the updates
+    insta::assert_snapshot!(_run_on(&mut runner, r#"
+    type Product: {
+      id: int32,
+      name: text,
+      price: float64,
+      active: bool,
+    }
+    func main() -> (
+      (std::sql::from("products"): [Product])
+      | std::sort(p -> p.id | std::to_int64)
+    )
+    "#, lutra_bin::Value::unit()).await.1, @r#"
+    [
+      {
+        id = 0,
+        name = "DISCONTINUED",
+        price = 0.0,
+        active = false,
+      },
+      {
+        id = 0,
+        name = "DISCONTINUED",
+        price = 0.0,
+        active = false,
+      },
+      {
+        id = 3,
+        name = "Doohickey",
+        price = 15.0,
+        active = false,
+      },
+    ]
+    "#);
+
+    runner.into_inner().rollback().await.unwrap();
+}
+
+#[tokio::test(flavor = "current_thread")]
+async fn update_with_complex_where() {
+    let mut client = _get_test_db_client().await.unwrap();
+    let tran = client.transaction().await.unwrap();
+
+    tran.batch_execute(
+        "
+            CREATE TABLE items (id int4, quantity int4, price float8);
+            INSERT INTO items VALUES (1, 5, 10.0), (2, 15, 20.0), (3, 25, 30.0);
+            ",
+    )
+    .await
+    .unwrap();
+
+    let mut runner = RunnerAsync::new(tran);
+
+    // Test UPDATE with complex WHERE clause
+    insta::assert_snapshot!(_run_on(&mut runner, r#"
+    type Item: {
+      id: int32,
+      quantity: int32,
+      price: float64,
+    }
+
+    func main(): {} -> std::sql::update(
+      "items",
+      func (i: Item) -> (
+        if i.quantity > 10 && i.price < 25.0
+        then .some({id = 99, quantity = 0, price = 0.0})
+        else .none
+      )
+    )
+    "#, lutra_bin::Value::unit()).await.1, @"{}");
+
     runner.into_inner().rollback().await.unwrap();
 }
 
@@ -2132,9 +2418,9 @@ fn std_sql_raw_00() {
     )
     "#, lutra_bin::Value::unit())), @r#"
     SELECT
-      hello::text AS _0,
-      world::bool AS _1,
-      (x::date - '1970-01-01'::date) AS _2
+      r0.hello::text AS _0,
+      r0.world::bool AS _1,
+      (r0.x::date - '1970-01-01'::date) AS _2
     FROM
       (
         select
@@ -2169,7 +2455,7 @@ fn std_sql_raw_01() {
         WITH r0 AS (
           SELECT
             (ROW_NUMBER() OVER () -1)::int4 AS index,
-            value::int4 AS value
+            r1.value::int4 AS value
           FROM
             (
               (
@@ -2244,19 +2530,19 @@ fn date_time_00() {
     )
     "#, lutra_bin::Value::unit())), @"
     SELECT
-      (a::date - '1970-01-01'::date) AS _0,
+      (r0.a::date - '1970-01-01'::date) AS _0,
       (
         EXTRACT(
           EPOCH
           FROM
-            b
+            r0.b
         ) * 1000000
       )::int8 AS _1,
       (
         EXTRACT(
           EPOCH
           FROM
-            c
+            r0.c
         ) * 1000000
       )::int8 AS _2
     FROM
@@ -2281,15 +2567,15 @@ async fn date_time_01() {
 
     // TODO: decide if current behavior of "modulo 24-hours" is what we want
 
-    let client = _get_test_db_client().await.unwrap();
-    client
-        .execute(
-            r#"CREATE TEMPORARY TABLE test(d date, t time, ts timestamp)"#,
-            &[],
-        )
-        .await
-        .unwrap();
-    let mut runner = RunnerAsync::new(client);
+    let mut client = _get_test_db_client().await.unwrap();
+    let tran = client.transaction().await.unwrap();
+    tran.execute(
+        r#"CREATE TEMPORARY TABLE test(d date, t time, ts timestamp)"#,
+        &[],
+    )
+    .await
+    .unwrap();
+    let mut runner = RunnerAsync::new(tran);
 
     insta::assert_snapshot!(_run_on(&mut runner, r#"
     func main() -> (
@@ -2339,7 +2625,7 @@ fn decimal_00() {
     )
     "#, lutra_bin::Value::unit())), @"
     SELECT
-      (a * 100)::int8 AS _0
+      (r0.a * 100)::int8 AS _0
     FROM
       (
         select
@@ -2358,15 +2644,15 @@ async fn decimal_01() {
 
     // TODO: decide if current behavior of "modulo 24-hours" is what we want
 
-    let client = _get_test_db_client().await.unwrap();
-    client
-        .execute(
-            r#"CREATE TEMPORARY TABLE test(a decimal(10, 2), b decimal(19, 3))"#,
-            &[],
-        )
-        .await
-        .unwrap();
-    let mut runner = RunnerAsync::new(client);
+    let mut client = _get_test_db_client().await.unwrap();
+    let tran = client.transaction().await.unwrap();
+    tran.execute(
+        r#"CREATE TEMPORARY TABLE test(a decimal(10, 2), b decimal(19, 3))"#,
+        &[],
+    )
+    .await
+    .unwrap();
+    let mut runner = RunnerAsync::new(tran);
 
     insta::assert_snapshot!(_run_on(&mut runner, r#"
     func main() -> (

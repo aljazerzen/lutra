@@ -2627,3 +2627,279 @@ fn fs_write_parquet() {
     ) TO 'test.parquet'::text (FORMAT parquet, COMPRESSION zstd)
     ");
 }
+
+// ============================================================================
+// UPDATE Tests
+// ============================================================================
+
+#[test]
+fn update_basic() {
+    insta::assert_snapshot!(_sql_and_output(_run_with_setup(
+        "
+        CREATE TABLE users (id int4, name text, age int4);
+        INSERT INTO users VALUES (1, 'Alice', 30), (2, 'Bob', 25), (3, 'Charlie', 35);
+        ",
+        r#"
+        type User: {
+          id: int32,
+          name: text,
+          age: int32,
+        }
+
+        func main(): {} -> std::sql::update(
+          "users",
+          func (u: User) -> if u.id == 2 then
+            .some({id = 2, name = "Bobby", age = 26})
+          else
+            .none
+        )
+        "#,
+        lutra_bin::Value::unit()
+    )), @"
+    UPDATE
+      users
+    SET
+      id = r12.id,
+      name = r12.name,
+      age = r12.age
+    FROM
+      (
+        SELECT
+          index,
+          r11._0 AS id,
+          r11._1 AS name,
+          r11._2 AS age
+        FROM
+          (
+            SELECT
+              r2.value AS index,
+              r10._0 AS _0,
+              r10._1 AS _1,
+              r10._2 AS _2
+            FROM
+              (
+                SELECT
+                  rowid AS index,
+                  r0.id AS _0,
+                  r0.name AS _1,
+                  r0.age AS _2
+                FROM
+                  users AS r0
+              ) AS r1,
+              LATERAL (
+                SELECT
+                  r1.index AS value
+              ) AS r2,
+              LATERAL (
+                SELECT
+                  r9._1_0 AS _0,
+                  r9._1_1 AS _1,
+                  r9._1_2 AS _2
+                FROM
+                  (
+                    SELECT
+                      r8._t,
+                      r8._1_0,
+                      r8._1_1,
+                      r8._1_2
+                    FROM
+                      (
+                        WITH r3 AS (
+                          SELECT
+                            CASE
+                              WHEN (r1._0 = 2::INT4) THEN 0::INT2
+                              ELSE 1::INT2
+                            END AS value
+                        )
+                        SELECT
+                          r4._t,
+                          r4._1_0,
+                          r4._1_1,
+                          r4._1_2
+                        FROM
+                          (
+                            SELECT
+                              1::INT2 AS _t,
+                              2::INT4 AS _1_0,
+                              'Bobby'::text AS _1_1,
+                              26::INT4 AS _1_2
+                          ) AS r4
+                        WHERE
+                          (
+                            (
+                              SELECT
+                                r5.value AS value
+                              FROM
+                                r3 AS r5
+                            ) = 0::INT2
+                          )
+                        UNION
+                        ALL
+                        SELECT
+                          r6._t,
+                          r6._1_0,
+                          r6._1_1,
+                          r6._1_2
+                        FROM
+                          (
+                            SELECT
+                              0::INT2 AS _t,
+                              NULL::INT4 AS _1_0,
+                              NULL::TEXT AS _1_1,
+                              NULL::INT4 AS _1_2
+                          ) AS r6
+                        WHERE
+                          (
+                            (
+                              SELECT
+                                r7.value AS value
+                              FROM
+                                r3 AS r7
+                            ) = 1::INT2
+                          )
+                      ) AS r8
+                    WHERE
+                      (r8._t = 1::INT2)
+                  ) AS r9
+              ) AS r10
+          ) AS r11
+      ) AS r12
+    WHERE
+      (r12.index = users.rowid)
+    ---
+    {}
+    ");
+}
+
+#[test]
+fn update_multiple_rows() {
+    let setup = "
+        CREATE TABLE products (id int4, name text, price float8, active bool);
+        INSERT INTO products VALUES
+            (1, 'Widget', 10.0, true),
+            (2, 'Gadget', 20.0, true),
+            (3, 'Doohickey', 15.0, false);
+    ";
+
+    insta::assert_snapshot!(_run_with_setup(
+        setup,
+        r#"
+        type Product: {
+          id: int32,
+          name: text,
+          price: float64,
+          active: bool,
+        }
+
+        func main(): {} -> std::sql::update(
+          "products",
+          func (p: Product) -> (
+            if p.active
+            then .some({id = 0, name = "DISCONTINUED", price = 0.0, active = false})
+            else .none
+          )
+        )
+        "#,
+        lutra_bin::Value::unit()
+    ).1, @"{}");
+}
+
+#[test]
+fn update_with_complex_where() {
+    insta::assert_snapshot!(_run_with_setup(
+        "
+        CREATE TABLE items (id int4, quantity int4, price float8);
+        INSERT INTO items VALUES (1, 5, 10.0), (2, 15, 20.0), (3, 25, 30.0);
+        ",
+        r#"
+        type Item: {
+          id: int32,
+          quantity: int32,
+          price: float64,
+        }
+
+        func main(): {} -> std::sql::update(
+          "items",
+          func (i: Item) -> (
+            if i.quantity > 10 && i.price < 25.0
+            then .some({id = 99, quantity = 0, price = 0.0})
+            else .none
+          )
+        )
+        "#,
+        lutra_bin::Value::unit()
+    ).1, @"{}");
+}
+
+#[tokio::test(flavor = "current_thread")]
+async fn update_verify_changes() {
+    let client = async_duckdb::ClientBuilder::new().open().await.unwrap();
+
+    client
+        .conn(|conn| {
+            conn.execute_batch(
+                "
+                CREATE TABLE users (id int4, name text, age int4);
+                INSERT INTO users VALUES (1, 'Alice', 30), (2, 'Bob', 25), (3, 'Charlie', 35);
+                ",
+            )
+        })
+        .await
+        .unwrap();
+
+    let runner = Runner::new(client, None).await.unwrap();
+
+    // Execute update
+    let (_sql, output) = _run_on(
+        &runner,
+        r#"
+    type User: {
+      id: int32,
+      name: text,
+      age: int32,
+    }
+
+    func main(): {} -> std::sql::update(
+      "users",
+      func (u: User) -> if u.id == 2
+      then .some({id = 2, name = "Bobby", age = 26})
+      else .none
+    )
+    "#,
+        lutra_bin::Value::unit(),
+    )
+    .await;
+
+    assert_eq!(output, "{}");
+
+    // Verify the update worked
+    insta::assert_snapshot!(_run_on(&runner, r#"
+    type User: {
+      id: int32,
+      name: text,
+      age: int32,
+    }
+    func main() -> (
+      (std::sql::from("users"): [User])
+      | std::sort(u -> u.id | std::to_int64)
+    )
+    "#, lutra_bin::Value::unit()).await.1, @r#"
+    [
+      {
+        id = 1,
+        name = "Alice",
+        age = 30,
+      },
+      {
+        id = 2,
+        name = "Bobby",
+        age = 26,
+      },
+      {
+        id = 3,
+        name = "Charlie",
+        age = 35,
+      },
+    ]
+    "#);
+}

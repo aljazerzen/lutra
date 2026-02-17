@@ -195,12 +195,7 @@ impl<'a> Context<'a> {
                     .iter()
                     .enumerate()
                     .map(|(index, x)| {
-                        let row = vec![cr::Expr {
-                            kind: cr::ExprKind::From(cr::From::Literal(ir::Literal::int64(
-                                index as i64,
-                            ))),
-                            ty: ir::Ty::new(ir::TyPrimitive::int64),
-                        }];
+                        let row = vec![new_index(index as i64)];
 
                         let x = self.compile_column_list(x);
 
@@ -319,12 +314,7 @@ impl<'a> Context<'a> {
 
                     // tag
                     cols.next().unwrap();
-                    row.push(cr::Expr {
-                        kind: cr::ExprKind::From(cr::From::Literal(ir::Literal::int16(
-                            variant.tag as i16,
-                        ))),
-                        ty: ir::Ty::new(ir::TyPrimitive::int16),
-                    });
+                    row.push(new_tag(variant.tag as i16));
 
                     let inner_name = format!("_{}", variant.tag);
 
@@ -382,10 +372,10 @@ impl<'a> Context<'a> {
 
                     let tag = cr::Expr {
                         kind: cr::ExprKind::Transform(base, cr::Transform::ProjectPick(vec![0])),
-                        ty: ir::Ty::new(ir::TyPrimitive::int16),
+                        ty: ty_tag(),
                     };
 
-                    let args = vec![tag, new_int16(enum_eq.tag as i16)];
+                    let args = vec![tag, new_tag(enum_eq.tag as i16)];
                     cr::ExprKind::From(cr::From::FuncCall("std::eq".to_string(), args))
                 }
             }
@@ -523,12 +513,7 @@ impl<'a> Context<'a> {
                     // b2.value WHERE selector = 2
 
                     fn new_branch_selector(index: usize) -> cr::Expr {
-                        cr::Expr {
-                            kind: cr::ExprKind::From(cr::From::Literal(ir::Literal::int16(
-                                index as i16,
-                            ))),
-                            ty: ir::Ty::new(ir::TyPrimitive::int16),
-                        }
+                        new_tag(index as i16)
                     }
 
                     let mut cases = Vec::with_capacity(switch.len());
@@ -539,7 +524,7 @@ impl<'a> Context<'a> {
                     }
                     let selector = cr::Expr {
                         kind: cr::ExprKind::From(cr::From::Case(cases)),
-                        ty: ir::Ty::new(ir::TyPrimitive::int16),
+                        ty: ty_tag(),
                     };
                     let selector = self.new_binding(selector);
 
@@ -586,7 +571,7 @@ impl<'a> Context<'a> {
             ColumnsOrUnpack::Unpack(e) => cr::ExprKind::Join(
                 self.new_binding(cr::Expr {
                     kind: cr::ExprKind::From(cr::From::Row(row)),
-                    ty: ir::Ty::new(ir::TyPrimitive::int64),
+                    ty: ty_index(),
                 }),
                 self.new_binding(e),
                 None,
@@ -682,7 +667,7 @@ impl<'a> Context<'a> {
                     )
                 } else {
                     // construct Option::Some
-                    let some_tag = new_int16(1);
+                    let some_tag = new_tag(1);
                     let some = cr::Expr {
                         kind: cr::ExprKind::Join(
                             self.new_binding(some_tag),
@@ -693,7 +678,7 @@ impl<'a> Context<'a> {
                     };
 
                     // construct Option::None
-                    let none_tag = new_int16(0);
+                    let none_tag = new_tag(0);
                     let mut none_cols = vec![none_tag];
                     none_cols.extend(self.rel_cols_ty_nested(&expr.ty).skip(1).map(|t| cr::Expr {
                         kind: cr::ExprKind::From(cr::From::Null),
@@ -720,7 +705,7 @@ impl<'a> Context<'a> {
                 let func = &call.args[1];
 
                 // index
-                let row = vec![self.new_rel_col(&array, 0, ir::Ty::new(ir::TyPrimitive::int64))];
+                let row = vec![self.new_rel_col(&array, 0, ty_index())];
 
                 // compile func body
                 let func = self.as_function_or_wrap(func);
@@ -749,8 +734,7 @@ impl<'a> Context<'a> {
                 let output_item_ty = *expr.ty.kind.clone().into_array().unwrap();
 
                 // index
-                let output_row =
-                    vec![self.new_rel_col(&array, 0, ir::Ty::new(ir::TyPrimitive::int64))];
+                let output_row = vec![self.new_rel_col(&array, 0, ty_index())];
 
                 // compile func body
                 let func = func.kind.as_function().unwrap();
@@ -862,7 +846,7 @@ impl<'a> Context<'a> {
                 args.extend(call.args[1..].iter().map(|a| self.compile_column(a)));
 
                 let row = vec![
-                    self.new_rel_col(&array, 0, ir::Ty::new(ir::TyPrimitive::int64)),
+                    self.new_rel_col(&array, 0, ty_index()),
                     cr::Expr {
                         kind: cr::ExprKind::From(cr::From::FuncCall(ptr.id.clone(), args)),
                         ty: expr.ty.clone(),
@@ -921,20 +905,19 @@ impl<'a> Context<'a> {
                         let prev = self.new_binding(joined);
                         let curr = self.new_binding(curr);
 
-                        let ty_index = ir::Ty::new(ir::TyPrimitive::int64);
                         let join_cond = cr::Expr {
                             ty: ir::Ty::new(ir::TyPrimitive::bool),
                             kind: cr::ExprKind::From(cr::From::FuncCall(
                                 "std::eq".into(),
                                 vec![
-                                    self.new_rel_col(&prev, 0, ty_index.clone()),
-                                    self.new_rel_col(&curr, 0, ty_index.clone()),
+                                    self.new_rel_col(&prev, 0, ty_index()),
+                                    self.new_rel_col(&curr, 0, ty_index()),
                                 ],
                             )),
                         };
 
                         let ty_index_field = ir::TyTupleField {
-                            ty: ty_index,
+                            ty: ty_index(),
                             name: None,
                         };
                         let mut ty_join_fields = Vec::new();
@@ -1057,7 +1040,7 @@ impl<'a> Context<'a> {
 
                 // order by -index
                 let iteration = self.new_binding(iteration);
-                let index = self.new_rel_col(&iteration, 0, ir::Ty::new(ir::TyPrimitive::int64));
+                let index = self.new_rel_col(&iteration, 0, ty_index());
                 let iteration = cr::Expr::new_iso_transform(
                     iteration,
                     cr::Transform::IndexBy(Some(Box::new(new_un_op(
@@ -1091,9 +1074,9 @@ impl<'a> Context<'a> {
                 // filter out initial accumulator
                 let iteration = self.new_binding(iteration);
                 let filter_initial_acc = new_bin_op(
-                    new_int(0),
+                    new_index(0),
                     "std::lt",
-                    self.new_rel_col(&iteration, 0, ir::Ty::new(ir::TyPrimitive::int64)),
+                    self.new_rel_col(&iteration, 0, ty_index()),
                     ir::TyPrimitive::bool,
                 );
                 let iteration = cr::Expr::new_iso_transform(
@@ -1130,12 +1113,14 @@ impl<'a> Context<'a> {
 
             "std::sql::from" => {
                 let table_ident = &call.args[0];
-                let ir::ExprKind::Literal(ir::Literal::text(table_ident)) = &table_ident.kind
-                else {
+                let ir::ExprKind::Literal(ir::Literal::text(name)) = &table_ident.kind else {
                     panic!("table identifier must be const")
                 };
 
-                cr::ExprKind::From(cr::From::Table(table_ident.clone()))
+                cr::ExprKind::From(cr::From::Table {
+                    name: name.clone(),
+                    use_row_id: false,
+                })
             }
             "std::sql::insert" => {
                 let rows = self.compile_rel(&call.args[0]);
@@ -1148,6 +1133,90 @@ impl<'a> Context<'a> {
                 };
 
                 cr::ExprKind::Transform(rows, cr::Transform::Insert(table_ident.clone()))
+            }
+            "std::sql::update" => {
+                // compiles to this:
+                //   BindCorrelated(
+                //     From(subject_table),
+                //     Join(
+                //       subject.rowid,
+                //       ProjectDiscard(
+                //         Filter(
+                //           updater,
+                //           _t == 1
+                //         ),
+                //         [0] // option tag
+                //       )
+                //     )
+                //   )
+
+                // subject (the table being updated)
+                let table = &call.args[0];
+                let ir::ExprKind::Literal(ir::Literal::text(table)) = &table.kind else {
+                    panic!("table identifier must be const")
+                };
+                let updater_ty = call.args[1].ty.kind.as_function().unwrap();
+                let row_ty = updater_ty.params[0].clone();
+
+                let subject = cr::Expr {
+                    kind: cr::ExprKind::From(cr::From::Table {
+                        name: table.clone(),
+                        use_row_id: true,
+                    }),
+                    ty: ir::Ty::new(ir::TyKind::Array(Box::new(row_ty.clone()))),
+                };
+                let subject = self.new_binding(subject);
+
+                // updater function (with subject in scope)
+                let updater_fn = &call.args[1];
+                let updater_fn = updater_fn.kind.as_function().unwrap();
+
+                let row_ref = self.new_array_item_ref(&subject);
+                self.functions
+                    .insert(updater_fn.id, FuncProvider::Expr(vec![row_ref.kind]));
+                let update = self.compile_rel(&updater_fn.body);
+                self.functions.remove(&updater_fn.id);
+
+                // filter updates by .some
+                let update = self.new_binding(update);
+                let tag_is_one = new_bin_op(
+                    self.new_rel_col(&update, 0, ty_tag()),
+                    "std::eq",
+                    new_tag(1),
+                    ir::TyPrimitive::bool,
+                );
+                let update =
+                    cr::Expr::new_iso_transform(update, cr::Transform::Where(Box::new(tag_is_one)));
+
+                // discard tag column
+                let update = cr::Expr {
+                    kind: cr::ExprKind::Transform(
+                        self.new_binding(update),
+                        cr::Transform::ProjectDiscard(vec![0]),
+                    ),
+                    ty: row_ty.clone(),
+                };
+
+                // join with row id
+                let row_id = self.new_rel_col(&subject, 0, ty_index());
+                let update = cr::Expr {
+                    kind: cr::ExprKind::Join(
+                        self.new_binding(row_id),
+                        self.new_binding(update),
+                        None,
+                    ),
+                    ty: subject.rel.ty.clone(),
+                };
+
+                let updates = Box::new(cr::Expr {
+                    ty: subject.rel.ty.clone(),
+                    kind: cr::ExprKind::BindCorrelated(subject, Box::new(update)),
+                });
+
+                cr::ExprKind::Update {
+                    table: table.clone(),
+                    updates,
+                }
             }
             "std::sql::raw" => {
                 let source = &call.args[0];
@@ -1182,7 +1251,7 @@ impl<'a> Context<'a> {
         let initial = self.compile_column_list(initial);
         let initial = cr::Expr {
             kind: self.row_or_join(
-                vec![new_int(0)], // index
+                vec![new_index(0)], // index
                 initial,
             ),
             ty: ty_acc.clone(),
@@ -1199,9 +1268,9 @@ impl<'a> Context<'a> {
         // reference input rel & pick the row by index
         let input_rel = self.new_binding(cr::Expr::new_rel_ref(&inputs));
         let find_by_index = cr::Transform::Where(Box::new(new_bin_op(
-            self.new_rel_col(&input_rel, 0, ir::Ty::new(ir::TyPrimitive::int64)),
+            self.new_rel_col(&input_rel, 0, ty_index()),
             "std::eq",
-            self.new_rel_col(&prev_acc_rel, 0, ir::Ty::new(ir::TyPrimitive::int64)),
+            self.new_rel_col(&prev_acc_rel, 0, ty_index()),
             ir::TyPrimitive::bool,
         )));
         let input_rel = self.new_binding(cr::Expr::new_iso_transform(input_rel, find_by_index));
@@ -1225,9 +1294,9 @@ impl<'a> Context<'a> {
 
         // compose the new state
         let new_index = new_bin_op(
-            self.new_rel_col(&prev_acc_rel, 0, ir::Ty::new(ir::TyPrimitive::int64)),
+            self.new_rel_col(&prev_acc_rel, 0, ty_index()),
             "std::add",
-            new_int(1),
+            new_index(1),
             ir::TyPrimitive::int64,
         );
         let new_acc = cr::Expr {
@@ -1408,23 +1477,28 @@ fn new_un_op(op: &str, operand: cr::Expr, ty: ir::TyPrimitive) -> cr::Expr {
     }
 }
 
-fn new_int(int: i64) -> cr::Expr {
-    let kind = cr::ExprKind::From(cr::From::Literal(ir::Literal::int64(int)));
+fn new_index(index: i64) -> cr::Expr {
+    let kind = cr::ExprKind::From(cr::From::Literal(ir::Literal::int64(index)));
     cr::Expr {
         kind,
-        ty: ir::Ty::new(ir::TyPrimitive::int64),
+        ty: ty_index(),
     }
+}
+
+fn ty_index() -> ir::Ty {
+    ir::Ty::new(ir::TyPrimitive::int64)
 }
 
 /// Creates an int16 literal expression, used for enum tags.
 /// Note: we use int16 instead of uint16 for PostgreSQL compatibility,
 /// since PostgreSQL doesn't have unsigned types and uint16 would map to int4.
-fn new_int16(int: i16) -> cr::Expr {
-    let kind = cr::ExprKind::From(cr::From::Literal(ir::Literal::int16(int)));
-    cr::Expr {
-        kind,
-        ty: ir::Ty::new(ir::TyPrimitive::int16),
-    }
+fn new_tag(tag: i16) -> cr::Expr {
+    let kind = cr::ExprKind::From(cr::From::Literal(ir::Literal::int16(tag)));
+    cr::Expr { kind, ty: ty_tag() }
+}
+
+fn ty_tag() -> ir::Ty {
+    ir::Ty::new(ir::TyPrimitive::int16)
 }
 
 fn ty_concat_as_tuples(a: ir::Ty, b: ir::Ty) -> ir::Ty {
@@ -1463,8 +1537,4 @@ fn ty_zip(a: ir::Ty, b: ir::Ty) -> ir::Ty {
     let tuple = ir::Ty::new(ir::TyKind::Tuple(fields));
 
     ir::Ty::new(ir::TyKind::Array(Box::new(tuple)))
-}
-
-fn ty_index() -> ir::Ty {
-    ir::Ty::new(ir::TyPrimitive::int64)
 }

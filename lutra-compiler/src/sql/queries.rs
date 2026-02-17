@@ -40,7 +40,7 @@ pub fn compile(
     // convert to correct repr
     let node = match dialect {
         super::Dialect::Postgres => node,
-        super::Dialect::DuckDB => ctx.duck_export(node, rel_ty),
+        super::Dialect::DuckDB => ctx.duck_export(node, rel_ty, false),
     };
 
     ctx.node_into_query(node, &rel.ty)
@@ -278,6 +278,50 @@ impl<'a> Context<'a> {
 
                 Node::Query(main)
             }
+
+            cr::ExprKind::Update { table, updates } => {
+                tracing::debug!("Update");
+
+                let updates_ty = &updates.ty;
+                let row_ty = updates.ty.kind.as_array().unwrap();
+
+                let updates = self.compile_rel(updates);
+                let updates = self.native_export(updates, updates_ty, true);
+                let updates = self.node_into_rel(updates, updates_ty);
+                let updates_var = utils::get_rel_alias(&updates).unwrap();
+
+                // assignments: col1 = updates.col1, col2 = updates.col2
+                let assignments = (self.native_cols(row_ty).into_iter())
+                    .map(|(col, _ty)| sql_ast::Assignment {
+                        target: sql_ast::AssignmentTarget::ColumnName(utils::new_object_name([
+                            &col,
+                        ])),
+                        value: utils::identifier(Some(updates_var), col),
+                    })
+                    .collect();
+
+                // where
+                let selection = Some(utils::new_bin_op(
+                    "=",
+                    [
+                        utils::identifier(Some(updates_var), "index"),
+                        utils::identifier(Some(table), self.row_id()),
+                    ],
+                ));
+
+                let table = utils::new_object_name([table]);
+                let update = sql_ast::SetExpr::Update(sql_ast::Update {
+                    table,
+                    alias: None,
+                    assignments,
+                    from: vec![updates],
+                    selection,
+                    returning: None,
+                    limit: None,
+                });
+
+                Node::Query(utils::query_new(update))
+            }
         }
     }
 
@@ -302,10 +346,20 @@ impl<'a> Context<'a> {
                 }
             }
 
-            cr::From::Table(table_ident) => {
-                let node = Node::Rel(utils::new_table(translate_table_ident(table_ident), None));
+            cr::From::Table { name, use_row_id } => {
+                let node = Node::Rel(utils::new_table(translate_table_ident(name), None));
 
-                self.native_import(node, ty)
+                let mut node = self.native_import(node, ty);
+
+                if *use_row_id {
+                    // special case: use row id instead of ROW_NUMBER for index
+                    let Node::Select(select) = &mut node else {
+                        unreachable!()
+                    };
+                    select.projection[0].expr = utils::identifier(None::<&str>, self.row_id());
+                }
+
+                node
             }
 
             cr::From::Null => Node::from(self.null(ty)),
@@ -472,7 +526,7 @@ impl<'a> Context<'a> {
             }
 
             cr::Transform::Insert(table_ident) => {
-                let source = self.native_export(input, input_ty);
+                let source = self.native_export(input, input_ty, false);
                 let source = self.node_into_query(source, input_ty);
 
                 let table = translate_table_ident(table_ident);
@@ -835,7 +889,7 @@ impl<'a> Context<'a> {
                     let [data, file_name] = unpack_args(args);
 
                     // For write_parquet, we need to export the data and then write it
-                    let data = self.native_export(Node::from(data), &args_in[0].ty);
+                    let data = self.native_export(Node::from(data), &args_in[0].ty, false);
                     let data = self.node_into_query(data, &args_in[0].ty);
 
                     return Node::Query(utils::query_new(sql_ast::SetExpr::Copy(Box::new(
