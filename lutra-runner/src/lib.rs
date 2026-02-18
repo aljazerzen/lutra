@@ -5,6 +5,9 @@ pub mod binary;
 #[cfg(feature = "channel")]
 pub mod channel;
 
+#[cfg(feature = "sync")]
+pub mod sync;
+
 use lutra_bin::{rr, string, vec};
 
 // Runner Posix Interface:

@@ -11,6 +11,7 @@ std = ["lutra-bin/std"]
 binary-tokio = ["tokio", "std"]
 binary-embedded = ["embedded-io-async"]
 channel = ["tokio", "tokio/rt", "std"]
+sync = ["tokio", "tokio/rt", "tokio/rt-multi-thread", "std"]
 
 [dependencies]
 embedded-io-async = { version = "0.6.1", optional = true }
