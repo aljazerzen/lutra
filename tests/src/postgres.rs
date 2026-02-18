@@ -1548,16 +1548,16 @@ fn if_01() {
     func main() -> if lang == "en" then en else sl
     "#, lutra_bin::Value::unit())), @r#"
     SELECT
-      r5.value
+      r3.value
     FROM
       (
-        WITH r0 AS (
-          SELECT
-            CASE
-              WHEN ('sl'::text = 'en'::text) THEN 0::int2
-              ELSE 1::int2
-            END AS value
-        )
+        SELECT
+          CASE
+            WHEN ('sl'::text = 'en'::text) THEN 0::int2
+            ELSE 1::int2
+          END AS value
+      ) AS r0,
+      LATERAL (
         SELECT
           r1.index,
           r1.value
@@ -1573,19 +1573,12 @@ fn if_01() {
               'no'::text AS value
           ) AS r1
         WHERE
-          (
-            (
-              SELECT
-                r2.value AS value
-              FROM
-                r0 AS r2
-            ) = 0::int2
-          )
+          (r0.value = 0::int2)
         UNION
         ALL
         SELECT
-          r3.index,
-          r3.value
+          r2.index,
+          r2.value
         FROM
           (
             SELECT
@@ -1596,19 +1589,12 @@ fn if_01() {
             SELECT
               1::int8 AS index,
               'ne'::text AS value
-          ) AS r3
+          ) AS r2
         WHERE
-          (
-            (
-              SELECT
-                r4.value AS value
-              FROM
-                r0 AS r4
-            ) = 1::int2
-          )
-      ) AS r5
+          (r0.value = 1::int2)
+      ) AS r3
     ORDER BY
-      r5.index
+      r3.index
     ---
     [
       "da",
@@ -1639,25 +1625,14 @@ fn match_04() {
     )
     "#, lutra_bin::Value::unit())), @r#"
     SELECT
-      (
-        SELECT
-          CASE
-            WHEN (r1._t = 0::int2) THEN ('Hello '::text || r1._0)
-            WHEN (
-              (r1._t = 1::int2)
-              AND (r1._1_t = 1::int2)
-            ) THEN 'Who''s a good boy?'::text
-            ELSE ('Come here '::text || r1._1_0)
-          END AS value
-        FROM
-          (
-            SELECT
-              r0._t AS _t,
-              r0._0 AS _0,
-              r0._1_t AS _1_t,
-              r0._1_0 AS _1_0
-          ) AS r1
-      ) AS value
+      CASE
+        WHEN (r0._t = 0::int2) THEN ('Hello '::text || r0._0)
+        WHEN (
+          (r0._t = 1::int2)
+          AND (r0._1_t = 1::int2)
+        ) THEN 'Who''s a good boy?'::text
+        ELSE ('Come here '::text || r0._1_0)
+      END AS value
     FROM
       (
         SELECT
@@ -1705,14 +1680,9 @@ fn match_05() {
     "#, lutra_bin::Value::unit())), @r#"
     SELECT
       CASE
-        WHEN (r0.value = 'world'::text) THEN 'Hello world!'::text
-        ELSE ('Hello '::text || r0.value)
+        WHEN ('Tom'::text = 'world'::text) THEN 'Hello world!'::text
+        ELSE ('Hello '::text || 'Tom'::text)
       END AS value
-    FROM
-      (
-        SELECT
-          'Tom'::text AS value
-      ) AS r0
     ---
     "Hello Tom"
     "#);
@@ -1735,12 +1705,12 @@ fn cmp_00() {
     )
     "#, lutra_bin::Value::unit())), @"
     SELECT
-      r4._0 AS _0,
-      r4._1 AS _1,
-      r4._2 AS _2,
-      r4._3 AS _3,
-      r4._4 AS _4,
-      r4._5 AS _5
+      (r0._0 = r0._1) AS _0,
+      (NOT (r0._0 = r0._1)) AS _1,
+      (r0._0 < r0._1) AS _2,
+      (r0._1 < r0._0) AS _3,
+      (r0._0 <= r0._1) AS _4,
+      (r0._1 <= r0._0) AS _5
     FROM
       (
         SELECT
@@ -1759,31 +1729,9 @@ fn cmp_00() {
           2::int8 AS index,
           5::int2 AS _0,
           3::int2 AS _1
-      ) AS r0,
-      LATERAL (
-        SELECT
-          r0.index AS value
-      ) AS r1,
-      LATERAL (
-        SELECT
-          (r3.value = r2.value) AS _0,
-          (NOT (r3.value = r2.value)) AS _1,
-          (r3.value < r2.value) AS _2,
-          (r2.value < r3.value) AS _3,
-          (r3.value <= r2.value) AS _4,
-          (r2.value <= r3.value) AS _5
-        FROM
-          (
-            SELECT
-              r0._1 AS value
-          ) AS r2,
-          LATERAL (
-            SELECT
-              r0._0 AS value
-          ) AS r3
-      ) AS r4
+      ) AS r0
     ORDER BY
-      r1.value
+      r0.index
     ---
     [
       {
@@ -1969,16 +1917,16 @@ async fn update_basic() {
     UPDATE
       users
     SET
-      id = r11.id,
-      name = r11.name,
-      age = r11.age
+      id = r10.id,
+      name = r10.name,
+      age = r10.age
     FROM
       (
         SELECT
           r2.value AS index,
-          r10._0 AS id,
-          r10._1 AS name,
-          r10._2 AS age
+          r9._0 AS id,
+          r9._1 AS name,
+          r9._2 AS age
         FROM
           (
             SELECT
@@ -1995,49 +1943,18 @@ async fn update_basic() {
           ) AS r2,
           LATERAL (
             SELECT
-              r9._1_0 AS _0,
-              r9._1_1 AS _1,
-              r9._1_2 AS _2
+              r8._1_0 AS _0,
+              r8._1_1 AS _1,
+              r8._1_2 AS _2
             FROM
               (
                 SELECT
-                  r8._t,
-                  r8._1_0,
-                  r8._1_1,
-                  r8._1_2
+                  r7._t,
+                  r7._1_0,
+                  r7._1_1,
+                  r7._1_2
                 FROM
                   (
-                    WITH r3 AS (
-                      SELECT
-                        CASE
-                          WHEN (r1._0 = 2::int4) THEN 0::int2
-                          ELSE 1::int2
-                        END AS value
-                    )
-                    SELECT
-                      r4._t,
-                      r4._1_0,
-                      r4._1_1,
-                      r4._1_2
-                    FROM
-                      (
-                        SELECT
-                          1::int2 AS _t,
-                          2::int4 AS _1_0,
-                          'Bobby'::text AS _1_1,
-                          26::int4 AS _1_2
-                      ) AS r4
-                    WHERE
-                      (
-                        (
-                          SELECT
-                            r5.value AS value
-                          FROM
-                            r3 AS r5
-                        ) = 0::int2
-                      )
-                    UNION
-                    ALL
                     SELECT
                       r6._t,
                       r6._1_0,
@@ -2046,28 +1963,53 @@ async fn update_basic() {
                     FROM
                       (
                         SELECT
-                          0::int2 AS _t,
-                          NULL::int4 AS _1_0,
-                          NULL::text AS _1_1,
-                          NULL::int4 AS _1_2
+                          CASE
+                            WHEN (r1._0 = 2::int4) THEN 0::int2
+                            ELSE 1::int2
+                          END AS value
+                      ) AS r3,
+                      LATERAL (
+                        SELECT
+                          r4._t,
+                          r4._1_0,
+                          r4._1_1,
+                          r4._1_2
+                        FROM
+                          (
+                            SELECT
+                              1::int2 AS _t,
+                              2::int4 AS _1_0,
+                              'Bobby'::text AS _1_1,
+                              26::int4 AS _1_2
+                          ) AS r4
+                        WHERE
+                          (r3.value = 0::int2)
+                        UNION
+                        ALL
+                        SELECT
+                          r5._t,
+                          r5._1_0,
+                          r5._1_1,
+                          r5._1_2
+                        FROM
+                          (
+                            SELECT
+                              0::int2 AS _t,
+                              NULL::int4 AS _1_0,
+                              NULL::text AS _1_1,
+                              NULL::int4 AS _1_2
+                          ) AS r5
+                        WHERE
+                          (r3.value = 1::int2)
                       ) AS r6
-                    WHERE
-                      (
-                        (
-                          SELECT
-                            r7.value AS value
-                          FROM
-                            r3 AS r7
-                        ) = 1::int2
-                      )
-                  ) AS r8
+                  ) AS r7
                 WHERE
-                  (r8._t = 1::int2)
-              ) AS r9
-          ) AS r10
-      ) AS r11
+                  (r7._t = 1::int2)
+              ) AS r8
+          ) AS r9
+      ) AS r10
     WHERE
-      (r11.index = users.ctid)
+      (r10.index = users.ctid)
     ---
     {}
     ");
@@ -2211,6 +2153,45 @@ async fn update_with_complex_where() {
       func (i: Item) -> (
         if i.quantity > 10 && i.price < 25.0
         then .some({id = 99, quantity = 0, price = 0.0})
+        else .none
+      )
+    )
+    "#, lutra_bin::Value::unit()).await.1, @"{}");
+
+    runner.into_inner().rollback().await.unwrap();
+}
+
+#[tokio::test(flavor = "current_thread")]
+async fn update_with_bind() {
+    let mut client = _get_test_db_client().await.unwrap();
+    let tran = client.transaction().await.unwrap();
+
+    tran.batch_execute(
+        "
+            CREATE TABLE products (id int4, name text, price float8);
+            INSERT INTO products VALUES (1, 'Widget', 10.0), (2, 'Gadget', 20.0), (3, 'Tool', 15.0);
+            ",
+    )
+    .await
+    .unwrap();
+
+    let mut runner = RunnerAsync::new(tran);
+
+    // Test UPDATE that uses a const (triggers push_into_update optimization)
+    insta::assert_snapshot!(_run_on(&mut runner, r#"
+    type Product: {
+      id: int32,
+      name: text,
+      price: float64,
+    }
+
+    const discount: float64 = 0.9
+
+    func main(): {} -> std::sql::update(
+      "products",
+      func (p: Product) -> (
+        if p.price > 12.0
+        then .some({id = p.id, name = p.name, price = p.price * discount})
         else .none
       )
     )
@@ -2370,18 +2351,10 @@ fn opt_01() {
     )
     "#, lutra_bin::Value::unit())), @r#"
     SELECT
-      (
-        SELECT
-          CASE
-            WHEN r1.value IS NOT NULL THEN r1.value
-            ELSE 'none'::text
-          END AS value
-        FROM
-          (
-            SELECT
-              r0.value AS value
-          ) AS r1
-      ) AS value
+      CASE
+        WHEN r0.value IS NOT NULL THEN r0.value
+        ELSE 'none'::text
+      END AS value
     FROM
       (
         SELECT

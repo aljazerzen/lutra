@@ -59,6 +59,7 @@ impl NameGenerator {
 
     #[allow(dead_code)]
     pub fn next(&mut self) -> String {
+        // tracing::debug!("{}{}", self.prefix, self.id_generator.next_id);
         // if self.prefix == "r" && self.id_generator.next_id == 3 {
         // panic!();
         // }

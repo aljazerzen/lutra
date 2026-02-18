@@ -475,16 +475,7 @@ impl<'a> Context<'a> {
 
                     self.bindings.remove(&binding.id).unwrap();
 
-                    let rel_ty_mat = self.get_ty_mat(&expr.rel.ty);
-                    let is_exactly_one_row = rel_ty_mat.kind.is_primitive()
-                        || rel_ty_mat.kind.is_tuple()
-                        || rel_ty_mat.kind.is_enum();
-                    if is_exactly_one_row {
-                        // if possible, use BindCorrelated, because it is easier for optimizers to work with
-                        cr::ExprKind::BindCorrelated(expr, Box::new(main))
-                    } else {
-                        cr::ExprKind::Bind(expr, Box::new(main))
-                    }
+                    cr::ExprKind::Bind(expr, Box::new(main))
                 }
             }
 
@@ -609,7 +600,7 @@ impl<'a> Context<'a> {
                 // reindex
                 let filtered = self.new_binding(filtered);
                 let index_col = self.new_rel_col(&filtered, 0, ty_index());
-                cr::ExprKind::Transform(filtered, cr::Transform::IndexBy(Some(Box::new(index_col))))
+                cr::ExprKind::Transform(filtered, cr::Transform::Reindex(Some(Box::new(index_col))))
             }
             "std::index" => {
                 let array = self.compile_rel(&call.args[0]);
@@ -790,7 +781,7 @@ impl<'a> Context<'a> {
                 // reindex
                 let filtered = self.new_binding(filtered);
                 let index_col = self.new_rel_col(&filtered, 0, ty_index());
-                cr::ExprKind::Transform(filtered, cr::Transform::IndexBy(Some(Box::new(index_col))))
+                cr::ExprKind::Transform(filtered, cr::Transform::Reindex(Some(Box::new(index_col))))
             }
             "std::sort" => {
                 let array = self.compile_rel(&call.args[0]);
@@ -806,7 +797,7 @@ impl<'a> Context<'a> {
                 let key = self.compile_column(&func.body);
                 self.functions.remove(&func.id);
 
-                cr::ExprKind::Transform(array, cr::Transform::IndexBy(Some(Box::new(key))))
+                cr::ExprKind::Transform(array, cr::Transform::Reindex(Some(Box::new(key))))
             }
 
             // aggregation functions
@@ -1032,7 +1023,7 @@ impl<'a> Context<'a> {
                 });
 
                 // reindex
-                cr::ExprKind::Transform(union, cr::Transform::IndexBy(None))
+                cr::ExprKind::Transform(union, cr::Transform::Reindex(None))
             }
 
             "std::fold" => {
@@ -1043,7 +1034,7 @@ impl<'a> Context<'a> {
                 let index = self.new_rel_col(&iteration, 0, ty_index());
                 let iteration = cr::Expr::new_iso_transform(
                     iteration,
-                    cr::Transform::IndexBy(Some(Box::new(new_un_op(
+                    cr::Transform::Reindex(Some(Box::new(new_un_op(
                         "std::neg",
                         index,
                         ir::TyPrimitive::int64,

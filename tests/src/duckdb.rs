@@ -2659,23 +2659,23 @@ fn update_basic() {
     UPDATE
       users
     SET
-      id = r12.id,
-      name = r12.name,
-      age = r12.age
+      id = r11.id,
+      name = r11.name,
+      age = r11.age
     FROM
       (
         SELECT
           index,
-          r11._0 AS id,
-          r11._1 AS name,
-          r11._2 AS age
+          r10._0 AS id,
+          r10._1 AS name,
+          r10._2 AS age
         FROM
           (
             SELECT
               r2.value AS index,
-              r10._0 AS _0,
-              r10._1 AS _1,
-              r10._2 AS _2
+              r9._0 AS _0,
+              r9._1 AS _1,
+              r9._2 AS _2
             FROM
               (
                 SELECT
@@ -2692,49 +2692,18 @@ fn update_basic() {
               ) AS r2,
               LATERAL (
                 SELECT
-                  r9._1_0 AS _0,
-                  r9._1_1 AS _1,
-                  r9._1_2 AS _2
+                  r8._1_0 AS _0,
+                  r8._1_1 AS _1,
+                  r8._1_2 AS _2
                 FROM
                   (
                     SELECT
-                      r8._t,
-                      r8._1_0,
-                      r8._1_1,
-                      r8._1_2
+                      r7._t,
+                      r7._1_0,
+                      r7._1_1,
+                      r7._1_2
                     FROM
                       (
-                        WITH r3 AS (
-                          SELECT
-                            CASE
-                              WHEN (r1._0 = 2::INT4) THEN 0::INT2
-                              ELSE 1::INT2
-                            END AS value
-                        )
-                        SELECT
-                          r4._t,
-                          r4._1_0,
-                          r4._1_1,
-                          r4._1_2
-                        FROM
-                          (
-                            SELECT
-                              1::INT2 AS _t,
-                              2::INT4 AS _1_0,
-                              'Bobby'::text AS _1_1,
-                              26::INT4 AS _1_2
-                          ) AS r4
-                        WHERE
-                          (
-                            (
-                              SELECT
-                                r5.value AS value
-                              FROM
-                                r3 AS r5
-                            ) = 0::INT2
-                          )
-                        UNION
-                        ALL
                         SELECT
                           r6._t,
                           r6._1_0,
@@ -2743,29 +2712,54 @@ fn update_basic() {
                         FROM
                           (
                             SELECT
-                              0::INT2 AS _t,
-                              NULL::INT4 AS _1_0,
-                              NULL::TEXT AS _1_1,
-                              NULL::INT4 AS _1_2
+                              CASE
+                                WHEN (r1._0 = 2::INT4) THEN 0::INT2
+                                ELSE 1::INT2
+                              END AS value
+                          ) AS r3,
+                          LATERAL (
+                            SELECT
+                              r4._t,
+                              r4._1_0,
+                              r4._1_1,
+                              r4._1_2
+                            FROM
+                              (
+                                SELECT
+                                  1::INT2 AS _t,
+                                  2::INT4 AS _1_0,
+                                  'Bobby'::text AS _1_1,
+                                  26::INT4 AS _1_2
+                              ) AS r4
+                            WHERE
+                              (r3.value = 0::INT2)
+                            UNION
+                            ALL
+                            SELECT
+                              r5._t,
+                              r5._1_0,
+                              r5._1_1,
+                              r5._1_2
+                            FROM
+                              (
+                                SELECT
+                                  0::INT2 AS _t,
+                                  NULL::INT4 AS _1_0,
+                                  NULL::TEXT AS _1_1,
+                                  NULL::INT4 AS _1_2
+                              ) AS r5
+                            WHERE
+                              (r3.value = 1::INT2)
                           ) AS r6
-                        WHERE
-                          (
-                            (
-                              SELECT
-                                r7.value AS value
-                              FROM
-                                r3 AS r7
-                            ) = 1::INT2
-                          )
-                      ) AS r8
+                      ) AS r7
                     WHERE
-                      (r8._t = 1::INT2)
-                  ) AS r9
-              ) AS r10
-          ) AS r11
-      ) AS r12
+                      (r7._t = 1::INT2)
+                  ) AS r8
+              ) AS r9
+          ) AS r10
+      ) AS r11
     WHERE
-      (r12.index = users.rowid)
+      (r11.index = users.rowid)
     ---
     {}
     ");

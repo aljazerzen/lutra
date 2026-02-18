@@ -115,9 +115,8 @@ pub enum Transform {
     Where(Box<Expr>),
 
     /// Replaces first column (which is index for array ty).
-    /// None implies to use the current order of rows in relation
-    /// (which is implemented by ROW_NUMBER())
-    IndexBy(Option<Box<Expr>>),
+    /// None implies to any order of rows (which is implemented by ROW_NUMBER)
+    Reindex(Option<Box<Expr>>),
 
     /// Applies the order from index column to rows of relation.
     Order,

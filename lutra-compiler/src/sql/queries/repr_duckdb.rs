@@ -124,7 +124,7 @@ impl<'a> queries::Context<'a> {
         if let ir::TyKind::Ident(ty_ident) = &ty.kind
             && (ty_ident.0 == ["std", "Time"] || ty_ident.0 == ["std", "Timestamp"])
         {
-            let r = format!("(EXTRACT(EPOCH FROM {ser_ref})*1000000)::int8");
+            let r = format!("epoch_us({ser_ref})");
             return vec![sql_ast::Expr::Source(r)];
         }
         // special case: std::Decimal
@@ -152,8 +152,8 @@ impl<'a> queries::Context<'a> {
                 result
             }
             ir::TyKind::Enum(variants) if self.is_option(variants) => {
-                // in both reprs, the field is a nullable column
-                vec![sql_ast::Expr::Source(ser_ref)]
+                // a nullable column
+                self.duck_col_import(ser_ref, &variants[1].ty)
             }
             ir::TyKind::Enum(variants) => {
                 // Get tag from UNION as ENUM, then convert to int2
@@ -244,7 +244,7 @@ impl<'a> queries::Context<'a> {
             && ty_ident.0 == ["std", "Timestamp"]
         {
             let expr = format!("{rel_var}.{}", cols[0]);
-            return sql_ast::Expr::Source(format!("to_timestamp({expr}::float8/1000000.0)"));
+            return sql_ast::Expr::Source(format!("make_timestamp({expr})"));
         }
         // special case: std::Decimal
         if let ir::TyKind::Ident(ty_ident) = &ty.kind
@@ -269,7 +269,7 @@ impl<'a> queries::Context<'a> {
                 sql_ast::Expr::Source(format!("{rel_var}.{}", cols[0]))
             }
             ir::TyKind::Enum(variants) if self.is_option(variants) => {
-                sql_ast::Expr::Source(format!("{rel_var}.{}", cols[0]))
+                self.duck_col_export(rel_var, cols, &variants[1].ty)
             }
             ir::TyKind::Tuple(fields) => {
                 // Construct STRUCT using struct_pack(field1 := val1, field2 := val2, ...)

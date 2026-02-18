@@ -19,11 +19,15 @@ impl cr::CrFold for Optimizer {
         expr = simplify_pick_discard(expr);
         expr = simplify_row_pick(expr);
         expr = simplify_pick_pick(expr);
+        expr = simplify_reindex_reindex(expr);
         expr = unpack_pack(expr);
         expr = pack_unpack(expr);
 
         let (e, re_fold) = push_correlated_into_group(expr);
         expr = e;
+
+        expr = push_bind_into_update(expr);
+        expr = bind_to_correlated(expr);
 
         if re_fold {
             expr = cr::fold_expr(self, expr)?;
@@ -198,6 +202,32 @@ fn simplify_pick_pick(expr: cr::Expr) -> cr::Expr {
     rel
 }
 
+fn simplify_reindex_reindex(expr: cr::Expr) -> cr::Expr {
+    // match: IndexBy(IndexBy(bound, inner_key), outer_key)
+    let cr::ExprKind::Transform(bound, cr::Transform::Reindex(_)) = &expr.kind else {
+        return expr;
+    };
+    let cr::ExprKind::Transform(_, cr::Transform::Reindex(_)) = &bound.rel.kind else {
+        return expr;
+    };
+    tracing::debug!("simplify_index_by_index_by");
+
+    // unpack
+    let mut expr = expr;
+    let cr::ExprKind::Transform(inner, cr::Transform::Reindex(_)) = &mut expr.kind else {
+        unreachable!();
+    };
+    let inner_rel = std::mem::replace(&mut inner.rel.kind, cr::ExprKind::From(cr::From::Null));
+    let cr::ExprKind::Transform(bound, cr::Transform::Reindex(_)) = inner_rel else {
+        unreachable!();
+    };
+
+    // use the outer expr, but replace the bound expr with the inner bound expr
+    inner.rel = bound.rel;
+
+    expr
+}
+
 fn simplify_row_pick(expr: cr::Expr) -> cr::Expr {
     // match
     let cr::ExprKind::From(cr::From::Row(row)) = &expr.kind else {
@@ -315,6 +345,67 @@ fn is_rel_col(expr: &cr::Expr, rel_id: usize, col_pos: usize) -> bool {
     };
 
     *rel_ref == rel_id
+}
+
+fn push_bind_into_update(expr: cr::Expr) -> cr::Expr {
+    // match: Bind(val, Update(table, updates))
+    let cr::ExprKind::Bind(_bound, main) = &expr.kind else {
+        return expr;
+    };
+    let cr::ExprKind::Update { .. } = &main.kind else {
+        return expr;
+    };
+    tracing::debug!("push_bind_into_update");
+
+    // unpack
+    let cr::ExprKind::Bind(bound, main) = expr.kind else {
+        unreachable!()
+    };
+    let main_ty = main.ty;
+    let cr::ExprKind::Update { table, updates } = main.kind else {
+        unreachable!()
+    };
+
+    // Construct Update(table, Bind(bound, updates)
+    cr::Expr {
+        ty: main_ty,
+        kind: cr::ExprKind::Update {
+            table,
+            updates: Box::new(cr::Expr {
+                ty: updates.ty.clone(),
+                kind: cr::ExprKind::Bind(bound, updates),
+            }),
+        },
+    }
+}
+
+fn bind_to_correlated(expr: cr::Expr) -> cr::Expr {
+    // match: Bind(val, main)
+    let cr::ExprKind::Bind(bound, _main) = &expr.kind else {
+        return expr;
+    };
+
+    // Check if bound expression is exactly one row
+    let is_exactly_one_row = bound.rel.ty.kind.is_primitive()
+        || bound.rel.ty.kind.is_tuple()
+        || bound.rel.ty.kind.is_enum();
+
+    if !is_exactly_one_row {
+        return expr;
+    }
+
+    tracing::debug!("bind_to_correlated");
+
+    // unpack
+    let cr::ExprKind::Bind(bound, main) = expr.kind else {
+        unreachable!()
+    };
+
+    // Convert Bind to BindCorrelated
+    cr::Expr {
+        ty: expr.ty,
+        kind: cr::ExprKind::BindCorrelated(bound, main),
+    }
 }
 
 pub struct RelRefReplacer {

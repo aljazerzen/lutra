@@ -183,7 +183,7 @@ impl<'a> Context<'a> {
                     transform,
                     cr::Transform::Aggregate(_)
                         | cr::Transform::Where(_)
-                        | cr::Transform::IndexBy(_)
+                        | cr::Transform::Reindex(_)
                         | cr::Transform::Group { .. }
                         | cr::Transform::Insert(_)
                 );
@@ -476,7 +476,7 @@ impl<'a> Context<'a> {
                 }
                 Node::Query(query)
             }
-            cr::Transform::IndexBy(key) => {
+            cr::Transform::Reindex(key) => {
                 // wrap into a new query
                 let rel = self.node_into_rel(input, input_ty);
                 let mut select = self.rel_into_select(rel, output_ty, true);

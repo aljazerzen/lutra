@@ -23,12 +23,14 @@ pub fn inline(program: ir::Program) -> ir::Program {
     // count bindings usage
     let mut counter = BindingUsageCounter {
         usage: Default::default(),
+        simple: Default::default(),
     };
     program.main = counter.fold_expr(program.main).unwrap();
     tracing::debug!("binding_usage = {:?}", counter.usage);
+    tracing::debug!("simple_bindings = {:?}", counter.simple);
 
     // inline bindings
-    let mut inliner = BindingInliner::new(counter.usage);
+    let mut inliner = BindingInliner::new(counter.usage, counter.simple);
     program.main = inliner.fold_expr(program.main).unwrap();
 
     program
@@ -216,11 +218,31 @@ impl FuncInliner {
 
 struct BindingUsageCounter {
     usage: HashMap<u32, usize>,
+    simple: HashSet<u32>,
+}
+
+impl BindingUsageCounter {
+    fn is_simple_expr(expr: &ir::Expr) -> bool {
+        match &expr.kind {
+            ir::ExprKind::Literal(ir::Literal::text(_)) => false,
+            ir::ExprKind::Literal(_) => true,
+            ir::ExprKind::Pointer(_) => true,
+            ir::ExprKind::TupleLookup(lookup) => Self::is_simple_expr(&lookup.base),
+            ir::ExprKind::Tuple(fields) => fields.iter().all(|f| Self::is_simple_expr(&f.expr)),
+            _ => false,
+        }
+    }
 }
 
 impl fold::IrFold for BindingUsageCounter {
     fn fold_binding(&mut self, binding: ir::Binding, ty: ir::Ty) -> Result<ir::Expr, ()> {
         self.usage.insert(binding.id, 0);
+
+        // Check if this binding is simple
+        if Self::is_simple_expr(&binding.expr) {
+            self.simple.insert(binding.id);
+        }
+
         fold::fold_binding(self, binding, ty)
     }
 
@@ -236,30 +258,30 @@ impl fold::IrFold for BindingUsageCounter {
 struct BindingInliner {
     bindings: HashMap<u32, ir::Expr>,
 
-    bindings_to_inline: HashSet<u32>,
+    to_inline: HashSet<u32>,
 }
 
 impl BindingInliner {
-    fn new(bindings_usage: HashMap<u32, usize>) -> Self {
-        let bindings_to_inline = bindings_usage
+    fn new(bindings_usage: HashMap<u32, usize>, simple: HashSet<u32>) -> Self {
+        // inline vars that are used 1 or 0 times, or are simple
+        let to_inline: HashSet<u32> = bindings_usage
             .into_iter()
-            // inline vars that are used 1 or 0 times
-            .filter(|(_, usage_count)| *usage_count <= 1)
+            .filter(|(id, usage_count)| *usage_count <= 1 || simple.contains(id))
             .map(|(id, _)| id)
             .collect();
 
-        tracing::debug!("inlining vars: {:?}", bindings_to_inline);
+        tracing::debug!("inlining vars: {:?}", to_inline);
 
         BindingInliner {
             bindings: Default::default(),
-            bindings_to_inline,
+            to_inline,
         }
     }
 }
 
 impl IrFold for BindingInliner {
     fn fold_binding(&mut self, binding: ir::Binding, ty: ir::Ty) -> Result<ir::Expr, ()> {
-        if self.bindings_to_inline.contains(&binding.id) {
+        if self.to_inline.contains(&binding.id) {
             // store in self.bindings
             let expr = self.fold_expr(binding.expr)?;
             self.bindings.insert(binding.id, expr);
@@ -273,10 +295,8 @@ impl IrFold for BindingInliner {
         if let ir::Pointer::Binding(binding_id) = &ptr {
             // replace ptr with bound value
 
-            // to avoid a clone, we remove from bindings
-            // this is ok, because each ptr will appear at most once
-            if let Some(value) = self.bindings.remove(binding_id) {
-                return Ok(value);
+            if let Some(value) = self.bindings.get(binding_id) {
+                return Ok(value.clone());
             }
         }
         fold::fold_ptr(ptr, ty)
