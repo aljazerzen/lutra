@@ -3,8 +3,9 @@ use std::rc::Rc;
 use std::time::Duration;
 
 use crossterm::event::KeyCode;
-use lutra_bin::rr;
 use lutra_bin::{Table, TableConfig, TableLayout};
+use lutra_bin::{ir, rr};
+use ratatui::layout::Alignment;
 use ratatui::prelude::*;
 use ratatui::widgets::{Block, Borders, Padding, Paragraph};
 
@@ -25,10 +26,18 @@ pub struct OutputPane {
     config: TableConfig,
     scroll: usize,
     viewport_rows: Cell<usize>,
+
+    // Auto-run state
+    auto_run: AutoRunState,
 }
 
 impl OutputPane {
-    pub fn new(program_ty: Rc<rr::ProgramType>, output: Vec<u8>, duration: Duration) -> Self {
+    pub fn new(
+        program_ty: Rc<rr::ProgramType>,
+        output: Vec<u8>,
+        duration: Duration,
+        auto_run: AutoRunState,
+    ) -> Self {
         // Create table config
         let config = TableConfig::default();
 
@@ -44,14 +53,29 @@ impl OutputPane {
             config,
             scroll: 0,
             viewport_rows: Cell::new(10), // Default until first render
+            auto_run,
         }
+    }
+
+    /// Get a mutable reference to the auto-run state.
+    pub fn auto_run_mut(&mut self) -> &mut AutoRunState {
+        &mut self.auto_run
+    }
+
+    /// Take ownership of the auto-run state, replacing it with a new default state.
+    pub fn take_auto_run(&mut self) -> AutoRunState {
+        std::mem::replace(&mut self.auto_run, AutoRunState::new())
     }
 }
 
 impl Component for OutputPane {
     fn render(&self, frame: &mut Frame, area: Rect) {
+        // Get auto-run status text and color
+        let status = self.auto_run.widget();
+
         let block = Block::default()
             .title(" Output ")
+            .title(Line::from(status).alignment(Alignment::Right))
             .borders(Borders::TOP | Borders::LEFT)
             .padding(Padding::left(1))
             .border_style(Style::default().fg(Color::DarkGray));
@@ -63,9 +87,9 @@ impl Component for OutputPane {
         // Header with duration
         let header = format!("Completed in {:.2?}", self.duration);
         let header = Span::styled(header, Style::default().fg(Color::DarkGray));
-        frame.render_widget(header, area);
+        frame.render_widget(header.into_right_aligned_line(), area);
 
-        let area = clip_top(area, 2);
+        let area = clip_top(area, 1);
 
         // Output value (rendered as table)
         let table = Table::new(&self.output, &self.program_ty.output, &self.program_ty.defs);
@@ -143,6 +167,9 @@ fn colorize_table<'a>(table_text: &'a str, layout: &lutra_bin::TableLayout) -> V
             }
 
             // muted prefix
+            if !line.is_char_boundary(mute_prefix) {
+                return Line::from(line);
+            }
             let (leading, rest) = line.split_at(mute_prefix);
             Line::from(vec![
                 Span::styled(leading, style_muted),
@@ -150,4 +177,72 @@ fn colorize_table<'a>(table_text: &'a str, layout: &lutra_bin::TableLayout) -> V
             ])
         })
         .collect()
+}
+
+/// Auto-run state for a program pane.
+#[derive(Debug, Clone)]
+pub struct AutoRunState {
+    /// Whether auto-run is enabled by user.
+    enabled: bool,
+
+    /// Last known input type (for detecting changes).
+    last_input_ty: Option<ir::Ty>,
+
+    /// Whether auto-run is currently suspended due to type change.
+    suspended: bool,
+}
+
+impl AutoRunState {
+    pub fn new() -> Self {
+        Self {
+            enabled: false,
+            last_input_ty: None,
+            suspended: false,
+        }
+    }
+
+    /// Toggle auto-run enabled/disabled. Returns new enabled state.
+    pub fn toggle(&mut self) -> bool {
+        self.enabled = !self.enabled;
+        if self.enabled {
+            // Clear suspension when manually enabling
+            self.suspended = false;
+        }
+        self.enabled
+    }
+
+    /// Check if input type changed. If changed and enabled, suspends auto-run.
+    /// Returns true if type changed.
+    pub fn on_new_input_ty(&mut self, new_input_ty: &ir::Ty) -> bool {
+        let changed = match &self.last_input_ty {
+            Some(old_ty) => old_ty != new_input_ty,
+            None => false,
+        };
+
+        if changed && self.enabled {
+            self.suspended = true;
+        }
+
+        self.last_input_ty = Some(new_input_ty.clone());
+        self.enabled && !self.suspended
+    }
+
+    /// Called after a successful manual run. Resumes auto-run if suspended.
+    pub fn on_successful_run(&mut self) {
+        if self.suspended && self.enabled {
+            self.suspended = false;
+        }
+    }
+
+    /// Returns status text and color for UI display.
+    pub fn widget(&self) -> Span<'static> {
+        let (text, color) = if !self.enabled {
+            (" ⏹ Auto-run disabled", Color::DarkGray)
+        } else if self.suspended {
+            (" ⏸ Auto-run (type changed)", Color::Yellow)
+        } else {
+            (" ▶︎ Auto-run enabled", Color::White)
+        };
+        Span::styled(text, Style::default().fg(color))
+    }
 }

@@ -246,5 +246,5 @@ impl<'d, 't> Table<'d, 't> {
 }
 
 fn max_column_depth(column_groups: &[ColumnGroup]) -> usize {
-    column_groups.iter().map(|c| c.depth()).max().unwrap_or(0)
+    column_groups.iter().map(|c| c.depth()).max().unwrap_or(1)
 }

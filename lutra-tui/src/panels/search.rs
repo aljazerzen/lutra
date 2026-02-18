@@ -174,7 +174,7 @@ impl SearchModal {
         // Render modal block with background
         let block = Block::default()
             .title(" Search ")
-            .borders(Borders::TOP)
+            .borders(Borders::TOP | Borders::LEFT)
             .border_style(Style::default().fg(style::COLOR_FG_ACCENT))
             .padding(Padding::horizontal(1))
             .bg(style::COLOR_BG_PRIMARY);

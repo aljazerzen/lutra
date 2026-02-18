@@ -5,7 +5,7 @@ mod source;
 
 pub use error::ErrorPane;
 pub use input::InputPane;
-pub use output::OutputPane;
+pub use output::{AutoRunState, OutputPane};
 
 use lutra_bin::{ir, rr};
 use lutra_compiler::Project;
@@ -35,9 +35,6 @@ pub struct ProgramPane {
 
     /// Currently running execution
     executing: Option<RunningExecution>,
-
-    /// Auto-run configuration
-    auto_run: AutoRunState,
 
     // -- handles --
     /// Runner client for sending execution commands
@@ -90,8 +87,6 @@ impl ProgramPane {
             prepared_program_id: None,
             executing: None,
 
-            auto_run: AutoRunState::new(),
-
             input_pane: None,
             output_pane: None,
             error_pane: None,
@@ -138,7 +133,6 @@ impl ProgramPane {
 
         // Create panes
         self.input_pane = Some(InputPane::new(&program_ty.input, &program_ty.defs));
-        self.output_pane = None;
         self.error_pane = None;
 
         // Set programs
@@ -164,8 +158,13 @@ impl ProgramPane {
     }
 
     /// Toggle auto-run enabled/disabled. Returns new enabled state.
+    /// Only works when OutputPane exists (returns false otherwise).
     pub fn toggle_auto_run(&mut self) -> bool {
-        self.auto_run.toggle()
+        if let Some(output_pane) = &mut self.output_pane {
+            output_pane.auto_run_mut().toggle()
+        } else {
+            false
+        }
     }
 
     /// Clears the current program.
@@ -184,7 +183,7 @@ impl ProgramPane {
     /// Recompile the program with new project.
     /// Returns true if auto-run should execute.
     pub fn recompile(&mut self, project: &Project, runner: &RunnerConfig) -> Result<bool, String> {
-        // Clear previous preparation
+        // Clear previous prepared program
         if let Some(program_id) = self.prepared_program_id.take() {
             let _ = self.runner_client.release(program_id);
         }
@@ -194,16 +193,15 @@ impl ProgramPane {
 
         // Check if input type changed
         if let Some(program_ty) = &self.program_ty {
-            let type_changed = self.auto_run.check_type_change(&program_ty.input);
+            if let Some(output) = &mut self.output_pane {
+                let auto_run = output.auto_run_mut();
+                let should_run = auto_run.on_new_input_ty(&program_ty.input);
 
-            if type_changed && self.auto_run.enabled {
-                // Type changed, auto-run suspended
-                return Ok(false);
+                return Ok(should_run);
             }
         }
 
-        // Return whether we should auto-run
-        Ok(self.auto_run.should_auto_run())
+        Ok(false)
     }
 
     /// Prepare and execute the program.
@@ -267,10 +265,18 @@ impl ProgramPane {
                     .clone()
                     .expect("program_ty should be set during execution");
 
-                // Resume auto-run if it was suspended
-                self.auto_run.on_successful_run();
+                // Get existing auto-run state from output pane
+                let mut auto_run = if let Some(output_pane) = &mut self.output_pane {
+                    output_pane.take_auto_run()
+                } else {
+                    AutoRunState::new()
+                };
 
-                self.output_pane = Some(OutputPane::new(program_ty, output, duration));
+                // Resume auto-run if it was suspended
+                auto_run.on_successful_run();
+
+                // Create new output pane with auto-run state
+                self.output_pane = Some(OutputPane::new(program_ty, output, duration, auto_run));
                 self.stage = RunStage::Output;
             }
             lutra_runner::channel::messages::Result::Err(err) => {
@@ -331,20 +337,6 @@ impl Component for ProgramPane {
         frame.render_widget(block, area);
         let area = inner;
 
-        // Split: auto-run status (1 line) + rest
-        let layout = Layout::vertical([
-            Constraint::Min(0),    // Source + stage
-            Constraint::Length(1), // Auto-run status
-        ])
-        .split(area);
-
-        // Render auto-run status at the bottom
-        let (text, color) = self.auto_run.status_text();
-        let status_line = Line::from(Span::styled(text, Style::default().fg(color)));
-        frame.render_widget(status_line, layout[1]);
-
-        let area = layout[0];
-
         // Split body area: source (if exists) + current stage
         let area = if let Some(source_pane) = &self.source_pane {
             // Use exact height needed for source pane, rest for stage
@@ -384,78 +376,6 @@ impl Component for ProgramPane {
                     stage.render(frame, area);
                 }
             }
-        }
-    }
-}
-
-/// Auto-run state for a program pane.
-#[derive(Debug, Clone)]
-struct AutoRunState {
-    /// Whether auto-run is enabled by user.
-    enabled: bool,
-
-    /// Last known input type (for detecting changes).
-    last_input_ty: Option<ir::Ty>,
-
-    /// Whether auto-run is currently suspended due to type change.
-    suspended: bool,
-}
-
-impl AutoRunState {
-    fn new() -> Self {
-        Self {
-            enabled: false,
-            last_input_ty: None,
-            suspended: false,
-        }
-    }
-
-    /// Toggle auto-run enabled/disabled. Returns new enabled state.
-    fn toggle(&mut self) -> bool {
-        self.enabled = !self.enabled;
-        if self.enabled {
-            // Clear suspension when manually enabling
-            self.suspended = false;
-        }
-        self.enabled
-    }
-
-    /// Check if input type changed. If changed and enabled, suspends auto-run.
-    /// Returns true if type changed.
-    fn check_type_change(&mut self, new_input_ty: &ir::Ty) -> bool {
-        let changed = match &self.last_input_ty {
-            Some(old_ty) => old_ty != new_input_ty,
-            None => false,
-        };
-
-        if changed && self.enabled {
-            self.suspended = true;
-        }
-
-        self.last_input_ty = Some(new_input_ty.clone());
-        changed
-    }
-
-    /// Returns true if auto-run should execute.
-    fn should_auto_run(&self) -> bool {
-        self.enabled && !self.suspended
-    }
-
-    /// Called after a successful manual run. Resumes auto-run if suspended.
-    fn on_successful_run(&mut self) {
-        if self.suspended && self.enabled {
-            self.suspended = false;
-        }
-    }
-
-    /// Returns status text and color for UI display.
-    fn status_text(&self) -> (&str, Color) {
-        if !self.enabled {
-            ("⏹ Auto-run disabled", Color::DarkGray)
-        } else if self.suspended {
-            ("⏸ Auto-run (type changed)", Color::Yellow)
-        } else {
-            ("▶︎ Auto-run enabled", Color::White)
         }
     }
 }

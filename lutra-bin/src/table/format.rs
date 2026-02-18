@@ -125,7 +125,7 @@ pub fn format_special(data: &[u8], ty: &ir::Ty) -> Option<Result<(String, Align)
             Err(e) => return Some(Err(e)),
         };
         if let Some(dt) = chrono::DateTime::from_timestamp_micros(micros) {
-            let formatted = dt.format("%Y-%m-%dT%H:%M:%S%.6f").to_string();
+            let formatted = dt.format("%Y-%m-%d %H:%M:%S%.6f").to_string();
             Some(Ok((formatted, Align::Right)))
         } else {
             Some(Ok((micros.to_string(), Align::Right)))
@@ -164,7 +164,7 @@ fn format_enum(
     if is_unit {
         Ok((variant.name.clone(), Align::Left))
     } else if table.is_flat(&variant.ty) {
-        let (inner_text, _) = format_value_impl(inner_data, &variant.ty, table)?;
+        let (inner_text, _) = format_value(inner_data, &variant.ty, table)?;
         Ok((format!("{}({})", variant.name, inner_text), Align::Left))
     } else {
         Ok((format!("{}(…)", variant.name), Align::Left))
@@ -203,7 +203,6 @@ fn read_enum_tag<'d>(
 
 /// Format type name for header row.
 pub fn format_ty_name(ty: &ir::Ty, table: &Table) -> String {
-    let ty = table.get_ty_mat(ty);
     match &ty.kind {
         ir::TyKind::Primitive(p) => format_primitive_ty_name(p),
         ir::TyKind::Array(item) => {
