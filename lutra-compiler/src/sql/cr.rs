@@ -109,14 +109,14 @@ pub enum Transform {
     Aggregate(Vec<Expr>),
 
     /// Filters by retaining only first N rows
-    Limit(usize),
+    Limit(usize, Box<Expr>),
 
     /// Filtering (also known as selection)
     Where(Box<Expr>),
 
     /// Replaces first column (which is index for array ty).
-    /// None implies to any order of rows (which is implemented by ROW_NUMBER)
-    Reindex(Option<Box<Expr>>),
+    /// Empty Vec implies any order of rows (which is implemented by ROW_NUMBER)
+    Reindex(Vec<Expr>),
 
     /// Applies the order from index column to rows of relation.
     Order,

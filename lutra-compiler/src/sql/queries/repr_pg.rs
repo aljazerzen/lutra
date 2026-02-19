@@ -13,6 +13,7 @@
 use std::borrow::Cow;
 
 use lutra_bin::ir;
+use sql_ast as sa;
 
 use crate::sql::queries::repr_duckdb;
 use crate::sql::utils::Node;
@@ -119,13 +120,13 @@ impl<'a> queries::Context<'a> {
 
         // index
         if self.get_ty_mat(ty).kind.is_array() {
-            values.push(utils::new_index(None));
+            values.push(sa::Expr::IndexBy(vec![]));
         }
 
         // table columns
-        values.extend(self.pg_cols(ty, false).into_iter().map(|(f_name, f_ty)| {
-            let ident = utils::identifier(Some(&rel_var), f_name);
-            self.pg_col_import(ident, f_ty.as_ref())
+        values.extend(self.pg_cols(ty, false).into_iter().map(|(c_name, c_ty)| {
+            let ident = utils::identifier(Some(&rel_var), c_name);
+            self.pg_col_import(ident, c_ty.as_ref())
         }));
 
         let mut select = utils::select_empty();
@@ -136,64 +137,56 @@ impl<'a> queries::Context<'a> {
 
     /// Converts a column from postgres repr into query repr.
     /// This is easy, because tuples have flattened columns in both reprs.
-    pub fn pg_col_import(&self, expr_pg: sql_ast::Expr, ty: &ir::Ty) -> sql_ast::Expr {
-        // special case: std::Date
-        if let ir::TyKind::Ident(ty_ident) = &ty.kind
-            && ty_ident.0 == ["std", "Date"]
-        {
-            return sql_ast::Expr::Source(format!("({expr_pg}::date - '1970-01-01'::date)"));
+    pub fn pg_col_import(&self, expr_pg: sa::Expr, ty: &ir::Ty) -> sa::Expr {
+        // special cases
+        if is_ident(ty, &["std", "Date"]) {
+            return sa::Expr::Source(format!("({expr_pg}::date - '1970-01-01'::date)"));
         }
-        // special case: std::Time & std::Timestamp
-        if let ir::TyKind::Ident(ty_ident) = &ty.kind
-            && (ty_ident.0 == ["std", "Time"] || ty_ident.0 == ["std", "Timestamp"])
-        {
-            return sql_ast::Expr::Source(format!("(EXTRACT(EPOCH FROM {expr_pg})*1000000)::int8"));
+        if is_ident(ty, &["std", "Time"]) || is_ident(ty, &["std", "Timestamp"]) {
+            return sa::Expr::Source(format!("(EXTRACT(EPOCH FROM {expr_pg})*1000000)::int8"));
         }
-        // special case: std::Decimal
-        if let ir::TyKind::Ident(ty_ident) = &ty.kind
-            && ty_ident.0 == ["std", "Decimal"]
-        {
-            return sql_ast::Expr::Source(format!("({expr_pg}*100)::int8"));
+        if is_ident(ty, &["std", "Decimal"]) {
+            return sa::Expr::Source(format!("({expr_pg}*100)::int8"));
         }
 
         // import of an enum tag, that is text in postgres repr, but an int16 in query repr
         if let ir::TyKind::Enum(variants) = &ty.kind {
-            let operand = Some(Box::new(sql_ast::Expr::Source(format!("{expr_pg}::text"))));
+            let operand = Some(Box::new(sa::Expr::Source(format!("{expr_pg}::text"))));
             let mut cases = Vec::with_capacity(variants.len());
             for (tag, v) in variants.iter().enumerate() {
-                let variant_name = sql_ast::escape_string(&v.name, '\'');
-                cases.push(sql_ast::CaseWhen {
-                    condition: sql_ast::Expr::Source(format!("'{variant_name}'")),
-                    result: sql_ast::Expr::Source(format!("{tag}")),
+                let variant_name = sa::escape_string(&v.name, '\'');
+                cases.push(sa::CaseWhen {
+                    condition: sa::Expr::Source(format!("'{variant_name}'")),
+                    result: sa::Expr::Source(format!("{tag}")),
                 });
             }
 
-            let case = sql_ast::Expr::Case {
+            let case = sa::Expr::Case {
                 operand,
                 cases,
                 else_result: None,
             };
-            return sql_ast::Expr::Source(format!("{case}::int2"));
+            return sa::Expr::Source(format!("{case}::int2"));
         }
 
         // general case: noop
         // (but with a type cast, just to be safe)
-        sql_ast::Expr::Source(format!("{expr_pg}::{}", self.compile_ty_name(ty)))
+        sa::Expr::Source(format!("{expr_pg}::{}", self.ty_name(ty)))
     }
 
     /// Convert a relation from "postgres repr" from "query repr".
-    pub fn pg_export(&mut self, node: Node, ty: &ir::Ty, keep_index: bool) -> Node {
+    pub fn pg_export(&mut self, node: Node, ty: &ir::Ty, include_index: bool) -> Node {
         let mut select = self.node_into_select(node, ty);
 
         let mut old_projection = select.projection.into_iter();
 
-        if ty.kind.is_array() && !keep_index {
+        if ty.kind.is_array() && !include_index {
             // first column will be index, discard it
             old_projection.next();
         }
 
-        select.projection = Iterator::zip(old_projection, self.pg_cols(ty, keep_index))
-            .map(|(p, (col, ty))| sql_ast::SelectItem {
+        select.projection = Iterator::zip(old_projection, self.pg_cols(ty, include_index))
+            .map(|(p, (col, ty))| sa::SelectItem {
                 expr: self.pg_col_export(p.expr, ty.as_ref()),
                 alias: Some(utils::new_ident(col)),
             })
@@ -204,53 +197,42 @@ impl<'a> queries::Context<'a> {
 
     /// Convert a column from "postgres repr" from "query repr".
     /// For example, type std::Date is exported from pg type `int4` into `date`.
-    pub fn pg_col_export(&self, expr: sql_ast::Expr, ty: &ir::Ty) -> sql_ast::Expr {
-        // special case: std::Date
-        if let ir::TyKind::Ident(ty_ident) = &ty.kind
-            && ty_ident.0 == ["std", "Date"]
-        {
-            return sql_ast::Expr::Source(format!("('1970-01-01'::date + {expr})"));
+    pub fn pg_col_export(&self, expr: sa::Expr, ty: &ir::Ty) -> sa::Expr {
+        // special cases
+        if is_ident(ty, &["std", "Date"]) {
+            return sa::Expr::Source(format!("('1970-01-01'::date + {expr})"));
         }
-        // special case: std::Time
-        if let ir::TyKind::Ident(ty_ident) = &ty.kind
-            && ty_ident.0 == ["std", "Time"]
-        {
-            return sql_ast::Expr::Source(format!(
+        if is_ident(ty, &["std", "Time"]) {
+            return sa::Expr::Source(format!(
                 "('00:00'::time + INTERVAL '1 microsecond' * {expr})"
             ));
         }
-        // special case: std::Timestamp
-        if let ir::TyKind::Ident(ty_ident) = &ty.kind
-            && ty_ident.0 == ["std", "Timestamp"]
-        {
-            return sql_ast::Expr::Source(format!("to_timestamp({expr}::float8/1000000.0)"));
+        if is_ident(ty, &["std", "Timestamp"]) {
+            return sa::Expr::Source(format!("to_timestamp({expr}::float8/1000000.0)"));
         }
-        // special case: std::Timestamp
-        if let ir::TyKind::Ident(ty_ident) = &ty.kind
-            && ty_ident.0 == ["std", "Decimal"]
-        {
-            return sql_ast::Expr::Source(format!("({expr}::decimal(20, 0)/100)"));
+        if is_ident(ty, &["std", "Decimal"]) {
+            return sa::Expr::Source(format!("({expr}::decimal(20, 0)/100)"));
         }
 
         // export of an enum tag, that is text in postgres repr, but an int16 in query repr
         if let ir::TyKind::Enum(variants) = &ty.kind {
-            let operand = Some(Box::new(sql_ast::Expr::Source(format!("{expr}::int2"))));
+            let operand = Some(Box::new(sa::Expr::Source(format!("{expr}::int2"))));
 
             let mut cases = Vec::with_capacity(variants.len());
             for (tag, v) in variants.iter().enumerate() {
-                let variant_name = sql_ast::escape_string(&v.name, '\'');
-                cases.push(sql_ast::CaseWhen {
-                    condition: sql_ast::Expr::Source(format!("{tag}")),
-                    result: sql_ast::Expr::Source(format!("'{variant_name}'")),
+                let variant_name = sa::escape_string(&v.name, '\'');
+                cases.push(sa::CaseWhen {
+                    condition: sa::Expr::Source(format!("{tag}")),
+                    result: sa::Expr::Source(format!("'{variant_name}'")),
                 });
             }
 
-            let case = sql_ast::Expr::Case {
+            let case = sa::Expr::Case {
                 operand,
                 cases,
                 else_result: None,
             };
-            return sql_ast::Expr::Source(format!("{case}::text"));
+            return sa::Expr::Source(format!("{case}::text"));
         }
 
         // general case: noop
@@ -279,7 +261,7 @@ impl<'a> queries::Context<'a> {
         };
 
         Node::Column {
-            expr: Box::new(sql_ast::Expr::Source(expr)),
+            expr: Box::new(sa::Expr::Source(expr)),
             rels: input_rels.into_iter().collect(),
         }
     }
@@ -381,8 +363,8 @@ impl<'a> queries::Context<'a> {
                     Some("j".into()),
                 )));
 
-                result.projection = vec![sql_ast::SelectItem {
-                    expr: utils::new_index(None),
+                result.projection = vec![sa::SelectItem {
+                    expr: sa::Expr::IndexBy(vec![]),
                     alias: Some(utils::new_ident(COL_ARRAY_INDEX)),
                 }];
 
@@ -390,8 +372,8 @@ impl<'a> queries::Context<'a> {
                 let names = self.rel_cols_nested(ty_item, "".into());
 
                 for (value, name) in std::iter::zip(values, names) {
-                    result.projection.push(sql_ast::SelectItem {
-                        expr: sql_ast::Expr::Source(value),
+                    result.projection.push(sa::SelectItem {
+                        expr: sa::Expr::Source(value),
                         alias: Some(utils::new_ident(name)),
                     });
                 }
@@ -404,8 +386,8 @@ impl<'a> queries::Context<'a> {
 
                 let names = self.rel_cols_nested(ty, "".into());
                 for (value, name) in std::iter::zip(values, names) {
-                    result.projection.push(sql_ast::SelectItem {
-                        expr: sql_ast::Expr::Source(value),
+                    result.projection.push(sa::SelectItem {
+                        expr: sa::Expr::Source(value),
                         alias: Some(utils::new_ident(name)),
                     });
                 }
@@ -424,7 +406,7 @@ impl<'a> queries::Context<'a> {
             ir::TyKind::Primitive(prim) => {
                 let r = match prim {
                     ir::TyPrimitive::text => format!("jsonb_build_array({json_ref}) ->> 0"),
-                    _ => format!("{json_ref}::text::{}", self.compile_ty_name(ty)),
+                    _ => format!("{json_ref}::text::{}", self.ty_name(ty)),
                 };
                 vec![r]
             }
@@ -485,4 +467,11 @@ fn is_special_framed(ty: &ir::Ty) -> bool {
     };
 
     SPECIAL_FRAMED_TYPES.iter().any(|f| name.0 == *f)
+}
+
+fn is_ident(ty: &ir::Ty, name: &[&'static str]) -> bool {
+    let ir::TyKind::Ident(ty_ident) = &ty.kind else {
+        return false;
+    };
+    ty_ident.0 == name
 }

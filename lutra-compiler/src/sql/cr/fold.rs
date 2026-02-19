@@ -108,9 +108,9 @@ pub fn fold_transform<T: ?Sized + CrFold>(fold: &mut T, transform: Transform) ->
         Transform::ProjectPick(cols) => Transform::ProjectPick(cols),
         Transform::ProjectDiscard(cols) => Transform::ProjectDiscard(cols),
         Transform::Aggregate(exprs) => Transform::Aggregate(fold_exprs(fold, exprs)?),
-        Transform::Limit(n) => Transform::Limit(n),
+        Transform::Limit(n, key) => Transform::Limit(n, Box::new(fold_expr(fold, *key)?)),
         Transform::Where(expr) => Transform::Where(Box::new(fold.fold_expr(*expr)?)),
-        Transform::Reindex(expr) => Transform::Reindex(fold_option(fold, expr)?),
+        Transform::Reindex(exprs) => Transform::Reindex(fold_exprs(fold, exprs)?),
         Transform::Order => Transform::Order,
         Transform::Group { key, values } => Transform::Group {
             key: Box::new(fold.fold_expr(*key)?),

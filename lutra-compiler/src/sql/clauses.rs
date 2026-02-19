@@ -480,7 +480,7 @@ impl<'a> Context<'a> {
             }
 
             ir::ExprKind::Switch(switch) => {
-                let single_col = self.rel_cols(&expr.ty, true).nth(1).is_none();
+                let single_col = self.rel_cols(&expr.ty).nth(1).is_none();
 
                 if single_col {
                     // CASE
@@ -600,7 +600,7 @@ impl<'a> Context<'a> {
                 // reindex
                 let filtered = self.new_binding(filtered);
                 let index_col = self.new_rel_col(&filtered, 0, ty_index());
-                cr::ExprKind::Transform(filtered, cr::Transform::Reindex(Some(Box::new(index_col))))
+                cr::ExprKind::Transform(filtered, cr::Transform::Reindex(vec![index_col]))
             }
             "std::index" => {
                 let array = self.compile_rel(&call.args[0]);
@@ -639,29 +639,12 @@ impl<'a> Context<'a> {
                 let ty_variants = expr.ty.kind.as_enum().unwrap();
 
                 if self.is_option(ty_variants) {
-                    // construct Option::Some
-                    let some = item;
-
-                    // construct Option::None
-                    let none = cr::Expr {
-                        kind: cr::ExprKind::From(cr::From::Null),
-                        ty: *item_ty, // use original type, so casts work
-                    };
-
-                    // union both variants and take first
-                    cr::ExprKind::Transform(
-                        self.new_binding(cr::Expr {
-                            kind: cr::ExprKind::Union(vec![some, none]),
-                            ty: expr.ty.clone(),
-                        }),
-                        cr::Transform::Limit(1),
-                    )
+                    cr::ExprKind::From(cr::From::Row(vec![item]))
                 } else {
                     // construct Option::Some
-                    let some_tag = new_tag(1);
                     let some = cr::Expr {
                         kind: cr::ExprKind::Join(
-                            self.new_binding(some_tag),
+                            self.new_binding(new_tag(1)),
                             self.new_binding(item),
                             None,
                         ),
@@ -669,8 +652,7 @@ impl<'a> Context<'a> {
                     };
 
                     // construct Option::None
-                    let none_tag = new_tag(0);
-                    let mut none_cols = vec![none_tag];
+                    let mut none_cols = vec![new_tag(0)];
                     none_cols.extend(self.rel_cols_ty_nested(&expr.ty).skip(1).map(|t| cr::Expr {
                         kind: cr::ExprKind::From(cr::From::Null),
                         ty: t.into_owned(),
@@ -680,14 +662,17 @@ impl<'a> Context<'a> {
                         ty: expr.ty.clone(),
                     };
 
-                    // union both variants and take first
-                    cr::ExprKind::Transform(
-                        self.new_binding(cr::Expr {
-                            kind: cr::ExprKind::Union(vec![some, none]),
-                            ty: expr.ty.clone(),
-                        }),
-                        cr::Transform::Limit(1),
-                    )
+                    // union both variants
+                    let union = self.new_binding(cr::Expr {
+                        kind: cr::ExprKind::Union(vec![some, none]),
+                        ty: expr.ty.clone(),
+                    });
+
+                    // take first
+                    let tag = self.new_rel_col(&union, 0, ty_tag());
+                    let neg_tag =
+                        new_un_op("std::neg", tag, *ty_tag().kind.as_primitive().unwrap());
+                    cr::ExprKind::Transform(union, cr::Transform::Limit(1, Box::new(neg_tag)))
                 }
             }
             "std::map" => {
@@ -781,7 +766,7 @@ impl<'a> Context<'a> {
                 // reindex
                 let filtered = self.new_binding(filtered);
                 let index_col = self.new_rel_col(&filtered, 0, ty_index());
-                cr::ExprKind::Transform(filtered, cr::Transform::Reindex(Some(Box::new(index_col))))
+                cr::ExprKind::Transform(filtered, cr::Transform::Reindex(vec![index_col]))
             }
             "std::sort" => {
                 let array = self.compile_rel(&call.args[0]);
@@ -797,7 +782,9 @@ impl<'a> Context<'a> {
                 let key = self.compile_column(&func.body);
                 self.functions.remove(&func.id);
 
-                cr::ExprKind::Transform(array, cr::Transform::Reindex(Some(Box::new(key))))
+                let old_index = self.new_rel_col(&array, 0, ty_index());
+
+                cr::ExprKind::Transform(array, cr::Transform::Reindex(vec![key, old_index]))
             }
 
             // aggregation functions
@@ -958,7 +945,7 @@ impl<'a> Context<'a> {
                 let a = self.compile_rel(&call.args[0]);
                 let a = self.new_binding(a);
 
-                let num_cols_a = self.rel_cols(&a.rel.ty, true).count();
+                let num_cols_a = self.rel_cols(&a.rel.ty).count();
 
                 let b = self.compile_rel(&call.args[1]);
                 let b = self.new_binding(b);
@@ -1023,28 +1010,20 @@ impl<'a> Context<'a> {
                 });
 
                 // reindex
-                cr::ExprKind::Transform(union, cr::Transform::Reindex(None))
+                cr::ExprKind::Transform(union, cr::Transform::Reindex(vec![]))
             }
 
             "std::fold" => {
                 let (inputs, iteration) = self.compile_std_scan(call);
 
-                // order by -index
+                // order by -index, limit 1
+
                 let iteration = self.new_binding(iteration);
                 let index = self.new_rel_col(&iteration, 0, ty_index());
+                let neg_index = new_un_op("std::neg", index, ir::TyPrimitive::int64);
                 let iteration = cr::Expr::new_iso_transform(
                     iteration,
-                    cr::Transform::Reindex(Some(Box::new(new_un_op(
-                        "std::neg",
-                        index,
-                        ir::TyPrimitive::int64,
-                    )))),
-                );
-
-                // limit 1
-                let iteration = cr::Expr::new_iso_transform(
-                    self.new_binding(iteration),
-                    cr::Transform::Limit(1),
+                    cr::Transform::Limit(1, Box::new(neg_index)),
                 );
 
                 // drop index

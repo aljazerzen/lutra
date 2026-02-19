@@ -192,13 +192,13 @@ impl ProgramPane {
         self.compile_and_prepare(project, runner)?;
 
         // Check if input type changed
-        if let Some(program_ty) = &self.program_ty {
-            if let Some(output) = &mut self.output_pane {
-                let auto_run = output.auto_run_mut();
-                let should_run = auto_run.on_new_input_ty(&program_ty.input);
+        if let Some(program_ty) = &self.program_ty
+            && let Some(output) = &mut self.output_pane
+        {
+            let auto_run = output.auto_run_mut();
+            let should_run = auto_run.on_new_input_ty(&program_ty.input);
 
-                return Ok(should_run);
-            }
+            return Ok(should_run);
         }
 
         Ok(false)

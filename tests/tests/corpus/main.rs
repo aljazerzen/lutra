@@ -50,6 +50,12 @@ fn main() {
                 .with_ignored_flag(case.ignored_postgres),
         );
 
+        let c = case.clone();
+        trails.push(
+            Trial::test(format!("{}::duckdb", c.name), || run_on_duckdb(c))
+                .with_ignored_flag(case.ignored_duckdb),
+        );
+
         // writeln!(tree_sitter_file, "===").unwrap();
         // writeln!(tree_sitter_file, "{}", case.name).unwrap();
         // writeln!(tree_sitter_file, "===").unwrap();
@@ -69,6 +75,7 @@ struct TestCase {
     output: String,
     ignored_interpreter: bool,
     ignored_postgres: bool,
+    ignored_duckdb: bool,
 }
 
 fn parse_file(contents: &str) -> Vec<TestCase> {
@@ -91,6 +98,7 @@ fn parse_file(contents: &str) -> Vec<TestCase> {
             name: first_line.trim().into(),
             ignored_interpreter: program.contains("# skip: interpreter"),
             ignored_postgres: program.contains("# skip: postgres"),
+            ignored_duckdb: program.contains("# skip: duckdb"),
             program: program.trim().into(),
             input: input.trim().into(),
             output: output.trim().into(),
@@ -124,6 +132,14 @@ async fn run_on_pg(case: TestCase) -> Result<(), libtest_mimic::Failed> {
     let res = run_program("pg", ProgramFormat::SqlPg, &runner, case).await;
     runner.into_inner().rollback().await.unwrap();
     res
+}
+
+#[tokio::main(flavor = "current_thread")]
+async fn run_on_duckdb(case: TestCase) -> Result<(), libtest_mimic::Failed> {
+    let runner = lutra_runner_duckdb::Runner::in_memory(None)
+        .await
+        .map_err(|e| format!("Failed to create DuckDB runner: {e:?}"))?;
+    run_program("duckdb", ProgramFormat::SqlDuckdb, &runner, case).await
 }
 
 async fn run_program(

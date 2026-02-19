@@ -1,6 +1,7 @@
 use std::borrow::Cow;
 
 use lutra_bin::ir;
+use sql_ast as sa;
 
 use crate::sql::{COL_ARRAY_INDEX, COL_VALUE};
 use crate::sql::{clauses, queries, utils};
@@ -27,20 +28,12 @@ pub trait RelCols<'a> {
     }
 
     /// Names of relational columns for a given type.
-    /// If include_index is false, top-level arrays does not produce index column.
-    fn rel_cols(
-        &'a self,
-        ty: &'a ir::Ty,
-        include_index: bool,
-    ) -> Box<dyn Iterator<Item = String> + 'a> {
+    fn rel_cols(&'a self, ty: &'a ir::Ty) -> Box<dyn Iterator<Item = String> + 'a> {
         let ty_mat = self.get_ty_mat(ty);
         match &ty_mat.kind {
             ir::TyKind::Primitive(_) => Box::new(Some(COL_VALUE.to_string()).into_iter()),
             ir::TyKind::Array(item) => {
-                let mut index = None;
-                if include_index {
-                    index = Some(COL_ARRAY_INDEX.to_string());
-                }
+                let index = Some(COL_ARRAY_INDEX.to_string());
 
                 Box::new(
                     index
@@ -173,9 +166,9 @@ impl<'a> queries::Context<'a> {
     pub fn projection(
         &self,
         ty: &ir::Ty,
-        values: impl IntoIterator<Item = sql_ast::Expr>,
-    ) -> Vec<sql_ast::SelectItem> {
-        let rel_cols = self.rel_cols(ty, true);
+        values: impl IntoIterator<Item = sa::Expr>,
+    ) -> Vec<sa::SelectItem> {
+        let rel_cols = self.rel_cols(ty);
 
         let values = values.into_iter();
 
@@ -192,7 +185,7 @@ impl<'a> queries::Context<'a> {
                 rel_cols.len(),
                 values.len(),
                 "\n  expected columns: {rel_cols:?},\n  got: [\n{:#}\n  ],\n  ty: {}",
-                sql_ast::Indent(sql_ast::Indent(sql_ast::DisplayCommaSeparated(&values))),
+                sa::Indent(sa::Indent(sa::DisplayCommaSeparated(&values))),
                 ir::print_ty(ty)
             );
             (values, rel_cols)
@@ -201,7 +194,7 @@ impl<'a> queries::Context<'a> {
         };
 
         std::iter::zip(values, rel_cols)
-            .map(|(expr, alias)| sql_ast::SelectItem {
+            .map(|(expr, alias)| sa::SelectItem {
                 expr,
                 alias: Some(utils::new_ident(alias)),
             })
@@ -210,14 +203,9 @@ impl<'a> queries::Context<'a> {
 
     /// Generates an identity (no-op) projection of a relation of type `ty`, from relation variable `rel_var`.
     /// When `top_level` is set, the projection does not include array index.
-    pub fn projection_noop(
-        &self,
-        rel_var: Option<&str>,
-        ty: &ir::Ty,
-        include_index: bool,
-    ) -> Vec<sql_ast::SelectItem> {
-        self.rel_cols(ty, include_index)
-            .map(|name| sql_ast::SelectItem {
+    pub fn projection_noop(&self, rel_var: Option<&str>, ty: &ir::Ty) -> Vec<sa::SelectItem> {
+        self.rel_cols(ty)
+            .map(|name| sa::SelectItem {
                 expr: super::identifier(rel_var, name),
                 alias: None,
             })
@@ -243,7 +231,7 @@ mod rel_repr {
     fn r(ty: &ir::Ty) -> String {
         let ctx = queries::Context::new(Default::default(), Dialect::Postgres);
 
-        ctx.rel_cols(ty, true).join(", ")
+        ctx.rel_cols(ty).join(", ")
     }
 
     #[test]

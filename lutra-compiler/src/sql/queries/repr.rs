@@ -33,10 +33,10 @@ impl<'a> Context<'a> {
 
     /// Converts a relation from "query repr" to "native repr".
     /// Native repr is either the postgres repr or duckdb repr.
-    pub fn native_export(&mut self, node: Node, ty: &ir::Ty, keep_index: bool) -> Node {
+    pub fn native_export(&mut self, node: Node, ty: &ir::Ty, include_index: bool) -> Node {
         match self.dialect() {
-            Dialect::Postgres => self.pg_export(node, ty, keep_index),
-            Dialect::DuckDB => self.duck_export(node, ty, keep_index),
+            Dialect::Postgres => self.pg_export(node, ty, include_index),
+            Dialect::DuckDB => self.duck_export(node, ty, include_index),
         }
     }
 

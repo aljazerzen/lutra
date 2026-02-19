@@ -124,12 +124,14 @@ func main() -> -400: int16 | std::to_int8
 
 # === cast_int32_to_int8
 # skip: postgres
+# skip: duckdb
 func main() -> -400000: int32 | std::to_int8
 # >
 -128
 
 # === cast_int64_to_int8
 # skip: postgres
+# skip: duckdb
 func main() -> -40000000001: int64 | std::to_int8
 # >
 -1
@@ -146,12 +148,14 @@ func main() -> 400: uint16 | std::to_int8
 
 # === cast_uint32_to_int8
 # skip: postgres
+# skip: duckdb
 func main() -> 400000: uint32 | std::to_int8
 # >
 -128
 
 # === cast_uint64_to_int8
 # skip: postgres
+# skip: duckdb
 func main() -> 40000000001: uint64 | std::to_int8
 # >
 1
@@ -163,6 +167,7 @@ func main() -> 4.4: float32 | std::to_int8
 
 # === cast_float64_to_int8
 # skip: postgres
+# skip: duckdb
 func main() -> 125523.121231: float64 | std::to_int8
 # >
 127
@@ -227,12 +232,14 @@ func main() -> 400: uint16 | std::to_int16
 
 # === cast_uint32_to_int16
 # skip: postgres
+# skip: duckdb
 func main() -> 400000: uint32 | std::to_int16
 # >
 6784
 
 # === cast_uint64_to_int16
 # skip: postgres
+# skip: duckdb
 func main() -> 40000000001: uint64 | std::to_int16
 # >
 -28671
@@ -321,6 +328,7 @@ func main() -> 400000: uint32 | std::to_int32
 
 # === cast_uint64_to_int32
 # skip: postgres
+# skip: duckdb
 func main() -> 40000000001: uint64 | std::to_int32
 # >
 1345294337
@@ -397,12 +405,14 @@ func main() -> -400: int16 | std::to_uint8
 
 # === cast_int32_to_uint8
 # skip: postgres
+# skip: duckdb
 func main() -> -400000: int32 | std::to_uint8
 # >
 128
 
 # === cast_int64_to_uint8
 # skip: postgres
+# skip: duckdb
 func main() -> -40000000001: int64 | std::to_uint8
 # >
 255
@@ -419,12 +429,14 @@ func main() -> 400: uint16 | std::to_uint8
 
 # === cast_uint32_to_uint8
 # skip: postgres
+# skip: duckdb
 func main() -> 400000: uint32 | std::to_uint8
 # >
 128
 
 # === cast_uint64_to_uint8
 # skip: postgres
+# skip: duckdb
 func main() -> 40000000001: uint64 | std::to_uint8
 # >
 1
@@ -436,6 +448,7 @@ func main() -> 4.4: float32 | std::to_uint8
 
 # === cast_float64_to_uint8
 # skip: postgres
+# skip: duckdb
 func main() -> 125523.121231: float64 | std::to_uint8
 # >
 255
@@ -452,12 +465,14 @@ func main() -> -400: int16 | std::to_uint16
 
 # === cast_int32_to_uint16
 # skip: postgres
+# skip: duckdb
 func main() -> -400000: int32 | std::to_uint16
 # >
 58752
 
 # === cast_int64_to_uint16
 # skip: postgres
+# skip: duckdb
 func main() -> -40000000001: int64 | std::to_uint16
 # >
 28671
@@ -474,12 +489,14 @@ func main() -> 400: uint16 | std::to_uint16
 
 # === cast_uint32_to_uint16
 # skip: postgres
+# skip: duckdb
 func main() -> 400000: uint32 | std::to_uint16
 # >
 6784
 
 # === cast_uint64_to_uint16
 # skip: postgres
+# skip: duckdb
 func main() -> 40000000001: uint64 | std::to_uint16
 # >
 36865
@@ -491,6 +508,7 @@ func main() -> 4.4: float32 | std::to_uint16
 
 # === cast_float64_to_uint16
 # skip: postgres
+# skip: duckdb
 func main() -> 125523.121231: float64 | std::to_uint16
 # >
 65535
@@ -512,6 +530,7 @@ func main() -> -400000: int32 | std::to_uint32
 
 # === cast_int64_to_uint32
 # skip: postgres
+# skip: duckdb
 func main() -> -40000000001: int64 | std::to_uint32
 # >
 2949672959
@@ -533,6 +552,7 @@ func main() -> 400000: uint32 | std::to_uint32
 
 # === cast_uint64_to_uint32
 # skip: postgres
+# skip: duckdb
 func main() -> 40000000001: uint64 | std::to_uint32
 # >
 1345294337

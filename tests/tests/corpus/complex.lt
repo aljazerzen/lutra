@@ -25,7 +25,7 @@ module chinook {
     {id = 3, title = "Hello world!"}, {id = 5, title = "Foo"}
   ]
 
-  func get_album_by_id(album_id: int64): Album -> (
+  func get_album_by_id(album_id: int64) -> (
     get_albums()
     | filter(func (this: Album) -> this.id == album_id)
     | index(0)

@@ -1,63 +1,53 @@
 //! Utils for constructing SQL AST nodes
 
+use sql_ast as sa;
+
 // TODO: these things should probably be moved into sql-ast crate
 
-pub fn get_rel_alias(rel: &sql_ast::RelNamed) -> Option<&str> {
+pub fn get_rel_alias(rel: &sa::RelNamed) -> Option<&str> {
     rel.alias.as_ref().map(|r| r.name.value.as_str())
 }
 
-pub fn as_sub_rel(rel: &sql_ast::RelNamed) -> Option<&sql_ast::Query> {
+pub fn as_sub_rel(rel: &sa::RelNamed) -> Option<&sa::Query> {
     match &rel.expr {
-        sql_ast::RelExpr::Subquery(subquery) => Some(subquery),
+        sa::RelExpr::Subquery(subquery) => Some(subquery),
         _ => None,
     }
 }
 
-pub fn as_mut_sub_rel(rel: &mut sql_ast::RelNamed) -> Option<&mut sql_ast::Query> {
+pub fn as_mut_sub_rel(rel: &mut sa::RelNamed) -> Option<&mut sa::Query> {
     match &mut rel.expr {
-        sql_ast::RelExpr::Subquery(subquery) => Some(subquery),
+        sa::RelExpr::Subquery(subquery) => Some(subquery),
         _ => None,
     }
 }
 
-pub fn new_table(name: sql_ast::ObjectName, alias: Option<String>) -> sql_ast::RelNamed {
-    sql_ast::RelNamed {
-        expr: sql_ast::RelExpr::Table(name),
-        lateral: false,
-        alias: alias.map(new_table_alias),
-    }
+pub fn expr_to_subquery(expr: sa::Expr) -> sa::RelExpr {
+    let mut select = select_empty();
+    select.projection.push(sa::SelectItem { expr, alias: None });
+
+    sa::RelExpr::Subquery(Box::new(query_select(select)))
 }
 
-pub fn sub_rel(query: sql_ast::Query, alias: String) -> sql_ast::RelNamed {
-    sql_ast::RelNamed {
-        lateral: false,
-        expr: sql_ast::RelExpr::Subquery(Box::new(query)),
-        alias: Some(new_table_alias(alias)),
-    }
-}
-
-pub fn lateral(mut relation: sql_ast::RelNamed) -> sql_ast::RelNamed {
+pub fn lateral(mut relation: sa::RelNamed) -> sa::RelNamed {
     relation.lateral = true;
     relation
 }
 
-pub fn rel_func(
-    name: sql_ast::Ident,
-    args: Vec<sql_ast::Expr>,
-    alias: Option<String>,
-) -> sql_ast::RelNamed {
-    sql_ast::RelNamed {
+pub fn rel_func(name: sa::Ident, args: Vec<sa::Expr>, alias: Option<String>) -> sa::RelNamed {
+    sa::RelNamed {
         lateral: false,
-        expr: sql_ast::RelExpr::Function {
-            name: sql_ast::ObjectName(vec![name]),
+        expr: sa::RelExpr::Function {
+            name: sa::ObjectName(vec![name]),
             args: args.into_iter().collect(),
+            ordinality: false,
         },
         alias: alias.map(new_table_alias),
     }
 }
 
-pub fn select_empty() -> sql_ast::Select {
-    sql_ast::Select {
+pub fn select_empty() -> sa::Select {
+    sa::Select {
         from: Default::default(),
         selection: Default::default(),
         group_by: Default::default(),
@@ -67,8 +57,8 @@ pub fn select_empty() -> sql_ast::Select {
     }
 }
 
-pub fn select_from(rel: sql_ast::RelNamed) -> sql_ast::Select {
-    sql_ast::Select {
+pub fn select_from(rel: sa::RelNamed) -> sa::Select {
+    sa::Select {
         from: vec![rel],
         selection: Default::default(),
         group_by: Default::default(),
@@ -78,28 +68,28 @@ pub fn select_from(rel: sql_ast::RelNamed) -> sql_ast::Select {
     }
 }
 
-pub fn union(left: sql_ast::SetExpr, right: sql_ast::SetExpr) -> sql_ast::SetExpr {
-    sql_ast::SetExpr::SetOperation {
-        op: sql_ast::SetOperator::Union,
-        set_quantifier: sql_ast::SetQuantifier::All,
+pub fn union(left: sa::SetExpr, right: sa::SetExpr) -> sa::SetExpr {
+    sa::SetExpr::SetOperation {
+        op: sa::SetOperator::Union,
+        set_quantifier: sa::SetQuantifier::All,
         left: Box::new(left),
         right: Box::new(right),
     }
 }
 
-pub fn query_into_set_expr(query: sql_ast::Query) -> sql_ast::SetExpr {
+pub fn query_into_set_expr(query: sa::Query) -> sa::SetExpr {
     if query.with.is_some()
         || query.order_by.is_some()
         || query.limit.is_some()
         || query.offset.is_some()
     {
-        return sql_ast::SetExpr::Query(Box::new(query));
+        return sa::SetExpr::Query(Box::new(query));
     }
     *query.body
 }
 
-pub fn query_new(set_expr: sql_ast::SetExpr) -> sql_ast::Query {
-    sql_ast::Query {
+pub fn query_new(set_expr: sa::SetExpr) -> sa::Query {
+    sa::Query {
         with: Default::default(),
         body: Box::new(set_expr),
         order_by: Default::default(),
@@ -108,111 +98,106 @@ pub fn query_new(set_expr: sql_ast::SetExpr) -> sql_ast::Query {
     }
 }
 
-pub fn query_select(select: sql_ast::Select) -> sql_ast::Query {
-    query_new(sql_ast::SetExpr::Select(Box::new(select)))
+pub fn query_select(select: sa::Select) -> sa::Query {
+    query_new(sa::SetExpr::Select(Box::new(select)))
 }
 
 #[track_caller]
-pub fn unwrap_select_item(item: sql_ast::SelectItem) -> sql_ast::Expr {
+pub fn unwrap_select_item(item: sa::SelectItem) -> sa::Expr {
     item.expr
 }
 
-pub fn bool(value: bool) -> sql_ast::Expr {
-    sql_ast::Expr::Source(if value { "TRUE" } else { "FALSE" }.to_string())
+pub fn bool(value: bool) -> sa::Expr {
+    sa::Expr::Source(if value { "TRUE" } else { "FALSE" }.to_string())
 }
 
-pub fn number(value: impl Into<String>) -> sql_ast::Expr {
-    sql_ast::Expr::Source(value.into())
+pub fn number(value: impl Into<String>) -> sa::Expr {
+    sa::Expr::Source(value.into())
 }
 
-pub fn identifier(first: Option<impl Into<String>>, second: impl Into<String>) -> sql_ast::Expr {
+pub fn identifier(first: Option<impl Into<String>>, second: impl Into<String>) -> sa::Expr {
     if let Some(table) = first {
-        sql_ast::Expr::CompoundIdentifier(vec![new_ident(table), new_ident(second)])
+        sa::Expr::CompoundIdentifier(vec![new_ident(table), new_ident(second)])
     } else {
-        sql_ast::Expr::Identifier(new_ident(second.into()))
+        sa::Expr::Identifier(new_ident(second.into()))
     }
 }
 
-pub fn order_by_one(mut expr: sql_ast::Expr) -> Option<sql_ast::OrderBy> {
-    if let sql_ast::Expr::IndexBy(order_by) = expr {
-        let Some(order_by) = order_by else {
+pub fn order_by_one(expr: sa::Expr) -> Option<sa::OrderBy> {
+    let keys = if let sa::Expr::IndexBy(keys) = expr {
+        if keys.is_empty() {
             return None; // we are ordering by an arbitrary index
         };
-        expr = *order_by;
-    }
-    if let sql_ast::Expr::Source(s) = &expr
+        keys
+    } else {
+        vec![expr]
+    };
+    if let Some(sa::Expr::Source(s)) = keys.first()
         && s == "0"
     {
         return None; // we are ordering by a constant index (only one row)
     }
 
-    Some(sql_ast::OrderBy {
-        exprs: vec![sql_ast::OrderByExpr {
-            expr,
-            options: sql_ast::OrderByOptions {
-                asc: None,
-                nulls_first: None,
-            },
-        }],
+    Some(sa::OrderBy {
+        exprs: keys
+            .into_iter()
+            .map(|key| sa::OrderByExpr {
+                expr: key,
+                options: sa::OrderByOptions {
+                    asc: None,
+                    nulls_first: None,
+                },
+            })
+            .collect(),
     })
 }
 
-pub fn with() -> sql_ast::With {
-    sql_ast::With {
+pub fn with() -> sa::With {
+    sa::With {
         recursive: false,
         cte_tables: Vec::new(),
     }
 }
 
-pub fn cte(name: String, val: sql_ast::Query) -> sql_ast::Cte {
-    sql_ast::Cte {
+pub fn cte(name: String, val: sa::Query) -> sa::Cte {
+    sa::Cte {
         alias: new_table_alias(name),
         query: Box::new(val),
         materialized: Default::default(),
     }
 }
 
-pub fn new_index(order_by: Option<sql_ast::Expr>) -> sql_ast::Expr {
-    sql_ast::Expr::IndexBy(order_by.map(Box::new))
+pub fn new_ident<S: Into<String>>(name: S) -> sa::Ident {
+    sa::Ident::with_quote_if_needed('"', name)
 }
 
-pub fn new_ident<S: Into<String>>(name: S) -> sql_ast::Ident {
-    sql_ast::Ident::with_quote_if_needed('"', name)
-}
-
-pub fn new_object_name<S, I>(parts: I) -> sql_ast::ObjectName
+pub fn new_object_name<S, I>(parts: I) -> sa::ObjectName
 where
     S: Into<String>,
     I: IntoIterator<Item = S>,
 {
-    sql_ast::ObjectName(parts.into_iter().map(new_ident).collect())
+    sa::ObjectName(parts.into_iter().map(new_ident).collect())
 }
 
-pub fn new_table_alias(name: impl Into<String>) -> sql_ast::TableAlias {
-    sql_ast::TableAlias {
-        name: new_ident(name),
-        columns: vec![],
-    }
+pub fn new_table_alias(name: impl Into<String>) -> sa::TableAlias {
+    sa::TableAlias::simple(new_ident(name))
 }
 
-pub fn new_bin_op(op: &str, args: impl IntoIterator<Item = sql_ast::Expr>) -> sql_ast::Expr {
+pub fn new_bin_op(op: &str, args: impl IntoIterator<Item = sa::Expr>) -> sa::Expr {
     let mut args = args.into_iter();
-    sql_ast::Expr::Source(format!(
+    sa::Expr::Source(format!(
         "({} {op} {})",
         args.next().unwrap(),
         args.next().unwrap(),
     ))
 }
 
-pub fn new_un_op(op: &str, args: impl IntoIterator<Item = sql_ast::Expr>) -> sql_ast::Expr {
+pub fn new_un_op(op: &str, args: impl IntoIterator<Item = sa::Expr>) -> sa::Expr {
     let mut args = args.into_iter();
-    sql_ast::Expr::Source(format!("({op} {})", args.next().unwrap()))
+    sa::Expr::Source(format!("({op} {})", args.next().unwrap()))
 }
 
-pub fn new_func_call(
-    func_name: &str,
-    args: impl IntoIterator<Item = sql_ast::Expr>,
-) -> sql_ast::Expr {
+pub fn new_func_call(func_name: &str, args: impl IntoIterator<Item = sa::Expr>) -> sa::Expr {
     let mut r = func_name.to_string();
     r += "(";
     for (index, arg) in args.into_iter().enumerate() {
@@ -222,10 +207,10 @@ pub fn new_func_call(
         r += &arg.to_string();
     }
     r += ")";
-    sql_ast::Expr::Source(r)
+    sa::Expr::Source(r)
 }
 
-pub fn set_or_bin_op(target: &mut Option<sql_ast::Expr>, op: &str, value: sql_ast::Expr) {
+pub fn set_or_bin_op(target: &mut Option<sa::Expr>, op: &str, value: sa::Expr) {
     *target = Some(if let Some(existing) = target.take() {
         new_bin_op(op, [existing, value])
     } else {

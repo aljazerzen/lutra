@@ -7,7 +7,7 @@ use super::utils;
 
 impl<'p> Context<'p> {
     /// Get SQL type name for a Lutra type (in query repr)
-    pub(super) fn compile_ty_name(&self, ty: &ir::Ty) -> String {
+    pub(super) fn ty_name(&self, ty: &ir::Ty) -> String {
         match &self.get_ty_mat(ty).kind {
             ir::TyKind::Primitive(prim) => self.compile_primitive_ty_name(*prim),
 
@@ -19,7 +19,7 @@ impl<'p> Context<'p> {
 
             ir::TyKind::Enum(variants) if self.is_option(variants) => {
                 // option enum is a nullable column
-                self.compile_ty_name(&variants[1].ty)
+                self.ty_name(&variants[1].ty)
             }
 
             ir::TyKind::Tuple(_) | ir::TyKind::Array(_) | ir::TyKind::Enum(_) => {
@@ -157,5 +157,47 @@ impl<'p> Context<'p> {
             }
             ir::TyKind::Function(_) | ir::TyKind::Ident(_) => unreachable!(),
         }
+    }
+
+    /// Get default value for a type
+    pub(super) fn default_value(&self, ty: &ir::Ty) -> String {
+        match self.dialect() {
+            Dialect::Postgres => self.pg_default_value(ty),
+            Dialect::DuckDB => self.duck_default_value(ty),
+        }
+    }
+
+    fn pg_default_value(&self, ty: &ir::Ty) -> String {
+        match &self.get_ty_mat(ty).kind {
+            ir::TyKind::Primitive(ir::TyPrimitive::int8) => "0::int2",
+            ir::TyKind::Primitive(ir::TyPrimitive::int16) => "0::int2",
+            ir::TyKind::Primitive(ir::TyPrimitive::int32) => "0::int4",
+            ir::TyKind::Primitive(ir::TyPrimitive::int64) => "0::int8",
+            ir::TyKind::Primitive(ir::TyPrimitive::float32) => "0.0::float4",
+            ir::TyKind::Primitive(ir::TyPrimitive::float64) => "0.0::float8",
+            ir::TyKind::Primitive(ir::TyPrimitive::bool) => "FALSE",
+            ir::TyKind::Primitive(ir::TyPrimitive::text) => "''",
+            _ => todo!(),
+        }
+        .to_string()
+    }
+
+    fn duck_default_value(&self, ty: &ir::Ty) -> String {
+        match &self.get_ty_mat(ty).kind {
+            ir::TyKind::Primitive(ir::TyPrimitive::int8) => "0::INT1",
+            ir::TyKind::Primitive(ir::TyPrimitive::int16) => "0::INT2",
+            ir::TyKind::Primitive(ir::TyPrimitive::int32) => "0::INT4",
+            ir::TyKind::Primitive(ir::TyPrimitive::int64) => "0::INT8",
+            ir::TyKind::Primitive(ir::TyPrimitive::uint8) => "0::UINT8",
+            ir::TyKind::Primitive(ir::TyPrimitive::uint16) => "0::UINT16",
+            ir::TyKind::Primitive(ir::TyPrimitive::uint32) => "0::UINT32",
+            ir::TyKind::Primitive(ir::TyPrimitive::uint64) => "0::UINT64",
+            ir::TyKind::Primitive(ir::TyPrimitive::float32) => "0.0::FLOAT4",
+            ir::TyKind::Primitive(ir::TyPrimitive::float64) => "0.0::FLOAT8",
+            ir::TyKind::Primitive(ir::TyPrimitive::bool) => "FALSE",
+            ir::TyKind::Primitive(ir::TyPrimitive::text) => "''",
+            _ => todo!(),
+        }
+        .to_string()
     }
 }

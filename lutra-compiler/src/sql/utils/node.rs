@@ -1,7 +1,7 @@
 use std::fmt::Write;
 
 use lutra_bin::ir;
-use sql_ast::Query;
+use sql_ast as sa;
 
 use crate::sql::utils::{self, RelCols};
 
@@ -13,8 +13,8 @@ pub enum Node {
     /// For example: `TRUE`, `my_table.id`, `(select id from my_table)`
     /// Might need certain relations in scope.
     Column {
-        expr: Box<sql_ast::Expr>,
-        rels: Vec<sql_ast::RelNamed>,
+        expr: Box<sa::Expr>,
+        rels: Vec<sa::RelNamed>,
     },
 
     /// Many columns.
@@ -22,14 +22,14 @@ pub enum Node {
     /// For example: `[TRUE, my_table.id, (select id from my_table)]`
     /// Might need certain relations in scope.
     Columns {
-        exprs: Vec<sql_ast::Expr>,
-        rels: Vec<sql_ast::RelNamed>,
+        exprs: Vec<sa::Expr>,
+        rels: Vec<sa::RelNamed>,
     },
 
     /// A relational expression.
     /// Includes things that can be used in FROM.
     /// For example: `my_table AS r1`, `(select a, b from my_table) AS r2`
-    Rel(sql_ast::RelNamed),
+    Rel(sa::RelNamed),
 
     /// A relation variable - a reference to a relation that affects cardinality
     /// of current evaluation context.
@@ -38,10 +38,10 @@ pub enum Node {
     RelVar(String),
 
     /// A select query.
-    Select(sql_ast::Select),
+    Select(sa::Select),
 
     /// A query.
-    Query(sql_ast::Query),
+    Query(sa::Query),
 
     /// Direct SQL source.
     // This has to be a variant, because we don't (yet) know what it
@@ -54,7 +54,7 @@ impl Node {
         Self::RelVar(String::new())
     }
 
-    pub fn as_columns(&self) -> Option<&[sql_ast::SelectItem]> {
+    pub fn as_columns(&self) -> Option<&[sa::SelectItem]> {
         match self {
             Node::Select(select)
                 if select.distinct.is_none()
@@ -69,8 +69,8 @@ impl Node {
     }
 }
 
-impl From<sql_ast::Expr> for Node {
-    fn from(expr: sql_ast::Expr) -> Self {
+impl From<sa::Expr> for Node {
+    fn from(expr: sa::Expr) -> Self {
         Node::Column {
             expr: Box::new(expr),
             rels: vec![],
@@ -85,7 +85,7 @@ impl std::fmt::Debug for Node {
 
         fn fmt_rels(
             f: &mut std::fmt::Formatter<'_>,
-            rels: &Vec<sql_ast::RelNamed>,
+            rels: &Vec<sa::RelNamed>,
         ) -> Result<(), std::fmt::Error> {
             for rvar in rels {
                 f.write_str("WITH {")?;
@@ -129,44 +129,29 @@ impl std::fmt::Debug for Node {
 }
 
 impl<'a> crate::sql::queries::Context<'a> {
-    pub fn query_into_rel(&mut self, query: sql_ast::Query) -> sql_ast::RelNamed {
+    pub fn query_into_rel(&mut self, query: sa::Query) -> sa::RelNamed {
         let rel_var = self.rel_name_gen.next();
-        utils::sub_rel(query, rel_var)
+        sa::RelExpr::subquery(query).alias(utils::new_ident(rel_var))
     }
 
-    pub fn rel_into_select(
-        &mut self,
-        rel: sql_ast::RelNamed,
-        ty: &ir::Ty,
-        include_index: bool,
-    ) -> sql_ast::Select {
+    pub fn rel_into_select(&mut self, rel: sa::RelNamed, ty: &ir::Ty) -> sa::Select {
         let rel_var = utils::get_rel_alias(&rel);
 
         let mut select = utils::select_empty();
-        select.projection = self.projection_noop(rel_var, ty, include_index);
+        select.projection = self.projection_noop(rel_var, ty);
         select.from = vec![rel];
         select
     }
 
-    pub fn rel_var_into_columns(
-        &mut self,
-        rel_var: Option<&str>,
-        ty: &ir::Ty,
-        include_index: bool,
-    ) -> Vec<sql_ast::Expr> {
-        self.rel_cols(ty, include_index)
+    pub fn rel_var_into_columns(&mut self, rel_var: Option<&str>, ty: &ir::Ty) -> Vec<sa::Expr> {
+        self.rel_cols(ty)
             .map(|c_name| utils::identifier(rel_var, c_name))
             .collect()
     }
 
-    pub fn rel_var_into_select(
-        &mut self,
-        rel_var: &str,
-        ty: &ir::Ty,
-        include_index: bool,
-    ) -> sql_ast::Select {
+    pub fn rel_var_into_select(&mut self, rel_var: &str, ty: &ir::Ty) -> sa::Select {
         let mut select = utils::select_empty();
-        select.projection = self.projection_noop(Some(rel_var), ty, include_index);
+        select.projection = self.projection_noop(Some(rel_var), ty);
         select
     }
 
@@ -175,9 +160,9 @@ impl<'a> crate::sql::queries::Context<'a> {
         Node::Query(utils::query_select(select))
     }
 
-    pub fn wrap_query(&mut self, query: Query, ty: &ir::Ty) -> Query {
+    pub fn wrap_query(&mut self, query: sa::Query, ty: &ir::Ty) -> sa::Query {
         let rel = self.query_into_rel(query);
-        let select = self.rel_into_select(rel, ty, true);
+        let select = self.rel_into_select(rel, ty);
         utils::query_select(select)
     }
 
@@ -185,7 +170,7 @@ impl<'a> crate::sql::queries::Context<'a> {
         &mut self,
         scoped: Node,
         ty: &ir::Ty,
-    ) -> (sql_ast::Expr, Vec<sql_ast::RelNamed>) {
+    ) -> (sa::Expr, Vec<sa::RelNamed>) {
         match scoped {
             Node::Column {
                 expr,
@@ -195,12 +180,12 @@ impl<'a> crate::sql::queries::Context<'a> {
                 exprs,
                 rels: rel_vars,
             } if exprs.len() == 1 => (exprs.into_iter().next().unwrap(), rel_vars),
-            Node::Source(source) => (sql_ast::Expr::Source(source), vec![]),
+            Node::Source(source) => (sa::Expr::Source(source), vec![]),
             _ => {
                 let rel = self.node_into_rel(scoped, ty);
 
                 let rel_var = utils::get_rel_alias(&rel).unwrap();
-                let c_name = self.rel_cols(ty, true).next().unwrap();
+                let c_name = self.rel_cols(ty).next().unwrap();
                 let expr = utils::identifier(Some(rel_var), c_name);
 
                 (expr, vec![rel])
@@ -208,33 +193,33 @@ impl<'a> crate::sql::queries::Context<'a> {
         }
     }
 
-    pub fn node_into_column(&mut self, scoped: Node, ty: &ir::Ty) -> sql_ast::Expr {
+    pub fn node_into_column(&mut self, scoped: Node, ty: &ir::Ty) -> sa::Expr {
         match scoped {
             Node::Column { expr, rels } if rels.is_empty() => *expr,
             Node::Columns { exprs, rels } if exprs.len() == 1 && rels.is_empty() => {
                 exprs.into_iter().next().unwrap()
             }
-            Node::Source(source) => sql_ast::Expr::Source(source),
+            Node::Source(source) => sa::Expr::Source(source),
             Node::RelVar(ref rel_name) => {
-                let cols = self.rel_var_into_columns(Some(rel_name), ty, true);
+                let cols = self.rel_var_into_columns(Some(rel_name), ty);
                 if cols.len() == 1 {
                     cols.into_iter().next().unwrap()
                 } else {
-                    sql_ast::Expr::Subquery(Box::new(self.node_into_query(scoped, ty)))
+                    sa::Expr::Subquery(Box::new(self.node_into_query(scoped, ty)))
                 }
             }
-            _ => sql_ast::Expr::Subquery(Box::new(self.node_into_query(scoped, ty))),
+            _ => sa::Expr::Subquery(Box::new(self.node_into_query(scoped, ty))),
         }
     }
 
-    pub fn node_into_columns(&mut self, scoped: Node, ty: &ir::Ty) -> Vec<sql_ast::Expr> {
+    pub fn node_into_columns(&mut self, scoped: Node, ty: &ir::Ty) -> Vec<sa::Expr> {
         match scoped {
             Node::Column { expr, rels } if rels.is_empty() => vec![*expr],
             Node::Columns { exprs, rels } if rels.is_empty() => exprs,
-            Node::Source(source) => vec![sql_ast::Expr::Source(source)],
-            Node::RelVar(rel_name) => self.rel_var_into_columns(Some(&rel_name), ty, true),
+            Node::Source(source) => vec![sa::Expr::Source(source)],
+            Node::RelVar(rel_name) => self.rel_var_into_columns(Some(&rel_name), ty),
             _ => {
-                vec![sql_ast::Expr::Subquery(Box::new(
+                vec![sa::Expr::Subquery(Box::new(
                     self.node_into_query(scoped, ty),
                 ))]
             }
@@ -245,42 +230,37 @@ impl<'a> crate::sql::queries::Context<'a> {
         &mut self,
         scoped: Node,
         ty: &ir::Ty,
-    ) -> (Vec<sql_ast::Expr>, Vec<sql_ast::RelNamed>) {
+    ) -> (Vec<sa::Expr>, Vec<sa::RelNamed>) {
         match scoped {
             Node::Column { expr, rels } => (vec![*expr], rels),
             Node::Columns { exprs, rels } => (exprs, rels),
-            Node::Source(source) => (vec![sql_ast::Expr::Source(source)], vec![]),
-            Node::RelVar(rel_name) => {
-                (self.rel_var_into_columns(Some(&rel_name), ty, true), vec![])
-            }
+            Node::Source(source) => (vec![sa::Expr::Source(source)], vec![]),
+            Node::RelVar(rel_name) => (self.rel_var_into_columns(Some(&rel_name), ty), vec![]),
             _ => {
                 let rel = self.node_into_rel(scoped, ty);
                 let rel_var = utils::get_rel_alias(&rel);
-                (self.rel_var_into_columns(rel_var, ty, true), vec![rel])
+                (self.rel_var_into_columns(rel_var, ty), vec![rel])
             }
         }
     }
 
-    pub fn node_into_rel(&mut self, node: Node, ty: &ir::Ty) -> sql_ast::RelNamed {
+    pub fn node_into_rel(&mut self, node: Node, ty: &ir::Ty) -> sa::RelNamed {
         match node {
             Node::Rel(rel) => rel,
             Node::Query(query) => self.query_into_rel(query),
             Node::Source(source) => {
-                self.query_into_rel(utils::query_new(sql_ast::SetExpr::Source(source)))
+                self.query_into_rel(utils::query_new(sa::SetExpr::Source(source)))
             }
             _ => {
                 let rel_name = self.rel_name_gen.next();
                 let select = self.node_into_select(node, ty);
-                utils::sub_rel(utils::query_select(select), rel_name)
+
+                sa::RelExpr::subquery(utils::query_select(select)).alias(utils::new_ident(rel_name))
             }
         }
     }
 
-    pub fn node_into_rel_var(
-        &mut self,
-        node: Node,
-        ty: &ir::Ty,
-    ) -> (String, Option<sql_ast::RelNamed>) {
+    pub fn node_into_rel_var(&mut self, node: Node, ty: &ir::Ty) -> (String, Option<sa::RelNamed>) {
         match node {
             Node::RelVar(name) => (name, None),
             _ => {
@@ -295,7 +275,7 @@ impl<'a> crate::sql::queries::Context<'a> {
         }
     }
 
-    pub fn node_into_select(&mut self, node: Node, ty: &ir::Ty) -> sql_ast::Select {
+    pub fn node_into_select(&mut self, node: Node, ty: &ir::Ty) -> sa::Select {
         match node {
             Node::Column {
                 expr,
@@ -315,8 +295,8 @@ impl<'a> crate::sql::queries::Context<'a> {
                 select.from = rel_vars;
                 select
             }
-            Node::Rel(rel) => self.rel_into_select(rel, ty, true),
-            Node::RelVar(rel_var) => self.rel_var_into_select(&rel_var, ty, true),
+            Node::Rel(rel) => self.rel_into_select(rel, ty),
+            Node::RelVar(rel_var) => self.rel_var_into_select(&rel_var, ty),
             Node::Select(select) => select,
             Node::Query(query) => {
                 // try unwrapping Query
@@ -324,36 +304,24 @@ impl<'a> crate::sql::queries::Context<'a> {
                     && query.offset.is_none()
                     && query.order_by.is_none()
                     && query.with.is_none()
-                    && let sql_ast::SetExpr::Select(select) = *query.body
+                    && let sa::SetExpr::Select(select) = *query.body
                 {
                     return *select;
                 }
 
                 // wrap into sub rel
                 let rel = self.query_into_rel(query);
-                self.rel_into_select(rel, ty, true)
+                self.rel_into_select(rel, ty)
             }
             Node::Source(_) => {
                 // assume source is a query, wrap it into sub rel
                 let rel = self.node_into_rel(node, ty);
-                self.rel_into_select(rel, ty, true)
+                self.rel_into_select(rel, ty)
             }
         }
     }
 
-    pub fn node_without_index(&mut self, node: Node, ty: &ir::Ty) -> sql_ast::Select {
-        match node {
-            Node::Column { .. } => self.node_into_select(node, ty),
-            Node::RelVar(rel_var) => self.rel_var_into_select(&rel_var, ty, false),
-
-            _ => {
-                let rel = self.node_into_rel(node, ty);
-                self.rel_into_select(rel, ty, false)
-            }
-        }
-    }
-
-    pub fn node_into_query(&mut self, node: Node, ty: &ir::Ty) -> sql_ast::Query {
+    pub fn node_into_query(&mut self, node: Node, ty: &ir::Ty) -> sa::Query {
         match node {
             Node::Query(query) => query,
             _ => utils::query_select(self.node_into_select(node, ty)),

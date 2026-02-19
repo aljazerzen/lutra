@@ -28,9 +28,9 @@ use display_utils::{NewLine, SpaceOrNewline};
 pub use self::dml::{Assignment, AssignmentTarget, Delete, Insert, Update};
 pub use self::query::{
     Copy, Cte, CteAsMaterialized, Distinct, ExprWithAlias, Join, JoinConstraint, JoinOperator,
-    LateralView, OrderBy, OrderByExpr, OrderByKind, OrderByOptions, PivotValueSource, Query,
-    RelExpr, RelNamed, Select, SelectInto, SelectItem, SetExpr, SetOperator, SetQuantifier,
-    TableAlias, TableVersion, Values, With,
+    LateralView, OrderBy, OrderByExpr, OrderByKind, OrderByOptions, Query, RelExpr, RelNamed,
+    Select, SelectInto, SelectItem, SetExpr, SetOperator, SetQuantifier, TableAlias, TableVersion,
+    Values, With,
 };
 
 pub use self::string::escape as escape_string;
@@ -181,7 +181,7 @@ fn valid_ident_regex() -> &'static regex::Regex {
 fn is_keyword(ident: &str) -> bool {
     const KEYWORDS: &[&str] = &[
         "select", "from", "where", "group", "by", "limit", "offset", "distinct", "on", "none",
-        "some", "end",
+        "some", "end", "time",
     ];
     KEYWORDS.contains(&ident)
 }
@@ -267,7 +267,7 @@ pub enum Expr {
     Source(String),
     Identifier(Ident),
     CompoundIdentifier(Vec<Ident>),
-    IndexBy(Option<Box<Expr>>),
+    IndexBy(Vec<Expr>),
     Case {
         operand: Option<Box<Expr>>,
         cases: Vec<CaseWhen>,
@@ -283,12 +283,14 @@ impl fmt::Display for Expr {
             Expr::Identifier(s) => write!(f, "{s}"),
             Expr::CompoundIdentifier(s) => write!(f, "{}", display_separated(s, ".")),
 
-            Expr::IndexBy(Some(order_by)) => {
-                f.write_str("(ROW_NUMBER() OVER (ORDER BY ")?;
-                order_by.fmt(f)?;
+            Expr::IndexBy(keys) => {
+                f.write_str("(ROW_NUMBER() OVER (")?;
+                if !keys.is_empty() {
+                    f.write_str("ORDER BY ")?;
+                    display_comma_separated(keys).fmt(f)?;
+                }
                 f.write_str(")-1)::int4")
             }
-            Expr::IndexBy(None) => f.write_str("(ROW_NUMBER() OVER ()-1)::int4"),
 
             Expr::Case {
                 operand,

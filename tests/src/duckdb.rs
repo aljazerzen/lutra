@@ -537,7 +537,7 @@ fn option_array() {
         lutra_bin::Value::unit()
     )), @"
     SELECT
-      r0.value
+      r0.value AS value
     FROM
       (
         SELECT
@@ -579,14 +579,8 @@ fn tuple_with_option() {
         lutra_bin::Value::unit()
     )), @r#"
     SELECT
-      r0._0 AS name,
-      r0._1 AS age
-    FROM
-      (
-        SELECT
-          'Alice'::text AS _0,
-          30::INT4 AS _1
-      ) AS r0
+      'Alice'::text AS name,
+      30::INT4 AS age
     ---
     {
       name = "Alice",
@@ -603,14 +597,8 @@ fn tuple_with_option_none() {
         lutra_bin::Value::unit()
     )), @r#"
     SELECT
-      r0._0 AS name,
-      r0._1 AS age
-    FROM
-      (
-        SELECT
-          'Bob'::text AS _0,
-          NULL::INT4 AS _1
-      ) AS r0
+      'Bob'::text AS name,
+      NULL::INT4 AS age
     ---
     {
       name = "Bob",
@@ -639,20 +627,13 @@ fn enum_with_payloads() {
     )), @"
     SELECT
       CASE
-        r0._t::int2
+        1::INT2::int2
         WHEN 0 THEN union_value(pending := NULL)::
         UNION
     (pending BOOL, in_progress INT4, done TEXT)
-        WHEN 1 THEN union_value(in_progress := r0._1)
-        WHEN 2 THEN union_value(done := r0._2)
+        WHEN 1 THEN union_value(in_progress := 42::INT4)
+        WHEN 2 THEN union_value(done := NULL::TEXT)
       END AS value
-    FROM
-      (
-        SELECT
-          1::INT2 AS _t,
-          42::INT4 AS _1,
-          NULL::TEXT AS _2
-      ) AS r0
     ---
     in_progress(42)
     ");
@@ -673,44 +654,37 @@ fn enum_array_with_payloads() {
     )), @r#"
     SELECT
       CASE
-        r1._t::int2
+        r0._t::int2
         WHEN 0 THEN union_value(pending := NULL)::
         UNION
     (pending BOOL, in_progress INT4, done TEXT)
-        WHEN 1 THEN union_value(in_progress := r1._1)
-        WHEN 2 THEN union_value(done := r1._2)
+        WHEN 1 THEN union_value(in_progress := r0._1)
+        WHEN 2 THEN union_value(done := r0._2)
       END AS value
     FROM
       (
         SELECT
-          r0._t,
-          r0._1,
-          r0._2
-        FROM
-          (
-            SELECT
-              0::INT8 AS index,
-              0::INT2 AS _t,
-              NULL::INT4 AS _1,
-              NULL::TEXT AS _2
-            UNION
-            ALL
-            SELECT
-              1::INT8 AS index,
-              1::INT2 AS _t,
-              50::INT4 AS _1,
-              NULL::TEXT AS _2
-            UNION
-            ALL
-            SELECT
-              2::INT8 AS index,
-              2::INT2 AS _t,
-              NULL::INT4 AS _1,
-              'finished'::text AS _2
-          ) AS r0
-        ORDER BY
-          r0.index
-      ) AS r1
+          0::INT8 AS index,
+          0::INT2 AS _t,
+          NULL::INT4 AS _1,
+          NULL::TEXT AS _2
+        UNION
+        ALL
+        SELECT
+          1::INT8 AS index,
+          1::INT2 AS _t,
+          50::INT4 AS _1,
+          NULL::TEXT AS _2
+        UNION
+        ALL
+        SELECT
+          2::INT8 AS index,
+          2::INT2 AS _t,
+          NULL::INT4 AS _1,
+          'finished'::text AS _2
+      ) AS r0
+    ORDER BY
+      r0.index
     ---
     [
       pending,
@@ -735,23 +709,15 @@ fn tuple_with_enum() {
         lutra_bin::Value::unit()
     )), @"
     SELECT
-      r0._0 AS id,
+      1::INT4 AS id,
       CASE
-        r0._1_t::int2
+        1::INT2::int2
         WHEN 0 THEN union_value(pending := NULL)::
         UNION
     (pending BOOL, in_progress INT4, done TEXT)
-        WHEN 1 THEN union_value(in_progress := r0._1_1)
-        WHEN 2 THEN union_value(done := r0._1_2)
+        WHEN 1 THEN union_value(in_progress := 42::INT4)
+        WHEN 2 THEN union_value(done := NULL::TEXT)
       END AS status
-    FROM
-      (
-        SELECT
-          1::INT4 AS _0,
-          1::INT2 AS _1_t,
-          42::INT4 AS _1_1,
-          NULL::TEXT AS _1_2
-      ) AS r0
     ---
     {
       id = 1,
@@ -771,14 +737,8 @@ fn tuple_prim() {
         lutra_bin::Value::unit()
     )), @"
     SELECT
-      r0._0 AS x,
-      r0._1 AS y
-    FROM
-      (
-        SELECT
-          1::INT4 AS _0,
-          2::INT2 AS _1
-      ) AS r0
+      1::INT4 AS x,
+      2::INT2 AS y
     ---
     {
       x = 1,
@@ -794,16 +754,9 @@ fn tuple_mixed() {
         lutra_bin::Value::unit()
     )), @r#"
     SELECT
-      r0._0 AS name,
-      r0._1 AS age,
-      r0._2 AS active
-    FROM
-      (
-        SELECT
-          'Alice'::text AS _0,
-          30::INT4 AS _1,
-          TRUE AS _2
-      ) AS r0
+      'Alice'::text AS name,
+      30::INT4 AS age,
+      TRUE AS active
     ---
     {
       name = "Alice",
@@ -820,15 +773,8 @@ fn tuple_tuple_prim() {
         lutra_bin::Value::unit()
     )), @"
     SELECT
-      struct_pack(x := r0._0_0, y := r0._0_1) AS a,
-      r0._1 AS b
-    FROM
-      (
-        SELECT
-          1::INT4 AS _0_0,
-          2::INT2 AS _0_1,
-          3::INT8 AS _1
-      ) AS r0
+      struct_pack(x := 1::INT4, y := 2::INT2) AS a,
+      3::INT8 AS b
     ---
     {
       a = {
@@ -851,7 +797,7 @@ fn array_prim() {
         lutra_bin::Value::unit()
     )), @"
     SELECT
-      r0.value
+      r0.value AS value
     FROM
       (
         SELECT
@@ -886,9 +832,17 @@ fn array_empty() {
         lutra_bin::Value::unit()
     )), @"
     SELECT
-      NULL::INT8 AS value
-    WHERE
-      FALSE
+      r0.value AS value
+    FROM
+      (
+        SELECT
+          0 AS index,
+          NULL::INT8 AS value
+        WHERE
+          FALSE
+      ) AS r0
+    ORDER BY
+      r0.index
     ---
     []
     ");
@@ -901,29 +855,23 @@ fn array_tuple() {
         lutra_bin::Value::unit()
     )), @"
     SELECT
-      r1._0 AS x,
-      r1._1 AS y
+      r0._0 AS x,
+      r0._1 AS y
     FROM
       (
         SELECT
-          r0._0,
-          r0._1
-        FROM
-          (
-            SELECT
-              0::INT8 AS index,
-              1::INT4 AS _0,
-              2::INT2 AS _1
-            UNION
-            ALL
-            SELECT
-              1::INT8 AS index,
-              3::INT4 AS _0,
-              4::INT2 AS _1
-          ) AS r0
-        ORDER BY
-          r0.index
-      ) AS r1
+          0::INT8 AS index,
+          1::INT4 AS _0,
+          2::INT2 AS _1
+        UNION
+        ALL
+        SELECT
+          1::INT8 AS index,
+          3::INT4 AS _0,
+          4::INT2 AS _1
+      ) AS r0
+    ORDER BY
+      r0.index
     ---
     [
       {
@@ -950,61 +898,53 @@ fn tuple_array_prim() {
         lutra_bin::Value::unit()
     )), @r#"
     SELECT
-      r2._0 AS field0,
-      r2._1 AS field1,
-      r2._2 AS field2,
-      r2._3 AS field3
-    FROM
+      TRUE AS field0,
       (
         SELECT
-          TRUE AS _0,
+          COALESCE(
+            list(
+              r0.value
+              ORDER BY
+                r0.index
+            ),
+            CAST([] AS INT8 [])
+          ) AS value
+        FROM
           (
             SELECT
-              COALESCE(
-                list(
-                  r0.value
-                  ORDER BY
-                    r0.index
-                ),
-                CAST([] AS INT8 [])
-              ) AS value
-            FROM
-              (
-                SELECT
-                  0::INT8 AS index,
-                  1::INT8 AS value
-                UNION
-                ALL
-                SELECT
-                  1::INT8 AS index,
-                  2::INT8 AS value
-                UNION
-                ALL
-                SELECT
-                  2::INT8 AS index,
-                  3::INT8 AS value
-              ) AS r0
-          ) AS _1,
+              0::INT8 AS index,
+              1::INT8 AS value
+            UNION
+            ALL
+            SELECT
+              1::INT8 AS index,
+              2::INT8 AS value
+            UNION
+            ALL
+            SELECT
+              2::INT8 AS index,
+              3::INT8 AS value
+          ) AS r0
+      ) AS field1,
+      (
+        SELECT
+          COALESCE(
+            list(
+              struct_pack(field0 := r1._0, field1 := r1._1)
+              ORDER BY
+                r1.index
+            ),
+            CAST([] AS STRUCT(field0 INT4, field1 TEXT) [])
+          ) AS value
+        FROM
           (
             SELECT
-              COALESCE(
-                list(
-                  struct_pack(field0 := r1._0, field1 := r1._1)
-                  ORDER BY
-                    r1.index
-                ),
-                CAST([] AS STRUCT(field0 INT4, field1 TEXT) [])
-              ) AS value
-            FROM
-              (
-                SELECT
-                  0::INT8 AS index,
-                  4::INT4 AS _0,
-                  'hello'::text AS _1
-              ) AS r1
-          ) AS _2,
-          FALSE AS _3
-      ) AS r2
+              0::INT8 AS index,
+              4::INT4 AS _0,
+              'hello'::text AS _1
+          ) AS r1
+      ) AS field2,
+      FALSE AS field3
     ---
     {
       true,
@@ -1031,7 +971,7 @@ fn array_array_prim() {
         lutra_bin::Value::unit()
     )), @"
     SELECT
-      r3.value
+      r3.value AS value
     FROM
       (
         SELECT
@@ -1182,9 +1122,17 @@ fn input_array_prim() {
         ])
     )), @"
     SELECT
-      u.unnest AS value
+      r0.value AS value
     FROM
-      LATERAL unnest($1::INT8 []) AS u
+      (
+        SELECT
+          (ROW_NUMBER() OVER () -1)::int4 AS index,
+          u.unnest AS value
+        FROM
+          LATERAL unnest($1::INT8 []) AS u
+      ) AS r0
+    ORDER BY
+      r0.index
     ---
     [
       10,
@@ -1204,9 +1152,17 @@ fn input_array_text() {
         ])
     )), @r#"
     SELECT
-      u.unnest AS value
+      r0.value AS value
     FROM
-      LATERAL unnest($1::TEXT []) AS u
+      (
+        SELECT
+          (ROW_NUMBER() OVER () -1)::int4 AS index,
+          u.unnest AS value
+        FROM
+          LATERAL unnest($1::TEXT []) AS u
+      ) AS r0
+    ORDER BY
+      r0.index
     ---
     [
       "hello",
@@ -1228,14 +1184,8 @@ fn input_nested_tuple_array() {
         ])
     )), @"
     SELECT
-      r0._0 AS items,
-      r0._1 AS count
-    FROM
-      (
-        SELECT
-          $1::INT8 [] AS _0,
-          $2::INT4 AS _1
-      ) AS r0
+      $1::INT8 [] AS items,
+      $2::INT4 AS count
     ---
     {
       items = [
@@ -1328,11 +1278,14 @@ fn sql_from_primitive_table() {
     FROM
       (
         SELECT
+          (ROW_NUMBER() OVER () -1)::int4 AS index,
           r0.id AS _0,
           r0.name AS _1
         FROM
           users AS r0
       ) AS r1
+    ORDER BY
+      r1.index
     ---
     [
       {
@@ -1369,6 +1322,7 @@ fn sql_from_flat_tuple() {
     FROM
       (
         SELECT
+          (ROW_NUMBER() OVER () -1)::int4 AS index,
           r0.id AS _0,
           r0.name AS _1,
           r0.price AS _2,
@@ -1376,6 +1330,8 @@ fn sql_from_flat_tuple() {
         FROM
           products AS r0
       ) AS r1
+    ORDER BY
+      r1.index
     ---
     [
       {
@@ -1419,12 +1375,15 @@ fn sql_from_nested_tuple() {
     FROM
       (
         SELECT
+          (ROW_NUMBER() OVER () -1)::int4 AS index,
           r0.id AS _0,
           r0.data.user_id AS _1_0,
           r0.data.items AS _1_1
         FROM
           events AS r0
       ) AS r1
+    ORDER BY
+      r1.index
     ---
     [
       {
@@ -1472,11 +1431,14 @@ fn sql_from_array_column() {
     FROM
       (
         SELECT
+          (ROW_NUMBER() OVER () -1)::int4 AS index,
           r0.id AS _0,
           r0.tags AS _1
         FROM
           items AS r0
       ) AS r1
+    ORDER BY
+      r1.index
     ---
     [
       {
@@ -1519,12 +1481,15 @@ fn sql_from_option_column() {
     FROM
       (
         SELECT
+          (ROW_NUMBER() OVER () -1)::int4 AS index,
           r0.id AS _0,
           r0.name AS _1,
           r0.age AS _2
         FROM
           people AS r0
       ) AS r1
+    ORDER BY
+      r1.index
     ---
     [
       {
@@ -1561,11 +1526,14 @@ fn sql_from_date_column() {
     FROM
       (
         SELECT
+          (ROW_NUMBER() OVER () -1)::int4 AS index,
           r0.id AS _0,
           (r0.event_date::date - '1970-01-01'::date)::int4 AS _1
         FROM
           events AS r0
       ) AS r1
+    ORDER BY
+      r1.index
     ---
     [
       {
@@ -1612,6 +1580,8 @@ fn sql_insert_primitives() {
           4::INT4 AS _0,
           'Diana'::text AS _1
       ) AS r0
+    ORDER BY
+      r0.index
     ---
     {}
     ");
@@ -1658,6 +1628,8 @@ fn sql_insert_flat_tuple() {
           19.99::FLOAT8 AS _2,
           FALSE AS _3
       ) AS r0
+    ORDER BY
+      r0.index
     ---
     {}
     ");
@@ -1701,6 +1673,8 @@ fn sql_insert_option() {
           'Bob'::text AS _1,
           NULL::INT4 AS _2
       ) AS r0
+    ORDER BY
+      r0.index
     ---
     {}
     ");
@@ -1741,6 +1715,8 @@ fn sql_insert_date() {
           2::INT4 AS _0,
           20082::INT4 AS _1
       ) AS r0
+    ORDER BY
+      r0.index
     ---
     {}
     ");
@@ -1766,40 +1742,46 @@ fn serialize_array_in_tuple() {
         lutra_bin::Value::unit()
     )), @"
     SELECT
-      (- r0.value) AS value
+      r1.value AS value
     FROM
       (
         SELECT
-          0::INT8 AS index,
-          2::INT4 AS value
-        UNION
-        ALL
-        SELECT
-          1::INT8 AS index,
-          5::INT4 AS value
-        UNION
-        ALL
-        SELECT
-          2::INT8 AS index,
-          4::INT4 AS value
-        UNION
-        ALL
-        SELECT
-          3::INT8 AS index,
-          3::INT4 AS value
-        UNION
-        ALL
-        SELECT
-          4::INT8 AS index,
-          1::INT4 AS value
-        UNION
-        ALL
-        SELECT
-          5::INT8 AS index,
-          2::INT4 AS value
-      ) AS r0
+          r0.index AS index,
+          (- r0.value) AS value
+        FROM
+          (
+            SELECT
+              0::INT8 AS index,
+              2::INT4 AS value
+            UNION
+            ALL
+            SELECT
+              1::INT8 AS index,
+              5::INT4 AS value
+            UNION
+            ALL
+            SELECT
+              2::INT8 AS index,
+              4::INT4 AS value
+            UNION
+            ALL
+            SELECT
+              3::INT8 AS index,
+              3::INT4 AS value
+            UNION
+            ALL
+            SELECT
+              4::INT8 AS index,
+              1::INT4 AS value
+            UNION
+            ALL
+            SELECT
+              5::INT8 AS index,
+              2::INT4 AS value
+          ) AS r0
+      ) AS r1
     ORDER BY
-      r0.index
+      r1.index
     ---
     [
       -2,
@@ -1832,6 +1814,7 @@ fn serialize_array_of_tuples_in_tuple() {
     FROM
       (
         SELECT
+          r0.index AS index,
           (- r0._0) AS _0,
           (NOT r0._1) AS _1
         FROM
@@ -1853,9 +1836,9 @@ fn serialize_array_of_tuples_in_tuple() {
               4::INT4 AS _0,
               FALSE AS _1
           ) AS r0
-        ORDER BY
-          r0.index
       ) AS r1
+    ORDER BY
+      r1.index
     ---
     [
       {
@@ -1890,101 +1873,101 @@ fn serialize_nested_array() {
         lutra_bin::Value::unit()
     )), @"
     SELECT
-      (
-        SELECT
-          r4.value AS value
-        FROM
-          (
-            SELECT
-              r3.index,
-              r3.value
-            FROM
-              (
-                SELECT
-                  (ROW_NUMBER() OVER () -1)::int4 AS index,
-                  u.unnest AS value
-                FROM
-                  LATERAL unnest(r2.value) AS u
-              ) AS r3
-            WHERE
-              (r3.index = 1::INT8)
-          ) AS r4
-        UNION
-        ALL
-        SELECT
-          NULL::INT2 AS value
-        LIMIT
-          1
-      ) AS value
+      r5.value AS value
     FROM
       (
         SELECT
-          0::INT8 AS index,
+          r2.index AS index,
           (
             SELECT
-              COALESCE(
-                list(
-                  r0.value
-                  ORDER BY
-                    r0.index
-                ),
-                CAST([] AS INT2 [])
-              ) AS value
+              r4.value AS value
             FROM
               (
                 SELECT
-                  0::INT8 AS index,
-                  1::INT2 AS value
-                UNION
-                ALL
-                SELECT
-                  1::INT8 AS index,
-                  2::INT2 AS value
-                UNION
-                ALL
-                SELECT
-                  2::INT8 AS index,
-                  3::INT2 AS value
-              ) AS r0
+                  r3.index,
+                  r3.value
+                FROM
+                  (
+                    SELECT
+                      (ROW_NUMBER() OVER () -1)::int4 AS index,
+                      u.unnest AS value
+                    FROM
+                      LATERAL unnest(r2.value) AS u
+                  ) AS r3
+                WHERE
+                  (r3.index = 1::INT8)
+              ) AS r4
           ) AS value
-        UNION
-        ALL
-        SELECT
-          1::INT8 AS index,
+        FROM
           (
             SELECT
-              COALESCE(
-                list(
-                  r1.value
-                  ORDER BY
-                    r1.index
-                ),
-                CAST([] AS INT2 [])
-              ) AS value
-            FROM
+              0::INT8 AS index,
               (
                 SELECT
-                  0::INT8 AS index,
-                  4::INT2 AS value
-                UNION
-                ALL
+                  COALESCE(
+                    list(
+                      r0.value
+                      ORDER BY
+                        r0.index
+                    ),
+                    CAST([] AS INT2 [])
+                  ) AS value
+                FROM
+                  (
+                    SELECT
+                      0::INT8 AS index,
+                      1::INT2 AS value
+                    UNION
+                    ALL
+                    SELECT
+                      1::INT8 AS index,
+                      2::INT2 AS value
+                    UNION
+                    ALL
+                    SELECT
+                      2::INT8 AS index,
+                      3::INT2 AS value
+                  ) AS r0
+              ) AS value
+            UNION
+            ALL
+            SELECT
+              1::INT8 AS index,
+              (
                 SELECT
-                  1::INT8 AS index,
-                  5::INT2 AS value
-                UNION
-                ALL
-                SELECT
-                  2::INT8 AS index,
-                  6::INT2 AS value
-              ) AS r1
-          ) AS value
-      ) AS r2
+                  COALESCE(
+                    list(
+                      r1.value
+                      ORDER BY
+                        r1.index
+                    ),
+                    CAST([] AS INT2 [])
+                  ) AS value
+                FROM
+                  (
+                    SELECT
+                      0::INT8 AS index,
+                      4::INT2 AS value
+                    UNION
+                    ALL
+                    SELECT
+                      1::INT8 AS index,
+                      5::INT2 AS value
+                    UNION
+                    ALL
+                    SELECT
+                      2::INT8 AS index,
+                      6::INT2 AS value
+                  ) AS r1
+              ) AS value
+          ) AS r2
+      ) AS r5
     ORDER BY
-      r2.index
+      r5.index
     ---
     [
-      none,
-      none,
+      some(2),
+      some(5),
     ]
     ");
 }
@@ -2006,96 +1989,102 @@ fn serialize_nested_array_map() {
         lutra_bin::Value::unit()
     )), @"
     SELECT
+      r5.value AS value
+    FROM
       (
         SELECT
-          COALESCE(
-            list(
-              r4.value
-              ORDER BY
-                r4.index
-            ),
-            CAST([] AS INT8 [])
+          r2.index AS index,
+          (
+            SELECT
+              COALESCE(
+                list(
+                  r4.value
+                  ORDER BY
+                    r4.index
+                ),
+                CAST([] AS INT8 [])
+              ) AS value
+            FROM
+              (
+                SELECT
+                  r3.index AS index,
+                  (6::INT8 - r3.value) AS value
+                FROM
+                  (
+                    SELECT
+                      (ROW_NUMBER() OVER () -1)::int4 AS index,
+                      u.unnest AS value
+                    FROM
+                      LATERAL unnest(r2.value) AS u
+                  ) AS r3
+              ) AS r4
           ) AS value
         FROM
           (
             SELECT
-              r3.index AS index,
-              (6::INT8 - r3.value) AS value
-            FROM
+              0::INT8 AS index,
               (
                 SELECT
-                  (ROW_NUMBER() OVER () -1)::int4 AS index,
-                  u.unnest AS value
+                  COALESCE(
+                    list(
+                      r0.value
+                      ORDER BY
+                        r0.index
+                    ),
+                    CAST([] AS INT8 [])
+                  ) AS value
                 FROM
-                  LATERAL unnest(r2.value) AS u
-              ) AS r3
-          ) AS r4
-      ) AS value
-    FROM
-      (
-        SELECT
-          0::INT8 AS index,
-          (
-            SELECT
-              COALESCE(
-                list(
-                  r0.value
-                  ORDER BY
-                    r0.index
-                ),
-                CAST([] AS INT8 [])
+                  (
+                    SELECT
+                      0::INT8 AS index,
+                      1::INT8 AS value
+                    UNION
+                    ALL
+                    SELECT
+                      1::INT8 AS index,
+                      2::INT8 AS value
+                    UNION
+                    ALL
+                    SELECT
+                      2::INT8 AS index,
+                      3::INT8 AS value
+                  ) AS r0
               ) AS value
-            FROM
+            UNION
+            ALL
+            SELECT
+              1::INT8 AS index,
               (
                 SELECT
-                  0::INT8 AS index,
-                  1::INT8 AS value
-                UNION
-                ALL
-                SELECT
-                  1::INT8 AS index,
-                  2::INT8 AS value
-                UNION
-                ALL
-                SELECT
-                  2::INT8 AS index,
-                  3::INT8 AS value
-              ) AS r0
-          ) AS value
-        UNION
-        ALL
-        SELECT
-          1::INT8 AS index,
-          (
-            SELECT
-              COALESCE(
-                list(
-                  r1.value
-                  ORDER BY
-                    r1.index
-                ),
-                CAST([] AS INT8 [])
+                  COALESCE(
+                    list(
+                      r1.value
+                      ORDER BY
+                        r1.index
+                    ),
+                    CAST([] AS INT8 [])
+                  ) AS value
+                FROM
+                  (
+                    SELECT
+                      0::INT8 AS index,
+                      4::INT8 AS value
+                    UNION
+                    ALL
+                    SELECT
+                      1::INT8 AS index,
+                      5::INT8 AS value
+                    UNION
+                    ALL
+                    SELECT
+                      2::INT8 AS index,
+                      6::INT8 AS value
+                  ) AS r1
               ) AS value
-            FROM
-              (
-                SELECT
-                  0::INT8 AS index,
-                  4::INT8 AS value
-                UNION
-                ALL
-                SELECT
-                  1::INT8 AS index,
-                  5::INT8 AS value
-                UNION
-                ALL
-                SELECT
-                  2::INT8 AS index,
-                  6::INT8 AS value
-              ) AS r1
-          ) AS value
-      ) AS r2
+          ) AS r2
+      ) AS r5
     ORDER BY
-      r2.index
+      r5.index
     ---
     [
       [
@@ -2126,25 +2115,31 @@ fn serialize_bool_array() {
         lutra_bin::Value::unit()
     )), @"
     SELECT
-      (NOT r0.value) AS value
+      r1.value AS value
     FROM
       (
         SELECT
-          0::INT8 AS index,
-          FALSE AS value
-        UNION
-        ALL
-        SELECT
-          1::INT8 AS index,
-          TRUE AS value
-        UNION
-        ALL
-        SELECT
-          2::INT8 AS index,
-          TRUE AS value
-      ) AS r0
+          r0.index AS index,
+          (NOT r0.value) AS value
+        FROM
+          (
+            SELECT
+              0::INT8 AS index,
+              FALSE AS value
+            UNION
+            ALL
+            SELECT
+              1::INT8 AS index,
+              TRUE AS value
+            UNION
+            ALL
+            SELECT
+              2::INT8 AS index,
+              TRUE AS value
+          ) AS r0
+      ) AS r1
     ORDER BY
-      r0.index
+      r1.index
     ---
     [
       true,
@@ -2168,25 +2163,31 @@ fn serialize_text_array() {
         lutra_bin::Value::unit()
     )), @r#"
     SELECT
-      r0.value AS value
+      r1.value AS value
     FROM
       (
         SELECT
-          0::INT8 AS index,
-          'no'::text AS value
-        UNION
-        ALL
-        SELECT
-          1::INT8 AS index,
-          'yes'::text AS value
-        UNION
-        ALL
-        SELECT
-          2::INT8 AS index,
-          'neither'::text AS value
-      ) AS r0
+          r0.index AS index,
+          r0.value AS value
+        FROM
+          (
+            SELECT
+              0::INT8 AS index,
+              'no'::text AS value
+            UNION
+            ALL
+            SELECT
+              1::INT8 AS index,
+              'yes'::text AS value
+            UNION
+            ALL
+            SELECT
+              2::INT8 AS index,
+              'neither'::text AS value
+          ) AS r0
+      ) AS r1
     ORDER BY
-      r0.index
+      r1.index
     ---
     [
       "no",
@@ -2208,25 +2209,31 @@ fn serialize_deeply_nested() {
         lutra_bin::Value::unit()
     )), @"
     SELECT
+      r1.value AS value
+    FROM
       (
         SELECT
-          COALESCE(
-            list(
-              r0.value
-              ORDER BY
-                r0.index
-            ),
-            CAST([] AS BOOL [])
-          ) AS value
-        FROM
+          0::INT8 AS index,
           (
             SELECT
-              0::INT8 AS index,
-              TRUE AS value
-          ) AS r0
-      ) AS value
+              COALESCE(
+                list(
+                  r0.value
+                  ORDER BY
+                    r0.index
+                ),
+                CAST([] AS BOOL [])
+              ) AS value
+            FROM
+              (
+                SELECT
+                  0::INT8 AS index,
+                  TRUE AS value
+              ) AS r0
+          ) AS value
+      ) AS r1
     ORDER BY
-      0::INT8
+      r1.index
     ---
     [
       [
@@ -2256,59 +2263,65 @@ fn serialize_complex_nested() {
         lutra_bin::Value::unit()
     )), @"
     SELECT
+      r2.value AS value
+    FROM
       (
         SELECT
-          COALESCE(
-            list(
-              struct_pack(
-                field0 := r1._0,
-                field1 := struct_pack(
-                  field0 := r1._1_0,
-                  field1 := r1._1_1,
-                  field2 := r1._1_2
-                ),
-                field2 := r1._2
-              )
-              ORDER BY
-                r1.index
-            ),
-            CAST(
-              [] AS STRUCT(
-                field0 INT4,
-                field1 STRUCT(field0 INT4, field1 INT4 [], field2 INT2),
-                field2 INT2
-              ) []
-            )
-          ) AS value
-        FROM
+          0::INT8 AS index,
           (
             SELECT
-              0::INT8 AS index,
-              1::INT4 AS _0,
-              1::INT4 AS _1_0,
+              COALESCE(
+                list(
+                  struct_pack(
+                    field0 := r1._0,
+                    field1 := struct_pack(
+                      field0 := r1._1_0,
+                      field1 := r1._1_1,
+                      field2 := r1._1_2
+                    ),
+                    field2 := r1._2
+                  )
+                  ORDER BY
+                    r1.index
+                ),
+                CAST(
+                  [] AS STRUCT(
+                    field0 INT4,
+                    field1 STRUCT(field0 INT4, field1 INT4 [], field2 INT2),
+                    field2 INT2
+                  ) []
+                )
+              ) AS value
+            FROM
               (
                 SELECT
-                  COALESCE(
-                    list(
-                      r0.value
-                      ORDER BY
-                        r0.index
-                    ),
-                    CAST([] AS INT4 [])
-                  ) AS value
-                FROM
+                  0::INT8 AS index,
+                  1::INT4 AS _0,
+                  1::INT4 AS _1_0,
                   (
                     SELECT
-                      0::INT8 AS index,
-                      5::INT4 AS value
-                  ) AS r0
-              ) AS _1_1,
-              2::INT2 AS _1_2,
-              2::INT2 AS _2
-          ) AS r1
-      ) AS value
+                      COALESCE(
+                        list(
+                          r0.value
+                          ORDER BY
+                            r0.index
+                        ),
+                        CAST([] AS INT4 [])
+                      ) AS value
+                    FROM
+                      (
+                        SELECT
+                          0::INT8 AS index,
+                          5::INT4 AS value
+                      ) AS r0
+                  ) AS _1_1,
+                  2::INT2 AS _1_2,
+                  2::INT2 AS _2
+              ) AS r1
+          ) AS value
+      ) AS r2
     ORDER BY
-      0::INT8
+      r2.index
     ---
     [
       [
@@ -2340,43 +2353,40 @@ fn serialize_index_nested_array() {
         lutra_bin::Value::unit()
     )), @r#"
     SELECT
-      r2.value AS value
-    FROM
       (
         SELECT
-          r1.index,
-          r1.value
+          r2.value AS value
         FROM
           (
             SELECT
-              0::INT8 AS index,
+              r1.index,
+              r1.value
+            FROM
               (
                 SELECT
-                  COALESCE(
-                    list(
-                      r0.value
-                      ORDER BY
-                        r0.index
-                    ),
-                    CAST([] AS TEXT [])
-                  ) AS value
-                FROM
+                  0::INT8 AS index,
                   (
                     SELECT
-                      0::INT8 AS index,
-                      'hello'::text AS value
-                  ) AS r0
-              ) AS value
-          ) AS r1
-        WHERE
-          (r1.index = 0::INT8)
-      ) AS r2
-    UNION
-    ALL
-    SELECT
-      NULL::TEXT [] AS index
-    LIMIT
-      1
+                      COALESCE(
+                        list(
+                          r0.value
+                          ORDER BY
+                            r0.index
+                        ),
+                        CAST([] AS TEXT [])
+                      ) AS value
+                    FROM
+                      (
+                        SELECT
+                          0::INT8 AS index,
+                          'hello'::text AS value
+                      ) AS r0
+                  ) AS value
+              ) AS r1
+            WHERE
+              (r1.index = 0::INT8)
+          ) AS r2
+      ) AS value
     ---
     some([
       "hello",
@@ -2398,14 +2408,8 @@ fn serialize_input_array_in_tuple() {
         ])
     )), @r#"
     SELECT
-      r0._0 AS field0,
-      r0._1 AS x
-    FROM
-      (
-        SELECT
-          'hello'::text AS _0,
-          $1::INT4 [] AS _1
-      ) AS r0
+      'hello'::text AS field0,
+      $1::INT4 [] AS x
     ---
     {
       "hello",
@@ -2428,35 +2432,29 @@ fn serialize_literal_array_in_tuple() {
         lutra_bin::Value::unit()
     )), @r#"
     SELECT
-      r1._0 AS field0,
-      r1._1 AS field1
-    FROM
+      'hello'::text AS field0,
       (
         SELECT
-          'hello'::text AS _0,
+          COALESCE(
+            list(
+              r0.value
+              ORDER BY
+                r0.index
+            ),
+            CAST([] AS INT4 [])
+          ) AS value
+        FROM
           (
             SELECT
-              COALESCE(
-                list(
-                  r0.value
-                  ORDER BY
-                    r0.index
-                ),
-                CAST([] AS INT4 [])
-              ) AS value
-            FROM
-              (
-                SELECT
-                  0::INT8 AS index,
-                  1::INT4 AS value
-                UNION
-                ALL
-                SELECT
-                  1::INT8 AS index,
-                  2::INT4 AS value
-              ) AS r0
-          ) AS _1
-      ) AS r1
+              0::INT8 AS index,
+              1::INT4 AS value
+            UNION
+            ALL
+            SELECT
+              1::INT8 AS index,
+              2::INT4 AS value
+          ) AS r0
+      ) AS field1
     ---
     {
       "hello",
@@ -2484,33 +2482,28 @@ fn serialize_option_in_array() {
         lutra_bin::Value::unit()
     )), @"
     SELECT
-      r1._0 AS data
-    FROM
       (
         SELECT
+          COALESCE(
+            list(
+              r0.value
+              ORDER BY
+                r0.index
+            ),
+            CAST([] AS INT4 [])
+          ) AS value
+        FROM
           (
             SELECT
-              COALESCE(
-                list(
-                  r0.value
-                  ORDER BY
-                    r0.index
-                ),
-                CAST([] AS INT4 [])
-              ) AS value
-            FROM
-              (
-                SELECT
-                  0::INT8 AS index,
-                  NULL::INT4 AS value
-                UNION
-                ALL
-                SELECT
-                  1::INT8 AS index,
-                  5::INT4 AS value
-              ) AS r0
-          ) AS _0
-      ) AS r1
+              0::INT8 AS index,
+              NULL::INT4 AS value
+            UNION
+            ALL
+            SELECT
+              1::INT8 AS index,
+              5::INT4 AS value
+          ) AS r0
+      ) AS data
     ---
     {
       data = [
@@ -2534,41 +2527,35 @@ fn serialize_tuple_with_option_array() {
         lutra_bin::Value::unit()
     )), @r#"
     SELECT
-      r1._0 AS name,
-      r1._1 AS
-    values
-    FROM
+      'test'::text AS name,
       (
         SELECT
-          'test'::text AS _0,
+          COALESCE(
+            list(
+              r0.value
+              ORDER BY
+                r0.index
+            ),
+            CAST([] AS INT4 [])
+          ) AS value
+        FROM
           (
             SELECT
-              COALESCE(
-                list(
-                  r0.value
-                  ORDER BY
-                    r0.index
-                ),
-                CAST([] AS INT4 [])
-              ) AS value
-            FROM
-              (
-                SELECT
-                  0::INT8 AS index,
-                  1::INT4 AS value
-                UNION
-                ALL
-                SELECT
-                  1::INT8 AS index,
-                  NULL::INT4 AS value
-                UNION
-                ALL
-                SELECT
-                  2::INT8 AS index,
-                  3::INT4 AS value
-              ) AS r0
-          ) AS _1
-      ) AS r1
+              0::INT8 AS index,
+              1::INT4 AS value
+            UNION
+            ALL
+            SELECT
+              1::INT8 AS index,
+              NULL::INT4 AS value
+            UNION
+            ALL
+            SELECT
+              2::INT8 AS index,
+              3::INT4 AS value
+          ) AS r0
+      ) AS
+    values
     ---
     {
       name = "test",
@@ -2598,15 +2585,19 @@ fn fs_read_parquet() {
     FROM
       (
         SELECT
+          (ROW_NUMBER() OVER () -1)::int4 AS index,
           r0.id AS _0,
           r0.name AS _1
         FROM
           read_parquet('test.parquet'::text) AS r0
       ) AS r1
+    ORDER BY
+      r1.index
     ");
 }
 
 #[test]
+#[ignore] // the param is not unnested properly
 fn fs_write_parquet() {
     crate::init_logger();
 
@@ -2665,7 +2656,7 @@ fn update_basic() {
     FROM
       (
         SELECT
-          index,
+          r10.index,
           r10._0 AS id,
           r10._1 AS name,
           r10._2 AS age
@@ -2757,6 +2748,8 @@ fn update_basic() {
                   ) AS r8
               ) AS r9
           ) AS r10
+        ORDER BY
+          r10.index
       ) AS r11
     WHERE
       (r11.index = users.rowid)

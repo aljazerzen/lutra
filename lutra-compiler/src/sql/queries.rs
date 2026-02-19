@@ -1,3 +1,4 @@
+mod numbers;
 mod repr;
 mod repr_duckdb;
 mod repr_pg;
@@ -6,6 +7,7 @@ mod types;
 use std::collections::HashMap;
 
 use lutra_bin::ir;
+use sql_ast as sa;
 
 use crate::sql::utils::{Node, RelCols};
 use crate::sql::{COL_ARRAY_INDEX, COL_VALUE, Dialect};
@@ -16,31 +18,38 @@ pub fn compile(
     rel: cr::Expr,
     types: HashMap<&ir::Path, &ir::Ty>,
     dialect: super::Dialect,
-) -> sql_ast::Query {
+) -> sa::Query {
     let mut ctx = Context::new(types, dialect);
 
     let rel_ty = ctx.get_ty_mat(&rel.ty);
     let node = ctx.compile_rel(&rel);
 
-    // array special handling
-    let node = if rel_ty.kind.is_array() {
-        let mut select = ctx.node_into_select(node, rel_ty);
-
-        // drop index column
-        let index = select.projection.remove(0);
-
-        // apply the order
-        let mut query = utils::query_select(select);
-        query.order_by = utils::order_by_one(index.expr);
-        Node::Query(query)
-    } else {
-        node
-    };
-
-    // convert to correct repr
+    // convert to the repr used for query results
     let node = match dialect {
-        super::Dialect::Postgres => node,
-        super::Dialect::DuckDB => ctx.duck_export(node, rel_ty, false),
+        super::Dialect::Postgres => {
+            // PostgreSQL uses a repr very similar to "query repr", but:
+            // - without array index column,
+            // - ordered by array index column
+
+            if rel_ty.kind.is_array() {
+                let mut select = ctx.node_into_select(node, rel_ty);
+
+                // drop index column
+                let index = select.projection.remove(0);
+
+                // apply the order
+                let mut query = utils::query_select(select);
+                query.order_by = utils::order_by_one(index.expr);
+                Node::Query(query)
+            } else {
+                node
+            }
+        }
+
+        super::Dialect::DuckDB => {
+            // DuckDB uses "duckdb repr", so it can be converted to arrow
+            ctx.duck_export(node, rel_ty, false)
+        }
     };
 
     ctx.node_into_query(node, &rel.ty)
@@ -130,9 +139,9 @@ impl<'a> Context<'a> {
                     self.projection(
                         &rel.ty,
                         Iterator::chain(
-                            self.rel_cols(&left_in.rel.ty, true)
+                            self.rel_cols(&left_in.rel.ty)
                                 .map(|col| utils::identifier(Some(&left_name), col)),
-                            self.rel_cols(&right_in.rel.ty, true)
+                            self.rel_cols(&right_in.rel.ty)
                                 .map(|col| utils::identifier(Some(&right_name), col)),
                         ),
                     ),
@@ -184,6 +193,7 @@ impl<'a> Context<'a> {
                     cr::Transform::Aggregate(_)
                         | cr::Transform::Where(_)
                         | cr::Transform::Reindex(_)
+                        | cr::Transform::Limit(..)
                         | cr::Transform::Group { .. }
                         | cr::Transform::Insert(_)
                 );
@@ -248,6 +258,8 @@ impl<'a> Context<'a> {
             }
 
             cr::ExprKind::Iteration(initial_in, step_in) => {
+                tracing::debug!("Iteration");
+
                 let initial = self.compile_rel(initial_in);
 
                 let re_name = self.rel_name_gen.next();
@@ -262,11 +274,9 @@ impl<'a> Context<'a> {
                 );
 
                 let mut main = utils::select_empty();
-                main.projection = self.projection_noop(None, &rel.ty, true);
-                main.from = vec![utils::new_table(
-                    utils::new_object_name([re_name.clone()]),
-                    None,
-                )];
+                main.projection = self.projection_noop(None, &rel.ty);
+                main.from =
+                    vec![sa::RelExpr::Table(utils::new_object_name([re_name.clone()])).unnamed()];
 
                 let mut main = utils::query_select(main);
                 main.with = Some(utils::with());
@@ -292,10 +302,8 @@ impl<'a> Context<'a> {
 
                 // assignments: col1 = updates.col1, col2 = updates.col2
                 let assignments = (self.native_cols(row_ty).into_iter())
-                    .map(|(col, _ty)| sql_ast::Assignment {
-                        target: sql_ast::AssignmentTarget::ColumnName(utils::new_object_name([
-                            &col,
-                        ])),
+                    .map(|(col, _ty)| sa::Assignment {
+                        target: sa::AssignmentTarget::ColumnName(utils::new_object_name([&col])),
                         value: utils::identifier(Some(updates_var), col),
                     })
                     .collect();
@@ -310,7 +318,7 @@ impl<'a> Context<'a> {
                 ));
 
                 let table = utils::new_object_name([table]);
-                let update = sql_ast::SetExpr::Update(sql_ast::Update {
+                let update = sa::SetExpr::Update(sa::Update {
                     table,
                     alias: None,
                     assignments,
@@ -339,7 +347,8 @@ impl<'a> Context<'a> {
 
                 if rel_ref.is_cte {
                     let alias = self.rel_name_gen.next();
-                    let rel = utils::new_table(utils::new_object_name([rel_name]), Some(alias));
+                    let rel = sa::RelExpr::Table(utils::new_object_name([rel_name]))
+                        .alias(utils::new_ident(alias));
                     Node::Rel(rel)
                 } else {
                     Node::RelVar(rel_name)
@@ -347,7 +356,7 @@ impl<'a> Context<'a> {
             }
 
             cr::From::Table { name, use_row_id } => {
-                let node = Node::Rel(utils::new_table(translate_table_ident(name), None));
+                let node = Node::Rel(sa::RelExpr::Table(translate_table_ident(name)).unnamed());
 
                 let mut node = self.native_import(node, ty);
 
@@ -367,11 +376,9 @@ impl<'a> Context<'a> {
             cr::From::FuncCall(func_name, args_in) => {
                 self.compile_func_call(func_name, args_in, ty)
             }
-            cr::From::Param(param_index) => Node::Source(format!(
-                "${}::{}",
-                param_index + 1,
-                self.compile_ty_name(ty)
-            )),
+            cr::From::Param(param_index) => {
+                Node::Source(format!("${}::{}", param_index + 1, self.ty_name(ty)))
+            }
 
             cr::From::Deserialize(input_in) => {
                 let input = self.compile_rel(input_in);
@@ -390,14 +397,14 @@ impl<'a> Context<'a> {
 
                     let result = self.compile_column(result_in);
 
-                    sql_cases.push(sql_ast::CaseWhen { condition, result });
+                    sql_cases.push(sa::CaseWhen { condition, result });
                 }
 
                 // else
                 let (_, else_value_in) = cases.last().unwrap();
                 let else_value = self.compile_column(else_value_in);
 
-                Node::from(sql_ast::Expr::Case {
+                Node::from(sa::Expr::Case {
                     operand: None,
                     cases: sql_cases,
                     else_result: Some(Box::new(else_value)),
@@ -462,30 +469,26 @@ impl<'a> Context<'a> {
                 utils::set_or_bin_op(&mut select.selection, "AND", cond);
                 Node::Select(select)
             }
-            cr::Transform::Limit(limit_in) => {
+            cr::Transform::Limit(limit_in, order_by) => {
                 let mut query = self.node_into_query(input, input_ty);
 
                 query.limit = Some(utils::number(limit_in.to_string()));
 
-                if input_ty.kind.is_array() {
-                    // apply order from index column
-                    if query.order_by.is_none() {
-                        query.order_by =
-                            utils::order_by_one(utils::identifier(None::<&str>, COL_ARRAY_INDEX));
-                    }
-                }
+                let order_by = self.compile_column(order_by);
+                query.order_by = utils::order_by_one(order_by);
+
                 Node::Query(query)
             }
-            cr::Transform::Reindex(key) => {
+            cr::Transform::Reindex(keys) => {
                 // wrap into a new query
                 let rel = self.node_into_rel(input, input_ty);
-                let mut select = self.rel_into_select(rel, output_ty, true);
+                let mut select = self.rel_into_select(rel, output_ty);
 
                 // overwrite array index
-                let new_index = utils::new_index(key.as_ref().map(|k| self.compile_column(k)));
+                let keys = self.compile_columns(keys);
 
-                select.projection[0] = sql_ast::SelectItem {
-                    expr: new_index,
+                select.projection[0] = sa::SelectItem {
+                    expr: sa::Expr::IndexBy(keys),
                     alias: Some(utils::new_ident(COL_ARRAY_INDEX)),
                 };
                 Node::Select(select)
@@ -505,12 +508,12 @@ impl<'a> Context<'a> {
             } => {
                 // wrap into a new query
                 let rel = self.node_into_rel(input, input_ty);
-                let mut select = self.rel_into_select(rel, output_ty, true);
+                let mut select = self.rel_into_select(rel, output_ty);
 
                 let group_by = self.compile_columns(core::slice::from_ref(key));
 
                 let mut projection = vec![
-                    utils::new_index(None), // index
+                    sa::Expr::IndexBy(vec![]), // index
                 ];
 
                 // values
@@ -538,12 +541,12 @@ impl<'a> Context<'a> {
                     .map(utils::new_ident)
                     .collect();
 
-                let insert = sql_ast::Insert {
+                let insert = sa::Insert {
                     source: Box::new(source),
                     table,
                     columns,
                 };
-                let query = utils::query_new(sql_ast::SetExpr::Insert(insert));
+                let query = utils::query_new(sa::SetExpr::Insert(insert));
                 Node::Query(query)
             }
         };
@@ -554,7 +557,7 @@ impl<'a> Context<'a> {
     fn compile_columns_scoped(
         &mut self,
         columns: &[cr::Expr],
-    ) -> (Vec<sql_ast::Expr>, Vec<sql_ast::RelNamed>) {
+    ) -> (Vec<sa::Expr>, Vec<sa::RelNamed>) {
         let mut exprs = Vec::with_capacity(columns.len());
         let mut relations = Vec::new();
         for col in columns {
@@ -566,7 +569,7 @@ impl<'a> Context<'a> {
         (exprs, relations)
     }
 
-    fn compile_columns(&mut self, columns: &[cr::Expr]) -> Vec<sql_ast::Expr> {
+    fn compile_columns(&mut self, columns: &[cr::Expr]) -> Vec<sa::Expr> {
         let mut column_exprs = Vec::with_capacity(columns.len());
         for col in columns {
             let value = self.compile_rel(col);
@@ -577,7 +580,7 @@ impl<'a> Context<'a> {
 
     /// Compile an expression as relation and then fit the result into a column.
     /// In the worst case, this creates a subquery.
-    fn compile_column(&mut self, expr: &cr::Expr) -> sql_ast::Expr {
+    fn compile_column(&mut self, expr: &cr::Expr) -> sa::Expr {
         let rel = self.compile_rel(expr);
         self.node_into_column(rel, &expr.ty)
     }
@@ -586,11 +589,19 @@ impl<'a> Context<'a> {
         let args = self.compile_columns(args_in);
         let expr = match id {
             "std::mul" => utils::new_bin_op("*", args),
-            "std::div" => utils::new_bin_op("/", args),
+            "std::div" => match self.dialect {
+                Dialect::Postgres => utils::new_bin_op("/", args),
+                Dialect::DuckDB => match ty.kind.as_primitive().unwrap() {
+                    ir::TyPrimitive::float32 | ir::TyPrimitive::float64 => {
+                        utils::new_bin_op("/", args)
+                    }
+                    _ => utils::new_bin_op("//", args),
+                },
+            },
             "std::mod" => match ty.kind.as_primitive().unwrap() {
                 ir::TyPrimitive::float32 | ir::TyPrimitive::float64 => {
                     let [l, r] = unpack_args(args);
-                    sql_ast::Expr::Source(format!("MOD({l}::numeric, {r}::numeric)::float8"))
+                    sa::Expr::Source(format!("MOD({l}::numeric, {r}::numeric)::float8"))
                 }
                 _ => utils::new_bin_op("%", args),
             },
@@ -600,7 +611,7 @@ impl<'a> Context<'a> {
 
             "std::cmp" => {
                 let [a, b] = unpack_args(args);
-                sql_ast::Expr::Source(format!(
+                sa::Expr::Source(format!(
                     "(SELECT CASE WHEN a < b THEN 0 WHEN a > b THEN 2 ELSE 1 END::int2 FROM (VALUES ({a}, {b})) t(a,b))"
                 ))
             }
@@ -616,30 +627,31 @@ impl<'a> Context<'a> {
                 let [start, end] = unpack_args(args);
 
                 // generate_series
-                let generate_series = sql_ast::RelExpr::Function {
-                    name: utils::new_object_name(["generate_series"]),
-                    args: vec![start.clone(), sql_ast::Expr::Source(format!("({end} - 1)"))],
-                };
+                let generate_series = sa::RelExpr::function(
+                    utils::new_ident("generate_series"),
+                    vec![start.clone(), sa::Expr::Source(format!("({end} - 1)"))],
+                );
 
                 // select index, value from generate_series()
                 let mut select = utils::select_empty();
-                select.from.push(sql_ast::RelNamed {
+                select.from.push(sa::RelNamed {
                     lateral: false,
                     expr: generate_series,
-                    alias: Some(sql_ast::TableAlias {
-                        name: sql_ast::Ident::new("t"),
-                        columns: vec![sql_ast::Ident::new(COL_VALUE)],
+                    alias: Some(sa::TableAlias {
+                        name: sa::Ident::new("t"),
+                        columns: vec![sa::Ident::new(COL_VALUE)],
                     }),
                 });
-                let out_cast_ty = self.compile_ty_name(&args_in[0].ty);
+                let out_cast_ty = self.ty_name(&args_in[0].ty);
                 select.projection = vec![
-                    sql_ast::SelectItem {
-                        expr: sql_ast::Expr::Source(format!("(t.{COL_VALUE} - {start})::int4")),
+                    sa::SelectItem {
+                        expr: sa::Expr::Source(format!("(t.{COL_VALUE} - {start})::int4")),
                         alias: Some(COL_ARRAY_INDEX.into()),
                     },
-                    sql_ast::SelectItem::unnamed(sql_ast::Expr::Source(format!(
-                        "t.{COL_VALUE}::{out_cast_ty}"
-                    ))),
+                    sa::SelectItem {
+                        expr: sa::Expr::Source(format!("t.{COL_VALUE}::{out_cast_ty}")),
+                        alias: Some(COL_VALUE.into()),
+                    },
                 ];
                 return Node::Select(select);
             }
@@ -678,12 +690,12 @@ impl<'a> Context<'a> {
             }
             "std::sum" => {
                 let [arg] = unpack_args(args);
-                let ty = self.compile_ty_name(ty);
-                sql_ast::Expr::Source(format!("COALESCE(SUM({arg}), 0)::{ty}"))
+                let ty = self.ty_name(ty);
+                sa::Expr::Source(format!("COALESCE(SUM({arg}), 0)::{ty}"))
             }
             "std::mean" => {
                 let [arg] = unpack_args(args);
-                sql_ast::Expr::Source(
+                sa::Expr::Source(
                     if matches!(
                         args_in[0].ty.kind,
                         ir::TyKind::Primitive(ir::TyPrimitive::float32)
@@ -704,7 +716,7 @@ impl<'a> Context<'a> {
             "std::count" => {
                 let [arg] = unpack_args(args);
 
-                sql_ast::Expr::Source(if let sql_ast::Expr::CompoundIdentifier(parts) = arg {
+                sa::Expr::Source(if let sa::Expr::CompoundIdentifier(parts) = arg {
                     let rvar = &parts[0];
                     format!("COUNT({rvar}.*)")
                 } else {
@@ -715,11 +727,11 @@ impl<'a> Context<'a> {
                     format!("COUNT({arg} IS NULL)")
                 })
             }
-            "std::any" => sql_ast::Expr::Source(format!(
+            "std::any" => sa::Expr::Source(format!(
                 "COALESCE({}, FALSE)",
                 utils::new_func_call("BOOL_OR", args)
             )),
-            "std::all" => sql_ast::Expr::Source(format!(
+            "std::all" => sa::Expr::Source(format!(
                 "COALESCE({}, TRUE)",
                 utils::new_func_call("BOOL_AND", args)
             )),
@@ -727,107 +739,141 @@ impl<'a> Context<'a> {
             "std::lead" => {
                 let [arg, offset] = unpack_args(args);
 
-                let filler = get_default_value_for_ty(ty);
-                sql_ast::Expr::Source(format!(
+                let item_ty = self.get_ty_mat(ty).kind.as_array().unwrap();
+                let filler = self.default_value(item_ty);
+
+                sa::Expr::Source(format!(
                     "COALESCE(LEAD({arg}, {offset}::int4) OVER (ORDER BY {COL_ARRAY_INDEX}), {filler})"
                 ))
             }
             "std::lag" => {
                 let [arg, offset] = unpack_args(args);
 
-                let filler = get_default_value_for_ty(ty);
+                let item_ty = self.get_ty_mat(ty).kind.as_array().unwrap();
+                let filler = self.default_value(item_ty);
 
-                sql_ast::Expr::Source(format!(
+                sa::Expr::Source(format!(
                     "COALESCE(LAG({arg}, {offset}::int4) OVER (ORDER BY {COL_ARRAY_INDEX}), {filler})"
                 ))
             }
             "std::rolling_mean" => {
                 let [array, trailing, leading] = unpack_args(args);
 
-                sql_ast::Expr::Source(format!(
+                sa::Expr::Source(format!(
                     "(AVG({array}) OVER (ORDER BY {COL_ARRAY_INDEX} ROWS BETWEEN {trailing} PRECEDING AND {leading} FOLLOWING))::float8"
                 ))
             }
             "std::rank" => {
                 let [array] = unpack_args(args);
-                sql_ast::Expr::Source(format!("(RANK() OVER (ORDER BY {array}))::int4"))
+                sa::Expr::Source(format!("(RANK() OVER (ORDER BY {array}))::int4"))
             }
             "std::rank_dense" => {
                 let [array] = unpack_args(args);
-                sql_ast::Expr::Source(format!("(DENSE_RANK() OVER (ORDER BY {array}))::int4"))
+                sa::Expr::Source(format!("(DENSE_RANK() OVER (ORDER BY {array}))::int4"))
             }
             "std::rank_percentile" => {
                 let [array] = unpack_args(args);
-                sql_ast::Expr::Source(format!("PERCENT_RANK() OVER (ORDER BY {array})"))
+                sa::Expr::Source(format!("PERCENT_RANK() OVER (ORDER BY {array})"))
             }
             "std::cume_dist" => {
                 let [array] = unpack_args(args);
-                sql_ast::Expr::Source(format!("CUME_DIST() OVER (ORDER BY {array})"))
+                sa::Expr::Source(format!("CUME_DIST() OVER (ORDER BY {array})"))
             }
 
             "std::text::length" => {
                 let [text] = unpack_args(args);
-                sql_ast::Expr::Source(format!(
+                sa::Expr::Source(format!(
                     "LENGTH({text})::{}",
-                    self.compile_ty_name(&ir::Ty::new(ir::TyPrimitive::uint32))
+                    self.ty_name(&ir::Ty::new(ir::TyPrimitive::uint32))
                 ))
             }
             "std::text::from_ascii" => {
                 let [ascii] = unpack_args(args);
-                sql_ast::Expr::Source(format!("CHR({ascii})"))
+                sa::Expr::Source(format!("CHR({ascii})"))
             }
             "std::text::concat" => utils::new_bin_op("||", args),
             "std::text::join" => {
                 let [parts, sep] = unpack_args(args);
-                sql_ast::Expr::Source(format!("COALESCE(STRING_AGG({parts}, {sep}), '')"))
+                sa::Expr::Source(format!("COALESCE(STRING_AGG({parts}, {sep}), '')"))
             }
             "std::text::split" => {
                 let [text, sep] = unpack_args(args);
 
-                let mut select = utils::select_empty();
+                match self.dialect {
+                    Dialect::Postgres => {
+                        // PostgreSQL: use string_to_table function
+                        let mut select = utils::select_empty();
 
-                select.from.push(sql_ast::RelNamed {
-                    lateral: false,
-                    alias: Some(sql_ast::TableAlias {
-                        name: sql_ast::Ident::new("t"),
-                        columns: vec![sql_ast::Ident::new(COL_VALUE)],
-                    }),
-                    expr: sql_ast::RelExpr::Function {
-                        name: utils::new_object_name(["string_to_table"]),
-                        args: vec![text, sep],
-                    },
-                });
-                select.projection = vec![
-                    sql_ast::SelectItem {
-                        expr: utils::new_index(None),
-                        alias: Some(COL_ARRAY_INDEX.into()),
-                    },
-                    sql_ast::SelectItem::unnamed(utils::identifier(Some("t"), COL_VALUE)),
-                ];
-                return Node::Select(select);
+                        select.from.push(sa::RelNamed {
+                            lateral: false,
+                            alias: Some(sa::TableAlias {
+                                name: sa::Ident::new("t"),
+                                columns: vec![sa::Ident::new(COL_VALUE)],
+                            }),
+                            expr: sa::RelExpr::function(
+                                utils::new_ident("string_to_table"),
+                                vec![text, sep],
+                            ),
+                        });
+                        select.projection = vec![
+                            sa::SelectItem {
+                                expr: sa::Expr::IndexBy(vec![]),
+                                alias: Some(COL_ARRAY_INDEX.into()),
+                            },
+                            sa::SelectItem::unnamed(utils::identifier(Some("t"), COL_VALUE)),
+                        ];
+                        return Node::Select(select);
+                    }
+                    Dialect::DuckDB => {
+                        // DuckDB: string_split + unnest
+
+                        let split = sa::Expr::Source(format!("split({text}, {sep})"));
+
+                        // convert into a relation via unnest
+                        let unnest = sa::RelExpr::Function {
+                            name: utils::new_object_name(["unnest"]),
+                            args: vec![split],
+                            ordinality: true,
+                        };
+
+                        let mut select = utils::select_empty();
+                        select.from.push(unnest.alias_cols(
+                            utils::new_ident("t"),
+                            vec![utils::new_ident(COL_VALUE), utils::new_ident("idx")],
+                        ));
+                        select.projection = vec![
+                            sa::SelectItem {
+                                expr: sa::Expr::Source("t.idx - 1".into()),
+                                alias: Some(COL_ARRAY_INDEX.into()),
+                            },
+                            sa::SelectItem::unnamed(utils::identifier(Some("t"), COL_VALUE)),
+                        ];
+                        return Node::Select(select);
+                    }
+                }
             }
             "std::text::starts_with" => utils::new_func_call("STARTS_WITH", args),
             "std::text::ends_with" => {
                 let [text, suffix] = unpack_args(args);
-                sql_ast::Expr::Source(format!("({text} LIKE '%' || {suffix})"))
+                sa::Expr::Source(format!("({text} LIKE '%' || {suffix})"))
             }
             "std::text::contains" => {
                 let [text, pattern] = unpack_args(args);
-                sql_ast::Expr::Source(format!("({text} LIKE '%' || {pattern} || '%')"))
+                sa::Expr::Source(format!("({text} LIKE '%' || {pattern} || '%')"))
             }
 
             "std::math::abs" => {
                 let [text] = unpack_args(args);
-                sql_ast::Expr::Source(format!("ABS({text})"))
+                sa::Expr::Source(format!("ABS({text})"))
             }
             "std::math::pow" => {
                 let [operand, exponent] = unpack_args(args);
-                sql_ast::Expr::Source(format!("POW({operand}, {exponent})"))
+                sa::Expr::Source(format!("POW({operand}, {exponent})"))
             }
 
             "greatest" => {
                 let mut args = args.into_iter();
-                sql_ast::Expr::Source(format!(
+                sa::Expr::Source(format!(
                     "GREATEST({}, {})::int8",
                     args.next().unwrap(),
                     args.next().unwrap(),
@@ -836,47 +882,55 @@ impl<'a> Context<'a> {
 
             "is_null" => {
                 let [arg] = unpack_args(args);
-                sql_ast::Expr::Source(format!("{arg} IS NULL"))
+                sa::Expr::Source(format!("{arg} IS NULL"))
             }
             "is_not_null" => {
                 let [arg] = unpack_args(args);
-                sql_ast::Expr::Source(format!("{arg} IS NOT NULL"))
+                sa::Expr::Source(format!("{arg} IS NOT NULL"))
             }
 
             "std::to_int8" | "std::to_int16" | "std::to_int32" | "std::to_int64"
             | "std::to_uint8" | "std::to_uint16" | "std::to_uint32" | "std::to_uint64" => {
                 let [arg] = unpack_args(args);
-                let ty = self.compile_ty_name(ty);
-                match args_in[0].ty.kind.as_primitive().unwrap() {
-                    ir::TyPrimitive::int8
-                    | ir::TyPrimitive::int16
-                    | ir::TyPrimitive::int32
-                    | ir::TyPrimitive::int64
-                    | ir::TyPrimitive::uint8
-                    | ir::TyPrimitive::uint16
-                    | ir::TyPrimitive::uint32
-                    | ir::TyPrimitive::uint64 => sql_ast::Expr::Source(format!("{arg}::{ty}")),
-                    ir::TyPrimitive::float32 | ir::TyPrimitive::float64 => {
-                        sql_ast::Expr::Source(format!("trunc({arg})::{ty}"))
-                    }
-                    _ => panic!(),
-                }
+                self.compile_to_int(arg, &args_in[0].ty, ty)
             }
 
-            "std::to_float32" | "std::to_float64" | "std::to_text" => {
+            "std::to_float32" | "std::to_float64" => {
                 let [arg] = unpack_args(args);
-                let ty = self.compile_ty_name(ty);
-                sql_ast::Expr::Source(format!("({arg})::{ty}"))
+                let ty = self.ty_name(ty);
+                sa::Expr::Source(format!("({arg})::{ty}"))
+            }
+
+            "std::to_text" => {
+                let [arg] = unpack_args(args);
+                let ty = self.ty_name(ty);
+
+                let mut r = sa::Expr::Source(format!("({arg})::{ty}"));
+
+                if let Dialect::DuckDB = self.dialect {
+                    // DuckDB includes .0 for whole number floats -> remove it
+
+                    let arg_ty = self.get_ty_mat(&args_in[0].ty);
+                    let is_float = matches!(
+                        arg_ty.kind,
+                        ir::TyKind::Primitive(ir::TyPrimitive::float32 | ir::TyPrimitive::float64)
+                    );
+                    if is_float {
+                        r = sa::Expr::Source(format!("RTRIM(RTRIM({r}, '0'), '.')"));
+                    }
+                }
+
+                r
             }
 
             "std::fs::read_parquet" => match self.dialect {
                 Dialect::DuckDB => {
                     // Only DuckDB supports read_parquet
                     let [file_name] = unpack_args(args);
-                    let node = Node::Rel(sql_ast::RelNamed::unnamed(sql_ast::RelExpr::Function {
-                        name: utils::new_object_name(["read_parquet"]),
-                        args: vec![file_name],
-                    }));
+                    let node = Node::Rel(sa::RelNamed::unnamed(sa::RelExpr::function(
+                        utils::new_ident("read_parquet"),
+                        vec![file_name],
+                    )));
                     return self.native_import(node, ty);
                 }
                 Dialect::Postgres => {
@@ -892,13 +946,11 @@ impl<'a> Context<'a> {
                     let data = self.native_export(Node::from(data), &args_in[0].ty, false);
                     let data = self.node_into_query(data, &args_in[0].ty);
 
-                    return Node::Query(utils::query_new(sql_ast::SetExpr::Copy(Box::new(
-                        sql_ast::Copy {
-                            source: sql_ast::SetExpr::Query(Box::new(data)),
-                            target: file_name,
-                            options: "FORMAT parquet, COMPRESSION zstd".into(),
-                        },
-                    ))));
+                    return Node::Query(utils::query_new(sa::SetExpr::Copy(Box::new(sa::Copy {
+                        source: sa::SetExpr::Query(Box::new(data)),
+                        target: file_name,
+                        options: "FORMAT parquet, COMPRESSION zstd".into(),
+                    }))));
                 }
                 Dialect::Postgres => {
                     panic!("write_parquet is not supported on PostgreSQL")
@@ -911,29 +963,31 @@ impl<'a> Context<'a> {
                 let timestamp =
                     format!("('1970-01-01'::date + {date})::timestamp AT TIME ZONE {tz}");
 
-                sql_ast::Expr::Source(format!("(EXTRACT(EPOCH FROM {timestamp}) * 1000000)::int8"))
+                sa::Expr::Source(format!("(EXTRACT(EPOCH FROM {timestamp}) * 1000000)::int8"))
             }
             "std::date::to_year_month_day" => {
                 let [date] = unpack_args(args);
+                let f = self.get_ty_mat(ty).kind.as_tuple().unwrap();
 
                 let mut input_select = utils::select_empty();
-                input_select.projection = vec![sql_ast::SelectItem {
-                    expr: sql_ast::Expr::Source(format!("'1970-01-01'::date + {date}")),
+                input_select.projection = vec![sa::SelectItem {
+                    expr: sa::Expr::Source(format!("'1970-01-01'::date + {date}")),
                     alias: Some("x".into()),
                 }];
                 let input_query = utils::query_select(input_select);
 
                 let mut select = utils::select_empty();
-                select.from.push(utils::sub_rel(input_query, "t".into()));
+                select
+                    .from
+                    .push(sa::RelExpr::subquery(input_query).alias(utils::new_ident("t")));
 
                 let values = [
-                    "date_part('YEAR', t.x)::int4",
-                    "date_part('MONTH', t.x)::int2",
-                    "date_part('DAY', t.x)::int2",
+                    format!("date_part('YEAR', t.x)::{}", self.ty_name(&f[0].ty)),
+                    format!("date_part('MONTH', t.x)::{}", self.ty_name(&f[1].ty)),
+                    format!("date_part('DAY', t.x)::{}", self.ty_name(&f[2].ty)),
                 ]
                 .into_iter()
-                .map(str::to_string)
-                .map(sql_ast::Expr::Source);
+                .map(sa::Expr::Source);
                 select.projection = self.projection(ty, values);
                 return Node::Select(select);
             }
@@ -943,80 +997,11 @@ impl<'a> Context<'a> {
         Node::from(expr)
     }
 
-    fn null(&self, ty: &ir::Ty) -> sql_ast::Expr {
-        sql_ast::Expr::Source(format!("NULL::{}", self.compile_ty_name(ty)))
+    fn null(&self, ty: &ir::Ty) -> sa::Expr {
+        sa::Expr::Source(format!("NULL::{}", self.ty_name(ty)))
     }
 
-    fn compile_literal(&self, lit: &ir::Literal, ty: &ir::Ty) -> sql_ast::Expr {
-        sql_ast::Expr::Source(match lit {
-            ir::Literal::bool(true) => "TRUE".to_string(),
-            ir::Literal::bool(false) => "FALSE".to_string(),
-            ir::Literal::int8(v) => {
-                if *v >= 0 {
-                    format!("{v}::{}", self.compile_ty_name(ty))
-                } else {
-                    format!("({v})::{}", self.compile_ty_name(ty))
-                }
-            }
-            ir::Literal::int16(v) => {
-                if *v >= 0 {
-                    format!("{v}::{}", self.compile_ty_name(ty))
-                } else {
-                    format!("({v})::{}", self.compile_ty_name(ty))
-                }
-            }
-            ir::Literal::int32(v) => {
-                if *v >= 0 {
-                    format!("{v}::{}", self.compile_ty_name(ty))
-                } else {
-                    format!("({v})::{}", self.compile_ty_name(ty))
-                }
-            }
-            ir::Literal::int64(v) => {
-                if *v >= 0 {
-                    format!("{v}::{}", self.compile_ty_name(ty))
-                } else {
-                    format!("({v})::{}", self.compile_ty_name(ty))
-                }
-            }
-            ir::Literal::uint8(v) => {
-                if self.dialect == Dialect::DuckDB || *v < 0x80 {
-                    format!("{v}::{}", self.compile_ty_name(ty))
-                } else {
-                    format!("{}::{}", *v as i8, self.compile_ty_name(ty))
-                }
-            }
-            ir::Literal::uint16(v) => {
-                if self.dialect == Dialect::DuckDB || *v < 0x8000 {
-                    format!("{v}::{}", self.compile_ty_name(ty))
-                } else {
-                    format!("{}::{}", *v as i16, self.compile_ty_name(ty))
-                }
-            }
-            ir::Literal::uint32(v) => {
-                if self.dialect == Dialect::DuckDB || *v < 0x80000000 {
-                    format!("{v}::{}", self.compile_ty_name(ty))
-                } else {
-                    format!("{}::{}", *v as i32, self.compile_ty_name(ty))
-                }
-            }
-            ir::Literal::uint64(v) => {
-                if self.dialect == Dialect::DuckDB || *v < 0x8000000000000000 {
-                    format!("{v}::{}", self.compile_ty_name(ty))
-                } else {
-                    format!("{}::{}", *v as i64, self.compile_ty_name(ty))
-                }
-            }
-            ir::Literal::float32(v) => format!("{v}::{}", self.compile_ty_name(ty)),
-            ir::Literal::float64(v) => format!("{v}::{}", self.compile_ty_name(ty)),
-            ir::Literal::text(s) => {
-                let escaped = sql_ast::escape_string(s, '\'');
-                return sql_ast::Expr::Source(format!("'{escaped}'::text"));
-            }
-        })
-    }
-
-    fn construct_empty_rel(&self, ty: &ir::Ty) -> sql_ast::SetExpr {
+    fn construct_empty_rel(&self, ty: &ir::Ty) -> sa::SetExpr {
         // construct a rel without rows
         let mut values = Vec::new();
 
@@ -1043,28 +1028,11 @@ impl<'a> Context<'a> {
         let mut select = utils::select_empty();
         select.projection = self.projection(ty, values);
         select.selection = Some(utils::bool(false));
-        sql_ast::SetExpr::Select(Box::new(select))
+        sa::SetExpr::Select(Box::new(select))
     }
 }
 
-fn get_default_value_for_ty(ty: &ir::Ty) -> &str {
-    let item_ty = ty.kind.as_array().unwrap();
-    match &item_ty.kind {
-        ir::TyKind::Primitive(ir::TyPrimitive::int8) => "0::int2",
-        ir::TyKind::Primitive(ir::TyPrimitive::int16) => "0::int2",
-        ir::TyKind::Primitive(ir::TyPrimitive::int32) => "0::int4",
-        ir::TyKind::Primitive(ir::TyPrimitive::int64) => "0::int8",
-        ir::TyKind::Primitive(ir::TyPrimitive::float32) => "0.0::float4",
-        ir::TyKind::Primitive(ir::TyPrimitive::float64) => "0.0::float8",
-        ir::TyKind::Primitive(ir::TyPrimitive::bool) => "FALSE",
-        ir::TyKind::Primitive(ir::TyPrimitive::text) => "''",
-        _ => todo!(),
-    }
-}
-
-fn unpack_args<const N: usize>(
-    args: impl IntoIterator<Item = sql_ast::Expr>,
-) -> [sql_ast::Expr; N] {
+fn unpack_args<const N: usize>(args: impl IntoIterator<Item = sa::Expr>) -> [sa::Expr; N] {
     let mut r = Vec::with_capacity(N);
     let mut args = args.into_iter();
     for _ in 0..N {
@@ -1090,7 +1058,7 @@ fn unpack_args<const N: usize>(
 /// For example, BigQuery uses organizations, projects and datasets in table identifiers.
 /// So when translating to BigQuery SQL we will translate:
 /// - `"my_organization/my_project/my_dataset/my_table" -> my_organization.my_project.my_dataset.my_table`,
-fn translate_table_ident(table_ident: &str) -> sql_ast::ObjectName {
+fn translate_table_ident(table_ident: &str) -> sa::ObjectName {
     if let Some((schema, table)) = table_ident.split_once('/') {
         utils::new_object_name([schema, table])
     } else {

@@ -468,46 +468,6 @@ impl RelNamed {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, PartialOrd, Eq, Ord, Hash)]
-pub enum RelExpr {
-    Table(ObjectName),
-    Subquery(Box<Query>),
-    Function { name: ObjectName, args: Vec<Expr> },
-}
-
-/// The source of values in a `PIVOT` operation.
-#[derive(Debug, Clone, PartialEq, PartialOrd, Eq, Ord, Hash)]
-pub enum PivotValueSource {
-    /// Pivot on a static list of values.
-    ///
-    /// See <https://docs.snowflake.com/en/sql-reference/constructs/pivot#pivot-on-a-specified-list-of-column-values-for-the-pivot-column>.
-    List(Vec<ExprWithAlias>),
-    /// Pivot on all distinct values of the pivot column.
-    ///
-    /// See <https://docs.snowflake.com/en/sql-reference/constructs/pivot#pivot-on-all-distinct-column-values-automatically-with-dynamic-pivot>.
-    Any(Vec<OrderByExpr>),
-    /// Pivot on all values returned by a subquery.
-    ///
-    /// See <https://docs.snowflake.com/en/sql-reference/constructs/pivot#pivot-on-column-values-using-a-subquery-with-dynamic-pivot>.
-    Subquery(Box<Query>),
-}
-
-impl fmt::Display for PivotValueSource {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            PivotValueSource::List(values) => write!(f, "{}", display_comma_separated(values)),
-            PivotValueSource::Any(order_by) => {
-                write!(f, "ANY")?;
-                if !order_by.is_empty() {
-                    write!(f, " ORDER BY {}", display_comma_separated(order_by))?;
-                }
-                Ok(())
-            }
-            PivotValueSource::Subquery(query) => write!(f, "{query}"),
-        }
-    }
-}
-
 impl fmt::Display for RelNamed {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         if self.lateral && !matches!(self.expr, RelExpr::Table(..)) {
@@ -518,21 +478,7 @@ impl fmt::Display for RelNamed {
         {
             write!(f, "{alias} = ")?;
         }
-        match &self.expr {
-            RelExpr::Table(name) => {
-                name.fmt(f)?;
-            }
-            RelExpr::Subquery(subquery) => {
-                f.write_str("(")?;
-                NewLine.fmt(f)?;
-                Indent(subquery).fmt(f)?;
-                NewLine.fmt(f)?;
-                f.write_str(")")?;
-            }
-            RelExpr::Function { name, args } => {
-                write!(f, "{name}({})", display_comma_separated(args))?;
-            }
-        }
+        self.expr.fmt(f)?;
         if !f.alternate()
             && let Some(alias) = &self.alias
         {
@@ -543,9 +489,92 @@ impl fmt::Display for RelNamed {
 }
 
 #[derive(Debug, Clone, PartialEq, PartialOrd, Eq, Ord, Hash)]
+pub enum RelExpr {
+    Table(ObjectName),
+    Subquery(Box<Query>),
+    Function {
+        name: ObjectName,
+        args: Vec<Expr>,
+        ordinality: bool,
+    },
+}
+
+impl RelExpr {
+    pub fn unnamed(self) -> RelNamed {
+        RelNamed::unnamed(self)
+    }
+
+    pub fn alias(self, alias: Ident) -> RelNamed {
+        RelNamed {
+            expr: self,
+            alias: Some(TableAlias::simple(alias)),
+            lateral: false,
+        }
+    }
+
+    pub fn alias_cols(self, alias: Ident, cols: Vec<Ident>) -> RelNamed {
+        RelNamed {
+            expr: self,
+            alias: Some(TableAlias::new(alias, cols)),
+            lateral: false,
+        }
+    }
+
+    pub fn subquery(query: Query) -> Self {
+        RelExpr::Subquery(Box::new(query))
+    }
+
+    pub fn function(name: Ident, args: Vec<Expr>) -> Self {
+        RelExpr::Function {
+            name: ObjectName(vec![name]),
+            args: args.into_iter().collect(),
+            ordinality: false,
+        }
+    }
+}
+
+impl fmt::Display for RelExpr {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            RelExpr::Table(name) => {
+                name.fmt(f)?;
+            }
+            RelExpr::Subquery(subquery) => {
+                f.write_str("(")?;
+                NewLine.fmt(f)?;
+                Indent(subquery).fmt(f)?;
+                NewLine.fmt(f)?;
+                f.write_str(")")?;
+            }
+            RelExpr::Function {
+                name,
+                args,
+                ordinality,
+            } => {
+                write!(f, "{name}({})", display_comma_separated(args))?;
+                if *ordinality {
+                    write!(f, " WITH ORDINALITY")?;
+                }
+            }
+        }
+        Ok(())
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, PartialOrd, Eq, Ord, Hash)]
 pub struct TableAlias {
     pub name: Ident,
     pub columns: Vec<Ident>,
+}
+
+impl TableAlias {
+    fn new(name: Ident, columns: Vec<Ident>) -> Self {
+        Self { name, columns }
+    }
+
+    pub fn simple(name: Ident) -> Self {
+        Self::new(name, vec![])
+    }
 }
 
 impl fmt::Display for TableAlias {
