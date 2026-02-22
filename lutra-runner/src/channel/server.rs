@@ -3,24 +3,24 @@ use std::sync::mpsc::{Receiver, Sender};
 
 use lutra_bin::{Decode, rr};
 
-use crate::Run;
+use crate::RunSync;
 use crate::binary::messages;
 
-/// Server that receives commands from clients and executes them on a runner.
+/// Server that receives commands from clients and executes them on a RunSync runner.
 ///
 /// The server runs in a dedicated thread and maintains a cache of prepared programs.
 /// It processes commands sequentially in the order they are received.
-pub struct Server<R: Run> {
+pub struct Server<R: RunSync> {
     rx: Receiver<messages::ClientMessage>,
     tx: Sender<messages::ServerMessage>,
     runner: R,
     prepared_programs: HashMap<u32, Result<R::Prepared, messages::Error>>,
 }
 
-impl<R: Run> Server<R> {
+impl<R: RunSync> Server<R> {
     /// Create a new server with the given channels and runner.
     ///
-    /// Typically you should use `channel_pair()` instead of constructing directly.
+    /// Typically you should use `new_pair()` instead of constructing directly.
     pub fn new(
         rx: Receiver<messages::ClientMessage>,
         tx: Sender<messages::ServerMessage>,
@@ -34,19 +34,19 @@ impl<R: Run> Server<R> {
         }
     }
 
-    /// Run the server loop.
+    /// Run the server loop synchronously.
     ///
     /// This method blocks, processing commands until the client disconnects
     /// (channel is closed). When the loop exits, cleanup is performed.
-    pub async fn run(mut self) {
+    pub fn run(mut self) {
         // Process commands until channel closes
         while let Ok(msg) = self.rx.recv() {
             match msg {
                 messages::ClientMessage::Prepare(prepare) => {
-                    self.handle_prepare(prepare).await;
+                    self.handle_prepare(prepare);
                 }
                 messages::ClientMessage::Execute(execute) => {
-                    self.handle_execute(execute).await;
+                    self.handle_execute(execute);
                 }
                 messages::ClientMessage::Release(release) => {
                     self.handle_release(release);
@@ -55,13 +55,13 @@ impl<R: Run> Server<R> {
         }
 
         // Cleanup: shutdown runner
-        let _ = self.runner.shutdown().await;
+        let _ = self.runner.shutdown_sync();
     }
 
-    async fn handle_prepare(&mut self, prepare: messages::Prepare) {
+    fn handle_prepare(&mut self, prepare: messages::Prepare) {
         let result = match rr::Program::decode(&prepare.program) {
             Ok(program) => {
-                let r = self.runner.prepare(program).await;
+                let r = self.runner.prepare_sync(program);
 
                 r.map_err(|e| messages::Error {
                     message: format!("{:#?}", e),
@@ -77,8 +77,8 @@ impl<R: Run> Server<R> {
         self.prepared_programs.insert(prepare.program_id, result);
     }
 
-    async fn handle_execute(&mut self, execute: messages::Execute) {
-        let result = self.do_execute(&execute).await;
+    fn handle_execute(&mut self, execute: messages::Execute) {
+        let result = self.do_execute(&execute);
 
         let response = messages::ServerMessage::Response(messages::Response {
             request_id: execute.request_id,
@@ -88,7 +88,7 @@ impl<R: Run> Server<R> {
         let _ = self.tx.send(response);
     }
 
-    async fn do_execute(&mut self, execute: &messages::Execute) -> messages::Result {
+    fn do_execute(&mut self, execute: &messages::Execute) -> messages::Result {
         let Some(prepared) = self.prepared_programs.get(&execute.program_id) else {
             return messages::Result::Err(messages::Error {
                 message: format!("Program {} not prepared", execute.program_id),
@@ -98,13 +98,13 @@ impl<R: Run> Server<R> {
 
         let handle = match prepared {
             Ok(handle) => handle,
-            Err(err) => return messages::Result::Err(err.clone()),
+            Err(err) => {
+                return messages::Result::Err(err.clone());
+            }
         };
 
-        let res = self.runner.execute(handle, &execute.input).await;
-
-        match res {
-            Ok(bytes) => messages::Result::Ok(bytes),
+        match self.runner.execute_sync(handle, &execute.input) {
+            Ok(output) => messages::Result::Ok(output),
             Err(e) => messages::Result::Err(messages::Error {
                 message: format!("{:#?}", e),
                 code: Some(crate::error_codes::EXECUTION_ERROR.to_string()),

@@ -3,36 +3,26 @@ use lutra_runner_duckdb::Runner;
 
 /// Helper function to run a Lutra program on DuckDB
 #[track_caller]
-#[tokio::main(flavor = "current_thread")]
-pub async fn _run(source: &str, input: lutra_bin::Value) -> (String, String) {
+pub fn _run(source: &str, input: lutra_bin::Value) -> (String, String) {
     // Create in-memory DuckDB instance for each test
-    let runner = Runner::in_memory(None).await.unwrap();
-    _run_on(&runner, source, input).await
+    let mut runner = Runner::in_memory(None).unwrap();
+    _run_on(&mut runner, source, input)
 }
 
 /// Helper function to run a Lutra program on DuckDB with setup SQL
 #[track_caller]
-#[tokio::main(flavor = "current_thread")]
-pub async fn _run_with_setup(
-    setup: &str,
-    source: &str,
-    input: lutra_bin::Value,
-) -> (String, String) {
+pub fn _run_with_setup(setup: &str, source: &str, input: lutra_bin::Value) -> (String, String) {
     // Create in-memory DuckDB instance and execute setup
-    let client = async_duckdb::ClientBuilder::new().open().await.unwrap();
-    let setup = setup.to_string();
-    client
-        .conn(move |conn| conn.execute_batch(&setup))
-        .await
-        .unwrap();
+    let conn = duckdb::Connection::open_in_memory().unwrap();
+    conn.execute_batch(setup).unwrap();
 
-    let runner = Runner::new(client, None).await.unwrap();
-    _run_on(&runner, source, input).await
+    let mut runner = Runner::new(conn, None).unwrap();
+    _run_on(&mut runner, source, input)
 }
 
 /// Run a Lutra program on a provided runner
-pub async fn _run_on(
-    runner: &impl lutra_runner::Run,
+pub fn _run_on(
+    runner: &mut impl lutra_runner::RunSync,
     source: &str,
     input: lutra_bin::Value,
 ) -> (String, String) {
@@ -46,8 +36,8 @@ pub async fn _run_on(
     let input = input.encode(&ty.input, &ty.defs).unwrap();
 
     // execute
-    let program = runner.prepare(program).await.unwrap();
-    let output = runner.execute(&program, &input).await.unwrap();
+    let program = runner.prepare_sync(program).unwrap();
+    let output = runner.execute_sync(&program, &input).unwrap();
 
     // decode and print source
     let output = lutra_bin::print_source(&output, &ty.output, &ty.defs).unwrap();
@@ -146,28 +136,20 @@ fn prim_text() {
 // Schema Introspection Tests
 // ============================================================================
 
-#[tokio::test]
-async fn pull_interface_basic() {
-    use lutra_runner::Run;
+#[test]
+fn pull_interface_basic() {
+    use lutra_runner::RunSync;
 
-    let client = async_duckdb::ClientBuilder::new().open().await.unwrap();
+    let conn = duckdb::Connection::open_in_memory().unwrap();
+    conn.execute_batch(
+        r#"
+        CREATE TABLE users (id INTEGER PRIMARY KEY, name VARCHAR NOT NULL, email VARCHAR);
+        CREATE TABLE posts (id INTEGER PRIMARY KEY, user_id INTEGER, title VARCHAR NOT NULL, content VARCHAR);
+        "#,
+    ).unwrap();
 
-    client
-        .conn(|conn| {
-            conn.execute_batch(
-                r#"
-                CREATE TABLE users (id INTEGER PRIMARY KEY, name VARCHAR NOT NULL, email VARCHAR);
-                CREATE TABLE posts (id INTEGER PRIMARY KEY, user_id INTEGER, title VARCHAR NOT NULL, content VARCHAR);
-                "#,
-            )
-        })
-        .await
-        .unwrap();
-
-    let runner = lutra_runner_duckdb::Runner::new(client, None)
-        .await
-        .unwrap();
-    let interface = runner.get_interface().await.unwrap();
+    let mut runner = lutra_runner_duckdb::Runner::new(conn, None).unwrap();
+    let interface = runner.get_interface_sync().unwrap();
 
     insta::assert_snapshot!(interface, @r#"
     ## Row of table posts
@@ -194,36 +176,30 @@ async fn pull_interface_basic() {
     "#);
 }
 
-#[tokio::test]
-async fn pull_interface_types() {
-    use lutra_runner::Run;
+#[test]
+fn pull_interface_types() {
+    use lutra_runner::RunSync;
 
-    let client = async_duckdb::ClientBuilder::new().open().await.unwrap();
-    client
-        .conn(|conn| {
-            conn.execute_batch(
-                r#"
-                CREATE TABLE type_test (
-                    bool_col BOOLEAN,
-                    int8_col TINYINT,
-                    int16_col SMALLINT,
-                    int32_col INTEGER,
-                    int64_col BIGINT,
-                    float32_col FLOAT,
-                    float64_col DOUBLE,
-                    text_col VARCHAR,
-                    date_col DATE
-                );
-                "#,
-            )
-        })
-        .await
-        .unwrap();
+    let conn = duckdb::Connection::open_in_memory().unwrap();
+    conn.execute_batch(
+        r#"
+        CREATE TABLE type_test (
+            bool_col BOOLEAN,
+            int8_col TINYINT,
+            int16_col SMALLINT,
+            int32_col INTEGER,
+            int64_col BIGINT,
+            float32_col FLOAT,
+            float64_col DOUBLE,
+            text_col VARCHAR,
+            date_col DATE
+        );
+        "#,
+    )
+    .unwrap();
 
-    let runner = lutra_runner_duckdb::Runner::new(client, None)
-        .await
-        .unwrap();
-    let interface = runner.get_interface().await.unwrap();
+    let mut runner = lutra_runner_duckdb::Runner::new(conn, None).unwrap();
+    let interface = runner.get_interface_sync().unwrap();
 
     insta::assert_snapshot!(interface, @r#"
     ## Row of table type_test
@@ -235,31 +211,25 @@ async fn pull_interface_types() {
     "#);
 }
 
-#[tokio::test]
-async fn pull_interface_arrays() {
-    use lutra_runner::Run;
+#[test]
+fn pull_interface_arrays() {
+    use lutra_runner::RunSync;
 
-    let client = async_duckdb::ClientBuilder::new().open().await.unwrap();
-    client
-        .conn(|conn| {
-            conn.execute_batch(
-                r#"
-                CREATE TABLE arrays_test (
-                    id INTEGER,
-                    tags VARCHAR[],
-                    numbers INTEGER[],
-                    nested INTEGER[][]
-                );
-                "#,
-            )
-        })
-        .await
-        .unwrap();
+    let conn = duckdb::Connection::open_in_memory().unwrap();
+    conn.execute_batch(
+        r#"
+        CREATE TABLE arrays_test (
+            id INTEGER,
+            tags VARCHAR[],
+            numbers INTEGER[],
+            nested INTEGER[][]
+        );
+        "#,
+    )
+    .unwrap();
 
-    let runner = lutra_runner_duckdb::Runner::new(client, None)
-        .await
-        .unwrap();
-    let interface = runner.get_interface().await.unwrap();
+    let mut runner = lutra_runner_duckdb::Runner::new(conn, None).unwrap();
+    let interface = runner.get_interface_sync().unwrap();
 
     insta::assert_snapshot!(interface, @r#"
     ## Row of table arrays_test
@@ -271,30 +241,24 @@ async fn pull_interface_arrays() {
     "#);
 }
 
-#[tokio::test]
-async fn pull_interface_struct() {
-    use lutra_runner::Run;
+#[test]
+fn pull_interface_struct() {
+    use lutra_runner::RunSync;
 
-    let client = async_duckdb::ClientBuilder::new().open().await.unwrap();
-    client
-        .conn(|conn| {
-            conn.execute_batch(
-                r#"
-                CREATE TABLE struct_test (
-                    id INTEGER,
-                    person STRUCT(name VARCHAR, age INTEGER),
-                    location STRUCT(city VARCHAR, coordinates STRUCT(lat DOUBLE, lon DOUBLE))
-                );
-                "#,
-            )
-        })
-        .await
-        .unwrap();
+    let conn = duckdb::Connection::open_in_memory().unwrap();
+    conn.execute_batch(
+        r#"
+        CREATE TABLE struct_test (
+            id INTEGER,
+            person STRUCT(name VARCHAR, age INTEGER),
+            location STRUCT(city VARCHAR, coordinates STRUCT(lat DOUBLE, lon DOUBLE))
+        );
+        "#,
+    )
+    .unwrap();
 
-    let runner = lutra_runner_duckdb::Runner::new(client, None)
-        .await
-        .unwrap();
-    let interface = runner.get_interface().await.unwrap();
+    let mut runner = lutra_runner_duckdb::Runner::new(conn, None).unwrap();
+    let interface = runner.get_interface_sync().unwrap();
 
     insta::assert_snapshot!(interface, @r#"
     ## Row of table struct_test
@@ -306,31 +270,25 @@ async fn pull_interface_struct() {
     "#);
 }
 
-#[tokio::test]
-async fn pull_interface_indexes_basic() {
-    use lutra_runner::Run;
+#[test]
+fn pull_interface_indexes_basic() {
+    use lutra_runner::RunSync;
 
-    let client = async_duckdb::ClientBuilder::new().open().await.unwrap();
-    client
-        .conn(|conn| {
-            conn.execute_batch(
-                r#"
-                CREATE TABLE users (
-                    id INTEGER PRIMARY KEY,
-                    email VARCHAR UNIQUE,
-                    name VARCHAR
-                );
-                CREATE INDEX idx_name ON users(name);
-                "#,
-            )
-        })
-        .await
-        .unwrap();
+    let conn = duckdb::Connection::open_in_memory().unwrap();
+    conn.execute_batch(
+        r#"
+        CREATE TABLE users (
+            id INTEGER PRIMARY KEY,
+            email VARCHAR UNIQUE,
+            name VARCHAR
+        );
+        CREATE INDEX idx_name ON users(name);
+        "#,
+    )
+    .unwrap();
 
-    let runner = lutra_runner_duckdb::Runner::new(client, None)
-        .await
-        .unwrap();
-    let interface = runner.get_interface().await.unwrap();
+    let mut runner = lutra_runner_duckdb::Runner::new(conn, None).unwrap();
+    let interface = runner.get_interface_sync().unwrap();
 
     insta::assert_snapshot!(interface, @r#"
     ## Row of table users
@@ -354,32 +312,26 @@ async fn pull_interface_indexes_basic() {
     "#);
 }
 
-#[tokio::test]
-async fn pull_interface_indexes_compound() {
-    use lutra_runner::Run;
+#[test]
+fn pull_interface_indexes_compound() {
+    use lutra_runner::RunSync;
 
-    let client = async_duckdb::ClientBuilder::new().open().await.unwrap();
-    client
-        .conn(|conn| {
-            conn.execute_batch(
-                r#"
-                CREATE TABLE orders (
-                    id INTEGER,
-                    user_id INTEGER,
-                    product_id INTEGER,
-                    quantity INTEGER
-                );
-                CREATE INDEX idx_user_product ON orders(user_id, product_id);
-                "#,
-            )
-        })
-        .await
-        .unwrap();
+    let conn = duckdb::Connection::open_in_memory().unwrap();
+    conn.execute_batch(
+        r#"
+        CREATE TABLE orders (
+            id INTEGER,
+            user_id INTEGER,
+            product_id INTEGER,
+            quantity INTEGER
+        );
+        CREATE INDEX idx_user_product ON orders(user_id, product_id);
+        "#,
+    )
+    .unwrap();
 
-    let runner = lutra_runner_duckdb::Runner::new(client, None)
-        .await
-        .unwrap();
-    let interface = runner.get_interface().await.unwrap();
+    let mut runner = lutra_runner_duckdb::Runner::new(conn, None).unwrap();
+    let interface = runner.get_interface_sync().unwrap();
 
     insta::assert_snapshot!(interface, @r#"
     ## Row of table orders
@@ -2818,27 +2770,22 @@ fn update_with_complex_where() {
     ).1, @"{}");
 }
 
-#[tokio::test(flavor = "current_thread")]
-async fn update_verify_changes() {
-    let client = async_duckdb::ClientBuilder::new().open().await.unwrap();
+#[test]
+fn update_verify_changes() {
+    let conn = duckdb::Connection::open_in_memory().unwrap();
+    conn.execute_batch(
+        "
+        CREATE TABLE users (id int4, name text, age int4);
+        INSERT INTO users VALUES (1, 'Alice', 30), (2, 'Bob', 25), (3, 'Charlie', 35);
+        ",
+    )
+    .unwrap();
 
-    client
-        .conn(|conn| {
-            conn.execute_batch(
-                "
-                CREATE TABLE users (id int4, name text, age int4);
-                INSERT INTO users VALUES (1, 'Alice', 30), (2, 'Bob', 25), (3, 'Charlie', 35);
-                ",
-            )
-        })
-        .await
-        .unwrap();
-
-    let runner = Runner::new(client, None).await.unwrap();
+    let mut runner = Runner::new(conn, None).unwrap();
 
     // Execute update
     let (_sql, output) = _run_on(
-        &runner,
+        &mut runner,
         r#"
     type User: {
       id: int32,
@@ -2854,13 +2801,12 @@ async fn update_verify_changes() {
     )
     "#,
         lutra_bin::Value::unit(),
-    )
-    .await;
+    );
 
     assert_eq!(output, "{}");
 
     // Verify the update worked
-    insta::assert_snapshot!(_run_on(&runner, r#"
+    insta::assert_snapshot!(_run_on(&mut runner, r#"
     type User: {
       id: int32,
       name: text,
@@ -2870,7 +2816,7 @@ async fn update_verify_changes() {
       (std::sql::from("users"): [User])
       | std::sort(u -> u.id | std::to_int64)
     )
-    "#, lutra_bin::Value::unit()).await.1, @r#"
+    "#, lutra_bin::Value::unit()).1, @r#"
     [
       {
         id = 1,

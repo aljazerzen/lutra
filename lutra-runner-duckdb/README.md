@@ -4,14 +4,14 @@ DuckDB runner implementation for Lutra - enables in-process analytical queries.
 
 ## Overview
 
-`lutra-runner-duckdb` implements the `lutra_runner::Run` trait, providing an
+`lutra-runner-duckdb` implements the `lutra_runner::RunSync` trait, providing an
 embedded analytical database using [DuckDB](https://duckdb.org/). This allows
 you to execute Lutra programs in-process with DuckDB's fast analytical query
 engine.
 
 **Key Features:**
 - In-memory or file-based database
-- Async runtime integration via `async-duckdb`
+- Synchronous execution (no async runtime required)
 - Full support for primitives, tuples, arrays, and enums (including nested types).
 - No external database server required
 
@@ -34,29 +34,52 @@ in one of the following ways:
 - **Prod - dynamic linking**: Requires DuckDB shared library
   (`.so`/`.dylib`/`.dll`) available in the build environment.
 - **Prod - static linking**: The `duckdb` crate supports a `bundled` feature
-  that bundled DuckDB into this library, avoiding the need for a system library.
+  that bundles DuckDB into this library, avoiding the need for a system library.
   To use this, add the feature to your dependencies:
 
   ```toml
   [dependencies]
-  async-duckdb = { version = "0.3", features = ["bundled"] }
+  duckdb = { version = "1.4", features = ["bundled"] }
   ```
 
 ## Usage
 
 ### Rust API
 
+#### Synchronous Usage
+
 ```rust
-use lutra_runner::Run;
+use lutra_runner::RunSync;
+use lutra_runner_duckdb::Runner;
+
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    // Create in-memory database
+    let mut runner = Runner::in_memory(None)?;
+    
+    // Or use file-based storage
+    let mut runner = Runner::open("data/analysis.duckdb", None)?;
+    
+    // Prepare and execute a program
+    let prepared = runner.prepare_sync(program)?;
+    let output = runner.execute_sync(&prepared, &input)?;
+    
+    Ok(())
+}
+```
+
+#### Async Usage
+
+If you need to use the runner in an async context, wrap it with `AsyncRunner`:
+
+```rust
+use lutra_runner::{Run, AsyncRunner};
 use lutra_runner_duckdb::Runner;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    // Create in-memory database
-    let runner = Runner::in_memory().await?;
-    
-    // Or use file-based storage
-    let runner = Runner::open("data/analysis.duckdb").await?;
+    // Create runner and wrap for async usage
+    let sync_runner = Runner::in_memory(None)?;
+    let runner = AsyncRunner::new(sync_runner);
     
     // Prepare and execute a program
     let prepared = runner.prepare(program).await?;

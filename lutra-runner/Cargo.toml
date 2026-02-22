@@ -8,6 +8,7 @@ version.workspace = true
 
 [features]
 std = ["lutra-bin/std"]
+async = ["std"]
 binary-tokio = ["tokio", "std"]
 binary-embedded = ["embedded-io-async"]
 channel = ["tokio", "tokio/rt", "std"]

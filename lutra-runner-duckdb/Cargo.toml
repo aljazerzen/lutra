@@ -7,15 +7,14 @@ rust-version.workspace = true
 version.workspace = true
 
 [dependencies]
-async-duckdb = { workspace = true }
+duckdb = "1.4"
 
 bytes = { workspace = true }
-tokio = { workspace = true, features = ["rt"] }
 tracing = { workspace = true }
 thiserror = { workspace = true }
 tinyjson = "2"
 lutra-bin = { workspace = true, features = ["std"] }
-lutra-runner = { workspace = true }
+lutra-runner = { workspace = true, features = ["std"] }
 lutra-arrow = { workspace = true }
 arrow = { workspace = true }
 
@@ -23,7 +22,6 @@ arrow = { workspace = true }
 lutra-codegen = { workspace = true }
 
 [dev-dependencies]
-tokio = { workspace = true, features = ["rt", "macros"] }
 
 [features]
 default = []

@@ -83,6 +83,7 @@ impl RunnerAsync<tokio_postgres::Client> {
     }
 }
 
+#[derive(Clone)]
 pub struct PreparedProgram {
     program: rr::SqlProgram,
     stmt: tokio_postgres::Statement,

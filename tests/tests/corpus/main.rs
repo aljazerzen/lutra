@@ -110,6 +110,7 @@ fn parse_file(contents: &str) -> Vec<TestCase> {
 #[tokio::main(flavor = "current_thread")]
 async fn run_on_interpreter(case: TestCase) -> Result<(), libtest_mimic::Failed> {
     let runner = lutra_interpreter::InterpreterRunner::default();
+    let runner = lutra_runner::AsyncRunner::new(runner);
     run_program("interpreter", ProgramFormat::BytecodeLt, &runner, case).await
 }
 
@@ -137,8 +138,8 @@ async fn run_on_pg(case: TestCase) -> Result<(), libtest_mimic::Failed> {
 #[tokio::main(flavor = "current_thread")]
 async fn run_on_duckdb(case: TestCase) -> Result<(), libtest_mimic::Failed> {
     let runner = lutra_runner_duckdb::Runner::in_memory(None)
-        .await
         .map_err(|e| format!("Failed to create DuckDB runner: {e:?}"))?;
+    let runner = lutra_runner::AsyncRunner::new(runner);
     run_program("duckdb", ProgramFormat::SqlDuckdb, &runner, case).await
 }
 

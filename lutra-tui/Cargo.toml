@@ -18,6 +18,6 @@ tokio = { workspace = true, features = ["rt"] }
 lutra-compiler = { workspace = true }
 lutra-bin = { workspace = true }
 lutra-interpreter = { workspace = true }
-lutra-runner = { workspace = true, features = ["channel"] }
+lutra-runner = { workspace = true, features = ["channel", "sync"] }
 lutra-runner-postgres = { workspace = true, features = ["tokio-postgres"] }
 lutra-runner-duckdb = { workspace = true }

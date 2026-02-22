@@ -322,6 +322,7 @@ pub async fn run(cmd: RunCommand) -> anyhow::Result<()> {
     let output = if cmd.runner.interpreter {
         let runner =
             lutra_interpreter::InterpreterRunner::default().with_file_system(execution_dir);
+        let runner = lutra_runner::AsyncRunner::new(runner);
 
         let handle = runner.prepare(program).await?;
         runner.execute(&handle, &input).await?
@@ -330,7 +331,8 @@ pub async fn run(cmd: RunCommand) -> anyhow::Result<()> {
         let handle = runner.prepare(program).await?;
         runner.execute(&handle, &input).await?
     } else if let Some(duckdb_path) = cmd.runner.duckdb {
-        let runner = init_runner_duckdb(&duckdb_path, execution_dir).await?;
+        let runner = init_runner_duckdb(&duckdb_path, execution_dir)?;
+        let runner = lutra_runner::AsyncRunner::new(runner);
         let handle = runner.prepare(program).await?;
         runner.execute(&handle, &input).await?
     } else {
@@ -393,13 +395,11 @@ async fn init_runner_postgres(url: &str) -> anyhow::Result<lutra_runner_postgres
     Ok(lutra_runner_postgres::RunnerAsync::new(client))
 }
 
-async fn init_runner_duckdb(
+fn init_runner_duckdb(
     path: &str,
     file_system: Option<path::PathBuf>,
 ) -> anyhow::Result<lutra_runner_duckdb::Runner> {
-    lutra_runner_duckdb::Runner::open(path, file_system)
-        .await
-        .map_err(Into::into)
+    lutra_runner_duckdb::Runner::open(path, file_system).map_err(Into::into)
 }
 
 #[derive(clap::Parser)]
@@ -416,12 +416,14 @@ pub struct PullInterfaceCommand {
 pub async fn pull_interface(cmd: PullInterfaceCommand) -> anyhow::Result<()> {
     let interface = if cmd.runner.interpreter {
         let runner = lutra_interpreter::InterpreterRunner::default().with_file_system(cmd.project);
+        let runner = lutra_runner::AsyncRunner::new(runner);
         runner.get_interface().await?
     } else if let Some(pg_url) = cmd.runner.postgres {
         let runner = init_runner_postgres(&pg_url).await?;
         runner.get_interface().await?
     } else if let Some(duckdb_path) = cmd.runner.duckdb {
-        let runner = init_runner_duckdb(&duckdb_path, cmd.project).await?;
+        let runner = init_runner_duckdb(&duckdb_path, cmd.project)?;
+        let runner = lutra_runner::AsyncRunner::new(runner);
         runner.get_interface().await?
     } else {
         unreachable!()

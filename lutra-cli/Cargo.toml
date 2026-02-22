@@ -17,7 +17,7 @@ lutra-bin = { workspace = true }
 lutra-compiler = { workspace = true, features = ["clap"] }
 lutra-interpreter = { workspace = true }
 lutra-codegen = { workspace = true }
-lutra-runner = { workspace = true }
+lutra-runner = { workspace = true, features = ["async"] }
 lutra-runner-postgres = { workspace = true, features = ["tokio-postgres"] }
 lutra-runner-duckdb = { workspace = true }
 lutra-tui = { workspace = true }

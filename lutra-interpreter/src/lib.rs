@@ -7,7 +7,7 @@ pub use data::Data;
 pub use interpreter::{Cell, EvalError, Interpreter, NativeFunction, evaluate};
 pub use writer::{ArrayWriter, EnumWriter, TupleWriter};
 
-pub use lutra_runner::Run;
+pub use lutra_runner::{Run, RunSync};
 
 pub trait NativeModule: Sync {
     fn lookup_native_symbol(&self, id: &str) -> Option<interpreter::NativeFunction>;
@@ -28,19 +28,19 @@ pub struct InterpreterRunner<'a> {
     file_system: Option<std::path::PathBuf>,
 }
 
-impl<'a> lutra_runner::Run for InterpreterRunner<'a> {
+impl<'a> lutra_runner::RunSync for InterpreterRunner<'a> {
     type Error = EvalError;
     type Prepared = lutra_bin::rr::Program;
 
-    async fn prepare(
-        &self,
+    fn prepare_sync(
+        &mut self,
         program: lutra_bin::rr::Program,
     ) -> Result<Self::Prepared, Self::Error> {
         Ok(program)
     }
 
-    async fn execute(
-        &self,
+    fn execute_sync(
+        &mut self,
         program: &lutra_bin::rr::Program,
         input: &[u8],
     ) -> Result<std::vec::Vec<u8>, Self::Error> {
@@ -54,7 +54,7 @@ impl<'a> lutra_runner::Run for InterpreterRunner<'a> {
         )
     }
 
-    async fn get_interface(&self) -> Result<std::string::String, Self::Error> {
+    fn get_interface_sync(&mut self) -> Result<std::string::String, Self::Error> {
         let Some(fs) = &self.file_system else {
             return Ok(String::new());
         };

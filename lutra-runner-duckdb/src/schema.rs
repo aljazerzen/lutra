@@ -12,11 +12,11 @@ mod lutra {
 }
 
 /// Pull database schema and generate Lutra source code
-pub async fn pull_interface(runner: &Runner) -> Result<String, Error> {
-    use lutra_runner::Run;
+pub fn pull_interface(runner: &mut Runner) -> Result<String, Error> {
+    use lutra_runner::RunSync;
 
     let program = lutra::pull_interface();
-    let mut schemas = runner.run(&program, &()).await?.unwrap();
+    let mut schemas = runner.run_sync(&program, &())?.unwrap();
 
     let mut output = String::new();
 

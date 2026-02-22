@@ -1,5 +1,5 @@
 use crate::{Context, Error};
-use async_duckdb::duckdb::ToSql;
+use duckdb::ToSql;
 use lutra_bin::{Visitor, ir};
 use std::collections::HashMap;
 
@@ -139,10 +139,8 @@ pub struct Args<'a> {
 }
 
 impl<'a> Args<'a> {
-    pub fn as_params(&self) -> impl async_duckdb::duckdb::Params + '_ {
-        async_duckdb::duckdb::params_from_iter(
-            self.args.iter().map(|arg| arg.as_ref() as &dyn ToSql),
-        )
+    pub fn as_params(&self) -> impl duckdb::Params + '_ {
+        duckdb::params_from_iter(self.args.iter().map(|arg| arg.as_ref() as &dyn ToSql))
     }
 }
 

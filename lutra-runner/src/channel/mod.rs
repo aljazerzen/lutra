@@ -1,4 +1,4 @@
-//! Channel-based adapter for the Run trait.
+//! Channel-based adapter for RunSync runners.
 //!
 //! This module provides a synchronous, channel-based adapter that enables
 //! communication between threads using typed message passing instead of
@@ -9,21 +9,20 @@
 //! ```ignore
 //! use lutra_runner::channel;
 //! use lutra_interpreter::InterpreterRunner;
-//! use std::sync::Arc;
 //!
 //! // Create runner and spawn server thread
 //! let runner = InterpreterRunner::default();
 //! let (client, server) = channel::new_pair(runner);
 //!
-//! // Share client across threads
-//! let client = Arc::new(client);
+//! std::thread::spawn(move || {
+//!     server.run();
+//! });
 //!
 //! // Execute program (in production you would have actual program and input)
 //! // let output = client.run_once(&program, &input)?;
 //!
 //! // Cleanup
 //! drop(client);
-//! drop(server);
 //! ```
 
 mod client;
@@ -32,13 +31,13 @@ mod server;
 pub use client::{Client, ClientReceiver, ClientSender};
 pub use server::Server;
 
-use crate::Run;
+use crate::RunSync;
 use std::sync::mpsc;
 
 // Re-export message types for external use
 pub use crate::binary::messages;
 
-/// Create connected client/server pair and spawn server thread.
+/// Create connected client/server pair for RunSync runners.
 ///
 /// Uses unbounded channels for simplicity. In practice, execution is rate-limited
 /// by user interaction and runner execution time, so unbounded is sufficient.
@@ -52,17 +51,21 @@ pub use crate::binary::messages;
 /// let runner = InterpreterRunner::default();
 /// let (client, server) = channel::new_pair(runner);
 ///
+/// // Spawn server thread
+/// std::thread::spawn(move || {
+///     server.run();
+/// });
+///
 /// // Use client (in production you would have actual program and input)
 /// // let output = client.run_once(&program, &input)?;
 ///
 /// // Cleanup
 /// drop(client);
-/// drop(server);
 /// ```
 pub fn new_pair<R>(runner: R) -> (Client, Server<R>)
 where
-    R: Run + Send + 'static,
-    R::Prepared: Send,
+    R: RunSync + Send + 'static,
+    R::Prepared: Send + Clone,
 {
     let (client_tx, server_rx) = mpsc::channel();
     let (server_tx, client_rx) = mpsc::channel();
@@ -78,19 +81,19 @@ mod tests {
     use super::*;
     use lutra_bin::rr;
 
-    // Mock runner for testing
+    // Mock sync runner for testing
     struct MockRunner;
 
-    impl Run for MockRunner {
+    impl RunSync for MockRunner {
         type Error = String;
         type Prepared = (); // No state needed
 
-        async fn prepare(&self, _program: rr::Program) -> Result<Self::Prepared, Self::Error> {
+        fn prepare_sync(&mut self, _program: rr::Program) -> Result<Self::Prepared, Self::Error> {
             Ok(())
         }
 
-        async fn execute(
-            &self,
+        fn execute_sync(
+            &mut self,
             _handle: &Self::Prepared,
             input: &[u8],
         ) -> Result<Vec<u8>, Self::Error> {

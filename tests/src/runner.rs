@@ -2,7 +2,7 @@ use std::io;
 
 use lutra_bin::br;
 use lutra_compiler::ProgramFormat;
-use lutra_runner::{Run, binary};
+use lutra_runner::{AsyncRunner, Run, binary};
 
 #[tokio::test(flavor = "current_thread")]
 async fn main() {
@@ -11,6 +11,7 @@ async fn main() {
     let (io_client, io_server) = tokio::io::duplex(1000);
 
     let runner = lutra_interpreter::InterpreterRunner::default();
+    let runner = AsyncRunner::new(runner);
 
     let client = binary::tokio::Client::new(io_client);
     let mut server = binary::tokio::Server::new(io_server, runner);

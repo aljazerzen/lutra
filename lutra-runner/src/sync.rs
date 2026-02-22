@@ -1,6 +1,6 @@
-//! Synchronous adapter for the async [`Run`] trait.
+//! Wraps [Run] to provide [RunSync].
 //!
-//! This module provides [`SyncRunner`], which wraps any async [`Run`] implementation
+//! This module provides [SyncRunner], which wraps any async [Run] implementation
 //! and provides blocking versions of all methods by managing a Tokio runtime internally.
 //!
 //! # Usage
@@ -32,12 +32,12 @@
 //! - The underlying runner is cloned (via `Arc`) for each blocking call to avoid lifetime issues
 //! - Cloning a `SyncRunner` creates a new runtime but shares the same underlying runner via `Arc`
 
-use crate::Run;
+use crate::{Run, RunSync};
 use lutra_bin::{rr, string, vec};
 use std::sync::Arc;
 use tokio::runtime::Runtime;
 
-/// A synchronous adapter for async [`Run`] implementations.
+/// A synchronous adapter for async [Run] implementations.
 ///
 /// This wrapper contains a Tokio runtime and converts all async methods
 /// into blocking calls. This is useful when you need to use an async runner
@@ -69,7 +69,7 @@ impl<R> SyncRunner<R> {
     /// Creates a new synchronous runner wrapper.
     ///
     /// This will create a new Tokio runtime with default configuration.
-    /// If you need custom runtime configuration, use [`SyncRunner::with_runtime`].
+    /// If you need custom runtime configuration, use [SyncRunner::with_runtime].
     pub fn new(runner: R) -> Self
     where
         R: Send + Sync + 'static,
@@ -99,59 +99,39 @@ impl<R> SyncRunner<R> {
     }
 }
 
-impl<R> SyncRunner<R>
+// Implement RunSync for SyncRunner to enable use with channel protocol
+impl<R> RunSync for SyncRunner<R>
 where
     R: Run + Send + Sync + 'static,
-    R::Prepared: Send + Sync,
+    R::Prepared: Clone + Send + Sync,
     R::Error: Send,
 {
-    /// Synchronous version of [`Run::run`].
-    pub fn run<I, O>(
-        &self,
-        program: &rr::TypedProgram<I, O>,
-        input: &I,
-    ) -> Result<lutra_bin::Result<O>, R::Error>
-    where
-        I: lutra_bin::Encode + Send,
-        O: lutra_bin::Decode + Send,
-    {
-        let runner = Arc::clone(&self.runner);
-        let program_inner = program.inner.clone();
-        let input = input.encode();
+    type Error = R::Error;
+    type Prepared = R::Prepared;
 
-        self.rt.block_on(async move {
-            let handle = runner.prepare(program_inner).await?;
-            let output = runner.execute(&handle, &input).await?;
-            Ok(O::decode(&output))
-        })
-    }
-
-    /// Synchronous version of [`Run::prepare`].
-    pub fn prepare(&self, program: rr::Program) -> Result<R::Prepared, R::Error> {
+    fn prepare_sync(&mut self, program: rr::Program) -> Result<Self::Prepared, Self::Error> {
         let runner = Arc::clone(&self.runner);
         self.rt
             .block_on(async move { runner.prepare(program).await })
     }
 
-    /// Synchronous version of [`Run::execute`].
-    pub fn execute(&self, program: &R::Prepared, input: &[u8]) -> Result<vec::Vec<u8>, R::Error>
-    where
-        R::Prepared: Sync,
-    {
+    fn execute_sync(
+        &mut self,
+        program: &Self::Prepared,
+        input: &[u8],
+    ) -> Result<vec::Vec<u8>, Self::Error> {
         let runner = Arc::clone(&self.runner);
         self.rt
             .block_on(async move { runner.execute(program, input).await })
     }
 
-    /// Synchronous version of [`Run::get_interface`].
-    pub fn get_interface(&self) -> Result<string::String, R::Error> {
+    fn get_interface_sync(&mut self) -> Result<string::String, Self::Error> {
         let runner = Arc::clone(&self.runner);
         self.rt
             .block_on(async move { runner.get_interface().await })
     }
 
-    /// Synchronous version of [`Run::shutdown`].
-    pub fn shutdown(&self) -> Result<(), R::Error> {
+    fn shutdown_sync(&mut self) -> Result<(), Self::Error> {
         let runner = Arc::clone(&self.runner);
         self.rt.block_on(async move { runner.shutdown().await })
     }
@@ -214,7 +194,7 @@ mod tests {
     #[test]
     fn test_sync_runner_basic() {
         let mock = MockRunner;
-        let sync_runner = SyncRunner::new(mock);
+        let mut sync_runner = SyncRunner::new(mock);
 
         // Test prepare with a bytecode program
         use lutra_bin::br;
@@ -225,19 +205,19 @@ mod tests {
             },
             defs: vec::Vec::new(),
         });
-        let prepared = sync_runner.prepare(program).unwrap();
+        let prepared = sync_runner.prepare_sync(program).unwrap();
         assert_eq!(prepared, "prepared");
 
         // Test execute
         let input_data = b"hello world";
-        let output = sync_runner.execute(&prepared, input_data).unwrap();
+        let output = sync_runner.execute_sync(&prepared, input_data).unwrap();
         assert_eq!(&output[..], input_data);
 
         // Test get_interface
-        let interface = sync_runner.get_interface().unwrap();
+        let interface = sync_runner.get_interface_sync().unwrap();
         assert_eq!(&interface[..], "mock interface");
 
         // Test shutdown
-        sync_runner.shutdown().unwrap();
+        sync_runner.shutdown_sync().unwrap();
     }
 }

@@ -381,18 +381,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "async-duckdb"
-version = "0.3.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "471a468db6e4daa7fc63296f01d9434c99eac52263852dc9dbb1fd15d8661091"
-dependencies = [
- "crossbeam-channel",
- "duckdb",
- "futures-channel",
- "futures-util",
-]
-
-[[package]]
 name = "async-trait"
 version = "0.1.88"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2285,15 +2273,14 @@ name = "lutra-runner-duckdb"
 version = "0.4.0"
 dependencies = [
  "arrow",
- "async-duckdb",
  "bytes",
+ "duckdb",
  "lutra-arrow",
  "lutra-bin",
  "lutra-codegen",
  "lutra-runner",
  "thiserror 2.0.12",
  "tinyjson",
- "tokio",
  "tracing",
 ]
 
@@ -4032,8 +4019,8 @@ name = "tests"
 version = "0.4.0"
 dependencies = [
  "arrow",
- "async-duckdb",
  "console",
+ "duckdb",
  "insta",
  "libtest-mimic",
  "log",

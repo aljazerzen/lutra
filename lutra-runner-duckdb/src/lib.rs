@@ -4,7 +4,7 @@ mod case;
 mod params;
 mod schema;
 
-pub use lutra_runner::Run;
+pub use lutra_runner::{Run, RunSync};
 
 use lutra_bin::{ir, rr};
 use std::{collections::HashMap, path, sync::Arc};
@@ -12,54 +12,50 @@ use thiserror::Error;
 
 /// DuckDB runner for executing Lutra programs
 ///
-/// Uses async-duckdb which provides a proper async wrapper around DuckDB.
-/// The Client handles connection pooling and threading internally.
+/// Uses the synchronous duckdb crate. DuckDB operations are CPU-bound
+/// and don't involve actual async I/O, making this suitable for RunSync.
 pub struct Runner {
-    client: async_duckdb::Client,
+    conn: duckdb::Connection,
 }
 
 impl Runner {
-    pub async fn new(
-        client: async_duckdb::Client,
+    pub fn new(
+        conn: duckdb::Connection,
         file_system: Option<path::PathBuf>,
     ) -> Result<Self, Error> {
         if let Some(fs_path) = file_system {
-            client
-                .conn(move |c| {
-                    let set_fs_access = format!("SET file_search_path = \'{}\'", fs_path.display());
-                    c.execute(&set_fs_access, [])
-                })
-                .await?;
+            let set_fs_access = format!("SET file_search_path = '{}'", fs_path.display());
+            conn.execute(&set_fs_access, [])?;
         }
-        Ok(Self { client })
+        Ok(Self { conn })
     }
 
     /// Open a file-based DuckDB database
-    pub async fn open(path: &str, file_system: Option<path::PathBuf>) -> Result<Self, Error> {
-        let client = async_duckdb::ClientBuilder::new().path(path).open().await?;
-        Self::new(client, file_system).await
+    pub fn open(path: &str, file_system: Option<path::PathBuf>) -> Result<Self, Error> {
+        let conn = duckdb::Connection::open(path)?;
+        Self::new(conn, file_system)
     }
 
     /// Create an in-memory DuckDB database
-    pub async fn in_memory(file_system: Option<path::PathBuf>) -> Result<Self, Error> {
-        let client = async_duckdb::ClientBuilder::new().open().await?;
-        Self::new(client, file_system).await
+    pub fn in_memory(file_system: Option<path::PathBuf>) -> Result<Self, Error> {
+        let conn = duckdb::Connection::open_in_memory()?;
+        Self::new(conn, file_system)
     }
 }
 
+#[derive(Clone)]
 pub struct PreparedProgram {
     program: Arc<rr::SqlProgram>,
 }
 
-impl lutra_runner::Run for Runner {
+impl lutra_runner::RunSync for Runner {
     type Error = Error;
     type Prepared = PreparedProgram;
 
-    async fn prepare(&self, program: rr::Program) -> Result<Self::Prepared, Self::Error> {
+    fn prepare_sync(&mut self, program: rr::Program) -> Result<Self::Prepared, Self::Error> {
         // Accept both SqlDuckDB (preferred) and SqlPg (backward compatibility)
         let program = program
             .into_sql_duck_db()
-            .or_else(|p| p.into_sql_postgres())
             .map_err(|_| Error::UnsupportedFormat)?;
 
         // Don't prepare a statement, because we cannot cache it for later anyway.
@@ -70,41 +66,31 @@ impl lutra_runner::Run for Runner {
         })
     }
 
-    async fn execute(&self, handle: &Self::Prepared, input: &[u8]) -> Result<Vec<u8>, Self::Error> {
-        let program = handle.program.clone();
+    fn execute_sync(
+        &mut self,
+        handle: &Self::Prepared,
+        input: &[u8],
+    ) -> Result<Vec<u8>, Self::Error> {
+        let ctx = Context::new(&handle.program.defs);
 
-        // I hate this clone
-        let input = input.to_vec();
+        // Convert input to SQL params
+        let args = params::to_sql(input, &handle.program.input_ty, &ctx)?;
 
-        self.client
-            .conn(move |conn| {
-                let ctx = Context::new(&program.defs);
+        // Execute query and get Arrow RecordBatches
+        let mut stmt = self.conn.prepare(&handle.program.sql)?;
+        let arrow = stmt.query_arrow(args.as_params())?;
+        let batches: Vec<_> = arrow.collect();
 
-                // Convert input to SQL params
-                let args = match params::to_sql(&input, &program.input_ty, &ctx) {
-                    Ok(a) => a,
-                    Err(e) => return Ok(Err(e)),
-                };
+        // Convert Arrow to Lutra format
+        let output =
+            lutra_arrow::arrow_to_lutra(batches, &handle.program.output_ty, &handle.program.defs)
+                .map_err(|e| Error::ArrowConversion(e.to_string()))?;
 
-                // Execute query and get Arrow RecordBatches
-                let mut stmt = conn.prepare(&program.sql)?;
-                let arrow = stmt.query_arrow(args.as_params())?;
-                let batches: Vec<_> = arrow.collect();
-
-                // Convert Arrow to Lutra format
-                let output =
-                    match lutra_arrow::arrow_to_lutra(batches, &program.output_ty, &program.defs) {
-                        Ok(o) => o,
-                        Err(e) => return Ok(Err(Error::ArrowConversion(e.to_string()))),
-                    };
-
-                Ok(Ok(output.to_vec()))
-            })
-            .await?
+        Ok(output.to_vec())
     }
 
-    async fn get_interface(&self) -> Result<String, Self::Error> {
-        schema::pull_interface(self).await
+    fn get_interface_sync(&mut self) -> Result<String, Self::Error> {
+        schema::pull_interface(self)
     }
 }
 
@@ -113,20 +99,13 @@ pub enum Error {
     #[error("bad result: {}", .0)]
     BadDatabaseResponse(&'static str),
     #[error("duckdb: {}", .0)]
-    DuckDB(#[from] async_duckdb::Error),
+    DuckDB(#[from] duckdb::Error),
     #[error("unsupported program format")]
     UnsupportedFormat,
     #[error("unsupported data type: {}", .0)]
     UnsupportedDataType(&'static str),
     #[error("arrow conversion: {}", .0)]
     ArrowConversion(String),
-}
-
-impl Error {
-    #[allow(dead_code)]
-    pub(crate) fn from_duck(e: async_duckdb::duckdb::Error) -> Self {
-        Self::DuckDB(async_duckdb::Error::Duckdb(e))
-    }
 }
 
 pub(crate) struct Context<'a> {
@@ -161,16 +140,16 @@ impl<'a> Context<'a> {
 mod tests {
     use super::*;
 
-    #[tokio::test]
-    async fn test_in_memory() {
-        let _runner = Runner::in_memory(None).await.unwrap();
+    #[test]
+    fn test_in_memory() {
+        let _runner = Runner::in_memory(None).unwrap();
         // Basic smoke test
     }
 
-    #[tokio::test]
-    async fn test_file_based() {
+    #[test]
+    fn test_file_based() {
         let temp = std::env::temp_dir().join("test_lutra_duckdb.duckdb");
-        let _runner = Runner::open(temp.to_str().unwrap(), None).await.unwrap();
+        let _runner = Runner::open(temp.to_str().unwrap(), None).unwrap();
         // Test persistence
         std::fs::remove_file(temp).ok();
     }

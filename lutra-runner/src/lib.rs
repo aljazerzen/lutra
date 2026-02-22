@@ -6,7 +6,16 @@ pub mod binary;
 pub mod channel;
 
 #[cfg(feature = "sync")]
-pub mod sync;
+mod sync;
+
+#[cfg(feature = "async")]
+mod r#async;
+
+#[cfg(feature = "sync")]
+pub use sync::SyncRunner;
+
+#[cfg(feature = "async")]
+pub use r#async::AsyncRunner;
 
 use lutra_bin::{rr, string, vec};
 
@@ -92,6 +101,76 @@ pub trait Run {
     /// Releases any claimed resources or network connections.
     fn shutdown(&self) -> impl Future<Output = Result<(), Self::Error>> {
         async { Ok(()) }
+    }
+}
+
+/// Synchronous version of the Run trait for runners that don't block the process.
+///
+/// This trait should only be implemented for runners that:
+/// - Execute entirely in-memory (like the interpreter)
+/// - Use internal thread pools for blocking operations (like DuckDB)
+///
+/// Do NOT implement this for runners that perform actual async I/O operations
+/// (like network database connections).
+///
+/// Methods take `&mut self` since synchronous operations may need to mutate
+/// internal state (like database connections).
+pub trait RunSync {
+    type Error: core::fmt::Debug;
+    type Prepared;
+
+    /// Run a program.
+    ///
+    /// This is helper function for [RunSync::prepare_sync] followed by [RunSync::execute_sync],
+    /// with input encoding and output decoding.
+    fn run_sync<I, O>(
+        &mut self,
+        program: &rr::TypedProgram<I, O>,
+        input: &I,
+    ) -> Result<lutra_bin::Result<O>, Self::Error>
+    where
+        I: lutra_bin::Encode,
+        O: lutra_bin::Decode,
+    {
+        let input = input.encode();
+        let handle = self.prepare_sync(program.inner.clone())?;
+        let output = self.execute_sync(&handle, &input)?;
+        Ok(O::decode(&output))
+    }
+
+    /// Prepares a program for execution and returns a handle, which can be
+    /// used with [RunSync::execute_sync].
+    ///
+    /// If the program is invalid, error is returned either now or later by [RunSync::execute_sync].
+    ///
+    /// When the handle is returned, the program might not be
+    /// fully prepared yet, so first execution of the program
+    /// might take longer then subsequent [RunSync::execute_sync] calls.
+    fn prepare_sync(&mut self, program: rr::Program) -> Result<Self::Prepared, Self::Error>;
+
+    /// Execute a prepared program synchronously.
+    /// Program's format must match the format supported by this runner.
+    fn execute_sync(
+        &mut self,
+        program: &Self::Prepared,
+        input: &[u8],
+    ) -> Result<vec::Vec<u8>, Self::Error>;
+
+    /// Return static interface of this runner as Lutra source code.
+    ///
+    /// Runners can provide implementations for functions that are not part of
+    /// standard library. This function returns definitions of these functions as
+    /// Lutra source code.
+    ///
+    /// For example: interpreter can provide `fs::read_parquet()`
+    /// and DuckDB runner can provide `sql::read_table()`.
+    fn get_interface_sync(&mut self) -> Result<string::String, Self::Error> {
+        Ok(string::String::new())
+    }
+
+    /// Releases any claimed resources.
+    fn shutdown_sync(&mut self) -> Result<(), Self::Error> {
+        Ok(())
     }
 }
 

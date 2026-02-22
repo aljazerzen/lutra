@@ -48,11 +48,7 @@ impl Runner {
                 let _runner_thread = std::thread::Builder::new()
                     .name("runner-interpreter".to_string())
                     .spawn(move || {
-                        let rt = tokio::runtime::Builder::new_current_thread()
-                            .enable_all()
-                            .build()
-                            .unwrap();
-                        rt.block_on(server.run());
+                        server.run();
                     })?;
                 (client, _runner_thread)
             }
@@ -67,32 +63,24 @@ impl Runner {
                     lutra_runner_postgres::RunnerAsync::connect_no_tls(&connection_string).await
                 })?;
 
+                let runner = lutra_runner::SyncRunner::new(runner);
                 let (client, server) = lutra_runner::channel::new_pair(runner);
 
                 let _runner_thread = std::thread::Builder::new()
                     .name("runner-postgres".to_string())
                     .spawn(move || {
-                        rt.block_on(server.run());
+                        server.run();
                     })?;
                 (client, _runner_thread)
             }
             RunnerConfig::DuckDB { path, file_system } => {
-                // Create tokio runtime for async duckdb connection
-                let path = path.clone();
-                let rt = tokio::runtime::Builder::new_current_thread()
-                    .enable_all()
-                    .build()?;
-
-                let runner = rt.block_on(async {
-                    lutra_runner_duckdb::Runner::open(&path, file_system.clone()).await
-                })?;
-
+                let runner = lutra_runner_duckdb::Runner::open(path, file_system.clone())?;
                 let (client, server) = lutra_runner::channel::new_pair(runner);
 
                 let _runner_thread = std::thread::Builder::new()
                     .name("runner-duckdb".to_string())
                     .spawn(move || {
-                        rt.block_on(server.run());
+                        server.run();
                     })?;
                 (client, _runner_thread)
             }
