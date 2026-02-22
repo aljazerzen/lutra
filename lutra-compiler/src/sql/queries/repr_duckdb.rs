@@ -6,7 +6,7 @@
 use std::borrow::Cow;
 
 use lutra_bin::ir;
-use sql_ast as sa;
+use lutra_sql as sa;
 
 use crate::sql::COL_ARRAY_INDEX;
 use crate::sql::COL_VALUE;
@@ -412,7 +412,7 @@ fn is_ident(ty: &ir::Ty, name: &[&'static str]) -> bool {
     ty_ident.0 == name
 }
 
-fn take_front(cols: &mut Vec<sql_ast::Expr>, count: usize) -> Vec<sql_ast::Expr> {
+fn take_front(cols: &mut Vec<sa::Expr>, count: usize) -> Vec<sa::Expr> {
     let rem = cols.split_off(count);
     std::mem::replace(cols, rem)
 }

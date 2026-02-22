@@ -1,5 +1,6 @@
 [package]
 name = "lutra-compiler"
+description = "Compiler for Lutra query language"
 
 edition.workspace = true
 license.workspace = true
@@ -22,7 +23,7 @@ walkdir = "2.5.0"
 chumsky = { workspace = true }
 
 # sql backend
-sql-ast = { workspace = true }
+lutra-sql = { workspace = true }
 
 # cli
 clap = { version = "4.4.18", features = ["derive"], optional = true }

@@ -2144,7 +2144,7 @@ dependencies = [
 
 [[package]]
 name = "lutra-arrow"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "arrow",
  "lutra-bin",
@@ -2154,7 +2154,7 @@ dependencies = [
 
 [[package]]
 name = "lutra-bin"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "bytes",
  "chrono",
@@ -2173,7 +2173,7 @@ dependencies = [
 
 [[package]]
 name = "lutra-cli"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "anyhow",
  "clap",
@@ -2198,19 +2198,19 @@ dependencies = [
 
 [[package]]
 name = "lutra-codegen"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "base85",
  "bytes",
  "lutra-bin",
  "lutra-compiler",
- "sql-ast",
+ "lutra-sql",
  "tracing",
 ]
 
 [[package]]
 name = "lutra-compiler"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "append-only-vec",
  "ariadne",
@@ -2222,7 +2222,7 @@ dependencies = [
  "insta",
  "itertools 0.13.0",
  "lutra-bin",
- "sql-ast",
+ "lutra-sql",
  "strum 0.26.3",
  "thiserror 2.0.12",
  "tracing",
@@ -2231,7 +2231,7 @@ dependencies = [
 
 [[package]]
 name = "lutra-interpreter"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "arrow",
  "chrono",
@@ -2247,7 +2247,7 @@ dependencies = [
 
 [[package]]
 name = "lutra-ir"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "chumsky",
  "insta",
@@ -2259,7 +2259,7 @@ dependencies = [
 
 [[package]]
 name = "lutra-runner"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "embedded-io-async",
  "lutra-bin",
@@ -2270,7 +2270,7 @@ dependencies = [
 
 [[package]]
 name = "lutra-runner-duckdb"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "arrow",
  "bytes",
@@ -2286,7 +2286,7 @@ dependencies = [
 
 [[package]]
 name = "lutra-runner-postgres"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "bytes",
  "futures",
@@ -2319,8 +2319,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "lutra-sql"
+version = "0.5.0"
+dependencies = [
+ "log",
+ "regex",
+]
+
+[[package]]
 name = "lutra-tui"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "anyhow",
  "crossterm 0.28.1",
@@ -3754,14 +3762,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "sql-ast"
-version = "0.4.0"
-dependencies = [
- "log",
- "regex",
-]
-
-[[package]]
 name = "sqlformat"
 version = "0.3.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4016,7 +4016,7 @@ dependencies = [
 
 [[package]]
 name = "tests"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "arrow",
  "console",

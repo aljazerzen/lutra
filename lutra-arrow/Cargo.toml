@@ -1,6 +1,6 @@
 [package]
 name = "lutra-arrow"
-publish = ["codeberg-org"]
+description = "Arrow format conversion for Lutra: converting between Arrow RecordBatch and Lutra binary values"
 edition.workspace = true
 license.workspace = true
 repository.workspace = true

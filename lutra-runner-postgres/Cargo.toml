@@ -1,5 +1,6 @@
 [package]
 name = "lutra-runner-postgres"
+description = "PostgreSQL runner for Lutra"
 edition.workspace = true
 license.workspace = true
 repository.workspace = true

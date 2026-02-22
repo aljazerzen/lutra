@@ -1,5 +1,6 @@
 [package]
 name = "lutra-cli"
+description = "Command-line interface for the Lutra query language"
 edition.workspace = true
 license.workspace = true
 repository.workspace = true

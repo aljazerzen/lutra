@@ -222,7 +222,7 @@ struct Col {
 impl std::fmt::Display for Col {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let not_null = if self.nullable { "" } else { " NOT NULL" };
-        let name = sql_ast::Ident::with_quote_if_needed('"', &self.name);
+        let name = lutra_sql::Ident::with_quote_if_needed('"', &self.name);
         std::write!(f, "  {name} {}{not_null}", self.ty)
     }
 }

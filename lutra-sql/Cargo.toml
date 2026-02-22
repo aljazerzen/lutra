@@ -1,5 +1,6 @@
 [package]
-name = "sql-ast"
+name = "lutra-sql"
+description = "SQL AST representation"
 
 edition.workspace = true
 license.workspace = true

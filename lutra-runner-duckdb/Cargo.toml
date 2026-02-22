@@ -1,5 +1,6 @@
 [package]
 name = "lutra-runner-duckdb"
+description = "DuckDB runner for Lutra"
 edition.workspace = true
 license.workspace = true
 repository.workspace = true

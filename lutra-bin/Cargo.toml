@@ -1,5 +1,6 @@
 [package]
 name = "lutra-bin"
+description = "Binary format library for Lutra: IR/RR encoding, decoding, and value representation"
 edition.workspace = true
 license.workspace = true
 repository.workspace = true

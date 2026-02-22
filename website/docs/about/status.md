@@ -5,7 +5,7 @@ title: Status
 This project was created by Aljaž M. Eržen as a personal passion project.
 
 It is in a very early stage of development.
-It is not yet licensed under any license.
+It is available for anyone to use, modify, and distribute under the Apache 2.0 license.
 
 I'm looking for feedback on usability and language design.
 If you have spare time and interest in data tools, clone and build the project to see it in action.

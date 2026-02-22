@@ -7,7 +7,7 @@ mod types;
 use std::collections::HashMap;
 
 use lutra_bin::ir;
-use sql_ast as sa;
+use lutra_sql as sa;
 
 use crate::sql::utils::{Node, RelCols};
 use crate::sql::{COL_ARRAY_INDEX, COL_VALUE, Dialect};

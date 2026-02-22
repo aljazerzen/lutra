@@ -1,6 +1,6 @@
 //! Utils for constructing SQL AST nodes
 
-use sql_ast as sa;
+use lutra_sql as sa;
 
 // TODO: these things should probably be moved into sql-ast crate
 

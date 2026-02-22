@@ -1,5 +1,6 @@
 [package]
 name = "rust-interpreter"
+description = "Example Lutra project using bytecode interpreter"
 resolver = "2"
 edition = "2021"
 

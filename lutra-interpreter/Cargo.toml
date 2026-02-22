@@ -1,5 +1,6 @@
 [package]
 name = "lutra-interpreter"
+description = "Bytecode interpreter for Lutra programs"
 edition.workspace = true
 license.workspace = true
 repository.workspace = true

@@ -51,7 +51,7 @@ test:
 # Publish crates
 publish:
     cargo publish -p lutra-bin
-    cargo publish -p sql-ast
+    cargo publish -p lutra-sql
     cargo publish -p lutra-compiler
     cargo publish -p lutra-codegen
     cargo publish -p lutra-runner

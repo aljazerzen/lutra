@@ -1,5 +1,6 @@
 [package]
 name = "lutra-codegen"
+description = "Code generation for Lutra"
 
 edition.workspace = true
 license.workspace = true
@@ -12,7 +13,7 @@ version.workspace = true
 bytes = { workspace = true }
 lutra-compiler = { workspace = true }
 lutra-bin = { workspace = true, features = ["std"] }
-sql-ast = { workspace = true } # needed only for ident escape
+lutra-sql = { workspace = true } # needed only for ident escape
 base85 = "2.0.0"
 tracing = { workspace = true }
 # tracing-subscriber = { workspace = true }

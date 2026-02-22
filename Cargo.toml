@@ -1,30 +1,30 @@
 [workspace]
 members = [
     "lutra-bin",
-    "lutra-arrow",
     "lutra-bin/python",
-    "lutra-cli",
-    "lutra-codegen",
+    "lutra-sql",
     "lutra-compiler",
-    "lutra-interpreter",
-    "lutra-ir",
-    "lutra-tui",
-    "tests",
+    "lutra-codegen",
     "lutra-runner",
     "lutra-runner-postgres",
     "lutra-runner-postgres/python",
+    "lutra-arrow",
     "lutra-runner-duckdb",
-    "sql-ast",
+    "lutra-interpreter",
+    "lutra-tui",
+    "lutra-cli",
+    "lutra-ir",
+    "tests",
 ]
 exclude = ["examples"]
 resolver = "2"
 
 [workspace.package]
 edition = "2024"
-license = "MIT or Apache 2.0"
-repository = "https://code.murerzen.eu/lutra-data"
+license = "Apache-2.0"
+repository = "https://codeberg.org/lutra/lutra/"
 rust-version = "1.91"
-version = "0.4.0"
+version = "0.5.0"
 
 [workspace.dependencies]
 itertools = "0.13.0"
@@ -47,18 +47,18 @@ chrono-tz = { version = "0.10.4", default-features = false }
 arrow = "56.2.0"
 parquet = "56.2.0"
 
-lutra-arrow = { version = "0.4", registry = "codeberg-org", path = "lutra-arrow" }
-lutra-bin = { version = "0.4", registry = "codeberg-org", path = "lutra-bin", default-features = false }
-lutra-bin-python = { version = "0.4", registry = "codeberg-org", path = "lutra-bin/python" }
-lutra-cli = { version = "0.4", registry = "codeberg-org", path = "lutra-cli" }
-lutra-codegen = { version = "0.4", registry = "codeberg-org", path = "lutra-codegen" }
-lutra-compiler = { version = "0.4", registry = "codeberg-org", path = "lutra-compiler" }
-lutra-interpreter = { version = "0.4", registry = "codeberg-org", path = "lutra-interpreter" }
-lutra-ir = { version = "0.4", registry = "codeberg-org", path = "lutra-ir" }
-lutra-tui = { version = "0.4", registry = "codeberg-org", path = "lutra-tui" }
-tests = { version = "0.4", registry = "codeberg-org", path = "tests" }
-lutra-runner = { version = "0.4", registry = "codeberg-org", path = "lutra-runner" }
-lutra-runner-postgres = { version = "0.4", registry = "codeberg-org", path = "lutra-runner-postgres", default-features = false }
-lutra-runner-postgres-python = { version = "0.4", registry = "codeberg-org", path = "lutra-runner-postgres/python", default-features = false }
-lutra-runner-duckdb = { version = "0.4", registry = "codeberg-org", path = "lutra-runner-duckdb" }
-sql-ast = { version = "0.4", registry = "codeberg-org", path = "sql-ast" }
+lutra-arrow = { version = "0.5", path = "lutra-arrow" }
+lutra-bin = { version = "0.5", path = "lutra-bin", default-features = false }
+lutra-bin-python = { version = "0.5", path = "lutra-bin/python" }
+lutra-cli = { version = "0.5", path = "lutra-cli" }
+lutra-codegen = { version = "0.5", path = "lutra-codegen" }
+lutra-compiler = { version = "0.5", path = "lutra-compiler" }
+lutra-interpreter = { version = "0.5", path = "lutra-interpreter" }
+lutra-ir = { version = "0.5", path = "lutra-ir" }
+lutra-runner = { version = "0.5", path = "lutra-runner" }
+lutra-runner-duckdb = { version = "0.5", path = "lutra-runner-duckdb" }
+lutra-runner-postgres = { version = "0.5", path = "lutra-runner-postgres", default-features = false }
+lutra-runner-postgres-python = { version = "0.5", path = "lutra-runner-postgres/python", default-features = false }
+lutra-sql = { version = "0.5", path = "lutra-sql" }
+lutra-tui = { version = "0.5", path = "lutra-tui" }
+tests = { version = "0.5", path = "tests" }

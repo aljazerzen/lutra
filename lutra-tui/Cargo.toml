@@ -1,5 +1,6 @@
 [package]
 name = "lutra-tui"
+description = "Terminal UI components for Lutra: interactive project explorer and value input forms"
 edition.workspace = true
 license.workspace = true
 repository.workspace = true

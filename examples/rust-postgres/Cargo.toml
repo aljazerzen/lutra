@@ -1,5 +1,6 @@
 [package]
 name = "project2"
+description = "Example Lutra project using PostgreSQL runner"
 resolver = "2"
 edition = "2021"
 

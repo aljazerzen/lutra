@@ -1,5 +1,5 @@
 use lutra_bin::ir;
-use sql_ast as sa;
+use lutra_sql as sa;
 
 use crate::sql::Dialect;
 

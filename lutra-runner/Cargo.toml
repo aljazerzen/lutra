@@ -1,5 +1,6 @@
 [package]
 name = "lutra-runner"
+description = "Runner abstraction for executing Lutra programs"
 edition.workspace = true
 license.workspace = true
 repository.workspace = true

@@ -14,10 +14,6 @@ There is few Rust crates that provide different functionality:
 - `lutra-interpreter`: a runner that executes programs on a local interpreter
 - `lutra-runner-postgres`: a runner that executes programs on PostgreSQL
 
-!!! note
-
-    While Lutra (the project) is in a pre-release state, none of the packages are yet published to crates.io. Instead, I use a custom registry at [codeberg.org](https://codeberg.org/lutra/_cargo-index) to host the packages.
-
 
 ## Basic setup
 
@@ -44,13 +40,13 @@ First, we need to add dependencies to the `Cargo.toml` file:
 
 [build-dependencies]
 # For generating bindings
-lutra-codegen = {version = "0.2", registry-index = "https://codeberg.org/lutra/_cargo-index.git"}
+lutra-codegen = {version = "0.5"}
 
 [dependencies]
 # Used by generated bindings
-lutra-bin = {version = "0.2", registry-index = "https://codeberg.org/lutra/_cargo-index.git"}
+lutra-bin = {version = "0.5"}
 # For running programs
-lutra-interpreter = {version = "0.2", registry-index = "https://codeberg.org/lutra/_cargo-index.git"}
+lutra-interpreter = {version = "0.5"}
 ```
 
 Now, we call `lutra-codegen` in `build.rs` file:
@@ -141,7 +137,7 @@ Now, the setup is similar to the interpreter example, but we need to use `lutra-
 # Cargo.toml
 
 [dependencies]
-lutra-runner-postgres = {version = "0.2", registry-index = "https://codeberg.org/lutra/_cargo-index.git"}
+lutra-runner-postgres = {version = "0.5"}
 ```
 
 Also, we need to tell the compiler emit `sql-pg` program format, that can run on PostgreSQL.
