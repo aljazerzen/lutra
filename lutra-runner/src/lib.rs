@@ -94,7 +94,7 @@ pub trait Run {
     ///
     /// For example: interpreter can provide `fs::read_parquet()`
     /// and PostgreSQL runner can provide `sql::read_table()`.
-    fn get_interface(&self) -> impl Future<Output = Result<string::String, Self::Error>> {
+    fn pull_schema(&self) -> impl Future<Output = Result<string::String, Self::Error>> {
         async { Ok(string::String::new()) }
     }
 
@@ -164,7 +164,7 @@ pub trait RunSync {
     ///
     /// For example: interpreter can provide `fs::read_parquet()`
     /// and DuckDB runner can provide `sql::read_table()`.
-    fn get_interface_sync(&mut self) -> Result<string::String, Self::Error> {
+    fn pull_schema_sync(&mut self) -> Result<string::String, Self::Error> {
         Ok(string::String::new())
     }
 

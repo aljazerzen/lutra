@@ -89,9 +89,9 @@ where
         guard.execute_sync(program, input)
     }
 
-    async fn get_interface(&self) -> Result<string::String, Self::Error> {
+    async fn pull_schema(&self) -> Result<string::String, Self::Error> {
         let mut guard = self.inner.lock().unwrap();
-        guard.get_interface_sync()
+        guard.pull_schema_sync()
     }
 
     async fn shutdown(&self) -> Result<(), Self::Error> {

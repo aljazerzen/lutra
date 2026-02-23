@@ -54,13 +54,13 @@ impl<'a> lutra_runner::RunSync for InterpreterRunner<'a> {
         )
     }
 
-    fn get_interface_sync(&mut self) -> Result<std::string::String, Self::Error> {
+    fn pull_schema_sync(&mut self) -> Result<std::string::String, Self::Error> {
         let Some(fs) = &self.file_system else {
             return Ok(String::new());
         };
 
         // TODO: error
-        Ok(lutra_arrow::get_interface(fs).unwrap())
+        Ok(lutra_arrow::pull_schema(fs).unwrap())
     }
 }
 

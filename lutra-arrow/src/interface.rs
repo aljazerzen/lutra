@@ -34,7 +34,7 @@ pub enum Error {
 /// reading `.parquet` files.
 ///
 /// Does not traverse links.
-pub fn get_interface(base_path: &path::Path) -> Result<String, Error> {
+pub fn pull_schema(base_path: &path::Path) -> Result<String, Error> {
     let mut r = String::new();
     let mut paths_to_search = vec![base_path.to_path_buf()];
 
@@ -51,7 +51,7 @@ pub fn get_interface(base_path: &path::Path) -> Result<String, Error> {
         } else if md.is_file() && path.extension().is_some_and(|e| e == "parquet") {
             let relative = path.strip_prefix(base_path).unwrap();
 
-            r += &get_interface_of_parquet_file(&path, relative)?;
+            r += &pull_schema_of_parquet_file(&path, relative)?;
             r += "\n";
         }
     }
@@ -61,7 +61,7 @@ pub fn get_interface(base_path: &path::Path) -> Result<String, Error> {
 
 /// Read metadata of a parquet file and generates Lutra source code of a
 /// function that reads this file.
-fn get_interface_of_parquet_file(
+fn pull_schema_of_parquet_file(
     path: &path::Path,
     path_relative: &path::Path,
 ) -> Result<String, Error> {

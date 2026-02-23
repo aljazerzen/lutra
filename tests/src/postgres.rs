@@ -2672,7 +2672,7 @@ async fn pull_interface() {
     tran.batch_execute(MOVIES_SETUP).await.unwrap();
     let runner = RunnerAsync::new(tran);
 
-    insta::assert_snapshot!(runner.get_interface().await.unwrap(), @r#"
+    insta::assert_snapshot!(runner.pull_schema().await.unwrap(), @r#"
     ## Row of table persons
     type Person: {id: int32, first_name: text, last_name: text}
     ## Read from table persons
@@ -2792,7 +2792,7 @@ async fn _type_round_trip(ty: &str, ty_reflected: &str, value: lutra_bin::Value)
 
     // pull
     let runner = RunnerAsync::new(tran);
-    let interface = runner.get_interface().await.unwrap();
+    let interface = runner.pull_schema().await.unwrap();
     tracing::debug!("interface:\n{interface}");
 
     // compare with original type

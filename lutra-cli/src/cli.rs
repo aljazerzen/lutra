@@ -417,14 +417,14 @@ pub async fn pull_interface(cmd: PullInterfaceCommand) -> anyhow::Result<()> {
     let interface = if cmd.runner.interpreter {
         let runner = lutra_interpreter::InterpreterRunner::default().with_file_system(cmd.project);
         let runner = lutra_runner::AsyncRunner::new(runner);
-        runner.get_interface().await?
+        runner.pull_schema().await?
     } else if let Some(pg_url) = cmd.runner.postgres {
         let runner = init_runner_postgres(&pg_url).await?;
-        runner.get_interface().await?
+        runner.pull_schema().await?
     } else if let Some(duckdb_path) = cmd.runner.duckdb {
         let runner = init_runner_duckdb(&duckdb_path, cmd.project)?;
         let runner = lutra_runner::AsyncRunner::new(runner);
-        runner.get_interface().await?
+        runner.pull_schema().await?
     } else {
         unreachable!()
     };

@@ -121,7 +121,7 @@ where
         result::from_sql(&handle.program, &rows, &ctx)
     }
 
-    async fn get_interface(&self) -> Result<std::string::String, Self::Error> {
+    async fn pull_schema(&self) -> Result<std::string::String, Self::Error> {
         Ok(crate::schema::pull_interface(self).await?)
     }
 }

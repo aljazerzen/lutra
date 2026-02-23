@@ -149,7 +149,7 @@ fn pull_interface_basic() {
     ).unwrap();
 
     let mut runner = lutra_runner_duckdb::Runner::new(conn, None).unwrap();
-    let interface = runner.get_interface_sync().unwrap();
+    let interface = runner.pull_schema_sync().unwrap();
 
     insta::assert_snapshot!(interface, @r#"
     ## Row of table posts
@@ -199,7 +199,7 @@ fn pull_interface_types() {
     .unwrap();
 
     let mut runner = lutra_runner_duckdb::Runner::new(conn, None).unwrap();
-    let interface = runner.get_interface_sync().unwrap();
+    let interface = runner.pull_schema_sync().unwrap();
 
     insta::assert_snapshot!(interface, @r#"
     ## Row of table type_test
@@ -229,7 +229,7 @@ fn pull_interface_arrays() {
     .unwrap();
 
     let mut runner = lutra_runner_duckdb::Runner::new(conn, None).unwrap();
-    let interface = runner.get_interface_sync().unwrap();
+    let interface = runner.pull_schema_sync().unwrap();
 
     insta::assert_snapshot!(interface, @r#"
     ## Row of table arrays_test
@@ -258,7 +258,7 @@ fn pull_interface_struct() {
     .unwrap();
 
     let mut runner = lutra_runner_duckdb::Runner::new(conn, None).unwrap();
-    let interface = runner.get_interface_sync().unwrap();
+    let interface = runner.pull_schema_sync().unwrap();
 
     insta::assert_snapshot!(interface, @r#"
     ## Row of table struct_test
@@ -288,7 +288,7 @@ fn pull_interface_indexes_basic() {
     .unwrap();
 
     let mut runner = lutra_runner_duckdb::Runner::new(conn, None).unwrap();
-    let interface = runner.get_interface_sync().unwrap();
+    let interface = runner.pull_schema_sync().unwrap();
 
     insta::assert_snapshot!(interface, @r#"
     ## Row of table users
@@ -331,7 +331,7 @@ fn pull_interface_indexes_compound() {
     .unwrap();
 
     let mut runner = lutra_runner_duckdb::Runner::new(conn, None).unwrap();
-    let interface = runner.get_interface_sync().unwrap();
+    let interface = runner.pull_schema_sync().unwrap();
 
     insta::assert_snapshot!(interface, @r#"
     ## Row of table orders

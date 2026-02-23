@@ -89,7 +89,7 @@ impl lutra_runner::RunSync for Runner {
         Ok(output.to_vec())
     }
 
-    fn get_interface_sync(&mut self) -> Result<String, Self::Error> {
+    fn pull_schema_sync(&mut self) -> Result<String, Self::Error> {
         schema::pull_interface(self)
     }
 }

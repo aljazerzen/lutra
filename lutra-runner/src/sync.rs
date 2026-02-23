@@ -125,10 +125,9 @@ where
             .block_on(async move { runner.execute(program, input).await })
     }
 
-    fn get_interface_sync(&mut self) -> Result<string::String, Self::Error> {
+    fn pull_schema_sync(&mut self) -> Result<string::String, Self::Error> {
         let runner = Arc::clone(&self.runner);
-        self.rt
-            .block_on(async move { runner.get_interface().await })
+        self.rt.block_on(async move { runner.pull_schema().await })
     }
 
     fn shutdown_sync(&mut self) -> Result<(), Self::Error> {
@@ -182,7 +181,7 @@ mod tests {
             Ok(vec::Vec::from(input))
         }
 
-        async fn get_interface(&self) -> Result<string::String, Self::Error> {
+        async fn pull_schema(&self) -> Result<string::String, Self::Error> {
             Ok(string::String::from("mock interface"))
         }
 
@@ -213,8 +212,8 @@ mod tests {
         let output = sync_runner.execute_sync(&prepared, input_data).unwrap();
         assert_eq!(&output[..], input_data);
 
-        // Test get_interface
-        let interface = sync_runner.get_interface_sync().unwrap();
+        // Test pull_schema
+        let interface = sync_runner.pull_schema_sync().unwrap();
         assert_eq!(&interface[..], "mock interface");
 
         // Test shutdown

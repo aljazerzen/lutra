@@ -55,14 +55,14 @@ use lutra_runner_duckdb::Runner;
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Create in-memory database
     let mut runner = Runner::in_memory(None)?;
-    
+
     // Or use file-based storage
     let mut runner = Runner::open("data/analysis.duckdb", None)?;
-    
+
     // Prepare and execute a program
     let prepared = runner.prepare_sync(program)?;
     let output = runner.execute_sync(&prepared, &input)?;
-    
+
     Ok(())
 }
 ```
@@ -80,11 +80,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Create runner and wrap for async usage
     let sync_runner = Runner::in_memory(None)?;
     let runner = AsyncRunner::new(sync_runner);
-    
+
     // Prepare and execute a program
     let prepared = runner.prepare(program).await?;
     let output = runner.execute(&prepared, &input).await?;
-    
+
     Ok(())
 }
 ```
@@ -105,30 +105,7 @@ lutra run --duckdb=data.duckdb
 
 Following features are currently being worked on.
 
-### 1. Arrays/Enums from External Tables
-
-When constructing arrays in Lutra code, they work perfectly (see examples below).
-However, reading arrays/enums from **existing DuckDB table columns** via
-`std::sql::from()` is not yet fully supported:
-
-```rust
-// ✅ Works - constructing arrays in Lutra
-func main() -> [1, 2, 3]: [int64]
-
-// ✅ Works - arrays in tuples (serialized as DuckDB LIST via subquery)
-func main() -> {nums: [1, 2, 3]: [int64], count: 3}
-
-// ⚠️ Limited - reading LIST columns from existing tables
-func process_data() -> std::sql::from("table_with_list_column")
-// This may not deserialize LIST columns correctly
-```
-
-### 2. Schema Introspection
-
-The `get_interface()` method currently returns an empty string. Schema
-introspection from existing DuckDB databases is not yet implemented.
-
-### 3. Input Parameter Limitations
+### 1. Input Parameter Limitations
 
 Arrays of tuples as input parameters don't work because duckdb-rs does not yet
 support STRUCT and LIST values in their bind_parameter function.

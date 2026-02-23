@@ -44,7 +44,7 @@ fn test_interface_primitives_no_nulls() {
     _write_parquet_file(&test_dir, "users.parquet", batch);
 
     // Generate interface
-    let interface = lutra_arrow::get_interface(test_dir.path()).unwrap();
+    let interface = lutra_arrow::pull_schema(test_dir.path()).unwrap();
 
     insta::assert_snapshot!(interface, @r#"
     func users(): [{
@@ -79,7 +79,7 @@ fn test_interface_optional_with_nulls() {
 
     _write_parquet_file(&test_dir, "users_with_nulls.parquet", batch);
 
-    let interface = lutra_arrow::get_interface(test_dir.path()).unwrap();
+    let interface = lutra_arrow::pull_schema(test_dir.path()).unwrap();
 
     // Should wrap nullable field in option enum because it has nulls
     insta::assert_snapshot!(interface, @r#"
@@ -116,7 +116,7 @@ fn test_interface_optional_without_nulls() {
 
     _write_parquet_file(&test_dir, "users_no_nulls.parquet", batch);
 
-    let interface = lutra_arrow::get_interface(test_dir.path()).unwrap();
+    let interface = lutra_arrow::pull_schema(test_dir.path()).unwrap();
 
     // Should NOT wrap in option enum because there are no nulls
     insta::assert_snapshot!(interface, @r#"
@@ -174,7 +174,7 @@ fn test_interface_nested_struct() {
 
     _write_parquet_file(&test_dir, "users_with_address.parquet", batch);
 
-    let interface = lutra_arrow::get_interface(test_dir.path()).unwrap();
+    let interface = lutra_arrow::pull_schema(test_dir.path()).unwrap();
 
     // Nested optional fields are conservatively wrapped in option
     insta::assert_snapshot!(interface, @r#"
@@ -210,7 +210,7 @@ fn test_interface_multiple_files() {
     .unwrap();
     _write_parquet_file(&test_dir, "file2.parquet", batch2);
 
-    let interface = lutra_arrow::get_interface(test_dir.path()).unwrap();
+    let interface = lutra_arrow::pull_schema(test_dir.path()).unwrap();
 
     // Should have both functions (order may vary)
     assert!(interface.contains("func file1()"));
@@ -240,7 +240,7 @@ fn test_interface_nested_directories() {
     writer.write(&batch).unwrap();
     writer.close().unwrap();
 
-    let interface = lutra_arrow::get_interface(test_dir.path()).unwrap();
+    let interface = lutra_arrow::pull_schema(test_dir.path()).unwrap();
 
     // Should find nested file with path
     insta::assert_snapshot!(interface, @r#"
@@ -255,7 +255,7 @@ fn test_interface_nested_directories() {
 fn test_interface_empty_directory() {
     let test_dir = TempDir::new().unwrap();
 
-    let interface = lutra_arrow::get_interface(test_dir.path()).unwrap();
+    let interface = lutra_arrow::pull_schema(test_dir.path()).unwrap();
 
     // Should return empty string for empty directory
     assert_eq!(interface, "");
@@ -269,7 +269,7 @@ fn test_interface_non_parquet_files() {
     fs::write(test_dir.path().join("readme.txt"), "test").unwrap();
     fs::write(test_dir.path().join("data.csv"), "a,b,c").unwrap();
 
-    let interface = lutra_arrow::get_interface(test_dir.path()).unwrap();
+    let interface = lutra_arrow::pull_schema(test_dir.path()).unwrap();
 
     // Should ignore non-parquet files
     assert_eq!(interface, "");

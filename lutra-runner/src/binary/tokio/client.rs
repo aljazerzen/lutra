@@ -144,7 +144,7 @@ where
         }
     }
 
-    async fn get_interface(&self) -> Result<std::string::String, Self::Error> {
+    async fn pull_schema(&self) -> Result<std::string::String, Self::Error> {
         Ok("".into())
     }
 

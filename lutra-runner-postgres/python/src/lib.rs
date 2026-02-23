@@ -86,12 +86,12 @@ impl Runner {
         })
     }
 
-    fn get_interface<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+    fn pull_schema<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         let inner = self.inner.clone();
 
         pyo3_async_runtimes::tokio::future_into_py(py, async move {
             inner
-                .get_interface()
+                .pull_schema()
                 .await
                 .map_err(|e| PyValueError::new_err(e.to_string()))
         })

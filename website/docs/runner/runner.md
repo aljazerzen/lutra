@@ -47,7 +47,7 @@ trait Run {
     ///
     /// For example: interpreter can provide `fs::read_parquet(...)`
     /// and PostgreSQL runner can provide `sql::from(...)`.
-    fn get_interface(&self) -> Result<string::String, Self::Error>;
+    fn pull_schema(&self) -> Result<string::String, Self::Error>;
 }
 
 ```
