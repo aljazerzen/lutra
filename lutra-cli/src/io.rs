@@ -1,18 +1,12 @@
+use std::io::{self, BufReader, BufWriter, Read, Write};
 use std::path;
-use std::pin::Pin;
 use std::str::FromStr;
-use std::sync::atomic::{AtomicUsize, Ordering};
-use std::task::{Context, Poll, ready};
-
-use tokio::fs;
-use tokio::io::AsyncWrite;
-use tokio::io::{self, AsyncReadExt, AsyncWriteExt};
 
 use lutra_bin::{bytes, ir, rr, typed_data};
 
 use crate::DataFormat;
 
-pub async fn write_output(
+pub fn write_output(
     data: &[u8],
     output_path: Option<path::PathBuf>,
     cmd_format: Option<DataFormat>,
@@ -29,13 +23,12 @@ pub async fn write_output(
         })
         // fallback to lt
         .unwrap_or(DataFormat::Lt);
+
     if let Some(output_path) = &output_path {
         // file
-        let mut writer = io::BufWriter::new(fs::File::create(output_path).await?);
-
-        let size = write_format(&mut writer, data, format, &ty.output, &ty.defs).await?;
-        writer.flush().await?;
-        writer.shutdown().await?;
+        let mut writer = BufWriter::new(std::fs::File::create(output_path)?);
+        let size = write_format(&mut writer, data, format, &ty.output, &ty.defs)?;
+        writer.flush()?;
         eprintln!(
             "Output written to {} ({}, {size} bytes)",
             output_path.display(),
@@ -43,83 +36,88 @@ pub async fn write_output(
         );
     } else {
         // stdout
-        let mut writer = io::BufWriter::new(io::stdout());
-
-        write_format(&mut writer, data, format, &ty.output, &ty.defs).await?;
-        writer.flush().await?;
-        writer.shutdown().await?;
+        let mut writer = BufWriter::new(io::stdout());
+        write_format(&mut writer, data, format, &ty.output, &ty.defs)?;
+        writer.flush()?;
     };
 
     Ok(())
 }
 
-async fn write_format(
-    w: &mut (impl io::AsyncWrite + Unpin + Send),
+fn write_format(
+    w: &mut impl Write,
     data: &[u8],
     format: DataFormat,
     ty: &ir::Ty,
     ty_defs: &[ir::TyDef],
 ) -> anyhow::Result<usize> {
-    let mut w = AsyncWriteCounter::new(w);
+    let mut w = WriteCounter::new(w);
 
     match format {
-        DataFormat::Ld => w.write_all(data).await?,
+        DataFormat::Ld => w.write_all(data)?,
 
         DataFormat::Lt => {
-            w.write_all("const output = ".as_bytes()).await?;
+            w.write_all("const output = ".as_bytes())?;
             let source = lutra_bin::print_source(data, ty, ty_defs)?;
-            w.write_all(source.as_bytes()).await?;
-            w.write_all("\n".as_bytes()).await?;
+            w.write_all(source.as_bytes())?;
+            w.write_all("\n".as_bytes())?;
         }
 
         DataFormat::Ltd => {
             let mut buf = lutra_bin::bytes::BytesMut::new();
             typed_data::encode(&mut buf, data, ty, ty_defs)?;
-            w.write_all(&buf).await?
+            w.write_all(&buf)?;
         }
+
         DataFormat::Csv => {
             let tabular = lutra_bin::TabularReader::new(data, ty, ty_defs);
-            w.write_all(tabular.column_names().join(",").as_bytes())
-                .await?;
-            w.write_all("\n".as_bytes()).await?;
+            w.write_all(tabular.column_names().join(",").as_bytes())?;
+            w.write_all("\n".as_bytes())?;
             for row in tabular {
                 for (index, cell) in row.iter().enumerate() {
                     if index > 0 {
-                        w.write_all(",".as_bytes()).await?;
+                        w.write_all(",".as_bytes())?;
                     }
                     let source = lutra_bin::print_source(cell.data(), cell.ty(), cell.ty_defs())?;
-                    w.write_all(source.as_bytes()).await?;
+                    w.write_all(source.as_bytes())?;
                 }
-                w.write_all("\n".as_bytes()).await?;
+                w.write_all("\n".as_bytes())?;
             }
         }
+
         DataFormat::Parquet => {
-            use parquet::arrow::AsyncArrowWriter;
+            use parquet::arrow::ArrowWriter;
 
             let ty_item = ty.kind.as_array().unwrap(); // TODO
-
             let batch = lutra_arrow::lutra_to_arrow(data, ty_item, ty_defs)?;
 
-            let mut builder = AsyncArrowWriter::try_new(&mut w, batch.schema(), None).unwrap();
-            builder.write(&batch).await.unwrap();
-            builder.finish().await.unwrap();
+            // ArrowWriter requires Seek, so write to an in-memory buffer first
+            let mut buf = Vec::new();
+            {
+                let mut writer = ArrowWriter::try_new(&mut buf, batch.schema(), None)?;
+                writer.write(&batch)?;
+                writer.finish()?;
+            }
+            w.write_all(&buf)?;
         }
+
         DataFormat::Table => {
             let table = lutra_bin::Table::new(data, ty, ty_defs);
             let rendered = table.render();
-            w.write_all(rendered.as_bytes()).await?;
+            w.write_all(rendered.as_bytes())?;
         }
     }
+
     Ok(w.get_bytes_written())
 }
 
-pub async fn read_input(
+pub fn read_input(
     input_path: Option<path::PathBuf>,
     cmd_format: Option<DataFormat>,
     ty: &rr::ProgramType,
 ) -> anyhow::Result<Vec<u8>> {
     let format = cmd_format
-        // try to infer from output path extension
+        // try to infer from input path extension
         .or_else(|| {
             input_path
                 .as_ref()
@@ -132,8 +130,8 @@ pub async fn read_input(
 
     if let Some(input_path) = input_path {
         eprintln!("Reading input...");
-        let mut reader = io::BufReader::new(fs::File::open(input_path).await?);
-        read_format(&mut reader, format, &ty.input, &ty.defs).await
+        let mut reader = BufReader::new(std::fs::File::open(input_path)?);
+        read_format(&mut reader, format, &ty.input, &ty.defs)
     } else {
         // don't allow reading from stdin (a common mistake)
         // we can implement it when it's needed
@@ -148,8 +146,8 @@ pub async fn read_input(
     }
 }
 
-async fn read_format(
-    r: &mut (impl io::AsyncRead + io::AsyncSeek + Send + Unpin),
+fn read_format(
+    r: &mut impl Read,
     format: DataFormat,
     ty: &ir::Ty,
     ty_defs: &[ir::TyDef],
@@ -157,7 +155,7 @@ async fn read_format(
     match format {
         DataFormat::Ld => {
             let mut buf = Vec::new();
-            r.read_to_end(&mut buf).await?;
+            r.read_to_end(&mut buf)?;
             Ok(buf)
         }
 
@@ -167,72 +165,57 @@ async fn read_format(
 
         DataFormat::Ltd => {
             let mut buf = Vec::new();
-            r.read_to_end(&mut buf).await?;
-
+            r.read_to_end(&mut buf)?;
             Ok(buf.split_off(typed_data::data_offset()))
         }
+
         DataFormat::Csv => {
             todo!()
         }
+
         DataFormat::Parquet => {
-            // read all to memory
             let mut buf = Vec::new();
-            r.read_to_end(&mut buf).await?;
+            r.read_to_end(&mut buf)?;
             let buf = bytes::Bytes::from(buf);
 
-            // init parquet-to-arrow reader
             use parquet::arrow::arrow_reader::ParquetRecordBatchReaderBuilder;
             let builder = ParquetRecordBatchReaderBuilder::try_new(buf)?;
-
-            // read
             let batches = builder.build()?.collect::<Result<_, _>>()?;
 
-            // convert arrow to lutra
             let res = lutra_arrow::arrow_to_lutra(batches, ty, ty_defs)?;
             Ok(res.to_vec())
         }
-        DataFormat::Table => {
-            // Table format is output-only
-            Err(anyhow::anyhow!("Table format is not supported for input"))
-        }
+
+        DataFormat::Table => Err(anyhow::anyhow!("Table format is not supported for input")),
     }
 }
 
-pub struct AsyncWriteCounter<W> {
+struct WriteCounter<W> {
     inner: W,
-    bytes_written: AtomicUsize,
+    bytes_written: usize,
 }
 
-impl<W: AsyncWrite> AsyncWriteCounter<W> {
-    pub fn new(inner: W) -> Self {
+impl<W: Write> WriteCounter<W> {
+    fn new(inner: W) -> Self {
         Self {
             inner,
-            bytes_written: AtomicUsize::new(0),
+            bytes_written: 0,
         }
     }
 
-    pub fn get_bytes_written(&self) -> usize {
-        self.bytes_written.load(Ordering::Relaxed)
+    fn get_bytes_written(&self) -> usize {
+        self.bytes_written
     }
 }
 
-impl<W: AsyncWrite + Unpin> AsyncWrite for AsyncWriteCounter<W> {
-    fn poll_write(
-        mut self: Pin<&mut Self>,
-        cx: &mut Context<'_>,
-        buf: &[u8],
-    ) -> Poll<std::io::Result<usize>> {
-        let bytes_written = ready!(Pin::new(&mut self.inner).poll_write(cx, buf))?;
-        self.bytes_written
-            .fetch_add(bytes_written, Ordering::Relaxed);
-        Poll::Ready(Ok(bytes_written))
+impl<W: Write> Write for WriteCounter<W> {
+    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
+        let n = self.inner.write(buf)?;
+        self.bytes_written += n;
+        Ok(n)
     }
 
-    fn poll_flush(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<std::io::Result<()>> {
-        Pin::new(&mut self.inner).poll_flush(cx)
-    }
-
-    fn poll_shutdown(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<std::io::Result<()>> {
-        Pin::new(&mut self.inner).poll_shutdown(cx)
+    fn flush(&mut self) -> io::Result<()> {
+        self.inner.flush()
     }
 }

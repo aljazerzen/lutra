@@ -98,6 +98,9 @@ pub trait Run {
         async { Ok(string::String::new()) }
     }
 
+    /// Releases a prepared program, freeing any associated resources.
+    fn release(&self, prepared: Self::Prepared) -> impl Future<Output = Result<(), Self::Error>>;
+
     /// Releases any claimed resources or network connections.
     fn shutdown(&self) -> impl Future<Output = Result<(), Self::Error>> {
         async { Ok(()) }
@@ -167,6 +170,9 @@ pub trait RunSync {
     fn pull_schema_sync(&mut self) -> Result<string::String, Self::Error> {
         Ok(string::String::new())
     }
+
+    /// Releases a prepared program, freeing any associated resources.
+    fn release_sync(&mut self, prepared: Self::Prepared) -> Result<(), Self::Error>;
 
     /// Releases any claimed resources.
     fn shutdown_sync(&mut self) -> Result<(), Self::Error> {

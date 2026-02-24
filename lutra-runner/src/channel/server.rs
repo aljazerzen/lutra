@@ -1,23 +1,26 @@
 use std::collections::HashMap;
-use std::sync::mpsc::{Receiver, Sender};
+use tokio::sync::mpsc::{Receiver, Sender};
 
 use lutra_bin::{Decode, rr};
 
-use crate::RunSync;
+use crate::Run;
 use crate::binary::messages;
 
-/// Server that receives commands from clients and executes them on a RunSync runner.
+/// Server that receives commands from clients and executes them on a Run runner.
 ///
-/// The server runs in a dedicated thread and maintains a cache of prepared programs.
+/// The server runs in a dedicated async task and maintains a cache of prepared programs.
 /// It processes commands sequentially in the order they are received.
-pub struct Server<R: RunSync> {
+pub struct Server<R: Run> {
     rx: Receiver<messages::ClientMessage>,
     tx: Sender<messages::ServerMessage>,
     runner: R,
     prepared_programs: HashMap<u32, Result<R::Prepared, messages::Error>>,
 }
 
-impl<R: RunSync> Server<R> {
+impl<R: Run> Server<R>
+where
+    R::Prepared: Send,
+{
     /// Create a new server with the given channels and runner.
     ///
     /// Typically you should use `new_pair()` instead of constructing directly.
@@ -34,40 +37,43 @@ impl<R: RunSync> Server<R> {
         }
     }
 
-    /// Run the server loop synchronously.
+    /// Run the server loop asynchronously.
     ///
-    /// This method blocks, processing commands until the client disconnects
+    /// This method processes commands until the client disconnects
     /// (channel is closed). When the loop exits, cleanup is performed.
-    pub fn run(mut self) {
+    pub async fn listen(mut self) {
         // Process commands until channel closes
-        while let Ok(msg) = self.rx.recv() {
+        while let Some(msg) = self.rx.recv().await {
             match msg {
                 messages::ClientMessage::Prepare(prepare) => {
-                    self.handle_prepare(prepare);
+                    self.handle_prepare(prepare).await;
                 }
                 messages::ClientMessage::Execute(execute) => {
-                    self.handle_execute(execute);
+                    self.handle_execute(execute).await;
                 }
                 messages::ClientMessage::Release(release) => {
-                    self.handle_release(release);
+                    self.handle_release(release).await;
+                }
+                messages::ClientMessage::PullSchema => {
+                    self.handle_pull_schema().await;
                 }
             }
         }
 
         // Cleanup: shutdown runner
-        let _ = self.runner.shutdown_sync();
+        let _ = self.runner.shutdown().await;
     }
 
-    fn handle_prepare(&mut self, prepare: messages::Prepare) {
+    async fn handle_prepare(&mut self, prepare: messages::Prepare) {
         let result = match rr::Program::decode(&prepare.program) {
-            Ok(program) => {
-                let r = self.runner.prepare_sync(program);
-
-                r.map_err(|e| messages::Error {
+            Ok(program) => self
+                .runner
+                .prepare(program)
+                .await
+                .map_err(|e| messages::Error {
                     message: format!("{:#?}", e),
                     code: Some(crate::error_codes::PREPARE_ERROR.to_string()),
-                })
-            }
+                }),
             Err(e) => Err(messages::Error {
                 message: format!("{:#?}", e),
                 code: Some(crate::error_codes::DECODE_ERROR.to_string()),
@@ -77,18 +83,18 @@ impl<R: RunSync> Server<R> {
         self.prepared_programs.insert(prepare.program_id, result);
     }
 
-    fn handle_execute(&mut self, execute: messages::Execute) {
-        let result = self.do_execute(&execute);
+    async fn handle_execute(&mut self, execute: messages::Execute) {
+        let result = self.do_execute(&execute).await;
 
         let response = messages::ServerMessage::Response(messages::Response {
             request_id: execute.request_id,
             result,
         });
 
-        let _ = self.tx.send(response);
+        let _ = self.tx.send(response).await;
     }
 
-    fn do_execute(&mut self, execute: &messages::Execute) -> messages::Result {
+    async fn do_execute(&mut self, execute: &messages::Execute) -> messages::Result {
         let Some(prepared) = self.prepared_programs.get(&execute.program_id) else {
             return messages::Result::Err(messages::Error {
                 message: format!("Program {} not prepared", execute.program_id),
@@ -103,7 +109,7 @@ impl<R: RunSync> Server<R> {
             }
         };
 
-        match self.runner.execute_sync(handle, &execute.input) {
+        match self.runner.execute(handle, &execute.input).await {
             Ok(output) => messages::Result::Ok(output),
             Err(e) => messages::Result::Err(messages::Error {
                 message: format!("{:#?}", e),
@@ -112,7 +118,26 @@ impl<R: RunSync> Server<R> {
         }
     }
 
-    fn handle_release(&mut self, release: messages::Release) {
-        self.prepared_programs.remove(&release.program_id);
+    async fn handle_release(&mut self, release: messages::Release) {
+        if let Some(Ok(prepared)) = self.prepared_programs.remove(&release.program_id) {
+            let _ = self.runner.release(prepared).await;
+        }
+    }
+
+    async fn handle_pull_schema(&mut self) {
+        let result = match self.runner.pull_schema().await {
+            Ok(schema) => messages::SchemaResult::Ok(schema),
+            Err(e) => messages::SchemaResult::Err(messages::Error {
+                message: format!("{:#?}", e),
+                code: None,
+            }),
+        };
+
+        let _ = self
+            .tx
+            .send(messages::ServerMessage::SchemaResponse(
+                messages::SchemaResponse { result },
+            ))
+            .await;
     }
 }

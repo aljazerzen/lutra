@@ -94,6 +94,11 @@ where
         guard.pull_schema_sync()
     }
 
+    async fn release(&self, prepared: Self::Prepared) -> Result<(), Self::Error> {
+        let mut guard = self.inner.lock().unwrap();
+        guard.release_sync(prepared)
+    }
+
     async fn shutdown(&self) -> Result<(), Self::Error> {
         let mut guard = self.inner.lock().unwrap();
         guard.shutdown_sync()

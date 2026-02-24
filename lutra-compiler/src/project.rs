@@ -91,6 +91,9 @@ impl SourceTree {
     pub fn get_sources(&self) -> impl Iterator<Item = (&path::PathBuf, &String)> {
         self.sources.iter()
     }
+    pub fn get_root(&self) -> &std::path::Path {
+        self.root.as_path()
+    }
 
     pub fn get_by_id(&self, source_id: u16) -> Option<(&path::Path, &str)> {
         self.sources

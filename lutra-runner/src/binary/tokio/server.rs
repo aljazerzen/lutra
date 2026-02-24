@@ -91,6 +91,23 @@ where
 
                 self.stream.flush().await?;
             }
+            messages::ClientMessage::PullSchema => {
+                tracing::trace!("pull_schema");
+
+                let result = match self.runner.pull_schema().await {
+                    Ok(schema) => messages::SchemaResult::Ok(schema),
+                    Err(e) => messages::SchemaResult::Err(messages::Error {
+                        message: format!("{:?}", e),
+                        code: None,
+                    }),
+                };
+
+                let res =
+                    messages::ServerMessage::SchemaResponse(messages::SchemaResponse { result });
+                super::write_message(&mut self.stream, res).await.unwrap();
+
+                self.stream.flush().await?;
+            }
         }
         Ok(())
     }

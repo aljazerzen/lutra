@@ -54,6 +54,11 @@ impl<'a> lutra_runner::RunSync for InterpreterRunner<'a> {
         )
     }
 
+    fn release_sync(&mut self, prepared: Self::Prepared) -> Result<(), Self::Error> {
+        drop(prepared);
+        Ok(())
+    }
+
     fn pull_schema_sync(&mut self) -> Result<std::string::String, Self::Error> {
         let Some(fs) = &self.file_system else {
             return Ok(String::new());

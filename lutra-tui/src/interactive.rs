@@ -1,5 +1,4 @@
 use std::path::PathBuf;
-use std::sync::mpsc;
 
 use crossterm::event;
 use ratatui::prelude::*;
@@ -19,13 +18,15 @@ use crate::watcher::FileWatcher;
 pub fn run_interactive(
     project_path: PathBuf,
     runner_cfg: runner::RunnerConfig,
+    runner: lutra_runner::channel::Client,
+    runner_thread: std::thread::JoinHandle<()>,
 ) -> anyhow::Result<()> {
     // Create action channel
-    let (action_tx, action_rx) = mpsc::channel();
+    let (action_tx, action_rx) = std::sync::mpsc::channel();
 
     // Init event sources
     let watcher = FileWatcher::new(project_path.clone(), action_tx.clone())?;
-    let runner = runner::Runner::try_new(&runner_cfg, action_tx.clone())?;
+    let runner = runner::Runner::try_new(runner, runner_thread, action_tx.clone())?;
 
     // Create app
     let mut app = InteractiveApp::new(project_path.clone(), runner_cfg, runner.get_client());

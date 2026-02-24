@@ -130,6 +130,12 @@ where
         self.rt.block_on(async move { runner.pull_schema().await })
     }
 
+    fn release_sync(&mut self, prepared: Self::Prepared) -> Result<(), Self::Error> {
+        let runner = Arc::clone(&self.runner);
+        self.rt
+            .block_on(async move { runner.release(prepared).await })
+    }
+
     fn shutdown_sync(&mut self) -> Result<(), Self::Error> {
         let runner = Arc::clone(&self.runner);
         self.rt.block_on(async move { runner.shutdown().await })
@@ -181,12 +187,11 @@ mod tests {
             Ok(vec::Vec::from(input))
         }
 
-        async fn pull_schema(&self) -> Result<string::String, Self::Error> {
-            Ok(string::String::from("mock interface"))
-        }
-
-        async fn shutdown(&self) -> Result<(), Self::Error> {
-            Ok(())
+        fn release(
+            &self,
+            _prepared: Self::Prepared,
+        ) -> impl Future<Output = Result<(), Self::Error>> {
+            async { Ok(()) }
         }
     }
 

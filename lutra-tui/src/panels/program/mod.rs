@@ -112,14 +112,8 @@ impl ProgramPane {
     ) -> Result<(), String> {
         let program = self.path.0.join("::");
 
-        let format = match runner {
-            RunnerConfig::Interpreter { .. } => lutra_compiler::ProgramFormat::BytecodeLt,
-            RunnerConfig::Postgres { .. } => lutra_compiler::ProgramFormat::SqlPg,
-            RunnerConfig::DuckDB { .. } => lutra_compiler::ProgramFormat::SqlDuckdb,
-        };
-
-        let (program, ty) =
-            lutra_compiler::compile(project, &program, None, format).map_err(|e| e.to_string())?;
+        let (program, ty) = lutra_compiler::compile(project, &program, None, runner.format)
+            .map_err(|e| e.to_string())?;
 
         // Wrap in Rc for sharing across components
         let program = Rc::new(program);

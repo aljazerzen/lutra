@@ -121,6 +121,11 @@ where
         result::from_sql(&handle.program, &rows, &ctx)
     }
 
+    async fn release(&self, prepared: PreparedProgram) -> Result<(), Self::Error> {
+        drop(prepared);
+        Ok(())
+    }
+
     async fn pull_schema(&self) -> Result<std::string::String, Self::Error> {
         Ok(crate::schema::pull_interface(self).await?)
     }

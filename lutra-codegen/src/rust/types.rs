@@ -104,7 +104,9 @@ pub fn write_ty_def(
             writeln!(w, "pub enum {name} {{")?;
 
             for (index, variant) in variants.iter().enumerate() {
-                write!(w, "    {}", variant.name)?;
+                let va_name = crate::snake_to_sentence(&variant.name);
+
+                write!(w, "    {va_name}")?;
                 if !is_unit_variant(&variant.ty) {
                     let needs_box = variant_needs_box(ty, index);
 

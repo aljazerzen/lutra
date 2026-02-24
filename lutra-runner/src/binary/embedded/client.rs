@@ -98,12 +98,51 @@ where
                         return Ok(response.result);
                     }
                 }
+                messages::ServerMessage::SchemaResponse(_) => {
+                    // Unexpected schema response while waiting for an execute response; discard.
+                }
             }
         }
         panic!(
             "recv_response: connection closed before receiving response for request_id {}",
             request_id
         );
+    }
+
+    /// Send a pull_schema request and receive the schema result.
+    pub async fn pull_schema(&mut self) -> Result<messages::SchemaResult, C::Error> {
+        super::write_message(
+            &mut self.inner,
+            messages::ClientMessage::PullSchema(messages::PullSchema {}),
+        )
+        .await?;
+        self.inner.flush().await?;
+        loop {
+            let res = super::read_message(&mut self.inner).await;
+
+            let message = match res {
+                Ok(Ok(message)) => message,
+                Ok(Err(lutra_err)) => {
+                    tracing::error!("pull_schema: {lutra_err:?}");
+                    continue;
+                }
+                Err(ReadExactError::UnexpectedEof) => {
+                    panic!("pull_schema: connection closed before receiving schema response");
+                }
+                Err(ReadExactError::Other(e)) => {
+                    return Err(e);
+                }
+            };
+
+            match message {
+                messages::ServerMessage::SchemaResponse(response) => {
+                    return Ok(response.result);
+                }
+                messages::ServerMessage::Response(_) => {
+                    // Unexpected execute response while waiting for schema; discard.
+                }
+            }
+        }
     }
 
     pub fn destruct(self) -> C {

@@ -153,8 +153,9 @@ fn write_ty_def_impl(
 
             for (tag, variant) in variants.iter().enumerate() {
                 let va_format = layout::enum_variant_format(&head, &variant.ty);
+                let va_name = crate::snake_to_sentence(&variant.name);
 
-                write!(w, "            Self::{}", variant.name)?;
+                write!(w, "            Self::{va_name}")?;
 
                 if is_unit_variant(&variant.ty) {
                 } else if head.inner_bytes == 0 {
@@ -172,10 +173,10 @@ fn write_ty_def_impl(
                         writeln!(w, "                let r = {head_ptr_name}::None;")?;
                     } else if head.has_ptr {
                         writeln!(w, "                let head_ptr = {lutra_bin}::ReversePointer::new(w);")?;
-                        writeln!(w, "                let r = {head_ptr_name}::{}(head_ptr);", variant.name)?;
+                        writeln!(w, "                let r = {head_ptr_name}::{va_name}(head_ptr);")?;
                     } else {
                         writeln!(w, "                let inner_head_ptr = inner.encode_head(w);")?;
-                        writeln!(w, "                let r = {head_ptr_name}::{}({lutra_bin}::boxed::Box::new(inner_head_ptr));", variant.name)?;
+                        writeln!(w, "                let r = {head_ptr_name}::{va_name}({lutra_bin}::boxed::Box::new(inner_head_ptr));")?;
                     }
                 } else if head.inner_bytes > 0 {
                     writeln!(w, "                inner.encode_head(w);")?;
@@ -197,7 +198,9 @@ fn write_ty_def_impl(
                 writeln!(w, "        match self {{")?;
 
                 for variant in variants {
-                    write!(w, "            Self::{}", variant.name)?;
+                    let va_name = crate::snake_to_sentence(&variant.name);
+
+                    write!(w, "            Self::{va_name}")?;
                     if !is_unit_variant(&variant.ty) {
                         write!(w, "(inner)")?;
                     }
@@ -206,12 +209,12 @@ fn write_ty_def_impl(
                     if is_unit_variant(&variant.ty) {
                         // unit does not have a body
                     } else if head.has_ptr {
-                        writeln!(w, "                let {head_ptr_name}::{}(offset_ptr) = head else {{ unreachable!() }};", variant.name)?;
+                        writeln!(w, "                let {head_ptr_name}::{va_name}(offset_ptr) = head else {{ unreachable!() }};")?;
                         writeln!(w, "                offset_ptr.write_cur_len(w);")?;
                         writeln!(w, "                let inner_head_ptr = inner.encode_head(w);")?;
                         writeln!(w, "                inner.encode_body(inner_head_ptr, w);")?;
                     } else {
-                        writeln!(w, "                let {head_ptr_name}::{}(inner_head_ptr) = head else {{ unreachable!() }};", variant.name)?;
+                        writeln!(w, "                let {head_ptr_name}::{va_name}(inner_head_ptr) = head else {{ unreachable!() }};")?;
                         writeln!(w, "                inner.encode_body(*inner_head_ptr, w);")?;
                     }
 
@@ -231,8 +234,9 @@ fn write_ty_def_impl(
                     if is_unit_variant(&variant.ty) {
                         continue;
                     }
+                    let va_name = crate::snake_to_sentence(&variant.name);
 
-                    write!(w, "    {}", variant.name)?;
+                    write!(w, "    {va_name}")?;
 
                     if head.has_ptr {
                         write!(w, "({lutra_bin}::ReversePointer)")?;
@@ -344,6 +348,8 @@ fn write_ty_def_impl(
 
             writeln!(w, "        Ok(match tag {{")?;
             for (index, variant) in variants.iter().enumerate() {
+                let va_name = crate::snake_to_sentence(&variant.name);
+
                 writeln!(w, "            {index} => {{")?;
 
                 if is_unit_variant(&variant.ty) {
@@ -362,11 +368,11 @@ fn write_ty_def_impl(
                 let needs_box = variant_needs_box(ty, index);
 
                 if is_unit_variant(&variant.ty) {
-                    writeln!(w, "                {name}::{}", variant.name)?;
+                    writeln!(w, "                {name}::{va_name}", )?;
                 } else if needs_box {
-                    writeln!(w, "                {name}::{}({lutra_bin}::boxed::Box::new(inner))", variant.name)?;
+                    writeln!(w, "                {name}::{va_name}({lutra_bin}::boxed::Box::new(inner))")?;
                 } else {
-                    writeln!(w, "                {name}::{}(inner)", variant.name)?;
+                    writeln!(w, "                {name}::{va_name}(inner)")?;
                 }
 
                 writeln!(w, "            }},")?;

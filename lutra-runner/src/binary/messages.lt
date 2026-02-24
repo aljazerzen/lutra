@@ -1,46 +1,41 @@
 type ClientMessage: enum {
-    Prepare: Prepare,
-    Execute: Execute,
-    Release: Release,
+  # Prepare a program
+  prepare: Prepare,
+
+  # Execute a program with given inputs
+  execute: Execute,
+
+  # Release a prepared program with all associated resources
+  release: Release,
+
+  # Request the database schema as Lutra source code
+  pull_schema,
 }
 
 type ServerMessage: enum {
-    Response: Response,
+  # Execute response
+  response: Response,
+
+  # Schema response
+  schema_response: SchemaResponse,
 }
 
-type Prepare: {
-    program_id: uint32,
-    program: [uint8],
-}
+type Prepare: {program_id: uint32, program: [uint8]}
 
-type Execute: {
-    program_id: uint32,
-    input: [uint8],
-    request_id: uint32,
-}
+type Execute: {program_id: uint32, input: [uint8], request_id: uint32}
 
-type Release: {
-    program_id: uint32,
-}
+type Release: {program_id: uint32}
 
-type Response: {
-    request_id: uint32,
-    result: Result,
-}
+type SchemaResponse: {result: SchemaResult}
 
-type Result: enum {
-    Ok: [uint8],
-    Err: Error,
-}
+type SchemaResult: enum {ok: text, err: Error}
+
+type Response: {request_id: uint32, result: Result}
+
+type Result: enum {ok: [uint8], err: Error}
 
 ## Invalid request. This can either be attributed to:
 ## - invalid program,
 ## - invalid inputs,
 ## - invalid responses from native functions.
-type Error: {
-    message: text,
-    code: enum {
-        none,
-        some: text,
-    },
-}
+type Error: {message: text, code: enum {none, some: text}}

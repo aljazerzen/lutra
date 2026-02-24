@@ -1,15 +1,18 @@
 mod io;
 mod language_server;
+mod runners;
 
 use std::collections::HashMap;
 use std::path;
 
-use clap::{Args, Parser, Subcommand};
+use clap::{Parser, Subcommand};
 
 use lutra_bin::Encode;
 use lutra_codegen::ProgramFormat;
 use lutra_compiler::{CheckParams, DiscoverParams, codespan};
-use lutra_runner::Run;
+use lutra_runner::RunSync;
+
+use crate::runners::RunnerParams;
 
 fn main() {
     let action = Command::parse();
@@ -30,7 +33,7 @@ fn main() {
         Action::Compile(cmd) => compile(cmd),
         Action::Run(cmd) => run(cmd),
         Action::Interactive(cmd) => interactive(cmd),
-        Action::Pull(cmd) => pull_interface(cmd),
+        Action::Pull(cmd) => pull_schema(cmd),
         Action::Codegen(cmd) => codegen(cmd),
         Action::Format(cmd) => format(cmd),
         Action::LanguageServer(cmd) => {
@@ -76,7 +79,7 @@ pub enum Action {
     Interactive(InteractiveCommand),
 
     /// Pull interface from the runner
-    Pull(PullInterfaceCommand),
+    Pull(PullSchemaCommand),
 
     /// Compile the project and generate bindings code
     Codegen(CodegenCommand),
@@ -87,38 +90,6 @@ pub enum Action {
 
     /// Start language server (LSP)
     LanguageServer(language_server::Command),
-}
-
-#[derive(Args)]
-#[group(required = true, multiple = false)]
-struct RunnerParams {
-    /// Use interpreter runner
-    #[arg(long, short)]
-    interpreter: bool,
-
-    /// Use PostgreSQL runner. Requires a postgres:// URL or a libpq-style connection config.
-    #[arg(long, name = "DSN")]
-    postgres: Option<String>,
-
-    /// Use DuckDB runner. Provide path to database file or ":memory:" for in-memory database.
-    #[arg(long, name = "PATH")]
-    duckdb: Option<String>,
-}
-
-impl RunnerParams {
-    /// Returns the program format needed for this runner
-    fn get_program_format(&self) -> lutra_compiler::ProgramFormat {
-        #[allow(clippy::if_same_then_else)]
-        if self.interpreter {
-            lutra_compiler::ProgramFormat::BytecodeLt
-        } else if self.postgres.is_some() {
-            lutra_compiler::ProgramFormat::SqlPg
-        } else if self.duckdb.is_some() {
-            lutra_compiler::ProgramFormat::SqlDuckdb
-        } else {
-            unreachable!()
-        }
-    }
 }
 
 #[derive(clap::Parser)]
@@ -295,8 +266,9 @@ enum DataFormat {
     Table,
 }
 
-#[tokio::main(flavor = "current_thread")]
-pub async fn run(cmd: RunCommand) -> anyhow::Result<()> {
+pub fn run(cmd: RunCommand) -> anyhow::Result<()> {
+    use lutra_runner::RunSync;
+
     // compile
     eprintln!("Compiling...");
     let project = lutra_compiler::discover(cmd.discover.clone())?;
@@ -312,36 +284,20 @@ pub async fn run(cmd: RunCommand) -> anyhow::Result<()> {
     )?;
 
     // read input
-    // eprintln!("Reading input...");
     let input_path = cmd.input.as_deref().map(to_project_path);
-    let input = io::read_input(input_path, cmd.input_format, &ty).await?;
+    let input = io::read_input(input_path, cmd.input_format, &ty)?;
 
     // execute
     eprintln!("Executing...");
-    let execution_dir = Some(project.source.get_project_dir().to_path_buf());
-    let output = if cmd.runner.interpreter {
-        let runner =
-            lutra_interpreter::InterpreterRunner::default().with_file_system(execution_dir);
-        let runner = lutra_runner::AsyncRunner::new(runner);
 
-        let handle = runner.prepare(program).await?;
-        runner.execute(&handle, &input).await?
-    } else if let Some(pg_url) = cmd.runner.postgres {
-        let runner = init_runner_postgres(&pg_url).await?;
-        let handle = runner.prepare(program).await?;
-        runner.execute(&handle, &input).await?
-    } else if let Some(duckdb_path) = cmd.runner.duckdb {
-        let runner = init_runner_duckdb(&duckdb_path, execution_dir)?;
-        let runner = lutra_runner::AsyncRunner::new(runner);
-        let handle = runner.prepare(program).await?;
-        runner.execute(&handle, &input).await?
-    } else {
-        unreachable!()
-    };
+    let (mut runner, _) = crate::runners::init(cmd.runner, &project.source)?;
+
+    let handle = runner.prepare_sync(program)?;
+    let output = runner.execute_sync(&handle, &input)?;
 
     // handle output
     let output_path = cmd.output.as_deref().map(to_project_path);
-    io::write_output(&output, output_path, cmd.output_format, &ty).await?;
+    io::write_output(&output, output_path, cmd.output_format, &ty)?;
 
     Ok(())
 }
@@ -356,78 +312,40 @@ pub struct InteractiveCommand {
 }
 
 pub fn interactive(cmd: InteractiveCommand) -> anyhow::Result<()> {
-    let project_path = cmd
-        .discover
-        .project
-        .unwrap_or_else(|| std::env::current_dir().unwrap());
+    // discover
+    let project = lutra_compiler::discover(cmd.discover.clone())?;
 
-    let runner = if cmd.runner.interpreter {
-        lutra_tui::RunnerConfig::Interpreter {
-            fs_root: Some(project_path.clone()), // this is wrong
-        }
-    } else if let Some(pg_url) = cmd.runner.postgres {
-        lutra_tui::RunnerConfig::Postgres {
-            connection_string: pg_url,
-        }
-    } else if let Some(path) = cmd.runner.duckdb {
-        lutra_tui::RunnerConfig::DuckDB {
-            path,
-            file_system: Some(project_path.clone()), // this is wrong
-        }
-    } else {
-        unreachable!()
+    // runner cfg
+    let cfg = lutra_tui::RunnerConfig {
+        format: cmd.runner.get_program_format(),
     };
 
-    lutra_tui::run_interactive(project_path, runner)
-}
+    // init runner
+    let (runner, runner_thread) = crate::runners::init(cmd.runner, &project)?;
 
-async fn init_runner_postgres(url: &str) -> anyhow::Result<lutra_runner_postgres::RunnerAsync> {
-    use tokio_postgres::{NoTls, connect};
-
-    let (client, connection) = connect(url, NoTls).await.unwrap();
-
-    tokio::spawn(async move {
-        if let Err(e) = connection.await {
-            eprintln!("connection error: {e}");
-        }
-    });
-
-    Ok(lutra_runner_postgres::RunnerAsync::new(client))
-}
-
-fn init_runner_duckdb(
-    path: &str,
-    file_system: Option<path::PathBuf>,
-) -> anyhow::Result<lutra_runner_duckdb::Runner> {
-    lutra_runner_duckdb::Runner::open(path, file_system).map_err(Into::into)
+    // run tui
+    lutra_tui::run_interactive(project.get_root().to_path_buf(), cfg, runner, runner_thread)
 }
 
 #[derive(clap::Parser)]
-pub struct PullInterfaceCommand {
+pub struct PullSchemaCommand {
+    #[clap(flatten)]
+    discover: DiscoverParams,
+
+    #[clap(flatten)]
+    check: CheckParams,
+
     #[clap(flatten)]
     runner: RunnerParams,
-
-    /// Path to project directory
-    #[clap(long)]
-    project: Option<path::PathBuf>,
 }
 
-#[tokio::main(flavor = "current_thread")]
-pub async fn pull_interface(cmd: PullInterfaceCommand) -> anyhow::Result<()> {
-    let interface = if cmd.runner.interpreter {
-        let runner = lutra_interpreter::InterpreterRunner::default().with_file_system(cmd.project);
-        let runner = lutra_runner::AsyncRunner::new(runner);
-        runner.pull_schema().await?
-    } else if let Some(pg_url) = cmd.runner.postgres {
-        let runner = init_runner_postgres(&pg_url).await?;
-        runner.pull_schema().await?
-    } else if let Some(duckdb_path) = cmd.runner.duckdb {
-        let runner = init_runner_duckdb(&duckdb_path, cmd.project)?;
-        let runner = lutra_runner::AsyncRunner::new(runner);
-        runner.pull_schema().await?
-    } else {
-        unreachable!()
-    };
+pub fn pull_schema(cmd: PullSchemaCommand) -> anyhow::Result<()> {
+    // discover
+    let project = lutra_compiler::discover(cmd.discover.clone())?;
+
+    // pull
+    let (mut runner, _) = crate::runners::init(cmd.runner, &project)?;
+    let schema = runner.pull_schema_sync()?;
 
     println!(
         "# Generated by Lutra CLI{}\n",
@@ -435,7 +353,7 @@ pub async fn pull_interface(cmd: PullInterfaceCommand) -> anyhow::Result<()> {
             .map(|v| format!(" {v}"))
             .unwrap_or_default()
     );
-    println!("{interface}");
+    println!("{schema}");
     Ok(())
 }
 

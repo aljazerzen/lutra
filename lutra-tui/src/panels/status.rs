@@ -24,16 +24,12 @@ pub enum Status {
 impl StatusBar {
     /// Creates a new status bar.
     pub fn new(project_path: &Path, runner: &RunnerConfig) -> Self {
-        let runner_name = match runner {
-            RunnerConfig::Interpreter { .. } => "interpreter",
-            RunnerConfig::Postgres { .. } => "postgres",
-            RunnerConfig::DuckDB { .. } => "duckdb",
-        };
+        let runner_format = format!("{:?}", runner.format);
 
         Self {
             project_path: project_path.display().to_string(),
             status: Status::Compiling,
-            runner_name: runner_name.to_string(),
+            runner_name: runner_format,
         }
     }
 

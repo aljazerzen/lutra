@@ -3,27 +3,10 @@ use std::thread::JoinHandle;
 
 use crate::terminal::Action;
 
-use std::path::PathBuf;
-
 /// Runner configuration for execution.
 #[derive(Debug, Clone)]
-pub enum RunnerConfig {
-    Interpreter {
-        fs_root: Option<PathBuf>,
-    },
-    Postgres {
-        connection_string: String,
-    },
-    DuckDB {
-        path: String,
-        file_system: Option<PathBuf>,
-    },
-}
-
-impl Default for RunnerConfig {
-    fn default() -> Self {
-        RunnerConfig::Interpreter { fs_root: None }
-    }
+pub struct RunnerConfig {
+    pub format: lutra_compiler::ProgramFormat,
 }
 
 pub(crate) struct Runner {
@@ -35,59 +18,12 @@ pub(crate) struct Runner {
 
 impl Runner {
     pub fn try_new(
-        runner: &RunnerConfig,
+        client: lutra_runner::channel::Client,
+        runner_thread: std::thread::JoinHandle<()>,
         action_tx: mpsc::Sender<Action>,
     ) -> Result<Self, anyhow::Error> {
-        // Create runner client + thread based on runner config
-        let (client, runner_thread) = match &runner {
-            RunnerConfig::Interpreter { fs_root } => {
-                let runner = lutra_interpreter::InterpreterRunner::default()
-                    .with_file_system(fs_root.clone());
-                let (client, server) = lutra_runner::channel::new_pair(runner);
-
-                let _runner_thread = std::thread::Builder::new()
-                    .name("runner-interpreter".to_string())
-                    .spawn(move || {
-                        server.run();
-                    })?;
-                (client, _runner_thread)
-            }
-            RunnerConfig::Postgres { connection_string } => {
-                // Create tokio runtime for async postgres connection
-                let connection_string = connection_string.clone();
-                let rt = tokio::runtime::Builder::new_current_thread()
-                    .enable_all()
-                    .build()?;
-
-                let runner = rt.block_on(async {
-                    lutra_runner_postgres::RunnerAsync::connect_no_tls(&connection_string).await
-                })?;
-
-                let runner = lutra_runner::SyncRunner::new(runner);
-                let (client, server) = lutra_runner::channel::new_pair(runner);
-
-                let _runner_thread = std::thread::Builder::new()
-                    .name("runner-postgres".to_string())
-                    .spawn(move || {
-                        server.run();
-                    })?;
-                (client, _runner_thread)
-            }
-            RunnerConfig::DuckDB { path, file_system } => {
-                let runner = lutra_runner_duckdb::Runner::open(path, file_system.clone())?;
-                let (client, server) = lutra_runner::channel::new_pair(runner);
-
-                let _runner_thread = std::thread::Builder::new()
-                    .name("runner-duckdb".to_string())
-                    .spawn(move || {
-                        server.run();
-                    })?;
-                (client, _runner_thread)
-            }
-        };
-
         // Split client into sender and receiver
-        let (sender, receiver) = client.split();
+        let (sender, mut receiver) = client.split();
 
         // Spawn runner message thread that translates runner messages to actions
         let action_tx_runner = action_tx.clone();
@@ -95,7 +31,7 @@ impl Runner {
             .name("runner-messages".to_string())
             .spawn(move || {
                 // Blocking loop receiving messages
-                while let Ok(msg) = receiver.recv() {
+                while let Some(msg) = receiver.blocking_recv() {
                     if action_tx_runner.send(Action::RunnerMessage(msg)).is_err() {
                         break; // Action channel closed, exit
                     }

@@ -1,10 +1,11 @@
 use std::io::{self, ErrorKind};
 use std::sync::Arc;
 use std::sync::atomic::{AtomicU32, Ordering};
-use std::sync::mpsc::{Receiver, Sender};
+use tokio::sync::mpsc::{Receiver, Sender};
 
-use lutra_bin::{Encode, rr};
+use lutra_bin::{Encode, rr, vec};
 
+use crate::RunSync;
 use crate::binary::messages;
 
 /// Sender half of the client - can be cloned and shared across threads.
@@ -79,7 +80,7 @@ impl ClientSender {
         });
 
         self.tx
-            .send(msg)
+            .blocking_send(msg)
             .map_err(|_| io::Error::new(ErrorKind::BrokenPipe, "runner disconnected"))?;
 
         Ok(program_id)
@@ -99,7 +100,7 @@ impl ClientSender {
         });
 
         self.tx
-            .send(msg)
+            .blocking_send(msg)
             .map_err(|_| io::Error::new(ErrorKind::BrokenPipe, "runner disconnected"))?;
 
         Ok(request_id)
@@ -112,7 +113,18 @@ impl ClientSender {
         let msg = messages::ClientMessage::Release(messages::Release { program_id });
 
         self.tx
-            .send(msg)
+            .blocking_send(msg)
+            .map_err(|_| io::Error::new(ErrorKind::BrokenPipe, "runner disconnected"))?;
+
+        Ok(())
+    }
+
+    /// Send pull_schema command to request the database schema.
+    pub fn pull_schema(&self) -> io::Result<()> {
+        let msg = messages::ClientMessage::PullSchema;
+
+        self.tx
+            .blocking_send(msg)
             .map_err(|_| io::Error::new(ErrorKind::BrokenPipe, "runner disconnected"))?;
 
         Ok(())
@@ -125,15 +137,20 @@ impl ClientReceiver {
         Self { rx }
     }
 
-    /// Blocking receive of next server message.
-    pub fn recv(&self) -> io::Result<messages::ServerMessage> {
-        self.rx
-            .recv()
-            .map_err(|_| io::Error::new(ErrorKind::BrokenPipe, "runner disconnected"))
+    /// Receive next server message.
+    pub async fn recv(&mut self) -> Option<messages::ServerMessage> {
+        self.rx.recv().await
+    }
+
+    /// Blocking receive next server message.
+    pub fn blocking_recv(&mut self) -> Option<messages::ServerMessage> {
+        self.rx.blocking_recv()
     }
 
     /// Non-blocking receive of next server message.
-    pub fn try_recv(&self) -> Result<messages::ServerMessage, std::sync::mpsc::TryRecvError> {
+    pub fn try_recv(
+        &mut self,
+    ) -> Result<messages::ServerMessage, tokio::sync::mpsc::error::TryRecvError> {
         self.rx.try_recv()
     }
 
@@ -141,9 +158,11 @@ impl ClientReceiver {
     ///
     /// This method loops until it receives a response with the correct request_id.
     /// If multiple requests are in flight, responses for other requests are discarded.
-    pub fn recv_response(&self, request_id: u32) -> io::Result<messages::Result> {
+    pub fn blocking_recv_response(&mut self, request_id: u32) -> io::Result<messages::Result> {
         loop {
-            let msg = self.recv()?;
+            let msg = self
+                .blocking_recv()
+                .ok_or_else(|| io::Error::new(ErrorKind::BrokenPipe, "runner disconnected"))?;
 
             match msg {
                 messages::ServerMessage::Response(resp) => {
@@ -152,6 +171,27 @@ impl ClientReceiver {
                     }
                     // Wrong request_id, keep waiting
                     // (happens if multiple requests in flight)
+                }
+                messages::ServerMessage::SchemaResponse(_) => {
+                    // Unexpected schema response while waiting for an execute response; discard.
+                }
+            }
+        }
+    }
+
+    /// Block waiting for a schema response.
+    pub fn blocking_recv_schema(&mut self) -> io::Result<messages::SchemaResult> {
+        loop {
+            let msg = self
+                .blocking_recv()
+                .ok_or_else(|| io::Error::new(ErrorKind::BrokenPipe, "runner disconnected"))?;
+
+            match msg {
+                messages::ServerMessage::SchemaResponse(resp) => {
+                    return Ok(resp.result);
+                }
+                messages::ServerMessage::Response(_) => {
+                    // Unexpected execute response while waiting for schema; discard.
                 }
             }
         }
@@ -176,64 +216,51 @@ impl Client {
     pub fn split(self) -> (ClientSender, ClientReceiver) {
         (self.sender, self.receiver)
     }
+}
 
-    /// Send prepare command and return program_id.
-    ///
-    /// The program is encoded and sent to the server for preparation.
-    /// The server will cache the prepared program for future executions.
-    pub fn prepare(&self, program: &rr::Program) -> io::Result<u32> {
-        self.sender.prepare(program)
+/// Implementation of `RunSync` for the channel client.
+///
+/// This allows the channel client to be used anywhere a `RunSync` runner is expected,
+/// enabling uniform handling of both direct runners (like the interpreter or DuckDB)
+/// and channel-based runners.
+///
+/// # Example
+///
+/// ```ignore
+/// use lutra_runner::{RunSync, channel};
+/// use lutra_interpreter::InterpreterRunner;
+///
+/// let runner = InterpreterRunner::default();
+/// let (mut client, server) = channel::new_pair(runner);
+///
+/// // Spawn server thread
+/// std::thread::spawn(move || {
+///     server.run();
+/// });
+///
+/// // Use client through RunSync trait
+/// let prepared = client.prepare_sync(program)?;
+/// let output = client.execute_sync(&prepared, &input)?;
+/// ```
+impl RunSync for Client {
+    type Error = io::Error;
+    type Prepared = PreparedHandle;
+
+    fn prepare_sync(&mut self, program: rr::Program) -> Result<Self::Prepared, Self::Error> {
+        let program_id = self.sender.prepare(&program)?;
+        Ok(PreparedHandle { program_id })
     }
 
-    /// Send execute command and return request_id.
-    ///
-    /// The program must have been prepared first using `prepare()`.
-    /// Use `recv_response()` to wait for the execution result.
-    pub fn execute(&self, program_id: u32, input: &[u8]) -> io::Result<u32> {
-        self.sender.execute(program_id, input)
-    }
-
-    /// Send release command to free a prepared program.
-    ///
-    /// This removes the program from the server's cache.
-    pub fn release(&self, program_id: u32) -> io::Result<()> {
-        self.sender.release(program_id)
-    }
-
-    /// Block waiting for response with matching request_id.
-    ///
-    /// This method loops until it receives a response with the correct request_id.
-    /// If multiple requests are in flight, responses for other requests are discarded.
-    pub fn recv_response(&self, request_id: u32) -> io::Result<messages::Result> {
-        self.receiver.recv_response(request_id)
-    }
-
-    /// Convenience method: prepare + execute + release + wait for result.
-    ///
-    /// This is the simplest way to execute a program. The program is prepared,
-    /// executed with the given input, and then released from the cache.
-    ///
-    /// # Example
-    ///
-    /// ```ignore
-    /// use lutra_runner::channel;
-    /// use lutra_interpreter::InterpreterRunner;
-    ///
-    /// let runner = InterpreterRunner::default();
-    /// let (client, server) = channel::new_pair(runner);
-    /// // In production you would have actual program and input
-    /// let output = client.run_once(&program, &input)?;
-    /// drop(client);
-    /// drop(server);
-    /// ```
-    pub fn run_once(&self, program: &rr::Program, input: &[u8]) -> io::Result<Vec<u8>> {
-        let program_id = self.prepare(program)?;
-        let request_id = self.execute(program_id, input)?;
-        let result = self.recv_response(request_id)?;
-        self.release(program_id)?;
+    fn execute_sync(
+        &mut self,
+        prepared: &Self::Prepared,
+        input: &[u8],
+    ) -> Result<vec::Vec<u8>, Self::Error> {
+        let request_id = self.sender.execute(prepared.program_id, input)?;
+        let result = self.receiver.blocking_recv_response(request_id)?;
 
         match result {
-            messages::Result::Ok(output) => Ok(output),
+            messages::Result::Ok(output) => Ok(output.into()),
             messages::Result::Err(err) => {
                 let msg = match &err.code {
                     Some(code) => format!("{}: {}", code, err.message),
@@ -243,4 +270,29 @@ impl Client {
             }
         }
     }
+
+    fn pull_schema_sync(&mut self) -> Result<lutra_bin::string::String, Self::Error> {
+        self.sender.pull_schema()?;
+        match self.receiver.blocking_recv_schema()? {
+            messages::SchemaResult::Ok(schema) => Ok(schema),
+            messages::SchemaResult::Err(e) => Err(io::Error::other(e.message)),
+        }
+    }
+
+    fn release_sync(&mut self, prepared: Self::Prepared) -> Result<(), Self::Error> {
+        self.sender.release(prepared.program_id)
+    }
+
+    fn shutdown_sync(&mut self) -> Result<(), Self::Error> {
+        // Client shutdown is handled by dropping the sender
+        Ok(())
+    }
+}
+
+/// Prepared program handle for the channel client.
+///
+/// Stores both the program_id for communication and the program itself
+/// to allow releasing it when the handle is dropped.
+pub struct PreparedHandle {
+    program_id: u32,
 }
