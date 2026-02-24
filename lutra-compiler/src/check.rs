@@ -50,9 +50,7 @@ pub fn check_overlay(
 
 fn parse(tree: &SourceTree) -> Result<Result<pr::ModuleDef, Vec<Diagnostic>>, error::Error> {
     // init the root module def
-    let mut root = pr::ModuleDef {
-        defs: Default::default(),
-    };
+    let mut root = pr::ModuleDef::default();
 
     // parse and insert into the root
     let mut diags = Vec::new();
@@ -108,6 +106,8 @@ pub fn insert_module_at_path(
 ) -> Vec<diagnostic::Diagnostic> {
     if path.is_empty() {
         let mut d = Vec::new();
+
+        module.span_content = to_insert.span_content;
         for (name, def) in to_insert.defs {
             let conflict = module.defs.insert(name, def);
             if let Some(conflict) = conflict {
@@ -125,6 +125,7 @@ pub fn insert_module_at_path(
     let submodule = module.defs.entry(step).or_insert_with(|| {
         pr::Def::new(pr::DefKind::Module(pr::ModuleDef {
             defs: Default::default(),
+            span_content: None,
         }))
     });
     let pr::DefKind::Module(submodule) = &mut submodule.kind else {

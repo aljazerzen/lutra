@@ -1,5 +1,7 @@
 use std::collections::HashMap;
 
+use lutra_bin::ident;
+
 use crate::diagnostic::{Diagnostic, DiagnosticCode, WithErrorInfo};
 use crate::pr::{self, Ty};
 use crate::utils::fold::PrFold;
@@ -368,9 +370,9 @@ fn error_lookup_into_unpack_of_ty_param(param_name: &str) -> Diagnostic {
     ))
 }
 
-pub fn print_lookup(lookup: &pr::Lookup) -> String {
+fn print_lookup(lookup: &pr::Lookup) -> String {
     match lookup {
-        pr::Lookup::Name(n) => format!(".{}", pr::display_ident(n)),
+        pr::Lookup::Name(n) => format!(".{}", ident::display(n)),
         pr::Lookup::Position(p) => format!(".{p}",),
     }
 }

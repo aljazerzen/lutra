@@ -16,10 +16,14 @@ pub fn source() -> impl Parser<TokenKind, Source, Error = PError> {
     let ty = types::type_expr();
     let expr = expr(ty.clone());
 
-    let definitions = recursive(|definitions| {
+    let mod_content = recursive(|mod_content| {
         let module_def = keyword("module")
             .ignore_then(def_name())
-            .then(definitions.delimited_by(ctrl('{'), ctrl('}')))
+            .then(
+                mod_content
+                    .delimited_by(ctrl('{'), ctrl('}'))
+                    .map_with_span(set_content_span),
+            )
             .map(|(name, module_def)| (name, DefKind::Module(module_def)))
             .labelled("module definition");
 
@@ -56,11 +60,11 @@ pub fn source() -> impl Parser<TokenKind, Source, Error = PError> {
             });
 
         def.repeated()
-            .validate(|defs, _span, emit| into_module(defs, emit))
+            .validate(|defs, span, emit| into_module(defs, span, emit))
     });
 
     is_submodule
-        .then(definitions)
+        .then(mod_content)
         .map_with_span(|(is_submodule, root), span| Source {
             is_submodule,
             root,
@@ -69,7 +73,7 @@ pub fn source() -> impl Parser<TokenKind, Source, Error = PError> {
         .then_ignore(end())
 }
 
-fn into_module(def_vec: Vec<(String, Def)>, emit: &mut dyn FnMut(PError)) -> ModuleDef {
+fn into_module(def_vec: Vec<(String, Def)>, span: Span, emit: &mut dyn FnMut(PError)) -> ModuleDef {
     let mut defs = IndexMap::with_capacity(def_vec.len());
     for (i, (name, def)) in def_vec.into_iter().enumerate() {
         // hack that allows imports not to have names
@@ -86,7 +90,17 @@ fn into_module(def_vec: Vec<(String, Def)>, emit: &mut dyn FnMut(PError)) -> Mod
             emit(PError::custom(conflict.span.unwrap(), "duplicate name"));
         }
     }
-    ModuleDef { defs }
+    ModuleDef {
+        defs,
+        span_content: Some(span),
+    }
+}
+
+fn set_content_span(mut module: ModuleDef, mut span: Span) -> ModuleDef {
+    span.start += 1;
+    span.len = span.len.saturating_sub(2);
+    module.span_content = Some(span);
+    module
 }
 
 fn doc_comment() -> impl Parser<TokenKind, DocComment, Error = PError> + Clone {

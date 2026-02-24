@@ -7,7 +7,8 @@ use crate::pr;
 
 pub fn init_root(root_module_def: pr::ModuleDef) -> Result<pr::ModuleDef, Vec<Diagnostic>> {
     let mut root = pr::ModuleDef {
-        defs: IndexMap::new(),
+        span_content: root_module_def.span_content,
+        ..pr::ModuleDef::default()
     };
 
     let diagnostics = root.populate_module(root_module_def.defs);
@@ -104,7 +105,10 @@ impl pr::ModuleDef {
             let kind = match def.kind {
                 pr::DefKind::Module(module_def) => {
                     // init new module and recurse
-                    let mut new_mod = pr::ModuleDef::default();
+                    let mut new_mod = pr::ModuleDef {
+                        span_content: module_def.span_content,
+                        ..pr::ModuleDef::default()
+                    };
                     diagnostics.extend(new_mod.populate_module(module_def.defs));
 
                     pr::DefKind::Module(new_mod)

@@ -29,6 +29,47 @@ pub struct Dependency {
     pub inner: Project,
 }
 
+impl Project {
+    /// Search the resolved module tree recursively for definitions that carry
+    /// the annotation `@<annotation_name>` (bare identifier).
+    ///
+    /// Returns a vec of `(path, def)` pairs where `path` is the fully-qualified
+    /// path of the definition within the module tree.
+    pub fn find_by_annotation<'a>(&'a self, name: &str) -> Vec<(pr::Path, &'a pr::Def)> {
+        let mut result = Vec::new();
+        find_by_annotation_in(&self.root_module, name, pr::Path::empty(), &mut result);
+        result
+    }
+}
+
+fn find_by_annotation_in<'a>(
+    module: &'a pr::ModuleDef,
+    annotation_name: &str,
+    mut path: pr::Path,
+    result: &mut Vec<(pr::Path, &'a pr::Def)>,
+) {
+    for (name, def) in &module.defs {
+        path.push(name.clone());
+
+        if has_annotation(def, annotation_name) {
+            result.push((path.clone(), def));
+        }
+
+        if let pr::DefKind::Module(inner) = &def.kind {
+            find_by_annotation_in(inner, annotation_name, path.clone(), result);
+        }
+
+        path.pop();
+    }
+}
+
+fn has_annotation(def: &pr::Def, name: &str) -> bool {
+    def.annotations.iter().any(|ann| {
+        matches!(&ann.expr.kind, pr::ExprKind::Ident(path)
+            if path.len() == 1 && path.first() == name)
+    })
+}
+
 /// Sources used to resolve the project.
 /// All paths are relative to the project root.
 // We use `SourceTree` to represent both a single file (including a "file" piped

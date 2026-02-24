@@ -1,4 +1,5 @@
 use chumsky::Span;
+use lutra_bin::ident;
 
 use crate::pr::{self, ImportDef};
 use crate::printer::common::{Between, Separated};
@@ -127,7 +128,7 @@ impl PrintSource for NamedDef<'_> {
         match &self.1.kind {
             pr::DefKind::Module(module_def) => {
                 p.push("module ")?;
-                p.push(pr::display_ident(self.0))?;
+                p.push(ident::display(self.0))?;
                 p.push(" {")?;
                 p.indent();
                 p.new_line();
@@ -141,7 +142,7 @@ impl PrintSource for NamedDef<'_> {
             pr::DefKind::Expr(expr_def) if expr_def.constant => {
                 // const
                 p.push("const ")?;
-                p.push(pr::display_ident(self.0))?;
+                p.push(ident::display(self.0))?;
                 if let Some(ty) = &expr_def.ty {
                     p.push(": ")?;
                     ty.print(p)?;
@@ -157,7 +158,7 @@ impl PrintSource for NamedDef<'_> {
             }
             pr::DefKind::Ty(ty_def) => {
                 p.push("type ")?;
-                p.push(pr::display_ident(self.0))?;
+                p.push(ident::display(self.0))?;
 
                 if ty_def.is_framed {
                     Between {
@@ -196,7 +197,7 @@ impl PrintSource for pr::ImportDef {
 
                 if let Some(alias) = alias {
                     p.push(" as ")?;
-                    p.push(pr::display_ident(alias))?;
+                    p.push(ident::display(alias))?;
                 }
                 Some(())
             }

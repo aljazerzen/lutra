@@ -1,3 +1,5 @@
+use lutra_bin::ident;
+
 use crate::pr;
 use crate::printer::common::{Between, Separated};
 use crate::printer::{PrintSource, Printer};
@@ -13,7 +15,7 @@ impl PrintSource for pr::Expr {
                 base.print(p)?;
                 p.push(".")?;
                 match lookup {
-                    pr::Lookup::Name(n) => p.push(pr::display_ident(n))?,
+                    pr::Lookup::Name(n) => p.push(ident::display(n))?,
                     pr::Lookup::Position(i) => p.push(i.to_string())?,
                 }
             }
@@ -223,7 +225,7 @@ impl PrintSource for pr::Expr {
                 }
 
                 p.push("let ")?;
-                p.push(pr::display_ident(&binding.name))?;
+                p.push(ident::display(&binding.name))?;
                 p.push(" = ")?;
                 binding.bound.print(p)?;
                 p.push(";")?;
@@ -237,7 +239,7 @@ impl PrintSource for pr::Expr {
 
             pr::ExprKind::Variant(variant) => {
                 p.push(".")?;
-                p.push(pr::display_ident(&variant.name))?;
+                p.push(ident::display(&variant.name))?;
                 if let Some(inner) = &variant.inner {
                     Between {
                         node: inner.as_ref(),
@@ -338,7 +340,7 @@ pub(super) fn print_func<'c>(
     p.push("func ")?;
 
     if let Some(name) = name {
-        p.push(pr::display_ident(name))?;
+        p.push(ident::display(name))?;
     }
 
     Between {
@@ -393,7 +395,7 @@ pub(super) fn print_func<'c>(
 impl PrintSource for pr::CallArg {
     fn print<'c>(&self, p: &mut Printer<'c>) -> Option<()> {
         if let Some(label) = &self.label {
-            p.push(pr::display_ident(label))?;
+            p.push(ident::display(label))?;
             p.push(" = ")?;
         }
         self.expr.print(p)
@@ -407,7 +409,7 @@ impl PrintSource for pr::CallArg {
 impl PrintSource for pr::TupleField {
     fn print<'c>(&self, p: &mut Printer<'c>) -> Option<()> {
         if let Some(name) = &self.name {
-            let name = pr::display_ident(name);
+            let name = ident::display(name);
             p.push(name)?;
             p.push(" = ")?;
         }
@@ -432,11 +434,11 @@ impl PrintSource for pr::FuncParam {
         }
 
         if let Some(label) = &self.label {
-            p.push(pr::display_ident(label))?;
+            p.push(ident::display(label))?;
             p.push(" ")?;
         }
 
-        p.push(pr::display_ident(&self.name))?;
+        p.push(ident::display(&self.name))?;
 
         if let Some(ty) = &self.ty {
             p.push(": ")?;
@@ -472,7 +474,7 @@ impl PrintSource for pr::Pattern {
         match &self.kind {
             pr::PatternKind::Enum(name, inner) => {
                 p.push(".")?;
-                p.push(pr::display_ident(name))?;
+                p.push(ident::display(name))?;
                 if let Some(inner) = inner {
                     p.push("(")?;
                     inner.print(p)?;
@@ -488,7 +490,7 @@ impl PrintSource for pr::Pattern {
                 }
                 .print(p);
             }
-            pr::PatternKind::Bind(name) => p.push(pr::display_ident(name))?,
+            pr::PatternKind::Bind(name) => p.push(ident::display(name))?,
         };
         Some(())
     }

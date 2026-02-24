@@ -1,3 +1,5 @@
+use lutra_bin::ident;
+
 use crate::pr;
 use crate::printer::common::{Between, Separated};
 use crate::printer::{PrintSource, Printer};
@@ -50,14 +52,14 @@ impl PrintSource for pr::Ty {
             pr::TyKind::Func(func) => return print_ty_func(func, None, p),
             pr::TyKind::TupleComprehension(comp) => {
                 p.push("{for ")?;
-                p.push(pr::display_ident(&comp.variable_name))?;
+                p.push(ident::display(&comp.variable_name))?;
                 p.push(": ")?;
-                p.push(pr::display_ident(&comp.variable_ty))?;
+                p.push(ident::display(&comp.variable_ty))?;
                 p.push(" in ")?;
                 comp.tuple.print(p)?;
                 p.push(" do ")?;
                 if let Some(name) = &comp.body_name {
-                    p.push(pr::display_ident(name))?;
+                    p.push(ident::display(name))?;
                     p.push(": ")?;
                 }
                 comp.body_ty.print(p)?;
@@ -79,7 +81,7 @@ pub(super) fn print_ty_func<'c>(
 ) -> Option<()> {
     p.push("func ")?;
     if let Some(name) = name {
-        p.push(pr::display_ident(name))?;
+        p.push(ident::display(name))?;
     }
 
     Between {
@@ -124,7 +126,7 @@ impl PrintSource for pr::TyFuncParam {
         }
 
         if let Some(label) = &self.label {
-            p.push(pr::display_ident(label))?;
+            p.push(ident::display(label))?;
             p.push(": ")?;
         }
 
@@ -143,7 +145,7 @@ impl PrintSource for pr::TyFuncParam {
 impl PrintSource for pr::TyTupleField {
     fn print<'c>(&self, p: &mut Printer<'c>) -> Option<()> {
         if let Some(name) = &self.name {
-            p.push(pr::display_ident(name))?;
+            p.push(ident::display(name))?;
             p.push(": ")?;
         }
         if self.unpack {
@@ -158,7 +160,7 @@ impl PrintSource for pr::TyTupleField {
 }
 impl PrintSource for pr::TyEnumVariant {
     fn print<'c>(&self, p: &mut Printer<'c>) -> Option<()> {
-        p.push(pr::display_ident(&self.name))?;
+        p.push(ident::display(&self.name))?;
 
         let is_unit = self.ty.kind.as_tuple().is_some_and(|f| f.is_empty());
         if is_unit {
@@ -176,7 +178,7 @@ impl PrintSource for pr::TyEnumVariant {
 
 impl PrintSource for pr::TyParam {
     fn print<'c>(&self, p: &mut Printer<'c>) -> Option<()> {
-        p.push(pr::display_ident(&self.name))?;
+        p.push(ident::display(&self.name))?;
         match &self.domain {
             pr::TyDomain::Open => {}
             pr::TyDomain::OneOf(tys) => {
@@ -193,7 +195,7 @@ impl PrintSource for pr::TyParam {
                 for (i, field) in fields.iter().enumerate() {
                     match &field.location {
                         pr::Lookup::Name(name) => {
-                            p.push(pr::display_ident(name))?;
+                            p.push(ident::display(name))?;
                             p.push(": ")?;
                         }
                         pr::Lookup::Position(p) => {
@@ -217,7 +219,7 @@ impl PrintSource for pr::TyParam {
                     if i > 0 {
                         p.push(", ")?;
                     }
-                    p.push(pr::display_ident(&variant.name))?;
+                    p.push(ident::display(&variant.name))?;
                     if variant.ty.kind.as_tuple().is_some_and(|f| f.is_empty()) {
                         p.push(": ")?;
                         variant.ty.print(p)?;

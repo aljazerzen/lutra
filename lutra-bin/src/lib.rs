@@ -4,6 +4,7 @@ pub mod br;
 mod decode;
 mod encode;
 mod error;
+pub mod ident;
 pub mod ir;
 pub mod layout;
 mod printer;

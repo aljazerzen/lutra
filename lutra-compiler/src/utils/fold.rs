@@ -165,7 +165,8 @@ fn fold_module_def<F: ?Sized + PrFold>(fold: &mut F, module_def: ModuleDef) -> R
     for (name, def) in module_def.defs {
         defs.insert(name, fold.fold_def(def)?);
     }
-    Ok(ModuleDef { defs })
+    let span_content = module_def.span_content;
+    Ok(ModuleDef { defs, span_content })
 }
 
 pub fn fold_expr_def<F: ?Sized + PrFold>(fold: &mut F, expr_def: ExprDef) -> Result<ExprDef> {

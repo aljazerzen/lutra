@@ -38,6 +38,11 @@ pub enum DefKind {
 #[derive(PartialEq, Clone, Default)]
 pub struct ModuleDef {
     pub defs: IndexMap<String, Def>,
+
+    /// Span covering the content of this module, i.e. the region inside the
+    /// braces for inline modules, or the whole file body for file-based
+    /// submodules. This excludes inner doc comments or annotations.
+    pub span_content: Option<Span>,
 }
 
 #[derive(Debug, PartialEq, Clone)]

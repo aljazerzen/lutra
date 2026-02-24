@@ -30,7 +30,9 @@ impl PrFold for Desugarator {
             // base case
             defs.insert(name, self.fold_def(def)?);
         }
-        Ok(pr::ModuleDef { defs })
+
+        let span_content = module_def.span_content;
+        Ok(pr::ModuleDef { defs, span_content })
     }
 
     fn fold_expr(&mut self, mut expr: pr::Expr) -> Result<pr::Expr> {

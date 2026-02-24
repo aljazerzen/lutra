@@ -4,6 +4,7 @@ use std::fs;
 use std::path;
 use std::sync::Arc;
 
+use lutra_bin::ident;
 use parquet::arrow::arrow_reader::ParquetRecordBatchReaderBuilder;
 use parquet::basic::Repetition;
 use parquet::file::metadata as pq_metadata;
@@ -52,7 +53,6 @@ pub fn pull_schema(base_path: &path::Path) -> Result<String, Error> {
             let relative = path.strip_prefix(base_path).unwrap();
 
             r += &pull_schema_of_parquet_file(&path, relative)?;
-            r += "\n";
         }
     }
 
@@ -85,7 +85,7 @@ fn pull_schema_of_parquet_file(
     let path = to_str_or_err(path_relative.as_os_str())?;
 
     Ok(format!(
-        "func {func_name}(): {ty} -> std::fs::read_parquet(\"{path}\")\n"
+        "\nfunc {func_name}(): {ty} -> std::fs::read_parquet(\"{path}\")\n"
     ))
 }
 
@@ -175,7 +175,7 @@ fn format_tuple_fields(
 
         // Format field
         ty_fields += indent;
-        ty_fields += info.name();
+        ty_fields += &ident::display(info.name());
         ty_fields += ": ";
         ty_fields += &field_ty;
         ty_fields += ",\n";
