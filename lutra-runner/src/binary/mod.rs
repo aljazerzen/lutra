@@ -7,12 +7,3 @@
 pub mod embedded;
 #[cfg(feature = "binary-tokio")]
 pub mod tokio;
-
-#[cfg(any(
-    feature = "binary-tokio",
-    feature = "binary-embedded",
-    feature = "channel"
-))]
-pub mod messages {
-    include!(concat!(env!("OUT_DIR"), "/lutra.rs"));
-}

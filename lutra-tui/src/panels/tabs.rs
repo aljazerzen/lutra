@@ -119,12 +119,13 @@ impl Tabs {
     }
 
     /// Handle runner message (dispatch to correct panel by request_id).
-    pub fn handle_runner_message(&mut self, msg: lutra_runner::channel::messages::ServerMessage) {
-        // Iterate through all panels and let each check if message is for them
-        let lutra_runner::channel::messages::ServerMessage::Response(mut res) = msg else {
+    pub fn handle_runner_message(&mut self, msg: lutra_runner::proto::Response) {
+        // Only dispatch execute responses to panels; ignore prepare/release/schema responses.
+        let lutra_runner::proto::ResponseKind::Execute(_) = &msg.kind else {
             return;
         };
 
+        let mut res = msg;
         for panel in &mut self.panels {
             match panel.handle_runner_response(res) {
                 Ok(_) => break,    // found

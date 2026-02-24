@@ -1,6 +1,9 @@
 //! Common utils for Lutra identifiers
 
-pub fn display(s: &str) -> std::borrow::Cow<'_, str> {
+#[cfg(not(feature = "std"))]
+use alloc::format;
+
+pub fn display(s: &str) -> crate::borrow::Cow<'_, str> {
     fn forbidden_start(c: char) -> bool {
         !matches!(c, 'A'..='Z' | 'a'..='z' | '_')
     }

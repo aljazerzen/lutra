@@ -1,5 +1,7 @@
 //! PostgreSQL Lutra runner
 
+pub use lutra_runner::Run;
+
 #[cfg(not(any(feature = "postgres", feature = "tokio-postgres")))]
 compile_error!("At least one of 'postgres' or 'tokio-postgres' features has to be enabled.");
 
@@ -10,17 +12,17 @@ mod result;
 #[cfg(feature = "tokio-postgres")]
 mod schema;
 
-pub use lutra_runner::Run;
-
-use std::collections::HashMap;
+use lutra_bin::{ir, rr};
+use lutra_runner::proto;
 use thiserror::Error;
+
+#[cfg(feature = "tokio-postgres")]
+use std::{collections::HashMap, sync::Mutex};
 
 #[cfg(feature = "postgres")]
 use postgres::Error as PgError;
 #[cfg(not(feature = "postgres"))]
 use tokio_postgres::Error as PgError;
-
-use lutra_bin::{ir, rr};
 
 #[derive(Error, Debug)]
 pub enum Error {
@@ -28,6 +30,15 @@ pub enum Error {
     BadDatabaseResponse(&'static str),
     #[error("postgres: {:?}", .0)]
     Postgres(#[from] PgError),
+}
+
+impl From<Error> for proto::Error {
+    fn from(e: Error) -> Self {
+        proto::Error {
+            display: format!("{}", e),
+            code: None,
+        }
+    }
 }
 
 #[cfg(feature = "postgres")]
@@ -54,6 +65,8 @@ pub fn execute(
 #[cfg(feature = "tokio-postgres")]
 pub struct RunnerAsync<C: tokio_postgres::GenericClient = tokio_postgres::Client> {
     client: C,
+    next_program_id: std::sync::atomic::AtomicU32,
+    programs: Mutex<HashMap<u32, PreparedProgram>>,
 }
 
 impl<C> RunnerAsync<C>
@@ -61,7 +74,11 @@ where
     C: tokio_postgres::GenericClient,
 {
     pub fn new(client: C) -> Self {
-        RunnerAsync { client }
+        RunnerAsync {
+            client,
+            next_program_id: std::sync::atomic::AtomicU32::new(0),
+            programs: Mutex::new(HashMap::new()),
+        }
     }
 
     pub fn into_inner(self) -> C {
@@ -84,7 +101,7 @@ impl RunnerAsync<tokio_postgres::Client> {
 }
 
 #[derive(Clone)]
-pub struct PreparedProgram {
+struct PreparedProgram {
     program: rr::SqlProgram,
     stmt: tokio_postgres::Statement,
 }
@@ -94,40 +111,59 @@ impl<C> lutra_runner::Run for RunnerAsync<C>
 where
     C: tokio_postgres::GenericClient,
 {
-    type Error = Error;
-    type Prepared = PreparedProgram;
-
-    async fn prepare(&self, program: rr::Program) -> Result<Self::Prepared, Self::Error> {
+    async fn prepare(&self, program: rr::Program) -> Result<u32, proto::Error> {
+        let program_id = self
+            .next_program_id
+            .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
         let program = *program.into_sql_postgres().unwrap();
 
-        let stmt = self.client.prepare(&program.sql).await?;
+        let stmt = self
+            .client
+            .prepare(&program.sql)
+            .await
+            .map_err(Error::from)?;
 
-        Ok(PreparedProgram { program, stmt })
+        self.programs
+            .lock()
+            .unwrap()
+            .insert(program_id, PreparedProgram { program, stmt });
+        Ok(program_id)
     }
 
     async fn execute(
         &self,
-        handle: &Self::Prepared,
+        program_id: u32,
         input: &[u8],
-    ) -> Result<std::vec::Vec<u8>, Self::Error> {
-        let ctx = Context::new(&handle.program.defs);
+    ) -> Result<std::vec::Vec<u8>, proto::Error> {
+        let prepared = {
+            let guard = self.programs.lock().unwrap();
+            guard
+                .get(&program_id)
+                .cloned()
+                .ok_or_else(|| proto::Error::program_not_found(program_id))?
+        };
 
-        // pack input into query args
-        let args = params::to_sql(&handle.program, input, &ctx);
+        let ctx = Context::new(&prepared.program.defs);
+        let args = params::to_sql(&prepared.program, input, &ctx);
 
-        let rows = self.client.query(&handle.stmt, &args.as_refs()).await?;
+        let rows = self
+            .client
+            .query(&prepared.stmt, &args.as_refs())
+            .await
+            .map_err(Error::from)?;
 
-        // convert result from sql
-        result::from_sql(&handle.program, &rows, &ctx)
+        result::from_sql(&prepared.program, &rows, &ctx).map_err(Into::into)
     }
 
-    async fn release(&self, prepared: PreparedProgram) -> Result<(), Self::Error> {
-        drop(prepared);
+    async fn release(&self, program_id: u32) -> Result<(), proto::Error> {
+        self.programs.lock().unwrap().remove(&program_id);
         Ok(())
     }
 
-    async fn pull_schema(&self) -> Result<std::string::String, Self::Error> {
-        Ok(crate::schema::pull_interface(self).await?)
+    async fn pull_schema(&self) -> Result<std::string::String, proto::Error> {
+        crate::schema::pull_interface(self)
+            .await
+            .map_err(|e| Error::from(e).into())
     }
 }
 

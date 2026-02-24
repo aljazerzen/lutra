@@ -164,10 +164,9 @@ async fn run_program(
         todo!("parse lutra const expr: {}", case.input)
     };
 
-    let res = runner.prepare(program).await;
-    let handle = res.map_err(|e| format!("Run::prepare: {e:?}"))?;
+    let handle = (runner.prepare(program).await).map_err(|e| format!("Run::prepare: {e:?}"))?;
 
-    let res = runner.execute(&handle, &input).await;
+    let res = runner.execute(handle, &input).await;
     let output = res.map_err(|e| format!("Run::execute: {e:?}"))?;
 
     let output_source = lutra_bin::print_source(&output, &ty.output, &ty.defs)?;

@@ -4,7 +4,7 @@
 
 use lutra_bin::ir;
 
-use crate::{Error, Runner};
+use crate::Runner;
 
 #[allow(dead_code)]
 mod lutra {
@@ -12,7 +12,7 @@ mod lutra {
 }
 
 /// Pull database schema and generate Lutra source code
-pub fn pull_interface(runner: &mut Runner) -> Result<String, Error> {
+pub fn pull_interface(runner: &mut Runner) -> Result<String, lutra_runner::proto::Error> {
     use lutra_runner::RunSync;
 
     let program = lutra::pull_interface();

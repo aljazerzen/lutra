@@ -294,7 +294,7 @@ pub fn run(cmd: RunCommand) -> anyhow::Result<()> {
     let (mut runner, _) = crate::runners::init(cmd.runner, &project.source)?;
 
     let handle = runner.prepare_sync(program)?;
-    let output = runner.execute_sync(&handle, &input)?;
+    let output = runner.execute_sync(handle, &input)?;
 
     // handle output
     let output_path = cmd.output.as_deref().map(to_project_path);
@@ -445,8 +445,8 @@ pub fn codegen(cmd: CodegenCommand) -> anyhow::Result<()> {
 
     lutra_codegen::generate(&project, target, &cmd.output_file, opts)?;
 
-    eprintln!("Output written to {}", cmd.output_file.display());
-    eprintln!("Done.");
+    println!("Output written to {}", cmd.output_file.display());
+    println!("Done.");
 
     Ok(())
 }
@@ -463,8 +463,8 @@ pub fn format(cmd: FormatCommand) -> anyhow::Result<()> {
     let (err, edits) = lutra_compiler::format(&source_tree);
 
     if let Some(err) = err {
-        eprintln!("[Error]:");
-        eprintln!("{err}");
+        println!("[Error]:");
+        println!("{err}");
     }
 
     let mut edits_by_source: HashMap<&path::Path, Vec<_>> = HashMap::new();
@@ -477,7 +477,7 @@ pub fn format(cmd: FormatCommand) -> anyhow::Result<()> {
     }
 
     for (path, content) in source_tree.get_sources() {
-        println!("# -- {} --", path.display());
+        println!("-- {} --", path.display());
 
         if let Some(edits) = edits_by_source.get(path.as_path()) {
             let formatted = codespan::apply_text_edits(content, edits);

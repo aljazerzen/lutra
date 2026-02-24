@@ -36,8 +36,8 @@ pub fn _run_on(
     let input = input.encode(&ty.input, &ty.defs).unwrap();
 
     // execute
-    let program = runner.prepare_sync(program).unwrap();
-    let output = runner.execute_sync(&program, &input).unwrap();
+    let handle = runner.prepare_sync(program).unwrap();
+    let output = runner.execute_sync(handle, &input).unwrap();
 
     // decode and print source
     let output = lutra_bin::print_source(&output, &ty.output, &ty.defs).unwrap();

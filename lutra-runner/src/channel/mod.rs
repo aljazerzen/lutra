@@ -28,14 +28,11 @@
 mod client;
 mod server;
 
-pub use client::{Client, ClientReceiver, ClientSender, PreparedHandle};
+pub use client::{Client, ClientReceiver, ClientSender};
 pub use server::Server;
 
-use crate::Run;
+use crate::{Run, proto};
 use tokio::sync::mpsc;
-
-// Re-export message types for external use
-pub use crate::binary::messages;
 
 /// Create connected client/server pair for Run runners.
 ///
@@ -50,19 +47,19 @@ pub use crate::binary::messages;
 /// // Spawn server task inside a tokio runtime
 /// tokio::spawn(async move { server.run().await });
 ///
-/// // Use client
-/// let output = client.run_once(&program, &input)?;
-///
 /// // Cleanup
 /// drop(client);
 /// ```
 pub fn new_pair<R>(runner: R) -> (Client, Server<R>)
 where
     R: Run + Send + 'static,
-    R::Prepared: Send,
 {
-    let (client_tx, server_rx) = mpsc::channel(1);
-    let (server_tx, client_rx) = mpsc::channel(1);
+    let (client_tx, server_rx): (mpsc::Sender<proto::Request>, mpsc::Receiver<proto::Request>) =
+        mpsc::channel(1);
+    let (server_tx, client_rx): (
+        mpsc::Sender<proto::Response>,
+        mpsc::Receiver<proto::Response>,
+    ) = mpsc::channel(1);
 
     let client = Client::new(client_tx, client_rx);
     let server = Server::new(server_rx, server_tx, runner);

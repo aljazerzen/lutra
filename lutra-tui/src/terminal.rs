@@ -21,7 +21,7 @@ pub enum Action {
     Terminal(event::Event),
 
     /// Runner responses
-    RunnerMessage(lutra_runner::channel::messages::ServerMessage),
+    RunnerMessage(lutra_runner::proto::Response),
 
     // App-level commands (high-level)
     Exit,

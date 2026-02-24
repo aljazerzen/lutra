@@ -14,15 +14,11 @@
 //!
 //! Then wrap any async runner:
 //!
-//! ```no_run
+//! ```ignore
 //! use lutra_runner::{Run, sync::SyncRunner};
 //!
 //! let async_runner = MyAsyncRunner;
 //! let sync_runner = SyncRunner::new(async_runner);
-//!
-//! // Now use sync_runner with blocking calls
-//! let program = /* ... */;
-//! let prepared = sync_runner.prepare(program).unwrap();
 //! ```
 //!
 //! # Design
@@ -32,7 +28,7 @@
 //! - The underlying runner is cloned (via `Arc`) for each blocking call to avoid lifetime issues
 //! - Cloning a `SyncRunner` creates a new runtime but shares the same underlying runner via `Arc`
 
-use crate::{Run, RunSync};
+use crate::{Run, RunSync, proto};
 use lutra_bin::{rr, string, vec};
 use std::sync::Arc;
 use tokio::runtime::Runtime;
@@ -45,20 +41,21 @@ use tokio::runtime::Runtime;
 ///
 /// # Example
 ///
-/// ```no_run
+/// ```ignore
 /// use lutra_runner::{Run, sync::SyncRunner};
 ///
-/// async fn get_runner() -> impl Run<Error = std::io::Error, Prepared = ()> {
+/// async fn get_runner() -> impl Run {
 ///     // ... create your async runner
 /// #   todo!()
 /// }
 ///
-/// let async_runner = tokio::runtime::Runtime::new()
-///     .unwrap()
-///     .block_on(get_runner());
-/// let sync_runner = SyncRunner::new(async_runner);
-///
-/// // Now you can use sync_runner in synchronous code
+/// fn main() {
+///     let async_runner = tokio::runtime::Runtime::new()
+///         .unwrap()
+///         .block_on(get_runner());
+///     let sync_runner = SyncRunner::new(async_runner);
+///     // Now you can use sync_runner in synchronous code
+/// }
 /// ```
 pub struct SyncRunner<R> {
     runner: Arc<R>,
@@ -103,13 +100,8 @@ impl<R> SyncRunner<R> {
 impl<R> RunSync for SyncRunner<R>
 where
     R: Run + Send + Sync + 'static,
-    R::Prepared: Clone + Send + Sync,
-    R::Error: Send,
 {
-    type Error = R::Error;
-    type Prepared = R::Prepared;
-
-    fn prepare_sync(&mut self, program: rr::Program) -> Result<Self::Prepared, Self::Error> {
+    fn prepare_sync(&mut self, program: rr::Program) -> Result<u32, proto::Error> {
         let runner = Arc::clone(&self.runner);
         self.rt
             .block_on(async move { runner.prepare(program).await })
@@ -117,26 +109,26 @@ where
 
     fn execute_sync(
         &mut self,
-        program: &Self::Prepared,
+        program_id: u32,
         input: &[u8],
-    ) -> Result<vec::Vec<u8>, Self::Error> {
+    ) -> Result<vec::Vec<u8>, proto::Error> {
         let runner = Arc::clone(&self.runner);
         self.rt
-            .block_on(async move { runner.execute(program, input).await })
+            .block_on(async move { runner.execute(program_id, input).await })
     }
 
-    fn pull_schema_sync(&mut self) -> Result<string::String, Self::Error> {
+    fn pull_schema_sync(&mut self) -> Result<string::String, proto::Error> {
         let runner = Arc::clone(&self.runner);
         self.rt.block_on(async move { runner.pull_schema().await })
     }
 
-    fn release_sync(&mut self, prepared: Self::Prepared) -> Result<(), Self::Error> {
+    fn release_sync(&mut self, program_id: u32) -> Result<(), proto::Error> {
         let runner = Arc::clone(&self.runner);
         self.rt
-            .block_on(async move { runner.release(prepared).await })
+            .block_on(async move { runner.release(program_id).await })
     }
 
-    fn shutdown_sync(&mut self) -> Result<(), Self::Error> {
+    fn shutdown_sync(&mut self) -> Result<(), proto::Error> {
         let runner = Arc::clone(&self.runner);
         self.rt.block_on(async move { runner.shutdown().await })
     }
@@ -171,27 +163,24 @@ mod tests {
     struct MockRunner;
 
     impl Run for MockRunner {
-        type Error = String;
-        type Prepared = String;
-
-        async fn prepare(&self, _program: rr::Program) -> Result<Self::Prepared, Self::Error> {
-            Ok("prepared".to_string())
+        async fn prepare(&self, _program: rr::Program) -> Result<u32, proto::Error> {
+            Ok(0)
         }
 
         async fn execute(
             &self,
-            _program: &Self::Prepared,
+            _program_id: u32,
             input: &[u8],
-        ) -> Result<vec::Vec<u8>, Self::Error> {
-            // Echo back the input
+        ) -> Result<vec::Vec<u8>, proto::Error> {
             Ok(vec::Vec::from(input))
         }
 
-        fn release(
-            &self,
-            _prepared: Self::Prepared,
-        ) -> impl Future<Output = Result<(), Self::Error>> {
-            async { Ok(()) }
+        async fn pull_schema(&self) -> Result<string::String, proto::Error> {
+            Ok(string::String::from("mock interface"))
+        }
+
+        async fn release(&self, _program_id: u32) -> Result<(), proto::Error> {
+            Ok(())
         }
     }
 
@@ -200,7 +189,6 @@ mod tests {
         let mock = MockRunner;
         let mut sync_runner = SyncRunner::new(mock);
 
-        // Test prepare with a bytecode program
         use lutra_bin::br;
         let program = rr::Program::BytecodeLt(br::Program {
             externals: vec::Vec::new(),
@@ -209,19 +197,16 @@ mod tests {
             },
             defs: vec::Vec::new(),
         });
-        let prepared = sync_runner.prepare_sync(program).unwrap();
-        assert_eq!(prepared, "prepared");
+        let program_id = sync_runner.prepare_sync(program).unwrap();
 
-        // Test execute
         let input_data = b"hello world";
-        let output = sync_runner.execute_sync(&prepared, input_data).unwrap();
+        let output = sync_runner.execute_sync(program_id, input_data).unwrap();
         assert_eq!(&output[..], input_data);
 
-        // Test pull_schema
         let interface = sync_runner.pull_schema_sync().unwrap();
         assert_eq!(&interface[..], "mock interface");
 
-        // Test shutdown
+        sync_runner.release_sync(program_id).unwrap();
         sync_runner.shutdown_sync().unwrap();
     }
 }

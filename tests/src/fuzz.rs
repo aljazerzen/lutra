@@ -185,8 +185,8 @@ async fn generate_and_test(
         lutra_compiler::ProgramFormat::SqlPg,
     )
     .unwrap();
-    let program = client.prepare(program).await.unwrap();
-    let result = client.execute(&program, &[]).await.unwrap();
+    let handle = client.prepare(program).await.unwrap();
+    let result = client.execute(handle, &[]).await.unwrap();
     let case_val = case.val.encode(&ty.output, &ty.defs).unwrap();
     assert_eq!(result, case_val);
 
@@ -198,8 +198,8 @@ async fn generate_and_test(
         lutra_compiler::ProgramFormat::SqlPg,
     )
     .unwrap();
-    let program = client.prepare(program).await.unwrap();
-    let result = client.execute(&program, &case_val).await.unwrap();
+    let handle = client.prepare(program).await.unwrap();
+    let result = client.execute(handle, &case_val).await.unwrap();
     assert_eq!(result, case_val);
 
     // println!("{seed} ended");

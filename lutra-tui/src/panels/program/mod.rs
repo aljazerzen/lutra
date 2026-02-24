@@ -9,7 +9,6 @@ pub use output::{AutoRunState, OutputPane};
 
 use lutra_bin::{ir, rr};
 use lutra_compiler::Project;
-use lutra_runner::binary::messages::Response;
 use ratatui::prelude::*;
 use ratatui::widgets::{Block, Padding};
 use std::rc::Rc;
@@ -119,10 +118,8 @@ impl ProgramPane {
         let program = Rc::new(program);
         let program_ty = Rc::new(ty);
 
-        // Prepare program on runner (returns program_id)
-        let program_id = self
-            .runner_client
-            .prepare(&program)
+        // Prepare the program
+        let (_request_id, program_id) = (self.runner_client.prepare(&program))
             .map_err(|e| format!("Failed to prepare program: {}", e))?;
 
         // Create panes
@@ -235,7 +232,10 @@ impl ProgramPane {
     }
 
     /// Handle a message from the runner server.
-    pub fn handle_runner_response(&mut self, response: Response) -> Result<(), Response> {
+    pub fn handle_runner_response(
+        &mut self,
+        response: lutra_runner::proto::Response,
+    ) -> Result<(), lutra_runner::proto::Response> {
         // Check if this response is for our current execution
         let Some(running) = &self.executing else {
             return Err(response);
@@ -250,9 +250,13 @@ impl ProgramPane {
         // Clear executing state
         self.executing = None;
 
-        // Process result
-        match response.result {
-            lutra_runner::channel::messages::Result::Ok(output) => {
+        // Process result — only execute responses are dispatched here
+        let execute_result = match response.kind {
+            lutra_runner::proto::ResponseKind::Execute(r) => r,
+            _ => return Ok(()),
+        };
+        match execute_result {
+            lutra_runner::proto::ExecuteResult::Ok(output) => {
                 // SAFETY: program_ty must be Some if we're executing
                 let program_ty = self
                     .program_ty
@@ -273,11 +277,11 @@ impl ProgramPane {
                 self.output_pane = Some(OutputPane::new(program_ty, output, duration, auto_run));
                 self.stage = RunStage::Output;
             }
-            lutra_runner::channel::messages::Result::Err(err) => {
+            lutra_runner::proto::ExecuteResult::Err(err) => {
                 // Format error message with code if present
                 let error_msg = match &err.code {
-                    Some(code) => format!("{}: {}", code, err.message),
-                    None => err.message.clone(),
+                    Some(code) => format!("{}: {}", code, err.display),
+                    None => err.display.clone(),
                 };
                 self.error_pane = Some(ErrorPane::new(error_msg));
                 self.stage = RunStage::Error;

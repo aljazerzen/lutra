@@ -9,18 +9,12 @@ use pyo3::prelude::*;
 #[pymodule(name = "lutra_runner_postgres")]
 fn main(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<Runner>()?;
-    m.add_class::<Prepared>()?;
     Ok(())
 }
 
 #[pyclass]
 struct Runner {
     inner: Arc<lutra_runner_postgres::RunnerAsync>,
-}
-
-#[pyclass(frozen)]
-struct Prepared {
-    inner: lutra_runner_postgres::PreparedProgram,
 }
 
 #[pymethods]
@@ -55,34 +49,46 @@ impl Runner {
         run.call((slf, program, input), Default::default())
     }
 
+    /// Prepare a program and return its program_id handle.
     fn prepare<'py>(&self, py: Python<'py>, program: &[u8]) -> PyResult<Bound<'py, PyAny>> {
         let program = lutra_bin::rr::Program::decode(program)
             .map_err(|e| PyValueError::new_err(e.to_string()))?;
         let inner = self.inner.clone();
 
         pyo3_async_runtimes::tokio::future_into_py(py, async move {
-            let prepared =
-                (inner.prepare(program).await).map_err(|e| PyValueError::new_err(e.to_string()))?;
-
-            Ok(Prepared { inner: prepared })
+            inner
+                .prepare(program)
+                .await
+                .map_err(|e| PyValueError::new_err(e.to_string()))
         })
     }
 
+    /// Execute a prepared program by its program_id handle.
     fn execute<'py>(
         &self,
         py: Python<'py>,
-        program: Py<Prepared>,
+        program_id: u32,
         input: Vec<u8>,
     ) -> PyResult<Bound<'py, PyAny>> {
         let inner = self.inner.clone();
 
         pyo3_async_runtimes::tokio::future_into_py(py, async move {
-            let program = &program.get().inner;
+            inner
+                .execute(program_id, &input)
+                .await
+                .map_err(|e| PyValueError::new_err(e.to_string()))
+        })
+    }
 
-            let output = (inner.execute(program, &input).await)
-                .map_err(|e| PyValueError::new_err(e.to_string()))?;
+    /// Release a prepared program by its program_id handle.
+    fn release<'py>(&self, py: Python<'py>, program_id: u32) -> PyResult<Bound<'py, PyAny>> {
+        let inner = self.inner.clone();
 
-            Ok(output)
+        pyo3_async_runtimes::tokio::future_into_py(py, async move {
+            inner
+                .release(program_id)
+                .await
+                .map_err(|e| PyValueError::new_err(e.to_string()))
         })
     }
 

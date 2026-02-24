@@ -1,10 +1,11 @@
-use std::{collections::HashMap, marker::Unpin};
+use std::collections::HashMap;
+use std::marker::Unpin;
 
 use lutra_bin::Decode;
 use tokio::io::{AsyncRead, AsyncWrite, AsyncWriteExt};
 
 use crate::Run;
-use crate::binary::messages;
+use crate::proto;
 
 pub struct Server<C, R>
 where
@@ -13,8 +14,8 @@ where
 {
     stream: C,
     runner: R,
-
-    prepared_programs: HashMap<u32, Result<R::Prepared, messages::Error>>,
+    /// Maps client program_id → runner-allocated program_id.
+    program_ids: HashMap<u32, u32>,
 }
 
 impl<C, R> Server<C, R>
@@ -26,106 +27,75 @@ where
         Self {
             stream,
             runner,
-            prepared_programs: Default::default(),
+            program_ids: HashMap::new(),
         }
     }
 
     pub async fn run(&mut self) -> Result<(), std::io::Error> {
-        while let Ok(message) = super::read_message(&mut self.stream).await {
-            self.handle_message(message).await?;
+        while let Ok(request) = super::read_message(&mut self.stream).await {
+            self.handle_request(request).await?;
+
+            self.stream.flush().await?;
         }
         Ok(())
     }
 
-    async fn handle_message(
-        &mut self,
-        message: messages::ClientMessage,
-    ) -> Result<(), std::io::Error> {
-        match message {
-            messages::ClientMessage::Prepare(prepare) => {
+    async fn handle_request(&mut self, req: proto::Request) -> Result<(), std::io::Error> {
+        let res = match req.kind {
+            proto::RequestKind::Prepare(prepare) => {
                 tracing::trace!("prepare");
 
-                let result = match lutra_bin::rr::Program::decode(&prepare.program) {
-                    Ok(program) => {
-                        self.runner
-                            .prepare(program)
-                            .await
-                            .map_err(|e| messages::Error {
-                                message: format!("{:?}", e),
-                                code: Some(crate::error_codes::PREPARE_ERROR.to_string()),
-                            })
-                    }
-                    Err(e) => Err(messages::Error {
-                        message: format!("{:?}", e),
-                        code: Some(crate::error_codes::DECODE_ERROR.to_string()),
-                    }),
-                };
-
-                self.prepared_programs.insert(prepare.program_id, result);
-                // maybe send some kind of successful prepare response?
+                proto::ResponseKind::Prepare(self.handle_prepare(prepare).await.into())
             }
-            messages::ClientMessage::Execute(messages::Execute {
-                request_id,
-                program_id,
-                input,
-            }) => {
+            proto::RequestKind::Execute(execute) => {
                 tracing::trace!("execute");
 
-                let result = self.handle_execute(program_id, &input).await;
-
-                super::write_message(
-                    &mut self.stream,
-                    messages::ServerMessage::Response(messages::Response { request_id, result }),
-                )
-                .await
-                .unwrap();
-
-                self.stream.flush().await?;
+                proto::ResponseKind::Execute(self.handle_execute(execute).await.into())
             }
-            messages::ClientMessage::Release(release) => {
+            proto::RequestKind::Release(release) => {
                 tracing::trace!("release");
 
-                self.prepared_programs.remove(&release.program_id);
-
-                // maybe send some kind of successful release response?
-
-                self.stream.flush().await?;
+                proto::ResponseKind::Release(self.handle_release(release).await.into())
             }
-            messages::ClientMessage::PullSchema => {
+            proto::RequestKind::PullSchema => {
                 tracing::trace!("pull_schema");
 
-                let result = match self.runner.pull_schema().await {
-                    Ok(schema) => messages::SchemaResult::Ok(schema),
-                    Err(e) => messages::SchemaResult::Err(messages::Error {
-                        message: format!("{:?}", e),
-                        code: None,
-                    }),
-                };
-
-                let res =
-                    messages::ServerMessage::SchemaResponse(messages::SchemaResponse { result });
-                super::write_message(&mut self.stream, res).await.unwrap();
-
-                self.stream.flush().await?;
+                proto::ResponseKind::Schema(self.runner.pull_schema().await.into())
             }
-        }
+        };
+        let res = proto::Response {
+            kind: res,
+            request_id: req.id,
+        };
+
+        super::write_message(&mut self.stream, res).await
+    }
+
+    async fn handle_prepare(&mut self, prepare: proto::PrepareRequest) -> Result<(), proto::Error> {
+        let program =
+            lutra_bin::rr::Program::decode(&prepare.program).map_err(proto::Error::from)?;
+
+        let handle = self.runner.prepare(program).await?;
+        self.program_ids.insert(prepare.program_id, handle);
         Ok(())
     }
 
-    async fn handle_execute(&mut self, program_id: u32, input: &[u8]) -> messages::Result {
-        match self.prepared_programs.get(&program_id) {
-            Some(Ok(program)) => match self.runner.execute(program, input).await {
-                Ok(output) => messages::Result::Ok(output),
-                Err(e) => messages::Result::Err(messages::Error {
-                    message: format!("{:?}", e),
-                    code: Some(crate::error_codes::EXECUTION_ERROR.to_string()),
-                }),
-            },
-            Some(Err(err)) => messages::Result::Err(err.clone()),
-            None => messages::Result::Err(messages::Error {
-                message: format!("Program {} not prepared", program_id),
-                code: Some(crate::error_codes::PROGRAM_NOT_FOUND.to_string()),
-            }),
-        }
+    async fn handle_execute(
+        &mut self,
+        execute: proto::ExecuteRequest,
+    ) -> Result<Vec<u8>, proto::Error> {
+        let runner_id = (self.program_ids.get(&execute.program_id))
+            .copied()
+            .ok_or_else(|| proto::Error::program_not_found(execute.program_id))?;
+
+        self.runner.execute(runner_id, &execute.input).await
+    }
+
+    async fn handle_release(&mut self, release: proto::ReleaseRequest) -> Result<(), proto::Error> {
+        let Some(handle) = self.program_ids.remove(&release.program_id) else {
+            return Ok(());
+        };
+
+        self.runner.release(handle).await
     }
 }

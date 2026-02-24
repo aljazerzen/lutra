@@ -19,6 +19,10 @@ pub use r#async::AsyncRunner;
 
 use lutra_bin::{rr, string, vec};
 
+pub mod proto {
+    include!(concat!(env!("OUT_DIR"), "/lutra.rs"));
+}
+
 // Runner Posix Interface:
 // - an executable that can read arguments and env variables,
 // - Runner RPC over stdin+stdout,
@@ -41,52 +45,44 @@ use lutra_bin::{rr, string, vec};
 
 /// Ability to execute a lutra program.
 pub trait Run {
-    type Error: core::fmt::Debug;
-    type Prepared;
-
     /// Run a program.
     ///
-    /// This is helper function for [Run::prepare] followed by [Run::execute],
+    /// This is a helper for calls to [Run::prepare], [Run::execute], and [Run::release],
     /// with input encoding and output decoding.
     fn run<I, O>(
         &self,
         program: &rr::TypedProgram<I, O>,
         input: &I,
-    ) -> impl Future<Output = Result<lutra_bin::Result<O>, Self::Error>>
+    ) -> impl Future<Output = Result<lutra_bin::Result<O>, proto::Error>>
     where
         I: lutra_bin::Encode,
         O: lutra_bin::Decode,
     {
-        async {
+        async move {
             let input = input.encode();
-            let handle = self.prepare(program.inner.clone()).await?;
-            let output = self.execute(&handle, &input).await?;
+            let program_id = self.prepare(program.inner.clone()).await?;
+            let output = self.execute(program_id, &input).await?;
+            self.release(program_id).await?;
             Ok(O::decode(&output))
         }
     }
 
-    /// Prepares a program for execution and returns a handle, which can be
-    /// used with [Run::execute].
+    /// Prepares a program for execution and returns its handle.
     ///
     /// If the program is invalid, error is returned either now or later by [Run::execute].
     ///
-    /// When the handle is returned, the program might not be
-    /// fully prepared yet, so first execution of the program
-    /// might take longer then subsequent [Run::execute] calls.
-    fn prepare(
-        &self,
-        program: rr::Program,
-    ) -> impl Future<Output = Result<Self::Prepared, Self::Error>>;
+    /// The runner allocates the `program_id` internally.
+    /// On success, the program is ready to be executed via [Run::execute].
+    fn prepare(&self, program: rr::Program) -> impl Future<Output = Result<u32, proto::Error>>;
 
-    /// Execute a prepared program.
-    /// Program's format must match the format supported by this runner.
+    /// Execute a previously prepared program.
     fn execute(
         &self,
-        program: &Self::Prepared,
+        program_id: u32,
         input: &[u8],
-    ) -> impl Future<Output = Result<vec::Vec<u8>, Self::Error>>;
+    ) -> impl Future<Output = Result<vec::Vec<u8>, proto::Error>>;
 
-    /// Return static interface of this runner as Lutra source code.
+    /// Return static schema of this runner as Lutra source code.
     ///
     /// Runners can provide implementations for functions that are not part of
     /// standard library. This function returns definitions of these functions as
@@ -94,15 +90,16 @@ pub trait Run {
     ///
     /// For example: interpreter can provide `fs::read_parquet()`
     /// and PostgreSQL runner can provide `sql::read_table()`.
-    fn pull_schema(&self) -> impl Future<Output = Result<string::String, Self::Error>> {
+    fn pull_schema(&self) -> impl Future<Output = Result<string::String, proto::Error>> {
         async { Ok(string::String::new()) }
     }
 
     /// Releases a prepared program, freeing any associated resources.
-    fn release(&self, prepared: Self::Prepared) -> impl Future<Output = Result<(), Self::Error>>;
+    /// No-op if `program_id` is not known.
+    fn release(&self, program_id: u32) -> impl Future<Output = Result<(), proto::Error>>;
 
     /// Releases any claimed resources or network connections.
-    fn shutdown(&self) -> impl Future<Output = Result<(), Self::Error>> {
+    fn shutdown(&self) -> impl Future<Output = Result<(), proto::Error>> {
         async { Ok(()) }
     }
 }
@@ -119,47 +116,38 @@ pub trait Run {
 /// Methods take `&mut self` since synchronous operations may need to mutate
 /// internal state (like database connections).
 pub trait RunSync {
-    type Error: core::fmt::Debug;
-    type Prepared;
-
     /// Run a program.
     ///
-    /// This is helper function for [RunSync::prepare_sync] followed by [RunSync::execute_sync],
-    /// with input encoding and output decoding.
+    /// This is a helper for calls to [RunSync::prepare_sync], [RunSync::execute_sync],
+    /// and [RunSync::release_sync], with input encoding and output decoding.
     fn run_sync<I, O>(
         &mut self,
         program: &rr::TypedProgram<I, O>,
         input: &I,
-    ) -> Result<lutra_bin::Result<O>, Self::Error>
+    ) -> Result<lutra_bin::Result<O>, proto::Error>
     where
         I: lutra_bin::Encode,
         O: lutra_bin::Decode,
     {
         let input = input.encode();
-        let handle = self.prepare_sync(program.inner.clone())?;
-        let output = self.execute_sync(&handle, &input)?;
+        let program_id = self.prepare_sync(program.inner.clone())?;
+        let output = self.execute_sync(program_id, &input)?;
+        self.release_sync(program_id)?;
         Ok(O::decode(&output))
     }
 
-    /// Prepares a program for execution and returns a handle, which can be
-    /// used with [RunSync::execute_sync].
+    /// Prepares a program for execution and returns its handle.
     ///
     /// If the program is invalid, error is returned either now or later by [RunSync::execute_sync].
     ///
-    /// When the handle is returned, the program might not be
-    /// fully prepared yet, so first execution of the program
-    /// might take longer then subsequent [RunSync::execute_sync] calls.
-    fn prepare_sync(&mut self, program: rr::Program) -> Result<Self::Prepared, Self::Error>;
+    /// The runner allocates the `program_id` internally.
+    fn prepare_sync(&mut self, program: rr::Program) -> Result<u32, proto::Error>;
 
-    /// Execute a prepared program synchronously.
-    /// Program's format must match the format supported by this runner.
-    fn execute_sync(
-        &mut self,
-        program: &Self::Prepared,
-        input: &[u8],
-    ) -> Result<vec::Vec<u8>, Self::Error>;
+    /// Execute a previously prepared program.
+    fn execute_sync(&mut self, program_id: u32, input: &[u8])
+    -> Result<vec::Vec<u8>, proto::Error>;
 
-    /// Return static interface of this runner as Lutra source code.
+    /// Return static schema of this runner as Lutra source code.
     ///
     /// Runners can provide implementations for functions that are not part of
     /// standard library. This function returns definitions of these functions as
@@ -167,15 +155,16 @@ pub trait RunSync {
     ///
     /// For example: interpreter can provide `fs::read_parquet()`
     /// and DuckDB runner can provide `sql::read_table()`.
-    fn pull_schema_sync(&mut self) -> Result<string::String, Self::Error> {
+    fn pull_schema_sync(&mut self) -> Result<string::String, proto::Error> {
         Ok(string::String::new())
     }
 
     /// Releases a prepared program, freeing any associated resources.
-    fn release_sync(&mut self, prepared: Self::Prepared) -> Result<(), Self::Error>;
+    /// No-op if `program_id` is not known.
+    fn release_sync(&mut self, program_id: u32) -> Result<(), proto::Error>;
 
     /// Releases any claimed resources.
-    fn shutdown_sync(&mut self) -> Result<(), Self::Error> {
+    fn shutdown_sync(&mut self) -> Result<(), proto::Error> {
         Ok(())
     }
 }
@@ -186,4 +175,67 @@ pub mod error_codes {
     pub const PROGRAM_NOT_FOUND: &str = "PROGRAM_NOT_FOUND";
     pub const EXECUTION_ERROR: &str = "EXECUTION_ERROR";
     pub const PREPARE_ERROR: &str = "PREPARE_ERROR";
+}
+
+impl proto::Error {
+    /// Set the `code` field, overwriting any existing value.
+    pub fn with_code(mut self, code: &str) -> Self {
+        self.code = Some(::lutra_bin::string::String::from(code));
+        self
+    }
+
+    pub fn program_not_found(program_id: u32) -> proto::Error {
+        proto::Error {
+            display: format!("Program {} not prepared", program_id),
+            code: Some(crate::error_codes::PROGRAM_NOT_FOUND.to_string()),
+        }
+    }
+}
+
+impl ::core::fmt::Display for proto::Error {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        f.write_str(&self.display)
+    }
+}
+
+#[cfg(feature = "std")]
+impl ::std::error::Error for proto::Error {}
+
+impl From<lutra_bin::Error> for proto::Error {
+    fn from(value: lutra_bin::Error) -> Self {
+        Self {
+            code: Some(error_codes::DECODE_ERROR.into()),
+            display: value.to_string(),
+        }
+    }
+}
+
+impl From<Result<(), proto::Error>> for proto::PrepareResult {
+    fn from(value: Result<(), proto::Error>) -> Self {
+        Self(value.err())
+    }
+}
+
+impl From<Result<crate::vec::Vec<u8>, proto::Error>> for proto::ExecuteResult {
+    fn from(value: Result<crate::vec::Vec<u8>, proto::Error>) -> Self {
+        match value {
+            Ok(v) => Self::Ok(v),
+            Err(e) => Self::Err(e),
+        }
+    }
+}
+
+impl From<Result<(), proto::Error>> for proto::ReleaseResult {
+    fn from(value: Result<(), proto::Error>) -> Self {
+        Self(value.err())
+    }
+}
+
+impl From<Result<crate::string::String, proto::Error>> for proto::SchemaResult {
+    fn from(value: Result<crate::string::String, proto::Error>) -> Self {
+        match value {
+            Ok(v) => Self::Ok(v),
+            Err(e) => Self::Err(e),
+        }
+    }
 }

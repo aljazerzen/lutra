@@ -17,7 +17,7 @@
 //! }
 //! ```
 
-use crate::{Run, RunSync, rr, string, vec};
+use crate::{Run, RunSync, proto, rr, string, vec};
 
 /// Wrapper that adapts a `RunSync` implementation to work in async contexts.
 ///
@@ -69,37 +69,28 @@ impl<T> Clone for AsyncRunner<T> {
 impl<T> Run for AsyncRunner<T>
 where
     T: RunSync + Send + 'static,
-    T::Prepared: Clone + Send + Sync,
-    T::Error: Send,
 {
-    type Error = T::Error;
-    type Prepared = T::Prepared;
-
-    async fn prepare(&self, program: rr::Program) -> Result<Self::Prepared, Self::Error> {
+    async fn prepare(&self, program: rr::Program) -> Result<u32, proto::Error> {
         let mut guard = self.inner.lock().unwrap();
         guard.prepare_sync(program)
     }
 
-    async fn execute(
-        &self,
-        program: &Self::Prepared,
-        input: &[u8],
-    ) -> Result<vec::Vec<u8>, Self::Error> {
+    async fn execute(&self, program_id: u32, input: &[u8]) -> Result<vec::Vec<u8>, proto::Error> {
         let mut guard = self.inner.lock().unwrap();
-        guard.execute_sync(program, input)
+        guard.execute_sync(program_id, input)
     }
 
-    async fn pull_schema(&self) -> Result<string::String, Self::Error> {
+    async fn pull_schema(&self) -> Result<string::String, proto::Error> {
         let mut guard = self.inner.lock().unwrap();
         guard.pull_schema_sync()
     }
 
-    async fn release(&self, prepared: Self::Prepared) -> Result<(), Self::Error> {
+    async fn release(&self, program_id: u32) -> Result<(), proto::Error> {
         let mut guard = self.inner.lock().unwrap();
-        guard.release_sync(prepared)
+        guard.release_sync(program_id)
     }
 
-    async fn shutdown(&self) -> Result<(), Self::Error> {
+    async fn shutdown(&self) -> Result<(), proto::Error> {
         let mut guard = self.inner.lock().unwrap();
         guard.shutdown_sync()
     }

@@ -1,41 +1,46 @@
-type ClientMessage: enum {
+type Request: {id: uint32, kind: RequestKind}
+
+type RequestKind: enum {
   # Prepare a program
-  prepare: Prepare,
+  prepare: PrepareRequest,
 
   # Execute a program with given inputs
-  execute: Execute,
+  execute: ExecuteRequest,
 
   # Release a prepared program with all associated resources
-  release: Release,
+  release: ReleaseRequest,
 
   # Request the database schema as Lutra source code
   pull_schema,
 }
 
-type ServerMessage: enum {
-  # Execute response
-  response: Response,
+type PrepareRequest: {program_id: uint32, program: [uint8]}
 
-  # Schema response
-  schema_response: SchemaResponse,
+type ExecuteRequest: {program_id: uint32, input: [uint8]}
+
+type ReleaseRequest: {program_id: uint32}
+
+type Response: {request_id: uint32, kind: ResponseKind}
+
+type ResponseKind: enum {
+  prepare: PrepareResult,
+  execute: ExecuteResult,
+  release: ReleaseResult,
+  schema: SchemaResult,
 }
 
-type Prepare: {program_id: uint32, program: [uint8]}
+type PrepareResult: enum {ok, err: Error}
 
-type Execute: {program_id: uint32, input: [uint8], request_id: uint32}
+type ExecuteResult: enum {ok: [uint8], err: Error}
 
-type Release: {program_id: uint32}
-
-type SchemaResponse: {result: SchemaResult}
+type ReleaseResult: enum {ok, err: Error}
 
 type SchemaResult: enum {ok: text, err: Error}
 
-type Response: {request_id: uint32, result: Result}
+type Error: {
+  # Human-readable error message, intended to be shown directly to users.
+  display: text,
 
-type Result: enum {ok: [uint8], err: Error}
-
-## Invalid request. This can either be attributed to:
-## - invalid program,
-## - invalid inputs,
-## - invalid responses from native functions.
-type Error: {message: text, code: enum {none, some: text}}
+  # Machine-readable error code for programmatic handling.
+  code: enum {none, some: text},
+}

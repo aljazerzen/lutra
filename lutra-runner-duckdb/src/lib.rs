@@ -7,6 +7,7 @@ mod schema;
 pub use lutra_runner::{Run, RunSync};
 
 use lutra_bin::{ir, rr};
+use lutra_runner::proto;
 use std::{collections::HashMap, path, sync::Arc};
 use thiserror::Error;
 
@@ -16,6 +17,9 @@ use thiserror::Error;
 /// and don't involve actual async I/O, making this suitable for RunSync.
 pub struct Runner {
     conn: duckdb::Connection,
+
+    next_program_id: u32,
+    programs: HashMap<u32, Arc<rr::SqlProgram>>,
 }
 
 impl Runner {
@@ -27,7 +31,11 @@ impl Runner {
             let set_fs_access = format!("SET file_search_path = '{}'", fs_path.display());
             conn.execute(&set_fs_access, [])?;
         }
-        Ok(Self { conn })
+        Ok(Self {
+            conn,
+            next_program_id: 0,
+            programs: HashMap::new(),
+        })
     }
 
     /// Open a file-based DuckDB database
@@ -43,16 +51,8 @@ impl Runner {
     }
 }
 
-#[derive(Clone)]
-pub struct PreparedProgram {
-    program: Arc<rr::SqlProgram>,
-}
-
 impl lutra_runner::RunSync for Runner {
-    type Error = Error;
-    type Prepared = PreparedProgram;
-
-    fn prepare_sync(&mut self, program: rr::Program) -> Result<Self::Prepared, Self::Error> {
+    fn prepare_sync(&mut self, program: rr::Program) -> Result<u32, proto::Error> {
         // Accept both SqlDuckDB (preferred) and SqlPg (backward compatibility)
         let program = program
             .into_sql_duck_db()
@@ -60,42 +60,40 @@ impl lutra_runner::RunSync for Runner {
 
         // Don't prepare a statement, because we cannot cache it for later anyway.
         // That's because statement borrows connection, which means we cannot use it for other queries.
-
-        Ok(PreparedProgram {
-            program: Arc::from(program),
-        })
+        let program_id = self.next_program_id;
+        self.next_program_id += 1;
+        self.programs.insert(program_id, Arc::from(program));
+        Ok(program_id)
     }
 
-    fn execute_sync(
-        &mut self,
-        handle: &Self::Prepared,
-        input: &[u8],
-    ) -> Result<Vec<u8>, Self::Error> {
-        let ctx = Context::new(&handle.program.defs);
+    fn execute_sync(&mut self, program_id: u32, input: &[u8]) -> Result<Vec<u8>, proto::Error> {
+        let handle = (self.programs.get(&program_id))
+            .ok_or_else(|| proto::Error::program_not_found(program_id))?;
+
+        let ctx = Context::new(&handle.defs);
 
         // Convert input to SQL params
-        let args = params::to_sql(input, &handle.program.input_ty, &ctx)?;
+        let args = params::to_sql(input, &handle.input_ty, &ctx)?;
 
         // Execute query and get Arrow RecordBatches
-        let mut stmt = self.conn.prepare(&handle.program.sql)?;
-        let arrow = stmt.query_arrow(args.as_params())?;
+        let mut stmt = self.conn.prepare(&handle.sql).map_err(Error::from)?;
+        let arrow = stmt.query_arrow(args.as_params()).map_err(Error::from)?;
         let batches: Vec<_> = arrow.collect();
 
         // Convert Arrow to Lutra format
-        let output =
-            lutra_arrow::arrow_to_lutra(batches, &handle.program.output_ty, &handle.program.defs)
-                .map_err(|e| Error::ArrowConversion(e.to_string()))?;
+        let output = lutra_arrow::arrow_to_lutra(batches, &handle.output_ty, &handle.defs)
+            .map_err(|e| Error::ArrowConversion(e.to_string()))?;
 
         Ok(output.to_vec())
     }
 
-    fn release_sync(&mut self, prepared: Self::Prepared) -> Result<(), Self::Error> {
-        drop(prepared);
+    fn release_sync(&mut self, program_id: u32) -> Result<(), proto::Error> {
+        self.programs.remove(&program_id);
         Ok(())
     }
 
-    fn pull_schema_sync(&mut self) -> Result<String, Self::Error> {
-        schema::pull_interface(self)
+    fn pull_schema_sync(&mut self) -> Result<String, proto::Error> {
+        schema::pull_interface(self).map_err(Into::into)
     }
 }
 
@@ -111,6 +109,15 @@ pub enum Error {
     UnsupportedDataType(&'static str),
     #[error("arrow conversion: {}", .0)]
     ArrowConversion(String),
+}
+
+impl From<Error> for proto::Error {
+    fn from(e: Error) -> Self {
+        proto::Error {
+            display: format!("{}", e),
+            code: None,
+        }
+    }
 }
 
 pub(crate) struct Context<'a> {

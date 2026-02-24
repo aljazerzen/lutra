@@ -1,8 +1,6 @@
-use std::io;
-
 use lutra_bin::br;
 use lutra_compiler::ProgramFormat;
-use lutra_runner::{AsyncRunner, Run, binary};
+use lutra_runner::{AsyncRunner, Run, binary, proto};
 
 #[tokio::test(flavor = "current_thread")]
 async fn main() {
@@ -24,12 +22,12 @@ async fn main() {
         lutra_compiler::compile(&project, source, None, ProgramFormat::BytecodeLt).unwrap();
 
     let c = async {
-        let program = client.prepare(program).await.unwrap();
+        let handle = client.prepare(program).await.unwrap();
 
-        let res = client.execute(&program, &[1, 0, 0, 0, 0, 0, 0, 0]).await;
+        let res = client.execute(handle, &[1, 0, 0, 0, 0, 0, 0, 0]).await;
         assert_eq!("5", res_to_string(res, &ty.output));
 
-        let res = client.execute(&program, &[5, 0, 0, 0, 0, 0, 0, 0]).await;
+        let res = client.execute(handle, &[5, 0, 0, 0, 0, 0, 0, 0]).await;
         assert_eq!("17", res_to_string(res, &ty.output));
 
         client.shutdown().await.unwrap();
@@ -38,7 +36,7 @@ async fn main() {
     tokio::join!(c, server.run()).1.unwrap();
 }
 
-fn res_to_string(res: Result<Vec<u8>, io::Error>, output_ty: &br::Ty) -> String {
+fn res_to_string(res: Result<Vec<u8>, proto::Error>, output_ty: &br::Ty) -> String {
     let res = res.unwrap();
     lutra_bin::print_source(&res, output_ty, &[]).unwrap()
 }

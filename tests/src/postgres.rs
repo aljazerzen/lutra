@@ -57,8 +57,8 @@ pub async fn _run_on(
     let input = input.encode(&ty.input, &ty.defs).unwrap();
 
     // execute
-    let program = runner.prepare(program).await.unwrap();
-    let output = runner.execute(&program, &input).await.unwrap();
+    let handle = runner.prepare(program).await.unwrap();
+    let output = runner.execute(handle, &input).await.unwrap();
 
     // decode and print source
     let output = lutra_bin::print_source(&output, &ty.output, &ty.defs).unwrap();
@@ -2753,8 +2753,8 @@ async fn _type_round_trip(ty: &str, ty_reflected: &str, value: lutra_bin::Value)
 
     // execute
     let input = value.encode(&p_ty.input, &p_ty.defs).unwrap();
-    let p = runner.prepare(program).await.unwrap();
-    let output = runner.execute(&p, &input).await.unwrap();
+    let program_id = runner.prepare(program).await.unwrap();
+    let output = runner.execute(program_id, &input).await.unwrap();
 
     similar_asserts::assert_eq!(
         lutra_bin::print_source(&input, &p_ty.input, &p_ty.defs).unwrap(),
@@ -2821,14 +2821,14 @@ async fn _type_round_trip(ty: &str, ty_reflected: &str, value: lutra_bin::Value)
         lutra_compiler::compile(&project, "x -> insert_row(x)", None, ProgramFormat::SqlPg)
             .unwrap_or_else(|e| panic!("{e}"));
     let input = value.encode(&insert_ty.input, &insert_ty.defs).unwrap();
-    let p = runner.prepare(insert).await.unwrap();
-    runner.execute(&p, &input).await.unwrap();
+    let insert_id = runner.prepare(insert).await.unwrap();
+    runner.execute(insert_id, &input).await.unwrap();
 
     // from
     let (from, from_ty) =
         lutra_compiler::compile(&project, "from_row", None, ProgramFormat::SqlPg).unwrap();
-    let p = runner.prepare(from).await.unwrap();
-    let output = runner.execute(&p, &[]).await.unwrap();
+    let from_id = runner.prepare(from).await.unwrap();
+    let output = runner.execute(from_id, &[]).await.unwrap();
 
     // compare
     similar_asserts::assert_eq!(
