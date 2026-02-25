@@ -118,7 +118,7 @@ pub(super) fn run_action_loop<R: ratatui::backend::Backend>(
     app: &mut impl Component,
     terminal: &mut Terminal<R>,
     action_rx: std::sync::mpsc::Receiver<Action>,
-) -> Result<(), anyhow::Error>
+) -> Result<(), R::Error>
 where
     <R as ratatui::backend::Backend>::Error: Send + Sync + 'static,
 {

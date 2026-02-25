@@ -1,6 +1,7 @@
 mod input;
 mod interactive;
 mod keybindings;
+pub mod launcher;
 mod layout;
 mod panels;
 mod project;

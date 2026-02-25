@@ -309,22 +309,36 @@ pub struct InteractiveCommand {
     discover: DiscoverParams,
 
     #[clap(flatten)]
-    runner: RunnerParams,
+    runner: Option<RunnerParams>,
 }
 
 pub fn interactive(cmd: InteractiveCommand) -> anyhow::Result<()> {
+    // open launcher TUI, if needed
+    let (project, runner_params) = if cmd.discover.project.is_none() || cmd.runner.is_none() {
+        let runner = cmd.runner.map(RunnerParams::into_launcher);
+        let result = lutra_tui::launcher::run(cmd.discover.project, runner)?;
+
+        let Some(result) = result else { return Ok(()) };
+
+        let runner = RunnerParams::from_launcher(result.runner_params);
+        (Some(result.project_path), runner)
+    } else {
+        (cmd.discover.project, cmd.runner.unwrap())
+    };
+
     // discover
-    let project = lutra_compiler::discover(cmd.discover.clone())?;
+    let discover_params = lutra_compiler::DiscoverParams { project };
+    let project = lutra_compiler::discover(discover_params)?;
 
     // runner cfg
     let cfg = lutra_tui::RunnerConfig {
-        format: cmd.runner.get_program_format(),
+        format: runner_params.get_program_format(),
     };
 
     // init runner
-    let (runner, runner_thread) = crate::runners::init(cmd.runner, &project)?;
+    let (runner, runner_thread) = crate::runners::init(runner_params, &project)?;
 
-    // run tui
+    // open interactive TUI
     lutra_tui::run_interactive(project.get_root().to_path_buf(), cfg, runner, runner_thread)
 }
 

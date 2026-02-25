@@ -46,7 +46,7 @@ pub fn run_interactive(
     drop(watcher);
     runner.join();
 
-    r
+    Ok(r?)
 }
 
 /// The main interactive application state.

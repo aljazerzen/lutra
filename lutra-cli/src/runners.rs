@@ -1,5 +1,5 @@
 #[derive(clap::Args)]
-#[group(required = true, multiple = false)]
+#[group(required = false, multiple = false)]
 pub(crate) struct RunnerParams {
     /// Use interpreter runner
     #[arg(long, short)]
@@ -26,6 +26,41 @@ impl RunnerParams {
             lutra_compiler::ProgramFormat::SqlDuckdb
         } else {
             unreachable!()
+        }
+    }
+
+    /// Convert from launcher RunnerParams
+    pub fn from_launcher(params: lutra_tui::launcher::RunnerParams) -> Self {
+        match params {
+            lutra_tui::launcher::RunnerParams::Interpreter => Self {
+                interpreter: true,
+                postgres: None,
+                duckdb: None,
+            },
+            lutra_tui::launcher::RunnerParams::PostgreSQL(dsn) => Self {
+                interpreter: false,
+                postgres: Some(dsn),
+                duckdb: None,
+            },
+            lutra_tui::launcher::RunnerParams::DuckDB(path) => Self {
+                interpreter: false,
+                postgres: None,
+                duckdb: Some(path),
+            },
+        }
+    }
+
+    /// Convert to launcher RunnerParams
+    pub fn into_launcher(self) -> lutra_tui::launcher::RunnerParams {
+        if self.interpreter {
+            lutra_tui::launcher::RunnerParams::Interpreter
+        } else if let Some(dsn) = self.postgres {
+            lutra_tui::launcher::RunnerParams::PostgreSQL(dsn)
+        } else if let Some(path) = self.duckdb {
+            lutra_tui::launcher::RunnerParams::DuckDB(path)
+        } else {
+            // Default to interpreter if nothing is specified
+            lutra_tui::launcher::RunnerParams::Interpreter
         }
     }
 }

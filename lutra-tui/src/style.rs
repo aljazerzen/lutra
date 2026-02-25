@@ -4,6 +4,7 @@ use ratatui::widgets::{Block, Borders, Padding};
 pub static COLOR_FG_ACCENT: Color = Color::from_u32(0x006da0ca);
 pub static COLOR_BG_ACCENT: Color = Color::from_u32(0x004b657b);
 pub static COLOR_BG_PRIMARY: Color = Color::from_u32(0x00222222);
+pub static COLOR_BG_PRIMARY_ACTIVE: Color = Color::from_u32(0x002f2f2f);
 pub static COLOR_BG_SECONDARY: Color = Color::from_u32(0x00333333);
 pub static COLOR_BG_SECONDARY_ACTIVE: Color = Color::from_u32(0x003f3f3f);
 
