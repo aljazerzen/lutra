@@ -17,6 +17,7 @@ use thiserror::Error;
 /// and don't involve actual async I/O, making this suitable for RunSync.
 pub struct Runner {
     conn: duckdb::Connection,
+    file_system: Option<path::PathBuf>,
 
     next_program_id: u32,
     programs: HashMap<u32, Arc<rr::SqlProgram>>,
@@ -27,12 +28,13 @@ impl Runner {
         conn: duckdb::Connection,
         file_system: Option<path::PathBuf>,
     ) -> Result<Self, Error> {
-        if let Some(fs_path) = file_system {
+        if let Some(fs_path) = &file_system {
             let set_fs_access = format!("SET file_search_path = '{}'", fs_path.display());
             conn.execute(&set_fs_access, [])?;
         }
         Ok(Self {
             conn,
+            file_system,
             next_program_id: 0,
             programs: HashMap::new(),
         })
@@ -93,7 +95,17 @@ impl lutra_runner::RunSync for Runner {
     }
 
     fn pull_schema_sync(&mut self) -> Result<String, proto::Error> {
-        schema::pull_interface(self).map_err(Into::into)
+        let mut schema = schema::pull_interface(self)?;
+
+        // pull parquet file schema if file_system is configured
+        if let Some(fs_path) = &self.file_system {
+            let res = lutra_arrow::pull_schema(fs_path)
+                // Log error but don't fail
+                .inspect_err(|e| tracing::warn!("Failed to scan parquet files: {}", e));
+            schema += res.as_deref().unwrap_or_default();
+        }
+
+        Ok(schema)
     }
 }
 

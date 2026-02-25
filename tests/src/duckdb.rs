@@ -2836,3 +2836,116 @@ fn update_verify_changes() {
     ]
     "#);
 }
+
+#[test]
+fn pull_interface_with_parquet_files() {
+    use arrow::array::{ArrayRef, Int32Array, RecordBatch, StringArray};
+    use arrow::datatypes::{DataType, Field, Schema};
+    use lutra_runner::RunSync;
+    use parquet::arrow::ArrowWriter;
+    use parquet::file::properties::WriterProperties;
+    use std::fs;
+    use temp_dir::TempDir;
+
+    // Create temporary directory with a parquet file
+    let test_dir = TempDir::new().unwrap();
+
+    // Create a simple parquet file
+    let schema = Schema::new(vec![
+        Field::new("id", DataType::Int32, false),
+        Field::new("product_name", DataType::Utf8, false),
+    ]);
+
+    let batch = RecordBatch::try_new(
+        std::sync::Arc::new(schema),
+        vec![
+            std::sync::Arc::new(Int32Array::from(vec![1, 2])) as ArrayRef,
+            std::sync::Arc::new(StringArray::from(vec!["Widget", "Gadget"])) as ArrayRef,
+        ],
+    )
+    .unwrap();
+
+    let path = test_dir.path().join("products.parquet");
+    let file = fs::File::create(path).unwrap();
+    let props = WriterProperties::builder().build();
+    let mut writer = ArrowWriter::try_new(file, batch.schema(), Some(props)).unwrap();
+    writer.write(&batch).unwrap();
+    writer.close().unwrap();
+
+    // Create DuckDB with both a table and file_system path
+    let conn = duckdb::Connection::open_in_memory().unwrap();
+    conn.execute_batch(
+        r#"
+        CREATE TABLE users (id INTEGER PRIMARY KEY, name VARCHAR NOT NULL);
+        "#,
+    )
+    .unwrap();
+
+    let mut runner =
+        lutra_runner_duckdb::Runner::new(conn, Some(test_dir.path().to_path_buf())).unwrap();
+    let interface = runner.pull_schema_sync().unwrap();
+
+    // Should contain both SQL table schema and parquet file schema
+    insta::assert_snapshot!(interface, @r#"
+    ## Row of table users
+    type User: {id: int32, name: text}
+    ## Read from table users
+    func from_users(): [User] -> std::sql::from("users")
+    ## Write into table users
+    func insert_users(values: [User]) -> std::sql::insert(values, "users")
+    ## Lookup in users by constraint users_id_pkey
+    func from_users_by_id(id: int32): enum {none, some: User} -> (
+      from_users() | std::find(x -> x.id == id)
+    )
+
+    func products(): [{
+      id: int32,
+      product_name: text,
+    }] -> std::fs::read_parquet("products.parquet")
+
+    "#);
+}
+
+#[test]
+fn pull_interface_only_parquet_no_tables() {
+    use arrow::array::{ArrayRef, BooleanArray, RecordBatch};
+    use arrow::datatypes::{DataType, Field, Schema};
+    use lutra_runner::RunSync;
+    use parquet::arrow::ArrowWriter;
+    use parquet::file::properties::WriterProperties;
+    use std::fs;
+    use temp_dir::TempDir;
+
+    // Create temporary directory with a parquet file
+    let test_dir = TempDir::new().unwrap();
+
+    // Create a parquet file
+    let schema = Schema::new(vec![Field::new("active", DataType::Boolean, false)]);
+
+    let batch = RecordBatch::try_new(
+        std::sync::Arc::new(schema),
+        vec![std::sync::Arc::new(BooleanArray::from(vec![true, false])) as ArrayRef],
+    )
+    .unwrap();
+
+    let path = test_dir.path().join("flags.parquet");
+    let file = fs::File::create(path).unwrap();
+    let props = WriterProperties::builder().build();
+    let mut writer = ArrowWriter::try_new(file, batch.schema(), Some(props)).unwrap();
+    writer.write(&batch).unwrap();
+    writer.close().unwrap();
+
+    // Create empty DuckDB with file_system path
+    let conn = duckdb::Connection::open_in_memory().unwrap();
+    let mut runner =
+        lutra_runner_duckdb::Runner::new(conn, Some(test_dir.path().to_path_buf())).unwrap();
+    let interface = runner.pull_schema_sync().unwrap();
+
+    // Should only contain parquet file schema (no SQL tables section)
+    insta::assert_snapshot!(interface, @r#"
+    func flags(): [{
+      active: bool,
+    }] -> std::fs::read_parquet("flags.parquet")
+
+    "#);
+}

@@ -31,10 +31,16 @@ pub enum Error {
     },
 }
 
-/// Searches file system at a given path and produces Lutra source code for
-/// reading `.parquet` files.
+/// Scans the given base path for `.parquet` files and generates Lutra function
+/// definitions that use `std::fs::read_parquet()` to read them.
 ///
 /// Does not traverse links.
+///
+/// Handles:
+/// - Recursive directory traversal
+/// - Parquet metadata reading
+/// - Type inference from schemas
+/// - Intelligent nullability detection
 pub fn pull_schema(base_path: &path::Path) -> Result<String, Error> {
     let mut r = String::new();
     let mut paths_to_search = vec![base_path.to_path_buf()];
