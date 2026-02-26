@@ -281,9 +281,9 @@ fn test_interface_non_parquet_files() {
 fn to_arrow_int() {
     let ty = lutra_compiler::_test_compile_ty("int32");
     let value = lutra_bin::Value::Prim32(42);
-    let data = lutra_bin::bytes::Bytes::from(value.encode(&ty, &[]).unwrap());
+    let data = value.encode(&ty, &[]).unwrap();
 
-    let batch = lutra_arrow::lutra_to_arrow(data, &ty, &[]).unwrap();
+    let batch = lutra_arrow::lutra_to_arrow(data.as_slice(), &ty, &[]).unwrap();
 
     assert_eq!(batch.num_rows(), 1);
     assert_eq!(batch.num_columns(), 1);
@@ -302,9 +302,9 @@ fn to_arrow_int() {
 fn to_arrow_text() {
     let ty = lutra_compiler::_test_compile_ty("text");
     let value = lutra_bin::Value::Text("hello".into());
-    let data = lutra_bin::bytes::Bytes::from(value.encode(&ty, &[]).unwrap());
+    let data = value.encode(&ty, &[]).unwrap();
 
-    let batch = lutra_arrow::lutra_to_arrow(data, &ty, &[]).unwrap();
+    let batch = lutra_arrow::lutra_to_arrow(data.as_slice(), &ty, &[]).unwrap();
 
     assert_eq!(batch.num_rows(), 1);
     assert_eq!(batch.num_columns(), 1);
@@ -325,9 +325,9 @@ fn to_arrow_tuple() {
         lutra_bin::Value::Prim32(42),
         lutra_bin::Value::Text("world".into()),
     ]);
-    let data = lutra_bin::bytes::Bytes::from(value.encode(&ty, &[]).unwrap());
+    let data = value.encode(&ty, &[]).unwrap();
 
-    let batch = lutra_arrow::lutra_to_arrow(data, &ty, &[]).unwrap();
+    let batch = lutra_arrow::lutra_to_arrow(data.as_slice(), &ty, &[]).unwrap();
 
     assert_eq!(batch.num_rows(), 1);
     assert_eq!(batch.num_columns(), 2);
@@ -365,9 +365,9 @@ fn to_arrow_array_of_tuples() {
             lutra_bin::Value::Prim8(0),
         ]),
     ]);
-    let data = lutra_bin::bytes::Bytes::from(value.encode(&ty, &[]).unwrap());
+    let data = value.encode(&ty, &[]).unwrap();
 
-    let batch = lutra_arrow::lutra_to_arrow(data, &ty, &[]).unwrap();
+    let batch = lutra_arrow::lutra_to_arrow(data.as_slice(), &ty, &[]).unwrap();
 
     assert_eq!(batch.num_rows(), 2);
     assert_eq!(batch.num_columns(), 2);
@@ -403,9 +403,9 @@ fn to_arrow_array_of_int() {
         lutra_bin::Value::Prim32(34),
         lutra_bin::Value::Prim32(56),
     ]);
-    let data = lutra_bin::bytes::Bytes::from(value.encode(&ty, &[]).unwrap());
+    let data = value.encode(&ty, &[]).unwrap();
 
-    let batch = lutra_arrow::lutra_to_arrow(data, &ty, &[]).unwrap();
+    let batch = lutra_arrow::lutra_to_arrow(data.as_slice(), &ty, &[]).unwrap();
 
     assert_eq!(batch.num_rows(), 3);
     assert_eq!(batch.num_columns(), 1);

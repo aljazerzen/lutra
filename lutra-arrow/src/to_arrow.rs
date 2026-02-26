@@ -31,151 +31,138 @@ pub fn lutra_to_arrow(
     let ty = ctx.get_ty_mat(ty)?;
 
     let schema = get_schema(ty, &ctx)?;
-    let mut writer = ArrowRowWriter::new(schema, 0);
 
-    match &ty.kind {
+    let writer = match &ty.kind {
         ir::TyKind::Array(ty_item) => {
+            let ty_item = ctx.get_ty_mat(ty_item)?;
+            let row_converter = construct_row_converter(ty_item, &ctx)?;
+
             let array_reader = lutra_bin::ArrayReader::new_for_ty(data, ty);
-            writer.prepare_for_batch(array_reader.remaining())?;
 
+            let mut writer = ArrowRowWriter::new(schema, array_reader.remaining());
             for item in array_reader {
-                encode_row(&mut writer, item, ty_item, &ctx)?;
+                row_converter.convert(&mut writer, item.chunk());
             }
+            writer
         }
-        ir::TyKind::Primitive(_) | ir::TyKind::Tuple(_) => {
-            writer.prepare_for_batch(1)?;
-            encode_row(&mut writer, data, ty, &ctx)?;
-        }
-        ir::TyKind::Enum(_) => {
-            return Err(Error::UnsupportedType(
-                "enum types not yet supported in lutra_to_arrow".into(),
-            ));
-        }
-        ir::TyKind::Function(_) => {
-            return Err(Error::UnsupportedType(
-                "cannot serialize functions to Arrow".into(),
-            ));
-        }
-        ir::TyKind::Ident(_) => {
-            unreachable!("should have been resolved by get_ty_mat")
-        }
-    }
+        _ => {
+            let mut writer = ArrowRowWriter::new(schema, 1);
 
-    let batches = writer.finish()?;
-    assert_eq!(batches.len(), 1);
-    Ok(batches.into_iter().next().unwrap())
+            let converter = construct_row_converter(ty, &ctx)?;
+            converter.convert(&mut writer, data.chunk());
+
+            writer
+        }
+    };
+
+    Ok(writer.finish()?)
 }
 
-/// Encode a non-top-level value as a RecordBatch
-fn encode_row(
-    writer: &mut ArrowRowWriter,
-    data: impl bytes::Buf + Clone,
-    ty: &ir::Ty,
-    ctx: &Context,
-) -> Result<(), Error> {
-    let ty = ctx.get_ty_mat(ty)?;
+// ---------------------------------------------------------------------------
+// Convert trait
+// ---------------------------------------------------------------------------
+
+/// Decodes a Lutra value and writes it into [ArrowRowWriter].
+trait Convert {
+    fn convert(&self, writer: &mut ArrowRowWriter, data: &[u8]);
+}
+
+/// Row converter for tuple types: reads each field at its pre-computed offset.
+struct TupleConverter {
+    field_offsets: Vec<u32>,
+    fields: Vec<Box<dyn Convert>>,
+}
+
+impl Convert for TupleConverter {
+    fn convert(&self, writer: &mut ArrowRowWriter, data: &[u8]) {
+        let tuple_reader =
+            lutra_bin::TupleReader::new(data, Cow::Borrowed(self.field_offsets.as_slice()));
+        for (i, c) in self.fields.iter().enumerate() {
+            c.convert(writer, tuple_reader.get_field(i));
+        }
+    }
+}
+
+macro_rules! prim_converter {
+    ($name:ident, $rust_ty:ty, $builder_ty:ty) => {
+        struct $name;
+        impl Convert for $name {
+            fn convert(&self, writer: &mut ArrowRowWriter, data: &[u8]) {
+                let v = decode_prim::<$rust_ty>(data);
+                writer.next_as::<$builder_ty>().append_value(v);
+            }
+        }
+    };
+}
+
+prim_converter!(BoolConverter, bool, aa::BooleanBuilder);
+prim_converter!(Int8Converter, i8, aa::Int8Builder);
+prim_converter!(Int16Converter, i16, aa::Int16Builder);
+prim_converter!(Int32Converter, i32, aa::Int32Builder);
+prim_converter!(Int64Converter, i64, aa::Int64Builder);
+prim_converter!(UInt8Converter, u8, aa::UInt8Builder);
+prim_converter!(UInt16Converter, u16, aa::UInt16Builder);
+prim_converter!(UInt32Converter, u32, aa::UInt32Builder);
+prim_converter!(UInt64Converter, u64, aa::UInt64Builder);
+prim_converter!(Float32Converter, f32, aa::Float32Builder);
+prim_converter!(Float64Converter, f64, aa::Float64Builder);
+
+struct TextConverter;
+impl Convert for TextConverter {
+    fn convert(&self, writer: &mut ArrowRowWriter, data: &[u8]) {
+        let (offset, len) = ArrayReader::<&[u8]>::read_head(data);
+        // Safety: Lutra text is always valid UTF-8
+        let s = std::str::from_utf8(&data[offset..offset + len]).unwrap();
+        writer.next_as::<aa::StringBuilder>().append_value(s);
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Constructor functions
+// ---------------------------------------------------------------------------
+
+/// Build a row converter for the given type.
+fn construct_row_converter(ty: &ir::Ty, ctx: &Context) -> Result<Box<dyn Convert>, Error> {
     match &ty.kind {
-        ir::TyKind::Array(_) => Err(Error::UnsupportedType("nested arrays not supported".into())),
         ir::TyKind::Tuple(ty_fields) => {
             let field_offsets = lutra_bin::layout::tuple_field_offsets(ty);
-            let tuple_reader = lutra_bin::TupleReader::new(data, Cow::Owned(field_offsets));
-            for (i, ty_field) in ty_fields.iter().enumerate() {
-                encode_value(writer, tuple_reader.get_field(i), &ty_field.ty, ctx)?;
-            }
-            Ok(())
+            let fields = ty_fields
+                .iter()
+                .map(|f| construct_cell_converter(&f.ty, ctx))
+                .collect::<Result<Vec<_>, _>>()?;
+            Ok(Box::new(TupleConverter {
+                field_offsets,
+                fields,
+            }))
         }
-
-        ir::TyKind::Primitive(_) => encode_value(writer, data, ty, ctx),
-
+        ir::TyKind::Primitive(_) => Ok(construct_cell_converter(ty, ctx)?),
+        ir::TyKind::Array(_) => Err(Error::UnsupportedType("nested arrays not supported".into())),
         ir::TyKind::Enum(_) => Err(Error::UnsupportedType(
             "enum types not yet supported".into(),
         )),
         ir::TyKind::Function(_) => Err(Error::UnsupportedType(
             "cannot serialize functions to Arrow".into(),
         )),
-        ir::TyKind::Ident(_) => {
-            unreachable!("should have been resolved by get_ty_mat")
-        }
+        ir::TyKind::Ident(_) => unreachable!("should have been resolved by get_ty_mat"),
     }
 }
 
-/// Decode and write a single array item to the builder
-fn encode_value(
-    writer: &mut ArrowRowWriter,
-    data: impl bytes::Buf,
-    ty: &ir::Ty,
-    ctx: &Context,
-) -> Result<(), Error> {
+/// Build a converter for a single column and a single row.
+fn construct_cell_converter(ty: &ir::Ty, ctx: &Context) -> Result<Box<dyn Convert>, Error> {
     let ty = ctx.get_ty_mat(ty)?;
     match &ty.kind {
-        ir::TyKind::Primitive(ir::TyPrimitive::bool) => {
-            let v = decode_prim::<bool>(data);
-            writer.next_as::<aa::BooleanBuilder>().append_value(v);
-            Ok(())
-        }
-        ir::TyKind::Primitive(ir::TyPrimitive::int8) => {
-            let v = decode_prim::<i8>(data);
-            writer.next_as::<aa::Int8Builder>().append_value(v);
-            Ok(())
-        }
-        ir::TyKind::Primitive(ir::TyPrimitive::int16) => {
-            let v = decode_prim::<i16>(data);
-            writer.next_as::<aa::Int16Builder>().append_value(v);
-            Ok(())
-        }
-        ir::TyKind::Primitive(ir::TyPrimitive::int32) => {
-            let v = decode_prim::<i32>(data);
-            writer.next_as::<aa::Int32Builder>().append_value(v);
-            Ok(())
-        }
-        ir::TyKind::Primitive(ir::TyPrimitive::int64) => {
-            let v = decode_prim::<i64>(data);
-            writer.next_as::<aa::Int64Builder>().append_value(v);
-            Ok(())
-        }
-        ir::TyKind::Primitive(ir::TyPrimitive::uint8) => {
-            let v = decode_prim::<u8>(data);
-            writer.next_as::<aa::UInt8Builder>().append_value(v);
-            Ok(())
-        }
-        ir::TyKind::Primitive(ir::TyPrimitive::uint16) => {
-            let v = decode_prim::<u16>(data);
-            writer.next_as::<aa::UInt16Builder>().append_value(v);
-            Ok(())
-        }
-        ir::TyKind::Primitive(ir::TyPrimitive::uint32) => {
-            let v = decode_prim::<u32>(data);
-            writer.next_as::<aa::UInt32Builder>().append_value(v);
-            Ok(())
-        }
-        ir::TyKind::Primitive(ir::TyPrimitive::uint64) => {
-            let v = decode_prim::<u64>(data);
-            writer.next_as::<aa::UInt64Builder>().append_value(v);
-            Ok(())
-        }
-        ir::TyKind::Primitive(ir::TyPrimitive::float32) => {
-            let v = decode_prim::<f32>(data);
-            writer.next_as::<aa::Float32Builder>().append_value(v);
-            Ok(())
-        }
-        ir::TyKind::Primitive(ir::TyPrimitive::float64) => {
-            let v = decode_prim::<f64>(data);
-            writer.next_as::<aa::Float64Builder>().append_value(v);
-            Ok(())
-        }
-        ir::TyKind::Primitive(ir::TyPrimitive::text) => {
-            // TODO: this copies content twice, but it could copy it only once
-
-            let mut d = data;
-            let (offset, len) = ArrayReader::<&[u8]>::read_head(d.chunk());
-            d.advance(offset);
-            let mut bytes = vec![0; len];
-            d.copy_to_slice(&mut bytes);
-
-            let s = String::from_utf8(bytes).unwrap();
-            writer.next_as::<aa::StringBuilder>().append_value(s);
-            Ok(())
-        }
+        ir::TyKind::Primitive(ir::TyPrimitive::bool) => Ok(Box::new(BoolConverter)),
+        ir::TyKind::Primitive(ir::TyPrimitive::int8) => Ok(Box::new(Int8Converter)),
+        ir::TyKind::Primitive(ir::TyPrimitive::int16) => Ok(Box::new(Int16Converter)),
+        ir::TyKind::Primitive(ir::TyPrimitive::int32) => Ok(Box::new(Int32Converter)),
+        ir::TyKind::Primitive(ir::TyPrimitive::int64) => Ok(Box::new(Int64Converter)),
+        ir::TyKind::Primitive(ir::TyPrimitive::uint8) => Ok(Box::new(UInt8Converter)),
+        ir::TyKind::Primitive(ir::TyPrimitive::uint16) => Ok(Box::new(UInt16Converter)),
+        ir::TyKind::Primitive(ir::TyPrimitive::uint32) => Ok(Box::new(UInt32Converter)),
+        ir::TyKind::Primitive(ir::TyPrimitive::uint64) => Ok(Box::new(UInt64Converter)),
+        ir::TyKind::Primitive(ir::TyPrimitive::float32) => Ok(Box::new(Float32Converter)),
+        ir::TyKind::Primitive(ir::TyPrimitive::float64) => Ok(Box::new(Float64Converter)),
+        ir::TyKind::Primitive(ir::TyPrimitive::text) => Ok(Box::new(TextConverter)),
         ir::TyKind::Tuple(_) => Err(Error::UnsupportedType(
             "nested tuple types not yet supported".into(),
         )),
@@ -191,6 +178,10 @@ fn encode_value(
         ir::TyKind::Ident(_) => unreachable!(),
     }
 }
+
+// ---------------------------------------------------------------------------
+// Schema helpers
+// ---------------------------------------------------------------------------
 
 /// Get arrow schema for a lutra type
 fn get_schema(ty: &ir::Ty, ctx: &Context) -> Result<SchemaRef, Error> {
@@ -213,7 +204,7 @@ fn get_schema(ty: &ir::Ty, ctx: &Context) -> Result<SchemaRef, Error> {
     Ok(Arc::new(Schema::new(fields)))
 }
 
-/// Get arrow schema for a lutra type
+/// Get arrow schema fields for a row type
 fn get_schema_row(ty: &ir::Ty, ctx: &Context) -> Result<Vec<Field>, Error> {
     let ty = ctx.get_ty_mat(ty)?;
 
@@ -225,14 +216,12 @@ fn get_schema_row(ty: &ir::Ty, ctx: &Context) -> Result<Vec<Field>, Error> {
             let mut fields = Vec::new();
             for (i, ty_field) in ty_fields.iter().enumerate() {
                 let name = ty_field.name.clone().unwrap_or_else(|| format!("field{i}"));
-
                 let data_type = get_schema_cell(&ty_field.ty, ctx)?;
                 fields.push(Field::new(name, data_type, false));
             }
             Ok(fields)
         }
         ir::TyKind::Primitive(_) => {
-            // Single column for non-tuple types
             let field = Field::new("value", get_schema_cell(ty, ctx)?, false);
             Ok(vec![field])
         }
@@ -248,7 +237,6 @@ fn get_schema_cell(ty: &ir::Ty, ctx: &Context) -> Result<DataType, Error> {
     let ty = ctx.get_ty_mat(ty)?;
 
     match &ty.kind {
-        // Primitives
         ir::TyKind::Primitive(ir::TyPrimitive::bool) => Ok(DataType::Boolean),
         ir::TyKind::Primitive(ir::TyPrimitive::int8) => Ok(DataType::Int8),
         ir::TyKind::Primitive(ir::TyPrimitive::int16) => Ok(DataType::Int16),
@@ -261,127 +249,71 @@ fn get_schema_cell(ty: &ir::Ty, ctx: &Context) -> Result<DataType, Error> {
         ir::TyKind::Primitive(ir::TyPrimitive::float32) => Ok(DataType::Float32),
         ir::TyKind::Primitive(ir::TyPrimitive::float64) => Ok(DataType::Float64),
         ir::TyKind::Primitive(ir::TyPrimitive::text) => Ok(DataType::Utf8),
-
-        // Arrays
         ir::TyKind::Array(_) => Err(Error::UnsupportedType(
             "nested arrays not supported".to_string(),
         )),
-
-        // Nested Tuples
         ir::TyKind::Tuple(_) => Err(Error::UnsupportedType(
             "nested tuples not supported".to_string(),
         )),
-
-        // Enums
         ir::TyKind::Enum(_) => Err(Error::UnsupportedType(
             "enum types not supported".to_string(),
         )),
-
         ir::TyKind::Function(_) => Err(Error::UnsupportedType(
             "cannot serialize functions to Arrow".into(),
         )),
-
-        ir::TyKind::Ident(_) => {
-            unreachable!("should have been resolved by get_ty_mat")
-        }
+        ir::TyKind::Ident(_) => unreachable!("should have been resolved by get_ty_mat"),
     }
 }
 
+// ---------------------------------------------------------------------------
+// ArrowRowWriter and Organizer
+// ---------------------------------------------------------------------------
+
 /// Receives values row-by-row and passes them to [ArrayBuilder]s,
 /// which construct [RecordBatch]es.
-///
-/// Copied from connector_arrow crate
 pub struct ArrowRowWriter {
     schema: SchemaRef,
-    min_batch_size: usize,
-    data: Vec<aa::RecordBatch>,
 
     /// Determines into which column the next stream value should go.
     receiver: Organizer,
 
     /// Array buffers.
-    builders: Option<Vec<Box<dyn aa::ArrayBuilder>>>,
-    /// Number of rows reserved to be written in by [ArrowPartitionWriter::prepare_for_batch]
-    rows_reserved: usize,
-    /// Number of rows allocated within builders.
-    rows_capacity: usize,
+    builders: Vec<Box<dyn aa::ArrayBuilder>>,
 }
 
 impl ArrowRowWriter {
-    pub fn new(schema: SchemaRef, min_batch_size: usize) -> Self {
+    pub fn new(schema: SchemaRef, capacity: usize) -> Self {
         ArrowRowWriter {
             receiver: Organizer::new(schema.fields().len()),
-            data: Vec::new(),
 
-            builders: None,
-            rows_reserved: 0,
-            rows_capacity: 0,
-
+            builders: Self::allocate(&schema, capacity),
             schema,
-            min_batch_size,
         }
     }
 
-    pub fn prepare_for_batch(&mut self, row_count: usize) -> Result<(), arrow::error::ArrowError> {
-        self.receiver.reset_for_batch(row_count);
-        self.allocate(row_count)?;
-        Ok(())
-    }
-
-    /// Make sure that there is enough memory allocated in builders for the incoming batch.
-    /// Might allocate more than needed, for future row reservations.
-    fn allocate(&mut self, row_count: usize) -> Result<(), arrow::error::ArrowError> {
-        if self.rows_capacity >= row_count + self.rows_reserved {
-            // there is enough capacity, no need to allocate
-            self.rows_reserved += row_count;
-            return Ok(());
-        }
-
-        if self.rows_reserved > 0 {
-            self.flush()?;
-        }
-
-        let to_allocate = usize::max(row_count, self.min_batch_size);
-
-        let builders: Vec<Box<dyn aa::ArrayBuilder>> = self
-            .schema
+    fn allocate(schema: &Schema, capacity: usize) -> Vec<Box<dyn aa::ArrayBuilder>> {
+        schema
             .fields
             .iter()
-            .map(|f| arrow::array::make_builder(f.data_type(), to_allocate))
+            .map(|f| arrow::array::make_builder(f.data_type(), capacity))
+            .collect()
+    }
+
+    fn finish(self) -> Result<aa::RecordBatch, arrow::error::ArrowError> {
+        let columns: Vec<aa::ArrayRef> = self
+            .builders
+            .into_iter()
+            .map(|mut builder| builder.finish())
             .collect();
-
-        self.builders = Some(builders);
-        self.rows_reserved = row_count;
-        self.rows_capacity = to_allocate;
-        Ok(())
+        aa::RecordBatch::try_new(self.schema, columns)
     }
 
-    fn flush(&mut self) -> Result<(), arrow::error::ArrowError> {
-        let Some(mut builders) = self.builders.take() else {
-            return Ok(());
-        };
-        let columns: Vec<aa::ArrayRef> = builders
-            .iter_mut()
-            .map(|builder| builder.finish().slice(0, self.rows_reserved))
-            .collect();
-        let rb = aa::RecordBatch::try_new(self.schema.clone(), columns)?;
-        self.data.push(rb);
-        Ok(())
-    }
-
-    pub fn finish(mut self) -> Result<Vec<aa::RecordBatch>, arrow::error::ArrowError> {
-        self.flush()?;
-        Ok(self.data)
-    }
-
-    fn next_builder(&mut self) -> &mut dyn Any {
+    pub fn next_builder(&mut self) -> &mut dyn Any {
         let col = self.receiver.next_col_index();
-        // this is safe, because prepare_for_batch must have been called earlier
-        let builders = self.builders.as_mut().unwrap();
-        builders[col].as_any_mut()
+        self.builders[col].as_any_mut()
     }
 
-    fn next_as<T: 'static>(&mut self) -> &mut T {
+    pub fn next_as<T: 'static>(&mut self) -> &mut T {
         self.next_builder().downcast_mut().unwrap()
     }
 }
@@ -389,7 +321,6 @@ impl ArrowRowWriter {
 /// Determines into which column the next stream value should go.
 pub struct Organizer {
     col_count: usize,
-    row_count: usize,
 
     next_row: usize,
     next_col: usize,
@@ -399,17 +330,10 @@ impl Organizer {
     fn new(col_count: usize) -> Self {
         Organizer {
             col_count,
-            row_count: 0,
 
             next_row: 0,
             next_col: 0,
         }
-    }
-
-    fn reset_for_batch(&mut self, row_count: usize) {
-        self.row_count = row_count;
-        self.next_row = 0;
-        self.next_col = 0;
     }
 
     fn next_col_index(&mut self) -> usize {

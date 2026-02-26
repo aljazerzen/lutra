@@ -12,3 +12,12 @@ arrow = {workspace = true}
 parquet = {workspace = true}
 thiserror = {workspace = true}
 lutra-bin = {workspace = true}
+
+[dev-dependencies]
+criterion = { version = "0.5", features = ["html_reports"] }
+lutra-compiler = {workspace = true}
+rand = { version = "0.8", features = ["small_rng"] }
+
+[[bench]]
+name = "to_arrow_criterion"
+harness = false
