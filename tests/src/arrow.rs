@@ -274,3 +274,152 @@ fn test_interface_non_parquet_files() {
     // Should ignore non-parquet files
     assert_eq!(interface, "");
 }
+
+// Tests for lutra_to_arrow with arbitrary types (not just arrays)
+
+#[test]
+fn to_arrow_int() {
+    let ty = lutra_compiler::_test_compile_ty("int32");
+    let value = lutra_bin::Value::Prim32(42);
+    let data = lutra_bin::bytes::Bytes::from(value.encode(&ty, &[]).unwrap());
+
+    let batch = lutra_arrow::lutra_to_arrow(data, &ty, &[]).unwrap();
+
+    assert_eq!(batch.num_rows(), 1);
+    assert_eq!(batch.num_columns(), 1);
+
+    // Column should be named "item" and contain the value
+    assert_eq!(batch.schema().field(0).name(), "value");
+    let col = batch
+        .column(0)
+        .as_any()
+        .downcast_ref::<arrow::array::Int32Array>()
+        .unwrap();
+    assert_eq!(col.value(0), 42);
+}
+
+#[test]
+fn to_arrow_text() {
+    let ty = lutra_compiler::_test_compile_ty("text");
+    let value = lutra_bin::Value::Text("hello".into());
+    let data = lutra_bin::bytes::Bytes::from(value.encode(&ty, &[]).unwrap());
+
+    let batch = lutra_arrow::lutra_to_arrow(data, &ty, &[]).unwrap();
+
+    assert_eq!(batch.num_rows(), 1);
+    assert_eq!(batch.num_columns(), 1);
+
+    // Column should contain the text value
+    let col = batch
+        .column(0)
+        .as_any()
+        .downcast_ref::<arrow::array::StringArray>()
+        .unwrap();
+    assert_eq!(col.value(0), "hello");
+}
+
+#[test]
+fn to_arrow_tuple() {
+    let ty = lutra_compiler::_test_compile_ty("{x: int32, y: text}");
+    let value = lutra_bin::Value::Tuple(vec![
+        lutra_bin::Value::Prim32(42),
+        lutra_bin::Value::Text("world".into()),
+    ]);
+    let data = lutra_bin::bytes::Bytes::from(value.encode(&ty, &[]).unwrap());
+
+    let batch = lutra_arrow::lutra_to_arrow(data, &ty, &[]).unwrap();
+
+    assert_eq!(batch.num_rows(), 1);
+    assert_eq!(batch.num_columns(), 2);
+
+    // Check column names
+    assert_eq!(batch.schema().field(0).name(), "x");
+    assert_eq!(batch.schema().field(1).name(), "y");
+
+    // Check values
+    let col_x = batch
+        .column(0)
+        .as_any()
+        .downcast_ref::<arrow::array::Int32Array>()
+        .unwrap();
+    assert_eq!(col_x.value(0), 42);
+
+    let col_y = batch
+        .column(1)
+        .as_any()
+        .downcast_ref::<arrow::array::StringArray>()
+        .unwrap();
+    assert_eq!(col_y.value(0), "world");
+}
+
+#[test]
+fn to_arrow_array_of_tuples() {
+    let ty = lutra_compiler::_test_compile_ty("[{x: int32, bool}]");
+    let value = lutra_bin::Value::Array(vec![
+        lutra_bin::Value::Tuple(vec![
+            lutra_bin::Value::Prim32(100),
+            lutra_bin::Value::Prim8(1),
+        ]),
+        lutra_bin::Value::Tuple(vec![
+            lutra_bin::Value::Prim32(200),
+            lutra_bin::Value::Prim8(0),
+        ]),
+    ]);
+    let data = lutra_bin::bytes::Bytes::from(value.encode(&ty, &[]).unwrap());
+
+    let batch = lutra_arrow::lutra_to_arrow(data, &ty, &[]).unwrap();
+
+    assert_eq!(batch.num_rows(), 2);
+    assert_eq!(batch.num_columns(), 2);
+
+    // Check column names
+    assert_eq!(batch.schema().field(0).name(), "x");
+    assert_eq!(batch.schema().field(1).name(), "field1");
+
+    // Check x column values
+    let col_x = batch
+        .column(0)
+        .as_any()
+        .downcast_ref::<arrow::array::Int32Array>()
+        .unwrap();
+    assert_eq!(col_x.value(0), 100);
+    assert_eq!(col_x.value(1), 200);
+
+    // Check y column values
+    let col_y = batch
+        .column(1)
+        .as_any()
+        .downcast_ref::<arrow::array::BooleanArray>()
+        .unwrap();
+    assert!(col_y.value(0));
+    assert!(!col_y.value(1));
+}
+
+#[test]
+fn to_arrow_array_of_int() {
+    let ty = lutra_compiler::_test_compile_ty("[int32]");
+    let value = lutra_bin::Value::Array(vec![
+        lutra_bin::Value::Prim32(42),
+        lutra_bin::Value::Prim32(34),
+        lutra_bin::Value::Prim32(56),
+    ]);
+    let data = lutra_bin::bytes::Bytes::from(value.encode(&ty, &[]).unwrap());
+
+    let batch = lutra_arrow::lutra_to_arrow(data, &ty, &[]).unwrap();
+
+    assert_eq!(batch.num_rows(), 3);
+    assert_eq!(batch.num_columns(), 1);
+
+    // Check column names
+    assert_eq!(batch.schema().field(0).name(), "value");
+
+    // Check values
+    let col_a = batch
+        .column(0)
+        .as_any()
+        .downcast_ref::<arrow::array::Int32Array>()
+        .unwrap();
+    assert_eq!(col_a.value(0), 42);
+    assert_eq!(col_a.value(1), 34);
+    assert_eq!(col_a.value(2), 56);
+}

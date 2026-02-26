@@ -1624,11 +1624,11 @@ pub mod std_fs {
 
         // decode item ty from layout args
         let mut layout_args = assume::LayoutArgsReader::new(layout_args);
-        let ty_item = assume::bytes(layout_args.next_slice());
-        let ty_item = ir::Ty::decode(&ty_item).map_err(|_| EvalError::BadProgram)?;
+        let ty = assume::bytes(layout_args.next_slice());
+        let ty = ir::Ty::decode(&ty).map_err(|_| EvalError::BadProgram)?;
 
         // convert lutra to arrow
-        let batch = lutra_arrow::lutra_to_arrow(data, &ty_item, &it.defs)
+        let batch = lutra_arrow::lutra_to_arrow(data, &ty, &it.defs)
             .map_err(|e| EvalError::ExternalError(format!("lutra_to_arrow: {e}")))?;
 
         // write to parquet

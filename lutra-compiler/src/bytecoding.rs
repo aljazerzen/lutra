@@ -484,22 +484,22 @@ impl<'t> ByteCoder<'t> {
             }
 
             "std::fs::read_parquet" => {
-                // Pass the output array item type so interpreter can validate nullability
                 let ty_func = ty_mat.kind.as_function().unwrap();
-                let ty_return = &ty_func.body;
+                let ty_data = &ty_func.body;
 
                 self.include_defs = true;
 
                 let mut r = Vec::new();
-                pack_bytes_to_u32(ty_return.encode(), &mut r);
+                pack_bytes_to_u32(ty_data.encode(), &mut r);
                 r
             }
             "std::fs::write_parquet" => {
-                let array = self.get_ty_mat(as_ty_of_param(ty_mat));
-                let array_item = array.kind.as_array().unwrap();
+                let ty_data = as_ty_of_param(ty_mat);
+
+                self.include_defs = true;
 
                 let mut r = Vec::new();
-                pack_bytes_to_u32(array_item.encode(), &mut r);
+                pack_bytes_to_u32(ty_data.encode(), &mut r);
                 r
             }
 

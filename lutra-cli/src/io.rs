@@ -45,7 +45,7 @@ pub fn write_output(
 }
 
 fn write_format(
-    w: &mut impl Write,
+    w: &mut (impl Write + Send),
     data: &[u8],
     format: DataFormat,
     ty: &ir::Ty,
@@ -86,19 +86,12 @@ fn write_format(
         }
 
         DataFormat::Parquet => {
+            let batch = lutra_arrow::lutra_to_arrow(data, ty, ty_defs)?;
+
             use parquet::arrow::ArrowWriter;
-
-            let ty_item = ty.kind.as_array().unwrap(); // TODO
-            let batch = lutra_arrow::lutra_to_arrow(data, ty_item, ty_defs)?;
-
-            // ArrowWriter requires Seek, so write to an in-memory buffer first
-            let mut buf = Vec::new();
-            {
-                let mut writer = ArrowWriter::try_new(&mut buf, batch.schema(), None)?;
-                writer.write(&batch)?;
-                writer.finish()?;
-            }
-            w.write_all(&buf)?;
+            let mut writer = ArrowWriter::try_new(&mut w, batch.schema(), None)?;
+            writer.write(&batch)?;
+            writer.finish()?;
         }
 
         DataFormat::Table => {
