@@ -9,7 +9,6 @@ use super::RunnerParams;
 /// Runner pane component that handles both selection and configuration.
 pub struct RunnerPane {
     // Selection state
-    selected_index: usize,
     list_state: ListState,
 
     // Configuration state
@@ -35,9 +34,9 @@ impl RunnerPane {
 
         let (selected_index, config_input, configured) = if let Some(params) = initial {
             match params {
-                RunnerParams::Interpreter => (0, String::new(), true),
+                RunnerParams::DuckDB(path) => (0, path, true),
                 RunnerParams::PostgreSQL(dsn) => (1, dsn, true),
-                RunnerParams::DuckDB(path) => (2, path, true),
+                RunnerParams::Interpreter => (2, String::new(), true),
             }
         } else {
             (0, String::new(), false)
@@ -46,7 +45,6 @@ impl RunnerPane {
         list_state.select(Some(selected_index));
 
         Self {
-            selected_index,
             list_state,
             config_input,
             config_cursor_pos: 0,
@@ -57,22 +55,25 @@ impl RunnerPane {
     }
 
     fn move_up(&mut self) {
-        if self.selected_index > 0 {
-            self.selected_index -= 1;
-            self.list_state.select(Some(self.selected_index));
+        if let Some(idx) = self.list_state.selected()
+            && idx > 0
+        {
+            self.list_state.select(Some(idx - 1));
         }
     }
 
     fn move_down(&mut self) {
         let max = RunnerType::all().len() - 1;
-        if self.selected_index < max {
-            self.selected_index += 1;
-            self.list_state.select(Some(self.selected_index));
+        if let Some(idx) = self.list_state.selected()
+            && idx < max
+        {
+            self.list_state.select(Some(idx + 1));
         }
     }
 
     pub fn get_selected_type(&self) -> RunnerType {
-        RunnerType::all()[self.selected_index]
+        let idx = self.list_state.selected().unwrap_or(0);
+        RunnerType::all()[idx]
     }
 
     pub fn is_configuring(&self) -> bool {
@@ -331,8 +332,7 @@ impl RunnerPane {
 
 impl Component for RunnerPane {
     fn render(&self, frame: &mut Frame, area: Rect) {
-        let block = crate::style::panel_primary(" Runner ", self.focused)
-            .borders(Borders::TOP | Borders::LEFT);
+        let block = crate::style::panel_primary("Runner ", self.focused).padding(Padding::ZERO);
         let inner_area = block.inner(area);
         frame.render_widget(block, area);
 

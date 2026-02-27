@@ -1,4 +1,3 @@
-use std::path::PathBuf;
 use std::rc::Rc;
 
 use lutra_compiler::error::{DiagnosticMessage, Error as CompileError};
@@ -6,8 +5,8 @@ use lutra_compiler::{CheckParams, Project, SourceTree, check};
 
 /// Centralized state holding compilation results.
 pub struct ProjectState {
-    /// Path to the project root.
-    pub path: PathBuf,
+    /// Last source code.
+    pub source: Option<SourceTree>,
 
     /// Last compilation result.
     pub compilation: CompileResult,
@@ -30,32 +29,23 @@ pub enum CompileResult {
 
 impl ProjectState {
     /// Creates a new project state for the given path.
-    pub fn new(project_path: PathBuf) -> Self {
+    pub fn new() -> Self {
         Self {
-            path: project_path,
+            source: None,
             compilation: CompileResult::Pending,
             compiling: false,
         }
     }
 
-    /// Recompiles the project from the current source tree.
+    /// Compiles the project with a provided source tree (from the file watcher).
     pub fn recompile(&mut self) {
-        self.compiling = true;
-
-        // Discover
-        let source = match discover(self.path.clone()) {
-            Ok(s) => s,
-            Err(e) => {
-                self.compiling = false;
-                self.compilation = CompileResult::Failed {
-                    diagnostics: Rc::new(vec![]),
-                };
-                eprintln!("Failed to load sources: {e}");
-                return;
-            }
+        let Some(source) = self.source.clone() else {
+            return;
         };
 
-        // Check
+        self.compiling = true;
+
+        // Check (skip discover, use provided source)
         self.compilation = match check(source, CheckParams {}) {
             Ok(project) => CompileResult::Success {
                 project: Box::new(project),
@@ -83,12 +73,4 @@ impl ProjectState {
             CompileResult::Pending => 0,
         }
     }
-}
-
-/// Loads all .lt files from a project directory into a SourceTree.
-fn discover(path: PathBuf) -> Result<SourceTree, lutra_compiler::error::Error> {
-    let params = lutra_compiler::DiscoverParams {
-        project: Some(path),
-    };
-    lutra_compiler::discover(params)
 }

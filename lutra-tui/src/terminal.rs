@@ -23,6 +23,9 @@ pub enum Action {
     /// Runner responses
     RunnerMessage(lutra_runner::proto::Response),
 
+    /// Source tree updated from file watcher
+    SourceUpdated(lutra_compiler::SourceTree),
+
     // App-level commands (high-level)
     Exit,
     Recompile,

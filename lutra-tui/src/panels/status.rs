@@ -3,7 +3,7 @@ use std::path::Path;
 use ratatui::prelude::*;
 
 use crate::RunnerConfig;
-use crate::project::CompileResult;
+use crate::project::{CompileResult, ProjectState};
 
 /// Status bar at the bottom of the screen.
 pub struct StatusBar {
@@ -23,11 +23,13 @@ pub enum Status {
 
 impl StatusBar {
     /// Creates a new status bar.
-    pub fn new(project_path: &Path, runner: &RunnerConfig) -> Self {
+    pub fn new(project: &Path, runner: &RunnerConfig) -> Self {
         let runner_format = format!("{:?}", runner.format);
 
+        let path = project.canonicalize();
+        let path = path.as_deref().unwrap_or(project).display().to_string();
         Self {
-            project_path: project_path.display().to_string(),
+            project_path: path,
             status: Status::Compiling,
             runner_name: runner_format,
         }
@@ -37,8 +39,11 @@ impl StatusBar {
         self.status = Status::Compiling;
     }
 
-    pub fn update(&mut self, compilation: &CompileResult) {
-        self.status = match compilation {
+    pub fn update(&mut self, project: &ProjectState) {
+        if let Some(source) = &project.source {
+            self.project_path = source.get_project_dir().display().to_string();
+        }
+        self.status = match &project.compilation {
             CompileResult::Success { .. } => Status::Ok,
             CompileResult::Failed { diagnostics } => Status::Error(diagnostics.len()),
             CompileResult::Pending => Status::Compiling,

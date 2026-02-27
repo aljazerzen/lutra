@@ -1,4 +1,4 @@
-use std::path::PathBuf;
+use std::path;
 
 use crossterm::event;
 use ratatui::prelude::*;
@@ -16,7 +16,7 @@ use crate::watcher::FileWatcher;
 /// Watches the project directory for changes and provides a TUI
 /// for browsing definitions, viewing diagnostics, and running programs.
 pub fn run_interactive(
-    project_path: PathBuf,
+    project_path: path::PathBuf,
     runner_cfg: runner::RunnerConfig,
     runner: lutra_runner::channel::Client,
     runner_thread: std::thread::JoinHandle<()>,
@@ -29,7 +29,7 @@ pub fn run_interactive(
     let runner = runner::Runner::try_new(runner, runner_thread, action_tx.clone())?;
 
     // Create app
-    let mut app = InteractiveApp::new(project_path.clone(), runner_cfg, runner.get_client());
+    let mut app = InteractiveApp::new(&project_path, runner_cfg, runner.get_client());
 
     // Enter terminal
     let mut term = ratatui::init();
@@ -88,14 +88,14 @@ pub struct InteractiveApp {
 impl InteractiveApp {
     /// Creates a new interactive app for the given project path.
     pub fn new(
-        project_path: PathBuf,
+        project_path: &path::Path,
         runner: runner::RunnerConfig,
         runner_client: lutra_runner::channel::ClientSender,
     ) -> Self {
-        let status = StatusBar::new(&project_path, &runner);
+        let status = StatusBar::new(project_path, &runner);
 
         let mut app = Self {
-            project: ProjectState::new(project_path),
+            project: ProjectState::new(),
             layout: Layout::new(),
             runner,
             keybindings: KeyBindings::new(),
@@ -106,9 +106,6 @@ impl InteractiveApp {
             status,
             search: SearchModal::new(),
         };
-
-        // Initial compilation
-        app.recompile();
 
         // Set initial focus
         app.update_panel_focus();
@@ -122,7 +119,7 @@ impl InteractiveApp {
         self.project.recompile();
 
         // Update panels based on compilation result
-        self.status.update(&self.project.compilation);
+        self.status.update(&self.project);
         self.definitions.update(&self.project);
         self.diagnostics.update(&self.project);
         self.search.update(&self.project);
@@ -279,6 +276,11 @@ impl Component for InteractiveApp {
             }
             Action::RunnerMessage(msg) => {
                 self.run_panels.handle_runner_message(msg);
+                ActionResult::redraw()
+            }
+            Action::SourceUpdated(source) => {
+                self.project.source = Some(source);
+                self.recompile();
                 ActionResult::redraw()
             }
             Action::CloseTab => {

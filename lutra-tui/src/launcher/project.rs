@@ -3,15 +3,15 @@ use std::path::{Path, PathBuf};
 
 use crossterm::event::{KeyCode, KeyEvent};
 use ratatui::prelude::*;
-use ratatui::widgets::{Borders, List, ListItem, ListState};
+use ratatui::widgets::{List, ListItem, ListState, Padding};
 
 use crate::terminal::{Action, ActionResult, Component};
+use crate::utils::clip_top;
 
 /// Project selector component with tree view.
 pub struct ProjectSelector {
     root: TreeNode,
     flattened: Vec<(PathBuf, String, NodeType, usize)>,
-    selected_index: usize,
     list_state: ListState,
     selection: Option<PathBuf>,
     focused: bool,
@@ -29,14 +29,13 @@ impl ProjectSelector {
         let mut selector = Self {
             root,
             flattened: Vec::new(),
-            selected_index: 0,
             list_state: ListState::default(),
             selection: None,
             focused: true,
         };
 
         selector.update_flattened();
-        selector.list_state.select(Some(0));
+        selector.list_state.select(Some(1));
 
         Ok(selector)
     }
@@ -46,29 +45,33 @@ impl ProjectSelector {
         self.root.flatten(&mut self.flattened);
 
         // Clamp selected index
-        if self.selected_index >= self.flattened.len() && !self.flattened.is_empty() {
-            self.selected_index = self.flattened.len() - 1;
+        if let Some(idx) = self.list_state.selected()
+            && idx >= self.flattened.len()
+            && !self.flattened.is_empty()
+        {
+            self.list_state.select(Some(self.flattened.len() - 1));
         }
-
-        self.list_state.select(Some(self.selected_index));
     }
 
     fn move_up(&mut self) {
-        if self.selected_index > 0 {
-            self.selected_index -= 1;
-            self.list_state.select(Some(self.selected_index));
+        if let Some(idx) = self.list_state.selected()
+            && idx > 0
+        {
+            self.list_state.select(Some(idx - 1));
         }
     }
 
     fn move_down(&mut self) {
-        if self.selected_index + 1 < self.flattened.len() {
-            self.selected_index += 1;
-            self.list_state.select(Some(self.selected_index));
+        if let Some(idx) = self.list_state.selected()
+            && idx + 1 < self.flattened.len()
+        {
+            self.list_state.select(Some(idx + 1));
         }
     }
 
     fn toggle_current(&mut self) -> anyhow::Result<()> {
-        if let Some((path, _, _, _)) = self.flattened.get(self.selected_index)
+        if let Some(idx) = self.list_state.selected()
+            && let Some((path, _, _, _)) = self.flattened.get(idx)
             && let Some(node) = self.root.find_mut(path)
         {
             node.toggle_expand()?;
@@ -78,7 +81,9 @@ impl ProjectSelector {
     }
 
     fn select_current(&mut self) -> ActionResult {
-        if let Some((path, _, node_type, _)) = self.flattened.get(self.selected_index) {
+        if let Some(idx) = self.list_state.selected()
+            && let Some((path, _, node_type, _)) = self.flattened.get(idx)
+        {
             // Handle parent directory navigation
             if *node_type == NodeType::ParentDir {
                 return self.navigate_to_parent();
@@ -87,7 +92,7 @@ impl ProjectSelector {
             let node = TreeNode {
                 path: path.clone(),
                 name: String::new(),
-                node_type: *node_type,
+                kind: *node_type,
                 expanded: false,
                 depth: 0,
                 children: Vec::new(),
@@ -109,7 +114,7 @@ impl ProjectSelector {
                 let _ = new_root.load_children();
 
                 self.root = new_root;
-                self.selected_index = 0;
+                self.list_state.select(Some(0));
                 self.update_flattened();
 
                 return ActionResult::redraw();
@@ -141,7 +146,9 @@ impl ProjectSelector {
                 ActionResult::redraw()
             }
             KeyCode::Right | KeyCode::Char('l') | KeyCode::Enter => {
-                if let Some((_, _, node_type, _)) = self.flattened.get(self.selected_index) {
+                if let Some(idx) = self.list_state.selected()
+                    && let Some((_, _, node_type, _)) = self.flattened.get(idx)
+                {
                     // Navigate to parent if it's a parent directory entry
                     return match *node_type {
                         NodeType::ParentDir => self.navigate_to_parent(),
@@ -156,7 +163,8 @@ impl ProjectSelector {
                 ActionResult::default()
             }
             KeyCode::Left | KeyCode::Char('h') => {
-                if let Some((path, _, _, _)) = self.flattened.get(self.selected_index)
+                if let Some(idx) = self.list_state.selected()
+                    && let Some((path, _, _, _)) = self.flattened.get(idx)
                     && path.is_dir()
                     && let Some(node) = self.root.find_mut(path)
                     && node.expanded
@@ -173,70 +181,63 @@ impl ProjectSelector {
 
 impl Component for ProjectSelector {
     fn render(&self, frame: &mut Frame, area: Rect) {
-        let title = " Project ";
+        let block = crate::style::panel_primary("Project ", self.focused).padding(Padding::ZERO);
 
-        let block =
-            crate::style::panel_primary(title, self.focused).borders(Borders::TOP | Borders::LEFT);
+        let area_content = block.inner(area);
+        frame.render_widget(block, area);
 
-        let _inner = block.inner(area);
-
-        // When unfocused, show only the current selection
-        let items: Vec<ListItem> = if !self.focused {
-            if let Some(selection) = &self.selection {
+        if !self.focused {
+            // When unfocused, show only the current selection
+            let selection = if let Some(selection) = &self.selection {
                 let display = selection.display().to_string();
-                vec![ListItem::new(display).style(Style::default().fg(Color::Gray))]
+                Span::styled(display, Style::default().fg(Color::Gray))
             } else {
-                vec![ListItem::new("<no selection>").style(Style::default().fg(Color::DarkGray))]
-            }
-        } else {
-            // When focused, show full tree
-            self.flattened
-                .iter()
-                .map(|(path, name, node_type, depth)| {
-                    let indent = "  ".repeat(*depth);
-                    let icon = match node_type {
-                        NodeType::File | NodeType::LutraFile => "🗎",
-                        NodeType::Dir | NodeType::LutraDir => "🗀",
-                        NodeType::ParentDir => "↑",
-                    };
+                Span::styled("<no selection>", Style::default().fg(Color::DarkGray))
+            };
+            frame.render_widget(selection, area_content);
+            return;
+        }
 
-                    let display = format!("{}{} {}", indent, icon, name);
+        // root path
+        let root_path = Span::raw(self.root.path.display().to_string());
+        frame.render_widget(root_path, area_content);
+        let area_content = clip_top(area_content, 1);
 
-                    let style = match node_type {
-                        NodeType::LutraDir | NodeType::LutraFile => {
-                            Style::default().fg(crate::style::COLOR_FG_ACCENT)
-                        }
-                        NodeType::File | NodeType::Dir | NodeType::ParentDir => {
-                            Style::default().fg(Color::White)
-                        }
-                    };
+        // list
+        let items: Vec<ListItem> = self
+            .flattened
+            .iter()
+            .map(|(path, name, node_type, depth)| {
+                let indent = "  ".repeat(*depth);
+                let icon = match node_type {
+                    NodeType::File | NodeType::LutraFile => "🗎  ",
+                    NodeType::Dir | NodeType::LutraDir => "🗀  ",
+                    NodeType::ParentDir => "↑  ",
+                };
 
-                    // Highlight selection
-                    let style = if self.selection.as_ref() == Some(path) {
-                        style.bg(crate::style::COLOR_BG_PRIMARY_ACTIVE)
-                    } else {
-                        style
-                    };
+                let display = format!("{}{}{}", indent, icon, name);
 
-                    ListItem::new(display).style(style)
-                })
-                .collect()
-        };
+                let mut style = Style::default();
 
-        let mut list_state = if self.focused {
-            self.list_state
-        } else {
-            ListState::default()
-        };
+                if let NodeType::LutraDir | NodeType::LutraFile = node_type {
+                    style = style.fg(crate::style::COLOR_FG_ACCENT)
+                }
+                if self.selection.as_ref() == Some(path) {
+                    style = style.bg(crate::style::COLOR_BG_PRIMARY_ACTIVE)
+                };
 
-        let list = List::new(items).block(block).highlight_style(
+                ListItem::new(display).style(style)
+            })
+            .collect();
+
+        let list = List::new(items).highlight_style(
             Style::default()
                 .bg(crate::style::COLOR_BG_ACCENT)
                 .fg(Color::White)
                 .bold(),
         );
-
-        frame.render_stateful_widget(list, area, &mut list_state);
+        let mut list_state = self.list_state;
+        frame.render_stateful_widget(list, area_content, &mut list_state);
     }
 
     fn handle(&mut self, action: Action) -> ActionResult {
@@ -257,12 +258,21 @@ enum NodeType {
     ParentDir, // Special node for navigating to parent (..)
 }
 
+impl NodeType {
+    fn is_parent_dir(&self) -> bool {
+        matches!(self, NodeType::ParentDir)
+    }
+    fn is_dir(&self) -> bool {
+        matches!(self, NodeType::Dir | NodeType::LutraDir)
+    }
+}
+
 /// A node in the project tree.
 #[derive(Debug, Clone)]
 struct TreeNode {
     path: PathBuf,
     name: String,
-    node_type: NodeType,
+    kind: NodeType,
     expanded: bool,
     depth: usize,
     children: Vec<TreeNode>,
@@ -294,7 +304,7 @@ impl TreeNode {
         Ok(Self {
             path,
             name,
-            node_type,
+            kind: node_type,
             expanded: false,
             depth,
             children: Vec::new(),
@@ -309,13 +319,13 @@ impl TreeNode {
         let mut entries = Vec::new();
 
         // Add parent directory entry if not at filesystem root
-        if self.path.parent().is_some()
+        if self.depth == 0
             && let Some(parent_path) = self.path.parent()
         {
             let parent_node = TreeNode {
                 path: parent_path.to_path_buf(),
                 name: "..".to_string(),
-                node_type: NodeType::ParentDir,
+                kind: NodeType::ParentDir,
                 expanded: false,
                 depth: self.depth + 1,
                 children: Vec::new(),
@@ -339,15 +349,14 @@ impl TreeNode {
         }
 
         // Sort: parent dir first, then directories, then files, alphabetically
-        entries.sort_by(|a, b| match (a.node_type, b.node_type) {
-            (NodeType::ParentDir, NodeType::ParentDir) => std::cmp::Ordering::Equal,
-            (NodeType::ParentDir, _) => std::cmp::Ordering::Less,
-            (_, NodeType::ParentDir) => std::cmp::Ordering::Greater,
-            _ => match (a.path.is_dir(), b.path.is_dir()) {
-                (true, false) => std::cmp::Ordering::Less,
-                (false, true) => std::cmp::Ordering::Greater,
-                _ => a.name.to_lowercase().cmp(&b.name.to_lowercase()),
-            },
+        entries.sort_by(|a, b| {
+            (a.kind
+                .is_parent_dir()
+                .cmp(&b.kind.is_parent_dir())
+                .reverse())
+            .then_with(|| a.kind.is_dir().cmp(&b.kind.is_dir()).reverse())
+            .then_with(|| a.is_hidden().cmp(&b.is_hidden()))
+            .then_with(|| a.name.cmp(&b.name))
         });
 
         self.children = entries;
@@ -367,12 +376,14 @@ impl TreeNode {
     }
 
     fn flatten(&self, result: &mut Vec<(PathBuf, String, NodeType, usize)>) {
-        result.push((
-            self.path.clone(),
-            self.name.clone(),
-            self.node_type,
-            self.depth,
-        ));
+        if self.depth > 0 {
+            result.push((
+                self.path.clone(),
+                self.name.clone(),
+                self.kind,
+                self.depth - 1,
+            ));
+        }
 
         if self.expanded {
             for child in &self.children {
@@ -398,12 +409,16 @@ impl TreeNode {
     }
 
     fn is_valid_project(&self) -> bool {
-        match self.node_type {
+        match self.kind {
             NodeType::File => false,
             NodeType::LutraFile => true,
             NodeType::LutraDir => true,
             NodeType::Dir => false,
             NodeType::ParentDir => false,
         }
+    }
+
+    fn is_hidden(&self) -> bool {
+        self.name.starts_with('.')
     }
 }

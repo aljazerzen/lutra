@@ -137,7 +137,7 @@ impl<'a> queries::Context<'a> {
                 // extract each struct field using dot notation
                 let mut result = Vec::new();
                 for (position, field) in fields.iter().enumerate() {
-                    let name = field_name(field, position);
+                    let name = utils::new_ident(field_name(field, position));
 
                     let ser_ref = format!("{ser_ref}.{name}");
                     result.extend(self.duck_col_import(ser_ref, &field.ty));

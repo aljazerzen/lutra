@@ -118,23 +118,16 @@ impl LauncherApp {
     fn render_launch_button(&self, frame: &mut Frame, area: Rect) {
         let is_focused = matches!(self.focus, Focus::Done);
 
-        let block =
-            crate::style::panel_primary("", is_focused).borders(Borders::TOP | Borders::LEFT);
-        let inner = block.inner(area);
-        frame.render_widget(block, area);
-
         // button
-        let is_ready = self.is_ready();
         let text = "[ Launch ]";
 
-        let style = if is_focused && is_ready {
-            Style::default()
-                .bg(crate::style::COLOR_BG_ACCENT)
-                .fg(Color::White)
-                .bold()
-        } else {
-            Style::default().fg(Color::DarkGray)
-        };
+        let mut style = Style::default().fg(Color::DarkGray);
+        if is_focused {
+            style = style.bg(crate::style::COLOR_BG_ACCENT);
+        }
+        if self.is_ready() {
+            style = style.fg(Color::White).bold();
+        }
         let mut line = Line::from(Span::styled(text, style));
 
         // missing text
@@ -152,7 +145,7 @@ impl LauncherApp {
             ));
         };
 
-        frame.render_widget(line, inner);
+        frame.render_widget(line, area);
     }
 }
 
@@ -189,37 +182,35 @@ impl Component for LauncherApp {
             .split(main_layout[1]);
         let content_area = centered[1];
 
-        let project_focused = self.focus == Focus::Project;
-        let runner_focused = self.focus == Focus::Runner;
+        // Main block
+        let block =
+            crate::style::panel_primary(" Launcher ", false).borders(Borders::TOP | Borders::LEFT);
+        let inner = block.inner(content_area);
+        frame.render_widget(block, content_area);
 
-        let project_height = if project_focused {
-            Constraint::Min(10)
-        } else {
-            Constraint::Length(2)
-        };
-
-        let runner_height = if runner_focused {
-            Constraint::Min(10)
-        } else {
-            Constraint::Length(2)
-        };
-        let panels = Layout::default()
+        fn section_constr(is_focused: bool) -> Constraint {
+            if is_focused {
+                Constraint::Min(10)
+            } else {
+                Constraint::Length(2)
+            }
+        }
+        let area_panes = Layout::default()
             .direction(Direction::Vertical)
             .constraints([
-                project_height,
-                runner_height,
+                Constraint::Length(1), // Spacer
+                section_constr(self.focus == Focus::Project),
+                Constraint::Length(1), // Spacer
+                section_constr(self.focus == Focus::Runner),
+                Constraint::Length(1), // Spacer
                 Constraint::Length(3), // Launch button
             ])
-            .split(content_area);
+            .split(inner);
 
-        // Render project selector
-        self.project.render(frame, panels[0]);
-
-        // Render runner pane
-        self.runner.render(frame, panels[1]);
-
-        // Render launch button
-        self.render_launch_button(frame, panels[2]);
+        // Render sub-panes
+        self.project.render(frame, area_panes[1]);
+        self.runner.render(frame, area_panes[3]);
+        self.render_launch_button(frame, area_panes[5]);
 
         // Render help bar
         let help_text = match self.focus {

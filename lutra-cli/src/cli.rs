@@ -321,14 +321,10 @@ pub fn interactive(cmd: InteractiveCommand) -> anyhow::Result<()> {
         let Some(result) = result else { return Ok(()) };
 
         let runner = RunnerParams::from_launcher(result.runner_params);
-        (Some(result.project_path), runner)
+        (result.project_path, runner)
     } else {
-        (cmd.discover.project, cmd.runner.unwrap())
+        (cmd.discover.project.unwrap(), cmd.runner.unwrap())
     };
-
-    // discover
-    let discover_params = lutra_compiler::DiscoverParams { project };
-    let project = lutra_compiler::discover(discover_params)?;
 
     // runner cfg
     let cfg = lutra_tui::RunnerConfig {
@@ -336,10 +332,13 @@ pub fn interactive(cmd: InteractiveCommand) -> anyhow::Result<()> {
     };
 
     // init runner
-    let (runner, runner_thread) = crate::runners::init(runner_params, &project)?;
+    let source = lutra_compiler::discover(DiscoverParams {
+        project: Some(project.clone()),
+    })?;
+    let (runner, runner_thread) = crate::runners::init(runner_params, &source)?;
 
     // open interactive TUI
-    lutra_tui::run_interactive(project.get_root().to_path_buf(), cfg, runner, runner_thread)
+    lutra_tui::run_interactive(project, cfg, runner, runner_thread)
 }
 
 #[derive(clap::Parser)]
