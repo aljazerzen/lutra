@@ -377,10 +377,10 @@ pub fn pull_schema(cmd: PullSchemaCommand) -> anyhow::Result<()> {
             println!("{schema}");
         }
 
-        Some((_def_path, def)) => {
+        Some(def_path) => {
             // Rewrite a project file
 
-            let rel_path = schema::rewrite_module_contents(&project, def, schema)?;
+            let rel_path = schema::rewrite_module_contents(&project, &def_path, schema)?;
 
             let display = project.source.get_display_path(rel_path).unwrap();
             eprintln!("Written: {}", display.display());

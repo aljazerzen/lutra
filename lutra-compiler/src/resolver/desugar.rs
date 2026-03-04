@@ -31,8 +31,11 @@ impl PrFold for Desugarator {
             defs.insert(name, self.fold_def(def)?);
         }
 
-        let span_content = module_def.span_content;
-        Ok(pr::ModuleDef { defs, span_content })
+        Ok(pr::ModuleDef {
+            defs,
+            annotations: module_def.annotations,
+            span_content: module_def.span_content,
+        })
     }
 
     fn fold_expr(&mut self, mut expr: pr::Expr) -> Result<pr::Expr> {

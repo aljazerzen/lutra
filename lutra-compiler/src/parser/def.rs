@@ -27,25 +27,24 @@ pub fn source() -> impl Parser<TokenKind, Source, Error = PError> {
             .map(|(name, module_def)| (name, DefKind::Module(module_def)))
             .labelled("module definition");
 
-        let annotation = ctrl('@')
-            .ignore_then(expr.clone())
-            .map(|expr| Annotation {
-                expr: Box::new(expr),
-            })
-            .labelled("annotation");
+        let annotations = ctrl('@')
+            .ignore_then(expr.clone().map(Box::new))
+            .map(|expr| Annotation { expr })
+            .labelled("annotation")
+            .repeated();
 
         let def_kind = choice((
             module_def,
             type_def(ty.clone()),
             import_def(),
             func_def(expr.clone(), ty.clone()),
-            const_def(expr, ty),
+            const_def(expr.clone(), ty),
         ));
 
         // Currently doc comments need to be before the annotation; probably
         // should relax this?
         let def = (doc_comment().or_not())
-            .then(annotation.repeated())
+            .then(annotations.clone())
             .then(def_kind)
             .map_with_span(|((doc_comment, annotations), (name, def_kind)), span| {
                 let def = Def {
@@ -59,8 +58,23 @@ pub fn source() -> impl Parser<TokenKind, Source, Error = PError> {
                 (name.0, def)
             });
 
-        def.repeated()
-            .validate(|defs, span, emit| into_module(defs, span, emit))
+        let defs = def
+            .repeated()
+            .validate(|defs, span, emit| into_module(defs, span, emit));
+
+        let self_annotation = ctrl('@')
+            .then(ctrl('!'))
+            .ignore_then(expr.map(Box::new))
+            .map(|expr| Annotation { expr })
+            .labelled("annotation");
+
+        self_annotation
+            .repeated()
+            .then(defs)
+            .map(|(annotations, mut module_def)| {
+                module_def.annotations = annotations;
+                module_def
+            })
     });
 
     is_submodule
@@ -90,8 +104,10 @@ fn into_module(def_vec: Vec<(String, Def)>, span: Span, emit: &mut dyn FnMut(PEr
             emit(PError::custom(conflict.span.unwrap(), "duplicate name"));
         }
     }
+
     ModuleDef {
         defs,
+        annotations: vec![],
         span_content: Some(span),
     }
 }
@@ -286,5 +302,48 @@ mod tests {
             "hello",
         )
         "###);
+    }
+
+    #[test]
+    fn test_module_annotation_basic() {
+        let src = "submodule\n@!my_ann\n\nconst x = 1";
+        let parsed = parse_with_parser(src, source()).unwrap();
+        assert!(parsed.is_submodule);
+        assert_eq!(parsed.root.annotations.len(), 1);
+        assert!(matches!(
+            &parsed.root.annotations[0].expr.kind,
+            crate::pr::ExprKind::Ident(p) if p.len() == 1 && p.first() == "my_ann"
+        ));
+        assert_eq!(parsed.root.defs.len(), 1);
+    }
+
+    #[test]
+    fn test_module_annotation_multiple() {
+        let src = "submodule\n@!ann1\n@!ann2\n\nconst x = 1";
+        let parsed = parse_with_parser(src, source()).unwrap();
+        assert_eq!(parsed.root.annotations.len(), 2);
+    }
+
+    #[test]
+    fn test_module_annotation_no_submodule() {
+        // In a non-submodule file, @!foo should not be parsed as a module
+        // annotation (module_annotation.repeated() returns empty), and instead
+        // @! is parsed as a regular annotation with unary-not expression.
+        // Here we just verify there are no module-level annotations.
+        let src = "const x = 1";
+        let parsed = parse_with_parser(src, source()).unwrap();
+        assert!(!parsed.is_submodule);
+        assert_eq!(parsed.root.annotations.len(), 0);
+    }
+
+    #[test]
+    fn test_module_annotation_with_call_expr() {
+        let src = "submodule\n@!deprecated(\"use other instead\")\n\nconst x = 1";
+        let parsed = parse_with_parser(src, source()).unwrap();
+        assert_eq!(parsed.root.annotations.len(), 1);
+        assert!(matches!(
+            &parsed.root.annotations[0].expr.kind,
+            crate::pr::ExprKind::Call(_)
+        ));
     }
 }

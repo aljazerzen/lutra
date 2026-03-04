@@ -35,7 +35,7 @@ impl Project {
     ///
     /// Returns a vec of `(path, def)` pairs where `path` is the fully-qualified
     /// path of the definition within the module tree.
-    pub fn find_by_annotation<'a>(&'a self, name: &str) -> Vec<(pr::Path, &'a pr::Def)> {
+    pub fn find_by_annotation<'a>(&'a self, name: &str) -> Vec<pr::Path> {
         let mut result = Vec::new();
         find_by_annotation_in(&self.root_module, name, pr::Path::empty(), &mut result);
         result
@@ -46,13 +46,17 @@ fn find_by_annotation_in<'a>(
     module: &'a pr::ModuleDef,
     annotation_name: &str,
     mut path: pr::Path,
-    result: &mut Vec<(pr::Path, &'a pr::Def)>,
+    result: &mut Vec<pr::Path>,
 ) {
+    if has_annotation(&module.annotations, annotation_name) {
+        result.push(path.clone());
+    }
+
     for (name, def) in &module.defs {
         path.push(name.clone());
 
-        if has_annotation(def, annotation_name) {
-            result.push((path.clone(), def));
+        if has_annotation(&def.annotations, annotation_name) {
+            result.push(path.clone());
         }
 
         if let pr::DefKind::Module(inner) = &def.kind {
@@ -63,11 +67,19 @@ fn find_by_annotation_in<'a>(
     }
 }
 
-fn has_annotation(def: &pr::Def, name: &str) -> bool {
-    def.annotations.iter().any(|ann| {
-        matches!(&ann.expr.kind, pr::ExprKind::Ident(path)
-            if path.len() == 1 && path.first() == name)
-    })
+fn has_annotation(annotations: &[pr::Annotation], annotation_name: &str) -> bool {
+    annotations
+        .iter()
+        .any(|ann| is_named(&ann.expr, annotation_name))
+}
+
+fn is_named(expr: &pr::Expr, name: &str) -> bool {
+    is_ident(expr, name)
+        || matches!(&expr.kind, pr::ExprKind::Call(call) if is_ident(&call.subject, name))
+}
+
+fn is_ident(expr: &pr::Expr, name: &str) -> bool {
+    matches!(&expr.kind, pr::ExprKind::Ident(path) if (path.len() == 1 && path.first() == name))
 }
 
 /// Sources used to resolve the project.

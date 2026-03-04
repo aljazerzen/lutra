@@ -39,6 +39,9 @@ pub enum DefKind {
 pub struct ModuleDef {
     pub defs: IndexMap<String, Def>,
 
+    // Self-annotations, defined within the module
+    pub annotations: Vec<Annotation>,
+
     /// Span covering the content of this module, i.e. the region inside the
     /// braces for inline modules, or the whole file body for file-based
     /// submodules. This excludes inner doc comments or annotations.
@@ -140,6 +143,10 @@ impl From<Expr> for DefKind {
 impl std::fmt::Debug for ModuleDef {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let mut ds = f.debug_struct("ModuleDef");
+
+        if !self.annotations.is_empty() {
+            ds.field("annotations", &self.annotations);
+        }
 
         if self.defs.len() < 15 {
             ds.field("defs", &DebugNames(&self.defs));

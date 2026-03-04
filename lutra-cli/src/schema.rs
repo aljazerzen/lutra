@@ -8,20 +8,12 @@ use lutra_compiler::{Project, codespan, pr};
 /// - `Ok(Some(target))` – exactly one `@schema` annotation found.
 /// - `Ok(None)` – no `@schema` annotation found; caller should fall back to stdout.
 /// - `Err(msg)` – more than one `@schema` annotation found.
-pub fn find_schema_module_def(project: &Project) -> Result<Option<(pr::Path, &pr::Def)>, String> {
+pub fn find_schema_module_def(project: &Project) -> Result<Option<pr::Path>, String> {
     let annotated = project.find_by_annotation("schema");
 
-    let targets: Vec<(pr::Path, &pr::Def)> = annotated
-        .into_iter()
-        .filter(|(_, def)| {
-            // Only consider module defs.
-            matches!(def.kind, pr::DefKind::Module(_))
-        })
-        .collect();
-
-    match targets.len() {
+    match annotated.len() {
         0 => Ok(None),
-        1 => Ok(Some(targets.into_iter().next().unwrap())),
+        1 => Ok(Some(annotated.into_iter().next().unwrap())),
         n => Err(format!(
             "found {n} modules annotated with @schema, expected at most one"
         )),
@@ -30,12 +22,10 @@ pub fn find_schema_module_def(project: &Project) -> Result<Option<(pr::Path, &pr
 
 pub fn rewrite_module_contents<'p>(
     project: &'p lutra_compiler::Project,
-    def: &'p lutra_compiler::pr::Def,
+    def: &'p lutra_compiler::pr::Path,
     contents: String,
 ) -> Result<&'p path::Path, anyhow::Error> {
-    let lutra_compiler::pr::DefKind::Module(module_def) = &def.kind else {
-        unreachable!("find_schema_module_def only returns module defs")
-    };
+    let module_def = project.root_module.get_submodule(def.as_steps()).unwrap();
     let span_content = module_def
         .span_content
         .ok_or_else(|| anyhow::anyhow!("@schema module has no content span"))?;

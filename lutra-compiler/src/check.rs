@@ -107,6 +107,7 @@ pub fn insert_module_at_path(
     if path.is_empty() {
         let mut d = Vec::new();
 
+        module.annotations.extend(to_insert.annotations);
         module.span_content = to_insert.span_content;
         for (name, def) in to_insert.defs {
             let conflict = module.defs.insert(name, def);
@@ -122,12 +123,10 @@ pub fn insert_module_at_path(
     let step = path.remove(0);
 
     // find submodule def
-    let submodule = module.defs.entry(step).or_insert_with(|| {
-        pr::Def::new(pr::DefKind::Module(pr::ModuleDef {
-            defs: Default::default(),
-            span_content: None,
-        }))
-    });
+    let submodule = module
+        .defs
+        .entry(step)
+        .or_insert_with(|| pr::Def::new(pr::ModuleDef::default()));
     let pr::DefKind::Module(submodule) = &mut submodule.kind else {
         return vec![
             diagnostic::Diagnostic::new_custom("duplicate name").with_span(submodule.span),

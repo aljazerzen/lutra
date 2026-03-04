@@ -30,6 +30,17 @@ impl PrintSource for pr::Source {
 
 impl PrintSource for (&pr::ModuleDef, Option<crate::Span>) {
     fn print<'c>(&self, p: &mut Printer<'c>) -> Option<()> {
+        // self-annotations
+        for ann in &self.0.annotations {
+            p.push("@!")?;
+            ann.expr.print(p)?;
+            p.new_line();
+        }
+        if !self.0.annotations.is_empty() {
+            p.new_line();
+        }
+
+        // defs
         let mut last: Option<&pr::Def> = None;
         for (i, (name, def)) in self.0.defs.iter().enumerate() {
             if i > 0 {

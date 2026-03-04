@@ -7,6 +7,7 @@ use crate::pr;
 
 pub fn init_root(root_module_def: pr::ModuleDef) -> Result<pr::ModuleDef, Vec<Diagnostic>> {
     let mut root = pr::ModuleDef {
+        annotations: root_module_def.annotations,
         span_content: root_module_def.span_content,
         ..pr::ModuleDef::default()
     };
@@ -106,6 +107,7 @@ impl pr::ModuleDef {
                 pr::DefKind::Module(module_def) => {
                     // init new module and recurse
                     let mut new_mod = pr::ModuleDef {
+                        annotations: module_def.annotations,
                         span_content: module_def.span_content,
                         ..pr::ModuleDef::default()
                     };
