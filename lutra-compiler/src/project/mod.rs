@@ -1,3 +1,7 @@
+mod analysis;
+
+pub use analysis::{TargetSpan, TargetMap};
+
 use std::path;
 use std::str::FromStr;
 
@@ -20,6 +24,10 @@ pub struct Project {
     pub ordering: Vec<Vec<pr::Path>>,
 
     pub dependencies: Vec<Dependency>,
+
+    /// Index of all resolved identifier references, keyed by source location.
+    /// Built once after name resolution; used for go-to-definition and similar queries.
+    pub target_map: analysis::TargetMap,
 }
 
 #[derive(Debug)]
@@ -35,15 +43,15 @@ impl Project {
     ///
     /// Returns a vec of `(path, def)` pairs where `path` is the fully-qualified
     /// path of the definition within the module tree.
-    pub fn find_by_annotation<'a>(&'a self, name: &str) -> Vec<pr::Path> {
+    pub fn find_by_annotation(&self, name: &str) -> Vec<pr::Path> {
         let mut result = Vec::new();
         find_by_annotation_in(&self.root_module, name, pr::Path::empty(), &mut result);
         result
     }
 }
 
-fn find_by_annotation_in<'a>(
-    module: &'a pr::ModuleDef,
+fn find_by_annotation_in(
+    module: &pr::ModuleDef,
     annotation_name: &str,
     mut path: pr::Path,
     result: &mut Vec<pr::Path>,

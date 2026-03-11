@@ -300,6 +300,7 @@ pub struct If {
 #[derive(Debug, Clone, PartialEq)]
 pub struct VarBinding {
     pub name: String,
+    pub name_span: Span,
     pub bound: Box<Expr>,
     pub main: Box<Expr>,
 }

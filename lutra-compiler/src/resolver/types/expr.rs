@@ -205,6 +205,7 @@ impl fold::PrFold for super::TypeResolver<'_> {
                     ty: main.ty.clone(),
                     kind: pr::ExprKind::VarBinding(pr::VarBinding {
                         name: binding.name,
+                        name_span: binding.name_span,
                         bound,
                         main: Box::new(main),
                     }),

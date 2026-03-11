@@ -85,6 +85,7 @@ impl tower_lsp_server::LanguageServer for Backend {
                         will_save_wait_until: Some(false),
                     },
                 )),
+                definition_provider: Some(OneOf::Left(true)),
                 document_formatting_provider: Some(OneOf::Left(true)),
                 document_range_formatting_provider: Some(OneOf::Left(true)),
 
@@ -206,6 +207,59 @@ impl tower_lsp_server::LanguageServer for Backend {
         let edits = codespan::offset_text_edits(edits, span.start as i32);
 
         Ok(Some(to_proto::text_edits(&index, edits)))
+    }
+
+    async fn goto_definition(
+        &self,
+        params: GotoDefinitionParams,
+    ) -> Result<Option<GotoDefinitionResponse>> {
+        let uri = &params.text_document_position_params.text_document.uri;
+        let position = params.text_document_position_params.position;
+
+        let path = from_proto::path(uri);
+
+        let project = self.find_project_of_doc(&path).await;
+        let Some(project) = project else {
+            return Ok(None);
+        };
+        let project_lock = project.lock().await;
+
+        let Some(checked) = &project_lock.checked else {
+            return Ok(None);
+        };
+
+        let Ok(relative_path) = project_lock.source_tree.get_relative_path(&path) else {
+            return Ok(None);
+        };
+        let Some((source_id, _)) = project_lock.source_tree.get_by_path(relative_path) else {
+            return Ok(None);
+        };
+
+        let source_text = project_lock
+            .source_tree
+            .get_by_id(source_id)
+            .map(|(_, text)| text)
+            .unwrap_or("");
+
+        let line_index = lutra_compiler::codespan::LineNumbers::new(source_text);
+        let offset = line_index.byte_index_of_line_col(from_proto::line_col(&position));
+
+        let Some(span) = checked.find_target(source_id, offset) else {
+            return Ok(None);
+        };
+
+        let def_uri = to_proto::source_id(&project_lock.source_tree, span.source_id);
+        let def_source = project_lock
+            .source_tree
+            .get_by_id(span.source_id)
+            .map(|(_, text)| text)
+            .unwrap_or("");
+        let def_line_index = lutra_compiler::codespan::LineNumbers::new(def_source);
+        let range = def_line_index.range_of_span(span);
+
+        Ok(Some(GotoDefinitionResponse::Scalar(to_proto::location(
+            def_uri, &range,
+        ))))
     }
 }
 

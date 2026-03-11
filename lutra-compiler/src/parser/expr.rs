@@ -272,7 +272,7 @@ fn nested<'a>(
     expr: impl Parser<TokenKind, Expr, Error = PError> + Clone + 'a,
 ) -> impl Parser<TokenKind, ExprKind, Error = PError> + Clone + 'a {
     let var_bindings = keyword("let")
-        .ignore_then(ident_part())
+        .ignore_then(ident_part().map_with_span(|name, span| (name, span)))
         .then_ignore(ctrl('='))
         .then(expr.clone().map(Box::new))
         .then_ignore(ctrl(';'))
@@ -280,16 +280,20 @@ fn nested<'a>(
 
     let main = expr.map(Box::new);
 
-    let nested = var_bindings
-        .repeated()
-        .then(main)
-        .foldr(|((name, bound), binding_span), main| {
+    let nested = var_bindings.repeated().then(main).foldr(
+        |(((name, name_span), bound), binding_span), main| {
             let mut span = binding_span;
             span.set_end_of(main.span.as_ref().unwrap());
 
-            let kind = ExprKind::VarBinding(VarBinding { name, bound, main });
+            let kind = ExprKind::VarBinding(VarBinding {
+                name,
+                name_span,
+                bound,
+                main,
+            });
             Box::new(Expr::new_with_span(kind, span))
-        });
+        },
+    );
 
     delimited_by_parenthesis(nested.map(ExprKind::Nested), |_| ExprKind::Tuple(vec![]))
 }
