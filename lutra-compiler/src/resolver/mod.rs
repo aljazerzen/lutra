@@ -39,16 +39,19 @@ pub fn resolve(
     }
 
     // resolve names
-    let resolution_order = names::run(&mut root_module).map_err(|d| vec![d])?;
+    let (resolution_order, target_spans) = names::run(&mut root_module).map_err(|d| vec![d])?;
 
     // resolve types
     types::run(&mut root_module, &resolution_order)?;
+
+    let target_map = crate::project::TargetMap::build(target_spans);
 
     let project = Project {
         source: SourceTree::empty(),
         root_module,
         ordering: resolution_order,
         dependencies,
+        target_map,
     };
 
     // resolve layout
@@ -81,7 +84,7 @@ pub fn resolve_overlay_expr(
     );
 
     // resolve names
-    let resolution_order = names::run(&mut root_module).map_err(|d| vec![d])?;
+    let (resolution_order, _) = names::run(&mut root_module).map_err(|d| vec![d])?;
     assert_eq!(resolution_order.len(), 1);
     assert_eq!(resolution_order[0].len(), 1);
 

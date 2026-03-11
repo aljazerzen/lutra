@@ -1,6 +1,8 @@
 use crate::Result;
+use crate::Span;
 use crate::diagnostic::{Diagnostic, WithErrorInfo};
 use crate::pr;
+use crate::project::TargetSpan;
 use crate::resolver::NS_STD;
 use crate::utils::IdGenerator;
 use crate::utils::fold::{self, PrFold};
@@ -15,6 +17,7 @@ pub struct NameResolver<'a> {
     pub refs: Vec<pr::Path>,
     pub scope_id_gen: &'a mut IdGenerator<usize>,
     pub allow_recursive: bool,
+    pub target_spans: &'a mut Vec<(Span, crate::project::TargetSpan)>,
 }
 
 impl NameResolver<'_> {
@@ -48,11 +51,16 @@ impl fold::PrFold for NameResolver<'_> {
     fn fold_expr(&mut self, expr: pr::Expr) -> Result<pr::Expr> {
         Ok(match expr.kind {
             pr::ExprKind::Ident(ident) => {
-                let target = Some(self.lookup_ident(&ident).with_span_fallback(expr.span)?);
+                let (target, target_ref) =
+                    self.lookup_ident(&ident).with_span_fallback(expr.span)?;
+
+                if let (Some(span), Some(tr)) = (expr.span, target_ref) {
+                    self.target_spans.push((span, tr));
+                }
 
                 pr::Expr {
                     kind: pr::ExprKind::Ident(ident),
-                    target,
+                    target: Some(target),
                     ..expr
                 }
             }
@@ -107,7 +115,7 @@ impl fold::PrFold for NameResolver<'_> {
                 // main
                 let scope_id = self.scope_id_gen.next();
                 let mut scope = Scope::new_empty(scope_id);
-                scope.insert_local(binding.name.clone());
+                scope.insert_local(binding.name.clone(), Some(binding.name_span));
                 self.scopes.push(scope);
 
                 let main = Box::new(self.fold_expr(*binding.main)?);
@@ -116,6 +124,7 @@ impl fold::PrFold for NameResolver<'_> {
                 pr::Expr {
                     kind: pr::ExprKind::VarBinding(pr::VarBinding {
                         name: binding.name,
+                        name_span: binding.name_span,
                         bound,
                         main,
                     }),
@@ -135,8 +144,8 @@ impl fold::PrFold for NameResolver<'_> {
         let binds = collect_pattern_binds(&pattern)?;
 
         let scope = self.scopes.last_mut().unwrap();
-        for b in binds {
-            scope.insert_local(b);
+        for (name, span) in binds {
+            scope.insert_local(name, Some(span));
         }
 
         Ok(pattern)
@@ -145,11 +154,16 @@ impl fold::PrFold for NameResolver<'_> {
     fn fold_type(&mut self, ty: pr::Ty) -> Result<pr::Ty> {
         Ok(match ty.kind {
             pr::TyKind::Ident(ident) => {
-                let target = Some(self.lookup_ident(&ident).with_span_fallback(ty.span)?);
+                let (target, target_span) =
+                    self.lookup_ident(&ident).with_span_fallback(ty.span)?;
+
+                if let (Some(span), Some(tr)) = (ty.span, target_span) {
+                    self.target_spans.push((span, tr));
+                }
 
                 pr::Ty {
                     kind: pr::TyKind::Ident(ident),
-                    target,
+                    target: Some(target),
                     ..ty
                 }
             }
@@ -216,19 +230,21 @@ impl fold::PrFold for NameResolver<'_> {
 }
 
 impl NameResolver<'_> {
-    fn lookup_ident(&mut self, ident: &pr::Path) -> Result<pr::Ref> {
+    /// Resolve an identifier and return both the `pr::Ref` (stored on the AST
+    /// node) and an optional `TargetSpan` to be recorded in the target map.
+    fn lookup_ident(&mut self, ident: &pr::Path) -> Result<(pr::Ref, Option<TargetSpan>)> {
         // case 1: local name (param, local var)
         for scope in self.scopes.iter().rev() {
-            if let Some((scope, offset, _)) = scope.get(ident.first()) {
-                // match: this ident references a locally-scoped name
-
+            if let Some((scope, offset, def_span)) = scope.get(ident.first()) {
                 if ident.len() != 1 {
                     return Err(Diagnostic::new_custom(format!(
                         "{} is a param, not a module",
                         ident.first()
                     )));
                 }
-                return Ok(pr::Ref::Local { scope, offset });
+                let target = pr::Ref::Local { scope, offset };
+                let span = def_span.map(TargetSpan::Span);
+                return Ok((target, span));
             }
         }
 
@@ -238,7 +254,8 @@ impl NameResolver<'_> {
         })?;
         self.refs.push(fq.clone());
 
-        Ok(pr::Ref::Global(fq))
+        let span = Some(TargetSpan::Global(fq.clone()));
+        Ok((pr::Ref::Global(fq), span))
     }
 
     #[tracing::instrument("lookup", skip_all, fields(from = pr::Path::new(def_mod_fq).to_string()))]
@@ -328,12 +345,12 @@ impl NameResolver<'_> {
     }
 }
 
-/// Traverses a pattern and returns the set of all bound names.
-/// For example `.cat(name) | .dog(name)` would return `[name]`.
-fn collect_pattern_binds(pattern: &pr::Pattern) -> Result<Vec<String>> {
+/// Traverses a pattern and returns the set of all bound names with their spans.
+/// For example `.cat(name) | .dog(name)` would return `[(name, span)]`.
+fn collect_pattern_binds(pattern: &pr::Pattern) -> Result<Vec<(String, Span)>> {
     match &pattern.kind {
         pr::PatternKind::Literal(_) => Ok(vec![]),
-        pr::PatternKind::Bind(name) => Ok(vec![name.clone()]),
+        pr::PatternKind::Bind(name) => Ok(vec![(name.clone(), pattern.span)]),
 
         pr::PatternKind::Enum(_, inner) => Ok(inner
             .as_ref()
@@ -343,13 +360,15 @@ fn collect_pattern_binds(pattern: &pr::Pattern) -> Result<Vec<String>> {
         pr::PatternKind::AnyOf(branches) => {
             assert!(branches.len() >= 2);
 
-            let mut result = None;
+            let mut result: Option<Vec<(String, Span)>> = None;
             for b in branches {
                 let binds = collect_pattern_binds(b)?;
 
                 if let Some(result) = &result {
-                    // in subsequent branches, validate that binds match previous binds
-                    if &binds != result {
+                    // in subsequent branches, validate that names match (spans may differ)
+                    let names_match = result.len() == binds.len()
+                        && result.iter().zip(&binds).all(|((a, _), (b, _))| a == b);
+                    if !names_match {
                         return Err(Diagnostic::new_custom(
                             "patterns introduce different variable names",
                         )

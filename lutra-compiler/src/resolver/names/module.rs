@@ -13,6 +13,9 @@ pub struct ModuleRefResolver<'a> {
     pub refs_vars: Vec<(pr::Path, Vec<pr::Path>)>,
 
     pub scope_id_gen: IdGenerator<usize>,
+
+    /// Accumulates mapping from span to target Ref
+    pub target_spans: Vec<(crate::Span, crate::project::TargetSpan)>,
 }
 
 impl ModuleRefResolver<'_> {
@@ -64,6 +67,7 @@ impl ModuleRefResolver<'_> {
                 refs: Vec::new(),
                 scope_id_gen: &mut self.scope_id_gen,
                 allow_recursive: false,
+                target_spans: &mut self.target_spans,
             };
 
             let pr::DefKind::Import(import) = def else {
@@ -125,6 +129,7 @@ impl ModuleRefResolver<'_> {
                 refs: Vec::new(),
                 scope_id_gen: &mut self.scope_id_gen,
                 allow_recursive: true,
+                target_spans: &mut self.target_spans,
             };
 
             let def = r.fold_def_kind(def).with_span_fallback(span)?;

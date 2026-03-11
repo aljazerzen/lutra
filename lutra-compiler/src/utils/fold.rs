@@ -113,6 +113,7 @@ pub fn fold_expr_kind<T: ?Sized + PrFold>(fold: &mut T, expr_kind: ExprKind) -> 
         If(if_else) => If(fold_if(fold, if_else)?),
         VarBinding(binding) => VarBinding(pr::VarBinding {
             name: binding.name,
+            name_span: binding.name_span,
             bound: Box::new(fold.fold_expr(*binding.bound)?),
             main: Box::new(fold.fold_expr(*binding.main)?),
         }),
