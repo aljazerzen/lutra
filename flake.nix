@@ -2,8 +2,8 @@
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/master";
     flake-utils.url = "github:numtide/flake-utils";
-    fenix = {
-      url = "github:nix-community/fenix";
+    rust-overlay = {
+      url = "github:oxalica/rust-overlay";
       inputs.nixpkgs.follows = "nixpkgs";
     };
     lutra-pygments = {
@@ -11,15 +11,23 @@
       inputs.nixpkgs.follows = "nixpkgs";
       inputs.flake-utils.follows = "flake-utils";
     };
+    flake-compat = {
+      url = "github:NixOS/flake-compat";
+      flake = false;
+    };
+    nix-appimage = {
+      url = "github:ralismark/nix-appimage";
+    };
   };
 
   outputs =
     {
-      self,
       nixpkgs,
       flake-utils,
-      fenix,
+      rust-overlay,
       lutra-pygments,
+      nix-appimage,
+      ...
     }:
     flake-utils.lib.eachDefaultSystem (
       system:
@@ -27,6 +35,7 @@
         pkgs = import nixpkgs {
           inherit system;
           overlays = [
+            rust-overlay.overlays.default
             # overlay zensical to include lutra-pygments
             (final: prev: {
               zensical = prev.zensical.overridePythonAttrs (old: {
@@ -34,13 +43,48 @@
                   lutra-pygments.packages.${system}.default
                 ];
               });
-
             })
           ];
         };
-        fenix_pkgs = fenix.packages.${system};
 
-        # Build lutra-cli binary
+        # dev shell
+        devShell = pkgs.mkShell {
+          buildInputs = [
+            (pkgs.rust-bin.fromRustupToolchainFile ./rust-toolchain.toml)
+            pkgs.duckdb # for lutra-runner-duckdb
+
+            # tools
+            pkgs.just
+            pkgs.usql
+            pkgs.cargo-nextest
+            pkgs.cargo-insta
+            pkgs.cargo-depgraph
+            pkgs.graphviz
+
+            # python
+            pkgs.python312Packages.python
+            pkgs.python312Packages.venvShellHook
+            pkgs.uv
+            pkgs.maturin
+            pkgs.ruff
+
+            (pkgs.python312Packages.python-lsp-server.overridePythonAttrs (old: {
+              dependencies = builtins.filter (dep: (dep.pname or "") != "autopep8") old.dependencies;
+            }))
+            # Note: install mypy in the venv instead: `uv pip install mypy`
+
+            # website
+            pkgs.mprocs
+            pkgs.rsync
+            pkgs.zola
+            pkgs.typos-lsp
+            pkgs.zensical
+          ];
+          LD_LIBRARY_PATH = "${pkgs.lib.makeLibraryPath [ pkgs.duckdb ]}";
+          venvDir = "./target/python";
+        };
+
+        # lutra-cli binary
         lutra-cli = pkgs.rustPlatform.buildRustPackage {
           pname = "lutra-cli";
           version = "0.4.0";
@@ -64,7 +108,7 @@
           # Skip tests - they require a running PostgreSQL instance
           doCheck = false;
 
-          meta = with pkgs.lib; {
+          meta = {
             description = "Lutra query language CLI";
             homepage = "https://lutra-lang.org";
             mainProgram = "lutra";
@@ -74,53 +118,17 @@
       {
         packages = {
           default = lutra-cli;
-          lutra = lutra-cli;
+          lutra-cli = lutra-cli;
+
+          lutra-cli-appimage = nix-appimage.bundlers.${system}.default lutra-cli;
+
+          dev-container = pkgs.dockerTools.buildNixShellImage {
+            drv = devShell;
+            tag = "latest";
+          };
         };
 
-        devShells.default = pkgs.mkShell {
-          buildInputs = [
-            (fenix_pkgs.stable.withComponents [
-              "cargo"
-              "clippy"
-              "rust-src"
-              "rustc"
-              "rustfmt"
-              "rust-analyzer"
-            ])
-
-            pkgs.just
-            pkgs.cargo-nextest
-            pkgs.cargo-insta
-            pkgs.cargo-depgraph
-            pkgs.graphviz
-
-            pkgs.pgcli
-            pkgs.postgresql # for psql only (lutra-runner-python tests need it)
-            pkgs.duckdb # for lutra-runner-duckdb (system library)
-
-            # python
-            pkgs.python312Packages.python
-            pkgs.python312Packages.venvShellHook
-            pkgs.uv
-            pkgs.maturin
-            pkgs.ruff
-            pkgs.mypy
-
-            pkgs.python312Packages.python-lsp-server
-            # pkgs.python312Packages.python-lsp-ruff
-            # pkgs.python312Packages.pylsp-mypy
-            # to make mypy pick up packages from venv, run `uv pip install mypy`
-
-            # website
-            pkgs.mprocs
-            pkgs.rsync
-            pkgs.zola
-            pkgs.typos-lsp
-            pkgs.zensical
-          ];
-          LD_LIBRARY_PATH = "${pkgs.lib.makeLibraryPath [ pkgs.duckdb ]}";
-          venvDir = "./target/python";
-        };
+        devShells.default = devShell;
       }
     );
 }

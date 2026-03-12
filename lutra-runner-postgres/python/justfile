@@ -18,5 +18,5 @@ test:
     python -m mypy python/lutra_runner_postgres tests
 
     # tests
-    psql postgres://postgres:pass@localhost:5416 -f tests/init.sql
+    usql postgres://postgres:pass@localhost:5416 -f tests/init.sql
     python -m unittest tests/main.py
