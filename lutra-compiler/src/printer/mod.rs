@@ -31,6 +31,8 @@ use crate::codespan;
 use crate::parser::lexer::{Token, TokenKind};
 use crate::pr;
 
+pub use defs::format_def_signature;
+
 pub fn print_ty(ty: &pr::Ty) -> String {
     let mut p = Printer::new(&CONFIG_NO_WRAP, None);
     ty.print(&mut p).unwrap();

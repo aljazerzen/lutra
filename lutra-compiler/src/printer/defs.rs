@@ -3,8 +3,71 @@ use lutra_bin::ident;
 
 use crate::pr::{self, ImportDef};
 use crate::printer::common::{Between, Separated};
-use crate::printer::expr::print_func;
-use crate::printer::{PrintSource, Printer};
+use crate::printer::expr::{print_func, print_func_signature};
+use crate::printer::{CONFIG_NO_WRAP, PrintSource, Printer};
+
+/// Produce a compact, single-line signature string for `def` named `name`,
+/// suitable for display in an LSP hover popup.
+///
+/// Returns `None` for [`pr::DefKind::Import`] and
+/// [`pr::DefKind::Unresolved`] definitions, which have no meaningful
+/// signature to display.
+pub fn format_def_signature(name: &str, def: &pr::Def) -> Option<String> {
+    let mut p = Printer::new(&CONFIG_NO_WRAP, None);
+
+    match &def.kind {
+        pr::DefKind::Expr(expr_def) => {
+            if let Some(func) = expr_def.value.kind.as_func() {
+                // function: "func name(params): ReturnType"
+                // Use the AST Func node to preserve parameter labels.
+                print_func_signature(func, Some(name), &mut p)?;
+
+                // When the return type is not explicitly annotated in the
+                // source, supplement it from the inferred type.
+                if func.return_ty.is_none() {
+                    if let Some(inferred_ret) = expr_def
+                        .value
+                        .ty
+                        .as_ref()
+                        .and_then(|ty| ty.kind.as_func())
+                        .and_then(|tf| tf.body.as_deref())
+                    {
+                        p.push(": ")?;
+                        inferred_ret.print(&mut p)?;
+                    }
+                }
+            } else {
+                // value: "let name: Type"  /  "const name: Type"
+                let ty = expr_def.value.ty.as_ref()?;
+                let keyword = if expr_def.constant { "const " } else { "let " };
+                p.push(keyword)?;
+                p.push(ident::display(name))?;
+                p.push(": ")?;
+                ty.print(&mut p)?;
+            }
+        }
+        pr::DefKind::Ty(ty_def) => {
+            p.push("type ")?;
+            p.push(ident::display(name))?;
+            if ty_def.is_framed {
+                p.push("(")?;
+                (&ty_def.framed_label, &ty_def.ty).print(&mut p)?;
+                p.push(")")?;
+            } else {
+                p.push(": ")?;
+                ty_def.ty.print(&mut p)?;
+            }
+        }
+        pr::DefKind::Module(_) => {
+            p.push("module ")?;
+            p.push(ident::display(name))?;
+        }
+        pr::DefKind::Import(_) | pr::DefKind::Unresolved(_) => return None,
+    }
+
+    assert!(p.edits.is_empty());
+    Some(p.buffer)
+}
 
 impl PrintSource for pr::Source {
     fn print<'c>(&self, p: &mut Printer<'c>) -> Option<()> {

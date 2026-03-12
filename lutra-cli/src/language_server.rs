@@ -1,4 +1,3 @@
-use lutra_compiler::DiscoverParams;
 use std::collections::HashMap;
 use std::path;
 use std::sync::Arc;
@@ -6,8 +5,8 @@ use tokio::sync::{Mutex, RwLock};
 use tower_lsp_server::jsonrpc::Result;
 use tower_lsp_server::lsp_types::*;
 
-use lutra_compiler::SourceTree;
-use lutra_compiler::codespan;
+use lutra_compiler::{DiscoverParams, SourceTree};
+use lutra_compiler::{codespan, printer};
 
 #[derive(clap::Parser)]
 pub struct Command {
@@ -45,6 +44,28 @@ struct Backend {
     /// Projects that the LS is aware of.
     #[allow(dead_code)]
     projects: RwLock<Vec<Arc<Mutex<Project>>>>,
+}
+
+/// Context returned by [`Backend::resolve_position`], used by position-based
+/// LSP handlers such as `hover` and `goto_definition`.
+struct PositionContext {
+    /// Held for the duration of the handler so that `checked` and `source_tree`
+    /// remain valid.  Uses `OwnedMutexGuard` so the struct has no lifetime
+    /// parameter.
+    project: tokio::sync::OwnedMutexGuard<Project>,
+    /// The source file the cursor is in.
+    source_id: u16,
+    /// Byte offset of the cursor within that file.
+    offset: u32,
+    /// Line/column index for the source file; used for span ↔ LSP range
+    /// conversions.
+    line_index: codespan::LineNumbers,
+}
+
+impl PositionContext {
+    fn checked(&self) -> Option<&lutra_compiler::Project> {
+        self.project.checked.as_ref()
+    }
 }
 
 #[derive(Debug)]
@@ -85,6 +106,7 @@ impl tower_lsp_server::LanguageServer for Backend {
                         will_save_wait_until: Some(false),
                     },
                 )),
+                hover_provider: Some(HoverProviderCapability::Simple(true)),
                 definition_provider: Some(OneOf::Left(true)),
                 document_formatting_provider: Some(OneOf::Left(true)),
                 document_range_formatting_provider: Some(OneOf::Left(true)),
@@ -213,54 +235,77 @@ impl tower_lsp_server::LanguageServer for Backend {
         &self,
         params: GotoDefinitionParams,
     ) -> Result<Option<GotoDefinitionResponse>> {
-        let uri = &params.text_document_position_params.text_document.uri;
-        let position = params.text_document_position_params.position;
-
-        let path = from_proto::path(uri);
-
-        let project = self.find_project_of_doc(&path).await;
-        let Some(project) = project else {
-            return Ok(None);
-        };
-        let project_lock = project.lock().await;
-
-        let Some(checked) = &project_lock.checked else {
-            return Ok(None);
-        };
-
-        let Ok(relative_path) = project_lock.source_tree.get_relative_path(&path) else {
-            return Ok(None);
-        };
-        let Some((source_id, _)) = project_lock.source_tree.get_by_path(relative_path) else {
-            return Ok(None);
-        };
-
-        let source_text = project_lock
-            .source_tree
-            .get_by_id(source_id)
-            .map(|(_, text)| text)
-            .unwrap_or("");
-
-        let line_index = lutra_compiler::codespan::LineNumbers::new(source_text);
-        let offset = line_index.byte_index_of_line_col(from_proto::line_col(&position));
-
-        let Some(span) = checked.find_target(source_id, offset) else {
-            return Ok(None);
-        };
-
-        let def_uri = to_proto::source_id(&project_lock.source_tree, span.source_id);
-        let def_source = project_lock
-            .source_tree
-            .get_by_id(span.source_id)
-            .map(|(_, text)| text)
-            .unwrap_or("");
-        let def_line_index = lutra_compiler::codespan::LineNumbers::new(def_source);
-        let range = def_line_index.range_of_span(span);
-
-        Ok(Some(GotoDefinitionResponse::Scalar(to_proto::location(
-            def_uri, &range,
-        ))))
+        let ctx = self
+            .resolve_position(&params.text_document_position_params)
+            .await;
+        Ok(ctx.and_then(get_definition))
     }
+
+    async fn hover(&self, params: HoverParams) -> Result<Option<Hover>> {
+        let ctx = self
+            .resolve_position(&params.text_document_position_params)
+            .await;
+        Ok(ctx.and_then(get_hover))
+    }
+}
+
+fn get_definition(ctx: PositionContext) -> Option<GotoDefinitionResponse> {
+    let checked = ctx.checked()?;
+    let symbol = checked.find_by_span(ctx.source_id, ctx.offset);
+
+    let def_span = symbol.and_then(|s| s.target_span)?;
+
+    let def_uri = to_proto::source_id(&ctx.project.source_tree, def_span.source_id);
+    let def_source = ctx
+        .project
+        .source_tree
+        .get_by_id(def_span.source_id)
+        .map(|(_, text)| text)
+        .unwrap_or("");
+    let def_line_index = codespan::LineNumbers::new(def_source);
+    let range = def_line_index.range_of_span(def_span);
+
+    Some(GotoDefinitionResponse::Scalar(to_proto::location(
+        def_uri, &range,
+    )))
+}
+
+fn get_hover(ctx: PositionContext) -> Option<Hover> {
+    let checked = ctx.checked()?;
+    let symbol = checked.find_by_span(ctx.source_id, ctx.offset)?;
+
+    // TODO: show the inferred type for local bindings (let, parameters).
+    let target_path = symbol.target_path.as_ref()?;
+    let def = checked.root_module.get(target_path)?;
+
+    let mut content = String::new();
+
+    if let Some(signature) = printer::format_def_signature(target_path.last(), def) {
+        content.push_str("```lutra\n");
+        content.push_str(&signature);
+        content.push_str("\n```");
+    }
+
+    if let Some(doc) = &def.doc_comment {
+        if !content.is_empty() {
+            content.push_str("\n\n");
+        }
+        content.push_str(doc.content.trim());
+    }
+
+    if content.is_empty() {
+        return None;
+    }
+
+    let hover_range = to_proto::range(&ctx.line_index.range_of_span(symbol.source_span));
+
+    Some(Hover {
+        contents: HoverContents::Markup(MarkupContent {
+            kind: MarkupKind::Markdown,
+            value: content,
+        }),
+        range: Some(hover_range),
+    })
 }
 
 impl Backend {
@@ -346,6 +391,42 @@ impl Backend {
         }
     }
 
+    /// Shared setup for position-based LSP handlers (`hover`, `goto_definition`, …).
+    ///
+    /// Resolves the URI and cursor position in `tdi` to a [`PositionContext`]
+    /// that holds the project lock, `source_id`, byte `offset`, and a
+    /// [`codespan::LineNumbers`] index for the source file.
+    /// Returns `Ok(None)` whenever the URI or project cannot be resolved.
+    async fn resolve_position(&self, tdi: &TextDocumentPositionParams) -> Option<PositionContext> {
+        let uri = &tdi.text_document.uri;
+        let position = tdi.position;
+
+        let path = from_proto::path(uri);
+
+        let project = self.find_project_of_doc(&path).await?;
+        let project_lock = project.lock_owned().await;
+
+        if project_lock.checked.is_none() {
+            return None;
+        }
+
+        let relative_path = project_lock.source_tree.get_relative_path(&path).ok()?;
+        let (source_id, _) = project_lock.source_tree.get_by_path(relative_path)?;
+
+        let source = project_lock.source_tree.get_by_id(source_id);
+        let source_text = source.map(|(_, text)| text).unwrap_or("");
+
+        let line_index = codespan::LineNumbers::new(source_text);
+        let offset = line_index.byte_index_of_line_col(from_proto::line_col(&position));
+
+        Some(PositionContext {
+            project: project_lock,
+            source_id,
+            offset,
+            line_index,
+        })
+    }
+
     async fn find_project_of_doc(&self, path: &path::Path) -> Option<Arc<Mutex<Project>>> {
         let projects = self.projects.read().await;
 
@@ -363,6 +444,13 @@ impl Backend {
         None
     }
 
+    /// Discovers the Lutra project that `path` is a part of and registers it with the language server.
+    ///
+    /// Uses [`lutra_compiler::discover`] to locate all source files belonging to the project.
+    /// Any documents currently open in the editor (held in `self.documents`) are overlaid on
+    /// top of the on-disk source tree so that unsaved in-memory edits take precedence.
+    ///
+    /// On success the new [`Project`] is appended to `self.projects` and returned.
     async fn discover_project(&self, path: path::PathBuf) -> Option<Arc<Mutex<Project>>> {
         self.client
             .log_message(

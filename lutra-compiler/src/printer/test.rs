@@ -723,3 +723,72 @@ fn source_03() {
     # after
     "#);
 }
+
+// ── format_def_signature ────────────────────────────────────────────────────
+
+#[track_caller]
+fn _signature(source: &str, name: &str) -> String {
+    use super::format_def_signature;
+    use crate::check;
+    use crate::project::SourceTree;
+
+    let tree = SourceTree::single("".into(), source.to_string());
+    let project = check(tree, Default::default()).expect("type error");
+    let path = crate::pr::Path::from_name(name);
+    let def = project.root_module.get(&path).expect("def not found");
+    format_def_signature(name, def).expect("no signature")
+}
+
+#[test]
+fn signature_function() {
+    assert_snapshot!(_signature(
+        "func greet(name: text): text -> name",
+        "greet"
+    ), @"func greet(name: text): text");
+}
+
+#[test]
+fn signature_function_no_return() {
+    assert_snapshot!(_signature(
+        "func identity(x: int32) -> x",
+        "identity"
+    ), @"func identity(x: int32): int32");
+}
+
+#[test]
+fn signature_const() {
+    assert_snapshot!(_signature(
+        "const answer: int32 = 42",
+        "answer"
+    ), @"const answer: int32");
+}
+
+#[test]
+fn signature_type() {
+    assert_snapshot!(_signature(
+        "type Point: { x: float64, y: float64 }",
+        "Point"
+    ), @"type Point: {x: float64, y: float64}");
+}
+
+#[test]
+fn signature_type_doc_comment() {
+    // doc_comment is not part of the signature — it belongs to the hover
+    // Markdown, not the code block; verify the signature alone is clean.
+    assert_snapshot!(_signature(r#"
+        ## A named point in 2-D space.
+        type Point: { x: float64, y: float64 }
+    "#, "Point"), @"type Point: {x: float64, y: float64}");
+}
+
+#[test]
+fn signature_generic_function() {
+    // Generic functions have a `where` clause that must appear on a new line
+    // in the hover signature. This test pins the exact multiline output so
+    // regressions in the where-clause rendering are caught.
+    assert_snapshot!(_signature(
+        "func identity(x: T): T where T -> x",
+        "identity"
+    ), @"func identity(x: T): T
+where T");
+}

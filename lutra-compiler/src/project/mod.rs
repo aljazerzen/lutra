@@ -1,6 +1,6 @@
 mod analysis;
 
-pub use analysis::{TargetSpan, TargetMap};
+pub use analysis::{SymbolInfo, TargetMap, TargetSpan};
 
 use std::path;
 use std::str::FromStr;
