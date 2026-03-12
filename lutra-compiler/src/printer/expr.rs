@@ -332,7 +332,8 @@ impl PrintSource for (Option<pr::BinOp>, &pr::Expr) {
     }
 }
 
-pub(super) fn print_func<'c>(
+/// Print a function signature (header only, without the body `-> expr`).
+pub(super) fn print_func_signature<'c>(
     func: &pr::Func,
     name: Option<&str>,
     p: &mut Printer<'c>,
@@ -364,21 +365,27 @@ pub(super) fn print_func<'c>(
         if p.single_line {
             return None;
         }
-
         p.new_line();
         p.push("where ")?;
-
         p.indent();
-
         Separated {
             nodes: &func.ty_params,
             sep_inline: ", ",
             sep_line_end: ",",
         }
         .print(p)?;
-
         p.dedent();
     }
+
+    Some(())
+}
+
+pub(super) fn print_func<'c>(
+    func: &pr::Func,
+    name: Option<&str>,
+    p: &mut Printer<'c>,
+) -> Option<()> {
+    print_func_signature(func, name, p)?;
 
     if let Some(body) = &func.body {
         if func.ty_params.is_empty() {
