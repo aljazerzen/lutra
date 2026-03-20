@@ -60,6 +60,7 @@
             pkgs.cargo-insta
             pkgs.cargo-depgraph
             pkgs.graphviz
+            pkgs.podman
 
             # python
             pkgs.python312Packages.python
