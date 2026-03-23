@@ -48,7 +48,9 @@ generate-precompiled:
 
 # Test (this should pass for every commit)
 test:
-    cargo nextest run --profile=overview
+    cargo build -p lutra-cli --quiet
+
+    cargo nextest run --cargo-quiet --profile=overview
     just py test
     just website/test
 
