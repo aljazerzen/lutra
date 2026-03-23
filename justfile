@@ -11,6 +11,10 @@ show-deps-workspace:
 pg-up:
     podman run -e POSTGRES_PASSWORD=pass -p 5416:5432 docker.io/library/postgres:latest
 
+# Wait until PostgreSQL is ready
+pg-ready:
+    until podman run --rm --network host docker.io/library/postgres:latest pg_isready -h 127.0.0.1 -p 5416 -U postgres >/dev/null 2>&1; do sleep 1; done
+
 # Run tests, insta review, fmt, clippy
 dev FILTER_SET='all()' *NEXTEST_ARGS='':
     # RUST_BACKTRACE=1
