@@ -14,12 +14,14 @@ thiserror = { workspace = true }
 futures = { version = "0.3.31", default-features = false }
 tokio = { workspace = true }
 lutra-bin = { workspace = true, features = ["std"] }
-lutra-runner = { workspace = true }
+lutra-runner = { workspace = true, features = ["std"] }
 tinyjson = "2"
 postgres-types = { version = "0.2.9", default-features = false }
 postgres-protocol = { version = "0.6.8", default-features = false }
 
-tokio-postgres = { version = "0.7.13", default-features = false, features = ["runtime"], optional = true }
+tokio-postgres = { version = "0.7.13", default-features = false, features = [
+    "runtime",
+], optional = true }
 postgres = { version = "0.19.10", default-features = false, optional = true }
 regex = { version = "1.11.2", default-features = false }
 

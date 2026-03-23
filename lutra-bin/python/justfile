@@ -11,5 +11,6 @@ test:
     maturin develop
     cargo run -p lutra-cli -- \
         codegen --project=tests/types.lt tests/types_generated.py
-    python -m mypy tests python/lutra_bin
+    ty check tests python/lutra_bin
+    ruff check tests python/lutra_bin
     python -m unittest tests/main.py

@@ -14,8 +14,9 @@ test:
     cargo run -p lutra-cli -- \
       codegen --project=tests/lutra.lt tests/lutra_generated.py --programs-sql-pg ''
 
-    # mypy
-    python -m mypy python/lutra_runner_postgres tests
+    # check
+    ty check python/lutra_runner_postgres tests
+    ruff check python/lutra_runner_postgres tests
 
     # tests
     usql postgres://postgres:pass@localhost:5416 -f tests/init.sql
