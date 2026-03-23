@@ -6,7 +6,7 @@ use pyo3::buffer::PyBuffer;
 use pyo3::exceptions::PyValueError;
 use pyo3::ffi::c_str;
 use pyo3::prelude::*;
-use pyo3::types::{PyList, PySlice, PyTuple};
+use pyo3::types::{PyList, PySlice, PyTuple, PyType};
 
 /// Main module declaration
 #[pymodule(name = "lutra_bin")]
@@ -30,7 +30,7 @@ fn main(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<ArrayCodec>()?;
     m.add_class::<EnumCodecHelper>()?;
 
-    ir::register(m)?;
+    m.add_class::<Ty>()?;
     Ok(())
 }
 
@@ -326,32 +326,21 @@ impl EnumCodecHelper {
     }
 }
 
-mod ir {
-    use std::borrow::Cow;
+#[pyclass(module = "lutra_bin")]
+pub struct Ty(lutra_bin::ir::Ty);
 
-    use lutra_bin::{Decode, Encode};
-    use pyo3::{prelude::*, types::PyType};
-
-    pub fn register(p: &Bound<'_, PyModule>) -> PyResult<()> {
-        let m = PyModule::new(p.py(), "ir")?;
-        m.add_class::<Ty>()?;
-        p.add_submodule(&m)
+#[pymethods]
+impl Ty {
+    #[classmethod]
+    fn decode(_cls: &Bound<'_, PyType>, bytes: &[u8]) -> Ty {
+        use lutra_bin::Decode;
+        let ty = lutra_bin::ir::Ty::decode(bytes).unwrap();
+        Ty(ty)
     }
 
-    #[pyclass(module = "ir")]
-    pub struct Ty(pub(crate) lutra_bin::ir::Ty);
-
-    #[pymethods]
-    impl Ty {
-        #[classmethod]
-        fn decode(_cls: &Bound<'_, PyType>, bytes: &[u8]) -> Ty {
-            let ty = lutra_bin::ir::Ty::decode(bytes).unwrap();
-            Ty(ty)
-        }
-
-        fn encode(&self) -> Cow<'static, [u8]> {
-            self.0.encode().into()
-        }
+    fn encode(&self) -> Cow<'static, [u8]> {
+        use lutra_bin::Encode;
+        self.0.encode().into()
     }
 }
 

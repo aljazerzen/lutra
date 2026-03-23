@@ -80,7 +80,14 @@
             pkgs.rsync
             pkgs.zola
             pkgs.typos-lsp
-            pkgs.zensical
+            # Wrap zensical to prevent its python 3.13 propagated-build-inputs
+            # from leaking into PYTHONPATH (which breaks pyo3/maturin builds
+            # that use the python 3.12 venv).
+            (pkgs.symlinkJoin {
+              name = "zensical-wrapped";
+              paths = [ pkgs.zensical ];
+              postBuild = "rm -rf $out/nix-support";
+            })
           ];
           LD_LIBRARY_PATH = "${pkgs.lib.makeLibraryPath [ pkgs.duckdb ]}";
           venvDir = "./target/python";

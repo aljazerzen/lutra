@@ -15,6 +15,7 @@ from .lutra_bin import (
     TextCodec,
     ArrayCodec,
     EnumCodecHelper,
+    Ty,
 )
 from .common import Codec, Encodable, encode, decode, Program
 
@@ -36,6 +37,7 @@ __all__ = [
     "TextCodec",
     "ArrayCodec",
     "EnumCodecHelper",
+    "Ty",
     # python
     "Codec",
     "Encodable",

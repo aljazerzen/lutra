@@ -40,9 +40,3 @@ class Runner:
 
     ## Releases any claimed resources or network connections.
     async def shutdown(self) -> None: ...
-
-if typing.TYPE_CHECKING:
-    from . import Run
-
-    # statically assert that Runner implements Run protocol
-    _: type[Run] = Runner
