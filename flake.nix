@@ -65,9 +65,10 @@
             # python
             pkgs.python312Packages.python
             pkgs.python312Packages.venvShellHook
-            pkgs.uv
             pkgs.maturin
             pkgs.ruff
+            pkgs.ty
+            pkgs.uv
 
             (pkgs.python312Packages.python-lsp-server.overridePythonAttrs (old: {
               dependencies = builtins.filter (dep: (dep.pname or "") != "autopep8") old.dependencies;
