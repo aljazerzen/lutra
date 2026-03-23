@@ -1,16 +1,16 @@
 _default:
     just --list
 
-target_dir := "--target-dir=../../target/wheels"
+build_opts := "--target-dir=../../target/wheels --uv"
 
 build MODE='':
-    maturin build {{target_dir}} {{MODE}}
+    maturin build {{build_opts}} {{MODE}}
 
 develop:
-    maturin develop {{target_dir}}
+    maturin develop {{build_opts}}
 
 test:
-    maturin develop {{target_dir}} --quiet
+    maturin develop {{build_opts}} --quiet
 
     # lutra codegen
     cargo run -p lutra-cli --quiet -- \
