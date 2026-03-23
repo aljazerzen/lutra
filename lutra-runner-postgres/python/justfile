@@ -1,17 +1,19 @@
 _default:
     just --list
 
+target_dir := "--target-dir=../../target/wheels"
+
 build MODE='':
-    maturin build {{MODE}}
+    maturin build {{target_dir}} {{MODE}}
 
 develop:
-    maturin develop
+    maturin develop {{target_dir}}
 
 test:
-    maturin develop
+    maturin develop {{target_dir}} --quiet
 
     # lutra codegen
-    cargo run -p lutra-cli -- \
+    cargo run -p lutra-cli --quiet -- \
       codegen --project=tests/lutra.lt tests/lutra_generated.py --programs-sql-pg ''
 
     # check
