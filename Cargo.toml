@@ -62,3 +62,7 @@ lutra-runner-postgres-python = { version = "0.5", path = "lutra-runner-postgres/
 lutra-sql = { version = "0.5", path = "lutra-sql" }
 lutra-tui = { version = "0.5", path = "lutra-tui" }
 tests = { version = "0.5", path = "tests" }
+
+[profile.samply]
+inherits = "release"
+debug = true

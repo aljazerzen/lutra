@@ -10,6 +10,7 @@ result
 
 flamegraph.svg
 perf.data
+profile.json.gz
 
 /examples/*
 !/examples/python
