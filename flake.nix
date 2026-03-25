@@ -61,6 +61,7 @@
             pkgs.cargo-depgraph
             pkgs.graphviz
             pkgs.podman
+            pkgs.samply
 
             # python
             pkgs.python312Packages.python
