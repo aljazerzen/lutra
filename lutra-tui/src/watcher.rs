@@ -129,7 +129,7 @@ fn update_watched_dirs(
 /// Main debounce loop: accumulates file change events
 fn debounce_loop(event_rx: Receiver<()>, mut f: impl FnMut()) {
     // wait for an event (blocking)
-    while let Ok(_) = event_rx.recv() {
+    while event_rx.recv().is_ok() {
         // wait until 100ms of silence
         loop {
             match event_rx.recv_timeout(Duration::from_millis(100)) {

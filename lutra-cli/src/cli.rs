@@ -314,16 +314,17 @@ pub struct InteractiveCommand {
 
 pub fn interactive(cmd: InteractiveCommand) -> anyhow::Result<()> {
     // open launcher TUI, if needed
-    let (project, runner_params) = if cmd.discover.project.is_none() || cmd.runner.is_none() {
-        let runner = cmd.runner.map(RunnerParams::into_launcher);
-        let result = lutra_tui::launcher::run(cmd.discover.project, runner)?;
+    let (project, runner_params) = match (cmd.discover.project, cmd.runner) {
+        (Some(p), Some(r)) => (p, r),
+        (p, r) => {
+            let runner = r.map(RunnerParams::into_launcher);
+            let result = lutra_tui::launcher::run(p, runner)?;
 
-        let Some(result) = result else { return Ok(()) };
+            let Some(result) = result else { return Ok(()) };
 
-        let runner = RunnerParams::from_launcher(result.runner_params);
-        (result.project_path, runner)
-    } else {
-        (cmd.discover.project.unwrap(), cmd.runner.unwrap())
+            let runner = RunnerParams::from_launcher(result.runner_params);
+            (result.project_path, runner)
+        }
     };
 
     // runner cfg

@@ -24,8 +24,8 @@ pub fn format_def_signature(name: &str, def: &pr::Def) -> Option<String> {
 
                 // When the return type is not explicitly annotated in the
                 // source, supplement it from the inferred type.
-                if func.return_ty.is_none() {
-                    if let Some(inferred_ret) = expr_def
+                if func.return_ty.is_none()
+                    && let Some(inferred_ret) = expr_def
                         .value
                         .ty
                         .as_ref()
@@ -35,7 +35,6 @@ pub fn format_def_signature(name: &str, def: &pr::Def) -> Option<String> {
                         p.push(": ")?;
                         inferred_ret.print(&mut p)?;
                     }
-                }
             } else {
                 // value: "let name: Type"  /  "const name: Type"
                 let ty = expr_def.value.ty.as_ref()?;
