@@ -24,7 +24,7 @@ pub use discover::{DiscoverParams, discover};
 pub use format::format;
 pub use intermediate::inline;
 pub use lutra_bin::{ir, rr};
-pub use project::{Project, SymbolInfo, SourceTree};
+pub use project::{Project, SourceTree, SymbolInfo};
 
 #[derive(Debug, Clone, Copy)]
 #[cfg_attr(feature = "clap", derive(clap::ValueEnum))]

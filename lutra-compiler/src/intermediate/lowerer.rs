@@ -656,12 +656,11 @@ impl<'a> Lowerer<'a> {
 
         // wrap the call into bindings, in resolution order
         for o_group in project.ordering.iter().rev() {
-            assert_eq!(o_group.len(), 1);
-            let path = &o_group[0];
-
-            for (id, expr) in bindings.remove(path).unwrap_or_default() {
-                let ty = main.ty.clone();
-                main = ir::Expr::new(ir::Binding { id, expr, main }, ty);
+            for path in o_group {
+                for (id, expr) in bindings.remove(path).unwrap_or_default() {
+                    let ty = main.ty.clone();
+                    main = ir::Expr::new(ir::Binding { id, expr, main }, ty);
+                }
             }
         }
         // same for remaining bindings that come from project dependencies
