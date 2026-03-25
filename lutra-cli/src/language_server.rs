@@ -406,9 +406,7 @@ impl Backend {
         let project = self.find_project_of_doc(&path).await?;
         let project_lock = project.lock_owned().await;
 
-        if project_lock.checked.is_none() {
-            return None;
-        }
+        project_lock.checked.as_ref()?;
 
         let relative_path = project_lock.source_tree.get_relative_path(&path).ok()?;
         let (source_id, _) = project_lock.source_tree.get_by_path(relative_path)?;

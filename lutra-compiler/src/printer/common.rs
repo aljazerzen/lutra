@@ -66,7 +66,7 @@ impl<'a, N: PrintSource> Separated<'a, N> {
 
         // optimization: consume separator width in advance
         let sep_width = self.sep_inline.chars().count();
-        let sep_count = self.nodes.len().checked_sub(1).unwrap_or_default();
+        let sep_count = self.nodes.len().saturating_sub(1);
         p.consume(sep_width * sep_count)?;
 
         for (i, expr) in self.nodes.iter().enumerate() {
