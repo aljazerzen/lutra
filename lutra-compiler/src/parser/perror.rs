@@ -13,9 +13,12 @@ use crate::Span;
 pub struct ChumError<T: Hash + Eq + Debug> {
     span: Span,
     message: Option<&'static str>,
-    expected: HashSet<Option<T>>,
-    found: Option<T>,
-    label: SimpleLabel,
+    /// the set is only populated for error paths
+    #[warn(clippy::box_collection)] // we use Box because HashSet makes the struct too large
+    expected: Box<HashSet<Option<T>>>,
+    found: Option<Box<T>>,
+    /// `None` means either "no label" or "conflicting labels" (both map to no output)
+    label: Option<&'static str>,
 }
 
 pub type PError = ChumError<lexer::TokenKind>;
@@ -26,9 +29,9 @@ impl<T: Hash + Eq + Debug> ChumError<T> {
         Self {
             span,
             message: Some(msg),
-            expected: HashSet::default(),
+            expected: Box::default(),
             found: None,
-            label: SimpleLabel::None,
+            label: None,
         }
     }
 
@@ -44,7 +47,7 @@ impl<T: Hash + Eq + Debug> ChumError<T> {
 
     /// Returns the input, if any, that was found instead of an expected pattern.
     pub fn found(&self) -> Option<&T> {
-        self.found.as_ref()
+        self.found.as_deref()
     }
 
     /// Returns the reason for the error.
@@ -54,7 +57,7 @@ impl<T: Hash + Eq + Debug> ChumError<T> {
 
     /// Returns the error's label, if any.
     pub fn label(&self) -> Option<&'static str> {
-        self.label.into()
+        self.label
     }
 
     /// Map the error's inputs using the given function.
@@ -65,8 +68,8 @@ impl<T: Hash + Eq + Debug> ChumError<T> {
         ChumError {
             span: self.span,
             message: self.message,
-            expected: self.expected.into_iter().map(|e| e.map(&mut f)).collect(),
-            found: self.found.map(f),
+            expected: Box::new(self.expected.into_iter().map(|e| e.map(&mut f)).collect()),
+            found: self.found.map(|t| Box::new(f(*t))),
             label: self.label,
         }
     }
@@ -81,15 +84,14 @@ impl<T: Hash + Eq + Display + Debug> chumsky::Error<T> for ChumError<T> {
         expected: Iter,
         found: Option<T>,
     ) -> Self {
-        let exp = expected.into_iter().collect();
+        let exp: HashSet<_> = expected.into_iter().collect();
         tracing::trace!("looking for {:?} but found {:?} at: {:?}", exp, found, span);
         Self {
             span,
-            // reason: Some(String::from("unexpected")),
             message: None,
-            expected: exp,
-            found,
-            label: SimpleLabel::None,
+            expected: Box::new(exp),
+            found: found.map(Box::new),
+            label: None,
         }
     }
 
@@ -103,18 +105,15 @@ impl<T: Hash + Eq + Display + Debug> chumsky::Error<T> for ChumError<T> {
         Self {
             span,
             message: None,
-            expected: core::iter::once(Some(expected)).collect(),
-            found,
-            label: SimpleLabel::None,
+            expected: Box::new(core::iter::once(Some(expected)).collect()),
+            found: found.map(Box::new),
+            label: None,
         }
     }
 
     fn with_label(mut self, label: Self::Label) -> Self {
-        match self.label {
-            SimpleLabel::Some(_) => {}
-            _ => {
-                self.label = SimpleLabel::Some(label);
-            }
+        if self.label.is_none() {
+            self.label = Some(label);
         }
         self
     }
@@ -122,16 +121,19 @@ impl<T: Hash + Eq + Display + Debug> chumsky::Error<T> for ChumError<T> {
     ///from chumsky::error::Simple
     fn merge(mut self, other: Self) -> Self {
         // TODO: Assert that `self.span == other.span` here?
-        // self.reason = match (&self.reason, &other.reason) {
-        //     (Some(..), None) => self.reason,
-        //     (None, Some(..) ) => other.reason,
-        //     (Some(mut r1), Some(r2)) => {r1.push('s');Some(r1)},
-        // };
-
         self.message = None;
-        self.label = self.label.merge(other.label);
-        self.expected.extend(other.expected);
+        self.label = merge_labels(self.label, other.label);
+        self.expected.extend(*other.expected);
         self
+    }
+}
+
+/// Merge two labels. When both are `Some` but differ, both are dropped (they conflict).
+fn merge_labels(a: Option<&'static str>, b: Option<&'static str>) -> Option<&'static str> {
+    match (a, b) {
+        (Some(a), Some(b)) if a == b => Some(a),
+        (Some(_), Some(_)) => None,
+        (None, x) | (x, None) => x,
     }
 }
 
@@ -252,36 +254,63 @@ impl From<PError> for Diagnostic {
     }
 }
 
-// Vendored from
-// https://github.com/zesterer/chumsky/pull/238/files#diff-97e25e2a0e41c578875856e97b659be2719a65227c104b992e3144efa000c35eR184
-// since it's private in chumsky
+#[cfg(test)]
+mod tests {
+    use chumsky::Error as _;
 
-/// A type representing zero, one, or many labels applied to an error
-#[derive(Clone, Copy, Debug, PartialEq)]
-enum SimpleLabel {
-    Some(&'static str),
-    None,
-    Multi,
-}
+    use super::*;
 
-impl SimpleLabel {
-    fn merge(self, other: Self) -> Self {
-        match (self, other) {
-            (SimpleLabel::Some(a), SimpleLabel::Some(b)) if a == b => SimpleLabel::Some(a),
-            (SimpleLabel::Some(_), SimpleLabel::Some(_)) => SimpleLabel::Multi,
-            (SimpleLabel::Multi, _) => SimpleLabel::Multi,
-            (_, SimpleLabel::Multi) => SimpleLabel::Multi,
-            (SimpleLabel::None, x) => x,
-            (x, SimpleLabel::None) => x,
-        }
+    #[test]
+    fn perror_size() {
+        assert!(
+            std::mem::size_of::<PError>() <= 56,
+            "PError is {} bytes, expected ≤56",
+            std::mem::size_of::<PError>()
+        );
     }
-}
 
-impl From<SimpleLabel> for Option<&'static str> {
-    fn from(label: SimpleLabel) -> Self {
-        match label {
-            SimpleLabel::Some(s) => Some(s),
-            _ => None,
-        }
+    #[test]
+    fn merge_labels_same() {
+        assert_eq!(merge_labels(Some("a"), Some("a")), Some("a"));
+    }
+
+    #[test]
+    fn merge_labels_conflict() {
+        assert_eq!(merge_labels(Some("a"), Some("b")), None);
+    }
+
+    #[test]
+    fn merge_labels_one_none() {
+        assert_eq!(merge_labels(None, Some("b")), Some("b"));
+        assert_eq!(merge_labels(Some("a"), None), Some("a"));
+    }
+
+    #[test]
+    fn custom_error_round_trip() {
+        let span = crate::Span {
+            start: 0,
+            len: 5,
+            source_id: 0,
+        };
+        let e: PError = PError::custom(span, "oops");
+        assert_eq!(e.reason(), Some("oops"));
+        assert_eq!(e.found(), None);
+        assert_eq!(e.label(), None);
+        assert_eq!(e.expected().len(), 0);
+    }
+
+    #[test]
+    fn with_label_sets_once() {
+        let span = crate::Span {
+            start: 0,
+            len: 1,
+            source_id: 0,
+        };
+        let e: PError = PError::custom(span, "x");
+        let e = e.with_label("first");
+        assert_eq!(e.label(), Some("first"));
+        // A second call must not overwrite the first.
+        let e = e.with_label("second");
+        assert_eq!(e.label(), Some("first"));
     }
 }

@@ -41,4 +41,9 @@ chrono = { workspace = true }
 
 
 [dev-dependencies]
+criterion = { version = "0.5", features = ["html_reports"] }
 insta = { workspace = true }
+
+[[bench]]
+name = "compile_criterion"
+harness = false
