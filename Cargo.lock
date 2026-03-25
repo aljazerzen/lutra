@@ -2334,6 +2334,7 @@ dependencies = [
  "chrono",
  "chumsky",
  "clap",
+ "criterion",
  "enum-as-inner",
  "indexmap",
  "insta",
