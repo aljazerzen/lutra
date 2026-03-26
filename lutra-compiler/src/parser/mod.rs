@@ -1,15 +1,15 @@
-pub(crate) mod def;
+mod def;
 mod expr;
+mod helpers;
 mod interpolation;
-pub(crate) mod lexer;
-pub(crate) mod perror;
+mod lexer;
 mod test;
 mod types;
 
-use chumsky::{Stream, prelude::*};
+pub use self::lexer::{Token, TokenKind, lex_source_recovery};
 
-use self::lexer::{Token, TokenKind};
-use self::perror::PError;
+use chumsky::input::Input as _;
+use chumsky::prelude::*;
 
 use crate::Span;
 use crate::diagnostic::Diagnostic;
@@ -32,14 +32,19 @@ pub fn parse_source(
 
     let ast = if let Some(tokens) = tokens {
         trivia = tokens.trivia;
-        let stream = prepare_stream(tokens.semantic, source_id);
-        let (mut parsed, chum_errs) = def::source().parse_recovery(stream);
+        let tokens = prepare_tokens(tokens.semantic, source_id);
 
+        let (ast, errs) = def::source()
+            .parse(tokens.as_input())
+            .into_output_errors();
+
+        let mut parsed = ast;
         if let Some(parsed) = &mut parsed {
             parsed.span.start = 0;
             parsed.span.len = source.len() as u16;
         }
-        errors.extend(chum_errs.into_iter().map(Diagnostic::from));
+
+        errors.extend(errs.into_iter().map(Diagnostic::from));
 
         parsed
     } else {
@@ -53,14 +58,12 @@ pub fn parse_expr(source: &str, source_id: u16) -> (Option<pr::Expr>, Vec<Diagno
     let (tokens, mut errors) = lexer::lex_source_recovery(source, source_id);
 
     let ast = if let Some(tokens) = tokens {
-        let stream = prepare_stream(tokens.semantic, source_id);
+        let tokens = prepare_tokens(tokens.semantic, source_id);
 
-        let ty = types::type_expr();
-        let expr = expr::expr(ty);
-
-        let (ast, chum_errs) = expr.parse_recovery(stream);
-
-        errors.extend(chum_errs.into_iter().map(Diagnostic::from));
+        let (ast, errs) = expr::expr(types::type_expr())
+            .parse(tokens.as_input())
+            .into_output_errors();
+        errors.extend(errs.into_iter().map(Diagnostic::from));
         ast
     } else {
         None
@@ -69,81 +72,43 @@ pub fn parse_expr(source: &str, source_id: u16) -> (Option<pr::Expr>, Vec<Diagno
     (ast, errors)
 }
 
-/// Convert the output of the lexer into the input of the parser. Requires
-/// supplying the original source code.
-pub(crate) fn prepare_stream<'a>(
-    tokens: Vec<lexer::Token>,
-    source_id: u16,
-) -> Stream<'a, TokenKind, Span, impl Iterator<Item = (TokenKind, Span)> + Sized + 'a> {
-    let final_offset = tokens
-        .last()
-        .map(|t| t.span.start + t.span.len as u32)
-        .unwrap_or(0);
-
-    let tokens = tokens
+/// Convert the output of the lexer into token pairs and end-of-input span.
+fn prepare_tokens(tokens: Vec<lexer::Token>, source_id: u16) -> ParserTokens {
+    let pairs: Vec<(TokenKind, Span)> = tokens
         .into_iter()
-        .map(move |token| (token.kind, token.span.with_source_id(source_id)));
+        .map(|t| (t.kind, t.span.with_source_id(source_id)))
+        .collect();
+
     let eoi = Span {
-        start: final_offset,
+        start: pairs.last().map(|(_, s)| s.end()).unwrap_or(0),
         len: 0,
         source_id,
     };
-    Stream::from_iter(eoi, tokens)
+
+    ParserTokens { pairs, eoi }
 }
 
-fn ident_part() -> impl Parser<TokenKind, String, Error = PError> + Clone {
-    select! {
-        TokenKind::Ident(ident) => ident
-    }
-    .map_err(|e: PError| {
-        PError::expected_input_found(
-            e.span(),
-            [Some(TokenKind::Ident("".to_string()))],
-            e.found().cloned(),
-        )
-    })
+struct ParserTokens {
+    pairs: Vec<(TokenKind, Span)>,
+    eoi: Span,
 }
 
-fn ident_keyword(kw: &'static str) -> impl Parser<TokenKind, (), Error = PError> + Clone {
-    select! {
-        TokenKind::Ident(ident) if ident == kw => ()
+impl ParserTokens {
+    fn as_input(&self) -> PInput<'_> {
+        self.pairs.as_slice().split_token_span(self.eoi)
     }
 }
 
-fn keyword(kw: &'static str) -> impl Parser<TokenKind, (), Error = PError> + Clone {
-    just(TokenKind::Keyword(kw)).ignored()
-}
+/// Parser error type. `'src` is the lifetime of the input being parsed; it
+/// bounds token references stored inside the Rich error.
+pub(crate) type PError<'src> = Rich<'src, lexer::TokenKind, Span>;
 
-fn ctrl(char: char) -> impl Parser<TokenKind, (), Error = PError> + Clone {
-    just(TokenKind::Control(char)).ignored()
-}
+/// Type of parser Extra we use (full `Rich` errors, for error reporting).
+pub(crate) type PExtra<'src> = chumsky::extra::Err<PError<'src>>;
 
-/// Parse a sequence, allowing commas between items.
-/// Doesn't include the surrounding delimiters.
-fn sequence<'a, P, O>(parser: P) -> impl Parser<TokenKind, Vec<O>, Error = PError> + Clone
-where
-    P: Parser<TokenKind, O, Error = PError> + Clone,
-    O: 'a,
-{
-    parser.separated_by(ctrl(',')).allow_trailing()
-}
-
-fn delimited_by_parenthesis<P, O>(
-    parser: P,
-    fallback: impl Fn(crate::Span) -> O + Clone,
-) -> impl Parser<TokenKind, O, Error = PError> + Clone
-where
-    P: Parser<TokenKind, O, Error = PError> + Clone,
-{
-    parser
-        .delimited_by(ctrl('('), ctrl(')'))
-        .recover_with(nested_delimiters(
-            TokenKind::Control('('),
-            TokenKind::Control(')'),
-            [
-                (TokenKind::Control('['), TokenKind::Control(']')),
-                (TokenKind::Control('('), TokenKind::Control(')')),
-            ],
-            fallback,
-        ))
-}
+/// Type of parser input we use.
+///
+/// Uses a slice-based input so that backtracking is O(1) (cursor is just an
+/// index) instead of cloning the entire remaining iterator on every checkpoint.
+type PInput<'src> =
+    chumsky::input::MappedInput<'src, lexer::TokenKind, Span, &'src [(lexer::TokenKind, Span)]>;

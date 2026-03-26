@@ -35,7 +35,7 @@ impl fold::PrFold for Prefixer {
 
         // boiler plate
         expr.kind = self.fold_expr_kind(expr.kind)?;
-        expr.ty = fold::fold_type_opt(self, expr.ty)?;
+        expr.ty = expr.ty.map(|t| self.fold_type(*t).map(Box::new)).transpose()?;
         expr.ty_args = expr
             .ty_args
             .into_iter()

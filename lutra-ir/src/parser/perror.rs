@@ -1,8 +1,6 @@
 use std::fmt::Debug;
 
-use lutra_compiler::_lexer::TokenKind;
-
-pub type PError = chumsky::error::Cheap<TokenKind, Span>;
+pub type PError = chumsky::error::Cheap<Span>;
 
 #[derive(Debug, Clone)]
 pub struct Error {
@@ -12,11 +10,10 @@ pub struct Error {
 
 impl Error {
     pub fn from_parser(p: PError, source: &str) -> Error {
-        let range = p.span();
-        let span = Span {
-            start: range.start,
-            end: range.end,
-        };
+        let s = p.span();
+        let start = s.start;
+        let end = s.end;
+        let span = Span { start, end };
 
         let snippet: String = source
             .chars()
@@ -24,14 +21,7 @@ impl Error {
             .take(span.end - span.start)
             .collect();
 
-        let message = {
-            let while_parsing = p
-                .label()
-                .map(|l| format!(" while parsing {l}"))
-                .unwrap_or_default();
-
-            format!("unexpected '{snippet}'{while_parsing}")
-        };
+        let message = format!("unexpected '{snippet}'");
 
         Error { message, span }
     }
@@ -56,7 +46,7 @@ pub struct Span {
     pub end: usize,
 }
 
-impl chumsky::Span for Span {
+impl chumsky::span::Span for Span {
     type Context = ();
 
     type Offset = usize;

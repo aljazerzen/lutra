@@ -9,7 +9,7 @@ use super::TypeResolver;
 
 impl TypeResolver<'_> {
     pub fn infer_type(&mut self, expr: &Expr) -> Result<Ty> {
-        if let Some(ty) = &expr.ty {
+        if let Some(ty) = expr.ty.as_deref() {
             return Ok(ty.clone());
         }
 
@@ -25,7 +25,7 @@ impl TypeResolver<'_> {
             ExprKind::Array(items) => {
                 let mut items_ty = None;
                 for item in items {
-                    let item_ty = item.ty.clone().unwrap();
+                    let item_ty = item.ty.as_deref().cloned().unwrap();
                     if let Some(items_ty) = &items_ty {
                         self.validate_type(&item_ty, items_ty, &|| None)
                             .with_span_fallback(item.span)?;
@@ -55,7 +55,7 @@ impl TypeResolver<'_> {
                 body: func
                     .return_ty
                     .clone()
-                    .or_else(|| func.body.as_ref().and_then(|b| b.ty.clone()))
+                    .or_else(|| func.body.as_ref().and_then(|b| b.ty.as_deref().cloned()))
                     .map(Box::new),
                 ty_params: func.ty_params.clone(),
             }),

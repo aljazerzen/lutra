@@ -28,7 +28,7 @@ mod test;
 mod types;
 
 use crate::codespan;
-use crate::parser::lexer::{Token, TokenKind};
+use crate::parser::{Token, TokenKind};
 use crate::pr;
 
 pub use defs::format_def_signature;

@@ -26,7 +26,7 @@ impl TypeResolver<'_> {
     {
         let Some(found_ty) = &mut found.ty else {
             // found is none: infer from expected
-            found.ty = Some(expected.clone());
+            found.ty = Some(Box::new(expected.clone()));
             return Ok(());
         };
 

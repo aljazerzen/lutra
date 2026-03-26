@@ -1,4 +1,3 @@
-use chumsky::Span;
 use lutra_bin::ident;
 
 use crate::pr::{self, ImportDef};
@@ -31,10 +30,10 @@ pub fn format_def_signature(name: &str, def: &pr::Def) -> Option<String> {
                         .as_ref()
                         .and_then(|ty| ty.kind.as_func())
                         .and_then(|tf| tf.body.as_deref())
-                    {
-                        p.push(": ")?;
-                        inferred_ret.print(&mut p)?;
-                    }
+                {
+                    p.push(": ")?;
+                    inferred_ret.print(&mut p)?;
+                }
             } else {
                 // value: "let name: Type"  /  "const name: Type"
                 let ty = expr_def.value.ty.as_ref()?;
@@ -107,7 +106,7 @@ impl PrintSource for (&pr::ModuleDef, Option<crate::Span>) {
         for (i, (name, def)) in self.0.defs.iter().enumerate() {
             if i > 0 {
                 // inject trailing comments of the prev def
-                p.inject_trivia_prev_inline(def.span.map(|s| s.start()));
+                p.inject_trivia_prev_inline(def.span.map(|s| s.start));
 
                 // inject new-lines
                 let condensed = matches!(def.kind, pr::DefKind::Import(_))

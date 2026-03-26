@@ -92,7 +92,7 @@ impl TypeResolver<'_> {
                 self.diagnostics.push(d);
 
                 let mut placeholder = pr::Expr::new(pr::ExprKind::Tuple(vec![]));
-                placeholder.ty = Some(fallback_ty.clone());
+                placeholder.ty = Some(Box::new(fallback_ty.clone()));
                 placeholder
             }
         }

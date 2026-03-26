@@ -147,13 +147,13 @@ impl<'a> Lowerer<'a> {
             let kind = ir::ExprKind::Pointer(ir::Pointer::External(ir::ExternalPtr {
                 id: external_symbol_id,
             }));
-            let ty = self.lower_ty(expr.ty.clone().unwrap());
+            let ty = self.lower_ty(expr.ty.as_deref().cloned().unwrap());
             return Ok(ir::Expr { kind, ty });
         }
 
         let mut expr = expr;
 
-        if let pr::TyKind::Func(ty_func) = &expr.ty.as_ref().unwrap().kind
+        if let pr::TyKind::Func(ty_func) = &expr.ty.as_deref().unwrap().kind
             && !ty_func.ty_params.is_empty()
         {
             // replace refs to type params with inferred type args
@@ -182,7 +182,7 @@ impl<'a> Lowerer<'a> {
     #[tracing::instrument(name = "le", skip_all)]
     fn lower_expr(&mut self, expr: &pr::Expr) -> Result<ir::Expr> {
         tracing::trace!("lower_expr: {expr:?}");
-        let ty = expr.ty.as_ref().unwrap();
+        let ty = expr.ty.as_deref().unwrap();
 
         let kind = match &expr.kind {
             pr::ExprKind::Literal(lit) => {
@@ -229,7 +229,7 @@ impl<'a> Lowerer<'a> {
                     // this is un-framing (i.e. noop)
                     return Ok(ir::Expr {
                         kind: self.lower_expr(base)?.kind,
-                        ty: self.lower_ty(expr.ty.clone().unwrap()),
+                        ty: self.lower_ty(expr.ty.as_deref().cloned().unwrap()),
                     });
                 }
 
@@ -441,7 +441,7 @@ impl<'a> Lowerer<'a> {
         };
         Ok(ir::Expr {
             kind,
-            ty: self.lower_ty(expr.ty.clone().unwrap()),
+            ty: self.lower_ty(expr.ty.as_deref().cloned().unwrap()),
         })
     }
 
@@ -1148,7 +1148,7 @@ pub(crate) fn lower_type_defs(project: &Project) -> ir::Module {
 
             pr::DefKind::Expr(expr) => {
                 let expr = &expr.value;
-                let ty = lowerer.lower_ty(expr.ty.clone().unwrap());
+                let ty = lowerer.lower_ty(expr.ty.as_deref().cloned().unwrap());
 
                 module.insert(name.as_steps(), ir::Decl::Var(ty));
             }
@@ -1202,7 +1202,7 @@ fn order_ty_defs(mut by_name: HashMap<pr::Path, ir::Ty>, project: &Project) -> V
 /// Get the entry point's input type.
 /// Returns the type and a bool indicating if the type is a tuple, packed from multiple input params.
 fn get_entry_point_input(expr: &pr::Expr) -> (pr::Ty, bool) {
-    let ty = expr.ty.as_ref().unwrap();
+    let ty = expr.ty.as_deref().unwrap();
     let Some(ty_func) = ty.kind.as_func() else {
         return (pr::Ty::new(pr::TyKind::Tuple(vec![])), true);
     };

@@ -124,7 +124,7 @@ impl TypeResolver<'_> {
         }
 
         Ok(Expr {
-            ty: fn_ty.body.clone().map(|x| *x),
+            ty: fn_ty.body.clone(),
             span,
             ..Expr::new(ExprKind::Call(Call {
                 subject: func,

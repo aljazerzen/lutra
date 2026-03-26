@@ -1,20 +1,23 @@
+use chumsky::input::ValueInput;
 use chumsky::prelude::*;
 use indexmap::IndexMap;
 
-use super::expr::{expr, ident};
-use super::{ctrl, delimited_by_parenthesis, ident_part, keyword};
 use crate::Span;
-use crate::parser::lexer::TokenKind;
-use crate::parser::perror::PError;
-use crate::parser::types;
 use crate::pr::*;
 
+use super::helpers::*;
+use super::{PExtra, PError, TokenKind};
+use super::{expr, types};
+
 /// The top-level parser
-pub fn source() -> impl Parser<TokenKind, Source, Error = PError> {
+pub fn source<'src, I>() -> impl Parser<'src, I, Source, PExtra<'src>> + Clone + 'src
+where
+    I: ValueInput<'src, Token = TokenKind, Span = Span>,
+{
     let is_submodule = keyword("submodule").or_not().map(|x| x.is_some());
 
     let ty = types::type_expr();
-    let expr = expr(ty.clone());
+    let expr = expr::expr(ty.clone());
 
     let mod_content = recursive(|mod_content| {
         let module_def = keyword("module")
@@ -22,7 +25,7 @@ pub fn source() -> impl Parser<TokenKind, Source, Error = PError> {
             .then(
                 mod_content
                     .delimited_by(ctrl('{'), ctrl('}'))
-                    .map_with_span(set_content_span),
+                    .map_with(|m, e| set_content_span(m, e.span())),
             )
             .map(|(name, module_def)| (name, DefKind::Module(module_def)))
             .labelled("module definition");
@@ -31,22 +34,23 @@ pub fn source() -> impl Parser<TokenKind, Source, Error = PError> {
             .ignore_then(expr.clone().map(Box::new))
             .map(|expr| Annotation { expr })
             .labelled("annotation")
-            .repeated();
+            .repeated()
+            .collect::<Vec<_>>();
 
         let def_kind = choice((
-            module_def,
-            type_def(ty.clone()),
-            import_def(),
-            func_def(expr.clone(), ty.clone()),
-            const_def(expr.clone(), ty),
-        ));
+            module_def.boxed(),
+            type_def(ty.clone()).boxed(),
+            import_def().boxed(),
+            func_def(expr.clone(), ty.clone()).boxed(),
+            const_def(expr.clone(), ty).boxed(),
+        ))
+        .labelled("definition");
 
-        // Currently doc comments need to be before the annotation; probably
-        // should relax this?
         let def = (doc_comment().or_not())
             .then(annotations.clone())
             .then(def_kind)
-            .map_with_span(|((doc_comment, annotations), (name, def_kind)), span| {
+            .map_with(|((doc_comment, annotations), (name, def_kind)), e| {
+                let span = e.span();
                 let def = Def {
                     kind: def_kind,
                     span: Some(span),
@@ -54,13 +58,13 @@ pub fn source() -> impl Parser<TokenKind, Source, Error = PError> {
                     annotations,
                     doc_comment,
                 };
-
                 (name.0, def)
             });
 
         let defs = def
             .repeated()
-            .validate(|defs, span, emit| into_module(defs, span, emit));
+            .collect::<Vec<_>>()
+            .validate(|defs, e, emitter| into_module(defs, e.span(), emitter));
 
         let self_annotation = ctrl('@')
             .then(ctrl('!'))
@@ -70,6 +74,7 @@ pub fn source() -> impl Parser<TokenKind, Source, Error = PError> {
 
         self_annotation
             .repeated()
+            .collect::<Vec<_>>()
             .then(defs)
             .map(|(annotations, mut module_def)| {
                 module_def.annotations = annotations;
@@ -79,15 +84,19 @@ pub fn source() -> impl Parser<TokenKind, Source, Error = PError> {
 
     is_submodule
         .then(mod_content)
-        .map_with_span(|(is_submodule, root), span| Source {
+        .map_with(|(is_submodule, root), e| Source {
             is_submodule,
             root,
-            span,
+            span: e.span(),
         })
         .then_ignore(end())
 }
 
-fn into_module(def_vec: Vec<(String, Def)>, span: Span, emit: &mut dyn FnMut(PError)) -> ModuleDef {
+fn into_module(
+    def_vec: Vec<(String, Def)>,
+    span: Span,
+    emitter: &mut chumsky::input::Emitter<PError<'_>>,
+) -> ModuleDef {
     let mut defs = IndexMap::with_capacity(def_vec.len());
     for (i, (name, def)) in def_vec.into_iter().enumerate() {
         // hack that allows imports not to have names
@@ -100,8 +109,8 @@ fn into_module(def_vec: Vec<(String, Def)>, span: Span, emit: &mut dyn FnMut(PEr
         let span = def.span.unwrap();
         let conflict = defs.insert(name, def);
         if let Some(conflict) = conflict {
-            emit(PError::custom(span, "duplicate name"));
-            emit(PError::custom(conflict.span.unwrap(), "duplicate name"));
+            emitter.emit(Rich::custom(span, "duplicate name"));
+            emitter.emit(Rich::custom(conflict.span.unwrap(), "duplicate name"));
         }
     }
 
@@ -119,16 +128,19 @@ fn set_content_span(mut module: ModuleDef, mut span: Span) -> ModuleDef {
     module
 }
 
-fn doc_comment() -> impl Parser<TokenKind, DocComment, Error = PError> + Clone {
+fn doc_comment<'src, I>() -> impl Parser<'src, I, DocComment, PExtra<'src>> + Clone + 'src
+where
+    I: ValueInput<'src, Token = TokenKind, Span = Span>,
+{
     select! {
         TokenKind::DocComment(text) => text,
     }
     .repeated()
     .at_least(1)
-    .collect()
-    .map_with_span(|lines: Vec<String>, span| DocComment {
+    .collect::<Vec<_>>()
+    .map_with(|lines: Vec<String>, e| DocComment {
         content: lines.join("\n"),
-        span,
+        span: e.span(),
     })
     .labelled("doc comment")
 }
@@ -141,14 +153,20 @@ impl NameAndSpan {
     }
 }
 
-fn def_name() -> impl Parser<TokenKind, NameAndSpan, Error = PError> + Clone {
-    ident_part().map_with_span(NameAndSpan::new)
+fn def_name<'src, I>() -> impl Parser<'src, I, NameAndSpan, PExtra<'src>> + Clone + 'src
+where
+    I: ValueInput<'src, Token = TokenKind, Span = Span>,
+{
+    ident_part().map_with(|n, e| NameAndSpan::new(n, e.span()))
 }
 
-fn const_def(
-    expr: impl Parser<TokenKind, Expr, Error = PError> + Clone,
-    ty: impl Parser<TokenKind, Ty, Error = PError> + Clone,
-) -> impl Parser<TokenKind, (NameAndSpan, DefKind), Error = PError> + Clone {
+fn const_def<'src, I>(
+    expr: impl Parser<'src, I, Expr, PExtra<'src>> + Clone + 'src,
+    ty: impl Parser<'src, I, Ty, PExtra<'src>> + Clone + 'src,
+) -> impl Parser<'src, I, (NameAndSpan, DefKind), PExtra<'src>> + Clone
+where
+    I: ValueInput<'src, Token = TokenKind, Span = Span>,
+{
     keyword("const")
         .ignore_then(def_name())
         .then(ctrl(':').ignore_then(ty).or_not())
@@ -166,23 +184,27 @@ fn const_def(
         .labelled("constant definition")
 }
 
-fn func_def<'a>(
-    expr: impl Parser<TokenKind, Expr, Error = PError> + Clone + 'a,
-    ty: impl Parser<TokenKind, Ty, Error = PError> + Clone + 'a,
-) -> impl Parser<TokenKind, (NameAndSpan, DefKind), Error = PError> + Clone + 'a {
+fn func_def<'src, I>(
+    expr: impl Parser<'src, I, Expr, PExtra<'src>> + Clone + 'src,
+    ty: impl Parser<'src, I, Ty, PExtra<'src>> + Clone + 'src,
+) -> impl Parser<'src, I, (NameAndSpan, DefKind), PExtra<'src>> + Clone
+where
+    I: ValueInput<'src, Token = TokenKind, Span = Span>,
+{
     let head = keyword("func").ignore_then(def_name());
 
     let params = delimited_by_parenthesis(
         super::expr::func_param(ty.clone())
             .separated_by(ctrl(','))
-            .allow_trailing(),
+            .allow_trailing()
+            .collect(),
         |_| vec![],
     );
 
     let return_ty = ctrl(':').ignore_then(ty.clone()).or_not();
 
     let ty_params = keyword("where")
-        .ignore_then(types::type_params(ty.clone()).boxed())
+        .ignore_then(types::type_params(ty.clone()))
         .or_not()
         .map(|x| x.unwrap_or_default());
 
@@ -194,7 +216,8 @@ fn func_def<'a>(
         .then(return_ty)
         .then(ty_params)
         .then(body)
-        .map_with_span(|((((name, params), return_ty), ty_params), body), span| {
+        .map_with(|((((name, params), return_ty), ty_params), body), e| {
+            let span = e.span();
             let func = Func {
                 return_ty,
                 body,
@@ -210,12 +233,14 @@ fn func_def<'a>(
             (name, def)
         })
         .labelled("function definition")
-        .boxed()
 }
 
-fn type_def(
-    ty: impl Parser<TokenKind, Ty, Error = PError> + Clone,
-) -> impl Parser<TokenKind, (NameAndSpan, DefKind), Error = PError> + Clone {
+fn type_def<'src, I>(
+    ty: impl Parser<'src, I, Ty, PExtra<'src>> + Clone + 'src,
+) -> impl Parser<'src, I, (NameAndSpan, DefKind), PExtra<'src>> + Clone
+where
+    I: ValueInput<'src, Token = TokenKind, Span = Span>,
+{
     keyword("type")
         .ignore_then(def_name())
         .then(
@@ -242,13 +267,19 @@ fn type_def(
         .labelled("type definition")
 }
 
-fn import_def() -> impl Parser<TokenKind, (NameAndSpan, DefKind), Error = PError> + Clone {
+fn import_def<'src, I>() -> impl Parser<'src, I, (NameAndSpan, DefKind), PExtra<'src>> + Clone
+where
+    I: ValueInput<'src, Token = TokenKind, Span = Span>,
+{
     let import = recursive(|import_part| {
-        ident()
+        expr::ident()
             .then(choice((
                 just(TokenKind::PathSep)
                     .ignore_then(delimited_by_parenthesis(
-                        import_part.separated_by(ctrl(',')).allow_trailing(),
+                        import_part
+                            .separated_by(ctrl(','))
+                            .allow_trailing()
+                            .collect(),
                         |_| vec![],
                     ))
                     .map(|children| ImportKind::Many(Path::empty(), children)),
@@ -257,7 +288,8 @@ fn import_def() -> impl Parser<TokenKind, (NameAndSpan, DefKind), Error = PError
                     .or_not()
                     .map(|alias| ImportKind::Single(Path::empty(), alias)),
             )))
-            .map_with_span(|(path, mut kind), span| {
+            .map_with(|(path, mut kind), e| {
+                let span = e.span();
                 let (ImportKind::Single(p, ..) | ImportKind::Many(p, ..)) = &mut kind;
                 *p = path;
                 ImportDef { kind, span }
@@ -266,7 +298,10 @@ fn import_def() -> impl Parser<TokenKind, (NameAndSpan, DefKind), Error = PError
 
     keyword("import")
         .ignore_then(import)
-        .map_with_span(|import, s| (NameAndSpan::new("".into(), s), DefKind::Import(import)))
+        .map_with(|import, e| {
+            let s = e.span();
+            (NameAndSpan::new("".into(), s), DefKind::Import(import))
+        })
         .labelled("import statement")
 }
 
@@ -274,16 +309,18 @@ fn import_def() -> impl Parser<TokenKind, (NameAndSpan, DefKind), Error = PError
 mod tests {
     use insta::assert_debug_snapshot;
 
+    use crate::parser::test::parse_with;
+    use chumsky::prelude::Parser as _;
+
     use super::*;
-    use crate::parser::test::parse_with_parser;
 
     #[test]
     fn test_doc_comment() {
-        assert_debug_snapshot!(parse_with_parser(r#"
+        assert_debug_snapshot!(parse_with(r#"
         ## doc comment
         ## another line
 
-        "#, doc_comment()), @r#"
+        "#, |_| Box::new(doc_comment())), @r#"
         Ok(
             DocComment {
                 content: "doc comment\nanother line",
@@ -295,8 +332,10 @@ mod tests {
 
     #[test]
     fn test_doc_comment_or_not() {
-        assert_debug_snapshot!(parse_with_parser(r#"hello"#, doc_comment().or_not()).unwrap(), @"None");
-        assert_debug_snapshot!(parse_with_parser(r#"hello"#, doc_comment().or_not().then(ident_part())).unwrap(), @r###"
+        // In chumsky 0.12, parse() requires consuming all input, so we test
+        // or_not() on empty input to verify it returns None without errors.
+        assert_debug_snapshot!(parse_with(r#""#, |_| Box::new(doc_comment().or_not())).unwrap(), @"None");
+        assert_debug_snapshot!(parse_with(r#"hello"#, |_| Box::new(doc_comment().or_not().then(ident_part()))).unwrap(), @r###"
         (
             None,
             "hello",
@@ -307,7 +346,7 @@ mod tests {
     #[test]
     fn test_module_annotation_basic() {
         let src = "submodule\n@!my_ann\n\nconst x = 1";
-        let parsed = parse_with_parser(src, source()).unwrap();
+        let parsed = parse_with(src, |_| Box::new(source())).unwrap();
         assert!(parsed.is_submodule);
         assert_eq!(parsed.root.annotations.len(), 1);
         assert!(matches!(
@@ -320,18 +359,14 @@ mod tests {
     #[test]
     fn test_module_annotation_multiple() {
         let src = "submodule\n@!ann1\n@!ann2\n\nconst x = 1";
-        let parsed = parse_with_parser(src, source()).unwrap();
+        let parsed = parse_with(src, |_| Box::new(source())).unwrap();
         assert_eq!(parsed.root.annotations.len(), 2);
     }
 
     #[test]
     fn test_module_annotation_no_submodule() {
-        // In a non-submodule file, @!foo should not be parsed as a module
-        // annotation (module_annotation.repeated() returns empty), and instead
-        // @! is parsed as a regular annotation with unary-not expression.
-        // Here we just verify there are no module-level annotations.
         let src = "const x = 1";
-        let parsed = parse_with_parser(src, source()).unwrap();
+        let parsed = parse_with(src, |_| Box::new(source())).unwrap();
         assert!(!parsed.is_submodule);
         assert_eq!(parsed.root.annotations.len(), 0);
     }
@@ -339,7 +374,7 @@ mod tests {
     #[test]
     fn test_module_annotation_with_call_expr() {
         let src = "submodule\n@!deprecated(\"use other instead\")\n\nconst x = 1";
-        let parsed = parse_with_parser(src, source()).unwrap();
+        let parsed = parse_with(src, |_| Box::new(source())).unwrap();
         assert_eq!(parsed.root.annotations.len(), 1);
         assert!(matches!(
             &parsed.root.annotations[0].expr.kind,

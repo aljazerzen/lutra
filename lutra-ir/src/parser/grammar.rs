@@ -1,11 +1,13 @@
+use chumsky::input::MappedInput;
 use chumsky::prelude::*;
 use lutra_compiler::pr;
 
 use super::perror::PError;
+use super::perror::Span;
 use lutra_bin::ir::*;
 use lutra_compiler::_lexer::TokenKind;
 
-pub fn program() -> impl Parser<TokenKind, Program, Error = PError> {
+pub fn program<'src>() -> impl Parser<'src, I<'src>, Program, extra::Err<PError>> {
     let defs = keyword("type")
         .ignore_then(path())
         .then_ignore(ctrl('='))
@@ -13,6 +15,7 @@ pub fn program() -> impl Parser<TokenKind, Program, Error = PError> {
         .then_ignore(ctrl(';'))
         .map(|(name, ty)| TyDef { name, ty })
         .repeated()
+        .collect::<Vec<_>>()
         .labelled("type defs");
 
     let main = keyword("let")
@@ -23,7 +26,9 @@ pub fn program() -> impl Parser<TokenKind, Program, Error = PError> {
     defs.then(main).map(|(defs, main)| Program { main, defs })
 }
 
-fn expr() -> impl Parser<TokenKind, Expr, Error = PError> + Clone {
+type I<'src> = MappedInput<'src, TokenKind, Span, &'src [(TokenKind, Span)]>;
+
+fn expr<'src>() -> impl Parser<'src, I<'src>, Expr, extra::Err<PError>> + Clone {
     recursive(|expr| {
         let literal = select! {
             TokenKind::Literal(pr::Literal::Number(n)) => {
@@ -68,7 +73,7 @@ fn expr() -> impl Parser<TokenKind, Expr, Error = PError> + Clone {
         let call = func_call(expr.clone());
         let wrapped = choice((tuple_lookup, function, call))
             .delimited_by(ctrl('('), ctrl(')'))
-            .recover_with(nested_delimiters(
+            .recover_with(via_parser(nested_delimiters(
                 TokenKind::Control('('),
                 TokenKind::Control(')'),
                 [
@@ -77,26 +82,26 @@ fn expr() -> impl Parser<TokenKind, Expr, Error = PError> + Clone {
                     (TokenKind::Control('['), TokenKind::Control(']')),
                 ],
                 |_| ExprKind::Tuple(vec![]),
-            ));
+            )));
 
         let simple = choice((pointer, literal, tuple, array, wrapped))
             .then(ctrl(':').ignore_then(ty()))
             .map(|(kind, ty)| Expr { kind, ty });
 
-        binding(expr).or(simple)
+        binding(expr).or(simple).boxed()
     })
 }
 
-fn external_ptr() -> impl Parser<TokenKind, ExternalPtr, Error = PError> {
-    let id = ident_part()
+fn external_ptr<'src>() -> impl Parser<'src, I<'src>, ExternalPtr, extra::Err<PError>> {
+    ident_part()
         .separated_by(just(TokenKind::PathSep))
         .at_least(1)
-        .map(|id| id.join("::"));
-
-    id.map(|id| ExternalPtr { id })
+        .collect::<Vec<_>>()
+        .map(|id| id.join("::"))
+        .map(|id| ExternalPtr { id })
 }
 
-fn ty() -> impl Parser<TokenKind, Ty, Error = PError> {
+fn ty<'src>() -> impl Parser<'src, I<'src>, Ty, extra::Err<PError>> {
     recursive(|ty_inner| {
         let primitive = choice((
             ident_keyword("bool").to(TyPrimitive::bool),
@@ -127,6 +132,7 @@ fn ty() -> impl Parser<TokenKind, Ty, Error = PError> {
             .map(|(name, ty)| TyTupleField { name, ty })
             .separated_by(ctrl(','))
             .allow_trailing()
+            .collect::<Vec<_>>()
             .delimited_by(ctrl('{'), ctrl('}'))
             .map(TyKind::Tuple);
 
@@ -138,6 +144,7 @@ fn ty() -> impl Parser<TokenKind, Ty, Error = PError> {
                     .map(|(name, ty)| TyEnumVariant { name, ty })
                     .separated_by(ctrl(','))
                     .allow_trailing()
+                    .collect::<Vec<_>>()
                     .delimited_by(ctrl('{'), ctrl('}')),
             )
             .map(TyKind::Enum);
@@ -148,6 +155,7 @@ fn ty() -> impl Parser<TokenKind, Ty, Error = PError> {
                     .clone()
                     .separated_by(ctrl(','))
                     .allow_trailing()
+                    .collect::<Vec<_>>()
                     .delimited_by(ctrl('('), ctrl(')')),
             )
             .then_ignore(just(TokenKind::ArrowThin))
@@ -167,13 +175,16 @@ fn ty() -> impl Parser<TokenKind, Ty, Error = PError> {
     .labelled("a type")
 }
 
-fn uint32() -> impl Parser<TokenKind, u32, Error = PError> {
+fn uint32<'src>() -> impl Parser<'src, I<'src>, u32, extra::Err<PError>> {
     select! { TokenKind::Literal(pr::Literal::Number(i)) => i.parse::<u32>().unwrap() }
 }
 
-fn tuple<'a>(
-    nested_expr: impl Parser<TokenKind, Expr, Error = PError> + Clone + 'a,
-) -> impl Parser<TokenKind, ExprKind, Error = PError> + Clone + 'a {
+fn tuple<'src, 'a>(
+    nested_expr: impl Parser<'src, I<'src>, Expr, extra::Err<PError>> + Clone + 'a,
+) -> impl Parser<'src, I<'src>, ExprKind, extra::Err<PError>> + Clone + 'a
+where
+    'src: 'a,
+{
     nested_expr
         .map(|expr| TupleField {
             expr,
@@ -181,8 +192,9 @@ fn tuple<'a>(
         })
         .separated_by(ctrl(','))
         .allow_trailing()
+        .collect::<Vec<_>>()
         .delimited_by(ctrl('{'), ctrl('}'))
-        .recover_with(nested_delimiters(
+        .recover_with(via_parser(nested_delimiters(
             TokenKind::Control('{'),
             TokenKind::Control('}'),
             [
@@ -191,18 +203,22 @@ fn tuple<'a>(
                 (TokenKind::Control('['), TokenKind::Control(']')),
             ],
             |_| vec![],
-        ))
+        )))
         .map(ExprKind::Tuple)
         .labelled("tuple")
 }
 
-fn array<'a>(
-    expr: impl Parser<TokenKind, Expr, Error = PError> + Clone + 'a,
-) -> impl Parser<TokenKind, ExprKind, Error = PError> + Clone + 'a {
+fn array<'src, 'a>(
+    expr: impl Parser<'src, I<'src>, Expr, extra::Err<PError>> + Clone + 'a,
+) -> impl Parser<'src, I<'src>, ExprKind, extra::Err<PError>> + Clone + 'a
+where
+    'src: 'a,
+{
     expr.separated_by(ctrl(','))
         .allow_trailing()
+        .collect::<Vec<_>>()
         .delimited_by(ctrl('['), ctrl(']'))
-        .recover_with(nested_delimiters(
+        .recover_with(via_parser(nested_delimiters(
             TokenKind::Control('['),
             TokenKind::Control(']'),
             [
@@ -211,14 +227,17 @@ fn array<'a>(
                 (TokenKind::Control('['), TokenKind::Control(']')),
             ],
             |_| vec![],
-        ))
+        )))
         .map(ExprKind::Array)
         .labelled("array")
 }
 
-fn tuple_lookup<'a, E>(expr: E) -> impl Parser<TokenKind, ExprKind, Error = PError> + 'a
+fn tuple_lookup<'src, 'a, E>(
+    expr: E,
+) -> impl Parser<'src, I<'src>, ExprKind, extra::Err<PError>> + 'a
 where
-    E: Parser<TokenKind, Expr, Error = PError> + 'a,
+    'src: 'a,
+    E: Parser<'src, I<'src>, Expr, extra::Err<PError>> + 'a,
 {
     ident_keyword("tuple_lookup")
         .ignore_then(expr)
@@ -229,46 +248,42 @@ where
         .labelled("tuple lookup")
 }
 
-fn func_call<'a, E>(expr: E) -> impl Parser<TokenKind, ExprKind, Error = PError> + Clone + 'a
+fn func_call<'src, 'a, E>(
+    expr: E,
+) -> impl Parser<'src, I<'src>, ExprKind, extra::Err<PError>> + Clone + 'a
 where
-    E: Parser<TokenKind, Expr, Error = PError> + Clone + 'a,
+    'src: 'a,
+    E: Parser<'src, I<'src>, Expr, extra::Err<PError>> + Clone + 'a,
 {
     ident_keyword("call")
         .ignore_then(expr.clone())
-        .then(ctrl(',').ignore_then(expr).repeated())
+        .then(ctrl(',').ignore_then(expr).repeated().collect::<Vec<_>>())
         .then_ignore(ctrl(',').or_not())
         .map(|(function, args)| ExprKind::Call(Box::new(Call { function, args })))
         .labelled("function call")
 }
 
-fn function<E>(expr: E) -> impl Parser<TokenKind, ExprKind, Error = PError>
+fn function<'src, E>(expr: E) -> impl Parser<'src, I<'src>, ExprKind, extra::Err<PError>>
 where
-    E: Parser<TokenKind, Expr, Error = PError> + Clone,
+    E: Parser<'src, I<'src>, Expr, extra::Err<PError>> + Clone,
 {
-    // func
     keyword("func")
-        // scope id
         .ignore_then(uint32())
         .then_ignore(just(TokenKind::ArrowThin))
-        // body
         .then(expr)
         .map(|(id, body)| ExprKind::Function(Box::new(Function { id, body })))
         .labelled("function")
 }
 
-fn binding<E>(expr: E) -> impl Parser<TokenKind, Expr, Error = PError>
+fn binding<'src, E>(expr: E) -> impl Parser<'src, I<'src>, Expr, extra::Err<PError>>
 where
-    E: Parser<TokenKind, Expr, Error = PError> + Clone,
+    E: Parser<'src, I<'src>, Expr, extra::Err<PError>> + Clone,
 {
-    // binding
     keyword("let")
-        // symbol id
         .ignore_then(uint32())
         .then_ignore(ctrl('='))
-        // expr
         .then(expr.clone().labelled("bound"))
         .then_ignore(ctrl(';'))
-        // main
         .then(expr.labelled("main"))
         .map(|((id, expr), main)| Expr {
             ty: main.ty.clone(),
@@ -277,29 +292,32 @@ where
         .labelled("binding")
 }
 
-fn path() -> impl Parser<TokenKind, Path, Error = PError> + Clone {
+fn path<'src>() -> impl Parser<'src, I<'src>, Path, extra::Err<PError>> + Clone {
     ident_part()
         .separated_by(just(TokenKind::PathSep))
         .at_least(1)
+        .collect::<Vec<_>>()
         .map(Path)
 }
 
-fn ident_part() -> impl Parser<TokenKind, String, Error = PError> + Clone {
+fn ident_part<'src>() -> impl Parser<'src, I<'src>, String, extra::Err<PError>> + Clone {
     select! {
         TokenKind::Ident(ident) => ident,
     }
 }
 
-fn ident_keyword(kw: &'static str) -> impl Parser<TokenKind, (), Error = PError> + Clone {
+fn ident_keyword<'src>(
+    kw: &'static str,
+) -> impl Parser<'src, I<'src>, (), extra::Err<PError>> + Clone {
     select! {
         TokenKind::Ident(ident) if ident == kw => (),
     }
 }
 
-fn keyword(kw: &'static str) -> impl Parser<TokenKind, (), Error = PError> + Clone {
+fn keyword<'src>(kw: &'static str) -> impl Parser<'src, I<'src>, (), extra::Err<PError>> + Clone {
     just(TokenKind::Keyword(kw)).ignored()
 }
 
-fn ctrl(char: char) -> impl Parser<TokenKind, (), Error = PError> + Clone {
+fn ctrl<'src>(char: char) -> impl Parser<'src, I<'src>, (), extra::Err<PError>> + Clone {
     just(TokenKind::Control(char)).ignored()
 }

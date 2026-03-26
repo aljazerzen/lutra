@@ -128,7 +128,7 @@ impl std::fmt::Debug for SpanInSource {
     }
 }
 
-impl chumsky::Span for SpanInSource {
+impl chumsky::span::Span for SpanInSource {
     type Context = ();
 
     type Offset = u32;
