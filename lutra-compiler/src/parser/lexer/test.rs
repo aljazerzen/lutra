@@ -1,3 +1,4 @@
+use chumsky::prelude::*;
 use insta::assert_debug_snapshot;
 use insta::assert_snapshot;
 
@@ -5,18 +6,27 @@ use crate::pr::Literal;
 
 use super::{LError, lexer, literal, quoted_string};
 
-fn lex<T>(
-    lexer: impl chumsky::Parser<char, T, Error = LError>,
-    source: &str,
-) -> Result<T, Vec<LError>> {
-    lexer.parse(super::prepare_stream(source))
+#[track_caller]
+fn _lex<'src, T>(
+    parser: impl Parser<'src, &'src str, T, extra::Err<LError>>,
+    source: &'src str,
+) -> T {
+    parser.parse(source).into_result().unwrap()
+}
+
+#[track_caller]
+fn _lex_err<'src, T: std::fmt::Debug>(
+    parser: impl Parser<'src, &'src str, T, extra::Err<LError>>,
+    source: &'src str,
+) -> Vec<LError> {
+    parser.parse(source).into_result().unwrap_err()
 }
 
 #[test]
 fn line_wrap() {
-    assert_debug_snapshot!(lex(lexer(), r"5 +
+    assert_debug_snapshot!(_lex(lexer(), r"5 +
       3 "
-        ).unwrap(), @r#"
+        ), @r#"
     [
         0..1: Literal(Number("5")),
         2..3: Control('+'),
@@ -25,11 +35,11 @@ fn line_wrap() {
     ]
     "#);
 
-    assert_debug_snapshot!(lex(lexer(), r"5 +
+    assert_debug_snapshot!(_lex(lexer(), r"5 +
 # comment
    # comment with whitespace
     3 "
-        ).unwrap(), @r#"
+        ), @r#"
     [
         0..1: Literal(Number("5")),
         2..3: Control('+'),
@@ -47,34 +57,28 @@ fn line_wrap() {
 fn numbers() {
     // Binary notation
     assert_eq!(
-        lex(literal(), "0b1111000011110000").unwrap(),
+        _lex(literal(), "0b1111000011110000"),
         Literal::Number("0b1111000011110000".into())
     );
     assert_eq!(
-        lex(literal(), "0b_1111000011110000").unwrap(),
+        _lex(literal(), "0b_1111000011110000"),
         Literal::Number("0b_1111000011110000".into())
     );
 
     // Hexadecimal notation
+    assert_eq!(_lex(literal(), "0xff"), Literal::Number("0xff".into()));
     assert_eq!(
-        lex(literal(), "0xff").unwrap(),
-        Literal::Number("0xff".into())
-    );
-    assert_eq!(
-        lex(literal(), "0x_deadbeef").unwrap(),
+        _lex(literal(), "0x_deadbeef"),
         Literal::Number("0x_deadbeef".into())
     );
 
     // Octal notation
-    assert_eq!(
-        lex(literal(), "0o777").unwrap(),
-        Literal::Number("0o777".into())
-    );
+    assert_eq!(_lex(literal(), "0o777"), Literal::Number("0o777".into()));
 }
 
 #[test]
 fn debug_display() {
-    assert_debug_snapshot!(lex(lexer(), "5 + 3").unwrap(), @r#"
+    assert_debug_snapshot!(_lex(lexer(), "5 + 3"), @r#"
     [
         0..1: Literal(Number("5")),
         2..3: Control('+'),
@@ -85,7 +89,7 @@ fn debug_display() {
 
 #[test]
 fn doc_comment() {
-    assert_debug_snapshot!(lex(lexer(), "## docs").unwrap(), @r#"
+    assert_debug_snapshot!(_lex(lexer(), "## docs"), @r#"
     [
         0..7: DocComment("docs"),
     ]
@@ -95,41 +99,45 @@ fn doc_comment() {
 #[test]
 fn quotes() {
     // All these are valid & equal.
-    assert_snapshot!(lex(quoted_string(false), r#""aoeu""#).unwrap(), @"aoeu");
-    assert_snapshot!(lex(quoted_string(false), r#""""aoeu""""#).unwrap(), @"aoeu");
-    assert_snapshot!(lex(quoted_string(false), r#""""""aoeu""""""#).unwrap(), @"aoeu");
-    assert_snapshot!(lex(quoted_string(false), r#""""""""aoeu""""""""#).unwrap(), @"aoeu");
+    assert_snapshot!(_lex(quoted_string(false), r#""aoeu""#), @"aoeu");
+    assert_snapshot!(_lex(quoted_string(false), r#""""aoeu""""#), @"aoeu");
+    assert_snapshot!(_lex(quoted_string(false), r#""""""aoeu""""""#), @"aoeu");
+    assert_snapshot!(_lex(quoted_string(false), r#""""""""aoeu""""""""#), @"aoeu");
 
     // An even number is interpreted as a closed string (and the remainder is unparsed)
-    assert_snapshot!(lex(quoted_string(false), r#"""aoeu"""#).unwrap(), @"");
+    assert_debug_snapshot!(_lex_err(quoted_string(false), r#"""aoeu"""#), @"
+    [
+        at 2..3,
+    ]
+    ");
 
     // When not escaping, we take the inner string between the three quotes
-    assert_snapshot!(lex(quoted_string(false), r#""""\"hello\""""#).unwrap(), @r#"\"hello\"#);
+    assert_snapshot!(_lex(quoted_string(false), r#""""\"hello\""""#), @r#"\"hello\"#);
 
-    assert_snapshot!(lex(quoted_string(true), r#""""\"hello\"""""#).unwrap(), @r#""hello""#);
+    assert_snapshot!(_lex(quoted_string(true), r#""""\"hello\"""""#), @r#""hello""#);
 
     // Escape each inner quote depending on the outer quote
-    assert_snapshot!(lex(quoted_string(true), r#""\"hello\"""#).unwrap(), @r#""hello""#);
-    assert_snapshot!(lex(quoted_string(true), r#""\"hello\"""#).unwrap(), @r#""hello""#);
+    assert_snapshot!(_lex(quoted_string(true), r#""\"hello\"""#), @r#""hello""#);
+    assert_snapshot!(_lex(quoted_string(true), r#""\"hello\"""#), @r#""hello""#);
 
-    assert_snapshot!(lex(quoted_string(true), r#""""#).unwrap(), @"");
+    assert_snapshot!(_lex(quoted_string(true), r#""""#), @"");
 
     // An empty input should fail
-    lex(quoted_string(false), r#""#).unwrap_err();
+    _lex_err(quoted_string(false), r#""#);
 
     // An even number of quotes is an empty string
-    assert_snapshot!(lex(quoted_string(true), r#""""""""#).unwrap(), @"");
+    assert_snapshot!(_lex(quoted_string(true), r#""""""""#), @"");
 
     // Hex escape
-    assert_snapshot!(lex(quoted_string(true), r#""\x61\x62\x63""#).unwrap(), @"abc");
+    assert_snapshot!(_lex(quoted_string(true), r#""\x61\x62\x63""#), @"abc");
 
     // Unicode escape
-    assert_snapshot!(lex(quoted_string(true), r#""\u{01f422}""#).unwrap(), @"🐢");
+    assert_snapshot!(_lex(quoted_string(true), r#""\u{01f422}""#), @"🐢");
 }
 
 #[test]
 fn range() {
-    assert_debug_snapshot!(lex(lexer(), "1..2").unwrap(), @r#"
+    assert_debug_snapshot!(_lex(lexer(), "1..2"), @r#"
     [
         0..1: Literal(Number("1")),
         1..3: Range,
@@ -137,21 +145,21 @@ fn range() {
     ]
     "#);
 
-    assert_debug_snapshot!(lex(lexer(), "..2").unwrap(), @r#"
+    assert_debug_snapshot!(_lex(lexer(), "..2"), @r#"
     [
         0..2: Range,
         2..3: Literal(Number("2")),
     ]
     "#);
 
-    assert_debug_snapshot!(lex(lexer(), "1..").unwrap(), @r#"
+    assert_debug_snapshot!(_lex(lexer(), "1.."), @r#"
     [
         0..1: Literal(Number("1")),
         1..3: Range,
     ]
     "#);
 
-    assert_debug_snapshot!(lex(lexer(), "in ..5").unwrap(), @r#"
+    assert_debug_snapshot!(_lex(lexer(), "in ..5"), @r#"
     [
         0..2: Keyword("in"),
         3..5: Range,

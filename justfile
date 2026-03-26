@@ -47,10 +47,10 @@ generate-precompiled:
     cargo fmt -p lutra-bin
 
 bench:
-    cargo bench --bench compile -- --baseline-lenient main 
+    cargo bench --bench compiler -- --baseline-lenient main
 
 profile:
-    cargo samply --bench compile -- check
+    cargo samply --bench compiler -- check
 
 # Test (this should pass for every commit)
 test:

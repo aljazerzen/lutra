@@ -1,32 +1,30 @@
 #![cfg(test)]
 
-use chumsky::Parser;
+use chumsky::prelude::*;
 use insta::assert_debug_snapshot;
-use std::fmt::Debug;
 
 use crate::diagnostic::Diagnostic;
-use crate::parser::def;
-use crate::parser::expr;
-use crate::parser::lexer::TokenKind;
-use crate::parser::perror::PError;
-use crate::parser::prepare_stream;
-use crate::parser::types;
+use crate::parser::{PExtra, PInput, prepare_tokens};
+use crate::parser::{def, expr, types};
+
 use crate::pr;
 
-/// Parse source code based on the supplied parser.
+/// Parse source code using a parser produced by the given factory.
 ///
-/// Use this to test any parser!
-pub(crate) fn parse_with_parser<O: Debug>(
-    source: &str,
-    parser: impl Parser<TokenKind, O, Error = PError>,
-) -> Result<O, Vec<Diagnostic>> {
-    let tokens = crate::parser::lexer::lex_source(source)?;
-    let stream = prepare_stream(tokens.collect(), 0);
+/// The factory is called after the token slice is prepared, so the parser's
+/// `'src` lifetime is correctly tied to the slice — avoiding the HRTB issue
+/// that arises when a pre-built parser is passed as an argument.
+#[track_caller]
+pub(super) fn parse_with<O, F>(source: &str, make_parser: F) -> Result<O, Vec<Diagnostic>>
+where
+    O: std::fmt::Debug,
+    F: for<'src> FnOnce(&'src ()) -> Box<dyn Parser<'src, PInput<'src>, O, PExtra<'src>> + 'src>,
+{
+    let tokens = crate::parser::lexer::lex_source(source)?.collect();
+    let tokens = prepare_tokens(tokens, 0);
 
-    // TODO: possibly should check we consume all the input? Either with an
-    // end() parser or some other way (but if we add an end parser then this
-    // func doesn't work with `source`, which has its own end parser...)
-    let (ast, parse_errors) = parser.parse_recovery_verbose(stream);
+    let parser = make_parser(&());
+    let (ast, parse_errors) = parser.parse(tokens.as_input()).into_output_errors();
 
     if !parse_errors.is_empty() {
         tracing::info!("ast: {ast:?}");
@@ -37,13 +35,12 @@ pub(crate) fn parse_with_parser<O: Debug>(
 
 #[track_caller]
 fn parse_expr(source: &str) -> pr::Expr {
-    let parser = expr::expr(types::type_expr());
-    parse_with_parser(source, parser).unwrap()
+    parse_with(source, |_| Box::new(expr::expr(types::type_expr()))).unwrap()
 }
 
 #[track_caller]
 fn parse_func(source: &str) -> pr::Expr {
-    let source = parse_with_parser(source, def::source()).unwrap();
+    let source = parse_with(source, |_| Box::new(def::source())).unwrap();
     let (_, def) = source.root.defs.into_iter().next().unwrap();
     *def.kind.into_expr().unwrap().value
 }
@@ -800,7 +797,7 @@ fn parse_10() {
                             label: None,
                             name: "x",
                             ty: None,
-                            span: 0:4-8,
+                            span: 0:4-5,
                         },
                         body: Expr {
                             kind: Binary(

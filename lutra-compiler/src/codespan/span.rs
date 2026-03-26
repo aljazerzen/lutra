@@ -63,7 +63,7 @@ impl PartialOrd for Span {
     }
 }
 
-impl chumsky::Span for Span {
+impl chumsky::span::Span for Span {
     type Context = u16;
 
     type Offset = u32;
@@ -71,7 +71,9 @@ impl chumsky::Span for Span {
     fn new(context: Self::Context, range: std::ops::Range<Self::Offset>) -> Self {
         Self {
             start: range.start,
-            len: (range.end - range.start) as u16,
+            // chumsky 0.12 may produce reversed ranges (end < start) for
+            // zero-width inter-token positions; clamp to 0 in that case.
+            len: range.end.saturating_sub(range.start) as u16,
             source_id: context,
         }
     }

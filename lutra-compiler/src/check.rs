@@ -26,7 +26,7 @@ pub fn check(
 
     let std_lib = Dependency {
         name: NS_STD.into(),
-        inner: compile_std_lib()?,
+        inner: check_std_lib()?,
     };
 
     let mut project = parse(&source)?
@@ -155,7 +155,19 @@ fn os_path_to_mod_path(path: &Path) -> Result<Vec<String>, error::Error> {
         .try_collect()
 }
 
-fn compile_std_lib() -> Result<crate::Project, error::Error> {
+pub fn std_lib() -> &'static str {
+    include_str!("std.lt")
+}
+
+pub fn parse_std_lib() -> Result<pr::ModuleDef, error::Error> {
+    let source = SourceTree::single(
+        std::path::PathBuf::new(),
+        include_str!("std.lt").to_string(),
+    );
+    parse(&source)?.map_err(|d| Error::from_diagnostics(d, &source))
+}
+
+pub fn check_std_lib() -> Result<crate::Project, error::Error> {
     let source = SourceTree::single(
         std::path::PathBuf::new(),
         include_str!("std.lt").to_string(),

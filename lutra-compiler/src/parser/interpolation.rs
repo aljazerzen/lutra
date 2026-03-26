@@ -2,62 +2,52 @@ use chumsky::prelude::*;
 use itertools::Itertools;
 
 use crate::Span;
-use crate::parser::lexer::TokenKind;
-use crate::parser::perror::{ChumError, PError};
 use crate::pr::*;
 
-/// Parses interpolated strings
-pub(crate) fn parse(string: String, span_base: Span) -> Result<Vec<InterpolateItem>, Vec<PError>> {
-    let prepped_stream = prepare_stream(&string, span_base);
+use super::PError;
 
-    let res = interpolated_parser().parse(prepped_stream);
+/// Parses interpolated strings.
+pub(crate) fn parse(
+    string: String,
+    span_base: Span,
+) -> Result<Vec<InterpolateItem>, Vec<PError<'static>>> {
+    let (result, errors) = interpolated_parser(span_base)
+        .parse(string.as_str())
+        .into_output_errors();
 
-    match res {
-        Ok(items) => {
-            tracing::trace!("interpolated string ok: {:?}", items);
-            Ok(items)
-        }
-        Err(errors) => Err(errors
+    if errors.is_empty() {
+        tracing::trace!("interpolated string ok: {:?}", result);
+        Ok(result.unwrap_or_default())
+    } else {
+        let perrors = errors
             .into_iter()
             .map(|err| {
                 tracing::debug!("interpolated string error (lex inside parse): {:?}", err);
-                err.map(|c| TokenKind::Literal(Literal::Text(c.to_string())))
+                let span = absolute_span(*err.span(), span_base);
+                Rich::custom(span, err.to_string())
             })
-            .collect_vec()),
+            .collect_vec();
+        Err(perrors)
     }
 }
 
-pub(crate) fn prepare_stream<'a>(
-    source: &'a str,
+fn interpolated_parser<'src>(
     span_base: Span,
-) -> chumsky::Stream<'a, char, Span, Box<dyn Iterator<Item = (char, Span)> + 'a>> {
-    let iter = super::lexer::CharIterator::new(source);
-
-    chumsky::Stream::from_iter(
-        Span {
-            start: span_base.start + source.len() as u32,
-            len: 0,
-            source_id: span_base.source_id,
-        },
-        Box::new(iter.map(move |(c, mut span)| {
-            span.start += span_base.start;
-            (c, span.with_source_id(span_base.source_id))
-        })),
-    )
-}
-
-fn interpolated_parser() -> impl Parser<char, Vec<InterpolateItem>, Error = ChumError<char>> {
+) -> impl Parser<'src, &'src str, Vec<InterpolateItem>, extra::Err<Rich<'src, char, SimpleSpan>>> {
     let expr = interpolate_ident_part()
-        .map_with_span(move |name, s| (name, s))
+        .map_with(move |name, e| (name, e.span()))
         .separated_by(just('.'))
         .at_least(1)
-        .map(|ident_parts| {
+        .collect::<Vec<_>>()
+        .map(move |ident_parts| {
             let mut parts = ident_parts.into_iter();
 
             let (first, first_span) = parts.next().unwrap();
+            let first_span = absolute_span(first_span, span_base);
             let mut base = Box::new(Expr::new_with_span(Path::from_name(first), first_span));
 
             for (part, span) in parts {
+                let span = absolute_span(span, span_base);
                 let lookup = Lookup::Name(part);
                 let kind = ExprKind::Lookup { base, lookup };
                 base = Box::new(Expr::new_with_span(kind, span));
@@ -67,7 +57,7 @@ fn interpolated_parser() -> impl Parser<char, Vec<InterpolateItem>, Error = Chum
         .labelled("interpolated string variable")
         .then(
             just(':')
-                .ignore_then(filter(|c| *c != '}').repeated().collect::<String>())
+                .ignore_then(none_of('}').repeated().collect::<String>())
                 .or_not(),
         )
         .delimited_by(just('{'), just('}'))
@@ -83,24 +73,47 @@ fn interpolated_parser() -> impl Parser<char, Vec<InterpolateItem>, Error = Chum
         .collect::<String>()
         .map(InterpolateItem::String);
 
-    expr.or(string).repeated().then_ignore(end())
+    expr.or(string).repeated().collect().then_ignore(end())
 }
 
-pub(crate) fn interpolate_ident_part() -> impl Parser<char, String, Error = ChumError<char>> + Clone
-{
-    let plain = filter(|c: &char| c.is_alphabetic() || *c == '_')
-        .chain(filter(|c: &char| c.is_alphanumeric() || *c == '_').repeated())
+fn absolute_span(span: SimpleSpan, base: Span) -> Span {
+    Span {
+        start: span.start as u32 + base.start,
+        len: span.end.saturating_sub(span.start) as u16,
+        source_id: base.source_id,
+    }
+}
+
+pub(crate) fn interpolate_ident_part<'src>()
+-> impl Parser<'src, &'src str, String, extra::Err<Rich<'src, char, SimpleSpan>>> + Clone {
+    let plain = any()
+        .filter(|c: &char| c.is_alphabetic() || *c == '_')
+        .then(
+            any()
+                .filter(|c: &char| c.is_alphanumeric() || *c == '_')
+                .repeated()
+                .collect::<String>(),
+        )
+        .map(|(first, rest): (char, String)| {
+            let mut s = first.to_string();
+            s.push_str(&rest);
+            s
+        })
         .labelled("interpolated string");
 
-    let backticks = none_of('`').repeated().delimited_by(just('`'), just('`'));
+    let backticks = none_of('`')
+        .repeated()
+        .collect::<String>()
+        .delimited_by(just('`'), just('`'))
+        .labelled("interp:backticks");
 
-    plain.or(backticks.labelled("interp:backticks")).collect()
+    plain.or(backticks)
 }
 
 #[test]
 fn parse_interpolate() {
     use insta::assert_debug_snapshot;
-    let span_base = Span::new(0, 0..0);
+    let span_base = crate::Span::new(0, 0..0);
 
     assert_debug_snapshot!(
         parse("concat({a})".to_string(), span_base).unwrap(),

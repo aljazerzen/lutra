@@ -1,17 +1,21 @@
+use chumsky::input::ValueInput;
 use chumsky::prelude::*;
 
-use super::expr::ident;
-use super::perror::PError;
-use super::*;
+use super::expr;
+use super::helpers::*;
+use super::{PExtra, TokenKind};
 
-use crate::parser::lexer::TokenKind;
+use crate::Span;
 use crate::pr::*;
 
-pub(crate) fn type_expr() -> impl Parser<TokenKind, Ty, Error = PError> + Clone {
+pub(crate) fn type_expr<'src, I>() -> impl Parser<'src, I, Ty, PExtra<'src>> + Clone + 'src
+where
+    I: ValueInput<'src, Token = TokenKind, Span = Span>,
+{
     recursive(|nested_type_expr| {
         let primitive = primitive_set().map(TyKind::Primitive);
 
-        let ident = ident().map(TyKind::Ident);
+        let ident = expr::ident().map(TyKind::Ident);
 
         let func_params = delimited_by_parenthesis(
             (ident_part().then_ignore(ctrl(':')).or_not())
@@ -22,7 +26,8 @@ pub(crate) fn type_expr() -> impl Parser<TokenKind, Ty, Error = PError> + Clone 
                     ty,
                 })
                 .separated_by(ctrl(','))
-                .allow_trailing(),
+                .allow_trailing()
+                .collect(),
             |_| vec![],
         );
 
@@ -39,134 +44,93 @@ pub(crate) fn type_expr() -> impl Parser<TokenKind, Ty, Error = PError> + Clone 
             )
             .map(TyKind::Func);
 
-        let tuple = delimited_by_braces(
-            sequence(
-                ident_part()
-                    .then_ignore(ctrl(':'))
-                    .or_not()
-                    .then(nested_type_expr.clone())
-                    .map(|(name, ty)| TyTupleField {
-                        name,
-                        ty,
-                        unpack: false,
-                    }),
-            )
-            .map(TyKind::Tuple),
-        );
+        let comprehension_body = keyword("for")
+            .ignore_then(ident_part())
+            .then_ignore(ctrl(':'))
+            .then(ident_part())
+            .then_ignore(keyword("in"))
+            .then(nested_type_expr.clone().map(Box::new))
+            .then_ignore(keyword("do"))
+            .then(ident_part().then_ignore(ctrl(':')).or_not())
+            .then(nested_type_expr.clone().map(Box::new))
+            .map(|((((v_n, v_t), tuple), b_n), b_t)| TyTupleComprehension {
+                tuple,
+                variable_name: v_n,
+                variable_ty: v_t,
+                body_name: b_n,
+                body_ty: b_t,
+            })
+            .map(TyKind::TupleComprehension);
 
-        let tuple_comprehension = delimited_by_braces(
-            keyword("for")
-                .ignore_then(ident_part())
+        let tuple_body = sequence(
+            ident_part()
                 .then_ignore(ctrl(':'))
-                .then(ident_part())
-                .then_ignore(keyword("in"))
-                .then(nested_type_expr.clone().map(Box::new))
-                .then_ignore(keyword("do"))
-                .then(ident_part().then_ignore(ctrl(':')).or_not())
-                .then(nested_type_expr.clone().map(Box::new))
-                .map(|((((v_n, v_t), tuple), b_n), b_t)| TyTupleComprehension {
-                    tuple,
-                    variable_name: v_n,
-                    variable_ty: v_t,
-                    body_name: b_n,
-                    body_ty: b_t,
-                })
-                .map(TyKind::TupleComprehension),
-        );
-        let tuple = tuple_comprehension.or(tuple);
+                .or_not()
+                .then(nested_type_expr.clone())
+                .map(|(name, ty)| TyTupleField {
+                    name,
+                    ty,
+                    unpack: false,
+                }),
+        )
+        .map(TyKind::Tuple);
+
+        let tuple =
+            delimited_by_braces(comprehension_body.or(tuple_body), |_| TyKind::Tuple(vec![]))
+                .labelled("tuple");
 
         let enum_ = keyword("enum")
-            .ignore_then(
-                // variant name
+            .ignore_then(delimited_by_braces(
                 ident_part()
                     .then(
-                        // inner type
                         ctrl(':')
                             .ignore_then(nested_type_expr.clone())
                             .or_not()
-                            .map_with_span(|ty, span| {
-                                ty.unwrap_or_else(|| Ty::new_with_span(TyKind::Tuple(vec![]), span))
+                            .map_with(|ty, e| {
+                                ty.unwrap_or_else(|| {
+                                    Ty::new_with_span(TyKind::Tuple(vec![]), e.span())
+                                })
                             }),
                     )
                     .map(|(name, ty)| TyEnumVariant { name, ty })
                     .separated_by(ctrl(','))
                     .allow_trailing()
-                    .delimited_by(ctrl('{'), ctrl('}'))
-                    .recover_with(nested_delimiters(
-                        TokenKind::Control('{'),
-                        TokenKind::Control('}'),
-                        [
-                            (TokenKind::Control('{'), TokenKind::Control('}')),
-                            (TokenKind::Control('('), TokenKind::Control(')')),
-                            (TokenKind::Control('['), TokenKind::Control(']')),
-                        ],
-                        |_| vec![],
-                    )),
-            )
-            .map(TyKind::Enum)
+                    .collect()
+                    .map(TyKind::Enum),
+                |_| TyKind::Enum(vec![]),
+            ))
             .labelled("enum");
 
-        let array = nested_type_expr
-            .map(Box::new)
-            .delimited_by(ctrl('['), ctrl(']'))
-            .recover_with(nested_delimiters(
-                TokenKind::Control('['),
-                TokenKind::Control(']'),
-                [
-                    (TokenKind::Control('{'), TokenKind::Control('}')),
-                    (TokenKind::Control('('), TokenKind::Control(')')),
-                    (TokenKind::Control('['), TokenKind::Control(']')),
-                ],
-                |_| Box::new(Ty::new(TyKind::Tuple(vec![]))),
-            ))
-            .map(TyKind::Array)
-            .labelled("array");
+        let array = delimited_by_brackets(
+            nested_type_expr.map(Box::new).map(TyKind::Array),
+            empty_array,
+        )
+        .labelled("array");
 
-        // exclude
-        // term.clone()
-        //     .then(ctrl('-').ignore_then(term).repeated())
-        //     .foldl(|left, right| {
-        //         let left_span = left.span.as_ref().unwrap();
-        //         let right_span = right.span.as_ref().unwrap();
-        //         let span = Span {
-        //             start: left_span.start,
-        //             end: right_span.end,
-        //             source_id: left_span.source_id,
-        //         };
-
-        //         let kind = TyKind::Exclude {
-        //             base: Box::new(left),
-        //             except: Box::new(right),
-        //         };
-        //         TyKind::into_ty(kind, span)
-        //     })
-
-        choice((primitive, ident, func, tuple, array, enum_))
-            .map_with_span(Ty::new_with_span)
-            .boxed()
+        // Box each alternative so Choice<6-tuple> sees uniform Boxed<TyKind>
+        // elements, collapsing the 20K-line Choice<6-tuple>::go monomorphization.
+        choice((
+            primitive.boxed(),
+            ident.boxed(),
+            func.boxed(),
+            tuple.boxed(),
+            array.boxed(),
+            enum_.boxed(),
+        ))
+        .map_with(|kind, e| Ty::new_with_span(kind, e.span()))
+        .boxed() // prevent MapWith<Choice<6-tuple>> propagating out of recursive
     })
     .labelled("type")
 }
 
-fn delimited_by_braces(
-    tuple_contents: impl Parser<TokenKind, TyKind, Error = PError>,
-) -> impl Parser<TokenKind, TyKind, Error = PError> {
-    tuple_contents
-        .delimited_by(ctrl('{'), ctrl('}'))
-        .recover_with(nested_delimiters(
-            TokenKind::Control('{'),
-            TokenKind::Control('}'),
-            [
-                (TokenKind::Control('{'), TokenKind::Control('}')),
-                (TokenKind::Control('('), TokenKind::Control(')')),
-                (TokenKind::Control('['), TokenKind::Control(']')),
-            ],
-            |_| TyKind::Tuple(vec![]),
-        ))
-        .labelled("tuple")
+fn empty_array(s: Span) -> TyKind {
+    TyKind::Array(Box::new(Ty::new_with_span(TyKind::Tuple(vec![]), s)))
 }
 
-fn primitive_set() -> impl Parser<TokenKind, TyPrimitive, Error = PError> {
+fn primitive_set<'src, I>() -> impl Parser<'src, I, TyPrimitive, PExtra<'src>> + Clone + 'src
+where
+    I: ValueInput<'src, Token = TokenKind, Span = Span>,
+{
     select! {
         TokenKind::Ident(i) if i == "int8" => TyPrimitive::int8,
         TokenKind::Ident(i) if i == "int16" => TyPrimitive::int16,
@@ -183,32 +147,26 @@ fn primitive_set() -> impl Parser<TokenKind, TyPrimitive, Error = PError> {
     }
 }
 
-pub fn type_params<'a>(
-    ty: impl Parser<TokenKind, Ty, Error = PError> + Clone + 'a,
-) -> impl Parser<TokenKind, Vec<TyParam>, Error = PError> + 'a {
+pub fn type_params<'src, I>(
+    ty: impl Parser<'src, I, Ty, PExtra<'src>> + Clone + 'src,
+) -> impl Parser<'src, I, Vec<TyParam>, PExtra<'src>> + Clone + 'src
+where
+    I: ValueInput<'src, Token = TokenKind, Span = Span>,
+{
     let tuple = choice((
         ident_part()
             .then_ignore(ctrl(':'))
             .or_not()
             .then(ty.clone())
-            .map_with_span(|t, s| (t, s))
+            .map_with(|t, e| (t, e.span()))
             .separated_by(ctrl(','))
             .at_least(1)
+            .collect::<Vec<_>>()
             .then_ignore(ctrl(',').then(just(TokenKind::Range))),
         just(TokenKind::Range).to(vec![]),
     ))
     .delimited_by(ctrl('{'), ctrl('}'))
-    .recover_with(nested_delimiters(
-        TokenKind::Control('{'),
-        TokenKind::Control('}'),
-        [
-            (TokenKind::Control('{'), TokenKind::Control('}')),
-            (TokenKind::Control('('), TokenKind::Control(')')),
-            (TokenKind::Control('['), TokenKind::Control(']')),
-        ],
-        |_| vec![],
-    ))
-    .try_map(|mut positional, _| {
+    .try_map(|mut positional, _span| {
         let first_named = positional
             .iter()
             .position(|((n, _), _)| n.is_some())
@@ -230,7 +188,7 @@ pub fn type_params<'a>(
         // named
         for ((name, ty), span) in named {
             let Some(name) = name else {
-                return Err(PError::custom(
+                return Err(Rich::custom(
                     span,
                     "named field cannot be followed by a positional field",
                 ));
@@ -245,7 +203,8 @@ pub fn type_params<'a>(
     })
     .labelled("tuple domain");
 
-    let one_of_numbers = ident_keyword("number").map_with_span(|_, s| {
+    let one_of_numbers = ident_keyword("number").map_with(|_, e| {
+        let s = e.span();
         TyDomain::OneOf(vec![
             Ty::new_with_span(TyPrimitive::int8, s),
             Ty::new_with_span(TyPrimitive::int16, s),
@@ -260,7 +219,8 @@ pub fn type_params<'a>(
         ])
     });
 
-    let one_of_primitives = ident_keyword("primitive").map_with_span(|_, s| {
+    let one_of_primitives = ident_keyword("primitive").map_with(|_, e| {
+        let s = e.span();
         TyDomain::OneOf(vec![
             Ty::new_with_span(TyPrimitive::bool, s),
             Ty::new_with_span(TyPrimitive::int8, s),
@@ -277,27 +237,31 @@ pub fn type_params<'a>(
         ])
     });
 
-    // domain
     let domain = ctrl(':')
         .ignore_then(choice((
-            // ctrl('*').to(TyParamDomain::Open),
             tuple,
             one_of_primitives,
             one_of_numbers,
-            ty.separated_by(ctrl('|')).at_least(1).map(TyDomain::OneOf),
+            ty.separated_by(ctrl('|'))
+                .at_least(1)
+                .collect::<Vec<_>>()
+                .map(TyDomain::OneOf),
         )))
         .or_not()
         .map(|x| x.unwrap_or(TyDomain::Open))
         .labelled("type parameter domain");
 
-    // param name
     let param = ident_part()
         .then(domain)
-        .map_with_span(|(name, domain), span| TyParam {
+        .map_with(|(name, domain), e| TyParam {
             name,
             domain,
-            span: Some(span),
+            span: Some(e.span()),
         });
 
-    param.separated_by(ctrl(',')).allow_trailing().at_least(1)
+    param
+        .separated_by(ctrl(','))
+        .allow_trailing()
+        .at_least(1)
+        .collect()
 }

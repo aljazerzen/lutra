@@ -4,9 +4,15 @@ mod test;
 
 pub use perror::{Error, Span};
 
-use chumsky::{Stream, prelude::*};
+use chumsky::prelude::*;
 use lutra_bin::ir;
 use lutra_compiler::_lexer::{Token, TokenKind, lex};
+
+// Possible improvment: two-pass parsing.
+// First pass parses using fast EmptyErr, and on errors,
+// parses using PError, to produce rich diagnostics.
+// This was removed because it's too much moving parts for
+// not enough benefit (it gave -0.4ms on successful parse of std.lt).
 
 pub fn parse(source: &str) -> (Option<ir::Program>, Vec<Error>) {
     let (tokens, errors) = lex(source, 0);
@@ -14,8 +20,9 @@ pub fn parse(source: &str) -> (Option<ir::Program>, Vec<Error>) {
     let mut errors: Vec<_> = errors.into_iter().map(Error::from).collect();
 
     let ast = if let Some(tokens) = tokens {
-        let stream = prepare_stream(tokens.semantic);
-        let (ast, parse_errors) = grammar::program().parse_recovery(stream);
+        let (pairs, eoi) = prepare_pairs(tokens.semantic);
+        let input = pairs.as_slice().split_token_span(eoi);
+        let (ast, parse_errors) = grammar::program().parse(input).into_output_errors();
 
         errors.extend(
             parse_errors
@@ -31,29 +38,32 @@ pub fn parse(source: &str) -> (Option<ir::Program>, Vec<Error>) {
     (ast, errors)
 }
 
-/// Convert the output of the lexer into the input of the parser.
-fn prepare_stream<'a>(
-    tokens: Vec<Token>,
-) -> Stream<'a, TokenKind, Span, impl Iterator<Item = (TokenKind, Span)> + Sized + 'a> {
-    let final_span = tokens
+/// Build the (token-pair vec, end-of-input span) needed for `split_token_span`.
+fn prepare_pairs(tokens: Vec<Token>) -> (Vec<(TokenKind, Span)>, Span) {
+    let final_end = tokens
         .last()
         .map(|t| t.span.start as usize + t.span.len as usize)
         .unwrap_or(0);
 
-    let tokens = tokens.into_iter().map(move |token| {
-        (
-            token.kind,
-            Span {
-                start: token.span.start as usize,
-                end: token.span.start as usize + token.span.len as usize,
-            },
-        )
-    });
     let eoi = Span {
-        start: final_span,
-        end: final_span,
+        start: final_end,
+        end: final_end,
     };
-    Stream::from_iter(eoi, tokens)
+
+    let pairs = tokens
+        .into_iter()
+        .map(|t| {
+            (
+                t.kind,
+                Span {
+                    start: t.span.start as usize,
+                    end: t.span.start as usize + t.span.len as usize,
+                },
+            )
+        })
+        .collect();
+
+    (pairs, eoi)
 }
 
 #[track_caller]

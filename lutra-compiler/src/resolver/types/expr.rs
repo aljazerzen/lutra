@@ -20,7 +20,7 @@ impl fold::PrFold for super::TypeResolver<'_> {
                 tracing::debug!("... resolved to {}", named.as_ref());
 
                 let ty = match named {
-                    scope::Named::Expr(expr) => expr.ty.clone().unwrap(),
+                    scope::Named::Expr(expr) => expr.ty.as_deref().cloned().unwrap(),
                     scope::Named::Module => {
                         return Err(scope::err_name_kind("a value", "a module").with_span(span));
                     }
@@ -55,7 +55,7 @@ impl fold::PrFold for super::TypeResolver<'_> {
 
                         return Ok(pr::Expr {
                             kind: pr::ExprKind::Ident(ident),
-                            ty: Some(pr::Ty::new(pr::TyFunc {
+                            ty: Some(Box::new(pr::Ty::new(pr::TyFunc {
                                 params: vec![pr::TyFuncParam {
                                     constant: false,
                                     ty: Some(ty_inner),
@@ -63,7 +63,7 @@ impl fold::PrFold for super::TypeResolver<'_> {
                                 }],
                                 body: Some(Box::new(ty_framed)),
                                 ty_params: vec![],
-                            })),
+                            }))),
                             ..node
                         });
                     }
@@ -71,7 +71,7 @@ impl fold::PrFold for super::TypeResolver<'_> {
                 let (ty, ty_args) = self.introduce_ty_into_scope(ty, span.unwrap());
                 pr::Expr {
                     kind: pr::ExprKind::Ident(ident),
-                    ty: Some(ty),
+                    ty: Some(Box::new(ty)),
                     ty_args,
                     ..node
                 }
@@ -79,7 +79,7 @@ impl fold::PrFold for super::TypeResolver<'_> {
 
             pr::ExprKind::Lookup { base, lookup } => {
                 let base = Box::new(self.fold_expr(*base)?);
-                let base_ty = base.ty.as_ref().unwrap();
+                let base_ty = base.ty.as_deref().unwrap();
 
                 let target_ty = self
                     .resolve_tuple_lookup(base_ty, &lookup, span.unwrap())
@@ -87,7 +87,7 @@ impl fold::PrFold for super::TypeResolver<'_> {
 
                 let kind = pr::ExprKind::Lookup { base, lookup };
                 pr::Expr {
-                    ty: Some(target_ty),
+                    ty: Some(Box::new(target_ty)),
                     kind,
                     ..node
                 }
@@ -99,7 +99,7 @@ impl fold::PrFold for super::TypeResolver<'_> {
 
                     // resolve inner
                     let inner = self.fold_expr(*inner)?;
-                    let inner_ty = inner.ty.clone().unwrap();
+                    let inner_ty = inner.ty.as_deref().cloned().unwrap();
                     variant.inner = Some(Box::new(inner));
 
                     inner_ty
@@ -115,7 +115,7 @@ impl fold::PrFold for super::TypeResolver<'_> {
                 let ty = self.introduce_ty_var(enum_domain, span.unwrap());
 
                 pr::Expr {
-                    ty: Some(ty),
+                    ty: Some(Box::new(ty)),
                     ..pr::Expr::new(variant)
                 }
             }
@@ -174,7 +174,7 @@ impl fold::PrFold for super::TypeResolver<'_> {
                 expr.span = span;
                 ty.span = span;
                 return Ok(pr::Expr {
-                    ty: Some(ty),
+                    ty: Some(Box::new(ty)),
                     ..expr
                 });
             }
@@ -187,7 +187,7 @@ impl fold::PrFold for super::TypeResolver<'_> {
 
             pr::ExprKind::VarBinding(binding) => {
                 let bound = Box::new(self.fold_expr(*binding.bound)?);
-                let bound_ty = bound.ty.as_ref().unwrap();
+                let bound_ty = bound.ty.as_deref().unwrap();
 
                 // populate scope
                 let mut scope = scope::Scope::new(node.scope_id.unwrap(), scope::ScopeKind::Nested);
@@ -222,11 +222,11 @@ impl fold::PrFold for super::TypeResolver<'_> {
         let mut r = r;
         r.span = r.span.or(span);
         if r.ty.is_none() {
-            r.ty = Some(self.infer_type(&r)?);
+            r.ty = Some(Box::new(self.infer_type(&r)?));
         }
         if let Some(scope_id) = r.scope_id {
             // make ty infer scope_id of expr
-            r.ty.as_mut().unwrap().scope_id = Some(scope_id);
+            r.ty.as_deref_mut().unwrap().scope_id = Some(scope_id);
         }
         Ok(r)
     }
@@ -276,7 +276,7 @@ impl TypeResolver<'_> {
             .unwrap_or_else(self.push_diagnostic());
 
         let then = Box::new(self.fold_expr(*if_else.then)?);
-        let ty = then.ty.clone().unwrap();
+        let ty = then.ty.as_deref().cloned().unwrap();
 
         let mut els = Box::new(self.fold_expr(*if_else.els)?);
         self.validate_expr_type(&mut els, &ty, &|| None)
@@ -288,7 +288,7 @@ impl TypeResolver<'_> {
                 then,
                 els,
             }),
-            ty: Some(ty),
+            ty: Some(Box::new(ty)),
             ..node
         })
     }

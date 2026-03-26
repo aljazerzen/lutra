@@ -29,7 +29,7 @@ impl super::TypeResolver<'_> {
                     continue;
                 }
             };
-            let ty = expr.ty.clone().unwrap();
+            let ty = expr.ty.as_deref().cloned().unwrap();
 
             if f.unpack {
                 // validate that ty is a tuple
@@ -91,7 +91,7 @@ impl super::TypeResolver<'_> {
         let ty = pr::Ty::new(pr::TyKind::Tuple(ty_fields));
         Ok(pr::Expr {
             kind,
-            ty: Some(ty),
+            ty: Some(Box::new(ty)),
             ..node
         })
     }

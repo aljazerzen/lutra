@@ -16,8 +16,8 @@ pub struct Expr {
     pub span: Option<Span>,
 
     /// Type of expression this node represents.
-    /// [None] means that type should be inferred.
-    pub ty: Option<Ty>,
+    /// Inferred by type resolver.
+    pub ty: Option<Box<Ty>>,
 
     /// When this expression refers to a function with type parameters,
     /// these params are instantiated into these args and finalized when
@@ -338,5 +338,14 @@ impl From<Variant> for ExprKind {
 impl From<TypeAnnotation> for ExprKind {
     fn from(value: TypeAnnotation) -> Self {
         ExprKind::TypeAnnotation(value)
+    }
+}
+
+#[cfg(test)]
+mod size_tests {
+    use super::*;
+    #[test]
+    fn sizes() {
+        eprintln!("Expr={} TupleField={}", std::mem::size_of::<Expr>(), std::mem::size_of::<TupleField>());
     }
 }

@@ -164,7 +164,7 @@ fn types_09() {
        │
      2 │         func peek(array: [T], condition: func <R> (T): R): [T]
        │                                               ┬
-       │                                               ╰── type expected (, but found <
+       │                                               ╰── expected (, but found <
     ───╯
     ");
 }
@@ -672,7 +672,7 @@ fn types_23() {
        │
      2 │         func main() -> "hello" | func (x: text): text
        │                                                      │
-       │                                                      ╰─ function expected ->, but encountered the end of the file.
+       │                                                      ╰─ expected ->, but encountered the end of the file.
     ───╯
     "#);
 }

@@ -85,11 +85,19 @@ pub fn project_to_types(project: &Project) -> ir::Module {
 
 /// Internal implementation detail, do not use.
 // Only exposed because I don't want to maintain a separate lexer for IR parser.
+#[doc(hidden)]
 pub mod _lexer {
     pub use crate::diagnostic::Diagnostic;
-    pub use crate::parser::lexer::{Token, TokenKind};
+    pub use crate::parser::{Token, TokenKind, lex_source_recovery as lex};
+}
 
-    pub use crate::parser::lexer::lex_source_recovery as lex;
+/// Internal implementation detail, do not use.
+// Exposed for benchmarks.
+#[doc(hidden)]
+pub mod _bench {
+    pub use crate::check::{check_std_lib, parse_std_lib, std_lib};
+    pub use crate::diagnostic::Diagnostic;
+    pub use crate::parser::{parse_expr, parse_source};
 }
 
 #[track_caller]

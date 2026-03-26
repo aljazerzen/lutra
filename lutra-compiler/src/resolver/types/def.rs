@@ -73,7 +73,7 @@ impl super::TypeResolver<'_> {
                     let who = || Some(fq_ident.last().to_string());
                     self.validate_expr_type(&mut value, expected_ty, &who)
                         .unwrap_or_else(self.push_diagnostic());
-                    value.ty = Some(expected_ty.clone());
+                    value.ty = Some(Box::new(expected_ty.clone()));
                 }
 
                 // finalize scope
