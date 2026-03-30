@@ -63,6 +63,13 @@ impl PrFold for Desugarator {
         };
         Ok(expr)
     }
+
+    fn fold_type(&mut self, ty: pr::Ty) -> Result<pr::Ty> {
+        match ty.kind {
+            pr::TyKind::Option(inner) => self.desugar_option(*inner, ty.span),
+            _ => fold::fold_type(self, ty),
+        }
+    }
 }
 
 impl Desugarator {
@@ -247,6 +254,26 @@ impl Desugarator {
             body: Some(Box::new(self.fold_expr(*func.body)?)),
             ty_params: vec![],
         })))
+    }
+
+    fn desugar_option(
+        &mut self,
+        inner: pr::Ty,
+        span: Option<Span>,
+    ) -> std::result::Result<pr::Ty, Diagnostic> {
+        let inner_ty = self.fold_type(inner)?;
+        let unit_ty = pr::Ty::new_with_span(pr::TyKind::Tuple(vec![]), span.unwrap());
+        let kind = pr::TyKind::Enum(vec![
+            pr::TyEnumVariant {
+                name: "none".into(),
+                ty: unit_ty,
+            },
+            pr::TyEnumVariant {
+                name: "some".into(),
+                ty: inner_ty,
+            },
+        ]);
+        Ok(pr::Ty::new_with_span(kind, span.unwrap()))
     }
 }
 

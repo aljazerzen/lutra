@@ -672,9 +672,28 @@ fn types_23() {
        │
      2 │         func main() -> "hello" | func (x: text): text
        │                                                      │
-       │                                                      ╰─ expected ->, but encountered the end of the file.
+       │                                                      ╰─ expected -> or ?, but encountered the end of the file.
     ───╯
     "#);
+}
+
+#[test]
+fn types_24() {
+    // option type syntax desugars to enum { none, some: T }
+
+    insta::assert_snapshot!(_test_ty(r#"
+        func main(x: int32?): int32 -> match x {
+          .none => 0,
+          .some(v) => v + 1,
+        }
+    "#), @"int32");
+
+    insta::assert_snapshot!(_test_ty(r#"
+        func main(x: [int32]?): [int32] -> match x {
+          .none => [],
+          .some(v) => v,
+        }
+    "#), @"[int32]");
 }
 
 #[test]

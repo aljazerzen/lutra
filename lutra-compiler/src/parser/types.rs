@@ -107,7 +107,7 @@ where
         )
         .labelled("array");
 
-        choice((
+        let base = choice((
             primitive.boxed(),
             ident.boxed(),
             func.boxed(),
@@ -115,10 +115,31 @@ where
             array.boxed(),
             enum_.boxed(),
         ))
-        .map_with(|kind, e| Ty::new_with_span(kind, e.span()))
-        .boxed() // prevent MapWith<Choice<6-tuple>> propagating out of recursive
+        .map_with(|kind, e| Ty::new_with_span(kind, e.span()));
+
+        optional_type(base)
     })
     .labelled("type")
+}
+
+fn optional_type<'src, I>(
+    base: impl Parser<'src, I, Ty, PExtra<'src>> + 'src,
+) -> impl Parser<'src, I, Ty, PExtra<'src>> + Clone + 'src
+where
+    I: ValueInput<'src, Token = TokenKind, Span = Span>,
+{
+    base.then(ctrl('?').map_with(|_, e| e.span()).or_not())
+        .map(|(inner, question_span)| {
+            if let Some(q_span) = question_span {
+                let mut span = inner.span.unwrap();
+                span.set_end_of(&q_span);
+                Ty::new_with_span(TyKind::Option(Box::new(inner)), span)
+            } else {
+                inner
+            }
+        })
+        .labelled("optional type")
+        .boxed()
 }
 
 fn empty_array(s: Span) -> TyKind {

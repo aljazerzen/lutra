@@ -341,6 +341,7 @@ pub fn fold_type<T: ?Sized + PrFold>(fold: &mut T, ty: Ty) -> Result<Ty> {
             //     except: Box::new(fold.fold_type(*except)?),
             // },
             TyKind::Ident(_) | TyKind::Primitive(_) => ty.kind,
+            TyKind::Option(inner) => TyKind::Option(Box::new(fold.fold_type(*inner)?)),
             TyKind::TupleComprehension(comp) => TyKind::TupleComprehension(TyTupleComprehension {
                 tuple: Box::new(fold.fold_type(*comp.tuple)?),
                 variable_name: comp.variable_name,

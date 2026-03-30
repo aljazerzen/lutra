@@ -92,6 +92,7 @@ fn mark_recursive(ty: &mut pr::Ty, group: &[pr::Path]) -> bool {
             // arrays have an pointer, so they are never recursive
             false
         }
+        pr::TyKind::Option(_) => unreachable!(), // desugared
         pr::TyKind::Enum(variants) => {
             // enums: the interesting part
 
@@ -130,6 +131,7 @@ fn collect_refs(ty: &pr::Ty, refs: &mut Vec<pr::Path>) {
         pr::TyKind::Array(_) => {
             // arrays have an pointer, so their layout never depends on the inner type
         }
+        pr::TyKind::Option(_) => unreachable!(), // desugared
         pr::TyKind::Enum(_) => {
             // enums have a pointer (if we will determine it is needed)
         }

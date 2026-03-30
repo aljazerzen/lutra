@@ -53,6 +53,9 @@ pub enum TyKind {
     /// Type of arrays
     Array(Box<Ty>),
 
+    /// Syntactic sugar for enum { none, some: T }
+    Option(Box<Ty>),
+
     /// Type of functions with defined params and return types.
     Enum(Vec<TyEnumVariant>),
 
