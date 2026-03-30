@@ -82,7 +82,7 @@ fn lexer<'src>() -> impl LtLexer<'src, Vec<Token>> {
         just("..").to(TokenKind::Range),
     ));
 
-    let control = one_of("></%=+-*[]().,:|!{};@").map(TokenKind::Control);
+    let control = one_of("></%=+-*[]().,:|!{};@?").map(TokenKind::Control);
 
     let literal = literal().map(TokenKind::Literal);
 

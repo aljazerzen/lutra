@@ -34,6 +34,10 @@ impl PrintSource for pr::Ty {
                 }
                 .print(p);
             }
+            pr::TyKind::Option(inner) => {
+                inner.print(p)?;
+                p.push("?")?;
+            }
             pr::TyKind::Enum(variants) => {
                 p.push("enum ")?;
 

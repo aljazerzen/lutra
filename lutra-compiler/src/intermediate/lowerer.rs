@@ -760,7 +760,7 @@ impl<'a> Lowerer<'a> {
                     })
                     .collect(),
             ),
-            pr::TyKind::Ident(_) => unreachable!(),
+            pr::TyKind::Ident(_) | pr::TyKind::Option(_) => unreachable!(),
             pr::TyKind::Func(func) => ir::TyKind::Function(Box::new(ir::TyFunction {
                 params: func
                     .params
