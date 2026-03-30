@@ -340,12 +340,3 @@ impl From<TypeAnnotation> for ExprKind {
         ExprKind::TypeAnnotation(value)
     }
 }
-
-#[cfg(test)]
-mod size_tests {
-    use super::*;
-    #[test]
-    fn sizes() {
-        eprintln!("Expr={} TupleField={}", std::mem::size_of::<Expr>(), std::mem::size_of::<TupleField>());
-    }
-}

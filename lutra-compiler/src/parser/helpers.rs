@@ -1,7 +1,7 @@
 use chumsky::input::ValueInput;
 use chumsky::prelude::*;
 
-use super::{PExtra, PError, TokenKind};
+use super::{PError, PExtra, TokenKind};
 
 use crate::Span;
 use crate::diagnostic::{Diagnostic, DiagnosticCode};
@@ -27,9 +27,7 @@ where
     }
 }
 
-pub(crate) fn keyword<'src, I>(
-    kw: &'static str,
-) -> impl Parser<'src, I, (), PExtra<'src>> + Clone
+pub(crate) fn keyword<'src, I>(kw: &'static str) -> impl Parser<'src, I, (), PExtra<'src>> + Clone
 where
     I: ValueInput<'src, Token = TokenKind, Span = Span>,
 {

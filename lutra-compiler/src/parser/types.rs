@@ -107,8 +107,6 @@ where
         )
         .labelled("array");
 
-        // Box each alternative so Choice<6-tuple> sees uniform Boxed<TyKind>
-        // elements, collapsing the 20K-line Choice<6-tuple>::go monomorphization.
         choice((
             primitive.boxed(),
             ident.boxed(),

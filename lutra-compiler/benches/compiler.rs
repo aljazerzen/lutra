@@ -23,7 +23,7 @@ fn bench_check(c: &mut Criterion) {
     let mut group = c.benchmark_group("check");
 
     group.bench_function("std_lib", |b| {
-        b.iter(|| _bench::check_std_lib());
+        b.iter(_bench::check_std_lib);
     });
 
     let source = SourceTree::single("".into(), PROG.to_string());

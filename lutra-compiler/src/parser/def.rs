@@ -6,7 +6,7 @@ use crate::Span;
 use crate::pr::*;
 
 use super::helpers::*;
-use super::{PExtra, PError, TokenKind};
+use super::{PError, PExtra, TokenKind};
 use super::{expr, types};
 
 /// The top-level parser
