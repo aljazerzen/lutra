@@ -72,7 +72,7 @@ where
     //   left    4: ??  (coalesce)
     //   left    3: &&  (and)
     //   left    2: ||  (or)
-    let expr_ops = term.pratt((
+    term.pratt((
         prefix(9, operator_unary(), |op, rhs: Expr, e| {
             let kind = ExprKind::Unary(UnaryExpr {
                 op,
@@ -91,8 +91,7 @@ where
         ),
         infix(left(3), just(TokenKind::And).to(BinOp::And), new_bin_op),
         infix(left(2), just(TokenKind::Or).to(BinOp::Or), new_bin_op),
-    ));
-    expr_ops
+    ))
 }
 
 fn literal<'src, I>() -> impl Parser<'src, I, Literal, PExtra<'src>> + Clone + 'src

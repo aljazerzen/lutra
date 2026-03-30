@@ -28,7 +28,10 @@ pub trait PrFold {
     }
     fn fold_expr(&mut self, mut expr: Expr) -> Result<Expr> {
         expr.kind = self.fold_expr_kind(expr.kind)?;
-        expr.ty = expr.ty.map(|t| self.fold_type(*t).map(Box::new)).transpose()?;
+        expr.ty = expr
+            .ty
+            .map(|t| self.fold_type(*t).map(Box::new))
+            .transpose()?;
         expr.ty_args = expr
             .ty_args
             .into_iter()

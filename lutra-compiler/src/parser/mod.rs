@@ -34,9 +34,7 @@ pub fn parse_source(
         trivia = tokens.trivia;
         let tokens = prepare_tokens(tokens.semantic, source_id);
 
-        let (ast, errs) = def::source()
-            .parse(tokens.as_input())
-            .into_output_errors();
+        let (ast, errs) = def::source().parse(tokens.as_input()).into_output_errors();
 
         let mut parsed = ast;
         if let Some(parsed) = &mut parsed {
