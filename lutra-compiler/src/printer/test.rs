@@ -44,9 +44,9 @@ fn format_02() {
     assert_snapshot!(_format(r#"
     const long_name = [hello::world, hello::world, hello::world, hello::world, hello::world]
     "#),
-    @r"
+    @"
     const long_name = [
-      hello::world, hello::world, hello::world, hello::world, hello::world
+      hello::world, hello::world, hello::world, hello::world, hello::world,
     ]
     "
     )
@@ -75,9 +75,9 @@ fn format_03() {
 fn format_04() {
     assert_snapshot!(_format(r#"
     const x = [[hello::world, hello::world, hello::world, hello::world, hello::world]]
-    "#), @r"
+    "#), @"
     const x = [
-      [hello::world, hello::world, hello::world, hello::world, hello::world]
+      [hello::world, hello::world, hello::world, hello::world, hello::world],
     ]
     "
     )
@@ -87,9 +87,9 @@ fn format_04() {
 fn format_05() {
     assert_snapshot!(_format(r#"
     const x = [[hello::world, hello::world, hello::world], [hello::world, hello::world]]
-    "#), @r"
+    "#), @"
     const x = [
-      [hello::world, hello::world, hello::world], [hello::world, hello::world]
+      [hello::world, hello::world, hello::world], [hello::world, hello::world],
     ]
     "
     )
@@ -99,9 +99,9 @@ fn format_05() {
 fn format_06() {
     assert_snapshot!(_format(r#"
     const x = [hello::world, [hello::world, hello::world, hello::world], hello::world]
-    "#), @r"
+    "#), @"
     const x = [
-      hello::world, [hello::world, hello::world, hello::world], hello::world
+      hello::world, [hello::world, hello::world, hello::world], hello::world,
     ]
     "
     )
@@ -332,6 +332,28 @@ fn format_19() {
 }
 
 #[test]
+fn format_20() {
+    // pipelines
+
+    assert_snapshot!(_format(r#"
+    func main() -> (
+      my_const
+      | my_function_with_a_really_long_name_so_it_cannot_be_single_line(
+          arg1, arg2, arg3,
+        )
+    )
+    "#), @"
+    func main() -> (
+      my_const
+      | my_function_with_a_really_long_name_so_it_cannot_be_single_line(
+          arg1, arg2, arg3,
+        )
+    )
+    "
+    )
+}
+
+#[test]
 fn trivia_00() {
     assert_snapshot!(_format(r#"
     # TODO
@@ -430,10 +452,10 @@ fn trivia_04() {
     const x = [ # here
       1, 2, 3
     ]
-    "#), @r"
+    "#), @"
     const x = [
       # here
-      1, 2, 3
+      1, 2, 3,
     ]
     "
     )
@@ -494,14 +516,14 @@ fn trivia_06() {
 
          # trailing a
     }       # inline x
-    "#), @r"
+    "#), @"
     const x = {
 
       # leading a
       a = {
         # leading b
         # leading b
-        b = true # inline b
+        b = true, # inline b
 
         # trailing b
       }, # inline a

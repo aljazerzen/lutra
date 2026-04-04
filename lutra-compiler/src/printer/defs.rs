@@ -1,7 +1,7 @@
 use lutra_bin::ident;
 
 use crate::pr::{self, ImportDef};
-use crate::printer::common::{Between, Separated};
+use crate::printer::common::{PrintSourceExt, Separated};
 use crate::printer::expr::{print_func, print_func_signature};
 use crate::printer::{CONFIG_NO_WRAP, PrintSource, Printer};
 
@@ -233,13 +233,9 @@ impl PrintSource for NamedDef<'_> {
                 p.push(ident::display(self.0))?;
 
                 if ty_def.is_framed {
-                    Between {
-                        node: &(&ty_def.framed_label, &ty_def.ty),
-                        prefix: "(",
-                        suffix: ")",
-                        span: self.1.span,
-                    }
-                    .print(p)?;
+                    (&ty_def.framed_label, &ty_def.ty)
+                        .between("(", ")", self.1.span)
+                        .print(p)?;
                 } else {
                     p.push(": ")?;
                     ty_def.ty.print(p)?;
@@ -280,16 +276,13 @@ impl PrintSource for pr::ImportDef {
                 let mut parts: Vec<&ImportDef> = parts.iter().collect();
                 parts.sort_by(|a, b| a.path().cmp(b.path()));
 
-                Between {
-                    prefix: "(",
-                    node: &Separated {
-                        nodes: &parts,
-                        sep_inline: ", ",
-                        sep_line_end: ",",
-                    },
-                    suffix: ")",
-                    span: None,
+                Separated {
+                    nodes: &parts,
+                    sep_inline: ", ",
+                    sep_line_end: ",",
                 }
+                .between("(", ")", None)
+                .single_line_end(",")
                 .print(p)
             }
         }

@@ -1,7 +1,7 @@
 use lutra_bin::ident;
 
 use crate::pr;
-use crate::printer::common::{Between, Separated};
+use crate::printer::common::{PrintSourceExt, Separated};
 use crate::printer::{PrintSource, Printer};
 
 impl PrintSource for pr::Expr {
@@ -81,48 +81,30 @@ impl PrintSource for pr::Expr {
                         sep_inline: " ",
                         sep_line_end: "",
                     };
-                    return Between {
-                        prefix: "(",
-                        node: &nodes,
-                        suffix: ")",
-                        span: self.span,
-                    }
-                    .print(p);
+                    return nodes.between("(", ")", self.span).print(p);
                 }
 
                 // general case
-                return Between {
-                    prefix: "(",
-                    node: expr.as_ref(),
-                    suffix: ")",
-                    span: self.span,
-                }
-                .print(p);
+                return expr.as_ref().between("(", ")", self.span).print(p);
             }
             pr::ExprKind::Tuple(fields) => {
-                return Between {
-                    prefix: "{",
-                    node: &Separated {
-                        nodes: fields,
-                        sep_inline: ", ",
-                        sep_line_end: ",",
-                    },
-                    suffix: "}",
-                    span: self.span,
+                return Separated {
+                    nodes: fields,
+                    sep_inline: ", ",
+                    sep_line_end: ",",
                 }
+                .between("{", "}", self.span)
+                .single_line_end(",")
                 .print(p);
             }
             pr::ExprKind::Array(exprs) => {
-                return Between {
-                    prefix: "[",
-                    node: &Separated {
-                        nodes: exprs,
-                        sep_inline: ", ",
-                        sep_line_end: ",",
-                    },
-                    suffix: "]",
-                    span: self.span,
+                return Separated {
+                    nodes: exprs,
+                    sep_inline: ", ",
+                    sep_line_end: ",",
                 }
+                .between("[", "]", self.span)
+                .single_line_end(",")
                 .print(p);
             }
 
@@ -143,16 +125,13 @@ impl PrintSource for pr::Expr {
                     p.push(")")?;
                 } else {
                     // general case
-                    Between {
-                        prefix: "(",
-                        node: &Separated {
-                            nodes: &call.args,
-                            sep_inline: ", ",
-                            sep_line_end: ",",
-                        },
-                        suffix: ")",
-                        span: self.span,
+                    Separated {
+                        nodes: &call.args,
+                        sep_inline: ", ",
+                        sep_line_end: ",",
                     }
+                    .between("(", ")", self.span)
+                    .single_line_end(",")
                     .print(p)?;
                 }
             }
@@ -241,13 +220,7 @@ impl PrintSource for pr::Expr {
                 p.push(".")?;
                 p.push(ident::display(&variant.name))?;
                 if let Some(inner) = &variant.inner {
-                    Between {
-                        node: inner.as_ref(),
-                        prefix: "(",
-                        suffix: ")",
-                        span: self.span,
-                    }
-                    .print(p)?;
+                    inner.as_ref().between("(", ")", self.span).print(p)?;
                 }
             }
         }
@@ -323,8 +296,13 @@ impl PrintSource for (Option<pr::BinOp>, &pr::Expr) {
         if let Some(op) = self.0 {
             p.push(op.to_string())?;
             p.push(" ")?;
+            p.indent();
         }
-        self.1.print(p)
+        self.1.print(p)?;
+        if self.0.is_some() {
+            p.dedent();
+        }
+        Some(())
     }
 
     fn span(&self) -> Option<crate::Span> {
@@ -344,16 +322,13 @@ pub(super) fn print_func_signature<'c>(
         p.push(ident::display(name))?;
     }
 
-    Between {
-        prefix: "(",
-        node: &Separated {
-            nodes: &func.params,
-            sep_inline: ", ",
-            sep_line_end: ",",
-        },
-        suffix: ")",
-        span: None,
+    Separated {
+        nodes: &func.params,
+        sep_inline: ", ",
+        sep_line_end: ",",
     }
+    .between("(", ")", None)
+    .single_line_end(",")
     .print(p)?;
 
     if let Some(return_ty) = &func.return_ty {

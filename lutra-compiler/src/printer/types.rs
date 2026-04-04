@@ -1,7 +1,7 @@
 use lutra_bin::ident;
 
 use crate::pr;
-use crate::printer::common::{Between, Separated};
+use crate::printer::common::{PrintSourceExt, Separated};
 use crate::printer::{PrintSource, Printer};
 
 impl PrintSource for pr::Ty {
@@ -13,26 +13,17 @@ impl PrintSource for pr::Ty {
             pr::TyKind::Ident(ident) => p.push(ident.to_string())?,
             pr::TyKind::Primitive(prim) => p.push(prim.to_string())?,
             pr::TyKind::Tuple(fields) => {
-                return Between {
-                    prefix: "{",
-                    node: &Separated {
-                        nodes: fields,
-                        sep_inline: ", ",
-                        sep_line_end: ",",
-                    },
-                    suffix: "}",
-                    span: self.span,
+                return Separated {
+                    nodes: fields,
+                    sep_inline: ", ",
+                    sep_line_end: ",",
                 }
+                .between("{", "}", self.span)
+                .single_line_end(",")
                 .print(p);
             }
             pr::TyKind::Array(item) => {
-                return Between {
-                    prefix: "[",
-                    node: item.as_ref(),
-                    suffix: "]",
-                    span: self.span,
-                }
-                .print(p);
+                return item.as_ref().between("[", "]", self.span).print(p);
             }
             pr::TyKind::Option(inner) => {
                 inner.print(p)?;
@@ -41,16 +32,13 @@ impl PrintSource for pr::Ty {
             pr::TyKind::Enum(variants) => {
                 p.push("enum ")?;
 
-                Between {
-                    prefix: "{",
-                    node: &Separated {
-                        nodes: variants,
-                        sep_inline: ", ",
-                        sep_line_end: ",",
-                    },
-                    suffix: "}",
-                    span: self.span,
+                Separated {
+                    nodes: variants,
+                    sep_inline: ", ",
+                    sep_line_end: ",",
                 }
+                .between("{", "}", self.span)
+                .single_line_end(",")
                 .print(p)?;
             }
             pr::TyKind::Func(func) => return print_ty_func(func, None, p),
@@ -88,16 +76,12 @@ pub(super) fn print_ty_func<'c>(
         p.push(ident::display(name))?;
     }
 
-    Between {
-        prefix: "(",
-        node: &Separated {
-            nodes: &func.params,
-            sep_inline: ", ",
-            sep_line_end: ",",
-        },
-        suffix: ")",
-        span: None,
+    Separated {
+        nodes: &func.params,
+        sep_inline: ", ",
+        sep_line_end: ",",
     }
+    .between("(", ")", None)
     .print(p)?;
 
     if let Some(return_ty) = &func.body {

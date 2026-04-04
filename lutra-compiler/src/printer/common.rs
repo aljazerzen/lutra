@@ -1,5 +1,36 @@
 use crate::printer::{PrintSource, Printer};
 
+pub trait PrintSourceExt: PrintSource {
+    // fn separated<'a>(
+    //     self: &'a [Self],
+    //     sep_inline: &'static str,
+    //     sep_line_end: &'static str,
+    // ) -> Separated<'a, Self> {
+    //     Separated {
+    //         nodes: self,
+    //         sep_inline,
+    //         sep_line_end,
+    //     }
+    // }
+
+    fn between<'a>(
+        &'a self,
+        prefix: &'static str,
+        suffix: &'static str,
+        span: Option<crate::Span>,
+    ) -> Between<'a, Self> {
+        Between {
+            prefix,
+            node: self,
+            suffix,
+            span,
+            single_line_end: None,
+        }
+    }
+}
+
+impl<T> PrintSourceExt for T where T: PrintSource {}
+
 /// A construct that can print nodes separated by some delimiter.
 /// If possible, nodes will be printed in a single line, separated by `sep_inline`.
 /// Otherwise, they will be printed one-per-line, each line ending with `sep_line_end`.
@@ -83,11 +114,19 @@ impl<'a, N: PrintSource> Separated<'a, N> {
 /// A construct that can print nodes wrapped into a prefix and a suffix.
 /// If possible, all three parts will be printed in a single line.
 /// Otherwise, node will be placed on a separate line.
-pub(super) struct Between<'a, N: PrintSource> {
-    pub prefix: &'static str,
-    pub node: &'a N,
-    pub suffix: &'static str,
-    pub span: Option<crate::Span>,
+pub(super) struct Between<'a, N: PrintSource + ?Sized> {
+    prefix: &'static str,
+    node: &'a N,
+    suffix: &'static str,
+    span: Option<crate::Span>,
+    single_line_end: Option<&'static str>,
+}
+
+impl<'a, N: PrintSource + ?Sized> Between<'a, N> {
+    pub fn single_line_end(mut self, trailer: &'static str) -> Self {
+        self.single_line_end = Some(trailer);
+        self
+    }
 }
 
 impl<'a, N: PrintSource> PrintSource for Between<'a, N> {
@@ -120,6 +159,13 @@ impl<'a, N: PrintSource> PrintSource for Between<'a, N> {
 
         p.pending_suffix += self.suffix.chars().count() as u16;
         self.node.print(p)?;
+
+        if let Some(l) = self.single_line_end
+            && !p.buffer.ends_with(l)
+        {
+            // line trailer
+            p.push(l)?;
+        }
 
         p.inject_trivia_prev_inline(self.span().map(|s| s.end()));
 
