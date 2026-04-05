@@ -1,11 +1,10 @@
 [data-md-color-scheme="slate"] {
   --md-default-fg-color: #dbdbdb;
   --md-default-fg-color--light: #dbdbdb;
-  --md-default-fg-color--lighter: #fff;
 
   --md-default-bg-color: #202b38;
-  --md-default-bg-color--light: #202b38;
   --md-default-bg-color--dark: #202b38;
+  --md-default-bg-color--light: #202b38;
 
   --md-code-fg-color: #d0cdbb;
   --md-code-bg-color: #161f27;
@@ -39,4 +38,8 @@
     /* console prompt */
     user-select: none;
     color: var(--md-code-hl-comment-color) !important;
+}
+
+.md-search__button {
+  line-height: 100%;
 }
