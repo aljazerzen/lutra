@@ -123,7 +123,7 @@ impl PrintSource for (&pr::ModuleDef, Option<crate::Span>) {
                 while p.take_trivia_new_line(span.start).is_some() {}
             }
 
-            // print the def
+            // print the def (and emit one edit chunk per definition)
             let named_def: NamedDef = (name.as_str(), def);
             print_or_skip(&named_def, p);
 
@@ -164,6 +164,7 @@ fn print_or_skip<T: PrintSource>(t: &T, p: &mut Printer) {
     let mut normal_print = p.fork();
     if t.print(&mut normal_print).is_some() {
         p.merge(normal_print);
+        p.finish_edit();
         return;
     }
 

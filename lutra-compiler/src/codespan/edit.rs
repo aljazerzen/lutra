@@ -1,3 +1,4 @@
+#[derive(Debug)]
 pub struct TextEdit {
     pub span: crate::Span,
     pub new_text: String,

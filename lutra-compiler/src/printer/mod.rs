@@ -199,9 +199,20 @@ impl<'c> Printer<'c> {
     fn merge(&mut self, forked: Printer<'c>) {
         self.rem_width = forked.rem_width;
         self.trivia = forked.trivia;
-        self.buffer += &forked.buffer;
-        self.buffer_span.set_end_of(&forked.buffer_span);
+
+        if forked.edits.is_empty() {
+            self.buffer += &forked.buffer;
+            self.buffer_span.set_end_of(&forked.buffer_span);
+            return;
+        }
+
+        // Forked printer emitted standalone edits (e.g. one-per-definition).
+        // Flush current buffer before importing them, then continue with the
+        // fork's remaining open buffer range.
+        self.finish_edit();
         self.edits.extend(forked.edits);
+        self.buffer = forked.buffer;
+        self.buffer_span = forked.buffer_span;
     }
 
     /// Subtracts remaining widths. Returns `None` when there is not enough
@@ -356,6 +367,10 @@ impl<'c> Printer<'c> {
     /// This is used to skip formatting of some nodes, i.e. not produce
     /// any [codespan::TextEdit] that would change it.
     fn finish_edit(&mut self) {
+        if self.buffer.is_empty() && self.buffer_span.len == 0 {
+            return;
+        }
+
         let code = std::mem::take(&mut self.buffer);
         self.edits.push(codespan::TextEdit {
             span: self.buffer_span,
