@@ -18,6 +18,22 @@ fn _format(source: &str) -> String {
     crate::codespan::apply_text_edits(source, &edits)
 }
 
+#[track_caller]
+fn _print_edits(source: &str) -> (crate::pr::Source, Vec<crate::codespan::TextEdit>) {
+    let (parsed, dia, trivia) = crate::parser::parse_source(source, 0);
+
+    if !dia.is_empty() {
+        panic!("parse err: {dia:?}");
+    }
+
+    let Some(parsed) = parsed else {
+        panic!("parse err: {dia:?}");
+    };
+
+    let edits = super::print_source(&parsed, Some(&trivia));
+    (parsed, edits)
+}
+
 #[test]
 fn format_00() {
     assert_snapshot!(_format(r#"
@@ -813,4 +829,41 @@ fn signature_generic_function() {
         "identity"
     ), @"func identity(x: T): T
 where T");
+}
+
+#[test]
+fn emits_definition_granular_edits() {
+    let source = "const   a=1\nconst   b=2\nconst   c=3";
+    let (parsed, edits) = _print_edits(source);
+
+    let def_spans: Vec<_> = parsed
+        .root
+        .defs
+        .iter()
+        .map(|(_, def)| def.span.expect("expected span"))
+        .collect();
+
+    for def_span in def_spans {
+        let covering = edits
+            .iter()
+            .filter(|e| e.span.start <= def_span.start && def_span.end() <= e.span.end())
+            .count();
+        assert_eq!(
+            covering, 1,
+            "expected exactly one edit to cover definition at {:?}",
+            def_span
+        );
+    }
+}
+
+#[test]
+fn minimize_drops_unchanged_definition_edits() {
+    let source = "const a = 1\nconst   b=2\n";
+    let (_parsed, edits) = _print_edits(source);
+
+    let minimized = crate::codespan::minimize_text_edits(source, edits);
+    assert_eq!(minimized.len(), 1);
+
+    let out = crate::codespan::apply_text_edits(source, &minimized);
+    assert_eq!(out, "const a = 1\n\nconst b = 2\n");
 }
