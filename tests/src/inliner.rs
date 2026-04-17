@@ -4,7 +4,7 @@ use insta::assert_snapshot;
 fn _test_compile_and_print(source: &str) -> String {
     let program = lutra_compiler::_test_compile_main(source).unwrap_or_else(|e| panic!("{e}"));
     let program = lutra_compiler::inline(program);
-    lutra_bin::ir::print(&program)
+    lutra_bin::ir::print_no_color(&program)
 }
 
 #[test]
@@ -13,18 +13,18 @@ fn inline_00() {
     func twice(x: T) where T -> {x, x}
 
     func main() -> twice([true, true, false])
-    "#), @r"
+    "#), @"
     let main = (func 1 ->
       let 2 = [
-        true[90m: bool[0m,
-        true[90m: bool[0m,
-        false[90m: bool[0m,
-      ][90m: [bool][0m;
+        true: bool,
+        true: bool,
+        false: bool,
+      ]: [bool];
       (tuple
-        var.2[90m: [bool][0m,
-        var.2[90m: [bool][0m,
-      )[90m: {x: [bool], x: [bool]}[0m
-    )[90m: func ({}) -> {x: [bool], x: [bool]}[0m
+        var.2: [bool],
+        var.2: [bool],
+      ): {x: [bool], x: [bool]}
+    ): func ({}) -> {x: [bool], x: [bool]}
     ")
 }
 
@@ -34,16 +34,16 @@ fn inline_01() {
     func once(x: T) where T -> {x}
 
     func main() -> once([true, true, false])
-    "#), @r"
+    "#), @"
     let main = (func 1 ->
       (tuple
         [
-          true[90m: bool[0m,
-          true[90m: bool[0m,
-          false[90m: bool[0m,
-        ][90m: [bool][0m,
-      )[90m: {x: [bool]}[0m
-    )[90m: func ({}) -> {x: [bool]}[0m
+          true: bool,
+          true: bool,
+          false: bool,
+        ]: [bool],
+      ): {x: [bool]}
+    ): func ({}) -> {x: [bool]}
     ")
 }
 
@@ -58,39 +58,39 @@ fn inline_02() {
     "#), @"
     let main = (func 2 ->
       let 5 = (call
-        external.std::to_columnar[90m: func ([{int64, int64}]) -> {[int64], [int64]}[0m,
+        external.std::to_columnar: func ([{int64, int64}]) -> {[int64], [int64]},
         [
           (tuple
-            5[90m: int64[0m,
-            3[90m: int64[0m,
-          )[90m: {int64, int64}[0m,
+            5: int64,
+            3: int64,
+          ): {int64, int64},
           (tuple
-            65[90m: int64[0m,
-            1[90m: int64[0m,
-          )[90m: {int64, int64}[0m,
+            65: int64,
+            1: int64,
+          ): {int64, int64},
           (tuple
-            3[90m: int64[0m,
-            2[90m: int64[0m,
-          )[90m: {int64, int64}[0m,
-        ][90m: [{int64, int64}][0m,
-      )[90m: {[int64], [int64]}[0m;
+            3: int64,
+            2: int64,
+          ): {int64, int64},
+        ]: [{int64, int64}],
+      ): {[int64], [int64]};
       (tuple
         (call
-          external.std::min[90m: func ([int64]) -> enum {none, some: int64}[0m,
+          external.std::min: func ([int64]) -> enum {none, some: int64},
           (tuple_lookup
-            var.5[90m: {[int64], [int64]}[0m
+            var.5: {[int64], [int64]}
             0
-          )[90m: [int64][0m,
-        )[90m: enum {none, some: int64}[0m,
+          ): [int64],
+        ): enum {none, some: int64},
         (call
-          external.std::min[90m: func ([int64]) -> enum {none, some: int64}[0m,
+          external.std::min: func ([int64]) -> enum {none, some: int64},
           (tuple_lookup
-            var.5[90m: {[int64], [int64]}[0m
+            var.5: {[int64], [int64]}
             1
-          )[90m: [int64][0m,
-        )[90m: enum {none, some: int64}[0m,
-      )[90m: {enum {none, some: int64}, enum {none, some: int64}}[0m
-    )[90m: func ({}) -> {enum {none, some: int64}, enum {none, some: int64}}[0m
+          ): [int64],
+        ): enum {none, some: int64},
+      ): {enum {none, some: int64}, enum {none, some: int64}}
+    ): func ({}) -> {enum {none, some: int64}, enum {none, some: int64}}
     ")
 }
 
@@ -112,25 +112,25 @@ fn inline_03() {
     let main = (func 1 ->
       (tuple
         (enum_variant 1
-          "hello"[90m: text[0m
-        )[90m: OptText[0m,
-        (enum_variant 0)[90m: OptText[0m,
+          "hello": text
+        ): OptText,
+        (enum_variant 0): OptText,
         (enum_eq
           (enum_variant 1
-            "hello"[90m: text[0m
-          )[90m: enum {none, some: text}[0m
+            "hello": text
+          ): enum {none, some: text}
           1
-        )[90m: bool[0m,
+        ): bool,
         (call
-          external.std::not[90m: func (bool) -> bool[0m,
+          external.std::not: func (bool) -> bool,
           (enum_eq
             (enum_variant 1
-              "hello"[90m: text[0m
-            )[90m: enum {none, some: text}[0m
+              "hello": text
+            ): enum {none, some: text}
             1
-          )[90m: bool[0m,
-        )[90m: bool[0m,
-      )[90m: {OptText, OptText, bool, bool}[0m
-    )[90m: func ({}) -> {OptText, OptText, bool, bool}[0m
+          ): bool,
+        ): bool,
+      ): {OptText, OptText, bool, bool}
+    ): func ({}) -> {OptText, OptText, bool, bool}
     "#)
 }

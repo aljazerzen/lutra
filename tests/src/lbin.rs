@@ -43,8 +43,8 @@ fn _test_get_type(name: &'static str) -> &'static ir::Ty {
         })
         .unwrap();
 
-        let project = lutra_compiler::check(source, lutra_compiler::CheckParams {})
-            .unwrap_or_else(|e| panic!("{e}"));
+        let project =
+            lutra_compiler::check(source, Default::default()).unwrap_or_else(|e| panic!("{e}"));
 
         let module = lutra_compiler::project_to_types(&project);
         module

@@ -3,7 +3,7 @@ mod printer;
 
 pub use crate::generated::ir::*;
 #[cfg(feature = "std")]
-pub use printer::{print, print_ty};
+pub use printer::{print, print_no_color, print_ty};
 
 use crate::{boxed, string, vec};
 

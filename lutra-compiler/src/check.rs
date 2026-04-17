@@ -1,4 +1,5 @@
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 
 use itertools::Itertools;
 
@@ -14,23 +15,26 @@ use crate::{Span, error};
 
 #[cfg_attr(feature = "clap", derive(clap::Parser))]
 #[derive(Default)]
-pub struct CheckParams {}
+pub struct CheckParams {
+    #[cfg_attr(feature = "clap", arg(skip))]
+    pub dependencies: Vec<Dependency>,
+}
 
 pub fn check(
     mut source: project::SourceTree,
-    _: CheckParams,
+    mut params: CheckParams,
 ) -> Result<project::Project, error::Error> {
     if source.is_empty() {
         source.insert(PathBuf::from(""), "".into());
     }
 
-    let std_lib = Dependency {
+    params.dependencies.push(Dependency {
         name: NS_STD.into(),
-        inner: check_std_lib()?,
-    };
+        inner: Arc::new(check_std_lib()?),
+    });
 
     let mut project = parse(&source)?
-        .and_then(|ast| crate::resolver::resolve(ast, vec![std_lib]))
+        .and_then(|ast| crate::resolver::resolve(ast, params.dependencies))
         .map_err(|e| Error::from_diagnostics(e, &source))?;
     project.source = source;
     Ok(project)
@@ -178,4 +182,18 @@ pub fn check_std_lib() -> Result<crate::Project, error::Error> {
         .map_err(|e| Error::from_diagnostics(e, &source))?;
     project.source = source;
     Ok(project)
+}
+
+impl CheckParams {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn with_dep(mut self, name: impl Into<String>, project: Arc<crate::Project>) -> Self {
+        self.dependencies.push(crate::project::Dependency {
+            name: name.into(),
+            inner: project,
+        });
+        self
+    }
 }

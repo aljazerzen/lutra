@@ -105,7 +105,7 @@ pub fn _test_compile_ty(ty_source: &str) -> ir::Ty {
     let source = format!("type t: {ty_source}");
 
     let source = SourceTree::single("".into(), source);
-    let project = check(source, CheckParams {}).unwrap_or_else(|e| panic!("{e}"));
+    let project = check(source, Default::default()).unwrap_or_else(|e| panic!("{e}"));
 
     let module = project_to_types(&project);
 
@@ -121,8 +121,11 @@ pub fn _test_compile_ty(ty_source: &str) -> ir::Ty {
 
 pub fn _test_compile_main(source: &str) -> Result<ir::Program, error::Error> {
     let source = SourceTree::single("".into(), source.to_string());
-    let project = check(source, CheckParams {})?;
+    let project = check(source, Default::default())?;
+    _test_compile_main_in(&project)
+}
 
+pub fn _test_compile_main_in(project: &Project) -> Result<ir::Program, error::Error> {
     let main = check_overlay(&project, "main", None)?;
     let program = intermediate::lowerer::lower_expr(&project, &main);
     Ok(intermediate::layouter::on_program(program))

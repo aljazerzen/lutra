@@ -3,7 +3,19 @@
 use crate::ir;
 
 pub fn print(program: &ir::Program) -> String {
-    let mut printer = Printer::default();
+    let mut printer = Printer {
+        color: true,
+        ..Printer::default()
+    };
+
+    printer.print_program(program)
+}
+
+pub fn print_no_color(program: &ir::Program) -> String {
+    let mut printer = Printer {
+        color: false,
+        ..Printer::default()
+    };
 
     printer.print_program(program)
 }
@@ -17,6 +29,7 @@ pub fn print_ty(ty: &ir::Ty) -> String {
 #[derive(Clone, Default)]
 struct Printer {
     indent: usize,
+    color: bool,
 }
 
 const INDENT: usize = 2;
@@ -254,9 +267,14 @@ impl Printer {
 
         let print_ty = !matches!(expr.kind, ir::ExprKind::Binding(_));
         if print_ty {
-            r += "\x1b[90m: ";
+            if self.color {
+                r += "\x1b[90m";
+            }
+            r += ": ";
             r += &self.print_ty(&expr.ty);
-            r += "\x1b[0m";
+            if self.color {
+                r += "\x1b[0m";
+            }
         }
         r
     }

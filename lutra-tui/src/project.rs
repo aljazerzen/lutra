@@ -1,7 +1,7 @@
 use std::rc::Rc;
 
 use lutra_compiler::error::{DiagnosticMessage, Error as CompileError};
-use lutra_compiler::{CheckParams, Project, SourceTree, check};
+use lutra_compiler::{Project, SourceTree, check};
 
 /// Centralized state holding compilation results.
 pub struct ProjectState {
@@ -46,7 +46,7 @@ impl ProjectState {
         self.compiling = true;
 
         // Check (skip discover, use provided source)
-        self.compilation = match check(source, CheckParams {}) {
+        self.compilation = match check(source, Default::default()) {
             Ok(project) => CompileResult::Success {
                 project: Box::new(project),
             },

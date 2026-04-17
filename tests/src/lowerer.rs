@@ -1,14 +1,36 @@
+use std::sync::Arc;
+
 use insta::assert_snapshot;
+
+use lutra_compiler as lc;
 
 #[track_caller]
 fn _test_compile_and_print(source: &str) -> String {
     crate::init_logger();
 
-    let program = match lutra_compiler::_test_compile_main(source) {
+    let program = match lc::_test_compile_main(source) {
         Ok(t) => t,
         Err(e) => panic!("{e}"),
     };
-    lutra_bin::ir::print(&program)
+    lutra_bin::ir::print_no_color(&program)
+}
+
+#[track_caller]
+fn _test_compile_dep_and_print(dep: &str, this: &str) -> String {
+    crate::init_logger();
+
+    // check dep
+    let dep_source = lc::SourceTree::single("".into(), dep.to_string());
+    let dep_project = Arc::new(lc::check(dep_source, Default::default()).unwrap());
+
+    // check this
+    let source = lc::SourceTree::single("".into(), this.to_string());
+    let project = lc::check(source, lc::CheckParams::new().with_dep("dep", dep_project)).unwrap();
+
+    // compile main
+    let program = lc::_test_compile_main_in(&project).unwrap();
+
+    lutra_bin::ir::print_no_color(&program)
 }
 
 #[test]
@@ -50,88 +72,88 @@ fn lower_01() {
     let main = (func 1 ->
       let 2 = (func 6 ->
         let 3 = (call
-          external.std::cmp[90m: func (int64, int64) -> std::Ordering[0m,
-          fn.6+0[90m: int64[0m,
-          fn.6+1[90m: int64[0m,
-        )[90m: std::Ordering[0m;
+          external.std::cmp: func (int64, int64) -> std::Ordering,
+          fn.6+0: int64,
+          fn.6+1: int64,
+        ): std::Ordering;
         (
           switch,
           (
             (enum_eq
-              var.3[90m: std::Ordering[0m
+              var.3: std::Ordering
               1
-            )[90m: bool[0m,
-            true[90m: bool[0m,
+            ): bool,
+            true: bool,
           ),
           (
-            true[90m: bool[0m,
-            false[90m: bool[0m,
+            true: bool,
+            false: bool,
           ),
-        )[90m: bool[0m
-      )[90m: func (int64, int64) -> bool[0m;
+        ): bool
+      ): func (int64, int64) -> bool;
       let 0 = (func 2 ->
         (call
-          external.std::index[90m: func ([chinook::album], int64) -> enum {none, some: chinook::album}[0m,
+          external.std::index: func ([chinook::album], int64) -> enum {none, some: chinook::album},
           (call
-            external.std::filter[90m: func ([chinook::album], func (chinook::album) -> bool) -> [chinook::album][0m,
+            external.std::filter: func ([chinook::album], func (chinook::album) -> bool) -> [chinook::album],
             (call
-              external.chinook::get_albums[90m: func () -> [chinook::album][0m,
-            )[90m: [chinook::album][0m,
+              external.chinook::get_albums: func () -> [chinook::album],
+            ): [chinook::album],
             (func 3 ->
               (call
-                var.2[90m: func (int64, int64) -> bool[0m,
+                var.2: func (int64, int64) -> bool,
                 (tuple_lookup
-                  fn.3+0[90m: chinook::album[0m
+                  fn.3+0: chinook::album
                   0
-                )[90m: int64[0m,
-                fn.2+0[90m: int64[0m,
-              )[90m: bool[0m
-            )[90m: func (chinook::album) -> bool[0m,
-          )[90m: [chinook::album][0m,
-          0[90m: int64[0m,
-        )[90m: enum {none, some: chinook::album}[0m
-      )[90m: func (int64) -> enum {none, some: chinook::album}[0m;
+                ): int64,
+                fn.2+0: int64,
+              ): bool
+            ): func (chinook::album) -> bool,
+          ): [chinook::album],
+          0: int64,
+        ): enum {none, some: chinook::album}
+      ): func (int64) -> enum {none, some: chinook::album};
       let 1 = (func 4 ->
         (call
-          external.std::index[90m: func ([box_office::AlbumSale], int64) -> enum {none, some: box_office::AlbumSale}[0m,
+          external.std::index: func ([box_office::AlbumSale], int64) -> enum {none, some: box_office::AlbumSale},
           (call
-            external.std::filter[90m: func ([box_office::AlbumSale], func (box_office::AlbumSale) -> bool) -> [box_office::AlbumSale][0m,
+            external.std::filter: func ([box_office::AlbumSale], func (box_office::AlbumSale) -> bool) -> [box_office::AlbumSale],
             (call
-              external.box_office::get_album_sales[90m: func () -> [box_office::AlbumSale][0m,
-            )[90m: [box_office::AlbumSale][0m,
+              external.box_office::get_album_sales: func () -> [box_office::AlbumSale],
+            ): [box_office::AlbumSale],
             (func 5 ->
               (call
-                var.2[90m: func (int64, int64) -> bool[0m,
+                var.2: func (int64, int64) -> bool,
                 (tuple_lookup
-                  fn.5+0[90m: box_office::AlbumSale[0m
+                  fn.5+0: box_office::AlbumSale
                   0
-                )[90m: int64[0m,
-                fn.4+0[90m: int64[0m,
-              )[90m: bool[0m
-            )[90m: func (box_office::AlbumSale) -> bool[0m,
-          )[90m: [box_office::AlbumSale][0m,
-          0[90m: int64[0m,
-        )[90m: enum {none, some: box_office::AlbumSale}[0m
-      )[90m: func (int64) -> enum {none, some: box_office::AlbumSale}[0m;
+                ): int64,
+                fn.4+0: int64,
+              ): bool
+            ): func (box_office::AlbumSale) -> bool,
+          ): [box_office::AlbumSale],
+          0: int64,
+        ): enum {none, some: box_office::AlbumSale}
+      ): func (int64) -> enum {none, some: box_office::AlbumSale};
       (call
         (func 0 ->
           (tuple
             (call
-              external.chinook::get_albums[90m: func () -> [chinook::album][0m,
-            )[90m: [chinook::album][0m,
+              external.chinook::get_albums: func () -> [chinook::album],
+            ): [chinook::album],
             (call
-              var.0[90m: func (int64) -> enum {none, some: chinook::album}[0m,
-              fn.0+0[90m: int64[0m,
-            )[90m: enum {none, some: chinook::album}[0m,
+              var.0: func (int64) -> enum {none, some: chinook::album},
+              fn.0+0: int64,
+            ): enum {none, some: chinook::album},
             (call
-              var.1[90m: func (int64) -> enum {none, some: box_office::AlbumSale}[0m,
-              fn.0+0[90m: int64[0m,
-            )[90m: enum {none, some: box_office::AlbumSale}[0m,
-          )[90m: {[chinook::album], enum {none, some: chinook::album}, enum {none, some: box_office::AlbumSale}}[0m
-        )[90m: func (int64) -> {[chinook::album], enum {none, some: chinook::album}, enum {none, some: box_office::AlbumSale}}[0m,
-        fn.1+0[90m: int64[0m,
-      )[90m: {[chinook::album], enum {none, some: chinook::album}, enum {none, some: box_office::AlbumSale}}[0m
-    )[90m: func (int64) -> {[chinook::album], enum {none, some: chinook::album}, enum {none, some: box_office::AlbumSale}}[0m
+              var.1: func (int64) -> enum {none, some: box_office::AlbumSale},
+              fn.0+0: int64,
+            ): enum {none, some: box_office::AlbumSale},
+          ): {[chinook::album], enum {none, some: chinook::album}, enum {none, some: box_office::AlbumSale}}
+        ): func (int64) -> {[chinook::album], enum {none, some: chinook::album}, enum {none, some: box_office::AlbumSale}},
+        fn.1+0: int64,
+      ): {[chinook::album], enum {none, some: chinook::album}, enum {none, some: box_office::AlbumSale}}
+    ): func (int64) -> {[chinook::album], enum {none, some: chinook::album}, enum {none, some: box_office::AlbumSale}}
     ")
 }
 
@@ -151,26 +173,26 @@ fn lower_02() {
     type Status = enum {open, closed: text};
     let main = (func 0 ->
       let 0 = (enum_variant 1
-        "x"[90m: text[0m
-      )[90m: Status[0m;
+        "x": text
+      ): Status;
       (
         switch,
         (
           (enum_eq
-            var.0[90m: Status[0m
+            var.0: Status
             0
-          )[90m: bool[0m,
-          "open"[90m: text[0m,
+          ): bool,
+          "open": text,
         ),
         (
           (enum_eq
-            var.0[90m: Status[0m
+            var.0: Status
             1
-          )[90m: bool[0m,
-          "closed"[90m: text[0m,
+          ): bool,
+          "closed": text,
         ),
-      )[90m: text[0m
-    )[90m: func ({}) -> text[0m
+      ): text
+    ): func ({}) -> text
     "#)
 }
 
@@ -180,27 +202,49 @@ fn lower_03() {
     func twice(x: T) where T -> {x, x}
 
     func main() -> twice([true, true, false])
-    "#), @r"
+    "#), @"
     let main = (func 1 ->
       let 0 = (func 2 ->
         (tuple
-          fn.2+0[90m: [bool][0m,
-          fn.2+0[90m: [bool][0m,
-        )[90m: {x: [bool], x: [bool]}[0m
-      )[90m: func ([bool]) -> {x: [bool], x: [bool]}[0m;
+          fn.2+0: [bool],
+          fn.2+0: [bool],
+        ): {x: [bool], x: [bool]}
+      ): func ([bool]) -> {x: [bool], x: [bool]};
       (call
         (func 0 ->
           (call
-            var.0[90m: func ([bool]) -> {x: [bool], x: [bool]}[0m,
+            var.0: func ([bool]) -> {x: [bool], x: [bool]},
             [
-              true[90m: bool[0m,
-              true[90m: bool[0m,
-              false[90m: bool[0m,
-            ][90m: [bool][0m,
-          )[90m: {x: [bool], x: [bool]}[0m
-        )[90m: func ({}) -> {x: [bool], x: [bool]}[0m,
-        fn.1+0[90m: {}[0m,
-      )[90m: {x: [bool], x: [bool]}[0m
-    )[90m: func ({}) -> {x: [bool], x: [bool]}[0m
+              true: bool,
+              true: bool,
+              false: bool,
+            ]: [bool],
+          ): {x: [bool], x: [bool]}
+        ): func ({}) -> {x: [bool], x: [bool]},
+        fn.1+0: {},
+      ): {x: [bool], x: [bool]}
+    ): func ({}) -> {x: [bool], x: [bool]}
     ")
+}
+
+#[test]
+fn lower_04() {
+    insta::assert_snapshot!(
+    _test_compile_dep_and_print(
+        r#"
+        type A: {kind: B}
+        type B: enum {none, some: A}
+        "#,
+        r#"
+        func main(): dep::A -> {kind = .none}
+        "#,
+    ), @"
+    type dep::B = enum {none, @recursive some: dep::A};
+    type dep::A = {kind: dep::B};
+    let main = (func 0 ->
+      (tuple
+        (enum_variant 0): dep::B,
+      ): {kind: dep::B}
+    ): func ({}) -> dep::A
+    ");
 }
