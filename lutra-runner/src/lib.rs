@@ -18,6 +18,9 @@ pub use sync::SyncRunner;
 pub use r#async::AsyncRunner;
 
 use lutra_bin::{rr, string, vec};
+#[cfg(not(feature = "std"))]
+#[macro_use]
+extern crate alloc;
 
 pub mod proto {
     include!(concat!(env!("OUT_DIR"), "/lutra.rs"));
@@ -185,6 +188,7 @@ impl proto::Error {
     }
 
     pub fn program_not_found(program_id: u32) -> proto::Error {
+        use lutra_bin::string::ToString;
         proto::Error {
             display: format!("Program {} not prepared", program_id),
             code: Some(crate::error_codes::PROGRAM_NOT_FOUND.to_string()),
@@ -203,6 +207,7 @@ impl ::std::error::Error for proto::Error {}
 
 impl From<lutra_bin::Error> for proto::Error {
     fn from(value: lutra_bin::Error) -> Self {
+        use lutra_bin::string::ToString;
         Self {
             code: Some(error_codes::DECODE_ERROR.into()),
             display: value.to_string(),

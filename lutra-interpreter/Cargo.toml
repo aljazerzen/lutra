@@ -10,6 +10,9 @@ version.workspace = true
 [lib]
 test = false
 
+[features]
+std = ["lutra-bin/std", "lutra-runner/std"]
+
 [dependencies]
 lutra-bin = { workspace = true }
 lutra-runner = { workspace = true }
