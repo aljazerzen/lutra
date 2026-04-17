@@ -28,6 +28,8 @@ dev FILTER_SET='all()' *NEXTEST_ARGS='':
     cargo check --all-targets --profile=test
     cargo clippy --all-targets
     cargo check -p lutra-bin --no-default-features
+    cargo check -p lutra-runner --no-default-features
+    cargo check -p lutra-sql --no-default-features
 
 # Run ignored tests
 test-ignored:

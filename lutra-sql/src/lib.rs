@@ -2,6 +2,7 @@
 #![cfg_attr(not(feature = "std"), no_std)]
 
 #[cfg(not(feature = "std"))]
+#[macro_use]
 extern crate alloc;
 
 mod display_utils;
@@ -12,16 +13,13 @@ mod string;
 #[cfg(not(feature = "std"))]
 use alloc::{
     boxed::Box,
-    format,
     string::{String, ToString},
     vec::Vec,
 };
 
 use core::cmp::Ordering;
-use core::{
-    fmt::{self, Display},
-    hash,
-};
+use core::fmt::{self, Display};
+use core::hash;
 
 use display_utils::{NewLine, SpaceOrNewline};
 
@@ -166,7 +164,7 @@ impl Ident {
 }
 
 fn valid_ident_regex() -> &'static regex::Regex {
-    static VALID_IDENT: std::sync::OnceLock<regex::Regex> = std::sync::OnceLock::new();
+    static VALID_IDENT: once_cell::race::OnceBox<regex::Regex> = once_cell::race::OnceBox::new();
     VALID_IDENT.get_or_init(|| {
         // One of:
         // - `*`
@@ -174,7 +172,7 @@ fn valid_ident_regex() -> &'static regex::Regex {
         //
         // We could replace this with pomsky (regex<>pomsky : sql<>prql)
         // ^ ('*' | [ascii_lower '_$'] [ascii_lower ascii_digit '_$']* ) $
-        regex::Regex::new(r"^((\*)|(^[a-z_\$][a-z0-9_\$]*))$").unwrap()
+        Box::new(regex::Regex::new(r"^((\*)|(^[a-z_\$][a-z0-9_\$]*))$").unwrap())
     })
 }
 

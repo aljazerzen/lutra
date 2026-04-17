@@ -1,6 +1,3 @@
-#[cfg(not(feature = "std"))]
-use alloc::string::String;
-
 use core::fmt;
 
 pub fn escape(string: &str, quote: char) -> EscapeQuotedString<'_> {
