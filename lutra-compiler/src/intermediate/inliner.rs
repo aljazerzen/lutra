@@ -18,7 +18,7 @@ pub fn inline(program: ir::Program) -> ir::Program {
     };
     program.main = inliner.fold_expr(program.main).unwrap();
 
-    tracing::debug!("ir (funcs inlined):\n{}", ir::print(&program));
+    tracing::debug!("ir (funcs inlined):\n{}", ir::print_no_color(&program));
 
     // count bindings usage
     let mut counter = BindingUsageCounter {

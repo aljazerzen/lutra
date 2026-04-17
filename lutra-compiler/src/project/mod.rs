@@ -4,6 +4,7 @@ pub use analysis::{SymbolInfo, TargetMap, TargetSpan};
 
 use std::path;
 use std::str::FromStr;
+use std::sync::Arc;
 
 use indexmap::IndexMap;
 use itertools::Itertools;
@@ -30,11 +31,11 @@ pub struct Project {
     pub target_map: analysis::TargetMap,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Dependency {
     pub name: String,
 
-    pub inner: Project,
+    pub inner: Arc<Project>,
 }
 
 impl Project {

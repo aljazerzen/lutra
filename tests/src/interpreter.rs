@@ -188,7 +188,7 @@ fn func_call_size() {
         .into(),
     );
 
-    let project = lutra_compiler::check(source, lutra_compiler::CheckParams {}).unwrap();
+    let project = lutra_compiler::check(source, Default::default()).unwrap();
     let (program, _ty) = lutra_compiler::compile(
         &project,
         "x",
