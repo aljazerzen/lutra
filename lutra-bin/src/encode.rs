@@ -248,6 +248,71 @@ impl<E: Encode + Layout> Encode for Option<E> {
     }
 }
 
+impl<T: Encode + Layout, E: Encode + Layout> Encode for core::result::Result<T, E> {
+    type HeadPtr =
+        core::result::Result<core::result::Result<T::HeadPtr, E::HeadPtr>, ReversePointer>;
+
+    #[allow(clippy::collapsible_else_if)]
+    fn encode_head(&self, buf: &mut BytesMut) -> Self::HeadPtr {
+        let t_head_bits = T::head_size();
+        let e_head_bits = E::head_size();
+        let max_head_bits = t_head_bits.max(e_head_bits);
+        let has_ptr = max_head_bits > 32;
+        let inner_bytes = if has_ptr {
+            4
+        } else {
+            max_head_bits.div_ceil(8)
+        };
+
+        let tag: u8 = if self.is_ok() { 0 } else { 1 };
+        buf.put_u8(tag);
+
+        if has_ptr {
+            let ptr = ReversePointer::new(buf);
+            Err(ptr)
+        } else {
+            match self {
+                Ok(inner) => {
+                    let head_ptr = inner.encode_head(buf);
+                    buf.put_bytes(0, inner_bytes - t_head_bits.div_ceil(8));
+                    Ok(Ok(head_ptr))
+                }
+                Err(inner) => {
+                    let head_ptr = inner.encode_head(buf);
+                    buf.put_bytes(0, inner_bytes - e_head_bits.div_ceil(8));
+                    Ok(Err(head_ptr))
+                }
+            }
+        }
+    }
+
+    fn encode_body(&self, head: Self::HeadPtr, buf: &mut BytesMut) {
+        match head {
+            Err(ptr) => {
+                ptr.write_cur_len(buf);
+                match self {
+                    Ok(inner) => {
+                        let hp = inner.encode_head(buf);
+                        inner.encode_body(hp, buf);
+                    }
+                    Err(inner) => {
+                        let hp = inner.encode_head(buf);
+                        inner.encode_body(hp, buf);
+                    }
+                }
+            }
+            Ok(Ok(head)) => {
+                let Ok(inner) = self else { unreachable!() };
+                inner.encode_body(head, buf);
+            }
+            Ok(Err(head)) => {
+                let Err(inner) = self else { unreachable!() };
+                inner.encode_body(head, buf);
+            }
+        }
+    }
+}
+
 impl Encode for () {
     type HeadPtr = ();
 

@@ -255,8 +255,8 @@ impl ProgramPane {
             lutra_runner::proto::ResponseKind::Execute(r) => r,
             _ => return Ok(()),
         };
-        match execute_result {
-            lutra_runner::proto::ExecuteResult::Ok(output) => {
+        match execute_result.0 {
+            Ok(output) => {
                 // SAFETY: program_ty must be Some if we're executing
                 let program_ty = self
                     .program_ty
@@ -277,7 +277,7 @@ impl ProgramPane {
                 self.output_pane = Some(OutputPane::new(program_ty, output, duration, auto_run));
                 self.stage = RunStage::Output;
             }
-            lutra_runner::proto::ExecuteResult::Err(err) => {
+            Err(err) => {
                 // Format error message with code if present
                 let error_msg = match &err.code {
                     Some(code) => format!("{}: {}", code, err.display),

@@ -106,10 +106,7 @@ where
             return Err(unexpected_response_kind());
         };
 
-        match result {
-            proto::SchemaResult::Ok(schema) => Ok(schema),
-            proto::SchemaResult::Err(e) => Err(e),
-        }
+        result.0
     }
 
     /// Read responses until finding the one with the matching `request_id`.
@@ -154,10 +151,7 @@ where
             return Err(unexpected_response_kind());
         };
 
-        match result {
-            proto::ExecuteResult::Ok(output) => Ok(output),
-            proto::ExecuteResult::Err(err) => Err(err),
-        }
+        result.0
     }
 
     async fn pull_schema(&self) -> Result<std::string::String, proto::Error> {

@@ -21,3 +21,9 @@ type Tree: enum {Leaf: uint8, Node: {left: Tree, right: Tree}}
 type opt: enum {None, Some: text}
 
 type opt2: enum {None, Some: int16}
+
+type res: enum {ok: int8, err: int16}
+
+type res2: enum {ok: bool, err: bool}
+
+type res3: enum {ok: text, err: text}

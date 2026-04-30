@@ -85,6 +85,13 @@ pub fn write_ty_def(
             writeln!(w, ");\n")?;
         }
 
+        ir::TyKind::Enum(variants) if is_result_enum(variants, &ty.variants_recursive) => {
+            // generate a wrapper new-type struct
+            write!(w, "pub struct {name}(pub ")?;
+            write_ty_ref(w, ty, false, ctx)?;
+            writeln!(w, ");\n")?;
+        }
+
         ir::TyKind::Tuple(fields) => {
             writeln!(w, "pub struct {name} {{")?;
 
@@ -237,6 +244,22 @@ pub fn write_ty_ref(
             write!(w, ">")?;
         }
 
+        ir::TyKind::Enum(variants) if is_result_enum(variants, &ty.variants_recursive) => {
+            let ok_ty = &variants[0].ty;
+            let err_ty = &variants[1].ty;
+
+            write!(w, "core::result::Result")?;
+            if as_expr {
+                write!(w, "::<")?;
+            } else {
+                write!(w, "<")?;
+            }
+            write_ty_ref(w, ok_ty, as_expr, ctx)?;
+            write!(w, ", ")?;
+            write_ty_ref(w, err_ty, as_expr, ctx)?;
+            write!(w, ">")?;
+        }
+
         ir::TyKind::Tuple(_) | ir::TyKind::Enum(_) => {
             ctx.def_buffer.push_back(ty.clone());
 
@@ -258,4 +281,11 @@ pub fn is_unit_variant(variant_ty: &ir::Ty) -> bool {
 
 pub fn is_option_enum(variants: &[ir::TyEnumVariant]) -> bool {
     variants.len() == 2 && is_unit_variant(&variants[0].ty) && !is_unit_variant(&variants[1].ty)
+}
+
+pub fn is_result_enum(variants: &[ir::TyEnumVariant], variants_recursive: &[u16]) -> bool {
+    variants_recursive.is_empty()
+        && variants.len() == 2
+        && !is_unit_variant(&variants[0].ty)
+        && !is_unit_variant(&variants[1].ty)
 }

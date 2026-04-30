@@ -283,6 +283,92 @@ fn test_opt2_01() {
 }
 
 #[test]
+fn test_res_01() {
+    let ty = _test_get_type("res");
+    let value = Value::Enum(
+        0, // ok
+        Box::new(Value::Prim8(42)),
+    );
+    assert_snapshot!(_test_encode_decode::<types::res>(value, ty), @r#"
+    Length: 3 (0x3) bytes
+    0000:   00 2a 00                                             .*.
+    "#
+    );
+}
+
+#[test]
+fn test_res_02() {
+    let ty = _test_get_type("res");
+    let value = Value::Enum(
+        1, // err
+        Box::new(Value::Prim16(1000)),
+    );
+    assert_snapshot!(_test_encode_decode::<types::res>(value, ty), @r#"
+    Length: 3 (0x3) bytes
+    0000:   01 e8 03                                             ...
+    "#
+    );
+}
+
+#[test]
+fn test_res2_01() {
+    let ty = _test_get_type("res2");
+    let value = Value::Enum(
+        0,                         // ok
+        Box::new(Value::Prim8(1)), // true
+    );
+    assert_snapshot!(_test_encode_decode::<types::res2>(value, ty), @r"
+    Length: 2 (0x2) bytes
+    0000:   00 01                                                ..
+    "
+    );
+}
+
+#[test]
+fn test_res2_02() {
+    let ty = _test_get_type("res2");
+    let value = Value::Enum(
+        1,                         // err
+        Box::new(Value::Prim8(0)), // false
+    );
+    assert_snapshot!(_test_encode_decode::<types::res2>(value, ty), @r"
+    Length: 2 (0x2) bytes
+    0000:   01 00                                                ..
+    "
+    );
+}
+
+#[test]
+fn test_res3_01() {
+    let ty = _test_get_type("res3");
+    let value = Value::Enum(
+        0, // ok
+        Box::new(Value::Text("hello".into())),
+    );
+    assert_snapshot!(_test_encode_decode::<types::res3>(value, ty), @r#"
+    Length: 18 (0x12) bytes
+    0000:   00 04 00 00  00 08 00 00  00 05 00 00  00 68 65 6c   .............hel
+    0010:   6c 6f                                                lo
+    "#
+    );
+}
+
+#[test]
+fn test_res3_02() {
+    let ty = _test_get_type("res3");
+    let value = Value::Enum(
+        1, // err
+        Box::new(Value::Text("world".into())),
+    );
+    assert_snapshot!(_test_encode_decode::<types::res3>(value, ty), @r#"
+    Length: 18 (0x12) bytes
+    0000:   01 04 00 00  00 08 00 00  00 05 00 00  00 77 6f 72   .............wor
+    0010:   6c 64                                                ld
+    "#
+    );
+}
+
+#[test]
 fn test_opt2_02() {
     let ty = _test_get_type("opt2");
     let value = Value::Enum(
