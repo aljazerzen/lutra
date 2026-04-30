@@ -104,6 +104,39 @@ impl<E: Decode> Decode for Option<E> {
         }
     }
 }
+impl<T: Decode, E: Decode> Decode for core::result::Result<T, E> {
+    fn decode(buf: &[u8]) -> Result<Self> {
+        let t_head_bits = T::head_size();
+        let e_head_bits = E::head_size();
+        let max_head_bits = t_head_bits.max(e_head_bits);
+        let has_ptr = max_head_bits > 32;
+
+        let [tag] = buf.read_const::<1>();
+        let buf = buf.skip(1);
+
+        Ok(match tag {
+            0 => {
+                let t = if has_ptr {
+                    let offset = u32::from_le_bytes(buf.read_const::<4>()) as usize;
+                    T::decode(buf.skip(offset))?
+                } else {
+                    T::decode(buf)?
+                };
+                Ok(t)
+            }
+            1 => {
+                let e = if has_ptr {
+                    let offset = u32::from_le_bytes(buf.read_const::<4>()) as usize;
+                    E::decode(buf.skip(offset))?
+                } else {
+                    E::decode(buf)?
+                };
+                Err(e)
+            }
+            _ => return Err(crate::Error::InvalidData),
+        })
+    }
+}
 impl Decode for () {
     fn decode(_buf: &[u8]) -> Result<Self> {
         Ok(())

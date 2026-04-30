@@ -221,12 +221,9 @@ impl From<Result<(), proto::Error>> for proto::PrepareResult {
     }
 }
 
-impl From<Result<crate::vec::Vec<u8>, proto::Error>> for proto::ExecuteResult {
-    fn from(value: Result<crate::vec::Vec<u8>, proto::Error>) -> Self {
-        match value {
-            Ok(v) => Self::Ok(v),
-            Err(e) => Self::Err(e),
-        }
+impl From<Result<lutra_bin::vec::Vec<u8>, proto::Error>> for proto::ExecuteResult {
+    fn from(value: Result<lutra_bin::vec::Vec<u8>, proto::Error>) -> Self {
+        Self(value)
     }
 }
 
@@ -236,11 +233,8 @@ impl From<Result<(), proto::Error>> for proto::ReleaseResult {
     }
 }
 
-impl From<Result<crate::string::String, proto::Error>> for proto::SchemaResult {
-    fn from(value: Result<crate::string::String, proto::Error>) -> Self {
-        match value {
-            Ok(v) => Self::Ok(v),
-            Err(e) => Self::Err(e),
-        }
+impl From<Result<lutra_bin::string::String, proto::Error>> for proto::SchemaResult {
+    fn from(value: Result<lutra_bin::string::String, proto::Error>) -> Self {
+        Self(value)
     }
 }

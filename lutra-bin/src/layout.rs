@@ -98,6 +98,14 @@ impl<I: Layout> Layout for Option<I> {
     }
 }
 
+impl<T: Layout, E: Layout> Layout for core::result::Result<T, E> {
+    fn head_size() -> usize {
+        // 1 byte tag + inline inner (capped at 32 bits → 4 bytes when a pointer is needed)
+        let max_bits = T::head_size().max(E::head_size());
+        8 + max_bits.min(32)
+    }
+}
+
 impl Layout for () {
     fn head_size() -> usize {
         0

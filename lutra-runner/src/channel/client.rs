@@ -166,10 +166,7 @@ impl RunSync for Client {
     ) -> Result<vec::Vec<u8>, proto::Error> {
         let request_id = self.sender.execute(program_id, input)?;
         match self.receiver.blocking_recv_for(request_id)? {
-            proto::ResponseKind::Execute(result) => match result {
-                proto::ExecuteResult::Ok(output) => Ok(output),
-                proto::ExecuteResult::Err(err) => Err(err),
-            },
+            proto::ResponseKind::Execute(result) => result.0,
             _ => Err(disconnected()),
         }
     }
@@ -177,10 +174,7 @@ impl RunSync for Client {
     fn pull_schema_sync(&mut self) -> Result<lutra_bin::string::String, proto::Error> {
         let request_id = self.sender.pull_schema()?;
         match self.receiver.blocking_recv_for(request_id)? {
-            proto::ResponseKind::Schema(result) => match result {
-                proto::SchemaResult::Ok(schema) => Ok(schema),
-                proto::SchemaResult::Err(e) => Err(e),
-            },
+            proto::ResponseKind::Schema(result) => result.0,
             _ => Err(disconnected()),
         }
     }

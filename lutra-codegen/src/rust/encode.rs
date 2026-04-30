@@ -3,7 +3,9 @@ use std::fmt::Write;
 use lutra_bin::{ir, layout};
 
 use crate::rust::Context;
-use crate::rust::types::{is_option_enum, is_unit_variant, variant_needs_box, write_ty_ref};
+use crate::rust::types::{
+    is_option_enum, is_result_enum, is_unit_variant, variant_needs_box, write_ty_ref,
+};
 
 pub fn write_encode_impls(
     w: &mut impl Write,
@@ -76,6 +78,33 @@ fn write_ty_def_impl(
             writeln!(w, "         <{inner_head_ptr} as {lutra_bin}::Encode>::HeadPtr,")?;
             writeln!(w, "         {lutra_bin}::ReversePointer,")?;
             writeln!(w, "    >>;")?;
+            writeln!(w, "    fn encode_head(&self, buf: &mut {lutra_bin}::bytes::BytesMut) -> Self::HeadPtr {{")?;
+            writeln!(w, "        self.0.encode_head(buf)")?;
+            writeln!(w, "    }}")?;
+            writeln!(w, "    fn encode_body(&self, head: Self::HeadPtr, buf: &mut {lutra_bin}::bytes::BytesMut) {{")?;
+            writeln!(w, "        self.0.encode_body(head, buf)")?;
+            writeln!(w, "    }}")?;
+            writeln!(w, "}}")?;
+        }
+
+        ir::TyKind::Enum(variants) if is_result_enum(variants, &ty.variants_recursive) => {
+            let ok_ty = &variants[0].ty;
+            let err_ty = &variants[1].ty;
+
+            let mut ok_head_ptr = String::new();
+            write_ty_ref(&mut ok_head_ptr, ok_ty, true, ctx)?;
+
+            let mut err_head_ptr = String::new();
+            write_ty_ref(&mut err_head_ptr, err_ty, true, ctx)?;
+
+            writeln!(w, "impl {lutra_bin}::Encode for {name} {{")?;
+            writeln!(w, "    type HeadPtr = core::result::Result<")?;
+            writeln!(w, "        core::result::Result<")?;
+            writeln!(w, "            <{ok_head_ptr} as {lutra_bin}::Encode>::HeadPtr,")?;
+            writeln!(w, "            <{err_head_ptr} as {lutra_bin}::Encode>::HeadPtr,")?;
+            writeln!(w, "        >,")?;
+            writeln!(w, "        {lutra_bin}::ReversePointer,")?;
+            writeln!(w, "    >;")?;
             writeln!(w, "    fn encode_head(&self, buf: &mut {lutra_bin}::bytes::BytesMut) -> Self::HeadPtr {{")?;
             writeln!(w, "        self.0.encode_head(buf)")?;
             writeln!(w, "    }}")?;
@@ -283,6 +312,21 @@ fn write_ty_def_impl(
         }
 
         ir::TyKind::Enum(variants) if is_option_enum(variants) => {
+            writeln!(w, "impl {lutra_bin}::Decode for {name} {{")?;
+            writeln!(
+                w,
+                "    fn decode(buf: &[u8]) -> {lutra_bin}::Result<Self> {{"
+            )?;
+
+            write!(w, "        Ok(Self(")?;
+            write_ty_ref(w, ty, true, ctx)?;
+            writeln!(w, "::decode(buf)?))")?;
+
+            writeln!(w, "    }}")?;
+            writeln!(w, "}}\n")?;
+        }
+
+        ir::TyKind::Enum(variants) if is_result_enum(variants, &ty.variants_recursive) => {
             writeln!(w, "impl {lutra_bin}::Decode for {name} {{")?;
             writeln!(
                 w,
