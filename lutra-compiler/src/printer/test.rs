@@ -19,7 +19,7 @@ fn _format(source: &str) -> String {
 }
 
 #[track_caller]
-fn _print_edits(source: &str) -> (crate::pr::Source, Vec<crate::codespan::TextEdit>) {
+fn _print_edits(source: &str) -> (crate::pr::Source, Vec<crate::codespan::TextEdit<'_>>) {
     let (parsed, dia, trivia) = crate::parser::parse_source(source, 0);
 
     if !dia.is_empty() {
@@ -766,7 +766,7 @@ fn source_03() {
 
 #[track_caller]
 fn _signature(source: &str, name: &str) -> String {
-    use super::format_def_signature;
+    use super::print_def_signature;
     use crate::check;
     use crate::project::SourceTree;
 
@@ -774,7 +774,7 @@ fn _signature(source: &str, name: &str) -> String {
     let project = check(tree, Default::default()).expect("type error");
     let path = crate::pr::Path::from_name(name);
     let def = project.root_module.get(&path).expect("def not found");
-    format_def_signature(name, def).expect("no signature")
+    print_def_signature(name, def).expect("no signature")
 }
 
 #[test]

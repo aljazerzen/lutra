@@ -3,6 +3,7 @@
 //! Low-level tabular data reader.
 
 use std::collections::HashMap;
+use std::num::NonZero;
 use std::rc::Rc;
 
 use crate::TupleReader;
@@ -72,11 +73,11 @@ impl<'d, 't> TabularReader<'d, 't> {
         r
     }
 
-    pub(crate) fn ty(&self) -> &'t ir::Ty {
+    pub fn ty(&self) -> &'t ir::Ty {
         self.inner.ty()
     }
 
-    pub(super) fn get_ty_mat(&self, ty: &'t ir::Ty) -> &'t ir::Ty {
+    pub fn get_ty_mat(&self, ty: &'t ir::Ty) -> &'t ir::Ty {
         let mut ty = ty;
         while let ir::TyKind::Ident(path) = &ty.kind {
             ty = self.types.get(path).unwrap();
@@ -119,6 +120,16 @@ impl<'d, 't> TabularReader<'d, 't> {
                 }
             }
             ir::TyKind::Ident(_) | ir::TyKind::Function(_) => unreachable!(),
+        }
+    }
+
+    pub fn advance_by_(&mut self, n: usize) -> Result<(), NonZero<usize>> {
+        let items = n.min(self.rem_items);
+        self.rem_items -= items;
+        self.inner.data = &self.inner.data[(items * self.array_item_size)..];
+        match NonZero::new(n - items) {
+            Some(k) => Err(k),
+            None => Ok(()),
         }
     }
 }

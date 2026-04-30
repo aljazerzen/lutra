@@ -1,10 +1,10 @@
 use crossterm::event::KeyCode;
-use ratatui::prelude::*;
 
-use crate::utils::{clip_left, clip_top};
+use crate::terminal::{Action, Span, Style, View};
 
-use super::{Action, Form, FormResult};
+use super::{Form, FormResult};
 
+#[derive(Clone)]
 pub struct BoolForm {
     value: bool,
 }
@@ -14,24 +14,21 @@ impl BoolForm {
         BoolForm { value }
     }
 
-    pub fn render(&self, form: &Form, frame: &mut Frame<'_>, area: Rect) -> Rect {
-        let area_value = super::render_name_colon(form, frame, area);
-
-        if form.cursor {
-            frame.render_widget("[ ]".black().on_white(), area_value);
+    pub fn render<'a>(&self, form: &'a Form, focused: bool) -> View<'a> {
+        let mut line = form.render_name_prefix(focused);
+        let box_style = if focused && form.cursor {
+            Style::cursor()
         } else {
-            frame.render_widget("[ ]".white(), area_value);
+            Style::new()
         };
-        if self.value {
-            let area_x = clip_left(area_value, 1);
-            if form.cursor {
-                frame.render_widget("x".black(), area_x);
-            } else {
-                frame.render_widget("x".white(), area_x);
-            }
-        }
+        let value = if self.value { "[x]" } else { "[ ]" };
+        line.push_span(Span::styled(value, box_style));
 
-        clip_top(area, 1)
+        let mut view = View::from(line);
+        if focused && form.cursor {
+            view.set_cursor_inline();
+        }
+        view
     }
 
     pub fn handle(&mut self, action: &Action) -> FormResult {

@@ -2,19 +2,24 @@
 
 use insta::assert_snapshot;
 use lutra_bin::Value;
+use lutra_tui::table;
 
 fn _table(ty_src: &str, value: Value) -> String {
     let ty = lutra_compiler::_test_compile_ty(ty_src);
     let data = value.encode(&ty, &[]).unwrap();
 
-    lutra_bin::Table::new(&data, &ty, &[]).render()
+    table::Table::new(&data, &ty, &[])
+        .render_once(Default::default())
+        .to_string()
 }
 
-fn _table_with_config(ty_src: &str, value: Value, config: lutra_bin::TableConfig) -> String {
+fn _table_with_config(ty_src: &str, value: Value, config: table::Config) -> String {
     let ty = lutra_compiler::_test_compile_ty(ty_src);
     let data = value.encode(&ty, &[]).unwrap();
 
-    lutra_bin::Table::new(&data, &ty, &[]).render_with_config(&config)
+    table::Table::new(&data, &ty, &[])
+        .render_once(config)
+        .to_string()
 }
 
 #[test]
@@ -179,7 +184,7 @@ fn test_enum_with_flat_payload() {
 
 #[test]
 fn test_text_truncation() {
-    let config = lutra_bin::TableConfig {
+    let config = table::Config {
         max_col_width: 10,
         max_array_items: 3,
         sample_rows: Some(100),

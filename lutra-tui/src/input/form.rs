@@ -7,14 +7,11 @@ mod text;
 mod tuple;
 
 use lutra_bin::ir;
-use ratatui::prelude::*;
 use std::borrow::Cow;
 use std::collections::HashMap;
 use std::rc::Rc;
 
-use crate::utils::clip_left;
-
-use super::Action;
+use crate::terminal::{Action, Line, Span, Style, View};
 
 use self::array::ArrayForm;
 use self::bool::BoolForm;
@@ -26,6 +23,7 @@ use self::tuple::TupleForm;
 
 pub type TyDefs = Rc<HashMap<ir::Path, ir::Ty>>;
 
+#[derive(Clone)]
 pub struct Form {
     pub name: FormName,
     pub ty: ir::Ty,
@@ -34,6 +32,7 @@ pub struct Form {
     pub ty_defs: TyDefs,
 }
 
+#[derive(Clone)]
 pub enum FormKind {
     Bool(BoolForm),
     Text(TextForm),
@@ -51,7 +50,6 @@ pub enum FormResult {
     Submit,
 }
 
-/// Recursively resolve type identifiers to concrete types
 fn resolve_ty<'a>(ty: &'a ir::Ty, ty_defs: &'a TyDefs) -> &'a ir::Ty {
     match &ty.kind {
         ir::TyKind::Ident(path) => {
@@ -77,13 +75,12 @@ impl Form {
             name: FormName::default(),
             kind: FormKind::Button(ButtonForm::new(form, submit_text)),
             cursor: false,
-            ty: ir::Ty::new_unit(), // does not matter
+            ty: ir::Ty::new_unit(),
             ty_defs,
         }
     }
 
     pub fn new(ty: &ir::Ty, name: FormName, ty_defs: TyDefs) -> Self {
-        // Resolve any type identifiers
         let resolved_ty = resolve_ty(ty, &ty_defs);
 
         let kind: FormKind = match &resolved_ty.kind {
@@ -91,8 +88,6 @@ impl Form {
                 FormKind::Text(TextForm::new(String::new()))
             }
             ir::TyKind::Primitive(ir::TyPrimitive::bool) => FormKind::Bool(BoolForm::new(false)),
-
-            // All numeric types use NumberForm
             ir::TyKind::Primitive(
                 prim @ (ir::TyPrimitive::int8
                 | ir::TyPrimitive::int16
@@ -105,13 +100,10 @@ impl Form {
                 | ir::TyPrimitive::float32
                 | ir::TyPrimitive::float64),
             ) => FormKind::Number(NumberForm::new(*prim, "0".into())),
-
             ir::TyKind::Enum(variants) => FormKind::Enum(EnumForm::new(variants, ty_defs.clone())),
             ir::TyKind::Tuple(fields) if fields.is_empty() => FormKind::TupleUnit,
             ir::TyKind::Tuple(fields) => FormKind::Tuple(TupleForm::new(fields, ty_defs.clone())),
-
             ir::TyKind::Array(_) => FormKind::Array(ArrayForm::new()),
-
             ir::TyKind::Ident(_) => panic!("Type identifier should have been resolved"),
             ir::TyKind::Function(_) => panic!("Function types cannot be input in forms"),
         };
@@ -134,25 +126,16 @@ impl Form {
         }
     }
 
-    fn get_name(&self) -> Cow<'_, str> {
-        self.name.as_str().unwrap_or(Cow::Borrowed("(unnamed)"))
-    }
-
-    pub fn render(&self, frame: &mut Frame, area: Rect) -> Rect {
-        if area.is_empty() {
-            return area;
-        }
-
-        // render inner
+    pub fn view<'a>(&'a self, focused: bool) -> View<'a> {
         match &self.kind {
-            FormKind::Bool(form) => form.render(self, frame, area),
-            FormKind::Text(form) => form.render(self, frame, area),
-            FormKind::Number(form) => form.render(self, frame, area),
-            FormKind::Tuple(form) => form.render(self, frame, area),
-            FormKind::TupleUnit => area,
-            FormKind::Enum(form) => form.render(self, frame, area),
-            FormKind::Array(form) => form.render(self, frame, area),
-            FormKind::Button(form) => form.render(self, frame, area),
+            FormKind::Bool(form) => form.render(self, focused),
+            FormKind::Text(form) => form.render(self, focused),
+            FormKind::Number(form) => form.render(self, focused),
+            FormKind::Tuple(form) => form.render(self, focused),
+            FormKind::TupleUnit => View::new(),
+            FormKind::Enum(form) => form.render(self, focused),
+            FormKind::Array(form) => form.render(self, focused),
+            FormKind::Button(form) => form.render(self, focused),
         }
     }
 
@@ -193,8 +176,6 @@ impl Form {
         }
     }
 
-    /// Walks over all focusable forms and stops when the cursor form is found.
-    /// Returns number of passed forms and boolean indicating that cursor has been found.
     pub fn take_cursor(&mut self) -> (usize, bool) {
         if self.cursor && !matches!(self.kind, FormKind::Button(_)) {
             self.cursor = false;
@@ -255,8 +236,6 @@ impl Form {
         (passed_forms, false)
     }
 
-    /// Walks over focusable forms and sets cursor at the specified position. If that
-    /// position is not found, `Err(position - number of focusable nodes)` is returned.
     pub fn insert_cursor(&mut self, mut position: usize) -> Result<Vec<usize>, usize> {
         match &mut self.kind {
             FormKind::Tuple(form) =>
@@ -273,13 +252,11 @@ impl Form {
                         }
                     }
                     Err(position)
+                } else if position == 0 {
+                    self.cursor = true;
+                    Ok(vec![])
                 } else {
-                    if position == 0 {
-                        self.cursor = true;
-                        Ok(vec![])
-                    } else {
-                        Err(position - 1)
-                    }
+                    Err(position - 1)
                 }
             }
             FormKind::TupleUnit => Err(position),
@@ -327,16 +304,14 @@ impl Form {
             }
             FormKind::Button(form) => match form.inner.insert_cursor(position) {
                 Ok(mut path) => {
-                    // found, prefix with 0
                     path.insert(0, 0);
                     Ok(path)
                 }
                 Err(0) => {
-                    // cursor on button
                     self.cursor = true;
                     Ok(vec![])
                 }
-                Err(p) => Err(p - 1), // cursor somewhere after button
+                Err(p) => Err(p - 1),
             },
         }
     }
@@ -366,9 +341,28 @@ impl Form {
             FormKind::Button(form) => form.inner.set_value(value),
         }
     }
+
+    fn get_name(&self) -> Cow<'_, str> {
+        self.name.as_str().unwrap_or(Cow::Borrowed("(unnamed)"))
+    }
+
+    fn render_name_prefix(&self, focused: bool) -> Line<'_> {
+        Line::from(vec![
+            Span::styled(self.get_name(), self.name_style(focused)),
+            Span::styled(": ", self.name_style(focused)),
+        ])
+    }
+
+    fn name_style(&self, focused: bool) -> Style {
+        if focused && self.cursor {
+            Style::accent().bold()
+        } else {
+            Style::muted()
+        }
+    }
 }
 
-#[derive(Default)]
+#[derive(Default, Clone)]
 pub struct FormName {
     name: Option<String>,
     position: Option<usize>,
@@ -386,27 +380,11 @@ impl From<String> for FormName {
 impl FormName {
     fn as_str(&self) -> Option<Cow<'_, str>> {
         if let Some(name) = &self.name {
-            return Some(Cow::from(name));
+            return Some(Cow::Borrowed(name));
         }
         if let Some(pos) = &self.position {
-            return Some(Cow::from(pos.to_string()));
+            return Some(Cow::Owned(pos.to_string()));
         }
         None
     }
-}
-
-pub fn render_name_colon(form: &Form, frame: &mut Frame, area: Rect) -> Rect {
-    let name = form.get_name();
-
-    let name_span = if form.cursor {
-        name.as_ref().white().bold()
-    } else {
-        name.as_ref().white()
-    };
-    frame.render_widget(name_span, area);
-
-    let area_colon = clip_left(area, name.len() as u16);
-    frame.render_widget(":".white(), area_colon);
-
-    clip_left(area_colon, 2)
 }

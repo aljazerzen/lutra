@@ -14,6 +14,7 @@ members = [
     "lutra-tui",
     "lutra-cli",
     "lutra-ir",
+    "lutra-project-tools",
     "tests",
 ]
 exclude = ["examples"]
@@ -58,6 +59,7 @@ lutra-codegen = { version = "0.5", path = "lutra-codegen" }
 lutra-compiler = { version = "0.5", path = "lutra-compiler" }
 lutra-interpreter = { version = "0.5", path = "lutra-interpreter" }
 lutra-ir = { version = "0.5", path = "lutra-ir" }
+lutra-project-tools = { version = "0.5", path = "lutra-project-tools" }
 lutra-runner = { version = "0.5", path = "lutra-runner" }
 lutra-runner-duckdb = { version = "0.5", path = "lutra-runner-duckdb" }
 lutra-runner-postgres = { version = "0.5", path = "lutra-runner-postgres", default-features = false }

@@ -70,6 +70,14 @@ pub fn parse_expr(source: &str, source_id: u16) -> (Option<pr::Expr>, Vec<Diagno
     (ast, errors)
 }
 
+pub fn parse_path(source: &str) -> Option<pr::Path> {
+    let tokens = lexer::lex_source(source).ok()?;
+    let tokens = prepare_tokens(tokens.collect(), 0);
+
+    let (path, _) = expr::path().parse(tokens.as_input()).into_output_errors();
+    path
+}
+
 /// Convert the output of the lexer into token pairs and end-of-input span.
 fn prepare_tokens(tokens: Vec<lexer::Token>, source_id: u16) -> ParserTokens {
     let pairs: Vec<(TokenKind, Span)> = tokens

@@ -1,10 +1,9 @@
 //! Layout computation for table rendering (pass 1).
 
-use bytes::Buf;
+use lutra_bin::bytes::Buf;
 
-use crate::ArrayReader;
-use crate::ir;
-use crate::tabular::TableCell;
+use lutra_bin::ir;
+use lutra_bin::{ArrayReader, TableCell};
 
 use super::format::{format_ty_name, format_value, truncate};
 use super::{Config, Table};
@@ -12,21 +11,35 @@ use super::{Config, Table};
 /// Computed layout for table rendering.
 #[derive(Debug, Clone)]
 pub struct Layout {
+    pub config: Config,
+
     /// Height of the names section of the header (column names)
     pub names_height: usize,
     /// Hierarchical column groups (for multi-row headers).
     pub column_groups: Vec<ColumnGroup>,
     /// Flat list of leaf columns.
     pub columns: Vec<Column>,
-
+    /// Whether to render the row index column.
+    pub show_index: bool,
     /// Width for the index column.
     pub col_index_width: usize,
-    /// Width for each leaf column.
-    pub col_widths: Vec<usize>,
     /// Visual height for each logical row (due to array expansion).
     pub row_heights: Vec<usize>,
-    /// Number of table rows
-    pub total_rows: usize,
+}
+
+impl Layout {
+    pub fn header_height(&self) -> usize {
+        self.names_height + 2 // types + divider
+    }
+    pub fn row_count(&self) -> usize {
+        self.row_heights.len()
+    }
+    pub fn last_row(&self) -> usize {
+        self.row_heights.len().saturating_sub(1)
+    }
+    pub fn last_col(&self) -> usize {
+        self.columns.len().saturating_sub(1)
+    }
 }
 
 /// Leaf column with type info (for formatting/alignment).
@@ -38,6 +51,15 @@ pub struct Column {
     pub ty_name: String,
     /// Alignment for data in this column.
     pub align: Align,
+    /// Width of this column.
+    pub width: usize,
+}
+
+impl Column {
+    fn width_from_header(mut self) -> Self {
+        self.width = self.name.chars().count().max(self.ty_name.chars().count());
+        self
+    }
 }
 
 /// Cell alignment.
@@ -45,6 +67,7 @@ pub struct Column {
 pub enum Align {
     Left,
     Right,
+    Center,
 }
 
 /// Hierarchical column group (for multi-row headers with nested columns).
@@ -78,24 +101,16 @@ impl ColumnGroup {
 
 impl<'d, 't> Table<'d, 't> {
     /// Compute layout by sampling rows from the tabular iterator.
-    pub fn compute_layout(mut self, config: &Config) -> Layout {
+    pub fn compute_layout(mut self, config: Config) -> Layout {
+        let show_index = matches!(self.get_ty_mat(self.ty()).kind, ir::TyKind::Array(_));
         let column_groups = self.build_column_groups(self.row_ty());
-        let columns = self.flatten_columns(&column_groups, self.row_ty());
-
         let names_height = max_column_depth(&column_groups);
 
-        // Compute row index width based on total rows
-        let total_rows = self.remaining();
-        let col_index_width = total_rows.saturating_sub(1).to_string().len();
-
-        // Initialize widths from headers
-        let mut col_widths: Vec<usize> = columns
-            .iter()
-            .map(|c| {
-                let name_width = c.name.chars().count();
-                let ty_width = c.ty_name.chars().count();
-                name_width.max(ty_width)
-            })
+        // Flatten columns and initialize widths from headers
+        let mut columns: Vec<Column> = self
+            .flatten_columns(&column_groups, self.row_ty())
+            .into_iter()
+            .map(Column::width_from_header)
             .collect();
 
         let mut row_heights = Vec::new();
@@ -104,9 +119,9 @@ impl<'d, 't> Table<'d, 't> {
         while let Some(row) = self.next() {
             let mut row_height = 1usize;
             for (i, cell) in row.iter().enumerate() {
-                let (width, height) = self.measure_cell(cell, config);
-                if i < col_widths.len() {
-                    col_widths[i] = col_widths[i].max(width);
+                let (width, height) = self.measure_cell(cell, &config);
+                if i < columns.len() {
+                    columns[i].width = columns[i].width.max(width);
                 }
                 row_height = row_height.max(height);
             }
@@ -120,14 +135,22 @@ impl<'d, 't> Table<'d, 't> {
             }
         }
 
+        // Compute row index width based on total rows.
+        let last_row = row_heights.len().saturating_sub(1);
+        let col_index_width = if show_index {
+            last_row.to_string().len()
+        } else {
+            0
+        };
+
         Layout {
+            config,
             names_height,
             column_groups,
             columns,
-            col_widths,
+            show_index,
             col_index_width,
             row_heights,
-            total_rows,
         }
     }
 
@@ -158,6 +181,7 @@ impl<'d, 't> Table<'d, 't> {
                             name: group.name.clone(),
                             ty_name: format_ty_name(&field.ty, self),
                             align: self.infer_align(&field.ty),
+                            width: 0,
                         });
                     } else {
                         leaves.extend(self.flatten_columns(&group.children, &field.ty));
@@ -171,6 +195,7 @@ impl<'d, 't> Table<'d, 't> {
                     name: "value".into(),
                     ty_name: format_ty_name(ty, self),
                     align: self.infer_align(ty),
+                    width: 0,
                 }]
             }
         }
@@ -179,6 +204,9 @@ impl<'d, 't> Table<'d, 't> {
     /// Infer alignment from type.
     fn infer_align(&self, ty: &ir::Ty) -> Align {
         let ty = self.get_ty_mat(ty);
+        if let Some(inner) = ty.kind.as_option() {
+            return self.infer_align(inner);
+        }
         match &ty.kind {
             ir::TyKind::Primitive(p) => match p {
                 ir::TyPrimitive::bool | ir::TyPrimitive::text => Align::Left,
@@ -214,7 +242,7 @@ impl<'d, 't> Table<'d, 't> {
                 let mut max_width = 0usize;
                 let items_to_measure = count.min(config.max_array_items);
                 for item_data in reader.take(items_to_measure) {
-                    if let Ok((text, _)) = format_value(item_data.chunk(), item_ty, self) {
+                    if let Ok(text) = format_value(item_data.chunk(), item_ty, self) {
                         let text = truncate(&text, config.max_col_width);
                         max_width = max_width.max(text.chars().count());
                     }
@@ -234,7 +262,7 @@ impl<'d, 't> Table<'d, 't> {
             }
             _ => {
                 // Primitive or enum: format and measure
-                if let Ok((text, _)) = format_value(cell.data(), cell.ty(), self) {
+                if let Ok(text) = format_value(cell.data(), cell.ty(), self) {
                     let text = truncate(&text, config.max_col_width);
                     (text.chars().count(), 1)
                 } else {

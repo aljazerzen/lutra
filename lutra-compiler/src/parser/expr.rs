@@ -517,7 +517,7 @@ where
         })
 }
 
-pub(crate) fn ident<'src, I>() -> impl Parser<'src, I, Path, PExtra<'src>> + Clone + 'src
+pub(crate) fn path<'src, I>() -> impl Parser<'src, I, Path, PExtra<'src>> + Clone + 'src
 where
     I: ValueInput<'src, Token = TokenKind, Span = Span>,
 {

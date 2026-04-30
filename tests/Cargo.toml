@@ -15,6 +15,7 @@ lutra-interpreter = { workspace = true }
 lutra-ir = { workspace = true }
 lutra-runner = { workspace = true, features = ["std", "binary-tokio", "async"] }
 lutra-runner-duckdb = { workspace = true }
+lutra-tui = { workspace = true }
 lutra-runner-postgres = { workspace = true, features = ["postgres", "tokio-postgres"] }
 arrow = { workspace = true }
 parquet = { workspace = true }

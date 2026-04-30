@@ -15,7 +15,7 @@ where
     recursive(|nested_type_expr| {
         let primitive = primitive_set().map(TyKind::Primitive);
 
-        let ident = expr::ident().map(TyKind::Ident);
+        let ident = expr::path().map(TyKind::Ident);
 
         let func_params = delimited_by_parenthesis(
             (ident_part().then_ignore(ctrl(':')).or_not())

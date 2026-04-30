@@ -99,7 +99,19 @@ impl Ty {
         }
     }
     pub fn is_unit(&self) -> bool {
-        self.kind.as_tuple().is_some_and(|f| f.is_empty())
+        self.kind.is_unit()
+    }
+}
+
+impl TyKind {
+    pub fn is_unit(&self) -> bool {
+        self.as_tuple().is_some_and(|f| f.is_empty())
+    }
+
+    pub fn as_option(&self) -> Option<&Ty> {
+        self.as_enum()
+            .filter(|v| v.len() == 2 && v[0].ty.is_unit() && !v[1].ty.is_unit())
+            .map(|v| &v[1].ty)
     }
 }
 

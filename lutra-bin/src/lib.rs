@@ -3,14 +3,14 @@
 pub mod br;
 mod decode;
 mod encode;
-mod error;
+pub mod error;
 pub mod ident;
 pub mod ir;
 pub mod layout;
 mod printer;
 pub mod reader;
 pub mod rr;
-mod table;
+mod shape;
 mod tabular;
 pub mod typed_data;
 mod value;
@@ -29,8 +29,7 @@ pub use visitor::Visitor;
 
 #[cfg(feature = "std")]
 pub use printer::print_source;
-#[cfg(feature = "std")]
-pub use table::{Config as TableConfig, Table, layout::Layout as TableLayout};
+pub use shape::{Shape, get_shape};
 #[cfg(feature = "std")]
 pub use tabular::{TableCell, TabularReader};
 

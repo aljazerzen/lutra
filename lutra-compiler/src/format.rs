@@ -2,7 +2,9 @@ use crate::SourceTree;
 use crate::codespan;
 use crate::error;
 
-pub fn format(source_tree: &SourceTree) -> (Option<error::Error>, Vec<codespan::TextEdit>) {
+pub fn format(
+    source_tree: &SourceTree,
+) -> (Option<error::Error>, Vec<codespan::TextEdit<'static>>) {
     let mut edits = Vec::new();
     let mut diagnostics = Vec::new();
 
