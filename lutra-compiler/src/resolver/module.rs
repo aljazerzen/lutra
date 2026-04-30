@@ -23,6 +23,9 @@ pub fn init_root(root_module_def: pr::ModuleDef) -> Result<pr::ModuleDef, Vec<Di
 impl pr::ModuleDef {
     /// Get definition by fully qualified ident.
     pub fn get(&self, fq_ident: &pr::Path) -> Option<&pr::Def> {
+        if fq_ident.is_empty() {
+            return None;
+        }
         let sub_module = self.get_submodule(fq_ident.parent())?;
         sub_module.defs.get(fq_ident.last())
     }

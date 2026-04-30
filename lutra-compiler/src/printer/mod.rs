@@ -31,7 +31,7 @@ use crate::codespan;
 use crate::parser::{Token, TokenKind};
 use crate::pr;
 
-pub use defs::format_def_signature;
+pub use defs::print_def_signature;
 
 pub fn print_ty(ty: &pr::Ty) -> String {
     let mut p = Printer::new(&CONFIG_NO_WRAP, None);
@@ -41,7 +41,10 @@ pub fn print_ty(ty: &pr::Ty) -> String {
     p.buffer
 }
 
-pub fn print_source(source: &pr::Source, trivia: Option<&[Token]>) -> Vec<codespan::TextEdit> {
+pub fn print_source(
+    source: &pr::Source,
+    trivia: Option<&[Token]>,
+) -> Vec<codespan::TextEdit<'static>> {
     let mut p = Printer::new(&CONFIG_PRETTY, trivia);
     p.buffer_span.source_id = source.span.source_id;
 
@@ -93,7 +96,7 @@ struct Printer<'c> {
 
     /// Finished edits of preceding nodes, whose code might not be contingent to
     /// the code of the nodes in the current [Self::buffer].
-    edits: Vec<codespan::TextEdit>,
+    edits: Vec<codespan::TextEdit<'static>>,
 }
 
 struct Config {
@@ -372,10 +375,8 @@ impl<'c> Printer<'c> {
         }
 
         let code = std::mem::take(&mut self.buffer);
-        self.edits.push(codespan::TextEdit {
-            span: self.buffer_span,
-            new_text: code,
-        });
+        self.edits
+            .push(codespan::TextEdit::new(self.buffer_span, code));
         self.buffer_span.start = self.buffer_span.end();
         self.buffer_span.len = 0;
     }

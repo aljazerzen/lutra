@@ -19,7 +19,7 @@ fn _format(source: &str) -> String {
 }
 
 #[track_caller]
-fn _print_edits(source: &str) -> (crate::pr::Source, Vec<crate::codespan::TextEdit>) {
+fn _print_edits(source: &str) -> (crate::pr::Source, Vec<crate::codespan::TextEdit<'_>>) {
     let (parsed, dia, trivia) = crate::parser::parse_source(source, 0);
 
     if !dia.is_empty() {
@@ -766,7 +766,7 @@ fn source_03() {
 
 #[track_caller]
 fn _signature(source: &str, name: &str) -> String {
-    use super::format_def_signature;
+    use super::print_def_signature;
     use crate::check;
     use crate::project::SourceTree;
 
@@ -774,7 +774,7 @@ fn _signature(source: &str, name: &str) -> String {
     let project = check(tree, Default::default()).expect("type error");
     let path = crate::pr::Path::from_name(name);
     let def = project.root_module.get(&path).expect("def not found");
-    format_def_signature(name, def).expect("no signature")
+    print_def_signature(name, def).expect("no signature")
 }
 
 #[test]
@@ -782,7 +782,7 @@ fn signature_function() {
     assert_snapshot!(_signature(
         "func greet(name: text): text -> name",
         "greet"
-    ), @"func greet(name: text): text");
+    ), @"func greet(name: text): text -> name");
 }
 
 #[test]
@@ -790,7 +790,7 @@ fn signature_function_no_return() {
     assert_snapshot!(_signature(
         "func identity(x: int32) -> x",
         "identity"
-    ), @"func identity(x: int32): int32");
+    ), @"func identity(x: int32) -> x");
 }
 
 #[test]
@@ -798,7 +798,7 @@ fn signature_const() {
     assert_snapshot!(_signature(
         "const answer: int32 = 42",
         "answer"
-    ), @"const answer: int32");
+    ), @"const answer = 42");
 }
 
 #[test]
@@ -816,7 +816,10 @@ fn signature_type_doc_comment() {
     assert_snapshot!(_signature(r#"
         ## A named point in 2-D space.
         type Point: { x: float64, y: float64 }
-    "#, "Point"), @"type Point: {x: float64, y: float64}");
+    "#, "Point"), @"
+    ## A named point in 2-D space.
+    type Point: {x: float64, y: float64}
+    ");
 }
 
 #[test]
@@ -827,8 +830,11 @@ fn signature_generic_function() {
     assert_snapshot!(_signature(
         "func identity(x: T): T where T -> x",
         "identity"
-    ), @"func identity(x: T): T
-where T");
+    ), @"
+    func identity(x: T): T
+    where T
+    -> x
+    ");
 }
 
 #[test]

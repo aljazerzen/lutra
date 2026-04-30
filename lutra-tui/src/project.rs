@@ -64,13 +64,4 @@ impl ProjectState {
         };
         self.compiling = false;
     }
-
-    /// Returns the number of errors in the current compilation.
-    pub fn diagnostic_count(&self) -> usize {
-        match &self.compilation {
-            CompileResult::Success { .. } => 0,
-            CompileResult::Failed { diagnostics } => diagnostics.len(),
-            CompileResult::Pending => 0,
-        }
-    }
 }

@@ -95,9 +95,8 @@ fn write_format(
         }
 
         DataFormat::Table => {
-            let table = lutra_bin::Table::new(data, ty, ty_defs);
-            let rendered = table.render();
-            w.write_all(rendered.as_bytes())?;
+            let table = lutra_tui::table::Table::new(data, ty, ty_defs);
+            w.write_all(table.render_once(Default::default()).to_string().as_bytes())?;
         }
     }
 

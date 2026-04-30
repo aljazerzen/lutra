@@ -280,7 +280,7 @@ fn get_hover(ctx: PositionContext) -> Option<Hover> {
 
     let mut content = String::new();
 
-    if let Some(signature) = printer::format_def_signature(target_path.last(), def) {
+    if let Some(signature) = printer::print_def_signature(target_path.last(), def) {
         content.push_str("```lutra\n");
         content.push_str(&signature);
         content.push_str("\n```");
@@ -549,13 +549,7 @@ fn apply_changes(text: &mut String, changes: Vec<TextDocumentContentChangeEvent>
 
         let span = line_numbers.span_of_range(&range, 0);
 
-        *text = codespan::apply_text_edits(
-            text,
-            &[codespan::TextEdit {
-                span,
-                new_text: change.text,
-            }],
-        );
+        *text = codespan::apply_text_edits(text, &[codespan::TextEdit::new(span, change.text)]);
     }
 }
 
@@ -633,7 +627,7 @@ mod to_proto {
             let rng = line_index.range_of_span(edit.span);
             res.push(TextEdit {
                 range: range(&rng),
-                new_text: edit.new_text,
+                new_text: edit.new_text.to_string(),
             });
         }
         res

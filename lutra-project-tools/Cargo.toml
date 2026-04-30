@@ -1,0 +1,12 @@
+[package]
+name = "lutra-project-tools"
+description = "Project-level helpers for Lutra projects"
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+version.workspace = true
+
+[dependencies]
+anyhow = { workspace = true }
+lutra-compiler = { workspace = true }

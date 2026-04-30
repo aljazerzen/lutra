@@ -1,13 +1,12 @@
 use crossterm::event::KeyCode;
 use lutra_bin::ir;
-use ratatui::prelude::*;
 
-use crate::utils::{clip_left, clip_top};
-
-use super::{Action, Form, FormName, FormResult, TyDefs};
+use super::{Form, FormName, FormResult, TyDefs};
+use crate::terminal::{Action, Span, Style, View};
 
 const ACTIONS: [ArrayAction; 2] = [ArrayAction::Push, ArrayAction::Pop];
 
+#[derive(Clone)]
 pub struct ArrayForm {
     focused_action: usize,
     pub items: Vec<Form>,
@@ -36,36 +35,34 @@ impl ArrayForm {
         }
     }
 
-    pub fn render(&self, form: &Form, frame: &mut Frame, area: Rect) -> Rect {
-        let focus_area = super::render_name_colon(form, frame, area);
+    pub fn render<'a>(&'a self, form: &'a Form, focused: bool) -> View<'a> {
+        let mut view = View::from(form.render_name_prefix(focused));
 
-        if form.cursor {
-            let mut area = focus_area;
-            area.x -= 1;
-            for (index, action) in [ArrayAction::Push, ArrayAction::Pop].iter().enumerate() {
-                let is_selected = self.focused_action == index;
+        for (index, action) in ACTIONS.iter().enumerate() {
+            if index > 0 {
+                view.push_span(Span::new("  "));
+            }
+            let selected = focused && form.cursor && self.focused_action == index;
+            let style = if selected {
+                Style::cursor()
+            } else {
+                Style::new()
+            };
+            view.push_span(Span::styled(action.as_ref().to_string(), style));
 
-                let action_str = action.as_ref();
-                let widget = if is_selected {
-                    action_str.black().on_white()
-                } else {
-                    action_str.white()
-                };
-                frame.render_widget(widget, clip_left(area, 1));
-                area = clip_left(area, action_str.len() as u16 + 1);
+            if selected {
+                view.set_cursor_inline();
             }
         }
 
-        let mut area = clip_top(area, 1);
-
         for item in &self.items {
-            frame.render_widget("-".white(), area);
-
-            let area_item = clip_left(area, 2);
-            let after_item = item.render(frame, area_item);
-            area = clip_top(area, after_item.y - area.y)
+            let mut child = item.view(focused);
+            child.prefix_first(Span::new("- "));
+            child.prefix(Span::new("  "));
+            view.extend_lines(child);
         }
-        area
+
+        view
     }
 
     pub fn handle(&mut self, action: &Action, self_ty: &ir::Ty, ty_defs: &TyDefs) -> FormResult {

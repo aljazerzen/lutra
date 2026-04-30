@@ -272,7 +272,7 @@ where
     I: ValueInput<'src, Token = TokenKind, Span = Span>,
 {
     let import = recursive(|import_part| {
-        expr::ident()
+        expr::path()
             .then(choice((
                 just(TokenKind::PathSep)
                     .ignore_then(delimited_by_parenthesis(

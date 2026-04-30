@@ -1,7 +1,16 @@
 #[derive(Debug)]
-pub struct TextEdit {
+pub struct TextEdit<'a> {
     pub span: crate::Span,
-    pub new_text: String,
+    pub new_text: std::borrow::Cow<'a, str>,
+}
+
+impl<'a> TextEdit<'a> {
+    pub fn new(span: crate::Span, new_text: impl Into<std::borrow::Cow<'a, str>>) -> Self {
+        Self {
+            span,
+            new_text: new_text.into(),
+        }
+    }
 }
 
 /// Apply edits to the source code
@@ -27,7 +36,7 @@ pub fn apply_text_edits(text: &str, edits: &[TextEdit]) -> String {
 }
 
 /// Drop text edits that do not change the source.
-pub fn minimize_text_edits(text: &str, edits: Vec<TextEdit>) -> Vec<TextEdit> {
+pub fn minimize_text_edits<'a>(text: &str, edits: Vec<TextEdit<'a>>) -> Vec<TextEdit<'a>> {
     edits
         .into_iter()
         .filter(|e| {

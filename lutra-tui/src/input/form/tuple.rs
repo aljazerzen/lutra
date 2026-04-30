@@ -1,11 +1,10 @@
 use crossterm::event::KeyCode;
 use lutra_bin::ir;
-use ratatui::prelude::*;
 
 use super::{Form, FormName, FormResult, TyDefs};
-use crate::terminal::Action;
-use crate::utils::{clip_left, clip_top};
+use crate::terminal::{Action, Line, Span, Style, View};
 
+#[derive(Clone)]
 pub struct TupleForm {
     pub fields: Vec<Form>,
     pub is_folded: bool,
@@ -31,36 +30,38 @@ impl TupleForm {
         }
     }
 
-    pub fn render(&self, form: &Form, frame: &mut Frame, area: Rect) -> Rect {
+    pub fn render<'a>(&'a self, form: &Form, focused: bool) -> View<'a> {
         let name = form.get_name();
-
-        frame.render_widget(name.as_ref().white(), area);
-        let after_name_area = clip_left(area, name.len() as u16 + 1);
+        let mut line = Line::empty();
+        line.push_span(Span::styled(name.into_owned(), form.name_style(focused)));
 
         if self.is_folded {
-            if form.cursor {
-                frame.render_widget("...".black().on_white(), after_name_area);
+            line.push_span(Span::new(" "));
+            let ellipsis_style = if focused && form.cursor {
+                Style::cursor()
             } else {
-                frame.render_widget("...".white(), after_name_area);
+                Style::muted()
+            };
+            let cursor_col = line.width() as u16;
+            line.push_span(Span::styled("...", ellipsis_style));
+            let mut view = View::from(line);
+            if focused && form.cursor {
+                view.cursor = Some((0, cursor_col));
             }
-
-            clip_top(area, 1)
-        } else {
-            if form.cursor {
-                frame.render_widget(" ".black().on_white(), after_name_area);
-            }
-
-            let mut next_field_area = clip_top(clip_left(area, 2), 1);
-            for field in &self.fields {
-                next_field_area = field.render(frame, next_field_area);
-            }
-
-            // deindent
-            next_field_area.x -= 2;
-            next_field_area.width += 2;
-
-            next_field_area
+            return view;
         }
+
+        let mut view = View::from(line);
+        if focused && form.cursor {
+            view.cursor = Some((0, 0));
+        }
+
+        for field in &self.fields {
+            let mut child = field.view(focused);
+            child.prefix(Span::new("  "));
+            view.extend_lines(child);
+        }
+        view
     }
 
     pub(crate) fn get_value(&self) -> lutra_bin::Value {

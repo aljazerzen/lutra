@@ -23,8 +23,10 @@ pub use codespan::Span;
 pub use discover::{DiscoverParams, discover};
 pub use format::format;
 pub use intermediate::inline;
-pub use lutra_bin::{ir, rr};
+pub use parser::parse_path;
 pub use project::{Project, SourceTree, SymbolInfo};
+
+pub use lutra_bin::{ir, rr};
 
 #[derive(Debug, Clone, Copy)]
 #[cfg_attr(feature = "clap", derive(clap::ValueEnum))]

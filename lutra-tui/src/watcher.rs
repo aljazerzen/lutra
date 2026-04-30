@@ -4,6 +4,7 @@ use std::sync::mpsc::{Receiver, Sender, channel};
 use std::thread;
 use std::time::Duration;
 
+use lutra_compiler::SourceTree;
 use notify::{RecursiveMode, Watcher};
 
 use crate::terminal::Action;
@@ -24,7 +25,13 @@ impl FileWatcher {
     ///
     /// Immediately performs initial discovery and sends SourceUpdated action.
     /// Then watches only directories that contain .lt files.
-    pub fn new(project_path: PathBuf, action_tx: Sender<Action>) -> anyhow::Result<Self> {
+    pub fn new(project_path: Option<PathBuf>, action_tx: Sender<Action>) -> anyhow::Result<Self> {
+        let Some(project_path) = project_path else {
+            action_tx.send(Action::SourceUpdated(SourceTree::empty()))?;
+            return Ok(Self {
+                _watcher_thread: None,
+            });
+        };
         let init_thread = thread::spawn(move || {
             // Initial discovery
             match discover_and_watch(project_path, action_tx) {

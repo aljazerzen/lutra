@@ -1,62 +1,107 @@
-use crossterm::event::KeyCode;
-use ratatui::{layout::Offset, prelude::*};
+use crossterm::event::{Event, KeyCode, KeyModifiers};
 
-use super::{Action, Form, FormResult};
-use crate::utils::clip_top;
+use super::{Form, FormResult};
+use crate::editor::{self, Edit};
+use crate::terminal::{Action, Span, Style, View};
 
+#[derive(Clone)]
 pub struct TextForm {
     value: String,
+    cursor: usize,
 }
 
 impl TextForm {
     pub fn new(value: String) -> TextForm {
-        TextForm { value }
+        let cursor = value.len();
+        TextForm { value, cursor }
     }
 
-    pub fn render(&self, form: &Form, frame: &mut Frame<'_>, area: Rect) -> Rect {
-        let area_value = super::render_name_colon(form, frame, area);
+    pub fn render<'a>(&'a self, form: &'a Form, focused: bool) -> View<'a> {
+        let mut line = form.render_name_prefix(focused);
 
-        let value_text = if self.value.is_empty() {
-            "<empty>"
-        } else {
-            self.value.as_str()
-        };
         if self.value.is_empty() {
-            frame.render_widget(value_text.dark_gray().italic(), area_value);
+            line.push_span(Span::styled("<empty>", Style::muted()));
         } else {
-            frame.render_widget(value_text.white(), area_value);
+            let (left, right) = self.value.split_at(self.cursor);
+            line.push_span(left);
+            line.push_span(right);
         };
+        let mut view = View::from(line);
 
-        if form.cursor {
-            let cursor_pos = self.value.len();
-            let cursor_char = value_text.chars().nth(cursor_pos).unwrap_or(' ');
-
-            let mut area_cursor = area_value.offset(Offset {
-                x: cursor_pos as i32,
-                y: 0,
-            });
-            area_cursor.width = 1;
-            frame.render_widget(cursor_char.to_string().black().on_white(), area_cursor);
+        if focused && form.cursor {
+            let line = view.lines.last_mut().unwrap();
+            let last_span = line.spans.pop().unwrap();
+            view.set_cursor_inline();
+            let line = view.lines.last_mut().unwrap();
+            line.push_span(last_span);
         }
 
-        clip_top(area, 1)
+        view
     }
 
     pub fn handle(&mut self, action: &Action) -> FormResult {
-        let Some(key) = action.as_key() else {
-            return FormResult::None;
-        };
+        match action {
+            Action::Terminal(Event::Paste(text)) => {
+                self.apply_edit(|_, at| Edit::insert(at, text.clone()));
+                FormResult::Redraw
+            }
+            _ => {
+                let Some(key) = action.as_key() else {
+                    return FormResult::None;
+                };
 
-        match key.code {
-            KeyCode::Char(c) => {
-                self.value.push(c);
-                FormResult::Redraw
+                match key.code {
+                    KeyCode::Char(c) if !key.modifiers.contains(KeyModifiers::CONTROL) => {
+                        self.apply_edit(|_, at| Edit::insert(at, c.to_string()));
+                        FormResult::Redraw
+                    }
+                    KeyCode::Left if key.modifiers.contains(KeyModifiers::CONTROL) => {
+                        self.cursor = editor::move_word_backward(&self.value, self.cursor);
+                        FormResult::Redraw
+                    }
+                    KeyCode::Right if key.modifiers.contains(KeyModifiers::CONTROL) => {
+                        self.cursor = editor::move_word_forward(&self.value, self.cursor);
+                        FormResult::Redraw
+                    }
+                    KeyCode::Left => {
+                        self.cursor = editor::move_backward(&self.value, self.cursor);
+                        FormResult::Redraw
+                    }
+                    KeyCode::Right => {
+                        self.cursor = editor::move_forward(&self.value, self.cursor);
+                        FormResult::Redraw
+                    }
+                    KeyCode::Home => {
+                        self.cursor = 0;
+                        FormResult::Redraw
+                    }
+                    KeyCode::End => {
+                        self.cursor = self.value.len();
+                        FormResult::Redraw
+                    }
+                    KeyCode::Backspace if key.modifiers.contains(KeyModifiers::CONTROL) => {
+                        self.apply_edit(|text, at| {
+                            Edit::delete(text, at, editor::move_word_backward)
+                        });
+                        FormResult::Redraw
+                    }
+                    KeyCode::Backspace => {
+                        self.apply_edit(|text, at| Edit::delete(text, at, editor::move_backward));
+                        FormResult::Redraw
+                    }
+                    KeyCode::Delete if key.modifiers.contains(KeyModifiers::CONTROL) => {
+                        self.apply_edit(|text, at| {
+                            Edit::delete(text, at, editor::move_word_forward)
+                        });
+                        FormResult::Redraw
+                    }
+                    KeyCode::Delete => {
+                        self.apply_edit(|text, at| Edit::delete(text, at, editor::move_forward));
+                        FormResult::Redraw
+                    }
+                    _ => FormResult::None,
+                }
             }
-            KeyCode::Backspace => {
-                self.value.pop();
-                FormResult::Redraw
-            }
-            _ => FormResult::None,
         }
     }
 
@@ -68,6 +113,12 @@ impl TextForm {
         let lutra_bin::Value::Text(value) = value else {
             panic!()
         };
+        self.cursor = value.len();
         self.value = value;
+    }
+
+    fn apply_edit(&mut self, edit: impl FnOnce(&str, usize) -> Edit) {
+        let edit = edit(&self.value, self.cursor);
+        edit.apply(&mut self.value, &mut self.cursor);
     }
 }

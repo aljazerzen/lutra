@@ -1,10 +1,10 @@
 use crossterm::event::KeyCode;
 use lutra_bin::ir;
-use ratatui::prelude::*;
 
-use super::{Action, Form, FormKind, FormName, FormResult, TyDefs};
-use crate::utils::{clip_left, clip_top};
+use super::{Form, FormKind, FormName, FormResult, TyDefs};
+use crate::terminal::{Action, Span, Style, View};
 
+#[derive(Clone)]
 pub struct EnumForm {
     pub selected: usize,
     pub variants: Vec<Form>,
@@ -34,48 +34,46 @@ impl EnumForm {
         self.variants.get_mut(self.selected)
     }
 
-    pub fn render(&self, form: &Form, frame: &mut Frame, area: Rect) -> Rect {
-        let value_area = super::render_name_colon(form, frame, area);
+    pub fn render<'a>(&'a self, form: &'a Form, focused: bool) -> View<'a> {
+        let mut view = View::from(form.render_name_prefix(focused));
+        let form_selected = focused && form.cursor;
 
-        if let Some(selected) = self.variants.get(self.selected) {
-            if !form.cursor {
-                let value = selected.get_name();
-                frame.render_widget(value.white(), value_area);
-            } else {
-                let mut area = value_area;
-
-                for (pos, variant) in self.variants.iter().enumerate() {
-                    let is_selected = pos == self.selected;
-                    let name = variant.get_name();
-                    if is_selected {
-                        frame.render_widget(name.as_ref().black().on_white(), area);
-                    } else {
-                        frame.render_widget(name.as_ref().white(), area);
-                    }
-                    const SPACING: u16 = 1;
-                    let width = name.len() as u16 + SPACING;
-                    if area.width <= width {
-                        break;
-                    }
-                    area = clip_left(area, width);
-                }
+        for (pos, variant) in self.variants.iter().enumerate() {
+            if pos > 0 {
+                view.push_span(Span::new("  "));
             }
 
-            let mut inner_area = clip_left(clip_top(area, 1), 2);
-            if let FormKind::Tuple(tuple) = &selected.kind {
-                for field in &tuple.fields {
-                    inner_area = field.render(frame, inner_area);
-                }
-            } else {
-                inner_area = selected.render(frame, inner_area);
-            }
+            let variant_selected = pos == self.selected;
+            let style = match (form_selected, variant_selected) {
+                (true, true) => Style::cursor(),
+                (true, false) => Style::new(),
 
-            inner_area.x -= 2;
-            inner_area.width += 2;
-            return inner_area;
+                (false, true) => Style::new().bold(),
+                (false, false) => Style::muted(),
+            };
+            view.push_span(Span::styled(variant.get_name().into_owned(), style));
+
+            // cursor
+            if form_selected && variant_selected {
+                view.set_cursor_inline();
+            }
         }
 
-        clip_top(area, 1)
+        if let Some(selected) = self.variants.get(self.selected) {
+            if let FormKind::Tuple(tuple) = &selected.kind {
+                for field in &tuple.fields {
+                    let mut child = field.view(focused);
+                    child.prefix(Span::new("  "));
+                    view.extend_lines(child);
+                }
+            } else {
+                let mut child = selected.view(focused);
+                child.prefix(Span::new("  "));
+                view.extend_lines(child);
+            }
+        }
+
+        view
     }
 
     pub fn handle(&mut self, action: &Action) -> FormResult {
@@ -108,6 +106,7 @@ impl EnumForm {
         let lutra_bin::Value::Enum(tag, value) = value else {
             panic!()
         };
+        self.selected = tag;
         self.variants.get_mut(tag).unwrap().set_value(*value);
     }
 }

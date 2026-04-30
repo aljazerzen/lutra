@@ -1,5 +1,6 @@
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 
+use crate::cell::CellStage;
 use crate::terminal::Action;
 
 /// Centralized keybinding configuration.
@@ -10,10 +11,12 @@ pub struct KeyBindings;
 /// Context for key binding resolution.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum KeyContext {
-    Definitions,
+    /// Compilation errors are displayed; navigation scrolls diagnostics.
     Diagnostics,
-    Run,
-    RunInput,
+    /// Completion suggestions are visible; Up/Down/Enter navigate them.
+    Completions,
+    /// Normal cell editing, scoped to the active cell stage.
+    Cell(CellStage),
 }
 
 impl KeyBindings {
@@ -21,62 +24,115 @@ impl KeyBindings {
         Self
     }
 
-    /// Process a key event in the given context and return a command action if matched.
+    /// Translate a key event to a semantic action based on the current context.
     ///
-    /// Returns `None` if the key should instead be passed through to the focused component.
-    pub fn process_key_event(&self, key: KeyEvent, context: KeyContext) -> Option<Action> {
-        // Context-specific bindings
-        let action = match context {
-            KeyContext::Definitions => None,
-            KeyContext::Diagnostics => None,
-            KeyContext::Run | KeyContext::RunInput => match key.code {
-                // Close tab
-                KeyCode::Char('w') if key.modifiers.contains(KeyModifiers::CONTROL) => {
-                    Some(Action::CloseTab)
-                }
+    /// Returns `None` for keys that should be forwarded as raw terminal events
+    /// (i.e. printable character input and backspace handled directly by the frame).
+    ///
+    /// Note: Ctrl+D is intentionally excluded — it only exits when the program
+    /// buffer is empty, a state check that belongs in the dispatcher.
+    pub fn process_key(&self, key: KeyEvent, ctx: KeyContext) -> Option<Action> {
+        // Global bindings — apply in every context.
+        match key.code {
+            KeyCode::Char('q') if key.modifiers.contains(KeyModifiers::CONTROL) => {
+                return Some(Action::Exit);
+            }
+            KeyCode::Char('d') if key.modifiers.contains(KeyModifiers::CONTROL) => {
+                return Some(Action::ExitIfEmpty);
+            }
+            KeyCode::Char('c') if key.modifiers.contains(KeyModifiers::CONTROL) => {
+                return Some(Action::ClearCell);
+            }
+            _ => {}
+        }
+
+        // Context-specific bindings.
+        match ctx {
+            KeyContext::Diagnostics => match key.code {
+                KeyCode::PageUp => Some(Action::ScrollDiagnosticsUp),
+                KeyCode::PageDown => Some(Action::ScrollDiagnosticsDown),
                 _ => None,
             },
-        };
-        if let Some(action) = action {
-            return Some(action);
-        }
 
-        // Global bindings
-        if let Some(action) = self.process_global_bindings(key) {
-            return Some(action);
-        }
+            KeyContext::Completions => match key.code {
+                KeyCode::Up => Some(Action::CompletionUp),
+                KeyCode::Down => Some(Action::CompletionDown),
+                KeyCode::Enter | KeyCode::Tab | KeyCode::Right => Some(Action::CompletionApply),
+                KeyCode::Esc => Some(Action::CompletionHide),
+                // All other keys fall through to Program-focus behavior.
+                _ => self.process_key_at_cell(key, CellStage::Program),
+            },
 
-        None
+            KeyContext::Cell(stage) => self.process_key_at_cell(key, stage),
+        }
     }
 
-    /// Global keybindings that work in all contexts.
-    fn process_global_bindings(&self, key: KeyEvent) -> Option<Action> {
+    fn process_key_at_cell(&self, key: KeyEvent, focus: CellStage) -> Option<Action> {
         match key.code {
-            // Exit
-            KeyCode::Esc => Some(Action::Exit),
-            KeyCode::Char('q') if key.modifiers.contains(KeyModifiers::CONTROL) => {
-                Some(Action::Exit)
+            KeyCode::Esc => return Some(Action::ClearCell),
+            KeyCode::Tab => return Some(Action::CycleFocusNext),
+            KeyCode::BackTab => return Some(Action::CycleFocusPrev),
+            _ => {}
+        }
+
+        match focus {
+            CellStage::Browse => match key.code {
+                KeyCode::Up => Some(Action::HistoryUp),
+                KeyCode::Down => Some(Action::HistoryDown),
+                KeyCode::Enter => Some(Action::HistorySelect),
+                _ => self.process_edit_key(key),
+            },
+            CellStage::Program => match key.code {
+                KeyCode::Up => Some(Action::HistoryUp),
+                KeyCode::Enter => Some(Action::SubmitPrompt),
+                _ => self.process_edit_key(key),
+            },
+            CellStage::Input => None,
+            CellStage::Output => match key.code {
+                KeyCode::Up => Some(Action::TableMoveUp),
+                KeyCode::Down => Some(Action::TableMoveDown),
+                KeyCode::Left => Some(Action::TableMoveLeft),
+                KeyCode::Right => Some(Action::TableMoveRight),
+                KeyCode::Home => Some(Action::TableMoveHome),
+                KeyCode::End => Some(Action::TableMoveEnd),
+                KeyCode::PageUp => Some(Action::TableMovePageUp),
+                KeyCode::PageDown => Some(Action::TableMovePageDown),
+                KeyCode::Enter => Some(Action::ClearCell),
+                _ => None,
+            },
+        }
+    }
+
+    fn process_edit_key(&self, key: KeyEvent) -> Option<Action> {
+        match key.code {
+            KeyCode::Left if key.modifiers.contains(KeyModifiers::CONTROL) => {
+                Some(Action::EditMoveWordBackward)
             }
-
-            // Focus cycling
-            KeyCode::Tab => Some(Action::CycleFocus),
-
-            // Tab navigation (Ctrl+Left/Right)
-            KeyCode::Left if key.modifiers.contains(KeyModifiers::CONTROL) => Some(Action::PrevTab),
             KeyCode::Right if key.modifiers.contains(KeyModifiers::CONTROL) => {
-                Some(Action::NextTab)
+                Some(Action::EditMoveWordForward)
             }
-
-            // Search (Ctrl+P)
-            KeyCode::Char('p') if key.modifiers.contains(KeyModifiers::CONTROL) => {
-                Some(Action::DefSearchOpen)
+            KeyCode::Left => Some(Action::EditMoveBackward),
+            KeyCode::Right => Some(Action::EditMoveForward),
+            KeyCode::Home => Some(Action::EditMoveHome),
+            KeyCode::End => Some(Action::EditMoveEnd),
+            KeyCode::Backspace if key.modifiers.contains(KeyModifiers::CONTROL) => {
+                Some(Action::EditDeleteWordBackward)
             }
-
-            // Toggle auto-run (Ctrl+R)
-            KeyCode::Char('r') if key.modifiers.contains(KeyModifiers::CONTROL) => {
-                Some(Action::ToggleAutoRun)
+            KeyCode::Backspace if key.modifiers.contains(KeyModifiers::ALT) => {
+                Some(Action::EditDeleteWordBackward)
             }
+            KeyCode::Char('h') if key.modifiers.contains(KeyModifiers::CONTROL) => {
+                Some(Action::EditDeleteWordBackward)
+            }
+            KeyCode::Char('w') if key.modifiers.contains(KeyModifiers::CONTROL) => {
+                Some(Action::EditDeleteWordBackward)
+            }
+            KeyCode::Backspace => Some(Action::EditDeleteBackward),
 
+            KeyCode::Delete if key.modifiers.contains(KeyModifiers::CONTROL) => {
+                Some(Action::EditDeleteWordForward)
+            }
+            KeyCode::Delete => Some(Action::EditDeleteForward),
             _ => None,
         }
     }

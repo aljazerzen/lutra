@@ -2,19 +2,24 @@
 
 use insta::assert_snapshot;
 use lutra_bin::Value;
+use lutra_tui::table;
 
 fn _table(ty_src: &str, value: Value) -> String {
     let ty = lutra_compiler::_test_compile_ty(ty_src);
     let data = value.encode(&ty, &[]).unwrap();
 
-    lutra_bin::Table::new(&data, &ty, &[]).render()
+    table::Table::new(&data, &ty, &[])
+        .render_once(Default::default())
+        .to_string()
 }
 
-fn _table_with_config(ty_src: &str, value: Value, config: lutra_bin::TableConfig) -> String {
+fn _table_with_config(ty_src: &str, value: Value, config: table::Config) -> String {
     let ty = lutra_compiler::_test_compile_ty(ty_src);
     let data = value.encode(&ty, &[]).unwrap();
 
-    lutra_bin::Table::new(&data, &ty, &[]).render_with_config(&config)
+    table::Table::new(&data, &ty, &[])
+        .render_once(config)
+        .to_string()
 }
 
 #[test]
@@ -169,17 +174,17 @@ fn test_enum_with_flat_payload() {
     );
 
     assert_snapshot!(result, @"
-      opt
-      enum{none,some}
-    ─────────────────
-    0 none
-    1 some(42)
+         opt
+      int32?
+    ────────
+    0
+    1     42
     ");
 }
 
 #[test]
 fn test_text_truncation() {
-    let config = lutra_bin::TableConfig {
+    let config = table::Config {
         max_col_width: 10,
         max_array_items: 3,
         sample_rows: Some(100),
@@ -221,10 +226,10 @@ fn test_single_tuple() {
     );
 
     assert_snapshot!(result, @"
-          x y
-      int32 text
-    ─────────────
-    0    42 hello
+        x y
+    int32 text
+    ───────────
+       42 hello
     ");
 }
 
@@ -305,10 +310,10 @@ fn test_single_primitive() {
     let result = _table("int32", Value::Prim32(42));
 
     assert_snapshot!(result, @"
-      value
-      int32
-    ───────
-    0    42
+    value
+    int32
+    ─────
+       42
     ");
 }
 

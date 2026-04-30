@@ -1,11 +1,10 @@
 use crossterm::event::KeyCode;
-use ratatui::prelude::*;
 
 use crate::input::form::{Form, FormResult};
-use crate::terminal::Action;
-use crate::utils::clip_top;
+use crate::terminal::{Action, Line, Span, Style, View};
 
 /// A form and a button after.
+#[derive(Clone)]
 pub struct ButtonForm {
     pub inner: Box<Form>,
 
@@ -20,21 +19,20 @@ impl ButtonForm {
         }
     }
 
-    pub fn render(&self, form: &Form, frame: &mut Frame, area: Rect) -> Rect {
-        let area = self.inner.render(frame, area);
+    pub fn render<'a>(&'a self, form: &'a Form, focused: bool) -> View<'a> {
+        let mut view = self.inner.view(focused);
 
-        // space
-        let area = clip_top(area, 1);
-
-        // button
-        let style = if form.cursor {
-            Style::default().bg(Color::White).fg(Color::Black)
+        let style = if focused && form.cursor {
+            Style::cursor()
         } else {
-            Style::default()
+            Style::new()
         };
-        let btn = Span::styled(format!("[{}]", self.text), style);
-        frame.render_widget(btn, area);
-        clip_top(area, 1)
+        let button_line = Line::from(vec![Span::styled(format!("[{}]", self.text), style)]);
+        view.push_line(button_line);
+        if focused && form.cursor {
+            view.set_cursor_inline();
+        }
+        view
     }
 
     pub fn handle(&self, action: &Action) -> FormResult {
