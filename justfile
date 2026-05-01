@@ -33,7 +33,7 @@ dev FILTER_SET='all()' *NEXTEST_ARGS='':
 
 # Run ignored tests
 test-ignored:
-    INSTA_FORCE_PASS=1 \
+    # INSTA_FORCE_PASS=1
     cargo nextest --profile=overview run --run-ignored=only
 
 # Re-generate committed generated files

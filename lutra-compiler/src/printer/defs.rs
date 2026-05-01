@@ -2,21 +2,50 @@ use lutra_bin::ident;
 
 use crate::pr::{self, ImportDef};
 use crate::printer::common::{PrintSourceExt, Separated};
-use crate::printer::expr::print_func;
+use crate::printer::expr;
+use crate::printer::types;
 use crate::printer::{CONFIG_NO_WRAP, PrintSource, Printer};
 
-/// Produce a compact, single-line signature string for `def` named `name`,
+/// Produce a compact, single-line signature string of a definition,
 /// suitable for display in an LSP hover popup.
+/// Prints resolved types as type annotations.
 ///
 /// Returns `None` for [`pr::DefKind::Import`] and
 /// [`pr::DefKind::Unresolved`] definitions, which have no meaningful
 /// signature to display.
 pub fn print_def_signature(name: &str, def: &pr::Def) -> Option<String> {
-    let mut p = Printer::new(&CONFIG_NO_WRAP, None);
-    (name, def).print(&mut p)?;
+    let mut printer = Printer::new(&CONFIG_NO_WRAP, None);
+    let p = &mut printer;
+
+    match &def.kind {
+        pr::DefKind::Expr(expr_def) if expr_def.constant => {
+            p.push("const ")?;
+            p.push(ident::display(name))?;
+            if let Some(ty) = &expr_def.ty {
+                p.push(": ")?;
+                ty.print(p)?;
+            }
+        }
+        pr::DefKind::Expr(expr_def) => {
+            // let func = expr_def.value.kind.as_func().unwrap();
+            // print_func_signature(func, Some(name), p)?;
+            let func = expr_def.value.ty.as_ref()?.kind.as_func()?;
+            types::print_ty_func(func, Some(name), p)?;
+        }
+        pr::DefKind::Ty(ty_def) => {
+            p.push("type ")?;
+            p.push(ident::display(name))?;
+            ty_def.print(p)?;
+        }
+        pr::DefKind::Module(_) => {
+            p.push("module ")?;
+            p.push(ident::display(name))?;
+        }
+        pr::DefKind::Import(_) | pr::DefKind::Unresolved(_) => return None,
+    }
 
     assert!(p.edits.is_empty());
-    Some(p.buffer)
+    Some(printer.buffer)
 }
 
 impl PrintSource for pr::Source {
@@ -179,20 +208,12 @@ impl PrintSource for NamedDef<'_> {
             pr::DefKind::Expr(expr_def) => {
                 // func
                 let func = expr_def.value.kind.as_func().unwrap();
-                print_func(func, Some(self.0), p)?;
+                expr::print_func(func, Some(self.0), p)?;
             }
             pr::DefKind::Ty(ty_def) => {
                 p.push("type ")?;
                 p.push(ident::display(self.0))?;
-
-                if ty_def.is_framed {
-                    (&ty_def.framed_label, &ty_def.ty)
-                        .between("(", ")", self.1.span)
-                        .print(p)?;
-                } else {
-                    p.push(": ")?;
-                    ty_def.ty.print(p)?;
-                }
+                ty_def.print(p)?;
             }
             pr::DefKind::Import(import_def) => {
                 p.push("import ")?;
@@ -207,6 +228,23 @@ impl PrintSource for NamedDef<'_> {
 
     fn span(&self) -> Option<crate::Span> {
         self.1.span
+    }
+}
+
+impl PrintSource for pr::TyDef {
+    fn print<'c>(&self, p: &mut Printer<'c>) -> Option<()> {
+        if self.is_framed {
+            p.push("(")?;
+            (&self.framed_label, &self.ty).print(p)?;
+            p.push(")")
+        } else {
+            p.push(": ")?;
+            self.ty.print(p)
+        }
+    }
+
+    fn span(&self) -> Option<crate::Span> {
+        self.ty.span
     }
 }
 

@@ -7,5 +7,5 @@ fail-fast = false
 [profile.overview]
 status-level = "none"
 final-status-level = "slow"
-failure-output = "final"
+failure-output = "never"
 fail-fast = false
