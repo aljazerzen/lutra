@@ -2791,6 +2791,30 @@ func main() -> std::date::to_year_month_day(@2025-12-16)
   day = 16,
 }
 
+# === std_timestamp_to_date_00
+func main() -> std::timestamp::to_date(@2025-12-16T00:00:00, "UTC")
+# >
+@2025-12-16
+
+# === std_timestamp_to_date_01
+func main() -> std::timestamp::to_date(@2025-12-15T23:00:00, "Europe/Ljubljana")
+# >
+@2025-12-16
+
+# === std_timestamp_to_date_02
+func main() -> std::timestamp::to_date(@2025-12-16T05:00:00, "America/New_York")
+# >
+@2025-12-16
+
+# === std_timestamp_to_date_03
+func main() -> (
+  @2025-12-16
+  | std::date::to_timestamp("Europe/Ljubljana")
+  | std::timestamp::to_date("Europe/Ljubljana")
+)
+# >
+@2025-12-16
+
 # === timestamp_00
 const main = @2025-12-29T16:07:44.123456
 # >

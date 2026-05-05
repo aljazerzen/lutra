@@ -991,6 +991,22 @@ impl<'a> Context<'a> {
                 select.projection = self.projection(ty, values);
                 return Node::Select(select);
             }
+            "std::timestamp::to_date" => {
+                let [timestamp, tz] = unpack_args(args);
+
+                let local_date = match self.dialect {
+                    Dialect::Postgres => {
+                        let timestamp = format!("to_timestamp({timestamp}::float8/1000000.0)");
+                        format!("({timestamp} AT TIME ZONE {tz})::date")
+                    }
+                    Dialect::DuckDB => {
+                        let timestamp = format!("make_timestamp({timestamp})");
+                        format!("(({timestamp} AT TIME ZONE 'UTC') AT TIME ZONE {tz})::date")
+                    }
+                };
+
+                sa::Expr::Source(format!("({local_date} - '1970-01-01'::date)::int4"))
+            }
 
             _ => todo!("sql impl for {id}"),
         };

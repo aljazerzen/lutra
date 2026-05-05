@@ -1720,6 +1720,41 @@ pub mod std_date {
     }
 }
 
+pub mod std_timestamp {
+    use crate::{EvalError, native::*};
+
+    pub struct Module;
+
+    impl NativeModule for Module {
+        fn lookup_native_symbol(&self, id: &str) -> Option<crate::interpreter::NativeFunction> {
+            Some(match id {
+                "to_date" => &to_date,
+                _ => return None,
+            })
+        }
+    }
+
+    pub fn to_date(
+        _it: &mut Interpreter,
+        _layout_args: &[u32],
+        args: Vec<Cell>,
+    ) -> Result<Cell, EvalError> {
+        let [timestamp, time_zone] = assume::exactly_n(args);
+
+        let timestamp: i64 = assume::primitive(&timestamp)?;
+        let time_zone = assume::text_ref(time_zone)?;
+
+        let date = {
+            let tz: chrono_tz::Tz = time_zone.as_str().parse().unwrap();
+            let datetime = chrono::DateTime::from_timestamp_micros(timestamp).unwrap();
+
+            datetime.with_timezone(&tz).date_naive().to_epoch_days()
+        };
+
+        Ok(Cell::Data(encode(&date)))
+    }
+}
+
 pub mod interpreter {
     use crate::{EvalError, native::*};
 
