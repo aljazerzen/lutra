@@ -2929,3 +2929,9 @@ func main() -> [
   none,
   none,
 ]
+
+# === custom_type_00
+type MyInt: int32
+func main() -> std::to_int64(4: MyInt)
+# >
+4

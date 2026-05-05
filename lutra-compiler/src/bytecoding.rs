@@ -267,7 +267,7 @@ impl<'t> ByteCoder<'t> {
             | "std::mod" | "std::add" | "std::sub" | "std::neg" | "std::cmp" | "std::eq"
             | "std::lt" | "std::lte" | "std::sequence" | "std::math::abs" | "std::math::pow" => {
                 let param_ty = as_ty_of_param(ty_mat);
-                let primitive = param_ty.kind.as_primitive().unwrap();
+                let primitive = self.get_ty_mat(param_ty).kind.as_primitive().unwrap();
 
                 vec![encode_prim(primitive)]
             }
@@ -292,7 +292,7 @@ impl<'t> ByteCoder<'t> {
                 let item_ty = self.get_ty_mat(param_ty).kind.as_array().unwrap();
 
                 let item_layout = item_ty.layout.as_ref().unwrap();
-                let item_ty = item_ty.kind.as_primitive().unwrap();
+                let item_ty = self.get_ty_mat(item_ty).kind.as_primitive().unwrap();
 
                 vec![
                     item_layout.head_size.div_ceil(8), // item_head_size
@@ -304,7 +304,7 @@ impl<'t> ByteCoder<'t> {
                 let item_layout = as_layout_of_param_array(ty_mat);
 
                 let ty_func = ty_mat.kind.as_function().unwrap();
-                let ty_out_variants = ty_func.body.kind.as_enum().unwrap();
+                let ty_out_variants = self.get_ty_mat(&ty_func.body).kind.as_enum().unwrap();
                 let ty_out_format = lutra_bin::layout::enum_format(
                     ty_out_variants,
                     &ty_func.body.variants_recursive,

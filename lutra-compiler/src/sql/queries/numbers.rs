@@ -13,8 +13,10 @@ impl super::Context<'_> {
     ) -> sa::Expr {
         let target_ty_name = self.ty_name(target);
 
-        let source = source.kind.as_primitive().unwrap();
-        let target = target.kind.as_primitive().unwrap();
+        // let source = source.kind.as_primitive().unwrap();
+        // let target = target.kind.as_primitive().unwrap();
+        let source = self.get_ty_mat(source).kind.as_primitive().unwrap();
+        let target = self.get_ty_mat(target).kind.as_primitive().unwrap();
 
         match source {
             ir::TyPrimitive::int8
