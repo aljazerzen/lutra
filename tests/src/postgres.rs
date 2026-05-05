@@ -2673,16 +2673,12 @@ async fn pull_interface() {
     let runner = RunnerAsync::new(tran);
 
     insta::assert_snapshot!(runner.pull_schema().await.unwrap(), @r#"
-    ## Row of table persons
-    type Person: {id: int32, first_name: text, last_name: text}
-    ## Read from table persons
-    func from_persons(): [Person] -> std::sql::from("persons")
-    ## Write into table persons
-    func insert_persons(values: [Person]) -> std::sql::insert(values, "persons")
-    ## Lookup in persons by index persons_pkey
-    func from_persons_by_id(id: int32): enum {none, some: Person} -> (
-      from_persons() | std::find(x -> x.id == id)
-    )
+    ## Row of table movie_actors
+    type MovieActor: {source: int32, target: int32, role: text}
+    ## Read from table movie_actors
+    func from_movie_actors(): [MovieActor] -> std::sql::from("movie_actors")
+    ## Write into table movie_actors
+    func insert_movie_actors(values: [MovieActor]) -> std::sql::insert(values, "movie_actors")
 
     ## Row of table movies
     type Movie: {id: int32, title: text, premiere_date: std::Date, director_id: int16}
@@ -2699,12 +2695,16 @@ async fn pull_interface() {
       from_movies() | std::filter(x -> x.premiere_date == premiere_date)
     )
 
-    ## Row of table movie_actors
-    type MovieActor: {source: int32, target: int32, role: text}
-    ## Read from table movie_actors
-    func from_movie_actors(): [MovieActor] -> std::sql::from("movie_actors")
-    ## Write into table movie_actors
-    func insert_movie_actors(values: [MovieActor]) -> std::sql::insert(values, "movie_actors")
+    ## Row of table persons
+    type Person: {id: int32, first_name: text, last_name: text}
+    ## Read from table persons
+    func from_persons(): [Person] -> std::sql::from("persons")
+    ## Write into table persons
+    func insert_persons(values: [Person]) -> std::sql::insert(values, "persons")
+    ## Lookup in persons by index persons_pkey
+    func from_persons_by_id(id: int32): enum {none, some: Person} -> (
+      from_persons() | std::find(x -> x.id == id)
+    )
 
     module another {
 
@@ -2796,7 +2796,10 @@ async fn _type_round_trip(ty: &str, ty_reflected: &str, value: lutra_bin::Value)
     tracing::debug!("interface:\n{interface}");
 
     // compare with original type
-    let interface_ty_def = interface.lines().find(|l| l.starts_with("type ")).unwrap();
+    let interface_ty_def = interface
+        .lines()
+        .find(|l| l.starts_with("type Row: "))
+        .unwrap();
     let interface_ty = interface_ty_def.strip_prefix("type Row: ").unwrap();
     similar_asserts::assert_eq!(ty_reflected, interface_ty);
 

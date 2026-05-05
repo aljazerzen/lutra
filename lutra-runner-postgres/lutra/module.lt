@@ -22,6 +22,7 @@ func pull_interface() -> (
         t.relnamespace == n.oid
         && t.relkind == "r"
       ))
+      | sort(t -> t.relname)
       | map(func (t: pg::PgClass) -> {
         table_name = t.relname,
         columns = (
