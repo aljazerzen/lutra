@@ -58,7 +58,7 @@ profile:
 test:
     cargo build -p lutra-cli --quiet
 
-    cargo nextest run --cargo-quiet --profile=overview
+    cargo nextest run --cargo-quiet
     just py test
     just website/test
 
