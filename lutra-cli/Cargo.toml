@@ -39,7 +39,7 @@ tokio = { workspace = true, features = [
     "sync",
 ] }
 strum = { workspace = true }
-tower-lsp-server = "0.22.1"
+tower-lsp-server = "0.23.0"
 codespan-lsp = "0.13.0"
 
 lutra-arrow = { workspace = true }

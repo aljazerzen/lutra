@@ -10,8 +10,9 @@
 ///
 /// The program under test is intentionally tiny so that the fixed cost of
 /// compiling std.lt dominates, which is what we care about here.
-use criterion::{Criterion, black_box, criterion_group, criterion_main};
+use criterion::{Criterion, criterion_group, criterion_main};
 use lutra_compiler::{_bench, _lexer, CheckParams, ProgramFormat, SourceTree, check, compile};
+use std::hint::black_box;
 
 const PROG: &str = "func main() -> std::add(1, 2): int32";
 const EXPR_PROG: &str = "std::add(1, 2 * 3 ?? 4)";

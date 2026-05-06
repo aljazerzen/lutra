@@ -720,7 +720,6 @@ func main() -> (30 + 2): uint16
 
 # === std_add_uint16_01
 # skip: postgres
-# skip: duckdb
 func main() -> (16384 + 16384): uint16
 # >
 32768

@@ -3,7 +3,7 @@ use std::path;
 use std::sync::Arc;
 use tokio::sync::{Mutex, RwLock};
 use tower_lsp_server::jsonrpc::Result;
-use tower_lsp_server::lsp_types::*;
+use tower_lsp_server::ls_types::*;
 
 use lutra_compiler::{DiscoverParams, SourceTree};
 use lutra_compiler::{codespan, printer};
@@ -555,7 +555,7 @@ fn apply_changes(text: &mut String, changes: Vec<TextDocumentContentChangeEvent>
 
 mod to_proto {
     use lutra_compiler::codespan;
-    use tower_lsp_server::{UriExt, lsp_types::*};
+    use tower_lsp_server::ls_types::*;
 
     pub fn source_id(source_tree: &lutra_compiler::SourceTree, source_id: u16) -> Uri {
         // TODO: this feels wrong, we should rethink identifiers in SourceTree
@@ -636,7 +636,7 @@ mod to_proto {
 
 mod from_proto {
     use lutra_compiler::codespan;
-    use tower_lsp_server::{UriExt, lsp_types::*};
+    use tower_lsp_server::ls_types::*;
 
     pub fn path(uri: &Uri) -> std::path::PathBuf {
         uri.to_file_path().unwrap().into_owned()

@@ -495,18 +495,15 @@ fn option_array() {
         SELECT
           0::INT8 AS index,
           NULL::INT4 AS value
-        UNION
-        ALL
+        UNION ALL
         SELECT
           1::INT8 AS index,
           1::INT4 AS value
-        UNION
-        ALL
+        UNION ALL
         SELECT
           2::INT8 AS index,
           2::INT4 AS value
-        UNION
-        ALL
+        UNION ALL
         SELECT
           3::INT8 AS index,
           NULL::INT4 AS value
@@ -620,15 +617,13 @@ fn enum_array_with_payloads() {
           0::INT2 AS _t,
           NULL::INT4 AS _1,
           NULL::TEXT AS _2
-        UNION
-        ALL
+        UNION ALL
         SELECT
           1::INT8 AS index,
           1::INT2 AS _t,
           50::INT4 AS _1,
           NULL::TEXT AS _2
-        UNION
-        ALL
+        UNION ALL
         SELECT
           2::INT8 AS index,
           2::INT2 AS _t,
@@ -755,13 +750,11 @@ fn array_prim() {
         SELECT
           0::INT8 AS index,
           1::INT8 AS value
-        UNION
-        ALL
+        UNION ALL
         SELECT
           1::INT8 AS index,
           2::INT8 AS value
-        UNION
-        ALL
+        UNION ALL
         SELECT
           2::INT8 AS index,
           3::INT8 AS value
@@ -815,8 +808,7 @@ fn array_tuple() {
           0::INT8 AS index,
           1::INT4 AS _0,
           2::INT2 AS _1
-        UNION
-        ALL
+        UNION ALL
         SELECT
           1::INT8 AS index,
           3::INT4 AS _0,
@@ -854,25 +846,21 @@ fn tuple_array_prim() {
       (
         SELECT
           COALESCE(
-            list(
-              r0.value
+            list(r0.value
               ORDER BY
-                r0.index
-            ),
-            CAST([] AS INT8 [])
+                r0.index),
+            CAST([ ] AS INT8[])
           ) AS value
         FROM
           (
             SELECT
               0::INT8 AS index,
               1::INT8 AS value
-            UNION
-            ALL
+            UNION ALL
             SELECT
               1::INT8 AS index,
               2::INT8 AS value
-            UNION
-            ALL
+            UNION ALL
             SELECT
               2::INT8 AS index,
               3::INT8 AS value
@@ -886,7 +874,7 @@ fn tuple_array_prim() {
               ORDER BY
                 r1.index
             ),
-            CAST([] AS STRUCT(field0 INT4, field1 TEXT) [])
+            CAST([ ] AS STRUCT(field0 INT4, field1 TEXT)[])
           ) AS value
         FROM
           (
@@ -931,71 +919,59 @@ fn array_array_prim() {
           (
             SELECT
               COALESCE(
-                list(
-                  r0.value
+                list(r0.value
                   ORDER BY
-                    r0.index
-                ),
-                CAST([] AS INT8 [])
+                    r0.index),
+                CAST([ ] AS INT8[])
               ) AS value
             FROM
               (
                 SELECT
                   0::INT8 AS index,
                   1::INT8 AS value
-                UNION
-                ALL
+                UNION ALL
                 SELECT
                   1::INT8 AS index,
                   2::INT8 AS value
               ) AS r0
           ) AS value
-        UNION
-        ALL
+        UNION ALL
         SELECT
           1::INT8 AS index,
           (
             SELECT
               COALESCE(
-                list(
-                  r1.value
+                list(r1.value
                   ORDER BY
-                    r1.index
-                ),
-                CAST([] AS INT8 [])
+                    r1.index),
+                CAST([ ] AS INT8[])
               ) AS value
             FROM
               (
                 SELECT
                   0::INT8 AS index,
                   3::INT8 AS value
-                UNION
-                ALL
+                UNION ALL
                 SELECT
                   1::INT8 AS index,
                   4::INT8 AS value
               ) AS r1
           ) AS value
-        UNION
-        ALL
+        UNION ALL
         SELECT
           2::INT8 AS index,
           (
             SELECT
               COALESCE(
-                list(
-                  r2.value
+                list(r2.value
                   ORDER BY
-                    r2.index
-                ),
-                CAST([] AS INT8 [])
+                    r2.index),
+                CAST([ ] AS INT8[])
               ) AS value
             FROM
               (
                 SELECT
-                  0::INT8 AS index,
-                  5::INT8 AS value
-              ) AS r2
+                  0::INT8 AS index, 5::INT8 AS value) AS r2
           ) AS value
       ) AS r3
     ORDER BY
@@ -1081,7 +1057,7 @@ fn input_array_prim() {
           (ROW_NUMBER() OVER () -1)::int4 AS index,
           u.unnest AS value
         FROM
-          LATERAL unnest($1::INT8 []) AS u
+          LATERAL unnest($1::INT8[]) AS u
       ) AS r0
     ORDER BY
       r0.index
@@ -1111,7 +1087,7 @@ fn input_array_text() {
           (ROW_NUMBER() OVER () -1)::int4 AS index,
           u.unnest AS value
         FROM
-          LATERAL unnest($1::TEXT []) AS u
+          LATERAL unnest($1::TEXT[]) AS u
       ) AS r0
     ORDER BY
       r0.index
@@ -1136,7 +1112,7 @@ fn input_nested_tuple_array() {
         ])
     )), @"
     SELECT
-      $1::INT8 [] AS items,
+      $1::INT8[] AS items,
       $2::INT4 AS count
     ---
     {
@@ -1525,8 +1501,7 @@ fn sql_insert_primitives() {
           0::INT8 AS index,
           3::INT4 AS _0,
           'Charlie'::text AS _1
-        UNION
-        ALL
+        UNION ALL
         SELECT
           1::INT8 AS index,
           4::INT4 AS _0,
@@ -1571,8 +1546,7 @@ fn sql_insert_flat_tuple() {
           'Widget'::text AS _1,
           9.99::FLOAT8 AS _2,
           TRUE AS _3
-        UNION
-        ALL
+        UNION ALL
         SELECT
           1::INT8 AS index,
           2::INT4 AS _0,
@@ -1617,8 +1591,7 @@ fn sql_insert_option() {
           1::INT4 AS _0,
           'Alice'::text AS _1,
           30::INT4 AS _2
-        UNION
-        ALL
+        UNION ALL
         SELECT
           1::INT8 AS index,
           2::INT4 AS _0,
@@ -1660,8 +1633,7 @@ fn sql_insert_date() {
           0::INT8 AS index,
           1::INT4 AS _0,
           19737::INT4 AS _1
-        UNION
-        ALL
+        UNION ALL
         SELECT
           1::INT8 AS index,
           2::INT4 AS _0,
@@ -1705,28 +1677,23 @@ fn serialize_array_in_tuple() {
             SELECT
               0::INT8 AS index,
               2::INT4 AS value
-            UNION
-            ALL
+            UNION ALL
             SELECT
               1::INT8 AS index,
               5::INT4 AS value
-            UNION
-            ALL
+            UNION ALL
             SELECT
               2::INT8 AS index,
               4::INT4 AS value
-            UNION
-            ALL
+            UNION ALL
             SELECT
               3::INT8 AS index,
               3::INT4 AS value
-            UNION
-            ALL
+            UNION ALL
             SELECT
               4::INT8 AS index,
               1::INT4 AS value
-            UNION
-            ALL
+            UNION ALL
             SELECT
               5::INT8 AS index,
               2::INT4 AS value
@@ -1775,14 +1742,12 @@ fn serialize_array_of_tuples_in_tuple() {
               0::INT8 AS index,
               2::INT4 AS _0,
               FALSE AS _1
-            UNION
-            ALL
+            UNION ALL
             SELECT
               1::INT8 AS index,
               5::INT4 AS _0,
               TRUE AS _1
-            UNION
-            ALL
+            UNION ALL
             SELECT
               2::INT8 AS index,
               4::INT4 AS _0,
@@ -1857,56 +1822,47 @@ fn serialize_nested_array() {
               (
                 SELECT
                   COALESCE(
-                    list(
-                      r0.value
+                    list(r0.value
                       ORDER BY
-                        r0.index
-                    ),
-                    CAST([] AS INT2 [])
+                        r0.index),
+                    CAST([ ] AS INT2[])
                   ) AS value
                 FROM
                   (
                     SELECT
                       0::INT8 AS index,
                       1::INT2 AS value
-                    UNION
-                    ALL
+                    UNION ALL
                     SELECT
                       1::INT8 AS index,
                       2::INT2 AS value
-                    UNION
-                    ALL
+                    UNION ALL
                     SELECT
                       2::INT8 AS index,
                       3::INT2 AS value
                   ) AS r0
               ) AS value
-            UNION
-            ALL
+            UNION ALL
             SELECT
               1::INT8 AS index,
               (
                 SELECT
                   COALESCE(
-                    list(
-                      r1.value
+                    list(r1.value
                       ORDER BY
-                        r1.index
-                    ),
-                    CAST([] AS INT2 [])
+                        r1.index),
+                    CAST([ ] AS INT2[])
                   ) AS value
                 FROM
                   (
                     SELECT
                       0::INT8 AS index,
                       4::INT2 AS value
-                    UNION
-                    ALL
+                    UNION ALL
                     SELECT
                       1::INT8 AS index,
                       5::INT2 AS value
-                    UNION
-                    ALL
+                    UNION ALL
                     SELECT
                       2::INT8 AS index,
                       6::INT2 AS value
@@ -1949,12 +1905,10 @@ fn serialize_nested_array_map() {
           (
             SELECT
               COALESCE(
-                list(
-                  r4.value
+                list(r4.value
                   ORDER BY
-                    r4.index
-                ),
-                CAST([] AS INT8 [])
+                    r4.index),
+                CAST([ ] AS INT8[])
               ) AS value
             FROM
               (
@@ -1978,56 +1932,47 @@ fn serialize_nested_array_map() {
               (
                 SELECT
                   COALESCE(
-                    list(
-                      r0.value
+                    list(r0.value
                       ORDER BY
-                        r0.index
-                    ),
-                    CAST([] AS INT8 [])
+                        r0.index),
+                    CAST([ ] AS INT8[])
                   ) AS value
                 FROM
                   (
                     SELECT
                       0::INT8 AS index,
                       1::INT8 AS value
-                    UNION
-                    ALL
+                    UNION ALL
                     SELECT
                       1::INT8 AS index,
                       2::INT8 AS value
-                    UNION
-                    ALL
+                    UNION ALL
                     SELECT
                       2::INT8 AS index,
                       3::INT8 AS value
                   ) AS r0
               ) AS value
-            UNION
-            ALL
+            UNION ALL
             SELECT
               1::INT8 AS index,
               (
                 SELECT
                   COALESCE(
-                    list(
-                      r1.value
+                    list(r1.value
                       ORDER BY
-                        r1.index
-                    ),
-                    CAST([] AS INT8 [])
+                        r1.index),
+                    CAST([ ] AS INT8[])
                   ) AS value
                 FROM
                   (
                     SELECT
                       0::INT8 AS index,
                       4::INT8 AS value
-                    UNION
-                    ALL
+                    UNION ALL
                     SELECT
                       1::INT8 AS index,
                       5::INT8 AS value
-                    UNION
-                    ALL
+                    UNION ALL
                     SELECT
                       2::INT8 AS index,
                       6::INT8 AS value
@@ -2078,13 +2023,11 @@ fn serialize_bool_array() {
             SELECT
               0::INT8 AS index,
               FALSE AS value
-            UNION
-            ALL
+            UNION ALL
             SELECT
               1::INT8 AS index,
               TRUE AS value
-            UNION
-            ALL
+            UNION ALL
             SELECT
               2::INT8 AS index,
               TRUE AS value
@@ -2126,13 +2069,11 @@ fn serialize_text_array() {
             SELECT
               0::INT8 AS index,
               'no'::text AS value
-            UNION
-            ALL
+            UNION ALL
             SELECT
               1::INT8 AS index,
               'yes'::text AS value
-            UNION
-            ALL
+            UNION ALL
             SELECT
               2::INT8 AS index,
               'neither'::text AS value
@@ -2169,19 +2110,15 @@ fn serialize_deeply_nested() {
           (
             SELECT
               COALESCE(
-                list(
-                  r0.value
+                list(r0.value
                   ORDER BY
-                    r0.index
-                ),
-                CAST([] AS BOOL [])
+                    r0.index),
+                CAST([ ] AS BOOL[])
               ) AS value
             FROM
               (
                 SELECT
-                  0::INT8 AS index,
-                  TRUE AS value
-              ) AS r0
+                  0::INT8 AS index, TRUE AS value) AS r0
           ) AS value
       ) AS r1
     ORDER BY
@@ -2237,11 +2174,11 @@ fn serialize_complex_nested() {
                     r1.index
                 ),
                 CAST(
-                  [] AS STRUCT(
+                  [ ] AS STRUCT(
                     field0 INT4,
-                    field1 STRUCT(field0 INT4, field1 INT4 [], field2 INT2),
+                    field1 STRUCT(field0 INT4, field1 INT4[], field2 INT2),
                     field2 INT2
-                  ) []
+                  )[]
                 )
               ) AS value
             FROM
@@ -2253,19 +2190,15 @@ fn serialize_complex_nested() {
                   (
                     SELECT
                       COALESCE(
-                        list(
-                          r0.value
+                        list(r0.value
                           ORDER BY
-                            r0.index
-                        ),
-                        CAST([] AS INT4 [])
+                            r0.index),
+                        CAST([ ] AS INT4[])
                       ) AS value
                     FROM
                       (
                         SELECT
-                          0::INT8 AS index,
-                          5::INT4 AS value
-                      ) AS r0
+                          0::INT8 AS index, 5::INT4 AS value) AS r0
                   ) AS _1_1,
                   2::INT2 AS _1_2,
                   2::INT2 AS _2
@@ -2320,19 +2253,15 @@ fn serialize_index_nested_array() {
                   (
                     SELECT
                       COALESCE(
-                        list(
-                          r0.value
+                        list(r0.value
                           ORDER BY
-                            r0.index
-                        ),
-                        CAST([] AS TEXT [])
+                            r0.index),
+                        CAST([ ] AS TEXT[])
                       ) AS value
                     FROM
                       (
                         SELECT
-                          0::INT8 AS index,
-                          'hello'::text AS value
-                      ) AS r0
+                          0::INT8 AS index, 'hello'::text AS value) AS r0
                   ) AS value
               ) AS r1
             WHERE
@@ -2361,7 +2290,7 @@ fn serialize_input_array_in_tuple() {
     )), @r#"
     SELECT
       'hello'::text AS field0,
-      $1::INT4 [] AS x
+      $1::INT4[] AS x
     ---
     {
       "hello",
@@ -2388,20 +2317,17 @@ fn serialize_literal_array_in_tuple() {
       (
         SELECT
           COALESCE(
-            list(
-              r0.value
+            list(r0.value
               ORDER BY
-                r0.index
-            ),
-            CAST([] AS INT4 [])
+                r0.index),
+            CAST([ ] AS INT4[])
           ) AS value
         FROM
           (
             SELECT
               0::INT8 AS index,
               1::INT4 AS value
-            UNION
-            ALL
+            UNION ALL
             SELECT
               1::INT8 AS index,
               2::INT4 AS value
@@ -2437,20 +2363,17 @@ fn serialize_option_in_array() {
       (
         SELECT
           COALESCE(
-            list(
-              r0.value
+            list(r0.value
               ORDER BY
-                r0.index
-            ),
-            CAST([] AS INT4 [])
+                r0.index),
+            CAST([ ] AS INT4[])
           ) AS value
         FROM
           (
             SELECT
               0::INT8 AS index,
               NULL::INT4 AS value
-            UNION
-            ALL
+            UNION ALL
             SELECT
               1::INT8 AS index,
               5::INT4 AS value
@@ -2483,25 +2406,21 @@ fn serialize_tuple_with_option_array() {
       (
         SELECT
           COALESCE(
-            list(
-              r0.value
+            list(r0.value
               ORDER BY
-                r0.index
-            ),
-            CAST([] AS INT4 [])
+                r0.index),
+            CAST([ ] AS INT4[])
           ) AS value
         FROM
           (
             SELECT
               0::INT8 AS index,
               1::INT4 AS value
-            UNION
-            ALL
+            UNION ALL
             SELECT
               1::INT8 AS index,
               NULL::INT4 AS value
-            UNION
-            ALL
+            UNION ALL
             SELECT
               2::INT8 AS index,
               3::INT4 AS value
@@ -2631,8 +2550,7 @@ fn update_basic() {
               ) AS r1,
               LATERAL (
                 SELECT
-                  r1.index AS value
-              ) AS r2,
+                  r1.index AS value) AS r2,
               LATERAL (
                 SELECT
                   r8._1_0 AS _0,
@@ -2676,8 +2594,7 @@ fn update_basic() {
                               ) AS r4
                             WHERE
                               (r3.value = 0::INT2)
-                            UNION
-                            ALL
+                            UNION ALL
                             SELECT
                               r5._t,
                               r5._1_0,

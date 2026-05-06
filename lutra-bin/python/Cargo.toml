@@ -10,4 +10,4 @@ test = false
 
 [dependencies]
 lutra-bin = { workspace = true, features = ["std"] }
-pyo3 = "0.25.0"
+pyo3 = "0.28.3"

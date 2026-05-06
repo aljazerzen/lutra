@@ -48,8 +48,8 @@ tokio = "1.42.0"
 strum = { version = "0.26.3", features = ["std", "derive"] }
 chrono = { version = "0.4.42", default-features = false }
 chrono-tz = { version = "0.10.4", default-features = false }
-arrow = "56.2.0"
-parquet = "56.2.0"
+arrow = "58.2.0"
+parquet = "58.2.0"
 
 lutra-arrow = { version = "0.5", path = "lutra-arrow" }
 lutra-bin = { version = "0.5", path = "lutra-bin", default-features = false }

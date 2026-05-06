@@ -156,7 +156,7 @@ where
         crate::diagnostic::Severity::Error => ReportKind::Error,
     };
 
-    let mut report = Report::build(kind, source_path, span.start)
+    let mut report = Report::build(kind, (source_path, span.clone()))
         .with_config(config)
         .with_label(Label::new((source_path, span)).with_message(&diagnostic.message));
 
@@ -170,8 +170,8 @@ where
             let span = std::ops::Range::from(span);
             report.add_label(Label::new((source_path, span)).with_message(&diagnostic.message))
         } else {
-            notes += "\n   │ ";
             notes += &additional.message;
+            notes += "\n";
         }
     }
     if !notes.is_empty() {
@@ -231,10 +231,15 @@ impl<'a, S: crate::project::SourceProvider> FileTreeCache<'a, S> {
 
 impl<'a, S: crate::project::SourceProvider> ariadne::Cache<&Path> for FileTreeCache<'a, S> {
     type Storage = String;
-    fn fetch(&mut self, path: &&Path) -> Result<&ariadne::Source, Box<dyn fmt::Debug + '_>> {
+
+    fn fetch(
+        &mut self,
+        path: &&Path,
+    ) -> Result<&ariadne::Source<<Self as ariadne::Cache<&Path>>::Storage>, impl std::fmt::Debug>
+    {
         let (_, content) = match self.provider.get_by_path(path) {
             Some(v) => v,
-            None => return Err(Box::new(format!("Unknown file `{path:?}`"))),
+            None => return Err(format!("Unknown file `{path:?}`")),
         };
 
         Ok(self
@@ -243,13 +248,11 @@ impl<'a, S: crate::project::SourceProvider> ariadne::Cache<&Path> for FileTreeCa
             .or_insert_with(|| ariadne::Source::from(content.to_string())))
     }
 
-    fn display<'b>(&self, id: &&'b Path) -> Option<Box<dyn fmt::Display + 'b>> {
+    fn display<'b>(&self, id: &'b &Path) -> Option<impl std::fmt::Display + 'b> {
         if id.as_os_str().is_empty() {
-            Some(Box::new(
-                self.provider.get_root().file_name()?.display().to_string(),
-            ))
+            Some(self.provider.get_root().file_name()?.display().to_string())
         } else {
-            Some(Box::new(id.display()))
+            Some(id.display().to_string())
         }
     }
 }

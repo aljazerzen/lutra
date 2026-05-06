@@ -1,7 +1,7 @@
-use criterion::{BenchmarkId, Criterion, black_box, criterion_group, criterion_main};
+use criterion::{BenchmarkId, Criterion, criterion_group, criterion_main};
 use lutra_bin::{Value, ir};
 use rand::rngs::SmallRng;
-use rand::{Rng, SeedableRng};
+use rand::{RngExt, SeedableRng};
 
 fn generate_complex_tuple_array(num_rows: usize) -> (Vec<u8>, ir::Ty) {
     let ty =
@@ -11,12 +11,12 @@ fn generate_complex_tuple_array(num_rows: usize) -> (Vec<u8>, ir::Ty) {
 
     let mut values = Vec::with_capacity(num_rows);
     for _ in 0..num_rows {
-        let id: u32 = rng.r#gen();
-        let name_idx = rng.gen_range(0..5);
+        let id = rng.random();
+        let name_idx = rng.random_range(0..5);
         let names = ["Alice", "Bob", "Charlie", "Diana", "Eve"];
         let name = names[name_idx];
-        let score: f64 = rng.r#gen();
-        let active = rng.gen_bool(0.5);
+        let score: f64 = rng.random();
+        let active = rng.random_bool(0.5);
 
         values.push(Value::Tuple(vec![
             Value::Prim32(id),
@@ -43,7 +43,8 @@ fn bench_to_arrow_complex_tuple_array(c: &mut Criterion) {
                 let (data, ty) = generate_complex_tuple_array(num_rows);
 
                 b.iter_with_large_drop(|| {
-                    lutra_arrow::lutra_to_arrow(black_box(data.as_slice()), &ty, &[]).unwrap()
+                    lutra_arrow::lutra_to_arrow(std::hint::black_box(data.as_slice()), &ty, &[])
+                        .unwrap()
                 });
             },
         );

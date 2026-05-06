@@ -5,7 +5,7 @@ use tokio::sync;
 use lutra_runner::Run;
 use lutra_runner_postgres::RunnerAsync;
 
-use rand::{Rng, SeedableRng};
+use rand::{RngExt, SeedableRng};
 
 use crate::POSTGRES_URL_SHARED;
 
@@ -205,7 +205,7 @@ async fn generate_and_test(
     // println!("{seed} ended");
 }
 
-fn generate(constructs: &[Construct], rng: &mut impl Rng, depth: usize) -> Case {
+fn generate(constructs: &[Construct], rng: &mut impl RngExt, depth: usize) -> Case {
     if depth > 7 {
         return Case {
             val_source: "false".into(),

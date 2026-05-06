@@ -10,11 +10,11 @@ version.workspace = true
 [dependencies]
 anyhow = { workspace = true }
 itertools = { workspace = true }
-crossterm = "0.28.0"
+crossterm = "0.29.0"
 unicode-width = "0.2"
 unicode-segmentation = "1.12"
-notify = "6.0"
-notify-debouncer-mini = "0.4"
+notify = "8.2.0"
+notify-debouncer-mini = "0.7.0"
 tokio = { workspace = true, features = ["rt"] }
 chrono = { workspace = true }
 

@@ -74,14 +74,14 @@ fn types_03() {
         func main() -> floor(4.4)
     "#), @"
     [E0006] Error:
-       ╭─[<unknown>:4:46]
+       ╭─[ <unknown>:4:46 ]
        │
      4 │         func floor(x: T) where T -> floor_64(x)
        │                                              ┬
        │                                              ╰── func floor_64 expected type `float64`, but found type `T`
     ───╯
     Error:
-       ╭─[<unknown>:6:24]
+       ╭─[ <unknown>:6:24 ]
        │
      6 │         func main() -> floor(4.4)
        │                        ──┬──
@@ -160,7 +160,7 @@ fn types_09() {
         where T
     "#), @"
     [E0003] Error:
-       ╭─[<unknown>:2:47]
+       ╭─[ <unknown>:2:47 ]
        │
      2 │         func peek(array: [T], condition: func <R> (T): R): [T]
        │                                               ┬
@@ -217,7 +217,7 @@ fn types_13() {
         func main() -> floor(false)
     "#), @"
     [E0007] Error:
-       ╭─[<unknown>:5:24]
+       ╭─[ <unknown>:5:24 ]
        │
      5 │         func main() -> floor(false)
        │                        ──┬──
@@ -240,14 +240,14 @@ fn types_14() {
         func main() -> floor(2.3)
     "#), @"
     [E0006] Error:
-       ╭─[<unknown>:7:22]
+       ╭─[ <unknown>:7:22 ]
        │
      7 │             floor_64(x)
        │                      ┬
        │                      ╰── func floor_64 expected type `float64`, but found type `T`
     ───╯
     [E0006] Error:
-       ╭─[<unknown>:7:13]
+       ╭─[ <unknown>:7:13 ]
        │
      7 │             floor_64(x)
        │             ─────┬─────
@@ -288,7 +288,7 @@ fn types_14() {
         func main() -> twice_floored(2.3)
     "#), @"
     [E0007] Error:
-       ╭─[<unknown>:7:13]
+       ╭─[ <unknown>:7:13 ]
        │
      7 │         -> {floor(x), floor(x)}
        │             ──┬──
@@ -313,7 +313,7 @@ fn types_15() {
         func main() -> get_b({a = false, b = 4.6: float64})
     "#), @"
     [E0006] Error:
-       ╭─[<unknown>:5:46]
+       ╭─[ <unknown>:5:46 ]
        │
      5 │         func main() -> get_b({a = false, b = 4.6: float64})
        │                                              ──────┬─────
@@ -327,7 +327,7 @@ fn types_15() {
         func main() -> get_b({a = false, c = 4})
     "#), @"
     [E0006] Error:
-       ╭─[<unknown>:5:24]
+       ╭─[ <unknown>:5:24 ]
        │
      5 │         func main() -> get_b({a = false, c = 4})
        │                        ──┬──
@@ -352,7 +352,7 @@ fn types_16() {
         func main() -> get_b({a = "7", 4: int64, c = 5.7})
     "#), @r#"
     [E0006] Error:
-       ╭─[<unknown>:5:35]
+       ╭─[ <unknown>:5:35 ]
        │
      5 │         func main() -> get_b({a = "7", 4: int64, c = 5.7})
        │                                   ─┬─
@@ -367,7 +367,7 @@ fn types_16() {
         func main() -> get_b({a = false})
     "#), @"
     [E0006] Error:
-       ╭─[<unknown>:5:24]
+       ╭─[ <unknown>:5:24 ]
        │
      5 │         func main() -> get_b({a = false})
        │                        ──┬──
@@ -396,14 +396,14 @@ fn types_17() {
         func main() -> get({4})
     "#), @"
     [E0006] Error:
-       ╭─[<unknown>:6:20]
+       ╭─[ <unknown>:6:20 ]
        │
      6 │         -> get_int(x)
        │                    ┬
        │                    ╰── func get_int expected type `{int64}`, but found type `T`
     ───╯
     [E0006] Error:
-       ╭─[<unknown>:6:12]
+       ╭─[ <unknown>:6:12 ]
        │
      6 │         -> get_int(x)
        │            ─────┬────
@@ -421,14 +421,14 @@ fn types_17() {
         func main() -> get({4})
     "#), @"
     [E0006] Error:
-       ╭─[<unknown>:6:20]
+       ╭─[ <unknown>:6:20 ]
        │
      6 │         -> get_int(x)
        │                    ┬
        │                    ╰── func get_int expected type `{a: int64}`, but found type `T`
     ───╯
     [E0006] Error:
-       ╭─[<unknown>:6:12]
+       ╭─[ <unknown>:6:12 ]
        │
      6 │         -> get_int(x)
        │            ─────┬────
@@ -447,7 +447,7 @@ fn types_17() {
         func main() -> needs_one({4})
     "#), @"
     [E0006] Error:
-       ╭─[<unknown>:7:12]
+       ╭─[ <unknown>:7:12 ]
        │
      7 │         -> needs_two(x)
        │            ────┬────
@@ -489,7 +489,7 @@ fn types_19() {
         func f(x) where T -> x + 1
     "#), @"
     Error:
-       ╭─[<unknown>:2:16]
+       ╭─[ <unknown>:2:16 ]
        │
      2 │         func f(x) where T -> x + 1
        │                ┬
@@ -527,7 +527,7 @@ fn types_21() {
     )
     "#), @"
     [E0006] Error:
-       ╭─[<unknown>:4:15]
+       ╭─[ <unknown>:4:15 ]
        │
      4 │       | x -> x.b
        │               ─┬
@@ -541,7 +541,7 @@ fn types_21() {
     )
     "#), @"
     [E0006] Error:
-       ╭─[<unknown>:4:15]
+       ╭─[ <unknown>:4:15 ]
        │
      4 │       | x -> x.3
        │               ─┬
@@ -558,7 +558,7 @@ fn types_22() {
         func main() -> [true, false].a
     "#), @"
     [E0006] Error:
-       ╭─[<unknown>:2:37]
+       ╭─[ <unknown>:2:37 ]
        │
      2 │         func main() -> [true, false].a
        │                                     ─┬
@@ -569,7 +569,7 @@ fn types_22() {
         func main() -> "hello".a
     "#), @r#"
     [E0006] Error:
-       ╭─[<unknown>:2:31]
+       ╭─[ <unknown>:2:31 ]
        │
      2 │         func main() -> "hello".a
        │                               ─┬
@@ -580,30 +580,28 @@ fn types_22() {
         func main(x: T) where T: int32 | text -> x.a
     "#), @"
     Error:
-       ╭─[<unknown>:2:51]
+       ╭─[ <unknown>:2:51 ]
        │
      2 │         func main(x: T) where T: int32 | text -> x.a
        │                                                   ─┬
        │                                                    ╰── lookup expected a tuple, found type parameter T
        │
-       │ Note:
-       │ T is not constrained to tuples only
-       │ add `T: {}` to constrain it to tuples
+       │ Note: T is not constrained to tuples only
+       │       add `T: {}` to constrain it to tuples
     ───╯
     ");
     insta::assert_snapshot!(_test_err(r#"
         func main(x: T) where T -> x.a
     "#), @"
     Error:
-       ╭─[<unknown>:2:37]
+       ╭─[ <unknown>:2:37 ]
        │
      2 │         func main(x: T) where T -> x.a
        │                                     ─┬
        │                                      ╰── lookup expected a tuple, found type parameter T
        │
-       │ Note:
-       │ T is not constrained to tuples only
-       │ add `T: {}` to constrain it to tuples
+       │ Note: T is not constrained to tuples only
+       │       add `T: {}` to constrain it to tuples
     ───╯
     ");
     insta::assert_snapshot!(_test_err(r#"
@@ -611,7 +609,7 @@ fn types_22() {
         func main(x: t) -> x.a
     "#), @"
     [E0006] Error:
-       ╭─[<unknown>:3:29]
+       ╭─[ <unknown>:3:29 ]
        │
      3 │         func main(x: t) -> x.a
        │                             ─┬
@@ -632,7 +630,7 @@ fn types_23() {
         func main(a: int32, b) -> a + 1
     "#), @"
     Error:
-       ╭─[<unknown>:2:29]
+       ╭─[ <unknown>:2:29 ]
        │
      2 │         func main(a: int32, b) -> a + 1
        │                             ┬
@@ -644,7 +642,7 @@ fn types_23() {
         func main()
     "#), @"
     Error:
-       ╭─[<unknown>:2:9]
+       ╭─[ <unknown>:2:9 ]
        │
      2 │         func main()
        │         ─────┬─────
@@ -656,7 +654,7 @@ fn types_23() {
         func main(name): {}
     "#), @"
     Error:
-       ╭─[<unknown>:2:19]
+       ╭─[ <unknown>:2:19 ]
        │
      2 │         func main(name): {}
        │                   ──┬─
@@ -668,7 +666,7 @@ fn types_23() {
         func main() -> "hello" | func (x: text): text
     "#), @r#"
     [E0003] Error:
-       ╭─[<unknown>:2:54]
+       ╭─[ <unknown>:2:54 ]
        │
      2 │         func main() -> "hello" | func (x: text): text
        │                                                      │
@@ -704,7 +702,7 @@ fn array_00() {
         ),
         @"
     Error:
-       ╭─[<unknown>:1:16]
+       ╭─[ <unknown>:1:16 ]
        │
      1 │ func main() -> []
        │                ─┬
@@ -722,7 +720,7 @@ fn array_01() {
         ),
         @"
     Error:
-       ╭─[<unknown>:1:16]
+       ╭─[ <unknown>:1:16 ]
        │
      1 │ func main() -> std::lag([], 1)
        │                ────┬───
@@ -750,7 +748,7 @@ fn array_03() {
         ),
         @"
     Error:
-       ╭─[<unknown>:1:22]
+       ╭─[ <unknown>:1:22 ]
        │
      1 │ const main = {false, [], true}
        │                      ─┬
@@ -786,7 +784,7 @@ fn array_06() {
         const main = [false, "true", false]"#
     ), @r#"
     [E0006] Error:
-       ╭─[<unknown>:2:30]
+       ╭─[ <unknown>:2:30 ]
        │
      2 │         const main = [false, "true", false]
        │                              ───┬──
@@ -813,7 +811,7 @@ fn type_annotation_01() {
         ),
         @"
     [E0007] Error:
-       ╭─[<unknown>:1:14]
+       ╭─[ <unknown>:1:14 ]
        │
      1 │ const main = 5: text
        │              ┬
@@ -901,7 +899,7 @@ fn enums_02() {
         "#
     ), @"
     [E0006] Error:
-       ╭─[<unknown>:4:24]
+       ╭─[ <unknown>:4:24 ]
        │
      4 │         func main() -> .pending: Status
        │                        ────┬───
@@ -924,24 +922,22 @@ fn recursive_00() {
         "#
     ), @"
     Error:
-       ╭─[<unknown>:2:9]
+       ╭─[ <unknown>:2:9 ]
        │
      2 │         type Tree1: {left: Tree1, right: Tree1}
        │         ───────────────────┬───────────────────
        │                            ╰───────────────────── type has infinite size
        │
-       │ Note:
-       │ self references are allowed only from within arrays or enums
+       │ Note: self references are allowed only from within arrays or enums
     ───╯
     Error:
-       ╭─[<unknown>:6:9]
+       ╭─[ <unknown>:6:9 ]
        │
      6 │         type Tree3: Tree3
        │         ────────┬────────
        │                 ╰────────── type has infinite size
        │
-       │ Note:
-       │ self references are allowed only from within arrays or enums
+       │ Note: self references are allowed only from within arrays or enums
     ───╯
     "
     );
@@ -959,14 +955,13 @@ fn recursive_01() {
         "#
     ), @"
     Error:
-       ╭─[<unknown>:5:9]
+       ╭─[ <unknown>:5:9 ]
        │
      5 │         type Tree2: {Branches2}
        │         ───────────┬───────────
        │                    ╰───────────── type has infinite size
        │
-       │ Note:
-       │ recursive references are allowed only from within arrays or enums
+       │ Note: recursive references are allowed only from within arrays or enums
     ───╯
     "
     );
@@ -1013,7 +1008,7 @@ fn match_02() {
         }
     "#), @r#"
     Error:
-       ╭─[<unknown>:6:11]
+       ╭─[ <unknown>:6:11 ]
        │
      6 │           .red => "red",
        │           ──┬─
@@ -1034,7 +1029,7 @@ fn match_03() {
         }
     "#), @"
     [E0006] Error:
-       ╭─[<unknown>:7:20]
+       ╭─[ <unknown>:7:20 ]
        │
      7 │           .blue => false,
        │                    ──┬──
@@ -1075,7 +1070,7 @@ fn match_06() {
         }
     "#), @"
     Error:
-       ╭─[<unknown>:5:24]
+       ╭─[ <unknown>:5:24 ]
        │
      5 │           .cat(name) | .dog(is_vaccinated) => true,
        │                        ─────────┬─────────
@@ -1097,7 +1092,7 @@ fn match_07() {
         }
     "#), @"
     [E0006] Error:
-       ╭─[<unknown>:8:29]
+       ╭─[ <unknown>:8:29 ]
        │
      8 │           .cat(name) | .dog(name) => name,
        │                             ──┬─
@@ -1150,14 +1145,14 @@ fn defs_00() {
         const a = 6
     "#), @"
     [E0003] Error:
-       ╭─[<unknown>:3:9]
+       ╭─[ <unknown>:3:9 ]
        │
      3 │         const a = 6
        │         ─────┬─────
        │              ╰─────── duplicate name
     ───╯
     [E0003] Error:
-       ╭─[<unknown>:2:9]
+       ╭─[ <unknown>:2:9 ]
        │
      2 │         const a = 3
        │         ─────┬─────
@@ -1172,14 +1167,14 @@ fn defs_01() {
         func a() -> 6
     "#), @"
     [E0003] Error:
-       ╭─[<unknown>:3:9]
+       ╭─[ <unknown>:3:9 ]
        │
      3 │         func a() -> 6
        │         ──────┬──────
        │               ╰──────── duplicate name
     ───╯
     [E0003] Error:
-       ╭─[<unknown>:2:9]
+       ╭─[ <unknown>:2:9 ]
        │
      2 │         func a() -> 3
        │         ──────┬──────
@@ -1196,24 +1191,22 @@ fn constants_00() {
         const d = [1, c]
     "#), @"
     Error:
-       ╭─[<unknown>:2:27]
+       ╭─[ <unknown>:2:27 ]
        │
      2 │         const a = {false, true || false}
        │                           ──────┬──────
        │                                 ╰──────── non-constant expression
        │
-       │ Note:
-       │ use `func` instead of `const`
+       │ Note: use `func` instead of `const`
     ───╯
     Error:
-       ╭─[<unknown>:3:30]
+       ╭─[ <unknown>:3:30 ]
        │
      3 │         const b = [6: int64, 2 + 6]
        │                              ──┬──
        │                                ╰──── non-constant expression
        │
-       │ Note:
-       │ use `func` instead of `const`
+       │ Note: use `func` instead of `const`
     ───╯
     ");
 }
@@ -1223,14 +1216,13 @@ fn constants_01() {
         const a = func () -> true
     "#), @"
     Error:
-       ╭─[<unknown>:2:19]
+       ╭─[ <unknown>:2:19 ]
        │
      2 │         const a = func () -> true
        │                   ───────┬───────
        │                          ╰───────── non-constant expression
        │
-       │ Note:
-       │ use `func` instead of `const`
+       │ Note: use `func` instead of `const`
     ───╯
     ");
 }
@@ -1240,7 +1232,7 @@ fn constants_02() {
         func main(table_name: text): [{bool}] -> std::sql::from(table_name)
     "#), @"
     Error:
-       ╭─[<unknown>:2:65]
+       ╭─[ <unknown>:2:65 ]
        │
      2 │         func main(table_name: text): [{bool}] -> std::sql::from(table_name)
        │                                                                 ─────┬────
@@ -1261,14 +1253,13 @@ fn unpack_01() {
         const main = {false, ..true, "hello"}
     "#), @r#"
     [E0006] Error:
-       ╭─[<unknown>:2:32]
+       ╭─[ <unknown>:2:32 ]
        │
      2 │         const main = {false, ..true, "hello"}
        │                                ──┬─
        │                                  ╰─── only tuples can be unpacked
        │
-       │ Note:
-       │ got type bool
+       │ Note: got type bool
     ───╯
     "#);
 }
@@ -1329,14 +1320,13 @@ fn unpack_06() {
       )
     "#), @r#"
     Error:
-       ╭─[<unknown>:4:40]
+       ╭─[ <unknown>:4:40 ]
        │
      4 │         | x -> {4: int32, ..x, "hello"}.x2
        │                                        ─┬─
        │                                         ╰─── ambiguous lookup into unpack of an unknown type
        │
-       │ Note:
-       │ consider annotating the unpacked expression
+       │ Note: consider annotating the unpacked expression
     ───╯
     "#);
 }
@@ -1348,14 +1338,13 @@ fn unpack_11() {
     func main() -> {4: int32, ..identity({true, false}), "hello"}.2
     "#), @r#"
     Error:
-       ╭─[<unknown>:3:66]
+       ╭─[ <unknown>:3:66 ]
        │
      3 │     func main() -> {4: int32, ..identity({true, false}), "hello"}.2
        │                                                                  ─┬
        │                                                                   ╰── ambiguous lookup into unpack of an unknown type
        │
-       │ Note:
-       │ consider annotating the unpacked expression
+       │ Note: consider annotating the unpacked expression
     ───╯
     "#);
 }
@@ -1375,7 +1364,7 @@ fn unpack_13() {
     func main() -> false_x_false({true, x2 = "hello"})
     "#), @"
     Error:
-       ╭─[<unknown>:2:76]
+       ╭─[ <unknown>:2:76 ]
        │
      2 │     func false_x_false(x: T) where T: {x2: text, ..} -> {false, ..x, false}.2
        │                                                                            ─┬
@@ -1427,7 +1416,7 @@ fn ty_tuple_comprehension_01a() {
     -> std::default()
     "#), @"
     Error:
-       ╭─[<unknown>:4:5]
+       ╭─[ <unknown>:4:5 ]
        │
      4 │ ╭─▶     func main(): {for f: F in A do g: bool}
      5 │ ├─▶     -> std::default()
@@ -1511,7 +1500,7 @@ fn ty_tuple_comprehension_06() {
     func main(a: A): {id: bool, title: bool, release_year: bool} -> make_flags(a)
     "#), @"
     [E0006] Error:
-       ╭─[<unknown>:8:60]
+       ╭─[ <unknown>:8:60 ]
        │
      8 │     func main(a: A): {id: bool, title: bool, release_year: bool} -> make_flags(a)
        │                                                            ──┬─
@@ -1529,7 +1518,7 @@ fn ty_tuple_comprehension_06() {
     func main(a: A): {id: bool, title: bool} -> make_flags(a)
     "#), @"
     [E0007] Error:
-       ╭─[<unknown>:8:49]
+       ╭─[ <unknown>:8:49 ]
        │
      8 │     func main(a: A): {id: bool, title: bool} -> make_flags(a)
        │                                                 ─────┬────
@@ -1612,7 +1601,7 @@ fn tuple_00() {
     func main(): {title: text, is_released: bool} -> {title = "hello"}
     "#), @r#"
     [E0006] Error:
-       ╭─[<unknown>:2:54]
+       ╭─[ <unknown>:2:54 ]
        │
      2 │     func main(): {title: text, is_released: bool} -> {title = "hello"}
        │                                                      ────────┬────────
@@ -1624,7 +1613,7 @@ fn tuple_00() {
     func main(): {title: text} -> {title = "hello", is_released = true}
     "#), @r#"
     [E0006] Error:
-       ╭─[<unknown>:2:35]
+       ╭─[ <unknown>:2:35 ]
        │
      2 │     func main(): {title: text} -> {title = "hello", is_released = true}
        │                                   ──────────────────┬──────────────────
@@ -1645,7 +1634,7 @@ fn tuple_01() {
     func main(): {text, bool} -> {"hello"}
     "#), @r#"
     [E0006] Error:
-       ╭─[<unknown>:2:34]
+       ╭─[ <unknown>:2:34 ]
        │
      2 │     func main(): {text, bool} -> {"hello"}
        │                                  ────┬────
@@ -1657,7 +1646,7 @@ fn tuple_01() {
     func main(): {text} -> {"hello", true}
     "#), @r#"
     [E0006] Error:
-       ╭─[<unknown>:2:28]
+       ╭─[ <unknown>:2:28 ]
        │
      2 │     func main(): {text} -> {"hello", true}
        │                            ───────┬───────
@@ -1678,7 +1667,7 @@ fn tuple_02() {
     func main(): {text, bool} -> {title = "hello"}
     "#), @r#"
     [E0006] Error:
-       ╭─[<unknown>:2:34]
+       ╭─[ <unknown>:2:34 ]
        │
      2 │     func main(): {text, bool} -> {title = "hello"}
        │                                  ────────┬────────
@@ -1690,7 +1679,7 @@ fn tuple_02() {
     func main(): {text} -> {title = "hello", is_released = true}
     "#), @r#"
     [E0006] Error:
-       ╭─[<unknown>:2:28]
+       ╭─[ <unknown>:2:28 ]
        │
      2 │     func main(): {text} -> {title = "hello", is_released = true}
        │                            ──────────────────┬──────────────────
@@ -1711,7 +1700,7 @@ fn tuple_03() {
     func main(): {title: text, is_released: bool} -> {"hello"}
     "#), @r#"
     [E0006] Error:
-       ╭─[<unknown>:2:54]
+       ╭─[ <unknown>:2:54 ]
        │
      2 │     func main(): {title: text, is_released: bool} -> {"hello"}
        │                                                      ────┬────
@@ -1723,7 +1712,7 @@ fn tuple_03() {
     func main(): {title: text} -> {"hello", true}
     "#), @r#"
     [E0006] Error:
-       ╭─[<unknown>:2:35]
+       ╭─[ <unknown>:2:35 ]
        │
      2 │     func main(): {title: text} -> {"hello", true}
        │                                   ───────┬───────
@@ -1740,14 +1729,14 @@ fn tuple_04() {
     func main(): {title: bool, is_released: bool} -> {"hello", "world"}
     "#), @r#"
     [E0006] Error:
-       ╭─[<unknown>:2:55]
+       ╭─[ <unknown>:2:55 ]
        │
      2 │     func main(): {title: bool, is_released: bool} -> {"hello", "world"}
        │                                                       ───┬───
        │                                                          ╰───── expected type `bool`, but found type `text`
     ───╯
     [E0006] Error:
-       ╭─[<unknown>:2:64]
+       ╭─[ <unknown>:2:64 ]
        │
      2 │     func main(): {title: bool, is_released: bool} -> {"hello", "world"}
        │                                                                ───┬───
@@ -1800,7 +1789,7 @@ fn import_02() {
     func main() -> {}
     "#), @"
     Error:
-       ╭─[<unknown>:3:14]
+       ╭─[ <unknown>:3:14 ]
        │
      3 │       import project::a::b as b
        │              ─────────┬────────
@@ -1830,7 +1819,7 @@ fn import_04() {
     func main() -> a
     "#), @"
     [E0005] Error:
-       ╭─[<unknown>:3:20]
+       ╭─[ <unknown>:3:20 ]
        │
      3 │     func main() -> a
        │                    ┬
@@ -1842,7 +1831,7 @@ fn import_04() {
     func main(): a -> 1
     "#), @"
     [E0005] Error:
-       ╭─[<unknown>:3:18]
+       ╭─[ <unknown>:3:18 ]
        │
      3 │     func main(): a -> 1
        │                  ┬
@@ -1885,7 +1874,7 @@ fn framed_00() {
     const x: MyInt = 4: int32
     "#), @"
     [E0006] Error:
-       ╭─[<unknown>:3:22]
+       ╭─[ <unknown>:3:22 ]
        │
      3 │     const x: MyInt = 4: int32
        │                      ────┬───
@@ -1909,7 +1898,7 @@ fn framed_02() {
     const main = MyInt(4: int32, false)
     "#), @"
     Error:
-       ╭─[<unknown>:3:18]
+       ╭─[ <unknown>:3:18 ]
        │
      3 │     const main = MyInt(4: int32, false)
        │                  ───────────┬──────────
@@ -1925,7 +1914,7 @@ fn framed_03() {
     const main = MyInt()
     "#), @"
     Error:
-       ╭─[<unknown>:3:18]
+       ╭─[ <unknown>:3:18 ]
        │
      3 │     const main = MyInt()
        │                  ───┬───
@@ -1941,14 +1930,13 @@ fn framed_04() {
     const main = MyInt(false)
     "#), @"
     [E0006] Error:
-       ╭─[<unknown>:3:24]
+       ╭─[ <unknown>:3:24 ]
        │
      3 │     const main = MyInt(false)
        │                        ──┬──
        │                          ╰──── func MyInt expected type `MyInt`, but found type `bool`
        │
-       │ Note:
-       │ type `MyInt` expands to `int32`
+       │ Note: type `MyInt` expands to `int32`
     ───╯
     ");
 }
@@ -1968,14 +1956,13 @@ fn framed_06() {
     const main = MyInt(12).1
     "#), @"
     [E0006] Error:
-       ╭─[<unknown>:3:27]
+       ╭─[ <unknown>:3:27 ]
        │
      3 │     const main = MyInt(12).1
        │                           ─┬
        │                            ╰── field .1 does not exist in type MyInt
        │
-       │ Note:
-       │ MyInt is a framed type. Inner value can be accessed with `.0`
+       │ Note: MyInt is a framed type. Inner value can be accessed with `.0`
     ───╯
     ");
 }
@@ -1987,14 +1974,13 @@ fn framed_07() {
     const main = MyInt(12).inner
     "#), @"
     [E0006] Error:
-       ╭─[<unknown>:3:27]
+       ╭─[ <unknown>:3:27 ]
        │
      3 │     const main = MyInt(12).inner
        │                           ───┬──
        │                              ╰──── field .inner does not exist in type MyInt
        │
-       │ Note:
-       │ MyInt is a framed type. Inner value can be accessed with `.0`
+       │ Note: MyInt is a framed type. Inner value can be accessed with `.0`
     ───╯
     ");
 }
@@ -2059,41 +2045,38 @@ fn framed_11() {
     }
     "#), @"
     Error:
-       ╭─[<unknown>:5:12]
+       ╭─[ <unknown>:5:12 ]
        │
      5 │       Date(wrong = 12),
        │            ─────┬────
        │                 ╰────── unknown parameter `wrong`
     ───╯
     [E0006] Error:
-       ╭─[<unknown>:6:31]
+       ╭─[ <unknown>:6:31 ]
        │
      6 │       Date(days_since_epoch = false),
        │                               ──┬──
        │                                 ╰──── func Date expected type `Date`, but found type `bool`
        │
-       │ Note:
-       │ type `Date` expands to `int32`
+       │ Note: type `Date` expands to `int32`
     ───╯
     [E0006] Error:
-       ╭─[<unknown>:7:15]
+       ╭─[ <unknown>:7:15 ]
        │
      7 │       Date(12).1,
        │               ─┬
        │                ╰── field .1 does not exist in type Date
        │
-       │ Note:
-       │ Date is a framed type. Inner value can be accessed with `.days_since_epoch` or `.0`
+       │ Note: Date is a framed type. Inner value can be accessed with `.days_since_epoch` or `.0`
     ───╯
     [E0006] Error:
-       ╭─[<unknown>:8:15]
+       ╭─[ <unknown>:8:15 ]
        │
      8 │       Date(12).wrong,
        │               ───┬──
        │                  ╰──── field .wrong does not exist in type Date
        │
-       │ Note:
-       │ Date is a framed type. Inner value can be accessed with `.days_since_epoch` or `.0`
+       │ Note: Date is a framed type. Inner value can be accessed with `.days_since_epoch` or `.0`
     ───╯
     ");
 }
@@ -2119,21 +2102,20 @@ fn call_00() {
     const a = true | std::and(false, false)
     "#), @"
     Error:
-       ╭─[<unknown>:2:22]
+       ╭─[ <unknown>:2:22 ]
        │
      2 │     const a = true | std::and(false, false)
        │                      ───────────┬──────────
        │                                 ╰──────────── func std::and expected 2 arguments, but got 3
     ───╯
     Error:
-       ╭─[<unknown>:2:22]
+       ╭─[ <unknown>:2:22 ]
        │
      2 │     const a = true | std::and(false, false)
        │                      ───────────┬──────────
        │                                 ╰──────────── non-constant expression
        │
-       │ Note:
-       │ use `func` instead of `const`
+       │ Note: use `func` instead of `const`
     ───╯
     ");
 }
@@ -2161,14 +2143,14 @@ fn call_02() {
     func main() -> noop(true, z = false)
     "#), @"
     Error:
-       ╭─[<unknown>:4:31]
+       ╭─[ <unknown>:4:31 ]
        │
      4 │     func main() -> noop(true, z = false)
        │                               ────┬────
        │                                   ╰────── unknown parameter `z`
     ───╯
     [E0006] Error:
-       ╭─[<unknown>:4:25]
+       ╭─[ <unknown>:4:25 ]
        │
      4 │     func main() -> noop(true, z = false)
        │                         ──┬─
@@ -2187,14 +2169,14 @@ fn call_03() {
     func main() -> noop(true)
     "#), @"
     Error:
-       ╭─[<unknown>:4:20]
+       ╭─[ <unknown>:4:20 ]
        │
      4 │     func main() -> noop(true)
        │                    ─────┬────
        │                         ╰────── func noop expected 2 arguments, but got 1
     ───╯
     [E0006] Error:
-       ╭─[<unknown>:4:25]
+       ╭─[ <unknown>:4:25 ]
        │
      4 │     func main() -> noop(true)
        │                         ──┬─
@@ -2213,14 +2195,14 @@ fn call_04() {
     func main() -> noop(3, "hello", false)
     "#), @r#"
     Error:
-       ╭─[<unknown>:4:20]
+       ╭─[ <unknown>:4:20 ]
        │
      4 │     func main() -> noop(3, "hello", false)
        │                    ───────────┬───────────
        │                               ╰───────────── func noop expected 2 arguments, but got 3
     ───╯
     [E0006] Error:
-       ╭─[<unknown>:4:28]
+       ╭─[ <unknown>:4:28 ]
        │
      4 │     func main() -> noop(3, "hello", false)
        │                            ───┬───

@@ -233,13 +233,11 @@ fn array_prim() {
         SELECT
           0::int8 AS index,
           3::int2 AS value
-        UNION
-        ALL
+        UNION ALL
         SELECT
           1::int8 AS index,
           6::int2 AS value
-        UNION
-        ALL
+        UNION ALL
         SELECT
           2::int8 AS index,
           12::int2 AS value
@@ -290,16 +288,14 @@ fn array_enum() {
           NULL::text AS _1_0,
           NULL::text AS _1_1,
           NULL::text AS _2
-        UNION
-        ALL
+        UNION ALL
         SELECT
           1::int8 AS index,
           1::int2 AS _t,
           'today'::text AS _1_0,
           'me'::text AS _1_1,
           NULL::text AS _2
-        UNION
-        ALL
+        UNION ALL
         SELECT
           2::int8 AS index,
           2::int2 AS _t,
@@ -356,19 +352,16 @@ fn enum_array() {
               0::int2 AS _t,
               NULL::jsonb AS _1,
               NULL::text AS _2
-            UNION
-            ALL
+            UNION ALL
             SELECT
               1::int8 AS index,
               1::int2 AS _t,
               (
                 SELECT
                   COALESCE(
-                    jsonb_agg(
-                      r0.value
+                    jsonb_agg(r0.value
                       ORDER BY
-                        r0.index
-                    ),
+                        r0.index),
                     '[]'::jsonb
                   ) AS value
                 FROM
@@ -376,16 +369,14 @@ fn enum_array() {
                     SELECT
                       0::int8 AS index,
                       'today'::text AS value
-                    UNION
-                    ALL
+                    UNION ALL
                     SELECT
                       1::int8 AS index,
                       'me'::text AS value
                   ) AS r0
               ) AS _1,
               NULL::text AS _2
-            UNION
-            ALL
+            UNION ALL
             SELECT
               2::int8 AS index,
               2::int2 AS _t,
@@ -444,11 +435,9 @@ fn tuple_array_prim() {
       (
         SELECT
           COALESCE(
-            jsonb_agg(
-              r0.value
+            jsonb_agg(r0.value
               ORDER BY
-                r0.index
-            ),
+                r0.index),
             '[]'::jsonb
           ) AS value
         FROM
@@ -456,13 +445,11 @@ fn tuple_array_prim() {
             SELECT
               0::int8 AS index,
               1::int8 AS value
-            UNION
-            ALL
+            UNION ALL
             SELECT
               1::int8 AS index,
               2::int8 AS value
-            UNION
-            ALL
+            UNION ALL
             SELECT
               2::int8 AS index,
               3::int8 AS value
@@ -471,19 +458,15 @@ fn tuple_array_prim() {
       (
         SELECT
           COALESCE(
-            jsonb_agg(
-              r1.value
+            jsonb_agg(r1.value
               ORDER BY
-                r1.index
-            ),
+                r1.index),
             '[]'::jsonb
           ) AS value
         FROM
           (
             SELECT
-              0::int8 AS index,
-              4::int4 AS value
-          ) AS r1
+              0::int8 AS index, 4::int4 AS value) AS r1
       ) AS _2,
       FALSE AS _3
     ---
@@ -538,16 +521,14 @@ fn tuple_array_enum() {
               NULL::text AS _1_0,
               NULL::text AS _1_1,
               NULL::text AS _2
-            UNION
-            ALL
+            UNION ALL
             SELECT
               1::int8 AS index,
               1::int2 AS _t,
               'today'::text AS _1_0,
               'me'::text AS _1_1,
               NULL::text AS _2
-            UNION
-            ALL
+            UNION ALL
             SELECT
               2::int8 AS index,
               2::int2 AS _t,
@@ -599,8 +580,7 @@ fn tuple_array_option() {
             SELECT
               0::int8 AS index,
               NULL::int4 AS value
-            UNION
-            ALL
+            UNION ALL
             SELECT
               1::int8 AS index,
               5::int4 AS value
@@ -627,11 +607,9 @@ fn tuple_array_empty() {
       (
         SELECT
           COALESCE(
-            jsonb_agg(
-              r0.value
+            jsonb_agg(r0.value
               ORDER BY
-                r0.index
-            ),
+                r0.index),
             '[]'::jsonb
           ) AS value
         FROM
@@ -667,11 +645,9 @@ fn array_array_prim() {
           (
             SELECT
               COALESCE(
-                jsonb_agg(
-                  r0.value
+                jsonb_agg(r0.value
                   ORDER BY
-                    r0.index
-                ),
+                    r0.index),
                 '[]'::jsonb
               ) AS value
             FROM
@@ -679,30 +655,25 @@ fn array_array_prim() {
                 SELECT
                   0::int8 AS index,
                   1::int8 AS value
-                UNION
-                ALL
+                UNION ALL
                 SELECT
                   1::int8 AS index,
                   2::int8 AS value
-                UNION
-                ALL
+                UNION ALL
                 SELECT
                   2::int8 AS index,
                   3::int8 AS value
               ) AS r0
           ) AS value
-        UNION
-        ALL
+        UNION ALL
         SELECT
           1::int8 AS index,
           (
             SELECT
               COALESCE(
-                jsonb_agg(
-                  r1.value
+                jsonb_agg(r1.value
                   ORDER BY
-                    r1.index
-                ),
+                    r1.index),
                 '[]'::jsonb
               ) AS value
             FROM
@@ -710,8 +681,7 @@ fn array_array_prim() {
                 SELECT
                   0::int8 AS index,
                   4::int8 AS value
-                UNION
-                ALL
+                UNION ALL
                 SELECT
                   1::int8 AS index,
                   5::int8 AS value
@@ -744,11 +714,9 @@ fn array_array_array_tuple_prim() {
       (
         SELECT
           COALESCE(
-            jsonb_agg(
-              r1.value
+            jsonb_agg(r1.value
               ORDER BY
-                r1.index
-            ),
+                r1.index),
             '[]'::jsonb
           ) AS value
         FROM
@@ -872,14 +840,12 @@ fn array_tuple_prim() {
           0::int8 AS index,
           3::int8 AS _0,
           FALSE AS _1
-        UNION
-        ALL
+        UNION ALL
         SELECT
           1::int8 AS index,
           6::int8 AS _0,
           TRUE AS _1
-        UNION
-        ALL
+        UNION ALL
         SELECT
           2::int8 AS index,
           12::int8 AS _0,
@@ -931,14 +897,12 @@ fn tuple_array_tuple_prim() {
               0::int8 AS index,
               3::int2 AS _0,
               FALSE AS _1
-            UNION
-            ALL
+            UNION ALL
             SELECT
               1::int8 AS index,
               6::int2 AS _0,
               TRUE AS _1
-            UNION
-            ALL
+            UNION ALL
             SELECT
               2::int8 AS index,
               12::int2 AS _0,
@@ -1508,11 +1472,9 @@ fn serialize_10() {
       (
         SELECT
           COALESCE(
-            jsonb_agg(
-              r0.value
+            jsonb_agg(r0.value
               ORDER BY
-                r0.index
-            ),
+                r0.index),
             '[]'::jsonb
           ) AS value
         FROM
@@ -1520,8 +1482,7 @@ fn serialize_10() {
             SELECT
               0::int8 AS index,
               1::int2 AS value
-            UNION
-            ALL
+            UNION ALL
             SELECT
               1::int8 AS index,
               2::int2 AS value
@@ -1566,16 +1527,14 @@ fn if_01() {
             SELECT
               0::int8 AS index,
               'yes'::text AS value
-            UNION
-            ALL
+            UNION ALL
             SELECT
               1::int8 AS index,
               'no'::text AS value
           ) AS r1
         WHERE
           (r0.value = 0::int2)
-        UNION
-        ALL
+        UNION ALL
         SELECT
           r2.index,
           r2.value
@@ -1584,8 +1543,7 @@ fn if_01() {
             SELECT
               0::int8 AS index,
               'da'::text AS value
-            UNION
-            ALL
+            UNION ALL
             SELECT
               1::int8 AS index,
               'ne'::text AS value
@@ -1641,16 +1599,14 @@ fn match_04() {
           'Whiskers'::text AS _0,
           NULL::int2 AS _1_t,
           NULL::text AS _1_0
-        UNION
-        ALL
+        UNION ALL
         SELECT
           1::int8 AS index,
           1::int2 AS _t,
           NULL::text AS _0,
           0::int2 AS _1_t,
           'Belie'::text AS _1_0
-        UNION
-        ALL
+        UNION ALL
         SELECT
           2::int8 AS index,
           1::int2 AS _t,
@@ -1717,14 +1673,12 @@ fn cmp_00() {
           0::int8 AS index,
           3::int2 AS _0,
           3::int2 AS _1
-        UNION
-        ALL
+        UNION ALL
         SELECT
           1::int8 AS index,
           3::int2 AS _0,
           5::int2 AS _1
-        UNION
-        ALL
+        UNION ALL
         SELECT
           2::int8 AS index,
           5::int2 AS _0,
@@ -1836,8 +1790,7 @@ async fn sql_insert_00() {
           0::int8 AS index,
           'Memento'::text AS _0,
           11016::int4 AS _1
-        UNION
-        ALL
+        UNION ALL
         SELECT
           1::int8 AS index,
           'Inception'::text AS _0,
@@ -1939,8 +1892,7 @@ async fn update_basic() {
           ) AS r1,
           LATERAL (
             SELECT
-              r1.index AS value
-          ) AS r2,
+              r1.index AS value) AS r2,
           LATERAL (
             SELECT
               r8._1_0 AS _0,
@@ -1984,8 +1936,7 @@ async fn update_basic() {
                           ) AS r4
                         WHERE
                           (r3.value = 0::int2)
-                        UNION
-                        ALL
+                        UNION ALL
                         SELECT
                           r5._t,
                           r5._1_0,
@@ -2222,37 +2173,30 @@ fn group_00() {
         SELECT
           0::int8 AS index,
           1::int8 AS value
-        UNION
-        ALL
+        UNION ALL
         SELECT
           1::int8 AS index,
           1::int8 AS value
-        UNION
-        ALL
+        UNION ALL
         SELECT
           2::int8 AS index,
           1::int8 AS value
-        UNION
-        ALL
+        UNION ALL
         SELECT
           3::int8 AS index,
           3::int8 AS value
-        UNION
-        ALL
+        UNION ALL
         SELECT
           4::int8 AS index,
           2::int8 AS value
-        UNION
-        ALL
+        UNION ALL
         SELECT
           5::int8 AS index,
           3::int8 AS value
       ) AS r0,
       LATERAL (
         SELECT
-          r0.index,
-          r0.value
-      ) AS r1
+          r0.index, r0.value) AS r1
     GROUP BY
       r0.value
     ---
@@ -2360,13 +2304,11 @@ fn opt_01() {
         SELECT
           0::int8 AS index,
           'hello'::text AS value
-        UNION
-        ALL
+        UNION ALL
         SELECT
           1::int8 AS index,
           NULL::text AS value
-        UNION
-        ALL
+        UNION ALL
         SELECT
           2::int8 AS index,
           'world'::text AS value
@@ -2425,7 +2367,8 @@ fn std_sql_raw_01() {
       r7.value
     FROM
       (
-        WITH r0 AS (
+        WITH
+        r0 AS (
           SELECT
             (ROW_NUMBER() OVER () -1)::int4 AS index,
             r1.value::int4 AS value
@@ -2450,12 +2393,12 @@ fn std_sql_raw_01() {
           r6.value
         FROM
           (
-            WITH RECURSIVE r2 AS (
+            WITH
+            RECURSIVE r2 AS (
               SELECT
                 0::int8 AS index,
                 1::int4 AS value
-              UNION
-              ALL
+              UNION ALL
               SELECT
                 (r3.index + 1::int8) AS index,
                 (r3.value * r5.value) AS value
@@ -2504,20 +2447,12 @@ fn date_time_00() {
     "#, lutra_bin::Value::unit())), @"
     SELECT
       (r0.a::date - '1970-01-01'::date) AS _0,
-      (
-        EXTRACT(
-          EPOCH
+      (EXTRACT(EPOCH
           FROM
-            r0.b
-        ) * 1000000
-      )::int8 AS _1,
-      (
-        EXTRACT(
-          EPOCH
+            r0.b) * 1000000)::int8 AS _1,
+      (EXTRACT(EPOCH
           FROM
-            r0.c
-        ) * 1000000
-      )::int8 AS _2
+            r0.c) * 1000000)::int8 AS _2
     FROM
       (
         select
@@ -2602,8 +2537,7 @@ fn decimal_00() {
     FROM
       (
         select
-          '123123.05'::decimal(10, 2) as a
-      ) AS r0
+          '123123.05'::decimal(10, 2) as a) AS r0
     ---
     {
       a = 123123.05,

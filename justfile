@@ -31,10 +31,9 @@ dev FILTER_SET='all()' *NEXTEST_ARGS='':
     cargo check -p lutra-runner --no-default-features
     cargo check -p lutra-sql --no-default-features
 
-# Run ignored tests
+# Run ignored tests and print only tests that pass
 test-ignored:
-    # INSTA_FORCE_PASS=1
-    cargo nextest --profile=overview run --run-ignored=only
+    cargo nextest --profile=final-all run --run-ignored=only 2>&1 | rg PASS
 
 # Re-generate committed generated files
 [working-directory: 'lutra-bin/src/project']
