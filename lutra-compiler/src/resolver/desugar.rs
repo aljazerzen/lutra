@@ -19,19 +19,26 @@ struct Desugarator;
 
 impl PrFold for Desugarator {
     fn fold_module_def(&mut self, module_def: pr::ModuleDef) -> Result<pr::ModuleDef> {
+        let mut imports = Vec::with_capacity(module_def.imports.len());
         let mut defs = IndexMap::with_capacity(module_def.defs.len());
-        for (name, def) in module_def.defs {
-            // special case: imports
-            if let pr::DefKind::Import(import) = def.kind {
-                defs.extend(self.desugar_import(import));
-                continue;
-            }
 
-            // base case
+        // imports
+        for def in module_def.imports {
+            let pr::DefKind::Import(import) = def.kind else {
+                panic!()
+            };
+            let (simples, stars) = desugar_import(import);
+            defs.extend(simples);
+            imports.extend(stars);
+        }
+
+        // defs
+        for (name, def) in module_def.defs {
             defs.insert(name, self.fold_def(def)?);
         }
 
         Ok(pr::ModuleDef {
+            imports,
             defs,
             annotations: module_def.annotations,
             span_content: module_def.span_content,
@@ -238,15 +245,6 @@ impl Desugarator {
         Ok(expr.kind)
     }
 
-    /// Desugars `import x::{a, b as c} into:
-    /// ```lt
-    /// import x::a as a
-    /// import x::b as c
-    /// ```
-    fn desugar_import(&self, import: pr::ImportDef) -> Vec<(String, pr::Def)> {
-        desugar_import_re(&pr::Path::empty(), import)
-    }
-
     fn desugar_func_short(&mut self, func: pr::FuncShort) -> Result<pr::ExprKind> {
         Ok(pr::ExprKind::Func(Box::new(pr::Func {
             params: vec![func.param],
@@ -277,25 +275,40 @@ impl Desugarator {
     }
 }
 
-fn desugar_import_re(prefix: &pr::Path, import: pr::ImportDef) -> Vec<(String, pr::Def)> {
+/// Desugars `import x::{a, b as c, d::*} into:
+/// ```lt
+/// import x::a
+/// import x::b as c
+/// import x::d::*
+/// ```
+fn desugar_import(import: pr::ImportDef) -> (Vec<(String, pr::Def)>, Vec<pr::Def>) {
     match import.kind {
+        pr::ImportKind::Many(prefix, parts) => {
+            // expand
+            let mut simples = Vec::with_capacity(parts.len());
+            let mut stars = Vec::with_capacity(parts.len());
+            for mut i in parts {
+                i.kind.path_mut().prepend(prefix.clone());
+                let (simple, star) = desugar_import(i);
+                simples.extend(simple);
+                stars.extend(star);
+            }
+            (simples, stars)
+        }
         pr::ImportKind::Single(path, alias) => {
             let name = alias.unwrap_or_else(|| path.last().to_string());
-            let mut def = pr::Def::new(pr::DefKind::Import(pr::ImportDef {
-                kind: pr::ImportKind::Single(path.prepend(prefix.clone()), None),
-                span: import.span,
-            }));
-            def.span = Some(import.span);
-            vec![(name, def)]
+            let def = pr::Def {
+                span: Some(import.span),
+                ..pr::Def::new(pr::ImportDef::new_simple(path, import.span))
+            };
+            (vec![(name, def)], vec![])
         }
-        pr::ImportKind::Many(path, parts) => {
-            let mut r = Vec::with_capacity(parts.len());
-
-            let prefix = path.prepend(prefix.clone());
-            for i in parts {
-                r.extend(desugar_import_re(&prefix, i));
-            }
-            r
+        pr::ImportKind::Star(_) => {
+            let def = pr::Def {
+                span: Some(import.span),
+                ..pr::Def::new(import)
+            };
+            (vec![], vec![def])
         }
     }
 }

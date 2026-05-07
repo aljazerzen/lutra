@@ -46,9 +46,14 @@ impl Path {
         self.path.is_empty()
     }
 
-    pub fn prepend(self, mut prefix: Path) -> Path {
-        prefix.path.extend(self.path);
-        prefix
+    pub fn prepend(&mut self, mut prefix: Path) {
+        prefix.path.append(&mut self.path);
+        self.path = prefix.path;
+    }
+
+    pub fn append(mut self, suffix: Path) -> Path {
+        self.path.extend(suffix.path);
+        self
     }
 
     pub fn extend(&mut self, suffix: Path) {

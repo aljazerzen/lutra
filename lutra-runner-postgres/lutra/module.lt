@@ -1,10 +1,5 @@
-import std::filter
-import std::sort
-import std::map
-import std::find
+import std::(filter, find, map, sort, to_int32, to_int64)
 import std::option::or_default
-import std::to_int32
-import std::to_int64
 import pg_catalog as pg
 
 func pull_interface() -> (

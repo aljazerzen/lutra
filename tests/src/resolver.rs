@@ -1746,7 +1746,8 @@ fn tuple_04() {
 }
 
 #[test]
-fn import_00() {
+fn import_simple() {
+    // Basic imports: single item, aliased item, and aliased type
     insta::assert_snapshot!(_test_ty(r#"
     module a {
       func f() -> "f"
@@ -1765,7 +1766,9 @@ fn import_00() {
 }
 
 #[test]
-fn import_01() {
+fn import_cross_module_chain() {
+    // Imports that form a chain across module boundaries
+    // d1 <- d2 <- d3 <- c, all via imports across submodule and parent
     insta::assert_snapshot!(_test_ty(r#"
     module a {
       module b {
@@ -1781,7 +1784,8 @@ fn import_01() {
 }
 
 #[test]
-fn import_02() {
+fn import_recursive_error() {
+    // Importing a module that references itself should be an error
     insta::assert_snapshot!(_test_err(r#"
     module a {
       import project::a::b as b
@@ -1799,7 +1803,8 @@ fn import_02() {
 }
 
 #[test]
-fn import_03() {
+fn import_module_alias() {
+    // A whole module can be imported under an alias and its members accessed via alias
     insta::assert_snapshot!(_test_ty(r#"
     module a {
       module b {
@@ -1813,7 +1818,8 @@ fn import_03() {
 }
 
 #[test]
-fn import_04() {
+fn import_module_as_value_error() {
+    // A module cannot be used as an expression or type directly
     insta::assert_snapshot!(_test_err(r#"
     module a {}
     func main() -> a
@@ -1841,7 +1847,8 @@ fn import_04() {
 }
 
 #[test]
-fn import_05() {
+fn import_multiple_grouped() {
+    // Multiple items from the same module imported with grouping syntax
     insta::assert_snapshot!(_test_ty(r#"
     module a {
       const b = "b"
@@ -1853,7 +1860,8 @@ fn import_05() {
 }
 
 #[test]
-fn import_06() {
+fn import_nested_grouped() {
+    // Nested grouping imports items from a submodule inline
     insta::assert_snapshot!(_test_ty(r#"
     module a {
       const b = "b"
@@ -1865,6 +1873,94 @@ fn import_06() {
     import a::(b, c::(d, e))
     func main() -> {b, d, e}
     "#), @"{b: text, d: int16, e: bool}");
+}
+
+#[test]
+fn import_star_basic() {
+    // Star import brings all defs from a module
+    insta::assert_snapshot!(_test_ty(r#"
+    module a {
+      func f() -> "f"
+      const c = "c"
+      type T: text
+    }
+    import a::*
+    func main() -> {c, f()}: {T, T}
+    "#), @"{a::T, a::T}");
+}
+
+#[test]
+fn import_star_nested_module() {
+    // Star import from a nested module
+    insta::assert_snapshot!(_test_ty(r#"
+    module a {
+      module b {
+        const x = "hello"
+        const y = "world"
+      }
+    }
+    import a::b::*
+    func main() -> {x, y}
+    "#), @"{x: text, y: text}");
+}
+
+#[test]
+fn import_star_includes_submodules() {
+    // Star import includes submodules
+    insta::assert_snapshot!(_test_ty(r#"
+    module a {
+      module inner {
+        const val = "hello"
+      }
+    }
+    import a::*
+    func main() -> inner::val
+    "#), @"text");
+}
+
+#[test]
+fn import_star_shadowed_by_explicit() {
+    // Explicit definitions shadow star imports
+    insta::assert_snapshot!(_test_ty(r#"
+    module a {
+      const x = "original"
+    }
+    import a::*
+    const x = "explicit"
+    func main() -> x
+    "#), @"text");
+}
+
+#[test]
+fn import_star_no_reexports() {
+    // Star imports include re-exports from the target module
+    insta::assert_snapshot!(_test_ty(r#"
+    module inner {
+      const x = true
+    }
+    module a {
+      import project::inner::x
+    }
+    import a::*
+    func main() -> x
+    "#), @"bool");
+}
+
+#[test]
+fn import_star_missing_module() {
+    // Error when star importing from non-existent module
+    insta::assert_snapshot!(_test_err(r#"
+    import nonexistent::*
+    func main() -> 1
+    "#), @"
+    Error:
+       ╭─[ <unknown>:2:12 ]
+       │
+     2 │     import nonexistent::*
+       │            ───────┬──────
+       │                   ╰──────── name does not exist
+    ───╯
+    ");
 }
 
 #[test]

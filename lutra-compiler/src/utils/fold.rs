@@ -167,12 +167,17 @@ pub fn fold_def_kind<T: ?Sized + PrFold>(fold: &mut T, def_kind: DefKind) -> Res
 fn fold_module_def<F: ?Sized + PrFold>(fold: &mut F, module_def: ModuleDef) -> Result<ModuleDef> {
     let annotations = module_def.annotations;
 
+    let mut imports = Vec::with_capacity(module_def.imports.len());
+    for def in module_def.imports {
+        imports.push(fold.fold_def(def)?);
+    }
     let mut defs = IndexMap::with_capacity(module_def.defs.len());
     for (name, def) in module_def.defs {
         defs.insert(name, fold.fold_def(def)?);
     }
     let span_content = module_def.span_content;
     Ok(ModuleDef {
+        imports,
         defs,
         span_content,
         annotations,

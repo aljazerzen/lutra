@@ -97,14 +97,15 @@ fn into_module(
     span: Span,
     emitter: &mut chumsky::input::Emitter<PError<'_>>,
 ) -> ModuleDef {
+    let mut imports = Vec::new();
     let mut defs = IndexMap::with_capacity(def_vec.len());
-    for (i, (name, def)) in def_vec.into_iter().enumerate() {
+    for (name, def) in def_vec {
         // hack that allows imports not to have names
-        let name = if name.is_empty() {
-            format!("_import{i}")
-        } else {
-            name
-        };
+        if name.is_empty() {
+            assert!(matches!(def.kind, DefKind::Import(_)));
+            imports.push(def);
+            continue;
+        }
 
         let span = def.span.unwrap();
         let conflict = defs.insert(name, def);
@@ -115,6 +116,7 @@ fn into_module(
     }
 
     ModuleDef {
+        imports,
         defs,
         annotations: vec![],
         span_content: Some(span),
@@ -283,6 +285,9 @@ where
                         |_| vec![],
                     ))
                     .map(|children| ImportKind::Many(Path::empty(), children)),
+                just(TokenKind::PathSep)
+                    .ignore_then(ctrl('*'))
+                    .to(ImportKind::Star(Path::empty())),
                 keyword("as")
                     .ignore_then(ident_part())
                     .or_not()
@@ -290,8 +295,7 @@ where
             )))
             .map_with(|(path, mut kind), e| {
                 let span = e.span();
-                let (ImportKind::Single(p, ..) | ImportKind::Many(p, ..)) = &mut kind;
-                *p = path;
+                *kind.path_mut() = path;
                 ImportDef { kind, span }
             })
     });

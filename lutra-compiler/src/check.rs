@@ -113,6 +113,7 @@ pub fn insert_module_at_path(
 
         module.annotations.extend(to_insert.annotations);
         module.span_content = to_insert.span_content;
+        module.imports.extend(to_insert.imports);
         for (name, def) in to_insert.defs {
             let conflict = module.defs.insert(name, def);
             if let Some(conflict) = conflict {

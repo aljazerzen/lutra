@@ -32,14 +32,8 @@ impl NameResolver<'_> {
         })
     }
 
-    pub fn fold_import_def(
-        &mut self,
-        import_def: pr::ImportDef,
-    ) -> Result<pr::ImportDef, Diagnostic> {
-        let target = import_def.as_simple().unwrap();
-
-        let target_fq = self.lookup_in_mod_tree(self.def_module_path, target)?;
-        Ok(pr::ImportDef::new_simple(target_fq, import_def.span))
+    pub fn fold_relative_path(&self, path: &pr::Path) -> Result<pr::Path> {
+        self.lookup_in_mod_tree(self.def_module_path, path)
     }
 }
 
@@ -304,7 +298,7 @@ impl NameResolver<'_> {
             // resolved imports
             pr::DefKind::Import(import) => {
                 // use resolved fq ident and extend it with remaining steps
-                let mut new_path = import.as_simple().unwrap().clone();
+                let mut new_path = import.kind.as_simple().unwrap().clone();
                 new_path.extend(steps);
                 self.lookup_in_mod_tree(&[], &new_path)
             }
@@ -312,7 +306,7 @@ impl NameResolver<'_> {
             // unresolved imports
             pr::DefKind::Unresolved(Some(def_kind)) if def_kind.is_import() => {
                 let import = def_kind.as_import().unwrap();
-                let import_target = import.as_simple().unwrap();
+                let import_target = import.kind.as_simple().unwrap();
 
                 // resolve import target
                 let import_fq = self

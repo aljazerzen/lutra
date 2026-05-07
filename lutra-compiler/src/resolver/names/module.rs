@@ -1,5 +1,5 @@
 use crate::Result;
-use crate::diagnostic::WithErrorInfo;
+use crate::diagnostic::{Diagnostic, DiagnosticCode, WithErrorInfo};
 use crate::pr;
 use crate::utils::IdGenerator;
 
@@ -24,7 +24,9 @@ impl ModuleRefResolver<'_> {
         self.current_path = pr::Path::empty();
         self.resolve_imports()?;
         assert_eq!(self.current_path.len(), 0);
-        self.resolve_refs()?;
+        self.resolve_import_stars()?;
+        assert_eq!(self.current_path.len(), 0);
+        self.resolve_defs()?;
         assert_eq!(self.current_path.len(), 0);
         Ok(())
     }
@@ -58,9 +60,12 @@ impl ModuleRefResolver<'_> {
 
             // take the def out of the module tree
             let (def, span) = self.root.take_unresolved(path);
+            let pr::DefKind::Import(import) = def else {
+                unreachable!()
+            };
 
             // resolve the def
-            let mut r = super::expr::NameResolver {
+            let r = super::expr::NameResolver {
                 root: self.root,
                 def_module_path: path.parent(),
                 scopes: Vec::new(),
@@ -69,15 +74,12 @@ impl ModuleRefResolver<'_> {
                 allow_recursive: false,
                 target_spans: &mut self.target_spans,
             };
-
-            let pr::DefKind::Import(import) = def else {
-                unreachable!()
-            };
-            let import = r.fold_import_def(import).with_span_fallback(span)?;
+            let target = import.kind.as_simple().unwrap();
+            let target_fq = r.fold_relative_path(target).with_span_fallback(span)?;
 
             // put the def back in
             let def_loc = self.root.get_mut(path).unwrap();
-            def_loc.kind = pr::DefKind::Import(import);
+            def_loc.kind = pr::DefKind::Import(pr::ImportDef::new_simple(target_fq, import.span));
 
             path.pop();
         }
@@ -92,7 +94,74 @@ impl ModuleRefResolver<'_> {
         Ok(())
     }
 
-    fn resolve_refs(&mut self) -> Result<()> {
+    fn resolve_import_stars(&mut self) -> Result<()> {
+        let path = &mut self.current_path;
+        let module = self.root.get_module_mut(path.as_steps()).unwrap();
+
+        let mut submodules = Vec::new();
+        for (name, def) in &module.defs {
+            if let pr::DefKind::Module(_) = &def.kind {
+                submodules.push(name.clone());
+            }
+        }
+
+        let trace_span = tracing::span!(
+            tracing::Level::DEBUG,
+            "import stars",
+            module = path.to_string()
+        );
+        let _trace_enter = trace_span.enter();
+
+        let imports = std::mem::take(&mut module.imports);
+        for def in imports {
+            let pr::DefKind::Import(import) = def.kind else {
+                unreachable!()
+            };
+            let pr::ImportKind::Star(target) = import.kind else {
+                unreachable!()
+            };
+            tracing::trace!("{}", target);
+
+            // resolve the def
+            let r = super::expr::NameResolver {
+                root: self.root,
+                def_module_path: path.as_steps(),
+                scopes: Vec::new(),
+                refs: Vec::new(),
+                scope_id_gen: &mut self.scope_id_gen,
+                allow_recursive: false,
+                target_spans: &mut self.target_spans,
+            };
+            let target_fq = r
+                .fold_relative_path(&target)
+                .with_span_fallback(Some(import.span))?;
+
+            // find target module and named of contents
+            let target_mod = (self.root.get_submodule(target_fq.as_steps()))
+                .ok_or_else(|| Diagnostic::new("expected module", DiagnosticCode::NAME_KIND))?;
+            let names: Vec<_> = target_mod.defs.keys().cloned().collect();
+
+            // construct simple imports for
+            let module = self.root.get_module_mut(path.as_steps()).unwrap();
+            for name in names {
+                let mut def_fq = target_fq.clone();
+                def_fq.push(name.clone());
+                let def = pr::Def::new(pr::ImportDef::new_simple(def_fq, import.span));
+                module.defs.insert(name, def);
+            }
+        }
+
+        drop(_trace_enter);
+
+        for name in submodules {
+            self.current_path.push(name);
+            self.resolve_imports()?;
+            self.current_path.pop();
+        }
+        Ok(())
+    }
+
+    fn resolve_defs(&mut self) -> Result<()> {
         let path = &mut self.current_path;
         let module = self.root.get_module_mut(path.as_steps()).unwrap();
 
@@ -158,7 +227,7 @@ impl ModuleRefResolver<'_> {
 
         for name in submodules {
             self.current_path.push(name);
-            self.resolve_refs()?;
+            self.resolve_defs()?;
             self.current_path.pop();
         }
         Ok(())

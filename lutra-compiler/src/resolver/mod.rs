@@ -2,7 +2,6 @@
 
 mod const_eval;
 mod desugar;
-mod module;
 mod names;
 mod prefixer;
 mod recursive;
@@ -25,10 +24,10 @@ pub fn resolve(
     // desugar
     let module_tree = desugar::run(module_tree).map_err(|d| vec![d])?;
 
-    tracing::debug!("{:#?}", module_tree);
+    tracing::trace!("{:#?}", module_tree);
 
-    // init the module structure
-    let mut root_module = module::init_root(module_tree)?;
+    // convert defs into Unresolved
+    let mut root_module = module_tree.into_unresolved();
 
     // inject dependencies
     for dep in &dependencies {

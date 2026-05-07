@@ -265,7 +265,7 @@ impl PrintSource for pr::ImportDef {
                 p.push("::")?;
 
                 let mut parts: Vec<&ImportDef> = parts.iter().collect();
-                parts.sort_by(|a, b| a.path().cmp(b.path()));
+                parts.sort_by(|a, b| a.kind.path().cmp(b.kind.path()));
 
                 Separated {
                     nodes: &parts,
@@ -275,6 +275,11 @@ impl PrintSource for pr::ImportDef {
                 .between("(", ")", None)
                 .single_line_end(",")
                 .print(p)
+            }
+            pr::ImportKind::Star(path) => {
+                p.push(path.to_string())?;
+                p.push("::*")?;
+                Some(())
             }
         }
     }
