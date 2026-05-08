@@ -25,15 +25,14 @@ impl super::TypeResolver<'_> {
 
         self.debug_current_def = fq_ident.clone();
 
-        // take def out of the module
-        let def = self.root_mod.get_mut(fq_ident).unwrap();
-        let pr::DefKind::Unresolved(def) = &mut def.kind else {
-            unreachable!("resolving already resolved: {fq_ident}")
+        // take def out of the module (replace with a placeholder)
+        let def_kind = {
+            let def = self.root_mod.get_mut(fq_ident).unwrap();
+            std::mem::replace(&mut def.kind, pr::DefKind::dummy())
         };
-        let def_kind = def.take().unwrap();
 
         // resolve
-        let def_kind = self.resolve_unresolved(fq_ident, *def_kind)?;
+        let def_kind = self.resolve_unresolved(fq_ident, def_kind)?;
 
         // put def back in
         let def = self.root_mod.get_mut(fq_ident).unwrap();
@@ -50,9 +49,6 @@ impl super::TypeResolver<'_> {
             pr::DefKind::Module(_) => {
                 unreachable!("module def cannot be unresolved at this point")
                 // it should have been converted into Module in [crate::resolver::module::init_root]
-            }
-            pr::DefKind::Unresolved(_) => {
-                unreachable!("nested unresolved?")
             }
             pr::DefKind::Expr(expr_def) => {
                 // push a top-level scope for exprs that need inference type args but are not wrapped into a function

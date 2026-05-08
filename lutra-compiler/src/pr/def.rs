@@ -27,11 +27,12 @@ pub enum DefKind {
     Expr(ExprDef),
     Ty(TyDef),
     Import(ImportDef),
+}
 
-    /// A definition that has not yet been resolved.
-    /// Created during the first pass of the AST, must not be present in
-    /// a fully resolved module structure.
-    Unresolved(Option<Box<DefKind>>),
+impl DefKind {
+    pub fn dummy() -> Self {
+        DefKind::Module(ModuleDef::default())
+    }
 }
 
 #[derive(PartialEq, Clone, Default)]
@@ -47,6 +48,95 @@ pub struct ModuleDef {
     /// braces for inline modules, or the whole file body for file-based
     /// submodules. This excludes inner doc comments or annotations.
     pub span_content: Option<Span>,
+}
+
+impl ModuleDef {
+    /// Get definition by fully qualified ident.
+    pub fn get(&self, fq_ident: &Path) -> Option<&Def> {
+        let sub_module = self.get_submodule(fq_ident.parent()?)?;
+        sub_module.defs.get(fq_ident.last())
+    }
+
+    /// Get definition by fully qualified ident and return remaining steps into the def.
+    pub fn try_get<'a, 's>(&'a self, steps: &'s [String]) -> Option<(&'a Def, &'s [String])> {
+        let mut curr_mod = self;
+        for (index, step) in steps.iter().enumerate() {
+            let def = curr_mod.defs.get(step)?;
+            if let DefKind::Module(sub_module) = &def.kind {
+                curr_mod = sub_module;
+            } else {
+                return Some((def, &steps[(index + 1)..]));
+            }
+        }
+        None
+    }
+
+    /// Get an exclusive reference to definition by fully qualified ident.
+    pub fn get_mut(&mut self, ident: &Path) -> Option<&mut Def> {
+        let module = self.get_module_mut(ident.parent()?)?;
+
+        module.defs.get_mut(ident.last())
+    }
+
+    pub fn get_submodule<'a>(&'a self, path: &[String]) -> Option<&'a ModuleDef> {
+        let mut curr_mod = self;
+        for step in path {
+            let def = curr_mod.defs.get(step)?;
+            curr_mod = def.kind.as_module()?;
+        }
+        Some(curr_mod)
+    }
+
+    pub fn get_module_mut(&mut self, path: &[String]) -> Option<&mut ModuleDef> {
+        let mut curr_mod = self;
+        for step in path {
+            let def = curr_mod.defs.get_mut(step)?;
+            curr_mod = def.kind.as_module_mut()?;
+        }
+        Some(curr_mod)
+    }
+
+    pub fn iter_defs(&self) -> impl Iterator<Item = (&String, &Def)> {
+        self.defs.iter()
+    }
+
+    pub fn iter_defs_re(&self) -> impl Iterator<Item = (Path, &Def)> {
+        let non_modules = (self.defs.iter())
+            .filter(|(_, d)| !d.kind.is_module())
+            .map(|(name, d)| (Path::from_name(name), d));
+
+        let sub_defs = (self.defs.iter())
+            .filter(|(_, d)| d.kind.is_module())
+            .flat_map(|(name, d)| {
+                let sub_module = d.kind.as_module().unwrap();
+                sub_module
+                    .iter_defs_re()
+                    .map(|(p, d)| (Path::from_name(name).append(p), d))
+                    .collect_vec()
+            });
+
+        non_modules.chain(sub_defs)
+    }
+
+    /// Collect all non-module def paths under this module into a set.
+    pub fn collect_unresolved(&self) -> std::collections::HashSet<Path> {
+        let p = Path::empty();
+        self.collect_unresolved_re(&p)
+    }
+
+    fn collect_unresolved_re(&self, prefix: &Path) -> std::collections::HashSet<Path> {
+        let mut paths = std::collections::HashSet::new();
+        for (name, def) in &self.defs {
+            let mut path = prefix.clone();
+            path.push(name.clone());
+            if let DefKind::Module(sub) = &def.kind {
+                paths.extend(sub.collect_unresolved_re(&path));
+            } else {
+                paths.insert(path);
+            }
+        }
+        paths
+    }
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -125,108 +215,6 @@ pub struct Annotation {
 pub struct DocComment {
     pub content: String,
     pub span: Span,
-}
-
-impl ModuleDef {
-    /// Get definition by fully qualified ident.
-    pub fn get(&self, fq_ident: &Path) -> Option<&Def> {
-        if fq_ident.is_empty() {
-            return None;
-        }
-        let sub_module = self.get_submodule(fq_ident.parent())?;
-        sub_module.defs.get(fq_ident.last())
-    }
-
-    /// Get definition by fully qualified ident and return remaining steps into the def.
-    pub fn try_get<'a, 's>(&'a self, steps: &'s [String]) -> Option<(&'a Def, &'s [String])> {
-        let mut curr_mod = self;
-        for (index, step) in steps.iter().enumerate() {
-            let def = curr_mod.defs.get(step)?;
-            if let DefKind::Module(sub_module) = &def.kind {
-                curr_mod = sub_module;
-            } else {
-                return Some((def, &steps[(index + 1)..]));
-            }
-        }
-        None
-    }
-
-    /// Get an exclusive reference to definition by fully qualified ident.
-    pub fn get_mut(&mut self, ident: &Path) -> Option<&mut Def> {
-        let module = self.get_module_mut(ident.parent())?;
-
-        module.defs.get_mut(ident.last())
-    }
-
-    pub fn get_submodule(&self, path: &[String]) -> Option<&ModuleDef> {
-        let mut curr_mod = self;
-        for step in path {
-            let def = curr_mod.defs.get(step)?;
-            curr_mod = def.kind.as_module()?;
-        }
-        Some(curr_mod)
-    }
-
-    pub fn get_module_mut(&mut self, path: &[String]) -> Option<&mut ModuleDef> {
-        let mut curr_mod = self;
-        for step in path {
-            let def = curr_mod.defs.get_mut(step)?;
-            curr_mod = def.kind.as_module_mut()?;
-        }
-        Some(curr_mod)
-    }
-
-    pub fn iter_defs(&self) -> impl Iterator<Item = (&String, &Def)> {
-        self.defs.iter()
-    }
-
-    pub fn iter_defs_re(&self) -> impl Iterator<Item = (Path, &Def)> {
-        let non_modules = (self.defs.iter())
-            .filter(|(_, d)| !d.kind.is_module())
-            .map(|(name, d)| (Path::from_name(name), d));
-
-        let sub_defs = (self.defs.iter())
-            .filter(|(_, d)| d.kind.is_module())
-            .flat_map(|(name, d)| {
-                let sub_module = d.kind.as_module().unwrap();
-                sub_module
-                    .iter_defs_re()
-                    .map(|(p, d)| (Path::from_name(name).append(p), d))
-                    .collect_vec()
-            });
-
-        non_modules.chain(sub_defs)
-    }
-
-    pub(crate) fn take_unresolved(&mut self, ident: &Path) -> (DefKind, Option<Span>) {
-        let def = self.get_mut(ident).unwrap();
-        let unresolved = def.kind.as_unresolved_mut().unwrap();
-        (*unresolved.take().unwrap(), def.span)
-    }
-
-    pub(crate) fn insert_unresolved(&mut self, ident: &Path, def_kind: DefKind) {
-        let def = self.get_mut(ident).unwrap();
-        *def.kind.as_unresolved_mut().unwrap() = Some(Box::new(def_kind));
-    }
-
-    pub(crate) fn into_unresolved(self) -> ModuleDef {
-        // init new module and recurse
-        let mut new_mod = ModuleDef {
-            imports: self.imports,
-            annotations: self.annotations,
-            span_content: self.span_content,
-            ..ModuleDef::default()
-        };
-
-        for (name, def) in self.defs {
-            let kind = match def.kind {
-                DefKind::Module(m) => DefKind::Module(m.into_unresolved()),
-                kind => DefKind::Unresolved(Some(Box::new(kind))),
-            };
-            new_mod.defs.insert(name, Def { kind, ..def });
-        }
-        new_mod
-    }
 }
 
 impl Def {

@@ -1,3 +1,5 @@
+use std::collections::HashSet;
+
 use crate::Result;
 use crate::diagnostic::{Diagnostic, DiagnosticCode, WithErrorInfo};
 use crate::pr;
@@ -5,36 +7,56 @@ use crate::utils::IdGenerator;
 
 /// Traverses module tree and runs name resolution on each of the definitions.
 /// Collects references of each definition.
-pub struct ModuleRefResolver<'a> {
+pub struct DefNameResolver<'a> {
     pub root: &'a mut pr::ModuleDef,
-    pub current_path: pr::Path,
-
-    pub refs_tys: Vec<(pr::Path, Vec<pr::Path>)>,
-    pub refs_vars: Vec<(pr::Path, Vec<pr::Path>)>,
-
+    /// Path of the current def being resolved
+    pub current: pr::Path,
+    /// Paths of definitions that still need name resolution
+    pub unresolved: HashSet<pr::Path>,
+    /// Generator for scope ids
     pub scope_id_gen: IdGenerator<usize>,
 
+    // -- output --
+    /// Accumulated references between types
+    pub refs_tys: Vec<(pr::Path, Vec<pr::Path>)>,
+    /// Accumulated references between expressions
+    pub refs_vars: Vec<(pr::Path, Vec<pr::Path>)>,
     /// Accumulates mapping from span to target Ref
     pub target_spans: Vec<(crate::Span, crate::project::TargetSpan)>,
 }
 
-impl ModuleRefResolver<'_> {
+impl<'a> DefNameResolver<'a> {
     /// Entry point
     pub fn run(&mut self) -> Result<()> {
-        self.current_path = pr::Path::empty();
+        self.current = pr::Path::empty();
         self.resolve_imports()?;
-        assert_eq!(self.current_path.len(), 0);
+        assert_eq!(self.current.len(), 0);
         self.resolve_import_stars()?;
-        assert_eq!(self.current_path.len(), 0);
+        assert_eq!(self.current.len(), 0);
         self.resolve_defs()?;
-        assert_eq!(self.current_path.len(), 0);
+        assert_eq!(self.current.len(), 0);
         Ok(())
     }
 
-    fn resolve_imports(&mut self) -> Result<()> {
-        let path = &mut self.current_path;
-        let module = self.root.get_module_mut(path.as_steps()).unwrap();
+    fn get_expr_resolver<'b>(&'b mut self) -> super::expr::NameResolver<'b> {
+        super::expr::NameResolver {
+            // -- inherited --
+            root: self.root,
+            unresolved: &self.unresolved,
+            scope_id_gen: &mut self.scope_id_gen,
+            target_spans: &mut self.target_spans,
+            // -- config --
+            current: &self.current,
+            allow_recursive: false,
+            // -- state --
+            scopes: Vec::new(),
+            refs: Vec::new(),
+        }
+    }
 
+    fn resolve_imports(&mut self) -> Result<()> {
+        // collect module structure
+        let module = self.root.get_submodule(self.current.as_steps()).unwrap();
         let mut submodules = Vec::new();
         let mut imports = Vec::new();
         for (name, def) in &module.defs {
@@ -42,61 +64,62 @@ impl ModuleRefResolver<'_> {
                 pr::DefKind::Module(_) => {
                     submodules.push(name.clone());
                 }
-                pr::DefKind::Unresolved(Some(d)) if d.is_import() => {
-                    imports.push(name.clone());
+                pr::DefKind::Import(_) => {
+                    self.current.push(name.clone());
+                    let unresolved = self.unresolved.contains(&self.current);
+                    let name = self.current.pop().unwrap();
+                    if unresolved {
+                        imports.push(name);
+                    }
                 }
-                pr::DefKind::Unresolved(None) => panic!(),
                 _ => {}
             }
         }
+        let _ = module;
 
-        let trace_span =
-            tracing::span!(tracing::Level::DEBUG, "imports", module = path.to_string());
+        // resolve each import
+        let trace_span = tracing::span!(
+            tracing::Level::DEBUG,
+            "imports",
+            module = self.current.to_string()
+        );
         let _trace_enter = trace_span.enter();
-
         for name in imports {
             tracing::trace!("import {name}");
-            path.push(name);
+            self.current.push(name);
 
-            // take the def out of the module tree
-            let (def, span) = self.root.take_unresolved(path);
-            let pr::DefKind::Import(import) = def else {
-                unreachable!()
+            // clone the import info
+            let (import, span) = {
+                let def = self.root.get(&self.current).unwrap();
+                (def.kind.as_import().unwrap().clone(), def.span)
             };
 
             // resolve the def
-            let r = super::expr::NameResolver {
-                root: self.root,
-                def_module_path: path.parent(),
-                scopes: Vec::new(),
-                refs: Vec::new(),
-                scope_id_gen: &mut self.scope_id_gen,
-                allow_recursive: false,
-                target_spans: &mut self.target_spans,
-            };
+            let r = self.get_expr_resolver();
             let target = import.kind.as_simple().unwrap();
-            let target_fq = r.fold_relative_path(target).with_span_fallback(span)?;
+            let target_fq = r.resolve_path(target).with_span_fallback(span)?;
 
             // put the def back in
-            let def_loc = self.root.get_mut(path).unwrap();
+            let def_loc = self.root.get_mut(&self.current).unwrap();
             def_loc.kind = pr::DefKind::Import(pr::ImportDef::new_simple(target_fq, import.span));
 
-            path.pop();
+            // mark as resolved
+            self.unresolved.remove(&self.current);
+            self.current.pop();
         }
-
         drop(_trace_enter);
 
+        // recurse into submodules
         for name in submodules {
-            self.current_path.push(name);
+            self.current.push(name);
             self.resolve_imports()?;
-            self.current_path.pop();
+            self.current.pop();
         }
         Ok(())
     }
 
     fn resolve_import_stars(&mut self) -> Result<()> {
-        let path = &mut self.current_path;
-        let module = self.root.get_module_mut(path.as_steps()).unwrap();
+        let module = self.root.get_module_mut(self.current.as_steps()).unwrap();
 
         let mut submodules = Vec::new();
         for (name, def) in &module.defs {
@@ -108,7 +131,7 @@ impl ModuleRefResolver<'_> {
         let trace_span = tracing::span!(
             tracing::Level::DEBUG,
             "import stars",
-            module = path.to_string()
+            module = self.current.to_string()
         );
         let _trace_enter = trace_span.enter();
 
@@ -123,17 +146,9 @@ impl ModuleRefResolver<'_> {
             tracing::trace!("{}", target);
 
             // resolve the def
-            let r = super::expr::NameResolver {
-                root: self.root,
-                def_module_path: path.as_steps(),
-                scopes: Vec::new(),
-                refs: Vec::new(),
-                scope_id_gen: &mut self.scope_id_gen,
-                allow_recursive: false,
-                target_spans: &mut self.target_spans,
-            };
+            let r = self.get_expr_resolver();
             let target_fq = r
-                .fold_relative_path(&target)
+                .resolve_path(&target)
                 .with_span_fallback(Some(import.span))?;
 
             // find target module and named of contents
@@ -142,7 +157,7 @@ impl ModuleRefResolver<'_> {
             let names: Vec<_> = target_mod.defs.keys().cloned().collect();
 
             // construct simple imports for
-            let module = self.root.get_module_mut(path.as_steps()).unwrap();
+            let module = self.root.get_module_mut(self.current.as_steps()).unwrap();
             for name in names {
                 let mut def_fq = target_fq.clone();
                 def_fq.push(name.clone());
@@ -150,85 +165,95 @@ impl ModuleRefResolver<'_> {
                 module.defs.insert(name, def);
             }
         }
-
         drop(_trace_enter);
 
+        // recurse into submodules
         for name in submodules {
-            self.current_path.push(name);
+            self.current.push(name);
             self.resolve_imports()?;
-            self.current_path.pop();
+            self.current.pop();
         }
         Ok(())
     }
 
     fn resolve_defs(&mut self) -> Result<()> {
-        let path = &mut self.current_path;
-        let module = self.root.get_module_mut(path.as_steps()).unwrap();
-
+        // collect module structure
+        let module = self.root.get_submodule(self.current.as_steps()).unwrap();
         let mut submodules = Vec::new();
-        let mut unresolved_defs = Vec::new();
+        let mut defs = Vec::new();
         for (name, def) in &module.defs {
             match &def.kind {
                 pr::DefKind::Module(_) => {
                     submodules.push(name.clone());
                 }
-                pr::DefKind::Unresolved(Some(_)) => {
-                    unresolved_defs.push(name.clone());
+                pr::DefKind::Import(_) => {}
+                _ => {
+                    self.current.push(name.clone());
+                    let unresolved = self.unresolved.contains(&self.current);
+                    let name = self.current.pop().unwrap();
+                    if unresolved {
+                        defs.push(name);
+                    }
                 }
-                pr::DefKind::Unresolved(None) => panic!(),
-                _ => {}
             }
         }
+        let _ = module;
 
-        let trace_span = tracing::span!(tracing::Level::DEBUG, "names", module = path.to_string());
+        let trace_span = tracing::span!(
+            tracing::Level::DEBUG,
+            "names",
+            module = self.current.to_string()
+        );
         let _trace_enter = trace_span.enter();
 
-        for name in unresolved_defs {
+        // resolve each def
+        for name in defs {
             tracing::trace!("def {name}");
-            path.push(name);
+            self.current.push(name);
 
-            // take the def out of the module tree
-            let (def, span) = self.root.take_unresolved(path);
-
-            // resolve the def
-            let mut r = super::expr::NameResolver {
-                root: self.root,
-                def_module_path: path.parent(),
-                scopes: Vec::new(),
-                refs: Vec::new(),
-                scope_id_gen: &mut self.scope_id_gen,
-                allow_recursive: true,
-                target_spans: &mut self.target_spans,
+            // take the def kind out (replace with a placeholder)
+            let (def_kind, span) = {
+                let def = self.root.get_mut(&self.current).unwrap();
+                let kind =
+                    std::mem::replace(&mut def.kind, pr::DefKind::Module(pr::ModuleDef::default()));
+                (kind, def.span)
             };
 
-            let def = r.fold_def_kind(def).with_span_fallback(span)?;
+            // resolve the def
+            let mut r = self.get_expr_resolver();
+            r.allow_recursive = true;
+            let def = r.fold_def_kind(def_kind).with_span_fallback(span)?;
 
             // filter out self-references
-            r.refs.retain(|r| r != path);
-
+            let mut refs = r.refs;
+            refs.retain(|p| p != r.current);
             match &def {
                 pr::DefKind::Expr(_) => {
-                    self.refs_vars.push((path.clone(), r.refs));
+                    self.refs_vars.push((self.current.clone(), refs));
                 }
                 pr::DefKind::Ty(_) => {
-                    self.refs_tys.push((path.clone(), r.refs));
+                    self.refs_tys.push((self.current.clone(), refs));
                 }
-                pr::DefKind::Module(_) | pr::DefKind::Import(_) | pr::DefKind::Unresolved(_) => {
+                pr::DefKind::Module(_) | pr::DefKind::Import(_) => {
                     unreachable!()
                 }
             }
 
-            // put the def back in
-            self.root.insert_unresolved(path, def);
+            // put the resolved def back in
+            self.root.get_mut(&self.current).unwrap().kind = def;
 
-            path.pop();
+            // mark as resolved
+            self.unresolved.remove(&self.current);
+
+            self.current.pop();
         }
         drop(_trace_enter);
 
+        // recurse into submodules
         for name in submodules {
-            self.current_path.push(name);
+            self.current.push(name);
             self.resolve_defs()?;
-            self.current_path.pop();
+            self.current.pop();
         }
         Ok(())
     }

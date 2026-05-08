@@ -30,8 +30,12 @@ impl Path {
         self.path.last().unwrap()
     }
 
-    pub fn parent(&self) -> &[String] {
-        &self.path[0..(self.len() - 1)]
+    pub fn parent(&self) -> Option<&[String]> {
+        if self.is_empty() {
+            None
+        } else {
+            Some(&self.path[0..(self.len() - 1)])
+        }
     }
 
     pub fn as_steps(&self) -> &[String] {

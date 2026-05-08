@@ -259,7 +259,7 @@ impl DefIcon {
                 }
             }
             pr::DefKind::Ty(_) => Some(DefIcon::Type),
-            pr::DefKind::Import(_) | pr::DefKind::Unresolved(_) => None,
+            pr::DefKind::Import(_) => None,
         }
     }
 }

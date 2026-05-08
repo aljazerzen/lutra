@@ -10,9 +10,8 @@ use crate::printer::{CONFIG_NO_WRAP, PrintSource, Printer};
 /// suitable for display in an LSP hover popup.
 /// Prints resolved types as type annotations.
 ///
-/// Returns `None` for [`pr::DefKind::Import`] and
-/// [`pr::DefKind::Unresolved`] definitions, which have no meaningful
-/// signature to display.
+/// Returns `None` for [`pr::DefKind::Import`] definitions, which have no
+/// meaningful signature to display.
 pub fn print_def_signature(name: &str, def: &pr::Def) -> Option<String> {
     let mut printer = Printer::new(&CONFIG_NO_WRAP, None);
     let p = &mut printer;
@@ -41,7 +40,7 @@ pub fn print_def_signature(name: &str, def: &pr::Def) -> Option<String> {
             p.push("module ")?;
             p.push(ident::display(name))?;
         }
-        pr::DefKind::Import(_) | pr::DefKind::Unresolved(_) => return None,
+        pr::DefKind::Import(_) => return None,
     }
 
     assert!(p.edits.is_empty());
@@ -219,7 +218,6 @@ impl PrintSource for NamedDef<'_> {
                 p.push("import ")?;
                 import_def.print(p)?;
             }
-            pr::DefKind::Unresolved(_) => unreachable!(),
         }
 
         p.mark_printed(&self.1.span);

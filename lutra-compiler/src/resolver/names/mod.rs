@@ -2,6 +2,8 @@ mod expr;
 mod module;
 mod scope;
 
+use std::collections::HashSet;
+
 use itertools::Itertools;
 use scope::Scope;
 
@@ -11,18 +13,21 @@ use crate::{pr, utils};
 
 type TargetSpanMap = Vec<(crate::Span, crate::project::TargetSpan)>;
 
-/// Runs name resolution for global names - names that refer to definitions.
+/// Resolves names
 ///
-/// Keeps track of all inter-definition references.
 /// Returns a resolution order and the collected target map entries.
-pub fn run(root: &mut pr::ModuleDef) -> Result<(Vec<Vec<pr::Path>>, TargetSpanMap)> {
+pub fn run(
+    root: &mut pr::ModuleDef,
+    unresolved: HashSet<pr::Path>,
+) -> Result<(Vec<Vec<pr::Path>>, TargetSpanMap)> {
     // resolve inter-definition references
     let (refs_tys, refs_vars, target_spans) = {
-        let mut r = module::ModuleRefResolver {
+        let mut r = module::DefNameResolver {
             root,
+            unresolved,
             refs_tys: Default::default(),
             refs_vars: Default::default(),
-            current_path: pr::Path::empty(),
+            current: pr::Path::empty(),
             scope_id_gen: Default::default(),
             target_spans: Vec::new(),
         };

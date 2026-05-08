@@ -155,12 +155,6 @@ pub fn fold_def_kind<T: ?Sized + PrFold>(fold: &mut T, def_kind: DefKind) -> Res
         Ty(type_def) => Ty(fold.fold_type_def(type_def)?),
         Module(module_def) => Module(fold.fold_module_def(module_def)?),
         Import(_) => def_kind,
-        Unresolved(inner) => Unresolved(
-            inner
-                .map(|x| fold_def_kind(fold, *x))
-                .transpose()?
-                .map(Box::new),
-        ),
     })
 }
 

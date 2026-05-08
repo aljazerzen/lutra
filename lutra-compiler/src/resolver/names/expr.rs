@@ -1,3 +1,5 @@
+use std::collections::HashSet;
+
 use crate::Result;
 use crate::Span;
 use crate::diagnostic::{Diagnostic, WithErrorInfo};
@@ -11,13 +13,21 @@ use super::Scope;
 
 /// Traverses AST and resolves identifiers.
 pub struct NameResolver<'a> {
+    // -- inherited --
     pub root: &'a pr::ModuleDef,
-    pub def_module_path: &'a [String],
-    pub scopes: Vec<Scope>,
-    pub refs: Vec<pr::Path>,
+    pub unresolved: &'a HashSet<pr::Path>,
     pub scope_id_gen: &'a mut IdGenerator<usize>,
-    pub allow_recursive: bool,
     pub target_spans: &'a mut Vec<(Span, crate::project::TargetSpan)>,
+
+    // -- config --
+    pub current: &'a pr::Path,
+    pub allow_recursive: bool,
+
+    // -- state --
+    /// Scope stack
+    pub scopes: Vec<Scope>,
+    /// Accumulated refs of this def
+    pub refs: Vec<pr::Path>,
 }
 
 impl NameResolver<'_> {
@@ -26,14 +36,18 @@ impl NameResolver<'_> {
             pr::DefKind::Expr(var_def) => pr::DefKind::Expr(self.fold_expr_def(var_def)?),
             pr::DefKind::Ty(ty_def) => pr::DefKind::Ty(self.fold_type_def(ty_def)?),
 
-            pr::DefKind::Module(_) | pr::DefKind::Import(_) | pr::DefKind::Unresolved(_) => {
+            pr::DefKind::Module(_) | pr::DefKind::Import(_) => {
                 unreachable!()
             }
         })
     }
 
-    pub fn fold_relative_path(&self, path: &pr::Path) -> Result<pr::Path> {
-        self.lookup_in_mod_tree(self.def_module_path, path)
+    pub fn resolve_path(&self, path: &pr::Path) -> Result<pr::Path> {
+        self.lookup_in_mod_tree(self.get_current_mod(), path)
+    }
+
+    fn get_current_mod(&self) -> &[String] {
+        self.current.parent().unwrap_or(self.current.as_steps())
     }
 }
 
@@ -243,7 +257,7 @@ impl NameResolver<'_> {
         }
 
         // case 2: name in module tree
-        let fq = (self.lookup_in_mod_tree(self.def_module_path, ident)).inspect_err(|_| {
+        let fq = (self.lookup_in_mod_tree(self.get_current_mod(), ident)).inspect_err(|_| {
             tracing::debug!("scopes: {:?}", self.scopes);
         })?;
         self.refs.push(fq.clone());
@@ -291,26 +305,32 @@ impl NameResolver<'_> {
         };
         base_fq.push(first);
 
+        // Self-reference: the def currently being resolved.
+        if self.current == &base_fq {
+            return if steps.is_empty() && self.allow_recursive {
+                Ok(base_fq)
+            } else {
+                Err(Diagnostic::new_custom("recursive reference"))
+            };
+        }
+
         match &def.kind {
             // recurse into submodules
             pr::DefKind::Module(sub_module) => self.lookup_in_module(sub_module, base_fq, steps),
 
-            // resolved imports
-            pr::DefKind::Import(import) => {
-                // use resolved fq ident and extend it with remaining steps
+            // resolved import: follow the fully-qualified path
+            pr::DefKind::Import(import) if !self.unresolved.contains(&base_fq) => {
                 let mut new_path = import.kind.as_simple().unwrap().clone();
                 new_path.extend(steps);
                 self.lookup_in_mod_tree(&[], &new_path)
             }
 
-            // unresolved imports
-            pr::DefKind::Unresolved(Some(def_kind)) if def_kind.is_import() => {
-                let import = def_kind.as_import().unwrap();
+            // unresolved import: resolve target on the fly
+            pr::DefKind::Import(import) => {
                 let import_target = import.kind.as_simple().unwrap();
 
-                // resolve import target
                 let import_fq = self
-                    .lookup_in_mod_tree(base_fq.parent(), import_target)
+                    .lookup_in_mod_tree(base_fq.parent().unwrap(), import_target)
                     .with_span_fallback(def.span)?;
 
                 tracing::debug!("resolved import to {import_fq:?}, steps={steps}");
@@ -319,15 +339,6 @@ impl NameResolver<'_> {
                 let mut new_path = import_fq;
                 new_path.extend(steps);
                 self.lookup_in_mod_tree(&[], &new_path)
-            }
-
-            // recursive lookup into self (we take node out of Unresolved during name resolution)
-            pr::DefKind::Unresolved(None) => {
-                if steps.is_empty() && self.allow_recursive {
-                    Ok(base_fq)
-                } else {
-                    Err(Diagnostic::new_custom("recursive path"))
-                }
             }
 
             // found it!

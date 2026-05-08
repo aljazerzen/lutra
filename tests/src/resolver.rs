@@ -1797,7 +1797,7 @@ fn import_recursive_error() {
        │
      3 │       import project::a::b as b
        │              ─────────┬────────
-       │                       ╰────────── recursive path
+       │                       ╰────────── recursive reference
     ───╯
     ");
 }

@@ -1158,8 +1158,6 @@ pub(crate) fn lower_type_defs(project: &Project) -> ir::Module {
             }
 
             pr::DefKind::Import(_) => {}
-
-            pr::DefKind::Unresolved(_) => panic!(),
         }
     }
 

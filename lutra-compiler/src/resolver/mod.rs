@@ -22,12 +22,10 @@ pub fn resolve(
     dependencies: Vec<Dependency>,
 ) -> Result<Project, Vec<Diagnostic>> {
     // desugar
-    let module_tree = desugar::run(module_tree).map_err(|d| vec![d])?;
+    let mut root_module = desugar::run(module_tree).map_err(|d| vec![d])?;
 
-    tracing::trace!("{:#?}", module_tree);
-
-    // convert defs into Unresolved
-    let mut root_module = module_tree.into_unresolved();
+    tracing::trace!("{:#?}", root_module);
+    let unresolved = root_module.collect_unresolved();
 
     // inject dependencies
     for dep in &dependencies {
@@ -38,7 +36,8 @@ pub fn resolve(
     }
 
     // resolve names
-    let (resolution_order, target_spans) = names::run(&mut root_module).map_err(|d| vec![d])?;
+    let (resolution_order, target_spans) =
+        names::run(&mut root_module, unresolved).map_err(|d| vec![d])?;
 
     // resolve types
     types::run(&mut root_module, &resolution_order)?;
@@ -73,17 +72,16 @@ pub fn resolve_overlay_expr(
     let var_name = "_";
     root_module.defs.insert(
         var_name.to_string(),
-        pr::Def::new(pr::DefKind::Unresolved(Some(Box::new(pr::DefKind::Expr(
-            pr::ExprDef {
-                value: Box::new(expr),
-                ty: None,
-                constant: false,
-            },
-        ))))),
+        pr::Def::new(pr::DefKind::Expr(pr::ExprDef {
+            value: Box::new(expr),
+            ty: None,
+            constant: false,
+        })),
     );
 
     // resolve names
-    let (resolution_order, _) = names::run(&mut root_module).map_err(|d| vec![d])?;
+    let unresolved = std::collections::HashSet::from([pr::Path::from_name(var_name)]);
+    let (resolution_order, _) = names::run(&mut root_module, unresolved).map_err(|d| vec![d])?;
     assert_eq!(resolution_order.len(), 1);
     assert_eq!(resolution_order[0].len(), 1);
 

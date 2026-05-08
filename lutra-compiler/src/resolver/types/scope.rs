@@ -253,7 +253,7 @@ impl<'a> TypeResolver<'a> {
 
                     pr::DefKind::Module(_) => Ok(Named::Module),
 
-                    pr::DefKind::Unresolved(_) | pr::DefKind::Import(_) => unreachable!(),
+                    pr::DefKind::Import(_) => unreachable!(),
                 }
             }
 
