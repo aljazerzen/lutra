@@ -3,7 +3,7 @@ title: Binary format
 ---
 
 Lutra binary format is a method of serializing structured data.
-It it used in the interface of Lutra runners to encode inputs and outputs of programs.
+It is used at the runner boundary to encode program inputs and outputs.
 
 Schema of the data structures is defined with the Lutra language.
 This schema is used to generate code in the desired language.
@@ -16,9 +16,9 @@ This schema is used to generate code in the desired language.
   </figcaption>
 </figure>
 
-The format supports partial decoding, i.e. reading only a part of the encoded data structure.
+The format supports partial decoding, that is, reading only part of the encoded data structure.
 
-Schema evolution is not supported. In other words, to deserialize a structure, it must use the exact schema it has been serialized with. Any other schema might work, but the format does not provide any guarantees.
+Schema evolution is not supported. To deserialize a structure safely, you must use the same schema that was used to serialize it. Other schemas might appear to work, but the format provides no guarantees.
 
 Currently supported languages:
 

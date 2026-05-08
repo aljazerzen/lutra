@@ -1,30 +1,37 @@
 ---
-title: 'Use from Rust'
+title: Rust guide
 ---
 
-Lutra projects can be invoked from Rust, by hooking Lutra compiler into `build.rs`, where it checks the project and generates bindings that can then be called from Rust code.
+Use Lutra from Rust when you want to:
 
-## Crates
+- compile Lutra projects at build time,
+- generate Rust types and program bindings,
+- execute typed Lutra programs from Rust,
+- choose between local interpreter and PostgreSQL runners.
 
-There is few Rust crates that provide different functionality:
+This page shows the common Rust workflow: keep your Lutra project in the Rust
+repository, compile it in `build.rs`, include the generated Rust code, and run
+programs from your application.
 
-- `lutra-bin`: binary format serialization
-- `lutra-compiler`: Lutra compiler that can parse and check Lutra projects
-- `lutra-codegen`: a utility crate that generates Rust and Python bindings from Lutra projects
-- `lutra-interpreter`: a runner that executes programs on a local interpreter
-- `lutra-runner-postgres`: a runner that executes programs on PostgreSQL
+## Project layout
 
+A small Rust project might look like this:
 
-## Basic setup
+```text
+my_project/
+├── Cargo.toml
+├── build.rs
+└── src/
+    ├── main.rs
+    └── main.lt
+```
 
-See [full example](https://codeberg.org/lutra/lutra/src/branch/main/examples/
-rust-interpreter).
+The Lutra source lives in `src/main.lt`. The generated Rust bindings are written
+to `$OUT_DIR/generated.rs` during the build.
 
-Let's start with a small Lutra project, in `src/main.lt`:
+## Write a small Lutra project
 
-```lt
-# src/main.lt
-
+```lt title="src/main.lt"
 type Movie: {id: int64, title: text, is_released: bool}
 
 func get_movies(): [Movie] -> [
@@ -33,75 +40,61 @@ func get_movies(): [Movie] -> [
 ]
 ```
 
-First, we need to add dependencies to the `Cargo.toml` file:
+## Add Cargo dependencies
 
-```toml
-# Cargo.toml
-
+```toml title="Cargo.toml"
 [build-dependencies]
-# For generating bindings
-lutra-codegen = {version = "0.5"}
+lutra-codegen = { version = "0.5" }
 
 [dependencies]
-# Used by generated bindings
-lutra-bin = {version = "0.5"}
-# For running programs
-lutra-interpreter = {version = "0.5"}
+lutra-bin = { version = "0.5" }
+lutra-interpreter = { version = "0.5" }
+tokio = { version = "1", features = ["macros", "rt"] }
 ```
 
-Now, we call `lutra-codegen` in `build.rs` file:
+`lutra-codegen` compiles the Lutra project and generates Rust bindings.
+`lutra-bin` is used by the generated code. `lutra-interpreter` is the simplest
+runner for local execution.
 
-```rust
-// build.rs
+## Generate bindings in `build.rs`
 
+```rust title="build.rs"
 use lutra_codegen as codegen;
 use std::{env, path};
 
 fn main() {
-    println!("cargo::rerun-if-changed=build.rs");
-
-    // generated file should reside in $OUT_DIR (./target/.../out)
     let out_file = path::Path::new(&env::var("OUT_DIR").unwrap()).join("generated.rs");
 
-    // we want to compile all programs in the root module
     let opts = codegen::GenerateOptions::default()
         .generate_programs("", codegen::ProgramFormat::BytecodeLt);
 
-    // run codegen
     let input_files = codegen::generate("src/main.lt", &out_file, opts);
 
-    // print all input files, so cargo knows when to rerun codegen
     for f in input_files {
         println!("cargo::rerun-if-changed={}", f.to_str().unwrap());
     }
 }
 ```
 
-This will generate type definitions for `Movie` and compile `get_movies` function.
-The produced code will look like this:
+This does two things:
 
-```rust
-// target/.../out/generated.rs
+1. generate Rust types that match your Lutra types,
+2. generate typed program constructors for your Lutra functions.
 
-...
+## Include the generated code
 
-#[derive(Debug, Clone)]
-pub struct Movie {
-    pub id: i32,
-    pub title: String,
+```rust title="src/main.rs"
+mod generated {
+    include!(concat!(env!("OUT_DIR"), "/generated.rs"));
 }
-
-pub fn get_movies() -> rr::TypedProgram<(), Vec<Movie>> { ... }
-
-...
 ```
 
-This generated code can be included in the Rust crate.
+After that, your Rust code can call `generated::get_movies()` and use the
+generated `generated::Movie` type.
 
-```rust
-// main.rs
+## Run a program with the interpreter
 
-// include the file generated in build.rs
+```rust title="src/main.rs"
 mod generated {
     include!(concat!(env!("OUT_DIR"), "/generated.rs"));
 }
@@ -110,69 +103,83 @@ use lutra_interpreter::Run;
 
 #[tokio::main(flavor = "current_thread")]
 async fn main() {
-    // init the runner
     let runner = lutra_interpreter::InterpreterRunner::default();
 
-    // run the program
     let movies = runner
         .run(&generated::get_movies(), &())
         .await
         .unwrap()
         .unwrap();
 
-    // result is a Rust struct
     println!("Result: {movies:#?}");
 }
 ```
 
+The input is `&()`, because `get_movies()` takes no arguments.
+The result is a Rust `Vec<generated::Movie>`.
 
-## PostgreSQL
+## Switch to PostgreSQL
 
-See full example [here](https://codeberg.org/lutra/lutra/src/branch/main/examples/
-rust-postgres).
+For PostgreSQL-backed programs, change both the generated program format and the
+runtime dependency.
 
-Now, the setup is similar to the interpreter example, but we need to use `lutra-runner-postgres` instead of `lutra-interpreter`.
+### Add the PostgreSQL runner
 
-```toml
-# Cargo.toml
-
+```toml title="Cargo.toml"
 [dependencies]
-lutra-runner-postgres = {version = "0.5"}
+lutra-runner-postgres = { version = "0.5" }
 ```
 
-Also, we need to tell the compiler emit `sql-pg` program format, that can run on PostgreSQL.
+### Generate PostgreSQL programs in `build.rs`
 
-```rs
-// build.rs
-
-fn main() {
-    // ...
-    let opts = codegen::GenerateOptions::default()
-        .generate_programs("", codegen::ProgramFormat::SqlPg);
-    // ...
-}
+```rust title="build.rs"
+let opts = codegen::GenerateOptions::default()
+    .generate_programs("", codegen::ProgramFormat::SqlPg);
 ```
 
-Now, we can connect to PostgreSQL and run the program from `main.rs`.
+### Run the program from Rust
 
-```rs
-// include the file generated in build.rs
+```rust title="src/main.rs"
 mod generated {
     include!(concat!(env!("OUT_DIR"), "/generated.rs"));
 }
 
-use lutra_runner_postgres::RunnerAsync;
 use lutra_runner_postgres::Run;
 
 #[tokio::main(flavor = "current_thread")]
 async fn main() {
-    // init PostgreSQL runner
-    const PG_URL: &str = "postgres://postgres:pass@localhost:5416";
-    let client = RunnerAsync::connect_no_tls(PG_URL).await.unwrap();
+    let client = lutra_runner_postgres::RunnerAsync::connect_no_tls(
+        "postgres://postgres:pass@localhost:5416",
+    )
+    .await
+    .unwrap();
 
-    // fetch movies
-    let res = client.run(&generated::get_movies(), &()).await;
-    let movies = res.unwrap().unwrap()
+    let movies = client
+        .run(&generated::get_movies(), &())
+        .await
+        .unwrap()
+        .unwrap();
+
     println!("{movies:#?}");
 }
 ```
+
+The Rust-side calling style stays almost the same. The main difference is the
+runner and the program format emitted during code generation.
+
+## Use the examples in this repository
+
+See the full examples here:
+
+- `examples/rust-interpreter/`
+- `examples/rust-postgres/`
+
+These are a good starting point if you want a working end-to-end project.
+
+## See also
+
+- [Command line guide](cli.md) for installation and first-use workflow.
+- [Projects](../learn/projects.md) if you want more context on modules and project layout.
+- [CLI reference](../reference/cli.md) for exact `codegen` usage.
+- [Runner model](../reference/project/runner-model.md) if you want to understand how programs move into runners.
+- [Binary format](../reference/project/binary-format.md) if you want the low-level data boundary details.

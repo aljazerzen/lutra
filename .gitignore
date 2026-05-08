@@ -3,8 +3,8 @@ result
 
 .idea/
 .vscode
-.aider*
 .helix
+.plans
 
 *.pending-snap
 

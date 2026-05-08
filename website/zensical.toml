@@ -36,7 +36,7 @@ site_url = "https://lutra-lang.org/docs"
 #
 # Read more: https://zensical.org/docs/setup/basics/#copyright
 copyright = """
-Copyright &copy; 2025 Aljaž M. Eržen
+Copyright &copy; 2026 Aljaž M. Eržen
 """
 
 extra_css = ["style.css"]
@@ -137,12 +137,12 @@ features = [
     # When section index pages are enabled, documents can be directly attached
     # to sections, which is particularly useful for providing overview pages.
     # https://zensical.org/docs/setup/navigation/#section-index-pages
-    "navigation.indexes",
+    # "navigation.indexes",
 
     # When instant navigation is enabled, clicks on all internal links will be
     # intercepted and dispatched via XHR without fully reloading the page.
     # https://zensical.org/docs/setup/navigation/#instant-navigation
-    "navigation.instant",
+    # "navigation.instant",
 
     # With instant prefetching, your site will start to fetch a page once the
     # user hovers over a link. This will reduce the perceived loading time
@@ -233,27 +233,38 @@ accent = "blue"
 Home = "https://lutra-lang.org"
 
 [[project.nav]]
-Usage = [
-    "usage/core-concepts.md",
-    "usage/command-line.md",
-    "usage/rust.md",
-    "usage/python.md",
+Usage = ["usage/index.md", "usage/cli.md", "usage/rust.md", "usage/python.md"]
+
+[[project.nav]]
+Learn = [
+    "learn/introduction.md",
+    "learn/basics.md",
+    "learn/pipelines.md",
+    "learn/tabular-data.md",
+    "learn/aggregations.md",
+    "learn/projects.md",
 ]
 
 [[project.nav]]
-Language = [
-    "language/intro.md",
-    "language/features.md",
-    "language/getting-started.md",
-    "language/reference.md",
-]
-
-[[project.nav]]
-Runner = [
-    "runner/runner.md",
-    "runner/format.md",
-    "runner/format-spec.md",
-    "runner/repr.md",
+Reference = [
+    "reference/index.md",
+    "reference/cli.md",
+    { Language = [
+        "reference/language/syntax.md",
+        "reference/language/literals.md",
+        "reference/language/types.md",
+        "reference/language/expressions.md",
+        "reference/language/patterns.md",
+        "reference/language/definitions.md",
+        "reference/language/modules.md",
+        "reference/language/operators.md",
+    ] },
+    { Project = [
+        "reference/project/runner-model.md",
+        "reference/project/binary-format.md",
+        "reference/project/format-spec.md",
+        "reference/project/representations.md",
+    ] },
 ]
 
 [[project.nav]]
@@ -306,4 +317,3 @@ alternate_style = true
 [project.markdown_extensions.pymdownx.tasklist]
 custom_checkbox = true
 [project.markdown_extensions.pymdownx.tilde]
-

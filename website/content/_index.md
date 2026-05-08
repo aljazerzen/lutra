@@ -104,12 +104,12 @@ Again, this all compiles to SQL and can be executed on PostgreSQL.
 
 <ul class="card-list">
 
-{% card(title="Core concepts", href="/docs/usage/core-concepts/", label="Docs") %}
-    How can Lutra be used? How does it interact with other tools?
+{% card(title="Project overview", href="/docs/reference/project/overview/", label="Docs") %}
+    How do projects, programs, runners, and the binary format fit together?
 {% end %}
 
-{% card(title="Try it out", href="/docs/usage/command-line/", label="Docs") %}
-    Install CLI that can check, compile and run Lutra programs.
+{% card(title="Use the CLI", href="/docs/usage/cli/", label="Docs") %}
+    Install the CLI and run, check, and compile Lutra programs.
 {% end %}
 
 {% card(title="Advent of SQL 2024", href="https://codeberg.org/lutra/advent-of-sql", label="Examples") %}

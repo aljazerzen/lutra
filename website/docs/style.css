@@ -26,8 +26,8 @@
 }
 
 .highlight .nc {
-    /* color for Name.Class (Zensical does not support this by default) */
-    color: var(--md-code-hl-class-color);
+  /* color for Name.Class (Zensical does not support this by default) */
+  color: var(--md-code-hl-class-color);
 }
 
 .md-nav .md-ellipsis {
@@ -35,11 +35,40 @@
 }
 
 .highlight .gp {
-    /* console prompt */
-    user-select: none;
-    color: var(--md-code-hl-comment-color) !important;
+  /* console prompt */
+  user-select: none;
+  color: var(--md-code-hl-comment-color) !important;
 }
 
 .md-search__button {
   line-height: 100%;
+}
+
+.md-typeset .grid.cards {
+  grid-gap: 1rem;
+}
+
+.md-typeset .grid.cards>ol>li,
+.md-typeset .grid.cards>ul>li,
+.md-typeset .grid>.card {
+  border-radius: 0;
+  border: none;
+  padding: 0;
+}
+
+.md-typeset .grid.cards>ol>li>hr,
+.md-typeset .grid.cards>ul>li>hr,
+.md-typeset .grid>.card>hr {
+  margin-top: 0.3em;
+  margin-bottom: 0.3em;
+}
+
+.md-typeset .grid.cards>ol>li:focus-within,
+.md-typeset .grid.cards>ol>li:hover,
+.md-typeset .grid.cards>ul>li:focus-within,
+.md-typeset .grid.cards>ul>li:hover,
+.md-typeset .grid>.card:focus-within,
+.md-typeset .grid>.card:hover {
+  border: none;
+  box-shadow: none;
 }
