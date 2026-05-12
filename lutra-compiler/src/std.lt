@@ -1,3 +1,5 @@
+@!project(name = "std")
+
 # --- Utils ---
 
 ## Constructs the usual "default" value
@@ -88,6 +90,7 @@ where T: int8 | int16 | int32 | int64 | float32 | float64
 func cmp(a: T, b: T): Ordering
 where T: primitive
 
+## Result of a three-way comparison. Returned by [cmp].
 type Ordering: enum {less, equal, greater}
 
 ## Tests if values are equal. Used by `==` operator.
@@ -153,8 +156,9 @@ func or(left: bool, right: bool): bool
 ## Inverts a boolean. Used by `!` operator.
 func not(expr: bool): bool
 
-# --- Option functions ---
+## Nullable values
 module option {
+  ## Returns `true` iff the value is `.some`.
   func is_some(value: enum {none, some: T}): bool
   where T
   -> (
@@ -164,6 +168,8 @@ module option {
     }
   )
 
+  ## Returns `true` iff the value is `.none`.
+  ## The inverse of [is_some].
   func is_none(value: enum {none, some: T}): bool
   where T
   -> (
@@ -259,51 +265,73 @@ module option {
 
 # --- Array functions ---
 
+## Returns the item at a zero-based `position`, or `.none` if out of bounds.
 func index(array: [T], position: int64): enum {none, some: T}
 where T
 
+## Returns the number of items in an array.
 func count(array: [T]): int64
 where T
 
+## Returns `true` if the array contains no items.
 func is_empty(array: [T]): bool
 where T
 -> eq(count(array), 0)
 
+## Transforms each item using a `mapper` function.
+## Returns a new array of the same length.
 func map(array: [I], mapper: func (I): O): [O]
 where I, O
 
+## Applies `mapper` to each item and concatenates the resulting arrays.
 func flat_map(array: [I], mapper: func (I): [O]): [O]
 where I, O
 
+## Returns only the items for which `condition` returns `true`.
 func filter(array: [T], condition: func (T): bool): [T]
 where T
 
+## Returns the first item for which `condition` returns `true`,
+## or `.none` if no item matches.
 func find(array: [T], condition: func (T): bool): enum {none, some: T}
 where T
 -> (array | filter(condition) | index(0))
 
+## Returns items from index `start` (inclusive) to `end` (exclusive).
 func slice(array: [T], start: int64, end: int64): [T]
 where T
 
+## Sorts the array in ascending order by the value returned by `key`.
 func sort(array: [I], key: func (I): K): [I]
 where I, K: primitive
 
+## Transposes an array of rows into a tuple of columns.
+## Each field of the row type becomes a column — an array of that field's values.
+## The inverse of [from_columnar].
 func to_columnar(rows: [T]): {for f: F in T do f: [F]}
 where T: {..}
 
+## Transposes a tuple of columns into an array of rows.
+## The inverse of [to_columnar].
 func from_columnar(columnar: {for f: F in T do f: [F]}): [T]
 where T: {..}
 
+## Applies `mapper` to the array in columnar form.
+## Equivalent to [to_columnar], then `mapper`, then [from_columnar].
 func map_columnar(
   x: [I], mapper: func ({for f: F in I do f: [F]}): {for f: F in O do f: [F]}
 ): [O]
 where I: {..}, O: {..}
 -> (x | to_columnar | mapper | from_columnar)
 
+## Reduces an array to a single value by applying `mapper` in columnar form.
+## Equivalent to [to_columnar] followed by `mapper`.
 func aggregate(x: [T], mapper: func ({for f: F in T do f: [F]}): O): O
 where T: {..}, O
 -> (x | to_columnar | mapper)
 
+## Pairs items from `left` and `right` by position.
+## The result length equals the shorter of the two inputs.
 func zip(left: [L], right: [R]): [{L, R}]
 where L, R
 
@@ -323,7 +351,8 @@ func distinct(array: [T]): [T]
 where T
 -> (array | group(x -> x) | map(x -> x.key))
 
-func append(top: [T], bottom: [T]): [T]
+## Concatenates two arrays, `first` items followed by `second` items.
+func append(first: [T], second: [T]): [T]
 where T
 
 ## Folds every input into the an accumulator value by applying an operation,
@@ -500,11 +529,14 @@ module math {
 
   # func round(val: int64, n_digits: int64): int64
 
+  ## The mathematical constant π as a 32-bit float.
   const pi32: float32 = 3.1415927
 
+  ## The mathematical constant π as a 64-bit float.
   const pi64: float64 = 3.141592653589793
 
   # TODO: exponent should probably always be uint32
+  ## Raises `val` to the power of `exponent`.
   func pow(val: T, exponent: T): T
   where T: int64 | float64
 
@@ -524,8 +556,10 @@ module math {
 
 ## Text functions
 module text {
+  ## Concatenates two text values.
   func concat(left: text, right: text): text
 
+  ## Returns the number of characters in a text value.
   func length(value: text): uint32
 
   ## Converts ASCII code to its corresponding Unicode character.
@@ -562,14 +596,19 @@ module text {
   # func regex_search(haystack: text, pattern: text): bool
 }
 
+## File system operations
 module fs {
+  ## Reads rows from a Parquet file at `file_name`.
   func read_parquet(file_name: text): [R]
   where R: {..}
 
+  ## Writes `data` to a Parquet file at `file_name`.
   func write_parquet(data: [R], file_name: text): {}
   where R: {..}
 }
 
+## SQL database interface
+##
 ## Module available only when targeting SQL databases.
 ## Currently this includes only `sql-pg` format.
 module sql {
@@ -704,8 +743,11 @@ type Time(microseconds: int64)
 # where D: Time64Millisecond -> x.0 | div(1000) | Time64Microsecond
 # where D: Time64Microsecond -> x
 
+## Adds two `Time` durations together.
 func add_time(a: Time, b: Time): Time -> (add(a.0, b.0) | Time)
 
+## Computes the elapsed `Time` between two `Timestamp`s.
+## Result is `a - b`: positive when `a` is later than `b`.
 func sub_timestamp(a: Timestamp, b: Timestamp): Time -> (sub(a.0, b.0) | Time)
 
 ## Returns offset of a time zone from UTC on a given date.

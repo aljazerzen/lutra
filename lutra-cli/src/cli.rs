@@ -35,6 +35,7 @@ fn main() {
         Action::Interactive(cmd) => interactive(cmd),
         Action::Pull(cmd) => pull_schema(cmd),
         Action::Codegen(cmd) => codegen(cmd),
+        Action::Docs(cmd) => docs(cmd),
         Action::Format(cmd) => format(cmd),
         Action::LanguageServer(cmd) => {
             language_server::run(cmd);
@@ -83,6 +84,9 @@ pub enum Action {
 
     /// Compile the project and generate bindings code
     Codegen(CodegenCommand),
+
+    /// Convert a project into Markdown reference
+    Docs(DocsCommand),
 
     /// Format source files
     #[clap(alias = "fmt")]
@@ -438,6 +442,39 @@ pub fn codegen(cmd: CodegenCommand) -> anyhow::Result<()> {
     println!("Output written to {}", cmd.output_file.display());
     println!("Done.");
 
+    Ok(())
+}
+
+#[derive(clap::Parser)]
+pub struct DocsCommand {
+    /// Path to a file in a Lutra project.
+    #[clap(flatten)]
+    discover: DiscoverParams,
+
+    #[clap(flatten)]
+    check: CheckParams,
+
+    /// Output directory for generated Markdown pages.
+    output_dir: std::path::PathBuf,
+}
+
+pub fn docs(cmd: DocsCommand) -> anyhow::Result<()> {
+    let project = if cmd.discover.project.as_ref().is_some_and(|p| p == ":std:") {
+        lutra_compiler::check_std()?
+    } else {
+        let source_tree = lutra_compiler::discover(cmd.discover.clone())?;
+        lutra_compiler::check(source_tree, cmd.check)?
+    };
+
+    use lutra_project_tools::docs;
+    let pages = docs::generate_md_pages(&project)?;
+    docs::write_md_pages(&cmd.output_dir, &pages)?;
+
+    eprintln!(
+        "Written {} page(s) to {}",
+        pages.len(),
+        cmd.output_dir.display()
+    );
     Ok(())
 }
 

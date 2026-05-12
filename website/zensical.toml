@@ -258,6 +258,17 @@ Reference = [
         "reference/language/definitions.md",
         "reference/language/modules.md",
         "reference/language/operators.md",
+        { "Standard library" = [
+            "reference/language/std/index.md",
+            "reference/language/std/option/index.md",
+            "reference/language/std/math/index.md",
+            "reference/language/std/text/index.md",
+            "reference/language/std/fs/index.md",
+            "reference/language/std/sql/index.md",
+            "reference/language/std/date/index.md",
+            "reference/language/std/timestamp/index.md",
+        ] },
+
     ] },
     { Project = [
         "reference/project/runner-model.md",

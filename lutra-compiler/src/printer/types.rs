@@ -171,11 +171,15 @@ impl PrintSource for pr::TyParam {
             pr::TyDomain::Open => {}
             pr::TyDomain::OneOf(tys) => {
                 p.push(": ")?;
-                for (i, ty) in tys.iter().enumerate() {
-                    if i > 0 {
-                        p.push(" | ")?;
+                if let Some(alias) = abbreviated_domain(tys) {
+                    p.push(alias)?;
+                } else {
+                    for (i, ty) in tys.iter().enumerate() {
+                        if i > 0 {
+                            p.push(" | ")?;
+                        }
+                        ty.print(p)?;
                     }
-                    ty.print(p)?;
                 }
             }
             pr::TyDomain::TupleHasFields(fields) => {
@@ -222,4 +226,23 @@ impl PrintSource for pr::TyParam {
     fn span(&self) -> Option<crate::Span> {
         self.span
     }
+}
+
+/// Returns the abbreviated keyword for a `TyDomain::OneOf` list when it
+/// exactly matches one of the two hardcoded parser sets, or `None` otherwise.
+fn abbreviated_domain(tys: &[pr::Ty]) -> Option<&'static str> {
+    use crate::parser::{TY_DOMAIN_NUMBERS, TY_DOMAIN_PRIMITIVES};
+
+    let prims: Vec<pr::TyPrimitive> = tys
+        .iter()
+        .map(|ty| ty.kind.as_primitive().cloned())
+        .collect::<Option<Vec<_>>>()?;
+
+    if prims == TY_DOMAIN_PRIMITIVES {
+        return Some("primitive");
+    }
+    if prims == TY_DOMAIN_NUMBERS {
+        return Some("number");
+    }
+    None
 }

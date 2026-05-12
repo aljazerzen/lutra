@@ -30,7 +30,7 @@ pub fn check(
 
     params.dependencies.push(Dependency {
         name: NS_STD.into(),
-        inner: Arc::new(check_std_lib()?),
+        inner: Arc::new(check_std()?),
     });
 
     let mut project = parse(&source)?
@@ -160,11 +160,11 @@ fn os_path_to_mod_path(path: &Path) -> Result<Vec<String>, error::Error> {
         .try_collect()
 }
 
-pub fn std_lib() -> &'static str {
+pub fn std_source() -> &'static str {
     include_str!("std.lt")
 }
 
-pub fn parse_std_lib() -> Result<pr::ModuleDef, error::Error> {
+pub fn parse_std() -> Result<pr::ModuleDef, error::Error> {
     let source = SourceTree::single(
         std::path::PathBuf::new(),
         include_str!("std.lt").to_string(),
@@ -172,7 +172,9 @@ pub fn parse_std_lib() -> Result<pr::ModuleDef, error::Error> {
     parse(&source)?.map_err(|d| Error::from_diagnostics(d, &source))
 }
 
-pub fn check_std_lib() -> Result<crate::Project, error::Error> {
+// TODO: instead of exposing this, we should make regular [check] work
+// with std.lt (skip recursion somehow).
+pub fn check_std() -> Result<crate::Project, error::Error> {
     let source = SourceTree::single(
         std::path::PathBuf::new(),
         include_str!("std.lt").to_string(),

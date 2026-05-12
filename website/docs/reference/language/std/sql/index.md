@@ -1,0 +1,85 @@
+# `std::sql` - SQL database interface
+
+Module available only when targeting SQL databases.
+Currently this includes only `sql-pg` format.
+
+## `func` from
+
+```lutra
+func from(const text): [R]
+where R: {..}
+```
+
+Reads rows from a table.
+
+The order of table rows is unknown and might change over repeated invocations.
+
+Table identifier can contain slashes to denote table namespaces.
+Any additional slashes will remain in table name verbatim.
+For example:
+- `from("my_schema/invoices")` will read from `my_schema.invoices`,
+- `from("my_schema/hello/world")` will read from `my_schema."hello/world"`.
+
+## `func` insert
+
+```lutra
+func insert([R], const text): {}
+where R: {..}
+```
+
+Inserts rows into a table.
+
+For table identifier format, see documentation of [std::sql::from].
+
+## `func` update
+
+```lutra
+func update(const text, func (R): enum {none, some: R}): {}
+where R: {..}
+```
+
+Updates rows in a table.
+
+The `updater` function is applied to each row in the table. When it returns
+`.none` the row is not updated, and when it return `.some(new_value)` it is
+updated to the new value.
+
+The function receives the current row values and can use them to decide
+whether to update and what the new values should be.
+
+Example:
+```lt
+std::sql::update(
+  "users",
+  func (u: User) -> if u.age > 65 then (
+    .some({status = "senior", ..u})
+  ) else (
+    .none
+  )
+)
+```
+
+For table identifier format, see documentation of [std::sql::from].
+
+## `func` raw
+
+```lutra
+func raw(const text): R
+where R
+```
+
+Evaluates raw SQL.
+
+This function is an escape hatch for accessing SQL directly.
+It should be used as a last resort, because it circumvents type checking
+and can cause program panic on malformed SQL or incorrect resulting type.
+
+Resulting type of the expression must match the "SQL representation"
+of the Lutra type:
+- primitives -> a single column,
+- tuples -> one column for each tuple field,
+- nested tuples -> unpacked into parent relation,
+- arrays -> columns of the inner object,
+- enums -> one tag column, followed by columns of each of the variants,
+- enums that are the option -> one nullable column.
+

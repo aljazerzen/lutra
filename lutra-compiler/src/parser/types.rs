@@ -224,36 +224,22 @@ where
 
     let one_of_numbers = ident_keyword("number").map_with(|_, e| {
         let s = e.span();
-        TyDomain::OneOf(vec![
-            Ty::new_with_span(TyPrimitive::int8, s),
-            Ty::new_with_span(TyPrimitive::int16, s),
-            Ty::new_with_span(TyPrimitive::int32, s),
-            Ty::new_with_span(TyPrimitive::int64, s),
-            Ty::new_with_span(TyPrimitive::uint8, s),
-            Ty::new_with_span(TyPrimitive::uint16, s),
-            Ty::new_with_span(TyPrimitive::uint32, s),
-            Ty::new_with_span(TyPrimitive::uint64, s),
-            Ty::new_with_span(TyPrimitive::float32, s),
-            Ty::new_with_span(TyPrimitive::float64, s),
-        ])
+        TyDomain::OneOf(
+            TY_DOMAIN_NUMBERS
+                .iter()
+                .map(|p| Ty::new_with_span(p.clone(), s))
+                .collect(),
+        )
     });
 
     let one_of_primitives = ident_keyword("primitive").map_with(|_, e| {
         let s = e.span();
-        TyDomain::OneOf(vec![
-            Ty::new_with_span(TyPrimitive::bool, s),
-            Ty::new_with_span(TyPrimitive::int8, s),
-            Ty::new_with_span(TyPrimitive::int16, s),
-            Ty::new_with_span(TyPrimitive::int32, s),
-            Ty::new_with_span(TyPrimitive::int64, s),
-            Ty::new_with_span(TyPrimitive::uint8, s),
-            Ty::new_with_span(TyPrimitive::uint16, s),
-            Ty::new_with_span(TyPrimitive::uint32, s),
-            Ty::new_with_span(TyPrimitive::uint64, s),
-            Ty::new_with_span(TyPrimitive::float32, s),
-            Ty::new_with_span(TyPrimitive::float64, s),
-            Ty::new_with_span(TyPrimitive::text, s),
-        ])
+        TyDomain::OneOf(
+            TY_DOMAIN_PRIMITIVES
+                .iter()
+                .map(|p| Ty::new_with_span(p.clone(), s))
+                .collect(),
+        )
     });
 
     let domain = ctrl(':')
@@ -284,3 +270,35 @@ where
         .at_least(1)
         .collect()
 }
+
+/// The set of numeric primitive types, in canonical order.
+/// Corresponds to the `number` keyword in a `where` constraint.
+pub(crate) const TY_DOMAIN_NUMBERS: &[TyPrimitive] = &[
+    TyPrimitive::int8,
+    TyPrimitive::int16,
+    TyPrimitive::int32,
+    TyPrimitive::int64,
+    TyPrimitive::uint8,
+    TyPrimitive::uint16,
+    TyPrimitive::uint32,
+    TyPrimitive::uint64,
+    TyPrimitive::float32,
+    TyPrimitive::float64,
+];
+
+/// The set of all primitive types, in canonical order.
+/// Corresponds to the `primitive` keyword in a `where` constraint.
+pub(crate) const TY_DOMAIN_PRIMITIVES: &[TyPrimitive] = &[
+    TyPrimitive::bool,
+    TyPrimitive::int8,
+    TyPrimitive::int16,
+    TyPrimitive::int32,
+    TyPrimitive::int64,
+    TyPrimitive::uint8,
+    TyPrimitive::uint16,
+    TyPrimitive::uint32,
+    TyPrimitive::uint64,
+    TyPrimitive::float32,
+    TyPrimitive::float64,
+    TyPrimitive::text,
+];

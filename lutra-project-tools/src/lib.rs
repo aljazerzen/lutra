@@ -1,3 +1,5 @@
+pub mod docs;
+
 use std::path;
 
 use lutra_compiler::{Project, codespan, pr};

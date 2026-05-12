@@ -2,9 +2,8 @@ use lutra_bin::ident;
 
 use crate::pr::{self, ImportDef};
 use crate::printer::common::{PrintSourceExt, Separated};
-use crate::printer::expr;
-use crate::printer::types;
 use crate::printer::{CONFIG_NO_WRAP, PrintSource, Printer};
+use crate::printer::{expr, types};
 
 /// Produce a compact, single-line signature string of a definition,
 /// suitable for display in an LSP hover popup.
@@ -20,14 +19,18 @@ pub fn print_def_signature(name: &str, def: &pr::Def) -> Option<String> {
         pr::DefKind::Expr(expr_def) if expr_def.constant => {
             p.push("const ")?;
             p.push(ident::display(name))?;
-            if let Some(ty) = &expr_def.ty {
+            if let Some(ty) = expr_def.value.ty.as_deref() {
                 p.push(": ")?;
                 ty.print(p)?;
             }
+
+            let mut f = p.fork();
+            f.single_line = true;
+            if f.push(" = ").is_some() && expr_def.value.print(&mut f).is_some() {
+                p.merge(f);
+            }
         }
         pr::DefKind::Expr(expr_def) => {
-            // let func = expr_def.value.kind.as_func().unwrap();
-            // print_func_signature(func, Some(name), p)?;
             let func = expr_def.value.ty.as_ref()?.kind.as_func()?;
             types::print_ty_func(func, Some(name), p)?;
         }
