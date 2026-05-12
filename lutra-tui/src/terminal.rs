@@ -6,14 +6,6 @@ use unicode_width::UnicodeWidthStr;
 
 pub use crossterm::style::Color;
 
-/// Top-level component of a TUI.
-///
-/// Other components should always have similar functions for rendering and handling actions,
-/// but with additional parameters (additional state from the parent).
-pub trait Component {
-    fn handle(&mut self, action: Action) -> ActionResult;
-}
-
 #[derive(Debug)]
 pub enum Action {
     /// Terminal event (raw, uninterpreted)
@@ -88,8 +80,6 @@ pub enum Effect {
     Redraw,
     /// Request app shutdown.
     Shutdown,
-    /// Commit styled lines above the current inline viewport.
-    Print { view: View<'static> },
 }
 
 #[derive(Default)]
@@ -118,13 +108,6 @@ impl ActionResult {
             ..Default::default()
         }
     }
-    pub fn print(view: View<'static>) -> Self {
-        Self {
-            effects: vec![Effect::Print { view }, Effect::Redraw],
-            ..Default::default()
-        }
-    }
-
     pub(crate) fn into_parts(self) -> (Vec<Action>, Vec<Effect>) {
         (self.actions, self.effects)
     }
@@ -143,6 +126,13 @@ pub struct Rect {
 }
 
 impl Rect {
+    pub fn vertical(cols: u16) -> Rect {
+        Rect {
+            cols,
+            rows: u16::MAX,
+        }
+    }
+
     #[allow(dead_code)]
     pub fn split_top(self, rows_top: u16) -> (Self, Self) {
         let top = Rect {

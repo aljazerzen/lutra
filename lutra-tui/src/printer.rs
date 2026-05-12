@@ -6,13 +6,21 @@ use crossterm::style::{
     Attribute, Print, ResetColor, SetAttribute, SetBackgroundColor, SetForegroundColor,
 };
 use crossterm::terminal::{self, Clear, ClearType};
-use unicode_segmentation::UnicodeSegmentation;
-use unicode_width::UnicodeWidthStr;
 
 use crate::terminal::Rect;
 use crate::terminal::{Line, Span, View};
 
-pub(crate) struct ShellRenderer {
+/// Abstracts over the real terminal and a recording surface used in tests.
+pub(crate) trait Printer {
+    fn commit_view(&mut self, view: View<'_>) -> io::Result<()>;
+    fn update_view(&mut self, view: View<'_>, area: Rect) -> io::Result<()>;
+}
+
+// ---------------------------------------------------------------------------
+// TerminalPrinter — writes to the real terminal
+// ---------------------------------------------------------------------------
+
+pub(crate) struct TerminalPrinter {
     stdout: io::Stdout,
     /// Absolute row where the live region starts (right after committed content).
     region_start_row: u16,
@@ -20,7 +28,7 @@ pub(crate) struct ShellRenderer {
     last_region_height: u16,
 }
 
-impl ShellRenderer {
+impl TerminalPrinter {
     pub(crate) fn new() -> io::Result<Self> {
         terminal::enable_raw_mode()?;
         let mut stdout = io::stdout();
@@ -52,9 +60,10 @@ impl ShellRenderer {
         self.stdout.flush()?;
         terminal::disable_raw_mode()
     }
+}
 
-    // print before the "working" region
-    pub fn print(&mut self, view: View<'_>) -> io::Result<()> {
+impl Printer for TerminalPrinter {
+    fn commit_view(&mut self, view: View<'_>) -> io::Result<()> {
         if view.is_empty() {
             return Ok(());
         }
@@ -92,8 +101,7 @@ impl ShellRenderer {
         Ok(())
     }
 
-    // render the "working" region
-    pub(crate) fn render(&mut self, view: View, area: Rect) -> io::Result<()> {
+    fn update_view(&mut self, view: View, area: Rect) -> io::Result<()> {
         let mut lines = view.lines;
         if lines.is_empty() {
             lines.push(Line::default());
@@ -124,7 +132,14 @@ impl ShellRenderer {
         let visible_lines = &lines[skip..];
 
         for (i, line) in visible_lines.iter().enumerate() {
-            self.render_line(start + i as u16, line, area.cols)?;
+            queue!(
+                self.stdout,
+                cursor::MoveTo(0, start + i as u16),
+                Clear(ClearType::CurrentLine)
+            )?;
+            let mut l = line.to_owned();
+            l.split_at_width(area.cols as usize);
+            self.queue_line(&l)?;
         }
 
         let cursor = view.cursor.unwrap_or((0, 0));
@@ -145,24 +160,14 @@ impl ShellRenderer {
         self.last_region_height = visible_height;
         Ok(())
     }
+}
 
-    fn render_line(&mut self, row: u16, line: &Line<'_>, cols: u16) -> io::Result<()> {
-        queue!(
-            self.stdout,
-            cursor::MoveTo(0, row),
-            Clear(ClearType::CurrentLine)
-        )?;
-        self.queue_line(&truncate_line(line, cols))?;
-        queue!(self.stdout, ResetColor)?;
-        Ok(())
-    }
-
+impl TerminalPrinter {
     fn queue_line(&mut self, line: &Line<'_>) -> io::Result<()> {
         for span in &line.spans {
             self.queue_span(span)?;
         }
-        queue!(self.stdout, ResetColor)?;
-        Ok(())
+        queue!(self.stdout, ResetColor)
     }
 
     fn queue_span(&mut self, span: &Span<'_>) -> io::Result<()> {
@@ -188,34 +193,4 @@ impl ShellRenderer {
         }
         Ok(())
     }
-}
-
-fn truncate_line(line: &Line<'_>, width: u16) -> Line<'static> {
-    if width == 0 {
-        return Line::default();
-    }
-
-    let max = width as usize;
-    let mut out = Line::default();
-    let mut used = 0usize;
-
-    for span in &line.spans {
-        let mut chunk = String::new();
-        for grapheme in span.content.graphemes(true) {
-            let grapheme_width = UnicodeWidthStr::width(grapheme);
-            if grapheme_width > 0 && used + grapheme_width > max {
-                break;
-            }
-            chunk.push_str(grapheme);
-            used += grapheme_width;
-        }
-        if !chunk.is_empty() {
-            out.push_span(Span::new(chunk).set(span.style));
-        }
-        if used >= max {
-            break;
-        }
-    }
-
-    out
 }

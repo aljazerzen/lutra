@@ -1,22 +1,23 @@
 mod cell;
 mod commands;
 mod completions;
+mod driver;
 mod editor;
 mod export;
 mod input;
 mod inspect;
-mod interactive;
 mod keybindings;
 mod panels;
+mod printer;
 mod project;
-mod renderer;
 mod repl;
 mod runner;
 mod shell;
 pub mod table;
 mod terminal;
+mod tests;
 mod watcher;
 
+pub use driver::run_shell;
 pub use input::prompt_for_ty;
-pub use interactive::run_shell;
 pub use runner::RunnerConfig;

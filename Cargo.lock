@@ -2210,6 +2210,7 @@ dependencies = [
  "anyhow",
  "chrono",
  "crossterm 0.29.0",
+ "insta",
  "itertools",
  "lutra-bin",
  "lutra-compiler",

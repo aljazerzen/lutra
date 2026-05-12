@@ -134,16 +134,6 @@ where
     }
 }
 
-// Implement Clone if the underlying runner is cheap to clone (via Arc)
-impl<R> Clone for SyncRunner<R> {
-    fn clone(&self) -> Self {
-        Self {
-            runner: Arc::clone(&self.runner),
-            rt: Runtime::new().expect("failed to create Tokio runtime"),
-        }
-    }
-}
-
 impl<R> std::fmt::Debug for SyncRunner<R>
 where
     R: std::fmt::Debug,

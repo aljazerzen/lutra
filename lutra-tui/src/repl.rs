@@ -1,3 +1,4 @@
+use std::rc::Rc;
 use std::time::Duration;
 
 use crossterm::event::KeyCode;
@@ -5,7 +6,7 @@ use crossterm::event::KeyCode;
 use crate::cell::{Cell, CellOutput, CellStage};
 use crate::completions::Completions;
 use crate::editor::{self, Edit};
-use crate::terminal::{Action, ActionResult, Component, Line, Rect, View};
+use crate::terminal::{Action, ActionResult, View};
 use crate::{export, input, table};
 
 /// REPL pane for evaluating arbitrary expressions.
@@ -20,7 +21,10 @@ pub struct ReplPane {
     pub completions: Completions,
 
     /// Expression history snapshots.
-    history: Vec<Cell>,
+    history: Vec<Rc<Cell>>,
+
+    /// Committed cells waiting to be rendered and printed by the shell driver.
+    pub(crate) pending_prints: Vec<Rc<Cell>>,
 }
 
 impl ReplPane {
@@ -31,6 +35,7 @@ impl ReplPane {
             cursor: Cursor::new(),
             completions: Completions::new(),
             history: Vec::new(),
+            pending_prints: Vec::new(),
         }
     }
 
@@ -42,10 +47,12 @@ impl ReplPane {
         }
     }
 
-    pub fn cursor_and_cell<T>(&mut self, f: impl FnOnce(&mut Cursor, &mut Cell) -> T) -> T {
-        let cell = (self.cursor.history_cursor)
-            .and_then(|i| self.history.get_mut(i))
-            .unwrap_or(&mut self.draft);
+    pub fn cursor_and_cell<T>(&mut self, f: impl FnOnce(&mut Cursor, &Cell) -> T) -> T {
+        let history_idx = self.cursor.history_cursor;
+        let cell: &Cell = history_idx
+            .and_then(|i| self.history.get(i))
+            .map(Rc::as_ref)
+            .unwrap_or(&self.draft);
         f(&mut self.cursor, cell)
     }
 
@@ -72,7 +79,7 @@ impl ReplPane {
         res
     }
 
-    /// Commit the frame cell into history.
+    /// Commit the draft cell: moves it to history.
     pub fn commit_cell(&mut self, keep_program: bool) -> ActionResult {
         if self.draft.is_empty() {
             return ActionResult::default();
@@ -84,16 +91,10 @@ impl ReplPane {
         }
         self.cursor.goto_draft(Some(self.draft.program.len()));
 
-        // compose view for printing
-        let mut area: Rect = crossterm::terminal::size().unwrap().into();
-        area.rows = u16::MAX;
-        let mut view = cell.render(area, None, View::new()).to_owned();
-        view.push_line(Line::empty());
-
-        // push to history
-        self.history.push(cell);
-
-        ActionResult::print(view)
+        let rc = Rc::new(cell);
+        self.history.push(Rc::clone(&rc));
+        self.pending_prints.push(rc);
+        ActionResult::redraw()
     }
 
     /// Build a run error entry from the current cell state.
@@ -200,7 +201,7 @@ impl ReplPane {
             })
         }
 
-        as_success(&self.draft).or_else(|| self.history.iter().rev().find_map(as_success))
+        as_success(&self.draft).or_else(|| self.history.iter().rev().find_map(|rc| as_success(rc)))
     }
 
     pub fn set_execution_result(&mut self, output: Result<Vec<u8>, String>, duration: Duration) {
@@ -240,10 +241,8 @@ impl ReplPane {
         self.cursor.stage = CellStage::Output;
         self.cursor.output = cursor_output;
     }
-}
 
-impl Component for ReplPane {
-    fn handle(&mut self, action: Action) -> ActionResult {
+    pub fn handle(&mut self, action: Action) -> ActionResult {
         match action {
             // Semantic actions from keybindings.
             Action::ClearCell => {
@@ -251,7 +250,6 @@ impl Component for ReplPane {
                     self.cursor.goto_draft(None);
                     return ActionResult::redraw();
                 }
-
                 let res = self.commit_cell(false);
                 if !self.draft.is_empty() {
                     self.draft = Cell::new();
@@ -398,17 +396,17 @@ impl Component for ReplPane {
 
             // Raw terminal events: only handle text input (Char/Paste).
             // All other keys have already been translated to semantic actions by keybindings.
-            Action::Terminal(event) if self.cursor.stage == CellStage::Input => self
-                .cursor_and_cell(move |_, cell| {
-                    let Some(input) = &mut cell.input else {
-                        return ActionResult::default();
-                    };
-                    match input.handle(event) {
-                        input::InputResult::None => ActionResult::default(),
-                        input::InputResult::Redraw => ActionResult::redraw(),
-                        input::InputResult::Submit => ActionResult::action(Action::SubmitInput),
-                    }
-                }),
+            // Input stage is always on the draft cell, never on a history entry.
+            Action::Terminal(event) if self.cursor.stage == CellStage::Input => {
+                let Some(input) = &mut self.draft.input else {
+                    return ActionResult::default();
+                };
+                match input.handle(event) {
+                    input::InputResult::None => ActionResult::default(),
+                    input::InputResult::Redraw => ActionResult::redraw(),
+                    input::InputResult::Submit => ActionResult::action(Action::SubmitInput),
+                }
+            }
             Action::Terminal(crossterm::event::Event::Key(key)) => match self.cursor.stage {
                 CellStage::Browse | CellStage::Program => match key.code {
                     KeyCode::Char(c) if !c.is_control() => {

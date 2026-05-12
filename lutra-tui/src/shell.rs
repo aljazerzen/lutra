@@ -1,105 +1,16 @@
-use std::collections::VecDeque;
-use std::io;
 use std::path;
 
 use crossterm::event;
-use crossterm::terminal;
 
 use crate::commands::CommandRegistry;
 use crate::input;
 use crate::keybindings::{KeyBindings, KeyContext};
 use crate::panels::StatusBar;
 use crate::project::{CompileResult, ProjectState};
-use crate::renderer::ShellRenderer;
 use crate::repl::ReplPane;
 use crate::runner;
 use crate::terminal::Rect;
-use crate::terminal::{
-    Action, ActionResult, Component, Effect, Line, Span, Style, View, wrap_line,
-};
-use crate::watcher::FileWatcher;
-
-/// Starts the interactive shell environment.
-///
-/// Watches the project directory for changes and provides a terminal-native
-/// shell for evaluating expressions.
-pub fn run_shell(
-    project_path: Option<path::PathBuf>,
-    runner_cfg: runner::RunnerConfig,
-    runner: lutra_runner::channel::Client,
-    runner_thread: std::thread::JoinHandle<()>,
-) -> anyhow::Result<()> {
-    // Create action channel
-    let (action_tx, action_rx) = std::sync::mpsc::channel();
-
-    // Init event sources
-    let watcher = FileWatcher::new(project_path.clone(), action_tx.clone())?;
-    let runner = runner::RunnerProxy::try_new(runner, runner_thread, action_tx.clone())?;
-
-    // Create app
-    let mut app = Shell::new(project_path, runner_cfg, runner.get_client());
-
-    // Enter terminal
-    let mut renderer = ShellRenderer::new()?;
-    let _event_thread = crate::terminal::spawn_event_reader(action_tx);
-
-    // Print welcome message
-    renderer.print(welcome_view())?;
-
-    // Initial render
-    let area: Rect = terminal::size()?.into();
-    renderer.render(app.view(area), area)?;
-
-    // Run the app
-    let run_result = run_shell_loop(&mut app, &mut renderer, action_rx);
-
-    // Always restore terminal state
-    renderer.restore()?;
-
-    // Stop app & event sources
-    drop(app);
-    drop(watcher);
-    runner.join();
-
-    Ok(run_result?)
-}
-
-fn run_shell_loop(
-    app: &mut Shell,
-    renderer: &mut ShellRenderer,
-    action_rx: std::sync::mpsc::Receiver<Action>,
-) -> io::Result<()> {
-    while let Ok(action) = action_rx.recv() {
-        let mut redraw = false;
-        let mut effects = Vec::new();
-        let mut queue = VecDeque::new();
-        queue.push_back(action);
-
-        while let Some(action) = queue.pop_front() {
-            let res = app.handle(action);
-            let (actions, new_effects) = res.into_parts();
-            effects.extend(new_effects);
-            queue.extend(actions);
-        }
-
-        for effect in effects {
-            match effect {
-                Effect::Redraw => redraw = true,
-                Effect::Shutdown => return Ok(()),
-                Effect::Print { view } => {
-                    renderer.print(view)?;
-                }
-            }
-        }
-
-        if redraw {
-            let area: Rect = terminal::size()?.into();
-            renderer.render(app.view(area), area)?;
-        }
-    }
-
-    Ok(())
-}
+use crate::terminal::{Action, ActionResult, Line, Style, View};
 
 /// The interactive shell application state.
 pub struct Shell {
@@ -180,40 +91,37 @@ impl Shell {
         )
     }
 
-    fn diagnostics_wrapped_lines(&self, cols: u16) -> View<'_> {
+    fn render_diagnostics(&self, cols: u16) -> View<'_> {
         let CompileResult::Failed { diagnostics } = &self.project.compilation else {
             return View::new();
         };
 
         let mut view = View::new();
-        wrap_line(
-            &mut view,
-            &Line::new(format!(
-                "{} compile error{}",
-                diagnostics.len(),
-                if diagnostics.len() == 1 { "" } else { "s" }
-            )),
-            cols,
-        );
-        view.push_line(Line::default());
+        view.push_line(Line::new(format!(
+            "{} compile error{}",
+            diagnostics.len(),
+            if diagnostics.len() == 1 { "" } else { "s" }
+        )));
+        view.push_line(Line::empty());
 
         for (i, diagnostic) in diagnostics.iter().enumerate() {
             if i > 0 {
-                view.push_line(Line::default());
+                view.push_line(Line::empty());
             }
             for text_line in diagnostic.display().lines() {
-                wrap_line(&mut view, &Line::new(text_line.to_string()), cols);
+                view.push_line(text_line);
             }
         }
 
+        view.wrap(cols, 0);
         view
     }
 
-    pub(crate) fn view(&self, area: Rect) -> View<'_> {
+    pub(crate) fn render(&self, area: Rect) -> View<'_> {
         let (body_area, _status) = area.split_bottom(2);
 
         let mut view = if self.has_diagnostics() {
-            let diagnostics = self.diagnostics_wrapped_lines(area.cols).lines;
+            let diagnostics = self.render_diagnostics(area.cols).lines;
             let overflow = diagnostics.len().saturating_sub(body_area.rows as usize);
 
             View::from(
@@ -230,7 +138,10 @@ impl Shell {
         };
 
         view.truncate(body_area.rows as usize);
-        view.push_line(Line::styled("─".repeat(area.cols as usize), Style::muted()));
+        view.push_line(Line::styled(
+            "─".repeat(area.cols.min(20) as usize),
+            Style::muted(),
+        ));
         view.push_line(Line::styled(
             self.status.view(self.key_context()),
             Style::muted(),
@@ -431,7 +342,7 @@ impl Shell {
                 None => ActionResult::default(),
             },
 
-            Action::Terminal(event::Event::Resize(_, _)) => ActionResult::redraw(),
+            Action::Terminal(event::Event::Resize(..)) => ActionResult::redraw(),
             Action::Terminal(event) => {
                 // debug
                 if let event::Event::Key(key) = &event {
@@ -450,20 +361,4 @@ impl Shell {
             action => self.repl.handle(action),
         }
     }
-}
-
-fn welcome_view() -> View<'static> {
-    let mut view = View::new();
-    view.push_line(Line::from(vec![
-        Span::styled("Lutra", Style::accent().bold()),
-        Span::styled(" v", Style::muted()),
-        Span::styled(env!("CARGO_PKG_VERSION"), Style::muted()),
-    ]));
-    view.push_line(Line::styled(
-        "Tip:  Enter to run  ·  ↑↓ for history  ·  Esc to clear  ·  Ctrl+Q to exit",
-        Style::muted(),
-    ));
-    view.prefix(Span::styled("▌ ", Style::muted()));
-    view.push_line(Line::empty());
-    view
 }

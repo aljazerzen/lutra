@@ -6,7 +6,7 @@ use std::rc::Rc;
 use crossterm::event::{self, Event, KeyCode, KeyModifiers};
 use lutra_bin::ir;
 
-use crate::renderer::ShellRenderer;
+use crate::printer::{Printer, TerminalPrinter};
 use crate::terminal::{Action, Line, Rect, Style, View};
 
 use self::form::{Form, FormName, FormResult};
@@ -21,11 +21,11 @@ pub fn prompt_for_ty(
     if let Some(initial) = initial {
         pane.set_value(initial);
     }
-    let mut renderer = ShellRenderer::new()?;
+    let mut renderer = TerminalPrinter::new()?;
 
     loop {
         let area: Rect = crossterm::terminal::size()?.into();
-        renderer.render(pane.render(true), area)?;
+        renderer.update_view(pane.render(true), area)?;
 
         match pane.handle(event::read()?) {
             InputResult::None => {}
