@@ -157,6 +157,8 @@ func or(left: bool, right: bool): bool
 ## Inverts a boolean. Used by `!` operator.
 func not(expr: bool): bool
 
+import option::*
+
 ## Nullable values
 module option {
   ## Returns `true` iff the value is `.some`.

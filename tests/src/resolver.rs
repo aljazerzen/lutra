@@ -1926,9 +1926,9 @@ fn import_star_shadowed_by_explicit() {
       const x = "original"
     }
     import a::*
-    const x = "explicit"
+    const x = true
     func main() -> x
-    "#), @"text");
+    "#), @"bool");
 }
 
 #[test]

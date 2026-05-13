@@ -26,9 +26,26 @@ impl Prefixer {
 
         Some(pr::Ref::Global(absolute_ref))
     }
+
+    fn prefix_path(&self, path: pr::Path) -> pr::Path {
+        pr::Path::from_name(self.prefix.clone()).append(path)
+    }
 }
 
 impl fold::PrFold for Prefixer {
+    fn fold_import(&mut self, mut import: pr::ImportDef) -> crate::Result<pr::ImportDef> {
+        import.kind = match import.kind {
+            pr::ImportKind::Single(path, alias) => {
+                pr::ImportKind::Single(self.prefix_path(path), alias)
+            }
+            pr::ImportKind::Many(path, imports) => {
+                pr::ImportKind::Many(self.prefix_path(path), imports)
+            }
+            pr::ImportKind::Star(path) => pr::ImportKind::Star(self.prefix_path(path)),
+        };
+        Ok(import)
+    }
+
     fn fold_expr(&mut self, mut expr: pr::Expr) -> crate::Result<pr::Expr> {
         // the thing
         expr.target = self.prefix_ref(expr.target);

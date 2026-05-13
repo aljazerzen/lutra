@@ -328,8 +328,8 @@ where
 
 #[cfg(test)]
 mod tests {
-    use crate::parser::test::parse_with;
     use super::*;
+    use crate::parser::test::parse_with;
 
     #[test]
     fn test_module_annotation_basic() {

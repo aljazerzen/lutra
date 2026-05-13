@@ -248,3 +248,59 @@ fn lower_04() {
     ): func ({}) -> dep::A
     ");
 }
+
+#[test]
+fn lower_05_dependency_import_aliases_are_prefixed() {
+    insta::assert_snapshot!(
+    _test_compile_dep_and_print(
+        r#"
+        import option::is_some
+
+        module option {
+          func is_some(value: enum {none, some: T}): bool
+          where T
+          -> (
+            match value {
+              .some => true,
+              .none => false,
+            }
+          )
+        }
+        "#,
+        r#"
+        func main() -> dep::is_some(.none: int32?)
+        "#,
+    ), @"
+    let main = (func 1 ->
+      let 0 = (func 2 ->
+        let 1 = fn.2+0: enum {none, some: int32};
+        (
+          switch,
+          (
+            (enum_eq
+              var.1: enum {none, some: int32}
+              1
+            ): bool,
+            true: bool,
+          ),
+          (
+            (enum_eq
+              var.1: enum {none, some: int32}
+              0
+            ): bool,
+            false: bool,
+          ),
+        ): bool
+      ): func (enum {none, some: int32}) -> bool;
+      (call
+        (func 0 ->
+          (call
+            var.0: func (enum {none, some: int32}) -> bool,
+            (enum_variant 0): enum {none, some: int32},
+          ): bool
+        ): func ({}) -> bool,
+        fn.1+0: {},
+      ): bool
+    ): func ({}) -> bool
+    ");
+}

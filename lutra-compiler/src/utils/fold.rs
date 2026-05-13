@@ -79,6 +79,9 @@ pub trait PrFold {
     fn fold_pattern(&mut self, pattern: Pattern) -> Result<Pattern> {
         fold_pattern(self, pattern)
     }
+    fn fold_import(&mut self, import: ImportDef) -> Result<ImportDef> {
+        Ok(import)
+    }
 }
 
 pub fn fold_expr_kind<T: ?Sized + PrFold>(fold: &mut T, expr_kind: ExprKind) -> Result<ExprKind> {
@@ -154,7 +157,7 @@ pub fn fold_def_kind<T: ?Sized + PrFold>(fold: &mut T, def_kind: DefKind) -> Res
         Expr(var_def) => Expr(fold.fold_expr_def(var_def)?),
         Ty(type_def) => Ty(fold.fold_type_def(type_def)?),
         Module(module_def) => Module(fold.fold_module_def(module_def)?),
-        Import(_) => def_kind,
+        Import(import_def) => Import(fold.fold_import(import_def)?),
     })
 }
 

@@ -156,9 +156,13 @@ impl<'a> DefNameResolver<'a> {
                 .ok_or_else(|| Diagnostic::new("expected module", DiagnosticCode::NAME_KIND))?;
             let names: Vec<_> = target_mod.defs.keys().cloned().collect();
 
-            // construct simple imports for
+            // construct simple imports for each name, but don't overwrite
+            // explicit definitions that already exist in the module.
             let module = self.root.get_module_mut(self.current.as_steps()).unwrap();
             for name in names {
+                if module.defs.contains_key(&name) {
+                    continue;
+                }
                 let mut def_fq = target_fq.clone();
                 def_fq.push(name.clone());
                 let def = pr::Def::new(pr::ImportDef::new_simple(def_fq, import.span));
