@@ -270,12 +270,12 @@ fn resolve_doc_links(text: &str, current_mod: &pr::Path, root: &pr::ModuleDef) -
             continue;
         }
 
-        if let Some(target_key) = resolve_reference(&inner, current_mod) {
-            if let Some(link) = relative_link(current_mod, &target_key, root) {
-                out += &format!("[`{inner}`]({link})");
-                i = j + 1;
-                continue;
-            }
+        if let Some(target_key) = resolve_reference(&inner, current_mod)
+            && let Some(link) = relative_link(current_mod, &target_key, root)
+        {
+            out += &format!("[`{inner}`]({link})");
+            i = j + 1;
+            continue;
         }
 
         out.push(chars[i]);

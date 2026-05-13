@@ -1,5 +1,5 @@
 use std::path::{Path, PathBuf};
-use std::sync::Arc;
+use std::sync::{Arc, OnceLock};
 
 use itertools::Itertools;
 
@@ -14,10 +14,13 @@ use crate::{SourceTree, diagnostic};
 use crate::{Span, error};
 
 #[cfg_attr(feature = "clap", derive(clap::Parser))]
-#[derive(Default)]
+#[derive(Default, Clone)]
 pub struct CheckParams {
     #[cfg_attr(feature = "clap", arg(skip))]
     pub dependencies: Vec<Dependency>,
+
+    #[cfg_attr(feature = "clap", arg(skip))]
+    pub no_std: bool,
 }
 
 pub fn check(
@@ -28,10 +31,12 @@ pub fn check(
         source.insert(PathBuf::from(""), "".into());
     }
 
-    params.dependencies.push(Dependency {
-        name: NS_STD.into(),
-        inner: Arc::new(check_std()?),
-    });
+    if !params.no_std {
+        params.dependencies.push(Dependency {
+            name: NS_STD.into(),
+            inner: std_project()?,
+        });
+    }
 
     let mut project = parse(&source)?
         .and_then(|ast| crate::resolver::resolve(ast, params.dependencies))
@@ -160,31 +165,24 @@ fn os_path_to_mod_path(path: &Path) -> Result<Vec<String>, error::Error> {
         .try_collect()
 }
 
-pub fn std_source() -> &'static str {
-    include_str!("std.lt")
-}
-
-pub fn parse_std() -> Result<pr::ModuleDef, error::Error> {
-    let source = SourceTree::single(
+pub fn std_source() -> SourceTree {
+    SourceTree::single(
         std::path::PathBuf::new(),
         include_str!("std.lt").to_string(),
-    );
-    parse(&source)?.map_err(|d| Error::from_diagnostics(d, &source))
+    )
 }
 
-// TODO: instead of exposing this, we should make regular [check] work
-// with std.lt (skip recursion somehow).
-pub fn check_std() -> Result<crate::Project, error::Error> {
-    let source = SourceTree::single(
-        std::path::PathBuf::new(),
-        include_str!("std.lt").to_string(),
-    );
+/// Compile `std.lt` once and cache the result for the lifetime of the process.
+static STD_PROJECT: OnceLock<Arc<crate::Project>> = OnceLock::new();
 
-    let mut project = parse(&source)?
-        .and_then(|root| crate::resolver::resolve(root, vec![]))
-        .map_err(|e| Error::from_diagnostics(e, &source))?;
-    project.source = source;
-    Ok(project)
+fn std_project() -> Result<Arc<crate::Project>, error::Error> {
+    if let Some(cached) = STD_PROJECT.get() {
+        return Ok(Arc::clone(cached));
+    }
+
+    let project = Arc::new(check(std_source(), CheckParams::new().no_std())?);
+    let _ = STD_PROJECT.set(project);
+    Ok(Arc::clone(STD_PROJECT.get().unwrap()))
 }
 
 impl CheckParams {
@@ -197,6 +195,11 @@ impl CheckParams {
             name: name.into(),
             inner: project,
         });
+        self
+    }
+
+    pub fn no_std(mut self) -> Self {
+        self.no_std = true;
         self
     }
 }

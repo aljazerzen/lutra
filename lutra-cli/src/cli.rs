@@ -460,7 +460,10 @@ pub struct DocsCommand {
 
 pub fn docs(cmd: DocsCommand) -> anyhow::Result<()> {
     let project = if cmd.discover.project.as_ref().is_some_and(|p| p == ":std:") {
-        lutra_compiler::check_std()?
+        let source = lutra_compiler::std_source();
+        let mut params = cmd.check;
+        params.no_std = true;
+        lutra_compiler::check(source, params)?
     } else {
         let source_tree = lutra_compiler::discover(cmd.discover.clone())?;
         lutra_compiler::check(source_tree, cmd.check)?

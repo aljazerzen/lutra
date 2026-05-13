@@ -773,8 +773,7 @@ fn _signature(source: &str) -> String {
     let tree = SourceTree::single("".into(), source.to_string());
     let project = check(tree, Default::default()).expect("type error");
     let (name, def) = (project.root_module.iter_defs())
-        .filter(|(n, _)| *n != crate::resolver::NS_STD)
-        .next()
+        .find(|(n, _)| *n != crate::resolver::NS_STD)
         .unwrap();
     print_def_signature(name, def).expect("no signature")
 }

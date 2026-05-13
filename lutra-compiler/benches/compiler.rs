@@ -24,12 +24,12 @@ fn bench_check(c: &mut Criterion) {
     let mut group = c.benchmark_group("check");
 
     group.bench_function("std_lib", |b| {
-        b.iter(_bench::check_std);
+        b.iter(|| lutra_compiler::check(lutra_compiler::std_source(), CheckParams::new().no_std()));
     });
 
     let source = SourceTree::single("".into(), PROG.to_string());
     group.bench_function("source", |b| {
-        b.iter(|| check(black_box(source.clone()), CheckParams::default()).unwrap());
+        b.iter(|| check(black_box(source.clone()), CheckParams::new()).unwrap());
     });
     group.finish();
 }
@@ -71,7 +71,7 @@ fn bench_parser(c: &mut Criterion) {
 fn bench_compile(c: &mut Criterion) {
     // Build the project once; we only want to measure the compile step.
     let source = SourceTree::single("".into(), PROG.to_string());
-    let project = check(source, CheckParams::default()).unwrap();
+    let project = check(source, CheckParams::new()).unwrap();
 
     let mut group = c.benchmark_group("compile");
     group.bench_function("bytecode", |b| {

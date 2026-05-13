@@ -18,7 +18,7 @@ pub mod pr;
 pub mod printer;
 
 pub use bytecoding::compile_program as bytecode_program;
-pub use check::{CheckParams, check, check_overlay, check_std, std_source};
+pub use check::{CheckParams, check, check_overlay, std_source};
 pub use codespan::Span;
 pub use discover::{DiscoverParams, discover};
 pub use format::format;
@@ -97,7 +97,6 @@ pub mod _lexer {
 // Exposed for benchmarks.
 #[doc(hidden)]
 pub mod _bench {
-    pub use crate::check::{check_std, parse_std, std_source};
     pub use crate::diagnostic::Diagnostic;
     pub use crate::parser::{parse_expr, parse_source};
 }
