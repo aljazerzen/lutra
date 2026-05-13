@@ -46,17 +46,18 @@ where
         ))
         .labelled("definition");
 
-        let def = (doc_comment().or_not())
+        let def = (doc_annotation().or_not())
             .then(annotations.clone())
             .then(def_kind)
-            .map_with(|((doc_comment, annotations), (name, def_kind)), e| {
-                let span = e.span();
+            .map_with(|((doc_ann, ann), (name, def_kind)), e| {
+                let mut annotations = Vec::with_capacity(ann.len() + 1);
+                annotations.extend(doc_ann);
+                annotations.extend(ann);
                 let def = Def {
                     kind: def_kind,
-                    span: Some(span),
+                    span: Some(e.span()),
                     span_name: Some(name.1),
                     annotations,
-                    doc_comment,
                 };
                 (name.0, def)
             });
@@ -66,11 +67,14 @@ where
             .collect::<Vec<_>>()
             .validate(|defs, e, emitter| into_module(defs, e.span(), emitter));
 
-        let self_annotation = ctrl('@')
-            .then(ctrl('!'))
-            .ignore_then(expr.map(Box::new))
-            .map(|expr| Annotation { expr })
-            .labelled("annotation");
+        let self_annotation = choice((
+            ctrl('@')
+                .then(ctrl('!'))
+                .ignore_then(expr.map(Box::new))
+                .map(|expr| Annotation { expr })
+                .labelled("annotation"),
+            self_doc_comment(),
+        ));
 
         self_annotation
             .repeated()
@@ -130,7 +134,8 @@ fn set_content_span(mut module: ModuleDef, mut span: Span) -> ModuleDef {
     module
 }
 
-fn doc_comment<'src, I>() -> impl Parser<'src, I, DocComment, PExtra<'src>> + Clone + 'src
+/// Parses `## ...` doc comment lines into a `@doc("...")` annotation.
+fn doc_annotation<'src, I>() -> impl Parser<'src, I, Annotation, PExtra<'src>> + Clone + 'src
 where
     I: ValueInput<'src, Token = TokenKind, Span = Span>,
 {
@@ -140,11 +145,23 @@ where
     .repeated()
     .at_least(1)
     .collect::<Vec<_>>()
-    .map_with(|lines: Vec<String>, e| DocComment {
-        content: lines.join("\n"),
-        span: e.span(),
-    })
+    .map_with(|lines: Vec<String>, e| Annotation::new_doc(lines.join("\n"), e.span()))
     .labelled("doc comment")
+}
+
+/// Parses `#! ...` self doc comment lines into a `@!doc("...")` annotation.
+fn self_doc_comment<'src, I>() -> impl Parser<'src, I, Annotation, PExtra<'src>> + Clone + 'src
+where
+    I: ValueInput<'src, Token = TokenKind, Span = Span>,
+{
+    select! {
+        TokenKind::DocCommentSelf(text) => text,
+    }
+    .repeated()
+    .at_least(1)
+    .collect::<Vec<_>>()
+    .map_with(|lines: Vec<String>, e| Annotation::new_doc(lines.join("\n"), e.span()))
+    .labelled("self doc comment")
 }
 
 struct NameAndSpan(String, Span);
@@ -311,41 +328,8 @@ where
 
 #[cfg(test)]
 mod tests {
-    use insta::assert_debug_snapshot;
-
     use crate::parser::test::parse_with;
-    use chumsky::prelude::Parser as _;
-
     use super::*;
-
-    #[test]
-    fn test_doc_comment() {
-        assert_debug_snapshot!(parse_with(r#"
-        ## doc comment
-        ## another line
-
-        "#, |_| Box::new(doc_comment())), @r#"
-        Ok(
-            DocComment {
-                content: "doc comment\nanother line",
-                span: 0:9-47,
-            },
-        )
-        "#);
-    }
-
-    #[test]
-    fn test_doc_comment_or_not() {
-        // In chumsky 0.12, parse() requires consuming all input, so we test
-        // or_not() on empty input to verify it returns None without errors.
-        assert_debug_snapshot!(parse_with(r#""#, |_| Box::new(doc_comment().or_not())).unwrap(), @"None");
-        assert_debug_snapshot!(parse_with(r#"hello"#, |_| Box::new(doc_comment().or_not().then(ident_part()))).unwrap(), @r###"
-        (
-            None,
-            "hello",
-        )
-        "###);
-    }
 
     #[test]
     fn test_module_annotation_basic() {

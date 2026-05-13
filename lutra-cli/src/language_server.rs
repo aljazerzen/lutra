@@ -274,7 +274,6 @@ fn get_hover(ctx: PositionContext) -> Option<Hover> {
     let checked = ctx.checked()?;
     let symbol = checked.find_by_span(ctx.source_id, ctx.offset)?;
 
-    // TODO: show the inferred type for local bindings (let, parameters).
     let target_path = symbol.target_path.as_ref()?;
     let def = checked.root_module.get(target_path)?;
 
@@ -286,11 +285,11 @@ fn get_hover(ctx: PositionContext) -> Option<Hover> {
         content.push_str("\n```");
     }
 
-    if let Some(doc) = &def.doc_comment {
+    if let Some(doc) = def.get_doc() {
         if !content.is_empty() {
             content.push_str("\n\n");
         }
-        content.push_str(doc.content.trim());
+        content.push_str(doc.trim());
     }
 
     if content.is_empty() {

@@ -47,9 +47,6 @@ generate-precompiled:
     ../../../target/debug/lutra codegen --lutra-bin-path="crate" --project=. ./generated.rs
     cargo fmt -p lutra-bin
 
-generate-docs-std:
-    cargo run -p lutra-cli -- docs --project=:std: website/docs/reference/language/std
-
 bench:
     cargo bench --bench compiler -- --baseline-lenient main
 

@@ -76,6 +76,9 @@ impl PrintSource for (&pr::ModuleDef, Option<crate::Span>) {
     fn print<'c>(&self, p: &mut Printer<'c>) -> Option<()> {
         // self-annotations
         for ann in &self.0.annotations {
+            if try_print_doc_annotation(ann, p, "#! ") {
+                continue;
+            }
             p.push("@!")?;
             ann.expr.print(p)?;
             p.new_line();
@@ -123,21 +126,22 @@ impl PrintSource for (&pr::ModuleDef, Option<crate::Span>) {
     }
 }
 
-impl PrintSource for pr::DocComment {
-    fn print<'c>(&self, p: &mut Printer<'c>) -> Option<()> {
-        p.inject_trivia_leading(Some(self.span.start));
-        for line in self.content.lines() {
-            p.push_unchecked("## ");
-            p.push_unchecked(line);
-            p.new_line();
-        }
-        while p.take_trivia_new_line(self.span.end()).is_some() {}
-        Some(())
+/// Try to print an annotation as a doc comment.
+/// Returns `true` if the annotation was printed.
+fn try_print_doc_annotation(ann: &pr::Annotation, p: &mut Printer, prefix: &str) -> bool {
+    let Some(content) = ann.as_doc() else {
+        return false;
+    };
+    p.inject_trivia_leading(ann.expr.span.map(|s| s.start));
+    for line in content.lines() {
+        p.push_unchecked(prefix);
+        p.push_unchecked(line);
+        p.new_line();
     }
-
-    fn span(&self) -> Option<crate::Span> {
-        unreachable!()
+    if let Some(span) = &ann.expr.span {
+        while p.take_trivia_new_line(span.end()).is_some() {}
     }
+    true
 }
 
 fn print_or_skip<T: PrintSource>(t: &T, p: &mut Printer) {
@@ -165,15 +169,12 @@ type NamedDef<'a> = (&'a str, &'a pr::Def);
 impl PrintSource for NamedDef<'_> {
     #[tracing::instrument(name = "d", skip_all)]
     fn print<'c>(&self, p: &mut Printer<'c>) -> Option<()> {
-        if let Some(doc_comment) = &self.1.doc_comment {
-            doc_comment.print(p)?;
-        }
+        for (i, ann) in self.1.annotations.iter().enumerate() {
+            p.inject_trivia_leading(ann.expr.span.map(|s| s.start));
 
-        if let Some(a) = self.1.annotations.first() {
-            p.inject_trivia_leading(a.expr.span.map(|s| s.start));
-        }
-
-        for ann in &self.1.annotations {
+            if try_print_doc_annotation(ann, p, "## ") {
+                continue;
+            }
             p.push("@")?;
             ann.expr.print(p)?;
             p.new_line();

@@ -1,4 +1,4 @@
-# `std`
+# `std` - Standard library
 
 ## Modules
 

@@ -329,6 +329,12 @@ impl From<Range> for ExprKind {
     }
 }
 
+impl From<Call> for ExprKind {
+    fn from(value: Call) -> Self {
+        ExprKind::Call(value)
+    }
+}
+
 impl From<Variant> for ExprKind {
     fn from(value: Variant) -> Self {
         ExprKind::Variant(value)

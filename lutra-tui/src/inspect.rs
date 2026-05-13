@@ -42,9 +42,9 @@ fn format_module<'a>(
         ]);
     };
 
-    let doc = (project.root_module.get(&path)).and_then(|def| def.doc_comment.as_ref());
+    let doc = project.root_module.get_doc_at(&path);
     if let Some(doc) = doc {
-        for line in doc.content.lines() {
+        for line in doc.lines() {
             view.push_line(Line::styled(line.trim(), Style::muted()));
         }
     }

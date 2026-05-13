@@ -7,19 +7,19 @@ It is organized for lookup, not as a tutorial.
 
 <div class="grid cards" markdown>
 
--   :lucide-book-type:{.lg .baseline} [__Language__](./language/syntax)
+-   :material-book:{.lg .baseline} [__Language__](./language/syntax)
 
     ---
 
     Syntax, literals, types, expressions, patterns, modules
 
--   :lucide-app-window:{.lg .baseline} [__Project__](./project/runner-model)
+-   :material-folder-play:{.lg .baseline} [__Project__](./project/runner-model)
 
     ---
 
     Runners, binary format, and data representations
 
--   :lucide-terminal:{.lg .baseline} [__CLI__](./cli)
+-   :material-console-line:{.lg .baseline} [__CLI__](./cli)
 
     ---
 

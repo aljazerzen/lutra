@@ -29,7 +29,6 @@ pub fn generate_md_pages(project: &Project) -> anyhow::Result<Vec<MarkdownPage>>
         &project.root_module,
         &project.root_module,
         &pr::Path::empty(),
-        "",
         &path_prefix,
         &dependencies,
     )
@@ -65,11 +64,11 @@ fn render_module<'a>(
     module: &'a pr::ModuleDef,
     root: &'a pr::ModuleDef,
     path: &pr::Path,
-    doc_comment: &'a str,
     path_prefix: &pr::Path,
     dependencies: &HashSet<&'a str>,
 ) -> anyhow::Result<Vec<MarkdownPage>> {
-    let (title, doc) = parse_doc_comment(doc_comment);
+    let doc = root.get_doc_at(path).unwrap_or_default();
+    let (title, doc) = parse_doc_comment(doc);
     let path_display = path_prefix.clone() + path.clone();
 
     let mut content = String::new();
@@ -95,33 +94,28 @@ fn render_module<'a>(
     }
 
     // Partition defs into child modules and leaf definitions (source order preserved).
-    let mut child_modules: Vec<(&String, &pr::ModuleDef, &pr::Def)> = Vec::new();
-    let mut leaf_defs: Vec<(&String, &pr::Def)> = Vec::new();
-
+    let mut sub_modules: Vec<(&String, &pr::Def)> = Vec::new();
+    let mut leafs: Vec<(&String, &pr::Def)> = Vec::new();
     for (name, def) in module.iter_defs() {
         if path.is_empty() && dependencies.contains(name.as_str()) {
             continue;
         }
         match &def.kind {
             pr::DefKind::Import(_) => {}
-            pr::DefKind::Module(submodule) => child_modules.push((name, submodule, def)),
-            _ => leaf_defs.push((name, def)),
+            pr::DefKind::Module(_) => sub_modules.push((name, def)),
+            _ => leafs.push((name, def)),
         }
     }
 
     // --- Modules section ---
-    if !child_modules.is_empty() {
+    if !sub_modules.is_empty() {
         content += "## Modules\n\n";
-        for (name, _, def) in &child_modules {
+        for (name, def) in &sub_modules {
             let child_path = path.clone() + pr::Path::from_name(*name);
             let Some(link) = relative_link(path, &child_path, root) else {
                 continue;
             };
-            let child_doc = def
-                .doc_comment
-                .as_ref()
-                .map(|d| d.content.as_str())
-                .unwrap_or_default();
+            let child_doc = def.get_doc().unwrap_or_default();
             let (child_title, _) = parse_doc_comment(child_doc);
 
             content += &format!("- [`{name}`]({link})");
@@ -134,7 +128,7 @@ fn render_module<'a>(
     }
 
     // --- Leaf definitions ---
-    for (name, def) in &leaf_defs {
+    for (name, def) in &leafs {
         let kind = match &def.kind {
             pr::DefKind::Expr(e) if e.constant => "const",
             pr::DefKind::Expr(_) => "func",
@@ -148,9 +142,9 @@ fn render_module<'a>(
         content += "```lutra\n";
         content += &signature;
         content += "\n```\n";
-        if let Some(doc) = &def.doc_comment {
+        if let Some(doc) = def.get_doc() {
             content += "\n";
-            content += &resolve_doc_links(&doc.content, path, root);
+            content += &resolve_doc_links(doc, path, root);
             content += "\n";
         }
         content += "\n";
@@ -162,18 +156,13 @@ fn render_module<'a>(
         content,
     }];
 
-    for (name, submodule, def) in child_modules {
+    for (name, def) in sub_modules {
         let child_path = path.clone() + pr::Path::from_name(name);
-        let child_doc = def
-            .doc_comment
-            .as_ref()
-            .map(|d| d.content.as_str())
-            .unwrap_or_default();
+        let sub_module = def.kind.as_module().unwrap();
         pages.extend(render_module(
-            submodule,
+            sub_module,
             root,
             &child_path,
-            child_doc,
             path_prefix,
             dependencies,
         )?);

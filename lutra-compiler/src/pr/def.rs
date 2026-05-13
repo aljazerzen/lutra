@@ -2,7 +2,7 @@ use enum_as_inner::EnumAsInner;
 use indexmap::IndexMap;
 use itertools::Itertools;
 
-use super::{Expr, Path, Ty};
+use super::{Call, CallArg, Expr, ExprKind, Literal, Path, Ty};
 use crate::Span;
 
 /// Definition.
@@ -11,8 +11,6 @@ pub struct Def {
     pub kind: DefKind,
 
     pub annotations: Vec<Annotation>,
-
-    pub doc_comment: Option<DocComment>,
 
     /// Code span of the whole definition (including doc comments and annotations)
     pub span: Option<Span>,
@@ -137,6 +135,14 @@ impl ModuleDef {
         }
         paths
     }
+
+    pub fn get_doc_at(&self, fq: &Path) -> Option<&str> {
+        if fq.is_empty() {
+            get_doc(&self.annotations)
+        } else {
+            self.get(fq)?.get_doc()
+        }
+    }
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -211,10 +217,40 @@ pub struct Annotation {
     pub expr: Box<Expr>,
 }
 
-#[derive(Debug, Clone, PartialEq)]
-pub struct DocComment {
-    pub content: String,
-    pub span: Span,
+impl Annotation {
+    pub fn new(name: &str, args: Vec<CallArg>, span: Span) -> Self {
+        let subject = Box::new(Expr::new_with_span(Path::from_name(name), span));
+        let expr = Box::new(Expr::new_with_span(Call { subject, args }, span));
+        Annotation { expr }
+    }
+
+    /// Construct a `@doc("...")` annotation.
+    pub fn new_doc(content: String, span: Span) -> Self {
+        let content = Expr::new_with_span(Literal::Text(content), span);
+        Self::new("doc", vec![CallArg::simple(content)], span)
+    }
+
+    pub fn as_doc(&self) -> Option<&str> {
+        let ExprKind::Call(call) = &self.expr.kind else {
+            return None;
+        };
+        let ExprKind::Ident(path) = &call.subject.kind else {
+            return None;
+        };
+        if path.len() == 1
+            && path.first() == "doc"
+            && let Some(arg) = call.args.first()
+            && let ExprKind::Literal(super::Literal::Text(text)) = &arg.expr.kind
+        {
+            return Some(text.as_str());
+        }
+        None
+    }
+}
+
+/// Extract the doc string from a `@doc("...")` annotation, if present.
+pub fn get_doc(annotations: &[Annotation]) -> Option<&str> {
+    annotations.iter().find_map(Annotation::as_doc)
 }
 
 impl Def {
@@ -222,11 +258,15 @@ impl Def {
         Def {
             kind: kind.into(),
             annotations: Vec::new(),
-            doc_comment: None,
 
             span: None,
             span_name: None,
         }
+    }
+
+    pub fn get_doc(&self) -> Option<&str> {
+        get_doc(&self.annotations)
+            .or_else(|| self.kind.as_module().and_then(|m| get_doc(&m.annotations)))
     }
 }
 

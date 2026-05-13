@@ -59,8 +59,9 @@
 .md-typeset .grid.cards>ol>li>hr,
 .md-typeset .grid.cards>ul>li>hr,
 .md-typeset .grid>.card>hr {
-  margin-top: 0.3em;
-  margin-bottom: 0.3em;
+  margin-top: 0;
+  margin-bottom: -0.2rem;
+  border-bottom: 1px solid var(--md-default-fg-color--lighter);
 }
 
 .md-typeset .grid.cards>ol>li:focus-within,

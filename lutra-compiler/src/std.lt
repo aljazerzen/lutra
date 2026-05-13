@@ -1,4 +1,5 @@
 @!project(name = "std")
+#! Standard library
 
 # --- Utils ---
 

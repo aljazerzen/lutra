@@ -1,6 +1,9 @@
 _default:
     just --list
 
+generate-std:
+    cargo run -p lutra-cli -- docs --project=:std: docs/reference/language/std
+
 serve:
     mprocs \
         'zola serve' \
