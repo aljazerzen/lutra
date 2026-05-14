@@ -370,6 +370,20 @@ fn format_20() {
 }
 
 #[test]
+fn format_21() {
+    assert_snapshot!(_format(r#"
+    import foo::*
+    import foo::(baz, bar)
+    const   x=1
+    "#), @"
+    import foo::*
+    import foo::(bar, baz)
+
+    const x = 1
+    ")
+}
+
+#[test]
 fn trivia_00() {
     assert_snapshot!(_format(r#"
     # TODO

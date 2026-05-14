@@ -99,9 +99,16 @@ impl PrintSource for (&pr::ModuleDef, Option<crate::Span>) {
             p.new_line();
         }
 
+        // prepare & sort
+        let imports = self.0.imports.iter().map(|def| ("", def));
+        let defs = self.0.defs.iter().map(|(name, def)| (name.as_str(), def));
+        let mut defs: Vec<NamedDef> = imports.chain(defs).collect();
+        defs.sort_by_key(|(_, def)| def.span.map(|s| s.start).unwrap_or(u32::MAX));
+
         // defs
         let mut last: Option<&pr::Def> = None;
-        for (i, (name, def)) in self.0.defs.iter().enumerate() {
+        for (i, named_def) in defs.into_iter().enumerate() {
+            let def = named_def.1;
             if i > 0 {
                 // inject trailing comments of the prev def
                 p.inject_trivia_prev_inline(def.span.map(|s| s.start));
@@ -122,7 +129,6 @@ impl PrintSource for (&pr::ModuleDef, Option<crate::Span>) {
             }
 
             // print the def (and emit one edit chunk per definition)
-            let named_def: NamedDef = (name.as_str(), def);
             print_or_skip(&named_def, p);
 
             last = Some(def);

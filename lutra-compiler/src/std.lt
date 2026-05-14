@@ -113,7 +113,8 @@ type Ordering: enum {less, equal, greater}
 
 ## Tests if values are equal. Used by `==` operator.
 func eq(left: T, right: T): bool
-where T: primitive -> (
+where T: primitive
+-> (
   match cmp(left, right) {
     .equal => true,
     _ => false,
@@ -122,7 +123,8 @@ where T: primitive -> (
 
 ## Tests if values are not equal. Used by `!=` operator.
 func ne(left: T, right: T): bool
-where T: primitive  -> (
+where T: primitive
+-> (
   match cmp(left, right) {
     .equal => false,
     _ => true,
@@ -131,7 +133,8 @@ where T: primitive  -> (
 
 ## Tests if left value is greater than the right. Used by `>` operator.
 func gt(left: T, right: T): bool
-where T: primitive -> (
+where T: primitive
+-> (
   match cmp(left, right) {
     .greater => true,
     _ => false,
@@ -140,7 +143,8 @@ where T: primitive -> (
 
 ## Tests if left value is less than the right. Used by `<` operator.
 func lt(left: T, right: T): bool
-where T: primitive -> (
+where T: primitive
+-> (
   match cmp(left, right) {
     .less => true,
     _ => false,
@@ -149,7 +153,8 @@ where T: primitive -> (
 
 ## Tests if left value is greater or equal to the right. Used by `>=` operator.
 func gte(left: T, right: T): bool
-where T: primitive -> (
+where T: primitive
+-> (
   match cmp(left, right) {
     .less => false,
     _ => true,
@@ -158,7 +163,8 @@ where T: primitive -> (
 
 ## Tests if left value is less or equal to the right. Used by `<=` operator.
 func lte(left: T, right: T): bool
-where T: primitive -> (
+where T: primitive
+-> (
   match cmp(left, right) {
     .greater => false,
     _ => true,
@@ -179,7 +185,7 @@ import option::*
 ## Nullable values
 module option {
   ## Returns `true` iff the value is `.some`.
-  func is_some(value: enum {none, some: T}): bool
+  func is_some(value: T?): bool
   where T
   -> (
     match value {
@@ -190,7 +196,7 @@ module option {
 
   ## Returns `true` iff the value is `.none`.
   ## The inverse of [is_some].
-  func is_none(value: enum {none, some: T}): bool
+  func is_none(value: T?): bool
   where T
   -> (
     match value {
@@ -200,7 +206,7 @@ module option {
   )
 
   ## When value is `.none`, returns a fallback value instead.
-  func or_else(value: enum {none, some: T}, fallback: T): T
+  func or_else(value: T?, fallback: T): T
   where T
   -> (
     match value {
@@ -213,7 +219,7 @@ module option {
   ##
   ## Default value depends on the type. See [super::default].
   ## For numbers it is 0, for booleans it is false.
-  func or_default(value: enum {none, some: T}): T
+  func or_default(value: T?): T
   where T
   -> (
     match value {
@@ -225,10 +231,7 @@ module option {
   ## Zips two options together into an option of a tuple.
   ## Returns `.some({a, b})` only if both `a` and `b` are `.some`.
   # TODO: maybe merge this into std::zip?
-  func zip(
-    a: enum {none, some: A},
-    b: enum {none, some: B},
-  ): enum {none, some: {A, B}}
+  func zip(a: A?, b: B?): enum {none, some: {A, B}}
   where A, B
   -> (
     match a {
@@ -236,49 +239,39 @@ module option {
       .some(a) => match b {
         .none => .none,
         .some(b) => .some({a, b}),
-      }
+      },
     }
   )
 
   ## Maps value in `.some`. Does nothing if the value is `.none`.
   # TODO: maybe merge this into std::map?
-  func map(
-    value: enum {none, some: I},
-    mapper: func (I): O
-  ): enum {none, some: O}
+  func map(value: I?, mapper: func (I): O): O?
   where I, O
   -> (
     match value {
       .none => .none,
-      .some(v) => .some(mapper(v))
+      .some(v) => .some(mapper(v)),
     }
   )
 
   ## Maps value in `.some`. Does nothing if the value is `.none`.
   # TODO: maybe merge this into std::flat_map?
-  func flat_map(
-    value: enum {none, some: I},
-    mapper: func (I): enum {none, some: O}
-  ): enum {none, some: O}
+  func flat_map(value: I?, mapper: func (I): O?): O?
   where I, O
   -> (
     match value {
       .none => .none,
-      .some(v) => mapper(v)
+      .some(v) => mapper(v),
     }
   )
 
   ## When value is `.none` returns fallback, otherwise maps value in `.some`.
-  func map_or(
-    value: enum {none, some: I},
-    fallback: O,
-    mapper: func (I): O
-  ): O
+  func map_or(value: I?, fallback: O, mapper: func (I): O): O
   where I, O
   -> (
     match value {
       .none => fallback,
-      .some(v) => mapper(v)
+      .some(v) => mapper(v),
     }
   )
 }
@@ -286,7 +279,7 @@ module option {
 # --- Array functions ---
 
 ## Returns the item at a zero-based `position`, or `.none` if out of bounds.
-func index(array: [T], position: int64): enum {none, some: T}
+func index(array: [T], position: int64): T?
 where T
 
 ## Returns the number of items in an array.
@@ -313,7 +306,7 @@ where T
 
 ## Returns the first item for which `condition` returns `true`,
 ## or `.none` if no item matches.
-func find(array: [T], condition: func (T): bool): enum {none, some: T}
+func find(array: [T], condition: func (T): bool): T?
 where T
 -> (array | filter(condition) | index(0))
 
@@ -339,7 +332,7 @@ where T: {..}
 ## Applies `mapper` to the array in columnar form.
 ## Equivalent to [to_columnar], then `mapper`, then [from_columnar].
 func map_columnar(
-  x: [I], mapper: func ({for f: F in I do f: [F]}): {for f: F in O do f: [F]}
+  x: [I], mapper: func ({for f: F in I do f: [F]}): {for f: F in O do f: [F]},
 ): [O]
 where I: {..}, O: {..}
 -> (x | to_columnar | mapper | from_columnar)
@@ -433,12 +426,12 @@ where N: int8 | int16 | int32 | int64 | uint8 | uint16 | uint32 | uint64
 
 ## Find the minimum value in the array.
 ## Returns `none` when array is empty.
-func min(array: [T]): enum {none, some: T}
+func min(array: [T]): T?
 where T: primitive
 
 ## Find the maximum value in the array.
 ## Returns `none` when array is empty.
-func max(array: [T]): enum {none, some: T}
+func max(array: [T]): T?
 where T: primitive
 
 ## Compute sum of all number in an array.
@@ -458,9 +451,8 @@ func any(values: [bool]): bool
 
 ## Returns `true` if the haystack array contains an item equal to `needle`.
 func contains(haystack: [T], needle: T): bool
-where T: primitive -> (
-  haystack | filter(x -> eq(x, needle)) | is_empty | not
-)
+where T: primitive
+-> (haystack | filter(x -> eq(x, needle)) | is_empty | not)
 
 # --- Window functions ---
 
@@ -672,10 +664,7 @@ module sql {
   ## ```
   ##
   ## For table identifier format, see documentation of [std::sql::from].
-  func update(
-    const table: text,
-    updater: func (R): enum {none, some: R},
-  ): {}
+  func update(const table: text, updater: func (R): R?): {}
   where R: {..}
 
   ## Evaluates raw SQL.
@@ -793,7 +782,7 @@ module date {
   ## Converts a date into year, month, and day numbers.
   ## Month and day start with 1.
   func to_year_month_day(date: super::Date): {
-    year: int32, month: uint8, day: uint8
+    year: int32, month: uint8, day: uint8,
   }
 }
 
