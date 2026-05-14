@@ -35,7 +35,7 @@ impl NameResolver<'_> {
         Ok(match def {
             pr::DefKind::Expr(var_def) => pr::DefKind::Expr(self.fold_expr_def(var_def)?),
             pr::DefKind::Ty(ty_def) => pr::DefKind::Ty(self.fold_type_def(ty_def)?),
-
+            pr::DefKind::Anno(ann_def) => pr::DefKind::Anno(fold::fold_anno_def(self, ann_def)?),
             pr::DefKind::Module(_) | pr::DefKind::Import(_) => {
                 unreachable!()
             }
@@ -284,7 +284,7 @@ impl NameResolver<'_> {
             _ => (pr::Path::new(def_mod_fq), pr::Path::new(steps)),
         };
 
-        let base_def = (self.root.get_submodule(base_path.as_steps()))
+        let base_def = (self.root.get_module(base_path.as_steps()))
             .ok_or_else(|| Diagnostic::new_custom("unknown name"))?;
 
         self.lookup_in_module(base_def, base_path, relative)

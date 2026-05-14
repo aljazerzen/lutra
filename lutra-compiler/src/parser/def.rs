@@ -32,7 +32,7 @@ where
 
         let annotations = ctrl('@')
             .ignore_then(expr.clone().map(Box::new))
-            .map(|expr| Annotation { expr })
+            .map(|expr| Anno { expr })
             .labelled("annotation")
             .repeated()
             .collect::<Vec<_>>();
@@ -42,7 +42,8 @@ where
             type_def(ty.clone()).boxed(),
             import_def().boxed(),
             func_def(expr.clone(), ty.clone()).boxed(),
-            const_def(expr.clone(), ty).boxed(),
+            const_def(expr.clone(), ty.clone()).boxed(),
+            anno_def(ty).boxed(),
         ))
         .labelled("definition");
 
@@ -71,7 +72,7 @@ where
             ctrl('@')
                 .then(ctrl('!'))
                 .ignore_then(expr.map(Box::new))
-                .map(|expr| Annotation { expr })
+                .map(|expr| Anno { expr })
                 .labelled("annotation"),
             self_doc_comment(),
         ));
@@ -135,7 +136,7 @@ fn set_content_span(mut module: ModuleDef, mut span: Span) -> ModuleDef {
 }
 
 /// Parses `## ...` doc comment lines into a `@doc("...")` annotation.
-fn doc_annotation<'src, I>() -> impl Parser<'src, I, Annotation, PExtra<'src>> + Clone + 'src
+fn doc_annotation<'src, I>() -> impl Parser<'src, I, Anno, PExtra<'src>> + Clone + 'src
 where
     I: ValueInput<'src, Token = TokenKind, Span = Span>,
 {
@@ -145,12 +146,12 @@ where
     .repeated()
     .at_least(1)
     .collect::<Vec<_>>()
-    .map_with(|lines: Vec<String>, e| Annotation::new_doc(lines.join("\n"), e.span()))
+    .map_with(|lines, e| Anno::new_std_doc(lines.join("\n"), e.span()))
     .labelled("doc comment")
 }
 
 /// Parses `#! ...` self doc comment lines into a `@!doc("...")` annotation.
-fn self_doc_comment<'src, I>() -> impl Parser<'src, I, Annotation, PExtra<'src>> + Clone + 'src
+fn self_doc_comment<'src, I>() -> impl Parser<'src, I, Anno, PExtra<'src>> + Clone + 'src
 where
     I: ValueInput<'src, Token = TokenKind, Span = Span>,
 {
@@ -160,7 +161,7 @@ where
     .repeated()
     .at_least(1)
     .collect::<Vec<_>>()
-    .map_with(|lines: Vec<String>, e| Annotation::new_doc(lines.join("\n"), e.span()))
+    .map_with(|lines, e| Anno::new_std_doc(lines.join("\n"), e.span()))
     .labelled("self doc comment")
 }
 
@@ -284,6 +285,21 @@ where
             .map(DefKind::Ty),
         )
         .labelled("type definition")
+}
+
+fn anno_def<'src, I>(
+    ty: impl Parser<'src, I, Ty, PExtra<'src>> + Clone + 'src,
+) -> impl Parser<'src, I, (NameAndSpan, DefKind), PExtra<'src>> + Clone
+where
+    I: ValueInput<'src, Token = TokenKind, Span = Span>,
+{
+    let params = super::types::func_params(ty);
+
+    keyword("anno")
+        .ignore_then(def_name())
+        .then(params)
+        .map(|(name, params)| (name, DefKind::Anno(AnnoDef { params })))
+        .labelled("annotation definition")
 }
 
 fn import_def<'src, I>() -> impl Parser<'src, I, (NameAndSpan, DefKind), PExtra<'src>> + Clone

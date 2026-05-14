@@ -133,6 +133,7 @@ fn render_module<'a>(
             pr::DefKind::Expr(e) if e.constant => "const",
             pr::DefKind::Expr(_) => "func",
             pr::DefKind::Ty(_) => "type",
+            pr::DefKind::Anno(_) => "anno",
             _ => unreachable!(),
         };
         let signature = printer::print_def_signature(name, def)

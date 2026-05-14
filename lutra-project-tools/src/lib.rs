@@ -19,11 +19,11 @@ pub fn update_schema(
 
 /// Find the unique `@schema`-annotated module in the project.
 fn find_schema_module_def(project: &Project) -> Result<Option<pr::Path>, anyhow::Error> {
-    let annotated = project.find_by_annotation("schema");
+    let annotated = project.find_by_anno(pr::Anno::as_std_schema);
 
     match annotated.len() {
         0 => Ok(None),
-        1 => Ok(Some(annotated.into_iter().next().unwrap())),
+        1 => Ok(Some(annotated.into_iter().next().unwrap().0)),
         n => Err(anyhow::anyhow!(
             "found {n} modules annotated with @schema, expected at most one"
         )),
@@ -35,7 +35,7 @@ fn rewrite_module_contents<'p, 'c>(
     def: &'p pr::Path,
     contents: &'c str,
 ) -> Result<codespan::TextEdit<'c>, anyhow::Error> {
-    let module_def = project.root_module.get_submodule(def.as_steps()).unwrap();
+    let module_def = project.root_module.get_module(def.as_steps()).unwrap();
     let span_content = module_def
         .span_content
         .ok_or_else(|| anyhow::anyhow!("@schema module has no content span"))?;

@@ -92,16 +92,39 @@ impl TypeResolver<'_> {
         let fn_ty = func.ty.as_ref().unwrap();
         let fn_ty = fn_ty.kind.as_func().unwrap().clone();
 
-        let args = self.match_args_to_params(args, &fn_ty.params, &metadata, span);
+        let args = self.resolve_call_args(args, &fn_ty.params, metadata, span);
+        Ok(Expr {
+            ty: fn_ty.body.clone(),
+            span,
+            ..Expr::new(ExprKind::Call(Call {
+                subject: func,
+                args,
+            }))
+        })
+    }
 
-        let mut args_resolved = Vec::with_capacity(fn_ty.params.len());
-        for (param, arg) in std::iter::zip(&fn_ty.params, args) {
+    pub fn resolve_call_args(
+        &mut self,
+        args: Vec<CallArg>,
+        params: &[pr::TyFuncParam],
+        metadata: FuncMetadata,
+        span: Option<Span>,
+    ) -> Vec<CallArg> {
+        let args = self.match_args_to_params(args, params, &metadata, span);
+        let mut args_resolved = Vec::with_capacity(params.len());
+        for (param, arg) in std::iter::zip(params, args) {
             let Some(mut arg) = arg else {
                 continue;
             };
 
             // fold
-            arg.expr = self.fold_expr(arg.expr)?;
+            match self.fold_expr(arg.expr) {
+                Ok(e) => arg.expr = e,
+                Err(e) => {
+                    self.diagnostics.push(e);
+                    continue;
+                }
+            }
 
             // validate type
             let who = || metadata.as_who();
@@ -110,6 +133,7 @@ impl TypeResolver<'_> {
                     .unwrap_or_else(self.push_diagnostic());
             }
 
+            // validate const marker
             if param.constant {
                 self.const_validator
                     .validate_is_const(&arg.expr)
@@ -122,15 +146,7 @@ impl TypeResolver<'_> {
 
             args_resolved.push(arg);
         }
-
-        Ok(Expr {
-            ty: fn_ty.body.clone(),
-            span,
-            ..Expr::new(ExprKind::Call(Call {
-                subject: func,
-                args: args_resolved,
-            }))
-        })
+        args_resolved
     }
 
     /// For each given arg, finds the func param that it should pass the value to.

@@ -2306,3 +2306,103 @@ fn call_04() {
     ───╯
     "#);
 }
+
+#[test]
+fn anno_00_happy_path() {
+    insta::assert_snapshot!(_test_ty(r#"
+    anno deprecated(reason: text)
+
+    @deprecated("use new_api instead")
+    const main: int64 = 1
+    "#), @"int64");
+}
+
+#[test]
+fn anno_01_unknown() {
+    insta::assert_snapshot!(_test_err(r#"
+    @nonexistent
+    const main: int64 = 1
+    "#), @"
+    Error:
+       ╭─[ <unknown>:2:6 ]
+       │
+     2 │     @nonexistent
+       │      ─────┬─────
+       │           ╰─────── name does not exist
+    ───╯
+    ");
+}
+
+#[test]
+fn anno_02_wrong_arg_type() {
+    insta::assert_snapshot!(_test_err(r#"
+    anno deprecated(reason: text)
+
+    @deprecated(false)
+    const main: int64 = 1
+    "#), @"
+    [E0006] Error:
+       ╭─[ <unknown>:4:17 ]
+       │
+     4 │     @deprecated(false)
+       │                 ──┬──
+       │                   ╰──── expected type `text`, but found type `bool`
+    ───╯
+    ");
+}
+
+#[test]
+fn anno_03_extra_args() {
+    insta::assert_snapshot!(_test_err(r#"
+    anno schema()
+
+    @schema("extra")
+    const main: int64 = 1
+    "#), @r#"
+    Error:
+       ╭─[ <unknown>:4:6 ]
+       │
+     4 │     @schema("extra")
+       │      ───────┬───────
+       │             ╰───────── expected 0 arguments, but got 1
+    ───╯
+    "#);
+}
+
+#[test]
+fn anno_04_missing_args() {
+    insta::assert_snapshot!(_test_err(r#"
+    anno deprecated(reason: text)
+
+    @deprecated()
+    const main: int64 = 1
+    "#), @"
+    Error:
+       ╭─[ <unknown>:4:6 ]
+       │
+     4 │     @deprecated()
+       │      ──────┬─────
+       │            ╰─────── expected 1 arguments, but got 0
+    ───╯
+    ");
+}
+
+#[test]
+fn anno_05_non_const_arg() {
+    insta::assert_snapshot!(_test_err(r#"
+    anno deprecated(reason: text)
+
+    func reason(): text -> "x"
+
+    @deprecated(reason())
+    const main: int64 = 1
+    "#), @"
+    Error:
+       ╭─[ <unknown>:6:17 ]
+       │
+     6 │     @deprecated(reason())
+       │                 ────┬───
+       │                     ╰───── non-constant expression
+    ───╯
+    ");
+}

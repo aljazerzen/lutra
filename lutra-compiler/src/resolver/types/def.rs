@@ -1,6 +1,7 @@
 use crate::Result;
-use crate::diagnostic::{Diagnostic, WithErrorInfo};
+use crate::diagnostic::{Diagnostic, DiagnosticCode, WithErrorInfo};
 use crate::resolver::NS_STD;
+use crate::resolver::types::functions::FuncMetadata;
 use crate::resolver::types::scope;
 use crate::utils::fold::PrFold;
 use crate::{pr, utils};
@@ -13,6 +14,7 @@ impl super::TypeResolver<'_> {
                 self.resolve_def(fq_ident)?;
             }
         }
+        self.resolve_root_anno();
         Ok(())
     }
 
@@ -37,7 +39,78 @@ impl super::TypeResolver<'_> {
         // put def back in
         let def = self.root_mod.get_mut(fq_ident).unwrap();
         def.kind = def_kind;
+        let annotations = std::mem::take(&mut def.annotations);
+
+        // validate annotations
+        let annotations = (annotations.into_iter())
+            .map(|a| self.resolve_anno(a))
+            .collect();
+
+        // put annotations back in
+        let def = self.root_mod.get_mut(fq_ident).unwrap();
+        def.annotations = annotations;
         Ok(())
+    }
+
+    /// Validates a single annotation expression.
+    /// Returns the annotation unchanged (validation is side-effect only via diagnostics).
+    fn resolve_anno(&mut self, mut ann: pr::Anno) -> pr::Anno {
+        // Extract the (target, args)
+        let args = ann.get_args_mut().map(std::mem::take).unwrap_or_default();
+        let target = match &mut ann.expr.kind {
+            pr::ExprKind::Ident(_) => ann.expr.target.clone(),
+            pr::ExprKind::Call(call) => call.subject.target.clone(),
+            _ => {
+                let d = Diagnostic::new_custom("invalid annotation").with_span(ann.expr.span);
+                self.diagnostics.push(d);
+                return ann;
+            }
+        };
+
+        // Find target def
+        let Some(pr::Ref::Global(target_fq)) = target else {
+            // shouldn't happen after name resolution
+            unreachable!()
+        };
+        let Some(def) = self.root_mod.get(&target_fq) else {
+            // shouldn't happen after name resolution
+            unreachable!()
+        };
+        let pr::DefKind::Anno(ann_def) = &def.kind else {
+            self.diagnostics.push(
+                Diagnostic::new("expected annotation", DiagnosticCode::NAME_KIND)
+                    .with_span(ann.expr.span),
+            );
+            return ann;
+        };
+        let ann_def = ann_def.clone(); // clone to release self.root_mod
+        let metadata = FuncMetadata::default();
+
+        let scope = scope::Scope::new(usize::MAX, scope::ScopeKind::Isolated);
+        self.scopes.push(scope);
+
+        // resolve
+        let args = self.resolve_call_args(args, &ann_def.params, metadata, ann.expr.span);
+
+        let _ = self.finalize_type_vars();
+        self.scopes.pop();
+
+        // place resolved args back
+        if let Some(a) = ann.get_args_mut() {
+            *a = args;
+        }
+        ann
+    }
+
+    fn resolve_root_anno(&mut self) {
+        let annotations = std::mem::take(&mut self.root_mod.annotations);
+
+        let annotations = annotations
+            .into_iter()
+            .map(|a| self.resolve_anno(a))
+            .collect();
+
+        self.root_mod.annotations = annotations;
     }
 
     pub fn resolve_unresolved(
@@ -106,6 +179,13 @@ impl super::TypeResolver<'_> {
                 })
             }
             pr::DefKind::Import(target) => pr::DefKind::Import(target),
+            pr::DefKind::Anno(ann_def) => {
+                let mut ann_def = utils::fold::fold_anno_def(self, ann_def)?;
+                for param in &mut ann_def.params {
+                    param.constant = true;
+                }
+                pr::DefKind::Anno(ann_def)
+            }
         })
     }
 }

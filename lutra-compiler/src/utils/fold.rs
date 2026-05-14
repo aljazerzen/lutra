@@ -158,6 +158,16 @@ pub fn fold_def_kind<T: ?Sized + PrFold>(fold: &mut T, def_kind: DefKind) -> Res
         Ty(type_def) => Ty(fold.fold_type_def(type_def)?),
         Module(module_def) => Module(fold.fold_module_def(module_def)?),
         Import(import_def) => Import(fold.fold_import(import_def)?),
+        Anno(ann_def) => Anno(fold_anno_def(fold, ann_def)?),
+    })
+}
+
+pub fn fold_anno_def<T: ?Sized + PrFold>(
+    fold: &mut T,
+    ann_def: pr::AnnoDef,
+) -> Result<pr::AnnoDef> {
+    Ok(pr::AnnoDef {
+        params: fold_ty_func_params(fold, ann_def.params)?,
     })
 }
 
@@ -362,17 +372,23 @@ pub fn fold_type<T: ?Sized + PrFold>(fold: &mut T, ty: Ty) -> Result<Ty> {
 
 pub fn fold_ty_func<F: ?Sized + PrFold>(fold: &mut F, f: TyFunc) -> Result<TyFunc> {
     Ok(TyFunc {
-        params: f
-            .params
-            .into_iter()
-            .map(|p| fold_ty_func_param(fold, p))
-            .try_collect()?,
+        params: fold_ty_func_params(fold, f.params)?,
         body: f
             .body
             .map(|t| fold.fold_type(*t).map(Box::new))
             .transpose()?,
         ty_params: f.ty_params,
     })
+}
+
+fn fold_ty_func_params<F: ?Sized + PrFold>(
+    fold: &mut F,
+    params: Vec<TyFuncParam>,
+) -> Result<Vec<TyFuncParam>> {
+    params
+        .into_iter()
+        .map(|p| fold_ty_func_param(fold, p))
+        .collect()
 }
 
 pub fn fold_ty_func_param<F: ?Sized + PrFold>(

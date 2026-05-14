@@ -2,7 +2,7 @@ use enum_as_inner::EnumAsInner;
 use indexmap::IndexMap;
 use itertools::Itertools;
 
-use super::{Call, CallArg, Expr, ExprKind, Literal, Path, Ty};
+use super::{Call, CallArg, Expr, ExprKind, Literal, Path, Ref, Ty, TyFuncParam};
 use crate::Span;
 
 /// Definition.
@@ -10,7 +10,7 @@ use crate::Span;
 pub struct Def {
     pub kind: DefKind,
 
-    pub annotations: Vec<Annotation>,
+    pub annotations: Vec<Anno>,
 
     /// Code span of the whole definition (including doc comments and annotations)
     pub span: Option<Span>,
@@ -25,12 +25,13 @@ pub enum DefKind {
     Expr(ExprDef),
     Ty(TyDef),
     Import(ImportDef),
+    Anno(AnnoDef),
 }
 
-impl DefKind {
-    pub fn dummy() -> Self {
-        DefKind::Module(ModuleDef::default())
-    }
+/// Annotation type definition. Introduced with `anno name(const params...)`.
+#[derive(Debug, PartialEq, Clone)]
+pub struct AnnoDef {
+    pub params: Vec<TyFuncParam>,
 }
 
 #[derive(PartialEq, Clone, Default)]
@@ -40,7 +41,7 @@ pub struct ModuleDef {
     pub defs: IndexMap<String, Def>,
 
     // Self-annotations, defined within the module
-    pub annotations: Vec<Annotation>,
+    pub annotations: Vec<Anno>,
 
     /// Span covering the content of this module, i.e. the region inside the
     /// braces for inline modules, or the whole file body for file-based
@@ -51,7 +52,7 @@ pub struct ModuleDef {
 impl ModuleDef {
     /// Get definition by fully qualified ident.
     pub fn get(&self, fq_ident: &Path) -> Option<&Def> {
-        let sub_module = self.get_submodule(fq_ident.parent()?)?;
+        let sub_module = self.get_module(fq_ident.parent()?)?;
         sub_module.defs.get(fq_ident.last())
     }
 
@@ -76,7 +77,7 @@ impl ModuleDef {
         module.defs.get_mut(ident.last())
     }
 
-    pub fn get_submodule<'a>(&'a self, path: &[String]) -> Option<&'a ModuleDef> {
+    pub fn get_module<'a>(&'a self, path: &[String]) -> Option<&'a ModuleDef> {
         let mut curr_mod = self;
         for step in path {
             let def = curr_mod.defs.get(step)?;
@@ -136,11 +137,19 @@ impl ModuleDef {
         paths
     }
 
-    pub fn get_doc_at(&self, fq: &Path) -> Option<&str> {
+    pub fn get_doc_at<'a>(&'a self, fq: &Path) -> Option<&'a str> {
+        self.get_anno_at(fq, Anno::as_std_doc)
+    }
+
+    pub fn get_anno_at<'a, R: 'a>(
+        &'a self,
+        fq: &Path,
+        matcher: impl Fn(&'a Anno) -> Option<R>,
+    ) -> Option<R> {
         if fq.is_empty() {
-            get_doc(&self.annotations)
+            self.annotations.iter().find_map(matcher)
         } else {
-            self.get(fq)?.get_doc()
+            self.get(fq)?.annotations.iter().find_map(matcher)
         }
     }
 }
@@ -213,44 +222,76 @@ impl ImportKind {
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct Annotation {
+pub struct Anno {
     pub expr: Box<Expr>,
 }
 
-impl Annotation {
-    pub fn new(name: &str, args: Vec<CallArg>, span: Span) -> Self {
-        let subject = Box::new(Expr::new_with_span(Path::from_name(name), span));
+impl Anno {
+    pub fn new(name: Path, args: Vec<CallArg>, span: Span) -> Self {
+        let subject = Box::new(Expr::new_with_span(name, span));
         let expr = Box::new(Expr::new_with_span(Call { subject, args }, span));
-        Annotation { expr }
+        Anno { expr }
     }
 
-    /// Construct a `@doc("...")` annotation.
-    pub fn new_doc(content: String, span: Span) -> Self {
-        let content = Expr::new_with_span(Literal::Text(content), span);
-        Self::new("doc", vec![CallArg::simple(content)], span)
+    pub fn get_args_mut(&mut self) -> Option<&mut Vec<CallArg>> {
+        self.expr.kind.as_call_mut().map(|c| &mut c.args)
     }
 
-    pub fn as_doc(&self) -> Option<&str> {
-        let ExprKind::Call(call) = &self.expr.kind else {
-            return None;
-        };
-        let ExprKind::Ident(path) = &call.subject.kind else {
-            return None;
-        };
-        if path.len() == 1
-            && path.first() == "doc"
-            && let Some(arg) = call.args.first()
-            && let ExprKind::Literal(super::Literal::Text(text)) = &arg.expr.kind
+    pub fn as_named<'a>(&'a self, name: &[&str]) -> Option<&'a [CallArg]> {
+        if is_named_fq(&self.expr, name) {
+            return Some(&[]);
+        }
+        if let ExprKind::Call(call) = &self.expr.kind
+            && is_named_fq(&call.subject, name)
         {
-            return Some(text.as_str());
+            return Some(&call.args);
         }
         None
     }
+
+    // --- std annotations ---
+
+    /// Construct a `@std::doc("...")` annotation.
+    pub fn new_std_doc(content: String, span: Span) -> Self {
+        let content = Expr::new_with_span(Literal::Text(content), span);
+        let args = vec![CallArg::simple(content)];
+        Anno::new(Path::new(["std", "doc"].to_vec()), args, span)
+    }
+
+    /// Matches as `@std::doc("...")` annotation.
+    pub fn as_std_doc(&self) -> Option<&str> {
+        let args = self.as_named(&["std", "doc"])?;
+        Some(args.first()?.expr.kind.as_literal()?.as_text()?)
+    }
+
+    /// Matches as `@std::package(name = "...")` annotation.
+    pub fn as_std_package(&self) -> Option<&str> {
+        let args = self.as_named(&["std", "package"])?;
+        Some(args.first()?.expr.kind.as_literal()?.as_text()?)
+    }
+
+    /// Matches as `@std::schema` annotation.
+    pub fn as_std_schema(&self) -> Option<()> {
+        let _ = self.as_named(&["std", "schema"])?;
+        Some(())
+    }
+
+    /// Matches as `@std::rust_derive([...])` annotation.
+    pub fn as_std_rust_derive(&self) -> Option<Vec<&str>> {
+        let args = self.as_named(&["std", "rust_derive"])?;
+        let items = args.first()?.expr.kind.as_array()?;
+        items
+            .iter()
+            .map(|i| Some(i.kind.as_literal()?.as_text()?.as_str()))
+            .collect()
+    }
 }
 
-/// Extract the doc string from a `@doc("...")` annotation, if present.
-pub fn get_doc(annotations: &[Annotation]) -> Option<&str> {
-    annotations.iter().find_map(Annotation::as_doc)
+fn is_named_fq(expr: &Expr, fq: &[&str]) -> bool {
+    if let Some(Ref::Global(target)) = &expr.target {
+        return target.as_steps() == fq;
+    }
+    expr.kind.as_ident().is_some_and(|i| i.as_steps() == fq)
 }
 
 impl Def {
@@ -264,9 +305,22 @@ impl Def {
         }
     }
 
+    pub fn dummy() -> Self {
+        Def::new(DefKind::dummy())
+    }
+
     pub fn get_doc(&self) -> Option<&str> {
-        get_doc(&self.annotations)
-            .or_else(|| self.kind.as_module().and_then(|m| get_doc(&m.annotations)))
+        self.get_anno(Anno::as_std_doc)
+    }
+
+    pub fn get_anno<'a, R: 'a>(&'a self, matcher: impl Fn(&'a Anno) -> Option<R>) -> Option<R> {
+        self.annotations.iter().find_map(matcher)
+    }
+}
+
+impl DefKind {
+    pub fn dummy() -> Self {
+        DefKind::Module(ModuleDef::default())
     }
 }
 

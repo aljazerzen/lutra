@@ -33,7 +33,13 @@ impl PrFold for Desugarator {
         }
 
         // defs
-        for (name, def) in module_def.defs {
+        for (name, mut def) in module_def.defs {
+            // move self-annotation into Def
+            if let Some(sub_module) = def.kind.as_module_mut() {
+                def.annotations = std::mem::take(&mut sub_module.annotations);
+            }
+
+            // desugar
             defs.insert(name, self.fold_def(def)?);
         }
 

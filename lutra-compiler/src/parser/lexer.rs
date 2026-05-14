@@ -87,6 +87,7 @@ fn lexer<'src>() -> impl LtLexer<'src, Vec<Token>> {
     let literal = literal().map(TokenKind::Literal);
 
     let keyword = choice((
+        just("anno").to(TokenKind::Keyword("anno")),
         just("as").to(TokenKind::Keyword("as")),
         just("const").to(TokenKind::Keyword("const")),
         just("do").to(TokenKind::Keyword("do")),

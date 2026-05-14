@@ -1,12 +1,14 @@
 submodule
 
+import std::rust_derive
+
 type Program: {
   externals: [ExternalSymbol],
   main: Expr,
   defs: [project::ir::TyDef],
 }
 
-@derive(["Debug", "Clone", "PartialEq", "Eq", "Hash"])
+@rust_derive(["Debug", "Clone", "PartialEq", "Eq", "Hash"])
 type ExternalSymbol: {
   id: text,
   layout_args: [uint32],
@@ -16,7 +18,7 @@ type Expr: {
   kind: ExprKind,
 }
 
-@derive(["Debug", "Clone", "enum_as_inner::EnumAsInner"])
+@rust_derive(["Debug", "Clone", "enum_as_inner::EnumAsInner"])
 type ExprKind: enum {
   Pointer: Sid,
   Literal: [uint8],
@@ -37,7 +39,7 @@ type ExprKind: enum {
 ## - 0b01xxxxxx - local bindings
 ## - 0b10xxxxxx - function scopes
 ## - 0b11xxxxxx - unused
-@derive(["Debug", "Clone", "Copy", "PartialEq", "Eq", "Hash"])
+@rust_derive(["Debug", "Clone", "Copy", "PartialEq", "Eq", "Hash"])
 type Sid: uint32
 
 type Call: {
@@ -100,7 +102,7 @@ type SwitchBranch: {
   value: Expr,
 }
 
-@derive(["Debug", "Clone", "PartialEq", "Default"])
+@rust_derive(["Debug", "Clone", "PartialEq", "Default"])
 type TyLayout: {
   head_size: uint32,
   body_ptrs: [uint32],

@@ -83,7 +83,7 @@ fn codegen_module(
 
     // iterate pr defs (which keep the order in the source)
     let root_mod = &ctx.project.root_module;
-    let pr_mod = root_mod.get_submodule(&module_path).unwrap();
+    let pr_mod = root_mod.get_module(&module_path).unwrap();
     for (name, pr_def) in &pr_mod.defs {
         let Some(decl) = module.decls.iter().find(|d| &d.name == name) else {
             continue;

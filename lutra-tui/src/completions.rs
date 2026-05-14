@@ -260,6 +260,7 @@ impl DefIcon {
             }
             pr::DefKind::Ty(_) => Some(DefIcon::Type),
             pr::DefKind::Import(_) => None,
+            pr::DefKind::Anno(_) => None, // TODO?
         }
     }
 }

@@ -7,7 +7,7 @@ use crate::rust::Context;
 
 pub fn write_tys(
     w: &mut impl Write,
-    tys: Vec<(ir::Ty, &[pr::Annotation])>,
+    tys: Vec<(ir::Ty, &[pr::Anno])>,
     ctx: &mut Context,
 ) -> Result<Vec<ir::Ty>, std::fmt::Error> {
     let mut all_tys = Vec::new();
@@ -39,7 +39,7 @@ pub fn write_tys_in_buffer(
 pub fn write_ty_def(
     w: &mut impl Write,
     ty: &ir::Ty,
-    annotations: &[pr::Annotation],
+    annotations: &[pr::Anno],
     ctx: &mut Context,
 ) -> Result<(), std::fmt::Error> {
     let lutra_bin = &ctx.options.lutra_bin_path;
@@ -47,27 +47,10 @@ pub fn write_ty_def(
     let name = ty.name.as_ref().unwrap();
 
     // derive traits
-    let mut derive_traits = vec![];
-
-    let derive_annotation = annotations.iter().find(|x| {
-        x.expr
-            .kind
-            .as_call()
-            .and_then(|c| c.subject.kind.as_ident())
-            .is_some_and(|i| i.last() == "derive")
-    });
-    if let Some(derive_annotation) = derive_annotation {
-        let c = derive_annotation.expr.kind.as_call().unwrap();
-        let values = c.args[0].expr.kind.as_array().unwrap();
-        derive_traits.extend(
-            values
-                .iter()
-                .map(|e| e.kind.as_literal().unwrap().as_text().unwrap().clone()),
-        );
-    } else {
-        derive_traits.extend(["Debug".into(), "Clone".into()]);
-    }
-    writeln!(w, "#[derive({})]", derive_traits.join(", "))?;
+    let derive = (annotations.iter())
+        .find_map(pr::Anno::as_std_rust_derive)
+        .unwrap_or_else(|| vec!["Debug", "Clone"]);
+    writeln!(w, "#[derive({})]", derive.join(", "))?;
 
     writeln!(w, "#[allow(non_camel_case_types)]")?;
     match &ty.kind {

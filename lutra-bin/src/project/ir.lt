@@ -1,5 +1,7 @@
 submodule
 
+import std::rust_derive
+
 type Program: {
   main: Expr,
   defs: [TyDef]
@@ -10,7 +12,7 @@ type Expr: {
   ty: Ty,
 }
 
-@derive(["Debug", "Clone", "enum_as_inner::EnumAsInner"])
+@rust_derive(["Debug", "Clone", "enum_as_inner::EnumAsInner"])
 type ExprKind: enum {
   Pointer: Pointer,
   Literal: Literal,
@@ -26,7 +28,7 @@ type ExprKind: enum {
   Switch: [SwitchBranch],
 }
 
-@derive(["Debug", "Clone", "enum_as_inner::EnumAsInner"])
+@rust_derive(["Debug", "Clone", "enum_as_inner::EnumAsInner"])
 type Pointer: enum {
   External: ExternalPtr,
   Binding: uint32,
@@ -37,13 +39,13 @@ type ExternalPtr: {
   id: text,
 }
 
-@derive(["Debug", "Clone"])
+@rust_derive(["Debug", "Clone"])
 type ParameterPtr: {
   function_id: uint32,
   param_position: uint8
 }
 
-@derive(["Debug", "Clone", "PartialEq", "enum_as_inner::EnumAsInner"])
+@rust_derive(["Debug", "Clone", "PartialEq", "enum_as_inner::EnumAsInner"])
 type Literal: enum {
   bool: bool,
   int8: int8,
@@ -111,7 +113,7 @@ type TyDef: {
   ty: Ty,
 }
 
-@derive(["Debug", "Clone"])
+@rust_derive(["Debug", "Clone"])
 type Ty: {
   kind: TyKind,
   layout: enum { None, Some: TyLayout },
@@ -119,7 +121,7 @@ type Ty: {
   variants_recursive: [uint16],
 }
 
-@derive(["Debug", "Clone", "PartialEq", "enum_as_inner::EnumAsInner"])
+@rust_derive(["Debug", "Clone", "PartialEq", "enum_as_inner::EnumAsInner"])
 type TyKind: enum {
   Primitive: TyPrimitive,
 
@@ -134,7 +136,7 @@ type TyKind: enum {
   Ident: Path,
 }
 
-@derive(["Debug", "Clone", "Copy", "PartialEq", "Eq", "Hash"])
+@rust_derive(["Debug", "Clone", "Copy", "PartialEq", "Eq", "Hash"])
 type TyPrimitive: enum {
   bool,
   int8,
@@ -150,31 +152,31 @@ type TyPrimitive: enum {
   text,
 }
 
-@derive(["Debug", "Clone", "PartialEq"])
+@rust_derive(["Debug", "Clone", "PartialEq"])
 type TyTupleField: {
   name: enum { None, Some: text},
   ty: Ty,
 }
 
-@derive(["Debug", "Clone", "PartialEq"])
+@rust_derive(["Debug", "Clone", "PartialEq"])
 type TyEnumVariant: {
   name: text,
   ty: Ty,
 }
 
-@derive(["Debug", "Clone", "PartialEq", "Default"])
+@rust_derive(["Debug", "Clone", "PartialEq", "Default"])
 type TyLayout: {
   head_size: uint32,
   body_ptrs: [uint32],
 }
 
-@derive(["Debug", "Clone", "PartialEq"])
+@rust_derive(["Debug", "Clone", "PartialEq"])
 type TyFunction: {
   params: [Ty],
   body: Ty
 }
 
-@derive(["Debug", "Clone", "PartialEq", "Eq", "PartialOrd", "Ord", "Hash"])
+@rust_derive(["Debug", "Clone", "PartialEq", "Eq", "PartialOrd", "Ord", "Hash"])
 type Path: [text]
 
 type Module: {

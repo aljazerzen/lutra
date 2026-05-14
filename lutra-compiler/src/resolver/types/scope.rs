@@ -254,6 +254,7 @@ impl<'a> TypeResolver<'a> {
                     pr::DefKind::Module(_) => Ok(Named::Module),
 
                     pr::DefKind::Import(_) => unreachable!(),
+                    pr::DefKind::Anno(_) => unreachable!(), // TODO?
                 }
             }
 

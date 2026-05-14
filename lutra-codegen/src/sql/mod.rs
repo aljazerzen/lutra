@@ -55,7 +55,7 @@ fn codegen_module(
 
     // iterate pr defs (which keep the order in the source)
     let root_mod = &ctx.project.root_module;
-    let pr_mod = root_mod.get_submodule(&module_path).unwrap();
+    let pr_mod = root_mod.get_module(&module_path).unwrap();
     for (name, pr_def) in &pr_mod.defs {
         let Some(decl) = module.decls.iter().find(|d| &d.name == name) else {
             continue;
@@ -91,7 +91,7 @@ fn codegen_module(
 
 fn write_tys(
     w: &mut impl Write,
-    tys: Vec<(ir::Ty, &[pr::Annotation])>,
+    tys: Vec<(ir::Ty, &[pr::Anno])>,
     ctx: &mut Context,
 ) -> Result<(), std::fmt::Error> {
     let mut p = Printer {
@@ -116,7 +116,7 @@ impl<'a> Printer<'a> {
     }
 
     /// Generates a type definition.
-    pub fn write_ty_def(&mut self, ty: &ir::Ty, _annotations: &[pr::Annotation]) {
+    pub fn write_ty_def(&mut self, ty: &ir::Ty, _annotations: &[pr::Anno]) {
         let name = ty.name.as_ref().unwrap();
         let table_name = format!("{}s", crate::camel_to_snake(name));
         self.buf += &format!("\nCREATE TABLE {table_name} (\n");

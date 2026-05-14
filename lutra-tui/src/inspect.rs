@@ -14,7 +14,7 @@ pub fn inspect_definition<'p>(program: &str, project: &'p Project) -> Option<Vie
         lutra_compiler::parse_path(program)?
     };
 
-    if let Some(module_def) = project.root_module.get_submodule(path.as_steps()) {
+    if let Some(module_def) = project.root_module.get_module(path.as_steps()) {
         return Some(format_module(path, module_def, project));
     }
 

@@ -12,30 +12,18 @@ pub(crate) fn type_expr<'src, I>() -> impl Parser<'src, I, Ty, PExtra<'src>> + C
 where
     I: ValueInput<'src, Token = TokenKind, Span = Span>,
 {
-    recursive(|nested_type_expr| {
+    recursive(|ty| {
         let primitive = primitive_set().map(TyKind::Primitive);
 
         let ident = expr::path().map(TyKind::Ident);
 
-        let func_params = delimited_by_parenthesis(
-            (ident_part().then_ignore(ctrl(':')).or_not())
-                .ignore_then(nested_type_expr.clone().map(Some))
-                .map(|ty| TyFuncParam {
-                    constant: false,
-                    label: None,
-                    ty,
-                })
-                .separated_by(ctrl(','))
-                .allow_trailing()
-                .collect(),
-            |_| vec![],
-        );
+        let func_params = func_params(ty.clone());
 
         let func = keyword("func")
             .ignore_then(
                 func_params
                     .then_ignore(ctrl(':'))
-                    .then(nested_type_expr.clone().map(Box::new).map(Some))
+                    .then(ty.clone().map(Box::new).map(Some))
                     .map(|(params, body)| TyFunc {
                         params,
                         body,
@@ -49,10 +37,10 @@ where
             .then_ignore(ctrl(':'))
             .then(ident_part())
             .then_ignore(keyword("in"))
-            .then(nested_type_expr.clone().map(Box::new))
+            .then(ty.clone().map(Box::new))
             .then_ignore(keyword("do"))
             .then(ident_part().then_ignore(ctrl(':')).or_not())
-            .then(nested_type_expr.clone().map(Box::new))
+            .then(ty.clone().map(Box::new))
             .map(|((((v_n, v_t), tuple), b_n), b_t)| TyTupleComprehension {
                 tuple,
                 variable_name: v_n,
@@ -66,7 +54,7 @@ where
             ident_part()
                 .then_ignore(ctrl(':'))
                 .or_not()
-                .then(nested_type_expr.clone())
+                .then(ty.clone())
                 .map(|(name, ty)| TyTupleField {
                     name,
                     ty,
@@ -84,7 +72,7 @@ where
                 ident_part()
                     .then(
                         ctrl(':')
-                            .ignore_then(nested_type_expr.clone())
+                            .ignore_then(ty.clone())
                             .or_not()
                             .map_with(|ty, e| {
                                 ty.unwrap_or_else(|| {
@@ -101,11 +89,8 @@ where
             ))
             .labelled("enum");
 
-        let array = delimited_by_brackets(
-            nested_type_expr.map(Box::new).map(TyKind::Array),
-            empty_array,
-        )
-        .labelled("array");
+        let array = delimited_by_brackets(ty.map(Box::new).map(TyKind::Array), empty_array)
+            .labelled("array");
 
         let base = choice((
             primitive.boxed(),
@@ -120,6 +105,26 @@ where
         optional_type(base)
     })
     .labelled("type")
+}
+
+pub(super) fn func_params<'src, I>(
+    ty: impl Parser<'src, I, Ty, PExtra<'src>> + Clone + 'src,
+) -> impl Parser<'src, I, Vec<TyFuncParam>, PExtra<'src>> + Clone + 'src
+where
+    I: ValueInput<'src, Token = TokenKind, Span = Span>,
+{
+    let param = (ident_part().then_ignore(ctrl(':')).or_not())
+        .then(ty.map(Some))
+        .map(|(label, ty)| TyFuncParam {
+            constant: false,
+            label,
+            ty,
+        });
+
+    delimited_by_parenthesis(
+        param.separated_by(ctrl(',')).allow_trailing().collect(),
+        |_| vec![],
+    )
 }
 
 fn optional_type<'src, I>(

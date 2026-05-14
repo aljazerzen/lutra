@@ -44,6 +44,18 @@ pub fn print_def_signature(name: &str, def: &pr::Def) -> Option<String> {
             p.push(ident::display(name))?;
         }
         pr::DefKind::Import(_) => return None,
+        pr::DefKind::Anno(ann_def) => {
+            p.push("anno ")?;
+            p.push(ident::display(name))?;
+            p.push("(")?;
+            for (i, param) in ann_def.params.iter().enumerate() {
+                if i > 0 {
+                    p.push(", ")?;
+                }
+                param.print(p)?;
+            }
+            p.push(")")?;
+        }
     }
 
     assert!(p.edits.is_empty());
@@ -76,7 +88,7 @@ impl PrintSource for (&pr::ModuleDef, Option<crate::Span>) {
     fn print<'c>(&self, p: &mut Printer<'c>) -> Option<()> {
         // self-annotations
         for ann in &self.0.annotations {
-            if try_print_doc_annotation(ann, p, "#! ") {
+            if try_print_doc_anno(ann, p, "#! ") {
                 continue;
             }
             p.push("@!")?;
@@ -128,8 +140,8 @@ impl PrintSource for (&pr::ModuleDef, Option<crate::Span>) {
 
 /// Try to print an annotation as a doc comment.
 /// Returns `true` if the annotation was printed.
-fn try_print_doc_annotation(ann: &pr::Annotation, p: &mut Printer, prefix: &str) -> bool {
-    let Some(content) = ann.as_doc() else {
+fn try_print_doc_anno(ann: &pr::Anno, p: &mut Printer, prefix: &str) -> bool {
+    let Some(content) = ann.as_std_doc() else {
         return false;
     };
     p.inject_trivia_leading(ann.expr.span.map(|s| s.start));
@@ -172,7 +184,7 @@ impl PrintSource for NamedDef<'_> {
         for (i, ann) in self.1.annotations.iter().enumerate() {
             p.inject_trivia_leading(ann.expr.span.map(|s| s.start));
 
-            if try_print_doc_annotation(ann, p, "## ") {
+            if try_print_doc_anno(ann, p, "## ") {
                 continue;
             }
             p.push("@")?;
@@ -221,6 +233,18 @@ impl PrintSource for NamedDef<'_> {
             pr::DefKind::Import(import_def) => {
                 p.push("import ")?;
                 import_def.print(p)?;
+            }
+            pr::DefKind::Anno(ann_def) => {
+                p.push("anno ")?;
+                p.push(ident::display(self.0))?;
+                p.push("(")?;
+                for (i, param) in ann_def.params.iter().enumerate() {
+                    if i > 0 {
+                        p.push(", ")?;
+                    }
+                    param.print(p)?;
+                }
+                p.push(")")?;
             }
         }
 
