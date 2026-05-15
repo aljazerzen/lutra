@@ -236,5 +236,5 @@ This workflow is a good fit when you want to:
 - [Command line guide](cli.md) for installation and first-use workflow.
 - [Tabular data basics](../learn/tabular-data.md) and [Aggregations](../learn/aggregations.md) for the data-oriented language guides.
 - [Reference: Modules](../reference/language/modules.md) if you are organizing larger Lutra projects.
-- [CLI reference](../reference/cli.md) for exact `codegen` and `run` usage.
-- [Runner model](../reference/project/runner-model.md) if you want to understand the runtime boundary.
+- [CLI reference](../reference/runtime/cli.md) for exact `codegen` and `run` usage.
+[Runner model](../reference/runtime/runner-model.md) if you want to understand the runtime boundary.

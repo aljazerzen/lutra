@@ -248,7 +248,6 @@ Learn = [
 [[project.nav]]
 Reference = [
     "reference/index.md",
-    "reference/cli.md",
     { Language = [
         "reference/language/syntax.md",
         "reference/language/literals.md",
@@ -270,11 +269,14 @@ Reference = [
         ] },
 
     ] },
-    { Project = [
-        "reference/project/runner-model.md",
-        "reference/project/binary-format.md",
-        "reference/project/format-spec.md",
-        "reference/project/representations.md",
+    { Runtime = [
+        "reference/runtime/runner-model.md",
+        "reference/runtime/cli.md",
+    ] },
+    { Internals = [
+        "reference/internals/binary-format.md",
+        "reference/internals/format-spec.md",
+        "reference/internals/representations.md",
     ] },
 ]
 

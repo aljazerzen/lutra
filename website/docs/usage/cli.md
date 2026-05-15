@@ -9,7 +9,7 @@ Use the Lutra CLI when you want to:
 - explore data interactively,
 - generate bindings for Python or Rust.
 
-For exact command and option details, see the [CLI reference](../reference/cli.md).
+For exact command and option details, see the [CLI reference](../reference/runtime/cli.md).
 
 ## Install the CLI
 
@@ -124,8 +124,8 @@ $ lutra codegen --project ./project.lt ./generated.py
 
 ## See also
 
-- [CLI reference](../reference/cli.md) for exact commands and options.
-- [Runner model](../reference/project/runner-model.md) if you want to understand how programs are executed.
+- [CLI reference](../reference/runtime/cli.md) for exact commands and options.
+[Runner model](../reference/runtime/runner-model.md) if you want to understand how programs are executed.
 - [Learn](../learn/introduction.md) if you want to learn the language.
 - [Tabular data basics](../learn/tabular-data.md) and [Aggregations](../learn/aggregations.md) for the main data-oriented guides.
 - [Python guide](python.md) and [Rust guide](rust.md) for host-language workflows.

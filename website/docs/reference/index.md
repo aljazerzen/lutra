@@ -7,34 +7,37 @@ It is organized for lookup, not as a tutorial.
 
 <div class="grid cards" markdown>
 
--   :material-book:{.lg .baseline} [__Language__](./language/syntax)
+-   :material-code-braces:{.lg .baseline} [__Language__](./language/syntax)
 
     ---
 
     Syntax, literals, types, expressions, patterns, modules
 
--   :material-folder-play:{.lg .baseline} [__Project__](./project/runner-model)
+-   :material-play-circle:{.lg .baseline} [__Runtime__](./runtime/runner-model)
 
     ---
 
-    Runners, binary format, and data representations
+    Runners, CLI, execution flow
 
--   :material-console-line:{.lg .baseline} [__CLI__](./cli)
+-   :material-cogs:{.lg .baseline} [__Internals__](./internals/binary-format)
 
     ---
 
-    Commands, options, and interactive mode
+    Binary format, type representations
 
 </div>
 
-## Project concepts
+## Runtime concepts
 
-The project reference is centered around four ideas:
-
-- A **project** is a set of `.lt` files.
+- A **runner** is an execution target (interpreter, DuckDB, PostgreSQL).
 - A **program** is compiled code with typed input and output.
-- A **runner** executes a compiled program.
 - The **binary format** carries inputs and outputs across the runner boundary.
+
+## Internals concepts
+
+- The **binary format** is a compact byte encoding for values crossing the runner boundary.
+- **Type representations** define how each Lutra type maps to storage in different backends.
+- The **format spec** defines the exact byte-level encoding rules.
 
 ## See also
 

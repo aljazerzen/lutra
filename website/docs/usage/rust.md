@@ -180,6 +180,6 @@ These are a good starting point if you want a working end-to-end project.
 
 - [Command line guide](cli.md) for installation and first-use workflow.
 - [Projects](../learn/projects.md) if you want more context on modules and project layout.
-- [CLI reference](../reference/cli.md) for exact `codegen` usage.
-- [Runner model](../reference/project/runner-model.md) if you want to understand how programs move into runners.
-- [Binary format](../reference/project/binary-format.md) if you want the low-level data boundary details.
+- [CLI reference](../reference/runtime/cli.md) for exact `codegen` usage.
+[Runner model](../reference/runtime/runner-model.md) if you want to understand how programs move into runners.
+[Binary format](../reference/internals/binary-format.md) if you want the low-level data boundary details.

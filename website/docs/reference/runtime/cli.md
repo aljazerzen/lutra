@@ -107,4 +107,4 @@ $ lutra codegen --project ./project.lt ./generated.py
 
 - [Command line guide](../usage/cli.md) for installation and first-use workflow.
 - [Learn](../learn/introduction.md) for the language guides.
-- [Runner model](./project/runner-model.md) for backend execution details.
+[Runner model](./runtime/runner-model.md) for backend execution details.
