@@ -379,7 +379,7 @@ where T
 ## After folding all inputs, the last accumulator is returned.
 ##
 ## This function is sometimes also called "reduce" or "inject".
-## This function is similar to [std::scan], but it returns only the final
+## This function is similar to [scan], but it returns only the final
 ## accumulator.
 func fold(inputs: [I], initial: A, operation: func (A, I): A): A
 where I, A
@@ -394,7 +394,7 @@ where I, A
 ##
 ## Returns values of all produced accumulators.
 ##
-## This function is similar to [std::fold], but it returns all accumulators,
+## This function is similar to [fold], but it returns all accumulators,
 ## instead of only the final one.
 func scan(inputs: [I], initial: A, operation: func (A, I): A): [A]
 where I, A
@@ -527,7 +527,7 @@ where T: primitive
 func cume_dist(array: [T]): [float64]
 where T: primitive
 
-## Mathematical functions
+## Mathematical ops
 module math {
   ## Absolute value
   func abs(val: T): T
@@ -583,7 +583,7 @@ module text {
 
   ## Splits text into substrings at every occurrence of a separator.
   ##
-  ## For example, `split("1_two_3", "_")` is ["1", "two", "3"]`
+  ## For example, `split("1_two_3", "_")` is `["1", "two", "3"]`
   func split(value: text, separator: text): [text]
 
   # func lower(value: text): text
@@ -638,7 +638,7 @@ module sql {
 
   ## Inserts rows into a table.
   ##
-  ## For table identifier format, see documentation of [std::sql::from].
+  ## For table identifier format, see documentation of [module::from].
   func insert(rows: [R], const table_identifier: text): {}
   where R: {..}
 
@@ -663,7 +663,7 @@ module sql {
   ## )
   ## ```
   ##
-  ## For table identifier format, see documentation of [std::sql::from].
+  ## For table identifier format, see documentation of [module::from].
   func update(const table: text, updater: func (R): R?): {}
   where R: {..}
 

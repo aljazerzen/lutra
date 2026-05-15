@@ -4,7 +4,7 @@ title: Command line
 
 This page lists the main Lutra CLI commands and when to use them.
 
-For an installation and first-use guide, see the [Command line guide](../usage/cli.md).
+For an installation and first-use guide, see the [Command line guide](../../usage/cli.md).
 
 ## Top-level commands
 
@@ -105,6 +105,6 @@ $ lutra codegen --project ./project.lt ./generated.py
 
 ## See also
 
-- [Command line guide](../usage/cli.md) for installation and first-use workflow.
-- [Learn](../learn/introduction.md) for the language guides.
-[Runner model](./runtime/runner-model.md) for backend execution details.
+- [Command line guide](../../usage/cli.md) for installation and first-use workflow.
+- [Learn](../../learn/introduction.md) for the language guides.
+- [Runner model](./runner-model.md) for backend execution details.

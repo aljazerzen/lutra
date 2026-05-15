@@ -2,9 +2,6 @@
 title: Reference
 ---
 
-Use the reference when you want exact information about Lutra.
-It is organized for lookup, not as a tutorial.
-
 <div class="grid cards" markdown>
 
 -   :material-code-braces:{.lg .baseline} [__Language__](./language/syntax)
@@ -27,17 +24,12 @@ It is organized for lookup, not as a tutorial.
 
 </div>
 
-## Runtime concepts
+## Core concepts
 
-- A **runner** is an execution target (interpreter, DuckDB, PostgreSQL).
+- A **project** is a set of `.lt` files, organized as a tree of modules.
 - A **program** is compiled code with typed input and output.
+- A **runner** is an execution target (interpreter, DuckDB, PostgreSQL).
 - The **binary format** carries inputs and outputs across the runner boundary.
-
-## Internals concepts
-
-- The **binary format** is a compact byte encoding for values crossing the runner boundary.
-- **Type representations** define how each Lutra type maps to storage in different backends.
-- The **format spec** defines the exact byte-level encoding rules.
 
 ## See also
 

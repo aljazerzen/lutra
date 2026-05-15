@@ -129,17 +129,11 @@ fn render_module<'a>(
 
     // --- Leaf definitions ---
     for (name, def) in &leafs {
-        let kind = match &def.kind {
-            pr::DefKind::Expr(e) if e.constant => "const",
-            pr::DefKind::Expr(_) => "func",
-            pr::DefKind::Ty(_) => "type",
-            pr::DefKind::Anno(_) => "anno",
-            _ => unreachable!(),
-        };
+        let kind = def_kind_name(def);
         let signature = printer::print_def_signature(name, def)
             .with_context(|| format!("failed to render signature for {name}"))?;
 
-        content += &format!("## `{kind}` {name}\n\n");
+        content += &format!("## `{kind}` {name}\n\n"); // keep in-sync with get_anchor
         content += "```lutra\n";
         content += &signature;
         content += "\n```\n";
@@ -172,6 +166,21 @@ fn render_module<'a>(
     Ok(pages)
 }
 
+fn def_kind_name(def: &pr::Def) -> &'static str {
+    match &def.kind {
+        pr::DefKind::Expr(e) if e.constant => "const",
+        pr::DefKind::Expr(_) => "func",
+        pr::DefKind::Ty(_) => "type",
+        pr::DefKind::Anno(_) => "anno",
+        pr::DefKind::Module(_) => "module",
+        pr::DefKind::Import(_) => "import",
+    }
+}
+
+fn get_anchor(def: &pr::Def, name: &str) -> String {
+    format!("{}-{name}", def_kind_name(def))
+}
+
 fn parse_doc_comment(doc: &str) -> (Option<&str>, &str) {
     let doc_trimmed = doc.trim_start();
     let title = doc_trimmed.lines().next();
@@ -202,11 +211,15 @@ fn relative_link(
     target_fq: &pr::Path,
     root: &pr::ModuleDef,
 ) -> Option<String> {
-    let is_module = target_fq.is_empty() || root.get(target_fq)?.kind.is_module();
-    let (target_mod, anchor) = if is_module {
+    let (target_mod, anchor) = if target_fq.is_empty() {
         (target_fq.as_steps(), None)
     } else {
-        (target_fq.parent()?, Some(target_fq.last()))
+        let def = root.get(target_fq)?;
+        if def.kind.is_module() {
+            (target_fq.as_steps(), None)
+        } else {
+            (target_fq.parent()?, Some(get_anchor(def, target_fq.last())))
+        }
     };
 
     let from_file = page_filepath(current_mod.as_steps());
@@ -226,7 +239,7 @@ fn relative_link(
     let mut url = rel.to_str()?.to_string();
     if let Some(anchor) = anchor {
         url += "#";
-        url += anchor;
+        url += &anchor;
     }
     Some(url)
 }
@@ -285,6 +298,10 @@ fn resolve_reference(reference: &str, current_module: &pr::Path) -> Option<pr::P
         "project" => {
             parts.remove(0);
             pr::Path::empty()
+        }
+        "module" => {
+            parts.remove(0);
+            current_module.clone()
         }
         "super" => {
             parts.remove(0);

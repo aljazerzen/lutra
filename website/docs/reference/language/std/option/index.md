@@ -17,7 +17,7 @@ where T
 ```
 
 Returns `true` iff the value is `.none`.
-The inverse of [`is_some`](#is_some).
+The inverse of [`is_some`](#func-is_some).
 
 ## `func` or_else
 
@@ -37,7 +37,7 @@ where T
 
 When value is `.none`, returns the default value instead.
 
-Default value depends on the type. See [`super::default`](../index.md#default).
+Default value depends on the type. See [`super::default`](../index.md#func-default).
 For numbers it is 0, for booleans it is false.
 
 ## `func` zip

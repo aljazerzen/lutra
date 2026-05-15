@@ -2,13 +2,36 @@
 
 ## Modules
 
+- [`std`](std/index.md)
 - [`option`](option/index.md) - Nullable values
-- [`math`](math/index.md) - Mathematical functions
+- [`math`](math/index.md) - Mathematical ops
 - [`text`](text/index.md) - Text functions
 - [`fs`](fs/index.md) - File system operations
 - [`sql`](sql/index.md) - SQL database interface
 - [`date`](date/index.md)
 - [`timestamp`](timestamp/index.md)
+
+## `anno` doc
+
+```lutra
+anno doc(const content: text)
+```
+
+## `anno` package
+
+```lutra
+anno package(const name: text)
+```
+
+Annotates a project with metadata.
+
+## `anno` rust_derive
+
+```lutra
+anno rust_derive(const macros: [text])
+```
+
+Annotates a type with traits to `#[Derive]` when translating to Rust.
 
 ## `func` default
 
@@ -195,7 +218,7 @@ the second.
 type Ordering: enum {less, equal, greater}
 ```
 
-Result of a three-way comparison. Returned by [`cmp`](#cmp).
+Result of a three-way comparison. Returned by [`cmp`](#func-cmp).
 
 ## `func` eq
 
@@ -367,7 +390,7 @@ where T: {..}
 
 Transposes an array of rows into a tuple of columns.
 Each field of the row type becomes a column — an array of that field's values.
-The inverse of [`from_columnar`](#from_columnar).
+The inverse of [`from_columnar`](#func-from_columnar).
 
 ## `func` from_columnar
 
@@ -377,7 +400,7 @@ where T: {..}
 ```
 
 Transposes a tuple of columns into an array of rows.
-The inverse of [`to_columnar`](#to_columnar).
+The inverse of [`to_columnar`](#func-to_columnar).
 
 ## `func` map_columnar
 
@@ -387,7 +410,7 @@ where I: {..}, O: {..}
 ```
 
 Applies `mapper` to the array in columnar form.
-Equivalent to [`to_columnar`](#to_columnar), then `mapper`, then [`from_columnar`](#from_columnar).
+Equivalent to [`to_columnar`](#func-to_columnar), then `mapper`, then [`from_columnar`](#func-from_columnar).
 
 ## `func` aggregate
 
@@ -397,7 +420,7 @@ where T: {..}, O
 ```
 
 Reduces an array to a single value by applying `mapper` in columnar form.
-Equivalent to [`to_columnar`](#to_columnar) followed by `mapper`.
+Equivalent to [`to_columnar`](#func-to_columnar) followed by `mapper`.
 
 ## `func` zip
 
@@ -465,7 +488,7 @@ The `initial` value is the accumulator for the first call.
 After folding all inputs, the last accumulator is returned.
 
 This function is sometimes also called "reduce" or "inject".
-This function is similar to [std::scan], but it returns only the final
+This function is similar to [`scan`](#func-scan), but it returns only the final
 accumulator.
 
 ## `func` scan
@@ -485,7 +508,7 @@ The `initial` value is the accumulator for the first call.
 
 Returns values of all produced accumulators.
 
-This function is similar to [std::fold], but it returns all accumulators,
+This function is similar to [`fold`](#func-fold), but it returns all accumulators,
 instead of only the final one.
 
 ## `func` apply_until_empty

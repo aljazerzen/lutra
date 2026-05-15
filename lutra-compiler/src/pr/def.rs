@@ -260,13 +260,17 @@ impl Anno {
 
     /// Matches as `@std::doc("...")` annotation.
     pub fn as_std_doc(&self) -> Option<&str> {
-        let args = self.as_named(&["std", "doc"])?;
+        let args = (self.as_named(&["std", "doc"])).or_else(|| self.as_named(&["doc"]))?;
+        // fallback is needed for docs on defs in std
         Some(args.first()?.expr.kind.as_literal()?.as_text()?)
     }
 
     /// Matches as `@std::package(name = "...")` annotation.
     pub fn as_std_package(&self) -> Option<&str> {
-        let args = self.as_named(&["std", "package"])?;
+        let args = self
+            .as_named(&["std", "package"])
+            .or_else(|| self.as_named(&["package"]))?;
+        // fallback is needed for the @package on std itself
         Some(args.first()?.expr.kind.as_literal()?.as_text()?)
     }
 

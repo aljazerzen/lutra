@@ -86,7 +86,7 @@ still want the definitions to live under the same module path.
 
 ## See also
 
-- [Tabular data basics](tabular-basic.md)
+- [Tabular data basics](tabular-data.md)
 - [Aggregations](aggregations.md)
 - [Reference: Modules](../reference/language/modules.md)
 - [Reference overview](../reference/index.md)

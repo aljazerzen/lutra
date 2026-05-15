@@ -1,4 +1,4 @@
-# `std::math` - Mathematical functions
+# `std::math` - Mathematical ops
 
 ## `func` abs
 

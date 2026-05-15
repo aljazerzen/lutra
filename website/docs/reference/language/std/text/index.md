@@ -41,7 +41,7 @@ func split(text, text): [text]
 
 Splits text into substrings at every occurrence of a separator.
 
-For example, `split("1_two_3", "_")` is ["1", "two", "3"]`
+For example, `split("1_two_3", "_")` is `["1", "two", "3"]`
 
 ## `func` starts_with
 

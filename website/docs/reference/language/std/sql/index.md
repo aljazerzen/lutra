@@ -29,7 +29,7 @@ where R: {..}
 
 Inserts rows into a table.
 
-For table identifier format, see documentation of [std::sql::from].
+For table identifier format, see documentation of [`module::from`](#func-from).
 
 ## `func` update
 
@@ -59,7 +59,7 @@ std::sql::update(
 )
 ```
 
-For table identifier format, see documentation of [std::sql::from].
+For table identifier format, see documentation of [`module::from`](#func-from).
 
 ## `func` raw
 
