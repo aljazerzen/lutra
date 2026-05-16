@@ -100,6 +100,9 @@ fn render_module<'a>(
         if path.is_empty() && dependencies.contains(name.as_str()) {
             continue;
         }
+        if def.get_anno(pr::Anno::as_hidden).is_some() {
+            continue;
+        }
         match &def.kind {
             pr::DefKind::Import(_) => {}
             pr::DefKind::Module(_) => sub_modules.push((name, def)),

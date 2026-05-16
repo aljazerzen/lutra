@@ -4,13 +4,16 @@
 # Self-reference module so that `std` references within std resolves.
 # This is needed, because some syntax (operators, doc comments) is de-sugared
 # into std::xxx references.
+@hidden
 module std {
   import super::*
 }
 
-# Annotates a definition with documentation.
-# Used by `##` and `#!` syntax.
+## Annotates a definition with documentation.
 anno doc(content: text)
+
+## Annotates a definition to be hidden from documentation.
+anno hidden()
 
 ## Annotates a project with metadata.
 anno package(name: text)
@@ -31,7 +34,7 @@ anno rust_derive(macros: [text])
 func default(): T
 where T
 
-# --- Casts ---
+# --- Type conversions ---
 
 ## Converts a number to `int8`
 func to_int8(x: T): int8
@@ -289,7 +292,7 @@ where T
 ## Returns `true` if the array contains no items.
 func is_empty(array: [T]): bool
 where T
--> eq(count(array), 0)
+-> project::eq(count(array), 0)
 
 ## Transforms each item using a `mapper` function.
 ## Returns a new array of the same length.
@@ -619,7 +622,7 @@ module fs {
   where R: {..}
 }
 
-## SQL database interface
+## SQL interface
 ##
 ## Module available only when targeting SQL databases.
 ## Currently this includes only `sql-pg` format.

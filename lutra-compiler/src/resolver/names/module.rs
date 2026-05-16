@@ -245,7 +245,7 @@ impl<'a> DefNameResolver<'a> {
             }
 
             // resolve annotations
-            let mut r = self.init_expr_resolver(false);
+            let mut r = self.init_expr_resolver(true);
             let annotations = std::mem::take(&mut def.annotations);
             for ann in annotations {
                 let expr = Box::new(r.fold_expr(*ann.expr)?);

@@ -2,7 +2,6 @@
 
 ## Modules
 
-- [`std`](std/index.md)
 - [`option`](option/index.md) - Nullable values
 - [`math`](math/index.md) - Mathematical ops
 - [`text`](text/index.md) - Text functions
@@ -16,6 +15,16 @@
 ```lutra
 anno doc(const content: text)
 ```
+
+Annotates a definition with documentation.
+
+## `anno` hidden
+
+```lutra
+anno hidden()
+```
+
+Annotates a definition to be hidden from documentation.
 
 ## `anno` package
 

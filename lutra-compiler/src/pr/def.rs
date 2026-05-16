@@ -265,6 +265,15 @@ impl Anno {
         Some(args.first()?.expr.kind.as_literal()?.as_text()?)
     }
 
+    /// Matches as `@std::hidden` annotation.
+    pub fn as_hidden(&self) -> Option<()> {
+        let _ = self
+            .as_named(&["std", "hidden"])
+            .or_else(|| self.as_named(&["hidden"]))?;
+        // fallback is needed for docs on defs in std
+        Some(())
+    }
+
     /// Matches as `@std::package(name = "...")` annotation.
     pub fn as_std_package(&self) -> Option<&str> {
         let args = self
