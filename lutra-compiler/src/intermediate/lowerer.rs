@@ -639,10 +639,7 @@ impl<'a> Lowerer<'a> {
         // fold each of the bindings
         let mut bindings = HashMap::new();
         let mut i = 0;
-        loop {
-            let Some((reference, id)) = self.def_dependencies.get_index(i) else {
-                break;
-            };
+        while let Some((reference, id)) = self.def_dependencies.get_index(i) {
             i += 1;
             let reference = reference.clone();
             let id = *id;

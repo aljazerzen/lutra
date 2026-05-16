@@ -142,7 +142,7 @@ fn encode_body<'t>(
                 return Err(Error::Bug);
             };
 
-            for ((f, h), f_ty) in fields.iter().zip(tuple_ptrs.into_iter()).zip(ty_fields) {
+            for ((f, h), f_ty) in fields.iter().zip(tuple_ptrs).zip(ty_fields) {
                 encode_body(w, f, h, &f_ty.ty, ctx)?
             }
         }
@@ -159,7 +159,7 @@ fn encode_body<'t>(
                 head_ptrs.push(encode_head(w, i, items_ty, ctx)?);
             }
 
-            for (i, h) in items.iter().zip(head_ptrs.into_iter()) {
+            for (i, h) in items.iter().zip(head_ptrs) {
                 encode_body(w, i, h, items_ty, ctx)?;
             }
         }

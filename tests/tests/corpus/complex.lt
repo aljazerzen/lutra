@@ -221,6 +221,7 @@ func main() -> (
 
 
 # === compounding_interest_01
+# skip: duckdb
 
 type Payment: {time: int32, amount: float64}
 

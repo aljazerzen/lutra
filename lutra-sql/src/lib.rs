@@ -287,7 +287,7 @@ impl fmt::Display for Expr {
                     f.write_str("ORDER BY ")?;
                     display_comma_separated(keys).fmt(f)?;
                 }
-                f.write_str(")-1)::int4")
+                f.write_str(")-1)::int8")
             }
 
             Expr::Case {

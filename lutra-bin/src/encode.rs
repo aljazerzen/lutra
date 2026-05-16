@@ -190,7 +190,7 @@ impl<E: Encode> Encode for [E] {
             heads.push(i.encode_head(buf));
         }
 
-        for (i, h) in self.iter().zip(heads.into_iter()) {
+        for (i, h) in self.iter().zip(heads) {
             i.encode_body(h, buf);
         }
     }

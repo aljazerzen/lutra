@@ -2370,7 +2370,7 @@ fn std_sql_raw_01() {
         WITH
         r0 AS (
           SELECT
-            (ROW_NUMBER() OVER () -1)::int4 AS index,
+            (ROW_NUMBER() OVER () -1)::int8 AS index,
             r1.value::int4 AS value
           FROM
             (

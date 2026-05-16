@@ -36,8 +36,8 @@ impl PrFold for Desugarator {
         for (name, mut def) in module_def.defs {
             // move self-annotation into Def
             if let Some(sub_module) = def.kind.as_module_mut() {
-                sub_module.annotations.extend(def.annotations.drain(..));
-                def.annotations = std::mem::take(&mut sub_module.annotations);
+                sub_module.annotations.append(&mut def.annotations);
+                def.annotations.append(&mut sub_module.annotations);
             }
 
             // desugar

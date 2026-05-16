@@ -203,7 +203,7 @@ impl EncodeRows for ArrayEncoder {
             residuals.push(self.inner.encode_head(buf, &mut row_iter));
         }
 
-        for (row, h) in rows.iter().zip(residuals.into_iter()) {
+        for (row, h) in rows.iter().zip(residuals) {
             let mut row_iter = RowIter { row, idx: 0 };
             self.inner.encode_body(buf, &mut row_iter, h);
         }
@@ -708,7 +708,7 @@ impl EncodeJson for JsonArrayEncoder {
             head_residuals.push(self.inner.encode_head(buf, i, ctx));
         }
 
-        for (v, r) in value.iter().zip(head_residuals.into_iter()) {
+        for (v, r) in value.iter().zip(head_residuals) {
             self.inner.encode_body(buf, v, r, ctx)
         }
     }
@@ -751,7 +751,7 @@ impl EncodeJson for JsonTupleEncoder {
             panic!()
         };
 
-        for ((encoder, v), r) in self.inner.iter().zip(value).zip(head_residuals.into_iter()) {
+        for ((encoder, v), r) in self.inner.iter().zip(value).zip(head_residuals) {
             encoder.encode_body(buf, v, r, ctx)
         }
     }

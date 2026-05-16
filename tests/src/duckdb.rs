@@ -1054,7 +1054,7 @@ fn input_array_prim() {
     FROM
       (
         SELECT
-          (ROW_NUMBER() OVER () -1)::int4 AS index,
+          (ROW_NUMBER() OVER () -1)::int8 AS index,
           u.unnest AS value
         FROM
           LATERAL unnest($1::INT8[]) AS u
@@ -1084,7 +1084,7 @@ fn input_array_text() {
     FROM
       (
         SELECT
-          (ROW_NUMBER() OVER () -1)::int4 AS index,
+          (ROW_NUMBER() OVER () -1)::int8 AS index,
           u.unnest AS value
         FROM
           LATERAL unnest($1::TEXT[]) AS u
@@ -1206,7 +1206,7 @@ fn sql_from_primitive_table() {
     FROM
       (
         SELECT
-          (ROW_NUMBER() OVER () -1)::int4 AS index,
+          (ROW_NUMBER() OVER () -1)::int8 AS index,
           r0.id AS _0,
           r0.name AS _1
         FROM
@@ -1250,7 +1250,7 @@ fn sql_from_flat_tuple() {
     FROM
       (
         SELECT
-          (ROW_NUMBER() OVER () -1)::int4 AS index,
+          (ROW_NUMBER() OVER () -1)::int8 AS index,
           r0.id AS _0,
           r0.name AS _1,
           r0.price AS _2,
@@ -1303,7 +1303,7 @@ fn sql_from_nested_tuple() {
     FROM
       (
         SELECT
-          (ROW_NUMBER() OVER () -1)::int4 AS index,
+          (ROW_NUMBER() OVER () -1)::int8 AS index,
           r0.id AS _0,
           r0.data.user_id AS _1_0,
           r0.data.items AS _1_1
@@ -1359,7 +1359,7 @@ fn sql_from_array_column() {
     FROM
       (
         SELECT
-          (ROW_NUMBER() OVER () -1)::int4 AS index,
+          (ROW_NUMBER() OVER () -1)::int8 AS index,
           r0.id AS _0,
           r0.tags AS _1
         FROM
@@ -1409,7 +1409,7 @@ fn sql_from_option_column() {
     FROM
       (
         SELECT
-          (ROW_NUMBER() OVER () -1)::int4 AS index,
+          (ROW_NUMBER() OVER () -1)::int8 AS index,
           r0.id AS _0,
           r0.name AS _1,
           r0.age AS _2
@@ -1454,7 +1454,7 @@ fn sql_from_date_column() {
     FROM
       (
         SELECT
-          (ROW_NUMBER() OVER () -1)::int4 AS index,
+          (ROW_NUMBER() OVER () -1)::int8 AS index,
           r0.id AS _0,
           (r0.event_date::date - '1970-01-01'::date)::int4 AS _1
         FROM
@@ -1806,7 +1806,7 @@ fn serialize_nested_array() {
                 FROM
                   (
                     SELECT
-                      (ROW_NUMBER() OVER () -1)::int4 AS index,
+                      (ROW_NUMBER() OVER () -1)::int8 AS index,
                       u.unnest AS value
                     FROM
                       LATERAL unnest(r2.value) AS u
@@ -1918,7 +1918,7 @@ fn serialize_nested_array_map() {
                 FROM
                   (
                     SELECT
-                      (ROW_NUMBER() OVER () -1)::int4 AS index,
+                      (ROW_NUMBER() OVER () -1)::int8 AS index,
                       u.unnest AS value
                     FROM
                       LATERAL unnest(r2.value) AS u
@@ -2456,7 +2456,7 @@ fn fs_read_parquet() {
     FROM
       (
         SELECT
-          (ROW_NUMBER() OVER () -1)::int4 AS index,
+          (ROW_NUMBER() OVER () -1)::int8 AS index,
           r0.id AS _0,
           r0.name AS _1
         FROM
