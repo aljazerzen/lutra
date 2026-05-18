@@ -60,6 +60,11 @@ pub(super) struct Context<'a> {
 
     pub(super) rel_name_gen: NameGenerator,
 
+    /// Tracks bindings that are currently in scope during compilation.
+    ///
+    /// Each `cr::BoundExpr` has a unique `id`. When a binding expression is
+    /// compiled, its id is registered here so that all nested inner
+    /// `RelRef(id)` expressions can resolve to the compiled relation name.
     rel_vars: HashMap<usize, RelRef>,
 
     dialect: super::Dialect,
@@ -118,6 +123,23 @@ impl<'a> Context<'a> {
         self.rel_vars.remove(&input.id);
     }
 
+    /// Compiles a CR expression into a SQL AST node.
+    ///
+    /// How each `ExprKind` maps to SQL:
+    /// - `Bind`           → `WITH name AS (val) main` (CTE, uncorrelated)
+    /// - `BindCorrelated` → `FROM bound, LATERAL (main)` (correlated subquery)
+    /// - `Transform`      → compiles input, registers it, then applies the
+    ///                       transform (e.g. `Group` → `GROUP BY`, `Where` →
+    ///                       `WHERE`, etc.)
+    /// - `Join`           → `FROM left, right WHERE condition`
+    /// - `Union`          → `UNION ALL`
+    ///
+    /// Two helpers extract column expressions from a compiled `Node`:
+    /// - `compile_columns`: for each expression, calls `compile_rel` then
+    ///   `node_into_columns`. Complex nodes become inline subqueries.
+    /// - `compile_columns_scoped`: calls `compile_rel` then
+    ///   `node_into_columns_and_rels`, returning column references alongside
+    ///   LATERAL relations that need to be added to the `FROM` clause.
     #[tracing::instrument(name = "r", skip_all)]
     fn compile_rel(&mut self, rel: &cr::Expr) -> Node {
         match &rel.kind {

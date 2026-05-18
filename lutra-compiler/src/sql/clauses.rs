@@ -986,11 +986,47 @@ impl<'a> Context<'a> {
                 let key = self.compile_rel(&func.body);
                 self.functions.remove(&func.id);
 
-                let values = cr::Expr::new_serialize(cr::Expr::new_rel_ref(&array));
-                let values = vec![key.clone(), values];
+                let serialize = cr::Expr::new_serialize(cr::Expr::new_rel_ref(&array));
 
-                let key = Box::new(key);
-                cr::ExprKind::Transform(array, cr::Transform::Group { key, values })
+                if is_simple(&key) {
+                    // simple key: cloning is fine
+                    let values = vec![key.clone(), serialize];
+                    let key = Box::new(key);
+                    cr::ExprKind::Transform(array, cr::Transform::Group { key, values })
+                } else {
+                    // complex key: bind it once and reference from both
+                    // key and values via RelRef.
+                    //
+                    // Structure:
+                    //   BindCorrelated(array,
+                    //     Bind(kb,
+                    //       Transform(RelRef(array), Group {
+                    //         key: RelRef(kb),
+                    //         values: [RelRef(kb), Serialize(RelRef(array))]
+                    //       })))
+                    //
+                    // BindCorrelated registers array first so Bind can
+                    // compile the key expression which references array items.
+                    let kb = self.new_binding(key);
+                    let key_ref = cr::Expr::new_rel_ref(&kb);
+                    let values = vec![key_ref.clone(), serialize];
+
+                    let group = cr::Expr {
+                        kind: cr::ExprKind::Transform(
+                            self.new_binding(cr::Expr::new_rel_ref(&array)),
+                            cr::Transform::Group {
+                                key: Box::new(key_ref),
+                                values,
+                            },
+                        ),
+                        ty: expr.ty.clone(),
+                    };
+                    let bind = cr::Expr {
+                        kind: cr::ExprKind::Bind(kb, Box::new(group)),
+                        ty: expr.ty.clone(),
+                    };
+                    cr::ExprKind::BindCorrelated(array, Box::new(bind))
+                }
             }
 
             "std::append" => {
@@ -1428,6 +1464,25 @@ impl ColumnsOrUnpack {
             ColumnsOrUnpack::Columns(cols) => cols,
             ColumnsOrUnpack::Unpack(rel) => panic!("expected columns, found: {rel:?}"),
         }
+    }
+}
+
+/// Returns true if the key expression is simple enough to clone without
+/// causing duplicate SQL compilation issues. Simple keys are chains of
+/// ProjectPick/ProjectDiscard transforms on RelRef/Literal/Null nodes.
+fn is_simple(expr: &cr::Expr) -> bool {
+    match &expr.kind {
+        cr::ExprKind::From(from) => matches!(
+            from,
+            cr::From::RelRef(_) | cr::From::Literal(_) | cr::From::Null
+        ),
+        cr::ExprKind::Transform(bound, transform) => {
+            matches!(
+                transform,
+                cr::Transform::ProjectPick(_) | cr::Transform::ProjectDiscard(_)
+            ) && is_simple(&bound.rel)
+        }
+        _ => false,
     }
 }
 

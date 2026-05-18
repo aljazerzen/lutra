@@ -52,7 +52,10 @@ pub fn compile(
 
     // intermediate optimizations
     let program_ir = intermediate::inline(program_ir);
-    tracing::debug!("ir (inlined):\n{}\n", lutra_bin::ir::print(&program_ir));
+    tracing::debug!(
+        "ir (inlined):\n{}\n",
+        lutra_bin::ir::print_no_color(&program_ir)
+    );
     let program_ir = intermediate::layouter::on_program(program_ir);
 
     // backend (sql or bytecode)

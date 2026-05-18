@@ -1440,6 +1440,33 @@ func main() -> (
   },
 ]
 
+# === std_group_03
+import std::*
+
+func main() -> (
+  [Timestamp(0), Timestamp(10), Timestamp(1779117303000000)]
+  | group(e -> (
+      e | timestamp::to_date("UTC") | date::to_year_month_day | ymd -> ymd.0
+    ))
+  | sort(e -> e.key)
+)
+# >
+[
+  {
+    key = 1970,
+    values = [
+      @1970-01-01T00:00:00.000000,
+      @1970-01-01T00:00:00.000010,
+    ],
+  },
+  {
+    key = 2026,
+    values = [
+      @2026-05-18T15:15:03.000000,
+    ],
+  },
+]
+
 # === std_group_map_00
 func main() -> (
   [1, 2, 2, 2, 5: int64, 5]

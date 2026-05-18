@@ -293,7 +293,7 @@ fn push_correlated_into_group(expr: cr::Expr) -> (cr::Expr, bool) {
     if !is_rel_col(&correlated[0], bound.id, 0) {
         return (expr, false);
     }
-    tracing::debug!("push_correlated_into_group: {expr:#?}");
+    tracing::debug!("push_correlated_into_group");
 
     // unpack
     let cr::ExprKind::BindCorrelated(bound, correlated) = expr.kind else {

@@ -2220,40 +2220,49 @@ fn group_00() {
 #[test]
 fn group_01() {
     insta::assert_snapshot!(_sql_and_output(_run(r#"
-    import std::(map, group, to_int64, sum)
+    import std::*
 
-    const gifts: [{child_id: int32, price: float64}] = []
+    const gifts: [{child_id: int32, price: float64}] = [
+      {child_id = 1, price = 1.11},
+      {child_id = 1, price = 3.00},
+      {child_id = 5, price = 7.23},
+    ]
 
     func main() -> (
       gifts
       | group(g -> g.child_id)
-      | map(
-        p -> {
-          p.values | map(g -> g.price | to_int64) | sum()
-        },
-      )
+      | map(p -> p.values | map(g -> g.price) | sum())
     )
     "#, lutra_bin::Value::unit())), @"
     SELECT
-      COALESCE(SUM(r1.value), 0)::int8 AS _0
+      COALESCE(SUM(r1.value), 0)::float8 AS value
     FROM
       (
         SELECT
-          0 AS index,
-          NULL::int4 AS _0,
-          NULL::float8 AS _1
-        WHERE
-          FALSE
+          0::int8 AS index,
+          1::int4 AS _0,
+          1.11::float8 AS _1
+        UNION ALL
+        SELECT
+          1::int8 AS index,
+          1::int4 AS _0,
+          3::float8 AS _1
+        UNION ALL
+        SELECT
+          2::int8 AS index,
+          5::int4 AS _0,
+          7.23::float8 AS _1
       ) AS r0,
       LATERAL (
         SELECT
-          r0.index AS index,
-          trunc(r0._1)::int8 AS value
-      ) AS r1
+          r0.index AS index, r0._1 AS value) AS r1
     GROUP BY
       r0._0
     ---
-    []
+    [
+      7.23,
+      4.11,
+    ]
     ");
 }
 
