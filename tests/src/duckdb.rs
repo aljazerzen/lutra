@@ -1,4 +1,4 @@
-use lutra_compiler::{ProgramFormat, SourceTree};
+use lutra_compiler::{ProgramRepr, SourceTree};
 use lutra_runner_duckdb::Runner;
 
 /// Helper function to run a Lutra program on DuckDB
@@ -57,7 +57,7 @@ fn _compile(
     };
 
     // compile
-    let res = lutra_compiler::compile(&project, "main", None, ProgramFormat::SqlDuckdb);
+    let res = lutra_compiler::compile(&project, "main", None, ProgramRepr::SqlDuckdb);
     let (program, ty) = match res {
         Ok(x) => x,
         Err(e) => return Err(format!("compile error:\n{e}")),

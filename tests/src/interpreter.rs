@@ -189,13 +189,9 @@ fn func_call_size() {
     );
 
     let project = lutra_compiler::check(source, Default::default()).unwrap();
-    let (program, _ty) = lutra_compiler::compile(
-        &project,
-        "x",
-        None,
-        lutra_compiler::ProgramFormat::BytecodeLt,
-    )
-    .unwrap();
+    let (program, _ty) =
+        lutra_compiler::compile(&project, "x", None, lutra_compiler::ProgramRepr::BytecodeLt)
+            .unwrap();
 
     let program_lt = program.encode();
 

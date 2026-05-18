@@ -8,7 +8,7 @@ use std::path;
 use clap::{Parser, Subcommand};
 
 use lutra_bin::Encode;
-use lutra_codegen::ProgramFormat;
+use lutra_codegen::ProgramRepr;
 use lutra_compiler::{CheckParams, DiscoverParams, codespan};
 use lutra_runner::RunSync;
 
@@ -169,7 +169,7 @@ pub struct CompileCommand {
     output: Option<path::PathBuf>,
 
     #[clap(long, default_value = "bytecode-lt")]
-    format: lutra_compiler::ProgramFormat,
+    format: lutra_compiler::ProgramRepr,
 }
 
 pub fn compile(cmd: CompileCommand) -> anyhow::Result<()> {
@@ -284,7 +284,7 @@ pub fn run(cmd: RunCommand) -> anyhow::Result<()> {
         &project,
         &cmd.program,
         Some("--program"),
-        cmd.runner.get_program_format(),
+        cmd.runner.get_program_repr(),
     )?;
 
     // read input
@@ -320,7 +320,7 @@ pub fn interactive(cmd: InteractiveCommand) -> anyhow::Result<()> {
     let runner_params = cmd.runner.unwrap_or_default();
     // runner cfg
     let cfg = lutra_tui::RunnerConfig {
-        format: runner_params.get_program_format(),
+        repr: runner_params.get_program_repr(),
     };
 
     // init runner
@@ -419,10 +419,10 @@ pub fn codegen(cmd: CodegenCommand) -> anyhow::Result<()> {
         opts = opts.generate_function_traits();
     }
     for mod_name in cmd.programs_bytecode_lt {
-        opts = opts.generate_programs(mod_name, ProgramFormat::BytecodeLt);
+        opts = opts.generate_programs(mod_name, ProgramRepr::BytecodeLt);
     }
     for mod_name in cmd.programs_sql_pg {
-        opts = opts.generate_programs(mod_name, ProgramFormat::SqlPg);
+        opts = opts.generate_programs(mod_name, ProgramRepr::SqlPg);
     }
     if let Some(lutra_bin_path) = cmd.lutra_bin_path {
         opts = opts.with_lutra_bin_path(lutra_bin_path);

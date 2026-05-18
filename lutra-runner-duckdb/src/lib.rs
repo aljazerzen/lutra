@@ -58,7 +58,7 @@ impl lutra_runner::RunSync for Runner {
         // Accept both SqlDuckDB (preferred) and SqlPg (backward compatibility)
         let program = program
             .into_sql_duck_db()
-            .map_err(|_| Error::UnsupportedFormat)?;
+            .map_err(|_| Error::UnsupportedProgramRepr)?;
 
         // Don't prepare a statement, because we cannot cache it for later anyway.
         // That's because statement borrows connection, which means we cannot use it for other queries.
@@ -115,8 +115,8 @@ pub enum Error {
     BadDatabaseResponse(&'static str),
     #[error("duckdb: {}", .0)]
     DuckDB(#[from] duckdb::Error),
-    #[error("unsupported program format")]
-    UnsupportedFormat,
+    #[error("unsupported program repr")]
+    UnsupportedProgramRepr,
     #[error("unsupported data type: {}", .0)]
     UnsupportedDataType(&'static str),
     #[error("arrow conversion: {}", .0)]

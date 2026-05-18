@@ -2,7 +2,7 @@ use std::collections::HashSet;
 use std::hash::{Hash, Hasher};
 use std::{env, sync, time};
 
-use lutra_compiler::{ProgramFormat, SourceTree};
+use lutra_compiler::{ProgramRepr, SourceTree};
 use lutra_runner::Run;
 use lutra_runner_postgres::RunnerAsync;
 use tokio::io::{AsyncRead, AsyncWrite};
@@ -41,7 +41,7 @@ pub async fn _run_on(
     };
 
     // compile to sql
-    let res = lutra_compiler::compile(&project, "main", None, ProgramFormat::SqlPg);
+    let res = lutra_compiler::compile(&project, "main", None, ProgramRepr::SqlPg);
     let (program, ty) = match res {
         Ok(x) => x,
         Err(e) => return (String::new(), format!("compile error:\n{e}")),
@@ -2683,7 +2683,7 @@ async fn _type_round_trip(ty: &str, ty_reflected: &str, value: lutra_bin::Value)
     let source = SourceTree::single("".into(), format!("func main(x: {ty}) -> x"));
     let project = lutra_compiler::check(source, Default::default()).unwrap();
     let (program, p_ty) =
-        lutra_compiler::compile(&project, "main", None, ProgramFormat::SqlPg).unwrap();
+        lutra_compiler::compile(&project, "main", None, ProgramRepr::SqlPg).unwrap();
 
     // execute
     let input = value.encode(&p_ty.input, &p_ty.defs).unwrap();
@@ -2755,7 +2755,7 @@ async fn _type_round_trip(ty: &str, ty_reflected: &str, value: lutra_bin::Value)
 
     // insert
     let (insert, insert_ty) =
-        lutra_compiler::compile(&project, "x -> insert_row(x)", None, ProgramFormat::SqlPg)
+        lutra_compiler::compile(&project, "x -> insert_row(x)", None, ProgramRepr::SqlPg)
             .unwrap_or_else(|e| panic!("{e}"));
     let input = value.encode(&insert_ty.input, &insert_ty.defs).unwrap();
     let insert_id = runner.prepare(insert).await.unwrap();
@@ -2763,7 +2763,7 @@ async fn _type_round_trip(ty: &str, ty_reflected: &str, value: lutra_bin::Value)
 
     // from
     let (from, from_ty) =
-        lutra_compiler::compile(&project, "from_row", None, ProgramFormat::SqlPg).unwrap();
+        lutra_compiler::compile(&project, "from_row", None, ProgramRepr::SqlPg).unwrap();
     let from_id = runner.prepare(from).await.unwrap();
     let output = runner.execute(from_id, &[]).await.unwrap();
 

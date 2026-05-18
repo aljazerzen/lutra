@@ -284,7 +284,7 @@ fn type_str(s: &str) -> Vec<Event> {
 
 fn cfg() -> RunnerConfig {
     RunnerConfig {
-        format: lutra_compiler::ProgramFormat::BytecodeLt,
+        repr: lutra_compiler::ProgramRepr::BytecodeLt,
     }
 }
 

@@ -7,7 +7,7 @@ fn main() {
 
     // we want to compile all programs in the root module
     let opts =
-        codegen::GenerateOptions::default().generate_programs("", codegen::ProgramFormat::SqlPg);
+        codegen::GenerateOptions::default().generate_programs("", codegen::ProgramRepr::SqlPg);
 
     // run codegen
     let input_files = codegen::generate("src/main.lt", &out_file, opts);

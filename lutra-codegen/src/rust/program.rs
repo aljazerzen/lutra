@@ -1,7 +1,7 @@
 use std::fmt::Write;
 
 use lutra_bin::{Encode, ir};
-use lutra_compiler::{ProgramFormat, pr};
+use lutra_compiler::{ProgramRepr, pr};
 
 use crate::rust::Context;
 use crate::rust::types;
@@ -11,7 +11,7 @@ use crate::rust::types;
 pub fn write_rr_programs(
     w: &mut impl Write,
     functions: &[(&String, ir::TyFunction)],
-    format: ProgramFormat,
+    format: ProgramRepr,
     ctx: &mut Context,
 ) -> Result<(), std::fmt::Error> {
     if functions.is_empty() {

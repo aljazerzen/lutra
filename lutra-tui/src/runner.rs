@@ -9,7 +9,7 @@ pub use lutra_runner::proto;
 
 #[derive(Debug, Clone)]
 pub struct RunnerConfig {
-    pub format: lutra_compiler::ProgramFormat,
+    pub repr: lutra_compiler::ProgramRepr,
 }
 
 /// Handle of a runner instance.
@@ -63,7 +63,7 @@ impl RunnerProxy {
 
 /// State needed to communicate with a runner
 pub(crate) struct RunnerSession {
-    format: lutra_compiler::ProgramFormat,
+    repr: lutra_compiler::ProgramRepr,
     client: lutra_runner::channel::ClientSender,
     prepared: Option<PreparedProgram>,
     pending: Option<Pending>,
@@ -91,18 +91,18 @@ pub(crate) struct RunnerEvent {
 impl RunnerSession {
     pub fn new(
         client: lutra_runner::channel::ClientSender,
-        format: lutra_compiler::ProgramFormat,
+        repr: lutra_compiler::ProgramRepr,
     ) -> Self {
         Self {
-            format,
+            repr,
             client,
             prepared: None,
             pending: None,
         }
     }
 
-    pub fn format(&self) -> lutra_compiler::ProgramFormat {
-        self.format
+    pub fn repr(&self) -> lutra_compiler::ProgramRepr {
+        self.repr
     }
 
     pub fn run(&mut self, program: &rr::Program, input: Vec<u8>) -> Result<(), String> {

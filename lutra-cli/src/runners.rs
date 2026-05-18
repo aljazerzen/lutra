@@ -25,15 +25,15 @@ impl Default for RunnerParams {
 }
 
 impl RunnerParams {
-    /// Returns the program format needed for this runner
-    pub fn get_program_format(&self) -> lutra_compiler::ProgramFormat {
+    /// Returns the program repr needed for this runner
+    pub fn get_program_repr(&self) -> lutra_compiler::ProgramRepr {
         #[allow(clippy::if_same_then_else)]
         if self.interpreter {
-            lutra_compiler::ProgramFormat::BytecodeLt
+            lutra_compiler::ProgramRepr::BytecodeLt
         } else if self.postgres.is_some() {
-            lutra_compiler::ProgramFormat::SqlPg
+            lutra_compiler::ProgramRepr::SqlPg
         } else if self.duckdb.is_some() {
-            lutra_compiler::ProgramFormat::SqlDuckdb
+            lutra_compiler::ProgramRepr::SqlDuckdb
         } else {
             unreachable!()
         }

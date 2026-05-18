@@ -1,7 +1,7 @@
 use std::path::PathBuf;
 
 use libtest_mimic::{Arguments, Trial};
-use lutra_compiler::ProgramFormat;
+use lutra_compiler::ProgramRepr;
 
 fn init_logger() {
     tracing_subscriber::fmt::Subscriber::builder()
@@ -111,7 +111,7 @@ fn parse_file(contents: &str) -> Vec<TestCase> {
 async fn run_on_interpreter(case: TestCase) -> Result<(), libtest_mimic::Failed> {
     let runner = lutra_interpreter::InterpreterRunner::default();
     let runner = lutra_runner::AsyncRunner::new(runner);
-    run_program("interpreter", ProgramFormat::BytecodeLt, &runner, case).await
+    run_program("interpreter", ProgramRepr::BytecodeLt, &runner, case).await
 }
 
 #[tokio::main(flavor = "current_thread")]
@@ -130,7 +130,7 @@ async fn run_on_pg(case: TestCase) -> Result<(), libtest_mimic::Failed> {
     let tran = client.transaction().await.unwrap();
 
     let runner = lutra_runner_postgres::RunnerAsync::new(tran);
-    let res = run_program("pg", ProgramFormat::SqlPg, &runner, case).await;
+    let res = run_program("pg", ProgramRepr::SqlPg, &runner, case).await;
     runner.into_inner().rollback().await.unwrap();
     res
 }
@@ -140,12 +140,12 @@ async fn run_on_duckdb(case: TestCase) -> Result<(), libtest_mimic::Failed> {
     let runner = lutra_runner_duckdb::Runner::in_memory(None)
         .map_err(|e| format!("Failed to create DuckDB runner: {e:?}"))?;
     let runner = lutra_runner::AsyncRunner::new(runner);
-    run_program("duckdb", ProgramFormat::SqlDuckdb, &runner, case).await
+    run_program("duckdb", ProgramRepr::SqlDuckdb, &runner, case).await
 }
 
 async fn run_program(
     runner_name: &'static str,
-    program_format: ProgramFormat,
+    program_format: ProgramRepr,
     runner: &impl lutra_runner::Run,
     case: TestCase,
 ) -> Result<(), libtest_mimic::Failed> {

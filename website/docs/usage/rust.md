@@ -66,7 +66,7 @@ fn main() {
     let out_file = path::Path::new(&env::var("OUT_DIR").unwrap()).join("generated.rs");
 
     let opts = codegen::GenerateOptions::default()
-        .generate_programs("", codegen::ProgramFormat::BytecodeLt);
+        .generate_programs("", codegen::ProgramRepr::BytecodeLt);
 
     let input_files = codegen::generate("src/main.lt", &out_file, opts);
 
@@ -120,7 +120,7 @@ The result is a Rust `Vec<generated::Movie>`.
 
 ## Switch to PostgreSQL
 
-For PostgreSQL-backed programs, change both the generated program format and the
+For PostgreSQL-backed programs, change both the generated program repr and the
 runtime dependency.
 
 ### Add the PostgreSQL runner
@@ -134,7 +134,7 @@ lutra-runner-postgres = { version = "0.5" }
 
 ```rust title="build.rs"
 let opts = codegen::GenerateOptions::default()
-    .generate_programs("", codegen::ProgramFormat::SqlPg);
+    .generate_programs("", codegen::ProgramRepr::SqlPg);
 ```
 
 ### Run the program from Rust
@@ -165,7 +165,7 @@ async fn main() {
 ```
 
 The Rust-side calling style stays almost the same. The main difference is the
-runner and the program format emitted during code generation.
+runner and the program repr emitted during code generation.
 
 ## Use the examples in this repository
 

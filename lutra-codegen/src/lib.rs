@@ -2,7 +2,7 @@ mod python;
 mod rust;
 mod sql;
 
-pub use lutra_compiler::ProgramFormat;
+pub use lutra_compiler::ProgramRepr;
 
 use std::borrow::Cow;
 use std::{fs, path};
@@ -99,7 +99,7 @@ pub fn generate_program_bytecode(project_dir: &path::Path, program: &str, out_fi
         &project,
         program,
         None,
-        lutra_compiler::ProgramFormat::BytecodeLt,
+        lutra_compiler::ProgramRepr::BytecodeLt,
     )
     .unwrap();
 
@@ -113,7 +113,7 @@ pub struct GenerateOptions {
     generate_encode_decode: bool,
     generate_function_traits: bool,
 
-    include_programs: Vec<(String, ProgramFormat)>,
+    include_programs: Vec<(String, ProgramRepr)>,
 
     lutra_bin_path: String,
 }
@@ -156,7 +156,7 @@ impl GenerateOptions {
     }
 
     /// Generates programs for all functions in a module
-    pub fn generate_programs(mut self, module_path: impl ToString, fmt: ProgramFormat) -> Self {
+    pub fn generate_programs(mut self, module_path: impl ToString, fmt: ProgramRepr) -> Self {
         self.include_programs.push((module_path.to_string(), fmt));
         self
     }

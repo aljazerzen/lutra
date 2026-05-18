@@ -1,5 +1,5 @@
 use lutra_bin::br;
-use lutra_compiler::ProgramFormat;
+use lutra_compiler::ProgramRepr;
 use lutra_runner::{AsyncRunner, Run, binary, proto};
 
 #[tokio::test(flavor = "current_thread")]
@@ -19,7 +19,7 @@ async fn main() {
     let project = lutra_compiler::check(source, Default::default()).unwrap();
     let source = "func (x: int64) -> 3 * x + 2";
     let (program, ty) =
-        lutra_compiler::compile(&project, source, None, ProgramFormat::BytecodeLt).unwrap();
+        lutra_compiler::compile(&project, source, None, ProgramRepr::BytecodeLt).unwrap();
 
     let c = async {
         let handle = client.prepare(program).await.unwrap();

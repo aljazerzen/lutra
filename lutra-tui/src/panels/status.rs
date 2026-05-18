@@ -25,7 +25,7 @@ pub enum Status {
 impl StatusBar {
     /// Creates a new status bar.
     pub fn new(project: Option<path::PathBuf>, runner: &RunnerConfig) -> Self {
-        let runner_format = format!("{:?}", runner.format);
+        let runner = format!("{:?}", runner.repr);
 
         let project_path = project
             .map(|project| {
@@ -37,7 +37,7 @@ impl StatusBar {
         Self {
             project_path,
             status: Status::Compiling,
-            runner_name: runner_format,
+            runner_name: runner,
             debug: None,
         }
     }

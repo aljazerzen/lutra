@@ -3,7 +3,7 @@ use std::path::PathBuf;
 use std::{borrow::Cow, fmt::Write};
 
 use lutra_bin::{Encode, ir, layout};
-use lutra_compiler::{ProgramFormat, Project, pr};
+use lutra_compiler::{ProgramRepr, Project, pr};
 
 use crate::camel_to_snake;
 
@@ -547,7 +547,7 @@ fn ty_encode_body(ty: &ir::Ty, val_ref: &str, residual_ref: &str, ctx: &mut Cont
 fn write_programs(
     w: &mut impl Write,
     functions: &[(&String, ir::TyFunction)],
-    format: ProgramFormat,
+    format: ProgramRepr,
     ctx: &mut Context,
 ) -> Result<(), std::fmt::Error> {
     if functions.is_empty() {

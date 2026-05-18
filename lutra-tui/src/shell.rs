@@ -46,7 +46,7 @@ impl Shell {
     ) -> Self {
         let mut s = Self {
             project: ProjectState::new(),
-            runner: runner::RunnerSession::new(runner_client, runner_cfg.format),
+            runner: runner::RunnerSession::new(runner_client, runner_cfg.repr),
             keybindings: KeyBindings::new(),
             commands: CommandRegistry::default(),
             repl: ReplPane::new(),
@@ -212,7 +212,7 @@ impl Shell {
         }
 
         // base case: lutra program
-        let res = lutra_compiler::compile(project, &prompt, None, self.runner.format());
+        let res = lutra_compiler::compile(project, &prompt, None, self.runner.repr());
         if let Err(err) = res {
             return r.and(self.repl.commit_compile_error(err.to_string()));
         }

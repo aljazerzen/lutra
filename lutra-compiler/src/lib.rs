@@ -28,9 +28,10 @@ pub use project::{Project, SourceTree, SymbolInfo};
 
 pub use lutra_bin::{ir, rr};
 
+/// The representation kind of a compiled Lutra program.
 #[derive(Debug, Clone, Copy)]
 #[cfg_attr(feature = "clap", derive(clap::ValueEnum))]
-pub enum ProgramFormat {
+pub enum ProgramRepr {
     SqlPg,
     SqlDuckdb,
     BytecodeLt,
@@ -40,7 +41,7 @@ pub fn compile(
     project: &Project,
     program: &str,
     name_hint: Option<&str>,
-    format: ProgramFormat,
+    target_repr: ProgramRepr,
 ) -> Result<(rr::Program, rr::ProgramType), error::Error> {
     // resolve
     let program_pr = self::check::check_overlay(project, program, name_hint)?;
@@ -55,15 +56,15 @@ pub fn compile(
     let program_ir = intermediate::layouter::on_program(program_ir);
 
     // backend (sql or bytecode)
-    let program = match format {
-        ProgramFormat::SqlPg => rr::Program::SqlPostgres(Box::new(sql::compile_ir(
+    let program = match target_repr {
+        ProgramRepr::SqlPg => rr::Program::SqlPostgres(Box::new(sql::compile_ir(
             &program_ir,
             sql::Dialect::Postgres,
         ))),
-        ProgramFormat::SqlDuckdb => {
+        ProgramRepr::SqlDuckdb => {
             rr::Program::SqlDuckDB(Box::new(sql::compile_ir(&program_ir, sql::Dialect::DuckDB)))
         }
-        ProgramFormat::BytecodeLt => {
+        ProgramRepr::BytecodeLt => {
             rr::Program::BytecodeLt(bytecoding::compile_program(program_ir.clone()))
         }
     };

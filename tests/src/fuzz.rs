@@ -182,7 +182,7 @@ async fn generate_and_test(
         project,
         &case.val_source,
         None,
-        lutra_compiler::ProgramFormat::SqlPg,
+        lutra_compiler::ProgramRepr::SqlPg,
     )
     .unwrap();
     let handle = client.prepare(program).await.unwrap();
@@ -195,7 +195,7 @@ async fn generate_and_test(
         project,
         &format!("func (x: {}) -> x", case.ty_source),
         None,
-        lutra_compiler::ProgramFormat::SqlPg,
+        lutra_compiler::ProgramRepr::SqlPg,
     )
     .unwrap();
     let handle = client.prepare(program).await.unwrap();

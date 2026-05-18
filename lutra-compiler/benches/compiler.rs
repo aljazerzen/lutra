@@ -11,7 +11,7 @@
 /// The program under test is intentionally tiny so that the fixed cost of
 /// compiling std.lt dominates, which is what we care about here.
 use criterion::{Criterion, criterion_group, criterion_main};
-use lutra_compiler::{_bench, _lexer, CheckParams, ProgramFormat, SourceTree, check, compile};
+use lutra_compiler::{_bench, _lexer, CheckParams, ProgramRepr, SourceTree, check, compile};
 use std::hint::black_box;
 
 const PROG: &str = "func main() -> std::add(1, 2): int32";
@@ -75,10 +75,10 @@ fn bench_compile(c: &mut Criterion) {
 
     let mut group = c.benchmark_group("compile");
     group.bench_function("bytecode", |b| {
-        b.iter(|| compile(black_box(&project), "main", None, ProgramFormat::BytecodeLt).unwrap());
+        b.iter(|| compile(black_box(&project), "main", None, ProgramRepr::BytecodeLt).unwrap());
     });
     group.bench_function("sql_duckdb", |b| {
-        b.iter(|| compile(black_box(&project), "main", None, ProgramFormat::SqlDuckdb).unwrap());
+        b.iter(|| compile(black_box(&project), "main", None, ProgramRepr::SqlDuckdb).unwrap());
     });
     group.finish();
 }
