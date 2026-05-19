@@ -1,4 +1,4 @@
-# `std::sql` - SQL database interface
+# `std::sql` - SQL interface
 
 Module available only when targeting SQL databases.
 Currently this includes only `sql-pg` format.

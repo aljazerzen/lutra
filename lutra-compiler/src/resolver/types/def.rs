@@ -34,7 +34,7 @@ impl super::TypeResolver<'_> {
         };
 
         // resolve
-        let def_kind = self.resolve_unresolved(fq_ident, def_kind)?;
+        let def_kind = self.resolve_def_kind(fq_ident, def_kind)?;
 
         // put def back in
         let def = self.root_mod.get_mut(fq_ident).unwrap();
@@ -113,7 +113,7 @@ impl super::TypeResolver<'_> {
         self.root_mod.annotations = annotations;
     }
 
-    pub fn resolve_unresolved(
+    pub fn resolve_def_kind(
         &mut self,
         fq_ident: &pr::Path,
         def: pr::DefKind,

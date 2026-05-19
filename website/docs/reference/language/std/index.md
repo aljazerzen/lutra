@@ -6,7 +6,7 @@
 - [`math`](math/index.md) - Mathematical ops
 - [`text`](text/index.md) - Text functions
 - [`fs`](fs/index.md) - File system operations
-- [`sql`](sql/index.md) - SQL database interface
+- [`sql`](sql/index.md) - SQL interface
 - [`date`](date/index.md)
 - [`timestamp`](timestamp/index.md)
 
