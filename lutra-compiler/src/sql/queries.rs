@@ -610,8 +610,8 @@ impl<'a> Context<'a> {
     fn compile_func_call(&mut self, id: &str, args_in: &[cr::Expr], ty: &ir::Ty) -> Node {
         let args = self.compile_columns(args_in);
         let expr = match id {
-            "std::mul" => utils::new_bin_op("*", args),
-            "std::div" => match self.dialect {
+            "std::ops::mul" => utils::new_bin_op("*", args),
+            "std::ops::div" => match self.dialect {
                 Dialect::Postgres => utils::new_bin_op("/", args),
                 Dialect::DuckDB => match ty.kind.as_primitive().unwrap() {
                     ir::TyPrimitive::float32 | ir::TyPrimitive::float64 => {
@@ -620,32 +620,32 @@ impl<'a> Context<'a> {
                     _ => utils::new_bin_op("//", args),
                 },
             },
-            "std::mod" => match ty.kind.as_primitive().unwrap() {
+            "std::ops::mod" => match ty.kind.as_primitive().unwrap() {
                 ir::TyPrimitive::float32 | ir::TyPrimitive::float64 => {
                     let [l, r] = unpack_args(args);
                     sa::Expr::Source(format!("MOD({l}::numeric, {r}::numeric)::float8"))
                 }
                 _ => utils::new_bin_op("%", args),
             },
-            "std::add" => utils::new_bin_op("+", args),
-            "std::sub" => utils::new_bin_op("-", args),
-            "std::neg" => utils::new_un_op("-", args),
+            "std::ops::add" => utils::new_bin_op("+", args),
+            "std::ops::sub" => utils::new_bin_op("-", args),
+            "std::ops::neg" => utils::new_un_op("-", args),
 
-            "std::cmp" => {
+            "std::ops::cmp" => {
                 let [a, b] = unpack_args(args);
                 sa::Expr::Source(format!(
                     "(SELECT CASE WHEN a < b THEN 0 WHEN a > b THEN 2 ELSE 1 END::int2 FROM (VALUES ({a}, {b})) t(a,b))"
                 ))
             }
-            "std::eq" => utils::new_bin_op("=", args),
-            "std::lt" => utils::new_bin_op("<", args),
-            "std::lte" => utils::new_bin_op("<=", args),
+            "std::ops::eq" => utils::new_bin_op("=", args),
+            "std::ops::lt" => utils::new_bin_op("<", args),
+            "std::ops::lte" => utils::new_bin_op("<=", args),
 
-            "std::and" => utils::new_bin_op("AND", args),
-            "std::or" => utils::new_bin_op("OR", args),
-            "std::not" => utils::new_un_op("NOT", args),
+            "std::ops::and" => utils::new_bin_op("AND", args),
+            "std::ops::or" => utils::new_bin_op("OR", args),
+            "std::ops::not" => utils::new_un_op("NOT", args),
 
-            "std::sequence" => {
+            "std::array::sequence" => {
                 let [start, end] = unpack_args(args);
 
                 // generate_series
@@ -678,7 +678,7 @@ impl<'a> Context<'a> {
                 return Node::Select(select);
             }
 
-            "std::min" => {
+            "std::array::min" => {
                 let ty_item = self.get_ty_mat(&args_in[0].ty);
 
                 let is_bool = ty_item
@@ -694,7 +694,7 @@ impl<'a> Context<'a> {
                     utils::new_func_call("MIN", args)
                 }
             }
-            "std::max" => {
+            "std::array::max" => {
                 let ty_item = self.get_ty_mat(&args_in[0].ty);
 
                 let is_bool = ty_item
@@ -710,12 +710,12 @@ impl<'a> Context<'a> {
                     utils::new_func_call("MAX", args)
                 }
             }
-            "std::sum" => {
+            "std::array::sum" => {
                 let [arg] = unpack_args(args);
                 let ty = self.ty_name(ty);
                 sa::Expr::Source(format!("COALESCE(SUM({arg}), 0)::{ty}"))
             }
-            "std::mean" => {
+            "std::array::mean" => {
                 let [arg] = unpack_args(args);
                 sa::Expr::Source(
                     if matches!(
@@ -735,7 +735,7 @@ impl<'a> Context<'a> {
                     },
                 )
             }
-            "std::count" => {
+            "std::array::count" => {
                 let [arg] = unpack_args(args);
 
                 sa::Expr::Source(if let sa::Expr::CompoundIdentifier(parts) = arg {
@@ -749,16 +749,16 @@ impl<'a> Context<'a> {
                     format!("COUNT({arg} IS NULL)")
                 })
             }
-            "std::any" => sa::Expr::Source(format!(
+            "std::array::any" => sa::Expr::Source(format!(
                 "COALESCE({}, FALSE)",
                 utils::new_func_call("BOOL_OR", args)
             )),
-            "std::all" => sa::Expr::Source(format!(
+            "std::array::all" => sa::Expr::Source(format!(
                 "COALESCE({}, TRUE)",
                 utils::new_func_call("BOOL_AND", args)
             )),
 
-            "std::lead" => {
+            "std::array::lead" => {
                 let [arg, offset] = unpack_args(args);
 
                 let item_ty = self.get_ty_mat(ty).kind.as_array().unwrap();
@@ -768,7 +768,7 @@ impl<'a> Context<'a> {
                     "COALESCE(LEAD({arg}, {offset}::int4) OVER (ORDER BY {COL_ARRAY_INDEX}), {filler})"
                 ))
             }
-            "std::lag" => {
+            "std::array::lag" => {
                 let [arg, offset] = unpack_args(args);
 
                 let item_ty = self.get_ty_mat(ty).kind.as_array().unwrap();
@@ -778,26 +778,26 @@ impl<'a> Context<'a> {
                     "COALESCE(LAG({arg}, {offset}::int4) OVER (ORDER BY {COL_ARRAY_INDEX}), {filler})"
                 ))
             }
-            "std::rolling_mean" => {
+            "std::array::rolling_mean" => {
                 let [array, trailing, leading] = unpack_args(args);
 
                 sa::Expr::Source(format!(
                     "(AVG({array}) OVER (ORDER BY {COL_ARRAY_INDEX} ROWS BETWEEN {trailing} PRECEDING AND {leading} FOLLOWING))::float8"
                 ))
             }
-            "std::rank" => {
+            "std::array::rank" => {
                 let [array] = unpack_args(args);
                 sa::Expr::Source(format!("(RANK() OVER (ORDER BY {array}))::int4"))
             }
-            "std::rank_dense" => {
+            "std::array::rank_dense" => {
                 let [array] = unpack_args(args);
                 sa::Expr::Source(format!("(DENSE_RANK() OVER (ORDER BY {array}))::int4"))
             }
-            "std::rank_percentile" => {
+            "std::array::rank_percentile" => {
                 let [array] = unpack_args(args);
                 sa::Expr::Source(format!("PERCENT_RANK() OVER (ORDER BY {array})"))
             }
-            "std::cume_dist" => {
+            "std::array::cume_dist" => {
                 let [array] = unpack_args(args);
                 sa::Expr::Source(format!("CUME_DIST() OVER (ORDER BY {array})"))
             }
@@ -911,19 +911,25 @@ impl<'a> Context<'a> {
                 sa::Expr::Source(format!("{arg} IS NOT NULL"))
             }
 
-            "std::to_int8" | "std::to_int16" | "std::to_int32" | "std::to_int64"
-            | "std::to_uint8" | "std::to_uint16" | "std::to_uint32" | "std::to_uint64" => {
+            "std::convert::to_int8"
+            | "std::convert::to_int16"
+            | "std::convert::to_int32"
+            | "std::convert::to_int64"
+            | "std::convert::to_uint8"
+            | "std::convert::to_uint16"
+            | "std::convert::to_uint32"
+            | "std::convert::to_uint64" => {
                 let [arg] = unpack_args(args);
                 self.compile_to_int(arg, &args_in[0].ty, ty)
             }
 
-            "std::to_float32" | "std::to_float64" => {
+            "std::convert::to_float32" | "std::convert::to_float64" => {
                 let [arg] = unpack_args(args);
                 let ty = self.ty_name(ty);
                 sa::Expr::Source(format!("({arg})::{ty}"))
             }
 
-            "std::to_text" => {
+            "std::convert::to_text" => {
                 let [arg] = unpack_args(args);
                 let ty = self.ty_name(ty);
 

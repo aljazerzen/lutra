@@ -160,7 +160,7 @@ impl fold::IrFold for FuncInliner {
                     let ty_bool = ir::Ty::new(ir::TyPrimitive::bool);
                     let std_not = ir::Expr::new(
                         ir::ExternalPtr {
-                            id: "std::not".into(),
+                            id: "std::ops::not".into(),
                         },
                         ir::Ty::new(ir::TyFunction {
                             params: vec![ty_bool.clone()],
@@ -321,12 +321,12 @@ impl IrFold for BindingInliner {
         // )
         if let ir::ExprKind::Call(call) = &enum_eq.subject.kind
             && let ir::ExprKind::Pointer(ir::Pointer::External(func)) = &call.function.kind
-            && func.id == "std::cmp"
+            && func.id == "std::ops::cmp"
         {
             let (cmp_func, swap) = match enum_eq.tag {
-                0 => ("std::lt", false),
-                1 => ("std::eq", false),
-                2 => ("std::lt", true),
+                0 => ("std::ops::lt", false),
+                1 => ("std::ops::eq", false),
+                2 => ("std::ops::lt", true),
                 _ => unreachable!(),
             };
 
@@ -382,32 +382,33 @@ impl IrFold for BindingInliner {
         // )
         if let ir::ExprKind::Call(outer) = &expr.kind
             && let Some(outer_id) = as_external(&outer.function)
+            && !outer.args.is_empty()
             && let ir::ExprKind::Call(inner) = &outer.args[0].kind
             && let Some(inner_id) = as_external(&inner.function)
         {
             match (outer_id, inner_id) {
-                ("std::not", "std::not") => {
+                ("std::ops::not", "std::ops::not") => {
                     // not(not(x)) --> x
                     return Ok(inner.args[0].clone());
                 }
 
-                ("std::not", "std::lt") => {
+                ("std::ops::not", "std::ops::lt") => {
                     // not(lt(a, b)) --> lte(b, a)
                     let mut call = *inner.clone();
 
                     let func_id = as_external_mut(&mut call.function).unwrap();
-                    *func_id = "std::lte".to_string();
+                    *func_id = "std::ops::lte".to_string();
 
                     call.args.reverse();
 
                     return Ok(ir::Expr::new(call, expr.ty));
                 }
-                ("std::not", "std::lte") => {
+                ("std::ops::not", "std::ops::lte") => {
                     // not(lte(a, b)) --> lt(b, a)
                     let mut call = *inner.clone();
 
                     let func_id = as_external_mut(&mut call.function).unwrap();
-                    *func_id = "std::lt".to_string();
+                    *func_id = "std::ops::lt".to_string();
 
                     call.args.reverse();
 

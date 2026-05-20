@@ -182,7 +182,7 @@ impl ProgramRepr {
     fn get_implicit_externals(&self) -> Vec<std::borrow::Cow<'static, str>> {
         match self {
             ProgramRepr::SqlPg => vec!["std::sql".into()],
-            ProgramRepr::SqlDuckdb => vec!["std::sql".into()],
+            ProgramRepr::SqlDuckdb => vec!["std::sql".into(), "std::fs".into()],
             ProgramRepr::BytecodeLt => vec![],
         }
     }
@@ -208,11 +208,12 @@ impl CompileParams {
         I: IntoIterator<Item = T>,
         T: Into<std::borrow::Cow<'static, str>>,
     {
-        self.externals = externals.into_iter().map(|x| x.into()).collect();
+        self.externals
+            .extend(externals.into_iter().map(|x| x.into()));
         self
     }
 
-    pub fn push_external(mut self, external: impl Into<std::borrow::Cow<'static, str>>) -> Self {
+    pub fn with_external(mut self, external: impl Into<std::borrow::Cow<'static, str>>) -> Self {
         self.externals.push(external.into());
         self
     }

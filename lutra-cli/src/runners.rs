@@ -16,7 +16,7 @@ pub(crate) struct RunnerParams {
 
 impl RunnerParams {
     pub(crate) fn or_default(mut self) -> Self {
-        if !self.interpreter && !self.postgres.is_some() && !self.duckdb.is_some() {
+        if !self.interpreter && self.postgres.is_none() && self.duckdb.is_none() {
             self.duckdb = Some(":memory:".into());
         }
         self

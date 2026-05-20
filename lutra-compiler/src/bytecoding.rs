@@ -261,33 +261,52 @@ impl<'t> ByteCoder<'t> {
 
     fn compile_external_symbol(&mut self, id: String, ty_mat: &ir::Ty) -> ExternalSymbol {
         let layout_args: Vec<u32> = match id.as_str() {
-            "std::to_int8" | "std::to_int16" | "std::to_int32" | "std::to_int64"
-            | "std::to_uint8" | "std::to_uint16" | "std::to_uint32" | "std::to_uint64"
-            | "std::to_float32" | "std::to_float64" | "std::to_text" | "std::mul" | "std::div"
-            | "std::mod" | "std::add" | "std::sub" | "std::neg" | "std::cmp" | "std::eq"
-            | "std::lt" | "std::lte" | "std::sequence" | "std::math::abs" | "std::math::pow" => {
+            "std::convert::to_int8"
+            | "std::convert::to_int16"
+            | "std::convert::to_int32"
+            | "std::convert::to_int64"
+            | "std::convert::to_uint8"
+            | "std::convert::to_uint16"
+            | "std::convert::to_uint32"
+            | "std::convert::to_uint64"
+            | "std::convert::to_float32"
+            | "std::convert::to_float64"
+            | "std::convert::to_text"
+            | "std::ops::mul"
+            | "std::ops::div"
+            | "std::ops::mod"
+            | "std::ops::add"
+            | "std::ops::sub"
+            | "std::ops::neg"
+            | "std::ops::cmp"
+            | "std::ops::eq"
+            | "std::ops::lt"
+            | "std::ops::lte"
+            | "std::array::sequence"
+            | "std::math::abs"
+            | "std::math::pow" => {
                 let param_ty = as_ty_of_param(ty_mat);
                 let primitive = self.get_ty_mat(param_ty).kind.as_primitive().unwrap();
 
                 vec![encode_prim(primitive)]
             }
 
-            "std::fold" => {
+            "std::array::fold" => {
                 let item_layout = as_layout_of_param_array(ty_mat);
                 vec![
                     item_layout.head_size.div_ceil(8), // item_head_size
                 ]
             }
 
-            "std::min"
-            | "std::max"
-            | "std::sum"
-            | "std::mean"
-            | "std::rolling_mean"
-            | "std::rank"
-            | "std::rank_dense"
-            | "std::rank_percentile"
-            | "std::cume_dist" => {
+            "std::array::min"
+            | "std::array::max"
+            | "std::array::sum"
+            | "std::array::mean"
+            | "std::array::rolling_mean"
+            | "std::array::rank"
+            | "std::array::rank_dense"
+            | "std::array::rank_percentile"
+            | "std::array::cume_dist" => {
                 let param_ty = as_ty_of_param(ty_mat);
                 let item_ty = self.get_ty_mat(param_ty).kind.as_array().unwrap();
 
@@ -300,7 +319,7 @@ impl<'t> ByteCoder<'t> {
                 ]
             }
 
-            "std::index" => {
+            "std::array::index" => {
                 let item_layout = as_layout_of_param_array(ty_mat);
 
                 let ty_func = ty_mat.kind.as_function().unwrap();
@@ -319,7 +338,10 @@ impl<'t> ByteCoder<'t> {
                 r
             }
 
-            "std::filter" | "std::slice" | "std::append" | "std::apply_until_empty" => {
+            "std::array::filter"
+            | "std::array::slice"
+            | "std::array::append"
+            | "std::array::apply_until_empty" => {
                 let item_layout = as_layout_of_param_array(ty_mat);
 
                 let mut r = Vec::with_capacity(1 + 1 + item_layout.body_ptrs.len());
@@ -327,7 +349,7 @@ impl<'t> ByteCoder<'t> {
                 r.extend(as_len_and_items(&item_layout.body_ptrs)); // item_body_ptrs
                 r
             }
-            "std::sort" => {
+            "std::array::sort" => {
                 let item_layout = as_layout_of_param_array(ty_mat);
 
                 let mut r = Vec::with_capacity(1 + 1 + item_layout.body_ptrs.len());
@@ -344,7 +366,7 @@ impl<'t> ByteCoder<'t> {
                 r
             }
 
-            "std::lag" | "std::lead" => {
+            "std::array::lag" | "std::array::lead" => {
                 let item_layout = as_layout_of_param_array(ty_mat);
 
                 let mut r = Vec::with_capacity(1 + 1 + item_layout.body_ptrs.len());
@@ -361,7 +383,7 @@ impl<'t> ByteCoder<'t> {
                 r
             }
 
-            "std::map" | "std::flat_map" | "std::scan" => {
+            "std::array::map" | "std::array::flat_map" | "std::array::scan" => {
                 let input_layout = as_layout_of_param_array(ty_mat);
                 let output_layout = as_layout_of_return_array(ty_mat);
 
@@ -372,7 +394,7 @@ impl<'t> ByteCoder<'t> {
                 r
             }
 
-            "std::to_columnar" => {
+            "std::array::to_columnar" => {
                 let ty_func = ty_mat.kind.as_function().unwrap();
 
                 let input_item = ty_func.params[0].kind.as_array().unwrap();
@@ -400,7 +422,7 @@ impl<'t> ByteCoder<'t> {
 
                 r
             }
-            "std::from_columnar" => {
+            "std::array::from_columnar" => {
                 let ty_func = ty_mat.kind.as_function().unwrap();
 
                 let output_item = ty_func.body.kind.as_array().unwrap();
@@ -428,7 +450,7 @@ impl<'t> ByteCoder<'t> {
                 r
             }
 
-            "std::zip" => {
+            "std::array::zip" => {
                 let ty_func = ty_mat.kind.as_function().unwrap();
 
                 let a_item = self.get_ty_mat(&ty_func.params[0]).kind.as_array().unwrap();
@@ -445,7 +467,7 @@ impl<'t> ByteCoder<'t> {
                 r
             }
 
-            "std::group" => {
+            "std::array::group" => {
                 let ty_func = ty_mat.kind.as_function().unwrap();
 
                 let input_item = self.get_ty_mat(&ty_func.params[0]).kind.as_array().unwrap();

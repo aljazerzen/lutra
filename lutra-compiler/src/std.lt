@@ -21,169 +21,173 @@ anno package(name: text)
 ## Annotates a type with traits to `#[Derive]` when translating to Rust.
 anno rust_derive(macros: [text])
 
-# --- Utils ---
+import convert::*
 
-## Constructs the usual "default" value
-##
-## For `bool` it is false.
-## For numbers, this is zero.
-## For `text` it is an empty text.
-## For tuples, it a tuple with every field set to default value.
-## For arrays, it is an empty array.
-## For enums, it the first variant.
-func default(): T
-where T
+## Type conversions
+module convert {
+  ## Constructs the usual "default" value
+  ##
+  ## For `bool` it is false.
+  ## For numbers, this is zero.
+  ## For `text` it is an empty text.
+  ## For tuples, it a tuple with every field set to default value.
+  ## For arrays, it is an empty array.
+  ## For enums, it the first variant.
+  func default(): T
+  where T
 
-# --- Type conversions ---
+  ## Converts a number to `int8`
+  func to_int8(x: T): int8
+  where T: number
 
-## Converts a number to `int8`
-func to_int8(x: T): int8
-where T: number
+  ## Converts a number to `int16`
+  func to_int16(x: T): int16
+  where T: number
 
-## Converts a number to `int16`
-func to_int16(x: T): int16
-where T: number
+  ## Converts a number to `int32`
+  func to_int32(x: T): int32
+  where T: number
 
-## Converts a number to `int32`
-func to_int32(x: T): int32
-where T: number
+  ## Converts a number to `int64`
+  func to_int64(x: T): int64
+  where T: number
 
-## Converts a number to `int64`
-func to_int64(x: T): int64
-where T: number
+  ## Converts a number to `uint8`
+  func to_uint8(x: T): uint8
+  where T: number
 
-## Converts a number to `uint8`
-func to_uint8(x: T): uint8
-where T: number
+  ## Converts a number to `uint16`
+  func to_uint16(x: T): uint16
+  where T: number
 
-## Converts a number to `uint16`
-func to_uint16(x: T): uint16
-where T: number
+  ## Converts a number to `uint32`
+  func to_uint32(x: T): uint32
+  where T: number
 
-## Converts a number to `uint32`
-func to_uint32(x: T): uint32
-where T: number
+  ## Converts a number to `uint64`
+  func to_uint64(x: T): uint64
+  where T: number
 
-## Converts a number to `uint64`
-func to_uint64(x: T): uint64
-where T: number
+  ## Converts a number to `float32`
+  func to_float32(x: T): float32
+  where T: number
 
-## Converts a number to `float32`
-func to_float32(x: T): float32
-where T: number
+  ## Converts a number to `float64`
+  func to_float64(x: T): float64
+  where T: number
 
-## Converts a number to `float64`
-func to_float64(x: T): float64
-where T: number
+  ## Converts a value to `text`
+  func to_text(x: T): text
+  where T: primitive
+}
 
-## Converts a value to `text`
-func to_text(x: T): text
-where T: primitive
+import ops::*
 
-# --- Operators ---
+## Operators
+module ops {
+  ## Multiplies two numbers.
+  func mul(left: T, right: T): T
+  where T: number
 
-## Multiplies two numbers.
-func mul(left: T, right: T): T
-where T: number
+  ## Divides two numbers.
+  func div(left: T, right: T): T
+  where T: number
 
-## Divides two numbers.
-func div(left: T, right: T): T
-where T: number
+  ## Division remainder.
+  func mod(left: T, right: T): T
+  where T: number
 
-## Division remainder.
-func mod(left: T, right: T): T
-where T: number
+  ## Adds two numbers.
+  func add(left: T, right: T): T
+  where T: number
 
-## Adds two numbers.
-func add(left: T, right: T): T
-where T: number
+  ## Subtracts two numbers.
+  func sub(left: T, right: T): T
+  where T: number
 
-## Subtracts two numbers.
-func sub(left: T, right: T): T
-where T: number
+  ## Negates a number.
+  func neg(x: T): T
+  where T: int8 | int16 | int32 | int64 | float32 | float64
 
-## Negates a number.
-func neg(x: T): T
-where T: int8 | int16 | int32 | int64 | float32 | float64
+  ## Compare two values to determine if the first is less, equal, or greater than
+  ## the second.
+  func cmp(a: T, b: T): Ordering
+  where T: primitive
 
-## Compare two values to determine if the first is less, equal, or greater than
-## the second.
-func cmp(a: T, b: T): Ordering
-where T: primitive
+  ## Result of a three-way comparison. Returned by [cmp].
+  type Ordering: enum {less, equal, greater}
 
-## Result of a three-way comparison. Returned by [cmp].
-type Ordering: enum {less, equal, greater}
+  ## Tests if values are equal. Used by `==` operator.
+  func eq(left: T, right: T): bool
+  where T: primitive
+  -> (
+    match cmp(left, right) {
+      .equal => true,
+      _ => false,
+    }
+  )
 
-## Tests if values are equal. Used by `==` operator.
-func eq(left: T, right: T): bool
-where T: primitive
--> (
-  match cmp(left, right) {
-    .equal => true,
-    _ => false,
-  }
-)
+  ## Tests if values are not equal. Used by `!=` operator.
+  func ne(left: T, right: T): bool
+  where T: primitive
+  -> (
+    match cmp(left, right) {
+      .equal => false,
+      _ => true,
+    }
+  )
 
-## Tests if values are not equal. Used by `!=` operator.
-func ne(left: T, right: T): bool
-where T: primitive
--> (
-  match cmp(left, right) {
-    .equal => false,
-    _ => true,
-  }
-)
+  ## Tests if left value is greater than the right. Used by `>` operator.
+  func gt(left: T, right: T): bool
+  where T: primitive
+  -> (
+    match cmp(left, right) {
+      .greater => true,
+      _ => false,
+    }
+  )
 
-## Tests if left value is greater than the right. Used by `>` operator.
-func gt(left: T, right: T): bool
-where T: primitive
--> (
-  match cmp(left, right) {
-    .greater => true,
-    _ => false,
-  }
-)
+  ## Tests if left value is less than the right. Used by `<` operator.
+  func lt(left: T, right: T): bool
+  where T: primitive
+  -> (
+    match cmp(left, right) {
+      .less => true,
+      _ => false,
+    }
+  )
 
-## Tests if left value is less than the right. Used by `<` operator.
-func lt(left: T, right: T): bool
-where T: primitive
--> (
-  match cmp(left, right) {
-    .less => true,
-    _ => false,
-  }
-)
+  ## Tests if left value is greater or equal to the right. Used by `>=` operator.
+  func gte(left: T, right: T): bool
+  where T: primitive
+  -> (
+    match cmp(left, right) {
+      .less => false,
+      _ => true,
+    }
+  )
 
-## Tests if left value is greater or equal to the right. Used by `>=` operator.
-func gte(left: T, right: T): bool
-where T: primitive
--> (
-  match cmp(left, right) {
-    .less => false,
-    _ => true,
-  }
-)
+  ## Tests if left value is less or equal to the right. Used by `<=` operator.
+  func lte(left: T, right: T): bool
+  where T: primitive
+  -> (
+    match cmp(left, right) {
+      .greater => false,
+      _ => true,
+    }
+  )
 
-## Tests if left value is less or equal to the right. Used by `<=` operator.
-func lte(left: T, right: T): bool
-where T: primitive
--> (
-  match cmp(left, right) {
-    .greater => false,
-    _ => true,
-  }
-)
+  ## Tests if both values are true. Used by `&&` operator.
+  func and(left: bool, right: bool): bool
 
-## Tests if both values are true. Used by `&&` operator.
-func and(left: bool, right: bool): bool
+  ## Tests if either of the values is true. Used by `||` operator.
+  func or(left: bool, right: bool): bool
 
-## Tests if either of the values is true. Used by `||` operator.
-func or(left: bool, right: bool): bool
+  ## Inverts a boolean. Used by `!` operator.
+  func not(expr: bool): bool
+}
 
-## Inverts a boolean. Used by `!` operator.
-func not(expr: bool): bool
-
-import option::*
+import option::(is_some, is_none, or_else, or_default, map_or)
 
 ## Nullable values
 module option {
@@ -279,256 +283,261 @@ module option {
   )
 }
 
-# --- Array functions ---
+import array::*
 
-## Returns the item at a zero-based `position`, or `.none` if out of bounds.
-func index(array: [T], position: int64): T?
-where T
-
-## Returns the number of items in an array.
-func count(array: [T]): int64
-where T
-
-## Returns `true` if the array contains no items.
-func is_empty(array: [T]): bool
-where T
--> project::eq(count(array), 0)
-
-## Transforms each item using a `mapper` function.
-## Returns a new array of the same length.
-func map(array: [I], mapper: func (I): O): [O]
-where I, O
-
-## Applies `mapper` to each item and concatenates the resulting arrays.
-func flat_map(array: [I], mapper: func (I): [O]): [O]
-where I, O
-
-## Returns only the items for which `condition` returns `true`.
-func filter(array: [T], condition: func (T): bool): [T]
-where T
-
-## Returns the first item for which `condition` returns `true`,
-## or `.none` if no item matches.
-func find(array: [T], condition: func (T): bool): T?
-where T
--> (array | filter(condition) | index(0))
-
-## Returns items from index `start` (inclusive) to `end` (exclusive).
-func slice(array: [T], start: int64, end: int64): [T]
-where T
-
-## Sorts the array in ascending order by the value returned by `key`.
-func sort(array: [I], key: func (I): K): [I]
-where I, K: primitive
-
-## Transposes an array of rows into a tuple of columns.
-## Each field of the row type becomes a column — an array of that field's values.
-## The inverse of [from_columnar].
-func to_columnar(rows: [T]): {for f: F in T do f: [F]}
-where T: {..}
-
-## Transposes a tuple of columns into an array of rows.
-## The inverse of [to_columnar].
-func from_columnar(columnar: {for f: F in T do f: [F]}): [T]
-where T: {..}
-
-## Applies `mapper` to the array in columnar form.
-## Equivalent to [to_columnar], then `mapper`, then [from_columnar].
-func map_columnar(
-  x: [I], mapper: func ({for f: F in I do f: [F]}): {for f: F in O do f: [F]},
-): [O]
-where I: {..}, O: {..}
--> (x | to_columnar | mapper | from_columnar)
-
-## Reduces an array to a single value by applying `mapper` in columnar form.
-## Equivalent to [to_columnar] followed by `mapper`.
-func aggregate(x: [T], mapper: func ({for f: F in T do f: [F]}): O): O
-where T: {..}, O
--> (x | to_columnar | mapper)
-
-## Pairs items from `left` and `right` by position.
-## The result length equals the shorter of the two inputs.
-func zip(left: [L], right: [R]): [{L, R}]
-where L, R
-
-## Groups array items by a key.
-## Returns groups, which contain the key and an array of values in this group.
-func group(input: [I], get_key: func (I): K): [{key: K, values: [I]}]
-where I, K
-
-## Groups array items by a key.
-## Returns groups, which contain the key and an array of values in this group.
-func group_map(input: [I], get_key: func (I): K, mapper: func (K, [I]): O): [O]
-where I, K, O
--> (input | group(get_key) | map(x -> mapper(x.key, x.values)))
-
-## Deduplicates array items.
-func distinct(array: [T]): [T]
-where T
--> (array | group(x -> x) | map(x -> x.key))
-
-## Concatenates two arrays, `first` items followed by `second` items.
-func append(first: [T], second: [T]): [T]
-where T
-
-## Folds every input into the an accumulator value by applying an operation,
-## returning the final result.
+## Array functions
 ##
-## The `operation` takes two arguments: accumulator and an input.
-## It returns the value that the accumulator should have in next iteration.
-##
-## The `initial` value is the accumulator for the first call.
-##
-## After folding all inputs, the last accumulator is returned.
-##
-## This function is sometimes also called "reduce" or "inject".
-## This function is similar to [scan], but it returns only the final
-## accumulator.
-func fold(inputs: [I], initial: A, operation: func (A, I): A): A
-where I, A
+## Basic array functions, aggregation, and window functions
+module array {
+  ## Returns the item at a zero-based `position`, or `.none` if out of bounds.
+  func index(array: [T], position: int64): T?
+  where T
 
-## Applies an operation to each input, using the output from the previous
-## iteration.
-##
-## The `operation` takes two arguments: accumulator and an input.
-## It returns the value that the accumulator should have in next iteration.
-##
-## The `initial` value is the accumulator for the first call.
-##
-## Returns values of all produced accumulators.
-##
-## This function is similar to [fold], but it returns all accumulators,
-## instead of only the final one.
-func scan(inputs: [I], initial: A, operation: func (A, I): A): [A]
-where I, A
+  ## Returns the number of items in an array.
+  func count(array: [T]): int64
+  where T
 
-# func apply(
-#   value: I,
-#   function: func (I): O
-# ): O
-# where I, O -> function(value)
+  ## Returns `true` if the array contains no items.
+  func is_empty(array: [T]): bool
+  where T
+  -> project::eq(count(array), 0)
 
-## Applies an operation to an array, until it returns an empty array.
-## First operation is supplied with the initial array.
-## Each following operation is supplied with result of previous operation.
-##
-## Returns all produced arrays concatenated together, including initial array.
-##
-## In SQL, this is known as "RECURSIVE CTE" or "recursive join".
-func apply_until_empty(initial: [T], operation: func ([T]): [T]): [T]
-where T
+  ## Transforms each item using a `mapper` function.
+  ## Returns a new array of the same length.
+  func map(array: [I], mapper: func (I): O): [O]
+  where I, O
 
-## Returns an array of sequential integers
-## from start (inclusive) to end (exclusive).
-##
-## For example: `sequence(0, 3) == [0, 1, 2]`
-func sequence(start: N, end: N): [N]
-where N: int8 | int16 | int32 | int64 | uint8 | uint16 | uint32 | uint64
+  ## Applies `mapper` to each item and concatenates the resulting arrays.
+  func flat_map(array: [I], mapper: func (I): [O]): [O]
+  where I, O
 
-# --- Aggregation functions ---
+  ## Returns only the items for which `condition` returns `true`.
+  func filter(array: [T], condition: func (T): bool): [T]
+  where T
 
-## Find the minimum value in the array.
-## Returns `none` when array is empty.
-func min(array: [T]): T?
-where T: primitive
+  ## Returns the first item for which `condition` returns `true`,
+  ## or `.none` if no item matches.
+  func find(array: [T], condition: func (T): bool): T?
+  where T
+  -> (array | filter(condition) | index(0))
 
-## Find the maximum value in the array.
-## Returns `none` when array is empty.
-func max(array: [T]): T?
-where T: primitive
+  ## Returns items from index `start` (inclusive) to `end` (exclusive).
+  func slice(array: [T], start: int64, end: int64): [T]
+  where T
 
-## Compute sum of all number in an array.
-## Returns zero when array is empty.
-func sum(column: [T]): T
-where T: number
+  ## Sorts the array in ascending order by the value returned by `key`.
+  func sort(array: [I], key: func (I): K): [I]
+  where I, K: primitive
 
-## Compute arithmetic mean of an array of numbers.
-func mean(array: [T]): float64
-where T: number
+  ## Transposes an array of rows into a tuple of columns.
+  ## Each field of the row type becomes a column — an array of that field's values.
+  ## The inverse of [from_columnar].
+  func to_columnar(rows: [T]): {for f: F in T do f: [F]}
+  where T: {..}
 
-## Returns `true` if all items in the array are `true`.
-func all(values: [bool]): bool
+  ## Transposes a tuple of columns into an array of rows.
+  ## The inverse of [to_columnar].
+  func from_columnar(columnar: {for f: F in T do f: [F]}): [T]
+  where T: {..}
 
-## Returns `true` if any value in the array is `true`.
-func any(values: [bool]): bool
+  ## Applies `mapper` to the array in columnar form.
+  ## Equivalent to [to_columnar], then `mapper`, then [from_columnar].
+  func map_columnar(
+    x: [I], mapper: func ({for f: F in I do f: [F]}): {for f: F in O do f: [F]},
+  ): [O]
+  where I: {..}, O: {..}
+  -> (x | to_columnar | mapper | from_columnar)
 
-## Returns `true` if the haystack array contains an item equal to `needle`.
-func contains(haystack: [T], needle: T): bool
-where T: primitive
--> (haystack | filter(x -> eq(x, needle)) | is_empty | not)
+  ## Reduces an array to a single value by applying `mapper` in columnar form.
+  ## Equivalent to [to_columnar] followed by `mapper`.
+  func aggregate(x: [T], mapper: func ({for f: F in T do f: [F]}): O): O
+  where T: {..}, O
+  -> (x | to_columnar | mapper)
 
-# --- Window functions ---
+  ## Pairs items from `left` and `right` by position.
+  ## The result length equals the shorter of the two inputs.
+  func zip(left: [L], right: [R]): [{L, R}]
+  where L, R
 
-## Shifts array items backwards by an offset.
-## Items in front are set to their default value.
-##
-## For example, `lag(["a", "b", "c"], 1)` is `["", "a", "b"]`.
-func lag(array: [T], offset: int64): [T]
-where T
+  ## Groups array items by a key.
+  ## Returns groups, which contain the key and an array of values in this group.
+  func group(input: [I], get_key: func (I): K): [{key: K, values: [I]}]
+  where I, K
 
-## Shifts array items forwards by an offset.
-## Items in back are set to their default value.
-##
-## For example, `lead(["a", "b", "c"], 1)` is `["b", "c", ""]`.
-func lead(array: [T], offset: int64): [T]
-where T
+  ## Groups array items by a key.
+  ## Returns groups, which contain the key and an array of values in this group.
+  func group_map(input: [I], get_key: func (I): K, mapper: func (K, [I]): O): [O]
+  where I, K, O
+  -> (input | group(get_key) | map(x -> mapper(x.key, x.values)))
 
-## Computes rolling arithmetic mean over an array of numbers.
-## Also known as moving average.
-##
-## Returns an array of same length as the input,
-## where each item is the mean of the corresponding input item and
-## a number of preceding and following items.
-##
-## For example, `rolling_mean(..., 1, 2)` computes mean of each item, along with
-## 1 preceding and 2 following items, which is 4 items total.
-func rolling_mean(array: [T], preceding: uint32, following: uint32): [float64]
-where T: number
+  ## Deduplicates array items.
+  func distinct(array: [T]): [T]
+  where T
+  -> (array | group(x -> x) | map(x -> x.key))
 
-## Computes rank of each array item.
-##
-## Rank is the number of items that are less than current item, plus one.
-##
-## The values range from `1` to `n` (number of items).
-## Also known as "min rank".
-##
-## For example, `rank(["a", "b", "b", "c"])` is `[1, 2, 2, 4]`.
-func rank(array: [T]): [int32]
-where T: primitive
+  ## Concatenates two arrays, `first` items followed by `second` items.
+  func append(first: [T], second: [T]): [T]
+  where T
 
-## Computes dense rank of each array item.
-##
-## Dense rank is the number of unique items that are less than current item,
-## plus one.
-##
-## The values range from `1` to `n` (number of unique items).
-##
-## For example, `rank_dense(["a", "b", "b", "c"])` is `[1, 2, 2, 3]`.
-func rank_dense(array: [T]): [int32]
-where T: primitive
+  ## Folds every input into the an accumulator value by applying an operation,
+  ## returning the final result.
+  ##
+  ## The `operation` takes two arguments: accumulator and an input.
+  ## It returns the value that the accumulator should have in next iteration.
+  ##
+  ## The `initial` value is the accumulator for the first call.
+  ##
+  ## After folding all inputs, the last accumulator is returned.
+  ##
+  ## This function is sometimes also called "reduce" or "inject".
+  ## This function is similar to [scan], but it returns only the final
+  ## accumulator.
+  func fold(inputs: [I], initial: A, operation: func (A, I): A): A
+  where I, A
 
-## Computes percentile rank of each array item.
-##
-## Percentile rank is the item rank rescaled to range from 0.0 to 1.0.
-##
-## The values range from 0.0 to 1.0.
-##
-## For example, `rank_percentile(["a", "b", "b", "c"])` is
-## `[0.0, 0.33333, 0.25, 1.0]`.
-func rank_percentile(array: [T]): [float64]
-where T: primitive
+  ## Applies an operation to each input, using the output from the previous
+  ## iteration.
+  ##
+  ## The `operation` takes two arguments: accumulator and an input.
+  ## It returns the value that the accumulator should have in next iteration.
+  ##
+  ## The `initial` value is the accumulator for the first call.
+  ##
+  ## Returns values of all produced accumulators.
+  ##
+  ## This function is similar to [fold], but it returns all accumulators,
+  ## instead of only the final one.
+  func scan(inputs: [I], initial: A, operation: func (A, I): A): [A]
+  where I, A
 
-## Computes ECDF (Empirical Cumulative Density Function) of array items.
-##
-## Value of each item i is the number of items that are less than or equal to i,
-## divided by the total number of items.
-##
-## The values range from `1.0/n` to `1.0`.
-##
-## For example, `cume_dist(["a", "b", "b", "c"])` is
-## `[0.25, 0.75, 0.75, 1.0]`.
-func cume_dist(array: [T]): [float64]
-where T: primitive
+  # func apply(
+  #   value: I,
+  #   function: func (I): O
+  # ): O
+  # where I, O -> function(value)
+
+  ## Applies an operation to an array, until it returns an empty array.
+  ## First operation is supplied with the initial array.
+  ## Each following operation is supplied with result of previous operation.
+  ##
+  ## Returns all produced arrays concatenated together, including initial array.
+  ##
+  ## In SQL, this is known as "RECURSIVE CTE" or "recursive join".
+  func apply_until_empty(initial: [T], operation: func ([T]): [T]): [T]
+  where T
+
+  ## Returns an array of sequential integers
+  ## from start (inclusive) to end (exclusive).
+  ##
+  ## For example: `sequence(0, 3) == [0, 1, 2]`
+  func sequence(start: N, end: N): [N]
+  where N: int8 | int16 | int32 | int64 | uint8 | uint16 | uint32 | uint64
+
+  # --- Aggregation functions ---
+
+  ## Find the minimum value in the array.
+  ## Returns `none` when array is empty.
+  func min(array: [T]): T?
+  where T: primitive
+
+  ## Find the maximum value in the array.
+  ## Returns `none` when array is empty.
+  func max(array: [T]): T?
+  where T: primitive
+
+  ## Compute sum of all number in an array.
+  ## Returns zero when array is empty.
+  func sum(column: [T]): T
+  where T: number
+
+  ## Compute arithmetic mean of an array of numbers.
+  func mean(array: [T]): float64
+  where T: number
+
+  ## Returns `true` if all items in the array are `true`.
+  func all(values: [bool]): bool
+
+  ## Returns `true` if any value in the array is `true`.
+  func any(values: [bool]): bool
+
+  ## Returns `true` if the haystack array contains an item equal to `needle`.
+  func contains(haystack: [T], needle: T): bool
+  where T: primitive
+  -> (haystack | filter(x -> project::eq(x, needle)) | is_empty | project::not)
+
+  # --- Window functions ---
+
+  ## Shifts array items backwards by an offset.
+  ## Items in front are set to their default value.
+  ##
+  ## For example, `lag(["a", "b", "c"], 1)` is `["", "a", "b"]`.
+  func lag(array: [T], offset: int64): [T]
+  where T
+
+  ## Shifts array items forwards by an offset.
+  ## Items in back are set to their default value.
+  ##
+  ## For example, `lead(["a", "b", "c"], 1)` is `["b", "c", ""]`.
+  func lead(array: [T], offset: int64): [T]
+  where T
+
+  ## Computes rolling arithmetic mean over an array of numbers.
+  ## Also known as moving average.
+  ##
+  ## Returns an array of same length as the input,
+  ## where each item is the mean of the corresponding input item and
+  ## a number of preceding and following items.
+  ##
+  ## For example, `rolling_mean(..., 1, 2)` computes mean of each item, along with
+  ## 1 preceding and 2 following items, which is 4 items total.
+  func rolling_mean(array: [T], preceding: uint32, following: uint32): [float64]
+  where T: number
+
+  ## Computes rank of each array item.
+  ##
+  ## Rank is the number of items that are less than current item, plus one.
+  ##
+  ## The values range from `1` to `n` (number of items).
+  ## Also known as "min rank".
+  ##
+  ## For example, `rank(["a", "b", "b", "c"])` is `[1, 2, 2, 4]`.
+  func rank(array: [T]): [int32]
+  where T: primitive
+
+  ## Computes dense rank of each array item.
+  ##
+  ## Dense rank is the number of unique items that are less than current item,
+  ## plus one.
+  ##
+  ## The values range from `1` to `n` (number of unique items).
+  ##
+  ## For example, `rank_dense(["a", "b", "b", "c"])` is `[1, 2, 2, 3]`.
+  func rank_dense(array: [T]): [int32]
+  where T: primitive
+
+  ## Computes percentile rank of each array item.
+  ##
+  ## Percentile rank is the item rank rescaled to range from 0.0 to 1.0.
+  ##
+  ## The values range from 0.0 to 1.0.
+  ##
+  ## For example, `rank_percentile(["a", "b", "b", "c"])` is
+  ## `[0.0, 0.33333, 0.25, 1.0]`.
+  func rank_percentile(array: [T]): [float64]
+  where T: primitive
+
+  ## Computes ECDF (Empirical Cumulative Density Function) of array items.
+  ##
+  ## Value of each item i is the number of items that are less than or equal to i,
+  ## divided by the total number of items.
+  ##
+  ## The values range from `1.0/n` to `1.0`.
+  ##
+  ## For example, `cume_dist(["a", "b", "b", "c"])` is
+  ## `[0.25, 0.75, 0.75, 1.0]`.
+  func cume_dist(array: [T]): [float64]
+  where T: primitive
+}
 
 ## Mathematical ops
 module math {

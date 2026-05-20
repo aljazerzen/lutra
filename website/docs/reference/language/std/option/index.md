@@ -37,7 +37,7 @@ where T
 
 When value is `.none`, returns the default value instead.
 
-Default value depends on the type. See [`super::default`](../index.md#func-default).
+Default value depends on the type. See [`super::default`](../index.md#import-default).
 For numbers it is 0, for booleans it is false.
 
 ## `func` zip

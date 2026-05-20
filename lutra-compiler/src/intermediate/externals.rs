@@ -14,9 +14,15 @@ pub fn validate_externals(
         errors: Vec::new(),
     };
 
-    // allow the whole std:: by default
-    // TODO: this is not ok, because it also includes std::fs and std::sql
-    ext.allowed.insert("std");
+    // allow core std modules by default
+    ext.allowed.insert("std::convert");
+    ext.allowed.insert("std::ops");
+    ext.allowed.insert("std::array");
+    ext.allowed.insert("std::option");
+    ext.allowed.insert("std::math");
+    ext.allowed.insert("std::text");
+    ext.allowed.insert("std::date");
+    ext.allowed.insert("std::timestamp");
 
     let program = fold::IrFold::fold_program(&mut ext, program).unwrap();
     if !ext.errors.is_empty() {

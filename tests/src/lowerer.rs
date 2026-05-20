@@ -66,21 +66,21 @@ fn lower_01() {
       box_office::get_album_sales_by_id(album_id),
     }
     "#), @"
-    type std::Ordering = enum {less, equal, greater};
+    type std::ops::Ordering = enum {less, equal, greater};
     type chinook::album = {id: int64, title: text};
     type box_office::AlbumSale = {id: int64, total: float64};
     let main = (func 1 ->
       let 2 = (func 6 ->
         let 3 = (call
-          external.std::cmp: func (int64, int64) -> std::Ordering,
+          external.std::ops::cmp: func (int64, int64) -> std::ops::Ordering,
           fn.6+0: int64,
           fn.6+1: int64,
-        ): std::Ordering;
+        ): std::ops::Ordering;
         (
           switch,
           (
             (enum_eq
-              var.3: std::Ordering
+              var.3: std::ops::Ordering
               1
             ): bool,
             true: bool,
@@ -93,9 +93,9 @@ fn lower_01() {
       ): func (int64, int64) -> bool;
       let 0 = (func 2 ->
         (call
-          external.std::index: func ([chinook::album], int64) -> enum {none, some: chinook::album},
+          external.std::array::index: func ([chinook::album], int64) -> enum {none, some: chinook::album},
           (call
-            external.std::filter: func ([chinook::album], func (chinook::album) -> bool) -> [chinook::album],
+            external.std::array::filter: func ([chinook::album], func (chinook::album) -> bool) -> [chinook::album],
             (call
               external.chinook::get_albums: func () -> [chinook::album],
             ): [chinook::album],
@@ -115,9 +115,9 @@ fn lower_01() {
       ): func (int64) -> enum {none, some: chinook::album};
       let 1 = (func 4 ->
         (call
-          external.std::index: func ([box_office::AlbumSale], int64) -> enum {none, some: box_office::AlbumSale},
+          external.std::array::index: func ([box_office::AlbumSale], int64) -> enum {none, some: box_office::AlbumSale},
           (call
-            external.std::filter: func ([box_office::AlbumSale], func (box_office::AlbumSale) -> bool) -> [box_office::AlbumSale],
+            external.std::array::filter: func ([box_office::AlbumSale], func (box_office::AlbumSale) -> bool) -> [box_office::AlbumSale],
             (call
               external.box_office::get_album_sales: func () -> [box_office::AlbumSale],
             ): [box_office::AlbumSale],

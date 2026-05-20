@@ -103,8 +103,8 @@ impl<'a> Lowerer<'a> {
     /// Lowers a reference to native functions. If target function is not native, it returns None.
     #[tracing::instrument(name = "leed", skip_all)]
     fn lower_ref_to_native(&mut self, path: &pr::Path) -> Result<Option<ir::ExprKind>> {
-        if path.as_steps() == [NS_STD, "default"] {
-            // special case: evaluate std::default in lowerer
+        if path.as_steps() == [NS_STD, "convert", "default"] {
+            // special case: evaluate std::convert::default in lowerer
             return Ok(None);
         }
 
@@ -133,8 +133,8 @@ impl<'a> Lowerer<'a> {
         let expr = def.kind.as_expr().unwrap();
         let expr = *expr.value.clone();
 
-        if path.as_steps() == [NS_STD, "default"] {
-            // special case: evaluate std::default in lowerer
+        if path.as_steps() == [NS_STD, "convert", "default"] {
+            // special case: evaluate std::convert::default in lowerer
             let ty_arg = ty_args.into_iter().next().unwrap();
             return Ok(self.impl_std_default(ty_arg));
         }
@@ -562,7 +562,7 @@ impl<'a> Lowerer<'a> {
                     let inner_cond = self.lower_pattern_to_condition(&inner_ref, inner)?;
 
                     if let Some(inner_cond) = inner_cond {
-                        expr = new_bool_bin_func("std::and", expr, inner_cond);
+                        expr = new_bool_bin_func("std::ops::and", expr, inner_cond);
                     }
                 }
                 Ok(Some(expr))
@@ -583,7 +583,11 @@ impl<'a> Lowerer<'a> {
                     ty: subject_ty.clone(),
                 };
 
-                Ok(Some(new_bool_bin_func("std::eq", subject.clone(), lit)))
+                Ok(Some(new_bool_bin_func(
+                    "std::ops::eq",
+                    subject.clone(),
+                    lit,
+                )))
             }
 
             // AnyOf matches if any of branches match
@@ -598,7 +602,7 @@ impl<'a> Lowerer<'a> {
                     return Ok(None);
                 };
                 for c in conditions {
-                    res = new_bool_bin_func("std::or", c, res);
+                    res = new_bool_bin_func("std::ops::or", c, res);
                 }
                 Ok(Some(res))
             }

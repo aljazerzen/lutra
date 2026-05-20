@@ -16,7 +16,9 @@ pub trait NativeModule: Sync {
 }
 
 pub static BUILTIN_MODULES: &[(&str, &dyn NativeModule)] = &[
-    ("std", &native::std::Module),
+    ("std::convert", &native::std_convert::Module),
+    ("std::ops", &native::std_ops::Module),
+    ("std::array", &native::std_array::Module),
     ("std::text", &native::std_text::Module),
     ("std::math", &native::std_math::Module),
     ("std::fs", &native::std_fs::Module),

@@ -128,15 +128,10 @@ macro_rules! neg_arg {
     }};
 }
 
-pub mod std {
-    use ::std::borrow::Cow;
-    use ::std::cmp::Ordering;
-    use ::std::collections::HashMap;
-
-    use crate::native::assume::{LayoutArgsReader, exactly_n};
+pub mod std_convert {
+    use crate::EvalError;
     use crate::native::*;
-    use crate::{ArrayWriter, Data, EnumWriter, EvalError, TupleWriter};
-    use lutra_bin::{ArrayReader, Decode, TupleReader, ir};
+    use lutra_bin::ir;
 
     pub struct Module;
 
@@ -154,55 +149,6 @@ pub mod std {
                 "to_float32" => &to_float32,
                 "to_float64" => &to_float64,
                 "to_text" => &to_text,
-
-                "mul" => &mul,
-                "div" => &div,
-                "mod" => &r#mod,
-                "add" => &add,
-                "sub" => &sub,
-                "neg" => &neg,
-
-                "cmp" => &cmp,
-                "eq" => &eq,
-                "lt" => &lt,
-                "lte" => &lte,
-
-                "and" => &and,
-                "or" => &or,
-                "not" => &not,
-
-                "index" => &index,
-                "map" => &map,
-                "flat_map" => &flat_map,
-                "filter" => &filter,
-                "slice" => &slice,
-                "sort" => &sort,
-                "to_columnar" => &to_columnar,
-                "from_columnar" => &from_columnar,
-                "zip" => &zip,
-                "group" => &group,
-                "append" => &append,
-                "fold" => &fold,
-                "scan" => &scan,
-                "apply_until_empty" => &apply_until_empty,
-                "sequence" => &sequence,
-
-                "min" => &min,
-                "max" => &max,
-                "sum" => &sum,
-                "mean" => &mean,
-                "all" => &all,
-                "any" => &any,
-                "count" => &count,
-
-                "lag" => &lag,
-                "lead" => &lead,
-                "rolling_mean" => &rolling_mean,
-                "rank" => &rank,
-                "rank_dense" => &rank_dense,
-                "rank_percentile" => &rank_percentile,
-                "cume_dist" => &cume_dist,
-
                 _ => return None,
             })
         }
@@ -241,6 +187,41 @@ pub mod std {
             ir::TyPrimitive::text => return Ok(x),
         };
         Ok(Cell::Data(encode(&x)))
+    }
+}
+
+pub mod std_ops {
+    use ::std::cmp::Ordering;
+
+    use crate::native::assume::exactly_n;
+    use crate::native::*;
+    use crate::{Data, EvalError};
+    use lutra_bin::ir;
+
+    pub struct Module;
+
+    impl NativeModule for Module {
+        fn lookup_native_symbol(&self, id: &str) -> Option<crate::interpreter::NativeFunction> {
+            Some(match id {
+                "mul" => &mul,
+                "div" => &div,
+                "mod" => &r#mod,
+                "add" => &add,
+                "sub" => &sub,
+                "neg" => &neg,
+
+                "cmp" => &cmp,
+                "eq" => &eq,
+                "lt" => &lt,
+                "lte" => &lte,
+
+                "and" => &and,
+                "or" => &or,
+                "not" => &not,
+
+                _ => return None,
+            })
+        }
     }
 
     bin_num_func!(add, +);
@@ -290,7 +271,7 @@ pub mod std {
         }};
     }
 
-    fn cmp_raw(ty_arg: u32, a: &Data, b: &Data) -> Ordering {
+    pub fn cmp_raw(ty_arg: u32, a: &Data, b: &Data) -> Ordering {
         let ty_prim = decode::ty_primitive(ty_arg);
         match ty_prim {
             ir::TyPrimitive::bool => cmp_op!(a, b, bool, cmp),
@@ -332,6 +313,60 @@ pub mod std {
         let operand = assume::bool(&args[0])?;
         let res = !operand;
         Ok(Cell::Data(encode(&res)))
+    }
+}
+
+pub mod std_array {
+    use ::std::borrow::Cow;
+    use ::std::collections::HashMap;
+
+    use crate::native::assume::LayoutArgsReader;
+    use crate::native::*;
+    use crate::{ArrayWriter, Data, EnumWriter, EvalError, TupleWriter};
+    use lutra_bin::{ArrayReader, Decode, TupleReader, ir};
+
+    use super::std_ops::cmp_raw;
+
+    pub struct Module;
+
+    impl NativeModule for Module {
+        fn lookup_native_symbol(&self, id: &str) -> Option<crate::interpreter::NativeFunction> {
+            Some(match id {
+                "index" => &index,
+                "map" => &map,
+                "flat_map" => &flat_map,
+                "filter" => &filter,
+                "slice" => &slice,
+                "sort" => &sort,
+                "to_columnar" => &to_columnar,
+                "from_columnar" => &from_columnar,
+                "zip" => &zip,
+                "group" => &group,
+                "append" => &append,
+                "fold" => &fold,
+                "scan" => &scan,
+                "apply_until_empty" => &apply_until_empty,
+                "sequence" => &sequence,
+
+                "min" => &min,
+                "max" => &max,
+                "sum" => &sum,
+                "mean" => &mean,
+                "all" => &all,
+                "any" => &any,
+                "count" => &count,
+
+                "lag" => &lag,
+                "lead" => &lead,
+                "rolling_mean" => &rolling_mean,
+                "rank" => &rank,
+                "rank_dense" => &rank_dense,
+                "rank_percentile" => &rank_percentile,
+                "cume_dist" => &cume_dist,
+
+                _ => return None,
+            })
+        }
     }
 
     pub fn index(

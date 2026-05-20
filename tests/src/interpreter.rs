@@ -58,7 +58,7 @@ fn interpret_01() {
           7: int64,
         ): [int64],
         (call
-          external.std::add: func (int64) -> int64,
+          external.std::ops::add: func (int64) -> int64,
           6: int64,
           2: int64,
         ): int64,
@@ -93,7 +93,7 @@ fn interpret_02() {
         }: {int64, int64}
       ): func (int64) -> {int64, int64};
       (
-        call external.std::map: func ([int64], func (int64) -> {int64, int64}) -> [{int64, int64}],
+        call external.std::array::map: func ([int64], func (int64) -> {int64, int64}) -> [{int64, int64}],
         [2: int64, 3: int64, 1: int64]: [int64],
         var.1: func (int64) -> {int64, int64},
       ): [{int64, int64}]
@@ -128,7 +128,7 @@ fn interpret_03() {
         {2:int64, 3:int64}: {int64, int64},
       ]: [{int64, int64}];
       let 2 = (func 1 ->
-        (call external.std::mul: func (int64, int64) -> int64,
+        (call external.std::ops::mul: func (int64, int64) -> int64,
           (tuple_lookup
             fn.1+0: {int64, int64}
             0
@@ -139,7 +139,7 @@ fn interpret_03() {
           ): int64,
         ): int64
       ): func ({int64, int64}) -> int64;
-      (call external.std::map: func ([{int64, int64}], func ({int64, int64}) -> int64) -> [int64],
+      (call external.std::array::map: func ([{int64, int64}], func ({int64, int64}) -> int64) -> [int64],
         var.1: [{int64, int64}],
         var.2: func ({int64, int64}) -> int64,
       ): [int64]
@@ -190,7 +190,7 @@ fn func_call_size() {
     );
 
     let project = lc::check(source, Default::default()).unwrap();
-    let params = lc::CompileParams::new("x", lc::ProgramRepr::BytecodeLt).push_external("x");
+    let params = lc::CompileParams::new("x", lc::ProgramRepr::BytecodeLt).with_external("x");
     let (program, _ty) = lc::compile(&project, &params).unwrap();
 
     let program_lt = program.encode();

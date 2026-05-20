@@ -58,7 +58,7 @@ fn inline_02() {
     "#), @"
     let main = (func 2 ->
       let 5 = (call
-        external.std::to_columnar: func ([{int64, int64}]) -> {[int64], [int64]},
+        external.std::array::to_columnar: func ([{int64, int64}]) -> {[int64], [int64]},
         [
           (tuple
             5: int64,
@@ -76,14 +76,14 @@ fn inline_02() {
       ): {[int64], [int64]};
       (tuple
         (call
-          external.std::min: func ([int64]) -> enum {none, some: int64},
+          external.std::array::min: func ([int64]) -> enum {none, some: int64},
           (tuple_lookup
             var.5: {[int64], [int64]}
             0
           ): [int64],
         ): enum {none, some: int64},
         (call
-          external.std::min: func ([int64]) -> enum {none, some: int64},
+          external.std::array::min: func ([int64]) -> enum {none, some: int64},
           (tuple_lookup
             var.5: {[int64], [int64]}
             1
@@ -122,7 +122,7 @@ fn inline_03() {
           1
         ): bool,
         (call
-          external.std::not: func (bool) -> bool,
+          external.std::ops::not: func (bool) -> bool,
           (enum_eq
             (enum_variant 1
               "hello": text

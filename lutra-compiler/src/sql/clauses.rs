@@ -376,7 +376,7 @@ impl<'a> Context<'a> {
                     };
 
                     let args = vec![tag, new_tag(enum_eq.tag as i16)];
-                    cr::ExprKind::From(cr::From::FuncCall("std::eq".to_string(), args))
+                    cr::ExprKind::From(cr::From::FuncCall("std::ops::eq".to_string(), args))
                 }
             }
             ir::ExprKind::EnumUnwrap(enum_unwrap) => {
@@ -525,7 +525,7 @@ impl<'a> Context<'a> {
                     for (index, branch) in switch.iter().enumerate() {
                         let condition = cr::Expr {
                             kind: cr::ExprKind::From(cr::From::FuncCall(
-                                "std::eq".into(),
+                                "std::ops::eq".into(),
                                 vec![selector_ref.clone(), new_branch_selector(index)],
                             )),
                             ty: ir::Ty::new(ir::TyPrimitive::bool),
@@ -579,7 +579,7 @@ impl<'a> Context<'a> {
         };
 
         let kind = match ptr.id.as_str() {
-            "std::slice" => {
+            "std::array::slice" => {
                 let array = self.compile_rel(&call.args[0]);
                 let start = self.compile_column(&call.args[1]);
                 let end = self.compile_column(&call.args[2]);
@@ -590,9 +590,14 @@ impl<'a> Context<'a> {
                 let filtered = cr::Expr::new_iso_transform(
                     array,
                     cr::Transform::Where(Box::new(new_bin_op(
-                        new_bin_op(start, "std::lte", index_col.clone(), ir::TyPrimitive::bool),
-                        "std::and",
-                        new_bin_op(index_col, "std::lt", end, ir::TyPrimitive::bool),
+                        new_bin_op(
+                            start,
+                            "std::ops::lte",
+                            index_col.clone(),
+                            ir::TyPrimitive::bool,
+                        ),
+                        "std::ops::and",
+                        new_bin_op(index_col, "std::ops::lt", end, ir::TyPrimitive::bool),
                         ir::TyPrimitive::bool,
                     ))),
                 );
@@ -602,7 +607,7 @@ impl<'a> Context<'a> {
                 let index_col = self.new_rel_col(&filtered, 0, ty_index());
                 cr::ExprKind::Transform(filtered, cr::Transform::Reindex(vec![index_col]))
             }
-            "std::index" => {
+            "std::array::index" => {
                 let array = self.compile_rel(&call.args[0]);
                 let index = self.compile_column(&call.args[1]);
 
@@ -615,7 +620,7 @@ impl<'a> Context<'a> {
                     array,
                     cr::Transform::Where(Box::new(new_bin_op(
                         index_col,
-                        "std::eq",
+                        "std::ops::eq",
                         index,
                         ir::TyPrimitive::bool,
                     ))),
@@ -671,11 +676,11 @@ impl<'a> Context<'a> {
                     // take first
                     let tag = self.new_rel_col(&union, 0, ty_tag());
                     let neg_tag =
-                        new_un_op("std::neg", tag, *ty_tag().kind.as_primitive().unwrap());
+                        new_un_op("std::ops::neg", tag, *ty_tag().kind.as_primitive().unwrap());
                     cr::ExprKind::Transform(union, cr::Transform::Limit(1, Box::new(neg_tag)))
                 }
             }
-            "std::map" => {
+            "std::array::map" => {
                 let array = self.compile_rel(&call.args[0]);
                 let array = self.new_binding(array);
                 let func = &call.args[1];
@@ -702,7 +707,7 @@ impl<'a> Context<'a> {
                     }),
                 )
             }
-            "std::flat_map" => {
+            "std::array::flat_map" => {
                 let array = self.compile_rel(&call.args[0]);
                 let array = self.new_binding(array);
                 let func = &call.args[1];
@@ -747,7 +752,7 @@ impl<'a> Context<'a> {
                     }),
                 )
             }
-            "std::filter" => {
+            "std::array::filter" => {
                 let array = self.compile_rel(&call.args[0]);
                 let array = self.new_binding(array);
                 let func = &call.args[1];
@@ -768,7 +773,7 @@ impl<'a> Context<'a> {
                 let index_col = self.new_rel_col(&filtered, 0, ty_index());
                 cr::ExprKind::Transform(filtered, cr::Transform::Reindex(vec![index_col]))
             }
-            "std::sort" => {
+            "std::array::sort" => {
                 let array = self.compile_rel(&call.args[0]);
                 let array = self.new_binding(array);
 
@@ -788,8 +793,8 @@ impl<'a> Context<'a> {
             }
 
             // aggregation functions
-            "std::min" | "std::max" | "std::sum" | "std::mean" | "std::count" | "std::any"
-            | "std::all" | "std::text::join" => {
+            "std::array::min" | "std::array::max" | "std::array::sum" | "std::array::mean"
+            | "std::array::count" | "std::array::any" | "std::array::all" | "std::text::join" => {
                 let array = self.compile_rel(&call.args[0]);
                 let array = self.new_binding(array);
 
@@ -808,13 +813,13 @@ impl<'a> Context<'a> {
             }
 
             // window functions
-            "std::lead"
-            | "std::lag"
-            | "std::rolling_mean"
-            | "std::rank"
-            | "std::rank_dense"
-            | "std::rank_percentile"
-            | "std::cume_dist" => {
+            "std::array::lead"
+            | "std::array::lag"
+            | "std::array::rolling_mean"
+            | "std::array::rank"
+            | "std::array::rank_dense"
+            | "std::array::rank_percentile"
+            | "std::array::cume_dist" => {
                 let array = self.compile_rel(&call.args[0]);
                 let array = self.new_binding(array);
 
@@ -833,7 +838,7 @@ impl<'a> Context<'a> {
                 cr::ExprKind::Transform(array, cr::Transform::Aggregate(row))
             }
 
-            "std::to_columnar" => {
+            "std::array::to_columnar" => {
                 let array = self.compile_rel(&call.args[0]);
                 let array = self.new_binding(array);
 
@@ -856,7 +861,7 @@ impl<'a> Context<'a> {
                 cr::ExprKind::Transform(array, cr::Transform::Aggregate(aggregate_cols))
             }
 
-            "std::from_columnar" => {
+            "std::array::from_columnar" => {
                 let tuple = self.compile_rel(&call.args[0]);
                 let tuple = self.new_binding(tuple);
 
@@ -886,7 +891,7 @@ impl<'a> Context<'a> {
                         let join_cond = cr::Expr {
                             ty: ir::Ty::new(ir::TyPrimitive::bool),
                             kind: cr::ExprKind::From(cr::From::FuncCall(
-                                "std::eq".into(),
+                                "std::ops::eq".into(),
                                 vec![
                                     self.new_rel_col(&prev, 0, ty_index()),
                                     self.new_rel_col(&curr, 0, ty_index()),
@@ -941,7 +946,7 @@ impl<'a> Context<'a> {
                 }
             }
 
-            "std::zip" => {
+            "std::array::zip" => {
                 let a = self.compile_rel(&call.args[0]);
                 let a = self.new_binding(a);
 
@@ -952,7 +957,7 @@ impl<'a> Context<'a> {
 
                 let a_index = self.new_rel_col(&a, 0, ty_index());
                 let b_index = self.new_rel_col(&b, 0, ty_index());
-                let condition = new_bin_op(a_index, "std::eq", b_index, ir::TyPrimitive::bool);
+                let condition = new_bin_op(a_index, "std::ops::eq", b_index, ir::TyPrimitive::bool);
 
                 let join_ty = ty_zip(
                     self.get_ty_mat(&a.rel.ty).clone(),
@@ -969,7 +974,7 @@ impl<'a> Context<'a> {
                 )
             }
 
-            "std::group" => {
+            "std::array::group" => {
                 let array = self.compile_rel(&call.args[0]);
                 let array = self.new_binding(array);
 
@@ -1029,7 +1034,7 @@ impl<'a> Context<'a> {
                 }
             }
 
-            "std::append" => {
+            "std::array::append" => {
                 // compute each rel and apply order to it
                 let first = self.compile_rel(&call.args[0]);
                 let first =
@@ -1049,14 +1054,14 @@ impl<'a> Context<'a> {
                 cr::ExprKind::Transform(union, cr::Transform::Reindex(vec![]))
             }
 
-            "std::fold" => {
+            "std::array::fold" => {
                 let (inputs, iteration) = self.compile_std_scan(call);
 
                 // order by -index, limit 1
 
                 let iteration = self.new_binding(iteration);
                 let index = self.new_rel_col(&iteration, 0, ty_index());
-                let neg_index = new_un_op("std::neg", index, ir::TyPrimitive::int64);
+                let neg_index = new_un_op("std::ops::neg", index, ir::TyPrimitive::int64);
                 let iteration = cr::Expr::new_iso_transform(
                     iteration,
                     cr::Transform::Limit(1, Box::new(neg_index)),
@@ -1074,14 +1079,14 @@ impl<'a> Context<'a> {
                 cr::ExprKind::Bind(inputs, Box::new(iteration))
             }
 
-            "std::scan" => {
+            "std::array::scan" => {
                 let (inputs, iteration) = self.compile_std_scan(call);
 
                 // filter out initial accumulator
                 let iteration = self.new_binding(iteration);
                 let filter_initial_acc = new_bin_op(
                     new_index(0),
-                    "std::lt",
+                    "std::ops::lt",
                     self.new_rel_col(&iteration, 0, ty_index()),
                     ir::TyPrimitive::bool,
                 );
@@ -1093,7 +1098,7 @@ impl<'a> Context<'a> {
                 cr::ExprKind::Bind(inputs, Box::new(iteration))
             }
 
-            "std::apply_until_empty" => {
+            "std::array::apply_until_empty" => {
                 // compute each rel and apply order to it
                 let initial = Box::new(self.compile_rel(&call.args[0]));
                 let operation = &call.args[1];
@@ -1187,7 +1192,7 @@ impl<'a> Context<'a> {
                 let update = self.new_binding(update);
                 let tag_is_one = new_bin_op(
                     self.new_rel_col(&update, 0, ty_tag()),
-                    "std::eq",
+                    "std::ops::eq",
                     new_tag(1),
                     ir::TyPrimitive::bool,
                 );
@@ -1275,7 +1280,7 @@ impl<'a> Context<'a> {
         let input_rel = self.new_binding(cr::Expr::new_rel_ref(&inputs));
         let find_by_index = cr::Transform::Where(Box::new(new_bin_op(
             self.new_rel_col(&input_rel, 0, ty_index()),
-            "std::eq",
+            "std::ops::eq",
             self.new_rel_col(&prev_acc_rel, 0, ty_index()),
             ir::TyPrimitive::bool,
         )));
@@ -1301,7 +1306,7 @@ impl<'a> Context<'a> {
         // compose the new state
         let new_index = new_bin_op(
             self.new_rel_col(&prev_acc_rel, 0, ty_index()),
-            "std::add",
+            "std::ops::add",
             new_index(1),
             ir::TyPrimitive::int64,
         );
