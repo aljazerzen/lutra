@@ -129,7 +129,6 @@ impl super::TypeResolver<'_> {
                 self.scopes.push(scope);
 
                 // resolve
-                self.allow_native_functions = true;
                 let expr_def = self.fold_expr_def(expr_def)?;
                 let expected_ty = expr_def.ty;
 
@@ -168,6 +167,28 @@ impl super::TypeResolver<'_> {
                     ty: None,
                     constant: expr_def.constant,
                 })
+            }
+            pr::DefKind::External(ty) => {
+                let ty_func = ty.kind.as_func().unwrap();
+                let scope_id = ty.scope_id.unwrap_or(usize::MAX);
+                let scope = scope::Scope::new(scope_id, scope::ScopeKind::Isolated);
+                self.scopes.push(scope);
+
+                // prepare generic arguments
+                self.scopes
+                    .last_mut()
+                    .unwrap()
+                    .insert_type_params(&ty_func.ty_params);
+
+                // resolve the function type
+                let ty = self.fold_type(ty)?;
+
+                // finalize scope
+                let mapping = self.finalize_type_vars()?;
+                let ty = utils::TypeReplacer::on_ty(ty, mapping);
+                self.scopes.pop().unwrap();
+
+                pr::DefKind::External(ty)
             }
             pr::DefKind::Ty(ty_def) => {
                 let mut ty = self.fold_type(ty_def.ty)?;

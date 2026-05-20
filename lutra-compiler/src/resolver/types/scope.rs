@@ -83,7 +83,7 @@ pub enum TyVarConstraint {
 
 #[derive(Debug, strum::AsRefStr)]
 pub enum Named<'a> {
-    Expr(&'a pr::Expr),
+    Value(&'a pr::Ty),
     Ty {
         ty: &'a pr::Ty,
         is_framed: bool,
@@ -244,7 +244,8 @@ impl<'a> TypeResolver<'a> {
             pr::Ref::Global(tgt_fq) => {
                 let def = self.root_mod.get(tgt_fq);
                 match &def.unwrap_or_else(|| panic!("cannot find {tgt_fq}")).kind {
-                    pr::DefKind::Expr(expr) => Ok(Named::Expr(&expr.value)),
+                    pr::DefKind::Expr(expr) => Ok(Named::Value(expr.value.ty.as_deref().unwrap())),
+                    pr::DefKind::External(ty) => Ok(Named::Value(ty)),
                     pr::DefKind::Ty(def) => Ok(Named::Ty {
                         ty: &def.ty,
                         is_framed: def.is_framed,
@@ -334,7 +335,7 @@ impl<'a> TypeResolver<'a> {
                         .with_span(ty.span)),
                 }
             }
-            Named::Expr(_) => Err(err_name_kind("a type", "a value").with_span(ty.span)),
+            Named::Value(_) => Err(err_name_kind("a type", "a value").with_span(ty.span)),
             Named::Module => Err(err_name_kind("a type", "a module").with_span(ty.span)),
         }
     }

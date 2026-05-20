@@ -41,6 +41,7 @@ where
             module_def.boxed(),
             type_def(ty.clone()).boxed(),
             import_def().boxed(),
+            external_func_def(ty.clone()).boxed(),
             func_def(expr.clone(), ty.clone()).boxed(),
             const_def(expr.clone(), ty.clone()).boxed(),
             anno_def(ty).boxed(),
@@ -228,9 +229,7 @@ where
         .or_not()
         .map(|x| x.unwrap_or_default());
 
-    let body = just(TokenKind::ArrowThin)
-        .ignore_then(expr.map(Box::new))
-        .or_not();
+    let body = just(TokenKind::ArrowThin).ignore_then(expr.map(Box::new));
 
     head.then(params)
         .then(return_ty)
@@ -253,6 +252,39 @@ where
             (name, def)
         })
         .labelled("function definition")
+}
+
+fn external_func_def<'src, I>(
+    ty: impl Parser<'src, I, Ty, PExtra<'src>> + Clone + 'src,
+) -> impl Parser<'src, I, (NameAndSpan, DefKind), PExtra<'src>> + Clone
+where
+    I: ValueInput<'src, Token = TokenKind, Span = Span>,
+{
+    let head = keyword("external")
+        .ignore_then(keyword("func"))
+        .ignore_then(def_name());
+
+    let params = super::types::func_params(ty.clone());
+
+    let return_ty = ctrl(':').ignore_then(ty.clone());
+
+    let ty_params = keyword("where")
+        .ignore_then(types::type_params(ty.clone()))
+        .or_not()
+        .map(|x| x.unwrap_or_default());
+
+    head.then(params)
+        .then(return_ty)
+        .then(ty_params)
+        .map(|(((name, params), return_ty), ty_params)| {
+            let ty = Ty::new(TyKind::Func(TyFunc {
+                params,
+                body: Some(Box::new(return_ty)),
+                ty_params,
+            }));
+            (name, DefKind::External(ty))
+        })
+        .labelled("external function definition")
 }
 
 fn type_def<'src, I>(

@@ -155,6 +155,7 @@ pub fn fold_def_kind<T: ?Sized + PrFold>(fold: &mut T, def_kind: DefKind) -> Res
     use DefKind::*;
     Ok(match def_kind {
         Expr(var_def) => Expr(fold.fold_expr_def(var_def)?),
+        External(ty) => External(fold.fold_type(ty)?),
         Ty(type_def) => Ty(fold.fold_type_def(type_def)?),
         Module(module_def) => Module(fold.fold_module_def(module_def)?),
         Import(import_def) => Import(fold.fold_import(import_def)?),
@@ -277,7 +278,7 @@ pub fn fold_func_call<T: ?Sized + PrFold>(fold: &mut T, call: Call) -> Result<Ca
 
 pub fn fold_func<T: ?Sized + PrFold>(fold: &mut T, func: Func) -> Result<Func> {
     Ok(Func {
-        body: fold_optional_box(fold, func.body)?,
+        body: Box::new(fold.fold_expr(*func.body)?),
         return_ty: fold_type_opt(fold, func.return_ty)?,
         params: fold_func_params(fold, func.params)?,
         ty_params: func.ty_params, // recurse into this too?
@@ -381,7 +382,7 @@ pub fn fold_ty_func<F: ?Sized + PrFold>(fold: &mut F, f: TyFunc) -> Result<TyFun
     })
 }
 
-fn fold_ty_func_params<F: ?Sized + PrFold>(
+pub fn fold_ty_func_params<F: ?Sized + PrFold>(
     fold: &mut F,
     params: Vec<TyFuncParam>,
 ) -> Result<Vec<TyFuncParam>> {

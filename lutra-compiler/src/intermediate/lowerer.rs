@@ -100,9 +100,9 @@ impl<'a> Lowerer<'a> {
         }
     }
 
-    /// Lowers a reference to native functions. If target function is not native, it returns None.
+    /// Lowers a reference to external functions. If target is not external, returns None.
     #[tracing::instrument(name = "leed", skip_all)]
-    fn lower_ref_to_native(&mut self, path: &pr::Path) -> Result<Option<ir::ExprKind>> {
+    fn lower_ref_to_external(&mut self, path: &pr::Path) -> Result<Option<ir::ExprKind>> {
         if path.as_steps() == [NS_STD, "convert", "default"] {
             // special case: evaluate std::convert::default in lowerer
             return Ok(None);
@@ -111,13 +111,10 @@ impl<'a> Lowerer<'a> {
         // validate that it is an external definition
         let def = self.root_module.get(path);
         let def = def.unwrap_or_else(|| panic!("{path} does not exist"));
-        let expr = def.kind.as_expr().unwrap();
-        let expr = &expr.value;
-        if !is_native_func(expr) {
+        if !def.kind.is_external() {
             return Ok(None);
         }
 
-        // return ptr to a native func
         let external_symbol_id = path.iter().join("::");
         Ok(Some(ir::ExprKind::Pointer(ir::Pointer::External(
             ir::ExternalPtr {
@@ -130,8 +127,6 @@ impl<'a> Lowerer<'a> {
     fn lower_expr_def(&mut self, path: &pr::Path, ty_args: Vec<pr::Ty>) -> Result<ir::Expr> {
         let def = self.root_module.get(path);
         let def = def.unwrap_or_else(|| panic!("{path} does not exist"));
-        let expr = def.kind.as_expr().unwrap();
-        let expr = *expr.value.clone();
 
         if path.as_steps() == [NS_STD, "convert", "default"] {
             // special case: evaluate std::convert::default in lowerer
@@ -139,19 +134,18 @@ impl<'a> Lowerer<'a> {
             return Ok(self.impl_std_default(ty_arg));
         }
 
-        if is_native_func(&expr) {
-            // Usually, this is lowered earlier, when lowering pointers.
-            // But for top-level external symbols, we do it here.
-
+        if let pr::DefKind::External(ext_ty) = &def.kind {
+            // External function: return a pointer to the external symbol
             let external_symbol_id = path.iter().join("::");
             let kind = ir::ExprKind::Pointer(ir::Pointer::External(ir::ExternalPtr {
                 id: external_symbol_id,
             }));
-            let ty = self.lower_ty(expr.ty.as_deref().cloned().unwrap());
+            let ty = self.lower_ty(ext_ty.clone());
             return Ok(ir::Expr { kind, ty });
         }
 
-        let mut expr = expr;
+        let expr = def.kind.as_expr().unwrap();
+        let mut expr = *expr.value.clone();
 
         if let pr::TyKind::Func(ty_func) = &expr.ty.as_deref().unwrap().kind
             && !ty_func.ty_params.is_empty()
@@ -271,7 +265,7 @@ impl<'a> Lowerer<'a> {
 
                 self.scopes.push(scope);
                 self.is_main_a_func = false;
-                let body = self.lower_expr(func.body.as_ref().unwrap())?;
+                let body = self.lower_expr(&func.body)?;
                 self.scopes.pop();
 
                 let func = ir::Function {
@@ -447,7 +441,7 @@ impl<'a> Lowerer<'a> {
 
     fn lower_ref_global(&mut self, ref_: &pr::Path, ty_args: &[pr::Ty]) -> Result<ir::ExprKind> {
         // if native ref, return ir::Ptr::Native
-        if let Some(ptr) = self.lower_ref_to_native(ref_)? {
+        if let Some(ptr) = self.lower_ref_to_external(ref_)? {
             return Ok(ptr);
         }
 
@@ -1154,6 +1148,11 @@ pub(crate) fn lower_type_defs(project: &Project) -> ir::Module {
                 module.insert(name.as_steps(), ir::Decl::Var(ty));
             }
 
+            pr::DefKind::External(ext_ty) => {
+                let ty = lowerer.lower_ty(ext_ty.clone());
+                module.insert(name.as_steps(), ir::Decl::Var(ty));
+            }
+
             pr::DefKind::Ty(_) => {
                 lowerer.type_defs_queue.push_back(name);
             }
@@ -1223,8 +1222,4 @@ fn get_entry_point_input(expr: &pr::Expr) -> (pr::Ty, bool) {
             .collect(),
     ));
     (ty, true)
-}
-
-fn is_native_func(expr: &pr::Expr) -> bool {
-    expr.kind.as_func().is_some_and(|x| x.body.is_none())
 }

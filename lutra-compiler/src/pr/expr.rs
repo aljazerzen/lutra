@@ -156,7 +156,7 @@ pub struct Func {
     pub return_ty: Option<Ty>,
 
     /// Expression containing parameter references.
-    pub body: Option<Box<Expr>>,
+    pub body: Box<Expr>,
 
     /// Parameters of the types within this function (where clause).
     pub ty_params: Vec<TyParam>,

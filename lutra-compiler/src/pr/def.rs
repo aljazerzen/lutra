@@ -23,6 +23,8 @@ pub struct Def {
 pub enum DefKind {
     Module(ModuleDef),
     Expr(ExprDef),
+    /// External function definition. Always contains a `TyKind::Func`.
+    External(Ty),
     Ty(TyDef),
     Import(ImportDef),
     Anno(AnnoDef),

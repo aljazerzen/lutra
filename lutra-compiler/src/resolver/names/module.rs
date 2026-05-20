@@ -233,7 +233,7 @@ impl<'a> DefNameResolver<'a> {
             let mut refs = r.refs;
             refs.retain(|p| p != r.current); // filter out self-references
             match &def.kind {
-                pr::DefKind::Expr(_) => {
+                pr::DefKind::Expr(_) | pr::DefKind::External(_) => {
                     self.refs_vars.push((self.current.clone(), refs));
                 }
                 pr::DefKind::Ty(_) | pr::DefKind::Anno(_) => {

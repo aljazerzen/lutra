@@ -93,6 +93,7 @@ fn lexer<'src>() -> impl LtLexer<'src, Vec<Token>> {
         just("do").to(TokenKind::Keyword("do")),
         just("else").to(TokenKind::Keyword("else")),
         just("enum").to(TokenKind::Keyword("enum")),
+        just("external").to(TokenKind::Keyword("external")),
         just("for").to(TokenKind::Keyword("for")),
         just("func").to(TokenKind::Keyword("func")),
         just("if").to(TokenKind::Keyword("if")),

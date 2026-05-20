@@ -57,7 +57,7 @@ fn types_02() {
 
     // same, but describe function as a type, not an expression
     insta::assert_snapshot!(_test_ty(r#"
-        func identity(x: T): T where T
+        external func identity(x: T): T where T
 
         func main() -> identity(false)
     "#), @"bool");
@@ -67,7 +67,7 @@ fn types_03() {
     // validation of type params
 
     insta::assert_snapshot!(_test_err(r#"
-        func floor_64(x: float64): float64
+        external func floor_64(x: float64): float64
 
         func floor(x: T) where T -> floor_64(x)
 
@@ -116,7 +116,7 @@ fn types_06() {
     insta::assert_snapshot!(_test_ty(r#"
         func identity(x: T) where T -> x
 
-        func map(x: [I], mapper: func (I): O): [O]
+        external func map(x: [I], mapper: func (I): O): [O]
         where I, O
 
         func main() -> map([false, true, false], identity)
@@ -127,7 +127,7 @@ fn types_07() {
     insta::assert_snapshot!(_test_ty(r#"
         func twice(x: T) where T -> {x, x}
 
-        func map(x: [I], mapper: func (I): O): [O]
+        external func map(x: [I], mapper: func (I): O): [O]
         where I, O
 
         func main() -> map([false, true, true], twice)
@@ -136,13 +136,13 @@ fn types_07() {
 #[test]
 fn types_08() {
     insta::assert_snapshot!(_test_ty(r#"
-        func filter(array: [T], condition: func (T): bool): [T]
+        external func filter(array: [T], condition: func (T): bool): [T]
         where T
 
-        func map(x: [I], mapper: func (I): O): [O]
+        external func map(x: [I], mapper: func (I): O): [O]
         where I, O
 
-        func slice(x: [T], start: int64, end: int64): [T]
+        external func slice(x: [T], start: int64, end: int64): [T]
         where T
 
         func main() -> (
@@ -156,15 +156,15 @@ fn types_08() {
 #[test]
 fn types_09() {
     insta::assert_snapshot!(_test_err(r#"
-        func peek(array: [T], condition: func <R> (T): R): [T]
+        external func peek(array: [T], condition: func <R> (T): R): [T]
         where T
     "#), @"
     [E0003] Error:
-       ╭─[ <unknown>:2:47 ]
+       ╭─[ <unknown>:2:56 ]
        │
-     2 │         func peek(array: [T], condition: func <R> (T): R): [T]
-       │                                               ┬
-       │                                               ╰── expected (, but found <
+     2 │         external func peek(array: [T], condition: func <R> (T): R): [T]
+       │                                                        ┬
+       │                                                        ╰── expected (, but found <
     ───╯
     ");
 }
@@ -180,9 +180,9 @@ fn types_10() {
 fn types_11() {
     insta::assert_snapshot!(_test_ty(r#"
         type album_sale: {id: int64, total: float64}
-        func get_album_sales(): [album_sale]
+        external func get_album_sales(): [album_sale]
 
-        func filter(array: [T], condition: func (T): bool): [T]
+        external func filter(array: [T], condition: func (T): bool): [T]
         where T
 
         func main(): [album_sale] -> (
@@ -204,14 +204,14 @@ fn types_12() {
 #[test]
 fn types_13() {
     insta::assert_snapshot!(_test_ty(r#"
-        func floor(x: T): T
+        external func floor(x: T): T
         where T: float32 | float64
 
         func main() -> floor(2.4: float32)
     "#), @"float32");
 
     insta::assert_snapshot!(_test_err(r#"
-        func floor(x: T): T
+        external func floor(x: T): T
         where T: float32 | float64
 
         func main() -> floor(false)
@@ -230,7 +230,7 @@ fn types_14() {
     // validate type params: one of
 
     insta::assert_snapshot!(_test_err(r#"
-        func floor_64(x: float64): float64
+        external func floor_64(x: float64): float64
 
         func floor(x: T): T
         where T: float32 | float64
@@ -256,7 +256,7 @@ fn types_14() {
     ");
 
     insta::assert_snapshot!(_test_ty(r#"
-        func floor(x: F): F
+        external func floor(x: F): F
         where F: float32 | float64
 
         func twice_floored(x: T)
@@ -267,7 +267,7 @@ fn types_14() {
     "#), @"{float64, float32}");
 
     insta::assert_snapshot!(_test_ty(r#"
-        func floor(x: F): F
+        external func floor(x: F): F
         where F: float32 | float64
 
         func twice_floored(x: T)
@@ -278,7 +278,7 @@ fn types_14() {
     "#), @"{float64, float64}");
 
     insta::assert_snapshot!(_test_err(r#"
-        func floor(x: F): F
+        external func floor(x: F): F
         where F: float32 | float64
 
         func twice_floored(x: T)
@@ -300,14 +300,14 @@ fn types_14() {
 fn types_15() {
     // type param: tuple domain with named arg
     insta::assert_snapshot!(_test_ty(r#"
-        func get_b(x: T): T
+        external func get_b(x: T): T
         where T: {b: int64, ..}
 
         func main() -> get_b({a = false, b = 4: int64})
     "#), @"{a: bool, b: int64}");
 
     insta::assert_snapshot!(_test_err(r#"
-        func get_b(x: T): T
+        external func get_b(x: T): T
         where T: {b: int64, ..}
 
         func main() -> get_b({a = false, b = 4.6: float64})
@@ -321,7 +321,7 @@ fn types_15() {
     ───╯
     ");
     insta::assert_snapshot!(_test_err(r#"
-        func get_b(x: T): T
+        external func get_b(x: T): T
         where T: {b: int64, ..}
 
         func main() -> get_b({a = false, c = 4})
@@ -339,14 +339,14 @@ fn types_15() {
 fn types_16() {
     // type param: tuple domain with positional arg
     insta::assert_snapshot!(_test_ty(r#"
-        func get_b(x: T): T
+        external func get_b(x: T): T
         where T: {bool, int64, ..}
 
         func main() -> get_b({a = false, 4, c = 5.7: float32})
     "#), @"{a: bool, int64, c: float32}");
 
     insta::assert_snapshot!(_test_err(r#"
-        func get_b(x: T): T
+        external func get_b(x: T): T
         where T: {bool, int64, ..}
 
         func main() -> get_b({a = "7", 4: int64, c = 5.7})
@@ -361,7 +361,7 @@ fn types_16() {
     "#);
 
     insta::assert_snapshot!(_test_err(r#"
-        func get_b(x: T): T
+        external func get_b(x: T): T
         where T: {bool, int64, a: bool, ..}
 
         func main() -> get_b({a = false})
@@ -375,7 +375,7 @@ fn types_16() {
     ───╯
     ");
     insta::assert_snapshot!(_test_ty(r#"
-        func get_b(x: T): T
+        external func get_b(x: T): T
         where T: {bool, int64, a: bool, ..}
 
         func main() -> get_b({a = false, 4})
@@ -387,7 +387,7 @@ fn types_17() {
     // validate type params: tuple domain
 
     insta::assert_snapshot!(_test_err(r#"
-        func get_int(x: {int64}): int64
+        external func get_int(x: {int64}): int64
 
         func get(x: T): T
         where T: {int64, ..}
@@ -412,7 +412,7 @@ fn types_17() {
     ");
 
     insta::assert_snapshot!(_test_err(r#"
-        func get_int(x: {a: int64}): int64
+        external func get_int(x: {a: int64}): int64
 
         func get(x: T): T
         where T: {a: int64, ..}
@@ -437,7 +437,7 @@ fn types_17() {
     ");
 
     insta::assert_snapshot!(_test_err(r#"
-        func needs_two(x: I): int64
+        external func needs_two(x: I): int64
         where I: {int64, bool, ..}
 
         func needs_one(x: T): int64
@@ -456,7 +456,7 @@ fn types_17() {
     ");
 
     insta::assert_snapshot!(_test_ty(r#"
-        func needs_one(x: I): I
+        external func needs_one(x: I): I
         where I: {int64, ..}
 
         func needs_two(x: T): T
@@ -639,26 +639,26 @@ fn types_23() {
     ");
 
     insta::assert_snapshot!(_test_err(r#"
-        func main()
+        external func main()
     "#), @"
-    Error:
-       ╭─[ <unknown>:2:9 ]
+    [E0003] Error:
+       ╭─[ <unknown>:2:29 ]
        │
-     2 │         func main()
-       │         ─────┬─────
-       │              ╰─────── missing return type
+     2 │         external func main()
+       │                             │
+       │                             ╰─ expected :, but encountered the end of the file.
     ───╯
     ");
 
     insta::assert_snapshot!(_test_err(r#"
-        func main(name): {}
+        external func main(name): {}
     "#), @"
     Error:
-       ╭─[ <unknown>:2:19 ]
+       ╭─[ <unknown>:2:28 ]
        │
-     2 │         func main(name): {}
-       │                   ──┬─
-       │                     ╰─── cannot infer type
+     2 │         external func main(name): {}
+       │                            ──┬─
+       │                              ╰─── name does not exist
     ───╯
     ");
 
@@ -836,7 +836,7 @@ fn primitives() {
     insta::assert_snapshot!(
         _test_ty(
             "
-            func x(): {
+            external func x(): {
                 bool,
                 int8,
                 int16,
@@ -1556,7 +1556,7 @@ fn ty_tuple_comprehension_09() {
     // from_columnar. It was fixed by adding `LocalTyInliner`.
 
     insta::assert_snapshot!(_test_ty(r#"
-    func from_columnar(columnar: {for f: F in T do f: [F]}): [T]
+    external func from_columnar(columnar: {for f: F in T do f: [F]}): [T]
     where T: {..}
 
     func main() -> (
@@ -1580,7 +1580,7 @@ fn ty_tuple_comprehension_10() {
     // comprehension yields named fields
 
     insta::assert_snapshot!(_test_ty(r#"
-    func from_columnar(columnar: {for f: F in T do f: [F]}): T
+    external func from_columnar(columnar: {for f: F in T do f: [F]}): T
     where T: {..}
 
     func main() -> (

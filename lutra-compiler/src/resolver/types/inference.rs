@@ -55,7 +55,7 @@ impl TypeResolver<'_> {
                 body: func
                     .return_ty
                     .clone()
-                    .or_else(|| func.body.as_ref().and_then(|b| b.ty.as_deref().cloned()))
+                    .or_else(|| func.body.ty.as_deref().cloned())
                     .map(Box::new),
                 ty_params: func.ty_params.clone(),
             }),

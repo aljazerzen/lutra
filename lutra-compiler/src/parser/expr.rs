@@ -479,7 +479,7 @@ where
         ))
         .then(ctrl(':').ignore_then(ty.clone()).or_not())
         .then_ignore(just(TokenKind::ArrowThin))
-        .then(expr.map(Box::new).map(Some))
+        .then(expr.map(Box::new))
         .map(|((params, return_ty), body)| {
             Box::new(Func {
                 params,

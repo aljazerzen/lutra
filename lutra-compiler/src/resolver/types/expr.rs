@@ -20,7 +20,7 @@ impl fold::PrFold for super::TypeResolver<'_> {
                 tracing::debug!("... resolved to {}", named.as_ref());
 
                 let ty = match named {
-                    scope::Named::Expr(expr) => expr.ty.as_deref().cloned().unwrap(),
+                    scope::Named::Value(ty) => ty.clone(),
                     scope::Named::Module => {
                         return Err(scope::err_name_kind("a value", "a module").with_span(span));
                     }

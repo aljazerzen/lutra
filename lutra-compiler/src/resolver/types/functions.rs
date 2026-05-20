@@ -16,9 +16,6 @@ impl TypeResolver<'_> {
             "resolving func with params: ({})",
             func.params.iter().map(|p| &p.name).join(", ")
         );
-        let allow_native = self.allow_native_functions;
-        self.allow_native_functions = false;
-
         let mut scope = Scope::new(
             scope_id,
             if func.ty_params.is_empty() {
@@ -50,25 +47,12 @@ impl TypeResolver<'_> {
         res.map_err(|mut d| d.remove(0))?;
 
         // fold body
-        if let Some(body) = func.body {
-            let mut body = Box::new(self.fold_expr(*body)?);
-
-            // validate that the body has correct type
-            if let Some(return_ty) = &func.return_ty {
-                self.validate_expr_type(&mut body, return_ty, &|| None)?;
-            }
-            func.body = Some(body);
-        } else {
-            // there is no body: this is a native function definition
-            if !allow_native {
-                return Err(Diagnostic::new_custom("missing function body"));
-            }
-
-            // ... which require return type to be set
-            if func.return_ty.is_none() {
-                return Err(Diagnostic::new_custom("missing return type"));
-            }
+        let mut body = Box::new(self.fold_expr(*func.body)?);
+        // validate that the body has correct type
+        if let Some(return_ty) = &func.return_ty {
+            self.validate_expr_type(&mut body, return_ty, &|| None)?;
         }
+        func.body = body;
 
         // pop the scope
         tracing::debug!("func done, popping scope");

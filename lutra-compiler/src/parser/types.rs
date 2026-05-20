@@ -113,10 +113,11 @@ pub(super) fn func_params<'src, I>(
 where
     I: ValueInput<'src, Token = TokenKind, Span = Span>,
 {
-    let param = (ident_part().then_ignore(ctrl(':')).or_not())
+    let param = (keyword("const").or_not())
+        .then(ident_part().then_ignore(ctrl(':')).or_not())
         .then(ty.map(Some))
-        .map(|(label, ty)| TyFuncParam {
-            constant: false,
+        .map(|((constant, label), ty)| TyFuncParam {
+            constant: constant.is_some(),
             label,
             ty,
         });

@@ -34,6 +34,10 @@ pub fn print_def_signature(name: &str, def: &pr::Def) -> Option<String> {
             let func = expr_def.value.ty.as_ref()?.kind.as_func()?;
             types::print_ty_func(func, Some(name), p)?;
         }
+        pr::DefKind::External(ty) => {
+            let func = ty.kind.as_func()?;
+            types::print_ty_func(func, Some(name), p)?;
+        }
         pr::DefKind::Ty(ty_def) => {
             p.push("type ")?;
             p.push(ident::display(name))?;
@@ -230,6 +234,12 @@ impl PrintSource for NamedDef<'_> {
                 // func
                 let func = expr_def.value.kind.as_func().unwrap();
                 expr::print_func(func, Some(self.0), p)?;
+            }
+            pr::DefKind::External(ty) => {
+                // external func
+                p.push("external ")?;
+                let func = ty.kind.as_func().unwrap();
+                types::print_ty_func(func, Some(self.0), p)?;
             }
             pr::DefKind::Ty(ty_def) => {
                 p.push("type ")?;

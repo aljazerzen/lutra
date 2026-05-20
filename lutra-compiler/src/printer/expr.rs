@@ -362,15 +362,13 @@ pub(super) fn print_func<'c>(
 ) -> Option<()> {
     print_func_signature(func, name, p)?;
 
-    if let Some(body) = &func.body {
-        if func.ty_params.is_empty() {
-            p.push(" -> ")?;
-        } else {
-            p.new_line();
-            p.push("-> ")?;
-        }
-        body.print(p)?;
+    if func.ty_params.is_empty() {
+        p.push(" -> ")?;
+    } else {
+        p.new_line();
+        p.push("-> ")?;
     }
+    func.body.print(p)?;
     Some(())
 }
 

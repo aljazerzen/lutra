@@ -34,7 +34,6 @@ struct TypeResolver<'a> {
     debug_current_def: crate::pr::Path,
 
     scopes: Vec<scope::Scope>,
-    allow_native_functions: bool,
 
     const_validator: super::const_eval::ConstantValidator,
 
@@ -47,7 +46,6 @@ impl TypeResolver<'_> {
             root_mod,
             debug_current_def: crate::pr::Path::from_name("?"),
             scopes: Vec::new(),
-            allow_native_functions: false,
 
             const_validator: super::const_eval::ConstantValidator::new(),
             diagnostics: Default::default(),

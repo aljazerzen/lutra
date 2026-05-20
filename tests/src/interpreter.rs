@@ -184,7 +184,7 @@ fn func_call_size() {
     let source = lc::SourceTree::single(
         "".into(),
         r#"
-        func x(): {}
+        external func x(): {}
         "#
         .into(),
     );

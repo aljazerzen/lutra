@@ -45,7 +45,7 @@ fn expr<'src>() -> impl Parser<'src, I<'src>, Expr, extra::Err<PError>> + Clone 
             TokenKind::Literal(pr::Literal::Text(i)) => ExprKind::Literal(Literal::text(i)),
         };
 
-        let pointer_external = ident_keyword("external")
+        let pointer_external = keyword("external")
             .ignore_then(ctrl('.'))
             .ignore_then(external_ptr())
             .map(Pointer::External);

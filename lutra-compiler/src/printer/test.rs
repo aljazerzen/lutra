@@ -301,13 +301,13 @@ fn format_16() {
 
 #[test]
 fn format_17() {
-    // formatting of native functions
+    // formatting of external functions
 
     assert_snapshot!(_format(r#"
-    func index(array: [T], position: int64): enum { None, Some: T }
+    external func index(array: [T], position: int64): enum { None, Some: T }
     where T
     "#), @"
-    func index(array: [T], position: int64): enum {None, Some: T}
+    external func index(array: [T], position: int64): enum {None, Some: T}
     where T
     "
     )
@@ -655,12 +655,12 @@ fn trivia_10() {
     assert_snapshot!(_format(r#"
 # Utils
 
-func default(): T
+external func default(): T
 where T
  "#), @r"
     # Utils
 
-    func default(): T
+    external func default(): T
     where T
     ");
 }

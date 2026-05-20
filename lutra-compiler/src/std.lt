@@ -33,51 +33,51 @@ module convert {
   ## For tuples, it a tuple with every field set to default value.
   ## For arrays, it is an empty array.
   ## For enums, it the first variant.
-  func default(): T
+  external func default(): T
   where T
 
   ## Converts a number to `int8`
-  func to_int8(x: T): int8
+  external func to_int8(x: T): int8
   where T: number
 
   ## Converts a number to `int16`
-  func to_int16(x: T): int16
+  external func to_int16(x: T): int16
   where T: number
 
   ## Converts a number to `int32`
-  func to_int32(x: T): int32
+  external func to_int32(x: T): int32
   where T: number
 
   ## Converts a number to `int64`
-  func to_int64(x: T): int64
+  external func to_int64(x: T): int64
   where T: number
 
   ## Converts a number to `uint8`
-  func to_uint8(x: T): uint8
+  external func to_uint8(x: T): uint8
   where T: number
 
   ## Converts a number to `uint16`
-  func to_uint16(x: T): uint16
+  external func to_uint16(x: T): uint16
   where T: number
 
   ## Converts a number to `uint32`
-  func to_uint32(x: T): uint32
+  external func to_uint32(x: T): uint32
   where T: number
 
   ## Converts a number to `uint64`
-  func to_uint64(x: T): uint64
+  external func to_uint64(x: T): uint64
   where T: number
 
   ## Converts a number to `float32`
-  func to_float32(x: T): float32
+  external func to_float32(x: T): float32
   where T: number
 
   ## Converts a number to `float64`
-  func to_float64(x: T): float64
+  external func to_float64(x: T): float64
   where T: number
 
   ## Converts a value to `text`
-  func to_text(x: T): text
+  external func to_text(x: T): text
   where T: primitive
 }
 
@@ -86,32 +86,32 @@ import ops::*
 ## Operators
 module ops {
   ## Multiplies two numbers.
-  func mul(left: T, right: T): T
+  external func mul(left: T, right: T): T
   where T: number
 
   ## Divides two numbers.
-  func div(left: T, right: T): T
+  external func div(left: T, right: T): T
   where T: number
 
   ## Division remainder.
-  func mod(left: T, right: T): T
+  external func mod(left: T, right: T): T
   where T: number
 
   ## Adds two numbers.
-  func add(left: T, right: T): T
+  external func add(left: T, right: T): T
   where T: number
 
   ## Subtracts two numbers.
-  func sub(left: T, right: T): T
+  external func sub(left: T, right: T): T
   where T: number
 
   ## Negates a number.
-  func neg(x: T): T
+  external func neg(x: T): T
   where T: int8 | int16 | int32 | int64 | float32 | float64
 
   ## Compare two values to determine if the first is less, equal, or greater than
   ## the second.
-  func cmp(a: T, b: T): Ordering
+  external func cmp(a: T, b: T): Ordering
   where T: primitive
 
   ## Result of a three-way comparison. Returned by [cmp].
@@ -178,13 +178,13 @@ module ops {
   )
 
   ## Tests if both values are true. Used by `&&` operator.
-  func and(left: bool, right: bool): bool
+  external func and(left: bool, right: bool): bool
 
   ## Tests if either of the values is true. Used by `||` operator.
-  func or(left: bool, right: bool): bool
+  external func or(left: bool, right: bool): bool
 
   ## Inverts a boolean. Used by `!` operator.
-  func not(expr: bool): bool
+  external func not(expr: bool): bool
 }
 
 import option::(is_some, is_none, or_else, or_default, map_or)
@@ -290,11 +290,11 @@ import array::*
 ## Basic array functions, aggregation, and window functions
 module array {
   ## Returns the item at a zero-based `position`, or `.none` if out of bounds.
-  func index(array: [T], position: int64): T?
+  external func index(array: [T], position: int64): T?
   where T
 
   ## Returns the number of items in an array.
-  func count(array: [T]): int64
+  external func count(array: [T]): int64
   where T
 
   ## Returns `true` if the array contains no items.
@@ -304,15 +304,15 @@ module array {
 
   ## Transforms each item using a `mapper` function.
   ## Returns a new array of the same length.
-  func map(array: [I], mapper: func (I): O): [O]
+  external func map(array: [I], mapper: func (I): O): [O]
   where I, O
 
   ## Applies `mapper` to each item and concatenates the resulting arrays.
-  func flat_map(array: [I], mapper: func (I): [O]): [O]
+  external func flat_map(array: [I], mapper: func (I): [O]): [O]
   where I, O
 
   ## Returns only the items for which `condition` returns `true`.
-  func filter(array: [T], condition: func (T): bool): [T]
+  external func filter(array: [T], condition: func (T): bool): [T]
   where T
 
   ## Returns the first item for which `condition` returns `true`,
@@ -322,22 +322,22 @@ module array {
   -> (array | filter(condition) | index(0))
 
   ## Returns items from index `start` (inclusive) to `end` (exclusive).
-  func slice(array: [T], start: int64, end: int64): [T]
+  external func slice(array: [T], start: int64, end: int64): [T]
   where T
 
   ## Sorts the array in ascending order by the value returned by `key`.
-  func sort(array: [I], key: func (I): K): [I]
+  external func sort(array: [I], key: func (I): K): [I]
   where I, K: primitive
 
   ## Transposes an array of rows into a tuple of columns.
   ## Each field of the row type becomes a column — an array of that field's values.
   ## The inverse of [from_columnar].
-  func to_columnar(rows: [T]): {for f: F in T do f: [F]}
+  external func to_columnar(rows: [T]): {for f: F in T do f: [F]}
   where T: {..}
 
   ## Transposes a tuple of columns into an array of rows.
   ## The inverse of [to_columnar].
-  func from_columnar(columnar: {for f: F in T do f: [F]}): [T]
+  external func from_columnar(columnar: {for f: F in T do f: [F]}): [T]
   where T: {..}
 
   ## Applies `mapper` to the array in columnar form.
@@ -356,12 +356,12 @@ module array {
 
   ## Pairs items from `left` and `right` by position.
   ## The result length equals the shorter of the two inputs.
-  func zip(left: [L], right: [R]): [{L, R}]
+  external func zip(left: [L], right: [R]): [{L, R}]
   where L, R
 
   ## Groups array items by a key.
   ## Returns groups, which contain the key and an array of values in this group.
-  func group(input: [I], get_key: func (I): K): [{key: K, values: [I]}]
+  external func group(input: [I], get_key: func (I): K): [{key: K, values: [I]}]
   where I, K
 
   ## Groups array items by a key.
@@ -376,7 +376,7 @@ module array {
   -> (array | group(x -> x) | map(x -> x.key))
 
   ## Concatenates two arrays, `first` items followed by `second` items.
-  func append(first: [T], second: [T]): [T]
+  external func append(first: [T], second: [T]): [T]
   where T
 
   ## Folds every input into the an accumulator value by applying an operation,
@@ -392,7 +392,7 @@ module array {
   ## This function is sometimes also called "reduce" or "inject".
   ## This function is similar to [scan], but it returns only the final
   ## accumulator.
-  func fold(inputs: [I], initial: A, operation: func (A, I): A): A
+  external func fold(inputs: [I], initial: A, operation: func (A, I): A): A
   where I, A
 
   ## Applies an operation to each input, using the output from the previous
@@ -407,7 +407,7 @@ module array {
   ##
   ## This function is similar to [fold], but it returns all accumulators,
   ## instead of only the final one.
-  func scan(inputs: [I], initial: A, operation: func (A, I): A): [A]
+  external func scan(inputs: [I], initial: A, operation: func (A, I): A): [A]
   where I, A
 
   # func apply(
@@ -423,42 +423,42 @@ module array {
   ## Returns all produced arrays concatenated together, including initial array.
   ##
   ## In SQL, this is known as "RECURSIVE CTE" or "recursive join".
-  func apply_until_empty(initial: [T], operation: func ([T]): [T]): [T]
+  external func apply_until_empty(initial: [T], operation: func ([T]): [T]): [T]
   where T
 
   ## Returns an array of sequential integers
   ## from start (inclusive) to end (exclusive).
   ##
   ## For example: `sequence(0, 3) == [0, 1, 2]`
-  func sequence(start: N, end: N): [N]
+  external func sequence(start: N, end: N): [N]
   where N: int8 | int16 | int32 | int64 | uint8 | uint16 | uint32 | uint64
 
   # --- Aggregation functions ---
 
   ## Find the minimum value in the array.
   ## Returns `none` when array is empty.
-  func min(array: [T]): T?
+  external func min(array: [T]): T?
   where T: primitive
 
   ## Find the maximum value in the array.
   ## Returns `none` when array is empty.
-  func max(array: [T]): T?
+  external func max(array: [T]): T?
   where T: primitive
 
   ## Compute sum of all number in an array.
   ## Returns zero when array is empty.
-  func sum(column: [T]): T
+  external func sum(column: [T]): T
   where T: number
 
   ## Compute arithmetic mean of an array of numbers.
-  func mean(array: [T]): float64
+  external func mean(array: [T]): float64
   where T: number
 
   ## Returns `true` if all items in the array are `true`.
-  func all(values: [bool]): bool
+  external func all(values: [bool]): bool
 
   ## Returns `true` if any value in the array is `true`.
-  func any(values: [bool]): bool
+  external func any(values: [bool]): bool
 
   ## Returns `true` if the haystack array contains an item equal to `needle`.
   func contains(haystack: [T], needle: T): bool
@@ -471,14 +471,14 @@ module array {
   ## Items in front are set to their default value.
   ##
   ## For example, `lag(["a", "b", "c"], 1)` is `["", "a", "b"]`.
-  func lag(array: [T], offset: int64): [T]
+  external func lag(array: [T], offset: int64): [T]
   where T
 
   ## Shifts array items forwards by an offset.
   ## Items in back are set to their default value.
   ##
   ## For example, `lead(["a", "b", "c"], 1)` is `["b", "c", ""]`.
-  func lead(array: [T], offset: int64): [T]
+  external func lead(array: [T], offset: int64): [T]
   where T
 
   ## Computes rolling arithmetic mean over an array of numbers.
@@ -490,7 +490,7 @@ module array {
   ##
   ## For example, `rolling_mean(..., 1, 2)` computes mean of each item, along with
   ## 1 preceding and 2 following items, which is 4 items total.
-  func rolling_mean(array: [T], preceding: uint32, following: uint32): [float64]
+  external func rolling_mean(array: [T], preceding: uint32, following: uint32): [float64]
   where T: number
 
   ## Computes rank of each array item.
@@ -501,7 +501,7 @@ module array {
   ## Also known as "min rank".
   ##
   ## For example, `rank(["a", "b", "b", "c"])` is `[1, 2, 2, 4]`.
-  func rank(array: [T]): [int32]
+  external func rank(array: [T]): [int32]
   where T: primitive
 
   ## Computes dense rank of each array item.
@@ -512,7 +512,7 @@ module array {
   ## The values range from `1` to `n` (number of unique items).
   ##
   ## For example, `rank_dense(["a", "b", "b", "c"])` is `[1, 2, 2, 3]`.
-  func rank_dense(array: [T]): [int32]
+  external func rank_dense(array: [T]): [int32]
   where T: primitive
 
   ## Computes percentile rank of each array item.
@@ -523,7 +523,7 @@ module array {
   ##
   ## For example, `rank_percentile(["a", "b", "b", "c"])` is
   ## `[0.0, 0.33333, 0.25, 1.0]`.
-  func rank_percentile(array: [T]): [float64]
+  external func rank_percentile(array: [T]): [float64]
   where T: primitive
 
   ## Computes ECDF (Empirical Cumulative Density Function) of array items.
@@ -535,14 +535,14 @@ module array {
   ##
   ## For example, `cume_dist(["a", "b", "b", "c"])` is
   ## `[0.25, 0.75, 0.75, 1.0]`.
-  func cume_dist(array: [T]): [float64]
+  external func cume_dist(array: [T]): [float64]
   where T: primitive
 }
 
 ## Mathematical ops
 module math {
   ## Absolute value
-  func abs(val: T): T
+  external func abs(val: T): T
   where T: number
 
   # func sqrt(val: int64): int64
@@ -561,7 +561,7 @@ module math {
 
   # TODO: exponent should probably always be uint32
   ## Raises `val` to the power of `exponent`.
-  func pow(val: T, exponent: T): T
+  external func pow(val: T, exponent: T): T
   where T: int64 | float64
 
   # func exp(val: int64): int64
@@ -581,22 +581,22 @@ module math {
 ## Text functions
 module text {
   ## Concatenates two text values.
-  func concat(left: text, right: text): text
+  external func concat(left: text, right: text): text
 
   ## Returns the number of characters in a text value.
-  func length(value: text): uint32
+  external func length(value: text): uint32
 
   ## Converts ASCII code to its corresponding Unicode character.
   ## This function always succeeds, because ASCII is a subset of Unicode.
-  func from_ascii(ascii: uint8): text
+  external func from_ascii(ascii: uint8): text
 
   ## Joins parts together, placing separator between each pair.
-  func join(parts: [text], separator: text): text
+  external func join(parts: [text], separator: text): text
 
   ## Splits text into substrings at every occurrence of a separator.
   ##
   ## For example, `split("1_two_3", "_")` is `["1", "two", "3"]`
-  func split(value: text, separator: text): [text]
+  external func split(value: text, separator: text): [text]
 
   # func lower(value: text): text
   # func upper(value: text): text
@@ -609,13 +609,13 @@ module text {
   # func replace(value: text, pattern: text, replacement: text): text
 
   ## Tests if a text starts with a prefix.
-  func starts_with(value: text, prefix: text): bool
+  external func starts_with(value: text, prefix: text): bool
 
   ## Tests if a text contains a pattern.
-  func contains(value: text, pattern: text): bool
+  external func contains(value: text, pattern: text): bool
 
   ## Tests if a text ends with a suffix.
-  func ends_with(value: text, suffix: text): bool
+  external func ends_with(value: text, suffix: text): bool
 
   # func regex_search(haystack: text, pattern: text): bool
 }
@@ -623,11 +623,11 @@ module text {
 ## File system operations
 module fs {
   ## Reads rows from a Parquet file at `file_name`.
-  func read_parquet(file_name: text): [R]
+  external func read_parquet(file_name: text): [R]
   where R: {..}
 
   ## Writes `data` to a Parquet file at `file_name`.
-  func write_parquet(data: [R], file_name: text): {}
+  external func write_parquet(data: [R], file_name: text): {}
   where R: {..}
 }
 
@@ -645,13 +645,13 @@ module sql {
   ## For example:
   ## - `from("my_schema/invoices")` will read from `my_schema.invoices`,
   ## - `from("my_schema/hello/world")` will read from `my_schema."hello/world"`.
-  func from(const table_identifier: text): [R]
+  external func from(const table_identifier: text): [R]
   where R: {..}
 
   ## Inserts rows into a table.
   ##
   ## For table identifier format, see documentation of [module::from].
-  func insert(rows: [R], const table_identifier: text): {}
+  external func insert(rows: [R], const table_identifier: text): {}
   where R: {..}
 
   ## Updates rows in a table.
@@ -676,7 +676,7 @@ module sql {
   ## ```
   ##
   ## For table identifier format, see documentation of [module::from].
-  func update(const table: text, updater: func (R): R?): {}
+  external func update(const table: text, updater: func (R): R?): {}
   where R: {..}
 
   ## Evaluates raw SQL.
@@ -693,7 +693,7 @@ module sql {
   ## - arrays -> columns of the inner object,
   ## - enums -> one tag column, followed by columns of each of the variants,
   ## - enums that are the option -> one nullable column.
-  func raw(const sql_source: text): R
+  external func raw(const sql_source: text): R
   where R
 }
 
@@ -789,18 +789,18 @@ module date {
   )
 
   ## Computes the timestamp of a local date at a timezone.
-  func to_timestamp(date: super::Date, time_zone: text): super::Timestamp
+  external func to_timestamp(date: super::Date, time_zone: text): super::Timestamp
 
   ## Converts a date into year, month, and day numbers.
   ## Month and day start with 1.
-  func to_year_month_day(date: super::Date): {
+  external func to_year_month_day(date: super::Date): {
     year: int32, month: uint8, day: uint8,
   }
 }
 
 module timestamp {
   ## Computes the local date of a timestamp at a timezone.
-  func to_date(timestamp: super::Timestamp, time_zone: text): super::Date
+  external func to_date(timestamp: super::Timestamp, time_zone: text): super::Date
 }
 
 ## Exact decimal value with a fixed `SCALE`, which is the number of digits past

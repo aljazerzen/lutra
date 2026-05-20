@@ -258,6 +258,7 @@ impl DefIcon {
                     Some(DefIcon::Function)
                 }
             }
+            pr::DefKind::External(_) => Some(DefIcon::Function),
             pr::DefKind::Ty(_) => Some(DefIcon::Type),
             pr::DefKind::Import(_) => None,
             pr::DefKind::Anno(_) => None, // TODO?

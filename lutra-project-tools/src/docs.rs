@@ -172,7 +172,7 @@ fn render_module<'a>(
 fn def_kind_name(def: &pr::Def) -> &'static str {
     match &def.kind {
         pr::DefKind::Expr(e) if e.constant => "const",
-        pr::DefKind::Expr(_) => "func",
+        pr::DefKind::Expr(_) | pr::DefKind::External(_) => "func",
         pr::DefKind::Ty(_) => "type",
         pr::DefKind::Anno(_) => "anno",
         pr::DefKind::Module(_) => "module",

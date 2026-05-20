@@ -39,7 +39,7 @@ fn lower_01() {
     module chinook {
       type album: {id: int64, title: text}
 
-      func get_albums(): [album]
+      external func get_albums(): [album]
 
       func get_album_by_id(album_id: int64): enum { none, some: album } -> (
         get_albums()
@@ -51,7 +51,7 @@ fn lower_01() {
     module box_office {
       type AlbumSale: {id: int64, total: float64}
 
-      func get_album_sales(): [AlbumSale]
+      external func get_album_sales(): [AlbumSale]
 
       func get_album_sales_by_id(album_id: int64): enum { none, some: AlbumSale } -> (
         get_album_sales()

@@ -256,7 +256,7 @@ impl Desugarator {
         Ok(pr::ExprKind::Func(Box::new(pr::Func {
             params: vec![func.param],
             return_ty: None,
-            body: Some(Box::new(self.fold_expr(*func.body)?)),
+            body: Box::new(self.fold_expr(*func.body)?),
             ty_params: vec![],
         })))
     }
