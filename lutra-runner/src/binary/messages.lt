@@ -12,6 +12,9 @@ type RequestKind: enum {
 
   # Request the database schema as Lutra source code
   pull_schema,
+
+  # Request the set of externals this runner provides
+  get_externals,
 }
 
 type PrepareRequest: {program_id: uint32, program: [uint8]}
@@ -27,6 +30,7 @@ type ResponseKind: enum {
   execute: ExecuteResult,
   release: ReleaseResult,
   schema: SchemaResult,
+  externals: ExternalsResult,
 }
 
 type PrepareResult: enum {ok, err: Error}
@@ -36,6 +40,8 @@ type ExecuteResult: enum {ok: [uint8], err: Error}
 type ReleaseResult: enum {ok, err: Error}
 
 type SchemaResult: enum {ok: text, err: Error}
+
+type ExternalsResult: enum {ok: [text], err: Error}
 
 type Error: {
   # Human-readable error message, intended to be shown directly to users.

@@ -156,7 +156,10 @@ async fn run_program(
     let project = lutra_compiler::check(source_tree, Default::default())?;
 
     // compile the program
-    let (program, ty) = lutra_compiler::compile(&project, "main", None, program_format)?;
+    let (program, ty) = lutra_compiler::compile(
+        &project,
+        &lutra_compiler::CompileParams::new("main", program_format),
+    )?;
 
     let input = if case.input.is_empty() {
         Vec::new()

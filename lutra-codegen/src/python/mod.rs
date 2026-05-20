@@ -547,7 +547,7 @@ fn ty_encode_body(ty: &ir::Ty, val_ref: &str, residual_ref: &str, ctx: &mut Cont
 fn write_programs(
     w: &mut impl Write,
     functions: &[(&String, ir::TyFunction)],
-    format: ProgramRepr,
+    repr: ProgramRepr,
     ctx: &mut Context,
 ) -> Result<(), std::fmt::Error> {
     if functions.is_empty() {
@@ -560,8 +560,11 @@ fn write_programs(
         let fq_path = fq_path.to_string();
 
         // compile
-        let (program, mut ty) =
-            lutra_compiler::compile(ctx.project, &fq_path, None, format).unwrap();
+        let (program, mut ty) = lutra_compiler::compile(
+            ctx.project,
+            &lutra_compiler::CompileParams::new(&fq_path, repr),
+        )
+        .unwrap();
 
         // encode to base85
         let buf = program.encode();

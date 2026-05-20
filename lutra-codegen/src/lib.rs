@@ -95,13 +95,9 @@ pub fn generate_program_bytecode(project_dir: &path::Path, program: &str, out_fi
         lutra_compiler::check(source, Default::default()).unwrap_or_else(|e| panic!("{e}"));
 
     // lower & bytecode
-    let (program, _ty) = lutra_compiler::compile(
-        &project,
-        program,
-        None,
-        lutra_compiler::ProgramRepr::BytecodeLt,
-    )
-    .unwrap();
+    let params =
+        lutra_compiler::CompileParams::new(program, lutra_compiler::ProgramRepr::BytecodeLt);
+    let (program, _ty) = lutra_compiler::compile(&project, &params).unwrap();
 
     let buf = program.into_bytecode_lt().unwrap().encode();
     std::fs::write(out_file, buf).unwrap();

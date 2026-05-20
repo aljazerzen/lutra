@@ -26,6 +26,9 @@ pub enum Error {
 
     #[error("{}", DisplayMessages(.diagnostics))]
     Compile { diagnostics: Vec<DiagnosticMessage> },
+
+    #[error("{message}")]
+    UnsupportedExternal { message: String },
 }
 
 impl Error {

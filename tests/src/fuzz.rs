@@ -180,9 +180,7 @@ async fn generate_and_test(
     // fetch the value from source
     let (program, ty) = lutra_compiler::compile(
         project,
-        &case.val_source,
-        None,
-        lutra_compiler::ProgramRepr::SqlPg,
+        &lutra_compiler::CompileParams::new(&case.val_source, lutra_compiler::ProgramRepr::SqlPg),
     )
     .unwrap();
     let handle = client.prepare(program).await.unwrap();
@@ -193,9 +191,10 @@ async fn generate_and_test(
     // roundtrip
     let (program, _ty) = lutra_compiler::compile(
         project,
-        &format!("func (x: {}) -> x", case.ty_source),
-        None,
-        lutra_compiler::ProgramRepr::SqlPg,
+        &lutra_compiler::CompileParams::new(
+            format!("func (x: {}) -> x", case.ty_source),
+            lutra_compiler::ProgramRepr::SqlPg,
+        ),
     )
     .unwrap();
     let handle = client.prepare(program).await.unwrap();

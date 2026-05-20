@@ -18,8 +18,11 @@ async fn main() {
     let source = lutra_compiler::SourceTree::empty();
     let project = lutra_compiler::check(source, Default::default()).unwrap();
     let source = "func (x: int64) -> 3 * x + 2";
-    let (program, ty) =
-        lutra_compiler::compile(&project, source, None, ProgramRepr::BytecodeLt).unwrap();
+    let (program, ty) = lutra_compiler::compile(
+        &project,
+        &lutra_compiler::CompileParams::new(source, ProgramRepr::BytecodeLt),
+    )
+    .unwrap();
 
     let c = async {
         let handle = client.prepare(program).await.unwrap();

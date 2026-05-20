@@ -105,6 +105,17 @@ pub trait Run {
     fn shutdown(&self) -> impl Future<Output = Result<(), proto::Error>> {
         async { Ok(()) }
     }
+
+    /// Returns the set of externals this runner provides.
+    ///
+    /// Externals are named module prefixes (e.g. `"std::sql"`, `"std::fs"`).
+    /// The compiler uses these to validate that all external functions
+    /// referenced by a program are available before execution.
+    fn get_externals(
+        &self,
+    ) -> impl Future<Output = Result<vec::Vec<string::String>, proto::Error>> {
+        async { Ok(vec::Vec::new()) }
+    }
 }
 
 /// Synchronous version of the Run trait for runners that don't block the process.
@@ -169,6 +180,15 @@ pub trait RunSync {
     /// Releases any claimed resources.
     fn shutdown_sync(&mut self) -> Result<(), proto::Error> {
         Ok(())
+    }
+
+    /// Returns the set of externals this runner provides.
+    ///
+    /// Externals are named module prefixes (e.g. `"std::sql"`, `"std::fs"`).
+    /// The compiler uses these to validate that all external functions
+    /// referenced by a program are available before execution.
+    fn get_externals_sync(&mut self) -> Result<vec::Vec<string::String>, proto::Error> {
+        Ok(vec::Vec::new())
     }
 }
 
@@ -235,6 +255,12 @@ impl From<Result<(), proto::Error>> for proto::ReleaseResult {
 
 impl From<Result<lutra_bin::string::String, proto::Error>> for proto::SchemaResult {
     fn from(value: Result<lutra_bin::string::String, proto::Error>) -> Self {
+        Self(value)
+    }
+}
+
+impl From<Result<vec::Vec<string::String>, proto::Error>> for proto::ExternalsResult {
+    fn from(value: Result<vec::Vec<string::String>, proto::Error>) -> Self {
         Self(value)
     }
 }

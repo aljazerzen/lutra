@@ -41,7 +41,10 @@ pub async fn _run_on(
     };
 
     // compile to sql
-    let res = lutra_compiler::compile(&project, "main", None, ProgramRepr::SqlPg);
+    let res = lutra_compiler::compile(
+        &project,
+        &lutra_compiler::CompileParams::new("main", ProgramRepr::SqlPg),
+    );
     let (program, ty) = match res {
         Ok(x) => x,
         Err(e) => return (String::new(), format!("compile error:\n{e}")),
@@ -2691,8 +2694,11 @@ async fn _type_round_trip(ty: &str, ty_reflected: &str, value: lutra_bin::Value)
     // compile
     let source = SourceTree::single("".into(), format!("func main(x: {ty}) -> x"));
     let project = lutra_compiler::check(source, Default::default()).unwrap();
-    let (program, p_ty) =
-        lutra_compiler::compile(&project, "main", None, ProgramRepr::SqlPg).unwrap();
+    let (program, p_ty) = lutra_compiler::compile(
+        &project,
+        &lutra_compiler::CompileParams::new("main", ProgramRepr::SqlPg),
+    )
+    .unwrap();
 
     // execute
     let input = value.encode(&p_ty.input, &p_ty.defs).unwrap();
@@ -2763,16 +2769,21 @@ async fn _type_round_trip(ty: &str, ty_reflected: &str, value: lutra_bin::Value)
     };
 
     // insert
-    let (insert, insert_ty) =
-        lutra_compiler::compile(&project, "x -> insert_row(x)", None, ProgramRepr::SqlPg)
-            .unwrap_or_else(|e| panic!("{e}"));
+    let (insert, insert_ty) = lutra_compiler::compile(
+        &project,
+        &lutra_compiler::CompileParams::new("x -> insert_row(x)", ProgramRepr::SqlPg),
+    )
+    .unwrap_or_else(|e| panic!("{e}"));
     let input = value.encode(&insert_ty.input, &insert_ty.defs).unwrap();
     let insert_id = runner.prepare(insert).await.unwrap();
     runner.execute(insert_id, &input).await.unwrap();
 
     // from
-    let (from, from_ty) =
-        lutra_compiler::compile(&project, "from_row", None, ProgramRepr::SqlPg).unwrap();
+    let (from, from_ty) = lutra_compiler::compile(
+        &project,
+        &lutra_compiler::CompileParams::new("from_row", ProgramRepr::SqlPg),
+    )
+    .unwrap();
     let from_id = runner.prepare(from).await.unwrap();
     let output = runner.execute(from_id, &[]).await.unwrap();
 

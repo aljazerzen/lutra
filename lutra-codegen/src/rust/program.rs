@@ -11,7 +11,7 @@ use crate::rust::types;
 pub fn write_rr_programs(
     w: &mut impl Write,
     functions: &[(&String, ir::TyFunction)],
-    format: ProgramRepr,
+    repr: ProgramRepr,
     ctx: &mut Context,
 ) -> Result<(), std::fmt::Error> {
     if functions.is_empty() {
@@ -25,8 +25,11 @@ pub fn write_rr_programs(
         let fq_path = fq_path.to_string();
 
         // compile
-        let (program, mut ty) =
-            lutra_compiler::compile(ctx.project, &fq_path, None, format).unwrap();
+        let (program, mut ty) = lutra_compiler::compile(
+            ctx.project,
+            &lutra_compiler::CompileParams::new(&fq_path, repr),
+        )
+        .unwrap();
 
         // encode and write to file
         let out_file = ctx.out_dir.join(format!("{fq_path}.rr.lb"));

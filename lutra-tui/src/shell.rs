@@ -212,7 +212,8 @@ impl Shell {
         }
 
         // base case: lutra program
-        let res = lutra_compiler::compile(project, &prompt, None, self.runner.repr());
+        let params = lutra_compiler::CompileParams::new(&prompt, self.runner.repr());
+        let res = lutra_compiler::compile(project, &params);
         if let Err(err) = res {
             return r.and(self.repl.commit_compile_error(err.to_string()));
         }

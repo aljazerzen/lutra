@@ -37,18 +37,50 @@ pub enum ProgramRepr {
     BytecodeLt,
 }
 
+/// The representation kind of a compiled Lutra program.
+#[derive(Clone)]
+#[cfg_attr(feature = "clap", derive(clap::Parser))]
+pub struct CompileParams {
+    /// Program source code.
+    ///
+    /// Usually this is a path to an expression in the project, but it can be
+    /// any lutra expression.
+    #[cfg_attr(feature = "clap", clap(long, default_value = "main"))]
+    program: String,
+
+    /// The name of the program that should be displayed in diagnostics.
+    /// For example, when called by cli, this would be `"--program"`.
+    #[cfg_attr(feature = "clap", clap(skip))]
+    program_name_hint: Option<String>,
+
+    /// Target program representation.
+    #[cfg_attr(feature = "clap", clap(long, default_value = "bytecode-lt"))]
+    repr: ProgramRepr,
+
+    /// Externals that are allowed to be used by the program.
+    ///
+    /// Contains fully-qualified paths to the external functions or modules.
+    /// When a module is referenced, all contained external functions are allowed.
+    #[cfg_attr(feature = "clap", clap(skip))]
+    externals: Vec<std::borrow::Cow<'static, str>>,
+}
+
 pub fn compile(
     project: &Project,
-    program: &str,
-    name_hint: Option<&str>,
-    target_repr: ProgramRepr,
+    params: &CompileParams,
 ) -> Result<(rr::Program, rr::ProgramType), error::Error> {
     // resolve
-    let program_pr = self::check::check_overlay(project, program, name_hint)?;
+    let program_pr = self::check::check_overlay(
+        project,
+        &params.program,
+        params.program_name_hint.as_deref(),
+    )?;
 
     // lower
     let program_ir = intermediate::lowerer::lower_expr(project, &program_pr);
     tracing::debug!("ir:\n{}\n", lutra_bin::ir::print(&program_ir));
+
+    let program_ir = intermediate::validate_externals(program_ir, &params.externals)?;
 
     // intermediate optimizations
     let program_ir = intermediate::inline(program_ir);
@@ -59,7 +91,7 @@ pub fn compile(
     let program_ir = intermediate::layouter::on_program(program_ir);
 
     // backend (sql or bytecode)
-    let program = match target_repr {
+    let program = match params.repr {
         ProgramRepr::SqlPg => rr::Program::SqlPostgres(Box::new(sql::compile_ir(
             &program_ir,
             sql::Dialect::Postgres,
@@ -134,4 +166,58 @@ pub fn _test_compile_main_in(project: &Project) -> Result<ir::Program, error::Er
     let main = check_overlay(project, "main", None)?;
     let program = intermediate::lowerer::lower_expr(project, &main);
     Ok(intermediate::layouter::on_program(program))
+}
+
+impl std::fmt::Display for ProgramRepr {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::SqlPg => write!(f, "sql-pg"),
+            Self::SqlDuckdb => write!(f, "sql-duckdb"),
+            Self::BytecodeLt => write!(f, "bytecode-lt"),
+        }
+    }
+}
+
+impl ProgramRepr {
+    fn get_implicit_externals(&self) -> Vec<std::borrow::Cow<'static, str>> {
+        match self {
+            ProgramRepr::SqlPg => vec!["std::sql".into()],
+            ProgramRepr::SqlDuckdb => vec!["std::sql".into()],
+            ProgramRepr::BytecodeLt => vec![],
+        }
+    }
+}
+
+impl CompileParams {
+    pub fn new(program: impl Into<String>, repr: ProgramRepr) -> Self {
+        Self {
+            program: program.into(),
+            program_name_hint: None,
+            repr,
+            externals: repr.get_implicit_externals(),
+        }
+    }
+
+    pub fn with_program_name_hint(mut self, hint: impl Into<String>) -> Self {
+        self.program_name_hint = Some(hint.into());
+        self
+    }
+
+    pub fn with_externals<I, T>(mut self, externals: I) -> Self
+    where
+        I: IntoIterator<Item = T>,
+        T: Into<std::borrow::Cow<'static, str>>,
+    {
+        self.externals = externals.into_iter().map(|x| x.into()).collect();
+        self
+    }
+
+    pub fn push_external(mut self, external: impl Into<std::borrow::Cow<'static, str>>) -> Self {
+        self.externals.push(external.into());
+        self
+    }
+
+    pub fn repr(&self) -> ProgramRepr {
+        self.repr
+    }
 }

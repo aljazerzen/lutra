@@ -62,6 +62,11 @@ where
 
                 proto::ResponseKind::Schema(self.runner.pull_schema().await.into())
             }
+            proto::RequestKind::GetExternals => {
+                tracing::trace!("get_externals");
+
+                proto::ResponseKind::Externals(self.runner.get_externals().await.into())
+            }
         };
         let res = proto::Response {
             kind: res,

@@ -165,6 +165,16 @@ where
     fn shutdown(&self) -> impl Future<Output = Result<(), proto::Error>> {
         self.shutdown_stream()
     }
+
+    async fn get_externals(&self) -> Result<std::vec::Vec<std::string::String>, proto::Error> {
+        let request_id = self.send_request(proto::RequestKind::GetExternals).await?;
+
+        let proto::ResponseKind::Externals(result) = self.recv_for(request_id).await? else {
+            return Err(unexpected_response_kind());
+        };
+
+        result.0
+    }
 }
 
 fn unexpected_response_kind() -> proto::Error {

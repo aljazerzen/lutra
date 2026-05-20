@@ -44,6 +44,9 @@ impl<R: Run> Server<R> {
                 proto::RequestKind::PullSchema => {
                     proto::ResponseKind::Schema(self.runner.pull_schema().await.into())
                 }
+                proto::RequestKind::GetExternals => {
+                    proto::ResponseKind::Externals(self.runner.get_externals().await.into())
+                }
             };
             let response = proto::Response {
                 request_id: req.id,

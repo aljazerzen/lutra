@@ -93,4 +93,8 @@ impl<'a> lutra_runner::RunSync for InterpreterRunner<'a> {
         // TODO: error
         Ok(lutra_arrow::pull_schema(fs).unwrap())
     }
+
+    fn get_externals_sync(&mut self) -> Result<std::vec::Vec<String>, proto::Error> {
+        Ok(vec!["std::fs".into()])
+    }
 }

@@ -165,6 +165,10 @@ where
             .await
             .map_err(|e| Error::from(e).into())
     }
+
+    async fn get_externals(&self) -> Result<std::vec::Vec<std::string::String>, proto::Error> {
+        Ok(vec!["std::sql".into()])
+    }
 }
 
 struct Context<'a> {

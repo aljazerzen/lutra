@@ -9,7 +9,7 @@ use clap::{Parser, Subcommand};
 
 use lutra_bin::Encode;
 use lutra_codegen::ProgramRepr;
-use lutra_compiler::{CheckParams, DiscoverParams, codespan};
+use lutra_compiler::{CheckParams, CompileParams, DiscoverParams, codespan};
 use lutra_runner::RunSync;
 
 use crate::runners::RunnerParams;
@@ -156,20 +156,13 @@ pub struct CompileCommand {
     #[clap(flatten)]
     check: CheckParams,
 
-    /// Program to execute.
-    ///
-    /// Usually this is a path to an expression in the project, but it can be
-    /// any lutra expression.
-    #[clap(long, default_value = "main")]
-    program: String,
+    #[clap(flatten)]
+    compile: CompileParams,
 
     /// Write compiled program to a `.rr.ld` file.
     /// Relative to project root.
     #[clap(long)]
     output: Option<path::PathBuf>,
-
-    #[clap(long, default_value = "bytecode-lt")]
-    format: lutra_compiler::ProgramRepr,
 }
 
 pub fn compile(cmd: CompileCommand) -> anyhow::Result<()> {
@@ -179,7 +172,7 @@ pub fn compile(cmd: CompileCommand) -> anyhow::Result<()> {
     let project = lutra_compiler::check(project, cmd.check)?;
 
     let (program, ty) =
-        lutra_compiler::compile(&project, &cmd.program, Some("--program"), cmd.format)?;
+        lutra_compiler::compile(&project, &cmd.compile.with_program_name_hint("--program"))?;
 
     println!("Compiled.");
 
@@ -273,19 +266,23 @@ enum DataFormat {
 pub fn run(cmd: RunCommand) -> anyhow::Result<()> {
     use lutra_runner::RunSync;
 
-    // compile
+    // check
     eprintln!("Compiling...");
     let project = lutra_compiler::discover(cmd.discover.clone())?;
 
     let project = lutra_compiler::check(project, cmd.check)?;
     let to_project_path = |p: &str| project.source.get_absolute_path(p);
 
-    let (program, ty) = lutra_compiler::compile(
-        &project,
-        &cmd.program,
-        Some("--program"),
-        cmd.runner.get_program_repr(),
-    )?;
+    // init runner
+    let runner = cmd.runner.or_default();
+    let program_repr = runner.get_program_repr();
+    let (mut runner, _) = crate::runners::init(runner, &project.source)?;
+
+    // compile
+    let params = lutra_compiler::CompileParams::new(&cmd.program, program_repr)
+        .with_program_name_hint("--program")
+        .with_externals(runner.get_externals_sync()?);
+    let (program, ty) = lutra_compiler::compile(&project, &params)?;
 
     // read input
     let input_path = cmd.input.as_deref().map(to_project_path);
@@ -293,8 +290,6 @@ pub fn run(cmd: RunCommand) -> anyhow::Result<()> {
 
     // execute
     eprintln!("Executing...");
-
-    let (mut runner, _) = crate::runners::init(cmd.runner, &project.source)?;
 
     let handle = runner.prepare_sync(program)?;
     let output = runner.execute_sync(handle, &input)?;
@@ -312,12 +307,12 @@ pub struct InteractiveCommand {
     discover: DiscoverParams,
 
     #[clap(flatten)]
-    runner: Option<RunnerParams>,
+    runner: RunnerParams,
 }
 
 pub fn interactive(cmd: InteractiveCommand) -> anyhow::Result<()> {
     // default runner
-    let runner_params = cmd.runner.unwrap_or_default();
+    let runner_params = cmd.runner.or_default();
     // runner cfg
     let cfg = lutra_tui::RunnerConfig {
         repr: runner_params.get_program_repr(),
@@ -350,7 +345,8 @@ pub fn pull_schema(cmd: PullSchemaCommand) -> anyhow::Result<()> {
     let project = lutra_compiler::check(source_tree, cmd.check)?;
 
     // pull
-    let (mut runner, _) = crate::runners::init(cmd.runner, &project.source)?;
+    let runner_params = cmd.runner.or_default();
+    let (mut runner, _) = crate::runners::init(runner_params, &project.source)?;
     let schema = runner.pull_schema_sync()?;
 
     // try update the @schema module

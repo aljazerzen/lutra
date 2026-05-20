@@ -93,6 +93,11 @@ impl ClientSender {
     pub fn pull_schema(&self) -> Result<u32, proto::Error> {
         self.send_request(proto::RequestKind::PullSchema)
     }
+
+    /// Send get_externals request and return request_id.
+    pub fn get_externals(&self) -> Result<u32, proto::Error> {
+        self.send_request(proto::RequestKind::GetExternals)
+    }
 }
 
 impl ClientReceiver {
@@ -194,5 +199,15 @@ impl RunSync for Client {
 
     fn shutdown_sync(&mut self) -> Result<(), proto::Error> {
         Ok(())
+    }
+
+    fn get_externals_sync(
+        &mut self,
+    ) -> Result<lutra_bin::vec::Vec<lutra_bin::string::String>, proto::Error> {
+        let request_id = self.sender.get_externals()?;
+        match self.receiver.blocking_recv_for(request_id)? {
+            proto::ResponseKind::Externals(result) => result.0,
+            _ => Err(disconnected()),
+        }
     }
 }

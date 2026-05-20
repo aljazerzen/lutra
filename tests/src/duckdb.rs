@@ -57,7 +57,10 @@ fn _compile(
     };
 
     // compile
-    let res = lutra_compiler::compile(&project, "main", None, ProgramRepr::SqlDuckdb);
+    let res = lutra_compiler::compile(
+        &project,
+        &lutra_compiler::CompileParams::new("main", ProgramRepr::SqlDuckdb),
+    );
     let (program, ty) = match res {
         Ok(x) => x,
         Err(e) => return Err(format!("compile error:\n{e}")),

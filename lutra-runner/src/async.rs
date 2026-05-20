@@ -94,4 +94,9 @@ where
         let mut guard = self.inner.lock().unwrap();
         guard.shutdown_sync()
     }
+
+    async fn get_externals(&self) -> Result<vec::Vec<string::String>, proto::Error> {
+        let mut guard = self.inner.lock().unwrap();
+        guard.get_externals_sync()
+    }
 }

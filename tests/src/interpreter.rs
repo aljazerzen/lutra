@@ -3,12 +3,13 @@
 use insta::{assert_debug_snapshot, assert_snapshot};
 
 use lutra_bin::Encode;
+use lutra_compiler as lc;
 use lutra_interpreter::EvalError;
 
 #[track_caller]
 fn _test_interpret(program: &str) -> String {
     let program = lutra_ir::_test_parse(program);
-    let bytecode = lutra_compiler::bytecode_program(program.clone());
+    let bytecode = lc::bytecode_program(program.clone());
 
     let output =
         lutra_interpreter::evaluate(&bytecode, vec![], lutra_interpreter::BUILTIN_MODULES, None)
@@ -20,7 +21,7 @@ fn _test_interpret(program: &str) -> String {
 #[track_caller]
 fn _test_err(program: &str) -> EvalError {
     let program = lutra_ir::_test_parse(program);
-    let bytecode = lutra_compiler::bytecode_program(program.clone());
+    let bytecode = lc::bytecode_program(program.clone());
 
     lutra_interpreter::evaluate(&bytecode, vec![], lutra_interpreter::BUILTIN_MODULES, None)
         .unwrap_err()
@@ -180,7 +181,7 @@ fn eval_error_01() {
 
 #[test]
 fn func_call_size() {
-    let source = lutra_compiler::SourceTree::single(
+    let source = lc::SourceTree::single(
         "".into(),
         r#"
         func x(): {}
@@ -188,10 +189,9 @@ fn func_call_size() {
         .into(),
     );
 
-    let project = lutra_compiler::check(source, Default::default()).unwrap();
-    let (program, _ty) =
-        lutra_compiler::compile(&project, "x", None, lutra_compiler::ProgramRepr::BytecodeLt)
-            .unwrap();
+    let project = lc::check(source, Default::default()).unwrap();
+    let params = lc::CompileParams::new("x", lc::ProgramRepr::BytecodeLt).push_external("x");
+    let (program, _ty) = lc::compile(&project, &params).unwrap();
 
     let program_lt = program.encode();
 

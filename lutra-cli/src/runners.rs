@@ -14,13 +14,12 @@ pub(crate) struct RunnerParams {
     duckdb: Option<String>,
 }
 
-impl Default for RunnerParams {
-    fn default() -> Self {
-        Self {
-            interpreter: false,
-            postgres: None,
-            duckdb: Some(":memory:".into()),
+impl RunnerParams {
+    pub(crate) fn or_default(mut self) -> Self {
+        if !self.interpreter && !self.postgres.is_some() && !self.duckdb.is_some() {
+            self.duckdb = Some(":memory:".into());
         }
+        self
     }
 }
 
