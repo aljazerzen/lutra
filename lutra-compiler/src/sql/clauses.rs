@@ -984,10 +984,7 @@ impl<'a> Context<'a> {
                 let func = &call.args[1];
                 let func = func.kind.as_function().unwrap();
 
-                let item_ref = cr::ExprKind::Transform(
-                    self.new_binding(cr::Expr::new_rel_ref(&array)),
-                    cr::Transform::ProjectDiscard(vec![0]), // discard index
-                );
+                let item_ref = self.new_array_item_ref(&array).kind;
 
                 self.functions
                     .insert(func.id, FuncProvider::Expr(vec![item_ref.clone()]));
@@ -996,7 +993,13 @@ impl<'a> Context<'a> {
 
                 let serialize = cr::Expr::new_serialize(cr::Expr::new_rel_ref(&array));
 
-                if is_simple(&key) {
+                let is_key_simple = is_simple(&key);
+                let key = if key.ty.kind.is_array() {
+                    cr::Expr::new_serialize(key.clone())
+                } else {
+                    key
+                };
+                if is_key_simple {
                     // simple key: cloning is fine
                     let values = vec![key.clone(), serialize];
                     let key = Box::new(key);

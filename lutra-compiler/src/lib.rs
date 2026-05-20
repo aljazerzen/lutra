@@ -78,7 +78,7 @@ pub fn compile(
 
     // lower
     let program_ir = intermediate::lowerer::lower_expr(project, &program_pr);
-    tracing::debug!("ir:\n{}\n", lutra_bin::ir::print(&program_ir));
+    tracing::debug!("ir:\n{}\n", lutra_bin::ir::print_no_color(&program_ir));
 
     let program_ir = intermediate::validate_externals(program_ir, &params.externals)?;
 

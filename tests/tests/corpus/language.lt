@@ -1467,6 +1467,77 @@ func main() -> (
   },
 ]
 
+# === std_group_04
+# skip: duckdb
+# skip: postgres
+import std::*
+
+func day(ts: Timestamp) -> timestamp::to_date(ts, "UTC")
+
+func main() -> ([Timestamp(0), Timestamp(10000)] | group(e -> day(e)))
+# >
+[
+  {
+    key = @1970-01-01,
+    values = [
+      @1970-01-01T00:00:00.000000,
+      @1970-01-01T00:00:00.010000,
+    ],
+  },
+]
+
+# === std_group_05
+import std::*
+
+func days(ts: Timestamp) -> [timestamp::to_date(ts, "UTC")]
+
+func main() -> [Timestamp(0), Timestamp(10000)] | group(days)
+# >
+[
+  {
+    key = [
+      @1970-01-01,
+    ],
+    values = [
+      @1970-01-01T00:00:00.000000,
+      @1970-01-01T00:00:00.010000,
+    ],
+  },
+]
+
+# === std_group_06
+# skip: duckdb
+# skip: postgres
+import std::*
+
+func main() -> (
+  [Timestamp(0), Timestamp(10000)]
+  | map(x -> [x, x])
+  | group(xs -> xs | index(0) | or_default)
+  | sort(x -> x.key.0)
+)
+# >
+[
+  {
+    key = @1970-01-01T00:00:00.000000,
+    values = [
+      [
+        @1970-01-01T00:00:00.000000,
+        @1970-01-01T00:00:00.000000,
+      ],
+    ],
+  },
+  {
+    key = @1970-01-01T00:00:00.010000,
+    values = [
+      [
+        @1970-01-01T00:00:00.010000,
+        @1970-01-01T00:00:00.010000,
+      ],
+    ],
+  },
+]
+
 # === std_group_map_00
 func main() -> (
   [1, 2, 2, 2, 5: int64, 5]
