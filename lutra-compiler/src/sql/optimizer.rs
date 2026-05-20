@@ -170,13 +170,31 @@ fn simplify_pick_discard(expr: cr::Expr) -> cr::Expr {
         unreachable!();
     };
 
-    let mut cols: Vec<_> = (0..256).collect(); // TODO: this works only for <256 cols
-    utils::drop_by_position(&mut cols, &discard);
-    utils::pick_by_position(&mut cols, &pick);
+    let cols = compose_pick_after_discard(&pick, &discard);
     cr::Expr {
         kind: cr::ExprKind::Transform(inner, cr::Transform::ProjectPick(cols)),
         ty: expr.ty,
     }
+}
+
+fn compose_pick_after_discard(pick: &[usize], discard: &[usize]) -> Vec<usize> {
+    let mut discard = discard.to_vec();
+    discard.sort_unstable();
+    discard.dedup();
+
+    pick.iter()
+        .map(|p| {
+            let mut p = *p;
+            for d in &discard {
+                if *d <= p {
+                    p += 1;
+                } else {
+                    break;
+                }
+            }
+            p
+        })
+        .collect()
 }
 
 fn simplify_pick_pick(expr: cr::Expr) -> cr::Expr {

@@ -76,8 +76,8 @@ pub enum From {
     // A literal value
     Literal(ir::Literal),
 
-    /// SQL query parameter. Contains 0-based index
-    Param(u8),
+    /// SQL query parameter. Contains 0-based index.
+    Param(u16),
 
     /// Call a function by its lutra name
     FuncCall(String, Vec<Expr>),
@@ -198,7 +198,6 @@ impl Expr {
         }
     }
 
-    #[allow(dead_code)]
     pub fn as_literal(&self) -> Option<&ir::Literal> {
         let ExprKind::From(From::Literal(lit)) = &self.kind else {
             return None;

@@ -89,9 +89,8 @@ impl super::Context<'_> {
             let modulo = 1u128 << t_bits;
             let half = 1i128 << (t_bits - 1);
 
-            // TODO: we don't want to use expr multiple times, it should only be used once.
             sa::Expr::Source(format!(
-                "CASE WHEN (({expr})::INT8 % {modulo} + {modulo}) % {modulo} >= {half} THEN ((({expr})::INT8 % {modulo} + {modulo}) % {modulo}) - {modulo} ELSE (({expr})::INT8 % {modulo} + {modulo}) % {modulo} END"
+                "(SELECT CASE WHEN w >= {half} THEN w - {modulo} ELSE w END FROM (SELECT (({expr})::INT8 % {modulo} + {modulo}) % {modulo} AS w) t)"
             ))
         } else {
             // casting to unsigned: ((value % modulo) + modulo) % modulo

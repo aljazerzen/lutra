@@ -608,6 +608,34 @@ impl<'a> Context<'a> {
     }
 
     fn compile_func_call(&mut self, id: &str, args_in: &[cr::Expr], ty: &ir::Ty) -> Node {
+        match id {
+            "std::text::ends_with" => {
+                let text = self.compile_column(&args_in[0]);
+                let suffix =
+                    if let Some(s) = &args_in[1].as_literal().and_then(ir::Literal::as_text) {
+                        escape_like_pattern_literal(s)
+                    } else {
+                        escape_like_pattern(self.compile_column(&args_in[1]))
+                    };
+                return Node::from(sa::Expr::Source(format!(
+                    "({text} LIKE '%' || {suffix} ESCAPE '\\')"
+                )));
+            }
+            "std::text::contains" => {
+                let text = self.compile_column(&args_in[0]);
+                let pattern =
+                    if let Some(s) = args_in[1].as_literal().and_then(ir::Literal::as_text) {
+                        escape_like_pattern_literal(s)
+                    } else {
+                        escape_like_pattern(self.compile_column(&args_in[1]))
+                    };
+                return Node::from(sa::Expr::Source(format!(
+                    "({text} LIKE '%' || {pattern} || '%' ESCAPE '\\')"
+                )));
+            }
+            _ => {}
+        }
+
         let args = self.compile_columns(args_in);
         let expr = match id {
             "std::ops::mul" => utils::new_bin_op("*", args),
@@ -875,14 +903,6 @@ impl<'a> Context<'a> {
                 }
             }
             "std::text::starts_with" => utils::new_func_call("STARTS_WITH", args),
-            "std::text::ends_with" => {
-                let [text, suffix] = unpack_args(args);
-                sa::Expr::Source(format!("({text} LIKE '%' || {suffix})"))
-            }
-            "std::text::contains" => {
-                let [text, pattern] = unpack_args(args);
-                sa::Expr::Source(format!("({text} LIKE '%' || {pattern} || '%')"))
-            }
 
             "std::math::abs" => {
                 let [text] = unpack_args(args);
@@ -1083,6 +1103,21 @@ fn unpack_args<const N: usize>(args: impl IntoIterator<Item = sa::Expr>) -> [sa:
         r.push(args.next().unwrap());
     }
     r.try_into().unwrap()
+}
+
+fn escape_like_pattern(pattern: sa::Expr) -> sa::Expr {
+    sa::Expr::Source(format!(
+        "REPLACE(REPLACE(REPLACE({pattern}, '\\', '\\\\'), '%', '\\%'), '_', '\\_')"
+    ))
+}
+
+fn escape_like_pattern_literal(pattern: &str) -> sa::Expr {
+    let pattern = pattern
+        .replace('\\', "\\\\")
+        .replace('%', "\\%")
+        .replace('_', "\\_");
+    let escaped = sa::escape_string(&pattern, '\'');
+    sa::Expr::Source(format!("'{escaped}'::text"))
 }
 
 /// Converts a "lutra table identifier" into an SQL object name.

@@ -2499,10 +2499,32 @@ func main() -> {
   false,
 }
 
+# === std_text_contains_01
+func main() -> {
+  std::text::contains("100% real_thing\\ok", "% real_thing\\"),
+  std::text::contains("100% real_thing\\ok", "% fake"),
+}
+# >
+{
+  true,
+  false,
+}
+
 # === std_text_ends_with_00
 func main() -> {
   std::text::ends_with("bananas", "anas"),
   std::text::ends_with("bananas", "nana"),
+}
+# >
+{
+  true,
+  false,
+}
+
+# === std_text_ends_with_01
+func main() -> {
+  std::text::ends_with("100% real_thing\\ok", "_thing\\ok"),
+  std::text::ends_with("100% real_thing\\ok", "%ok"),
 }
 # >
 {

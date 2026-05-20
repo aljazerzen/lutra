@@ -262,7 +262,10 @@ impl<'a> Context<'a> {
                                     .rel_cols_ty_nested(&expr.ty)
                                     .enumerate()
                                     .map(|(p, field_ty)| cr::Expr {
-                                        kind: cr::ExprKind::From(cr::From::Param(p as u8)),
+                                        kind: cr::ExprKind::From(cr::From::Param(
+                                            u16::try_from(p)
+                                                .expect("too many flattened SQL parameters"),
+                                        )),
                                         ty: field_ty.into_owned(),
                                     })
                                     .collect();
