@@ -1,6 +1,13 @@
 #[derive(clap::Args)]
 #[group(required = false, multiple = false)]
 pub(crate) struct RunnerParams {
+    /// Runner URL. Scheme selects the runner:
+    ///   interpreter:// or lt:// - interpreter
+    ///   postgres://DSN          - PostgreSQL
+    ///   duckdb://PATH           - DuckDB (use duckdb://:memory: for in-memory)
+    #[arg(long)]
+    runner: Option<String>,
+
     /// Use interpreter runner
     #[arg(long, short)]
     interpreter: bool,
@@ -15,11 +22,43 @@ pub(crate) struct RunnerParams {
 }
 
 impl RunnerParams {
+    /// Parse `--runner URL` into the individual fields, then apply defaults.
     pub(crate) fn or_default(mut self) -> Self {
+        if let Some(url) = self.runner.take() {
+            self.apply_runner_url(url).unwrap_or_else(|e| {
+                eprintln!("Error: {e}");
+                std::process::exit(1);
+            });
+        }
         if !self.interpreter && self.postgres.is_none() && self.duckdb.is_none() {
             self.duckdb = Some(":memory:".into());
         }
         self
+    }
+
+    fn apply_runner_url(&mut self, url: String) -> anyhow::Result<()> {
+        // Split on "://"; if absent, treat the whole string as the scheme.
+        let (scheme, rest) = url.split_once("://").unwrap_or((&url, ""));
+        match scheme {
+            "interpreter" | "lt" => {
+                self.interpreter = true;
+            }
+            "postgres" | "postgresql" => {
+                // Pass the full original URL so libpq / tokio-postgres can parse it.
+                self.postgres = Some(url);
+            }
+            "duckdb" => {
+                let path = if rest.is_empty() { ":memory:" } else { rest };
+                self.duckdb = Some(path.to_string());
+            }
+            _ => {
+                anyhow::bail!(
+                    "unknown runner scheme {scheme:?}; expected one of: \
+                     interpreter, lt, postgres, duckdb"
+                );
+            }
+        }
+        Ok(())
     }
 }
 
