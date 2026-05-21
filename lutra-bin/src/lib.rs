@@ -11,6 +11,8 @@ mod printer;
 pub mod reader;
 pub mod rr;
 mod shape;
+#[path = "std_types.rs"]
+pub mod std;
 mod tabular;
 pub mod typed_data;
 mod value;
@@ -38,27 +40,27 @@ pub use bytes;
 #[cfg(not(feature = "std"))]
 extern crate alloc;
 
+#[cfg(feature = "std")]
+pub use ::std::vec;
 #[cfg(not(feature = "std"))]
 pub use alloc::vec;
-#[cfg(feature = "std")]
-pub use std::vec;
 
+#[cfg(feature = "std")]
+pub use ::std::string;
 #[cfg(not(feature = "std"))]
 pub use alloc::string;
-#[cfg(feature = "std")]
-pub use std::string;
 
+#[cfg(feature = "std")]
+use ::std::borrow;
 #[cfg(not(feature = "std"))]
 use alloc::borrow;
-#[cfg(feature = "std")]
-use std::borrow;
 
+#[cfg(feature = "std")]
+pub use ::std::boxed;
 #[cfg(not(feature = "std"))]
 pub use alloc::boxed;
-#[cfg(feature = "std")]
-pub use std::boxed;
 
+#[cfg(feature = "std")]
+pub use ::std::collections;
 #[cfg(not(feature = "std"))]
 pub use alloc::collections;
-#[cfg(feature = "std")]
-pub use std::collections;

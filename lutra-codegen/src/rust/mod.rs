@@ -11,6 +11,17 @@ use lutra_compiler::Project;
 
 use crate::{GenerateOptions, infer_names};
 
+fn canonical_std_type_reexport(module_path: &[String], name: &str) -> Option<&'static str> {
+    match (module_path, name) {
+        ([std], "Timestamp") if std == "std" => Some("std::Timestamp"),
+        ([std], "Date") if std == "std" => Some("std::Date"),
+        ([std], "Time") if std == "std" => Some("std::Time"),
+        ([std], "Decimal") if std == "std" => Some("std::Decimal"),
+        ([std, ops], "Ordering") if std == "std" && ops == "ops" => Some("std::ops::Ordering"),
+        _ => None,
+    }
+}
+
 #[derive(Debug)]
 pub struct Context<'a> {
     current_rust_mod: Vec<String>,
@@ -112,9 +123,30 @@ fn codegen_module(
 
     ctx.current_rust_mod = module_path.clone();
 
+    let mut canonical_tys = Vec::new();
+    let mut generated_tys = Vec::new();
+    for (ty, annotations) in tys {
+        let name = ty.name.as_deref().unwrap();
+        if let Some(path) = canonical_std_type_reexport(&module_path, name) {
+            canonical_tys.push((name.to_string(), path));
+        } else {
+            generated_tys.push((ty, annotations));
+        }
+    }
+
+    if ctx.options.generate_types {
+        let lutra_bin = &ctx.options.lutra_bin_path;
+        for (name, path) in &canonical_tys {
+            writeln!(w, "pub use {lutra_bin}::{path} as {name};")?;
+        }
+        if !canonical_tys.is_empty() {
+            writeln!(w)?;
+        }
+    }
+
     // write types
     let mut all_tys = if ctx.options.generate_types {
-        types::write_tys(w, tys, ctx)?
+        types::write_tys(w, generated_tys, ctx)?
     } else {
         vec![]
     };
