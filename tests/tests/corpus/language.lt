@@ -1468,8 +1468,6 @@ func main() -> (
 ]
 
 # === std_group_04
-# skip: duckdb
-# skip: postgres
 import std::*
 
 func day(ts: Timestamp) -> timestamp::to_date(ts, "UTC")
@@ -1506,8 +1504,6 @@ func main() -> [Timestamp(0), Timestamp(10000)] | group(days)
 ]
 
 # === std_group_06
-# skip: duckdb
-# skip: postgres
 import std::*
 
 func main() -> (

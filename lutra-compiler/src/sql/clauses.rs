@@ -1005,38 +1005,32 @@ impl<'a> Context<'a> {
                     let key = Box::new(key);
                     cr::ExprKind::Transform(array, cr::Transform::Group { key, values })
                 } else {
-                    // complex key: bind it once and reference from both
-                    // key and values via RelRef.
+                    // complex key: compute key for each row, join it with original rel,
+                    // then group the joined relation outside the correlated scope.
                     //
                     // Structure:
-                    //   BindCorrelated(array,
-                    //     Bind(kb,
-                    //       Transform(RelRef(array), Group {
-                    //         key: RelRef(kb),
-                    //         values: [RelRef(kb), Serialize(RelRef(array))]
-                    //       })))
-                    //
-                    // BindCorrelated registers array first so Bind can
-                    // compile the key expression which references array items.
-                    let kb = self.new_binding(key);
-                    let key_ref = cr::Expr::new_rel_ref(&kb);
-                    let values = vec![key_ref.clone(), serialize];
+                    //   Transform(
+                    //     BindCorrelated(array, Join(RelRef(array), key)),
+                    //     Group {
+                    //       key: key_ref,
+                    //       values: [
+                    //         key_ref,
+                    //         Serialize(array_ref),
+                    //       ]
+                    //     }
+                    //   )
 
-                    let group = cr::Expr {
-                        kind: cr::ExprKind::Transform(
-                            self.new_binding(cr::Expr::new_rel_ref(&array)),
-                            cr::Transform::Group {
-                                key: Box::new(key_ref),
-                                values,
-                            },
-                        ),
-                        ty: expr.ty.clone(),
-                    };
-                    let bind = cr::Expr {
-                        kind: cr::ExprKind::Bind(kb, Box::new(group)),
-                        ty: expr.ty.clone(),
-                    };
-                    cr::ExprKind::BindCorrelated(array, Box::new(bind))
+                    let (joined, array_ref, key_ref) = self.correlated_join(array, key);
+
+                    let serialized = cr::Expr::new_serialize(array_ref);
+
+                    cr::ExprKind::Transform(
+                        joined,
+                        cr::Transform::Group {
+                            key: Box::new(key_ref.clone()),
+                            values: vec![key_ref, serialized],
+                        },
+                    )
                 }
             }
 
@@ -1457,6 +1451,70 @@ impl<'a> Context<'a> {
                 },
             }
         })
+    }
+
+    /// Adds a `derived` expression for each row of `base`
+    /// by joining them inside a `BindCorrelated`.
+    fn correlated_join(
+        &mut self,
+        base: Box<cr::BoundExpr>,
+        derived: cr::Expr,
+    ) -> (Box<cr::BoundExpr>, cr::Expr, cr::Expr) {
+        let base_ty = base.rel.ty.clone();
+        let base_item_ty = {
+            let mat = self.get_ty_mat(&base.rel.ty);
+            mat.kind.as_array().unwrap().clone()
+        };
+        let derived_ty = derived.ty.clone();
+
+        // Count columns for each part
+        let base_nested = self.rel_cols_ty_nested(&base_item_ty).count();
+        let base_col_count = 1 + base_nested; // index + item cols
+        let derived_col_count = self.rel_cols_ty_nested(&derived_ty).count();
+
+        // Construct enriched type: [{base_item, derived}]
+        let enriched_item_ty = ty_concat_as_tuples((*base_item_ty).clone(), derived_ty.clone());
+        let enriched_ty = ir::Ty::new(ir::TyKind::Array(Box::new(enriched_item_ty)));
+
+        // Inner: for each row, join original data with derived value
+        let enriched_inner = cr::Expr {
+            kind: cr::ExprKind::Join(
+                self.new_binding(cr::Expr::new_rel_ref(&base)),
+                self.new_binding(derived),
+                None,
+            ),
+            ty: enriched_ty.clone(),
+        };
+
+        // BindCorrelated produces all enriched rows
+        let enriched = cr::Expr {
+            kind: cr::ExprKind::BindCorrelated(base, Box::new(enriched_inner)),
+            ty: enriched_ty,
+        };
+        let enriched_bound = self.new_binding(enriched);
+
+        // Pick base columns from enriched
+        let base_positions: Vec<usize> = (0..base_col_count).collect();
+        let base_ref = cr::Expr {
+            kind: cr::ExprKind::Transform(
+                self.new_binding(cr::Expr::new_rel_ref(&enriched_bound)),
+                cr::Transform::ProjectPick(base_positions),
+            ),
+            ty: base_ty,
+        };
+
+        // Pick derived columns from enriched
+        let derived_positions: Vec<usize> =
+            (base_col_count..base_col_count + derived_col_count).collect();
+        let derived_ref = cr::Expr {
+            kind: cr::ExprKind::Transform(
+                self.new_binding(cr::Expr::new_rel_ref(&enriched_bound)),
+                cr::Transform::ProjectPick(derived_positions),
+            ),
+            ty: derived_ty,
+        };
+
+        (enriched_bound, base_ref, derived_ref)
     }
 }
 
