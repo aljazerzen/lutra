@@ -186,6 +186,30 @@ impl ProgramRepr {
             ProgramRepr::BytecodeLt => vec![],
         }
     }
+
+    /// The tag string used in `get_externals()` to identify this repr.
+    pub fn tag(&self) -> &'static str {
+        match self {
+            ProgramRepr::SqlPg => "repr:sql-pg",
+            ProgramRepr::SqlDuckdb => "repr:sql-duckdb",
+            ProgramRepr::BytecodeLt => "repr:bytecode-lt",
+        }
+    }
+
+    /// Extract the program repr from a list of externals.
+    ///
+    /// Looks for a `repr:` prefixed tag. Returns `None` if no repr tag is found.
+    pub fn from_externals<S: AsRef<str>>(externals: &[S]) -> Option<Self> {
+        for ext in externals {
+            match ext.as_ref() {
+                "repr:sql-pg" | "repr:sql-postgres" => return Some(ProgramRepr::SqlPg),
+                "repr:sql-duckdb" => return Some(ProgramRepr::SqlDuckdb),
+                "repr:bytecode-lt" => return Some(ProgramRepr::BytecodeLt),
+                _ => {}
+            }
+        }
+        None
+    }
 }
 
 impl CompileParams {
@@ -196,6 +220,29 @@ impl CompileParams {
             repr,
             externals: repr.get_implicit_externals(),
         }
+    }
+
+    /// Create compile params from a program name and runner-provided externals.
+    ///
+    /// The externals list should contain a `repr:` tag (e.g. `repr:sql-pg`)
+    /// that determines the compilation target.
+    pub fn from_externals<S: AsRef<str>>(
+        program: impl Into<String>,
+        externals: &[S],
+    ) -> Result<Self, String> {
+        let repr = ProgramRepr::from_externals(externals).ok_or_else(|| {
+            "runner did not provide a program repr tag in get_externals()".to_string()
+        })?;
+        let externals: Vec<std::borrow::Cow<'static, str>> = externals
+            .iter()
+            .map(|s| std::borrow::Cow::Owned(s.as_ref().to_string()))
+            .collect();
+        Ok(Self {
+            program: program.into(),
+            program_name_hint: None,
+            repr,
+            externals,
+        })
     }
 
     pub fn with_program_name_hint(mut self, hint: impl Into<String>) -> Self {

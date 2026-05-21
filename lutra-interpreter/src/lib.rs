@@ -97,6 +97,6 @@ impl<'a> lutra_runner::RunSync for InterpreterRunner<'a> {
     }
 
     fn get_externals_sync(&mut self) -> Result<std::vec::Vec<String>, proto::Error> {
-        Ok(vec!["std::fs".into()])
+        Ok(vec!["repr:bytecode-lt".into(), "std::fs".into()])
     }
 }

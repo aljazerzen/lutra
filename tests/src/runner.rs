@@ -12,7 +12,7 @@ async fn main() {
     let runner = AsyncRunner::new(runner);
 
     let client = binary::tokio::Client::new(io_client);
-    let mut server = binary::tokio::Server::new(io_server, runner);
+    let mut server = binary::tokio::Server::new(io_server, &runner);
 
     // prepare a program
     let source = lutra_compiler::SourceTree::empty();

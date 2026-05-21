@@ -109,7 +109,7 @@ impl lutra_runner::RunSync for Runner {
     }
 
     fn get_externals_sync(&mut self) -> Result<Vec<String>, proto::Error> {
-        Ok(vec!["std::sql".into(), "std::fs".into()])
+        Ok(vec!["repr:sql-duckdb".into(), "std::sql".into(), "std::fs".into()])
     }
 }
 

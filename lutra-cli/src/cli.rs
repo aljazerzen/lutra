@@ -8,7 +8,6 @@ use std::path;
 use clap::{Parser, Subcommand};
 
 use lutra_bin::Encode;
-use lutra_codegen::ProgramRepr;
 use lutra_compiler::{CheckParams, CompileParams, DiscoverParams, codespan};
 use lutra_runner::RunSync;
 
@@ -37,6 +36,7 @@ fn main() {
         Action::Codegen(cmd) => codegen(cmd),
         Action::Docs(cmd) => docs(cmd),
         Action::Format(cmd) => format(cmd),
+        Action::Serve(cmd) => serve(cmd),
         Action::LanguageServer(cmd) => {
             language_server::run(cmd);
             Ok(())
@@ -91,6 +91,9 @@ pub enum Action {
     /// Format source files
     #[clap(alias = "fmt")]
     Format(FormatCommand),
+
+    /// Serve a runner over TCP using the binary protocol
+    Serve(ServeCommand),
 
     /// Start language server (LSP)
     LanguageServer(language_server::Command),
@@ -274,14 +277,14 @@ pub fn run(cmd: RunCommand) -> anyhow::Result<()> {
     let to_project_path = |p: &str| project.source.get_absolute_path(p);
 
     // init runner
-    let runner = cmd.runner.or_default();
-    let program_repr = runner.get_program_repr();
-    let (mut runner, _) = crate::runners::init(runner, &project.source)?;
+    let runner = (cmd.runner.into_url()).ok_or(anyhow::anyhow!("Missing --runner"))?;
+    let (mut runner, _) = crate::runners::init(runner, Some(&project.source))?;
 
     // compile
-    let params = lutra_compiler::CompileParams::new(&cmd.program, program_repr)
-        .with_program_name_hint("--program")
-        .with_externals(runner.get_externals_sync()?);
+    let params =
+        lutra_compiler::CompileParams::from_externals(&cmd.program, &runner.get_externals_sync()?)
+            .map_err(|e| anyhow::anyhow!("{e}"))?
+            .with_program_name_hint("--program");
     let (program, ty) = lutra_compiler::compile(&project, &params)?;
 
     // read input
@@ -311,17 +314,18 @@ pub struct InteractiveCommand {
 }
 
 pub fn interactive(cmd: InteractiveCommand) -> anyhow::Result<()> {
-    // default runner
-    let runner_params = cmd.runner.or_default();
-    // runner cfg
-    let cfg = lutra_tui::RunnerConfig {
-        repr: runner_params.get_program_repr(),
-    };
+    let runner_params = (cmd.runner.into_url()).ok_or(anyhow::anyhow!("Missing --runner"))?;
 
     // init runner
     let source = lutra_compiler::discover(cmd.discover.clone())?;
     let project_path = (cmd.discover.project.is_some()).then(|| source.get_root().to_path_buf());
-    let (runner, runner_thread) = crate::runners::init(runner_params, &source)?;
+    let (mut runner, runner_thread) = crate::runners::init(runner_params, Some(&source))?;
+
+    // derive repr from runner externals
+    let externals = runner.get_externals_sync()?;
+    let repr = lutra_compiler::ProgramRepr::from_externals(&externals)
+        .ok_or_else(|| anyhow::anyhow!("runner did not provide a repr: tag in get_externals()"))?;
+    let cfg = lutra_tui::RunnerConfig { repr };
 
     // open interactive TUI
     lutra_tui::run_shell(project_path, cfg, runner, runner_thread)
@@ -345,8 +349,8 @@ pub fn pull_schema(cmd: PullSchemaCommand) -> anyhow::Result<()> {
     let project = lutra_compiler::check(source_tree, cmd.check)?;
 
     // pull
-    let runner_params = cmd.runner.or_default();
-    let (mut runner, _) = crate::runners::init(runner_params, &project.source)?;
+    let runner_params = (cmd.runner.into_url()).ok_or(anyhow::anyhow!("Missing --runner"))?;
+    let (mut runner, _) = crate::runners::init(runner_params, Some(&project.source))?;
     let schema = runner.pull_schema_sync()?;
 
     // try update the @schema module
@@ -415,10 +419,10 @@ pub fn codegen(cmd: CodegenCommand) -> anyhow::Result<()> {
         opts = opts.generate_function_traits();
     }
     for mod_name in cmd.programs_bytecode_lt {
-        opts = opts.generate_programs(mod_name, ProgramRepr::BytecodeLt);
+        opts = opts.generate_programs(mod_name, lutra_codegen::ProgramRepr::BytecodeLt);
     }
     for mod_name in cmd.programs_sql_pg {
-        opts = opts.generate_programs(mod_name, ProgramRepr::SqlPg);
+        opts = opts.generate_programs(mod_name, lutra_codegen::ProgramRepr::SqlPg);
     }
     if let Some(lutra_bin_path) = cmd.lutra_bin_path {
         opts = opts.with_lutra_bin_path(lutra_bin_path);
@@ -475,6 +479,21 @@ pub fn docs(cmd: DocsCommand) -> anyhow::Result<()> {
         cmd.output_dir.display()
     );
     Ok(())
+}
+
+#[derive(clap::Parser)]
+pub struct ServeCommand {
+    /// Address to bind the TCP server on.
+    #[arg(long, default_value = "127.0.0.1:5555")]
+    at: String,
+
+    #[clap(flatten)]
+    runner: RunnerParams,
+}
+
+pub fn serve(cmd: ServeCommand) -> anyhow::Result<()> {
+    let runner_params = (cmd.runner.into_url()).ok_or(anyhow::anyhow!("Missing --runner"))?;
+    crate::runners::serve(runner_params, &cmd.at)
 }
 
 #[derive(clap::Parser)]

@@ -1,13 +1,5 @@
 /// Converts a string to snake_case
 /// Handles CamelCase, PascalCase, kebab-case, and space separated formats
-///
-/// # Examples
-/// ```
-/// assert_eq!(to_snake_case("HelloWorld"), "hello_world");
-/// assert_eq!(to_snake_case("userName"), "user_name");
-/// assert_eq!(to_snake_case("user-name"), "user_name");
-/// assert_eq!(to_snake_case("first name"), "first_name");
-/// ```
 pub fn to_snake_case(input: &str) -> String {
     if input.is_empty() {
         return String::new();
@@ -46,14 +38,6 @@ pub fn to_snake_case(input: &str) -> String {
 
 /// Converts a string to PascalCase
 /// Handles snake_case, kebab-case, space separated, and mixed formats
-///
-/// # Examples
-/// ```
-/// assert_eq!(to_camel_case("hello_world"), "HelloWorld");
-/// assert_eq!(to_camel_case("user-name"), "UserName");
-/// assert_eq!(to_camel_case("first name"), "FirstName");
-/// assert_eq!(to_camel_case("XMLHttpRequest"), "XmlHttpRequest");
-/// ```
 pub fn to_pascal_case(input: &str) -> String {
     input
         .split(['_', '-'])

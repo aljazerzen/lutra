@@ -7,23 +7,23 @@ use tokio::io::{AsyncRead, AsyncWrite, AsyncWriteExt};
 use crate::Run;
 use crate::proto;
 
-pub struct Server<C, R>
+pub struct Server<'r, C, R>
 where
     C: AsyncRead + AsyncWrite + Unpin,
     R: Run,
 {
     stream: C,
-    runner: R,
+    runner: &'r R,
     /// Maps client program_id → runner-allocated program_id.
     program_ids: HashMap<u32, u32>,
 }
 
-impl<C, R> Server<C, R>
+impl<'r, C, R> Server<'r, C, R>
 where
     C: AsyncRead + AsyncWrite + Unpin,
     R: Run,
 {
-    pub fn new(stream: C, runner: R) -> Self {
+    pub fn new(stream: C, runner: &'r R) -> Self {
         Self {
             stream,
             runner,

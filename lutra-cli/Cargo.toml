@@ -19,7 +19,7 @@ lutra-compiler = { workspace = true, features = ["clap"] }
 lutra-interpreter = { workspace = true }
 lutra-codegen = { workspace = true }
 lutra-project-tools = { workspace = true }
-lutra-runner = { workspace = true, features = ["async"] }
+lutra-runner = { workspace = true, features = ["async", "binary-tokio"] }
 lutra-runner-postgres = { workspace = true, features = ["tokio-postgres"] }
 lutra-runner-duckdb = { workspace = true }
 lutra-tui = { workspace = true }
@@ -37,6 +37,7 @@ tokio = { workspace = true, features = [
     "fs",
     "io-std",
     "sync",
+    "net",
 ] }
 strum = { workspace = true }
 tower-lsp-server = "0.23.0"
