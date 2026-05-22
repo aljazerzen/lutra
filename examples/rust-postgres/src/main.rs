@@ -1,18 +1,18 @@
 // include the file generated in build.rs
 mod generated {
-    include!(concat!(env!("OUT_DIR"), "/generated.rs"));
+    #![allow(dead_code)]
+    include!(concat!(env!("OUT_DIR"), "/lutra.rs"));
 }
-
-use lutra_runner_postgres::Run;
 
 #[tokio::main(flavor = "current_thread")]
 async fn main() {
     // init PostgreSQL runner
-    let client = lutra_runner_postgres::RunnerAsync::connect_no_tls(
+    let runner = lutra_runner_postgres::RunnerAsync::connect_no_tls(
         "postgres://postgres:pass@localhost:5416",
     )
     .await
     .unwrap();
+    let client = generated::Client::new(&runner);
 
     // insert a few movies
     let movies = vec![
@@ -27,17 +27,9 @@ async fn main() {
             is_released: false,
         },
     ];
-    client
-        .run(&generated::insert_movies(), &movies)
-        .await
-        .unwrap()
-        .unwrap();
+    client.insert_movies(&movies).await.unwrap().unwrap();
 
     // fetch movies
-    let res = client
-        .run(&generated::get_movies(), &())
-        .await
-        .unwrap()
-        .unwrap();
+    let res = client.get_movies().await.unwrap().unwrap();
     println!("{res:#?}");
 }

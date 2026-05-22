@@ -392,6 +392,9 @@ pub struct GenCodeCommand {
     no_function_traits: bool,
 
     #[arg(long)]
+    client: bool,
+
+    #[arg(long)]
     programs_bytecode_lt: Vec<String>,
     #[arg(long)]
     programs_sql_pg: Vec<String>,
@@ -418,6 +421,9 @@ pub fn gen_code(cmd: GenCodeCommand) -> anyhow::Result<()> {
     }
     if cmd.no_function_traits {
         opts = opts.generate_function_traits();
+    }
+    if cmd.client {
+        opts = opts.generate_client();
     }
     for mod_name in cmd.programs_bytecode_lt {
         opts = opts.generate_programs(mod_name, lutra_codegen::ProgramRepr::BytecodeLt);

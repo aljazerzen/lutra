@@ -1,3 +1,4 @@
+mod client;
 mod encode;
 mod functions;
 mod program;
@@ -159,14 +160,29 @@ fn codegen_module(
     }
 
     // write programs
-    let module_path_str = module_path.as_slice().join("::");
-    if let Some((_, format)) = ctx
-        .options
-        .include_programs
+    let prog_repr = get_programs_repr_of(ctx, &module_path);
+    if let Some(format) = prog_repr {
+        program::write_rr_programs(w, &functions, format, ctx)?;
+
+        all_tys.extend(types::write_tys_in_buffer(w, ctx)?);
+    }
+
+    let client_sub_modules = sub_modules
         .iter()
-        .find(|(p, _)| p == &module_path_str)
-    {
-        program::write_rr_programs(w, &functions, *format, ctx)?;
+        .map(|(name, _)| *name)
+        .filter(|name| {
+            let mut path = module_path.clone();
+            path.push(name.to_string());
+            has_programs_in_subtree(ctx, &path)
+        })
+        .collect::<Vec<_>>();
+    if ctx.options.generate_client && (prog_repr.is_some() || !client_sub_modules.is_empty()) {
+        let functions_here = if prog_repr.is_some() {
+            functions.as_slice()
+        } else {
+            &[]
+        };
+        client::write_client(w, functions_here, &client_sub_modules, prog_repr, ctx)?;
 
         all_tys.extend(types::write_tys_in_buffer(w, ctx)?);
     }
@@ -190,4 +206,31 @@ fn codegen_module(
     assert!(ctx.is_done(), "{ctx:?}");
 
     Ok(())
+}
+
+fn module_path_string(module_path: &[String]) -> String {
+    module_path.join("::")
+}
+
+fn get_programs_repr_of(
+    ctx: &Context,
+    module_path: &[String],
+) -> Option<lutra_compiler::ProgramRepr> {
+    let module_path_str = module_path_string(module_path);
+    ctx.options
+        .include_programs
+        .iter()
+        .find(|(p, _)| p == &module_path_str)
+        .map(|(_, repr)| *repr)
+}
+
+fn has_programs_in_subtree(ctx: &Context, module_path: &[String]) -> bool {
+    let module_path_str = module_path_string(module_path);
+    ctx.options.include_programs.iter().any(|(p, _)| {
+        p == &module_path_str
+            || (!module_path_str.is_empty()
+                && p.starts_with(&module_path_str)
+                && p[module_path_str.len()..].starts_with("::"))
+            || (module_path_str.is_empty() && !p.is_empty())
+    })
 }

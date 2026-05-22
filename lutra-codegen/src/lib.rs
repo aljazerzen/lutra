@@ -108,10 +108,12 @@ pub struct GenerateOptions {
     generate_types: bool,
     generate_encode_decode: bool,
     generate_function_traits: bool,
+    generate_client: bool,
 
     include_programs: Vec<(String, ProgramRepr)>,
 
     lutra_bin_path: String,
+    lutra_runner_path: String,
 }
 
 impl Default for GenerateOptions {
@@ -120,8 +122,10 @@ impl Default for GenerateOptions {
             generate_types: true,
             generate_encode_decode: true,
             generate_function_traits: false,
+            generate_client: false,
             include_programs: Vec::new(),
             lutra_bin_path: "::lutra_bin".into(),
+            lutra_runner_path: "::lutra_runner".into(),
         }
     }
 }
@@ -145,9 +149,21 @@ impl GenerateOptions {
         self
     }
 
+    /// Generate module client wrappers for generated programs
+    pub fn generate_client(mut self) -> Self {
+        self.generate_client = true;
+        self
+    }
+
     /// Set path to [lutra_bin] dependency
     pub fn with_lutra_bin_path(mut self, path: String) -> Self {
         self.lutra_bin_path = path;
+        self
+    }
+
+    /// Set path to [lutra_runner] dependency
+    pub fn with_lutra_runner_path(mut self, path: String) -> Self {
+        self.lutra_runner_path = path;
         self
     }
 
