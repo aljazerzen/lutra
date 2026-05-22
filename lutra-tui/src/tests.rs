@@ -4,7 +4,9 @@ use std::io;
 
 use crossterm::event::{Event, KeyCode, KeyEvent, KeyEventKind, KeyEventState, KeyModifiers};
 
-use crate::RunnerConfig;
+use lutra_compiler as lc;
+use lutra_runner as lr;
+
 use crate::terminal::{Action, Rect, View};
 use crate::{driver, printer, runner, shell};
 
@@ -16,19 +18,18 @@ use crate::{driver, printer, runner, shell};
 /// - does not spawn a file-watcher or terminal event-reader thread
 /// - processes events synchronously, draining runner messages after each one
 pub fn record_shell(
-    runner_cfg: runner::RunnerConfig,
-    runner: lutra_runner::channel::Client,
-    runner_thread: std::thread::JoinHandle<()>,
+    repr: lc::ProgramRepr,
+    runner: lr::channel::Client,
     viewport: Rect,
     events: Vec<crossterm::event::Event>,
 ) -> anyhow::Result<String> {
     let (action_tx, action_rx) = std::sync::mpsc::channel();
 
     // real runner, no file watcher
-    let runner = runner::RunnerProxy::try_new(runner, runner_thread, action_tx)?;
+    let runner = runner::RunnerProxy::try_new(runner, action_tx)?;
 
     let mut driver = driver::Driver {
-        app: shell::Shell::new(None, runner_cfg, runner.get_client()),
+        app: shell::Shell::new(None, repr, runner.get_client()),
         printer: RecordingPrinter::default(),
         viewport,
         queue: Default::default(),
@@ -38,7 +39,7 @@ pub fn record_shell(
     driver.start()?;
 
     // initial source update (normally sent by FileWatcher)
-    if driver.step(Action::SourceUpdated(lutra_compiler::SourceTree::empty()))? {
+    if driver.step(Action::SourceUpdated(lc::SourceTree::empty()))? {
         return Ok(driver.printer.finish());
     }
     if sleep_and_drain(&mut driver, &action_rx)? {
@@ -168,10 +169,10 @@ fn is_duration(s: &str) -> bool {
 // Runner factories
 // ---------------------------------------------------------------------------
 
-fn interpreter_runner() -> (lutra_runner::channel::Client, std::thread::JoinHandle<()>) {
+fn interpreter_runner() -> (lr::channel::Client, std::thread::JoinHandle<()>) {
     let runner = lutra_interpreter::InterpreterRunner::default();
-    let runner = lutra_runner::AsyncRunner::new(runner);
-    let (client, server) = lutra_runner::channel::new_pair(runner);
+    let runner = lr::AsyncRunner::new(runner);
+    let (client, server) = lr::channel::new_pair(runner);
     let handle = std::thread::spawn(move || {
         tokio::runtime::Builder::new_current_thread()
             .build()
@@ -184,29 +185,29 @@ fn interpreter_runner() -> (lutra_runner::channel::Client, std::thread::JoinHand
 /// A mock runner that always fails on execute with a known error message.
 struct AlwaysErrorRunner;
 
-impl lutra_runner::Run for AlwaysErrorRunner {
-    async fn prepare(&self, _: lutra_bin::rr::Program) -> Result<u32, lutra_runner::proto::Error> {
+impl lr::Run for AlwaysErrorRunner {
+    async fn prepare(&self, _: lutra_bin::rr::Program) -> Result<u32, lr::proto::Error> {
         Ok(0)
     }
 
-    async fn execute(
-        &self,
-        _: u32,
-        _input: &[u8],
-    ) -> Result<lutra_bin::vec::Vec<u8>, lutra_runner::proto::Error> {
-        Err(lutra_runner::proto::Error {
+    async fn execute(&self, _: u32, _input: &[u8]) -> Result<Vec<u8>, lr::proto::Error> {
+        Err(lr::proto::Error {
             display: "mock execution error".to_string(),
             code: None,
         })
     }
 
-    async fn release(&self, _: u32) -> Result<(), lutra_runner::proto::Error> {
+    async fn release(&self, _: u32) -> Result<(), lr::proto::Error> {
         Ok(())
+    }
+
+    async fn get_externals(&self) -> Result<Vec<String>, lr::proto::Error> {
+        Ok(vec![])
     }
 }
 
-fn error_runner() -> (lutra_runner::channel::Client, std::thread::JoinHandle<()>) {
-    let (client, server) = lutra_runner::channel::new_pair(AlwaysErrorRunner);
+fn error_runner() -> (lr::channel::Client, std::thread::JoinHandle<()>) {
+    let (client, server) = lr::channel::new_pair(AlwaysErrorRunner);
     let handle = std::thread::spawn(move || {
         tokio::runtime::Builder::new_current_thread()
             .build()
@@ -222,32 +223,30 @@ struct FixedSchemaRunner {
     schema: &'static str,
 }
 
-impl lutra_runner::Run for FixedSchemaRunner {
-    async fn prepare(&self, _: lutra_bin::rr::Program) -> Result<u32, lutra_runner::proto::Error> {
+impl lr::Run for FixedSchemaRunner {
+    async fn prepare(&self, _: lutra_bin::rr::Program) -> Result<u32, lr::proto::Error> {
         Ok(0)
     }
 
-    async fn execute(
-        &self,
-        _: u32,
-        _input: &[u8],
-    ) -> Result<lutra_bin::vec::Vec<u8>, lutra_runner::proto::Error> {
-        Ok(lutra_bin::vec::Vec::new())
+    async fn execute(&self, _: u32, _input: &[u8]) -> Result<Vec<u8>, lr::proto::Error> {
+        Ok(Vec::new())
     }
 
-    async fn release(&self, _: u32) -> Result<(), lutra_runner::proto::Error> {
+    async fn release(&self, _: u32) -> Result<(), lr::proto::Error> {
         Ok(())
     }
 
-    async fn pull_schema(&self) -> Result<lutra_bin::string::String, lutra_runner::proto::Error> {
+    async fn pull_schema(&self) -> Result<String, lr::proto::Error> {
         Ok(self.schema.to_string())
+    }
+
+    async fn get_externals(&self) -> Result<Vec<String>, lr::proto::Error> {
+        Ok(vec![])
     }
 }
 
-fn schema_runner(
-    schema: &'static str,
-) -> (lutra_runner::channel::Client, std::thread::JoinHandle<()>) {
-    let (client, server) = lutra_runner::channel::new_pair(FixedSchemaRunner { schema });
+fn schema_runner(schema: &'static str) -> (lr::channel::Client, std::thread::JoinHandle<()>) {
+    let (client, server) = lr::channel::new_pair(FixedSchemaRunner { schema });
     let handle = std::thread::spawn(move || {
         tokio::runtime::Builder::new_current_thread()
             .build()
@@ -282,25 +281,18 @@ fn type_str(s: &str) -> Vec<Event> {
     s.chars().map(|c| key(KeyCode::Char(c))).collect()
 }
 
-fn cfg() -> RunnerConfig {
-    RunnerConfig {
-        repr: lutra_compiler::ProgramRepr::BytecodeLt,
-    }
-}
-
 fn area() -> Rect {
     Rect { cols: 80, rows: 24 }
 }
 
-fn record_with(
-    runner: (lutra_runner::channel::Client, std::thread::JoinHandle<()>),
-    events: Vec<Event>,
-) -> String {
-    record_shell(cfg(), runner.0, runner.1, area(), events).unwrap()
+fn record_with(runner: lr::channel::Client, events: Vec<Event>) -> String {
+    let repr = lc::ProgramRepr::BytecodeLt;
+    record_shell(repr, runner, area(), events).unwrap()
 }
 
 fn record(events: Vec<Event>) -> String {
-    record_with(interpreter_runner(), events)
+    let (runner, _) = interpreter_runner();
+    record_with(runner, events)
 }
 
 // ---------------------------------------------------------------------------
@@ -320,7 +312,7 @@ fn startup_empty_project() {
 
     ▌
     ────────────────────
-     ⸱ ok ⸱ BytecodeLt ⸱ Cell(Program)
+     ⸱ ok ⸱ bytecode-lt ⸱ Cell(Program)
     [cursor 0,2]
     ");
 }
@@ -350,7 +342,7 @@ fn help_command() {
 
     ▌
     ────────────────────
-     ⸱ ok ⸱ BytecodeLt ⸱ Cell(Program)
+     ⸱ ok ⸱ bytecode-lt ⸱ Cell(Program)
     [cursor 0,2]
     ");
 }
@@ -368,7 +360,7 @@ fn typing_in_prompt() {
 
     ▌ hello world
     ────────────────────
-     ⸱ ok ⸱ BytecodeLt ⸱ Cell(Program)
+     ⸱ ok ⸱ bytecode-lt ⸱ Cell(Program)
     [cursor 0,13]
     ");
 }
@@ -398,7 +390,7 @@ fn run_success() {
 
     ▌
     ────────────────────
-     ⸱ ok ⸱ BytecodeLt ⸱ Cell(Program)
+     ⸱ ok ⸱ bytecode-lt ⸱ Cell(Program)
     [cursor 0,2]
     "#);
 }
@@ -408,7 +400,8 @@ fn run_error() {
     let mut events = type_str("\"hello\"");
     events.push(enter());
     events.push(esc());
-    insta::assert_snapshot!(record_with(error_runner(), events), @r#"
+    let (runner, _) = error_runner();
+    insta::assert_snapshot!(record_with(runner, events), @r#"
     ▌ Lutra v0.5.1
     ▌ Tip:  Enter to run  ·  ↑↓ for history  ·  Esc to clear  ·  Ctrl+Q to exit
 
@@ -424,7 +417,7 @@ fn run_error() {
 
     ▌
     ────────────────────
-     ⸱ ok ⸱ BytecodeLt ⸱ Cell(Program)
+     ⸱ ok ⸱ bytecode-lt ⸱ Cell(Program)
     [cursor 0,2]
     "#);
 }
@@ -434,7 +427,8 @@ fn pull_schema() {
     let schema = "let greeting: text";
     let mut events = type_str("/pull");
     events.push(enter());
-    insta::assert_snapshot!(record_with(schema_runner(schema), events), @"
+    let (runner, _) = schema_runner(schema);
+    insta::assert_snapshot!(record_with(runner, events), @"
     ▌ Lutra v0.5.1
     ▌ Tip:  Enter to run  ·  ↑↓ for history  ·  Esc to clear  ·  Ctrl+Q to exit
 
@@ -449,7 +443,7 @@ fn pull_schema() {
 
     ▌
     ────────────────────
-     ⸱ ok ⸱ BytecodeLt ⸱ Cell(Program)
+     ⸱ ok ⸱ bytecode-lt ⸱ Cell(Program)
     [cursor 0,2]
     ");
 }
@@ -469,7 +463,7 @@ fn resize() {
 
     ▌ hello world
     ────────────────────
-     ⸱ ok ⸱ BytecodeLt ⸱ Cell(Program)
+     ⸱ ok ⸱ bytecode-lt ⸱ Cell(Program)
     [cursor 0,13]
     ");
 }

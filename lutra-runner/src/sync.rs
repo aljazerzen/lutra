@@ -132,6 +132,11 @@ where
         let runner = Arc::clone(&self.runner);
         self.rt.block_on(async move { runner.shutdown().await })
     }
+
+    fn get_externals_sync(&mut self) -> Result<vec::Vec<string::String>, proto::Error> {
+        let r = Arc::clone(&self.runner);
+        self.rt.block_on(async move { r.get_externals().await })
+    }
 }
 
 impl<R> std::fmt::Debug for SyncRunner<R>
@@ -171,6 +176,10 @@ mod tests {
 
         async fn release(&self, _program_id: u32) -> Result<(), proto::Error> {
             Ok(())
+        }
+
+        async fn get_externals(&self) -> Result<vec::Vec<string::String>, proto::Error> {
+            Ok(vec![])
         }
     }
 

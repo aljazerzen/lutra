@@ -12,9 +12,9 @@ develop:
 test:
     maturin develop {{build_opts}} --quiet
 
-    # lutra codegen
+    # lutra gen-code
     cargo run -p lutra-cli --quiet -- \
-      codegen --project=tests/lutra.lt tests/lutra_generated.py --programs-sql-pg ''
+      gen-code --project=tests/lutra.lt tests/lutra_generated.py --programs-sql-pg ''
 
     # check
     ty check python/lutra_runner_postgres tests

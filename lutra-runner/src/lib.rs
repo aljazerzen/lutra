@@ -111,11 +111,8 @@ pub trait Run {
     /// Externals are named module prefixes (e.g. `"std::sql"`, `"std::fs"`).
     /// The compiler uses these to validate that all external functions
     /// referenced by a program are available before execution.
-    fn get_externals(
-        &self,
-    ) -> impl Future<Output = Result<vec::Vec<string::String>, proto::Error>> {
-        async { Ok(vec::Vec::new()) }
-    }
+    fn get_externals(&self)
+    -> impl Future<Output = Result<vec::Vec<string::String>, proto::Error>>;
 }
 
 /// Synchronous version of the Run trait for runners that don't block the process.
@@ -187,9 +184,7 @@ pub trait RunSync {
     /// Externals are named module prefixes (e.g. `"std::sql"`, `"std::fs"`).
     /// The compiler uses these to validate that all external functions
     /// referenced by a program are available before execution.
-    fn get_externals_sync(&mut self) -> Result<vec::Vec<string::String>, proto::Error> {
-        Ok(vec::Vec::new())
-    }
+    fn get_externals_sync(&mut self) -> Result<vec::Vec<string::String>, proto::Error>;
 }
 
 /// Standard error codes used in runner protocol

@@ -18,19 +18,18 @@ use crate::watcher::FileWatcher;
 /// shell for evaluating expressions.
 pub fn run_shell(
     project_path: Option<path::PathBuf>,
-    runner_cfg: runner::RunnerConfig,
+    repr: lutra_compiler::ProgramRepr,
     runner: lutra_runner::channel::Client,
-    runner_thread: std::thread::JoinHandle<()>,
 ) -> anyhow::Result<()> {
     // create action channel
     let (action_tx, action_rx) = std::sync::mpsc::channel();
 
     // init event sources
     let watcher = FileWatcher::new(project_path.clone(), action_tx.clone())?;
-    let runner = runner::RunnerProxy::try_new(runner, runner_thread, action_tx.clone())?;
+    let runner = runner::RunnerProxy::try_new(runner, action_tx.clone())?;
 
     // create app
-    let app = Shell::new(project_path, runner_cfg, runner.get_client());
+    let app = Shell::new(project_path, repr, runner.get_client());
 
     // enter terminal
     let printer = TerminalPrinter::new()?;

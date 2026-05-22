@@ -45,19 +45,27 @@ $ cargo install lutra-cli
 
 Create a file named `example.lt`:
 
-```lt
+```lt title="example.lt"
 func main() -> "Hello, world!"
 ```
 
-Run it with the local interpreter:
+Run it on DuckDB:
 
 ```console
-$ lutra run --project example.lt --interpreter
+$ lutra run --project example.lt --runner duckdb
 const output = "Hello, world!"
 ```
 
 This is the fastest way to try out small language examples from the learning
 guides.
+
+If you want omit the `--runner` argument, you can set the default runner in the
+`.lt` file.
+
+```lt title="example.lt"
+@!runner("duckdb")
+func main() -> "Hello, world!"
+```
 
 ## Check a project
 
@@ -76,7 +84,7 @@ You can also run a one-off expression without creating a project function.
 
 ```console
 $ lutra run \
-    --interpreter \
+    --runner duckdb \
     --program 'fold([1, 2, 3], 0: int32, func (s, v) -> s + v)'
 6
 ```
@@ -88,14 +96,14 @@ This is handy for quick experiments.
 Use `interactive` when you want a live project environment with recompilation.
 
 ```console
-$ lutra interactive --project example.lt --interpreter
+$ lutra interactive --project example.lt
 ```
 
 You can also use other runners:
 
 ```console
-$ lutra interactive --project project.lt --postgres 'postgres://user:pass@localhost:5432/db'
-$ lutra interactive --project project.lt --duckdb ':memory:'
+$ lutra interactive --project project.lt --runner postgres://user:pass@localhost:5432/db
+$ lutra interactive --project project.lt --runner duckdb:data.duckdb
 ```
 
 `interactive` is a good fit for exploration, rapid iteration, and trying
