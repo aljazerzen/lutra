@@ -1,4 +1,4 @@
-@!package(name = "std")
+@!metadata(name = "std")
 #! Standard library
 
 # Self-reference module so that `std` references within std resolves.
@@ -16,7 +16,11 @@ anno doc(content: text)
 anno hidden()
 
 ## Annotates a project with metadata.
-anno package(name: text)
+anno metadata(name: text)
+
+## Annotates a project with default runner URL.
+# TODO: maybe merge this into metadata (it would be nice to have an optional param)
+anno runner(url: text)
 
 ## Annotates a type with traits to `#[Derive]` when translating to Rust.
 anno rust_derive(macros: [text])
@@ -37,47 +41,47 @@ module convert {
   where T
 
   ## Converts a number to `int8`
-  external func to_int8(x: T): int8
+  external func to_int8(T): int8
   where T: number
 
   ## Converts a number to `int16`
-  external func to_int16(x: T): int16
+  external func to_int16(T): int16
   where T: number
 
   ## Converts a number to `int32`
-  external func to_int32(x: T): int32
+  external func to_int32(T): int32
   where T: number
 
   ## Converts a number to `int64`
-  external func to_int64(x: T): int64
+  external func to_int64(T): int64
   where T: number
 
   ## Converts a number to `uint8`
-  external func to_uint8(x: T): uint8
+  external func to_uint8(T): uint8
   where T: number
 
   ## Converts a number to `uint16`
-  external func to_uint16(x: T): uint16
+  external func to_uint16(T): uint16
   where T: number
 
   ## Converts a number to `uint32`
-  external func to_uint32(x: T): uint32
+  external func to_uint32(T): uint32
   where T: number
 
   ## Converts a number to `uint64`
-  external func to_uint64(x: T): uint64
+  external func to_uint64(T): uint64
   where T: number
 
   ## Converts a number to `float32`
-  external func to_float32(x: T): float32
+  external func to_float32(T): float32
   where T: number
 
   ## Converts a number to `float64`
-  external func to_float64(x: T): float64
+  external func to_float64(T): float64
   where T: number
 
   ## Converts a value to `text`
-  external func to_text(x: T): text
+  external func to_text(T): text
   where T: primitive
 }
 
@@ -86,32 +90,32 @@ import ops::*
 ## Operators
 module ops {
   ## Multiplies two numbers.
-  external func mul(left: T, right: T): T
+  external func mul(T, T): T
   where T: number
 
   ## Divides two numbers.
-  external func div(left: T, right: T): T
+  external func div(T, T): T
   where T: number
 
   ## Division remainder.
-  external func mod(left: T, right: T): T
+  external func mod(T, T): T
   where T: number
 
   ## Adds two numbers.
-  external func add(left: T, right: T): T
+  external func add(T, T): T
   where T: number
 
   ## Subtracts two numbers.
-  external func sub(left: T, right: T): T
+  external func sub(T, T): T
   where T: number
 
   ## Negates a number.
-  external func neg(x: T): T
+  external func neg(T): T
   where T: int8 | int16 | int32 | int64 | float32 | float64
 
   ## Compare two values to determine if the first is less, equal, or greater than
   ## the second.
-  external func cmp(a: T, b: T): Ordering
+  external func cmp(T, T): Ordering
   where T: primitive
 
   ## Result of a three-way comparison. Returned by [cmp].
@@ -178,16 +182,16 @@ module ops {
   )
 
   ## Tests if both values are true. Used by `&&` operator.
-  external func and(left: bool, right: bool): bool
+  external func and(bool, bool): bool
 
   ## Tests if either of the values is true. Used by `||` operator.
-  external func or(left: bool, right: bool): bool
+  external func or(bool, bool): bool
 
   ## Inverts a boolean. Used by `!` operator.
-  external func not(expr: bool): bool
+  external func not(bool): bool
 }
 
-import option::(is_some, is_none, or_else, or_default, map_or)
+import option::(is_none, is_some, map_or, or_default, or_else)
 
 ## Nullable values
 module option {
@@ -213,7 +217,7 @@ module option {
   )
 
   ## When value is `.none`, returns a fallback value instead.
-  func or_else(value: T?, fallback: T): T
+  func or_else(value: T?, fallback fallback: T): T
   where T
   -> (
     match value {
@@ -273,7 +277,7 @@ module option {
   )
 
   ## When value is `.none` returns fallback, otherwise maps value in `.some`.
-  func map_or(value: I?, fallback: O, mapper: func (I): O): O
+  func map_or(value: I?, fallback fallback: O, mapper: func (I): O): O
   where I, O
   -> (
     match value {
@@ -317,7 +321,7 @@ module array {
 
   ## Returns the first item for which `condition` returns `true`,
   ## or `.none` if no item matches.
-  func find(array: [T], condition: func (T): bool): T?
+  func find(array array: [T], condition: func (T): bool): T?
   where T
   -> (array | filter(condition) | index(0))
 
@@ -343,14 +347,17 @@ module array {
   ## Applies `mapper` to the array in columnar form.
   ## Equivalent to [to_columnar], then `mapper`, then [from_columnar].
   func map_columnar(
-    x: [I], mapper: func ({for f: F in I do f: [F]}): {for f: F in O do f: [F]},
+    array x: [I],
+    mapper mapper: func ({for f: F in I do f: [F]}): {for f: F in O do f: [F]},
   ): [O]
   where I: {..}, O: {..}
   -> (x | to_columnar | mapper | from_columnar)
 
   ## Reduces an array to a single value by applying `mapper` in columnar form.
   ## Equivalent to [to_columnar] followed by `mapper`.
-  func aggregate(x: [T], mapper: func ({for f: F in T do f: [F]}): O): O
+  func aggregate(
+    array x: [T], mapper mapper: func ({for f: F in T do f: [F]}): O,
+  ): O
   where T: {..}, O
   -> (x | to_columnar | mapper)
 
@@ -361,12 +368,16 @@ module array {
 
   ## Groups array items by a key.
   ## Returns groups, which contain the key and an array of values in this group.
-  external func group(input: [I], get_key: func (I): K): [{key: K, values: [I]}]
+  external func group(array: [I], get_key: func (I): K): [{key: K, values: [I]}]
   where I, K
 
   ## Groups array items by a key.
   ## Returns groups, which contain the key and an array of values in this group.
-  func group_map(input: [I], get_key: func (I): K, mapper: func (K, [I]): O): [O]
+  func group_map(
+    array input: [I],
+    get_key get_key: func (I): K,
+    mapper mapper: func (K, [I]): O,
+  ): [O]
   where I, K, O
   -> (input | group(get_key) | map(x -> mapper(x.key, x.values)))
 
@@ -392,7 +403,7 @@ module array {
   ## This function is sometimes also called "reduce" or "inject".
   ## This function is similar to [scan], but it returns only the final
   ## accumulator.
-  external func fold(inputs: [I], initial: A, operation: func (A, I): A): A
+  external func fold(array: [I], initial: A, operation: func (A, I): A): A
   where I, A
 
   ## Applies an operation to each input, using the output from the previous
@@ -407,14 +418,8 @@ module array {
   ##
   ## This function is similar to [fold], but it returns all accumulators,
   ## instead of only the final one.
-  external func scan(inputs: [I], initial: A, operation: func (A, I): A): [A]
+  external func scan(array: [I], initial: A, operation: func (A, I): A): [A]
   where I, A
-
-  # func apply(
-  #   value: I,
-  #   function: func (I): O
-  # ): O
-  # where I, O -> function(value)
 
   ## Applies an operation to an array, until it returns an empty array.
   ## First operation is supplied with the initial array.
@@ -423,7 +428,7 @@ module array {
   ## Returns all produced arrays concatenated together, including initial array.
   ##
   ## In SQL, this is known as "RECURSIVE CTE" or "recursive join".
-  external func apply_until_empty(initial: [T], operation: func ([T]): [T]): [T]
+  external func loop_until_empty(initial: [T], operation: func ([T]): [T]): [T]
   where T
 
   ## Returns an array of sequential integers
@@ -437,31 +442,31 @@ module array {
 
   ## Find the minimum value in the array.
   ## Returns `none` when array is empty.
-  external func min(array: [T]): T?
+  external func min([T]): T?
   where T: primitive
 
   ## Find the maximum value in the array.
   ## Returns `none` when array is empty.
-  external func max(array: [T]): T?
+  external func max([T]): T?
   where T: primitive
 
   ## Compute sum of all number in an array.
   ## Returns zero when array is empty.
-  external func sum(column: [T]): T
+  external func sum([T]): T
   where T: number
 
   ## Compute arithmetic mean of an array of numbers.
-  external func mean(array: [T]): float64
+  external func mean([T]): float64
   where T: number
 
   ## Returns `true` if all items in the array are `true`.
-  external func all(values: [bool]): bool
+  external func all([bool]): bool
 
   ## Returns `true` if any value in the array is `true`.
-  external func any(values: [bool]): bool
+  external func any([bool]): bool
 
   ## Returns `true` if the haystack array contains an item equal to `needle`.
-  func contains(haystack: [T], needle: T): bool
+  func contains(haystack haystack: [T], needle needle: T): bool
   where T: primitive
   -> (haystack | filter(x -> project::eq(x, needle)) | is_empty | project::not)
 
@@ -542,7 +547,7 @@ module array {
 ## Mathematical ops
 module math {
   ## Absolute value
-  external func abs(val: T): T
+  external func abs(T): T
   where T: number
 
   # func sqrt(val: int64): int64
@@ -560,8 +565,8 @@ module math {
   const pi64: float64 = 3.141592653589793
 
   # TODO: exponent should probably always be uint32
-  ## Raises `val` to the power of `exponent`.
-  external func pow(val: T, exponent: T): T
+  ## Raises `value` to the power of `exponent`.
+  external func pow(value: T, exponent: T): T
   where T: int64 | float64
 
   # func exp(val: int64): int64
@@ -584,11 +589,11 @@ module text {
   external func concat(left: text, right: text): text
 
   ## Returns the number of characters in a text value.
-  external func length(value: text): uint32
+  external func length(text): uint32
 
   ## Converts ASCII code to its corresponding Unicode character.
   ## This function always succeeds, because ASCII is a subset of Unicode.
-  external func from_ascii(ascii: uint8): text
+  external func from_ascii(uint8): text
 
   ## Joins parts together, placing separator between each pair.
   external func join(parts: [text], separator: text): text
@@ -645,13 +650,13 @@ module sql {
   ## For example:
   ## - `from("my_schema/invoices")` will read from `my_schema.invoices`,
   ## - `from("my_schema/hello/world")` will read from `my_schema."hello/world"`.
-  external func from(const table_identifier: text): [R]
+  external func from(const table_name: text): [R]
   where R: {..}
 
   ## Inserts rows into a table.
   ##
   ## For table identifier format, see documentation of [module::from].
-  external func insert(rows: [R], const table_identifier: text): {}
+  external func insert(rows: [R], const table_name: text): {}
   where R: {..}
 
   ## Updates rows in a table.
@@ -665,7 +670,7 @@ module sql {
   ##
   ## Example:
   ## ```lt
-  ## std::sql::update(
+  ## sql::update(
   ##   "users",
   ##   func (u: User) -> if u.age > 65 then (
   ##     .some({status = "senior", ..u})
@@ -675,8 +680,8 @@ module sql {
   ## )
   ## ```
   ##
-  ## For table identifier format, see documentation of [module::from].
-  external func update(const table: text, updater: func (R): R?): {}
+  ## For table identifier format, see documentation of [from].
+  external func update(const table_name: text, updater: func (R): R?): {}
   where R: {..}
 
   ## Evaluates raw SQL.
@@ -772,8 +777,8 @@ func add_time(a: Time, b: Time): Time -> (add(a.0, b.0) | Time)
 func sub_timestamp(a: Timestamp, b: Timestamp): Time -> (sub(a.0, b.0) | Time)
 
 ## Returns offset of a time zone from UTC on a given date.
-func timezone_offset(time_zone: text, d: Date): Time -> (
-  sub_timestamp(date::to_timestamp(d, time_zone), date::to_timestamp(d, "UTC"))
+func timezone_offset(time_zone tz: text, date d: Date): Time -> (
+  sub_timestamp(date::to_timestamp(d, tz), date::to_timestamp(d, "UTC"))
 )
 
 module date {
@@ -793,7 +798,7 @@ module date {
 
   ## Converts a date into year, month, and day numbers.
   ## Month and day start with 1.
-  external func to_year_month_day(date: super::Date): {
+  external func to_year_month_day(super::Date): {
     year: int32, month: uint8, day: uint8,
   }
 }

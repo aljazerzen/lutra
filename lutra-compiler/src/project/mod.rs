@@ -37,12 +37,18 @@ pub struct Dependency {
 }
 
 impl Project {
-    /// Returns name defined with `@!project(name = "...")`.
+    /// Returns name defined with `@!package(name = "...")`.
     ///
     /// Represents the default name of this project when included as a dependency.
     pub fn get_name(&self) -> Option<&str> {
         self.root_module
-            .get_anno_at(&pr::Path::empty(), pr::Anno::as_std_package)
+            .get_anno_at(&pr::Path::empty(), pr::Anno::as_std_metadata)
+    }
+
+    /// Returns the default runner URL defined with `@!runner("...")`.
+    pub fn get_runner(&self) -> Option<&str> {
+        self.root_module
+            .get_anno_at(&pr::Path::empty(), pr::Anno::as_std_runner)
     }
 
     /// Search the resolved module tree recursively for definitions that carry

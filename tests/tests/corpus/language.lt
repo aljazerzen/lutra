@@ -901,10 +901,10 @@ func main() -> std::scan(
   },
 ]
 
-# === std_apply_until_empty_00
+# === std_loop_until_empty_00
 func main() -> (
   [0: int16]
-  | std::apply_until_empty(v ->
+  | std::loop_until_empty(v ->
     v
     | std::map(i -> i + 1)
     | std::filter(i -> i < 10)

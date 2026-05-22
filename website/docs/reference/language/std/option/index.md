@@ -22,7 +22,7 @@ The inverse of [`is_some`](#func-is_some).
 ## `func` or_else
 
 ```lutra
-func or_else(enum {none, some: T}, T): T
+func or_else(enum {none, some: T}, fallback: T): T
 where T
 ```
 
@@ -71,7 +71,7 @@ Maps value in `.some`. Does nothing if the value is `.none`.
 ## `func` map_or
 
 ```lutra
-func map_or(enum {none, some: I}, O, func (I): O): O
+func map_or(enum {none, some: I}, fallback: O, func (I): O): O
 where I, O
 ```
 

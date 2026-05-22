@@ -38,9 +38,15 @@ impl RunnerParams {
         }
         None
     }
+
+    pub(crate) fn into_url_or(self, default: Option<&str>) -> anyhow::Result<RunnerUrl> {
+        self.into_url()
+            .or_else(|| default.map(|url| RunnerUrl::parse(url.to_string())))
+            .ok_or(anyhow::anyhow!("Missing --runner or @!runner"))
+    }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) struct RunnerUrl {
     scheme: String,
     rest: String,

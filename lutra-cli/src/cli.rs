@@ -277,7 +277,7 @@ pub fn run(cmd: RunCommand) -> anyhow::Result<()> {
     let to_project_path = |p: &str| project.source.get_absolute_path(p);
 
     // init runner
-    let runner = (cmd.runner.into_url()).ok_or(anyhow::anyhow!("Missing --runner"))?;
+    let runner = cmd.runner.into_url_or(project.get_runner())?;
     let (mut runner, _) = crate::runners::init(runner, Some(&project.source))?;
 
     // compile
@@ -314,11 +314,12 @@ pub struct InteractiveCommand {
 }
 
 pub fn interactive(cmd: InteractiveCommand) -> anyhow::Result<()> {
-    let runner_params = (cmd.runner.into_url()).ok_or(anyhow::anyhow!("Missing --runner"))?;
+    // check (needed for runner & project dir)
+    let source = lutra_compiler::discover(cmd.discover.clone())?;
+    let project = lutra_compiler::check(source.clone(), Default::default())?;
 
     // init runner
-    let source = lutra_compiler::discover(cmd.discover.clone())?;
-    let project_path = (cmd.discover.project.is_some()).then(|| source.get_root().to_path_buf());
+    let runner_params = cmd.runner.into_url_or(project.get_runner())?;
     let (mut runner, runner_thread) = crate::runners::init(runner_params, Some(&source))?;
 
     // derive repr from runner externals
@@ -328,6 +329,8 @@ pub fn interactive(cmd: InteractiveCommand) -> anyhow::Result<()> {
     let cfg = lutra_tui::RunnerConfig { repr };
 
     // open interactive TUI
+    let project_path =
+        (cmd.discover.project.is_some()).then_some(project.source.get_root().to_path_buf());
     lutra_tui::run_shell(project_path, cfg, runner, runner_thread)
 }
 
@@ -349,7 +352,7 @@ pub fn pull_schema(cmd: PullSchemaCommand) -> anyhow::Result<()> {
     let project = lutra_compiler::check(source_tree, cmd.check)?;
 
     // pull
-    let runner_params = (cmd.runner.into_url()).ok_or(anyhow::anyhow!("Missing --runner"))?;
+    let runner_params = cmd.runner.into_url_or(project.get_runner())?;
     let (mut runner, _) = crate::runners::init(runner_params, Some(&project.source))?;
     let schema = runner.pull_schema_sync()?;
 

@@ -3,7 +3,7 @@
 ## `func` concat
 
 ```lutra
-func concat(text, text): text
+func concat(left: text, right: text): text
 ```
 
 Concatenates two text values.
@@ -28,7 +28,7 @@ This function always succeeds, because ASCII is a subset of Unicode.
 ## `func` join
 
 ```lutra
-func join([text], text): text
+func join(parts: [text], separator: text): text
 ```
 
 Joins parts together, placing separator between each pair.
@@ -36,7 +36,7 @@ Joins parts together, placing separator between each pair.
 ## `func` split
 
 ```lutra
-func split(text, text): [text]
+func split(value: text, separator: text): [text]
 ```
 
 Splits text into substrings at every occurrence of a separator.
@@ -46,7 +46,7 @@ For example, `split("1_two_3", "_")` is `["1", "two", "3"]`
 ## `func` starts_with
 
 ```lutra
-func starts_with(text, text): bool
+func starts_with(value: text, prefix: text): bool
 ```
 
 Tests if a text starts with a prefix.
@@ -54,7 +54,7 @@ Tests if a text starts with a prefix.
 ## `func` contains
 
 ```lutra
-func contains(text, text): bool
+func contains(value: text, pattern: text): bool
 ```
 
 Tests if a text contains a pattern.
@@ -62,7 +62,7 @@ Tests if a text contains a pattern.
 ## `func` ends_with
 
 ```lutra
-func ends_with(text, text): bool
+func ends_with(value: text, suffix: text): bool
 ```
 
 Tests if a text ends with a suffix.

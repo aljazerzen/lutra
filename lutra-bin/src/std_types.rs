@@ -189,7 +189,6 @@ mod chrono_impls {
 
         fn try_from(value: chrono::NaiveDate) -> core::result::Result<Self, Self::Error> {
             let days = value.num_days_from_ce() - EPOCH_DAYS_FROM_CE;
-            let days = i32::try_from(days).map_err(|_| crate::Error::InvalidData)?;
             Ok(Self { days_epoch: days })
         }
     }

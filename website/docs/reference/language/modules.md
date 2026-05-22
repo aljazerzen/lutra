@@ -43,7 +43,7 @@ You can import several names from the same module path.
 
 ```lt
 import std::(Date, math::pow)
-import std::(flat_map, filter, apply_until_empty)
+import std::(flat_map, filter, loop_until_empty)
 ```
 
 ## Module definitions

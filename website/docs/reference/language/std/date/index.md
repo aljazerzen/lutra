@@ -14,7 +14,7 @@ Duration is measured from one midnight to another.
 ## `func` to_timestamp
 
 ```lutra
-func to_timestamp(super::Date, text): super::Timestamp
+func to_timestamp(date: super::Date, time_zone: text): super::Timestamp
 ```
 
 Computes the timestamp of a local date at a timezone.

@@ -5,7 +5,7 @@ Basic array functions, aggregation, and window functions
 ## `func` index
 
 ```lutra
-func index([T], int64): enum {none, some: T}
+func index(array: [T], position: int64): enum {none, some: T}
 where T
 ```
 
@@ -14,7 +14,7 @@ Returns the item at a zero-based `position`, or `.none` if out of bounds.
 ## `func` count
 
 ```lutra
-func count([T]): int64
+func count(array: [T]): int64
 where T
 ```
 
@@ -32,7 +32,7 @@ Returns `true` if the array contains no items.
 ## `func` map
 
 ```lutra
-func map([I], func (I): O): [O]
+func map(array: [I], mapper: func (I): O): [O]
 where I, O
 ```
 
@@ -42,7 +42,7 @@ Returns a new array of the same length.
 ## `func` flat_map
 
 ```lutra
-func flat_map([I], func (I): [O]): [O]
+func flat_map(array: [I], mapper: func (I): [O]): [O]
 where I, O
 ```
 
@@ -51,7 +51,7 @@ Applies `mapper` to each item and concatenates the resulting arrays.
 ## `func` filter
 
 ```lutra
-func filter([T], func (T): bool): [T]
+func filter(array: [T], condition: func (T): bool): [T]
 where T
 ```
 
@@ -60,7 +60,7 @@ Returns only the items for which `condition` returns `true`.
 ## `func` find
 
 ```lutra
-func find([T], func (T): bool): enum {none, some: T}
+func find(array: [T], func (T): bool): enum {none, some: T}
 where T
 ```
 
@@ -70,7 +70,7 @@ or `.none` if no item matches.
 ## `func` slice
 
 ```lutra
-func slice([T], int64, int64): [T]
+func slice(array: [T], start: int64, end: int64): [T]
 where T
 ```
 
@@ -79,7 +79,7 @@ Returns items from index `start` (inclusive) to `end` (exclusive).
 ## `func` sort
 
 ```lutra
-func sort([I], func (I): K): [I]
+func sort(array: [I], key: func (I): K): [I]
 where I, K: primitive
 ```
 
@@ -88,7 +88,7 @@ Sorts the array in ascending order by the value returned by `key`.
 ## `func` to_columnar
 
 ```lutra
-func to_columnar([T]): {for f: F in T do f: [F]}
+func to_columnar(rows: [T]): {for f: F in T do f: [F]}
 where T: {..}
 ```
 
@@ -99,7 +99,7 @@ The inverse of [`from_columnar`](#func-from_columnar).
 ## `func` from_columnar
 
 ```lutra
-func from_columnar({for f: F in T do f: [F]}): [T]
+func from_columnar(columnar: {for f: F in T do f: [F]}): [T]
 where T: {..}
 ```
 
@@ -109,7 +109,7 @@ The inverse of [`to_columnar`](#func-to_columnar).
 ## `func` map_columnar
 
 ```lutra
-func map_columnar([I], func ({for f: F in I do f: [F]}): {for f: F in O do f: [F]}): [O]
+func map_columnar(array: [I], mapper: func ({for f: F in I do f: [F]}): {for f: F in O do f: [F]}): [O]
 where I: {..}, O: {..}
 ```
 
@@ -119,7 +119,7 @@ Equivalent to [`to_columnar`](#func-to_columnar), then `mapper`, then [`from_col
 ## `func` aggregate
 
 ```lutra
-func aggregate([T], func ({for f: F in T do f: [F]}): O): O
+func aggregate(array: [T], mapper: func ({for f: F in T do f: [F]}): O): O
 where T: {..}, O
 ```
 
@@ -129,7 +129,7 @@ Equivalent to [`to_columnar`](#func-to_columnar) followed by `mapper`.
 ## `func` zip
 
 ```lutra
-func zip([L], [R]): [{L, R}]
+func zip(left: [L], right: [R]): [{L, R}]
 where L, R
 ```
 
@@ -139,7 +139,7 @@ The result length equals the shorter of the two inputs.
 ## `func` group
 
 ```lutra
-func group([I], func (I): K): [{key: K, values: [I]}]
+func group(array: [I], get_key: func (I): K): [{key: K, values: [I]}]
 where I, K
 ```
 
@@ -149,7 +149,7 @@ Returns groups, which contain the key and an array of values in this group.
 ## `func` group_map
 
 ```lutra
-func group_map([I], func (I): K, func (K, [I]): O): [O]
+func group_map(array: [I], get_key: func (I): K, mapper: func (K, [I]): O): [O]
 where I, K, O
 ```
 
@@ -168,7 +168,7 @@ Deduplicates array items.
 ## `func` append
 
 ```lutra
-func append([T], [T]): [T]
+func append(first: [T], second: [T]): [T]
 where T
 ```
 
@@ -177,7 +177,7 @@ Concatenates two arrays, `first` items followed by `second` items.
 ## `func` fold
 
 ```lutra
-func fold([I], A, func (A, I): A): A
+func fold(array: [I], initial: A, operation: func (A, I): A): A
 where I, A
 ```
 
@@ -198,7 +198,7 @@ accumulator.
 ## `func` scan
 
 ```lutra
-func scan([I], A, func (A, I): A): [A]
+func scan(array: [I], initial: A, operation: func (A, I): A): [A]
 where I, A
 ```
 
@@ -215,10 +215,10 @@ Returns values of all produced accumulators.
 This function is similar to [`fold`](#func-fold), but it returns all accumulators,
 instead of only the final one.
 
-## `func` apply_until_empty
+## `func` loop_until_empty
 
 ```lutra
-func apply_until_empty([T], func ([T]): [T]): [T]
+func loop_until_empty(initial: [T], operation: func ([T]): [T]): [T]
 where T
 ```
 
@@ -233,7 +233,7 @@ In SQL, this is known as "RECURSIVE CTE" or "recursive join".
 ## `func` sequence
 
 ```lutra
-func sequence(N, N): [N]
+func sequence(start: N, end: N): [N]
 where N: int8 | int16 | int32 | int64 | uint8 | uint16 | uint32 | uint64
 ```
 
@@ -300,7 +300,7 @@ Returns `true` if any value in the array is `true`.
 ## `func` contains
 
 ```lutra
-func contains([T], T): bool
+func contains(haystack: [T], needle: T): bool
 where T: primitive
 ```
 
@@ -309,7 +309,7 @@ Returns `true` if the haystack array contains an item equal to `needle`.
 ## `func` lag
 
 ```lutra
-func lag([T], int64): [T]
+func lag(array: [T], offset: int64): [T]
 where T
 ```
 
@@ -321,7 +321,7 @@ For example, `lag(["a", "b", "c"], 1)` is `["", "a", "b"]`.
 ## `func` lead
 
 ```lutra
-func lead([T], int64): [T]
+func lead(array: [T], offset: int64): [T]
 where T
 ```
 
@@ -333,7 +333,7 @@ For example, `lead(["a", "b", "c"], 1)` is `["b", "c", ""]`.
 ## `func` rolling_mean
 
 ```lutra
-func rolling_mean([T], uint32, uint32): [float64]
+func rolling_mean(array: [T], preceding: uint32, following: uint32): [float64]
 where T: number
 ```
 
@@ -350,7 +350,7 @@ For example, `rolling_mean(..., 1, 2)` computes mean of each item, along with
 ## `func` rank
 
 ```lutra
-func rank([T]): [int32]
+func rank(array: [T]): [int32]
 where T: primitive
 ```
 
@@ -366,7 +366,7 @@ For example, `rank(["a", "b", "b", "c"])` is `[1, 2, 2, 4]`.
 ## `func` rank_dense
 
 ```lutra
-func rank_dense([T]): [int32]
+func rank_dense(array: [T]): [int32]
 where T: primitive
 ```
 
@@ -382,7 +382,7 @@ For example, `rank_dense(["a", "b", "b", "c"])` is `[1, 2, 2, 3]`.
 ## `func` rank_percentile
 
 ```lutra
-func rank_percentile([T]): [float64]
+func rank_percentile(array: [T]): [float64]
 where T: primitive
 ```
 
@@ -398,7 +398,7 @@ For example, `rank_percentile(["a", "b", "b", "c"])` is
 ## `func` cume_dist
 
 ```lutra
-func cume_dist([T]): [float64]
+func cume_dist(array: [T]): [float64]
 where T: primitive
 ```
 

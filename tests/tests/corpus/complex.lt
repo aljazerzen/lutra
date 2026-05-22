@@ -330,9 +330,9 @@ func main() -> std::fold(
 }
 
 # === advent_of_sql_2024_08
-import std::(flat_map, filter, apply_until_empty)
+import std::(flat_map, filter, loop_until_empty)
 
-func main() -> (from_staff() | apply_until_empty(get_managers))
+func main() -> (from_staff() | loop_until_empty(get_managers))
 
 type Iter: {id: int32, depth: int16}
 

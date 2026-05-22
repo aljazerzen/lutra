@@ -276,12 +276,21 @@ impl Anno {
         Some(())
     }
 
-    /// Matches as `@std::package(name = "...")` annotation.
-    pub fn as_std_package(&self) -> Option<&str> {
+    /// Matches as `@std::metadata(name = "...")` annotation.
+    pub fn as_std_metadata(&self) -> Option<&str> {
         let args = self
-            .as_named(&["std", "package"])
-            .or_else(|| self.as_named(&["package"]))?;
-        // fallback is needed for the @package on std itself
+            .as_named(&["std", "metadata"])
+            .or_else(|| self.as_named(&["metadata"]))?;
+        // fallback is needed for the @metadata on std itself
+        Some(args.first()?.expr.kind.as_literal()?.as_text()?)
+    }
+
+    /// Matches as `@std::runner("...")` annotation.
+    pub fn as_std_runner(&self) -> Option<&str> {
+        let args = self
+            .as_named(&["std", "runner"])
+            .or_else(|| self.as_named(&["runner"]))?;
+        // fallback is needed for the @runner on std itself
         Some(args.first()?.expr.kind.as_literal()?.as_text()?)
     }
 

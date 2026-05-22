@@ -341,7 +341,7 @@ impl<'t> ByteCoder<'t> {
             "std::array::filter"
             | "std::array::slice"
             | "std::array::append"
-            | "std::array::apply_until_empty" => {
+            | "std::array::loop_until_empty" => {
                 let item_layout = as_layout_of_param_array(ty_mat);
 
                 let mut r = Vec::with_capacity(1 + 1 + item_layout.body_ptrs.len());

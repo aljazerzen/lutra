@@ -28,9 +28,9 @@ The mathematical constant π as a 64-bit float.
 ## `func` pow
 
 ```lutra
-func pow(T, T): T
+func pow(value: T, exponent: T): T
 where T: int64 | float64
 ```
 
-Raises `val` to the power of `exponent`.
+Raises `value` to the power of `exponent`.
 

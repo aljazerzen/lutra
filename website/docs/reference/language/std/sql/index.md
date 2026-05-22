@@ -6,7 +6,7 @@ Currently this includes only `sql-pg` format.
 ## `func` from
 
 ```lutra
-func from(const text): [R]
+func from(const table_name: text): [R]
 where R: {..}
 ```
 
@@ -23,7 +23,7 @@ For example:
 ## `func` insert
 
 ```lutra
-func insert([R], const text): {}
+func insert(rows: [R], const table_name: text): {}
 where R: {..}
 ```
 
@@ -34,7 +34,7 @@ For table identifier format, see documentation of [`module::from`](#func-from).
 ## `func` update
 
 ```lutra
-func update(const text, func (R): enum {none, some: R}): {}
+func update(const table_name: text, updater: func (R): enum {none, some: R}): {}
 where R: {..}
 ```
 
@@ -49,7 +49,7 @@ whether to update and what the new values should be.
 
 Example:
 ```lt
-std::sql::update(
+sql::update(
   "users",
   func (u: User) -> if u.age > 65 then (
     .some({status = "senior", ..u})
@@ -59,12 +59,12 @@ std::sql::update(
 )
 ```
 
-For table identifier format, see documentation of [`module::from`](#func-from).
+For table identifier format, see documentation of [`from`](#func-from).
 
 ## `func` raw
 
 ```lutra
-func raw(const text): R
+func raw(const sql_source: text): R
 where R
 ```
 

@@ -1098,7 +1098,7 @@ impl<'a> Context<'a> {
                 cr::ExprKind::Bind(inputs, Box::new(iteration))
             }
 
-            "std::array::apply_until_empty" => {
+            "std::array::loop_until_empty" => {
                 // compute each rel and apply order to it
                 let initial = Box::new(self.compile_rel(&call.args[0]));
                 let operation = &call.args[1];

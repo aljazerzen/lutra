@@ -345,7 +345,7 @@ pub mod std_array {
                 "append" => &append,
                 "fold" => &fold,
                 "scan" => &scan,
-                "apply_until_empty" => &apply_until_empty,
+                "loop_until_empty" => &loop_until_empty,
                 "sequence" => &sequence,
 
                 "min" => &min,
@@ -791,7 +791,7 @@ pub mod std_array {
         Ok(Cell::Data(outputs.finish()))
     }
 
-    pub fn apply_until_empty(
+    pub fn loop_until_empty(
         it: &mut Interpreter,
         layout_args: &[u32],
         args: Vec<Cell>,

@@ -29,13 +29,21 @@ anno hidden()
 
 Annotates a definition to be hidden from documentation.
 
-## `anno` package
+## `anno` metadata
 
 ```lutra
-anno package(const name: text)
+anno metadata(const name: text)
 ```
 
 Annotates a project with metadata.
+
+## `anno` runner
+
+```lutra
+anno runner(const url: text)
+```
+
+Annotates a project with default runner URL.
 
 ## `anno` rust_derive
 
@@ -97,7 +105,7 @@ Result is `a - b`: positive when `a` is later than `b`.
 ## `func` timezone_offset
 
 ```lutra
-func timezone_offset(text, Date): Time
+func timezone_offset(time_zone: text, date: Date): Time
 ```
 
 Returns offset of a time zone from UTC on a given date.
