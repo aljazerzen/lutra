@@ -12,7 +12,7 @@ develop:
 test:
     maturin develop {{build_opts}} --quiet
     cargo run -p lutra-cli --quiet -- \
-        codegen --project=tests/types.lt tests/types_generated.py
+        gen-code --project=tests/types.lt tests/types_generated.py
     ty check tests python/lutra_bin
     ruff check tests python/lutra_bin
     python -m unittest tests/main.py

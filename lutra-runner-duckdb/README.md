@@ -91,14 +91,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 ### CLI
 
-Lutra CLI provides this runner via `--duckdb` argument.
+Lutra CLI provides this runner via `--runner duckdb:path` scheme.
 
 ```bash
 # In-memory database
-lutra run --duckdb=:memory:
+lutra run --runner duckdb
 
 # File-based database
-lutra run --duckdb=data.duckdb
+lutra run --runner duckdb:some_dir/data.duckdb
 ```
 
 ## Work in progress

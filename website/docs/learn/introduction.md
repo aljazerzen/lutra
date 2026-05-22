@@ -24,7 +24,7 @@ func main() -> (
 When you run it, Lutra evaluates the `main` function and prints the result:
 
 ```console
-$ lutra run --project example.lt --interpreter
+$ lutra run --project example.lt --runner interpreter
 const output = [
   2,
   4,

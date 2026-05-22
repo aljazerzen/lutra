@@ -1,6 +1,5 @@
 use std::path;
 
-use crate::RunnerConfig;
 use crate::keybindings::KeyContext;
 use crate::project::{CompileResult, ProjectState};
 
@@ -24,8 +23,8 @@ pub enum Status {
 
 impl StatusBar {
     /// Creates a new status bar.
-    pub fn new(project: Option<path::PathBuf>, runner: &RunnerConfig) -> Self {
-        let runner = format!("{:?}", runner.repr);
+    pub fn new(project: Option<path::PathBuf>, repr: lutra_compiler::ProgramRepr) -> Self {
+        let runner = repr.to_string();
 
         let project_path = project
             .map(|project| {

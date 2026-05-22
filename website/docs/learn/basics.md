@@ -20,7 +20,7 @@ func main() -> "Hello, world!"
 Run it with the interpreter:
 
 ```console
-$ lutra run --project example.lt --interpreter
+$ lutra run --project example.lt --runner interpreter
 const output = "Hello, world!"
 ```
 
@@ -40,7 +40,7 @@ func main() -> greet("Ada")
 ```
 
 ```console
-$ lutra run --project example.lt --interpreter
+$ lutra run --project example.lt --runner interpreter
 const output = "Hello, Ada!"
 ```
 

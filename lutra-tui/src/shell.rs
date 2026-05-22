@@ -41,16 +41,16 @@ pub struct Shell {
 impl Shell {
     pub fn new(
         project_path: Option<path::PathBuf>,
-        runner_cfg: runner::RunnerConfig,
+        repr: lutra_compiler::ProgramRepr,
         runner_client: lutra_runner::channel::ClientSender,
     ) -> Self {
         let mut s = Self {
             project: ProjectState::new(),
-            runner: runner::RunnerSession::new(runner_client, runner_cfg.repr),
+            runner: runner::RunnerSession::new(runner_client, repr),
             keybindings: KeyBindings::new(),
             commands: CommandRegistry::default(),
             repl: ReplPane::new(),
-            status: StatusBar::new(project_path, &runner_cfg),
+            status: StatusBar::new(project_path, repr),
             startup_done: false,
             diagnostics_scroll: 0,
         };

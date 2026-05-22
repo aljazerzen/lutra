@@ -4,7 +4,6 @@ use std::io;
 
 use crossterm::event::{Event, KeyCode, KeyEvent, KeyEventKind, KeyEventState, KeyModifiers};
 
-use crate::RunnerConfig;
 use crate::terminal::{Action, Rect, View};
 use crate::{driver, printer, runner, shell};
 
@@ -16,19 +15,18 @@ use crate::{driver, printer, runner, shell};
 /// - does not spawn a file-watcher or terminal event-reader thread
 /// - processes events synchronously, draining runner messages after each one
 pub fn record_shell(
-    runner_cfg: runner::RunnerConfig,
+    repr: lutra_compiler::ProgramRepr,
     runner: lutra_runner::channel::Client,
-    runner_thread: std::thread::JoinHandle<()>,
     viewport: Rect,
     events: Vec<crossterm::event::Event>,
 ) -> anyhow::Result<String> {
     let (action_tx, action_rx) = std::sync::mpsc::channel();
 
     // real runner, no file watcher
-    let runner = runner::RunnerProxy::try_new(runner, runner_thread, action_tx)?;
+    let runner = runner::RunnerProxy::try_new(runner, action_tx)?;
 
     let mut driver = driver::Driver {
-        app: shell::Shell::new(None, runner_cfg, runner.get_client()),
+        app: shell::Shell::new(None, repr, runner.get_client()),
         printer: RecordingPrinter::default(),
         viewport,
         queue: Default::default(),
@@ -282,25 +280,18 @@ fn type_str(s: &str) -> Vec<Event> {
     s.chars().map(|c| key(KeyCode::Char(c))).collect()
 }
 
-fn cfg() -> RunnerConfig {
-    RunnerConfig {
-        repr: lutra_compiler::ProgramRepr::BytecodeLt,
-    }
-}
-
 fn area() -> Rect {
     Rect { cols: 80, rows: 24 }
 }
 
-fn record_with(
-    runner: (lutra_runner::channel::Client, std::thread::JoinHandle<()>),
-    events: Vec<Event>,
-) -> String {
-    record_shell(cfg(), runner.0, runner.1, area(), events).unwrap()
+fn record_with(runner: lutra_runner::channel::Client, events: Vec<Event>) -> String {
+    let repr = lutra_compiler::ProgramRepr::BytecodeLt;
+    record_shell(repr, runner, area(), events).unwrap()
 }
 
 fn record(events: Vec<Event>) -> String {
-    record_with(interpreter_runner(), events)
+    let (runner, _) = interpreter_runner();
+    record_with(runner, events)
 }
 
 // ---------------------------------------------------------------------------
@@ -320,7 +311,7 @@ fn startup_empty_project() {
 
     ▌
     ────────────────────
-     ⸱ ok ⸱ BytecodeLt ⸱ Cell(Program)
+     ⸱ ok ⸱ bytecode-lt ⸱ Cell(Program)
     [cursor 0,2]
     ");
 }
@@ -350,7 +341,7 @@ fn help_command() {
 
     ▌
     ────────────────────
-     ⸱ ok ⸱ BytecodeLt ⸱ Cell(Program)
+     ⸱ ok ⸱ bytecode-lt ⸱ Cell(Program)
     [cursor 0,2]
     ");
 }
@@ -368,7 +359,7 @@ fn typing_in_prompt() {
 
     ▌ hello world
     ────────────────────
-     ⸱ ok ⸱ BytecodeLt ⸱ Cell(Program)
+     ⸱ ok ⸱ bytecode-lt ⸱ Cell(Program)
     [cursor 0,13]
     ");
 }
@@ -398,7 +389,7 @@ fn run_success() {
 
     ▌
     ────────────────────
-     ⸱ ok ⸱ BytecodeLt ⸱ Cell(Program)
+     ⸱ ok ⸱ bytecode-lt ⸱ Cell(Program)
     [cursor 0,2]
     "#);
 }
@@ -408,7 +399,8 @@ fn run_error() {
     let mut events = type_str("\"hello\"");
     events.push(enter());
     events.push(esc());
-    insta::assert_snapshot!(record_with(error_runner(), events), @r#"
+    let (runner, _) = error_runner();
+    insta::assert_snapshot!(record_with(runner, events), @r#"
     ▌ Lutra v0.5.1
     ▌ Tip:  Enter to run  ·  ↑↓ for history  ·  Esc to clear  ·  Ctrl+Q to exit
 
@@ -424,7 +416,7 @@ fn run_error() {
 
     ▌
     ────────────────────
-     ⸱ ok ⸱ BytecodeLt ⸱ Cell(Program)
+     ⸱ ok ⸱ bytecode-lt ⸱ Cell(Program)
     [cursor 0,2]
     "#);
 }
@@ -434,7 +426,8 @@ fn pull_schema() {
     let schema = "let greeting: text";
     let mut events = type_str("/pull");
     events.push(enter());
-    insta::assert_snapshot!(record_with(schema_runner(schema), events), @"
+    let (runner, _) = schema_runner(schema);
+    insta::assert_snapshot!(record_with(runner, events), @"
     ▌ Lutra v0.5.1
     ▌ Tip:  Enter to run  ·  ↑↓ for history  ·  Esc to clear  ·  Ctrl+Q to exit
 
@@ -449,7 +442,7 @@ fn pull_schema() {
 
     ▌
     ────────────────────
-     ⸱ ok ⸱ BytecodeLt ⸱ Cell(Program)
+     ⸱ ok ⸱ bytecode-lt ⸱ Cell(Program)
     [cursor 0,2]
     ");
 }
@@ -469,7 +462,7 @@ fn resize() {
 
     ▌ hello world
     ────────────────────
-     ⸱ ok ⸱ BytecodeLt ⸱ Cell(Program)
+     ⸱ ok ⸱ bytecode-lt ⸱ Cell(Program)
     [cursor 0,13]
     ");
 }

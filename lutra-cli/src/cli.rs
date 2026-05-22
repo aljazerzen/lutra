@@ -11,8 +11,6 @@ use lutra_bin::Encode;
 use lutra_compiler::{CheckParams, CompileParams, DiscoverParams, codespan};
 use lutra_runner::RunSync;
 
-use crate::runners::RunnerParams;
-
 fn main() {
     let action = Command::parse();
 
@@ -33,8 +31,8 @@ fn main() {
         Action::Run(cmd) => run(cmd),
         Action::Interactive(cmd) => interactive(cmd),
         Action::Pull(cmd) => pull_schema(cmd),
-        Action::Codegen(cmd) => codegen(cmd),
-        Action::Docs(cmd) => docs(cmd),
+        Action::GenCode(cmd) => gen_code(cmd),
+        Action::GenDocs(cmd) => gen_docs(cmd),
         Action::Format(cmd) => format(cmd),
         Action::Serve(cmd) => serve(cmd),
         Action::LanguageServer(cmd) => {
@@ -64,10 +62,14 @@ pub struct Command {
 
 #[derive(Subcommand)]
 pub enum Action {
-    /// Read the project
+    /// Interactive REPL shell
+    #[clap(alias = "i")]
+    Interactive(InteractiveCommand),
+
+    /// Read a project
     Discover(DiscoverCommand),
 
-    /// Validate the project
+    /// Validate a project
     Check(CheckCommand),
 
     /// Compile a program
@@ -76,27 +78,24 @@ pub enum Action {
     /// Compile a program and run it
     Run(RunCommand),
 
-    /// Interactive project environment with live recompilation
-    Interactive(InteractiveCommand),
-
-    /// Pull interface from the runner
+    /// Pull runner interface into a project
     Pull(PullSchemaCommand),
-
-    /// Compile the project and generate bindings code
-    Codegen(CodegenCommand),
-
-    /// Convert a project into Markdown reference
-    Docs(DocsCommand),
 
     /// Format source files
     #[clap(alias = "fmt")]
     Format(FormatCommand),
 
-    /// Serve a runner over TCP using the binary protocol
-    Serve(ServeCommand),
+    /// Generate bindings code from a project
+    GenCode(GenCodeCommand),
+
+    /// Generate Markdown reference from a project
+    GenDocs(GenDocsCommand),
 
     /// Start language server (LSP)
     LanguageServer(language_server::Command),
+
+    /// Serve a runner proxy over TCP binary protocol
+    Serve(ServeCommand),
 }
 
 #[derive(clap::Parser)]
@@ -217,7 +216,7 @@ pub struct RunCommand {
     check: CheckParams,
 
     #[clap(flatten)]
-    runner: RunnerParams,
+    runner: runners::RunnerParams,
 
     /// Read input from `.lb` file.
     #[clap(long)]
@@ -277,8 +276,8 @@ pub fn run(cmd: RunCommand) -> anyhow::Result<()> {
     let to_project_path = |p: &str| project.source.get_absolute_path(p);
 
     // init runner
-    let runner = cmd.runner.into_url_or(project.get_runner())?;
-    let (mut runner, _) = crate::runners::init(runner, Some(&project.source))?;
+    let runner = cmd.runner.into_spec(project.get_runner())?;
+    let mut runner = runners::AnyRunnerSync::connect(&runner)?;
 
     // compile
     let params =
@@ -310,7 +309,7 @@ pub struct InteractiveCommand {
     discover: DiscoverParams,
 
     #[clap(flatten)]
-    runner: RunnerParams,
+    runner: runners::RunnerParams,
 }
 
 pub fn interactive(cmd: InteractiveCommand) -> anyhow::Result<()> {
@@ -319,19 +318,18 @@ pub fn interactive(cmd: InteractiveCommand) -> anyhow::Result<()> {
     let project = lutra_compiler::check(source.clone(), Default::default())?;
 
     // init runner
-    let runner_params = cmd.runner.into_url_or(project.get_runner())?;
-    let (mut runner, runner_thread) = crate::runners::init(runner_params, Some(&source))?;
+    let runner_params = cmd.runner.into_spec(project.get_runner())?;
+    let (mut runner, _) = runners::spawn(runner_params)?;
 
     // derive repr from runner externals
     let externals = runner.get_externals_sync()?;
     let repr = lutra_compiler::ProgramRepr::from_externals(&externals)
         .ok_or_else(|| anyhow::anyhow!("runner did not provide a repr: tag in get_externals()"))?;
-    let cfg = lutra_tui::RunnerConfig { repr };
 
     // open interactive TUI
     let project_path =
         (cmd.discover.project.is_some()).then_some(project.source.get_root().to_path_buf());
-    lutra_tui::run_shell(project_path, cfg, runner, runner_thread)
+    lutra_tui::run_shell(project_path, repr, runner)
 }
 
 #[derive(clap::Parser)]
@@ -343,7 +341,7 @@ pub struct PullSchemaCommand {
     check: CheckParams,
 
     #[clap(flatten)]
-    runner: RunnerParams,
+    runner: runners::RunnerParams,
 }
 
 pub fn pull_schema(cmd: PullSchemaCommand) -> anyhow::Result<()> {
@@ -352,8 +350,8 @@ pub fn pull_schema(cmd: PullSchemaCommand) -> anyhow::Result<()> {
     let project = lutra_compiler::check(source_tree, cmd.check)?;
 
     // pull
-    let runner_params = cmd.runner.into_url_or(project.get_runner())?;
-    let (mut runner, _) = crate::runners::init(runner_params, Some(&project.source))?;
+    let spec = cmd.runner.into_spec(project.get_runner())?;
+    let mut runner = runners::AnyRunnerSync::connect(&spec)?;
     let schema = runner.pull_schema_sync()?;
 
     // try update the @schema module
@@ -375,7 +373,7 @@ pub fn pull_schema(cmd: PullSchemaCommand) -> anyhow::Result<()> {
 }
 
 #[derive(clap::Parser)]
-pub struct CodegenCommand {
+pub struct GenCodeCommand {
     #[clap(flatten)]
     discover: lutra_compiler::DiscoverParams,
 
@@ -402,7 +400,7 @@ pub struct CodegenCommand {
     lutra_bin_path: Option<String>,
 }
 
-pub fn codegen(cmd: CodegenCommand) -> anyhow::Result<()> {
+pub fn gen_code(cmd: GenCodeCommand) -> anyhow::Result<()> {
     if cmd.discover.project.is_none() {
         return Err(anyhow::anyhow!("--project is required for codegen"));
     }
@@ -449,7 +447,7 @@ pub fn codegen(cmd: CodegenCommand) -> anyhow::Result<()> {
 }
 
 #[derive(clap::Parser)]
-pub struct DocsCommand {
+pub struct GenDocsCommand {
     /// Path to a file in a Lutra project.
     #[clap(flatten)]
     discover: DiscoverParams,
@@ -461,7 +459,7 @@ pub struct DocsCommand {
     output_dir: std::path::PathBuf,
 }
 
-pub fn docs(cmd: DocsCommand) -> anyhow::Result<()> {
+pub fn gen_docs(cmd: GenDocsCommand) -> anyhow::Result<()> {
     let project = if cmd.discover.project.as_ref().is_some_and(|p| p == ":std:") {
         let source = lutra_compiler::std_source();
         let mut params = cmd.check;
@@ -487,16 +485,31 @@ pub fn docs(cmd: DocsCommand) -> anyhow::Result<()> {
 #[derive(clap::Parser)]
 pub struct ServeCommand {
     /// Address to bind the TCP server on.
-    #[arg(long, default_value = "127.0.0.1:5555")]
+    #[arg(long, default_value = "127.0.0.1:7373")]
     at: String,
 
     #[clap(flatten)]
-    runner: RunnerParams,
+    runner: runners::RunnerParams,
 }
 
-pub fn serve(cmd: ServeCommand) -> anyhow::Result<()> {
-    let runner_params = (cmd.runner.into_url()).ok_or(anyhow::anyhow!("Missing --runner"))?;
-    crate::runners::serve(runner_params, &cmd.at)
+#[tokio::main(flavor = "current_thread")]
+pub async fn serve(cmd: ServeCommand) -> anyhow::Result<()> {
+    let spec = cmd.runner.into_spec(None)?;
+    let runner = runners::AnyRunner::connect(&spec).await?;
+
+    let listener = tokio::net::TcpListener::bind(&cmd.at).await?;
+    eprintln!("Listening on {}", cmd.at);
+
+    loop {
+        let (stream, peer) = listener.accept().await?;
+        eprintln!("Connection from {peer}");
+
+        let mut server = lutra_runner::binary::tokio::Server::new(stream, &runner);
+        if let Err(e) = server.run().await {
+            eprintln!("Connection from {peer} error: {e}");
+        }
+        eprintln!("Connection from {peer} closed");
+    }
 }
 
 #[derive(clap::Parser)]

@@ -7,23 +7,16 @@ use lutra_bin::rr;
 
 pub use lutra_runner::proto;
 
-#[derive(Debug, Clone)]
-pub struct RunnerConfig {
-    pub repr: lutra_compiler::ProgramRepr,
-}
-
 /// Handle of a runner instance.
 pub(crate) struct RunnerProxy {
     sender: lutra_runner::channel::ClientSender,
 
-    runner_thread: JoinHandle<()>,
     message_thread: JoinHandle<()>,
 }
 
 impl RunnerProxy {
     pub fn try_new(
         client: lutra_runner::channel::Client,
-        runner_thread: std::thread::JoinHandle<()>,
         action_tx: mpsc::Sender<Action>,
     ) -> Result<Self, anyhow::Error> {
         // Split client into sender and receiver
@@ -44,7 +37,6 @@ impl RunnerProxy {
 
         Ok(Self {
             sender,
-            runner_thread,
             message_thread,
         })
     }
@@ -56,7 +48,6 @@ impl RunnerProxy {
     /// Waits for all threads to stop
     pub fn join(self) {
         drop(self.sender);
-        let _ = self.runner_thread.join();
         let _ = self.message_thread.join();
     }
 }

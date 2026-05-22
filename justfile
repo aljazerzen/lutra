@@ -38,13 +38,13 @@ test-ignored:
 # Re-generate committed generated files
 [working-directory: 'lutra-bin/src/project']
 generate:
-    cargo run -p lutra-cli -- codegen --lutra-bin-path="crate" --project=. ./generated.rs
+    cargo run -p lutra-cli -- gen-code --lutra-bin-path="crate" --project=. ./generated.rs
     cargo fmt -p lutra-bin
 
 [working-directory: 'lutra-bin/src/project']
 generate-precompiled:
     # For when current code does not compile, but we still have an old cli binary
-    ../../../target/debug/lutra codegen --lutra-bin-path="crate" --project=. ./generated.rs
+    ../../../target/debug/lutra gen-code --lutra-bin-path="crate" --project=. ./generated.rs
     cargo fmt -p lutra-bin
 
 bench:

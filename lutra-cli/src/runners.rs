@@ -1,85 +1,292 @@
+use std::{path, str::FromStr};
+
+use lutra_bin::{rr, string, vec};
+use lutra_runner::proto;
+
 #[derive(clap::Args)]
-#[group(required = false, multiple = false)]
 pub(crate) struct RunnerParams {
-    /// Runner URL. Scheme selects the runner:
-    ///   interpreter:// or lt:// - interpreter
-    ///   postgres://DSN          - PostgreSQL
-    ///   duckdb://PATH           - DuckDB (use duckdb://:memory: for in-memory)
-    ///   tcp://HOST:PORT          - remote runner over TCP (binary protocol)
-    #[arg(long)]
-    runner: Option<String>,
-
-    /// Use interpreter runner
+    /// Runner URL.
+    ///
+    /// Supported schemes include duckdb:PATH, postgres://DSN, interpreter:PATH
+    /// or lt:PATH, tcp://HOST:PORT.
     #[arg(long, short)]
-    interpreter: bool,
-
-    /// Use PostgreSQL runner. Requires a postgres:// URL or a libpq-style connection config.
-    #[arg(long, name = "DSN")]
-    postgres: Option<String>,
-
-    /// Use DuckDB runner. Provide path to database file or ":memory:" for in-memory database.
-    #[arg(long, name = "PATH")]
-    duckdb: Option<String>,
+    runner: Option<String>,
 }
 
 impl RunnerParams {
-    pub(crate) fn into_url(mut self) -> Option<RunnerUrl> {
-        if let Some(url) = self.runner.take() {
-            return Some(RunnerUrl::parse(url));
-        }
-        if self.interpreter {
-            return Some(RunnerUrl::new("lt", "".into()));
-        }
-        if let Some(postgres) = self.postgres {
-            return Some(RunnerUrl::new("postgres", postgres));
-        }
-        if let Some(duckdb) = self.duckdb {
-            return Some(RunnerUrl::new("duckdb", duckdb));
-        }
-        None
-    }
+    pub(crate) fn into_spec(self, default: Option<&str>) -> anyhow::Result<Spec> {
+        let url = self
+            .runner
+            .or_else(|| default.map(|x| x.to_string()))
+            .ok_or(anyhow::anyhow!("Missing --runner or @!runner"))?;
+        let (scheme, rest) = split_scheme(url);
 
-    pub(crate) fn into_url_or(self, default: Option<&str>) -> anyhow::Result<RunnerUrl> {
-        self.into_url()
-            .or_else(|| default.map(|url| RunnerUrl::parse(url.to_string())))
-            .ok_or(anyhow::anyhow!("Missing --runner or @!runner"))
+        if let Some(path) = (scheme == "interpreter" || scheme == "lt").then_some(rest.as_str()) {
+            let file_system = (!path.is_empty())
+                .then(|| path::PathBuf::from_str(path))
+                .transpose()?;
+            return Ok(Spec::Interpreter { file_system });
+        } else if ["postgres", "pg", "postgresql"].contains(&scheme.as_str()) {
+            return Ok(Spec::Postgres {
+                url: format!("postgresql:{}", rest),
+            });
+        } else if scheme == "duckdb" {
+            let path_s = rest;
+            let path = path::PathBuf::from_str(&path_s)?;
+            let (db, file_system) = if path_s.is_empty() {
+                (":memory:".to_string(), None)
+            } else if path.is_dir() {
+                (":memory:".to_string(), Some(path))
+            } else {
+                let fs_dir = path.parent().map(|p| p.to_path_buf());
+                (path.to_string_lossy().into_owned(), fs_dir)
+            };
+            return Ok(Spec::Duckdb { db, file_system });
+        } else if scheme == "tcp" {
+            let addr = rest
+                .strip_prefix("//")
+                .ok_or_else(|| anyhow::anyhow!("Invalid tcp: URL"))?
+                .to_string();
+            return Ok(Spec::Tcp { addr });
+        }
+        Err(anyhow::anyhow!("Unknown runner scheme: {scheme}"))
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub(crate) struct RunnerUrl {
-    scheme: String,
-    rest: String,
+/// Split on ":"; if absent, treat the whole string as the scheme.
+fn split_scheme(mut url: String) -> (String, String) {
+    let mut rest = String::new();
+    if let Some(i) = url.find(":") {
+        rest = url.split_off(i + 1);
+        url.truncate(i);
+    }
+    (url, rest)
 }
 
-impl RunnerUrl {
-    fn new(scheme: &str, rest: String) -> Self {
-        let scheme = scheme.to_string();
-        Self { scheme, rest }
-    }
-    fn parse(mut url: String) -> Self {
-        // Split on "://"; if absent, treat the whole string as the scheme.
-        let mut rest = String::new();
-        if let Some(i) = url.find("://") {
-            rest = url.split_off(i + 3);
-            url.truncate(i);
+#[derive(Clone, Debug)]
+pub(crate) enum Spec {
+    Interpreter {
+        file_system: Option<path::PathBuf>,
+    },
+    Postgres {
+        url: String,
+    },
+    Duckdb {
+        db: String,
+        file_system: Option<path::PathBuf>,
+    },
+    Tcp {
+        addr: String,
+    },
+}
+
+impl Spec {
+    fn thread_name(&self) -> &'static str {
+        match self {
+            Self::Interpreter { .. } => "runner-interpreter",
+            Self::Postgres { .. } => "runner-postgres",
+            Self::Duckdb { .. } => "runner-duckdb",
+            Self::Tcp { .. } => "runner-tcp",
         }
-        RunnerUrl { scheme: url, rest }
     }
-    fn as_interpreter(&self) -> Option<&str> {
-        (self.scheme == "interpreter" || self.scheme == "lt").then_some(&self.rest)
+}
+
+pub(crate) enum AnyRunner {
+    Interpreter(lutra_runner::AsyncRunner<lutra_interpreter::InterpreterRunner<'static>>),
+    Postgres(lutra_runner_postgres::RunnerAsync),
+    Duckdb(lutra_runner::AsyncRunner<lutra_runner_duckdb::Runner>),
+    Tcp(lutra_runner::binary::tokio::Client<tokio::net::TcpStream>),
+}
+
+impl AnyRunner {
+    pub(crate) async fn connect(spec: &Spec) -> anyhow::Result<AnyRunner> {
+        match spec {
+            Spec::Interpreter { file_system } => {
+                let runner = lutra_interpreter::InterpreterRunner::default()
+                    .with_file_system(file_system.clone());
+                Ok(AnyRunner::Interpreter(lutra_runner::AsyncRunner::new(
+                    runner,
+                )))
+            }
+            Spec::Postgres { url } => Ok(AnyRunner::Postgres(
+                lutra_runner_postgres::RunnerAsync::connect_no_tls(url).await?,
+            )),
+            Spec::Duckdb { db, file_system } => {
+                Ok(AnyRunner::Duckdb(lutra_runner::AsyncRunner::new(
+                    lutra_runner_duckdb::Runner::open(db, file_system.clone())?,
+                )))
+            }
+            Spec::Tcp { addr } => {
+                let tcp_stream = tokio::net::TcpStream::connect(addr)
+                    .await
+                    .map_err(|e| anyhow::anyhow!("failed to connect to runner at {addr}: {e}"))?;
+                Ok(AnyRunner::Tcp(lutra_runner::binary::tokio::Client::new(
+                    tcp_stream,
+                )))
+            }
+        }
     }
-    fn as_postgres(&self) -> Option<&str> {
-        (self.scheme == "postgres").then_some(&self.rest)
+}
+
+impl lutra_runner::Run for AnyRunner {
+    async fn prepare(&self, program: rr::Program) -> Result<u32, proto::Error> {
+        match self {
+            Self::Interpreter(r) => r.prepare(program).await,
+            Self::Postgres(r) => r.prepare(program).await,
+            Self::Duckdb(r) => r.prepare(program).await,
+            Self::Tcp(r) => r.prepare(program).await,
+        }
     }
-    fn as_duckdb(&self) -> Option<&str> {
-        (self.scheme == "duckdb").then_some(&self.rest)
+
+    async fn execute(&self, program_id: u32, input: &[u8]) -> Result<vec::Vec<u8>, proto::Error> {
+        match self {
+            Self::Interpreter(r) => r.execute(program_id, input).await,
+            Self::Postgres(r) => r.execute(program_id, input).await,
+            Self::Duckdb(r) => r.execute(program_id, input).await,
+            Self::Tcp(r) => r.execute(program_id, input).await,
+        }
     }
-    fn as_tcp(&self) -> Option<&str> {
-        (self.scheme == "tcp").then_some(&self.rest)
+
+    async fn pull_schema(&self) -> Result<string::String, proto::Error> {
+        match self {
+            Self::Interpreter(r) => r.pull_schema().await,
+            Self::Postgres(r) => r.pull_schema().await,
+            Self::Duckdb(r) => r.pull_schema().await,
+            Self::Tcp(r) => r.pull_schema().await,
+        }
     }
-    fn err_unknown(&self) -> anyhow::Error {
-        anyhow::anyhow!("Unknown runner scheme: {}", self.scheme)
+
+    async fn release(&self, program_id: u32) -> Result<(), proto::Error> {
+        match self {
+            Self::Interpreter(r) => r.release(program_id).await,
+            Self::Postgres(r) => r.release(program_id).await,
+            Self::Duckdb(r) => r.release(program_id).await,
+            Self::Tcp(r) => r.release(program_id).await,
+        }
+    }
+
+    async fn shutdown(&self) -> Result<(), proto::Error> {
+        match self {
+            Self::Interpreter(r) => r.shutdown().await,
+            Self::Postgres(r) => r.shutdown().await,
+            Self::Duckdb(r) => r.shutdown().await,
+            Self::Tcp(r) => r.shutdown().await,
+        }
+    }
+
+    async fn get_externals(&self) -> Result<vec::Vec<string::String>, proto::Error> {
+        match self {
+            Self::Interpreter(r) => r.get_externals().await,
+            Self::Postgres(r) => r.get_externals().await,
+            Self::Duckdb(r) => r.get_externals().await,
+            Self::Tcp(r) => r.get_externals().await,
+        }
+    }
+}
+
+pub(crate) enum AnyRunnerSync {
+    Interpreter(lutra_interpreter::InterpreterRunner<'static>),
+    Postgres(lutra_runner::SyncRunner<lutra_runner_postgres::RunnerAsync>),
+    Duckdb(lutra_runner_duckdb::Runner),
+    Tcp(lutra_runner::SyncRunner<lutra_runner::binary::tokio::Client<tokio::net::TcpStream>>),
+}
+
+impl AnyRunnerSync {
+    pub(crate) fn connect(spec: &Spec) -> anyhow::Result<AnyRunnerSync> {
+        match spec {
+            Spec::Interpreter { file_system } => {
+                let runner = lutra_interpreter::InterpreterRunner::default()
+                    .with_file_system(file_system.clone());
+                Ok(AnyRunnerSync::Interpreter(runner))
+            }
+            Spec::Postgres { url } => {
+                let rt = tokio::runtime::Builder::new_current_thread()
+                    .enable_all()
+                    .build()?;
+                let runner =
+                    rt.block_on(lutra_runner_postgres::RunnerAsync::connect_no_tls(url))?;
+                Ok(AnyRunnerSync::Postgres(
+                    lutra_runner::SyncRunner::with_runtime(runner, rt),
+                ))
+            }
+            Spec::Duckdb { db, file_system } => Ok(AnyRunnerSync::Duckdb(
+                lutra_runner_duckdb::Runner::open(db, file_system.clone())?,
+            )),
+            Spec::Tcp { addr } => {
+                let rt = tokio::runtime::Builder::new_current_thread()
+                    .enable_all()
+                    .build()
+                    .unwrap();
+
+                let tcp_stream = rt
+                    .block_on(tokio::net::TcpStream::connect(addr))
+                    .map_err(|e| anyhow::anyhow!("failed to connect to runner at {addr}: {e}"))?;
+                Ok(AnyRunnerSync::Tcp(lutra_runner::SyncRunner::with_runtime(
+                    lutra_runner::binary::tokio::Client::new(tcp_stream),
+                    rt,
+                )))
+            }
+        }
+    }
+}
+
+impl lutra_runner::RunSync for AnyRunnerSync {
+    fn prepare_sync(&mut self, program: rr::Program) -> Result<u32, proto::Error> {
+        match self {
+            Self::Interpreter(r) => r.prepare_sync(program),
+            Self::Postgres(r) => r.prepare_sync(program),
+            Self::Duckdb(r) => r.prepare_sync(program),
+            Self::Tcp(r) => r.prepare_sync(program),
+        }
+    }
+
+    fn execute_sync(
+        &mut self,
+        program_id: u32,
+        input: &[u8],
+    ) -> Result<vec::Vec<u8>, proto::Error> {
+        match self {
+            Self::Interpreter(r) => r.execute_sync(program_id, input),
+            Self::Postgres(r) => r.execute_sync(program_id, input),
+            Self::Duckdb(r) => r.execute_sync(program_id, input),
+            Self::Tcp(r) => r.execute_sync(program_id, input),
+        }
+    }
+
+    fn pull_schema_sync(&mut self) -> Result<string::String, proto::Error> {
+        match self {
+            Self::Interpreter(r) => r.pull_schema_sync(),
+            Self::Postgres(r) => r.pull_schema_sync(),
+            Self::Duckdb(r) => r.pull_schema_sync(),
+            Self::Tcp(r) => r.pull_schema_sync(),
+        }
+    }
+
+    fn release_sync(&mut self, program_id: u32) -> Result<(), proto::Error> {
+        match self {
+            Self::Interpreter(r) => r.release_sync(program_id),
+            Self::Postgres(r) => r.release_sync(program_id),
+            Self::Duckdb(r) => r.release_sync(program_id),
+            Self::Tcp(r) => r.release_sync(program_id),
+        }
+    }
+
+    fn shutdown_sync(&mut self) -> Result<(), proto::Error> {
+        match self {
+            Self::Interpreter(r) => r.shutdown_sync(),
+            Self::Postgres(r) => r.shutdown_sync(),
+            Self::Duckdb(r) => r.shutdown_sync(),
+            Self::Tcp(r) => r.shutdown_sync(),
+        }
+    }
+
+    fn get_externals_sync(&mut self) -> Result<vec::Vec<string::String>, proto::Error> {
+        match self {
+            Self::Interpreter(r) => r.get_externals_sync(),
+            Self::Postgres(r) => r.get_externals_sync(),
+            Self::Duckdb(r) => r.get_externals_sync(),
+            Self::Tcp(r) => r.get_externals_sync(),
+        }
     }
 }
 
@@ -88,122 +295,20 @@ impl RunnerUrl {
 /// This is done only because we want to have a uniform interface that is
 /// provided by the [lutra_runner::channel::Client].
 /// Ideally, we could return `Box<dyn RunSync>`, but RunSync is not dyn compatible.
-pub fn init(
-    runner: RunnerUrl,
-    project: Option<&lutra_compiler::SourceTree>,
+pub fn spawn(
+    spec: Spec,
 ) -> anyhow::Result<(lutra_runner::channel::Client, std::thread::JoinHandle<()>)> {
-    let file_system = project.map(|p| p.get_project_dir().to_path_buf());
+    let rt = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()?;
+    let runner = rt.block_on(AnyRunner::connect(&spec))?;
 
-    Ok(if runner.as_interpreter().is_some() {
-        let runner = lutra_interpreter::InterpreterRunner::default().with_file_system(file_system);
-        let runner = lutra_runner::AsyncRunner::new(runner);
-        let (client, server) = lutra_runner::channel::new_pair(runner);
+    let (client, server) = lutra_runner::channel::new_pair(runner);
+    let handle = std::thread::Builder::new()
+        .name(spec.thread_name().to_string())
+        .spawn(move || {
+            rt.block_on(server.listen());
+        })?;
 
-        let handle = std::thread::Builder::new()
-            .name("runner-interpreter".to_string())
-            .spawn(move || {
-                tokio::runtime::Builder::new_current_thread()
-                    .build()
-                    .expect("failed to create tokio runtime")
-                    .block_on(server.listen());
-            })?;
-        (client, handle)
-    } else if let Some(pg_url) = runner.as_postgres() {
-        let rt = tokio::runtime::Builder::new_current_thread()
-            .enable_all()
-            .build()?;
-
-        let runner = rt
-            .block_on(async { lutra_runner_postgres::RunnerAsync::connect_no_tls(pg_url).await })?;
-
-        let (client, server) = lutra_runner::channel::new_pair(runner);
-
-        let handle = std::thread::Builder::new()
-            .name("runner-postgres".to_string())
-            .spawn(move || {
-                rt.block_on(server.listen());
-            })?;
-        (client, handle)
-    } else if let Some(duckdb_url) = runner.as_duckdb() {
-        let runner = lutra_runner_duckdb::Runner::open(duckdb_url, file_system)?;
-        let runner = lutra_runner::AsyncRunner::new(runner);
-        let (client, server) = lutra_runner::channel::new_pair(runner);
-
-        let handle = std::thread::Builder::new()
-            .name("runner-duckdb".to_string())
-            .spawn(move || {
-                tokio::runtime::Builder::new_current_thread()
-                    .build()
-                    .expect("failed to create tokio runtime")
-                    .block_on(server.listen());
-            })?;
-        (client, handle)
-    } else if let Some(addr) = runner.as_tcp() {
-        let rt = tokio::runtime::Builder::new_current_thread()
-            .enable_all()
-            .build()?;
-
-        let tcp_stream = rt
-            .block_on(tokio::net::TcpStream::connect(&addr))
-            .map_err(|e| anyhow::anyhow!("failed to connect to runner at {addr}: {e}"))?;
-
-        let runner = lutra_runner::binary::tokio::Client::new(tcp_stream);
-        let (client, server) = lutra_runner::channel::new_pair(runner);
-
-        let handle = std::thread::Builder::new()
-            .name("runner-tcp".to_string())
-            .spawn(move || {
-                rt.block_on(server.listen());
-            })?;
-        (client, handle)
-    } else {
-        unreachable!()
-    })
-}
-
-/// Bind a TCP server and proxy incoming connections to the downstream runner.
-#[tokio::main(flavor = "current_thread")]
-pub async fn serve(runner: RunnerUrl, addr: &str) -> anyhow::Result<()> {
-    let listener = tokio::net::TcpListener::bind(addr).await?;
-    eprintln!("Listening on {addr}");
-
-    if runner.as_interpreter().is_some() {
-        let r = lutra_interpreter::InterpreterRunner::default();
-        let r = lutra_runner::AsyncRunner::new(r);
-        accept_loop(listener, &r).await
-    } else if let Some(pg_url) = runner.as_postgres() {
-        let r = lutra_runner_postgres::RunnerAsync::connect_no_tls(pg_url).await?;
-        accept_loop(listener, &r).await
-    } else if let Some(duckdb_url) = runner.as_duckdb() {
-        let r = lutra_runner_duckdb::Runner::open(duckdb_url, None)?;
-        let r = lutra_runner::AsyncRunner::new(r);
-        accept_loop(listener, &r).await
-    } else if let Some(tcp_addr) = runner.as_tcp() {
-        let tcp_stream = tokio::net::TcpStream::connect(&tcp_addr)
-            .await
-            .map_err(|e| anyhow::anyhow!("failed to connect to runner at {tcp_addr}: {e}"))?;
-        let r = lutra_runner::binary::tokio::Client::new(tcp_stream);
-        accept_loop(listener, &r).await
-    } else {
-        return Err(runner.err_unknown());
-    }
-}
-
-/// Accept loop for serving a runner over TCP.
-///
-/// One client at a time; after disconnect the next connection is accepted.
-async fn accept_loop<R: lutra_runner::Run>(
-    listener: tokio::net::TcpListener,
-    runner: &R,
-) -> anyhow::Result<()> {
-    loop {
-        let (stream, peer) = listener.accept().await?;
-        eprintln!("Connection from {peer}");
-
-        let mut server = lutra_runner::binary::tokio::Server::new(stream, runner);
-        if let Err(e) = server.run().await {
-            eprintln!("Connection from {peer} error: {e}");
-        }
-        eprintln!("Connection from {peer} closed");
-    }
+    Ok((client, handle))
 }

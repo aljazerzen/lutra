@@ -20,4 +20,3 @@ mod watcher;
 
 pub use driver::run_shell;
 pub use input::prompt_for_ty;
-pub use runner::RunnerConfig;
