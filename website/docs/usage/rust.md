@@ -66,7 +66,8 @@ fn main() {
     let out_file = path::Path::new(&env::var("OUT_DIR").unwrap()).join("generated.rs");
 
     let opts = codegen::GenerateOptions::default()
-        .generate_programs("", codegen::ProgramRepr::BytecodeLt);
+        .generate_programs("", codegen::ProgramRepr::BytecodeLt)
+        .generate_client();
 
     let input_files = codegen::generate("src/main.lt", &out_file, opts);
 
@@ -89,8 +90,8 @@ mod generated {
 }
 ```
 
-After that, your Rust code can call `generated::get_movies()` and use the
-generated `generated::Movie` type.
+After that, your Rust code can call `generated::get_movies()`, construct a
+`generated::Client`, and use the generated `generated::Movie` type.
 
 ## Run a program with the interpreter
 
@@ -99,23 +100,18 @@ mod generated {
     include!(concat!(env!("OUT_DIR"), "/generated.rs"));
 }
 
-use lutra_interpreter::Run;
-
 #[tokio::main(flavor = "current_thread")]
 async fn main() {
     let runner = lutra_interpreter::InterpreterRunner::default();
+    let client = generated::Client::new_sync(&runner);
 
-    let movies = runner
-        .run(&generated::get_movies(), &())
-        .await
-        .unwrap()
-        .unwrap();
+    let movies = client.get_movies().await.unwrap().unwrap();
 
     println!("Result: {movies:#?}");
 }
 ```
 
-The input is `&()`, because `get_movies()` takes no arguments.
+For a zero-argument program, the generated client method takes no input.
 The result is a Rust `Vec<generated::Movie>`.
 
 ## Switch to PostgreSQL
@@ -134,7 +130,8 @@ lutra-runner-postgres = { version = "0.5" }
 
 ```rust title="build.rs"
 let opts = codegen::GenerateOptions::default()
-    .generate_programs("", codegen::ProgramRepr::SqlPg);
+    .generate_programs("", codegen::ProgramRepr::SqlPg)
+    .generate_client();
 ```
 
 ### Run the program from Rust
@@ -144,28 +141,24 @@ mod generated {
     include!(concat!(env!("OUT_DIR"), "/generated.rs"));
 }
 
-use lutra_runner_postgres::Run;
-
 #[tokio::main(flavor = "current_thread")]
 async fn main() {
-    let client = lutra_runner_postgres::RunnerAsync::connect_no_tls(
+    let runner = lutra_runner_postgres::RunnerAsync::connect_no_tls(
         "postgres://postgres:pass@localhost:5416",
     )
     .await
     .unwrap();
+    let client = generated::Client::new(&runner);
 
-    let movies = client
-        .run(&generated::get_movies(), &())
-        .await
-        .unwrap()
-        .unwrap();
+    let movies = client.get_movies().await.unwrap().unwrap();
 
     println!("{movies:#?}");
 }
 ```
 
 The Rust-side calling style stays almost the same. The main difference is the
-runner and the program repr emitted during code generation.
+runner, the generated client wrapper, and the program repr emitted during code
+generation.
 
 ## Use the examples in this repository
 
