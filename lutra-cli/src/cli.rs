@@ -382,25 +382,8 @@ pub struct GenCodeCommand {
 
     output_file: std::path::PathBuf,
 
-    #[arg(long)]
-    no_types: bool,
-
-    #[arg(long)]
-    no_encode_decode: bool,
-
-    #[arg(long)]
-    no_function_traits: bool,
-
-    #[arg(long)]
-    client: bool,
-
-    #[arg(long)]
-    programs_bytecode_lt: Vec<String>,
-    #[arg(long)]
-    programs_sql_pg: Vec<String>,
-
-    #[arg(long)]
-    lutra_bin_path: Option<String>,
+    #[clap(flatten)]
+    options: lutra_codegen::GenerateOptions,
 }
 
 pub fn gen_code(cmd: GenCodeCommand) -> anyhow::Result<()> {
@@ -411,30 +394,6 @@ pub fn gen_code(cmd: GenCodeCommand) -> anyhow::Result<()> {
     let project = lutra_compiler::discover(cmd.discover.clone())?;
     let project = lutra_compiler::check(project, cmd.check)?;
 
-    let mut opts = lutra_codegen::GenerateOptions::default();
-
-    if cmd.no_types {
-        opts = opts.no_generate_types();
-    }
-    if cmd.no_encode_decode {
-        opts = opts.no_generate_encode_decode();
-    }
-    if cmd.no_function_traits {
-        opts = opts.generate_function_traits();
-    }
-    if cmd.client {
-        opts = opts.generate_client();
-    }
-    for mod_name in cmd.programs_bytecode_lt {
-        opts = opts.generate_programs(mod_name, lutra_codegen::ProgramRepr::BytecodeLt);
-    }
-    for mod_name in cmd.programs_sql_pg {
-        opts = opts.generate_programs(mod_name, lutra_codegen::ProgramRepr::SqlPg);
-    }
-    if let Some(lutra_bin_path) = cmd.lutra_bin_path {
-        opts = opts.with_lutra_bin_path(lutra_bin_path);
-    }
-
     let out_ext = cmd.output_file.extension();
     let target = if out_ext.is_some_and(|x| x == "py") {
         lutra_codegen::Target::Python
@@ -444,7 +403,7 @@ pub fn gen_code(cmd: GenCodeCommand) -> anyhow::Result<()> {
         lutra_codegen::Target::Rust
     };
 
-    lutra_codegen::generate(&project, target, &cmd.output_file, opts)?;
+    lutra_codegen::generate(&project, target, &cmd.output_file, cmd.options)?;
 
     println!("Output written to {}", cmd.output_file.display());
     println!("Done.");

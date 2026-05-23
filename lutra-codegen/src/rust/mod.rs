@@ -139,7 +139,7 @@ fn codegen_module(
         }
     }
 
-    if ctx.options.generate_types {
+    if ctx.options.generates_types() {
         let lutra_bin = &ctx.options.lutra_bin_path;
         for (name, path) in &canonical_tys {
             writeln!(w, "pub use {lutra_bin}::{path} as {name};")?;
@@ -150,14 +150,14 @@ fn codegen_module(
     }
 
     // write types
-    let mut all_tys = if ctx.options.generate_types {
+    let mut all_tys = if ctx.options.generates_types() {
         types::write_tys(w, generated_tys, ctx)?
     } else {
         vec![]
     };
 
     // write traits for functions
-    if ctx.options.generate_function_traits {
+    if ctx.options.generates_function_traits() {
         functions::write_functions(w, &functions, ctx)?;
 
         all_tys.extend(types::write_tys_in_buffer(w, ctx)?);
@@ -180,7 +180,7 @@ fn codegen_module(
             has_programs_in_subtree(ctx, &path)
         })
         .collect::<Vec<_>>();
-    if ctx.options.generate_client && (prog_repr.is_some() || !client_sub_modules.is_empty()) {
+    if ctx.options.generates_client() && (prog_repr.is_some() || !client_sub_modules.is_empty()) {
         let functions_here = if prog_repr.is_some() {
             functions.as_slice()
         } else {
@@ -203,7 +203,7 @@ fn codegen_module(
 
     // write encode/decode impls
     ctx.current_rust_mod = module_path.clone();
-    if ctx.options.generate_encode_decode {
+    if ctx.options.generates_encode_decode() {
         encode::write_encode_impls(w, &all_tys, ctx)?;
     }
 
@@ -221,20 +221,10 @@ fn get_programs_repr_of(
     module_path: &[String],
 ) -> Option<lutra_compiler::ProgramRepr> {
     let module_path_str = module_path_string(module_path);
-    ctx.options
-        .include_programs
-        .iter()
-        .find(|(p, _)| p == &module_path_str)
-        .map(|(_, repr)| *repr)
+    ctx.options.included_program_repr(&module_path_str)
 }
 
 fn has_programs_in_subtree(ctx: &Context, module_path: &[String]) -> bool {
     let module_path_str = module_path_string(module_path);
-    ctx.options.include_programs.iter().any(|(p, _)| {
-        p == &module_path_str
-            || (!module_path_str.is_empty()
-                && p.starts_with(&module_path_str)
-                && p[module_path_str.len()..].starts_with("::"))
-            || (module_path_str.is_empty() && !p.is_empty())
-    })
+    ctx.options.has_programs_in_subtree(&module_path_str)
 }

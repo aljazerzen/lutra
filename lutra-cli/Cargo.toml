@@ -17,7 +17,7 @@ test = false
 lutra-bin = { workspace = true }
 lutra-compiler = { workspace = true, features = ["clap"] }
 lutra-interpreter = { workspace = true }
-lutra-codegen = { workspace = true }
+lutra-codegen = { workspace = true, features = ["clap"] }
 lutra-project-tools = { workspace = true }
 lutra-runner = { workspace = true, features = ["async", "binary-tokio"] }
 lutra-runner-postgres = { workspace = true, features = ["tokio-postgres"] }

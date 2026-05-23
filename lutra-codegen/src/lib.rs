@@ -104,26 +104,57 @@ pub fn generate_program_bytecode(project_dir: &path::Path, program: &str, out_fi
 }
 
 #[derive(Debug, Clone)]
+#[cfg_attr(feature = "clap", derive(clap::Args))]
 pub struct GenerateOptions {
-    generate_types: bool,
-    generate_encode_decode: bool,
-    generate_function_traits: bool,
-    generate_client: bool,
+    #[cfg_attr(feature = "clap", arg(long = "no-types", default_value_t = false))]
+    pub no_types: bool,
 
-    include_programs: Vec<(String, ProgramRepr)>,
+    #[cfg_attr(
+        feature = "clap",
+        arg(long = "no-encode-decode", default_value_t = false)
+    )]
+    pub no_encode_decode: bool,
 
-    lutra_bin_path: String,
-    lutra_runner_path: String,
+    #[cfg_attr(
+        feature = "clap",
+        arg(
+            long = "no-function-traits",
+            default_value_t = true,
+            num_args = 0..=1,
+            default_missing_value = "true"
+        )
+    )]
+    pub no_function_traits: bool,
+
+    #[cfg_attr(feature = "clap", arg(long))]
+    pub client: bool,
+
+    #[cfg_attr(feature = "clap", arg(long))]
+    pub programs_bytecode_lt: Vec<String>,
+
+    #[cfg_attr(feature = "clap", arg(long))]
+    pub programs_sql_pg: Vec<String>,
+
+    #[cfg_attr(feature = "clap", arg(long))]
+    pub programs_sql_duckdb: Vec<String>,
+
+    #[cfg_attr(feature = "clap", arg(long, default_value = "::lutra_bin"))]
+    pub lutra_bin_path: String,
+
+    #[cfg_attr(feature = "clap", arg(long, default_value = "::lutra_runner"))]
+    pub lutra_runner_path: String,
 }
 
 impl Default for GenerateOptions {
     fn default() -> Self {
         Self {
-            generate_types: true,
-            generate_encode_decode: true,
-            generate_function_traits: false,
-            generate_client: false,
-            include_programs: Vec::new(),
+            no_types: false,
+            no_encode_decode: false,
+            no_function_traits: true,
+            client: false,
+            programs_bytecode_lt: Vec::new(),
+            programs_sql_pg: Vec::new(),
+            programs_sql_duckdb: Vec::new(),
             lutra_bin_path: "::lutra_bin".into(),
             lutra_runner_path: "::lutra_runner".into(),
         }
@@ -133,25 +164,25 @@ impl Default for GenerateOptions {
 impl GenerateOptions {
     /// Do not generate type definitions
     pub fn no_generate_types(mut self) -> Self {
-        self.generate_types = false;
+        self.no_types = true;
         self
     }
 
     /// Do not generate [lutra_bin::Encode] and [lutra_bin::Decode] implementations
     pub fn no_generate_encode_decode(mut self) -> Self {
-        self.generate_encode_decode = false;
+        self.no_encode_decode = true;
         self
     }
 
     /// Do not generate traits for functions
     pub fn generate_function_traits(mut self) -> Self {
-        self.generate_function_traits = true;
+        self.no_function_traits = false;
         self
     }
 
     /// Generate module client wrappers for generated programs
     pub fn generate_client(mut self) -> Self {
-        self.generate_client = true;
+        self.client = true;
         self
     }
 
@@ -169,8 +200,55 @@ impl GenerateOptions {
 
     /// Generates programs for all functions in a module
     pub fn generate_programs(mut self, module_path: impl ToString, fmt: ProgramRepr) -> Self {
-        self.include_programs.push((module_path.to_string(), fmt));
+        let module_path = module_path.to_string();
+        match fmt {
+            ProgramRepr::BytecodeLt => self.programs_bytecode_lt.push(module_path),
+            ProgramRepr::SqlPg => self.programs_sql_pg.push(module_path),
+            ProgramRepr::SqlDuckdb => self.programs_sql_duckdb.push(module_path),
+        }
         self
+    }
+
+    pub(crate) fn generates_types(&self) -> bool {
+        !self.no_types
+    }
+
+    pub(crate) fn generates_encode_decode(&self) -> bool {
+        !self.no_encode_decode
+    }
+
+    pub(crate) fn generates_function_traits(&self) -> bool {
+        !self.no_function_traits
+    }
+
+    pub(crate) fn generates_client(&self) -> bool {
+        self.client
+    }
+
+    pub(crate) fn included_program_repr(&self, module_path: &str) -> Option<ProgramRepr> {
+        if self.programs_bytecode_lt.iter().any(|p| p == module_path) {
+            Some(ProgramRepr::BytecodeLt)
+        } else if self.programs_sql_pg.iter().any(|p| p == module_path) {
+            Some(ProgramRepr::SqlPg)
+        } else if self.programs_sql_duckdb.iter().any(|p| p == module_path) {
+            Some(ProgramRepr::SqlDuckdb)
+        } else {
+            None
+        }
+    }
+
+    pub(crate) fn has_programs_in_subtree(&self, module_path: &str) -> bool {
+        self.programs_bytecode_lt
+            .iter()
+            .chain(self.programs_sql_pg.iter())
+            .chain(self.programs_sql_duckdb.iter())
+            .any(|p| {
+                p == module_path
+                    || (!module_path.is_empty()
+                        && p.starts_with(module_path)
+                        && p[module_path.len()..].starts_with("::"))
+                    || (module_path.is_empty() && !p.is_empty())
+            })
     }
 }
 
