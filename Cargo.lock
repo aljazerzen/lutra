@@ -2069,6 +2069,7 @@ version = "0.5.1"
 dependencies = [
  "base85",
  "bytes",
+ "clap",
  "lutra-bin",
  "lutra-compiler",
  "lutra-sql",

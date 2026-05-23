@@ -124,13 +124,8 @@ fn codegen_module(
 
     // write traits for functions
     let module_path_str = module_path.as_slice().join("::");
-    if let Some((_, format)) = ctx
-        .options
-        .include_programs
-        .iter()
-        .find(|(p, _)| p == &module_path_str)
-    {
-        write_programs(w, &functions, *format, ctx)?;
+    if let Some(format) = ctx.options.included_program_repr(&module_path_str) {
+        write_programs(w, &functions, format, ctx)?;
 
         tys.extend(write_tys_in_buffer(w, ctx)?);
     }
