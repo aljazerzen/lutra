@@ -69,7 +69,9 @@ impl<'d> Renderer<'d> {
 
     fn render_headers(&self, view: &mut View<'d>) {
         if self.layout.column_groups.is_empty() {
-            view.push_line(self.render_leaf_names());
+            if self.layout.names_height > 0 {
+                view.push_line(self.render_leaf_names());
+            }
         } else {
             for row in 0..self.layout.names_height {
                 let mut line = Line::empty();

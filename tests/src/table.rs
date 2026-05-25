@@ -209,9 +209,9 @@ fn test_text_truncation() {
 fn test_empty_array() {
     let result = _table("[{a: int32}]", Value::Array(vec![]));
 
-    assert_eq!(
+    assert_snapshot!(
         result,
-        r#"      a
+        @r#"      a
   int32
 ───────
 "#
@@ -310,7 +310,6 @@ fn test_single_primitive() {
     let result = _table("int32", Value::Prim32(42));
 
     assert_snapshot!(result, @"
-    value
     int32
     ─────
        42
@@ -325,7 +324,6 @@ fn test_array_of_primitives() {
     );
 
     assert_snapshot!(result, @"
-      value
       int32
     ───────
     0     1

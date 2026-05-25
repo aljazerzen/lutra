@@ -104,7 +104,7 @@ impl<'d, 't> Table<'d, 't> {
     pub fn compute_layout(mut self, config: Config) -> Layout {
         let show_index = matches!(self.get_ty_mat(self.ty()).kind, ir::TyKind::Array(_));
         let column_groups = self.build_column_groups(self.row_ty());
-        let names_height = max_column_depth(&column_groups);
+        let names_height = self.get_names_height(&column_groups);
 
         // Flatten columns and initialize widths from headers
         let mut columns: Vec<Column> = self
@@ -152,6 +152,16 @@ impl<'d, 't> Table<'d, 't> {
             col_index_width,
             row_heights,
         }
+    }
+
+    fn get_names_height(&self, column_groups: &[ColumnGroup]) -> usize {
+        let row_ty = self.get_ty_mat(self.row_ty());
+        if matches!(&row_ty.kind, ir::TyKind::Primitive(_) | ir::TyKind::Enum(_)) {
+            // hide names entirely
+            return 0;
+        }
+        // max column depth
+        column_groups.iter().map(|c| c.depth()).max().unwrap_or(1)
     }
 
     fn build_column_groups(&self, ty: &'t ir::Ty) -> Vec<ColumnGroup> {
@@ -271,8 +281,4 @@ impl<'d, 't> Table<'d, 't> {
             }
         }
     }
-}
-
-fn max_column_depth(column_groups: &[ColumnGroup]) -> usize {
-    column_groups.iter().map(|c| c.depth()).max().unwrap_or(1)
 }
