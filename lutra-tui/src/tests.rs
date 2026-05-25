@@ -407,7 +407,6 @@ fn pipe_binds_last_history_output_into_draft() {
     ▌ "hello"
     ▌
     ▌ output
-    ▌ value
     ▌ text
     ▌ ─────
     ▌ hello
@@ -443,7 +442,6 @@ fn bound_input_executes() {
     ▌ "hello"
     ▌
     ▌ output
-    ▌ value
     ▌ text
     ▌ ─────
     ▌ hello
@@ -454,7 +452,6 @@ fn bound_input_executes() {
     ▌ x
     ▌
     ▌ output
-    ▌ value
     ▌ text
     ▌ ─────
     ▌ hello
@@ -484,7 +481,6 @@ fn inspect_output_seeds_input_for_scalar() {
     ▌ "hello"
     ▌
     ▌ output
-    ▌ value
     ▌ text
     ▌ ─────
     ▌ hello
@@ -515,7 +511,6 @@ fn inspect_output_seeds_map_for_array() {
     ▌ [1, 2, 3]: [int32]
     ▌
     ▌ output · 3 items
-    ▌   value
     ▌   int32
     ▌ ───────
     ▌ 0     1
@@ -548,7 +543,6 @@ fn run_success() {
     ▌ "hello"
     ▌
     ▌ output
-    ▌ value
     ▌ text
     ▌ ─────
     ▌ hello
