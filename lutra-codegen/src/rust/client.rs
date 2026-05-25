@@ -14,7 +14,6 @@ pub fn write_client(
     repr: Option<lutra_compiler::ProgramRepr>,
     ctx: &mut Context,
 ) -> Result<(), std::fmt::Error> {
-    let lutra_bin = &ctx.options.lutra_bin_path;
     let lutra_runner = &ctx.options.lutra_runner_path;
 
     writeln!(w, "pub struct Client<R> {{")?;
@@ -34,29 +33,21 @@ pub fn write_client(
         writeln!(w)?;
     }
 
-    for (name, func) in functions {
+    for (name, _func) in functions {
         let ty = compiled_program_ty(ctx, name, repr.unwrap());
 
-        write!(w, "    pub async fn {name}(")?;
-        if func.params.is_empty() {
-            writeln!(w, "&self,")?;
-        } else {
-            writeln!(w, "&self,")?;
-            write!(w, "        input: &")?;
-            super::types::write_ty_ref(w, &ty.input, false, ctx)?;
-            writeln!(w, ",")?;
-        }
-        write!(w, "    ) -> Result<{lutra_bin}::Result<")?;
-        super::types::write_ty_ref(w, &ty.output, false, ctx)?;
-        writeln!(w, ">, {lutra_runner}::proto::Error> {{")?;
+        write!(w, "    pub async fn {name}(\n        &self,\n")?;
+        write_client_method_params(w, &ty.input, ctx)?;
+        write_client_result_ty(w, &ty.output, ctx)?;
+        writeln!(w, " {{")?;
         writeln!(w, "        let program = {name}();")?;
-        if func.params.is_empty() {
-            writeln!(w, "        self.runner.run(&program, &()).await")?;
-        } else if func.params.len() == 1 {
-            writeln!(w, "        self.runner.run(&program, input).await")?;
-        } else {
-            writeln!(w, "        self.runner.run(&program, input).await")?;
-        }
+        write_encode_input(w, &ty.input, ctx)?;
+        writeln!(w, "        let program_id = self.runner.prepare(program.inner.clone()).await?;")?;
+        writeln!(w, "        let output = self.runner.execute(program_id, &input_buf).await?;")?;
+        writeln!(w, "        self.runner.release(program_id).await?;")?;
+        write!(w, "        Ok(<")?;
+        super::types::write_ty_ref(w, &ty.output, false, ctx)?;
+        writeln!(w, " as {}::Decode>::decode(&output))", ctx.options.lutra_bin_path)?;
         writeln!(w, "    }}")?;
         writeln!(w)?;
     }
@@ -75,31 +66,95 @@ pub fn write_client(
         writeln!(w)?;
     }
 
-    for (name, func) in functions {
+    for (name, _func) in functions {
         let ty = compiled_program_ty(ctx, name, repr.unwrap());
 
-        write!(w, "    pub fn {name}(")?;
-        if func.params.is_empty() {
-            writeln!(w, "&mut self,")?;
-        } else {
-            writeln!(w, "&mut self,")?;
-            write!(w, "        input: &")?;
-            super::types::write_ty_ref(w, &ty.input, false, ctx)?;
-            writeln!(w, ",")?;
-        }
-        write!(w, "    ) -> Result<{lutra_bin}::Result<")?;
-        super::types::write_ty_ref(w, &ty.output, false, ctx)?;
-        writeln!(w, ">, {lutra_runner}::proto::Error> {{")?;
+        write!(w, "    pub fn {name}(\n        &mut self,\n")?;
+        write_client_method_params(w, &ty.input, ctx)?;
+        write_client_result_ty(w, &ty.output, ctx)?;
+        writeln!(w, " {{")?;
         writeln!(w, "        let program = {name}();")?;
-        if func.params.is_empty() {
-            writeln!(w, "        self.runner.run_sync(&program, &())")?;
-        } else {
-            writeln!(w, "        self.runner.run_sync(&program, input)")?;
-        }
+        write_encode_input(w, &ty.input, ctx)?;
+        writeln!(w, "        let program_id = self.runner.prepare_sync(program.inner.clone())?;")?;
+        writeln!(w, "        let output = self.runner.execute_sync(program_id, &input_buf)?;")?;
+        writeln!(w, "        self.runner.release_sync(program_id)?;")?;
+        write!(w, "        Ok(<")?;
+        super::types::write_ty_ref(w, &ty.output, false, ctx)?;
+        writeln!(w, " as {}::Decode>::decode(&output))", ctx.options.lutra_bin_path)?;
         writeln!(w, "    }}")?;
         writeln!(w)?;
     }
     writeln!(w, "}}\n")?;
+
+    Ok(())
+}
+
+fn write_client_method_params(
+    w: &mut impl Write,
+    input: &ir::Ty,
+    ctx: &mut Context,
+) -> Result<(), std::fmt::Error> {
+    if input.is_unit() {
+        return Ok(());
+    }
+
+    if let ir::TyKind::Tuple(fields) = &input.kind {
+        // flatten tuples
+        for (index, field) in fields.iter().enumerate() {
+            let field_name = crate::tuple_field_name(&field.name, index);
+            write!(w, "        {field_name}: &")?;
+            super::types::write_ty_ref(w, &field.ty, false, ctx)?;
+            writeln!(w, ",")?;
+        }
+    } else {
+        write!(w, "        input: &")?;
+        super::types::write_ty_ref(w, input, false, ctx)?;
+        writeln!(w, ",")?;
+    }
+
+    Ok(())
+}
+
+fn write_client_result_ty(
+    w: &mut impl Write,
+    output: &ir::Ty,
+    ctx: &mut Context,
+) -> Result<(), std::fmt::Error> {
+    write!(w, "    ) -> Result<{}::Result<", ctx.options.lutra_bin_path)?;
+    super::types::write_ty_ref(w, output, false, ctx)?;
+    write!(w, ">, {}::proto::Error>", ctx.options.lutra_runner_path)
+}
+
+#[rustfmt::skip::macros(writeln)]
+#[rustfmt::skip::macros(write)]
+fn write_encode_input(
+    w: &mut impl Write,
+    input: &ir::Ty,
+    ctx: &mut Context,
+) -> Result<(), std::fmt::Error> {
+    let lutra_bin = &ctx.options.lutra_bin_path;
+
+    writeln!(w, "        use {lutra_bin}::Encode;")?;
+    writeln!(w, "        let mut input_buf = {lutra_bin}::bytes::BytesMut::new();")?;
+
+    if input.is_unit() {
+        return Ok(());
+    }
+
+    if let ir::TyKind::Tuple(fields) = &input.kind {
+        // encode tuples
+        for (index, field) in fields.iter().enumerate() {
+            let field_name = crate::tuple_field_name(&field.name, index);
+            writeln!(w, "        let {field_name}_head = {field_name}.encode_head(&mut input_buf);")?;
+        }
+        for (index, field) in fields.iter().enumerate() {
+            let field_name = crate::tuple_field_name(&field.name, index);
+            writeln!(w, "        {field_name}.encode_body({field_name}_head, &mut input_buf);")?;
+        }
+    } else {
+        writeln!(w, "        let input_head = input.encode_head(&mut input_buf);")?;
+        writeln!(w, "        input.encode_body(input_head, &mut input_buf);")?;
+    }
 
     Ok(())
 }
