@@ -13,13 +13,16 @@ pub fn compile_program(value: ir::Program) -> Program {
 
         defs: &value.defs,
         def_map: value.defs.iter().map(|def| (&def.name, &def.ty)).collect(),
+        next_wrapper_id: 0xFF00,
     };
 
-    Program {
+    let program = Program {
         main: b.compile_expr(value.main),
         externals: b.externals.into_iter().collect(),
         defs: if b.include_defs { value.defs } else { vec![] },
-    }
+    };
+    tracing::debug!("br:\n{program:#?}");
+    program
 }
 
 struct ByteCoder<'t> {
@@ -29,6 +32,9 @@ struct ByteCoder<'t> {
 
     // Some externals need defs (read_parquet), but most of the time, skip them.
     include_defs: bool,
+
+    /// Counter for generating unique wrapper function IDs.
+    next_wrapper_id: u32,
 }
 
 impl<'t> ByteCoder<'t> {
@@ -41,7 +47,7 @@ impl<'t> ByteCoder<'t> {
 
     fn compile_expr(&mut self, expr: ir::Expr) -> Expr {
         let kind = match expr.kind {
-            ir::ExprKind::Pointer(v) => ExprKind::Pointer(self.compile_pointer(v, &expr.ty)),
+            ir::ExprKind::Pointer(v) => self.compile_pointer(v, &expr.ty),
             ir::ExprKind::Literal(v) => ExprKind::Literal(self.compile_literal(v)),
             ir::ExprKind::Call(v) => ExprKind::Call(Box::new(self.compile_call(*v))),
             ir::ExprKind::Function(v) => ExprKind::Function(Box::new(self.compile_function(*v))),
@@ -60,23 +66,20 @@ impl<'t> ByteCoder<'t> {
         Expr { kind }
     }
 
-    fn compile_pointer(&mut self, ptr: ir::Pointer, ty: &ir::Ty) -> Sid {
+    fn compile_pointer(&mut self, ptr: ir::Pointer, ty: &ir::Ty) -> ExprKind {
         match ptr {
             ir::Pointer::External(e_ptr) => {
                 let ty = self.get_ty_mat(ty);
-                let e_symbol = self.compile_external_symbol(e_ptr.id, ty);
-                let (index, _) = self.externals.insert_full(e_symbol);
-
-                Sid(index as u32).with_tag(SidKind::External)
+                self.compile_external_symbol(e_ptr.id, ty)
             }
             #[rustfmt::skip]
             ir::Pointer::Binding(binding_id) => {
-                Sid(binding_id).with_tag(SidKind::Var)
+                ExprKind::Pointer(Sid(binding_id).with_tag(SidKind::Var))
             },
             ir::Pointer::Parameter(param_ptr) => {
                 let sid = param_ptr.function_id << 8 | param_ptr.param_position as u32;
 
-                Sid(sid).with_tag(SidKind::FunctionScope)
+                ExprKind::Pointer(Sid(sid).with_tag(SidKind::FunctionScope))
             }
         }
     }
@@ -259,9 +262,19 @@ impl<'t> ByteCoder<'t> {
         }
     }
 
-    fn compile_external_symbol(&mut self, id: String, ty_mat: &ir::Ty) -> ExternalSymbol {
+    fn compile_external_symbol(&mut self, id: String, ty_mat: &ir::Ty) -> ExprKind {
         let layout_args: Vec<u32> = match id.as_str() {
-            "std::convert::to_int8"
+            "std::ops::add"
+            | "std::ops::sub"
+            | "std::ops::mul"
+            | "std::ops::div"
+            | "std::ops::mod"
+            | "std::ops::neg"
+            | "std::ops::cmp"
+            | "std::ops::eq"
+            | "std::ops::lt"
+            | "std::ops::lte"
+            | "std::convert::to_int8"
             | "std::convert::to_int16"
             | "std::convert::to_int32"
             | "std::convert::to_int64"
@@ -272,23 +285,12 @@ impl<'t> ByteCoder<'t> {
             | "std::convert::to_float32"
             | "std::convert::to_float64"
             | "std::convert::to_text"
-            | "std::ops::mul"
-            | "std::ops::div"
-            | "std::ops::mod"
-            | "std::ops::add"
-            | "std::ops::sub"
-            | "std::ops::neg"
-            | "std::ops::cmp"
-            | "std::ops::eq"
-            | "std::ops::lt"
-            | "std::ops::lte"
-            | "std::array::sequence"
             | "std::math::abs"
-            | "std::math::pow" => {
+            | "std::math::pow"
+            | "std::array::sequence" => {
                 let param_ty = as_ty_of_param(ty_mat);
-                let primitive = self.get_ty_mat(param_ty).kind.as_primitive().unwrap();
-
-                vec![encode_prim(primitive)]
+                let ty_name = self.as_primitive_name(param_ty);
+                return self.make_external(format!("{id}_{ty_name}"), vec![]);
             }
 
             "std::array::fold" => {
@@ -300,23 +302,47 @@ impl<'t> ByteCoder<'t> {
 
             "std::array::min"
             | "std::array::max"
-            | "std::array::sum"
-            | "std::array::mean"
-            | "std::array::rolling_mean"
             | "std::array::rank"
             | "std::array::rank_dense"
             | "std::array::rank_percentile"
             | "std::array::cume_dist" => {
+                // These take func([T]): ... — inject cmp for item type T
                 let param_ty = as_ty_of_param(ty_mat);
                 let item_ty = self.get_ty_mat(param_ty).kind.as_array().unwrap();
-
                 let item_layout = item_ty.layout.as_ref().unwrap();
-                let item_ty = self.get_ty_mat(item_ty).kind.as_primitive().unwrap();
+                let layout_args = vec![item_layout.head_size.div_ceil(8)];
 
-                vec![
-                    item_layout.head_size.div_ceil(8), // item_head_size
-                    encode_prim(item_ty),
-                ]
+                let n_params = ty_mat.kind.as_function().unwrap().params.len();
+                let cmp_id = format!("std::ops::cmp_{}", self.as_primitive_name(item_ty));
+                let cmp = self.make_external(cmp_id, vec![]);
+                return self.wrap_external_with_extra_args(id, layout_args, n_params, vec![cmp]);
+            }
+
+            "std::array::sort" => {
+                let item_layout = as_layout_of_param_array(ty_mat);
+
+                let mut layout_args = Vec::with_capacity(1 + 1 + item_layout.body_ptrs.len());
+                layout_args.push(item_layout.head_size.div_ceil(8));
+                layout_args.extend(as_len_and_items(&item_layout.body_ptrs));
+
+                let ty_func = ty_mat.kind.as_function().unwrap();
+                let key_extractor_ty = self.get_ty_mat(&ty_func.params[1]);
+                let key_ty = &key_extractor_ty.kind.as_function().unwrap().body;
+
+                let n_params = ty_func.params.len();
+                let cmp_id = format!("std::ops::cmp_{}", self.as_primitive_name(key_ty));
+                let cmp = self.make_external(cmp_id, vec![]);
+                return self.wrap_external_with_extra_args(id, layout_args, n_params, vec![cmp]);
+            }
+
+            "std::array::sum" | "std::array::mean" | "std::array::rolling_mean" => {
+                let param_ty = as_ty_of_param(ty_mat);
+                let item_ty = self.get_ty_mat(param_ty).kind.as_array().unwrap();
+                let item_layout = item_ty.layout.as_ref().unwrap();
+                let layout_args = vec![item_layout.head_size.div_ceil(8)];
+
+                let ty_name = self.as_primitive_name(item_ty);
+                return self.make_external(format!("{id}_{ty_name}"), layout_args);
             }
 
             "std::array::index" => {
@@ -349,22 +375,6 @@ impl<'t> ByteCoder<'t> {
                 r.extend(as_len_and_items(&item_layout.body_ptrs)); // item_body_ptrs
                 r
             }
-            "std::array::sort" => {
-                let item_layout = as_layout_of_param_array(ty_mat);
-
-                let mut r = Vec::with_capacity(1 + 1 + item_layout.body_ptrs.len());
-                r.push(item_layout.head_size.div_ceil(8)); // item_head_size
-                r.extend(as_len_and_items(&item_layout.body_ptrs)); // item_body_ptrs
-
-                // ty of key
-                let ty_func = ty_mat.kind.as_function().unwrap();
-                let ty_key_extractor = self.get_ty_mat(&ty_func.params[1]);
-                let ty_key_extractor = ty_key_extractor.kind.as_function().unwrap();
-                let ty_key = self.get_ty_mat(&ty_key_extractor.body);
-                r.push(encode_prim(ty_key.kind.as_primitive().unwrap()));
-
-                r
-            }
 
             "std::array::lag" | "std::array::lead" => {
                 let item_layout = as_layout_of_param_array(ty_mat);
@@ -377,7 +387,6 @@ impl<'t> ByteCoder<'t> {
                 let ty_func = ty_mat.kind.as_function().unwrap();
                 let ty_item = ty_func.body.kind.as_array().unwrap();
                 let default_val = self.construct_default_for_ty(ty_item);
-                let default_val = default_val.encode(ty_item, self.defs).unwrap();
                 pack_bytes_to_u32(default_val, &mut r);
 
                 r
@@ -527,10 +536,112 @@ impl<'t> ByteCoder<'t> {
 
             _ => vec![],
         };
-        ExternalSymbol { id, layout_args }
+
+        let (index, _) = self
+            .externals
+            .insert_full(ExternalSymbol { id, layout_args });
+        ExprKind::Pointer(Sid(index as u32).with_tag(SidKind::External))
     }
 
-    fn construct_default_for_ty(&self, ty: &ir::Ty) -> lutra_bin::Value {
+    /// Determines the snake_case suffix for a numeric type parameter.
+    /// Handles both nominal types (e.g. `std::Int64` → `"int64"`) and
+    /// bare primitives (e.g. `int64` → `"int64"`).
+    fn as_primitive_name(&self, ty: &ir::Ty) -> String {
+        // Check if it's a nominal type (e.g. std::Int64)
+        if let ir::TyKind::Ident(path) = &ty.kind
+            && NOMINAL_PRIMITIVES.iter().any(|x| x == path.0.as_slice())
+        {
+            return path.0.last().unwrap().to_ascii_lowercase();
+        }
+
+        // Fall back to bare primitive
+        let prim = self.get_ty_mat(ty).kind.as_primitive().unwrap();
+        match prim {
+            ir::TyPrimitive::int8 => "int8",
+            ir::TyPrimitive::int16 => "int16",
+            ir::TyPrimitive::int32 => "int32",
+            ir::TyPrimitive::int64 => "int64",
+            ir::TyPrimitive::uint8 => "uint8",
+            ir::TyPrimitive::uint16 => "uint16",
+            ir::TyPrimitive::uint32 => "uint32",
+            ir::TyPrimitive::uint64 => "uint64",
+            ir::TyPrimitive::float32 => "float32",
+            ir::TyPrimitive::float64 => "float64",
+            ir::TyPrimitive::bool => "bool",
+            ir::TyPrimitive::text => "text",
+        }
+        .into()
+    }
+
+    /// Registers an external symbol and returns a `Pointer` ExprKind for it.
+    fn make_external(&mut self, id: String, layout_args: Vec<u32>) -> ExprKind {
+        let (index, _) = self
+            .externals
+            .insert_full(ExternalSymbol { id, layout_args });
+        ExprKind::Pointer(Sid(index as u32).with_tag(SidKind::External))
+    }
+
+    /// Wraps an external function in a `Function` that forwards the original
+    /// params and appends extra args (e.g. an injected comparator).
+    ///
+    /// Produces:
+    /// ```text
+    /// Function(params: [p0, ..., pN-1]) {
+    ///     Call(
+    ///         func: ExternalPointer(id),
+    ///         args: [p0, ..., pN-1, extra0, extra1, ...]
+    ///     )
+    /// }
+    /// ```
+    fn wrap_external_with_extra_args(
+        &mut self,
+        id: String,
+        layout_args: Vec<u32>,
+        n_params: usize,
+        extra_args: Vec<ExprKind>,
+    ) -> ExprKind {
+        // Register the real external symbol
+        let (ext_index, _) = self
+            .externals
+            .insert_full(ExternalSymbol { id, layout_args });
+        let ext_sid = Sid(ext_index as u32).with_tag(SidKind::External);
+
+        // Generate a unique wrapper function ID
+        let wrapper_id = self.next_wrapper_id;
+        self.next_wrapper_id += 1;
+        let wrapper_ns = Sid(wrapper_id << 8).with_tag(SidKind::FunctionScope);
+
+        // Build args: forward original params + append extras
+        let mut args: Vec<Expr> = (0..n_params)
+            .map(|i| {
+                let sid = Sid(wrapper_id << 8 | i as u32).with_tag(SidKind::FunctionScope);
+                Expr {
+                    kind: ExprKind::Pointer(sid),
+                }
+            })
+            .collect();
+        args.extend(extra_args.into_iter().map(|kind| Expr { kind }));
+
+        ExprKind::Function(Box::new(Function {
+            symbol_ns: wrapper_ns,
+            body: Expr {
+                kind: ExprKind::Call(Box::new(Call {
+                    function: Expr {
+                        kind: ExprKind::Pointer(ext_sid),
+                    },
+                    args,
+                })),
+            },
+        }))
+    }
+
+    fn construct_default_for_ty(&self, ty: &ir::Ty) -> Vec<u8> {
+        self.construct_default_for_ty_re(ty)
+            .encode(ty, self.defs)
+            .unwrap()
+    }
+
+    fn construct_default_for_ty_re(&self, ty: &ir::Ty) -> lutra_bin::Value {
         match &self.get_ty_mat(ty).kind {
             ir::TyKind::Primitive(prim) => match prim {
                 ir::TyPrimitive::bool | ir::TyPrimitive::int8 | ir::TyPrimitive::uint8 => {
@@ -552,12 +663,12 @@ impl<'t> ByteCoder<'t> {
             ir::TyKind::Tuple(ty_fields) => lutra_bin::Value::Tuple(
                 ty_fields
                     .iter()
-                    .map(|f| self.construct_default_for_ty(&f.ty))
+                    .map(|f| self.construct_default_for_ty_re(&f.ty))
                     .collect(),
             ),
             ir::TyKind::Enum(ty_enum_variants) => {
                 let variant = ty_enum_variants.iter().next().unwrap();
-                lutra_bin::Value::Enum(0, Box::new(self.construct_default_for_ty(&variant.ty)))
+                lutra_bin::Value::Enum(0, Box::new(self.construct_default_for_ty_re(&variant.ty)))
             }
 
             ir::TyKind::Function(_) => panic!(),
@@ -566,12 +677,20 @@ impl<'t> ByteCoder<'t> {
     }
 }
 
-fn encode_prim(primitive: &ir::TyPrimitive) -> u32 {
-    let mut buf = primitive.encode();
-    buf.put_bytes(0, 3);
-    // padding
-    u32::from_be_bytes(buf[0..4].try_into().unwrap())
-}
+/// Maps a nominal numeric type or bare primitive to a snake_case suffix
+/// for per-type external function names (e.g. `add_int64`, `mul_float32`).
+const NOMINAL_PRIMITIVES: &[[&str; 2]] = &[
+    ["std", "Int8"],
+    ["std", "Int16"],
+    ["std", "Int32"],
+    ["std", "Int64"],
+    ["std", "Uint8"],
+    ["std", "Uint16"],
+    ["std", "Uint32"],
+    ["std", "Uint64"],
+    ["std", "Float32"],
+    ["std", "Float64"],
+];
 
 fn as_len_and_items(items: &[u32]) -> impl Iterator<Item = u32> + '_ {
     Some(items.len() as u32)

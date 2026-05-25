@@ -60,12 +60,12 @@ impl SeveredBodies {
     }
 }
 
-fn extract_head_and_body<'b>(
-    buf: &'b Data,
+fn extract_head_and_body(
+    buf: Data,
     head_bytes: u32,
     body_ptrs: &[u32],
-) -> (&'b [u8], Option<SeveredBodies>) {
-    let head = &buf.chunk()[0..head_bytes as usize];
+) -> (Vec<u8>, Option<SeveredBodies>) {
+    let head = buf.flatten_n(head_bytes as usize);
 
     let body = if !body_ptrs.is_empty() {
         let mut ptrs = body_ptrs.iter();
@@ -73,12 +73,12 @@ fn extract_head_and_body<'b>(
         let first_body_ptr = ptrs.next().unwrap();
         let mut buf = buf.clone();
 
-        let first_body_offset = read_ptr(head, *first_body_ptr);
+        let first_body_offset = read_ptr(&head, *first_body_ptr);
 
         // read body offsets
         let mut body_offsets = vec::Vec::new();
         for ptr in ptrs {
-            let body_offset = read_ptr(head, *ptr);
+            let body_offset = read_ptr(&head, *ptr);
             body_offsets.push(body_offset - first_body_offset);
         }
 
@@ -111,7 +111,7 @@ fn write_head(
         return None;
     }
 
-    let (head, mut body) = extract_head_and_body(&data, head_bytes, body_ptrs);
+    let (head, mut body) = extract_head_and_body(data, head_bytes, body_ptrs);
 
     // offset body pointers to the out buffer
     if let Some(body) = body.as_mut() {
