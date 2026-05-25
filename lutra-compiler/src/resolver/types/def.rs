@@ -25,7 +25,7 @@ impl super::TypeResolver<'_> {
             tracing::debug!("resolving def {fq_ident}");
         }
 
-        self.debug_current_def = fq_ident.clone();
+        self.current_def_fq = Some(fq_ident.clone());
 
         // take def out of the module (replace with a placeholder)
         let def_kind = {
@@ -49,6 +49,8 @@ impl super::TypeResolver<'_> {
         // put annotations back in
         let def = self.root_mod.get_mut(fq_ident).unwrap();
         def.annotations = annotations;
+
+        self.current_def_fq = None;
         Ok(())
     }
 

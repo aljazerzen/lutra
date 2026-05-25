@@ -152,7 +152,7 @@ fn parse_03() {
                         domain: OneOf(
                             [
                                 Ty {
-                                    kind: Primitive(
+                                    kind: Ident(
                                         int8,
                                     ),
                                     span: Some(
@@ -164,7 +164,7 @@ fn parse_03() {
                                     variants_force_ptr: [],
                                 },
                                 Ty {
-                                    kind: Primitive(
+                                    kind: Ident(
                                         int16,
                                     ),
                                     span: Some(
@@ -226,7 +226,7 @@ fn parse_04() {
                                         "b",
                                     ),
                                     ty: Ty {
-                                        kind: Primitive(
+                                        kind: Ident(
                                             int64,
                                         ),
                                         span: Some(

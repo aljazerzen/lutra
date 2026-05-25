@@ -1,4 +1,4 @@
-use std::{fmt::Write, iter::zip};
+use std::{borrow::Cow, fmt::Write, iter::zip};
 
 use lutra_bin::{ir, layout};
 use lutra_compiler::pr;
@@ -63,7 +63,7 @@ pub fn write_ty_def(
 
     writeln!(w, "#[allow(non_camel_case_types)]")?;
     match &ty.kind {
-        ir::TyKind::Primitive(_) | ir::TyKind::Array(_) => {
+        ir::TyKind::Primitive(_) | ir::TyKind::Array(_) | ir::TyKind::Ident(_) => {
             // generate a wrapper new-type struct
             write!(w, "pub struct {name}(pub ")?;
             write_ty_ref(w, ty, false, ctx)?;
@@ -162,55 +162,27 @@ pub fn write_ty_ref(
     let lutra_bin = &ctx.options.lutra_bin_path;
 
     match &ty.kind {
-        ir::TyKind::Primitive(ir::TyPrimitive::bool) => {
-            write!(w, "bool")?;
-        }
-        ir::TyKind::Primitive(ir::TyPrimitive::int8) => {
-            write!(w, "i8")?;
-        }
-        ir::TyKind::Primitive(ir::TyPrimitive::int16) => {
-            write!(w, "i16")?;
-        }
-        ir::TyKind::Primitive(ir::TyPrimitive::int32) => {
-            write!(w, "i32")?;
-        }
-        ir::TyKind::Primitive(ir::TyPrimitive::int64) => {
-            write!(w, "i64")?;
-        }
-        ir::TyKind::Primitive(ir::TyPrimitive::uint8) => {
-            write!(w, "u8")?;
-        }
-        ir::TyKind::Primitive(ir::TyPrimitive::uint16) => {
-            write!(w, "u16")?;
-        }
-        ir::TyKind::Primitive(ir::TyPrimitive::uint32) => {
-            write!(w, "u32")?;
-        }
-        ir::TyKind::Primitive(ir::TyPrimitive::uint64) => {
-            write!(w, "u64")?;
-        }
-        ir::TyKind::Primitive(ir::TyPrimitive::float32) => {
-            write!(w, "f32")?;
-        }
-        ir::TyKind::Primitive(ir::TyPrimitive::float64) => {
-            write!(w, "f64")?;
-        }
-        ir::TyKind::Primitive(ir::TyPrimitive::text) => {
-            write!(w, "{lutra_bin}::string::String")?;
-        }
+        ir::TyKind::Primitive(ir::TyPrimitive::prim8) => write!(w, "u8")?,
+        ir::TyKind::Primitive(ir::TyPrimitive::prim16) => write!(w, "u16")?,
+        ir::TyKind::Primitive(ir::TyPrimitive::prim32) => write!(w, "u32")?,
+        ir::TyKind::Primitive(ir::TyPrimitive::prim64) => write!(w, "u64")?,
         ir::TyKind::Ident(ident) => {
-            let matching = zip(ident.0.iter(), ctx.current_rust_mod.iter())
-                .filter(|(a, b)| a == b)
-                .count();
-            let supers = ctx.current_rust_mod.len() - matching;
-            for _ in 0..supers {
-                w.write_str("super::")?;
-            }
-            for (i, part) in ident.0.iter().skip(matching).enumerate() {
-                if i > 0 {
-                    w.write_str("::")?;
+            if let Some(ty) = ty_ref_std(ident, ctx) {
+                write!(w, "{ty}")?;
+            } else {
+                let matching = zip(ident.0.iter(), ctx.current_rust_mod.iter())
+                    .filter(|(a, b)| a == b)
+                    .count();
+                let supers = ctx.current_rust_mod.len() - matching;
+                for _ in 0..supers {
+                    w.write_str("super::")?;
                 }
-                write!(w, "{part}")?;
+                for (i, part) in ident.0.iter().skip(matching).enumerate() {
+                    if i > 0 {
+                        w.write_str("::")?;
+                    }
+                    write!(w, "{part}")?;
+                }
             }
         }
         ir::TyKind::Array(items_ty) => {
@@ -265,6 +237,40 @@ pub fn write_ty_ref(
         _ => unimplemented!(),
     }
     Ok(())
+}
+
+fn ty_ref_std(ident: &ir::Path, ctx: &Context) -> Option<Cow<'static, str>> {
+    let rust_ty = if ident.is(&["std", "Bool"]) {
+        "bool"
+    } else if ident.is(&["std", "Int8"]) {
+        "i8"
+    } else if ident.is(&["std", "Int16"]) {
+        "i16"
+    } else if ident.is(&["std", "Int32"]) {
+        "i32"
+    } else if ident.is(&["std", "Int64"]) {
+        "i64"
+    } else if ident.is(&["std", "Uint8"]) {
+        "u8"
+    } else if ident.is(&["std", "Uint16"]) {
+        "u16"
+    } else if ident.is(&["std", "Uint32"]) {
+        "u32"
+    } else if ident.is(&["std", "Uint64"]) {
+        "u64"
+    } else if ident.is(&["std", "Float32"]) {
+        "f32"
+    } else if ident.is(&["std", "Float64"]) {
+        "f64"
+    } else if ident.is(&["std", "Text"]) {
+        return Some(Cow::Owned(format!(
+            "{}::string::String",
+            ctx.options.lutra_bin_path
+        )));
+    } else {
+        return None;
+    };
+    Some(Cow::Borrowed(rust_ty))
 }
 
 pub fn is_unit_variant(variant_ty: &ir::Ty) -> bool {

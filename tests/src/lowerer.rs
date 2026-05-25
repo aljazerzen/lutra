@@ -37,11 +37,11 @@ fn _test_compile_dep_and_print(dep: &str, this: &str) -> String {
 fn lower_01() {
     assert_snapshot!(_test_compile_and_print(r#"
     module chinook {
-      type album: {id: int64, title: text}
+      type album: {id: Int64, title: Text}
 
       external func get_albums(): [album]
 
-      func get_album_by_id(album_id: int64): enum { none, some: album } -> (
+      func get_album_by_id(album_id: Int64): enum { none, some: album } -> (
         get_albums()
         | std::filter(func (this: album) -> this.id == album_id)
         | std::index(0)
@@ -49,92 +49,96 @@ fn lower_01() {
     }
 
     module box_office {
-      type AlbumSale: {id: int64, total: float64}
+      type AlbumSale: {id: Int64, total: Float64}
 
       external func get_album_sales(): [AlbumSale]
 
-      func get_album_sales_by_id(album_id: int64): enum { none, some: AlbumSale } -> (
+      func get_album_sales_by_id(album_id: Int64): enum { none, some: AlbumSale } -> (
         get_album_sales()
         | std::filter(func (this: AlbumSale) -> this.id == album_id)
         | std::index(0)
       )
     }
 
-    func main(album_id: int64) -> {
+    func main(album_id: Int64) -> {
       chinook::get_albums(),
       chinook::get_album_by_id(album_id),
       box_office::get_album_sales_by_id(album_id),
     }
     "#), @"
+    type std::Bool = Prim8;
+    type std::Float64 = Prim64;
+    type std::Int64 = Prim64;
+    type std::Text = [Prim8];
     type std::ops::Ordering = enum {less, equal, greater};
-    type chinook::album = {id: int64, title: text};
-    type box_office::AlbumSale = {id: int64, total: float64};
+    type chinook::album = {id: Int64, title: Text};
+    type box_office::AlbumSale = {id: Int64, total: Float64};
     let main = (func 1 ->
       let 2 = (func 6 ->
         let 3 = (call
-          external.std::ops::cmp: func (int64, int64) -> std::ops::Ordering,
-          fn.6+0: int64,
-          fn.6+1: int64,
-        ): std::ops::Ordering;
+          external.std::ops::cmp: func (Int64, Int64) -> ops::Ordering,
+          fn.6+0: Int64,
+          fn.6+1: Int64,
+        ): ops::Ordering;
         (
           switch,
           (
             (enum_eq
-              var.3: std::ops::Ordering
+              var.3: ops::Ordering
               1
-            ): bool,
-            true: bool,
+            ): Bool,
+            1: Bool,
           ),
           (
-            true: bool,
-            false: bool,
+            1: Bool,
+            0: Bool,
           ),
-        ): bool
-      ): func (int64, int64) -> bool;
+        ): Bool
+      ): func (Int64, Int64) -> Bool;
       let 0 = (func 2 ->
         (call
-          external.std::array::index: func ([chinook::album], int64) -> enum {none, some: chinook::album},
+          external.std::array::index: func ([chinook::album], Int64) -> enum {none, some: chinook::album},
           (call
-            external.std::array::filter: func ([chinook::album], func (chinook::album) -> bool) -> [chinook::album],
+            external.std::array::filter: func ([chinook::album], func (chinook::album) -> Bool) -> [chinook::album],
             (call
               external.chinook::get_albums: func () -> [chinook::album],
             ): [chinook::album],
             (func 3 ->
               (call
-                var.2: func (int64, int64) -> bool,
+                var.2: func (Int64, Int64) -> Bool,
                 (tuple_lookup
                   fn.3+0: chinook::album
                   0
-                ): int64,
-                fn.2+0: int64,
-              ): bool
-            ): func (chinook::album) -> bool,
+                ): Int64,
+                fn.2+0: Int64,
+              ): Bool
+            ): func (chinook::album) -> Bool,
           ): [chinook::album],
-          0: int64,
+          0: Int64,
         ): enum {none, some: chinook::album}
-      ): func (int64) -> enum {none, some: chinook::album};
+      ): func (Int64) -> enum {none, some: chinook::album};
       let 1 = (func 4 ->
         (call
-          external.std::array::index: func ([box_office::AlbumSale], int64) -> enum {none, some: box_office::AlbumSale},
+          external.std::array::index: func ([box_office::AlbumSale], Int64) -> enum {none, some: box_office::AlbumSale},
           (call
-            external.std::array::filter: func ([box_office::AlbumSale], func (box_office::AlbumSale) -> bool) -> [box_office::AlbumSale],
+            external.std::array::filter: func ([box_office::AlbumSale], func (box_office::AlbumSale) -> Bool) -> [box_office::AlbumSale],
             (call
               external.box_office::get_album_sales: func () -> [box_office::AlbumSale],
             ): [box_office::AlbumSale],
             (func 5 ->
               (call
-                var.2: func (int64, int64) -> bool,
+                var.2: func (Int64, Int64) -> Bool,
                 (tuple_lookup
                   fn.5+0: box_office::AlbumSale
                   0
-                ): int64,
-                fn.4+0: int64,
-              ): bool
-            ): func (box_office::AlbumSale) -> bool,
+                ): Int64,
+                fn.4+0: Int64,
+              ): Bool
+            ): func (box_office::AlbumSale) -> Bool,
           ): [box_office::AlbumSale],
-          0: int64,
+          0: Int64,
         ): enum {none, some: box_office::AlbumSale}
-      ): func (int64) -> enum {none, some: box_office::AlbumSale};
+      ): func (Int64) -> enum {none, some: box_office::AlbumSale};
       (call
         (func 0 ->
           (tuple
@@ -142,18 +146,18 @@ fn lower_01() {
               external.chinook::get_albums: func () -> [chinook::album],
             ): [chinook::album],
             (call
-              var.0: func (int64) -> enum {none, some: chinook::album},
-              fn.0+0: int64,
+              var.0: func (Int64) -> enum {none, some: chinook::album},
+              fn.0+0: Int64,
             ): enum {none, some: chinook::album},
             (call
-              var.1: func (int64) -> enum {none, some: box_office::AlbumSale},
-              fn.0+0: int64,
+              var.1: func (Int64) -> enum {none, some: box_office::AlbumSale},
+              fn.0+0: Int64,
             ): enum {none, some: box_office::AlbumSale},
           ): {[chinook::album], enum {none, some: chinook::album}, enum {none, some: box_office::AlbumSale}}
-        ): func (int64) -> {[chinook::album], enum {none, some: chinook::album}, enum {none, some: box_office::AlbumSale}},
-        fn.1+0: int64,
+        ): func (Int64) -> {[chinook::album], enum {none, some: chinook::album}, enum {none, some: box_office::AlbumSale}},
+        fn.1+0: Int64,
       ): {[chinook::album], enum {none, some: chinook::album}, enum {none, some: box_office::AlbumSale}}
-    ): func (int64) -> {[chinook::album], enum {none, some: chinook::album}, enum {none, some: box_office::AlbumSale}}
+    ): func (Int64) -> {[chinook::album], enum {none, some: chinook::album}, enum {none, some: box_office::AlbumSale}}
     ")
 }
 
@@ -162,7 +166,7 @@ fn lower_02() {
     assert_snapshot!(_test_compile_and_print(r#"
     type Status: enum {
       open,
-      closed: text,
+      closed: Text,
     }
 
     func main() -> match .closed("x"): Status {
@@ -170,10 +174,11 @@ fn lower_02() {
       .closed => "closed",
     }
     "#), @r#"
-    type Status = enum {open, closed: text};
+    type std::Text = [Prim8];
+    type Status = enum {open, closed: Text};
     let main = (func 0 ->
       let 0 = (enum_variant 1
-        "x": text
+        "x": Text
       ): Status;
       (
         switch,
@@ -181,18 +186,18 @@ fn lower_02() {
           (enum_eq
             var.0: Status
             0
-          ): bool,
-          "open": text,
+          ): Bool,
+          "open": Text,
         ),
         (
           (enum_eq
             var.0: Status
             1
-          ): bool,
-          "closed": text,
+          ): Bool,
+          "closed": Text,
         ),
-      ): text
-    ): func ({}) -> text
+      ): Text
+    ): func ({}) -> Text
     "#)
 }
 
@@ -203,27 +208,28 @@ fn lower_03() {
 
     func main() -> twice([true, true, false])
     "#), @"
+    type std::Bool = Prim8;
     let main = (func 1 ->
       let 0 = (func 2 ->
         (tuple
-          fn.2+0: [bool],
-          fn.2+0: [bool],
-        ): {x: [bool], x: [bool]}
-      ): func ([bool]) -> {x: [bool], x: [bool]};
+          fn.2+0: [Bool],
+          fn.2+0: [Bool],
+        ): {x: [Bool], x: [Bool]}
+      ): func ([Bool]) -> {x: [Bool], x: [Bool]};
       (call
         (func 0 ->
           (call
-            var.0: func ([bool]) -> {x: [bool], x: [bool]},
-            [
-              true: bool,
-              true: bool,
-              false: bool,
-            ]: [bool],
-          ): {x: [bool], x: [bool]}
-        ): func ({}) -> {x: [bool], x: [bool]},
+            var.0: func ([Bool]) -> {x: [Bool], x: [Bool]},
+            (array
+              1: Bool,
+              1: Bool,
+              0: Bool,
+            ): [Bool],
+          ): {x: [Bool], x: [Bool]}
+        ): func ({}) -> {x: [Bool], x: [Bool]},
         fn.1+0: {},
-      ): {x: [bool], x: [bool]}
-    ): func ({}) -> {x: [bool], x: [bool]}
+      ): {x: [Bool], x: [Bool]}
+    ): func ({}) -> {x: [Bool], x: [Bool]}
     ")
 }
 
@@ -250,14 +256,15 @@ fn lower_04() {
 }
 
 #[test]
-fn lower_05_dependency_import_aliases_are_prefixed() {
+fn lower_05() {
+    // dependency_import_aliases_are_prefixed
     insta::assert_snapshot!(
     _test_compile_dep_and_print(
         r#"
         import option::is_some
 
         module option {
-          func is_some(value: enum {none, some: T}): bool
+          func is_some(value: enum {none, some: T}): Bool
           where T
           -> (
             match value {
@@ -268,39 +275,41 @@ fn lower_05_dependency_import_aliases_are_prefixed() {
         }
         "#,
         r#"
-        func main() -> dep::is_some(.none: int32?)
+        func main() -> dep::is_some(.none: Int32?)
         "#,
     ), @"
+    type dep::std::Bool = Prim8;
+    type std::Int32 = Prim32;
     let main = (func 1 ->
       let 0 = (func 2 ->
-        let 1 = fn.2+0: enum {none, some: int32};
+        let 1 = fn.2+0: enum {none, some: Int32};
         (
           switch,
           (
             (enum_eq
-              var.1: enum {none, some: int32}
+              var.1: enum {none, some: Int32}
               1
-            ): bool,
-            true: bool,
+            ): Bool,
+            1: dep::std::Bool,
           ),
           (
             (enum_eq
-              var.1: enum {none, some: int32}
+              var.1: enum {none, some: Int32}
               0
-            ): bool,
-            false: bool,
+            ): Bool,
+            0: dep::std::Bool,
           ),
-        ): bool
-      ): func (enum {none, some: int32}) -> bool;
+        ): dep::std::Bool
+      ): func (enum {none, some: Int32}) -> dep::std::Bool;
       (call
         (func 0 ->
           (call
-            var.0: func (enum {none, some: int32}) -> bool,
-            (enum_variant 0): enum {none, some: int32},
-          ): bool
-        ): func ({}) -> bool,
+            var.0: func (enum {none, some: Int32}) -> dep::std::Bool,
+            (enum_variant 0): enum {none, some: Int32},
+          ): dep::std::Bool
+        ): func ({}) -> dep::std::Bool,
         fn.1+0: {},
-      ): bool
-    ): func ({}) -> bool
+      ): dep::std::Bool
+    ): func ({}) -> dep::std::Bool
     ");
 }

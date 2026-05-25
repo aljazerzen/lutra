@@ -252,15 +252,15 @@ fn converted_type_to_lt(
     Ok(Some(match ty {
         ConvertedType::NONE => return Ok(None),
 
-        ConvertedType::UINT_8 => "uint8",
-        ConvertedType::UINT_16 => "uint16",
-        ConvertedType::UINT_32 => "uint32",
-        ConvertedType::UINT_64 => "uint64",
-        ConvertedType::INT_8 => "int8",
-        ConvertedType::INT_16 => "int16",
-        ConvertedType::INT_32 => "int32",
-        ConvertedType::INT_64 => "int64",
-        ConvertedType::UTF8 => "text",
+        ConvertedType::UINT_8 => "Uint8",
+        ConvertedType::UINT_16 => "Uint16",
+        ConvertedType::UINT_32 => "Uint32",
+        ConvertedType::UINT_64 => "Uint64",
+        ConvertedType::INT_8 => "Int8",
+        ConvertedType::INT_16 => "Int16",
+        ConvertedType::INT_32 => "Int32",
+        ConvertedType::INT_64 => "Int64",
+        ConvertedType::UTF8 => "Text",
 
         ConvertedType::MAP => return Err(NotImplementedError::new("MAP type")),
         ConvertedType::MAP_KEY_VALUE => return Err(NotImplementedError::new("MAP_KEY_VALUE type")),
@@ -268,13 +268,13 @@ fn converted_type_to_lt(
         ConvertedType::ENUM => return Err(NotImplementedError::new("ENUM type")),
         ConvertedType::DECIMAL => return Err(NotImplementedError::new("DECIMAL type")),
 
-        ConvertedType::DATE => "std::Date",
+        ConvertedType::DATE => "Date",
         ConvertedType::TIME_MILLIS => return Err(NotImplementedError::new("TIME_MILLIS type")),
         ConvertedType::TIME_MICROS => return Err(NotImplementedError::new("TIME_MICROS type")),
         ConvertedType::TIMESTAMP_MILLIS => {
             return Err(NotImplementedError::new("TIMESTAMP_MILLIS type"));
         }
-        ConvertedType::TIMESTAMP_MICROS => "std::Timestamp",
+        ConvertedType::TIMESTAMP_MICROS => "Timestamp",
 
         ConvertedType::JSON => return Err(NotImplementedError::new("JSON type")),
         ConvertedType::BSON => return Err(NotImplementedError::new("BSON type")),
@@ -285,12 +285,12 @@ fn converted_type_to_lt(
 fn physical_type_to_lt(ty: parquet::basic::Type) -> Result<&'static str, NotImplementedError> {
     use parquet::basic::Type;
     Ok(match ty {
-        Type::BOOLEAN => "bool",
-        Type::INT32 => "int32",
-        Type::INT64 => "int64",
+        Type::BOOLEAN => "Bool",
+        Type::INT32 => "Int32",
+        Type::INT64 => "Int64",
         Type::INT96 => return Err(NotImplementedError::new("INT96 type")),
-        Type::FLOAT => "float32",
-        Type::DOUBLE => "float64",
+        Type::FLOAT => "Float32",
+        Type::DOUBLE => "Float64",
         Type::BYTE_ARRAY => return Err(NotImplementedError::new("BYTE_ARRAY type")),
         Type::FIXED_LEN_BYTE_ARRAY => {
             return Err(NotImplementedError::new("FIXED_LEN_BYTE_ARRAY type"));

@@ -4,20 +4,22 @@ use insta::assert_snapshot;
 use lutra_bin::Value;
 use lutra_tui::table;
 
+#[track_caller]
 fn _table(ty_src: &str, value: Value) -> String {
-    let ty = lutra_compiler::_test_compile_ty(ty_src);
-    let data = value.encode(&ty, &[]).unwrap();
+    let (ty, ty_defs) = lutra_compiler::_test_compile_ty(ty_src);
+    let data = value.encode(&ty, &ty_defs).unwrap();
 
-    table::Table::new(&data, &ty, &[])
+    table::Table::new(&data, &ty, &ty_defs)
         .render_once(Default::default())
         .to_string()
 }
 
+#[track_caller]
 fn _table_with_config(ty_src: &str, value: Value, config: table::Config) -> String {
-    let ty = lutra_compiler::_test_compile_ty(ty_src);
-    let data = value.encode(&ty, &[]).unwrap();
+    let (ty, ty_defs) = lutra_compiler::_test_compile_ty(ty_src);
+    let data = value.encode(&ty, &ty_defs).unwrap();
 
-    table::Table::new(&data, &ty, &[])
+    table::Table::new(&data, &ty, &ty_defs)
         .render_once(config)
         .to_string()
 }
@@ -25,7 +27,7 @@ fn _table_with_config(ty_src: &str, value: Value, config: table::Config) -> Stri
 #[test]
 fn test_simple_flat_columns() {
     let result = _table(
-        "[{a: int32, b: text}]",
+        "[{a: Int32, b: Text}]",
         Value::Array(vec![
             Value::Tuple(vec![Value::Prim32(42), Value::new_text("hello")]),
             Value::Tuple(vec![Value::Prim32(100), Value::new_text("world")]),
@@ -34,7 +36,7 @@ fn test_simple_flat_columns() {
 
     assert_snapshot!(result, @"
           a b
-      int32 text
+      Int32 Text
     ─────────────
     0    42 hello
     1   100 world
@@ -44,7 +46,7 @@ fn test_simple_flat_columns() {
 #[test]
 fn test_nested_tuple() {
     let result = _table(
-        "[{id: int32, address: {city: text, zip: int32}}]",
+        "[{id: Int32, address: {city: Text, zip: Int32}}]",
         Value::Array(vec![
             Value::Tuple(vec![
                 Value::Prim32(1),
@@ -60,7 +62,7 @@ fn test_nested_tuple() {
     assert_snapshot!(result, @"
          id  address
             city   zip
-      int32 text int32
+      Int32 Text Int32
     ──────────────────
     0     1 NYC  10001
     1     2 LA   90001
@@ -70,7 +72,7 @@ fn test_nested_tuple() {
 #[test]
 fn test_array_expansion() {
     let result = _table(
-        "[{name: text, tags: [text]}]",
+        "[{name: Text, tags: [Text]}]",
         Value::Array(vec![
             Value::Tuple(vec![
                 Value::new_text("Alice"),
@@ -85,7 +87,7 @@ fn test_array_expansion() {
 
     assert_snapshot!(result, @"
       name  tags
-      text  [text]
+      Text  [Text]
     ──────────────
     0 Alice dev
             rust
@@ -96,7 +98,7 @@ fn test_array_expansion() {
 #[test]
 fn test_array_truncation() {
     let result = _table(
-        "[{name: text, tags: [text]}]",
+        "[{name: Text, tags: [Text]}]",
         Value::Array(vec![Value::Tuple(vec![
             Value::new_text("Alice"),
             Value::Array(vec![
@@ -111,7 +113,7 @@ fn test_array_truncation() {
 
     assert_snapshot!(result, @"
       name  tags
-      text  [text]
+      Text  [Text]
     ────────────────
     0 Alice a
             b
@@ -122,7 +124,7 @@ fn test_array_truncation() {
 #[test]
 fn test_non_flat_array() {
     let result = _table(
-        "[{id: int32, items: [{x: int32}]}]",
+        "[{id: Int32, items: [{x: Int32}]}]",
         Value::Array(vec![
             Value::Tuple(vec![
                 Value::Prim32(1),
@@ -137,7 +139,7 @@ fn test_non_flat_array() {
 
     assert_snapshot!(result, @"
          id items
-      int32 […]
+      Int32 […]
     ─────────────
     0     1 […]
     1     2 […]
@@ -166,7 +168,7 @@ fn test_enum_flat() {
 #[test]
 fn test_enum_with_flat_payload() {
     let result = _table(
-        "[{opt: enum{none, some: int32}}]",
+        "[{opt: enum{none, some: Int32}}]",
         Value::Array(vec![
             Value::Tuple(vec![Value::Enum(0, Box::new(Value::Tuple(vec![])))]),
             Value::Tuple(vec![Value::Enum(1, Box::new(Value::Prim32(42)))]),
@@ -175,7 +177,7 @@ fn test_enum_with_flat_payload() {
 
     assert_snapshot!(result, @"
          opt
-      int32?
+      Int32?
     ────────
     0
     1     42
@@ -191,7 +193,7 @@ fn test_text_truncation() {
     };
 
     let result = _table_with_config(
-        "[{msg: text}]",
+        "[{msg: Text}]",
         Value::Array(vec![Value::Tuple(vec![Value::new_text(
             "This is a very long message that should be truncated",
         )])]),
@@ -199,7 +201,7 @@ fn test_text_truncation() {
     );
     assert_snapshot!(result, @"
       msg
-      text
+      Text
     ────────────
     0 This is a…
     ");
@@ -207,27 +209,28 @@ fn test_text_truncation() {
 
 #[test]
 fn test_empty_array() {
-    let result = _table("[{a: int32}]", Value::Array(vec![]));
+    let result = _table("[{a: Int32}]", Value::Array(vec![]));
 
     assert_snapshot!(
         result,
-        @r#"      a
-  int32
-───────
-"#
+        @"
+          a
+      Int32
+    ───────
+    "
     );
 }
 
 #[test]
 fn test_single_tuple() {
     let result = _table(
-        "{x: int32, y: text}",
+        "{x: Int32, y: Text}",
         Value::Tuple(vec![Value::Prim32(42), Value::new_text("hello")]),
     );
 
     assert_snapshot!(result, @"
         x y
-    int32 text
+    Int32 Text
     ───────────
        42 hello
     ");
@@ -236,7 +239,7 @@ fn test_single_tuple() {
 #[test]
 fn test_alignment() {
     let result = _table(
-        "[{name: text, score: int32, active: bool}]",
+        "[{name: Text, score: Int32, active: Bool}]",
         Value::Array(vec![
             Value::Tuple(vec![
                 Value::new_text("Alice"),
@@ -253,7 +256,7 @@ fn test_alignment() {
 
     assert_snapshot!(result, @"
       name  score active
-      text  int32 bool
+      Text  Int32 Bool
     ────────────────────
     0 Alice    95 true
     1 Bob      82 false
@@ -263,7 +266,7 @@ fn test_alignment() {
 #[test]
 fn test_deeply_nested() {
     let result = _table(
-        "[{a: {b: {c: int32}}}]",
+        "[{a: {b: {c: Int32}}}]",
         Value::Array(vec![
             Value::Tuple(vec![Value::Tuple(vec![Value::Tuple(vec![Value::Prim32(
                 1,
@@ -278,7 +281,7 @@ fn test_deeply_nested() {
         a
         b
           c
-      int32
+      Int32
     ───────
     0     1
     1     2
@@ -289,7 +292,7 @@ fn test_deeply_nested() {
 fn test_mixed_depth_columns() {
     // id and address should both appear in first row (top-aligned)
     let result = _table(
-        "[{id: int32, address: {street: text, number: int32}}]",
+        "[{id: Int32, address: {street: Text, number: Int32}}]",
         Value::Array(vec![Value::Tuple(vec![
             Value::Prim32(1),
             Value::Tuple(vec![Value::new_text("Main St"), Value::Prim32(123)]),
@@ -299,7 +302,7 @@ fn test_mixed_depth_columns() {
     assert_snapshot!(result, @"
          id    address
             street  number
-      int32 text     int32
+      Int32 Text     Int32
     ──────────────────────
     0     1 Main St    123
     ");
@@ -307,10 +310,10 @@ fn test_mixed_depth_columns() {
 
 #[test]
 fn test_single_primitive() {
-    let result = _table("int32", Value::Prim32(42));
+    let result = _table("Int32", Value::Prim32(42));
 
     assert_snapshot!(result, @"
-    int32
+    Int32
     ─────
        42
     ");
@@ -319,12 +322,12 @@ fn test_single_primitive() {
 #[test]
 fn test_array_of_primitives() {
     let result = _table(
-        "[int32]",
+        "[Int32]",
         Value::Array(vec![Value::Prim32(1), Value::Prim32(2), Value::Prim32(3)]),
     );
 
     assert_snapshot!(result, @"
-      int32
+      Int32
     ───────
     0     1
     1     2

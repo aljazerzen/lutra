@@ -49,7 +49,7 @@ Subtracts two numbers.
 
 ```lutra
 func neg(T): T
-where T: int8 | int16 | int32 | int64 | float32 | float64 | project::Int8 | project::Int16 | project::Int32 | project::Int64 | project::Float32 | project::Float64
+where T: Int8 | Int16 | Int32 | Int64 | Float32 | Float64
 ```
 
 Negates a number.
@@ -75,7 +75,7 @@ Result of a three-way comparison. Returned by [`cmp`](#func-cmp).
 ## `func` eq
 
 ```lutra
-func eq(T, T): bool
+func eq(T, T): Bool
 where T: primitive
 ```
 
@@ -84,7 +84,7 @@ Tests if values are equal. Used by `==` operator.
 ## `func` ne
 
 ```lutra
-func ne(T, T): bool
+func ne(T, T): Bool
 where T: primitive
 ```
 
@@ -93,7 +93,7 @@ Tests if values are not equal. Used by `!=` operator.
 ## `func` gt
 
 ```lutra
-func gt(T, T): bool
+func gt(T, T): Bool
 where T: primitive
 ```
 
@@ -102,7 +102,7 @@ Tests if left value is greater than the right. Used by `>` operator.
 ## `func` lt
 
 ```lutra
-func lt(T, T): bool
+func lt(T, T): Bool
 where T: primitive
 ```
 
@@ -111,7 +111,7 @@ Tests if left value is less than the right. Used by `<` operator.
 ## `func` gte
 
 ```lutra
-func gte(T, T): bool
+func gte(T, T): Bool
 where T: primitive
 ```
 
@@ -120,7 +120,7 @@ Tests if left value is greater or equal to the right. Used by `>=` operator.
 ## `func` lte
 
 ```lutra
-func lte(T, T): bool
+func lte(T, T): Bool
 where T: primitive
 ```
 
@@ -129,7 +129,7 @@ Tests if left value is less or equal to the right. Used by `<=` operator.
 ## `func` and
 
 ```lutra
-func and(bool, bool): bool
+func and(Bool, Bool): Bool
 ```
 
 Tests if both values are true. Used by `&&` operator.
@@ -137,7 +137,7 @@ Tests if both values are true. Used by `&&` operator.
 ## `func` or
 
 ```lutra
-func or(bool, bool): bool
+func or(Bool, Bool): Bool
 ```
 
 Tests if either of the values is true. Used by `||` operator.
@@ -145,7 +145,7 @@ Tests if either of the values is true. Used by `||` operator.
 ## `func` not
 
 ```lutra
-func not(bool): bool
+func not(Bool): Bool
 ```
 
 Inverts a boolean. Used by `!` operator.

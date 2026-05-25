@@ -158,7 +158,10 @@ impl<'d, 't> Table<'d, 't> {
 
     fn get_names_height(&self, column_groups: &[ColumnGroup]) -> usize {
         let row_ty = self.get_ty_mat(self.row_ty());
-        if matches!(&row_ty.kind, ir::TyKind::Primitive(_) | ir::TyKind::Enum(_)) {
+        if matches!(
+            &row_ty.kind,
+            ir::TyKind::Primitive(_) | ir::TyKind::Ident(_) | ir::TyKind::Enum(_)
+        ) {
             // hide names entirely
             return 0;
         }
@@ -230,15 +233,19 @@ impl<'d, 't> Table<'d, 't> {
             return self.infer_align(inner);
         }
         match &ty.kind {
-            ir::TyKind::Primitive(p) => match p {
-                ir::TyPrimitive::bool | ir::TyPrimitive::text => Align::Left,
-                _ => Align::Right, // All numeric types
-            },
+            ir::TyKind::Primitive(_) => Align::Right,
             ir::TyKind::Enum(_) => Align::Left,
             ir::TyKind::Array(_) => Align::Left,
             ir::TyKind::Tuple(_) => Align::Left,
             ir::TyKind::Function(_) => Align::Left,
-            ir::TyKind::Ident(_) => unreachable!("should be resolved"),
+            ir::TyKind::Ident(i) => {
+                let ty_std = ir::TyStd::try_new(i).unwrap();
+                if ty_std.is_number() {
+                    Align::Right
+                } else {
+                    Align::Left
+                }
+            }
         }
     }
 

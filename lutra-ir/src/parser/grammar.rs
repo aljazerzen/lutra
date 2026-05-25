@@ -34,14 +34,14 @@ fn expr<'src>() -> impl Parser<'src, I<'src>, Expr, extra::Err<PError>> + Clone 
             TokenKind::Literal(pr::Literal::Number(n)) => {
                 let lit = pr::Literal::Number(n);
                 if let Some(i) = lit.as_integer() {
-                    ExprKind::Literal(Literal::int64(i as i64))
+                    ExprKind::Literal(Literal::Prim64(i.to_le()))
                 } else if let Some(f) = lit.as_float() {
-                    ExprKind::Literal(Literal::float64(f))
+                    ExprKind::Literal(Literal::Prim64(u64::from_le_bytes(f.to_le_bytes())))
                 } else {
                     todo!()
                 }
             },
-            TokenKind::Literal(pr::Literal::Boolean(i)) => ExprKind::Literal(Literal::bool(i)),
+            TokenKind::Literal(pr::Literal::Boolean(i)) => ExprKind::Literal(Literal::Prim8(i as u8)),
             TokenKind::Literal(pr::Literal::Text(i)) => ExprKind::Literal(Literal::text(i)),
         };
 
@@ -67,11 +67,10 @@ fn expr<'src>() -> impl Parser<'src, I<'src>, Expr, extra::Err<PError>> + Clone 
 
         let tuple = tuple(expr.clone());
         let array = array(expr.clone());
-
         let tuple_lookup = tuple_lookup(expr.clone());
         let function = function(expr.clone());
         let call = func_call(expr.clone());
-        let wrapped = choice((tuple_lookup, function, call))
+        let wrapped = choice((tuple_lookup, function, call, tuple, array))
             .delimited_by(ctrl('('), ctrl(')'))
             .recover_with(via_parser(nested_delimiters(
                 TokenKind::Control('('),
@@ -84,7 +83,7 @@ fn expr<'src>() -> impl Parser<'src, I<'src>, Expr, extra::Err<PError>> + Clone 
                 |_| ExprKind::Tuple(vec![]),
             )));
 
-        let simple = choice((pointer, literal, tuple, array, wrapped))
+        let simple = choice((pointer, literal, wrapped))
             .then(ctrl(':').ignore_then(ty()))
             .map(|(kind, ty)| Expr { kind, ty });
 
@@ -103,20 +102,12 @@ fn external_ptr<'src>() -> impl Parser<'src, I<'src>, ExternalPtr, extra::Err<PE
 
 fn ty<'src>() -> impl Parser<'src, I<'src>, Ty, extra::Err<PError>> {
     recursive(|ty_inner| {
-        let primitive = choice((
-            ident_keyword("bool").to(TyPrimitive::bool),
-            ident_keyword("int8").to(TyPrimitive::int8),
-            ident_keyword("int16").to(TyPrimitive::int16),
-            ident_keyword("int32").to(TyPrimitive::int32),
-            ident_keyword("int64").to(TyPrimitive::int64),
-            ident_keyword("uint8").to(TyPrimitive::uint8),
-            ident_keyword("uint16").to(TyPrimitive::uint16),
-            ident_keyword("uint32").to(TyPrimitive::uint32),
-            ident_keyword("uint64").to(TyPrimitive::uint64),
-            ident_keyword("float32").to(TyPrimitive::float32),
-            ident_keyword("float64").to(TyPrimitive::float64),
-            ident_keyword("text").to(TyPrimitive::text),
-        ))
+        let primitive = select! {
+            TokenKind::Ident(i) if i == "Prim8" => TyPrimitive::prim8,
+            TokenKind::Ident(i) if i == "Prim16" => TyPrimitive::prim16,
+            TokenKind::Ident(i) if i == "Prim32" => TyPrimitive::prim32,
+            TokenKind::Ident(i) if i == "Prim64" => TyPrimitive::prim64,
+        }
         .map(TyKind::Primitive);
 
         let array = ty_inner
@@ -166,11 +157,7 @@ fn ty<'src>() -> impl Parser<'src, I<'src>, Ty, extra::Err<PError>> {
 
         let ident = path().map(TyKind::Ident);
 
-        choice((primitive, array, tuple, enum_, func, ident)).map(|kind| {
-            let mut ty = Ty::new(kind);
-            ty.layout = lutra_bin::layout::compute(&ty);
-            ty
-        })
+        choice((primitive, array, tuple, enum_, func, ident)).map(Ty::new)
     })
     .labelled("a type")
 }
@@ -185,25 +172,17 @@ fn tuple<'src, 'a>(
 where
     'src: 'a,
 {
-    nested_expr
-        .map(|expr| TupleField {
-            expr,
-            unpack: false,
-        })
-        .separated_by(ctrl(','))
-        .allow_trailing()
-        .collect::<Vec<_>>()
-        .delimited_by(ctrl('{'), ctrl('}'))
-        .recover_with(via_parser(nested_delimiters(
-            TokenKind::Control('{'),
-            TokenKind::Control('}'),
-            [
-                (TokenKind::Control('{'), TokenKind::Control('}')),
-                (TokenKind::Control('('), TokenKind::Control(')')),
-                (TokenKind::Control('['), TokenKind::Control(']')),
-            ],
-            |_| vec![],
-        )))
+    ident_keyword("tuple")
+        .ignore_then(
+            nested_expr
+                .map(|expr| TupleField {
+                    expr,
+                    unpack: false,
+                })
+                .separated_by(ctrl(','))
+                .allow_trailing()
+                .collect::<Vec<_>>(),
+        )
         .map(ExprKind::Tuple)
         .labelled("tuple")
 }
@@ -214,20 +193,12 @@ fn array<'src, 'a>(
 where
     'src: 'a,
 {
-    expr.separated_by(ctrl(','))
-        .allow_trailing()
-        .collect::<Vec<_>>()
-        .delimited_by(ctrl('['), ctrl(']'))
-        .recover_with(via_parser(nested_delimiters(
-            TokenKind::Control('['),
-            TokenKind::Control(']'),
-            [
-                (TokenKind::Control('{'), TokenKind::Control('}')),
-                (TokenKind::Control('('), TokenKind::Control(')')),
-                (TokenKind::Control('['), TokenKind::Control(']')),
-            ],
-            |_| vec![],
-        )))
+    ident_keyword("array")
+        .ignore_then(
+            expr.separated_by(ctrl(','))
+                .allow_trailing()
+                .collect::<Vec<_>>(),
+        )
         .map(ExprKind::Array)
         .labelled("array")
 }

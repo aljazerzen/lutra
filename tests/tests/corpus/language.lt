@@ -5,7 +5,7 @@
 # A test consists of:
 #
 #    #  === <test name>       (test name)
-#    # skip: interpreter       (optional)
+#    # skip: Interpreter       (optional)
 #    # skip: postgres          (optional)
 #    # skip: duckdb            (optional)
 #    <lutra project code>
@@ -15,7 +15,7 @@
 #    <output>
 
 # === constant_00
-const main = {1: int32, [false, true], "hello"}
+const main = {1: Int32, [false, true], "hello"}
 # >
 {
   1,
@@ -27,7 +27,7 @@ const main = {1: int32, [false, true], "hello"}
 }
 
 # === bindings_00
-const a: int32 = 4
+const a: Int32 = 4
 func main() -> [{a, a + 1}, {a + 2, a + 3}]
 # >
 [
@@ -42,7 +42,7 @@ func main() -> [{a, a + 1}, {a + 2, a + 3}]
 ]
 
 # === bindings_01
-const a = {3: int32, false}
+const a = {3: Int32, false}
 func main() -> [{a.0, a.1}, {a.0 + 1, !a.1}]
 # >
 [
@@ -57,7 +57,7 @@ func main() -> [{a.0, a.1}, {a.0 + 1, !a.1}]
 ]
 
 # === bindings_02
-const a: [int16] = [1, 2]
+const a: [Int16] = [1, 2]
 func main() -> [
   {
     a | index(0) | option::or_default,
@@ -81,8 +81,8 @@ func main() -> [
 ]
 
 # === bindings_03
-const a: [int16] = [1, 2, 3]
-func main() -> {true, map(a, func (x: int16) -> x * 2), false}
+const a: [Int16] = [1, 2, 3]
+func main() -> {true, map(a, func (x: Int16) -> x * 2), false}
 # >
 {
   true,
@@ -95,10 +95,10 @@ func main() -> {true, map(a, func (x: int16) -> x * 2), false}
 }
 
 # === bindings_04
-const a: [int32] = [1, 2, 3]
+const a: [Int32] = [1, 2, 3]
 func main() -> {
   true,
-  a | map(func (x: int32) -> x * 2) | index(1),
+  a | map(func (x: Int32) -> x * 2) | index(1),
   false
 }
 # >
@@ -110,20 +110,20 @@ func main() -> {
 
 # === complex_00
 
-const x: [int16] = [
+const x: [Int16] = [
   1, 4, 2, 3, 2, 3, 4, 5, 1, 2
 ]
 
 func main() -> {
-  a = 1: int32 + 2,
-  {3: int64, 3 + 1: int16},
-  {2: int32, 2 + 1: int16},
+  a = 1: Int32 + 2,
+  {3: Int64, 3 + 1: Int16},
+  {2: Int32, 2 + 1: Int16},
   hello = (
     x
-    | map(func (y: int16) -> y + 1)
-    | filter(func (y: int16) -> !(y > 3))
-    | sort(func (x: int16) -> x)
-    | map(func (y: int16) -> y % 3)
+    | map(func (y: Int16) -> y + 1)
+    | filter(func (y: Int16) -> !(y > 3))
+    | sort(func (x: Int16) -> x)
+    | map(func (y: Int16) -> y % 3)
   )
 }
 
@@ -148,32 +148,32 @@ func main() -> {
 }
 
 # === default_00
-func main(): bool -> default()
+func main(): Bool -> default()
 # >
 false
 
 # === default_01
-func main(): int32 -> default()
+func main(): Int32 -> default()
 # >
 0
 
 # === default_02
-func main(): float32 -> default()
+func main(): Float32 -> default()
 # >
 0.0
 
 # === default_03
-func main(): text -> default()
+func main(): Text -> default()
 # >
 ""
 
 # === default_04
-func main(): [int64] -> default()
+func main(): [Int64] -> default()
 # >
 []
 
 # === default_05
-func main(): {int8, text, [bool]} -> default()
+func main(): {Int8, Text, [Bool]} -> default()
 # >
 {
   0,
@@ -183,15 +183,15 @@ func main(): {int8, text, [bool]} -> default()
 
 # === default_06
 type Status: enum {
-  open: int16,
-  closed: bool,
+  open: Int16,
+  closed: Bool,
 }
 func main(): Status -> default()
 # >
 open(0)
 
 # === default_10
-func main(): [bool] -> lag([default(), default()], 1)
+func main(): [Bool] -> lag([default(), default()], 1)
 # >
 [
   false,
@@ -199,7 +199,7 @@ func main(): [bool] -> lag([default(), default()], 1)
 ]
 
 # === default_11
-func main(): [int32] -> lag([default(), default()], 1)
+func main(): [Int32] -> lag([default(), default()], 1)
 # >
 [
   0,
@@ -207,7 +207,7 @@ func main(): [int32] -> lag([default(), default()], 1)
 ]
 
 # === default_12
-func main(): [float32] -> lag([default(), default()], 1)
+func main(): [Float32] -> lag([default(), default()], 1)
 # >
 [
   0.0,
@@ -215,7 +215,7 @@ func main(): [float32] -> lag([default(), default()], 1)
 ]
 
 # === default_13
-func main(): [text] -> lag([default(), default()], 1)
+func main(): [Text] -> lag([default(), default()], 1)
 # >
 [
   "",
@@ -225,7 +225,7 @@ func main(): [text] -> lag([default(), default()], 1)
 # === default_14
 # skip: postgres
 # skip: duckdb
-func main(): [[int64]] -> lag([default(), default()], 1)
+func main(): [[Int64]] -> lag([default(), default()], 1)
 # >
 [
   [],
@@ -235,7 +235,7 @@ func main(): [[int64]] -> lag([default(), default()], 1)
 # === default_15
 # skip: postgres
 # skip: duckdb
-func main(): [{int8, text, [bool]}] -> lag([default(), default()], 1)
+func main(): [{Int8, Text, [Bool]}] -> lag([default(), default()], 1)
 # >
 [
   {
@@ -255,8 +255,8 @@ func main(): [{int8, text, [bool]}] -> lag([default(), default()], 1)
 # skip: duckdb
 
 type Status: enum {
-  open: int64,
-  closed: bool,
+  open: Int64,
+  closed: Bool,
 }
 func main(): [Status] -> lag([default(), default()], 1)
 # >
@@ -266,67 +266,67 @@ func main(): [Status] -> lag([default(), default()], 1)
 ]
 
 # === empty_array_00
-func main(): [int64] -> []
+func main(): [Int64] -> []
 # >
 []
 
 # === empty_array_01
-func main(): [{a: int64, b: text}] -> []
+func main(): [{a: Int64, b: Text}] -> []
 # >
 []
 
 # === empty_array_02
-func ident(x: [bool]) -> x
+func ident(x: [Bool]) -> x
 func main() -> ident([])
 # >
 []
 
 # === enum_construction_00
 
-type Status: enum {done, pending: int64, cancelled: text}
+type Status: enum {done, pending: Int64, cancelled: Text}
 const main: Status = .done
 # >
 done
 
 # === enum_construction_01
 
-type Status: enum {done, pending: int64, cancelled: text}
+type Status: enum {done, pending: Int64, cancelled: Text}
 const main: Status = .pending(513)
 # >
 pending(513)
 
 # === enum_construction_02
 
-type Status: enum {done, pending: int64, cancelled: text}
+type Status: enum {done, pending: Int64, cancelled: Text}
 const main: Status = .cancelled("I don't like it")
 # >
 cancelled("I don't like it")
 
 # === enum_construction_03
 
-type Color: enum {red, green: bool, blue: bool}
+type Color: enum {red, green: Bool, blue: Bool}
 const main: Color = .red
 # >
 red
 
 # === enum_construction_04
 
-type Color: enum {red, green: int16, blue: bool}
+type Color: enum {red, green: Int16, blue: Bool}
 const main: Color = .green(12312)
 # >
 green(12312)
 
 # === enum_construction_05
 
-type Color: enum {red, green: bool, blue: bool}
+type Color: enum {red, green: Bool, blue: Bool}
 const main: Color = .blue(false)
 # >
 blue(false)
 
 # === enum_construction_06
 type Item: {
-  id: int64,
-  color: enum {red, green: bool, blue: bool},
+  id: Int64,
+  color: enum {red, green: Bool, blue: Bool},
 }
 const main: Item = {
   id = 4,
@@ -341,8 +341,8 @@ const main: Item = {
 # === enum_construction_08
 
 type Animal: enum {
-  cat: text,
-  dog: enum {collie: text, generic},
+  cat: Text,
+  dog: enum {collie: Text, generic},
 }
 
 func main(): [Animal] -> [
@@ -360,8 +360,8 @@ func main(): [Animal] -> [
 # === enum_construction_09
 
 type Status: enum {
-  open: int16,
-  closed: bool,
+  open: Int16,
+  closed: Bool,
 }
 func main(): [Status] -> [.open(0), .open(0)]
 # >
@@ -372,7 +372,7 @@ func main(): [Status] -> [.open(0), .open(0)]
 
 # === enum_construction_10
 
-func main(): [enum {none, some: text}] -> [
+func main(): [enum {none, some: Text}] -> [
   .none,
   .some("Whiskers"),
 ]
@@ -385,8 +385,8 @@ func main(): [enum {none, some: text}] -> [
 # === enum_construction_11
 
 type Animal: enum {
-  cat: text,
-  dog: enum {none, some: text},
+  cat: Text,
+  dog: enum {none, some: Text},
 }
 
 func main() -> [
@@ -403,7 +403,7 @@ func main() -> [
 
 
 # === functions_00
-func add_one(x: int64) -> x + 1
+func add_one(x: Int64) -> x + 1
 func main() -> {add_one(4), add_one(add_one(5))}
 # >
 {
@@ -415,23 +415,23 @@ func main() -> {add_one(4), add_one(add_one(5))}
 
 func main() -> (
   4
-  | func (x: int64) -> x + 1
-  | func (x: int64) -> x * 2
+  | func (x: Int64) -> x + 1
+  | func (x: Int64) -> x * 2
 )
 # >
 10
 
 # === functions_02
-func add_one(x: int64) -> x + 1
-func add_two(x: int64) -> add_one(add_one(x))
-func my_func(x: int64) -> add_two(x) + add_two(x)
+func add_one(x: Int64) -> x + 1
+func add_two(x: Int64) -> add_one(add_one(x))
+func my_func(x: Int64) -> add_two(x) + add_two(x)
 func main() -> my_func(1)
 # >
 6
 
 # === functions_03
 func main() -> (
-  4: int32
+  4: Int32
   | x -> x + 1
   | x -> x * 2
 )
@@ -439,7 +439,7 @@ func main() -> (
 10
 
 # === if_00
-func bool_to_text(x: bool) -> if x then (
+func bool_to_text(x: Bool) -> if x then (
   "yes"
 ) else (
   "no"
@@ -471,7 +471,7 @@ func main() -> if lang == "en" then en else sl
 ]
 
 # === match_00
-type Status: enum {done, pending: int64, cancelled: text}
+type Status: enum {done, pending: Int64, cancelled: Text}
 func main() -> match .pending(4): Status {
   .pending => "pending",
   .cancelled => "cancelled",
@@ -481,8 +481,8 @@ func main() -> match .pending(4): Status {
 "pending"
 
 # === match_01
-type Status: enum {done, pending: int32, cancelled: text}
-func main(): int32 -> match .pending(4): Status {
+type Status: enum {done, pending: Int32, cancelled: Text}
+func main(): Int32 -> match .pending(4): Status {
   .done => 0,
   .pending(x) => x,
   .cancelled => 0,
@@ -493,8 +493,8 @@ func main(): int32 -> match .pending(4): Status {
 
 # === match_02
 type Animal: enum {
-  cat: text,
-  dog: enum {collie: text, generic},
+  cat: Text,
+  dog: enum {collie: Text, generic},
 }
 func main() -> (
   .dog(.collie("Belie"))
@@ -511,8 +511,8 @@ func main() -> (
 # === match_03
 
 type Animal: enum {
-  cat: text,
-  dog: text,
+  cat: Text,
+  dog: Text,
 }
 
 func main() -> (
@@ -535,8 +535,8 @@ func main() -> (
 
 # === match_04
 type Animal: enum {
-  cat: text,
-  dog: enum {collie: text, generic},
+  cat: Text,
+  dog: enum {collie: Text, generic},
 }
 func main() -> (
   [
@@ -606,17 +606,17 @@ func main() -> (
 
 # === match_08
 type Animal: enum {
-  cat: text,
-  dog: enum {collie: text, generic},
+  cat: Text,
+  dog: enum {collie: Text, generic},
 }
 
-func main(): [text] -> (
+func main(): [Text] -> (
   [
     .cat("Whiskers"),
     .dog(.generic),
     .dog(.collie("Jessie")),
   ]
-  | map(func (a: Animal): text -> match a {
+  | map(func (a: Animal): Text -> match a {
     .cat(name) | .dog(.collie(name)) => name,
     _ => "<unnamed>"
   })
@@ -629,22 +629,22 @@ func main(): [text] -> (
 ]
 
 # === std_to_text_00
-func main() -> to_text(20: uint8)
+func main() -> to_text(20: Uint8)
 # >
 "20"
 
 # === std_to_text_01
-func main() -> to_text(-20: int8)
+func main() -> to_text(-20: Int8)
 # >
 "-20"
 
 # === std_to_text_02
-func main() -> to_text(1.10: float32)
+func main() -> to_text(1.10: Float32)
 # >
 "1.1"
 
 # === std_to_text_03
-func main() -> to_text(-1121121221.0: float64)
+func main() -> to_text(-1121121221.0: Float64)
 # >
 "-1121121221"
 
@@ -654,89 +654,89 @@ func main() -> to_text(false)
 "false"
 
 # === std_add_float64_00
-func main() -> (30.2 + 2.30): float64
+func main() -> (30.2 + 2.30): Float64
 # >
 32.5
 
 # === std_add_float64_01
-func main() -> (2.30 + 30.2): float64
+func main() -> (2.30 + 30.2): Float64
 # >
 32.5
 
 # === std_add_float64_02
-func main() -> (1.4 + 0.2): float64
+func main() -> (1.4 + 0.2): Float64
 # >
 1.5999999999999999
 
 # === std_add_int8_00
-func main() -> (30 + 2): int8
+func main() -> (30 + 2): Int8
 # >
 32
 
 # === std_add_int8_01
-func main() -> (-2 + 30): int8
+func main() -> (-2 + 30): Int8
 # >
 28
 
 # === std_add_int16_00
-func main() -> (30 + 2): int16
+func main() -> (30 + 2): Int16
 # >
 32
 
 # === std_add_int16_01
-func main() -> (-2 + 30): int16
+func main() -> (-2 + 30): Int16
 # >
 28
 
 # === std_add_int32_00
-func main() -> (30 + 2): int32
+func main() -> (30 + 2): Int32
 # >
 32
 
 # === std_add_int32_01
-func main() -> (-2 + 30): int32
+func main() -> (-2 + 30): Int32
 # >
 28
 
 # === std_add_int64_00
-func main() -> (30 + 2): int64
+func main() -> (30 + 2): Int64
 # >
 32
 
 # === std_add_int64_01
-func main() -> (-2 + 30): int64
+func main() -> (-2 + 30): Int64
 # >
 28
 
 # === std_add_uint8_00
-func main() -> (30 + 2): uint8
+func main() -> (30 + 2): Uint8
 # >
 32
 
 # === std_add_uint16_00
-func main() -> (30 + 2): uint16
+func main() -> (30 + 2): Uint16
 # >
 32
 
 # === std_add_uint16_01
 # skip: postgres
-func main() -> (16384 + 16384): uint16
+func main() -> (16384 + 16384): Uint16
 # >
 32768
 
 # === std_add_uint32_00
-func main() -> (30 + 2): uint32
+func main() -> (30 + 2): Uint32
 # >
 32
 
 # === std_add_uint64_00
-func main() -> (30 + 2): uint64
+func main() -> (30 + 2): Uint64
 # >
 32
 
 # === std_aggregate_00
-const my_rel: [{int64, int64}] = [{5,3},{65,1},{3, 2}]
-func main() -> aggregate(my_rel, func (x: {[int64], [int64]}) -> {min(x.0), min(x.1)})
+const my_rel: [{Int64, Int64}] = [{5,3},{65,1},{3, 2}]
+func main() -> aggregate(my_rel, func (x: {[Int64], [Int64]}) -> {min(x.0), min(x.1)})
 # >
 {
   some(3),
@@ -746,7 +746,7 @@ func main() -> aggregate(my_rel, func (x: {[int64], [int64]}) -> {min(x.0), min(
 # === std_aggregate_01
 func main() -> (
   [{false, "hello"}, {false, "world"}, {true, "!"}]
-  | aggregate(func (x: {[bool], [text]}) ->
+  | aggregate(func (x: {[Bool], [Text]}) ->
     {index(x.0, 0), index(x.1, 2)}
   )
 )
@@ -807,7 +807,7 @@ func main() -> any([])
 false
 
 # === std_append_00
-func main(): [int64] -> append(
+func main(): [Int64] -> append(
   [1, 2, 3],
   [4, 5],
 )
@@ -837,18 +837,18 @@ func main() -> append(
 
 # === std_fold_00
 func main() -> fold(
-  [1, 2, 3, 4, 5]: [int64],
+  [1, 2, 3, 4, 5]: [Int64],
   0,
-  func (s: int64, n: int64): int64 -> n + s
+  func (s: Int64, n: Int64): Int64 -> n + s
 )
 # >
 15
 
 # === std_fold_01
 func main() -> fold(
-  [1, 2, 3, 4, 5]: [int64],
-  {0, 0}: {sum: int64, count: int64},
-  func (s, n: int64) -> {sum = s.sum + n, count = s.count + 1}
+  [1, 2, 3, 4, 5]: [Int64],
+  {0, 0}: {sum: Int64, count: Int64},
+  func (s, n: Int64) -> {sum = s.sum + n, count = s.count + 1}
 )
 # >
 {
@@ -858,9 +858,9 @@ func main() -> fold(
 
 # === std_scan_00
 func main() -> scan(
-  [1, 2, 3, 4, 5]: [int64],
+  [1, 2, 3, 4, 5]: [Int64],
   0,
-  func (s: int64, n: int64): int64 -> n + s
+  func (s: Int64, n: Int64): Int64 -> n + s
 )
 # >
 [
@@ -873,9 +873,9 @@ func main() -> scan(
 
 # === std_scan_01
 func main() -> scan(
-  [1, 2, 3, 4, 5]: [int64],
-  {0, 0}: {sum: int64, count: int64},
-  func (s, n: int64) -> {sum = s.sum + n, count = s.count + 1}
+  [1, 2, 3, 4, 5]: [Int64],
+  {0, 0}: {sum: Int64, count: Int64},
+  func (s, n: Int64) -> {sum = s.sum + n, count = s.count + 1}
 )
 # >
 [
@@ -903,7 +903,7 @@ func main() -> scan(
 
 # === std_loop_until_empty_00
 func main() -> (
-  [0: int16]
+  [0: Int16]
   | loop_until_empty(v ->
     v
     | map(i -> i + 1)
@@ -925,7 +925,7 @@ func main() -> (
 ]
 
 # === std_sequence_00
-func main() -> sequence(0: int32, 3)
+func main() -> sequence(0: Int32, 3)
 # >
 [
   0,
@@ -934,7 +934,7 @@ func main() -> sequence(0: int32, 3)
 ]
 
 # === std_sequence_01
-func main() -> sequence(10: int8, 12)
+func main() -> sequence(10: Int8, 12)
 # >
 [
   10,
@@ -942,12 +942,12 @@ func main() -> sequence(10: int8, 12)
 ]
 
 # === std_sequence_02
-func main() -> sequence(10: int32, 8)
+func main() -> sequence(10: Int32, 8)
 # >
 []
 
 # === std_sequence_03
-func main() -> sequence(0: uint16, 3)
+func main() -> sequence(0: Uint16, 3)
 # >
 [
   0,
@@ -956,7 +956,7 @@ func main() -> sequence(0: uint16, 3)
 ]
 
 # === std_sequence_04
-func main() -> sequence(1000000000: int64, 1000000003)
+func main() -> sequence(1000000000: Int64, 1000000003)
 # >
 [
   1000000000,
@@ -965,7 +965,7 @@ func main() -> sequence(1000000000: int64, 1000000003)
 ]
 
 # === std_sequence_05
-func main() -> sequence(sum([1: int32, 2, 3]), 8)
+func main() -> sequence(sum([1: Int32, 2, 3]), 8)
 # >
 [
   6,
@@ -974,7 +974,7 @@ func main() -> sequence(sum([1: int32, 2, 3]), 8)
 
 # === std_sequence_06
 func main() -> (
-  sequence(1: int32, 5)
+  sequence(1: Int32, 5)
   | scan(1, func (a, c) -> a * c)
 )
 # >
@@ -986,27 +986,27 @@ func main() -> (
 ]
 
 # === std_mean_00
-func main() -> mean([]: [int64])
+func main() -> mean([]: [Int64])
 # >
 NaN
 
 # === std_mean_01
-func main() -> mean([5,3,65,3,2,56,67: int64])
+func main() -> mean([5,3,65,3,2,56,67: Int64])
 # >
 28.714285714285715
 
 # === std_mean_02
-func main() -> mean([5,3,65,3,2,56,67: int32])
+func main() -> mean([5,3,65,3,2,56,67: Int32])
 # >
 28.714285714285715
 
 # === std_mean_03
-func main() -> mean([5,3,65,3,2,56,67: int16])
+func main() -> mean([5,3,65,3,2,56,67: Int16])
 # >
 28.714285714285715
 
 # === std_mean_04
-func main() -> mean([5,3,65,3,2: int8])
+func main() -> mean([5,3,65,3,2: Int8])
 # >
 15.6
 
@@ -1014,32 +1014,32 @@ func main() -> mean([5,3,65,3,2: int8])
 # skip: duckdb
 # Similar to std_sum_03, DuckDB's SUM returns DOUBLE for FLOAT4 inputs, causing
 # different float32 rounding behavior in the mean calculation (SUM/COUNT).
-func main() -> mean([1.1, 1.3]: [float32])
+func main() -> mean([1.1, 1.3]: [Float32])
 # >
 1.2000000476837158
 
 # === std_mean_06
-func main() -> mean([1.1, 1.3]: [float64])
+func main() -> mean([1.1, 1.3]: [Float64])
 # >
 1.2000000000000002
 
 # === std_mean_07
-func main() -> mean([]: [float64])
+func main() -> mean([]: [Float64])
 # >
 NaN
 
 # === std_contains_00
-func main() -> contains([5,3,65,3,2,56,67], 3: int16)
+func main() -> contains([5,3,65,3,2,56,67], 3: Int16)
 # >
 true
 
 # === std_contains_01
-func main() -> contains([5,3,65,3,2,56,67], 7: int16)
+func main() -> contains([5,3,65,3,2,56,67], 7: Int16)
 # >
 false
 
 # === std_contains_02
-func main() -> contains([], 2: int16)
+func main() -> contains([], 2: Int16)
 # >
 false
 
@@ -1054,63 +1054,63 @@ func main() -> contains([false, false, false, false, false], true)
 false
 
 # === std_count_00
-func main() -> count([5: int16,3,65,3,2,56,67])
+func main() -> count([5: Int16,3,65,3,2,56,67])
 # >
 7
 
 # === std_count_01
-func main() -> count([]: [bool])
+func main() -> count([]: [Bool])
 # >
 0
 
 # === std_count_02
-func main() -> count([.some("a"), .none]: [enum {none, some: text}])
+func main() -> count([.some("a"), .none]: [enum {none, some: Text}])
 # >
 2
 
 # === std_div_00
-func main() -> (10 / 6): int64
+func main() -> (10 / 6): Int64
 # >
 1
 
 # === std_div_01
-func main() -> (-10 / 6): int64
+func main() -> (-10 / 6): Int64
 # >
 -1
 
 # === std_div_02
-func main() -> (10 / -6): int64
+func main() -> (10 / -6): Int64
 # >
 -1
 
 # === std_div_03
-func main() -> (-10 / -6): int64
+func main() -> (-10 / -6): Int64
 # >
 1
 
 # === std_div_04
-func main() -> (10.0 / 6.0): float64
+func main() -> (10.0 / 6.0): Float64
 # >
 1.6666666666666667
 
 # === std_div_05
-func main() -> (-10.0 / 6.0): float64
+func main() -> (-10.0 / 6.0): Float64
 # >
 -1.6666666666666667
 
 # === std_div_06
-func main() -> (10.0 / -6.0): float64
+func main() -> (10.0 / -6.0): Float64
 # >
 -1.6666666666666667
 
 # === std_div_07
-func main() -> (-10.0 / -6.0): float64
+func main() -> (-10.0 / -6.0): Float64
 # >
 1.6666666666666667
 
 
 # === std_filter_00
-func main() -> filter([5,3,65,3,2]: [int64], func (x: int64) -> x > 3)
+func main() -> filter([5,3,65,3,2]: [Int64], func (x: Int64) -> x > 3)
 # >
 [
   5,
@@ -1118,17 +1118,17 @@ func main() -> filter([5,3,65,3,2]: [int64], func (x: int64) -> x > 3)
 ]
 
 # === std_filter_01
-func main() -> filter([5,3,65,3,2]: [int64], func (x: int64) -> x < 1)
+func main() -> filter([5,3,65,3,2]: [Int64], func (x: Int64) -> x < 1)
 # >
 []
 
 # === std_filter_02
-func main() -> filter([], func (x: int64) -> x > 3)
+func main() -> filter([], func (x: Int64) -> x > 3)
 # >
 []
 
 # === std_filter_03
-func main() -> filter([false,true,true,false,true], func (x: bool) -> !x)
+func main() -> filter([false,true,true,false,true], func (x: Bool) -> !x)
 # >
 [
   false,
@@ -1138,7 +1138,7 @@ func main() -> filter([false,true,true,false,true], func (x: bool) -> !x)
 # === std_filter_04
 func main() -> filter(
   [{false, "one"},{true, "two"},{true, "three"},{false, "four"},{true, "five"}],
-  func (x: {bool, text}) -> x.0
+  func (x: {Bool, Text}) -> x.0
 )
 # >
 [
@@ -1158,18 +1158,18 @@ func main() -> filter(
 
 
 # === std_find_00
-func main() -> find([5,3,65,11,2]: [int64], x -> x > 10)
+func main() -> find([5,3,65,11,2]: [Int64], x -> x > 10)
 # >
 some(65)
 
 # === std_find_01
-func main() -> find([5,3,65,3,2]: [int64], x -> x < 0)
+func main() -> find([5,3,65,3,2]: [Int64], x -> x < 0)
 # >
 none
 
 
 # === std_flat_map_00
-func main() -> flat_map([1, 2, 3]: [int64], x -> [x, x])
+func main() -> flat_map([1, 2, 3]: [Int64], x -> [x, x])
 # >
 [
   1,
@@ -1182,7 +1182,7 @@ func main() -> flat_map([1, 2, 3]: [int64], x -> [x, x])
 
 # === std_flat_map_01
 func main() -> (
-  [{1: int64, false}, {2, true}]
+  [{1: Int64, false}, {2, true}]
   | flat_map(x -> [x, x])
 )
 # >
@@ -1206,7 +1206,7 @@ func main() -> (
 ]
 
 # === std_from_columnar_00
-func main() -> from_columnar({[4: int16, 3, 2], [5: int32, 4, 1]})
+func main() -> from_columnar({[4: Int16, 3, 2], [5: Int32, 4, 1]})
 # >
 [
   {
@@ -1224,17 +1224,17 @@ func main() -> from_columnar({[4: int16, 3, 2], [5: int32, 4, 1]})
 ]
 
 # === std_from_columnar_01
-func main() -> from_columnar({[1]: [int32], []: [int64]})
+func main() -> from_columnar({[1]: [Int32], []: [Int64]})
 # >
 []
 
 # === std_from_columnar_02
-func main() -> from_columnar({[]: [int8], [2]: [int16]})
+func main() -> from_columnar({[]: [Int8], [2]: [Int16]})
 # >
 []
 
 # === std_from_columnar_03
-func main() -> from_columnar({[1: int16, 2], [3: int16, 4, 5]})
+func main() -> from_columnar({[1: Int16, 2], [3: Int16, 4, 5]})
 # >
 [
   {
@@ -1262,7 +1262,7 @@ func main() -> from_columnar({[false, true], ["no", "yes", "neither"]})
 ]
 
 # === std_from_columnar_05
-func main() -> from_columnar({[1: int16, 2]})
+func main() -> from_columnar({[1: Int16, 2]})
 # >
 [
   {
@@ -1281,7 +1281,7 @@ func main() -> from_columnar({})
 []
 
 # === std_from_columnar_07
-func main() -> from_columnar({[false, true], ["no", "yes", "neither"], [1: int16, 2]})
+func main() -> from_columnar({[false, true], ["no", "yes", "neither"], [1: Int16, 2]})
 # >
 [
   {
@@ -1298,7 +1298,7 @@ func main() -> from_columnar({[false, true], ["no", "yes", "neither"], [1: int16
 
 # === std_zip_00
 func main() -> (
-  [1, 2, 3, 4: int16]
+  [1, 2, 3, 4: Int16]
   | zip(["one", "two", "three"])
 )
 # >
@@ -1319,7 +1319,7 @@ func main() -> (
 
 # === std_group_00
 func main() -> (
-  group([1, 2, 5, 1, 2, 4, 6, 12]: [int64], x -> x % 2)
+  group([1, 2, 5, 1, 2, 4, 6, 12]: [Int64], x -> x % 2)
   | sort(x -> x.key)
 )
 # >
@@ -1351,8 +1351,8 @@ func main() -> (
     {2, false, 21},
     {2, false, 22},
     {1, true, 10}
-  ]: [{int64, bool, int64}]
-  | group(func (x: {int64, bool, int64}) -> {x.0, x.2})
+  ]: [{Int64, Bool, Int64}]
+  | group(func (x: {Int64, Bool, Int64}) -> {x.0, x.2})
   | sort(x -> x.key.0 + x.key.1)
 )
 
@@ -1411,16 +1411,16 @@ func main() -> (
     {2, false, 21},
     {2, false, 22},
     {1, true, 10}
-  ]: [{int64, bool, int64}]
+  ]: [{Int64, Bool, Int64}]
   | group(
-    func (x: {int64, bool, int64}) -> {x.0, x.2}
+    func (x: {Int64, Bool, Int64}) -> {x.0, x.2}
   )
   | sort(x -> x.key.0 + x.key.1)
   | map(partition -> {
     k = partition.key.0,
     v = sum(map(
       partition.values,
-      func (x: {int64, bool, int64}) -> x.2
+      func (x: {Int64, Bool, Int64}) -> x.2
     )),
   })
 )
@@ -1528,7 +1528,7 @@ func main() -> (
 
 # === std_group_map_00
 func main() -> (
-  [1, 2, 2, 2, 5: int64, 5]
+  [1, 2, 2, 2, 5: Int64, 5]
   | group_map(
     x -> x, func (key, values) -> {key, count(values)}
   )
@@ -1552,7 +1552,7 @@ func main() -> (
 
 # === std_distinct_00
 func main() -> (
-  [1, 2, 2, 2, 5: int64, 5]
+  [1, 2, 2, 2, 5: Int64, 5]
   | distinct()
   | sort(x -> x)
 )
@@ -1564,8 +1564,8 @@ func main() -> (
 ]
 
 # === std_cmp_00
-const a: int32 = 2
-const b: int32 = 30
+const a: Int32 = 2
+const b: Int32 = 30
 
 func main() -> {cmp(a, b), cmp(a, a), cmp(b, a)}
 # >
@@ -1576,7 +1576,7 @@ func main() -> {cmp(a, b), cmp(a, a), cmp(b, a)}
 }
 
 # === std_eq_00
-func main() -> {30: int64 == 2, 30: int64 == 30}
+func main() -> {30: Int64 == 2, 30: Int64 == 30}
 # >
 {
   false,
@@ -1584,7 +1584,7 @@ func main() -> {30: int64 == 2, 30: int64 == 30}
 }
 
 # === std_eq_01
-func main() -> {30.3: float64 == 2.2, 30.3: float64 == 30.3}
+func main() -> {30.3: Float64 == 2.2, 30.3: Float64 == 30.3}
 # >
 {
   false,
@@ -1610,8 +1610,8 @@ func main() -> {"aa" == "b", "aa" == "aa"}
 
 # === std_ne_00
 func main() -> {
-  30.3: float64 != 2.2,
-  30.3: float64 != 30.3
+  30.3: Float64 != 2.2,
+  30.3: Float64 != 30.3
 }
 # >
 {
@@ -1621,8 +1621,8 @@ func main() -> {
 
 # === std_ne_01
 func main() -> {
-  30.3: float64 != 2.2,
-  30.3: float64 != 30.3
+  30.3: Float64 != 2.2,
+  30.3: Float64 != 30.3
 }
 # >
 {
@@ -1647,7 +1647,7 @@ func main() -> {"aa" != "b", "aa" != "aa"}
 }
 
 # === std_lt_00
-func main() -> {3 < 2: int64, 2 < 3: int64, 2 < 2: int64}
+func main() -> {3 < 2: Int64, 2 < 3: Int64, 2 < 2: Int64}
 # >
 {
   false,
@@ -1656,7 +1656,7 @@ func main() -> {3 < 2: int64, 2 < 3: int64, 2 < 2: int64}
 }
 
 # === std_lt_01
-func main() -> {3.3 < 2.2: float64, 2.2 < 3.3: float64, 2.2 < 2.2: float64}
+func main() -> {3.3 < 2.2: Float64, 2.2 < 3.3: Float64, 2.2 < 2.2: Float64}
 # >
 {
   false,
@@ -1686,7 +1686,7 @@ func main() -> {"aa" < "aa", "aa" < "ab", "ab" < "aa", "ab" < "ab"}
 
 
 # === std_lte_00
-func main() -> {3 <= 2: int64, 2 <= 3: int64, 2 <= 2: int64}
+func main() -> {3 <= 2: Int64, 2 <= 3: Int64, 2 <= 2: Int64}
 # >
 {
   false,
@@ -1695,7 +1695,7 @@ func main() -> {3 <= 2: int64, 2 <= 3: int64, 2 <= 2: int64}
 }
 
 # === std_lte_01
-func main() -> {3.3 <= 2.2: float64, 2.2 <= 3.3: float64, 2.2 <= 2.2: float64}
+func main() -> {3.3 <= 2.2: Float64, 2.2 <= 3.3: Float64, 2.2 <= 2.2: Float64}
 # >
 {
   false,
@@ -1724,7 +1724,7 @@ func main() -> {"aa" <= "aa", "aa" <= "ab", "ab" <= "aa", "ab" <= "ab"}
 }
 
 # === std_gt_00
-func main() -> {3 > 2: int64, 2 > 3: int64, 2 > 2: int64}
+func main() -> {3 > 2: Int64, 2 > 3: Int64, 2 > 2: Int64}
 # >
 {
   true,
@@ -1733,7 +1733,7 @@ func main() -> {3 > 2: int64, 2 > 3: int64, 2 > 2: int64}
 }
 
 # === std_gt_01
-func main() -> {3.3 > 2.2: float64, 2.2 > 3.3: float64, 2.2 > 2.2: float64}
+func main() -> {3.3 > 2.2: Float64, 2.2 > 3.3: Float64, 2.2 > 2.2: Float64}
 # >
 {
   true,
@@ -1762,7 +1762,7 @@ func main() -> {"aa" > "aa", "aa" > "ab", "ab" > "aa", "ab" > "ab"}
 }
 
 # === std_gte_00
-func main() -> {3 >= 2: int64, 2 >= 3: int64, 2 >= 2: int64}
+func main() -> {3 >= 2: Int64, 2 >= 3: Int64, 2 >= 2: Int64}
 # >
 {
   true,
@@ -1771,7 +1771,7 @@ func main() -> {3 >= 2: int64, 2 >= 3: int64, 2 >= 2: int64}
 }
 
 # === std_gte_01
-func main() -> {3.3 >= 2.2: float64, 2.2 >= 3.3: float64, 2.2 >= 2.2: float64}
+func main() -> {3.3 >= 2.2: Float64, 2.2 >= 3.3: Float64, 2.2 >= 2.2: Float64}
 # >
 {
   true,
@@ -1800,17 +1800,17 @@ func main() -> {"aa" >= "aa", "aa" >= "ab", "ab" >= "aa", "ab" >= "ab"}
 }
 
 # === std_index_00
-func main() -> index([5,3,65,3,2]: [int64], 3)
+func main() -> index([5,3,65,3,2]: [Int64], 3)
 # >
 some(3)
 
 # === std_index_01
-func main() -> index([5,3,65,3,2]: [int64], 10)
+func main() -> index([5,3,65,3,2]: [Int64], 10)
 # >
 none
 
 # === std_index_02
-func main() -> index([5.3,3.2,65.4,3.1,2.0], 3): enum { none, some: float64 }
+func main() -> index([5.3,3.2,65.4,3.1,2.0], 3): enum { none, some: Float64 }
 # >
 some(3.1)
 
@@ -1825,7 +1825,7 @@ func main() -> index(["hello", "world", "!"], 2)
 some("!")
 
 # === std_lag_00
-func main() -> lag([5,3,65,3,2,56,67]: [int8], 2)
+func main() -> lag([5,3,65,3,2,56,67]: [Int8], 2)
 # >
 [
   0,
@@ -1838,7 +1838,7 @@ func main() -> lag([5,3,65,3,2,56,67]: [int8], 2)
 ]
 
 # === std_lag_01
-func main() -> lag([5,3,65,3,2,56,67]: [int16], 12)
+func main() -> lag([5,3,65,3,2,56,67]: [Int16], 12)
 # >
 [
   0,
@@ -1851,12 +1851,12 @@ func main() -> lag([5,3,65,3,2,56,67]: [int16], 12)
 ]
 
 # === std_lag_02
-func main(): [int64] -> lag([], 3)
+func main(): [Int64] -> lag([], 3)
 # >
 []
 
 # === std_lag_03
-func main() -> lag([5,3,65,4], -2): [int8]
+func main() -> lag([5,3,65,4], -2): [Int8]
 # >
 [
   65,
@@ -1866,7 +1866,7 @@ func main() -> lag([5,3,65,4], -2): [int8]
 ]
 
 # === std_lead_00
-func main() -> lead([5,3,65,3,2,56,67], 2): [int8]
+func main() -> lead([5,3,65,3,2,56,67], 2): [Int8]
 # >
 [
   65,
@@ -1879,7 +1879,7 @@ func main() -> lead([5,3,65,3,2,56,67], 2): [int8]
 ]
 
 # === std_lead_01
-func main() -> lead([5,3,65,3,2,56,67], 12): [int64]
+func main() -> lead([5,3,65,3,2,56,67], 12): [Int64]
 # >
 [
   0,
@@ -1892,12 +1892,12 @@ func main() -> lead([5,3,65,3,2,56,67], 12): [int64]
 ]
 
 # === std_lead_02
-func main(): [int32] -> lead([], 3)
+func main(): [Int32] -> lead([], 3)
 # >
 []
 
 # === std_lead_03
-func main() -> lead([5,3,65,4], -2): [int64]
+func main() -> lead([5,3,65,4], -2): [Int64]
 # >
 [
   0,
@@ -1907,7 +1907,7 @@ func main() -> lead([5,3,65,4], -2): [int64]
 ]
 
 # === std_rolling_mean_00
-func main() -> [1, 2, 3, 4]: [int32] | rolling_mean(1, 1)
+func main() -> [1, 2, 3, 4]: [Int32] | rolling_mean(1, 1)
 # >
 [
   1.5,
@@ -1917,7 +1917,7 @@ func main() -> [1, 2, 3, 4]: [int32] | rolling_mean(1, 1)
 ]
 
 # === std_rolling_mean_01
-func main() -> [1, 2, 3, 4]: [int8] | rolling_mean(1, 1)
+func main() -> [1, 2, 3, 4]: [Int8] | rolling_mean(1, 1)
 # >
 [
   1.5,
@@ -1927,7 +1927,7 @@ func main() -> [1, 2, 3, 4]: [int8] | rolling_mean(1, 1)
 ]
 
 # === std_rolling_mean_02
-func main() -> [1, 2, 3, 4]: [int8] | rolling_mean(0, 2)
+func main() -> [1, 2, 3, 4]: [Int8] | rolling_mean(0, 2)
 # >
 [
   2.0,
@@ -1937,7 +1937,7 @@ func main() -> [1, 2, 3, 4]: [int8] | rolling_mean(0, 2)
 ]
 
 # === std_rolling_mean_03
-func main() -> [1, 2, 3, 4]: [int8] | rolling_mean(2, 0)
+func main() -> [1, 2, 3, 4]: [Int8] | rolling_mean(2, 0)
 # >
 [
   1.0,
@@ -1947,7 +1947,7 @@ func main() -> [1, 2, 3, 4]: [int8] | rolling_mean(2, 0)
 ]
 
 # === std_rolling_mean_04
-func main() -> [1, 2, 3, 4]: [int8] | rolling_mean(100, 100)
+func main() -> [1, 2, 3, 4]: [Int8] | rolling_mean(100, 100)
 # >
 [
   2.5,
@@ -1957,7 +1957,7 @@ func main() -> [1, 2, 3, 4]: [int8] | rolling_mean(100, 100)
 ]
 
 # === std_rolling_mean_05
-func main() -> []: [int8] | rolling_mean(1, 1)
+func main() -> []: [Int8] | rolling_mean(1, 1)
 # >
 []
 
@@ -1972,7 +1972,7 @@ func main() -> ["a", "b", "b", "c"] | rank()
 ]
 
 # === std_rank_01
-func main() -> [3.0, 1.0, 1.0, 2.0]: [float32] | rank()
+func main() -> [3.0, 1.0, 1.0, 2.0]: [Float32] | rank()
 # >
 [
   4,
@@ -1982,7 +1982,7 @@ func main() -> [3.0, 1.0, 1.0, 2.0]: [float32] | rank()
 ]
 
 # === std_rank_02
-func main() -> []: [float32] | rank()
+func main() -> []: [Float32] | rank()
 # >
 []
 
@@ -2017,7 +2017,7 @@ func main() -> ["a", "b", "b", "c"] | cume_dist()
 ]
 
 # === std_map_00
-func main() -> map([5,3,65,3,2], func (x: int64) -> x + 1)
+func main() -> map([5,3,65,3,2], func (x: Int64) -> x + 1)
 # >
 [
   6,
@@ -2028,12 +2028,12 @@ func main() -> map([5,3,65,3,2], func (x: int64) -> x + 1)
 ]
 
 # === std_map_01
-func main() -> map([], func (x: int64) -> x + 1)
+func main() -> map([], func (x: Int64) -> x + 1)
 # >
 []
 
 # === std_map_02
-func main() -> map([false, true, false], func (x: bool) -> !x)
+func main() -> map([false, true, false], func (x: Bool) -> !x)
 # >
 [
   true,
@@ -2042,7 +2042,7 @@ func main() -> map([false, true, false], func (x: bool) -> !x)
 ]
 
 # === std_map_03
-func main() -> map(["hello", "world", "!"], func (x: text) -> text::length(x))
+func main() -> map(["hello", "world", "!"], func (x: Text) -> text::length(x))
 # >
 [
   5,
@@ -2052,8 +2052,8 @@ func main() -> map(["hello", "world", "!"], func (x: text) -> text::length(x))
 
 # === std_map_columnar_00
 func main() -> map_columnar(
-  [{5: int16, 3: int16}, {65, 1}, {3, 2}],
-  func (x: {[int16], [int16]}) -> {
+  [{5: Int16, 3: Int16}, {65, 1}, {3, 2}],
+  func (x: {[Int16], [Int16]}) -> {
     lag(x.0, 1),
     lead(x.1, 1)
   }
@@ -2078,7 +2078,7 @@ func main() -> map_columnar(
 # === std_map_columnar_01
 func main() -> map_columnar(
     [{false,"hello"},{false,"world"},{true, "!"}],
-    func (x: {[bool], [text]}) -> {
+    func (x: {[Bool], [Text]}) -> {
         lead(x.0, 1),
         lag(x.1, 1),
     }
@@ -2101,12 +2101,12 @@ func main() -> map_columnar(
 ]
 
 # === std_max_00
-func main() -> max([5,3,65,3,2,56,67]: [uint64])
+func main() -> max([5,3,65,3,2,56,67]: [Uint64])
 # >
 some(67)
 
 # === std_max_01
-func main() -> max([]: [uint32])
+func main() -> max([]: [Uint32])
 # >
 none
 
@@ -2121,7 +2121,7 @@ func main() -> max([false, true, true, false])
 some(true)
 
 # === std_max_04
-func main() -> max([]: [bool])
+func main() -> max([]: [Bool])
 # >
 none
 
@@ -2136,12 +2136,12 @@ func main() -> max([true, true])
 some(true)
 
 # === std_min_00
-func main() -> min([5,3,65,3,2,56,67]: [uint64])
+func main() -> min([5,3,65,3,2,56,67]: [Uint64])
 # >
 some(2)
 
 # === std_min_01
-func main() -> min([]: [uint32])
+func main() -> min([]: [Uint32])
 # >
 none
 
@@ -2156,7 +2156,7 @@ func main() -> min([false, true, true, false])
 some(false)
 
 # === std_min_04
-func main() -> min([]: [bool])
+func main() -> min([]: [Bool])
 # >
 none
 
@@ -2171,57 +2171,57 @@ func main() -> min([true, true])
 some(true)
 
 # === std_mod_00
-func main() -> (10 % 6): int64
+func main() -> (10 % 6): Int64
 # >
 4
 
 # === std_mod_01
-func main() -> (-10 % 6): int64
+func main() -> (-10 % 6): Int64
 # >
 -4
 
 # === std_mod_02
-func main() -> (10 % -6): int64
+func main() -> (10 % -6): Int64
 # >
 4
 
 # === std_mod_03
-func main() -> (-10 % -6): int64
+func main() -> (-10 % -6): Int64
 # >
 -4
 
 # === std_mod_04
-func main() -> (10.0 % 6.0): float64
+func main() -> (10.0 % 6.0): Float64
 # >
 4.0
 
 # === std_mod_05
-func main() -> (-10.0 % 6.0): float64
+func main() -> (-10.0 % 6.0): Float64
 # >
 -4.0
 
 # === std_mod_06
-func main() -> (10.0 % -6.0): float64
+func main() -> (10.0 % -6.0): Float64
 # >
 4.0
 
 # === std_mod_07
-func main() -> (-10.0 % -6.0): float64
+func main() -> (-10.0 % -6.0): Float64
 # >
 -4.0
 
 # === std_mul_01
-func main() -> (2 * 3): int64
+func main() -> (2 * 3): Int64
 # >
 6
 
 # === std_mul_02
-func main() -> (2.1 * 3.5): float64
+func main() -> (2.1 * 3.5): Float64
 # >
 7.3500000000000005
 
 # === std_neg_00
-func main() -> {-2: int64, - (-3: int64)}
+func main() -> {-2: Int64, - (-3: Int64)}
 # >
 {
   -2,
@@ -2229,7 +2229,7 @@ func main() -> {-2: int64, - (-3: int64)}
 }
 
 # === std_neg_01
-func main() -> {-2.1: float64, - (-3.1: float64)}
+func main() -> {-2.1: Float64, - (-3.1: Float64)}
 # >
 {
   -2.1,
@@ -2255,7 +2255,7 @@ func main() -> {false || false, false || true, true || false, true || true}
 }
 
 # === std_slice_00
-func main() -> slice([5,3,65,3,2]: [int64], 1, 3)
+func main() -> slice([5,3,65,3,2]: [Int64], 1, 3)
 # >
 [
   3,
@@ -2265,7 +2265,7 @@ func main() -> slice([5,3,65,3,2]: [int64], 1, 3)
 # === std_slice_01
 # skip: postgres
 # skip: duckdb
-func main() -> slice([5,3,65,3,2]: [int64], 1, -1)
+func main() -> slice([5,3,65,3,2]: [Int64], 1, -1)
 # >
 [
   3,
@@ -2274,17 +2274,17 @@ func main() -> slice([5,3,65,3,2]: [int64], 1, -1)
 ]
 
 # === std_slice_02
-func main() -> slice([5,3,65,3,2]: [int64], 4, 2)
+func main() -> slice([5,3,65,3,2]: [Int64], 4, 2)
 # >
 []
 
 # === std_slice_03
-func main() -> slice([5,3,65,3,2]: [int64], 6, 7)
+func main() -> slice([5,3,65,3,2]: [Int64], 6, 7)
 # >
 []
 
 # === std_slice_04
-func main() -> slice([5,3,65,3,2]: [int64], -7, 0)
+func main() -> slice([5,3,65,3,2]: [Int64], -7, 0)
 # >
 []
 
@@ -2316,7 +2316,7 @@ func main() -> slice([{false,"hello"}, {false,"world"},{true, "!"},{false,"foo"}
 ]
 
 # === std_sort_00
-func main() -> sort([5,3,65,3,2]: [int64], func (x: int64) -> -x)
+func main() -> sort([5,3,65,3,2]: [Int64], func (x: Int64) -> -x)
 # >
 [
   65,
@@ -2328,8 +2328,8 @@ func main() -> sort([5,3,65,3,2]: [int64], func (x: int64) -> -x)
 
 # === std_sort_01
 func main() -> sort(
-  [{5: int64, "hello"}, {3: int64, "world"}, {65: int64, "!"}, {3: int64, "foo"}, {2: int64, "bar"}],
-  func (x: {int64, text}) -> x.0
+  [{5: Int64, "hello"}, {3: Int64, "world"}, {65: Int64, "!"}, {3: Int64, "foo"}, {2: Int64, "bar"}],
+  func (x: {Int64, Text}) -> x.0
 )
 # >
 [
@@ -2367,49 +2367,49 @@ func main() -> sort(["ab", "a", "aa", "e"], x -> x)
 
 
 # === std_sub_00
-func main() -> (30 - 2): int64
+func main() -> (30 - 2): Int64
 # >
 28
 
 # === std_sub_01
-func main() -> (2 - 30): int64
+func main() -> (2 - 30): Int64
 # >
 -28
 
 # === std_sub_02
-func main() -> (30.2 - 2.30): float64
+func main() -> (30.2 - 2.30): Float64
 # >
 27.9
 
 # === std_sub_03
-func main() -> (2.30 - 30.2): float64
+func main() -> (2.30 - 30.2): Float64
 # >
 -27.9
 
 # === std_sum_00
-func main() -> sum([5,3,65,3,2,56,67: int32])
+func main() -> sum([5,3,65,3,2,56,67: Int32])
 # >
 201
 
 # === std_sum_01
-func main() -> sum([]: [int16])
+func main() -> sum([]: [Int16])
 # >
 0
 
 # === std_sum_02
-func main() -> sum([5,3,65,3,2,56,67: int64])
+func main() -> sum([5,3,65,3,2,56,67: Int64])
 # >
 201
 
 # === std_sum_03
 # skip: duckdb
 # DuckDB does not have a native SUM(FLOAT4) aggregate - it only provides SUM(DOUBLE).
-func main() -> sum([5.4, 3.2, 1.1: float32])
+func main() -> sum([5.4, 3.2, 1.1: Float32])
 # >
 9.700001
 
 # === std_to_columnar_00
-func main() -> to_columnar([{5,3},{65,1},{3, 2}]: [{int64, int64}])
+func main() -> to_columnar([{5,3},{65,1},{3, 2}]: [{Int64, Int64}])
 # >
 {
   [
@@ -2590,37 +2590,37 @@ func main() -> {
 }
 
 # === std_math_abs_00
-func main() -> math::abs(-3: int16)
+func main() -> math::abs(-3: Int16)
 # >
 3
 
 # === std_math_abs_01
-func main() -> math::abs(-3.3: float32)
+func main() -> math::abs(-3.3: Float32)
 # >
 3.3
 
 # === std_math_abs_02
-func main() -> math::abs(0.0: float64)
+func main() -> math::abs(0.0: Float64)
 # >
 0.0
 
 # === std_math_pi_00
-func main(): float32 -> math::pi32
+func main(): Float32 -> math::pi32
 # >
 3.1415927
 
 # === std_math_pi_01
-func main(): float64 -> math::pi64
+func main(): Float64 -> math::pi64
 # >
 3.141592653589793
 
 # === tuple_00
-func main() -> {key = {"code 1", false}, value = 5: int64}.key.1
+func main() -> {key = {"code 1", false}, value = 5: Int64}.key.1
 # >
 false
 
 # === unpack_00
-const main = {a = 4: int32, ..{x1 = 3: int32, x2 = "hello"}, b = false}
+const main = {a = 4: Int32, ..{x1 = 3: Int32, x2 = "hello"}, b = false}
 # >
 {
   a = 4,
@@ -2630,8 +2630,8 @@ const main = {a = 4: int32, ..{x1 = 3: int32, x2 = "hello"}, b = false}
 }
 
 # === unpack_01
-const x = {x1 = 3: int32, x2 = "hello"}
-const main = {a = 4: int32, ..x, b = false}
+const x = {x1 = 3: Int32, x2 = "hello"}
+const main = {a = 4: Int32, ..x, b = false}
 # >
 {
   a = 4,
@@ -2645,7 +2645,7 @@ func identity(x: T): T
 where T: {..}
 -> x
 
-func main() -> {a = 4: int32, ..identity({true, false}), b = false}
+func main() -> {a = 4: Int32, ..identity({true, false}), b = false}
 # >
 {
   a = 4,
@@ -2669,56 +2669,56 @@ func main() -> false_x_false({true, true})
 }
 
 # === unpack_04
-const main = {a = 4: int32, ..{x1 = 3: int32, x2 = "hello"}, b = false}.x2
+const main = {a = 4: Int32, ..{x1 = 3: Int32, x2 = "hello"}, b = false}.x2
 # >
 "hello"
 
 # === unpack_05
-const x = {x1 = 3: int32, x2 = "hello"}
-const main = {a = 4: int32, ..x, b = false}.x2
+const x = {x1 = 3: Int32, x2 = "hello"}
+const main = {a = 4: Int32, ..x, b = false}.x2
 # >
 "hello"
 
 # === unpack_06
 func main() -> (
   {x1 = true, x2 = false}
-  | x -> {4: int32, ..x: {x1: bool, x2: bool}, "hello"}.x2
+  | x -> {4: Int32, ..x: {x1: Bool, x2: Bool}, "hello"}.x2
 )
 # >
 false
 
 # === unpack_07
-func false_x_false(x: T) where T: {x2: text, ..} -> {false, ..x, false}.x2
+func false_x_false(x: T) where T: {x2: Text, ..} -> {false, ..x, false}.x2
 func main() -> false_x_false({true, x2 = "hello"})
 # >
 "hello"
 
 # === unpack_08
-const main = {a = 4: int32, ..{x1 = 3: int32, x2 = "hello"}, b = false}.2
+const main = {a = 4: Int32, ..{x1 = 3: Int32, x2 = "hello"}, b = false}.2
 # >
 "hello"
 
 # === unpack_09
-const main = {..{3: int32, "hello"}, ..{"world", ..{false, ..{true, true}}}, "a"}.6
+const main = {..{3: Int32, "hello"}, ..{"world", ..{false, ..{true, true}}}, "a"}.6
 # >
 "a"
 
 # === unpack_10
-const x = {x1 = 3: int32, x2 = "hello"}
-const main = {a = 4: int32, ..x, b = false}.2
+const x = {x1 = 3: Int32, x2 = "hello"}
+const main = {a = 4: Int32, ..x, b = false}.2
 # >
 "hello"
 
 # === unpack_12
 func main() -> (
   {true, false}
-  | x -> {4: int32, ..x: {bool, bool}, "hello"}.2
+  | x -> {4: Int32, ..x: {Bool, Bool}, "hello"}.2
 )
 # >
 false
 
 # === unpack_14
-func false_x_false(x: T) where T: {bool, text, ..} -> {false, ..x, false}.2
+func false_x_false(x: T) where T: {Bool, Text, ..} -> {false, ..x, false}.2
 func main() -> false_x_false({true, "hello"})
 # >
 "hello"
@@ -2727,7 +2727,7 @@ func main() -> false_x_false({true, "hello"})
 # === recursive_type_00
 # skip: duckdb
 type Tree: enum {
-  leaf: int8,
+  leaf: Int8,
   node: {left: Tree, right: Tree},
 }
 const main: [Tree] = [
@@ -2743,7 +2743,7 @@ const main: [Tree] = [
 # === recursive_type_01
 # skip: duckdb
 type Tree: enum {
-  leaf: int8,
+  leaf: Int8,
   node: {left: Tree, right: Tree},
 }
 const main: Tree = .node({
@@ -2771,7 +2771,7 @@ node({
 # === recursive_type_02
 # skip: duckdb
 type Tree: enum {
-  leaf: int8,
+  leaf: Int8,
   node: [Tree],
 }
 const main: Tree = .node([
@@ -2952,7 +2952,7 @@ func main() -> (
 
 # === var_binding_01
 func main() -> (
-  [1, 2, 3]: [int32]
+  [1, 2, 3]: [Int32]
   | map(x -> (
     let a = x * 2;
     a * a
@@ -2967,7 +2967,7 @@ func main() -> (
 
 # === var_binding_02
 func main() -> (
-  [1, 2, 3]: [int32]
+  [1, 2, 3]: [Int32]
   | map(x -> (
     let a = x * 2;
     let b = a * 2;
@@ -2994,7 +2994,7 @@ func main() -> {
   calculate(1, multiply = 3, add = 2),
 }
 
-func calculate(value: int32, add addend: int32, multiply multiplier: int32) -> (
+func calculate(value: Int32, add addend: Int32, multiply multiplier: Int32) -> (
   value * multiplier + addend
 )
 # >
@@ -3032,7 +3032,7 @@ func main() -> .none | option::or_else("fallback")
 "fallback"
 
 # === std_option_or_else_02
-func main() -> .none: enum {none, some: text} | option::or_default()
+func main() -> .none: enum {none, some: Text} | option::or_default()
 # >
 ""
 
@@ -3044,7 +3044,7 @@ some("Hello world!")
 # === std_option_flat_map_00
 func main() -> (
   .some("world")
-  | option::flat_map(x -> .none: enum {none, some: int32})
+  | option::flat_map(x -> .none: enum {none, some: Int32})
 )
 # >
 none
@@ -3068,7 +3068,7 @@ func main() -> [
 ]
 
 # === custom_type_00
-type MyInt: int32
+type MyInt: Int32
 func main() -> to_int64(4: MyInt)
 # >
 4

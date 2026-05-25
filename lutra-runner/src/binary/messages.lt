@@ -1,4 +1,4 @@
-type Request: {id: uint32, kind: RequestKind}
+type Request: {id: Uint32, kind: RequestKind}
 
 type RequestKind: enum {
   # Prepare a program
@@ -17,13 +17,13 @@ type RequestKind: enum {
   get_externals,
 }
 
-type PrepareRequest: {program_id: uint32, program: [uint8]}
+type PrepareRequest: {program_id: Uint32, program: [Uint8]}
 
-type ExecuteRequest: {program_id: uint32, input: [uint8]}
+type ExecuteRequest: {program_id: Uint32, input: [Uint8]}
 
-type ReleaseRequest: {program_id: uint32}
+type ReleaseRequest: {program_id: Uint32}
 
-type Response: {request_id: uint32, kind: ResponseKind}
+type Response: {request_id: Uint32, kind: ResponseKind}
 
 type ResponseKind: enum {
   prepare: PrepareResult,
@@ -35,18 +35,18 @@ type ResponseKind: enum {
 
 type PrepareResult: enum {ok, err: Error}
 
-type ExecuteResult: enum {ok: [uint8], err: Error}
+type ExecuteResult: enum {ok: [Uint8], err: Error}
 
 type ReleaseResult: enum {ok, err: Error}
 
-type SchemaResult: enum {ok: text, err: Error}
+type SchemaResult: enum {ok: Text, err: Error}
 
-type ExternalsResult: enum {ok: [text], err: Error}
+type ExternalsResult: enum {ok: [Text], err: Error}
 
 type Error: {
   # Human-readable error message, intended to be shown directly to users.
-  display: text,
+  display: Text,
 
   # Machine-readable error code for programmatic handling.
-  code: enum {none, some: text},
+  code: enum {none, some: Text},
 }

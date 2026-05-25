@@ -125,7 +125,7 @@ fn validate_type_match(
     lutra_ty: &ir::Ty,
     ctx: &Context,
 ) -> Result<(), Error> {
-    let lutra_ty = ctx.get_ty_mat(lutra_ty)?;
+    let ty_mat = ctx.get_ty_mat(lutra_ty)?;
 
     // option types: validation happens on inner type when we recurse
     if let ir::TyKind::Enum(variants) = &lutra_ty.kind
@@ -134,25 +134,44 @@ fn validate_type_match(
         return Ok(());
     }
 
-    let ok = match (arrow_ty, &lutra_ty.kind) {
+    #[allow(clippy::match_like_matches_macro)]
+    let ok = match (arrow_ty, &ty_mat.kind) {
         // Primitives
-        (ad::DataType::Boolean, ir::TyKind::Primitive(ir::TyPrimitive::bool)) => true,
-        (ad::DataType::Int8, ir::TyKind::Primitive(ir::TyPrimitive::int8)) => true,
-        (ad::DataType::Int16, ir::TyKind::Primitive(ir::TyPrimitive::int16)) => true,
-        (ad::DataType::Int32, ir::TyKind::Primitive(ir::TyPrimitive::int32)) => true,
-        (ad::DataType::Date32, ir::TyKind::Primitive(ir::TyPrimitive::int32)) => true,
-        (ad::DataType::Int64, ir::TyKind::Primitive(ir::TyPrimitive::int64)) => true,
-        (ad::DataType::Timestamp(_, _), ir::TyKind::Primitive(ir::TyPrimitive::int64)) => true,
-        (ad::DataType::UInt8, ir::TyKind::Primitive(ir::TyPrimitive::uint8)) => true,
-        (ad::DataType::UInt16, ir::TyKind::Primitive(ir::TyPrimitive::uint16)) => true,
-        (ad::DataType::UInt32, ir::TyKind::Primitive(ir::TyPrimitive::uint32)) => true,
-        (ad::DataType::UInt64, ir::TyKind::Primitive(ir::TyPrimitive::uint64)) => true,
-        (ad::DataType::Float32, ir::TyKind::Primitive(ir::TyPrimitive::float32)) => true,
-        (ad::DataType::Float64, ir::TyKind::Primitive(ir::TyPrimitive::float64)) => true,
-        (
-            ad::DataType::Utf8 | ad::DataType::LargeUtf8,
-            ir::TyKind::Primitive(ir::TyPrimitive::text),
-        ) => true,
+        (_, ir::TyKind::Primitive(prim)) => match (arrow_ty.primitive_width(), prim) {
+            (Some(1), ir::TyPrimitive::prim8) => true,
+            (Some(2), ir::TyPrimitive::prim16) => true,
+            (Some(4), ir::TyPrimitive::prim32) => true,
+            (Some(8), ir::TyPrimitive::prim64) => true,
+            _ => false,
+        },
+        (_, ir::TyKind::Ident(ident)) => {
+            let ty_std = ir::TyStd::try_new(ident).unwrap();
+            match (arrow_ty, ty_std) {
+                (ad::DataType::Boolean, ir::TyStd::Bool) => true,
+                (ad::DataType::Int8, ir::TyStd::Int8) => true,
+                (ad::DataType::Int16, ir::TyStd::Int16) => true,
+                (ad::DataType::Int32, ir::TyStd::Int32 | ir::TyStd::Date) => true,
+                (
+                    ad::DataType::Int64,
+                    ir::TyStd::Int64 | ir::TyStd::Time | ir::TyStd::Timestamp | ir::TyStd::Decimal,
+                ) => true,
+                (ad::DataType::UInt8, ir::TyStd::UInt8) => true,
+                (ad::DataType::UInt16, ir::TyStd::UInt16) => true,
+                (ad::DataType::UInt32, ir::TyStd::UInt32) => true,
+                (ad::DataType::UInt64, ir::TyStd::UInt64) => true,
+                (ad::DataType::Float32, ir::TyStd::Float32) => true,
+                (ad::DataType::Float64, ir::TyStd::Float64) => true,
+                (ad::DataType::Utf8, ir::TyStd::Text) => true,
+                (ad::DataType::Date32, ir::TyStd::Date) => true,
+                (ad::DataType::Time64(ad::TimeUnit::Microsecond), ir::TyStd::Time) => true,
+                (
+                    ad::DataType::Timestamp(ad::TimeUnit::Microsecond, None),
+                    ir::TyStd::Timestamp,
+                ) => true,
+                (ad::DataType::Decimal64(20, 2), ir::TyStd::Decimal) => true,
+                _ => false,
+            }
+        }
 
         // Composite types
         (ad::DataType::Struct(arrow_fields), ir::TyKind::Tuple(lutra_fields)) => {

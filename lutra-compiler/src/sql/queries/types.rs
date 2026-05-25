@@ -6,10 +6,32 @@ use lutra_bin::ir;
 use super::utils;
 
 impl<'p> Context<'p> {
+    pub(crate) fn get_ty_std(&self, ty: &ir::Ty) -> Option<ir::TyStd> {
+        let mut ty = ty;
+        while let ir::TyKind::Ident(ident) = &ty.kind {
+            if let Some(std) = ir::TyStd::try_new(ident) {
+                return Some(std);
+            }
+            ty = self.types.get(ident).unwrap();
+        }
+        None
+    }
+
     /// Get SQL type name for a Lutra type (in query repr)
     pub(super) fn ty_name(&self, ty: &ir::Ty) -> String {
         match &self.get_ty_mat(ty).kind {
-            ir::TyKind::Primitive(prim) => self.compile_primitive_ty_name(*prim),
+            ir::TyKind::Ident(path) => self
+                .ty_std_name(ir::TyStd::try_new(path).unwrap())
+                .to_string(),
+            ir::TyKind::Primitive(prim) => {
+                let ty = match prim {
+                    ir::TyPrimitive::prim8 => ir::TyStd::Int8,
+                    ir::TyPrimitive::prim16 => ir::TyStd::Int16,
+                    ir::TyPrimitive::prim32 => ir::TyStd::Int32,
+                    ir::TyPrimitive::prim64 => ir::TyStd::Int64,
+                };
+                self.ty_std_name(ty).to_string()
+            }
 
             ir::TyKind::Tuple(fields) if fields.is_empty() => {
                 // unit type (holds no data) does not exist in sql so we use a type with
@@ -26,15 +48,48 @@ impl<'p> Context<'p> {
                 // container types are serialized
                 // (tuple should probably be flattened, but we probably never call
                 //  this method on non-flattened expressions)
-                self.ser_compile_ty_name(ty)
+                self.ser_ty_name(ty)
             }
 
-            ir::TyKind::Function(_) | ir::TyKind::Ident(_) => unreachable!(),
+            ir::TyKind::Function(_) => unreachable!(),
+        }
+    }
+
+    pub(super) fn ty_std_name(&self, ty: ir::TyStd) -> &'static str {
+        use ir::TyStd::*;
+        match self.dialect() {
+            Dialect::Postgres => match ty {
+                Bool => "bool",
+                Int8 | Int16 | UInt8 | UInt16 => "int2",
+                Int32 | UInt32 => "int4",
+                Int64 | UInt64 => "int8",
+                Float32 => "float4",
+                Float64 => "float8",
+                Text => "text",
+                Date => "int4",
+                Time | Timestamp | Decimal => "int8",
+            },
+            Dialect::DuckDB => match ty {
+                Bool => "BOOL",
+                Int8 => "INT1",
+                Int16 => "INT2",
+                Int32 => "INT4",
+                Int64 => "INT8",
+                UInt8 => "UINT8",
+                UInt16 => "UINT16",
+                UInt32 => "UINT32",
+                UInt64 => "UINT64",
+                Float32 => "FLOAT4",
+                Float64 => "FLOAT8",
+                Text => "TEXT",
+                Date => "INT4",
+                Time | Timestamp | Decimal => "INT8",
+            },
         }
     }
 
     /// Get SQL type name in the "serialized repr"
-    fn ser_compile_ty_name(&self, ty: &ir::Ty) -> String {
+    fn ser_ty_name(&self, ty: &ir::Ty) -> String {
         match self.dialect() {
             Dialect::Postgres => {
                 // PostgreSQL uses jsonb for complex types
@@ -42,78 +97,29 @@ impl<'p> Context<'p> {
             }
             Dialect::DuckDB => {
                 // DuckDB serializes to STRUCT/UNION/LIST
-                self.duck_compile_ty_name(ty)
+                self.duck_ty_name(ty)
             }
         }
     }
 
-    /// Primitive type name
-    fn compile_primitive_ty_name(&self, prim: ir::TyPrimitive) -> String {
-        match self.dialect() {
-            Dialect::Postgres => self.pg_compile_primitive_ty_name(prim),
-            Dialect::DuckDB => self.duck_compile_primitive_ty_name(prim),
-        }
-    }
-
-    /// PostgreSQL primitive type names
-    /// Note: PostgreSQL has no native unsigned types, so we use same-sized signed types.
-    /// Large unsigned values wrap around to negative (lutra-runner-postgres casts back).
-    /// Note: PostgreSQL has no int1/tinyint, so int8 uses smallint (int2).
-    fn pg_compile_primitive_ty_name(&self, prim: ir::TyPrimitive) -> String {
-        match prim {
-            ir::TyPrimitive::bool => "bool",
-            ir::TyPrimitive::int8 => "int2", // PostgreSQL has no int1, use int2
-            ir::TyPrimitive::int16 => "int2",
-            ir::TyPrimitive::int32 => "int4",
-            ir::TyPrimitive::int64 => "int8",
-            ir::TyPrimitive::uint8 => "int2", // PostgreSQL has no int1, use int2
-            ir::TyPrimitive::uint16 => "int2", // Same size, large values wrap to negative
-            ir::TyPrimitive::uint32 => "int4", // Same size, large values wrap to negative
-            ir::TyPrimitive::uint64 => "int8", // Same size, large values wrap to negative
-            ir::TyPrimitive::float32 => "float4",
-            ir::TyPrimitive::float64 => "float8",
-            ir::TyPrimitive::text => "text",
-        }
-        .to_string()
-    }
-
-    /// DuckDB primitive type names
-    fn duck_compile_primitive_ty_name(&self, prim: ir::TyPrimitive) -> String {
-        match prim {
-            ir::TyPrimitive::bool => "BOOL",
-            ir::TyPrimitive::int8 => "INT1",
-            ir::TyPrimitive::int16 => "INT2",
-            ir::TyPrimitive::int32 => "INT4",
-            ir::TyPrimitive::int64 => "INT8",
-            ir::TyPrimitive::uint8 => "UINT8",
-            ir::TyPrimitive::uint16 => "UINT16",
-            ir::TyPrimitive::uint32 => "UINT32",
-            ir::TyPrimitive::uint64 => "UINT64",
-            ir::TyPrimitive::float32 => "FLOAT4",
-            ir::TyPrimitive::float64 => "FLOAT8",
-            ir::TyPrimitive::text => "TEXT",
-        }
-        .to_string()
-    }
-
     /// Get type name for a Lutra type in "duckdb repr"
-    pub(super) fn duck_compile_ty_name(&self, ty: &ir::Ty) -> String {
-        // special case: std::Date
-        if let ir::TyKind::Ident(ty_ident) = &ty.kind
-            && ty_ident.0 == ["std", "Date"]
-        {
-            return "DATE".into();
-        }
-        // special case: std::Time & std::Timestamp
-        if let ir::TyKind::Ident(ty_ident) = &ty.kind
-            && (ty_ident.0 == ["std", "Time"] || ty_ident.0 == ["std", "Timestamp"])
-        {
-            return "TIMESTAMP".into();
+    pub(super) fn duck_ty_name(&self, ty: &ir::Ty) -> String {
+        if let Some(ty) = self.get_ty_std(ty) {
+            return self.duck_ty_std_name(ty).to_string();
         }
 
         let ty_mat = self.get_ty_mat(ty);
         match &ty_mat.kind {
-            ir::TyKind::Primitive(prim) => self.compile_primitive_ty_name(*prim),
+            ir::TyKind::Primitive(prim) => {
+                let ty = match prim {
+                    ir::TyPrimitive::prim8 => ir::TyStd::Int8,
+                    ir::TyPrimitive::prim16 => ir::TyStd::Int16,
+                    ir::TyPrimitive::prim32 => ir::TyStd::Int32,
+                    ir::TyPrimitive::prim64 => ir::TyStd::Int64,
+                };
+                self.duck_ty_std_name(ty).to_string()
+            }
+
             ir::TyKind::Tuple(fields) if fields.is_empty() => {
                 // Unit type
                 "bool".to_string()
@@ -125,7 +131,7 @@ impl<'p> Context<'p> {
                     .enumerate()
                     .map(|(p, f)| {
                         let name = utils::new_ident(super::repr_duckdb::field_name(f, p));
-                        let f_type = self.duck_compile_ty_name(&f.ty);
+                        let f_type = self.duck_ty_name(&f.ty);
                         format!("{name} {f_type}")
                     })
                     .collect();
@@ -133,11 +139,11 @@ impl<'p> Context<'p> {
             }
             ir::TyKind::Array(item_ty) => {
                 // Generate type[]
-                let item_type = self.duck_compile_ty_name(item_ty);
+                let item_type = self.duck_ty_name(item_ty);
                 format!("{item_type}[]")
             }
             ir::TyKind::Enum(variants) if self.is_option(variants) => {
-                self.duck_compile_ty_name(&variants[1].ty)
+                self.duck_ty_name(&variants[1].ty)
             }
             ir::TyKind::Enum(variants) => {
                 // Generate UNION(variant1 type1, variant2 type2, ...)
@@ -148,7 +154,7 @@ impl<'p> Context<'p> {
                             // Unit variants use BOOL as placeholder (DuckDB UNION needs a type)
                             "BOOL".to_string()
                         } else {
-                            self.duck_compile_ty_name(&v.ty)
+                            self.duck_ty_name(&v.ty)
                         };
                         format!("{} {}", utils::new_ident(&v.name), variant_ty)
                     })
@@ -159,45 +165,74 @@ impl<'p> Context<'p> {
         }
     }
 
+    fn duck_ty_std_name(&self, ty: ir::TyStd) -> &'static str {
+        use ir::TyStd::*;
+        match ty {
+            Bool => "BOOL",
+            Int8 => "INT1",
+            Int16 => "INT2",
+            Int32 => "INT4",
+            Int64 => "INT8",
+            UInt8 => "UINT8",
+            UInt16 => "UINT16",
+            UInt32 => "UINT32",
+            UInt64 => "UINT64",
+            Float32 => "FLOAT4",
+            Float64 => "FLOAT8",
+            Text => "TEXT",
+            Date => "DATE",
+            Time => "TIMESTAMP",
+            Timestamp => "TIMESTAMP",
+            Decimal => "DECIMAL",
+        }
+    }
+
     /// Get default value for a type
-    pub(super) fn default_value(&self, ty: &ir::Ty) -> String {
+    pub(super) fn default_value(&self, ty: &ir::Ty) -> &'static str {
+        use ir::TyStd::*;
+
+        let ty = self.get_ty_mat(ty);
+        let ty_std = match &ty.kind {
+            ir::TyKind::Ident(ident) => ir::TyStd::try_new(ident).unwrap(),
+            ir::TyKind::Primitive(ir::TyPrimitive::prim8) => Int8,
+            ir::TyKind::Primitive(ir::TyPrimitive::prim16) => Int16,
+            ir::TyKind::Primitive(ir::TyPrimitive::prim32) => Int32,
+            ir::TyKind::Primitive(ir::TyPrimitive::prim64) => Int64,
+            _ => todo!(),
+        };
+
         match self.dialect() {
-            Dialect::Postgres => self.pg_default_value(ty),
-            Dialect::DuckDB => self.duck_default_value(ty),
-        }
-    }
+            Dialect::Postgres => match ty_std {
+                Bool => "FALSE",
 
-    fn pg_default_value(&self, ty: &ir::Ty) -> String {
-        match &self.get_ty_mat(ty).kind {
-            ir::TyKind::Primitive(ir::TyPrimitive::int8) => "0::int2",
-            ir::TyKind::Primitive(ir::TyPrimitive::int16) => "0::int2",
-            ir::TyKind::Primitive(ir::TyPrimitive::int32) => "0::int4",
-            ir::TyKind::Primitive(ir::TyPrimitive::int64) => "0::int8",
-            ir::TyKind::Primitive(ir::TyPrimitive::float32) => "0.0::float4",
-            ir::TyKind::Primitive(ir::TyPrimitive::float64) => "0.0::float8",
-            ir::TyKind::Primitive(ir::TyPrimitive::bool) => "FALSE",
-            ir::TyKind::Primitive(ir::TyPrimitive::text) => "''",
-            _ => todo!(),
-        }
-        .to_string()
-    }
+                Int8 | Int16 | UInt8 | UInt16 => "0::int2",
+                Int32 | UInt32 => "0::int4",
+                Int64 | UInt64 => "0::int8",
+                Float32 => "0.0::float4",
+                Float64 => "0.0::float8",
+                Text => "''",
+                Date | Time | Timestamp | Decimal => {
+                    todo!()
+                }
+            },
+            Dialect::DuckDB => match ty_std {
+                Bool => "FALSE",
 
-    fn duck_default_value(&self, ty: &ir::Ty) -> String {
-        match &self.get_ty_mat(ty).kind {
-            ir::TyKind::Primitive(ir::TyPrimitive::int8) => "0::INT1",
-            ir::TyKind::Primitive(ir::TyPrimitive::int16) => "0::INT2",
-            ir::TyKind::Primitive(ir::TyPrimitive::int32) => "0::INT4",
-            ir::TyKind::Primitive(ir::TyPrimitive::int64) => "0::INT8",
-            ir::TyKind::Primitive(ir::TyPrimitive::uint8) => "0::UINT8",
-            ir::TyKind::Primitive(ir::TyPrimitive::uint16) => "0::UINT16",
-            ir::TyKind::Primitive(ir::TyPrimitive::uint32) => "0::UINT32",
-            ir::TyKind::Primitive(ir::TyPrimitive::uint64) => "0::UINT64",
-            ir::TyKind::Primitive(ir::TyPrimitive::float32) => "0.0::FLOAT4",
-            ir::TyKind::Primitive(ir::TyPrimitive::float64) => "0.0::FLOAT8",
-            ir::TyKind::Primitive(ir::TyPrimitive::bool) => "FALSE",
-            ir::TyKind::Primitive(ir::TyPrimitive::text) => "''",
-            _ => todo!(),
+                Int8 => "0::INT1",
+                Int16 => "0::INT2",
+                Int32 => "0::INT4",
+                Int64 => "0::INT8",
+                UInt8 => "0::UINT8",
+                UInt16 => "0::UINT16",
+                UInt32 => "0::UINT32",
+                UInt64 => "0::UINT64",
+                Float32 => "0.0::FLOAT4",
+                Float64 => "0.0::FLOAT8",
+                Text => "''",
+                Date | Time | Timestamp | Decimal => {
+                    todo!()
+                }
+            },
         }
-        .to_string()
     }
 }

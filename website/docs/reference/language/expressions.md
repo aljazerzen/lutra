@@ -16,7 +16,7 @@ A literal or a name is an expression.
 
 ```lt
 false
-42: int32
+42: Int32
 "hello"
 a
 std::cmp
@@ -56,7 +56,7 @@ values of framed types](./definitions#framed-types).
 Use `..expr` inside a tuple expression to insert all fields from another tuple.
 
 ```lt
-{a = 4: int32, ..{x1 = 3: int32, x2 = "hello"}, b = false}
+{a = 4: Int32, ..{x1 = 3: Int32, x2 = "hello"}, b = false}
 {false, ..x, false}
 ```
 
@@ -70,8 +70,8 @@ All items must have the same type.
 
 ```lt
 [true, false, true]
-[10, 33, -3, 2, 40]: [int64]
-[]: [int64]
+[10, 33, -3, 2, 40]: [Int64]
+[]: [Int64]
 ```
 
 ## Enum construction
@@ -128,8 +128,8 @@ The long form uses `func (...) -> expr` and can include parameter and return
 annotations:
 
 ```lt
-func (x: int64) -> x + 1
-func (animal: Animal): text -> match animal {
+func (x: Int64) -> x + 1
+func (animal: Animal): Text -> match animal {
   .cat(name) => name,
   _ => "<unnamed>",
 }
@@ -233,9 +233,9 @@ You can use multiple bindings:
 Use `expr: Type` to fix the type of an expression.
 
 ```lt
-4: int32
-[]: [bool]
-.none: enum {none, some: text}
+4: Int32
+[]: [Bool]
+.none: enum {none, some: Text}
 ```
 
 ## See also

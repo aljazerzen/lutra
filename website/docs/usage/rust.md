@@ -31,7 +31,7 @@ to `$OUT_DIR/lutra.rs` during the build.
 ## Write a small Lutra project
 
 ```lt title="src/main.lt"
-type Movie: {id: int64, title: text, is_released: bool}
+type Movie: {id: Int64, title: Text, is_released: Bool}
 
 func get_movies(): [Movie] -> [
   {id = 54, title = "Hello", is_released = true},

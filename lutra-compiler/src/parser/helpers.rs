@@ -16,17 +16,6 @@ where
     .labelled("identifier")
 }
 
-pub(crate) fn ident_keyword<'src, I>(
-    kw: &'static str,
-) -> impl Parser<'src, I, (), PExtra<'src>> + Clone
-where
-    I: ValueInput<'src, Token = TokenKind, Span = Span>,
-{
-    select! {
-        TokenKind::Ident(ident) if ident == kw => ()
-    }
-}
-
 pub(crate) fn keyword<'src, I>(kw: &'static str) -> impl Parser<'src, I, (), PExtra<'src>> + Clone
 where
     I: ValueInput<'src, Token = TokenKind, Span = Span>,

@@ -8,7 +8,7 @@ DuckDB reference and the type representations reference.
 ## `func` from
 
 ```lutra
-func from(const table_name: text): [R]
+func from(const table_name: Text): [R]
 where R: {..}
 ```
 
@@ -25,7 +25,7 @@ For example:
 ## `func` insert
 
 ```lutra
-func insert(rows: [R], const table_name: text): {}
+func insert(rows: [R], const table_name: Text): {}
 where R: {..}
 ```
 
@@ -36,7 +36,7 @@ For table identifier format, see documentation of [`module::from`](#func-from).
 ## `func` update
 
 ```lutra
-func update(const table_name: text, updater: func (R): enum {none, some: R}): {}
+func update(const table_name: Text, updater: func (R): enum {none, some: R}): {}
 where R: {..}
 ```
 
@@ -66,7 +66,7 @@ For table identifier format, see documentation of [`from`](#func-from).
 ## `func` raw
 
 ```lutra
-func raw(const sql_source: text): R
+func raw(const sql_source: Text): R
 where R
 ```
 

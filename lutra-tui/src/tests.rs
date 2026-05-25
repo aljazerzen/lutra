@@ -368,7 +368,7 @@ fn typing_in_prompt() {
 
 #[test]
 fn function_prompt_shows_argument_form() {
-    let mut events = type_str("func (x: bool) -> (x | std::convert::to_text)");
+    let mut events = type_str("func (x: Bool) -> (x | to_text)");
     events.push(enter());
     insta::assert_snapshot!(record(events), @"
     ▌ Lutra v0.5.1
@@ -379,7 +379,7 @@ fn function_prompt_shows_argument_form() {
     ▌ module
     ▌ m std
 
-    ▌ func (x: bool) -> (x | std::convert::to_text)
+    ▌ func (x: Bool) -> (x | to_text)
     ▌
     ▌ argument: [ ]
     ▌ [Run]
@@ -408,13 +408,13 @@ fn pipe_binds_last_history_output_into_draft() {
     ▌ "hello"
     ▌
     ▌ output
-    ▌ text
+    ▌ Text
     ▌ ─────
     ▌ hello
 
     ▌ /pipe
 
-    ▌ func (x: text) ->
+    ▌ func (x: Text) ->
     ▌ x
     ────────────────────
      ⸱ ok ⸱ bytecode-lt ⸱ Cell(Program)
@@ -443,17 +443,17 @@ fn bound_input_executes() {
     ▌ "hello"
     ▌
     ▌ output
-    ▌ text
+    ▌ Text
     ▌ ─────
     ▌ hello
 
     ▌ /pipe
 
-    ▌ func (x: text) ->
+    ▌ func (x: Text) ->
     ▌ x
     ▌
     ▌ output
-    ▌ text
+    ▌ Text
     ▌ ─────
     ▌ hello
 
@@ -482,22 +482,22 @@ fn inspect_output_seeds_input_for_scalar() {
     ▌ "hello"
     ▌
     ▌ output
-    ▌ text
+    ▌ Text
     ▌ ─────
     ▌ hello
 
-    ▌ func (x: text) ->
-    ▌ x
+    ▌ func (x: Text) ->
+    ▌ x | std::index(0) | std::or_default()
     ────────────────────
      ⸱ ok ⸱ bytecode-lt ⸱ Cell(Program)
-    [cursor 1,3]
+    [cursor 1,39]
     "#);
 }
 
 #[test]
 fn inspect_output_seeds_map_for_array() {
     // `[1, 2, 3]: [int32]` produces an array — seeded prompt should include a map step.
-    let mut events = type_str("[1, 2, 3]: [int32]");
+    let mut events = type_str("[1, 2, 3]: [Int32]");
     events.push(enter());
     events.push(enter());
     insta::assert_snapshot!(record(events), @"
@@ -509,16 +509,16 @@ fn inspect_output_seeds_map_for_array() {
     ▌ module
     ▌ m std
 
-    ▌ [1, 2, 3]: [int32]
+    ▌ [1, 2, 3]: [Int32]
     ▌
     ▌ output · 3 items
-    ▌   int32
+    ▌   Int32
     ▌ ───────
     ▌ 0     1
     ▌ 1     2
     ▌ 2     3
 
-    ▌ func (x: [int32]) ->
+    ▌ func (x: [Int32]) ->
     ▌ x | std::index(0) | std::or_default()
     ────────────────────
      ⸱ ok ⸱ bytecode-lt ⸱ Cell(Program)
@@ -529,7 +529,7 @@ fn inspect_output_seeds_map_for_array() {
 #[test]
 fn inspect_output_seeds_nested_column() {
     let mut events = type_str(
-        "[{album = {title = \"Hello\", id = 1}, artist = \"A\"}]: [{album: {title: text, id: int32}, artist: text}]",
+        "[{album = {title = \"Hello\", id = 1}, artist = \"A\"}]: [{album: {title: Text, id: Int32}, artist: Text}]",
     );
     events.push(enter());
     events.push(enter());
@@ -542,16 +542,16 @@ fn inspect_output_seeds_nested_column() {
     ▌ module
     ▌ m std
 
-    ▌ [{album = {title = "Hello", id = 1}, artist = "A"}]: [{album: {title: text, id: int32}, artist: text}]
+    ▌ [{album = {title = "Hello", id = 1}, artist = "A"}]: [{album: {title: Text, id: Int32}, artist: Text}]
     ▌
     ▌ output · 1 items · 3 fields
     ▌      album    artist
     ▌   title    id
-    ▌   text  int32 text
+    ▌   Text  Int32 Text
     ▌ ────────────────────
     ▌ 0 Hello     1 A
 
-    ▌ func (x: [{album: {title: text, id: int32}, artist: text}]) ->
+    ▌ func (x: [{album: {title: Text, id: Int32}, artist: Text}]) ->
     ▌ x | std::index(0) | std::or_default() | x -> x.album.title
     ────────────────────
      ⸱ ok ⸱ bytecode-lt ⸱ Cell(Program)
@@ -581,7 +581,7 @@ fn slash_help_from_bound_input_is_plain() {
     ▌ "hello"
     ▌
     ▌ output
-    ▌ text
+    ▌ Text
     ▌ ─────
     ▌ hello
 
@@ -623,7 +623,7 @@ fn run_success() {
     ▌ "hello"
     ▌
     ▌ output
-    ▌ text
+    ▌ Text
     ▌ ─────
     ▌ hello
 

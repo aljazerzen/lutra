@@ -40,6 +40,58 @@ impl<'a> Context<'a> {
     }
 }
 
+fn scalar_std_type_ref(ident: &ir::Path) -> Option<&'static str> {
+    if ident.is(&["std", "Bool"]) {
+        Some("bool")
+    } else if ident.is(&["std", "Int8"])
+        || ident.is(&["std", "Int16"])
+        || ident.is(&["std", "Int32"])
+        || ident.is(&["std", "Int64"])
+        || ident.is(&["std", "Uint8"])
+        || ident.is(&["std", "Uint16"])
+        || ident.is(&["std", "Uint32"])
+        || ident.is(&["std", "Uint64"])
+    {
+        Some("int")
+    } else if ident.is(&["std", "Float32"]) || ident.is(&["std", "Float64"]) {
+        Some("float")
+    } else if ident.is(&["std", "Text"]) {
+        Some("str")
+    } else {
+        None
+    }
+}
+
+fn scalar_std_codec(ident: &ir::Path) -> Option<&'static str> {
+    if ident.is(&["std", "Bool"]) {
+        Some("lutra_bin.BoolCodec()")
+    } else if ident.is(&["std", "Int8"]) {
+        Some("lutra_bin.Int8Codec()")
+    } else if ident.is(&["std", "Int16"]) {
+        Some("lutra_bin.Int16Codec()")
+    } else if ident.is(&["std", "Int32"]) {
+        Some("lutra_bin.Int32Codec()")
+    } else if ident.is(&["std", "Int64"]) {
+        Some("lutra_bin.Int64Codec()")
+    } else if ident.is(&["std", "Uint8"]) {
+        Some("lutra_bin.Uint8Codec()")
+    } else if ident.is(&["std", "Uint16"]) {
+        Some("lutra_bin.Uint16Codec()")
+    } else if ident.is(&["std", "Uint32"]) {
+        Some("lutra_bin.Uint32Codec()")
+    } else if ident.is(&["std", "Uint64"]) {
+        Some("lutra_bin.Uint64Codec()")
+    } else if ident.is(&["std", "Float32"]) {
+        Some("lutra_bin.Float32Codec()")
+    } else if ident.is(&["std", "Float64"]) {
+        Some("lutra_bin.Float64Codec()")
+    } else if ident.is(&["std", "Text"]) {
+        Some("lutra_bin.TextCodec()")
+    } else {
+        None
+    }
+}
+
 pub(crate) fn run(
     project: &Project,
     options: &super::GenerateOptions,
@@ -441,27 +493,20 @@ fn ty_ref(ty: &ir::Ty, as_ty: bool, ctx: &mut Context) -> Cow<'static, str> {
     }
 
     match &ty.kind {
-        ir::TyKind::Primitive(ir::TyPrimitive::bool) => "bool".into(),
-        ir::TyKind::Primitive(ir::TyPrimitive::int8) => "int".into(),
-        ir::TyKind::Primitive(ir::TyPrimitive::int16) => "int".into(),
-        ir::TyKind::Primitive(ir::TyPrimitive::int32) => "int".into(),
-        ir::TyKind::Primitive(ir::TyPrimitive::int64) => "int".into(),
-        ir::TyKind::Primitive(ir::TyPrimitive::uint8) => "int".into(),
-        ir::TyKind::Primitive(ir::TyPrimitive::uint16) => "int".into(),
-        ir::TyKind::Primitive(ir::TyPrimitive::uint32) => "int".into(),
-        ir::TyKind::Primitive(ir::TyPrimitive::uint64) => "int".into(),
-        ir::TyKind::Primitive(ir::TyPrimitive::float32) => "float".into(),
-        ir::TyKind::Primitive(ir::TyPrimitive::float64) => "float".into(),
-        ir::TyKind::Primitive(ir::TyPrimitive::text) => "str".into(),
+        ir::TyKind::Primitive(_) => "int".into(),
 
         ir::TyKind::Array(items_ty) => format!("list[{}]", ty_ref(items_ty, as_ty, ctx)).into(),
 
         ir::TyKind::Ident(ident) => {
-            let name = ident.0.last().unwrap().clone();
-            if ctx.tys_written.contains(&name) {
-                name.into()
+            if let Some(ty) = scalar_std_type_ref(ident) {
+                ty.into()
             } else {
-                format!("'{name}'").into()
+                let name = ident.0.last().unwrap().clone();
+                if ctx.tys_written.contains(&name) {
+                    name.into()
+                } else {
+                    format!("'{name}'").into()
+                }
             }
         }
 
@@ -494,24 +539,24 @@ fn ty_codec(ty: &ir::Ty, ctx: &mut Context) -> Cow<'static, str> {
     }
 
     match &ty.kind {
-        ir::TyKind::Primitive(ir::TyPrimitive::bool) => "lutra_bin.BoolCodec()".into(),
-        ir::TyKind::Primitive(ir::TyPrimitive::int8) => "lutra_bin.Int8Codec()".into(),
-        ir::TyKind::Primitive(ir::TyPrimitive::int16) => "lutra_bin.Int16Codec()".into(),
-        ir::TyKind::Primitive(ir::TyPrimitive::int32) => "lutra_bin.Int32Codec()".into(),
-        ir::TyKind::Primitive(ir::TyPrimitive::int64) => "lutra_bin.Int64Codec()".into(),
-        ir::TyKind::Primitive(ir::TyPrimitive::uint8) => "lutra_bin.Uint8Codec()".into(),
-        ir::TyKind::Primitive(ir::TyPrimitive::uint16) => "lutra_bin.Uint16Codec()".into(),
-        ir::TyKind::Primitive(ir::TyPrimitive::uint32) => "lutra_bin.Uint32Codec()".into(),
-        ir::TyKind::Primitive(ir::TyPrimitive::uint64) => "lutra_bin.Uint64Codec()".into(),
-        ir::TyKind::Primitive(ir::TyPrimitive::float32) => "lutra_bin.Float32Codec()".into(),
-        ir::TyKind::Primitive(ir::TyPrimitive::float64) => "lutra_bin.Float64Codec()".into(),
-        ir::TyKind::Primitive(ir::TyPrimitive::text) => "lutra_bin.TextCodec()".into(),
+        ir::TyKind::Primitive(ir::TyPrimitive::prim8) => "lutra_bin.Int8Codec()".into(),
+        ir::TyKind::Primitive(ir::TyPrimitive::prim16) => "lutra_bin.Int16Codec()".into(),
+        ir::TyKind::Primitive(ir::TyPrimitive::prim32) => "lutra_bin.Int32Codec()".into(),
+        ir::TyKind::Primitive(ir::TyPrimitive::prim64) => "lutra_bin.Int64Codec()".into(),
 
         ir::TyKind::Array(item_ty) => {
             format!("lutra_bin.ArrayCodec({})", ty_codec(item_ty, ctx)).into()
         }
 
-        ir::TyKind::Ident(_) | ir::TyKind::Tuple(_) | ir::TyKind::Enum(_) => {
+        ir::TyKind::Ident(ident) => {
+            if let Some(codec) = scalar_std_codec(ident) {
+                codec.into()
+            } else {
+                format!("{}.codec()", ty_ref(ty, false, ctx)).into()
+            }
+        }
+
+        ir::TyKind::Tuple(_) | ir::TyKind::Enum(_) => {
             format!("{}.codec()", ty_ref(ty, false, ctx)).into()
         }
 

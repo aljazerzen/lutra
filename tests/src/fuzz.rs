@@ -40,7 +40,7 @@ fn fuzz() {
             name: "text",
             val_source: "\"hello\"",
             val_builder: Box::new(|_| lutra_bin::Value::new_text("hello")),
-            ty_source: "text",
+            ty_source: "Text",
             param_count: 0,
         },
         Construct {

@@ -13,10 +13,18 @@ impl<'a> Context<'a> {
         }
     }
 
+    /// Single-step ident resolution (one hop only)
+    pub fn get_ty(&self, ident: &'a ir::Path) -> Result<&'a ir::Ty, Error> {
+        self.types.get(ident).copied().ok_or(Error::BadType)
+    }
+
     /// Resolve type identifiers to their materialized types
     pub fn get_ty_mat(&self, ty: &'a ir::Ty) -> Result<&'a ir::Ty, Error> {
         let mut ty = ty;
         while let ir::TyKind::Ident(path) = &ty.kind {
+            if ir::TyStd::try_new(path).is_some() {
+                return Ok(ty);
+            }
             ty = self.types.get(path).ok_or(Error::BadType)?;
         }
         Ok(ty)
@@ -29,7 +37,7 @@ impl<'a> Context<'a> {
             return Ok(false);
         }
         let some_ty = self.get_ty_mat(&variants[1].ty)?;
-        Ok(some_ty.kind.is_primitive() || some_ty.kind.is_array())
+        Ok(some_ty.kind.is_primitive() || some_ty.kind.is_ident() || some_ty.kind.is_array())
     }
 }
 

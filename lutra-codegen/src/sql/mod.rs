@@ -43,6 +43,80 @@ struct Context<'a> {
     project: &'a Project,
 }
 
+#[derive(Clone, Copy)]
+enum TyStd {
+    Bool,
+    Int8,
+    Int16,
+    Int32,
+    Int64,
+    Float32,
+    Float64,
+    Text,
+    Date,
+    Time,
+    Timestamp,
+    Decimal,
+}
+
+impl TyStd {
+    fn from_ident(ident: &ir::Path) -> Option<Self> {
+        if ident.is(&["std", "Bool"]) {
+            Some(Self::Bool)
+        } else if ident.is(&["std", "Int8"]) || ident.is(&["std", "Uint8"]) {
+            Some(Self::Int8)
+        } else if ident.is(&["std", "Int16"]) || ident.is(&["std", "Uint16"]) {
+            Some(Self::Int16)
+        } else if ident.is(&["std", "Int32"]) || ident.is(&["std", "Uint32"]) {
+            Some(Self::Int32)
+        } else if ident.is(&["std", "Int64"]) || ident.is(&["std", "Uint64"]) {
+            Some(Self::Int64)
+        } else if ident.is(&["std", "Float32"]) {
+            Some(Self::Float32)
+        } else if ident.is(&["std", "Float64"]) {
+            Some(Self::Float64)
+        } else if ident.is(&["std", "Text"]) {
+            Some(Self::Text)
+        } else if ident.is(&["std", "Date"]) {
+            Some(Self::Date)
+        } else if ident.is(&["std", "Time"]) {
+            Some(Self::Time)
+        } else if ident.is(&["std", "Timestamp"]) {
+            Some(Self::Timestamp)
+        } else if ident.is(&["std", "Decimal"]) {
+            Some(Self::Decimal)
+        } else {
+            None
+        }
+    }
+
+    fn from_primitive(prim: ir::TyPrimitive) -> Self {
+        match prim {
+            ir::TyPrimitive::prim8 => Self::Int8,
+            ir::TyPrimitive::prim16 => Self::Int16,
+            ir::TyPrimitive::prim32 => Self::Int32,
+            ir::TyPrimitive::prim64 => Self::Int64,
+        }
+    }
+
+    fn sql_name(self) -> &'static str {
+        match self {
+            Self::Bool => "BOOLEAN",
+            Self::Int8 => "SMALLINT",
+            Self::Int16 => "SMALLINT",
+            Self::Int32 => "INTEGER",
+            Self::Int64 => "BIGINT",
+            Self::Float32 => "REAL",
+            Self::Float64 => "FLOAT",
+            Self::Text => "TEXT",
+            Self::Date => "DATE",
+            Self::Time => "TIME",
+            Self::Timestamp => "TIMESTAMP",
+            Self::Decimal => "DECIMAL",
+        }
+    }
+}
+
 fn codegen_module(
     w: &mut impl std::fmt::Write,
     module: &ir::Module,
@@ -115,6 +189,21 @@ impl<'a> Printer<'a> {
         }
     }
 
+    fn get_ty_std(&self, ty: &'a ir::Ty) -> Option<TyStd> {
+        let mut ty = ty;
+        while let ir::TyKind::Ident(ident) = &ty.kind {
+            if let Some(ty_std) = TyStd::from_ident(ident) {
+                return Some(ty_std);
+            }
+            ty = self.ctx.ty_defs.get(ident).unwrap();
+        }
+
+        match ty.kind {
+            ir::TyKind::Primitive(prim) => Some(TyStd::from_primitive(prim)),
+            _ => None,
+        }
+    }
+
     /// Generates a type definition.
     pub fn write_ty_def(&mut self, ty: &ir::Ty, _annotations: &[pr::Anno]) {
         let name = ty.name.as_ref().unwrap();
@@ -134,54 +223,16 @@ impl<'a> Printer<'a> {
     pub fn get_table_columns(&mut self, ty: &ir::Ty, prefix: &str) -> Vec<Col> {
         let mut r = Vec::new();
 
-        const FRAMED: &[(&[&str], &str)] = &[
-            (&["std", "Date"], "DATE"),
-            (&["std", "Time"], "TIME"),
-            (&["std", "Timestamp"], "TIMESTAMP"),
-            (&["std", "Decimal"], "DECIMAL"),
-        ];
-
-        if let ir::TyKind::Ident(name) = &ty.kind {
-            for (lt_name, pg_ty) in FRAMED {
-                if &name.0 == lt_name {
-                    r.push(Col {
-                        name: get_name_terminal(prefix).into(),
-                        ty: pg_ty.to_string(),
-                        nullable: false,
-                    });
-                    return r;
-                }
-            }
+        if let Some(ty) = self.get_ty_std(ty) {
+            r.push(Col {
+                name: get_name_terminal(prefix).into(),
+                ty: ty.sql_name().into(),
+                nullable: false,
+            });
+            return r;
         }
 
         match &self.get_ty_mat(ty).kind {
-            ir::TyKind::Primitive(prim) => {
-                let ty = match prim {
-                    ir::TyPrimitive::bool => "BOOLEAN",
-
-                    ir::TyPrimitive::int8 => "SMALLINT",
-                    ir::TyPrimitive::uint8 => "SMALLINT",
-                    ir::TyPrimitive::int16 => "SMALLINT",
-                    ir::TyPrimitive::uint16 => "SMALLINT",
-
-                    ir::TyPrimitive::int32 => "INT",
-                    ir::TyPrimitive::uint32 => "INT",
-
-                    ir::TyPrimitive::int64 => "BIGINT",
-                    ir::TyPrimitive::uint64 => "BIGINT",
-
-                    ir::TyPrimitive::float32 => "REAL",
-                    ir::TyPrimitive::float64 => "FLOAT",
-                    ir::TyPrimitive::text => "TEXT",
-                };
-
-                r.push(Col {
-                    name: get_name_terminal(prefix).into(),
-                    ty: ty.into(),
-                    nullable: false,
-                });
-            }
-
             ir::TyKind::Tuple(fields) => {
                 for (i, f) in fields.iter().enumerate() {
                     let prefix = get_name_prefix(prefix, f.name.as_ref(), i);

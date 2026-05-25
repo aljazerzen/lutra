@@ -24,14 +24,16 @@ pub trait RelCols<'a> {
             return false;
         }
         let some_ty = self.get_ty_mat(&variants[1].ty);
-        some_ty.kind.is_primitive() || some_ty.kind.is_array()
+        some_ty.kind.is_primitive() || some_ty.kind.is_ident() || some_ty.kind.is_array()
     }
 
     /// Names of relational columns for a given type.
     fn rel_cols(&'a self, ty: &'a ir::Ty) -> Box<dyn Iterator<Item = String> + 'a> {
         let ty_mat = self.get_ty_mat(ty);
         match &ty_mat.kind {
-            ir::TyKind::Primitive(_) => Box::new(Some(COL_VALUE.to_string()).into_iter()),
+            ir::TyKind::Primitive(_) | ir::TyKind::Ident(_) => {
+                Box::new(Some(COL_VALUE.to_string()).into_iter())
+            }
             ir::TyKind::Array(item) => {
                 let index = Some(COL_ARRAY_INDEX.to_string());
 
@@ -46,8 +48,7 @@ pub trait RelCols<'a> {
                 self.rel_cols_nested(ty_mat, "".to_string())
             }
 
-            ir::TyKind::Function(_) => todo!(),
-            ir::TyKind::Ident(_) => todo!(),
+            ir::TyKind::Function(_) => unreachable!(),
         }
     }
 
@@ -60,7 +61,7 @@ pub trait RelCols<'a> {
     ) -> Box<dyn Iterator<Item = String> + 'a> {
         let ty_mat = self.get_ty_mat(ty);
         match &ty_mat.kind {
-            ir::TyKind::Primitive(_) | ir::TyKind::Array(_) => {
+            ir::TyKind::Primitive(_) | ir::TyKind::Array(_) | ir::TyKind::Ident(_) => {
                 let name = if name_prefix.is_empty() {
                     COL_VALUE.to_string()
                 } else {
@@ -110,8 +111,7 @@ pub trait RelCols<'a> {
                         }),
                 ),
             ),
-            ir::TyKind::Function(_) => todo!(),
-            ir::TyKind::Ident(_) => todo!(),
+            ir::TyKind::Function(_) => unreachable!(),
         }
     }
 
@@ -122,7 +122,7 @@ pub trait RelCols<'a> {
     ) -> Box<dyn Iterator<Item = Cow<'a, ir::Ty>> + 'a> {
         let ty_mat = self.get_ty_mat(ty);
         match &ty_mat.kind {
-            ir::TyKind::Primitive(_) | ir::TyKind::Array(_) => {
+            ir::TyKind::Primitive(_) | ir::TyKind::Ident(_) | ir::TyKind::Array(_) => {
                 Box::new(Some(Cow::Borrowed(ty_mat)).into_iter())
             }
 
@@ -136,7 +136,7 @@ pub trait RelCols<'a> {
 
             ir::TyKind::Enum(variants) => Box::new(itertools::chain(
                 // tag
-                Some(Cow::Owned(ir::Ty::new(ir::TyPrimitive::int16))),
+                Some(Cow::Owned(ir::Ty::new(ir::TyPrimitive::prim16))),
                 // variants
                 variants.iter().enumerate().flat_map(|(i, v)| {
                     let is_recursive =
@@ -148,8 +148,7 @@ pub trait RelCols<'a> {
                     }
                 }),
             )),
-            ir::TyKind::Function(_) => todo!(),
-            ir::TyKind::Ident(_) => todo!(),
+            ir::TyKind::Function(_) => unreachable!(),
         }
     }
 }
@@ -306,7 +305,7 @@ mod rel_repr {
     // helpers
 
     fn prim() -> ir::Ty {
-        ir::Ty::new(ir::TyPrimitive::int32)
+        ir::Ty::new(ir::TyPrimitive::prim32)
     }
 
     fn tuple_0() -> ir::Ty {

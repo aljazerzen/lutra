@@ -158,12 +158,12 @@ fn ty_from_pg_column(c: &lutra::PullInterfaceOutputItemstablesItemscolumnsItems)
     let tn = pg_ty.name();
 
     match tn {
-        "boolean" | "bool" => ir::Ty::new(ir::TyPrimitive::bool),
-        "smallint" | "int2" => ir::Ty::new(ir::TyPrimitive::int16),
-        "integer" | "int4" | "oid" => ir::Ty::new(ir::TyPrimitive::int32),
-        "bigint" | "int8" => ir::Ty::new(ir::TyPrimitive::int64),
-        "real" | "float4" => ir::Ty::new(ir::TyPrimitive::float32),
-        "double precision" | "float8" => ir::Ty::new(ir::TyPrimitive::float64),
+        "boolean" | "bool" => ir::Ty::bool(),
+        "smallint" | "int2" => ir::Ty::new_ident(&["std", "Int16"]),
+        "integer" | "int4" | "oid" => ir::Ty::new_ident(&["std", "Int32"]),
+        "bigint" | "int8" => ir::Ty::new_ident(&["std", "Int64"]),
+        "real" | "float4" => ir::Ty::new_ident(&["std", "Float32"]),
+        "double precision" | "float8" => ir::Ty::new_ident(&["std", "Float64"]),
 
         "date" => ir::Ty::new(ir::Path(vec!["std".into(), "Date".into()])),
         "timestamp" | "timestamp without time zone" => {
@@ -176,18 +176,18 @@ fn ty_from_pg_column(c: &lutra::PullInterfaceOutputItemstablesItemscolumnsItems)
 
         // "bytea" => None,
         // "bit" | "bit varying" | "varbit" => None,
-        "text" | "varchar" | "char" | "bpchar" | "name" => ir::Ty::new(ir::TyPrimitive::text),
+        "text" | "varchar" | "char" | "bpchar" | "name" => ir::Ty::text(),
 
         // _ if ty.starts_with("bit") => None,
         _ if tn.starts_with("varchar") | tn.starts_with("char") | tn.starts_with("bpchar") => {
-            ir::Ty::new(ir::TyPrimitive::text)
+            ir::Ty::text()
         }
         _ if tn.starts_with("decimal") | tn.starts_with("numeric") => {
             ir::Ty::new(ir::Path(vec!["std".into(), "Decimal".into()]))
         }
 
         // _ => None,
-        _ => ir::Ty::new(ir::TyPrimitive::text),
+        _ => ir::Ty::text(),
     }
 }
 

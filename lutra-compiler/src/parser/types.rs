@@ -13,7 +13,7 @@ where
     I: ValueInput<'src, Token = TokenKind, Span = Span>,
 {
     recursive(|ty| {
-        let primitive = primitive_set().map(TyKind::Primitive);
+        let primitive = ty_primitive().map(TyKind::Primitive);
 
         let ident = expr::path().map(TyKind::Ident);
 
@@ -152,23 +152,15 @@ fn empty_array(s: Span) -> TyKind {
     TyKind::Array(Box::new(Ty::new_with_span(TyKind::Tuple(vec![]), s)))
 }
 
-fn primitive_set<'src, I>() -> impl Parser<'src, I, TyPrimitive, PExtra<'src>> + Clone + 'src
+fn ty_primitive<'src, I>() -> impl Parser<'src, I, TyPrimitive, PExtra<'src>> + Clone + 'src
 where
     I: ValueInput<'src, Token = TokenKind, Span = Span>,
 {
     select! {
-        TokenKind::Ident(i) if i == "int8" => TyPrimitive::int8,
-        TokenKind::Ident(i) if i == "int16" => TyPrimitive::int16,
-        TokenKind::Ident(i) if i == "int32" => TyPrimitive::int32,
-        TokenKind::Ident(i) if i == "int64" => TyPrimitive::int64,
-        TokenKind::Ident(i) if i == "uint8" => TyPrimitive::uint8,
-        TokenKind::Ident(i) if i == "uint16" => TyPrimitive::uint16,
-        TokenKind::Ident(i) if i == "uint32" => TyPrimitive::uint32,
-        TokenKind::Ident(i) if i == "uint64" => TyPrimitive::uint64,
-        TokenKind::Ident(i) if i == "float32" => TyPrimitive::float32,
-        TokenKind::Ident(i) if i == "float64" => TyPrimitive::float64,
-        TokenKind::Ident(i) if i == "bool"=> TyPrimitive::bool,
-        TokenKind::Ident(i) if i == "text"=> TyPrimitive::text,
+        TokenKind::Ident(i) if i == "Prim8" => TyPrimitive::prim8,
+        TokenKind::Ident(i) if i == "Prim16" => TyPrimitive::prim16,
+        TokenKind::Ident(i) if i == "Prim32" => TyPrimitive::prim32,
+        TokenKind::Ident(i) if i == "Prim64" => TyPrimitive::prim64,
     }
 }
 
@@ -228,31 +220,9 @@ where
     })
     .labelled("tuple domain");
 
-    let one_of_numbers = ident_keyword("number").map_with(|_, e| {
-        let s = e.span();
-        TyDomain::OneOf(
-            TY_DOMAIN_NUMBERS
-                .iter()
-                .map(|p| Ty::new_with_span(p.clone(), s))
-                .collect(),
-        )
-    });
-
-    let one_of_primitives = ident_keyword("primitive").map_with(|_, e| {
-        let s = e.span();
-        TyDomain::OneOf(
-            TY_DOMAIN_PRIMITIVES
-                .iter()
-                .map(|p| Ty::new_with_span(p.clone(), s))
-                .collect(),
-        )
-    });
-
     let domain = ctrl(':')
         .ignore_then(choice((
             tuple,
-            one_of_primitives,
-            one_of_numbers,
             ty.separated_by(ctrl('|'))
                 .at_least(1)
                 .collect::<Vec<_>>()
@@ -276,35 +246,3 @@ where
         .at_least(1)
         .collect()
 }
-
-/// The set of numeric primitive types, in canonical order.
-/// Corresponds to the `number` keyword in a `where` constraint.
-pub(crate) const TY_DOMAIN_NUMBERS: &[TyPrimitive] = &[
-    TyPrimitive::int8,
-    TyPrimitive::int16,
-    TyPrimitive::int32,
-    TyPrimitive::int64,
-    TyPrimitive::uint8,
-    TyPrimitive::uint16,
-    TyPrimitive::uint32,
-    TyPrimitive::uint64,
-    TyPrimitive::float32,
-    TyPrimitive::float64,
-];
-
-/// The set of all primitive types, in canonical order.
-/// Corresponds to the `primitive` keyword in a `where` constraint.
-pub(crate) const TY_DOMAIN_PRIMITIVES: &[TyPrimitive] = &[
-    TyPrimitive::bool,
-    TyPrimitive::int8,
-    TyPrimitive::int16,
-    TyPrimitive::int32,
-    TyPrimitive::int64,
-    TyPrimitive::uint8,
-    TyPrimitive::uint16,
-    TyPrimitive::uint32,
-    TyPrimitive::uint64,
-    TyPrimitive::float32,
-    TyPrimitive::float64,
-    TyPrimitive::text,
-];

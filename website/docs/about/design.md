@@ -72,7 +72,7 @@ For example, executing in a PostgreSQL database does give access to SQL tables,
 but provides no access to the file system, network or any other POSIX interface.
 
 So the language focuses on being as "pure" as possible: provide only functions
-for dealing with data (arithmetics, text operations) and an access to data.
+for dealing with data (arithmetics, Text operations) and an access to data.
 
 It is not possible, for example, to make HTTP requests from within your Lutra
 program. There is no standard library that would give access to any networking
@@ -111,11 +111,11 @@ provides an algebraic and **composable** type system. Composable means that any
 "container" type (tuple, array or enum) can contain any other type. So we must
 support all of the following:
 
-- `[bool]`
-- `{text, bool}`
-- `{text, {text}, bool}`
-- `{text, [text], bool}`
-- `[{text, [{bool, bool, [text]}], bool}]`
+- `[Bool]`
+- `{Text, Bool}`
+- `{Text, {Text}, Bool}`
+- `{Text, [Text], Bool}`
+- `[{Text, [{Bool, Bool, [Text]}], Bool}]`
 
 To support all such types, it means to have a representation of these types
 within SQL queries, in query results and query parameters. We try to use
@@ -123,14 +123,14 @@ efficient representations, but then fallback to encoding values in JSON.
 
 Here are a few examples of query result representations:
 
-- `[bool]`: many rows, one column of type `bool`,
-- `{text, bool}`: one row, two columns of types `text` and `bool`,
-- `{text, {text}, bool}`: one row, three columns (the inner tuple is flattened
+- `[Bool]`: many rows, one column of type `Bool`,
+- `{Text, Bool}`: one row, two columns of types `Text` and `Bool`,
+- `{Text, {Text}, Bool}`: one row, three columns (the inner tuple is flattened
   into the parent),
-- `{text, [text], bool}`: one row, three columns of types `text`, `jsonb`, and
-  `bool`,
-- `[{text, [{bool, bool, [text]}], bool}]`: many rows, three columns of types
-  `text`, `jsonb`, and `bool`.
+- `{Text, [Text], Bool}`: one row, three columns of types `Text`, `jsonb`, and
+  `Bool`,
+- `[{Text, [{Bool, Bool, [Text]}], Bool}]`: many rows, three columns of types
+  `Text`, `jsonb`, and `Bool`.
   The json contains an array of arrays which have 3 elements: a boolean,
   a boolean, and an array of strings.
 
@@ -152,7 +152,7 @@ Asked on [programming.dev](https://programming.dev/post/42892331/21229256).
 To use a database index in Lutra, one would write:
 
 ```lt
-func get_albums_by_id(id: int16): [Album] -> (
+func get_albums_by_id(id: Int16): [Album] -> (
   sql::from("albums")
   | filter(this -> this.id == id)
 )
@@ -202,8 +202,8 @@ be an unimportant internal detail.
 ```lt
 # Example 1: no good name for ipv4 segments
 type Device: {
-  name: text,
-  ip_addr: {uint16, uint16, uint16, uint16},
+  name: Text,
+  ip_addr: {Uint16, Uint16, Uint16, Uint16},
 }
 
 # Example 2: we don't bother assigning names to `bounds`
@@ -230,7 +230,7 @@ binary format encodes tuples without names. It stores fields one after another,
 without any delimiter, field name or any other annotation.
 
 ```lt
-const x = {a = 3: int8, b = true}
+const x = {a = 3: Int8, b = true}
 
 # x is encoded with two bytes: [3, 1]
 ```

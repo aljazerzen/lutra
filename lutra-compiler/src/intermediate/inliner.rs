@@ -134,13 +134,16 @@ impl fold::IrFold for FuncInliner {
         //    (...cond..., bool_then)
         //    (.anything., bool_else)
         // )
-        fn as_bool_literal(expr: &ir::Expr) -> Option<bool> {
-            expr.kind.as_literal().and_then(|l| l.as_bool().cloned())
+        fn as_prim8(expr: &ir::Expr) -> Option<bool> {
+            expr.kind
+                .as_literal()
+                .and_then(|l| l.as_prim8())
+                .map(|i| *i != 0)
         }
-        if matches!(ty.kind, ir::TyKind::Primitive(ir::TyPrimitive::bool))
+        if ty.kind.as_ident().is_some_and(|i| i.is(&["std", "Bool"]))
             && branches.len() == 2
-            && let Some(value_then) = as_bool_literal(&branches[0].value)
-            && let Some(value_else) = as_bool_literal(&branches[1].value)
+            && let Some(value_then) = as_prim8(&branches[0].value)
+            && let Some(value_else) = as_prim8(&branches[1].value)
         {
             let cond = branches.into_iter().next().unwrap().condition;
 
@@ -157,14 +160,13 @@ impl fold::IrFold for FuncInliner {
                     // this just inverts the cond
                     let cond = self.fold_expr(cond)?;
 
-                    let ty_bool = ir::Ty::new(ir::TyPrimitive::bool);
                     let std_not = ir::Expr::new(
                         ir::ExternalPtr {
                             id: "std::ops::not".into(),
                         },
                         ir::Ty::new(ir::TyFunction {
-                            params: vec![ty_bool.clone()],
-                            body: ty_bool.clone(),
+                            params: vec![ir::Ty::bool()],
+                            body: ir::Ty::bool(),
                         }),
                     );
 
@@ -173,7 +175,7 @@ impl fold::IrFold for FuncInliner {
                             function: std_not,
                             args: vec![cond],
                         },
-                        ty_bool,
+                        ir::Ty::bool(),
                     ));
                 }
             }
@@ -331,7 +333,7 @@ impl IrFold for BindingInliner {
             };
 
             let mut func_ty = call.function.ty.clone();
-            func_ty.kind.as_function_mut().unwrap().body = ir::Ty::new(ir::TyPrimitive::bool);
+            func_ty.kind.as_function_mut().unwrap().body = ir::Ty::bool();
 
             let function = ir::Expr::new(
                 ir::ExternalPtr {

@@ -1,29 +1,33 @@
 submodule
 
-type x: {int64, a: text, b: [bool]}
+type x: {Int64, a: Text, b: [Bool]}
 
-type y: [int64]
+type y: [Int64]
 
-type z: bool
+type z: Bool
 
-type u: enum {f: bool, g, h: {a: int64, b: float64}}
+type z1(Bool)
+
+type z2([Bool])
+
+type u: enum {f: Bool, g, h: {a: Int64, b: Float64}}
 
 type v: enum {Yes, No, Maybe}
 
-type t: enum {single: int8, double: int16}
+type t: enum {single: Int8, double: Int16}
 
-type p: {[int64], [int64]}
+type p: {[Int64], [Int64]}
 
 type i: {v, z}
 
-type Tree: enum {Leaf: uint8, Node: {left: Tree, right: Tree}}
+type Tree: enum {Leaf: Uint8, Node: {left: Tree, right: Tree}}
 
-type opt: enum {None, Some: text}
+type opt: enum {None, Some: Text}
 
-type opt2: enum {None, Some: int16}
+type opt2: enum {None, Some: Int16}
 
-type res: enum {ok: int8, err: int16}
+type res: enum {ok: Int8, err: Int16}
 
-type res2: enum {ok: bool, err: bool}
+type res2: enum {ok: Bool, err: Bool}
 
-type res3: enum {ok: text, err: text}
+type res3: enum {ok: Text, err: Text}

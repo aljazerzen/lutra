@@ -83,7 +83,8 @@ pub enum TyVarConstraint {
 
 #[derive(Debug, strum::AsRefStr)]
 pub enum Named<'a> {
-    Value(&'a pr::Ty),
+    // Value of a type (that might not yet be resolved).
+    Value(Option<&'a pr::Ty>),
     Ty {
         ty: &'a pr::Ty,
         is_framed: bool,
@@ -91,6 +92,7 @@ pub enum Named<'a> {
     },
     Module,
     Scoped(&'a ScopedKind),
+    CurrDef,
 }
 
 /// A reference to a type-like objects
@@ -242,10 +244,14 @@ impl<'a> TypeResolver<'a> {
 
         match target {
             pr::Ref::Global(tgt_fq) => {
+                if self.current_def_fq.as_ref().is_some_and(|c| c == tgt_fq) {
+                    return Ok(Named::CurrDef);
+                }
+
                 let def = self.root_mod.get(tgt_fq);
                 match &def.unwrap_or_else(|| panic!("cannot find {tgt_fq}")).kind {
-                    pr::DefKind::Expr(expr) => Ok(Named::Value(expr.value.ty.as_deref().unwrap())),
-                    pr::DefKind::External(ty) => Ok(Named::Value(ty)),
+                    pr::DefKind::Expr(expr) => Ok(Named::Value(expr.value.ty.as_deref())),
+                    pr::DefKind::External(ty) => Ok(Named::Value(Some(ty))),
                     pr::DefKind::Ty(def) => Ok(Named::Ty {
                         ty: &def.ty,
                         is_framed: def.is_framed,
@@ -260,9 +266,7 @@ impl<'a> TypeResolver<'a> {
             }
 
             pr::Ref::Local { scope, offset } => {
-                let scope = self
-                    .scopes
-                    .iter()
+                let scope = (self.scopes.iter())
                     .find(|s| s.id == *scope)
                     .ok_or_else(|| panic!("cannot find scope: {scope}"))
                     .unwrap();
@@ -337,6 +341,7 @@ impl<'a> TypeResolver<'a> {
             }
             Named::Value(_) => Err(err_name_kind("a type", "a value").with_span(ty.span)),
             Named::Module => Err(err_name_kind("a type", "a module").with_span(ty.span)),
+            Named::CurrDef => todo!(),
         }
     }
 

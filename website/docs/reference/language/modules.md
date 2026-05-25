@@ -54,7 +54,7 @@ Use `module` to define a nested module inline.
 module chinook {
   func get_albums(): [Album] -> []
 
-  func get_album_by_id(album_id: int64): Album? -> (
+  func get_album_by_id(album_id: Int64): Album? -> (
     get_albums()
     | std::find(this -> this.id == album_id)
   )
@@ -81,7 +81,7 @@ This lets multiple files contribute definitions to the same module path.
 ```lt
 submodule
 
-func hello(a: float64, b: uint64): int64 -> 1
+func hello(a: Float64, b: Uint64): Int64 -> 1
 ```
 
 Note that compiler will always load the whole project structure, even when

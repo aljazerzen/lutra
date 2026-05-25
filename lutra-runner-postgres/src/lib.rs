@@ -182,11 +182,18 @@ impl<'a> Context<'a> {
         }
     }
 
-    fn get_ty_mat(&self, ty: &'a ir::Ty) -> &'a ir::Ty {
-        match &ty.kind {
-            ir::TyKind::Ident(path) => self.types.get(path).unwrap(),
-            _ => ty,
+    fn get_ty(&self, ident: &'a ir::Path) -> &'a ir::Ty {
+        self.types.get(ident).unwrap()
+    }
+
+    fn get_ty_mat(&self, mut ty: &'a ir::Ty) -> &'a ir::Ty {
+        while let ir::TyKind::Ident(ident) = &ty.kind {
+            if ir::TyStd::try_new(ident).is_some() {
+                return ty;
+            }
+            ty = self.get_ty(ident);
         }
+        ty
     }
 
     /// Checks if an enum is an "option" enum. Must match [lutra_compiler::sql::utils::is_option].
@@ -195,6 +202,6 @@ impl<'a> Context<'a> {
             return false;
         }
         let some_ty = self.get_ty_mat(&variants[1].ty);
-        some_ty.kind.is_primitive() || some_ty.kind.is_array()
+        some_ty.kind.is_primitive() || some_ty.kind.is_ident() || some_ty.kind.is_array()
     }
 }

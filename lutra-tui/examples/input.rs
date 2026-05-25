@@ -1,18 +1,21 @@
 use lutra_bin::ir;
 
 fn main() {
-    let mut ty = get_ty();
+    let (mut ty, ty_defs) = get_ty();
     ty.name = Some("Pupek".into());
 
     let initial = get_value();
 
-    let result = lutra_tui::prompt_for_ty(&ty, &[], Some(initial)).unwrap();
-    let result = result.encode(&ty, &[]).unwrap();
+    let result = lutra_tui::prompt_for_ty(&ty, &ty_defs, Some(initial)).unwrap();
+    let result = result.encode(&ty, &ty_defs).unwrap();
 
-    println!("{}", lutra_bin::print_source(&result, &ty, &[]).unwrap());
+    println!(
+        "{}",
+        lutra_bin::print_source(&result, &ty, &ty_defs).unwrap()
+    );
 }
 
-fn get_ty() -> ir::Ty {
+fn get_ty() -> (ir::Ty, Vec<ir::TyDef>) {
     let source = r#"
         {
           ime: text,

@@ -3,7 +3,7 @@
 ## `func` is_some
 
 ```lutra
-func is_some(enum {none, some: T}): bool
+func is_some(enum {none, some: T}): Bool
 where T
 ```
 
@@ -12,7 +12,7 @@ Returns `true` iff the value is `.some`.
 ## `func` is_none
 
 ```lutra
-func is_none(enum {none, some: T}): bool
+func is_none(enum {none, some: T}): Bool
 where T
 ```
 
@@ -37,7 +37,7 @@ where T
 
 When value is `.none`, returns the default value instead.
 
-Default value depends on the type. See [`super::default`](../index.md#import-default).
+Default value depends on the type. See `default`.
 For numbers it is 0, for booleans it is false.
 
 ## `func` zip

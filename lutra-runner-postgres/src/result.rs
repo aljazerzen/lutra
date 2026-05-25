@@ -1,6 +1,10 @@
 use bytes::{BufMut, BytesMut};
 use core::str;
-use lutra_bin::{Encode, ReversePointer, ir, rr};
+use lutra_bin::{
+    Encode, ReversePointer,
+    ir::{self, TyStd},
+    rr,
+};
 use postgres_types as pg_ty;
 use std::collections::HashMap;
 
@@ -48,9 +52,11 @@ impl<'a> super::Context<'a> {
         let ty_mat = self.get_ty_mat(ty);
         match &ty_mat.kind {
             // we expected X but got {X}: just take the first row
-            ir::TyKind::Primitive(_) | ir::TyKind::Array(_) => Box::new(RowCellEncoder {
-                inner: self.construct_cell_encoder(ty),
-            }),
+            ir::TyKind::Primitive(_) | ir::TyKind::Ident(_) | ir::TyKind::Array(_) => {
+                Box::new(RowCellEncoder {
+                    inner: self.construct_cell_encoder(ty),
+                })
+            }
 
             ir::TyKind::Tuple(fields) => Box::new(TupleEncoder {
                 inner: fields
@@ -85,7 +91,6 @@ impl<'a> super::Context<'a> {
                     .collect(),
             )),
             ir::TyKind::Function(_) => todo!(),
-            ir::TyKind::Ident(_) => todo!(),
         }
     }
 
@@ -95,8 +100,37 @@ impl<'a> super::Context<'a> {
         tracing::debug!("cell for: {}", lutra_bin::ir::print_ty(ty));
 
         match &self.get_ty_mat(ty).kind {
-            ir::TyKind::Primitive(prim) if *prim == ir::TyPrimitive::text => Box::new(TextEncoder),
-            ir::TyKind::Primitive(prim) => Box::new(PrimEncoder { prim: *prim }),
+            ir::TyKind::Primitive(ir::TyPrimitive::prim8) => Box::new(Int8Encoder),
+            ir::TyKind::Primitive(ir::TyPrimitive::prim16) => Box::new(Int16Encoder),
+            ir::TyKind::Primitive(ir::TyPrimitive::prim32) => Box::new(Int32Encoder),
+            ir::TyKind::Primitive(ir::TyPrimitive::prim64) => Box::new(Int64Encoder),
+
+            ir::TyKind::Ident(i) if i.is(&["std", "Bool"]) => Box::new(BoolEncoder),
+            ir::TyKind::Ident(i) if i.is(&["std", "Int8"]) || i.is(&["std", "Uint8"]) => {
+                Box::new(Int8Encoder)
+            }
+            ir::TyKind::Ident(i) if i.is(&["std", "Int16"]) || i.is(&["std", "Uint16"]) => {
+                Box::new(Int16Encoder)
+            }
+            ir::TyKind::Ident(i)
+                if i.is(&["std", "Int32"])
+                    || i.is(&["std", "Uint32"])
+                    || i.is(&["std", "Date"]) =>
+            {
+                Box::new(Int32Encoder)
+            }
+            ir::TyKind::Ident(i)
+                if i.is(&["std", "Int64"])
+                    || i.is(&["std", "Uint64"])
+                    || i.is(&["std", "Time"])
+                    || i.is(&["std", "Timestamp"])
+                    || i.is(&["std", "Decimal"]) =>
+            {
+                Box::new(Int64Encoder)
+            }
+            ir::TyKind::Ident(i) if i.is(&["std", "Float32"]) => Box::new(Float32Encoder),
+            ir::TyKind::Ident(i) if i.is(&["std", "Float64"]) => Box::new(Float64Encoder),
+            ir::TyKind::Ident(i) if i.is(&["std", "Text"]) => Box::new(TextEncoder),
 
             ir::TyKind::Tuple(_) | ir::TyKind::Array(_) => {
                 let mut ctx = JsonContext {
@@ -123,10 +157,18 @@ impl<'a> super::Context<'a> {
         tracing::debug!("json for: {}", lutra_bin::ir::print_ty(ty));
 
         match &ty.kind {
-            ir::TyKind::Primitive(prim) if *prim == ir::TyPrimitive::text => {
-                Box::new(JsonTextEncoder)
+            ir::TyKind::Ident(i) if i.is(&["std", "Text"]) => Box::new(JsonTextEncoder),
+            ir::TyKind::Ident(i) if let Some(ty) = TyStd::try_new(i) => {
+                Box::new(JsonTyStdEncoder { ty })
             }
-            ir::TyKind::Primitive(prim) => Box::new(JsonPrimEncoder { prim: *prim }),
+            ir::TyKind::Primitive(prim) => Box::new(JsonTyStdEncoder {
+                ty: match prim {
+                    ir::TyPrimitive::prim8 => ir::TyStd::Int16,
+                    ir::TyPrimitive::prim16 => ir::TyStd::Int16,
+                    ir::TyPrimitive::prim32 => ir::TyStd::Int32,
+                    ir::TyPrimitive::prim64 => ir::TyStd::Int64,
+                },
+            }),
 
             ir::TyKind::Tuple(fields) => Box::new(JsonTupleEncoder {
                 inner: fields
@@ -151,8 +193,8 @@ impl<'a> super::Context<'a> {
                     // insert a dummy
                     json_ctx.encoders.insert(
                         path.clone(),
-                        Box::new(JsonPrimEncoder {
-                            prim: ir::TyPrimitive::bool,
+                        Box::new(JsonTyStdEncoder {
+                            ty: ir::TyStd::Bool,
                         }),
                     );
 
@@ -290,43 +332,53 @@ impl EncodeRow for RowCellEncoder {
     }
 }
 
-struct PrimEncoder {
-    prim: ir::TyPrimitive,
-}
-
-impl EncodeCell for PrimEncoder {
+struct BoolEncoder;
+impl EncodeCell for BoolEncoder {
     fn encode_head(&self, buf: &mut BytesMut, cell: &RowIter) -> HeadResidual {
-        // PostgreSQL uses same-sized signed types for unsigned values.
-        // Large unsigned values wrap to negative in PostgreSQL, we cast back here.
-        match self.prim {
-            ir::TyPrimitive::bool => cell.get::<bool>().encode_head(buf),
-            ir::TyPrimitive::int8 => (cell.get::<i16>() as i8).encode_head(buf),
-            ir::TyPrimitive::int16 => cell.get::<i16>().encode_head(buf),
-            ir::TyPrimitive::int32 => cell.get::<i32>().encode_head(buf),
-            ir::TyPrimitive::int64 => cell.get::<i64>().encode_head(buf),
-            ir::TyPrimitive::uint8 => (cell.get::<i16>() as u8).encode_head(buf),
-            ir::TyPrimitive::uint16 => (cell.get::<i16>() as u16).encode_head(buf),
-            ir::TyPrimitive::uint32 => (cell.get::<i32>() as u32).encode_head(buf),
-            ir::TyPrimitive::uint64 => (cell.get::<i64>() as u64).encode_head(buf),
-            ir::TyPrimitive::float32 => cell.get::<f32>().encode_head(buf),
-            ir::TyPrimitive::float64 => cell.get::<f64>().encode_head(buf),
-            ir::TyPrimitive::text => unreachable!(),
-        }
+        (cell.get::<bool>() as i8).encode_head(buf);
         HeadResidual::None
     }
 
     fn encode_body(&self, _buf: &mut BytesMut, _cell: &RowIter, _r: HeadResidual) {}
 }
 
-struct TextEncoder;
+struct Int8Encoder;
+impl EncodeCell for Int8Encoder {
+    fn encode_head(&self, buf: &mut BytesMut, cell: &RowIter) -> HeadResidual {
+        (cell.get::<i16>() as i8).encode_head(buf);
+        HeadResidual::None
+    }
 
+    fn encode_body(&self, _buf: &mut BytesMut, _cell: &RowIter, _r: HeadResidual) {}
+}
+
+macro_rules! prim_encoder {
+    ($Encoder: ident, $ty: ty) => {
+        struct $Encoder;
+
+        impl EncodeCell for $Encoder {
+            fn encode_head(&self, buf: &mut BytesMut, cell: &RowIter) -> HeadResidual {
+                cell.get::<$ty>().encode_head(buf);
+                HeadResidual::None
+            }
+            fn encode_body(&self, _buf: &mut BytesMut, _cell: &RowIter, _r: HeadResidual) {}
+        }
+    };
+}
+
+prim_encoder!(Int16Encoder, i16);
+prim_encoder!(Int32Encoder, i32);
+prim_encoder!(Int64Encoder, i64);
+prim_encoder!(Float32Encoder, f32);
+prim_encoder!(Float64Encoder, f64);
+
+struct TextEncoder;
 impl EncodeCell for TextEncoder {
     fn encode_head(&self, buf: &mut BytesMut, cell: &RowIter) -> HeadResidual {
         let value = cell.get::<&str>();
         let ptr = value.encode_head(buf);
         HeadResidual::Offset(ptr)
     }
-
     fn encode_body(&self, buf: &mut BytesMut, cell: &RowIter, r: HeadResidual) {
         let HeadResidual::Offset(r) = r else { panic!() };
         let value = cell.get::<&str>();
@@ -337,7 +389,6 @@ impl EncodeCell for TextEncoder {
 struct TupleEncoder {
     inner: Vec<Box<dyn EncodeRow>>,
 }
-
 impl EncodeRow for TupleEncoder {
     fn encode_head(&self, buf: &mut BytesMut, row: &mut RowIter) -> HeadResidual {
         let mut residuals = Vec::with_capacity(self.inner.len());
@@ -576,49 +627,36 @@ struct JsonContext {
     encoders: HashMap<ir::Path, Box<dyn EncodeJson>>,
 }
 
-struct JsonPrimEncoder {
-    prim: ir::TyPrimitive,
+struct JsonTyStdEncoder {
+    ty: ir::TyStd,
 }
-
-impl EncodeJson for JsonPrimEncoder {
+impl EncodeJson for JsonTyStdEncoder {
     fn encode_head(
         &self,
         buf: &mut BytesMut,
         value: &tinyjson::JsonValue,
         _: &JsonContext,
     ) -> HeadResidual {
-        match (self.prim, value) {
-            (ir::TyPrimitive::bool, tinyjson::JsonValue::Boolean(v)) => (*v).encode_head(buf),
-            (ir::TyPrimitive::int8, tinyjson::JsonValue::Number(v)) => (*v as i8).encode_head(buf),
-            (ir::TyPrimitive::int16, tinyjson::JsonValue::Number(v)) => {
-                (*v as i16).encode_head(buf)
-            }
-            (ir::TyPrimitive::int32, tinyjson::JsonValue::Number(v)) => {
-                (*v as i32).encode_head(buf)
-            }
-            (ir::TyPrimitive::int64, tinyjson::JsonValue::Number(v)) => {
-                (*v as i64).encode_head(buf)
-            }
-            (ir::TyPrimitive::uint8, tinyjson::JsonValue::Number(v)) => (*v as u8).encode_head(buf),
-            (ir::TyPrimitive::uint16, tinyjson::JsonValue::Number(v)) => {
-                (*v as u16).encode_head(buf)
-            }
-            (ir::TyPrimitive::uint32, tinyjson::JsonValue::Number(v)) => {
-                (*v as u32).encode_head(buf)
-            }
-            (ir::TyPrimitive::uint64, tinyjson::JsonValue::Number(v)) => {
-                (*v as u64).encode_head(buf)
-            }
-            (ir::TyPrimitive::float32, tinyjson::JsonValue::Number(v)) => {
-                (*v as f32).encode_head(buf)
-            }
-            (ir::TyPrimitive::float64, tinyjson::JsonValue::Number(v)) => {
-                (*v as u64).encode_head(buf)
-            }
-            (ir::TyPrimitive::text, _) => unreachable!(),
+        match (self.ty, value) {
+            (ir::TyStd::Bool, tinyjson::JsonValue::Boolean(v)) => (*v).encode_head(buf),
+            (ir::TyStd::Int8, tinyjson::JsonValue::Number(v)) => (*v as i8).encode_head(buf),
+            (ir::TyStd::Int16, tinyjson::JsonValue::Number(v)) => (*v as i16).encode_head(buf),
+            (ir::TyStd::Int32, tinyjson::JsonValue::Number(v)) => (*v as i32).encode_head(buf),
+            (ir::TyStd::Int64, tinyjson::JsonValue::Number(v)) => (*v as i64).encode_head(buf),
+            (ir::TyStd::UInt8, tinyjson::JsonValue::Number(v)) => (*v as u8).encode_head(buf),
+            (ir::TyStd::UInt16, tinyjson::JsonValue::Number(v)) => (*v as u16).encode_head(buf),
+            (ir::TyStd::UInt32, tinyjson::JsonValue::Number(v)) => (*v as u32).encode_head(buf),
+            (ir::TyStd::UInt64, tinyjson::JsonValue::Number(v)) => (*v as u64).encode_head(buf),
+            (ir::TyStd::Float32, tinyjson::JsonValue::Number(v)) => (*v as f32).encode_head(buf),
+            (ir::TyStd::Float64, tinyjson::JsonValue::Number(v)) => (*v).encode_head(buf),
+            (ir::TyStd::Date, tinyjson::JsonValue::Number(v)) => (*v as i32).encode_head(buf),
+            (ir::TyStd::Time, tinyjson::JsonValue::Number(v)) => (*v as i64).encode_head(buf),
+            (ir::TyStd::Timestamp, tinyjson::JsonValue::Number(v)) => (*v as i64).encode_head(buf),
+            (ir::TyStd::Decimal, tinyjson::JsonValue::Number(v)) => (*v as i64).encode_head(buf),
+            (ir::TyStd::Text, _) => unreachable!(),
             (_, v) => panic!(
                 "expected {:?}, found JSON {}",
-                self.prim,
+                self.ty,
                 v.stringify().unwrap()
             ),
         };

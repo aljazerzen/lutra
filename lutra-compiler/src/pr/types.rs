@@ -2,6 +2,7 @@ use enum_as_inner::EnumAsInner;
 
 use crate::Span;
 use crate::pr::path::Path;
+use crate::resolver::NS_STD;
 
 use super::Ref;
 
@@ -88,18 +89,10 @@ pub struct TyEnumVariant {
 #[derive(Debug, Clone, PartialEq, Eq, Hash, strum::Display)]
 #[allow(non_camel_case_types)]
 pub enum TyPrimitive {
-    int8,
-    int16,
-    int32,
-    int64,
-    uint8,
-    uint16,
-    uint32,
-    uint64,
-    float32,
-    float64,
-    bool,
-    text,
+    prim8,
+    prim16,
+    prim32,
+    prim64,
 }
 
 // Type of a function
@@ -210,6 +203,15 @@ impl Ty {
             scope_id: None,
             variants_force_ptr: Vec::new(),
         }
+    }
+
+    pub fn new_std(name: &str) -> Self {
+        Ty::new(TyKind::Ident(Path::new([NS_STD, name])))
+    }
+
+    pub fn with_span(mut self, span: Span) -> Self {
+        self.span = Some(span);
+        self
     }
 }
 

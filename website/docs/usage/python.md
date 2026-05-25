@@ -43,9 +43,9 @@ table:
 
 ```lt title="main.lt"
 type Movie: {
-  id: int32,
-  title: text,
-  release_year: int16,
+  id: Int32,
+  title: Text,
+  release_year: Int16,
 }
 
 func get_movies(): [Movie] -> sql::from("movies")
@@ -135,7 +135,7 @@ The result is a `list[Movie]`.
 Programs can also take typed inputs.
 
 ```lt title="main.lt"
-func get_movies_after(year: int16): [Movie] -> (
+func get_movies_after(year: Int16): [Movie] -> (
   get_movies()
   | filter(m -> m.release_year >= year)
 )
@@ -171,7 +171,7 @@ A project for that workflow might look like this:
 ```lt title="main.lt"
 func from_transactions(): [Transaction] -> sql::from("transactions")
 
-type Transaction: {category: text, amount: Decimal, created_at: Date}
+type Transaction: {category: Text, amount: Decimal, created_at: Date}
 
 func compute_breakdown(since: Date): [Breakdown] -> (
   from_transactions()
@@ -185,7 +185,7 @@ func compute_breakdown(since: Date): [Breakdown] -> (
   )
 )
 
-type Breakdown: {category: text, total_amount: Decimal}
+type Breakdown: {category: Text, total_amount: Decimal}
 
 func write_breakdown(breakdown: [Breakdown]) -> (
   breakdown

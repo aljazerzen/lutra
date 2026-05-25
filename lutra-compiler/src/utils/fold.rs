@@ -70,6 +70,9 @@ pub trait PrFold {
     fn fold_type(&mut self, t: Ty) -> Result<Ty> {
         fold_type(self, t)
     }
+    fn fold_ty_param(&mut self, param: TyParam) -> Result<TyParam> {
+        fold_ty_param(self, param)
+    }
     fn fold_type_annotation(&mut self, a: TypeAnnotation) -> Result<TypeAnnotation> {
         Ok(TypeAnnotation {
             ty: Box::new(self.fold_type(*a.ty)?),
@@ -281,7 +284,7 @@ pub fn fold_func<T: ?Sized + PrFold>(fold: &mut T, func: Func) -> Result<Func> {
         body: Box::new(fold.fold_expr(*func.body)?),
         return_ty: fold_type_opt(fold, func.return_ty)?,
         params: fold_func_params(fold, func.params)?,
-        ty_params: func.ty_params, // recurse into this too?
+        ty_params: fold_ty_params(fold, func.ty_params)?,
     })
 }
 
@@ -378,7 +381,7 @@ pub fn fold_ty_func<F: ?Sized + PrFold>(fold: &mut F, f: TyFunc) -> Result<TyFun
             .body
             .map(|t| fold.fold_type(*t).map(Box::new))
             .transpose()?,
-        ty_params: f.ty_params,
+        ty_params: fold_ty_params(fold, f.ty_params)?,
     })
 }
 
@@ -400,6 +403,54 @@ pub fn fold_ty_func_param<F: ?Sized + PrFold>(
         constant: p.constant,
         label: p.label,
         ty: fold_type_opt(fold, p.ty)?,
+    })
+}
+
+pub fn fold_ty_params<F: ?Sized + PrFold>(
+    fold: &mut F,
+    params: Vec<TyParam>,
+) -> Result<Vec<TyParam>> {
+    params.into_iter().map(|p| fold.fold_ty_param(p)).collect()
+}
+
+pub fn fold_ty_param<F: ?Sized + PrFold>(fold: &mut F, param: TyParam) -> Result<TyParam> {
+    Ok(TyParam {
+        name: param.name,
+        domain: fold_ty_domain(fold, param.domain)?,
+        span: param.span,
+    })
+}
+
+pub fn fold_ty_domain<F: ?Sized + PrFold>(fold: &mut F, domain: TyDomain) -> Result<TyDomain> {
+    Ok(match domain {
+        TyDomain::Open => TyDomain::Open,
+        TyDomain::TupleLen { n } => TyDomain::TupleLen { n },
+        TyDomain::OneOf(tys) => {
+            TyDomain::OneOf(tys.into_iter().map(|t| fold.fold_type(t)).try_collect()?)
+        }
+        TyDomain::TupleHasFields(fields) => TyDomain::TupleHasFields(
+            fields
+                .into_iter()
+                .map(|f| -> Result<_> {
+                    Ok(TyDomainTupleField {
+                        location: f.location,
+                        span: f.span,
+                        ty: fold.fold_type(f.ty)?,
+                    })
+                })
+                .try_collect()?,
+        ),
+        TyDomain::EnumVariants(variants) => TyDomain::EnumVariants(
+            variants
+                .into_iter()
+                .map(|v| -> Result<_> {
+                    Ok(TyDomainEnumVariant {
+                        name: v.name,
+                        ty: fold.fold_type(v.ty)?,
+                    })
+                })
+                .try_collect()?,
+        ),
     })
 }
 

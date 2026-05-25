@@ -392,17 +392,10 @@ pub mod ir {
     #[derive(Debug, Clone, PartialEq, enum_as_inner::EnumAsInner)]
     #[allow(non_camel_case_types)]
     pub enum Literal {
-        bool(bool),
-        int8(i8),
-        int16(i16),
-        int32(i32),
-        int64(i64),
-        uint8(u8),
-        uint16(u16),
-        uint32(u32),
-        uint64(u64),
-        float32(f32),
-        float64(f64),
+        Prim8(u8),
+        Prim16(u16),
+        Prim32(u32),
+        Prim64(u64),
         text(crate::string::String),
     }
 
@@ -500,18 +493,10 @@ pub mod ir {
     #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
     #[allow(non_camel_case_types)]
     pub enum TyPrimitive {
-        bool,
-        int8,
-        int16,
-        int32,
-        int64,
-        uint8,
-        uint16,
-        uint32,
-        uint64,
-        float32,
-        float64,
-        text,
+        prim8,
+        prim16,
+        prim32,
+        prim64,
     }
 
     #[derive(Debug, Clone, PartialEq)]
@@ -1084,70 +1069,28 @@ pub mod ir {
             type HeadPtr = LiteralHeadPtr;
             fn encode_head(&self, w: &mut crate::bytes::BytesMut) -> LiteralHeadPtr {
                 match self {
-                    Self::bool(inner) => {
-                        w.put_slice(&[0]);
-                        let head_ptr = crate::ReversePointer::new(w);
-                        let r = LiteralHeadPtr::bool(head_ptr);
-                        r
-                    }
-                    Self::int8(inner) => {
+                    Self::Prim8(inner) => {
                         w.put_slice(&[1]);
                         let head_ptr = crate::ReversePointer::new(w);
                         let r = LiteralHeadPtr::int8(head_ptr);
                         r
                     }
-                    Self::int16(inner) => {
+                    Self::Prim16(inner) => {
                         w.put_slice(&[2]);
                         let head_ptr = crate::ReversePointer::new(w);
                         let r = LiteralHeadPtr::int16(head_ptr);
                         r
                     }
-                    Self::int32(inner) => {
+                    Self::Prim32(inner) => {
                         w.put_slice(&[3]);
                         let head_ptr = crate::ReversePointer::new(w);
                         let r = LiteralHeadPtr::int32(head_ptr);
                         r
                     }
-                    Self::int64(inner) => {
+                    Self::Prim64(inner) => {
                         w.put_slice(&[4]);
                         let head_ptr = crate::ReversePointer::new(w);
                         let r = LiteralHeadPtr::int64(head_ptr);
-                        r
-                    }
-                    Self::uint8(inner) => {
-                        w.put_slice(&[5]);
-                        let head_ptr = crate::ReversePointer::new(w);
-                        let r = LiteralHeadPtr::uint8(head_ptr);
-                        r
-                    }
-                    Self::uint16(inner) => {
-                        w.put_slice(&[6]);
-                        let head_ptr = crate::ReversePointer::new(w);
-                        let r = LiteralHeadPtr::uint16(head_ptr);
-                        r
-                    }
-                    Self::uint32(inner) => {
-                        w.put_slice(&[7]);
-                        let head_ptr = crate::ReversePointer::new(w);
-                        let r = LiteralHeadPtr::uint32(head_ptr);
-                        r
-                    }
-                    Self::uint64(inner) => {
-                        w.put_slice(&[8]);
-                        let head_ptr = crate::ReversePointer::new(w);
-                        let r = LiteralHeadPtr::uint64(head_ptr);
-                        r
-                    }
-                    Self::float32(inner) => {
-                        w.put_slice(&[9]);
-                        let head_ptr = crate::ReversePointer::new(w);
-                        let r = LiteralHeadPtr::float32(head_ptr);
-                        r
-                    }
-                    Self::float64(inner) => {
-                        w.put_slice(&[10]);
-                        let head_ptr = crate::ReversePointer::new(w);
-                        let r = LiteralHeadPtr::float64(head_ptr);
                         r
                     }
                     Self::text(inner) => {
@@ -1160,15 +1103,7 @@ pub mod ir {
             }
             fn encode_body(&self, head: LiteralHeadPtr, w: &mut crate::bytes::BytesMut) {
                 match self {
-                    Self::bool(inner) => {
-                        let LiteralHeadPtr::bool(offset_ptr) = head else {
-                            unreachable!()
-                        };
-                        offset_ptr.write_cur_len(w);
-                        let inner_head_ptr = inner.encode_head(w);
-                        inner.encode_body(inner_head_ptr, w);
-                    }
-                    Self::int8(inner) => {
+                    Self::Prim8(inner) => {
                         let LiteralHeadPtr::int8(offset_ptr) = head else {
                             unreachable!()
                         };
@@ -1176,7 +1111,7 @@ pub mod ir {
                         let inner_head_ptr = inner.encode_head(w);
                         inner.encode_body(inner_head_ptr, w);
                     }
-                    Self::int16(inner) => {
+                    Self::Prim16(inner) => {
                         let LiteralHeadPtr::int16(offset_ptr) = head else {
                             unreachable!()
                         };
@@ -1184,7 +1119,7 @@ pub mod ir {
                         let inner_head_ptr = inner.encode_head(w);
                         inner.encode_body(inner_head_ptr, w);
                     }
-                    Self::int32(inner) => {
+                    Self::Prim32(inner) => {
                         let LiteralHeadPtr::int32(offset_ptr) = head else {
                             unreachable!()
                         };
@@ -1192,56 +1127,8 @@ pub mod ir {
                         let inner_head_ptr = inner.encode_head(w);
                         inner.encode_body(inner_head_ptr, w);
                     }
-                    Self::int64(inner) => {
+                    Self::Prim64(inner) => {
                         let LiteralHeadPtr::int64(offset_ptr) = head else {
-                            unreachable!()
-                        };
-                        offset_ptr.write_cur_len(w);
-                        let inner_head_ptr = inner.encode_head(w);
-                        inner.encode_body(inner_head_ptr, w);
-                    }
-                    Self::uint8(inner) => {
-                        let LiteralHeadPtr::uint8(offset_ptr) = head else {
-                            unreachable!()
-                        };
-                        offset_ptr.write_cur_len(w);
-                        let inner_head_ptr = inner.encode_head(w);
-                        inner.encode_body(inner_head_ptr, w);
-                    }
-                    Self::uint16(inner) => {
-                        let LiteralHeadPtr::uint16(offset_ptr) = head else {
-                            unreachable!()
-                        };
-                        offset_ptr.write_cur_len(w);
-                        let inner_head_ptr = inner.encode_head(w);
-                        inner.encode_body(inner_head_ptr, w);
-                    }
-                    Self::uint32(inner) => {
-                        let LiteralHeadPtr::uint32(offset_ptr) = head else {
-                            unreachable!()
-                        };
-                        offset_ptr.write_cur_len(w);
-                        let inner_head_ptr = inner.encode_head(w);
-                        inner.encode_body(inner_head_ptr, w);
-                    }
-                    Self::uint64(inner) => {
-                        let LiteralHeadPtr::uint64(offset_ptr) = head else {
-                            unreachable!()
-                        };
-                        offset_ptr.write_cur_len(w);
-                        let inner_head_ptr = inner.encode_head(w);
-                        inner.encode_body(inner_head_ptr, w);
-                    }
-                    Self::float32(inner) => {
-                        let LiteralHeadPtr::float32(offset_ptr) = head else {
-                            unreachable!()
-                        };
-                        offset_ptr.write_cur_len(w);
-                        let inner_head_ptr = inner.encode_head(w);
-                        inner.encode_body(inner_head_ptr, w);
-                    }
-                    Self::float64(inner) => {
-                        let LiteralHeadPtr::float64(offset_ptr) = head else {
                             unreachable!()
                         };
                         offset_ptr.write_cur_len(w);
@@ -1288,60 +1175,25 @@ pub mod ir {
                 let tag = u64::from_le_bytes(tag_bytes.try_into().unwrap()) as usize;
                 let buf = buf.skip(1);
                 Ok(match tag {
-                    0 => {
-                        let offset = u32::from_le_bytes(buf.read_const::<4>());
-                        let inner = bool::decode(buf.skip(offset as usize))?;
-                        Literal::bool(inner)
-                    }
                     1 => {
                         let offset = u32::from_le_bytes(buf.read_const::<4>());
-                        let inner = i8::decode(buf.skip(offset as usize))?;
-                        Literal::int8(inner)
+                        let inner = u8::decode(buf.skip(offset as usize))?;
+                        Literal::Prim8(inner)
                     }
                     2 => {
                         let offset = u32::from_le_bytes(buf.read_const::<4>());
-                        let inner = i16::decode(buf.skip(offset as usize))?;
-                        Literal::int16(inner)
+                        let inner = u16::decode(buf.skip(offset as usize))?;
+                        Literal::Prim16(inner)
                     }
                     3 => {
                         let offset = u32::from_le_bytes(buf.read_const::<4>());
-                        let inner = i32::decode(buf.skip(offset as usize))?;
-                        Literal::int32(inner)
+                        let inner = u32::decode(buf.skip(offset as usize))?;
+                        Literal::Prim32(inner)
                     }
                     4 => {
                         let offset = u32::from_le_bytes(buf.read_const::<4>());
-                        let inner = i64::decode(buf.skip(offset as usize))?;
-                        Literal::int64(inner)
-                    }
-                    5 => {
-                        let offset = u32::from_le_bytes(buf.read_const::<4>());
-                        let inner = u8::decode(buf.skip(offset as usize))?;
-                        Literal::uint8(inner)
-                    }
-                    6 => {
-                        let offset = u32::from_le_bytes(buf.read_const::<4>());
-                        let inner = u16::decode(buf.skip(offset as usize))?;
-                        Literal::uint16(inner)
-                    }
-                    7 => {
-                        let offset = u32::from_le_bytes(buf.read_const::<4>());
-                        let inner = u32::decode(buf.skip(offset as usize))?;
-                        Literal::uint32(inner)
-                    }
-                    8 => {
-                        let offset = u32::from_le_bytes(buf.read_const::<4>());
                         let inner = u64::decode(buf.skip(offset as usize))?;
-                        Literal::uint64(inner)
-                    }
-                    9 => {
-                        let offset = u32::from_le_bytes(buf.read_const::<4>());
-                        let inner = f32::decode(buf.skip(offset as usize))?;
-                        Literal::float32(inner)
-                    }
-                    10 => {
-                        let offset = u32::from_le_bytes(buf.read_const::<4>());
-                        let inner = f64::decode(buf.skip(offset as usize))?;
-                        Literal::float64(inner)
+                        Literal::Prim64(inner)
                     }
                     11 => {
                         let offset = u32::from_le_bytes(buf.read_const::<4>());
@@ -1893,41 +1745,17 @@ pub mod ir {
             type HeadPtr = ();
             fn encode_head(&self, w: &mut crate::bytes::BytesMut) -> () {
                 match self {
-                    Self::bool => {
-                        w.put_slice(&[0]);
-                    }
-                    Self::int8 => {
+                    Self::prim8 => {
                         w.put_slice(&[1]);
                     }
-                    Self::int16 => {
+                    Self::prim16 => {
                         w.put_slice(&[2]);
                     }
-                    Self::int32 => {
+                    Self::prim32 => {
                         w.put_slice(&[3]);
                     }
-                    Self::int64 => {
+                    Self::prim64 => {
                         w.put_slice(&[4]);
-                    }
-                    Self::uint8 => {
-                        w.put_slice(&[5]);
-                    }
-                    Self::uint16 => {
-                        w.put_slice(&[6]);
-                    }
-                    Self::uint32 => {
-                        w.put_slice(&[7]);
-                    }
-                    Self::uint64 => {
-                        w.put_slice(&[8]);
-                    }
-                    Self::float32 => {
-                        w.put_slice(&[9]);
-                    }
-                    Self::float64 => {
-                        w.put_slice(&[10]);
-                    }
-                    Self::text => {
-                        w.put_slice(&[11]);
                     }
                 }
             }
@@ -1945,18 +1773,10 @@ pub mod ir {
                 tag_bytes.resize(8, 0);
                 let tag = u64::from_le_bytes(tag_bytes.try_into().unwrap()) as usize;
                 Ok(match tag {
-                    0 => TyPrimitive::bool,
-                    1 => TyPrimitive::int8,
-                    2 => TyPrimitive::int16,
-                    3 => TyPrimitive::int32,
-                    4 => TyPrimitive::int64,
-                    5 => TyPrimitive::uint8,
-                    6 => TyPrimitive::uint16,
-                    7 => TyPrimitive::uint32,
-                    8 => TyPrimitive::uint64,
-                    9 => TyPrimitive::float32,
-                    10 => TyPrimitive::float64,
-                    11 => TyPrimitive::text,
+                    1 => TyPrimitive::prim8,
+                    2 => TyPrimitive::prim16,
+                    3 => TyPrimitive::prim32,
+                    4 => TyPrimitive::prim64,
                     _ => return Err(crate::Error::InvalidData),
                 })
             }

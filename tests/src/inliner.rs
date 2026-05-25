@@ -3,7 +3,7 @@ use insta::assert_snapshot;
 #[track_caller]
 fn _test_compile_and_print(source: &str) -> String {
     let program = lutra_compiler::_test_compile_main(source).unwrap_or_else(|e| panic!("{e}"));
-    let program = lutra_compiler::inline(program);
+    let program = lutra_compiler::_test_inline(program);
     lutra_bin::ir::print_no_color(&program)
 }
 
@@ -14,17 +14,18 @@ fn inline_00() {
 
     func main() -> twice([true, true, false])
     "#), @"
+    type std::Bool = Prim8;
     let main = (func 1 ->
-      let 2 = [
-        true: bool,
-        true: bool,
-        false: bool,
-      ]: [bool];
+      let 2 = (array
+        1: Bool,
+        1: Bool,
+        0: Bool,
+      ): [Bool];
       (tuple
-        var.2: [bool],
-        var.2: [bool],
-      ): {x: [bool], x: [bool]}
-    ): func ({}) -> {x: [bool], x: [bool]}
+        var.2: [Bool],
+        var.2: [Bool],
+      ): {x: [Bool], x: [Bool]}
+    ): func ({}) -> {x: [Bool], x: [Bool]}
     ")
 }
 
@@ -35,62 +36,64 @@ fn inline_01() {
 
     func main() -> once([true, true, false])
     "#), @"
+    type std::Bool = Prim8;
     let main = (func 1 ->
       (tuple
-        [
-          true: bool,
-          true: bool,
-          false: bool,
-        ]: [bool],
-      ): {x: [bool]}
-    ): func ({}) -> {x: [bool]}
+        (array
+          1: Bool,
+          1: Bool,
+          0: Bool,
+        ): [Bool],
+      ): {x: [Bool]}
+    ): func ({}) -> {x: [Bool]}
     ")
 }
 
 #[test]
 fn inline_02() {
     assert_snapshot!(_test_compile_and_print(r#"
-    const my_rel: [{int64, int64}] = [{5,3},{65,1},{3, 2}]
+    const my_rel: [{Int64, Int64}] = [{5,3},{65,1},{3, 2}]
     func main() -> (
       my_rel
-      | std::aggregate(func (x: {[int64], [int64]}) -> {std::min(x.0), std::min(x.1)})
+      | std::aggregate(func (x: {[Int64], [Int64]}) -> {std::min(x.0), std::min(x.1)})
     )
     "#), @"
+    type std::Int64 = Prim64;
     let main = (func 2 ->
       let 5 = (call
-        external.std::array::to_columnar: func ([{int64, int64}]) -> {[int64], [int64]},
-        [
+        external.std::array::to_columnar: func ([{Int64, Int64}]) -> {[Int64], [Int64]},
+        (array
           (tuple
-            5: int64,
-            3: int64,
-          ): {int64, int64},
+            5: Int64,
+            3: Int64,
+          ): {Int64, Int64},
           (tuple
-            65: int64,
-            1: int64,
-          ): {int64, int64},
+            65: Int64,
+            1: Int64,
+          ): {Int64, Int64},
           (tuple
-            3: int64,
-            2: int64,
-          ): {int64, int64},
-        ]: [{int64, int64}],
-      ): {[int64], [int64]};
+            3: Int64,
+            2: Int64,
+          ): {Int64, Int64},
+        ): [{Int64, Int64}],
+      ): {[Int64], [Int64]};
       (tuple
         (call
-          external.std::array::min: func ([int64]) -> enum {none, some: int64},
+          external.std::array::min: func ([Int64]) -> enum {none, some: Int64},
           (tuple_lookup
-            var.5: {[int64], [int64]}
+            var.5: {[Int64], [Int64]}
             0
-          ): [int64],
-        ): enum {none, some: int64},
+          ): [Int64],
+        ): enum {none, some: Int64},
         (call
-          external.std::array::min: func ([int64]) -> enum {none, some: int64},
+          external.std::array::min: func ([Int64]) -> enum {none, some: Int64},
           (tuple_lookup
-            var.5: {[int64], [int64]}
+            var.5: {[Int64], [Int64]}
             1
-          ): [int64],
-        ): enum {none, some: int64},
-      ): {enum {none, some: int64}, enum {none, some: int64}}
-    ): func ({}) -> {enum {none, some: int64}, enum {none, some: int64}}
+          ): [Int64],
+        ): enum {none, some: Int64},
+      ): {enum {none, some: Int64}, enum {none, some: Int64}}
+    ): func ({}) -> {enum {none, some: Int64}, enum {none, some: Int64}}
     ")
 }
 
@@ -99,7 +102,7 @@ fn inline_03() {
     assert_snapshot!(_test_compile_and_print(r#"
     type OptText: enum {
       none,
-      some: text,
+      some: Text,
     }
     func main() -> {
       .some("hello"): OptText,
@@ -108,29 +111,31 @@ fn inline_03() {
       std::option::is_none(.some("hello")),
     }
     "#), @r#"
-    type OptText = enum {none, some: text};
+    type std::Bool = Prim8;
+    type std::Text = [Prim8];
+    type OptText = enum {none, some: Text};
     let main = (func 1 ->
       (tuple
         (enum_variant 1
-          "hello": text
+          "hello": Text
         ): OptText,
         (enum_variant 0): OptText,
         (enum_eq
           (enum_variant 1
-            "hello": text
-          ): enum {none, some: text}
+            "hello": Text
+          ): enum {none, some: Text}
           1
-        ): bool,
+        ): Bool,
         (call
-          external.std::ops::not: func (bool) -> bool,
+          external.std::ops::not: func (Bool) -> Bool,
           (enum_eq
             (enum_variant 1
-              "hello": text
-            ): enum {none, some: text}
+              "hello": Text
+            ): enum {none, some: Text}
             1
-          ): bool,
-        ): bool,
-      ): {OptText, OptText, bool, bool}
-    ): func ({}) -> {OptText, OptText, bool, bool}
+          ): Bool,
+        ): Bool,
+      ): {OptText, OptText, Bool, Bool}
+    ): func ({}) -> {OptText, OptText, Bool, Bool}
     "#)
 }

@@ -59,7 +59,7 @@ pub fn program_ty() -> rr::ProgramType {
             },
             ir::TyTupleField {
                 name: Some("path".into()),
-                ty: ir::Ty::new(ir::TyPrimitive::text),
+                ty: ir::Ty::text(),
             },
         ]),
         output: ir::Ty::new_unit(),

@@ -4,21 +4,23 @@ title: Types
 
 This page describes the type forms used in the Lutra language.
 
-## Primitive types
+## Standard types
 
-- `bool`
-- `int8`, `int16`, `int32`, `int64`
-- `uint8`, `uint16`, `uint32`, `uint64`
-- `float32`, `float64`
-- `text`
+The standard library defines these framed standard types:
+
+- `Bool`
+- `Int8`, `Int16`, `Int32`, `Int64`
+- `Uint8`, `Uint16`, `Uint32`, `Uint64`
+- `Float32`, `Float64`
+- `Text`
 
 Examples:
 
 ```lt
-const enabled: bool = true
-const count: int32 = 4
-const ratio: float64 = 1.5
-const name: text = "lutra"
+const enabled: Bool = true
+const count: Int32 = 4
+const ratio: Float64 = 1.5
+const name: Text = "lutra"
 ```
 
 ## Array types
@@ -26,9 +28,9 @@ const name: text = "lutra"
 Array types use `[T]`.
 
 ```lt
-[int64]
-[text]
-[{a: int64, b: text}]
+[Int64]
+[Text]
+[{a: Int64, b: Text}]
 ```
 
 An array contains zero or more values of the same element type.
@@ -39,9 +41,9 @@ Tuple types use `{...}`.
 A tuple field can be positional or named.
 
 ```lt
-{int8, text, [bool]}
-{a: int64, b: text}
-{sum: int64, count: int64}
+{Int8, Text, [Bool]}
+{a: Int64, b: Text}
+{sum: Int64, count: Int64}
 ```
 
 You can access tuple fields by position or by name. See
@@ -53,28 +55,28 @@ Enum types use `enum {...}`.
 Each variant has a name and can optionally carry a payload.
 
 ```lt
-enum {done, pending: int64, cancelled: text}
+enum {done, pending: Int64, cancelled: Text}
 ```
 
 Nested enums are also valid:
 
 ```lt
 enum {
-  cat: text,
-  dog: enum {collie: text, generic},
+  cat: Text,
+  dog: enum {collie: Text, generic},
 }
 ```
 
 ## Framed types
 
 A type definition can also introduce a framed type with a single wrapped field.
-The standard library uses this form for types such as `std::Date`,
-`std::Time`, `std::Timestamp`, and `std::Decimal`.
+The standard library uses this form for framed standard types such as
+`Bool`, `Int32`, `Text`, `Date`, `Time`, `Timestamp`, and `Decimal`.
 
 Conceptually, a framed type definition looks like this:
 
 ```lt
-type Date(days_epoch: int32)
+type Date(days_epoch: Int32)
 ```
 
 Values of framed types can be constructed by calling the type name:
@@ -96,8 +98,8 @@ The wrapped field can be accessed with normal field lookup syntax:
 You can attach a type to an expression with `: Type`.
 
 ```lt
-1: int32
-[]: [int64]
+1: Int32
+[]: [Int64]
 .cat("Whiskers"): Animal
 ```
 
@@ -120,7 +122,7 @@ where T
 A constraint can restrict a type variable to a tuple shape:
 
 ```lt
-func false_x_false(x: T) where T: {x2: text, ..} -> {false, ..x, false}.x2
+func false_x_false(x: T) where T: {x2: Text, ..} -> {false, ..x, false}.x2
 ```
 
 The tuple constraint `..` means the tuple may contain additional fields.

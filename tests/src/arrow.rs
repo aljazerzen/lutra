@@ -47,13 +47,13 @@ fn test_interface_primitives_no_nulls() {
     let interface = lutra_arrow::pull_schema(test_dir.path()).unwrap();
 
     insta::assert_snapshot!(interface, @r#"
-    func users(): [{
-      id: int32,
-      name: text,
-      score: float64,
-      active: bool,
-    }] -> std::fs::read_parquet("users.parquet")
 
+    func users(): [{
+      id: Int32,
+      name: Text,
+      score: Float64,
+      active: Bool,
+    }] -> std::fs::read_parquet("users.parquet")
     "#);
 }
 
@@ -83,11 +83,11 @@ fn test_interface_optional_with_nulls() {
 
     // Should wrap nullable field in option enum because it has nulls
     insta::assert_snapshot!(interface, @r#"
-    func users_with_nulls(): [{
-      id: int32,
-      nickname: enum {none, some: text},
-    }] -> std::fs::read_parquet("users_with_nulls.parquet")
 
+    func users_with_nulls(): [{
+      id: Int32,
+      nickname: enum {none, some: Text},
+    }] -> std::fs::read_parquet("users_with_nulls.parquet")
     "#);
 }
 
@@ -120,11 +120,11 @@ fn test_interface_optional_without_nulls() {
 
     // Should NOT wrap in option enum because there are no nulls
     insta::assert_snapshot!(interface, @r#"
-    func users_no_nulls(): [{
-      id: int32,
-      nickname: text,
-    }] -> std::fs::read_parquet("users_no_nulls.parquet")
 
+    func users_no_nulls(): [{
+      id: Int32,
+      nickname: Text,
+    }] -> std::fs::read_parquet("users_no_nulls.parquet")
     "#);
 }
 
@@ -178,12 +178,13 @@ fn test_interface_nested_struct() {
 
     // Nested optional fields are conservatively wrapped in option
     insta::assert_snapshot!(interface, @r#"
+
     func users_with_address(): [{
-      id: int32,
+      id: Int32,
       address: [{
-        street: text,
-        city: text,
-        zip: int32,
+        street: Text,
+        city: Text,
+        zip: Int32,
     }],
     }] -> std::fs::read_parquet("users_with_address.parquet")
     "#);
@@ -215,8 +216,8 @@ fn test_interface_multiple_files() {
     // Should have both functions (order may vary)
     assert!(interface.contains("func file1()"));
     assert!(interface.contains("func file2()"));
-    assert!(interface.contains("id: int32"));
-    assert!(interface.contains("name: text"));
+    assert!(interface.contains("id: Int32"));
+    assert!(interface.contains("name: Text"));
 }
 
 #[test]
@@ -244,10 +245,10 @@ fn test_interface_nested_directories() {
 
     // Should find nested file with path
     insta::assert_snapshot!(interface, @r#"
-    func data(): [{
-      value: int64,
-    }] -> std::fs::read_parquet("subdir/data.parquet")
 
+    func data(): [{
+      value: Int64,
+    }] -> std::fs::read_parquet("subdir/data.parquet")
     "#);
 }
 
@@ -279,11 +280,11 @@ fn test_interface_non_parquet_files() {
 
 #[test]
 fn to_arrow_int() {
-    let ty = lutra_compiler::_test_compile_ty("int32");
+    let (ty, ty_defs) = lutra_compiler::_test_compile_ty("Int32");
     let value = lutra_bin::Value::Prim32(42);
-    let data = value.encode(&ty, &[]).unwrap();
+    let data = value.encode(&ty, &ty_defs).unwrap();
 
-    let batch = lutra_arrow::lutra_to_arrow(data.as_slice(), &ty, &[]).unwrap();
+    let batch = lutra_arrow::lutra_to_arrow(data.as_slice(), &ty, &ty_defs).unwrap();
 
     assert_eq!(batch.num_rows(), 1);
     assert_eq!(batch.num_columns(), 1);
@@ -300,11 +301,11 @@ fn to_arrow_int() {
 
 #[test]
 fn to_arrow_text() {
-    let ty = lutra_compiler::_test_compile_ty("text");
+    let (ty, ty_defs) = lutra_compiler::_test_compile_ty("Text");
     let value = lutra_bin::Value::new_text("hello");
-    let data = value.encode(&ty, &[]).unwrap();
+    let data = value.encode(&ty, &ty_defs).unwrap();
 
-    let batch = lutra_arrow::lutra_to_arrow(data.as_slice(), &ty, &[]).unwrap();
+    let batch = lutra_arrow::lutra_to_arrow(data.as_slice(), &ty, &ty_defs).unwrap();
 
     assert_eq!(batch.num_rows(), 1);
     assert_eq!(batch.num_columns(), 1);
@@ -320,14 +321,14 @@ fn to_arrow_text() {
 
 #[test]
 fn to_arrow_tuple() {
-    let ty = lutra_compiler::_test_compile_ty("{x: int32, y: text}");
+    let (ty, ty_defs) = lutra_compiler::_test_compile_ty("{x: Int32, y: Text}");
     let value = lutra_bin::Value::Tuple(vec![
         lutra_bin::Value::Prim32(42),
         lutra_bin::Value::new_text("world"),
     ]);
-    let data = value.encode(&ty, &[]).unwrap();
+    let data = value.encode(&ty, &ty_defs).unwrap();
 
-    let batch = lutra_arrow::lutra_to_arrow(data.as_slice(), &ty, &[]).unwrap();
+    let batch = lutra_arrow::lutra_to_arrow(data.as_slice(), &ty, &ty_defs).unwrap();
 
     assert_eq!(batch.num_rows(), 1);
     assert_eq!(batch.num_columns(), 2);
@@ -354,7 +355,7 @@ fn to_arrow_tuple() {
 
 #[test]
 fn to_arrow_array_of_tuples() {
-    let ty = lutra_compiler::_test_compile_ty("[{x: int32, bool}]");
+    let (ty, ty_defs) = lutra_compiler::_test_compile_ty("[{x: Int32, Bool}]");
     let value = lutra_bin::Value::Array(vec![
         lutra_bin::Value::Tuple(vec![
             lutra_bin::Value::Prim32(100),
@@ -365,9 +366,9 @@ fn to_arrow_array_of_tuples() {
             lutra_bin::Value::Prim8(0),
         ]),
     ]);
-    let data = value.encode(&ty, &[]).unwrap();
+    let data = value.encode(&ty, &ty_defs).unwrap();
 
-    let batch = lutra_arrow::lutra_to_arrow(data.as_slice(), &ty, &[]).unwrap();
+    let batch = lutra_arrow::lutra_to_arrow(data.as_slice(), &ty, &ty_defs).unwrap();
 
     assert_eq!(batch.num_rows(), 2);
     assert_eq!(batch.num_columns(), 2);
@@ -397,15 +398,15 @@ fn to_arrow_array_of_tuples() {
 
 #[test]
 fn to_arrow_array_of_int() {
-    let ty = lutra_compiler::_test_compile_ty("[int32]");
+    let (ty, ty_defs) = lutra_compiler::_test_compile_ty("[Int32]");
     let value = lutra_bin::Value::Array(vec![
         lutra_bin::Value::Prim32(42),
         lutra_bin::Value::Prim32(34),
         lutra_bin::Value::Prim32(56),
     ]);
-    let data = value.encode(&ty, &[]).unwrap();
+    let data = value.encode(&ty, &ty_defs).unwrap();
 
-    let batch = lutra_arrow::lutra_to_arrow(data.as_slice(), &ty, &[]).unwrap();
+    let batch = lutra_arrow::lutra_to_arrow(data.as_slice(), &ty, &ty_defs).unwrap();
 
     assert_eq!(batch.num_rows(), 3);
     assert_eq!(batch.num_columns(), 1);

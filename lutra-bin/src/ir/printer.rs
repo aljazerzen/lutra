@@ -57,7 +57,7 @@ impl Printer {
 
         for ty_def in &program.defs {
             r += "type ";
-            r += &display_path(&ty_def.name);
+            r += &display_path(&ty_def.name.0);
             r += " = ";
             r += &self.print_ty(&ty_def.ty);
             r += ";\n";
@@ -132,7 +132,7 @@ impl Printer {
                 r
             }
             ir::ExprKind::Array(items) => {
-                let mut r = "[".to_string();
+                let mut r = "(array".to_string();
                 if !items.is_empty() {
                     self.indent();
                     for item in items {
@@ -143,7 +143,7 @@ impl Printer {
                     self.dedent();
                     r += &self.new_line();
                 }
-                r += "]";
+                r += ")";
                 r
             }
             ir::ExprKind::EnumVariant(variant) => {
@@ -282,18 +282,10 @@ impl Printer {
     #[allow(clippy::only_used_in_recursion)]
     fn print_ty(&self, ty: &ir::Ty) -> String {
         match &ty.kind {
-            ir::TyKind::Primitive(ir::TyPrimitive::bool) => "bool".to_string(),
-            ir::TyKind::Primitive(ir::TyPrimitive::int8) => "int8".to_string(),
-            ir::TyKind::Primitive(ir::TyPrimitive::int16) => "int16".to_string(),
-            ir::TyKind::Primitive(ir::TyPrimitive::int32) => "int32".to_string(),
-            ir::TyKind::Primitive(ir::TyPrimitive::int64) => "int64".to_string(),
-            ir::TyKind::Primitive(ir::TyPrimitive::uint8) => "uint8".to_string(),
-            ir::TyKind::Primitive(ir::TyPrimitive::uint16) => "uint16".to_string(),
-            ir::TyKind::Primitive(ir::TyPrimitive::uint32) => "uint32".to_string(),
-            ir::TyKind::Primitive(ir::TyPrimitive::uint64) => "uint64".to_string(),
-            ir::TyKind::Primitive(ir::TyPrimitive::float32) => "float32".to_string(),
-            ir::TyKind::Primitive(ir::TyPrimitive::float64) => "float64".to_string(),
-            ir::TyKind::Primitive(ir::TyPrimitive::text) => "text".to_string(),
+            ir::TyKind::Primitive(ir::TyPrimitive::prim8) => "Prim8".to_string(),
+            ir::TyKind::Primitive(ir::TyPrimitive::prim16) => "Prim16".to_string(),
+            ir::TyKind::Primitive(ir::TyPrimitive::prim32) => "Prim32".to_string(),
+            ir::TyKind::Primitive(ir::TyPrimitive::prim64) => "Prim64".to_string(),
             ir::TyKind::Tuple(fields) => {
                 let mut r = "{".to_string();
                 for (index, field) in fields.iter().enumerate() {
@@ -346,7 +338,13 @@ impl Printer {
                 r += &self.print_ty(&func.body);
                 r
             }
-            ir::TyKind::Ident(path) => display_path(path),
+            ir::TyKind::Ident(path) => {
+                if path.0.first().is_some_and(|x| x == "std") {
+                    display_path(&path.0[1..])
+                } else {
+                    display_path(&path.0)
+                }
+            }
         }
     }
 }
@@ -362,9 +360,9 @@ fn is_ty_unit(ty: &ir::Ty) -> bool {
     ty.kind.as_tuple().is_some_and(|f| f.is_empty())
 }
 
-fn display_path(path: &ir::Path) -> String {
+fn display_path(path: &[String]) -> String {
     let mut r = String::new();
-    for (index, part) in path.0.iter().enumerate() {
+    for (index, part) in path.iter().enumerate() {
         if index > 0 {
             r += "::";
         }

@@ -304,10 +304,10 @@ fn format_17() {
     // formatting of external functions
 
     assert_snapshot!(_format(r#"
-    external func index(array: [T], position: int64): enum { None, Some: T }
+    external func index(array: [T], position: Int64): enum { None, Some: T }
     where T
     "#), @"
-    external func index(array: [T], position: int64): enum {None, Some: T}
+    external func index(array: [T], position: Int64): enum {None, Some: T}
     where T
     "
     )
@@ -571,7 +571,7 @@ fn trivia_07() {
       # initial
       Pending,
       # user has clicked "start"
-      InProgress: {started: text, owner: text},
+      InProgress: {started: Text, owner: Text},
 
       # completed
       Done,
@@ -581,7 +581,7 @@ fn trivia_07() {
       # initial
       Pending,
       # user has clicked "start"
-      InProgress: {started: text, owner: text},
+      InProgress: {started: Text, owner: Text},
 
       # completed
       Done,
@@ -595,24 +595,24 @@ fn trivia_08() {
     assert_snapshot!(_format(r#"
     type Task: {
       # id
-      int64,
+      Int64,
       # some title
-      title: text,
+      title: Text,
 
       # completed
-      bool,
+      Bool,
 
       # TODO: add a few others
     }
- "#), @r"
+ "#), @"
     type Task: {
       # id
-      int64,
+      Int64,
       # some title
-      title: text,
+      title: Text,
 
       # completed
-      bool,
+      Bool,
 
       # TODO: add a few others
     }
@@ -745,10 +745,8 @@ fn source_02() {
     // framed type defs
 
     assert_snapshot!(_format(r#"
-    type Date(int32)
-    "#), @r"
-    type Date(int32)
-    ");
+    type Date(Int32)
+    "#), @"type Date(Int32)");
 }
 
 #[test]
@@ -761,7 +759,7 @@ fn source_03() {
     # after doc
     @Debug("Clone", "Debug")
     # after annotation
-    type Date: int32 # trailing
+    type Date: Int32 # trailing
 
     # after
     "#), @r#"
@@ -770,7 +768,7 @@ fn source_03() {
     # after doc
     @Debug("Clone", "Debug")
     # after annotation
-    type Date: int32 # trailing
+    type Date: Int32 # trailing
 
     # after
     "#);
@@ -795,29 +793,29 @@ fn _signature(source: &str) -> String {
 #[test]
 fn signature_function() {
     assert_snapshot!(_signature(
-        "func greet(name: text): text -> name",
-    ), @"func greet(text): text");
+        "func greet(name: Text): Text -> name",
+    ), @"func greet(Text): Text");
 }
 
 #[test]
 fn signature_function_no_return() {
     assert_snapshot!(_signature(
-        "func identity(x: int32) -> x",
-    ), @"func identity(int32): int32");
+        "func identity(x: Int32) -> x",
+    ), @"func identity(Int32): Int32");
 }
 
 #[test]
 fn signature_const() {
     assert_snapshot!(_signature(
-        "const answer: int32 = 42",
-    ), @"const answer: int32 = 42");
+        "const answer: Int32 = 42",
+    ), @"const answer: Int32 = 42");
 }
 
 #[test]
 fn signature_type() {
     assert_snapshot!(_signature(
-        "type Point: { x: float64, y: float64 }",
-    ), @"type Point: {x: float64, y: float64}");
+        "type Point: { x: Float64, y: Float64 }",
+    ), @"type Point: {x: Float64, y: Float64}");
 }
 
 #[test]
@@ -826,8 +824,8 @@ fn signature_type_doc_comment() {
     // Markdown, not the code block; verify the signature alone is clean.
     assert_snapshot!(_signature(r#"
         ## A named point in 2-D space.
-        type Point: { x: float64, y: float64 }
-    "#), @"type Point: {x: float64, y: float64}");
+        type Point: { x: Float64, y: Float64 }
+    "#), @"type Point: {x: Float64, y: Float64}");
 }
 
 #[test]
@@ -869,10 +867,10 @@ fn signature_primitive_domain() {
 fn signature_partial_number_domain() {
     // A custom subset that is NOT the canonical `number` set must print verbatim.
     assert_snapshot!(_signature(
-        "func negi(x: T): T where T: int8 | int16 | int32 | int64 -> x",
+        "func negi(x: T): T where T: Int8 | Int16 | Int32 | Int64 -> x",
     ), @"
     func negi(T): T
-    where T: int8 | int16 | int32 | int64
+    where T: Int8 | Int16 | Int32 | Int64
     ");
 }
 

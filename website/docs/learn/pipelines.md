@@ -11,9 +11,9 @@ one step, then apply the next.
 A function takes input values and returns an output value.
 
 ```lt
-func greet(name: text) -> f"Hello, {name}!"
+func greet(name: Text) -> f"Hello, {name}!"
 
-func add(a: int32, b: int32) -> a + b
+func add(a: Int32, b: Int32) -> a + b
 
 func main() -> {greet("Ada"), add(3, 4)}
 ```
@@ -22,7 +22,7 @@ Functions can infer their return type when it is obvious. You can also annotate
 it explicitly.
 
 ```lt
-func is_even(x: int32): bool -> x % 2 == 0
+func is_even(x: Int32): Bool -> x % 2 == 0
 ```
 
 In practice, Lutra code often uses:
@@ -36,9 +36,9 @@ In practice, Lutra code often uses:
 Constants are useful for fixed values that do not require computation.
 
 ```lt
-const tax_rate: float64 = 0.2
+const tax_rate: Float64 = 0.2
 
-func with_tax(price: float64) -> price * (1.0 + tax_rate)
+func with_tax(price: Float64) -> price * (1.0 + tax_rate)
 ```
 
 Use `func` when you need computation. Use `const` when you need a reusable
@@ -49,8 +49,8 @@ value.
 A pipe sends the value on the left into the expression on the right.
 
 ```lt
-func add_one(x: int32) -> x + 1
-func double(x: int32) -> x * 2
+func add_one(x: Int32) -> x + 1
+func double(x: Int32) -> x * 2
 
 func main() -> 10 | add_one | double
 ```
@@ -70,7 +70,7 @@ You can write a function directly where you need it.
 
 ```lt
 func main() -> (
-  [1, 2, 3]: [int32]
+  [1, 2, 3]: [Int32]
   | map(x -> x * 2)
 )
 ```
@@ -84,8 +84,8 @@ operations.
 
 ```lt
 func main() -> (
-  let subtotal = 50: int32;
-  let tax = 10: int32;
+  let subtotal = 50: Int32;
+  let tax = 10: Int32;
   subtotal + tax
 )
 ```
@@ -101,7 +101,7 @@ This is helpful when:
 Functions often return tuples so that related values stay together.
 
 ```lt
-func summarize(name: text, score: int32) -> {
+func summarize(name: Text, score: Int32) -> {
   name = name,
   passed = score >= 50,
   score = score,
@@ -119,7 +119,7 @@ Sometimes a transformation depends on a condition.
 Use `if` when you already have a boolean condition and only need two branches.
 
 ```lt
-func label(x: int32) -> if x > 0 then "positive" else "zero or negative"
+func label(x: Int32) -> if x > 0 then "positive" else "zero or negative"
 
 func main() -> [label(3), label(-1)]
 ```
@@ -130,7 +130,7 @@ Use `match` when you want to branch on enum variants.
 type Status: enum {
   draft,
   published,
-  scheduled: text,
+  scheduled: Text,
 }
 
 func to_text(status: Status) -> match status {
@@ -146,8 +146,8 @@ Patterns can also bind values:
 
 ```lt
 type Animal: enum {
-  cat: text,
-  dog: text,
+  cat: Text,
+  dog: Text,
 }
 
 func greet_animal(animal: Animal) -> match animal {
@@ -174,14 +174,14 @@ Use `_` when you do not care about the matched value.
 This is harder to read:
 
 ```lt
-func main() -> sum(map([1, 2, 3]: [int32], x -> x * 2))
+func main() -> sum(map([1, 2, 3]: [Int32], x -> x * 2))
 ```
 
 This is usually better:
 
 ```lt
 func main() -> (
-  [1, 2, 3]: [int32]
+  [1, 2, 3]: [Int32]
   | map(x -> x * 2)
   | sum()
 )
@@ -191,8 +191,8 @@ The benefit becomes even clearer with tuple-shaped rows:
 
 ```lt
 const movies = [
-  {id = 1: int32, title = "Arrival", year = 2016: int32},
-  {id = 2: int32, title = "Dune", year = 2021: int32},
+  {id = 1: Int32, title = "Arrival", year = 2016: Int32},
+  {id = 2: Int32, title = "Dune", year = 2021: Int32},
 ]
 
 func main() -> (

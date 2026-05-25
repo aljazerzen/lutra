@@ -50,9 +50,13 @@ pub fn get_shape_tuple(ty: &ir::Ty, ty_defs: &[ir::TyDef]) -> Option<usize> {
 }
 
 fn get_ty_mat<'a>(mut ty: &'a ir::Ty, ty_defs: &'a [ir::TyDef]) -> &'a ir::Ty {
-    while let TyKind::Ident(path) = &ty.kind
-        && let Some(def) = ty_defs.iter().find(|d| &d.name == path)
-    {
+    while let TyKind::Ident(path) = &ty.kind {
+        if ir::TyStd::try_new(path).is_some() {
+            return ty;
+        }
+        let Some(def) = ty_defs.iter().find(|d| &d.name == path) else {
+            return ty;
+        };
         ty = &def.ty;
     }
     ty

@@ -94,6 +94,44 @@ impl<'t> ValueVisitor<'t> for Printer<'t> {
         Ok(format!("\"{v}\""))
     }
 
+    fn visit_date(&mut self, days: i32) -> Result<Self::Res, crate::Error> {
+        #[cfg(feature = "chrono")]
+        {
+            if let Some(date) = chrono::NaiveDate::from_epoch_days(days) {
+                return Ok(format!("@{date}"));
+            }
+        }
+        ValueVisitor::<'t>::visit_int32(self, days)
+    }
+
+    fn visit_time(&mut self, micros_t: i64) -> Result<Self::Res, crate::Error> {
+        let micros = (micros_t % 1000000).abs();
+        let sec_t = micros_t / 1000000;
+
+        let sec = (sec_t % 60).abs();
+        let min_t = sec_t / 60;
+
+        let min = (min_t % 60).abs();
+        let h_t = min_t / 60;
+
+        Ok(format!("@{h_t:02}:{min:02}:{sec:02}.{micros:06}"))
+    }
+
+    fn visit_timestamp(&mut self, micros: i64) -> Result<Self::Res, crate::Error> {
+        #[cfg(feature = "chrono")]
+        {
+            if let Some(dt) = chrono::DateTime::from_timestamp_micros(micros) {
+                let dt = dt.to_rfc3339_opts(chrono::SecondsFormat::Micros, true);
+                return Ok(format!("@{}", dt.trim_end_matches('Z')));
+            }
+        }
+        ValueVisitor::<'t>::visit_int64(self, micros)
+    }
+
+    fn visit_decimal(&mut self, cent: i64) -> Result<Self::Res, crate::Error> {
+        Ok(format!("{}.{:02}", cent / 100, (cent % 100).abs()))
+    }
+
     fn visit_tuple(
         &mut self,
         fields: &[Value],
@@ -158,5 +196,52 @@ impl<'t> ValueVisitor<'t> for Printer<'t> {
         }
 
         Ok(r)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::Value;
+    use crate::ir;
+
+    fn path(segments: &[&str]) -> ir::Path {
+        ir::Path(segments.iter().map(|segment| (*segment).into()).collect())
+    }
+
+    fn ty_ident(segments: &[&str]) -> ir::Ty {
+        ir::Ty::new(path(segments))
+    }
+
+    fn ty_def(segments: &[&str], ty: ir::Ty) -> ir::TyDef {
+        ir::TyDef {
+            name: path(segments),
+            ty,
+        }
+    }
+
+    #[test]
+    fn nominal_numeric_dispatch_uses_type_ident() {
+        let ty = ty_ident(&["alias", "Signed"]);
+        let ty_defs = vec![
+            ty_def(&["alias", "Signed"], ty_ident(&["std", "Int32"])),
+            ty_def(&["std", "Int32"], ir::Ty::new(ir::TyPrimitive::prim32)),
+        ];
+
+        let value = Value::Prim32((-1_i32) as u32);
+
+        assert_eq!(value.print_source(&ty, &ty_defs).unwrap(), "-1");
+    }
+
+    #[test]
+    fn decimal_alias_keeps_special_printing() {
+        let ty = ty_ident(&["alias", "Money"]);
+        let ty_defs = vec![
+            ty_def(&["alias", "Money"], ty_ident(&["std", "Decimal"])),
+            ty_def(&["std", "Decimal"], ir::Ty::new(ir::TyPrimitive::prim64)),
+        ];
+
+        let value = Value::Prim64((-123_i64) as u64);
+
+        assert_eq!(value.print_source(&ty, &ty_defs).unwrap(), "-1.23");
     }
 }

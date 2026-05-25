@@ -17,45 +17,26 @@ pub trait ValueVisitor<'t> {
     }
 
     fn visit_value(&mut self, value: &Value, ty: &'t ir::Ty) -> Result<Self::Res, crate::Error> {
-        let ty = self.get_mat_ty(ty);
+        let mut ty = ty;
+        while let ir::TyKind::Ident(ident) = &ty.kind {
+            if let Some(result) = self.visit_ident(value, ident)? {
+                return Ok(result);
+            }
+            ty = self.get_ty(ident);
+        }
 
         match &ty.kind {
-            ir::TyKind::Primitive(ir::TyPrimitive::bool) => {
-                self.visit_bool(value.expect_prim8()? != 0)
-            }
-            ir::TyKind::Primitive(ir::TyPrimitive::int8) => {
+            ir::TyKind::Primitive(ir::TyPrimitive::prim8) => {
                 self.visit_int8(value.expect_prim8()? as i8)
             }
-            ir::TyKind::Primitive(ir::TyPrimitive::uint8) => {
-                self.visit_uint8(value.expect_prim8()?)
-            }
-            ir::TyKind::Primitive(ir::TyPrimitive::int16) => {
+            ir::TyKind::Primitive(ir::TyPrimitive::prim16) => {
                 self.visit_int16(value.expect_prim16()? as i16)
             }
-            ir::TyKind::Primitive(ir::TyPrimitive::uint16) => {
-                self.visit_uint16(value.expect_prim16()?)
-            }
-            ir::TyKind::Primitive(ir::TyPrimitive::int32) => {
+            ir::TyKind::Primitive(ir::TyPrimitive::prim32) => {
                 self.visit_int32(value.expect_prim32()? as i32)
             }
-            ir::TyKind::Primitive(ir::TyPrimitive::uint32) => {
-                self.visit_uint32(value.expect_prim32()?)
-            }
-            ir::TyKind::Primitive(ir::TyPrimitive::float32) => {
-                self.visit_float32(f32::from_ne_bytes(value.expect_prim32()?.to_ne_bytes()))
-            }
-            ir::TyKind::Primitive(ir::TyPrimitive::int64) => {
+            ir::TyKind::Primitive(ir::TyPrimitive::prim64) => {
                 self.visit_int64(value.expect_prim64()? as i64)
-            }
-            ir::TyKind::Primitive(ir::TyPrimitive::uint64) => {
-                self.visit_uint64(value.expect_prim64()?)
-            }
-            ir::TyKind::Primitive(ir::TyPrimitive::float64) => {
-                self.visit_float64(f64::from_ne_bytes(value.expect_prim64()?.to_ne_bytes()))
-            }
-            ir::TyKind::Primitive(ir::TyPrimitive::text) => {
-                let text = value.expect_text_cloned()?;
-                self.visit_text(&text)
             }
             ir::TyKind::Tuple(ty_fields) => {
                 let fields = value.expect_tuple()?;
@@ -75,6 +56,64 @@ pub trait ValueVisitor<'t> {
         }
     }
 
+    fn visit_ident(
+        &mut self,
+        value: &Value,
+        ident: &'t ir::Path,
+    ) -> Result<Option<Self::Res>, crate::Error> {
+        if ident.is(&["std", "Bool"]) {
+            let v = value.expect_prim8()? != 0;
+            self.visit_bool(v).map(Some)
+        } else if ident.is(&["std", "Int8"]) {
+            let v = value.expect_prim8()? as i8;
+            self.visit_int8(v).map(Some)
+        } else if ident.is(&["std", "Int16"]) {
+            let v = value.expect_prim16()? as i16;
+            self.visit_int16(v).map(Some)
+        } else if ident.is(&["std", "Int32"]) {
+            let v = value.expect_prim32()? as i32;
+            self.visit_int32(v).map(Some)
+        } else if ident.is(&["std", "Int64"]) {
+            let v = value.expect_prim64()? as i64;
+            self.visit_int64(v).map(Some)
+        } else if ident.is(&["std", "Uint8"]) {
+            let v = value.expect_prim8()?;
+            self.visit_uint8(v).map(Some)
+        } else if ident.is(&["std", "Uint16"]) {
+            let v = value.expect_prim16()?;
+            self.visit_uint16(v).map(Some)
+        } else if ident.is(&["std", "Uint32"]) {
+            let v = value.expect_prim32()?;
+            self.visit_uint32(v).map(Some)
+        } else if ident.is(&["std", "Uint64"]) {
+            let v = value.expect_prim64()?;
+            self.visit_uint64(v).map(Some)
+        } else if ident.is(&["std", "Float32"]) {
+            let v = f32::from_ne_bytes(value.expect_prim32()?.to_ne_bytes());
+            self.visit_float32(v).map(Some)
+        } else if ident.is(&["std", "Float64"]) {
+            let v = f64::from_ne_bytes(value.expect_prim64()?.to_ne_bytes());
+            self.visit_float64(v).map(Some)
+        } else if ident.is(&["std", "Text"]) {
+            let v = value.expect_text_cloned()?;
+            self.visit_text(&v).map(Some)
+        } else if ident.is(&["std", "Date"]) {
+            let v = value.expect_prim32()? as i32;
+            self.visit_date(v).map(Some)
+        } else if ident.is(&["std", "Time"]) {
+            let v = value.expect_prim64()? as i64;
+            self.visit_time(v).map(Some)
+        } else if ident.is(&["std", "Timestamp"]) {
+            let v = value.expect_prim64()? as i64;
+            self.visit_timestamp(v).map(Some)
+        } else if ident.is(&["std", "Decimal"]) {
+            let v = value.expect_prim64()? as i64;
+            self.visit_decimal(v).map(Some)
+        } else {
+            Ok(None)
+        }
+    }
+
     fn visit_bool(&mut self, v: bool) -> Result<Self::Res, crate::Error>;
     fn visit_int8(&mut self, v: i8) -> Result<Self::Res, crate::Error>;
     fn visit_int16(&mut self, v: i16) -> Result<Self::Res, crate::Error>;
@@ -87,6 +126,18 @@ pub trait ValueVisitor<'t> {
     fn visit_float32(&mut self, v: f32) -> Result<Self::Res, crate::Error>;
     fn visit_float64(&mut self, v: f64) -> Result<Self::Res, crate::Error>;
     fn visit_text(&mut self, v: &str) -> Result<Self::Res, crate::Error>;
+    fn visit_date(&mut self, days: i32) -> Result<Self::Res, crate::Error> {
+        self.visit_int32(days)
+    }
+    fn visit_time(&mut self, micros: i64) -> Result<Self::Res, crate::Error> {
+        self.visit_int64(micros)
+    }
+    fn visit_timestamp(&mut self, micros: i64) -> Result<Self::Res, crate::Error> {
+        self.visit_int64(micros)
+    }
+    fn visit_decimal(&mut self, cents: i64) -> Result<Self::Res, crate::Error> {
+        self.visit_int64(cents)
+    }
 
     fn visit_tuple(
         &mut self,

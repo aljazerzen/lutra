@@ -178,7 +178,7 @@ impl Expr {
     }
     pub fn new_serialize(rel: Expr) -> Self {
         Expr {
-            ty: ir::Ty::new(ir::TyPrimitive::text),
+            ty: ir::Ty::text(),
             kind: ExprKind::From(From::Serialize(Box::new(rel))),
         }
     }
@@ -208,6 +208,6 @@ impl Expr {
     #[allow(dead_code)]
     pub fn is_true(&self) -> bool {
         self.as_literal()
-            .is_some_and(|l| matches!(l, ir::Literal::bool(true)))
+            .is_some_and(|l| matches!(l, ir::Literal::Prim8(1)))
     }
 }

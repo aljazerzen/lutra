@@ -42,7 +42,7 @@ fn types_01() {
         _test_ty(
             "const main = false"
         ),
-        @"bool"
+        @"Bool"
     );
 }
 #[test]
@@ -53,21 +53,21 @@ fn types_02() {
         func identity(x: T) where T -> x
 
         func main() -> identity(false)
-    "#), @"bool");
+    "#), @"Bool");
 
     // same, but describe function as a type, not an expression
     insta::assert_snapshot!(_test_ty(r#"
         external func identity(x: T): T where T
 
         func main() -> identity(false)
-    "#), @"bool");
+    "#), @"Bool");
 }
 #[test]
 fn types_03() {
     // validation of type params
 
     insta::assert_snapshot!(_test_err(r#"
-        external func floor_64(x: float64): float64
+        external func floor_64(x: Float64): Float64
 
         func floor(x: T) where T -> floor_64(x)
 
@@ -78,7 +78,7 @@ fn types_03() {
        │
      4 │         func floor(x: T) where T -> floor_64(x)
        │                                              ┬
-       │                                              ╰── func floor_64 expected type `float64`, but found type `T`
+       │                                              ╰── func floor_64 expected type `Float64`, but found type `T`
     ───╯
     Error:
        ╭─[ <unknown>:6:24 ]
@@ -99,7 +99,7 @@ fn types_05() {
         -> mapper(x)
 
         func main() -> apply(false, identity)
-    "#), @"bool");
+    "#), @"Bool");
 
     insta::assert_snapshot!(_test_ty(r#"
         func twice(x: T) where T -> {x, x}
@@ -109,7 +109,7 @@ fn types_05() {
         -> mapper(x)
 
         func main() -> apply(false, twice)
-    "#), @"{x: bool, x: bool}");
+    "#), @"{x: Bool, x: Bool}");
 }
 #[test]
 fn types_06() {
@@ -120,7 +120,7 @@ fn types_06() {
         where I, O
 
         func main() -> map([false, true, false], identity)
-    "#), @"[bool]");
+    "#), @"[Bool]");
 }
 #[test]
 fn types_07() {
@@ -131,27 +131,27 @@ fn types_07() {
         where I, O
 
         func main() -> map([false, true, true], twice)
-    "#), @"[{x: bool, x: bool}]");
+    "#), @"[{x: Bool, x: Bool}]");
 }
 #[test]
 fn types_08() {
     insta::assert_snapshot!(_test_ty(r#"
-        external func filter(array: [T], condition: func (T): bool): [T]
+        external func filter(array: [T], condition: func (T): Bool): [T]
         where T
 
         external func map(x: [I], mapper: func (I): O): [O]
         where I, O
 
-        external func slice(x: [T], start: int64, end: int64): [T]
+        external func slice(x: [T], start: Int64, end: Int64): [T]
         where T
 
         func main() -> (
             [{"5", false}, {"4", true}, {"1", true}]
-            | filter(func (x: {text, bool}) -> x.1)
-            | map(func (x: {text, bool}) -> x.0)
+            | filter(func (x: {Text, Bool}) -> x.1)
+            | map(func (x: {Text, Bool}) -> x.0)
             | slice(0, 1)
         )
-    "#), @"[text]");
+    "#), @"[Text]");
 }
 #[test]
 fn types_09() {
@@ -174,15 +174,15 @@ fn types_10() {
 
     insta::assert_snapshot!(_test_ty(r#"
         func main() -> 3..5
-    "#), @"{start: enum {none, some: int64}, end: enum {none, some: int64}}");
+    "#), @"{start: enum {none, some: Int64}, end: enum {none, some: Int64}}");
 }
 #[test]
 fn types_11() {
     insta::assert_snapshot!(_test_ty(r#"
-        type album_sale: {id: int64, total: float64}
+        type album_sale: {id: Int64, total: Float64}
         external func get_album_sales(): [album_sale]
 
-        external func filter(array: [T], condition: func (T): bool): [T]
+        external func filter(array: [T], condition: func (T): Bool): [T]
         where T
 
         func main(): [album_sale] -> (
@@ -196,23 +196,23 @@ fn types_12() {
     // tuple lookup
 
     insta::assert_snapshot!(_test_ty(r#"
-        const a = {id = 4: int64, total = 4.5: float64}
+        const a = {id = 4: Int64, total = 4.5: Float64}
         func main() -> a.total
-    "#), @"float64");
+    "#), @"Float64");
 }
 
 #[test]
 fn types_13() {
     insta::assert_snapshot!(_test_ty(r#"
         external func floor(x: T): T
-        where T: float32 | float64
+        where T: Float32 | Float64
 
-        func main() -> floor(2.4: float32)
-    "#), @"float32");
+        func main() -> floor(2.4: Float32)
+    "#), @"Float32");
 
     insta::assert_snapshot!(_test_err(r#"
         external func floor(x: T): T
-        where T: float32 | float64
+        where T: Float32 | Float64
 
         func main() -> floor(false)
     "#), @"
@@ -221,7 +221,7 @@ fn types_13() {
        │
      5 │         func main() -> floor(false)
        │                        ──┬──
-       │                          ╰──── T is restricted to one of float32, float64, found bool
+       │                          ╰──── T is restricted to one of Float32, Float64, found Bool
     ───╯
     ");
 }
@@ -230,59 +230,58 @@ fn types_14() {
     // validate type params: one of
 
     insta::assert_snapshot!(_test_err(r#"
-        external func floor_64(x: float64): float64
+        external func floor_64(x: Float64): Float64
 
         func floor(x: T): T
-        where T: float32 | float64
-        -> (
-            floor_64(x)
-        )
+        where T: Float32 | Float64
+        -> floor_64(x)
+
         func main() -> floor(2.3)
     "#), @"
     [E0006] Error:
-       ╭─[ <unknown>:7:22 ]
+       ╭─[ <unknown>:6:21 ]
        │
-     7 │             floor_64(x)
-       │                      ┬
-       │                      ╰── func floor_64 expected type `float64`, but found type `T`
+     6 │         -> floor_64(x)
+       │                     ┬
+       │                     ╰── func floor_64 expected type `Float64`, but found type `T`
     ───╯
     [E0006] Error:
-       ╭─[ <unknown>:7:13 ]
+       ╭─[ <unknown>:6:12 ]
        │
-     7 │             floor_64(x)
-       │             ─────┬─────
-       │                  ╰─────── expected type `T`, but found type `float64`
+     6 │         -> floor_64(x)
+       │            ─────┬─────
+       │                 ╰─────── expected type `T`, but found type `Float64`
     ───╯
     ");
 
     insta::assert_snapshot!(_test_ty(r#"
         external func floor(x: F): F
-        where F: float32 | float64
+        where F: Float32 | Float64
 
         func twice_floored(x: T)
-        where T: float32 | float64
-        -> {floor(4.5: float64), floor(x)}
+        where T: Float32 | Float64
+        -> {floor(4.5: Float64), floor(x)}
 
-        func main(f: float32) -> twice_floored(f)
-    "#), @"{float64, float32}");
+        func main(f: Float32) -> twice_floored(f)
+    "#), @"{Float64, Float32}");
 
     insta::assert_snapshot!(_test_ty(r#"
         external func floor(x: F): F
-        where F: float32 | float64
+        where F: Float32 | Float64
 
         func twice_floored(x: T)
-        where T: float64
+        where T: Float64
         -> {floor(x), floor(x)}
 
-        func main() -> twice_floored(2.3: float64)
-    "#), @"{float64, float64}");
+        func main() -> twice_floored(2.3: Float64)
+    "#), @"{Float64, Float64}");
 
     insta::assert_snapshot!(_test_err(r#"
         external func floor(x: F): F
-        where F: float32 | float64
+        where F: Float32 | Float64
 
         func twice_floored(x: T)
-        where T: float64 | bool
+        where T: Float64 | Bool
         -> {floor(x), floor(x)}
 
         func main() -> twice_floored(2.3)
@@ -292,7 +291,7 @@ fn types_14() {
        │
      7 │         -> {floor(x), floor(x)}
        │             ──┬──
-       │               ╰──── T is restricted to one of float32, float64, found bool
+       │               ╰──── T is restricted to one of Float32, Float64, found Bool
     ───╯
     ");
 }
@@ -301,28 +300,28 @@ fn types_15() {
     // type param: tuple domain with named arg
     insta::assert_snapshot!(_test_ty(r#"
         external func get_b(x: T): T
-        where T: {b: int64, ..}
+        where T: {b: Int64, ..}
 
-        func main() -> get_b({a = false, b = 4: int64})
-    "#), @"{a: bool, b: int64}");
+        func main() -> get_b({a = false, b = 4: Int64})
+    "#), @"{a: Bool, b: Int64}");
 
     insta::assert_snapshot!(_test_err(r#"
         external func get_b(x: T): T
-        where T: {b: int64, ..}
+        where T: {b: Int64, ..}
 
-        func main() -> get_b({a = false, b = 4.6: float64})
+        func main() -> get_b({a = false, b = 4.6: Float64})
     "#), @"
     [E0006] Error:
        ╭─[ <unknown>:5:46 ]
        │
-     5 │         func main() -> get_b({a = false, b = 4.6: float64})
+     5 │         func main() -> get_b({a = false, b = 4.6: Float64})
        │                                              ──────┬─────
-       │                                                    ╰─────── expected type `int64`, but found type `float64`
+       │                                                    ╰─────── expected type `Int64`, but found type `Float64`
     ───╯
     ");
     insta::assert_snapshot!(_test_err(r#"
         external func get_b(x: T): T
-        where T: {b: int64, ..}
+        where T: {b: Int64, ..}
 
         func main() -> get_b({a = false, c = 4})
     "#), @"
@@ -331,7 +330,7 @@ fn types_15() {
        │
      5 │         func main() -> get_b({a = false, c = 4})
        │                        ──┬──
-       │                          ╰──── field .b does not exist in type {a: bool, c: _}
+       │                          ╰──── field .b does not exist in type {a: Bool, c: _}
     ───╯
     ");
 }
@@ -340,29 +339,29 @@ fn types_16() {
     // type param: tuple domain with positional arg
     insta::assert_snapshot!(_test_ty(r#"
         external func get_b(x: T): T
-        where T: {bool, int64, ..}
+        where T: {Bool, Int64, ..}
 
-        func main() -> get_b({a = false, 4, c = 5.7: float32})
-    "#), @"{a: bool, int64, c: float32}");
+        func main() -> get_b({a = false, 4, c = 5.7: Float32})
+    "#), @"{a: Bool, Int64, c: Float32}");
 
     insta::assert_snapshot!(_test_err(r#"
         external func get_b(x: T): T
-        where T: {bool, int64, ..}
+        where T: {Bool, Int64, ..}
 
-        func main() -> get_b({a = "7", 4: int64, c = 5.7})
+        func main() -> get_b({a = "7", 4: Int64, c = 5.7})
     "#), @r#"
     [E0006] Error:
        ╭─[ <unknown>:5:35 ]
        │
-     5 │         func main() -> get_b({a = "7", 4: int64, c = 5.7})
+     5 │         func main() -> get_b({a = "7", 4: Int64, c = 5.7})
        │                                   ─┬─
-       │                                    ╰─── expected type `bool`, but found type `text`
+       │                                    ╰─── expected type `Bool`, but found type `Text`
     ───╯
     "#);
 
     insta::assert_snapshot!(_test_err(r#"
         external func get_b(x: T): T
-        where T: {bool, int64, a: bool, ..}
+        where T: {Bool, Int64, a: Bool, ..}
 
         func main() -> get_b({a = false})
     "#), @"
@@ -371,15 +370,15 @@ fn types_16() {
        │
      5 │         func main() -> get_b({a = false})
        │                        ──┬──
-       │                          ╰──── field .1 does not exist in type {a: bool}
+       │                          ╰──── field .1 does not exist in type {a: Bool}
     ───╯
     ");
     insta::assert_snapshot!(_test_ty(r#"
         external func get_b(x: T): T
-        where T: {bool, int64, a: bool, ..}
+        where T: {Bool, Int64, a: Bool, ..}
 
         func main() -> get_b({a = false, 4})
-    "#), @"{a: bool, int64}");
+    "#), @"{a: Bool, Int64}");
 }
 
 #[test]
@@ -387,10 +386,10 @@ fn types_17() {
     // validate type params: tuple domain
 
     insta::assert_snapshot!(_test_err(r#"
-        external func get_int(x: {int64}): int64
+        external func get_int(x: {Int64}): Int64
 
         func get(x: T): T
-        where T: {int64, ..}
+        where T: {Int64, ..}
         -> get_int(x)
 
         func main() -> get({4})
@@ -400,22 +399,22 @@ fn types_17() {
        │
      6 │         -> get_int(x)
        │                    ┬
-       │                    ╰── func get_int expected type `{int64}`, but found type `T`
+       │                    ╰── func get_int expected type `{Int64}`, but found type `T`
     ───╯
     [E0006] Error:
        ╭─[ <unknown>:6:12 ]
        │
      6 │         -> get_int(x)
        │            ─────┬────
-       │                 ╰────── expected type `T`, but found type `int64`
+       │                 ╰────── expected type `T`, but found type `Int64`
     ───╯
     ");
 
     insta::assert_snapshot!(_test_err(r#"
-        external func get_int(x: {a: int64}): int64
+        external func get_int(x: {a: Int64}): Int64
 
         func get(x: T): T
-        where T: {a: int64, ..}
+        where T: {a: Int64, ..}
         -> get_int(x)
 
         func main() -> get({4})
@@ -425,23 +424,23 @@ fn types_17() {
        │
      6 │         -> get_int(x)
        │                    ┬
-       │                    ╰── func get_int expected type `{a: int64}`, but found type `T`
+       │                    ╰── func get_int expected type `{a: Int64}`, but found type `T`
     ───╯
     [E0006] Error:
        ╭─[ <unknown>:6:12 ]
        │
      6 │         -> get_int(x)
        │            ─────┬────
-       │                 ╰────── expected type `T`, but found type `int64`
+       │                 ╰────── expected type `T`, but found type `Int64`
     ───╯
     ");
 
     insta::assert_snapshot!(_test_err(r#"
-        external func needs_two(x: I): int64
-        where I: {int64, bool, ..}
+        external func needs_two(x: I): Int64
+        where I: {Int64, Bool, ..}
 
-        func needs_one(x: T): int64
-        where T: {int64, ..}
+        func needs_one(x: T): Int64
+        where T: {Int64, ..}
         -> needs_two(x)
 
         func main() -> needs_one({4})
@@ -457,14 +456,14 @@ fn types_17() {
 
     insta::assert_snapshot!(_test_ty(r#"
         external func needs_one(x: I): I
-        where I: {int64, ..}
+        where I: {Int64, ..}
 
         func needs_two(x: T): T
-        where T: {int64, bool, ..}
+        where T: {Int64, Bool, ..}
         -> needs_one(x)
 
-        func main() -> needs_two({4: int64, false})
-    "#), @"{int64, bool}");
+        func main() -> needs_two({4: Int64, false})
+    "#), @"{Int64, Bool}");
 }
 
 #[test]
@@ -472,15 +471,15 @@ fn types_18() {
     // lookup into type params
 
     insta::assert_snapshot!(_test_ty(r#"
-        func f(x: T) where T: {int64, ..} -> x.0
+        func f(x: T) where T: {Int64, ..} -> x.0
 
-        func main() -> f({4: int64, false})
-    "#), @"int64");
+        func main() -> f({4: Int64, false})
+    "#), @"Int64");
 
     insta::assert_snapshot!(_test_ty(r#"
-        func f(x: T) where T: {a: int64, ..} -> x.a
-        func main() -> f({false, a = 4: int64})
-    "#), @"int64");
+        func f(x: T) where T: {a: Int64, ..} -> x.a
+        func main() -> f({false, a = 4: Int64})
+    "#), @"Int64");
 }
 
 #[test]
@@ -503,7 +502,7 @@ fn types_20() {
     // matching patterns into type vars
 
     insta::assert_snapshot!(_test_ty(r#"
-        type Status: enum {done, pending: int16, cancelled: text}
+        type Status: enum {done, pending: Int16, cancelled: Text}
 
         func main() -> (
           .done: Status
@@ -513,7 +512,7 @@ fn types_20() {
             _ => f"something else",
           }
         )
-    "#), @"text");
+    "#), @"Text");
 }
 
 #[test]
@@ -531,7 +530,7 @@ fn types_21() {
        │
      4 │       | x -> x.b
        │               ─┬
-       │                ╰── field .b does not exist in type {a: bool, text, c: text}
+       │                ╰── field .b does not exist in type {a: Bool, Text, c: Text}
     ───╯
     ");
     insta::assert_snapshot!(_test_err(r#"
@@ -545,7 +544,7 @@ fn types_21() {
        │
      4 │       | x -> x.3
        │               ─┬
-       │                ╰── field .3 does not exist in type {a: bool, text, c: text}
+       │                ╰── field .3 does not exist in type {a: Bool, Text, c: Text}
     ───╯
     ");
 }
@@ -562,7 +561,7 @@ fn types_22() {
        │
      2 │         func main() -> [true, false].a
        │                                     ─┬
-       │                                      ╰── lookup expected a tuple, found [bool]
+       │                                      ╰── lookup expected a tuple, found [Bool]
     ───╯
     ");
     insta::assert_snapshot!(_test_err(r#"
@@ -573,16 +572,18 @@ fn types_22() {
        │
      2 │         func main() -> "hello".a
        │                               ─┬
-       │                                ╰── lookup expected a tuple, found text
+       │                                ╰── field .a does not exist in type Text
+       │
+       │ Note: Text is a framed type. Inner value can be accessed with `.0`
     ───╯
     "#);
     insta::assert_snapshot!(_test_err(r#"
-        func main(x: T) where T: int32 | text -> x.a
+        func main(x: T) where T: Int32 | Text -> x.a
     "#), @"
     Error:
        ╭─[ <unknown>:2:51 ]
        │
-     2 │         func main(x: T) where T: int32 | text -> x.a
+     2 │         func main(x: T) where T: Int32 | Text -> x.a
        │                                                   ─┬
        │                                                    ╰── lookup expected a tuple, found type parameter T
        │
@@ -605,7 +606,7 @@ fn types_22() {
     ───╯
     ");
     insta::assert_snapshot!(_test_err(r#"
-        type t: text
+        type t: Text
         func main(x: t) -> x.a
     "#), @"
     [E0006] Error:
@@ -613,7 +614,9 @@ fn types_22() {
        │
      3 │         func main(x: t) -> x.a
        │                             ─┬
-       │                              ╰── lookup expected a tuple, found text
+       │                              ╰── field .a does not exist in type Text
+       │
+       │ Note: Text is a framed type. Inner value can be accessed with `.0`
     ───╯
     ");
 }
@@ -623,16 +626,16 @@ fn types_23() {
     // error messages on missing types on functions
 
     insta::assert_snapshot!(_test_ty(r#"
-        func main(a: int32, b) -> a + b
-    "#), @"int32");
+        func main(a: Int32, b) -> a + b
+    "#), @"Int32");
 
     insta::assert_snapshot!(_test_err(r#"
-        func main(a: int32, b) -> a + 1
+        func main(a: Int32, b) -> a + 1
     "#), @"
     Error:
        ╭─[ <unknown>:2:29 ]
        │
-     2 │         func main(a: int32, b) -> a + 1
+     2 │         func main(a: Int32, b) -> a + 1
        │                             ┬
        │                             ╰── cannot infer type
     ───╯
@@ -670,7 +673,7 @@ fn types_23() {
        │
      2 │         func main() -> "hello" | func (x: text): text
        │                                                      │
-       │                                                      ╰─ expected -> or ?, but encountered the end of the file.
+       │                                                      ╰─ expected one of ->, :: or ?, but encountered the end of the file.
     ───╯
     "#);
 }
@@ -680,18 +683,61 @@ fn types_24() {
     // option type syntax desugars to enum { none, some: T }
 
     insta::assert_snapshot!(_test_ty(r#"
-        func main(x: int32?): int32 -> match x {
+        func main(x: Int32?): Int32 -> match x {
           .none => 0,
           .some(v) => v + 1,
         }
-    "#), @"int32");
+    "#), @"Int32");
 
     insta::assert_snapshot!(_test_ty(r#"
-        func main(x: [int32]?): [int32] -> match x {
+        func main(x: [Int32]?): [Int32] -> match x {
           .none => [],
           .some(v) => v,
         }
-    "#), @"[int32]");
+    "#), @"[Int32]");
+}
+
+#[test]
+fn types_25() {
+    // types should only reference types
+    insta::assert_snapshot!(_test_err(r#"
+        module a {
+        }
+        type b: {a, Int64}
+    "#), @"
+    [E0005] Error:
+       ╭─[ <unknown>:4:18 ]
+       │
+     4 │         type b: {a, Int64}
+       │                  ┬
+       │                  ╰── expected a type, found a module
+    ───╯
+    ");
+
+    insta::assert_snapshot!(_test_err(r#"
+        const a = false
+        type b: {a, Int64}
+    "#), @"
+    [E0005] Error:
+       ╭─[ <unknown>:3:18 ]
+       │
+     3 │         type b: {a, Int64}
+       │                  ┬
+       │                  ╰── expected a type, found a value
+    ───╯
+    ");
+
+    insta::assert_snapshot!(_test_err(r#"
+        func main(x: Int32) -> false | func (_: x) -> true
+    "#), @"
+    [E0005] Error:
+       ╭─[ <unknown>:2:49 ]
+       │
+     2 │         func main(x: Int32) -> false | func (_: x) -> true
+       │                                                 ┬
+       │                                                 ╰── expected a type, found a value
+    ───╯
+    ");
 }
 
 #[test]
@@ -734,9 +780,9 @@ fn array_01() {
 fn array_02() {
     insta::assert_snapshot!(
         _test_ty(
-            "func main(): [int64] -> std::lag([], 1)"
+            "func main(): [Int64] -> std::lag([], 1)"
         ),
-        @"[int64]"
+        @"[Int64]"
     );
 }
 
@@ -762,9 +808,9 @@ fn array_03() {
 fn array_04() {
     insta::assert_snapshot!(
         _test_ty(
-            "const main = [{5: int64, false}, {4, true}, {1, true}]"
+            "const main = [{5: Int64, false}, {4, true}, {1, true}]"
         ),
-        @"[{int64, bool}]"
+        @"[{Int64, Bool}]"
     );
 }
 
@@ -772,9 +818,9 @@ fn array_04() {
 fn array_05() {
     insta::assert_snapshot!(
         _test_ty(
-            "const main = [{5, false}, {4, true}, {1, true}]: [{int64, bool}]"
+            "const main = [{5, false}, {4, true}, {1, true}]: [{Int64, Bool}]"
         ),
-        @"[{int64, bool}]"
+        @"[{Int64, Bool}]"
     );
 }
 
@@ -788,7 +834,7 @@ fn array_06() {
        │
      2 │         const main = [false, "true", false]
        │                              ───┬──
-       │                                 ╰──── expected type `bool`, but found type `text`
+       │                                 ╰──── expected type `Bool`, but found type `Text`
     ───╯
     "#);
 }
@@ -797,9 +843,9 @@ fn array_06() {
 fn type_annotation_00() {
     insta::assert_snapshot!(
         _test_ty(
-            "const main = 5: int64"
+            "const main = 5: Int64"
         ),
-        @"int64"
+        @"Int64"
     );
 }
 
@@ -807,15 +853,15 @@ fn type_annotation_00() {
 fn type_annotation_01() {
     insta::assert_snapshot!(
         _test_err(
-            "const main = 5: text"
+            "const main = 5: Text"
         ),
         @"
     [E0007] Error:
        ╭─[ <unknown>:1:14 ]
        │
-     1 │ const main = 5: text
+     1 │ const main = 5: Text
        │              ┬
-       │              ╰── restricted to one of int8, int16, int32, int64, uint8, uint16, uint32, uint64, float32, float64, std::Decimal, found text
+       │              ╰── restricted to one of Int8, Int16, Int32, Int64, Uint8, Uint16, Uint32, Uint64, Float32, Float64, Decimal, found Text
     ───╯
     "
     );
@@ -825,9 +871,9 @@ fn type_annotation_01() {
 fn type_annotation_02() {
     insta::assert_snapshot!(
         _test_ty(
-            "const main = []: [bool]"
+            "const main = []: [Bool]"
         ),
-        @"[bool]"
+        @"[Bool]"
     );
 }
 
@@ -837,23 +883,23 @@ fn primitives() {
         _test_ty(
             "
             external func x(): {
-                bool,
-                int8,
-                int16,
-                int32,
-                int64,
-                uint8,
-                uint16,
-                uint32,
-                uint64,
-                float32,
-                float64,
-                text,
+                Bool,
+                Int8,
+                Int16,
+                Int32,
+                Int64,
+                Uint8,
+                Uint16,
+                Uint32,
+                Uint64,
+                Float32,
+                Float64,
+                Text,
             }
             func main() -> x()
             "
         ),
-        @"{bool, int8, int16, int32, int64, uint8, uint16, uint32, uint64, float32, float64, text}"
+        @"{Bool, Int8, Int16, Int32, Int64, Uint8, Uint16, Uint32, Uint64, Float32, Float64, Text}"
     );
 }
 
@@ -862,7 +908,7 @@ fn enums_00() {
     insta::assert_snapshot!(
         _test_ty(
             "
-            type Status: enum { Open, done, pending: text }
+            type Status: enum { Open, done, pending: Text }
 
             func main() -> .done: Status
             "
@@ -876,7 +922,7 @@ fn enums_01() {
     insta::assert_snapshot!(
         _test_ty(
             r#"
-            type Status: enum { Open, done, pending: text }
+            type Status: enum { Open, done, pending: Text }
 
             func main() -> .pending("hello"): Status
             "#
@@ -893,7 +939,7 @@ fn enums_02() {
     // annotation to it. So, our value expected annotation to have type text.
     insta::assert_snapshot!(_test_err(
         r#"
-        type Status: enum { Open, done, pending: text }
+        type Status: enum { Open, done, pending: Text }
 
         func main() -> .pending: Status
         "#
@@ -903,7 +949,7 @@ fn enums_02() {
        │
      4 │         func main() -> .pending: Status
        │                        ────┬───
-       │                            ╰───── expected type `{}`, but found type `text`
+       │                            ╰───── expected type `{}`, but found type `Text`
     ───╯
     ");
 }
@@ -947,7 +993,7 @@ fn recursive_00() {
 fn recursive_01() {
     insta::assert_snapshot!(_test_err(
         r#"
-        type Tree1: enum {leaf: int32, fork: Branches1}
+        type Tree1: enum {leaf: Int32, fork: Branches1}
         type Branches1: {left: Tree1, right: Tree1}
 
         type Tree2: {Branches2}
@@ -970,21 +1016,21 @@ fn recursive_01() {
 #[test]
 fn match_00() {
     insta::assert_snapshot!(_test_ty(r#"
-        type Status: enum {done, pending: int16, cancelled: text}
+        type Status: enum {done, pending: Int16, cancelled: Text}
 
         func main() -> match .done: Status {
           .done => "done",
           .pending => "pending",
           .cancelled => "cancelled",
         }
-    "#), @"text");
+    "#), @"Text");
 }
 
 #[test]
 #[ignore] // TODO
 fn match_01() {
     insta::assert_snapshot!(_test_err(r#"
-        type Status: enum {done, pending: int16, cancelled: text}
+        type Status: enum {done, pending: Int16, cancelled: Text}
 
         func main() -> match .done: Status {
           .done => "done",
@@ -998,7 +1044,7 @@ fn match_01() {
 #[test]
 fn match_02() {
     insta::assert_snapshot!(_test_err(r#"
-        type Status: enum {done, pending: int16, cancelled: text}
+        type Status: enum {done, pending: Int16, cancelled: Text}
         type Color: enum {red, green, blue}
 
         func main() -> match .done: Status {
@@ -1033,7 +1079,7 @@ fn match_03() {
        │
      7 │           .blue => false,
        │                    ──┬──
-       │                      ╰──── match expected type `text`, but found type `bool`
+       │                      ╰──── match expected type `Text`, but found type `Bool`
     ───╯
     ");
 }
@@ -1041,31 +1087,31 @@ fn match_03() {
 #[test]
 fn match_04() {
     insta::assert_snapshot!(_test_ty(r#"
-        type Status: enum {pending: bool}
+        type Status: enum {pending: Bool}
 
         func main() -> match .pending(false): Status {
           .pending(x) => x,
         }
-    "#), @"bool");
+    "#), @"Bool");
 }
 
 #[test]
 fn match_05() {
     insta::assert_snapshot!(_test_ty(r#"
-        type Status: enum {pending: int32}
+        type Status: enum {pending: Int32}
 
         func main() -> match .pending(4): Status {
           .pending(x) => x,
         }
-    "#), @"int32");
+    "#), @"Int32");
 }
 
 #[test]
 fn match_06() {
     insta::assert_snapshot!(_test_err(r#"
-        type Animal: enum {cat: text, dog: bool}
+        type Animal: enum {cat: Text, dog: Bool}
 
-        func main(): [text] -> match .cat: Animal {
+        func main(): [Text] -> match .cat: Animal {
           .cat(name) | .dog(is_vaccinated) => true,
         }
     "#), @"
@@ -1083,11 +1129,11 @@ fn match_06() {
 fn match_07() {
     insta::assert_snapshot!(_test_err(r#"
         type Animal: enum {
-          cat: text,
-          dog: bool,
+          cat: Text,
+          dog: Bool,
         }
 
-        func main(): text -> match .cat: Animal {
+        func main(): Text -> match .cat: Animal {
           .cat(name) | .dog(name) => name,
         }
     "#), @"
@@ -1096,7 +1142,7 @@ fn match_07() {
        │
      8 │           .cat(name) | .dog(name) => name,
        │                             ──┬─
-       │                               ╰─── expected type `text`, but found type `bool`
+       │                               ╰─── expected type `Text`, but found type `Bool`
     ───╯
     ");
 }
@@ -1107,35 +1153,35 @@ fn func_param_00() {
         func main() -> (
             false | a -> !a
         )
-    "#), @"bool");
+    "#), @"Bool");
 }
 
 #[test]
 fn func_param_01() {
     insta::assert_snapshot!(_test_ty(r#"
-        func main(): int16 -> (
+        func main(): Int16 -> (
             3 | x -> x * x
         )
-    "#), @"int16");
+    "#), @"Int16");
 }
 
 #[test]
 fn func_param_02() {
     insta::assert_snapshot!(_test_ty(r#"
-        func main(): [int16] -> (
+        func main(): [Int16] -> (
             [3, 2, 4, 1, 5, -3, 1]
             | std::map(x -> -x)
         )
-    "#), @"[int16]");
+    "#), @"[Int16]");
 }
 
 #[test]
 fn func_param_03() {
     insta::assert_snapshot!(_test_ty(r#"
         func main() -> (
-            {a = 3, b = 5: int16} | x -> x.a + x.b
+            {a = 3, b = 5: Int16} | x -> x.a + x.b
         )
-    "#), @"int16");
+    "#), @"Int16");
 }
 
 #[test]
@@ -1186,8 +1232,8 @@ fn defs_01() {
 fn constants_00() {
     insta::assert_snapshot!(_test_err(r#"
         const a = {false, true || false}
-        const b = [6: int64, 2 + 6]
-        const c = 5: int64
+        const b = [6: Int64, 2 + 6]
+        const c = 5: Int64
         const d = [1, c]
     "#), @"
     Error:
@@ -1202,7 +1248,7 @@ fn constants_00() {
     Error:
        ╭─[ <unknown>:3:30 ]
        │
-     3 │         const b = [6: int64, 2 + 6]
+     3 │         const b = [6: Int64, 2 + 6]
        │                              ──┬──
        │                                ╰──── non-constant expression
        │
@@ -1229,12 +1275,12 @@ fn constants_01() {
 #[test]
 fn constants_02() {
     insta::assert_snapshot!(_test_err(r#"
-        func main(table_name: text): [{bool}] -> std::sql::from(table_name)
+        func main(table_name: Text): [{Bool}] -> std::sql::from(table_name)
     "#), @"
     Error:
        ╭─[ <unknown>:2:65 ]
        │
-     2 │         func main(table_name: text): [{bool}] -> std::sql::from(table_name)
+     2 │         func main(table_name: Text): [{Bool}] -> std::sql::from(table_name)
        │                                                                 ─────┬────
        │                                                                      ╰────── non-constant expression
     ───╯
@@ -1245,7 +1291,7 @@ fn unpack_00() {
     insta::assert_snapshot!(_test_ty(r#"
         const x = {false, "hello"}
         const main = {false, ..x, "hello"}
-    "#), @"{bool, bool, text, text}");
+    "#), @"{Bool, Bool, Text, Text}");
 }
 #[test]
 fn unpack_01() {
@@ -1259,17 +1305,17 @@ fn unpack_01() {
        │                                ──┬─
        │                                  ╰─── only tuples can be unpacked
        │
-       │ Note: got type bool
+       │ Note: got type Bool
     ───╯
     "#);
 }
 #[test]
 fn unpack_02() {
     insta::assert_snapshot!(_test_ty(r#"
-        type A: {int32, int32}
+        type A: {Int32, Int32}
         const x: A = {45, 6}
         const main = {false, ..x, "hello"}
-    "#), @"{bool, int32, int32, text}");
+    "#), @"{Bool, Int32, Int32, Text}");
 }
 #[test]
 fn unpack_03() {
@@ -1278,8 +1324,8 @@ fn unpack_03() {
         where T: {..}
         -> x
 
-        func main() -> {a = 4: int32, ..identity({true, false}), b = false}
-    "#), @"{a: int32, bool, bool, b: bool}");
+        func main() -> {a = 4: Int32, ..identity({true, false}), b = false}
+    "#), @"{a: Int32, Bool, Bool, b: Bool}");
 }
 #[test]
 fn unpack_04() {
@@ -1289,16 +1335,16 @@ fn unpack_04() {
         -> {false, ..x, false}
 
         func main() -> false_x_false({"a", "b"})
-    "#), @"{bool, text, text, bool}");
+    "#), @"{Bool, Text, Text, Bool}");
 }
 
 #[test]
 fn unpack_05() {
     insta::assert_snapshot!(_test_ty(r#"
         const main = {
-          a = 4: int32,
+          a = 4: Int32,
           ..{
-            x1 = 3: int32,
+            x1 = 3: Int32,
             x2 = "hello",
           },
           ..{
@@ -1306,7 +1352,7 @@ fn unpack_05() {
           },
           b = false
         }.x3
-    "#), @"text");
+    "#), @"Text");
 }
 
 #[test]
@@ -1316,13 +1362,13 @@ fn unpack_06() {
     insta::assert_snapshot!(_test_err(r#"
       func main() -> (
         {x1 = true, x2 = false}
-        | x -> {4: int32, ..x, "hello"}.x2
+        | x -> {4: Int32, ..x, "hello"}.x2
       )
     "#), @r#"
     Error:
        ╭─[ <unknown>:4:40 ]
        │
-     4 │         | x -> {4: int32, ..x, "hello"}.x2
+     4 │         | x -> {4: Int32, ..x, "hello"}.x2
        │                                        ─┬─
        │                                         ╰─── ambiguous lookup into unpack of an unknown type
        │
@@ -1335,12 +1381,12 @@ fn unpack_06() {
 fn unpack_11() {
     insta::assert_snapshot!(_test_err(r#"
     func identity(x: T): T where T: {..} -> x
-    func main() -> {4: int32, ..identity({true, false}), "hello"}.2
+    func main() -> {4: Int32, ..identity({true, false}), "hello"}.2
     "#), @r#"
     Error:
        ╭─[ <unknown>:3:66 ]
        │
-     3 │     func main() -> {4: int32, ..identity({true, false}), "hello"}.2
+     3 │     func main() -> {4: Int32, ..identity({true, false}), "hello"}.2
        │                                                                  ─┬
        │                                                                   ╰── ambiguous lookup into unpack of an unknown type
        │
@@ -1353,20 +1399,20 @@ fn unpack_11() {
 fn unpack_12() {
     insta::assert_snapshot!(_test_ty(r#"
     func identity(x: T): T where T: {..} -> x
-    func main() -> {4: int32, ..identity({true, false}): {bool, bool}, "hello"}.2
-    "#), @"bool");
+    func main() -> {4: Int32, ..identity({true, false}): {Bool, Bool}, "hello"}.2
+    "#), @"Bool");
 }
 
 #[test]
 fn unpack_13() {
     insta::assert_snapshot!(_test_err(r#"
-    func false_x_false(x: T) where T: {x2: text, ..} -> {false, ..x, false}.2
+    func false_x_false(x: T) where T: {x2: Text, ..} -> {false, ..x, false}.2
     func main() -> false_x_false({true, x2 = "hello"})
     "#), @"
     Error:
        ╭─[ <unknown>:2:76 ]
        │
-     2 │     func false_x_false(x: T) where T: {x2: text, ..} -> {false, ..x, false}.2
+     2 │     func false_x_false(x: T) where T: {x2: Text, ..} -> {false, ..x, false}.2
        │                                                                            ─┬
        │                                                                             ╰── cannot do positional lookup into unpack of this type param
     ───╯
@@ -1376,9 +1422,9 @@ fn unpack_13() {
 #[test]
 fn unpack_14() {
     insta::assert_snapshot!(_test_ty(r#"
-    func false_x_false(x: T) where T: {bool, text, ..} -> {false, ..x, false}.2
+    func false_x_false(x: T) where T: {Bool, Text, ..} -> {false, ..x, false}.2
     func main() -> false_x_false({true, "hello"})
-    "#), @"text");
+    "#), @"Text");
 }
 
 #[test]
@@ -1386,11 +1432,11 @@ fn ty_tuple_comprehension_00() {
     // map to a simple type
 
     insta::assert_snapshot!(_test_ty(r#"
-    type A: {id: int64, title: text}
+    type A: {id: Int64, title: Text}
 
-    func main(): {for f: F in A do bool}
+    func main(): {for f: F in A do Bool}
     -> std::default()
-    "#), @"{bool, bool}");
+    "#), @"{Bool, Bool}");
 }
 
 #[test]
@@ -1398,11 +1444,11 @@ fn ty_tuple_comprehension_01() {
     // map to a simple type
 
     insta::assert_snapshot!(_test_ty(r#"
-    type A: {id: int64, title: text}
+    type A: {id: Int64, title: Text}
 
-    func main(): {for f: F in A do f: bool}
+    func main(): {for f: F in A do f: Bool}
     -> std::default()
-    "#), @"{id: bool, title: bool}");
+    "#), @"{id: Bool, title: Bool}");
 }
 
 #[test]
@@ -1410,15 +1456,15 @@ fn ty_tuple_comprehension_01a() {
     // bad body field name
 
     insta::assert_snapshot!(_test_err(r#"
-    type A: {id: int64, title: text}
+    type A: {id: Int64, title: Text}
 
-    func main(): {for f: F in A do g: bool}
+    func main(): {for f: F in A do g: Bool}
     -> std::default()
     "#), @"
     Error:
        ╭─[ <unknown>:4:5 ]
        │
-     4 │ ╭─▶     func main(): {for f: F in A do g: bool}
+     4 │ ╭─▶     func main(): {for f: F in A do g: Bool}
      5 │ ├─▶     -> std::default()
        │ │
        │ ╰─────────────────────────── expected field to be named f
@@ -1431,11 +1477,11 @@ fn ty_tuple_comprehension_02() {
     // map to a complex type, without refs to comprehension variable
 
     insta::assert_snapshot!(_test_ty(r#"
-    type A: {id: int64, title: text}
+    type A: {id: Int64, title: Text}
 
-    func main(): {for f: F in A do f: [bool]}
+    func main(): {for f: F in A do f: [Bool]}
     -> std::default()
-    "#), @"{id: [bool], title: [bool]}");
+    "#), @"{id: [Bool], title: [Bool]}");
 }
 
 #[test]
@@ -1443,13 +1489,13 @@ fn ty_tuple_comprehension_03() {
     // lookup in tuple comprehension
 
     insta::assert_snapshot!(_test_ty(r#"
-    type A: {id: int64, title: text}
-    type B: {for f: F in A do f: bool}
+    type A: {id: Int64, title: Text}
+    type B: {for f: F in A do f: Bool}
 
-    func f(flags: B): bool -> flags.id && flags.title
+    func f(flags: B): Bool -> flags.id && flags.title
 
     func main() -> f({id = true, title = false})
-    "#), @"bool");
+    "#), @"Bool");
 }
 
 #[test]
@@ -1457,11 +1503,11 @@ fn ty_tuple_comprehension_04() {
     // remove tuple names
 
     insta::assert_snapshot!(_test_ty(r#"
-    type A: {id: int64, title: text}
+    type A: {id: Int64, title: Text}
 
     func main(): {for f: F in A do F}
     -> std::default()
-    "#), @"{int64, text}");
+    "#), @"{Int64, Text}");
 }
 
 #[test]
@@ -1469,11 +1515,11 @@ fn ty_tuple_comprehension_05() {
     // wrap into array
 
     insta::assert_snapshot!(_test_ty(r#"
-    type A: {id: int64, title: text}
+    type A: {id: Int64, title: Text}
 
     func main(): {for f: F in A do f: [F]}
     -> std::default()
-    "#), @"{id: [int64], title: [text]}");
+    "#), @"{id: [Int64], title: [Text]}");
 }
 
 #[test]
@@ -1481,48 +1527,48 @@ fn ty_tuple_comprehension_06() {
     // validate tuples against comprehension
 
     insta::assert_snapshot!(_test_ty(r#"
-    func make_flags(x: T): {for f: F in T do f: bool}
+    func make_flags(x: T): {for f: F in T do f: Bool}
     where T: {..}
     -> std::default()
 
-    type A: {id: int64, title: text}
+    type A: {id: Int64, title: Text}
 
-    func main(a: A): {id: bool, title: bool} -> make_flags(a)
-    "#), @"{id: bool, title: bool}");
+    func main(a: A): {id: Bool, title: Bool} -> make_flags(a)
+    "#), @"{id: Bool, title: Bool}");
 
     insta::assert_snapshot!(_test_err(r#"
-    func make_flags(x: T): {for f: F in T do f: bool}
+    func make_flags(x: T): {for f: F in T do f: Bool}
     where T: {..}
     -> std::default()
 
-    type A: {id: int64, title: text}
+    type A: {id: Int64, title: Text}
 
-    func main(a: A): {id: bool, title: bool, release_year: bool} -> make_flags(a)
+    func main(a: A): {id: Bool, title: Bool, release_year: Bool} -> make_flags(a)
     "#), @"
     [E0006] Error:
        ╭─[ <unknown>:8:60 ]
        │
-     8 │     func main(a: A): {id: bool, title: bool, release_year: bool} -> make_flags(a)
+     8 │     func main(a: A): {id: Bool, title: Bool, release_year: Bool} -> make_flags(a)
        │                                                            ──┬─
-       │                                                              ╰─── field .release_year does not exist in type {id: int64, title: text}
+       │                                                              ╰─── field .release_year does not exist in type {id: Int64, title: Text}
     ───╯
     ");
 
     insta::assert_snapshot!(_test_err(r#"
-    func make_flags(x: T): {for f: F in T do f: bool}
+    func make_flags(x: T): {for f: F in T do f: Bool}
     where T: {..}
     -> std::default()
 
-    type A: {id: int64, title: text, release_year: int16}
+    type A: {id: Int64, title: Text, release_year: Int16}
 
-    func main(a: A): {id: bool, title: bool} -> make_flags(a)
+    func main(a: A): {id: Bool, title: Bool} -> make_flags(a)
     "#), @"
     [E0007] Error:
        ╭─[ <unknown>:8:49 ]
        │
-     8 │     func main(a: A): {id: bool, title: bool} -> make_flags(a)
+     8 │     func main(a: A): {id: Bool, title: Bool} -> make_flags(a)
        │                                                 ─────┬────
-       │                                                      ╰────── expected a tuple with 2 fields, found {id: int64, title: text, release_year: int16}
+       │                                                      ╰────── expected a tuple with 2 fields, found {id: Int64, title: Text, release_year: Int16}
     ───╯
     ");
 }
@@ -1532,9 +1578,9 @@ fn ty_tuple_comprehension_07() {
     // validate tuples against comprehension
 
     insta::assert_snapshot!(_test_ty(r#"
-    type A: {id: int64, title: text}
-    func main(a: {id: bool, title: bool}): {for f: F in A do f: bool} -> a
-    "#), @"{id: bool, title: bool}");
+    type A: {id: Int64, title: Text}
+    func main(a: {id: Bool, title: Bool}): {for f: F in A do f: Bool} -> a
+    "#), @"{id: Bool, title: Bool}");
 }
 
 #[test]
@@ -1542,9 +1588,9 @@ fn ty_tuple_comprehension_08() {
     // lookup into comprehension
 
     insta::assert_snapshot!(_test_ty(r#"
-    type A: {id: int64, title: text}
+    type A: {id: Int64, title: Text}
     func main(a: {for f: F in A do f: {F, F}}) -> a.title
-    "#), @"{text, text}");
+    "#), @"{Text, Text}");
 }
 
 #[test]
@@ -1560,11 +1606,11 @@ fn ty_tuple_comprehension_09() {
     where T: {..}
 
     func main() -> (
-      {gift_id = []}: {gift_id: [int32]}
+      {gift_id = []}: {gift_id: [Int32]}
       | x -> {x.gift_id, x.gift_id}
       | from_columnar
     )
-    "#), @"[{gift_id: int32, gift_id: int32}]");
+    "#), @"[{gift_id: Int32, gift_id: Int32}]");
 
     // A few useful functions for writing tests:
 
@@ -1584,9 +1630,9 @@ fn ty_tuple_comprehension_10() {
     where T: {..}
 
     func main() -> (
-      ({gift_id = []: [int32]} | from_columnar)
+      ({gift_id = []: [Int32]} | from_columnar)
     )
-    "#), @"{gift_id: int32}");
+    "#), @"{gift_id: Int32}");
 }
 
 #[test]
@@ -1594,30 +1640,30 @@ fn tuple_00() {
     // tuples, named type validation
 
     insta::assert_snapshot!(_test_ty(r#"
-    func main(): {title: text, is_released: bool} -> {title = "hello", is_released = true}
-    "#), @"{title: text, is_released: bool}");
+    func main(): {title: Text, is_released: Bool} -> {title = "hello", is_released = true}
+    "#), @"{title: Text, is_released: Bool}");
 
     insta::assert_snapshot!(_test_err(r#"
-    func main(): {title: text, is_released: bool} -> {title = "hello"}
+    func main(): {title: Text, is_released: Bool} -> {title = "hello"}
     "#), @r#"
     [E0006] Error:
        ╭─[ <unknown>:2:54 ]
        │
-     2 │     func main(): {title: text, is_released: bool} -> {title = "hello"}
+     2 │     func main(): {title: Text, is_released: Bool} -> {title = "hello"}
        │                                                      ────────┬────────
-       │                                                              ╰────────── expected type `{title: text, is_released: bool}`, but found type `{title: text}`
+       │                                                              ╰────────── expected type `{title: Text, is_released: Bool}`, but found type `{title: Text}`
     ───╯
     "#);
 
     insta::assert_snapshot!(_test_err(r#"
-    func main(): {title: text} -> {title = "hello", is_released = true}
+    func main(): {title: Text} -> {title = "hello", is_released = true}
     "#), @r#"
     [E0006] Error:
        ╭─[ <unknown>:2:35 ]
        │
-     2 │     func main(): {title: text} -> {title = "hello", is_released = true}
+     2 │     func main(): {title: Text} -> {title = "hello", is_released = true}
        │                                   ──────────────────┬──────────────────
-       │                                                     ╰──────────────────── expected type `{title: text}`, but found type `{title: text, is_released: bool}`
+       │                                                     ╰──────────────────── expected type `{title: Text}`, but found type `{title: Text, is_released: Bool}`
     ───╯
     "#);
 }
@@ -1627,30 +1673,30 @@ fn tuple_01() {
     // tuples, positional type validation
 
     insta::assert_snapshot!(_test_ty(r#"
-    func main(): {text, bool} -> {"hello", true}
-    "#), @"{text, bool}");
+    func main(): {Text, Bool} -> {"hello", true}
+    "#), @"{Text, Bool}");
 
     insta::assert_snapshot!(_test_err(r#"
-    func main(): {text, bool} -> {"hello"}
+    func main(): {Text, Bool} -> {"hello"}
     "#), @r#"
     [E0006] Error:
        ╭─[ <unknown>:2:34 ]
        │
-     2 │     func main(): {text, bool} -> {"hello"}
+     2 │     func main(): {Text, Bool} -> {"hello"}
        │                                  ────┬────
-       │                                      ╰────── expected type `{text, bool}`, but found type `{text}`
+       │                                      ╰────── expected type `{Text, Bool}`, but found type `{Text}`
     ───╯
     "#);
 
     insta::assert_snapshot!(_test_err(r#"
-    func main(): {text} -> {"hello", true}
+    func main(): {Text} -> {"hello", true}
     "#), @r#"
     [E0006] Error:
        ╭─[ <unknown>:2:28 ]
        │
-     2 │     func main(): {text} -> {"hello", true}
+     2 │     func main(): {Text} -> {"hello", true}
        │                            ───────┬───────
-       │                                   ╰───────── expected type `{text}`, but found type `{text, bool}`
+       │                                   ╰───────── expected type `{Text}`, but found type `{Text, Bool}`
     ───╯
     "#);
 }
@@ -1660,30 +1706,30 @@ fn tuple_02() {
     // tuples, positional type variation of named tuples
 
     insta::assert_snapshot!(_test_ty(r#"
-    func main(): {text, bool} -> {title = "hello", is_released = true}
-    "#), @"{text, bool}");
+    func main(): {Text, Bool} -> {title = "hello", is_released = true}
+    "#), @"{Text, Bool}");
 
     insta::assert_snapshot!(_test_err(r#"
-    func main(): {text, bool} -> {title = "hello"}
+    func main(): {Text, Bool} -> {title = "hello"}
     "#), @r#"
     [E0006] Error:
        ╭─[ <unknown>:2:34 ]
        │
-     2 │     func main(): {text, bool} -> {title = "hello"}
+     2 │     func main(): {Text, Bool} -> {title = "hello"}
        │                                  ────────┬────────
-       │                                          ╰────────── expected type `{text, bool}`, but found type `{title: text}`
+       │                                          ╰────────── expected type `{Text, Bool}`, but found type `{title: Text}`
     ───╯
     "#);
 
     insta::assert_snapshot!(_test_err(r#"
-    func main(): {text} -> {title = "hello", is_released = true}
+    func main(): {Text} -> {title = "hello", is_released = true}
     "#), @r#"
     [E0006] Error:
        ╭─[ <unknown>:2:28 ]
        │
-     2 │     func main(): {text} -> {title = "hello", is_released = true}
+     2 │     func main(): {Text} -> {title = "hello", is_released = true}
        │                            ──────────────────┬──────────────────
-       │                                              ╰──────────────────── expected type `{text}`, but found type `{title: text, is_released: bool}`
+       │                                              ╰──────────────────── expected type `{Text}`, but found type `{title: Text, is_released: Bool}`
     ───╯
     "#);
 }
@@ -1693,30 +1739,30 @@ fn tuple_03() {
     // tuples, named type validation of unnamed tuples
 
     insta::assert_snapshot!(_test_ty(r#"
-    func main(): {title: text, is_released: bool} -> {"hello", true}
-    "#), @"{title: text, is_released: bool}");
+    func main(): {title: Text, is_released: Bool} -> {"hello", true}
+    "#), @"{title: Text, is_released: Bool}");
 
     insta::assert_snapshot!(_test_err(r#"
-    func main(): {title: text, is_released: bool} -> {"hello"}
+    func main(): {title: Text, is_released: Bool} -> {"hello"}
     "#), @r#"
     [E0006] Error:
        ╭─[ <unknown>:2:54 ]
        │
-     2 │     func main(): {title: text, is_released: bool} -> {"hello"}
+     2 │     func main(): {title: Text, is_released: Bool} -> {"hello"}
        │                                                      ────┬────
-       │                                                          ╰────── expected type `{title: text, is_released: bool}`, but found type `{text}`
+       │                                                          ╰────── expected type `{title: Text, is_released: Bool}`, but found type `{Text}`
     ───╯
     "#);
 
     insta::assert_snapshot!(_test_err(r#"
-    func main(): {title: text} -> {"hello", true}
+    func main(): {title: Text} -> {"hello", true}
     "#), @r#"
     [E0006] Error:
        ╭─[ <unknown>:2:35 ]
        │
-     2 │     func main(): {title: text} -> {"hello", true}
+     2 │     func main(): {title: Text} -> {"hello", true}
        │                                   ───────┬───────
-       │                                          ╰───────── expected type `{title: text}`, but found type `{text, bool}`
+       │                                          ╰───────── expected type `{title: Text}`, but found type `{Text, Bool}`
     ───╯
     "#);
 }
@@ -1726,21 +1772,21 @@ fn tuple_04() {
     // tuples, multiple diagnostics
 
     insta::assert_snapshot!(_test_err(r#"
-    func main(): {title: bool, is_released: bool} -> {"hello", "world"}
+    func main(): {title: Bool, is_released: Bool} -> {"hello", "world"}
     "#), @r#"
     [E0006] Error:
        ╭─[ <unknown>:2:55 ]
        │
-     2 │     func main(): {title: bool, is_released: bool} -> {"hello", "world"}
+     2 │     func main(): {title: Bool, is_released: Bool} -> {"hello", "world"}
        │                                                       ───┬───
-       │                                                          ╰───── expected type `bool`, but found type `text`
+       │                                                          ╰───── expected type `Bool`, but found type `Text`
     ───╯
     [E0006] Error:
        ╭─[ <unknown>:2:64 ]
        │
-     2 │     func main(): {title: bool, is_released: bool} -> {"hello", "world"}
+     2 │     func main(): {title: Bool, is_released: Bool} -> {"hello", "world"}
        │                                                                ───┬───
-       │                                                                   ╰───── expected type `bool`, but found type `text`
+       │                                                                   ╰───── expected type `Bool`, but found type `Text`
     ───╯
     "#);
 }
@@ -1754,7 +1800,7 @@ fn import_simple() {
 
       const c = "c"
 
-      type T: text
+      type T: Text
     }
 
     import a::f
@@ -1780,7 +1826,7 @@ fn import_cross_module_chain() {
     }
 
     func main() -> a::b::d1
-    "#), @"text");
+    "#), @"Text");
 }
 
 #[test]
@@ -1814,7 +1860,7 @@ fn import_module_alias() {
     }
     import a as e
     func main() -> {e::d, e::b::c}
-    "#), @"{d: bool, c: text}");
+    "#), @"{d: Bool, c: Text}");
 }
 
 #[test]
@@ -1856,7 +1902,7 @@ fn import_multiple_grouped() {
     }
     import a::(b, c)
     func main() -> {b, c}
-    "#), @"{b: text, c: bool}");
+    "#), @"{b: Text, c: Bool}");
 }
 
 #[test]
@@ -1866,13 +1912,13 @@ fn import_nested_grouped() {
     module a {
       const b = "b"
       module c {
-        const d: int16 = 3
+        const d: Int16 = 3
         const e = false
       }
     }
     import a::(b, c::(d, e))
     func main() -> {b, d, e}
-    "#), @"{b: text, d: int16, e: bool}");
+    "#), @"{b: Text, d: Int16, e: Bool}");
 }
 
 #[test]
@@ -1882,7 +1928,7 @@ fn import_star_basic() {
     module a {
       func f() -> "f"
       const c = "c"
-      type T: text
+      type T: Text
     }
     import a::*
     func main() -> {c, f()}: {T, T}
@@ -1901,7 +1947,7 @@ fn import_star_nested_module() {
     }
     import a::b::*
     func main() -> {x, y}
-    "#), @"{x: text, y: text}");
+    "#), @"{x: Text, y: Text}");
 }
 
 #[test]
@@ -1915,7 +1961,7 @@ fn import_star_includes_submodules() {
     }
     import a::*
     func main() -> inner::val
-    "#), @"text");
+    "#), @"Text");
 }
 
 #[test]
@@ -1928,7 +1974,7 @@ fn import_star_shadowed_by_explicit() {
     import a::*
     const x = true
     func main() -> x
-    "#), @"bool");
+    "#), @"Bool");
 }
 
 #[test]
@@ -1943,7 +1989,7 @@ fn import_star_no_reexports() {
     }
     import a::*
     func main() -> x
-    "#), @"bool");
+    "#), @"Bool");
 }
 
 #[test]
@@ -1966,15 +2012,15 @@ fn import_star_missing_module() {
 #[test]
 fn framed_00() {
     insta::assert_snapshot!(_test_err(r#"
-    type MyInt(int32)
-    const x: MyInt = 4: int32
+    type MyInt(Int32)
+    const x: MyInt = 4: Int32
     "#), @"
     [E0006] Error:
        ╭─[ <unknown>:3:22 ]
        │
-     3 │     const x: MyInt = 4: int32
+     3 │     const x: MyInt = 4: Int32
        │                      ────┬───
-       │                          ╰───── x expected type `MyInt`, but found type `int32`
+       │                          ╰───── x expected type `MyInt`, but found type `Int32`
     ───╯
     ");
 }
@@ -1982,21 +2028,21 @@ fn framed_00() {
 #[test]
 fn framed_01() {
     insta::assert_snapshot!(_test_ty(r#"
-    type MyInt(int32)
-    const main = MyInt(4: int32)
+    type MyInt(Int32)
+    const main = MyInt(4: Int32)
     "#), @"MyInt");
 }
 
 #[test]
 fn framed_02() {
     insta::assert_snapshot!(_test_err(r#"
-    type MyInt(int32)
-    const main = MyInt(4: int32, false)
+    type MyInt(Int32)
+    const main = MyInt(4: Int32, false)
     "#), @"
     Error:
        ╭─[ <unknown>:3:18 ]
        │
-     3 │     const main = MyInt(4: int32, false)
+     3 │     const main = MyInt(4: Int32, false)
        │                  ───────────┬──────────
        │                             ╰──────────── func MyInt expected 1 arguments, but got 2
     ───╯
@@ -2006,7 +2052,7 @@ fn framed_02() {
 #[test]
 fn framed_03() {
     insta::assert_snapshot!(_test_err(r#"
-    type MyInt(int32)
+    type MyInt(Int32)
     const main = MyInt()
     "#), @"
     Error:
@@ -2022,7 +2068,7 @@ fn framed_03() {
 #[test]
 fn framed_04() {
     insta::assert_snapshot!(_test_err(r#"
-    type MyInt(int32)
+    type MyInt(Int32)
     const main = MyInt(false)
     "#), @"
     [E0006] Error:
@@ -2030,9 +2076,9 @@ fn framed_04() {
        │
      3 │     const main = MyInt(false)
        │                        ──┬──
-       │                          ╰──── func MyInt expected type `MyInt`, but found type `bool`
+       │                          ╰──── func MyInt expected type `MyInt`, but found type `Bool`
        │
-       │ Note: type `MyInt` expands to `int32`
+       │ Note: type `MyInt` expands to `Int32`
     ───╯
     ");
 }
@@ -2040,15 +2086,15 @@ fn framed_04() {
 #[test]
 fn framed_05() {
     insta::assert_snapshot!(_test_ty(r#"
-    type MyInt(int32)
+    type MyInt(Int32)
     const main = MyInt(12).0
-    "#), @"int32");
+    "#), @"Int32");
 }
 
 #[test]
 fn framed_06() {
     insta::assert_snapshot!(_test_err(r#"
-    type MyInt(int32)
+    type MyInt(Int32)
     const main = MyInt(12).1
     "#), @"
     [E0006] Error:
@@ -2066,7 +2112,7 @@ fn framed_06() {
 #[test]
 fn framed_07() {
     insta::assert_snapshot!(_test_err(r#"
-    type MyInt(int32)
+    type MyInt(Int32)
     const main = MyInt(12).inner
     "#), @"
     [E0006] Error:
@@ -2085,7 +2131,7 @@ fn framed_07() {
 #[ignore] // Issue #88
 fn framed_08() {
     insta::assert_snapshot!(_test_ty(r#"
-    type Status(enum {pending: text, done})
+    type Status(enum {pending: Text, done})
 
     func main() -> (
       let s = Status(.pending("hello"));
@@ -2103,7 +2149,7 @@ fn framed_09() {
     // framed labelled type, construction
 
     insta::assert_snapshot!(_test_ty(r#"
-    type Date(days_since_epoch: int32)
+    type Date(days_since_epoch: Int32)
 
     func main() -> {
       Date(12),
@@ -2117,13 +2163,13 @@ fn framed_10() {
     // framed labelled type, lookup
 
     insta::assert_snapshot!(_test_ty(r#"
-    type Date(days_since_epoch: int32)
+    type Date(days_since_epoch: Int32)
 
     func main() -> {
       Date(12).0,
       Date(12).days_since_epoch,
     }
-    "#), @"{int32, days_since_epoch: int32}");
+    "#), @"{Int32, days_since_epoch: Int32}");
 }
 
 #[test]
@@ -2131,7 +2177,7 @@ fn framed_11() {
     // framed labelled type, err messages
 
     insta::assert_snapshot!(_test_err(r#"
-    type Date(days_since_epoch: int32)
+    type Date(days_since_epoch: Int32)
 
     func main() -> {
       Date(wrong = 12),
@@ -2152,9 +2198,9 @@ fn framed_11() {
        │
      6 │       Date(days_since_epoch = false),
        │                               ──┬──
-       │                                 ╰──── func Date expected type `Date`, but found type `bool`
+       │                                 ╰──── func Date expected type `Date`, but found type `Bool`
        │
-       │ Note: type `Date` expands to `int32`
+       │ Note: type `Date` expands to `Int32`
     ───╯
     [E0006] Error:
        ╭─[ <unknown>:7:15 ]
@@ -2182,12 +2228,12 @@ fn framed_12() {
     // framed type, as type var
 
     insta::assert_snapshot!(_test_ty(r#"
-    type Date(days_since_epoch: int32)
+    type Date(days_since_epoch: Int32)
 
     func main() -> {
       Date(12) | x -> x.0,
     }
-    "#), @"{int32}");
+    "#), @"{Int32}");
 }
 
 #[test]
@@ -2221,12 +2267,10 @@ fn call_01() {
     // labelled call
 
     insta::assert_snapshot!(_test_ty(r#"
-    func noop(a x: int32) -> x
+    func noop(a x: Int32) -> x
 
     func main() -> noop(a = 4)
-    "#), @r"
-    int32
-    ");
+    "#), @"Int32");
 }
 
 #[test]
@@ -2234,7 +2278,7 @@ fn call_02() {
     // call, bad arg label
 
     insta::assert_snapshot!(_test_err(r#"
-    func noop(a x: int32, y: bool) -> x
+    func noop(a x: Int32, y: Bool) -> x
 
     func main() -> noop(true, z = false)
     "#), @"
@@ -2250,7 +2294,7 @@ fn call_02() {
        │
      4 │     func main() -> noop(true, z = false)
        │                         ──┬─
-       │                           ╰─── func noop expected type `int32`, but found type `bool`
+       │                           ╰─── func noop expected type `Int32`, but found type `Bool`
     ───╯
     ");
 }
@@ -2260,7 +2304,7 @@ fn call_03() {
     // call, not enough args
 
     insta::assert_snapshot!(_test_err(r#"
-    func noop(a x: int32, y: bool) -> x
+    func noop(a x: Int32, y: Bool) -> x
 
     func main() -> noop(true)
     "#), @"
@@ -2276,7 +2320,7 @@ fn call_03() {
        │
      4 │     func main() -> noop(true)
        │                         ──┬─
-       │                           ╰─── func noop expected type `int32`, but found type `bool`
+       │                           ╰─── func noop expected type `Int32`, but found type `Bool`
     ───╯
     ");
 }
@@ -2286,7 +2330,7 @@ fn call_04() {
     // call, too many args
 
     insta::assert_snapshot!(_test_err(r#"
-    func noop(a x: int32, y: bool) -> x
+    func noop(a x: Int32, y: Bool) -> x
 
     func main() -> noop(3, "hello", false)
     "#), @r#"
@@ -2302,7 +2346,7 @@ fn call_04() {
        │
      4 │     func main() -> noop(3, "hello", false)
        │                            ───┬───
-       │                               ╰───── func noop expected type `bool`, but found type `text`
+       │                               ╰───── func noop expected type `Bool`, but found type `Text`
     ───╯
     "#);
 }
@@ -2310,18 +2354,18 @@ fn call_04() {
 #[test]
 fn anno_00_happy_path() {
     insta::assert_snapshot!(_test_ty(r#"
-    anno deprecated(reason: text)
+    anno deprecated(reason: Text)
 
     @deprecated("use new_api instead")
-    const main: int64 = 1
-    "#), @"int64");
+    const main: Int64 = 1
+    "#), @"Int64");
 }
 
 #[test]
 fn anno_01_unknown() {
     insta::assert_snapshot!(_test_err(r#"
     @nonexistent
-    const main: int64 = 1
+    const main: Int64 = 1
     "#), @"
     Error:
        ╭─[ <unknown>:2:6 ]
@@ -2336,17 +2380,17 @@ fn anno_01_unknown() {
 #[test]
 fn anno_02_wrong_arg_type() {
     insta::assert_snapshot!(_test_err(r#"
-    anno deprecated(reason: text)
+    anno deprecated(reason: Text)
 
     @deprecated(false)
-    const main: int64 = 1
+    const main: Int64 = 1
     "#), @"
     [E0006] Error:
        ╭─[ <unknown>:4:17 ]
        │
      4 │     @deprecated(false)
        │                 ──┬──
-       │                   ╰──── expected type `text`, but found type `bool`
+       │                   ╰──── expected type `Text`, but found type `Bool`
     ───╯
     ");
 }
@@ -2357,7 +2401,7 @@ fn anno_03_extra_args() {
     anno schema()
 
     @schema("extra")
-    const main: int64 = 1
+    const main: Int64 = 1
     "#), @r#"
     Error:
        ╭─[ <unknown>:4:6 ]
@@ -2372,10 +2416,10 @@ fn anno_03_extra_args() {
 #[test]
 fn anno_04_missing_args() {
     insta::assert_snapshot!(_test_err(r#"
-    anno deprecated(reason: text)
+    anno deprecated(reason: Text)
 
     @deprecated()
-    const main: int64 = 1
+    const main: Int64 = 1
     "#), @"
     Error:
        ╭─[ <unknown>:4:6 ]
@@ -2390,12 +2434,12 @@ fn anno_04_missing_args() {
 #[test]
 fn anno_05_non_const_arg() {
     insta::assert_snapshot!(_test_err(r#"
-    anno deprecated(reason: text)
+    anno deprecated(reason: Text)
 
-    func reason(): text -> "x"
+    func reason(): Text -> "x"
 
     @deprecated(reason())
-    const main: int64 = 1
+    const main: Int64 = 1
     "#), @"
     Error:
        ╭─[ <unknown>:6:17 ]

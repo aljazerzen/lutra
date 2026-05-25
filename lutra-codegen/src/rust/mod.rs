@@ -107,6 +107,12 @@ fn codegen_module(
 
         match &decl.decl {
             ir::Decl::Module(module) => {
+                let is_dep = module_path.is_empty()
+                    && ctx.project.dependencies.iter().any(|d| &d.name == name);
+                if is_dep {
+                    continue;
+                }
+
                 sub_modules.push((name, module));
             }
             ir::Decl::Type(ty) => {
@@ -128,32 +134,33 @@ fn codegen_module(
 
     ctx.current_rust_mod = module_path.clone();
 
-    let mut canonical_tys = Vec::new();
-    let mut generated_tys = Vec::new();
-    for (ty, annotations) in tys {
-        let name = ty.name.as_deref().unwrap();
-        if let Some(path) = canonical_std_type_reexport(&module_path, name) {
-            canonical_tys.push((name.to_string(), path));
-        } else {
-            generated_tys.push((ty, annotations));
-        }
-    }
-
-    if ctx.options.generates_types() {
-        let lutra_bin = &ctx.options.lutra_bin_path;
-        for (name, path) in &canonical_tys {
-            writeln!(w, "pub use {lutra_bin}::{path} as {name};")?;
-        }
-        if !canonical_tys.is_empty() {
-            writeln!(w)?;
-        }
-    }
+    let mut all_tys = Vec::new();
 
     // write types
-    let mut all_tys = if ctx.options.generates_types() {
-        types::write_tys(w, generated_tys, ctx)?
-    } else {
-        vec![]
+    if ctx.options.generates_types() {
+        // partition
+        let mut tys_to_import = Vec::new();
+        let mut tys_to_generate = Vec::new();
+        for (ty, annotations) in tys {
+            let name = ty.name.as_deref().unwrap();
+            if let Some(path) = canonical_std_type_reexport(&module_path, name) {
+                tys_to_import.push((name.to_string(), path));
+            } else {
+                tys_to_generate.push((ty, annotations));
+            }
+        }
+
+        // write imports
+        let lutra_bin = &ctx.options.lutra_bin_path;
+        for (name, path) in &tys_to_import {
+            writeln!(w, "pub use {lutra_bin}::{path} as {name};")?;
+        }
+        if !tys_to_import.is_empty() {
+            writeln!(w)?;
+        }
+
+        // write ty defs
+        all_tys.extend(types::write_tys(w, tys_to_generate, ctx)?);
     };
 
     // write traits for functions

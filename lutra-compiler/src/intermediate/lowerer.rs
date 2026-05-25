@@ -344,10 +344,7 @@ impl<'a> Lowerer<'a> {
                     // compile the condition
                     let condition =
                         self.lower_pattern_to_condition(&subject_ref, &branch.pattern)?;
-                    let condition = condition.unwrap_or_else(|| ir::Expr {
-                        kind: ir::ExprKind::Literal(ir::Literal::bool(true)),
-                        ty: ir::Ty::new(ir::TyPrimitive::bool),
-                    });
+                    let condition = condition.unwrap_or_else(|| ir::Expr::new_lit_bool(true));
 
                     // collect pattern scope
                     let mut values = Vec::new();
@@ -385,10 +382,7 @@ impl<'a> Lowerer<'a> {
                     value: self.lower_expr(&if_else.then)?,
                 };
                 let second = ir::SwitchBranch {
-                    condition: ir::Expr {
-                        kind: ir::ExprKind::Literal(ir::Literal::bool(true)),
-                        ty: ir::Ty::new(ir::TyPrimitive::bool),
-                    },
+                    condition: ir::Expr::new_lit_bool(true),
                     value: self.lower_expr(&if_else.els)?,
                 };
                 ir::ExprKind::Switch(vec![first, second])
@@ -462,41 +456,32 @@ impl<'a> Lowerer<'a> {
     fn lower_literal(&mut self, lit: &pr::Literal, ty: &pr::Ty) -> Result<ir::Literal> {
         Ok(match lit {
             pr::Literal::Number(_) => {
-                let (ty_mat, frame_name) = self.get_ty_mat_pr(ty);
-
-                if frame_name.is_some_and(|n| n.as_steps() == [NS_STD, "Decimal"]) {
-                    return Ok(ir::Literal::int64(lit.as_decimal().unwrap()));
-                }
-
-                let prim = ty_mat.kind.as_primitive().ok_or_else(|| {
-                    Diagnostic::new_assert("expected literal to be of primitive type")
-                })?;
-
-                match prim {
-                    pr::TyPrimitive::int8 => ir::Literal::int8(lit.as_integer().unwrap() as i8),
-                    pr::TyPrimitive::int16 => ir::Literal::int16(lit.as_integer().unwrap() as i16),
-                    pr::TyPrimitive::int32 => ir::Literal::int32(lit.as_integer().unwrap() as i32),
-                    pr::TyPrimitive::int64 => ir::Literal::int64(lit.as_integer().unwrap() as i64),
-                    pr::TyPrimitive::uint8 => ir::Literal::uint8(lit.as_integer().unwrap() as u8),
-                    pr::TyPrimitive::uint16 => {
-                        ir::Literal::uint16(lit.as_integer().unwrap() as u16)
+                let (_, frame_name) = self.get_ty_mat_pr(ty);
+                let ty_std = ir::TyStd::try_from_steps(frame_name.unwrap().as_steps()).unwrap();
+                match ty_std {
+                    ir::TyStd::Int8 | ir::TyStd::UInt8 => {
+                        ir::Literal::Prim8(lit.as_integer().unwrap() as u8)
                     }
-                    pr::TyPrimitive::uint32 => {
-                        ir::Literal::uint32(lit.as_integer().unwrap() as u32)
+                    ir::TyStd::Int16 | ir::TyStd::UInt16 => {
+                        ir::Literal::Prim16(lit.as_integer().unwrap().to_le() as u16)
                     }
-                    pr::TyPrimitive::uint64 => ir::Literal::uint64(lit.as_integer().unwrap()),
-                    pr::TyPrimitive::float32 => {
-                        ir::Literal::float32(lit.as_float().unwrap() as f32)
+                    ir::TyStd::Int32 | ir::TyStd::UInt32 => {
+                        ir::Literal::Prim32(lit.as_integer().unwrap().to_le() as u32)
                     }
-                    pr::TyPrimitive::float64 => ir::Literal::float64(lit.as_float().unwrap()),
-                    _ => {
-                        return Err(Diagnostic::new_assert(
-                            "number literal is not of a number type?",
-                        ));
+                    ir::TyStd::Int64 | ir::TyStd::UInt64 => {
+                        ir::Literal::Prim64(lit.as_integer().unwrap())
                     }
+                    ir::TyStd::Float32 => {
+                        ir::Literal::Prim32((lit.as_float().unwrap() as f32).to_bits())
+                    }
+                    ir::TyStd::Float64 => ir::Literal::Prim64(lit.as_float().unwrap().to_bits()),
+                    ir::TyStd::Decimal => {
+                        ir::Literal::Prim64(lit.as_decimal().unwrap().to_le() as u64)
+                    }
+                    _ => unreachable!(),
                 }
             }
-            pr::Literal::Boolean(v) => ir::Literal::bool(*v),
+            pr::Literal::Boolean(v) => ir::Literal::Prim8(*v as u8),
             pr::Literal::Text(v) => ir::Literal::text(v.clone()),
 
             pr::Literal::Date(date) => {
@@ -505,9 +490,9 @@ impl<'a> Lowerer<'a> {
                     return Err(Diagnostic::new_custom("invalid date"));
                 };
 
-                ir::Literal::int32(epoch_days)
+                ir::Literal::Prim32(epoch_days.to_le() as u32)
             }
-            pr::Literal::Time(time) => ir::Literal::int64(time.to_microseconds()),
+            pr::Literal::Time(time) => ir::Literal::Prim64(time.to_microseconds().to_le() as u64),
 
             pr::Literal::DateTime(date, time) => {
                 let Some(epoch_days) = date.to_epoch_days() else {
@@ -517,7 +502,7 @@ impl<'a> Lowerer<'a> {
 
                 // convert to timestamp (at UTC, excluding leap seconds)
                 let date_micros = epoch_days as i64 * 24 * 60 * 60 * 1000 * 1000;
-                ir::Literal::int64(date_micros + time.to_microseconds())
+                ir::Literal::Prim64((date_micros + time.to_microseconds()).to_le() as u64)
             }
         })
     }
@@ -537,7 +522,7 @@ impl<'a> Lowerer<'a> {
                         subject: subject.clone(),
                         tag: tag as u64,
                     })),
-                    ty: ir::Ty::new(ir::TyPrimitive::bool),
+                    ty: ir::Ty::bool(),
                 };
 
                 if let Some(inner) = inner {
@@ -564,9 +549,9 @@ impl<'a> Lowerer<'a> {
 
             // match a literal value
             pr::PatternKind::Literal(lit) => {
-                let subject_ty = self.get_ty_mat(subject.ty.clone());
+                let subject_ty = subject.ty.clone();
 
-                // TODO: this is hack, we shouldn't be converting back to pr repe
+                // TODO: this is hack, we shouldn't be converting back to pr
                 let subject_ty_pr = pr::Ty::from(subject_ty.clone());
 
                 let lit = ir::Expr {
@@ -574,7 +559,7 @@ impl<'a> Lowerer<'a> {
                         self.lower_literal(lit, &subject_ty_pr)
                             .with_span(Some(pattern.span))?,
                     ),
-                    ty: subject_ty.clone(),
+                    ty: subject_ty,
                 };
 
                 Ok(Some(new_bool_bin_func(
@@ -684,7 +669,10 @@ impl<'a> Lowerer<'a> {
                     self.type_defs_queue.push_back(fq.clone());
 
                     let def = self.root_module.get(&fq).unwrap();
-                    let ty_def = def.kind.as_ty().unwrap();
+                    let ty_def = def
+                        .kind
+                        .as_ty()
+                        .unwrap_or_else(|| panic!("{fq:?} {:?}", def.kind));
 
                     tracing::debug!("lower ty ident: {}", fq);
                     return ir::Ty {
@@ -712,18 +700,10 @@ impl<'a> Lowerer<'a> {
         let kind = match ty.kind {
             pr::TyKind::Primitive(primitive) => {
                 let primitive = match primitive {
-                    pr::TyPrimitive::int8 => ir::TyPrimitive::int8,
-                    pr::TyPrimitive::int16 => ir::TyPrimitive::int16,
-                    pr::TyPrimitive::int32 => ir::TyPrimitive::int32,
-                    pr::TyPrimitive::int64 => ir::TyPrimitive::int64,
-                    pr::TyPrimitive::uint8 => ir::TyPrimitive::uint8,
-                    pr::TyPrimitive::uint16 => ir::TyPrimitive::uint16,
-                    pr::TyPrimitive::uint32 => ir::TyPrimitive::uint32,
-                    pr::TyPrimitive::uint64 => ir::TyPrimitive::uint64,
-                    pr::TyPrimitive::float32 => ir::TyPrimitive::float32,
-                    pr::TyPrimitive::float64 => ir::TyPrimitive::float64,
-                    pr::TyPrimitive::bool => ir::TyPrimitive::bool,
-                    pr::TyPrimitive::text => ir::TyPrimitive::text,
+                    pr::TyPrimitive::prim8 => ir::TyPrimitive::prim8,
+                    pr::TyPrimitive::prim16 => ir::TyPrimitive::prim16,
+                    pr::TyPrimitive::prim32 => ir::TyPrimitive::prim32,
+                    pr::TyPrimitive::prim64 => ir::TyPrimitive::prim64,
                 };
                 ir::TyKind::Primitive(primitive)
             }
@@ -813,21 +793,17 @@ impl<'a> Lowerer<'a> {
         }
     }
 
-    fn get_ty_mat(&mut self, ty: ir::Ty) -> ir::Ty {
-        if let ir::TyKind::Ident(fq_path) = &ty.kind {
+    fn get_ty_mat(&mut self, mut ty: ir::Ty) -> ir::Ty {
+        while let ir::TyKind::Ident(fq_path) = &ty.kind {
             let path = pr::Path::new(fq_path.0.clone());
 
             // ensure it is lowered
             self.lower_ty_def(path.clone());
 
             // fetch it
-            let ty = self.type_defs.get(&path).unwrap().clone();
-
-            // re-run get_ty_mat
-            self.get_ty_mat(ty)
-        } else {
-            ty
+            ty = self.type_defs.get(&path).unwrap().clone();
         }
+        ty
     }
 
     /// Returns material type and the named of it's inner-most frame.
@@ -953,10 +929,7 @@ impl<'a> Lowerer<'a> {
                         let condition = self
                             .lower_pattern_to_condition(&subject_ref, branch)
                             .unwrap();
-                        let condition = condition.unwrap_or_else(|| ir::Expr {
-                            kind: ir::ExprKind::Literal(ir::Literal::bool(true)),
-                            ty: ir::Ty::new(ir::TyPrimitive::bool),
-                        });
+                        let condition = condition.unwrap_or_else(|| ir::Expr::new_lit_bool(true));
                         cases.push(ir::SwitchBranch {
                             condition,
                             value: var,
@@ -1043,18 +1016,10 @@ impl<'a> Lowerer<'a> {
     fn construct_default_for_ty(&mut self, ty: ir::Ty) -> ir::Expr {
         let kind = match self.get_ty_mat(ty.clone()).kind {
             ir::TyKind::Primitive(prim) => ir::ExprKind::Literal(match prim {
-                ir::TyPrimitive::bool => ir::Literal::bool(false),
-                ir::TyPrimitive::int8 => ir::Literal::int8(0),
-                ir::TyPrimitive::int16 => ir::Literal::int16(0),
-                ir::TyPrimitive::int32 => ir::Literal::int32(0),
-                ir::TyPrimitive::int64 => ir::Literal::int64(0),
-                ir::TyPrimitive::uint8 => ir::Literal::uint8(0),
-                ir::TyPrimitive::uint16 => ir::Literal::uint16(0),
-                ir::TyPrimitive::uint32 => ir::Literal::uint32(0),
-                ir::TyPrimitive::uint64 => ir::Literal::uint64(0),
-                ir::TyPrimitive::float32 => ir::Literal::float32(0.0),
-                ir::TyPrimitive::float64 => ir::Literal::float64(0.0),
-                ir::TyPrimitive::text => ir::Literal::text("".into()),
+                ir::TyPrimitive::prim8 => ir::Literal::Prim8(0),
+                ir::TyPrimitive::prim16 => ir::Literal::Prim16(0),
+                ir::TyPrimitive::prim32 => ir::Literal::Prim32(0),
+                ir::TyPrimitive::prim64 => ir::Literal::Prim64(0),
             }),
             ir::TyKind::Array(_) => ir::ExprKind::Array(vec![]),
             ir::TyKind::Tuple(ty_fields) => ir::ExprKind::Tuple(
@@ -1106,9 +1071,7 @@ impl<'a> Lowerer<'a> {
         }
     }
 }
-
 fn new_bool_bin_func(func_id: &str, left: ir::Expr, right: ir::Expr) -> ir::Expr {
-    let bool_ty = ir::Ty::new(ir::TyPrimitive::bool);
     ir::Expr {
         kind: ir::ExprKind::Call(Box::new(ir::Call {
             function: ir::Expr {
@@ -1117,12 +1080,12 @@ fn new_bool_bin_func(func_id: &str, left: ir::Expr, right: ir::Expr) -> ir::Expr
                 })),
                 ty: ir::Ty::new(ir::TyFunction {
                     params: vec![left.ty.clone(), right.ty.clone()],
-                    body: bool_ty.clone(),
+                    body: ir::Ty::bool(),
                 }),
             },
             args: vec![left, right],
         })),
-        ty: bool_ty,
+        ty: ir::Ty::bool(),
     }
 }
 

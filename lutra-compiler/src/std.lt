@@ -2,20 +2,20 @@
 #! Standard library
 
 ## Annotates a definition with documentation.
-anno doc(content: text)
+anno doc(content: Text)
 
 ## Annotates a definition to be hidden from documentation.
 anno hidden()
 
 ## Annotates a project with metadata.
-anno metadata(name: text)
+anno metadata(name: Text)
 
 ## Annotates a project with default runner URL.
 # TODO: maybe merge this into metadata (it would be nice to have an optional param)
-anno runner(url: text)
+anno runner(url: Text)
 
 ## Annotates a type with traits to `#[Derive]` when translating to Rust.
-anno rust_derive(macros: [text])
+anno rust_derive(macros: [Text])
 
 import convert::*
 
@@ -33,47 +33,47 @@ module convert {
   where T
 
   ## Converts a number to `int8`
-  external func to_int8(T): int8
+  external func to_int8(T): Int8
   where T: number
 
   ## Converts a number to `int16`
-  external func to_int16(T): int16
+  external func to_int16(T): Int16
   where T: number
 
   ## Converts a number to `int32`
-  external func to_int32(T): int32
+  external func to_int32(T): Int32
   where T: number
 
   ## Converts a number to `int64`
-  external func to_int64(T): int64
+  external func to_int64(T): Int64
   where T: number
 
   ## Converts a number to `uint8`
-  external func to_uint8(T): uint8
+  external func to_uint8(T): Uint8
   where T: number
 
   ## Converts a number to `uint16`
-  external func to_uint16(T): uint16
+  external func to_uint16(T): Uint16
   where T: number
 
   ## Converts a number to `uint32`
-  external func to_uint32(T): uint32
+  external func to_uint32(T): Uint32
   where T: number
 
   ## Converts a number to `uint64`
-  external func to_uint64(T): uint64
+  external func to_uint64(T): Uint64
   where T: number
 
   ## Converts a number to `float32`
-  external func to_float32(T): float32
+  external func to_float32(T): Float32
   where T: number
 
   ## Converts a number to `float64`
-  external func to_float64(T): float64
+  external func to_float64(T): Float64
   where T: number
 
   ## Converts a value to `text`
-  external func to_text(T): text
+  external func to_text(T): Text
   where T: primitive
 }
 
@@ -103,7 +103,7 @@ module ops {
 
   ## Negates a number.
   external func neg(T): T
-  where T: int8 | int16 | int32 | int64 | float32 | float64
+  where T: Int8 | Int16 | Int32 | Int64 | Float32 | Float64
 
   ## Compare two values to determine if the first is less, equal, or greater than
   ## the second.
@@ -114,7 +114,7 @@ module ops {
   type Ordering: enum {less, equal, greater}
 
   ## Tests if values are equal. Used by `==` operator.
-  func eq(left: T, right: T): bool
+  func eq(left: T, right: T): Bool
   where T: primitive
   -> (
     match cmp(left, right) {
@@ -124,7 +124,7 @@ module ops {
   )
 
   ## Tests if values are not equal. Used by `!=` operator.
-  func ne(left: T, right: T): bool
+  func ne(left: T, right: T): Bool
   where T: primitive
   -> (
     match cmp(left, right) {
@@ -134,7 +134,7 @@ module ops {
   )
 
   ## Tests if left value is greater than the right. Used by `>` operator.
-  func gt(left: T, right: T): bool
+  func gt(left: T, right: T): Bool
   where T: primitive
   -> (
     match cmp(left, right) {
@@ -144,7 +144,7 @@ module ops {
   )
 
   ## Tests if left value is less than the right. Used by `<` operator.
-  func lt(left: T, right: T): bool
+  func lt(left: T, right: T): Bool
   where T: primitive
   -> (
     match cmp(left, right) {
@@ -154,7 +154,7 @@ module ops {
   )
 
   ## Tests if left value is greater or equal to the right. Used by `>=` operator.
-  func gte(left: T, right: T): bool
+  func gte(left: T, right: T): Bool
   where T: primitive
   -> (
     match cmp(left, right) {
@@ -164,7 +164,7 @@ module ops {
   )
 
   ## Tests if left value is less or equal to the right. Used by `<=` operator.
-  func lte(left: T, right: T): bool
+  func lte(left: T, right: T): Bool
   where T: primitive
   -> (
     match cmp(left, right) {
@@ -174,13 +174,13 @@ module ops {
   )
 
   ## Tests if both values are true. Used by `&&` operator.
-  external func and(bool, bool): bool
+  external func and(Bool, Bool): Bool
 
   ## Tests if either of the values is true. Used by `||` operator.
-  external func or(bool, bool): bool
+  external func or(Bool, Bool): Bool
 
   ## Inverts a boolean. Used by `!` operator.
-  external func not(bool): bool
+  external func not(Bool): Bool
 }
 
 import option::(is_none, is_some, map_or, or_default, or_else)
@@ -188,7 +188,7 @@ import option::(is_none, is_some, map_or, or_default, or_else)
 ## Nullable values
 module option {
   ## Returns `true` iff the value is `.some`.
-  func is_some(value: T?): bool
+  func is_some(value: T?): Bool
   where T
   -> (
     match value {
@@ -199,7 +199,7 @@ module option {
 
   ## Returns `true` iff the value is `.none`.
   ## The inverse of [is_some].
-  func is_none(value: T?): bool
+  func is_none(value: T?): Bool
   where T
   -> (
     match value {
@@ -220,14 +220,14 @@ module option {
 
   ## When value is `.none`, returns the default value instead.
   ##
-  ## Default value depends on the type. See [super::default].
+  ## Default value depends on the type. See `default`.
   ## For numbers it is 0, for booleans it is false.
   func or_default(value: T?): T
   where T
   -> (
     match value {
       .some(x) => x,
-      .none => super::default(),
+      .none => default(),
     }
   )
 
@@ -286,17 +286,17 @@ import array::*
 ## Basic array functions, aggregation, and window functions
 module array {
   ## Returns the item at a zero-based `position`, or `.none` if out of bounds.
-  external func index(array: [T], position: int64): T?
+  external func index(array: [T], position: Int64): T?
   where T
 
   ## Returns the number of items in an array.
-  external func count(array: [T]): int64
+  external func count(array: [T]): Int64
   where T
 
   ## Returns `true` if the array contains no items.
-  func is_empty(array: [T]): bool
+  func is_empty(array: [T]): Bool
   where T
-  -> project::eq(count(array), 0)
+  -> eq(count(array), 0)
 
   ## Transforms each item using a `mapper` function.
   ## Returns a new array of the same length.
@@ -308,17 +308,17 @@ module array {
   where I, O
 
   ## Returns only the items for which `condition` returns `true`.
-  external func filter(array: [T], condition: func (T): bool): [T]
+  external func filter(array: [T], condition: func (T): Bool): [T]
   where T
 
   ## Returns the first item for which `condition` returns `true`,
   ## or `.none` if no item matches.
-  func find(array array: [T], condition: func (T): bool): T?
+  func find(array array: [T], condition: func (T): Bool): T?
   where T
   -> (array | filter(condition) | index(0))
 
   ## Returns items from index `start` (inclusive) to `end` (exclusive).
-  external func slice(array: [T], start: int64, end: int64): [T]
+  external func slice(array: [T], start: Int64, end: Int64): [T]
   where T
 
   ## Sorts the array in ascending order by the value returned by `key`.
@@ -428,7 +428,7 @@ module array {
   ##
   ## For example: `sequence(0, 3) == [0, 1, 2]`
   external func sequence(start: N, end: N): [N]
-  where N: int8 | int16 | int32 | int64 | uint8 | uint16 | uint32 | uint64
+  where N: Int8 | Int16 | Int32 | Int64 | Uint8 | Uint16 | Uint32 | Uint64
 
   # --- Aggregation functions ---
 
@@ -448,19 +448,19 @@ module array {
   where T: number
 
   ## Compute arithmetic mean of an array of numbers.
-  external func mean([T]): float64
+  external func mean([T]): Float64
   where T: number
 
   ## Returns `true` if all items in the array are `true`.
-  external func all([bool]): bool
+  external func all([Bool]): Bool
 
   ## Returns `true` if any value in the array is `true`.
-  external func any([bool]): bool
+  external func any([Bool]): Bool
 
   ## Returns `true` if the haystack array contains an item equal to `needle`.
-  func contains(haystack haystack: [T], needle needle: T): bool
+  func contains(haystack haystack: [T], needle needle: T): Bool
   where T: primitive
-  -> (haystack | filter(x -> project::eq(x, needle)) | is_empty | project::not)
+  -> (haystack | filter(x -> eq(x, needle)) | is_empty | not)
 
   # --- Window functions ---
 
@@ -468,14 +468,14 @@ module array {
   ## Items in front are set to their default value.
   ##
   ## For example, `lag(["a", "b", "c"], 1)` is `["", "a", "b"]`.
-  external func lag(array: [T], offset: int64): [T]
+  external func lag(array: [T], offset: Int64): [T]
   where T
 
   ## Shifts array items forwards by an offset.
   ## Items in back are set to their default value.
   ##
   ## For example, `lead(["a", "b", "c"], 1)` is `["b", "c", ""]`.
-  external func lead(array: [T], offset: int64): [T]
+  external func lead(array: [T], offset: Int64): [T]
   where T
 
   ## Computes rolling arithmetic mean over an array of numbers.
@@ -487,7 +487,7 @@ module array {
   ##
   ## For example, `rolling_mean(..., 1, 2)` computes mean of each item, along with
   ## 1 preceding and 2 following items, which is 4 items total.
-  external func rolling_mean(array: [T], preceding: uint32, following: uint32): [float64]
+  external func rolling_mean(array: [T], preceding: Uint32, following: Uint32): [Float64]
   where T: number
 
   ## Computes rank of each array item.
@@ -498,7 +498,7 @@ module array {
   ## Also known as "min rank".
   ##
   ## For example, `rank(["a", "b", "b", "c"])` is `[1, 2, 2, 4]`.
-  external func rank(array: [T]): [int32]
+  external func rank(array: [T]): [Int32]
   where T: primitive
 
   ## Computes dense rank of each array item.
@@ -509,7 +509,7 @@ module array {
   ## The values range from `1` to `n` (number of unique items).
   ##
   ## For example, `rank_dense(["a", "b", "b", "c"])` is `[1, 2, 2, 3]`.
-  external func rank_dense(array: [T]): [int32]
+  external func rank_dense(array: [T]): [Int32]
   where T: primitive
 
   ## Computes percentile rank of each array item.
@@ -520,7 +520,7 @@ module array {
   ##
   ## For example, `rank_percentile(["a", "b", "b", "c"])` is
   ## `[0.0, 0.33333, 0.25, 1.0]`.
-  external func rank_percentile(array: [T]): [float64]
+  external func rank_percentile(array: [T]): [Float64]
   where T: primitive
 
   ## Computes ECDF (Empirical Cumulative Density Function) of array items.
@@ -532,7 +532,7 @@ module array {
   ##
   ## For example, `cume_dist(["a", "b", "b", "c"])` is
   ## `[0.25, 0.75, 0.75, 1.0]`.
-  external func cume_dist(array: [T]): [float64]
+  external func cume_dist(array: [T]): [Float64]
   where T: primitive
 }
 
@@ -551,15 +551,15 @@ module math {
   # func round(val: int64, n_digits: int64): int64
 
   ## The mathematical constant π as a 32-bit float.
-  const pi32: float32 = 3.1415927
+  const pi32: Float32 = 3.1415927
 
   ## The mathematical constant π as a 64-bit float.
-  const pi64: float64 = 3.141592653589793
+  const pi64: Float64 = 3.141592653589793
 
   # TODO: exponent should probably always be uint32
   ## Raises `value` to the power of `exponent`.
   external func pow(value: T, exponent: T): T
-  where T: int64 | float64
+  where T: Int64 | Float64
 
   # func exp(val: int64): int64
   # func ln(val: int64): int64
@@ -578,53 +578,53 @@ module math {
 ## Text functions
 module text {
   ## Concatenates two text values.
-  external func concat(left: text, right: text): text
+  external func concat(left: Text, right: Text): Text
 
   ## Returns the number of characters in a text value.
-  external func length(text): uint32
+  external func length(Text): Uint32
 
   ## Converts ASCII code to its corresponding Unicode character.
   ## This function always succeeds, because ASCII is a subset of Unicode.
-  external func from_ascii(uint8): text
+  external func from_ascii(Uint8): Text
 
   ## Joins parts together, placing separator between each pair.
-  external func join(parts: [text], separator: text): text
+  external func join(parts: [Text], separator: Text): Text
 
   ## Splits text into substrings at every occurrence of a separator.
   ##
   ## For example, `split("1_two_3", "_")` is `["1", "two", "3"]`
-  external func split(value: text, separator: text): [text]
+  external func split(value: Text, separator: Text): [Text]
 
-  # func lower(value: text): text
-  # func upper(value: text): text
+  # func lower(value: Text): Text
+  # func upper(value: Text): Text
 
-  # func ltrim(value: text): text
-  # func rtrim(value: text): text
-  # func trim(value: text): text
+  # func ltrim(value: Text): Text
+  # func rtrim(value: Text): Text
+  # func trim(value: Text): Text
 
-  # func substring(value: text, offset: int64, length: int64): text
-  # func replace(value: text, pattern: text, replacement: text): text
+  # func substring(value: Text, offset: int64, length: int64): Text
+  # func replace(value: Text, pattern: Text, replacement: Text): Text
 
   ## Tests if a text starts with a prefix.
-  external func starts_with(value: text, prefix: text): bool
+  external func starts_with(value: Text, prefix: Text): Bool
 
   ## Tests if a text contains a pattern.
-  external func contains(value: text, pattern: text): bool
+  external func contains(value: Text, pattern: Text): Bool
 
   ## Tests if a text ends with a suffix.
-  external func ends_with(value: text, suffix: text): bool
+  external func ends_with(value: Text, suffix: Text): Bool
 
-  # func regex_search(haystack: text, pattern: text): bool
+  # func regex_search(haystack: Text, pattern: Text): Bool
 }
 
 ## File system operations
 module fs {
   ## Reads rows from a Parquet file at `file_name`.
-  external func read_parquet(file_name: text): [R]
+  external func read_parquet(file_name: Text): [R]
   where R: {..}
 
   ## Writes `data` to a Parquet file at `file_name`.
-  external func write_parquet(data: [R], file_name: text): {}
+  external func write_parquet(data: [R], file_name: Text): {}
   where R: {..}
 }
 
@@ -644,13 +644,13 @@ module sql {
   ## For example:
   ## - `from("my_schema/invoices")` will read from `my_schema.invoices`,
   ## - `from("my_schema/hello/world")` will read from `my_schema."hello/world"`.
-  external func from(const table_name: text): [R]
+  external func from(const table_name: Text): [R]
   where R: {..}
 
   ## Inserts rows into a table.
   ##
   ## For table identifier format, see documentation of [module::from].
-  external func insert(rows: [R], const table_name: text): {}
+  external func insert(rows: [R], const table_name: Text): {}
   where R: {..}
 
   ## Updates rows in a table.
@@ -675,7 +675,7 @@ module sql {
   ## ```
   ##
   ## For table identifier format, see documentation of [from].
-  external func update(const table_name: text, updater: func (R): R?): {}
+  external func update(const table_name: Text, updater: func (R): R?): {}
   where R: {..}
 
   ## Evaluates raw SQL.
@@ -686,21 +686,57 @@ module sql {
   ##
   ## Resulting type of the expression must match the SQL representation of the
   ## Lutra type for the selected runner.
-  external func raw(const sql_source: text): R
+  external func raw(const sql_source: Text): R
   where R
 }
+
+## A boolean value.
+type Bool(Prim8)
+
+## A signed 8-bit integer.
+type Int8(Prim8)
+
+## A signed 16-bit integer.
+type Int16(Prim16)
+
+## A signed 32-bit integer.
+type Int32(Prim32)
+
+## A signed 64-bit integer.
+type Int64(Prim64)
+
+## An unsigned 8-bit integer.
+type Uint8(Prim8)
+
+## An unsigned 16-bit integer.
+type Uint16(Prim16)
+
+## An unsigned 32-bit integer.
+type Uint32(Prim32)
+
+## An unsigned 64-bit integer.
+type Uint64(Prim64)
+
+## A 32-bit floating-point number.
+type Float32(Prim32)
+
+## A 64-bit floating-point number.
+type Float64(Prim64)
+
+## Unicode text of arbitrary length. Encoded as UTF-8.
+type Text([Prim8])
 
 ## An instant in time. Timestamp without a timezone.
 ##
 ## Backed by a signed 64-bit integer, indicating microseconds since the Unix
 ## epoch (1970-01-01T00:00:00.000 UTC), excluding leap seconds.
 # TODO: support for timezone and other time units.
-type Timestamp(microseconds: int64)
+type Timestamp(microseconds: Int64)
 
 ## Elapsed days since Unix Epoch (1970-01-01).
 ##
 ## Backed by a signed 32-bit integer, representing number of days.
-type Date(days_epoch: int32)
+type Date(days_epoch: Int32)
 
 # ## Length of time, unrelated to calendar events.
 # ##
@@ -731,7 +767,7 @@ type Date(days_epoch: int32)
 ## Can be interpreted as duration or offset from the midnight.
 ##
 ## Backed by a signed 64-bit integer, representing number of microseconds.
-type Time(microseconds: int64)
+type Time(microseconds: Int64)
 
 # func to_time64_second(x: D): Time64Second
 # where D: Time32Second -> x.0 | to_int64 | Time64Second
@@ -765,7 +801,7 @@ func add_time(a: Time, b: Time): Time -> (add(a.0, b.0) | Time)
 func sub_timestamp(a: Timestamp, b: Timestamp): Time -> (sub(a.0, b.0) | Time)
 
 ## Returns offset of a time zone from UTC on a given date.
-func timezone_offset(time_zone tz: text, date d: Date): Time -> (
+func timezone_offset(time_zone tz: Text, date d: Date): Time -> (
   sub_timestamp(date::to_timestamp(d, tz), date::to_timestamp(d, "UTC"))
 )
 
@@ -774,33 +810,26 @@ module date {
   ##
   ## Dates are assumed to be in the same timezone.
   ## Duration is measured from one midnight to another.
-  func sub(a: super::Date, b: super::Date): super::Time -> (
-    super::sub(a.days_epoch, b.days_epoch)
-    | super::to_int64
-    | super::mul(86400000000)
-    | super::Time
+  func sub(a: Date, b: Date): Time -> (
+    project::sub(a.days_epoch, b.days_epoch) | to_int64 | mul(86400000000) | Time
   )
 
   ## Computes the timestamp of a local date at a timezone.
-  external func to_timestamp(date: super::Date, time_zone: text): super::Timestamp
+  external func to_timestamp(date: Date, time_zone: Text): Timestamp
 
   ## Converts a date into year, month, and day numbers.
   ## Month and day start with 1.
-  external func to_year_month_day(super::Date): {
-    year: int32, month: uint8, day: uint8,
-  }
+  external func to_year_month_day(Date): {year: Int32, month: Uint8, day: Uint8}
 }
 
 module timestamp {
   ## Computes the local date of a timestamp at a timezone.
-  external func to_date(timestamp: super::Timestamp, time_zone: text): super::Date
+  external func to_date(timestamp: Timestamp, time_zone: Text): Date
 }
 
 ## Exact decimal value with a fixed `SCALE`, which is the number of digits past
 ## the decimal point.
 ## Currently, `SCALE` is 2. This will be configurable in the future.
 ## Can hold values from `-10**(19-SCALE)` to `10**(19-SCALE)`.
-##
-## Backed by a signed 64-bit integer.
 # TODO: implement const type param for SCALE.
-type Decimal(int64)
+type Decimal(Prim64)

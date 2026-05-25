@@ -20,7 +20,11 @@ impl fold::PrFold for super::TypeResolver<'_> {
                 tracing::debug!("... resolved to {}", named.as_ref());
 
                 let ty = match named {
-                    scope::Named::Value(ty) => ty.clone(),
+                    scope::Named::Value(ty) => {
+                        // SAFETY: resolution order guarantees that referenced values are resolved
+                        // before referrers.
+                        ty.unwrap().clone()
+                    }
                     scope::Named::Module => {
                         return Err(scope::err_name_kind("a value", "a module").with_span(span));
                     }
@@ -67,6 +71,8 @@ impl fold::PrFold for super::TypeResolver<'_> {
                             ..node
                         });
                     }
+                    // for expressions, recursive refs are not allowed
+                    scope::Named::CurrDef => unreachable!(),
                 };
                 let (ty, ty_args) = self.introduce_ty_into_scope(ty, span.unwrap());
                 pr::Expr {
@@ -253,6 +259,42 @@ impl fold::PrFold for super::TypeResolver<'_> {
                 }
             }
 
+            pr::TyKind::Ident(_) => {
+                let span = ty.span;
+
+                // validate that types only reference types
+                let target = ty.target.as_ref().unwrap();
+                let named = self.get_ref(target).with_span(span)?;
+                match named {
+                    scope::Named::Ty { .. } | scope::Named::CurrDef => {}
+                    scope::Named::Value(_) => {
+                        return Err(scope::err_name_kind("a type", "a value").with_span(span));
+                    }
+                    scope::Named::Module => {
+                        return Err(scope::err_name_kind("a type", "a module").with_span(span));
+                    }
+                    scope::Named::Scoped(scoped) => match scoped {
+                        scope::ScopedKind::Param { .. } | scope::ScopedKind::Local { .. } => {
+                            return Err(scope::err_name_kind("a type", "a value").with_span(span));
+                        }
+                        scope::ScopedKind::LocalTy { .. }
+                        | scope::ScopedKind::TyParam { .. }
+                        | scope::ScopedKind::TyVar { .. } => {}
+                    },
+                };
+                ty
+            }
+
+            pr::TyKind::TupleComprehension(mut comp) => {
+                comp.tuple = Box::new(self.fold_type(*comp.tuple)?);
+                // don't fold the body, because that requires registing a scope,
+                // with a concrete type for the comprehension variable
+                pr::Ty {
+                    kind: pr::TyKind::TupleComprehension(comp),
+                    ..ty
+                }
+            }
+
             // normal fold
             _ => fold::fold_type(self, ty)?,
         };
@@ -270,7 +312,7 @@ impl TypeResolver<'_> {
             unreachable!()
         };
 
-        let bool = pr::Ty::new(pr::TyPrimitive::bool);
+        let bool = self.new_ty_std("Bool", node.span);
         let mut condition = Box::new(self.fold_expr_or_recover(*if_else.condition, &bool));
         self.validate_expr_type(&mut condition, &bool, &|| Some("if".into()))
             .unwrap_or_else(self.push_diagnostic());

@@ -20,15 +20,15 @@ Here is a small in-memory dataset. `movies` is a table of movie rows, and
 
 ```lt
 type Movie: {
-  id: int32,
-  title: text,
-  year: int32,
-  director_id: int32,
+  id: Int32,
+  title: Text,
+  year: Int32,
+  director_id: Int32,
 }
 
 type Director: {
-  id: int32,
-  name: text,
+  id: Int32,
+  name: Text,
 }
 
 const movies: [Movie] = [
@@ -123,7 +123,7 @@ Think of it as reordering the table, not changing its columns.
 items.
 
 ```lt
-func words(title: text) -> [title, f"{title}!" ]
+func words(title: Text) -> [title, f"{title}!" ]
 
 func main() -> (
   ["Arrival", "Dune"]
@@ -145,7 +145,7 @@ Lutra does not need special syntax for every join-like operation. A common
 pattern is to map each row and fetch related data inside the mapper.
 
 ```lt
-func get_director_by_id(id: int32) -> (
+func get_director_by_id(id: Int32) -> (
   directors | find(d -> d.id == id)
 )
 

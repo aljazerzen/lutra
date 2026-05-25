@@ -16,7 +16,7 @@ A small Lutra program looks like this:
 
 ```lt
 func main() -> (
-  [1, 2, 3]: [int32]
+  [1, 2, 3]: [Int32]
   | map(x -> x * 2)
 )
 ```

@@ -84,6 +84,36 @@ impl PrFold for Desugarator {
             _ => fold::fold_type(self, ty),
         }
     }
+
+    fn fold_ty_param(&mut self, param: pr::TyParam) -> Result<pr::TyParam> {
+        match param.domain {
+            pr::TyDomain::OneOf(items) => {
+                // desugar where T: primitive | number
+                let mut r = Vec::with_capacity(items.len());
+                for item in items {
+                    let span = item.span.unwrap();
+                    if let pr::TyKind::Ident(name) = &item.kind
+                        && name.as_steps() == ["number"]
+                    {
+                        let tys = TY_DOMAIN_NUMBER.iter().cloned().map(pr::Ty::new_std);
+                        r.extend(tys.map(|t| t.with_span(span)));
+                    } else if let pr::TyKind::Ident(name) = &item.kind
+                        && name.as_steps() == ["primitive"]
+                    {
+                        let tys = TY_DOMAIN_PRIMITIVE.iter().cloned().map(pr::Ty::new_std);
+                        r.extend(tys.map(|t| t.with_span(span)));
+                    } else {
+                        r.push(self.fold_type(item)?);
+                    }
+                }
+                Ok(pr::TyParam {
+                    domain: pr::TyDomain::OneOf(r),
+                    ..param
+                })
+            }
+            _ => fold::fold_ty_param(self, param),
+        }
+    }
 }
 
 impl Desugarator {
@@ -110,7 +140,7 @@ impl Desugarator {
                     },
                     pr::TyEnumVariant {
                         name: "some".into(),
-                        ty: pr::Ty::new_with_span(pr::TyPrimitive::int64, span),
+                        ty: pr::Ty::new_std("Int64"),
                     },
                 ]),
                 span,
@@ -329,3 +359,14 @@ fn new_binop(left: pr::Expr, op_name: &[&str], right: pr::Expr, op_span: Option<
         args: vec![pr::CallArg::simple(left), pr::CallArg::simple(right)],
     }))
 }
+
+/// Std types that are included in the `number` domain shorthands.
+pub(crate) const TY_DOMAIN_NUMBER: &[&str] = &[
+    "Int8", "Int16", "Int32", "Int64", "Uint8", "Uint16", "Uint32", "Uint64", "Float32", "Float64",
+];
+
+/// Std types that are included in the `primitive` domain shorthands.
+pub(crate) const TY_DOMAIN_PRIMITIVE: &[&str] = &[
+    "Int8", "Int16", "Int32", "Int64", "Uint8", "Uint16", "Uint32", "Uint64", "Float32", "Float64",
+    "Bool", "Text",
+];

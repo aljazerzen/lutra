@@ -27,12 +27,12 @@ Unary negation uses prefix `-`.
 
 ```lt
 -2
-- (-3.1: float64)
+- (-3.1: Float64)
 ```
 
 ## Comparison operators
 
-These comparison operators return `bool`:
+These comparison operators return `Bool`:
 
 | Operator | Meaning |
 | --- | --- |
@@ -46,8 +46,8 @@ These comparison operators return `bool`:
 Examples:
 
 ```lt
-30: int64 == 30
-2 < 3: int64
+30: Int64 == 30
+2 < 3: Int64
 "aa" >= "ab"
 ```
 
@@ -75,8 +75,8 @@ The pipe operator `|` passes the left-hand value as the first argument to the
 right-hand side.
 
 ```lt
-4: int32 | std::add(1)
-[1, 2, 3]: [int32] | std::map(x -> x * 2)
+4: Int32 | std::add(1)
+[1, 2, 3]: [Int32] | std::map(x -> x * 2)
 ```
 
 Unlike the operators listed earlier, `|` is not arithmetic or boolean. It is a

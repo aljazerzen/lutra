@@ -25,11 +25,14 @@ For example:
 
 ## Primitives
 
+The basic building blocks of the format are the primitives:
+
 - `Prim8` - 8 bits as 1 byte in the head,
 - `Prim16` - 16 bits as 2 bytes in the head,
 - `Prim32` - 32 bits as 4 bytes in the head,
-- `Prim64` - 64 bits as 8 bytes in the head,
-- `text` - head contains offset & len, body contains the text encoded as UTF8.
+- `Prim64` - 64 bits as 8 bytes in the head.
+
+None of these have a body.
 
 ## Tuple
 

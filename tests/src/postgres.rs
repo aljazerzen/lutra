@@ -199,7 +199,7 @@ INSERT INTO another."proj/days" (name) VALUES ('Wednesday'), ('Thursday'), ('Fri
 #[test]
 fn prim() {
     insta::assert_snapshot!(_sql_and_output(_run(r#"
-        const main = 3: int16
+        const main = 3: Int16
     "#, lutra_bin::Value::unit())), @"
     SELECT
       3::int2 AS value
@@ -211,7 +211,7 @@ fn prim() {
 #[test]
 fn tuple_prim() {
     insta::assert_snapshot!(_sql_and_output(_run(r#"
-        const main = {3: int16, false}
+        const main = {3: Int16, false}
     "#, lutra_bin::Value::unit())), @"
     SELECT
       3::int2 AS _0,
@@ -227,7 +227,7 @@ fn tuple_prim() {
 #[test]
 fn array_prim() {
     insta::assert_snapshot!(_sql_and_output(_run(r#"
-        const main = [3, 6, 12]: [int16]
+        const main = [3, 6, 12]: [Int16]
     "#, lutra_bin::Value::unit())), @"
     SELECT
       r0.value
@@ -259,7 +259,7 @@ fn array_prim() {
 #[test]
 fn array_empty() {
     insta::assert_snapshot!(_sql_and_output(_run(r#"
-        const main = []: [bool]
+        const main = []: [Bool]
     "#, lutra_bin::Value::unit())), @"
     SELECT
       NULL::bool AS value
@@ -274,7 +274,7 @@ fn array_empty() {
 fn array_enum() {
     insta::assert_snapshot!(_sql_and_output(_run(r#"
         type Status: enum {
-          pending, in_progress: {started_at: text, owner: text}, done: text
+          pending, in_progress: {started_at: Text, owner: Text}, done: Text
         }
         const main: [Status] = [.pending, .in_progress({"today", "me"}), .done("ok")]
     "#, lutra_bin::Value::unit())), @r#"
@@ -324,7 +324,7 @@ fn array_enum() {
 fn enum_array() {
     insta::assert_snapshot!(_sql_and_output(_run(r#"
         type Status: enum {
-          pending, in_progress: [text], done: text
+          pending, in_progress: [Text], done: Text
         }
         const main = {
           "statuses:",
@@ -405,7 +405,7 @@ fn enum_array() {
 #[test]
 fn tuple_tuple_prim() {
     insta::assert_snapshot!(_sql_and_output(_run(r#"
-        const main = {3: int16, {false, true, {"hello"}, 4: int32}}
+        const main = {3: Int16, {false, true, {"hello"}, 4: Int32}}
     "#, lutra_bin::Value::unit())), @r#"
     SELECT
       3::int2 AS _0,
@@ -431,7 +431,7 @@ fn tuple_tuple_prim() {
 #[test]
 fn tuple_array_prim() {
     insta::assert_snapshot!(_sql_and_output(_run(r#"
-        const main = {true, [1, 2, 3]: [int64], [4]: [int32], false}
+        const main = {true, [1, 2, 3]: [Int64], [4]: [Int32], false}
     "#, lutra_bin::Value::unit())), @"
     SELECT
       TRUE AS _0,
@@ -492,7 +492,7 @@ fn tuple_array_prim() {
 fn tuple_array_enum() {
     insta::assert_snapshot!(_sql_and_output(_run(r#"
         type Status: enum {
-          pending, in_progress: {started_at: text, owner: text}, done: text
+          pending, in_progress: {started_at: Text, owner: Text}, done: Text
         }
         const main = {
           "statuses:",
@@ -560,7 +560,7 @@ fn tuple_array_option() {
     insta::assert_snapshot!(_sql_and_output(_run(r#"
         const main = {
           "ids:",
-          [.none, .some(5)]: [enum { none, some: int32 }],
+          [.none, .some(5)]: [enum { none, some: Int32 }],
         }
     "#, lutra_bin::Value::unit())), @r#"
     SELECT
@@ -603,7 +603,7 @@ fn tuple_array_option() {
 #[test]
 fn tuple_array_empty() {
     insta::assert_snapshot!(_sql_and_output(_run(r#"
-        const main = {true, []: [int64], false}
+        const main = {true, []: [Int64], false}
     "#, lutra_bin::Value::unit())), @"
     SELECT
       TRUE AS _0,
@@ -637,7 +637,7 @@ fn tuple_array_empty() {
 #[test]
 fn array_array_prim() {
     insta::assert_snapshot!(_sql_and_output(_run(r#"
-        const main = [[1, 2, 3], [4, 5]]: [[int64]]
+        const main = [[1, 2, 3], [4, 5]]: [[Int64]]
     "#, lutra_bin::Value::unit())), @"
     SELECT
       r2.value
@@ -711,7 +711,7 @@ fn array_array_prim() {
 #[test]
 fn array_array_array_tuple_prim() {
     insta::assert_snapshot!(_sql_and_output(_run(r#"
-        const main = [[[{1: int32, "hello", 2: int16}]]]
+        const main = [[[{1: Int32, "hello", 2: Int16}]]]
     "#, lutra_bin::Value::unit())), @r#"
     SELECT
       (
@@ -769,17 +769,17 @@ fn tuple_array_tuple_tuple_prim() {
     insta::assert_snapshot!(_sql_and_output(_run(r#"
         const main =
           {
-            1: int32,
+            1: Int32,
             [
               {
-                1: int32,
+                1: Int32,
                 {
-                  1: int32, true, 2: int16
+                  1: Int32, true, 2: Int16
                 },
-                2: int16
+                2: Int16
               }
             ],
-            2: int16
+            2: Int16
           }
     "#, lutra_bin::Value::unit())), @"
     SELECT
@@ -832,7 +832,7 @@ fn tuple_array_tuple_tuple_prim() {
 #[test]
 fn array_tuple_prim() {
     insta::assert_snapshot!(_sql_and_output(_run(r#"
-        const main = [{3: int64, false}, {6, true}, {12, false}]
+        const main = [{3: Int64, false}, {6, true}, {12, false}]
     "#, lutra_bin::Value::unit())), @"
     SELECT
       r0._0,
@@ -879,7 +879,7 @@ fn tuple_array_tuple_prim() {
     insta::assert_snapshot!(_sql_and_output(_run(r#"
         const main = {
             "hello",
-            [{3: int16, false}, {6, true}, {12, false}],
+            [{3: Int16, false}, {6, true}, {12, false}],
         }
     "#, lutra_bin::Value::unit())), @r#"
     SELECT
@@ -936,7 +936,7 @@ fn tuple_array_tuple_prim() {
 #[test]
 fn param_00() {
     insta::assert_snapshot!(_run(r#"
-    func main(x: int64) -> x + 1
+    func main(x: Int64) -> x + 1
     "#,
     lutra_bin::Value::Prim64(3)
     ).1, @"4");
@@ -945,7 +945,7 @@ fn param_00() {
 #[test]
 fn param_01() {
     insta::assert_snapshot!(_run(r#"
-    func main(x: int64, y: text) -> {y, x}
+    func main(x: Int64, y: Text) -> {y, x}
     "#,
     lutra_bin::Value::Tuple(vec![
         lutra_bin::Value::Prim64(3),
@@ -962,7 +962,7 @@ fn param_01() {
 #[test]
 fn param_02() {
     insta::assert_snapshot!(_run(r#"
-    func main(x: {int64, {text, bool}, int32}) -> x
+    func main(x: {Int64, {Text, Bool}, Int32}) -> x
     "#,
     lutra_bin::Value::Tuple(vec![
         lutra_bin::Value::Prim64(3),
@@ -987,7 +987,7 @@ fn param_02() {
 #[test]
 fn param_03() {
     insta::assert_snapshot!(_run(r#"
-    func main(x: {int64, [text], int32}) -> x
+    func main(x: {Int64, [Text], Int32}) -> x
     "#,
     lutra_bin::Value::Tuple(vec![
         lutra_bin::Value::Prim64(3),
@@ -1012,7 +1012,7 @@ fn param_03() {
 #[test]
 fn param_04() {
     insta::assert_snapshot!(_run(r#"
-    func main(x: [{int64, text}]) -> std::index(x, 1)
+    func main(x: [{Int64, Text}]) -> std::index(x, 1)
     "#,
     lutra_bin::Value::Array(vec![
         lutra_bin::Value::Tuple(vec![
@@ -1035,7 +1035,7 @@ fn param_04() {
 #[test]
 fn param_05() {
     insta::assert_snapshot!(_run(r#"
-    func main(x: [{int32, {int32, int16}, int16}]) -> x
+    func main(x: [{Int32, {Int32, Int16}, Int16}]) -> x
     "#,
     lutra_bin::Value::Array(vec![
         lutra_bin::Value::Tuple(vec![
@@ -1064,7 +1064,7 @@ fn param_05() {
 #[test]
 fn param_06() {
     insta::assert_snapshot!(_run(r#"
-    func main(x: [{int32, {int32, int16}, int16}]) -> {"hello", x}
+    func main(x: [{Int32, {Int32, Int16}, Int16}]) -> {"hello", x}
     "#,
     lutra_bin::Value::Array(vec![
         lutra_bin::Value::Tuple(vec![
@@ -1097,7 +1097,7 @@ fn param_06() {
 fn param_07() {
     insta::assert_snapshot!(_sql_and_output(_run(r#"
     type Status: enum {
-      pending, in_progress: {started_at: text, owner: text}, done: text
+      pending, in_progress: {started_at: Text, owner: Text}, done: Text
     }
     func main(x: Status) -> {"hello", x}
     "#,
@@ -1130,7 +1130,7 @@ fn param_07() {
 fn param_08() {
     insta::assert_snapshot!(_sql_and_output(_run(r#"
     type Status: enum {
-      pending, in_progress: {started_at: text, owner: text}, done: text
+      pending, in_progress: {started_at: Text, owner: Text}, done: Text
     }
     func main(x: [Status]) -> {"hello", x}
     "#,
@@ -1174,9 +1174,9 @@ fn param_08() {
 fn param_09() {
     insta::assert_snapshot!(_run(r#"
     type Status: enum {
-      pending, in_progress: {started_at: text, owner: text}, done: text
+      pending, in_progress: {started_at: Text, owner: Text}, done: Text
     }
-    func main(x: {text, Status}) -> x
+    func main(x: {Text, Status}) -> x
     "#,
     lutra_bin::Value::Tuple(vec![
         lutra_bin::Value::new_text("hello"),
@@ -1203,10 +1203,37 @@ fn param_10() {
 }
 
 #[test]
+fn param_10a() {
+    insta::assert_snapshot!(_run(r#"
+    func main(x: std::Int32) -> x
+    "#,
+    lutra_bin::Value::Prim32(123)
+    ).1, @"123");
+}
+
+#[test]
+fn param_10b() {
+    insta::assert_snapshot!(_run(r#"
+    type Status: enum { pending, in_progress: std::Int32, done: Text }
+    func main(x: {value: std::Int32, status: Status}) -> x
+    "#,
+    lutra_bin::Value::Tuple(vec![
+        lutra_bin::Value::Prim32(123),
+        lutra_bin::Value::Enum(1, Box::new(lutra_bin::Value::Prim32(456))),
+    ])
+    ).1, @r#"
+    {
+      value = 123,
+      status = in_progress(456),
+    }
+    "#);
+}
+
+#[test]
 fn param_11() {
     // option enum
     insta::assert_snapshot!(_run(r#"
-    type OptInt: enum { none, some: int32 }
+    type OptInt: enum { none, some: Int32 }
     func main(x: [OptInt]) -> x
     "#,
     lutra_bin::Value::Array(vec![
@@ -1225,8 +1252,8 @@ fn param_11() {
 fn tuple_unpacking_00() {
     insta::assert_snapshot!(_run(r#"
     func main() -> {
-      4: int16,
-      ([{id = 3: int32, title = "Hello world!"}] | std::index(0)),
+      4: Int16,
+      ([{id = 3: Int32, title = "Hello world!"}] | std::index(0)),
     }
     "#,
     lutra_bin::Value::unit(),
@@ -1247,11 +1274,11 @@ fn serialize_00() {
     // Applying an operation of that array then forces deserialization.
 
     insta::assert_snapshot!(_run(r#"
-    func get_data() -> {a = [2, 5, 4, 3, 1, 2]: [int32]}
+    func get_data() -> {a = [2, 5, 4, 3, 1, 2]: [Int32]}
 
     func main() -> (
       get_data().a
-      | std::map(func (y: int32) -> -y)
+      | std::map(func (y: Int32) -> -y)
     )
     "#, lutra_bin::Value::unit()).1, @r#"
     [
@@ -1271,11 +1298,11 @@ fn serialize_01() {
     // Applying an operation of that array then forces deserialization.
 
     insta::assert_snapshot!(_run(r#"
-    func get_data() -> {a = [{2: int32, false}, {5, true}, {4, false}]}
+    func get_data() -> {a = [{2: Int32, false}, {5, true}, {4, false}]}
 
     func main() -> (
       get_data().a
-      | std::map(func (y: {int32, bool}) -> {-y.0, !y.1})
+      | std::map(func (y: {Int32, Bool}) -> {-y.0, !y.1})
     )
     "#, lutra_bin::Value::unit()).1, @r#"
     [
@@ -1298,10 +1325,10 @@ fn serialize_01() {
 #[test]
 fn serialize_02() {
     insta::assert_snapshot!(_run(r#"
-    func get_data() -> [[1: int16, 2, 3], [4, 5, 6]]
+    func get_data() -> [[1: Int16, 2, 3], [4, 5, 6]]
 
     func main() -> (
-      get_data() | std::map(func (y: [int16]) -> (
+      get_data() | std::map(func (y: [Int16]) -> (
         std::index(y, 1)
       ))
     )
@@ -1316,12 +1343,12 @@ fn serialize_02() {
 #[test]
 fn serialize_03() {
     insta::assert_snapshot!(_run(r#"
-    func get_data() -> [[1: int64, 2, 3], [4, 5, 6]]
+    func get_data() -> [[1: Int64, 2, 3], [4, 5, 6]]
 
     func main() -> (
       get_data()
-      | std::map(func (y: [int64]) -> (
-        y | std::map(func (z: int64) -> 6-z)
+      | std::map(func (y: [Int64]) -> (
+        y | std::map(func (z: Int64) -> 6-z)
       ))
     )
     "#, lutra_bin::Value::unit()).1, @r#"
@@ -1347,7 +1374,7 @@ fn serialize_04() {
 
     func main() -> (
       get_data().a
-      | std::map(func (y: bool) -> !y)
+      | std::map(func (y: Bool) -> !y)
     )
     "#, lutra_bin::Value::unit()).1, @r#"
     [
@@ -1365,7 +1392,7 @@ fn serialize_05() {
 
     func main() -> (
       get_data().a
-      | std::map(func (y: text) -> y)
+      | std::map(func (y: Text) -> y)
     )
     "#, lutra_bin::Value::unit()).1, @r#"
     [
@@ -1400,7 +1427,7 @@ fn serialize_07() {
         [
           {
             "hello",
-            [{1: int32, {1: int32, [5: int32], 2: int16}, 2: int16}]
+            [{1: Int32, {1: Int32, [5: Int32], 2: Int16}, 2: Int16}]
           }.1
         ]
       }.1
@@ -1442,7 +1469,7 @@ fn serialize_09() {
     // JsonUnpack(JsonPack(_)) should be optimized away
 
     insta::assert_snapshot!(_sql_and_output(_run(r#"
-    func main(x: [int8]) -> {"hello", x}
+    func main(x: [Int8]) -> {"hello", x}
     "#,
     lutra_bin::Value::Array(vec![
         lutra_bin::Value::Prim8(1),
@@ -1467,7 +1494,7 @@ fn serialize_09() {
 #[test]
 fn serialize_10() {
     insta::assert_snapshot!(_sql_and_output(_run(r#"
-    func main() -> {"hello", [1: int8, 2]}
+    func main() -> {"hello", [1: Int8, 2]}
     "#,
     lutra_bin::Value::unit())), @r#"
     SELECT
@@ -1568,8 +1595,8 @@ fn if_01() {
 fn match_04() {
     insta::assert_snapshot!(_sql_and_output(_run(r#"
     type Animal: enum {
-      cat: text,
-      dog: enum {collie: text, generic},
+      cat: Text,
+      dog: enum {collie: Text, generic},
     }
 
     func main() -> (
@@ -1650,7 +1677,7 @@ fn match_05() {
 #[test]
 fn cmp_00() {
     insta::assert_snapshot!(_sql_and_output(_run(r#"
-    func compare(a: int16, b: int16) -> {
+    func compare(a: Int16, b: Int16) -> {
         a == b,
         a != b,
         a < b,
@@ -1728,10 +1755,10 @@ async fn sql_from_00() {
 
     insta::assert_snapshot!(_sql_and_output(_run_on(&mut runner, r#"
     type Movie: {
-      id: int32,
-      title: text,
+      id: Int32,
+      title: Text,
       premiere_date: std::Date,
-      director_id: enum {none, some: int16},
+      director_id: enum {none, some: Int16},
     }
 
     func main(): [Movie] -> std::sql::from("movies")
@@ -1772,7 +1799,7 @@ async fn sql_insert_00() {
 
     insta::assert_snapshot!(_sql_and_output(_run_on(&mut runner, r#"
     type Movie: {
-      title: text,
+      title: Text,
       premiere_date: std::Date,
     }
     const two_movies: [Movie] = [
@@ -1805,8 +1832,8 @@ async fn sql_insert_00() {
 
     insta::assert_snapshot!(_run_on(&mut runner, r#"
     type Movie: {
-      id: int32,
-      title: text,
+      id: Int32,
+      title: Text,
       premiere_date: std::Date,
     }
     func main() -> (
@@ -1856,9 +1883,9 @@ async fn update_basic() {
     // Test basic UPDATE
     insta::assert_snapshot!(_sql_and_output(_run_on(&mut runner, r#"
     type User: {
-      id: int32,
-      name: text,
-      age: int32,
+      id: Int32,
+      name: Text,
+      age: Int32,
     }
 
     func main(): {} -> std::sql::update(
@@ -1971,9 +1998,9 @@ async fn update_basic() {
     // Verify the update worked
     insta::assert_snapshot!(_run_on(&mut runner, r#"
     type User: {
-      id: int32,
-      name: text,
-      age: int32,
+      id: Int32,
+      name: Text,
+      age: Int32,
     }
     func main() -> (
       (std::sql::from("users"): [User])
@@ -2024,10 +2051,10 @@ async fn update_multiple_rows() {
     // Test UPDATE that affects multiple rows
     insta::assert_snapshot!(_run_on(&mut runner, r#"
     type Product: {
-      id: int32,
-      name: text,
-      price: float64,
-      active: bool,
+      id: Int32,
+      name: Text,
+      price: Float64,
+      active: Bool,
     }
 
     func main(): {} -> std::sql::update(
@@ -2043,10 +2070,10 @@ async fn update_multiple_rows() {
     // Verify the updates
     insta::assert_snapshot!(_run_on(&mut runner, r#"
     type Product: {
-      id: int32,
-      name: text,
-      price: float64,
-      active: bool,
+      id: Int32,
+      name: Text,
+      price: Float64,
+      active: Bool,
     }
     func main() -> (
       (std::sql::from("products"): [Product])
@@ -2097,9 +2124,9 @@ async fn update_with_complex_where() {
     // Test UPDATE with complex WHERE clause
     insta::assert_snapshot!(_run_on(&mut runner, r#"
     type Item: {
-      id: int32,
-      quantity: int32,
-      price: float64,
+      id: Int32,
+      quantity: Int32,
+      price: Float64,
     }
 
     func main(): {} -> std::sql::update(
@@ -2134,12 +2161,12 @@ async fn update_with_bind() {
     // Test UPDATE that uses a const (triggers push_into_update optimization)
     insta::assert_snapshot!(_run_on(&mut runner, r#"
     type Product: {
-      id: int32,
-      name: text,
-      price: float64,
+      id: Int32,
+      name: Text,
+      price: Float64,
     }
 
-    const discount: float64 = 0.9
+    const discount: Float64 = 0.9
 
     func main(): {} -> std::sql::update(
       "products",
@@ -2157,7 +2184,7 @@ async fn update_with_bind() {
 #[test]
 fn group_00() {
     insta::assert_snapshot!(_sql_and_output(_run(r#"
-    const values: [int64] = [1, 1, 1, 3, 2, 3]
+    const values: [Int64] = [1, 1, 1, 3, 2, 3]
 
     func main() -> (
       values
@@ -2225,7 +2252,7 @@ fn group_01() {
     insta::assert_snapshot!(_sql_and_output(_run(r#"
     import std::*
 
-    const gifts: [{child_id: int32, price: float64}] = [
+    const gifts: [{child_id: Int32, price: Float64}] = [
       {child_id = 1, price = 1.11},
       {child_id = 1, price = 3.00},
       {child_id = 5, price = 7.23},
@@ -2273,8 +2300,8 @@ fn group_01() {
 fn opt_00() {
     insta::assert_snapshot!(_sql_and_output(_run(r#"
     func main() -> {
-      .some("hello"): enum {none, some: text},
-      .none: enum {none, some: text},
+      .some("hello"): enum {none, some: Text},
+      .none: enum {none, some: Text},
       std::option::is_some(.some("hello")),
       std::option::is_none(.some("hello")),
     }
@@ -2297,7 +2324,7 @@ fn opt_00() {
 #[test]
 fn opt_01() {
     insta::assert_snapshot!(_sql_and_output(_run(r#"
-    type OptText: enum {none, some: text}
+    type OptText: enum {none, some: Text}
     func main() -> (
       [.some("hello"), .none, .some("world")]: [OptText]
       | std::map(x -> match x {
@@ -2339,7 +2366,7 @@ fn opt_01() {
 #[test]
 fn std_sql_raw_00() {
     insta::assert_snapshot!(_sql_and_output(_run(r#"
-    func main(): [{hello: text, world: bool, x: std::Date}]
+    func main(): [{hello: Text, world: Bool, x: std::Date}]
     -> std::sql::raw(
       "select 'a' as hello, TRUE as world, '2025-11-14'::date as x"
     )
@@ -2369,7 +2396,7 @@ fn std_sql_raw_00() {
 #[test]
 fn std_sql_raw_01() {
     insta::assert_snapshot!(_sql_and_output(_run(r#"
-    func sequence(): [int32] -> std::sql::raw("(
+    func sequence(): [Int32] -> std::sql::raw("(
       SELECT 2 as value UNION SELECT 3 UNION SELECT 4 ORDER BY value
     )")
 
@@ -2619,15 +2646,16 @@ async fn pull_interface() {
     let runner = RunnerAsync::new(tran);
 
     insta::assert_snapshot!(runner.pull_schema().await.unwrap(), @r#"
+
     ## Row of table movie_actors
-    type MovieActor: {source: int32, target: int32, role: text}
+    type MovieActor: {source: Int32, target: Int32, role: Text}
     ## Read from table movie_actors
     func from_movie_actors(): [MovieActor] -> std::sql::from("movie_actors")
     ## Write into table movie_actors
     func insert_movie_actors(values: [MovieActor]) -> std::sql::insert(values, "movie_actors")
 
     ## Row of table movies
-    type Movie: {id: int32, title: text, premiere_date: std::Date, director_id: int16}
+    type Movie: {id: Int32, title: Text, premiere_date: Date, director_id: Int16}
     ## Read from table movies
     func from_movies(): [Movie] -> std::sql::from("movies")
     ## Write into table movies
@@ -2642,7 +2670,7 @@ async fn pull_interface() {
     )
 
     ## Row of table persons
-    type Person: {id: int32, first_name: text, last_name: text}
+    type Person: {id: Int32, first_name: Text, last_name: Text}
     ## Read from table persons
     func from_persons(): [Person] -> std::sql::from("persons")
     ## Write into table persons
@@ -2655,7 +2683,7 @@ async fn pull_interface() {
     module another {
 
       ## Row of table days
-      type Day: {id: int32, name: text}
+      type Day: {id: Int32, name: Text}
       ## Read from table days
       func from_days(): [Day] -> std::sql::from("days")
       ## Write into table days
@@ -2666,7 +2694,7 @@ async fn pull_interface() {
       )
 
       ## Row of table proj/days
-      type Proj/day: {id: int32, name: text}
+      type Proj/day: {id: Int32, name: Text}
       ## Read from table proj/days
       func from_proj/days(): [Proj/day] -> std::sql::from("proj/days")
       ## Write into table proj/days
@@ -2801,8 +2829,8 @@ async fn type_round_trip_00() {
     // basic tuple
 
     _type_round_trip(
-        "{id: int32, is_online: bool}",
-        "{id: int32, is_online: bool}",
+        "{id: Int32, is_online: Bool}",
+        "{id: Int32, is_online: Bool}",
         lutra_bin::Value::Tuple(vec![
             lutra_bin::Value::Prim32(10),
             lutra_bin::Value::Prim8(1),
@@ -2816,8 +2844,8 @@ async fn type_round_trip_01() {
     // nested tuple
 
     _type_round_trip(
-        "{id: int32, address: {street: text, number: int16}}",
-        "{id: int32, address: {street: text, number: int16}}",
+        "{id: Int32, address: {street: Text, number: Int16}}",
+        "{id: Int32, address: {street: Text, number: Int16}}",
         lutra_bin::Value::Tuple(vec![
             lutra_bin::Value::Prim32(10),
             lutra_bin::Value::Tuple(vec![
@@ -2834,8 +2862,8 @@ async fn type_round_trip_02() {
     // date, time, timestamp
 
     _type_round_trip(
-        "{d: std::Date, t: std::Time, ts: std::Timestamp}",
-        "{d: std::Date, t: std::Time, ts: std::Timestamp}",
+        "{d: Date, t: Time, ts: Timestamp}",
+        "{d: Date, t: Time, ts: Timestamp}",
         lutra_bin::Value::Tuple(vec![
             lutra_bin::Value::Prim32(0),
             lutra_bin::Value::Prim64(0),
@@ -2850,11 +2878,11 @@ async fn type_round_trip_03() {
     // enum
 
     _type_round_trip(
-        "{status: enum {pending, in_progress: int16, done: text}}",
+        "{status: enum {pending, in_progress: Int16, done: Text}}",
         // enums get reflected as:
         // - tag column of type text
         // - inner fields, but optional and without unit fields
-        "{status: text, status: {in_progress: int16, done: text}}",
+        "{status: Text, status: {in_progress: Int16, done: Text}}",
         lutra_bin::Value::Tuple(vec![lutra_bin::Value::Enum(
             1,
             Box::new(lutra_bin::Value::Prim16(22)),

@@ -41,16 +41,16 @@ fix the type.
 1
 432
 -23
-1: int32
-18446744073709551615: uint64
+1: Int32
+18446744073709551615: Uint64
 ```
 
 Hexadecimal integer literals use the `0x` prefix.
 
 ```lt
-0x7f: int8
-0xffff: uint16
-0x7fffffffffffffff: int64
+0x7f: Int8
+0xffff: Uint16
+0x7fffffffffffffff: Int64
 ```
 
 Underscores are allowed as visual separators.
@@ -66,8 +66,8 @@ Floating-point literals use a decimal point.
 ```lt
 42.801
 -32.2
-1.10: float32
--1121121221.0: float64
+1.10: Float32
+-1121121221.0: Float64
 ```
 
 ## Decimal literals

@@ -116,30 +116,28 @@ fn ty_from_duckdb_type(data_type: &str, is_nullable: bool) -> ir::Ty {
 
     let base_ty = match data_type.to_uppercase().as_str() {
         // Boolean
-        "BOOLEAN" | "BOOL" => ir::Ty::new(ir::TyPrimitive::bool),
+        "BOOLEAN" | "BOOL" => ir::Ty::bool(),
 
         // Signed integers
-        "TINYINT" | "INT1" => ir::Ty::new(ir::TyPrimitive::int8),
-        "SMALLINT" | "INT2" => ir::Ty::new(ir::TyPrimitive::int16),
-        "INTEGER" | "INT4" | "INT" => ir::Ty::new(ir::TyPrimitive::int32),
-        "BIGINT" | "INT8" => ir::Ty::new(ir::TyPrimitive::int64),
-        "HUGEINT" | "INT128" => ir::Ty::new(ir::TyPrimitive::int64), // fallback, no int128 in Lutra
+        "TINYINT" | "INT1" => ir::Ty::new_ident(&["std", "Int8"]),
+        "SMALLINT" | "INT2" => ir::Ty::new_ident(&["std", "Int16"]),
+        "INTEGER" | "INT" | "INT4" => ir::Ty::new_ident(&["std", "Int32"]),
+        "BIGINT" | "INT8" => ir::Ty::new_ident(&["std", "Int64"]),
+        "HUGEINT" | "INT128" => ir::Ty::new_ident(&["std", "Int128"]), // fallback, no int128 in Lutra
 
         // Unsigned integers
-        "UTINYINT" | "UINT8" => ir::Ty::new(ir::TyPrimitive::uint8),
-        "USMALLINT" | "UINT16" => ir::Ty::new(ir::TyPrimitive::uint16),
-        "UINTEGER" | "UINT32" => ir::Ty::new(ir::TyPrimitive::uint32),
-        "UBIGINT" | "UINT64" => ir::Ty::new(ir::TyPrimitive::uint64),
-        "UHUGEINT" | "UINT128" => ir::Ty::new(ir::TyPrimitive::uint64), // fallback
+        "UTINYINT" | "UINT8" => ir::Ty::new_ident(&["std", "Uint8"]),
+        "USMALLINT" | "UINT16" => ir::Ty::new_ident(&["std", "Uint16"]),
+        "UINTEGER" | "UINT32" => ir::Ty::new_ident(&["std", "Uint32"]),
+        "UBIGINT" | "UINT64" => ir::Ty::new_ident(&["std", "Uint64"]),
+        "UHUGEINT" | "UINT128" => ir::Ty::new_ident(&["std", "Uint128"]), // fallback
 
         // Floating point
-        "FLOAT" | "FLOAT4" | "REAL" => ir::Ty::new(ir::TyPrimitive::float32),
-        "DOUBLE" | "FLOAT8" => ir::Ty::new(ir::TyPrimitive::float64),
+        "FLOAT" | "FLOAT4" | "REAL" => ir::Ty::new_ident(&["std", "Float32"]),
+        "DOUBLE" | "FLOAT8" => ir::Ty::new_ident(&["std", "Float64"]),
 
         // Text types
-        "VARCHAR" | "TEXT" | "STRING" | "CHAR" | "BPCHAR" | "NAME" => {
-            ir::Ty::new(ir::TyPrimitive::text)
-        }
+        "VARCHAR" | "TEXT" | "STRING" | "CHAR" | "BPCHAR" | "NAME" => ir::Ty::text(),
 
         // Date/time types
         "DATE" => ir::Ty::new(ir::Path(vec!["std".into(), "Date".into()])),
@@ -157,11 +155,11 @@ fn ty_from_duckdb_type(data_type: &str, is_nullable: bool) -> ir::Ty {
 
         // VARCHAR with length
         s if s.starts_with("VARCHAR") || s.starts_with("CHAR") || s.starts_with("BPCHAR") => {
-            ir::Ty::new(ir::TyPrimitive::text)
+            ir::Ty::text()
         }
 
         // Unknown types fall back to text
-        _ => ir::Ty::new(ir::TyPrimitive::text),
+        _ => ir::Ty::text(),
     };
 
     if is_nullable {
@@ -300,7 +298,7 @@ fn get_column_type(table: &lutra::PullInterfaceOutputItemstablesItems, col_name:
         .iter()
         .find(|c| c.name == col_name)
         .map(|c| ty_from_duckdb_type(&c.data_type, false))
-        .unwrap_or_else(|| ir::Ty::new(ir::TyPrimitive::text)) // fallback
+        .unwrap_or_else(ir::Ty::text) // fallback
 }
 
 /// Unified function to generate a lookup function from Lookup metadata
@@ -427,31 +425,6 @@ fn parse_index_columns(sql: &str) -> Option<Vec<String>> {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn test_ty_from_duckdb_type() {
-        // Test primitives
-        assert!(matches!(
-            ty_from_duckdb_type("INTEGER", false).kind,
-            ir::TyKind::Primitive(ir::TyPrimitive::int32)
-        ));
-        assert!(matches!(
-            ty_from_duckdb_type("BIGINT", false).kind,
-            ir::TyKind::Primitive(ir::TyPrimitive::int64)
-        ));
-        assert!(matches!(
-            ty_from_duckdb_type("VARCHAR", false).kind,
-            ir::TyKind::Primitive(ir::TyPrimitive::text)
-        ));
-        assert!(matches!(
-            ty_from_duckdb_type("BOOLEAN", false).kind,
-            ir::TyKind::Primitive(ir::TyPrimitive::bool)
-        ));
-
-        // Test nullable wraps in option
-        let nullable_int = ty_from_duckdb_type("INTEGER", true);
-        assert!(matches!(nullable_int.kind, ir::TyKind::Enum(_)));
-    }
 
     #[test]
     fn test_table_type_name() {

@@ -45,7 +45,7 @@ fn write_ty_def_impl(
     let name = ty.name.as_ref().unwrap();
 
     match &ty.kind {
-        ir::TyKind::Primitive(_) => {
+        ir::TyKind::Primitive(_) | ir::TyKind::Ident(_) => {
             writeln!(w, "impl {lutra_bin}::Encode for {name} {{")?;
             writeln!(w, "    type HeadPtr = ();")?;
             writeln!(w, "    fn encode_head(&self, buf: &mut {lutra_bin}::bytes::BytesMut) {{")?;
@@ -296,7 +296,7 @@ fn write_ty_def_impl(
     writeln!(w, "}}\n")?;
 
     match &ty.kind {
-        ir::TyKind::Primitive(_) | ir::TyKind::Array(_) => {
+        ir::TyKind::Primitive(_) | ir::TyKind::Array(_) | ir::TyKind::Ident(_) => {
             writeln!(w, "impl {lutra_bin}::Decode for {name} {{")?;
             writeln!(
                 w,

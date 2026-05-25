@@ -3,18 +3,18 @@ use lutra_bin::Value;
 
 #[test]
 fn test_print_01() {
-    let ty = lutra_compiler::_test_compile_ty(
+    let (ty, ty_defs) = lutra_compiler::_test_compile_ty(
         "{
-        n_rows: int64,
+        n_rows: Int64,
         page: [{
-          id: int64,
-          name: text,
+          id: Int64,
+          name: Text,
           address: {
-            city: text,
-            street: text
+            city: Text,
+            street: Text
           },
-          int64,
-          is_admin: bool
+          Int64,
+          is_admin: Bool
         }]
       }
     ",
@@ -48,8 +48,8 @@ fn test_print_01() {
         ]),
     ]);
 
-    let value = value.encode(&ty, &[]).unwrap();
-    let source = lutra_bin::print_source(&value, &ty, &[]).unwrap();
+    let value = value.encode(&ty, &ty_defs).unwrap();
+    let source = lutra_bin::print_source(&value, &ty, &ty_defs).unwrap();
 
     assert_snapshot!(source, @r#"
     {
@@ -82,7 +82,7 @@ fn test_print_01() {
 
 #[test]
 fn test_print_02() {
-    let ty = lutra_compiler::_test_compile_ty("[int64]");
+    let (ty, ty_defs) = lutra_compiler::_test_compile_ty("[Int64]");
 
     let value = Value::Array(vec![
         Value::Prim64(1),
@@ -91,8 +91,8 @@ fn test_print_02() {
         Value::Prim64(4),
     ]);
 
-    let value = value.encode(&ty, &[]).unwrap();
-    let source = lutra_bin::print_source(&value, &ty, &[]).unwrap();
+    let value = value.encode(&ty, &ty_defs).unwrap();
+    let source = lutra_bin::print_source(&value, &ty, &ty_defs).unwrap();
     assert_snapshot!(source, @r#"
     [
       1,

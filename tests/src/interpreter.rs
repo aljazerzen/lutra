@@ -9,13 +9,14 @@ use lutra_interpreter::EvalError;
 #[track_caller]
 fn _test_interpret(program: &str) -> String {
     let program = lutra_ir::_test_parse(program);
+    let program = lc::_test_layout(program);
     let bytecode = lc::bytecode_program(program.clone());
 
     let output =
         lutra_interpreter::evaluate(&bytecode, vec![], lutra_interpreter::BUILTIN_MODULES, None)
             .unwrap();
 
-    lutra_bin::print_source(&output, program.get_output_ty(), &[]).unwrap()
+    lutra_bin::print_source(&output, program.get_output_ty(), &program.defs).unwrap()
 }
 
 #[track_caller]
@@ -36,36 +37,40 @@ fn interpreter_layout() {
 #[test]
 fn interpret_01() {
     assert_snapshot!(_test_interpret(r#"
+    type std::Int64 = Prim64;
+    type std::Float64 = Prim64;
     let main = (func 3 ->
       let 1 = (
-        func 2 -> [
-          fn.2+0: float64,
-          fn.2+0: float64,
-          fn.2+0: float64
-        ]: [float64]
-      ): func (float64) -> [float64];
-      let 2 = var.1: func (float64) -> [float64];
-      {
+        func 2 -> (array
+          fn.2+0: std::Float64,
+          fn.2+0: std::Float64,
+          fn.2+0: std::Float64
+        ): [std::Float64]
+      ): func (std::Float64) -> [std::Float64];
+      let 2 = var.1: func (std::Float64) -> [std::Float64];
+      (tuple
         (call
-          var.2: func (float64) -> [float64],
-          3.5: float64
-        ): [float64],
+          var.2: func (std::Float64) -> [std::Float64],
+          3.5: std::Float64
+        ): [std::Float64],
         (call
           (
-            func 3 -> [fn.3+0: int64, fn.3+1: int64]: [int64]
-          ): func (int64) -> [int64],
-          6: int64,
-          7: int64,
-        ): [int64],
-        (call
-          external.std::ops::add: func (int64) -> int64,
-          6: int64,
-          2: int64,
-        ): int64,
-      }: {[float64], [int64], int64}
-    ): func () -> {[float64], [int64], int64}
+            func 3 -> (array
+              fn.3+0: std::Int64,
+              fn.3+1: std::Int64
+            ): [std::Int64]
+          ): func (std::Int64) -> [std::Int64],
+          6: std::Int64,
+          7: std::Int64,
+        ): [std::Int64],
+        (call external.std::ops::add: func (std::Int64) -> std::Int64,
+          6: std::Int64,
+          2: std::Int64,
+        ): std::Int64,
+      ): {[std::Float64], [std::Int64], std::Int64}
+    ): func () -> {[std::Float64], [std::Int64], std::Int64}
     "#,
-    ), @r#"
+    ), @"
     {
       [
         3.5,
@@ -78,26 +83,26 @@ fn interpret_01() {
       ],
       8,
     }
-    "#
+    "
     );
 }
 
 #[test]
 fn interpret_02() {
     assert_snapshot!(_test_interpret(r#"
+    type Int64 = Prim64;
     let main = (func 0 ->
       let 1 = (
-        func 1 -> {
-          fn.1+0: int64,
-          fn.1+0: int64,
-        }: {int64, int64}
-      ): func (int64) -> {int64, int64};
-      (
-        call external.std::array::map: func ([int64], func (int64) -> {int64, int64}) -> [{int64, int64}],
-        [2: int64, 3: int64, 1: int64]: [int64],
-        var.1: func (int64) -> {int64, int64},
-      ): [{int64, int64}]
-    ): func () -> [{int64, int64}]
+        func 1 -> (tuple
+          fn.1+0: Int64,
+          fn.1+0: Int64,
+        ): {Int64, Int64}
+      ): func (Int64) -> {Int64, Int64};
+      (call external.std::array::map: func ([Int64], func (Int64) -> {Int64, Int64}) -> [{Int64, Int64}],
+        (array 2: Int64, 3: Int64, 1: Int64): [Int64],
+        var.1: func (Int64) -> {Int64, Int64},
+      ): [{Int64, Int64}]
+    ): func () -> [{Int64, Int64}]
     "#,
     ), @r#"
     [
@@ -121,29 +126,30 @@ fn interpret_02() {
 #[test]
 fn interpret_03() {
     assert_snapshot!(_test_interpret(r#"
+    type std::Int64 = Prim64;
     let main = (func 0 ->
-      let 1 = [
-        {1:int64, 3:int64}: {int64, int64},
-        {5:int64, 4:int64}: {int64, int64},
-        {2:int64, 3:int64}: {int64, int64},
-      ]: [{int64, int64}];
+      let 1 = (array
+        (tuple 1:std::Int64, 3:std::Int64): {std::Int64, std::Int64},
+        (tuple 5:std::Int64, 4:std::Int64): {std::Int64, std::Int64},
+        (tuple 2:std::Int64, 3:std::Int64): {std::Int64, std::Int64},
+      ): [{std::Int64, std::Int64}];
       let 2 = (func 1 ->
-        (call external.std::ops::mul: func (int64, int64) -> int64,
+        (call external.std::ops::mul: func (std::Int64, std::Int64) -> std::Int64,
           (tuple_lookup
-            fn.1+0: {int64, int64}
+            fn.1+0: {std::Int64, std::Int64}
             0
-          ): int64,
+          ): std::Int64,
           (tuple_lookup
-            fn.1+0: {int64, int64}
+            fn.1+0: {std::Int64, std::Int64}
             1
-          ): int64,
-        ): int64
-      ): func ({int64, int64}) -> int64;
-      (call external.std::array::map: func ([{int64, int64}], func ({int64, int64}) -> int64) -> [int64],
-        var.1: [{int64, int64}],
-        var.2: func ({int64, int64}) -> int64,
-      ): [int64]
-    ): func () -> [int64]
+          ): std::Int64,
+        ): std::Int64
+      ): func ({std::Int64, std::Int64}) -> std::Int64;
+      (call external.std::array::map: func ([{std::Int64, std::Int64}], func ({std::Int64, std::Int64}) -> std::Int64) -> [std::Int64],
+        var.1: [{std::Int64, std::Int64}],
+        var.2: func ({std::Int64, std::Int64}) -> std::Int64,
+      ): [std::Int64]
+    ): func () -> [std::Int64]
     "#,
     ), @r#"
     [

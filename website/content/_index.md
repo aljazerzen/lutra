@@ -8,11 +8,11 @@ components. It is a high-level, statically typed language, designed for querying
 data and expressing data structures.
 
 ```lutra
-type Album: {id: int16, title: text}
+type Album: {id: Int16, title: Text}
 
 func get_albums(): [Album] -> std::sql::from("albums")
 
-func get_album_by_id(album_id: int16): Album -> (
+func get_album_by_id(album_id: Int16): Album -> (
   get_albums()
   | find(this -> this.id == album_id)
 )
@@ -41,13 +41,13 @@ It is verbose in exchange for type safety, readability and composability.
 import std::(Date, find, filter, map, group, mean, sum, count, sort, slice)
 
 # Constant
-const transaction_fees: float64 = 0.8
+const transaction_fees: Float64 = 0.8
 
 # Type definition
 type Invoice: {
-  customer_id: int32,
+  customer_id: Int32,
   invoice_date: Date,
-  total: float64,
+  total: Float64,
 }
 
 # Function that reads a table
@@ -56,13 +56,13 @@ func get_invoices(): [Invoice] -> (
 )
 
 type Customer: {
-  id: int32,
-  first_name: text,
-  last_name: text,
+  id: Int32,
+  first_name: Text,
+  last_name: Text,
 }
 
 # Function that performs an index lookup
-func get_customer(id: int32): Customer -> (
+func get_customer(id: Int32): Customer -> (
   std::sql::from("customers")
   | find(c -> c.id == id)
   | std::option::or_default()

@@ -3,8 +3,8 @@ use lutra_bin::{Value, ir};
 use rand::rngs::SmallRng;
 use rand::{RngExt, SeedableRng};
 
-fn generate_complex_tuple_array(num_rows: usize) -> (Vec<u8>, ir::Ty) {
-    let ty =
+fn generate_complex_tuple_array(num_rows: usize) -> (Vec<u8>, ir::Ty, Vec<ir::TyDef>) {
+    let (ty, ty_defs) =
         lutra_compiler::_test_compile_ty("[{id: int32, name: text, score: float64, active: bool}]");
 
     let mut rng = SmallRng::seed_from_u64(42); // Reproducible seed
@@ -27,9 +27,9 @@ fn generate_complex_tuple_array(num_rows: usize) -> (Vec<u8>, ir::Ty) {
     }
 
     let value = Value::Array(values);
-    let data = value.encode(&ty, &[]).unwrap();
+    let data = value.encode(&ty, &ty_defs).unwrap();
 
-    (data, ty)
+    (data, ty, ty_defs)
 }
 
 fn bench_to_arrow_complex_tuple_array(c: &mut Criterion) {
@@ -40,11 +40,15 @@ fn bench_to_arrow_complex_tuple_array(c: &mut Criterion) {
             BenchmarkId::new("complex_tuple", num_rows),
             num_rows,
             |b, &num_rows| {
-                let (data, ty) = generate_complex_tuple_array(num_rows);
+                let (data, ty, ty_defs) = generate_complex_tuple_array(num_rows);
 
                 b.iter_with_large_drop(|| {
-                    lutra_arrow::lutra_to_arrow(std::hint::black_box(data.as_slice()), &ty, &[])
-                        .unwrap()
+                    lutra_arrow::lutra_to_arrow(
+                        std::hint::black_box(data.as_slice()),
+                        &ty,
+                        &ty_defs,
+                    )
+                    .unwrap()
                 });
             },
         );

@@ -86,7 +86,7 @@ pub fn _sql_and_output((sql, output): (String, String)) -> String {
 #[test]
 fn prim() {
     insta::assert_snapshot!(_sql_and_output(_run(
-        r#"const main = 3: int16"#,
+        r#"const main = 3: Int16"#,
         lutra_bin::Value::unit()
     )), @"
     SELECT
@@ -99,7 +99,7 @@ fn prim() {
 #[test]
 fn prim_int64() {
     insta::assert_snapshot!(_sql_and_output(_run(
-        r#"const main = 12345: int64"#,
+        r#"const main = 12345: Int64"#,
         lutra_bin::Value::unit()
     )), @"
     SELECT
@@ -156,24 +156,24 @@ fn pull_interface_basic() {
 
     insta::assert_snapshot!(interface, @r#"
     ## Row of table posts
-    type Post: {id: int32, user_id: enum {none, some: int32}, title: text, content: enum {none, some: text}}
+    type Post: {id: Int32, user_id: enum {none, some: Int32}, title: Text, content: enum {none, some: Text}}
     ## Read from table posts
     func from_posts(): [Post] -> std::sql::from("posts")
     ## Write into table posts
     func insert_posts(values: [Post]) -> std::sql::insert(values, "posts")
     ## Lookup in posts by constraint posts_id_pkey
-    func from_posts_by_id(id: int32): enum {none, some: Post} -> (
+    func from_posts_by_id(id: Int32): enum {none, some: Post} -> (
       from_posts() | std::find(x -> x.id == id)
     )
 
     ## Row of table users
-    type User: {id: int32, name: text, email: enum {none, some: text}}
+    type User: {id: Int32, name: Text, email: enum {none, some: Text}}
     ## Read from table users
     func from_users(): [User] -> std::sql::from("users")
     ## Write into table users
     func insert_users(values: [User]) -> std::sql::insert(values, "users")
     ## Lookup in users by constraint users_id_pkey
-    func from_users_by_id(id: int32): enum {none, some: User} -> (
+    func from_users_by_id(id: Int32): enum {none, some: User} -> (
       from_users() | std::find(x -> x.id == id)
     )
     "#);
@@ -205,8 +205,9 @@ fn pull_interface_types() {
     let interface = runner.pull_schema_sync().unwrap();
 
     insta::assert_snapshot!(interface, @r#"
+
     ## Row of table type_test
-    type TypeTestRow: {bool_col: enum {none, some: bool}, int8_col: enum {none, some: int8}, int16_col: enum {none, some: int16}, int32_col: enum {none, some: int32}, int64_col: enum {none, some: int64}, float32_col: enum {none, some: float32}, float64_col: enum {none, some: float64}, text_col: enum {none, some: text}, date_col: enum {none, some: std::Date}}
+    type TypeTestRow: {bool_col: enum {none, some: Bool}, int8_col: enum {none, some: Int8}, int16_col: enum {none, some: Int16}, int32_col: enum {none, some: Int32}, int64_col: enum {none, some: Int64}, float32_col: enum {none, some: Float32}, float64_col: enum {none, some: Float64}, text_col: enum {none, some: Text}, date_col: enum {none, some: Date}}
     ## Read from table type_test
     func from_type_test(): [TypeTestRow] -> std::sql::from("type_test")
     ## Write into table type_test
@@ -235,8 +236,9 @@ fn pull_interface_arrays() {
     let interface = runner.pull_schema_sync().unwrap();
 
     insta::assert_snapshot!(interface, @r#"
+
     ## Row of table arrays_test
-    type ArraysTestRow: {id: enum {none, some: int32}, tags: enum {none, some: [text]}, numbers: enum {none, some: [int32]}, nested: enum {none, some: [[int32]]}}
+    type ArraysTestRow: {id: enum {none, some: Int32}, tags: enum {none, some: [Text]}, numbers: enum {none, some: [Int32]}, nested: enum {none, some: [[Int32]]}}
     ## Read from table arrays_test
     func from_arrays_test(): [ArraysTestRow] -> std::sql::from("arrays_test")
     ## Write into table arrays_test
@@ -265,7 +267,7 @@ fn pull_interface_struct() {
 
     insta::assert_snapshot!(interface, @r#"
     ## Row of table struct_test
-    type StructTestRow: {id: enum {none, some: int32}, person: enum {none, some: {name: text, age: int32}}, location: enum {none, some: {city: text, coordinates: {lat: float64, lon: float64}}}}
+    type StructTestRow: {id: enum {none, some: Int32}, person: enum {none, some: {name: Text, age: Int32}}, location: enum {none, some: {city: Text, coordinates: {lat: Float64, lon: Float64}}}}
     ## Read from table struct_test
     func from_struct_test(): [StructTestRow] -> std::sql::from("struct_test")
     ## Write into table struct_test
@@ -295,21 +297,21 @@ fn pull_interface_indexes_basic() {
 
     insta::assert_snapshot!(interface, @r#"
     ## Row of table users
-    type User: {id: int32, email: enum {none, some: text}, name: enum {none, some: text}}
+    type User: {id: Int32, email: enum {none, some: Text}, name: enum {none, some: Text}}
     ## Read from table users
     func from_users(): [User] -> std::sql::from("users")
     ## Write into table users
     func insert_users(values: [User]) -> std::sql::insert(values, "users")
     ## Lookup in users by constraint users_id_pkey
-    func from_users_by_id(id: int32): enum {none, some: User} -> (
+    func from_users_by_id(id: Int32): enum {none, some: User} -> (
       from_users() | std::find(x -> x.id == id)
     )
     ## Lookup in users by constraint users_email_key
-    func from_users_by_email(email: text): enum {none, some: User} -> (
+    func from_users_by_email(email: Text): enum {none, some: User} -> (
       from_users() | std::find(x -> x.email == email)
     )
     ## Lookup in users by index idx_name
-    func from_users_by_name(name: text): [User] -> (
+    func from_users_by_name(name: Text): [User] -> (
       from_users() | std::filter(x -> x.name == name)
     )
     "#);
@@ -338,13 +340,13 @@ fn pull_interface_indexes_compound() {
 
     insta::assert_snapshot!(interface, @r#"
     ## Row of table orders
-    type Order: {id: enum {none, some: int32}, user_id: enum {none, some: int32}, product_id: enum {none, some: int32}, quantity: enum {none, some: int32}}
+    type Order: {id: enum {none, some: Int32}, user_id: enum {none, some: Int32}, product_id: enum {none, some: Int32}, quantity: enum {none, some: Int32}}
     ## Read from table orders
     func from_orders(): [Order] -> std::sql::from("orders")
     ## Write into table orders
     func insert_orders(values: [Order]) -> std::sql::insert(values, "orders")
     ## Lookup in orders by index idx_user_product
-    func from_orders_by_user_id_and_product_id(user_id: int32, product_id: int32): [Order] -> (
+    func from_orders_by_user_id_and_product_id(user_id: Int32, product_id: Int32): [Order] -> (
       from_orders() | std::filter(x -> x.user_id == user_id && x.product_id == product_id)
     )
     "#);
@@ -353,7 +355,7 @@ fn pull_interface_indexes_compound() {
 #[test]
 fn prim_float32() {
     insta::assert_snapshot!(_sql_and_output(_run(
-        r#"const main = 2.5: float32"#,
+        r#"const main = 2.5: Float32"#,
         lutra_bin::Value::unit()
     )), @"
     SELECT
@@ -366,7 +368,7 @@ fn prim_float32() {
 #[test]
 fn prim_int32() {
     insta::assert_snapshot!(_sql_and_output(_run(
-        r#"const main = 123456: int32"#,
+        r#"const main = 123456: Int32"#,
         lutra_bin::Value::unit()
     )), @"
     SELECT
@@ -379,7 +381,7 @@ fn prim_int32() {
 #[test]
 fn prim_int8() {
     insta::assert_snapshot!(_sql_and_output(_run(
-        r#"const main = 42: int8"#,
+        r#"const main = 42: Int8"#,
         lutra_bin::Value::unit()
     )), @"
     SELECT
@@ -392,7 +394,7 @@ fn prim_int8() {
 #[test]
 fn prim_uint8() {
     insta::assert_snapshot!(_sql_and_output(_run(
-        r#"const main = 200: uint8"#,
+        r#"const main = 200: Uint8"#,
         lutra_bin::Value::unit()
     )), @"
     SELECT
@@ -405,7 +407,7 @@ fn prim_uint8() {
 #[test]
 fn prim_uint16() {
     insta::assert_snapshot!(_sql_and_output(_run(
-        r#"const main = 50000: uint16"#,
+        r#"const main = 50000: Uint16"#,
         lutra_bin::Value::unit()
     )), @"
     SELECT
@@ -418,7 +420,7 @@ fn prim_uint16() {
 #[test]
 fn prim_uint32() {
     insta::assert_snapshot!(_sql_and_output(_run(
-        r#"const main = 3000000000: uint32"#,
+        r#"const main = 3000000000: Uint32"#,
         lutra_bin::Value::unit()
     )), @"
     SELECT
@@ -431,7 +433,7 @@ fn prim_uint32() {
 #[test]
 fn prim_uint64() {
     insta::assert_snapshot!(_sql_and_output(_run(
-        r#"const main = 10000000000: uint64"#,
+        r#"const main = 10000000000: Uint64"#,
         lutra_bin::Value::unit()
     )), @"
     SELECT
@@ -448,7 +450,7 @@ fn prim_uint64() {
 #[test]
 fn option_none() {
     insta::assert_snapshot!(_sql_and_output(_run(
-        r#"const main = .none: enum {none, some: int32}"#,
+        r#"const main = .none: enum {none, some: Int32}"#,
         lutra_bin::Value::unit()
     )), @"
     SELECT
@@ -461,7 +463,7 @@ fn option_none() {
 #[test]
 fn option_some() {
     insta::assert_snapshot!(_sql_and_output(_run(
-        r#"const main = .some(42): enum {none, some: int32}"#,
+        r#"const main = .some(42): enum {none, some: Int32}"#,
         lutra_bin::Value::unit()
     )), @"
     SELECT
@@ -474,7 +476,7 @@ fn option_some() {
 #[test]
 fn option_some_text() {
     insta::assert_snapshot!(_sql_and_output(_run(
-        r#"const main = .some("hello"): enum {none, some: text}"#,
+        r#"const main = .some("hello"): enum {none, some: Text}"#,
         lutra_bin::Value::unit()
     )), @r#"
     SELECT
@@ -488,7 +490,7 @@ fn option_some_text() {
 fn option_array() {
     // Array of options
     insta::assert_snapshot!(_sql_and_output(_run(
-        r#"const main = [.none, .some(1), .some(2), .none]: [enum {none, some: int32}]"#,
+        r#"const main = [.none, .some(1), .some(2), .none]: [enum {none, some: Int32}]"#,
         lutra_bin::Value::unit()
     )), @"
     SELECT
@@ -527,7 +529,7 @@ fn option_array() {
 fn tuple_with_option() {
     // Option within a tuple works (nullable column)
     insta::assert_snapshot!(_sql_and_output(_run(
-        r#"const main = {name = "Alice", age = .some(30): enum {none, some: int32}}"#,
+        r#"const main = {name = "Alice", age = .some(30): enum {none, some: Int32}}"#,
         lutra_bin::Value::unit()
     )), @r#"
     SELECT
@@ -545,7 +547,7 @@ fn tuple_with_option() {
 fn tuple_with_option_none() {
     // Option with none value within a tuple
     insta::assert_snapshot!(_sql_and_output(_run(
-        r#"const main = {name = "Bob", age = .none: enum {none, some: int32}}"#,
+        r#"const main = {name = "Bob", age = .none: enum {none, some: Int32}}"#,
         lutra_bin::Value::unit()
     )), @r#"
     SELECT
@@ -570,8 +572,8 @@ fn enum_with_payloads() {
         r#"
         type Status: enum {
             pending,
-            in_progress: int32,
-            done: text
+            in_progress: Int32,
+            done: Text
         }
         const main = .in_progress(42): Status
         "#,
@@ -597,8 +599,8 @@ fn enum_array_with_payloads() {
         r#"
         type Status: enum {
             pending,
-            in_progress: int32,
-            done: text
+            in_progress: Int32,
+            done: Text
         }
         const main = [.pending, .in_progress(50), .done("finished")]: [Status]
         "#,
@@ -651,10 +653,10 @@ fn tuple_with_enum() {
         r#"
         type Status: enum {
             pending,
-            in_progress: int32,
-            done: text
+            in_progress: Int32,
+            done: Text
         }
-        const main = {id = 1: int32, status = .in_progress(42): Status}
+        const main = {id = 1: Int32, status = .in_progress(42): Status}
         "#,
         lutra_bin::Value::unit()
     )), @"
@@ -683,7 +685,7 @@ fn tuple_with_enum() {
 #[test]
 fn tuple_prim() {
     insta::assert_snapshot!(_sql_and_output(_run(
-        r#"const main = {x = 1: int32, y = 2: int16}"#,
+        r#"const main = {x = 1: Int32, y = 2: Int16}"#,
         lutra_bin::Value::unit()
     )), @"
     SELECT
@@ -700,7 +702,7 @@ fn tuple_prim() {
 #[test]
 fn tuple_mixed() {
     insta::assert_snapshot!(_sql_and_output(_run(
-        r#"const main = {name = "Alice", age = 30: int32, active = true}"#,
+        r#"const main = {name = "Alice", age = 30: Int32, active = true}"#,
         lutra_bin::Value::unit()
     )), @r#"
     SELECT
@@ -719,7 +721,7 @@ fn tuple_mixed() {
 #[test]
 fn tuple_tuple_prim() {
     insta::assert_snapshot!(_sql_and_output(_run(
-        r#"const main = {a = {x = 1: int32, y = 2: int16}, b = 3: int64}"#,
+        r#"const main = {a = {x = 1: Int32, y = 2: Int16}, b = 3: Int64}"#,
         lutra_bin::Value::unit()
     )), @"
     SELECT
@@ -743,7 +745,7 @@ fn tuple_tuple_prim() {
 #[test]
 fn array_prim() {
     insta::assert_snapshot!(_sql_and_output(_run(
-        r#"const main = [1, 2, 3]: [int64]"#,
+        r#"const main = [1, 2, 3]: [Int64]"#,
         lutra_bin::Value::unit()
     )), @"
     SELECT
@@ -776,7 +778,7 @@ fn array_prim() {
 #[test]
 fn array_empty() {
     insta::assert_snapshot!(_sql_and_output(_run(
-        r#"const main = []: [int64]"#,
+        r#"const main = []: [Int64]"#,
         lutra_bin::Value::unit()
     )), @"
     SELECT
@@ -799,7 +801,7 @@ fn array_empty() {
 #[test]
 fn array_tuple() {
     insta::assert_snapshot!(_sql_and_output(_run(
-        r#"const main = [{x = 1: int32, y = 2: int16}, {x = 3, y = 4}]"#,
+        r#"const main = [{x = 1: Int32, y = 2: Int16}, {x = 3, y = 4}]"#,
         lutra_bin::Value::unit()
     )), @"
     SELECT
@@ -841,7 +843,7 @@ fn array_tuple() {
 fn tuple_array_prim() {
     // This be serialized to LIST & STRUCT types
     insta::assert_snapshot!(_sql_and_output(_run(
-        r#"const main = {true, [1, 2, 3]: [int64], [{4: int32, "hello"}], false}"#,
+        r#"const main = {true, [1, 2, 3]: [Int64], [{4: Int32, "hello"}], false}"#,
         lutra_bin::Value::unit()
     )), @r#"
     SELECT
@@ -910,7 +912,7 @@ fn tuple_array_prim() {
 #[test]
 fn array_array_prim() {
     insta::assert_snapshot!(_sql_and_output(_run(
-        r#"const main = [[1, 2], [3, 4], [5]]: [[int64]]"#,
+        r#"const main = [[1, 2], [3, 4], [5]]: [[Int64]]"#,
         lutra_bin::Value::unit()
     )), @"
     SELECT
@@ -1003,7 +1005,7 @@ fn array_array_prim() {
 #[test]
 fn input_prim() {
     insta::assert_snapshot!(_sql_and_output(_run(
-        r#"func main(x: int64): int64 -> x + 10"#,
+        r#"func main(x: Int64): Int64 -> x + 10"#,
         lutra_bin::Value::Prim64(5)
     )), @"
     SELECT
@@ -1016,7 +1018,7 @@ fn input_prim() {
 #[test]
 fn input_tuple() {
     insta::assert_snapshot!(_sql_and_output(_run(
-        r#"func main(p: {x: int64, y: int64}): int64 -> p.x + p.y"#,
+        r#"func main(p: {x: Int64, y: Int64}): Int64 -> p.x + p.y"#,
         lutra_bin::Value::Tuple(vec![
             lutra_bin::Value::Prim64(3),
             lutra_bin::Value::Prim64(4),
@@ -1032,7 +1034,7 @@ fn input_tuple() {
 #[test]
 fn input_text() {
     insta::assert_snapshot!(_sql_and_output(_run(
-        r#"func main(name: text): text -> f"Hello, {name}""#,
+        r#"func main(name: Text): Text -> f"Hello, {name}""#,
         lutra_bin::Value::new_text("World")
     )), @r#"
     SELECT
@@ -1045,7 +1047,7 @@ fn input_text() {
 #[test]
 fn input_array_prim() {
     insta::assert_snapshot!(_sql_and_output(_run(
-        r#"func main(nums: [int64]): [int64] -> nums"#,
+        r#"func main(nums: [Int64]): [Int64] -> nums"#,
         lutra_bin::Value::Array(vec![
             lutra_bin::Value::Prim64(10),
             lutra_bin::Value::Prim64(20),
@@ -1076,7 +1078,7 @@ fn input_array_prim() {
 #[test]
 fn input_array_text() {
     insta::assert_snapshot!(_sql_and_output(_run(
-        r#"func main(words: [text]): [text] -> words"#,
+        r#"func main(words: [Text]): [Text] -> words"#,
         lutra_bin::Value::Array(vec![
             lutra_bin::Value::new_text("hello"),
             lutra_bin::Value::new_text("world"),
@@ -1105,7 +1107,7 @@ fn input_array_text() {
 #[test]
 fn input_nested_tuple_array() {
     insta::assert_snapshot!(_sql_and_output(_run(
-        r#"func main(data: {items: [int64], count: int32}): {items: [int64], count: int32} -> data"#,
+        r#"func main(data: {items: [Int64], count: Int32}): {items: [Int64], count: Int32} -> data"#,
         lutra_bin::Value::Tuple(vec![
             lutra_bin::Value::Array(vec![
                 lutra_bin::Value::Prim64(100),
@@ -1139,7 +1141,7 @@ fn input_array_tuple() {
     // This is a limitation of using JSON for input serialization.
     // Arrays of primitives work because DuckDB can cast JSON arrays to native arrays.
     insta::assert_snapshot!(_sql_and_output(_run(
-        r#"func main(points: [{x: int16, y: int32}]) -> points"#,
+        r#"func main(points: [{x: Int16, y: Int32}]) -> points"#,
         lutra_bin::Value::Array(vec![
             lutra_bin::Value::Tuple(vec![
                 lutra_bin::Value::Prim16(3),
@@ -1162,7 +1164,7 @@ fn input_array_tuple() {
 #[test]
 fn comparison() {
     insta::assert_snapshot!(_sql_and_output(_run(
-        r#"func main() -> 5: int32 > 3"#,
+        r#"func main() -> 5: Int32 > 3"#,
         lutra_bin::Value::unit()
     )), @"
     SELECT
@@ -1198,7 +1200,7 @@ fn sql_from_primitive_table() {
         INSERT INTO users VALUES (1, 'Alice'), (2, 'Bob');
         "#,
         r#"
-        type Row: {id: int32, name: text}
+        type Row: {id: Int32, name: Text}
         func main(): [Row] -> std::sql::from("users")
         "#,
         lutra_bin::Value::unit()
@@ -1240,7 +1242,7 @@ fn sql_from_flat_tuple() {
         INSERT INTO products VALUES (1, 'Widget', 9.99, true), (2, 'Gadget', 19.99, false);
         "#,
         r#"
-        type Product: {id: int32, name: text, price: float64, in_stock: bool}
+        type Product: {id: Int32, name: Text, price: Float64, in_stock: Bool}
         func main(): [Product] -> std::sql::from("products")
         "#,
         lutra_bin::Value::unit()
@@ -1295,7 +1297,7 @@ fn sql_from_nested_tuple() {
             (2, {'user_id': 200, 'items': [4, 5]});
         "#,
         r#"
-        type Event: {id: int32, data: {user_id: int32, items: [int32]}}
+        type Event: {id: Int32, data: {user_id: Int32, items: [Int32]}}
         func main(): [Event] -> std::sql::from("events")
         "#,
         lutra_bin::Value::unit()
@@ -1351,7 +1353,7 @@ fn sql_from_array_column() {
         INSERT INTO items VALUES (1, ['rust', 'programming']), (2, ['sql', 'database']);
         "#,
         r#"
-        type Item: {id: int32, tags: [text]}
+        type Item: {id: Int32, tags: [Text]}
         func main(): [Item] -> std::sql::from("items")
         "#,
         lutra_bin::Value::unit()
@@ -1400,7 +1402,7 @@ fn sql_from_option_column() {
         INSERT INTO people VALUES (1, 'Alice', 30), (2, 'Bob', NULL);
         "#,
         r#"
-        type Person: {id: int32, name: text, age: enum {none, some: int32}}
+        type Person: {id: Int32, name: Text, age: enum {none, some: Int32}}
         func main(): [Person] -> std::sql::from("people")
         "#,
         lutra_bin::Value::unit()
@@ -1446,7 +1448,7 @@ fn sql_from_date_column() {
         INSERT INTO events VALUES (1, '2024-01-15'), (2, '2024-12-25');
         "#,
         r#"
-        type Event: {id: int32, event_date: std::Date}
+        type Event: {id: Int32, event_date: std::Date}
         func main(): [Event] -> std::sql::from("events")
         "#,
         lutra_bin::Value::unit()
@@ -1487,7 +1489,7 @@ fn sql_insert_primitives() {
         CREATE TABLE users (id int4, name text);
         "#,
         r#"
-        type Row: {id: int32, name: text}
+        type Row: {id: Int32, name: Text}
         const data: [Row] = [{id = 3, name = "Charlie"}, {id = 4, name = "Diana"}]
         func main(): {} -> std::sql::insert(data, "users")
         "#,
@@ -1525,7 +1527,7 @@ fn sql_insert_flat_tuple() {
         CREATE TABLE products (id int4, name text, price float8, in_stock bool);
         "#,
         r#"
-        type Product: {id: int32, name: text, price: float64, in_stock: bool}
+        type Product: {id: Int32, name: Text, price: Float64, in_stock: Bool}
         const products: [Product] = [
             {id = 1, name = "Widget", price = 9.99, in_stock = true},
             {id = 2, name = "Gadget", price = 19.99, in_stock = false}
@@ -1572,7 +1574,7 @@ fn sql_insert_option() {
         CREATE TABLE people (id int4, name text, age int4);
         "#,
         r#"
-        type Person: {id: int32, name: text, age: enum {none, some: int32}}
+        type Person: {id: Int32, name: Text, age: enum {none, some: Int32}}
         const people: [Person] = [
             {id = 1, name = "Alice", age = .some(30)},
             {id = 2, name = "Bob", age = .none}
@@ -1616,7 +1618,7 @@ fn sql_insert_date() {
         CREATE TABLE events (id int4, event_date date);
         "#,
         r#"
-        type Event: {id: int32, event_date: std::Date}
+        type Event: {id: Int32, event_date: std::Date}
         const events: [Event] = [
             {id = 1, event_date = @2024-01-15},
             {id = 2, event_date = @2024-12-25}
@@ -1659,11 +1661,11 @@ fn serialize_array_in_tuple() {
     // Applying an operation on that array then forces deserialization.
     insta::assert_snapshot!(_sql_and_output(_run(
         r#"
-        func get_data() -> {a = [2, 5, 4, 3, 1, 2]: [int32]}
+        func get_data() -> {a = [2, 5, 4, 3, 1, 2]: [Int32]}
 
         func main() -> (
           get_data().a
-          | std::map(func (y: int32) -> -y)
+          | std::map(func (y: Int32) -> -y)
         )
         "#,
         lutra_bin::Value::unit()
@@ -1721,11 +1723,11 @@ fn serialize_array_of_tuples_in_tuple() {
     // Array of tuples serialized to LIST of STRUCT
     insta::assert_snapshot!(_sql_and_output(_run(
         r#"
-        func get_data() -> {a = [{2: int32, false}, {5, true}, {4, false}]}
+        func get_data() -> {a = [{2: Int32, false}, {5, true}, {4, false}]}
 
         func main() -> (
           get_data().a
-          | std::map(func (y: {int32, bool}) -> {-y.0, !y.1})
+          | std::map(func (y: {Int32, Bool}) -> {-y.0, !y.1})
         )
         "#,
         lutra_bin::Value::unit()
@@ -1782,10 +1784,10 @@ fn serialize_nested_array() {
     // Nested arrays: [[int16]]
     insta::assert_snapshot!(_sql_and_output(_run(
         r#"
-        func get_data() -> [[1: int16, 2, 3], [4, 5, 6]]
+        func get_data() -> [[1: Int16, 2, 3], [4, 5, 6]]
 
         func main() -> (
-          get_data() | std::map(func (y: [int16]) -> (
+          get_data() | std::map(func (y: [Int16]) -> (
             std::index(y, 1)
           ))
         )
@@ -1888,12 +1890,12 @@ fn serialize_nested_array_map() {
     // Map over nested arrays
     insta::assert_snapshot!(_sql_and_output(_run(
         r#"
-        func get_data() -> [[1: int64, 2, 3], [4, 5, 6]]
+        func get_data() -> [[1: Int64, 2, 3], [4, 5, 6]]
 
         func main() -> (
           get_data()
-          | std::map(func (y: [int64]) -> (
-            y | std::map(func (z: int64) -> 6-z)
+          | std::map(func (y: [Int64]) -> (
+            y | std::map(func (z: Int64) -> 6-z)
           ))
         )
         "#,
@@ -2009,7 +2011,7 @@ fn serialize_bool_array() {
 
         func main() -> (
           get_data().a
-          | std::map(func (y: bool) -> !y)
+          | std::map(func (y: Bool) -> !y)
         )
         "#,
         lutra_bin::Value::unit()
@@ -2055,7 +2057,7 @@ fn serialize_text_array() {
 
         func main() -> (
           get_data().a
-          | std::map(func (y: text) -> y)
+          | std::map(func (y: Text) -> y)
         )
         "#,
         lutra_bin::Value::unit()
@@ -2146,7 +2148,7 @@ fn serialize_complex_nested() {
             [
               {
                 "hello",
-                [{1: int32, {1: int32, [5: int32], 2: int16}, 2: int16}]
+                [{1: Int32, {1: Int32, [5: Int32], 2: Int16}, 2: Int16}]
               }.1
             ]
           }.1
@@ -2283,7 +2285,7 @@ fn serialize_input_array_in_tuple() {
     // Input array directly placed in tuple (should avoid unnecessary serialize/deserialize)
     insta::assert_snapshot!(_sql_and_output(_run(
         r#"
-        func main(x: [int32]) -> {"hello", x}
+        func main(x: [Int32]) -> {"hello", x}
         "#,
         lutra_bin::Value::Array(vec![
             lutra_bin::Value::Prim32(1),
@@ -2311,7 +2313,7 @@ fn serialize_literal_array_in_tuple() {
     // Literal array in tuple
     insta::assert_snapshot!(_sql_and_output(_run(
         r#"
-        func main() -> {"hello", [1: int32, 2]}
+        func main() -> {"hello", [1: Int32, 2]}
         "#,
         lutra_bin::Value::unit()
     )), @r#"
@@ -2357,7 +2359,7 @@ fn serialize_option_in_array() {
     insta::assert_snapshot!(_sql_and_output(_run(
         r#"
         func main() -> {
-          data = [.none, .some(5)]: [enum { none, some: int32 }]
+          data = [.none, .some(5)]: [enum { none, some: Int32 }]
         }
         "#,
         lutra_bin::Value::unit()
@@ -2399,7 +2401,7 @@ fn serialize_tuple_with_option_array() {
         r#"
         func main() -> {
           name = "test",
-          values = [.some(1), .none, .some(3)]: [enum {none, some: int32}]
+          values = [.some(1), .none, .some(3)]: [enum {none, some: Int32}]
         }
         "#,
         lutra_bin::Value::unit()
@@ -2451,7 +2453,7 @@ fn fs_read_parquet() {
     crate::init_logger();
 
     insta::assert_snapshot!(_compile(
-    r#"func main(): [{id: int32, name: text}] -> std::fs::read_parquet("test.parquet")"#,
+    r#"func main(): [{id: Int32, name: Text}] -> std::fs::read_parquet("test.parquet")"#,
     ).unwrap().2, @"
     SELECT
       r1._0 AS id,
@@ -2476,7 +2478,7 @@ fn fs_write_parquet() {
     crate::init_logger();
 
     insta::assert_snapshot!(_compile(
-    r#"func main(x: [{id: int32, name: text}]) -> std::fs::write_parquet(x, "test.parquet")"#,
+    r#"func main(x: [{id: Int32, name: Text}]) -> std::fs::write_parquet(x, "test.parquet")"#,
     ).unwrap().2, @"
     COPY(
       (
@@ -2506,9 +2508,9 @@ fn update_basic() {
         ",
         r#"
         type User: {
-          id: int32,
-          name: text,
-          age: int32,
+          id: Int32,
+          name: Text,
+          age: Int32,
         }
 
         func main(): {} -> std::sql::update(
@@ -2644,10 +2646,10 @@ fn update_multiple_rows() {
         setup,
         r#"
         type Product: {
-          id: int32,
-          name: text,
-          price: float64,
-          active: bool,
+          id: Int32,
+          name: Text,
+          price: Float64,
+          active: Bool,
         }
 
         func main(): {} -> std::sql::update(
@@ -2672,9 +2674,9 @@ fn update_with_complex_where() {
         ",
         r#"
         type Item: {
-          id: int32,
-          quantity: int32,
-          price: float64,
+          id: Int32,
+          quantity: Int32,
+          price: Float64,
         }
 
         func main(): {} -> std::sql::update(
@@ -2708,9 +2710,9 @@ fn update_verify_changes() {
         &mut runner,
         r#"
     type User: {
-      id: int32,
-      name: text,
-      age: int32,
+      id: Int32,
+      name: Text,
+      age: Int32,
     }
 
     func main(): {} -> std::sql::update(
@@ -2728,9 +2730,9 @@ fn update_verify_changes() {
     // Verify the update worked
     insta::assert_snapshot!(_run_on(&mut runner, r#"
     type User: {
-      id: int32,
-      name: text,
-      age: int32,
+      id: Int32,
+      name: Text,
+      age: Int32,
     }
     func main() -> (
       (std::sql::from("users"): [User])
@@ -2808,19 +2810,19 @@ fn pull_interface_with_parquet_files() {
     // Should contain both SQL table schema and parquet file schema
     insta::assert_snapshot!(interface, @r#"
     ## Row of table users
-    type User: {id: int32, name: text}
+    type User: {id: Int32, name: Text}
     ## Read from table users
     func from_users(): [User] -> std::sql::from("users")
     ## Write into table users
     func insert_users(values: [User]) -> std::sql::insert(values, "users")
     ## Lookup in users by constraint users_id_pkey
-    func from_users_by_id(id: int32): enum {none, some: User} -> (
+    func from_users_by_id(id: Int32): enum {none, some: User} -> (
       from_users() | std::find(x -> x.id == id)
     )
 
     func products(): [{
-      id: int32,
-      product_name: text,
+      id: Int32,
+      product_name: Text,
     }] -> std::fs::read_parquet("products.parquet")
 
     "#);
@@ -2864,7 +2866,7 @@ fn pull_interface_only_parquet_no_tables() {
     // Should only contain parquet file schema (no SQL tables section)
     insta::assert_snapshot!(interface, @r#"
     func flags(): [{
-      active: bool,
+      active: Bool,
     }] -> std::fs::read_parquet("flags.parquet")
 
     "#);

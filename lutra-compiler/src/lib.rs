@@ -22,7 +22,6 @@ pub use check::{CheckParams, check, check_overlay, std_source};
 pub use codespan::Span;
 pub use discover::{DiscoverParams, discover};
 pub use format::format;
-pub use intermediate::inline;
 pub use parser::parse_path;
 pub use project::{Project, SourceTree, SymbolInfo};
 
@@ -138,34 +137,39 @@ pub mod _bench {
 }
 
 #[track_caller]
-pub fn _test_compile_ty(ty_source: &str) -> ir::Ty {
-    let source = format!("type t: {ty_source}");
-
-    let source = SourceTree::single("".into(), source);
+pub fn _test_compile_ty(ty_source: &str) -> (ir::Ty, Vec<ir::TyDef>) {
+    let source = SourceTree::empty();
     let project = check(source, Default::default()).unwrap_or_else(|e| panic!("{e}"));
 
-    let module = project_to_types(&project);
-
-    let item = module.decls.into_iter().next().unwrap();
-    assert_eq!(item.name, "t");
-    let ir::Decl::Type(mut ty) = item.decl else {
-        panic!()
-    };
-
-    ty.name = None;
-    ty
+    let program = format!("func (x: {ty_source}) -> x");
+    let program = check_overlay(&project, &program, None).unwrap();
+    let program = intermediate::lowerer::lower_expr(&project, &program);
+    let program = intermediate::layouter::on_program(program);
+    (program.get_input_ty().clone(), program.defs)
 }
 
+#[doc(hidden)]
 pub fn _test_compile_main(source: &str) -> Result<ir::Program, error::Error> {
     let source = SourceTree::single("".into(), source.to_string());
     let project = check(source, Default::default())?;
     _test_compile_main_in(&project)
 }
 
+#[doc(hidden)]
 pub fn _test_compile_main_in(project: &Project) -> Result<ir::Program, error::Error> {
     let main = check_overlay(project, "main", None)?;
     let program = intermediate::lowerer::lower_expr(project, &main);
     Ok(intermediate::layouter::on_program(program))
+}
+
+#[doc(hidden)]
+pub fn _test_inline(program: ir::Program) -> ir::Program {
+    intermediate::inline(program)
+}
+
+#[doc(hidden)]
+pub fn _test_layout(program: ir::Program) -> ir::Program {
+    intermediate::layouter::on_program(program)
 }
 
 impl std::fmt::Display for ProgramRepr {

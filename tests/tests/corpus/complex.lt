@@ -15,13 +15,13 @@
 
 # === chinook_00
 module chinook {
-  type Album: {id: int64, title: text}
+  type Album: {id: Int64, title: Text}
 
   func get_albums(): [Album] -> [
     {id = 3, title = "Hello world!"}, {id = 5, title = "Foo"}
   ]
 
-  func get_album_by_id(album_id: int64) -> (
+  func get_album_by_id(album_id: Int64) -> (
     get_albums()
     | filter(func (this: Album) -> this.id == album_id)
     | index(0)
@@ -29,13 +29,13 @@ module chinook {
   )
 }
 module box_office {
-  type Invoice: {id: int64, total: float64}
+  type Invoice: {id: Int64, total: Float64}
 
   func get_album_sales(): [Invoice] -> [
     {id = 3, total = 3.6}, {id = 3, total = 3.1}, {id = 5, total = 5.2}
   ]
 
-  func get_album_sales_by_id(album_id: int64): Invoice -> (
+  func get_album_sales_by_id(album_id: Int64): Invoice -> (
     get_album_sales()
     | filter(func (this: Invoice) -> this.id == album_id)
     | index(0)
@@ -74,7 +74,7 @@ func main() -> {
 
 # === chinook_01
 module chinook {
-  type Album: {id: int64, title: text}
+  type Album: {id: Int64, title: Text}
 
   func get_album(): Album -> (
     {id = 3, title = "Hello world!"}
@@ -82,7 +82,7 @@ module chinook {
 }
 
 func main() -> {
-  5: int16,
+  5: Int16,
   chinook::get_album()
 }
 
@@ -98,14 +98,14 @@ func main() -> {
 
 # === chinook_02
 module chinook {
-  type Album: {id: int64, title: text}
+  type Album: {id: Int64, title: Text}
 
   func get_albums(): [Album] -> [
     {id = 3, title = "Hello world!"},
     {id = 5, title = "Foo"},
   ]
 
-  func get_album_by_id(album_id: int64): Album -> (
+  func get_album_by_id(album_id: Int64): Album -> (
     get_albums()
     | filter(func (this: Album) -> this.id == album_id)
     | index(0)
@@ -126,8 +126,8 @@ func main() -> {chinook::get_album_by_id(3)}
 
 # === chinook_03
 module chinook {
-  type Album: {title: text, genre_id: int64}
-  type Genre: {id: int64, name: text}
+  type Album: {title: Text, genre_id: Int64}
+  type Genre: {id: Int64, name: Text}
 
   func get_genres(): [Genre] -> [
     {id = 1, name = "Rock"},
@@ -140,7 +140,7 @@ module chinook {
     {title = "AM", genre_id = 1},
   ]
 
-  func get_albums_by_genre(genre_id: int64): [Album] -> (
+  func get_albums_by_genre(genre_id: Int64): [Album] -> (
     get_albums()
     | filter(func (this: Album) -> this.genre_id == genre_id)
   )
@@ -177,9 +177,9 @@ func main() -> (
 
 # === compounding_interest_00
 
-type Accumulator: {time: int32, repayment: float64, debt: float64}
+type Accumulator: {time: Int32, repayment: Float64, debt: Float64}
 
-const payments: [{time: int32, amount: float64}] = [
+const payments: [{time: Int32, amount: Float64}] = [
   {3, 10_000.0}, # no fmt
   {5, 10_000.0},
   {7, 10_000.0},
@@ -191,7 +191,7 @@ func main() -> (
   payments
   | fold(
     {time = 0, repayment = 0.0, debt = 50000.0},
-    func (acc: Accumulator, payment: {time: int32, amount: float64}) -> (
+    func (acc: Accumulator, payment: {time: Int32, amount: Float64}) -> (
       {
         time = payment.time,
         repayment = payment.amount,
@@ -215,10 +215,10 @@ func main() -> (
 # === compounding_interest_01
 # skip: duckdb
 
-type Payment: {time: int32, amount: float64}
+type Payment: {time: Int32, amount: Float64}
 
 type State: {
-  time: int32, debt: float64, last_payment: Payment,
+  time: Int32, debt: Float64, last_payment: Payment,
 }
 
 const payments: [Payment] = [
@@ -229,7 +229,7 @@ const payments: [Payment] = [
   {13, 10373.0},
 ]
 
-func apply_time(state: State, time: int32): State -> {
+func apply_time(state: State, time: Int32): State -> {
   time = time,
   debt = (
     state.debt
@@ -242,7 +242,7 @@ func apply_payment(state: State, payment: Payment): State -> {
   time = state.time, debt = state.debt - payment.amount, last_payment = payment,
 }
 
-func simulate_debt(at_time: int32) -> (
+func simulate_debt(at_time: Int32) -> (
   payments
   | filter(func (p: Payment) -> p.time <= at_time)
   | fold(
@@ -277,7 +277,7 @@ func main() -> [10, 15] | map(x -> simulate_debt(x))
 ]
 
 # === compounding_interest_02
-type Payment: {date: Date, amount: float64}
+type Payment: {date: Date, amount: Float64}
 
 const payments: [Payment] = [
   {@2025-03-01, 10000.0},
@@ -287,14 +287,14 @@ const payments: [Payment] = [
   {@2025-12-01, 10000.0},
 ]
 
-type State: {date: Date, debt: float64}
+type State: {date: Date, debt: Float64}
 
 const initial_state: State = {date = @2025-01-01, debt = 50000.0}
 
 func main() -> fold(
   payments,
   initial_state,
-  func (acc: State, payment: {date: Date, amount: float64}) -> {
+  func (acc: State, payment: {date: Date, amount: Float64}) -> {
     date = payment.date,
     debt = (
       acc.debt
@@ -321,13 +321,13 @@ func main() -> fold(
 # === advent_of_sql_2024_08
 func main() -> (from_staff() | loop_until_empty(get_managers))
 
-type Iter: {id: int32, depth: int16}
+type Iter: {id: Int32, depth: Int16}
 
 func get_managers(level: [Iter]): [Iter] -> (
   level | flat_map(i -> get_staff_by_id(i.id))
 )
 
-func get_staff_by_id(staff_id: int32): [Iter] -> (
+func get_staff_by_id(staff_id: Int32): [Iter] -> (
   from_staff() | filter(x -> x.id == staff_id)
 )
 

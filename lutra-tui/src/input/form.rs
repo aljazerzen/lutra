@@ -50,11 +50,13 @@ pub enum FormResult {
     Submit,
 }
 
-fn get_ty_mat<'a>(mut ty: &'a ir::Ty, ty_defs: &'a TyDefs) -> &'a ir::Ty {
+fn get_ty_mat_or_std<'a>(mut ty: &'a ir::Ty, ty_defs: &'a TyDefs) -> &'a ir::Ty {
     while let ir::TyKind::Ident(path) = &ty.kind {
-        ty = ty_defs
-            .get(path)
-            .unwrap_or_else(|| panic!("Type identifier {:?} not found in definitions", path))
+        if path.is(&["std", "Text"]) {
+            return ty;
+        }
+
+        ty = ty_defs.get(path).unwrap();
     }
     ty
 }
@@ -78,30 +80,19 @@ impl Form {
     }
 
     pub fn new(ty: &ir::Ty, name: FormName, ty_defs: TyDefs) -> Self {
-        let ty_mat = get_ty_mat(ty, &ty_defs);
+        let ty_mat = get_ty_mat_or_std(ty, &ty_defs);
 
         let kind: FormKind = match &ty_mat.kind {
-            ir::TyKind::Primitive(ir::TyPrimitive::text) => {
+            ir::TyKind::Ident(i) => {
+                assert!(i.is(&["std", "Text"]));
                 FormKind::Text(TextForm::new(String::new()))
             }
-            ir::TyKind::Primitive(ir::TyPrimitive::bool) => FormKind::Bool(BoolForm::new(false)),
-            ir::TyKind::Primitive(
-                prim @ (ir::TyPrimitive::int8
-                | ir::TyPrimitive::int16
-                | ir::TyPrimitive::int32
-                | ir::TyPrimitive::int64
-                | ir::TyPrimitive::uint8
-                | ir::TyPrimitive::uint16
-                | ir::TyPrimitive::uint32
-                | ir::TyPrimitive::uint64
-                | ir::TyPrimitive::float32
-                | ir::TyPrimitive::float64),
-            ) => FormKind::Number(NumberForm::new(*prim, "0".into())),
+            ir::TyKind::Primitive(ir::TyPrimitive::prim8) => FormKind::Bool(BoolForm::new(false)),
+            ir::TyKind::Primitive(prim) => FormKind::Number(NumberForm::new(*prim, "0".into())),
             ir::TyKind::Enum(variants) => FormKind::Enum(EnumForm::new(variants, ty_defs.clone())),
             ir::TyKind::Tuple(fields) if fields.is_empty() => FormKind::TupleUnit,
             ir::TyKind::Tuple(fields) => FormKind::Tuple(TupleForm::new(fields, ty_defs.clone())),
             ir::TyKind::Array(_) => FormKind::Array(ArrayForm::new()),
-            ir::TyKind::Ident(_) => unreachable!(),
             ir::TyKind::Function(_) => panic!("Function types cannot be input in forms"),
         };
 

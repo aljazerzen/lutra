@@ -85,7 +85,7 @@ You can also run a one-off expression without creating a project function.
 ```console
 $ lutra run \
     --runner duckdb \
-    --program 'fold([1, 2, 3], 0: int32, func (s, v) -> s + v)'
+    --program 'fold([1, 2, 3], 0: Int32, func (s, v) -> s + v)'
 6
 ```
 

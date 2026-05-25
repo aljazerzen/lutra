@@ -34,7 +34,7 @@ A `const` defines a value. A `func` defines a computation.
 ```lt
 const greeting = "Hello"
 
-func greet(name: text) -> f"{greeting}, {name}!"
+func greet(name: Text) -> f"{greeting}, {name}!"
 
 func main() -> greet("Ada")
 ```
@@ -52,10 +52,10 @@ or reusable logic.
 Lutra is statically typed. Every expression has a type known at compile time.
 
 ```lt
-const answer: int32 = 42
+const answer: Int32 = 42
 const title = "Arrival"
 
-func is_large(x: int32) -> x > 10
+func is_large(x: Int32) -> x > 10
 
 func main() -> {
   answer,
@@ -66,9 +66,9 @@ func main() -> {
 
 Common types include:
 
-- primitive types such as `bool`, `int32`, `int64`, `float32`, `float64`, and `text`
-- tuples such as `{id: int32, title: text}`
-- arrays such as `[text]`
+- standard types such as `Bool`, `Int32`, `Int64`, `Float32`, `Float64`, and `Text`
+- tuples such as `{id: Int32, title: Text}`
+- arrays such as `[Text]`
 - enums such as `enum {draft, published}`
 
 ## Type annotations
@@ -77,8 +77,8 @@ Lutra can infer many types, but explicit annotations are useful when they make
 intent clearer or when the compiler must choose a numeric type.
 
 ```lt
-const movie_id: int32 = 5
-const rating = 8.7: float64
+const movie_id: Int32 = 5
+const rating = 8.7: Float64
 
 func main() -> {movie_id, rating}
 ```
@@ -89,7 +89,7 @@ Tuples group values of different types:
 
 ```lt
 const movie = {
-  id = 1: int32,
+  id = 1: Int32,
   title = "Arrival",
   released = true,
 }
@@ -112,7 +112,7 @@ func main() -> titles
 You will use arrays of tuples often, because they model tabular data naturally.
 
 ```lt
-const movies: [{id: int32, title: text}] = [
+const movies: [{id: Int32, title: Text}] = [
   {1, "Arrival"},
   {2, "Dune"},
 ]
@@ -128,7 +128,7 @@ Enums represent one value chosen from named variants.
 type Status: enum {
   draft,
   published,
-  scheduled: text,
+  scheduled: Text,
 }
 
 const posts: [Status] = [
@@ -144,8 +144,8 @@ Optional values are usually modeled as `enum {none, some: T}`.
 
 ```lt
 type MovieWithSubtitle: {
-  id: int32,
-  subtitle: enum {none, some: text},
+  id: Int32,
+  subtitle: enum {none, some: Text},
 }
 
 const movie1: MovieWithSubtitle = {1, .none}

@@ -3,7 +3,7 @@
 ## `func` sub
 
 ```lutra
-func sub(super::Date, super::Date): super::Time
+func sub(Date, Date): Time
 ```
 
 Computes time duration between two dates.
@@ -14,7 +14,7 @@ Duration is measured from one midnight to another.
 ## `func` to_timestamp
 
 ```lutra
-func to_timestamp(date: super::Date, time_zone: text): super::Timestamp
+func to_timestamp(date: Date, time_zone: Text): Timestamp
 ```
 
 Computes the timestamp of a local date at a timezone.
@@ -22,7 +22,7 @@ Computes the timestamp of a local date at a timezone.
 ## `func` to_year_month_day
 
 ```lutra
-func to_year_month_day(super::Date): {year: int32, month: uint8, day: uint8}
+func to_year_month_day(Date): {year: Int32, month: Uint8, day: Uint8}
 ```
 
 Converts a date into year, month, and day numbers.

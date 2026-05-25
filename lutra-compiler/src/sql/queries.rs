@@ -88,11 +88,14 @@ impl<'a> Context<'a> {
         }
     }
 
-    pub(super) fn get_ty_mat(&self, ty: &'a ir::Ty) -> &'a ir::Ty {
-        match &ty.kind {
-            ir::TyKind::Ident(path) => self.types.get(path).unwrap(),
-            _ => ty,
+    pub(super) fn get_ty_mat(&self, mut ty: &'a ir::Ty) -> &'a ir::Ty {
+        while let ir::TyKind::Ident(ident) = &ty.kind {
+            if ir::TyStd::try_new(ident).is_some() {
+                return ty;
+            }
+            ty = self.types.get(ident).unwrap();
         }
+        ty
     }
 
     pub(super) fn dialect(&self) -> super::Dialect {
@@ -641,20 +644,22 @@ impl<'a> Context<'a> {
             "std::ops::mul" => utils::new_bin_op("*", args),
             "std::ops::div" => match self.dialect {
                 Dialect::Postgres => utils::new_bin_op("/", args),
-                Dialect::DuckDB => match ty.kind.as_primitive().unwrap() {
-                    ir::TyPrimitive::float32 | ir::TyPrimitive::float64 => {
+                Dialect::DuckDB => {
+                    if self.get_ty_std(ty).is_some_and(ir::TyStd::is_float) {
                         utils::new_bin_op("/", args)
+                    } else {
+                        utils::new_bin_op("//", args)
                     }
-                    _ => utils::new_bin_op("//", args),
-                },
+                }
             },
-            "std::ops::mod" => match ty.kind.as_primitive().unwrap() {
-                ir::TyPrimitive::float32 | ir::TyPrimitive::float64 => {
+            "std::ops::mod" => {
+                if self.get_ty_std(ty).is_some_and(ir::TyStd::is_float) {
                     let [l, r] = unpack_args(args);
                     sa::Expr::Source(format!("MOD({l}::numeric, {r}::numeric)::float8"))
+                } else {
+                    utils::new_bin_op("%", args)
                 }
-                _ => utils::new_bin_op("%", args),
-            },
+            }
             "std::ops::add" => utils::new_bin_op("+", args),
             "std::ops::sub" => utils::new_bin_op("-", args),
             "std::ops::neg" => utils::new_un_op("-", args),
@@ -707,12 +712,7 @@ impl<'a> Context<'a> {
             }
 
             "std::array::min" => {
-                let ty_item = self.get_ty_mat(&args_in[0].ty);
-
-                let is_bool = ty_item
-                    .kind
-                    .as_primitive()
-                    .is_some_and(|p| *p == ir::TyPrimitive::bool);
+                let is_bool = self.get_ty_std(&args_in[0].ty) == Some(ir::TyStd::Bool);
 
                 if is_bool {
                     // special case: bool
@@ -723,12 +723,7 @@ impl<'a> Context<'a> {
                 }
             }
             "std::array::max" => {
-                let ty_item = self.get_ty_mat(&args_in[0].ty);
-
-                let is_bool = ty_item
-                    .kind
-                    .as_primitive()
-                    .is_some_and(|p| *p == ir::TyPrimitive::bool);
+                let is_bool = self.get_ty_std(&args_in[0].ty) == Some(ir::TyStd::Bool);
 
                 if is_bool {
                     // special case: bool
@@ -746,10 +741,7 @@ impl<'a> Context<'a> {
             "std::array::mean" => {
                 let [arg] = unpack_args(args);
                 sa::Expr::Source(
-                    if matches!(
-                        args_in[0].ty.kind,
-                        ir::TyKind::Primitive(ir::TyPrimitive::float32)
-                    ) {
+                    if self.get_ty_std(&args_in[0].ty) == Some(ir::TyStd::Float32) {
                         // case for: float4, int2, int4, int8
                         // PostgreSQL does not have a specialized float4 avg, but just uses float8
                         // This yields different results that it should.
@@ -834,7 +826,7 @@ impl<'a> Context<'a> {
                 let [text] = unpack_args(args);
                 sa::Expr::Source(format!(
                     "LENGTH({text})::{}",
-                    self.ty_name(&ir::Ty::new(ir::TyPrimitive::uint32))
+                    self.ty_name(&ir::Ty::new_ident(&["std", "Uint32"]))
                 ))
             }
             "std::text::from_ascii" => {
@@ -957,13 +949,10 @@ impl<'a> Context<'a> {
 
                 if let Dialect::DuckDB = self.dialect {
                     // DuckDB includes .0 for whole number floats -> remove it
-
-                    let arg_ty = self.get_ty_mat(&args_in[0].ty);
-                    let is_float = matches!(
-                        arg_ty.kind,
-                        ir::TyKind::Primitive(ir::TyPrimitive::float32 | ir::TyPrimitive::float64)
-                    );
-                    if is_float {
+                    if self
+                        .get_ty_std(&args_in[0].ty)
+                        .is_some_and(ir::TyStd::is_float)
+                    {
                         r = sa::Expr::Source(format!("RTRIM(RTRIM({r}, '0'), '.')"));
                     }
                 }
@@ -1069,24 +1058,22 @@ impl<'a> Context<'a> {
         // construct a rel without rows
         let mut values = Vec::new();
 
+        let ty = self.get_ty_mat(ty);
         if ty.kind.is_array() {
             values.push(utils::number("0"));
         }
         let item_ty = match &ty.kind {
-            ir::TyKind::Primitive(_) | ir::TyKind::Tuple(_) => ty,
             ir::TyKind::Array(item_ty) => item_ty,
-            ir::TyKind::Enum(_) | ir::TyKind::Function(_) | ir::TyKind::Ident(_) => {
-                todo!()
-            }
+            _ => ty,
         };
         match &self.get_ty_mat(item_ty).kind {
-            ir::TyKind::Primitive(_) => {
+            ir::TyKind::Primitive(_) | ir::TyKind::Ident(_) => {
                 values.push(self.null(item_ty));
             }
             ir::TyKind::Tuple(ty_fields) => {
                 values.extend(ty_fields.iter().map(|ty_field| self.null(&ty_field.ty)));
             }
-            _ => todo!(),
+            k => todo!("{k:?}"),
         }
 
         let mut select = utils::select_empty();

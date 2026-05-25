@@ -57,69 +57,31 @@ impl NumberForm {
         };
 
         match self.primitive {
-            ir::TyPrimitive::int8 => {
+            ir::TyPrimitive::prim8 => {
                 let val = text.parse::<i8>().unwrap_or_default();
                 lutra_bin::Value::Prim8(val as u8)
             }
-            ir::TyPrimitive::uint8 => {
-                let val = text.parse::<u8>().unwrap_or_default();
-                lutra_bin::Value::Prim8(val)
-            }
-            ir::TyPrimitive::int16 => {
+            ir::TyPrimitive::prim16 => {
                 let val = text.parse::<i16>().unwrap_or_default();
                 lutra_bin::Value::Prim16(val as u16)
             }
-            ir::TyPrimitive::uint16 => {
-                let val = text.parse::<u16>().unwrap_or_default();
-                lutra_bin::Value::Prim16(val)
-            }
-            ir::TyPrimitive::int32 => {
+            ir::TyPrimitive::prim32 => {
                 let val = text.parse::<i32>().unwrap_or_default();
                 lutra_bin::Value::Prim32(val as u32)
             }
-            ir::TyPrimitive::uint32 => {
-                let val = text.parse::<u32>().unwrap_or_default();
-                lutra_bin::Value::Prim32(val)
-            }
-            ir::TyPrimitive::float32 => {
-                let val = text.parse::<f32>().unwrap_or_default();
-                lutra_bin::Value::Prim32(val.to_bits())
-            }
-            ir::TyPrimitive::int64 => {
+            ir::TyPrimitive::prim64 => {
                 let val = text.parse::<i64>().unwrap_or_default();
                 lutra_bin::Value::Prim64(val as u64)
             }
-            ir::TyPrimitive::uint64 => {
-                let val = text.parse::<u64>().unwrap_or_default();
-                lutra_bin::Value::Prim64(val)
-            }
-            ir::TyPrimitive::float64 => {
-                let val = text.parse::<f64>().unwrap_or_default();
-                lutra_bin::Value::Prim64(val.to_bits())
-            }
-            _ => panic!(
-                "NumberForm used with non-numeric primitive: {:?}",
-                self.primitive
-            ),
         }
     }
 
     pub(crate) fn set_value(&mut self, value: lutra_bin::Value) {
         let text = match (&value, self.primitive) {
-            (lutra_bin::Value::Prim8(v), ir::TyPrimitive::int8) => (*v as i8).to_string(),
-            (lutra_bin::Value::Prim8(v), ir::TyPrimitive::uint8) => v.to_string(),
-            (lutra_bin::Value::Prim16(v), ir::TyPrimitive::int16) => (*v as i16).to_string(),
-            (lutra_bin::Value::Prim16(v), ir::TyPrimitive::uint16) => v.to_string(),
-            (lutra_bin::Value::Prim32(v), ir::TyPrimitive::int32) => (*v as i32).to_string(),
-            (lutra_bin::Value::Prim32(v), ir::TyPrimitive::uint32) => v.to_string(),
-            (lutra_bin::Value::Prim32(v), ir::TyPrimitive::float32) => {
-                f32::from_bits(*v).to_string()
-            }
-            (lutra_bin::Value::Prim64(v), ir::TyPrimitive::int64) => (*v as i64).to_string(),
-            (lutra_bin::Value::Prim64(v), ir::TyPrimitive::uint64) => v.to_string(),
-            (lutra_bin::Value::Prim64(v), ir::TyPrimitive::float64) => {
-                f64::from_bits(*v).to_string()
-            }
+            (lutra_bin::Value::Prim8(v), ir::TyPrimitive::prim8) => (*v as i8).to_string(),
+            (lutra_bin::Value::Prim16(v), ir::TyPrimitive::prim16) => (*v as i16).to_string(),
+            (lutra_bin::Value::Prim32(v), ir::TyPrimitive::prim32) => (*v as i32).to_string(),
+            (lutra_bin::Value::Prim64(v), ir::TyPrimitive::prim64) => (*v as i64).to_string(),
             _ => panic!(
                 "Value type mismatch: expected {:?}, got {:?}",
                 self.primitive, value
@@ -131,18 +93,10 @@ impl NumberForm {
 
     fn is_allowed_char(&self, c: char) -> bool {
         match self.primitive {
-            ir::TyPrimitive::int8
-            | ir::TyPrimitive::int16
-            | ir::TyPrimitive::int32
-            | ir::TyPrimitive::int64 => c.is_ascii_digit() || c == '-',
-            ir::TyPrimitive::uint8
-            | ir::TyPrimitive::uint16
-            | ir::TyPrimitive::uint32
-            | ir::TyPrimitive::uint64 => c.is_ascii_digit(),
-            ir::TyPrimitive::float32 | ir::TyPrimitive::float64 => {
-                c.is_ascii_digit() || c == '.' || c == '-' || c == 'e' || c == 'E'
-            }
-            _ => false,
+            ir::TyPrimitive::prim8
+            | ir::TyPrimitive::prim16
+            | ir::TyPrimitive::prim32
+            | ir::TyPrimitive::prim64 => c.is_ascii_digit() || c == '-',
         }
     }
 }

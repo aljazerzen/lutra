@@ -18,7 +18,7 @@ type Status: enum {open, closed}
 
 const greeting = "hello"
 
-func main() -> cmp(1: int32, 2)
+func main() -> cmp(1: Int32, 2)
 ```
 
 ## Comments
@@ -27,7 +27,7 @@ Line comments start with `#` and continue to the end of the line.
 
 ```lt
 # This is a comment.
-const main = 1: int32
+const main = 1: Int32
 ```
 
 ## Identifiers
@@ -35,8 +35,8 @@ const main = 1: int32
 Identifiers name values, functions, modules, types, fields, and enum variants.
 
 ```lt
-const album_count = 10: int32
-func add_one(x: int32) -> x + 1
+const album_count = 10: Int32
+func add_one(x: Int32) -> x + 1
 ```
 
 Lutra also supports qualified paths with `::`.
@@ -77,7 +77,7 @@ Parentheses group expressions and are commonly used for:
 
 ```lt
 func main() -> (
-  [1, 2, 3]: [int32]
+  [1, 2, 3]: [Int32]
   | std::map(x -> x + 1)
 )
 ```
@@ -88,11 +88,11 @@ Whitespace is used for readability, but punctuation determines structure.
 For example, these two function definitions are equivalent:
 
 ```lt
-func add_one(x: int32) -> x + 1
+func add_one(x: Int32) -> x + 1
 ```
 
 ```lt
-func add_one(x: int32) -> (
+func add_one(x: Int32) -> (
   x + 1
 )
 ```

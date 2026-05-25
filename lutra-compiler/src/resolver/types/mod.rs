@@ -14,8 +14,9 @@ use crate::utils::fold::PrFold;
 pub fn run(
     root_module: &mut pr::ModuleDef,
     resolution_order: &[Vec<pr::Path>],
+    is_std: bool,
 ) -> Result<(), Vec<crate::diagnostic::Diagnostic>> {
-    let mut resolver = TypeResolver::new(root_module);
+    let mut resolver = TypeResolver::new(root_module, is_std);
 
     let diagnostic = resolver.resolve_defs(resolution_order).err();
     resolver.diagnostics.extend(diagnostic);
@@ -30,9 +31,9 @@ pub fn run(
 /// Can fold (walk) over AST and for each function call or variable find what they are referencing.
 struct TypeResolver<'a> {
     root_mod: &'a mut pr::ModuleDef,
+    is_std: bool,
 
-    debug_current_def: crate::pr::Path,
-
+    current_def_fq: Option<pr::Path>,
     scopes: Vec<scope::Scope>,
 
     const_validator: super::const_eval::ConstantValidator,
@@ -41,10 +42,12 @@ struct TypeResolver<'a> {
 }
 
 impl TypeResolver<'_> {
-    fn new(root_mod: &mut pr::ModuleDef) -> TypeResolver<'_> {
+    fn new(root_mod: &mut pr::ModuleDef, is_std: bool) -> TypeResolver<'_> {
         TypeResolver {
             root_mod,
-            debug_current_def: crate::pr::Path::from_name("?"),
+            is_std,
+
+            current_def_fq: None,
             scopes: Vec::new(),
 
             const_validator: super::const_eval::ConstantValidator::new(),

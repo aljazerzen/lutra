@@ -153,27 +153,11 @@ enum TyClass<'t> {
 
 impl<'t> TyClass<'t> {
     fn of_ty(ty_mat: &'t ir::Ty) -> Result<Self> {
-        const TY_BYTE: &ir::Ty = &ir::Ty {
-            kind: ir::TyKind::Primitive(ir::TyPrimitive::uint8),
-            layout: None,
-            name: None,
-            variants_recursive: vec![],
-        };
-
         Ok(match &ty_mat.kind {
-            ir::TyKind::Primitive(ir::TyPrimitive::bool)
-            | ir::TyKind::Primitive(ir::TyPrimitive::int8)
-            | ir::TyKind::Primitive(ir::TyPrimitive::uint8) => TyClass::Prim8,
-            ir::TyKind::Primitive(ir::TyPrimitive::int16)
-            | ir::TyKind::Primitive(ir::TyPrimitive::uint16) => TyClass::Prim16,
-            ir::TyKind::Primitive(ir::TyPrimitive::int32)
-            | ir::TyKind::Primitive(ir::TyPrimitive::uint32)
-            | ir::TyKind::Primitive(ir::TyPrimitive::float32) => TyClass::Prim32,
-            ir::TyKind::Primitive(ir::TyPrimitive::int64)
-            | ir::TyKind::Primitive(ir::TyPrimitive::uint64)
-            | ir::TyKind::Primitive(ir::TyPrimitive::float64) => TyClass::Prim64,
-
-            ir::TyKind::Primitive(ir::TyPrimitive::text) => TyClass::Array(TY_BYTE),
+            ir::TyKind::Primitive(ir::TyPrimitive::prim8) => TyClass::Prim8,
+            ir::TyKind::Primitive(ir::TyPrimitive::prim16) => TyClass::Prim16,
+            ir::TyKind::Primitive(ir::TyPrimitive::prim32) => TyClass::Prim32,
+            ir::TyKind::Primitive(ir::TyPrimitive::prim64) => TyClass::Prim64,
 
             ir::TyKind::Tuple(t) => TyClass::Tuple(t),
             ir::TyKind::Array(t) => TyClass::Array(t),

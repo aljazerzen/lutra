@@ -5,7 +5,7 @@ Basic array functions, aggregation, and window functions
 ## `func` index
 
 ```lutra
-func index(array: [T], position: int64): enum {none, some: T}
+func index(array: [T], position: Int64): enum {none, some: T}
 where T
 ```
 
@@ -14,7 +14,7 @@ Returns the item at a zero-based `position`, or `.none` if out of bounds.
 ## `func` count
 
 ```lutra
-func count(array: [T]): int64
+func count(array: [T]): Int64
 where T
 ```
 
@@ -23,7 +23,7 @@ Returns the number of items in an array.
 ## `func` is_empty
 
 ```lutra
-func is_empty([T]): bool
+func is_empty([T]): Bool
 where T
 ```
 
@@ -51,7 +51,7 @@ Applies `mapper` to each item and concatenates the resulting arrays.
 ## `func` filter
 
 ```lutra
-func filter(array: [T], condition: func (T): bool): [T]
+func filter(array: [T], condition: func (T): Bool): [T]
 where T
 ```
 
@@ -60,7 +60,7 @@ Returns only the items for which `condition` returns `true`.
 ## `func` find
 
 ```lutra
-func find(array: [T], func (T): bool): enum {none, some: T}
+func find(array: [T], func (T): Bool): enum {none, some: T}
 where T
 ```
 
@@ -70,7 +70,7 @@ or `.none` if no item matches.
 ## `func` slice
 
 ```lutra
-func slice(array: [T], start: int64, end: int64): [T]
+func slice(array: [T], start: Int64, end: Int64): [T]
 where T
 ```
 
@@ -234,7 +234,7 @@ In SQL, this is known as "RECURSIVE CTE" or "recursive join".
 
 ```lutra
 func sequence(start: N, end: N): [N]
-where N: int8 | int16 | int32 | int64 | uint8 | uint16 | uint32 | uint64 | project::Int8 | project::Int16 | project::Int32 | project::Int64 | project::Uint8 | project::Uint16 | project::Uint32 | project::Uint64
+where N: Int8 | Int16 | Int32 | Int64 | Uint8 | Uint16 | Uint32 | Uint64
 ```
 
 Returns an array of sequential integers
@@ -275,7 +275,7 @@ Returns zero when array is empty.
 ## `func` mean
 
 ```lutra
-func mean([T]): float64
+func mean([T]): Float64
 where T: number
 ```
 
@@ -284,7 +284,7 @@ Compute arithmetic mean of an array of numbers.
 ## `func` all
 
 ```lutra
-func all([bool]): bool
+func all([Bool]): Bool
 ```
 
 Returns `true` if all items in the array are `true`.
@@ -292,7 +292,7 @@ Returns `true` if all items in the array are `true`.
 ## `func` any
 
 ```lutra
-func any([bool]): bool
+func any([Bool]): Bool
 ```
 
 Returns `true` if any value in the array is `true`.
@@ -300,7 +300,7 @@ Returns `true` if any value in the array is `true`.
 ## `func` contains
 
 ```lutra
-func contains(haystack: [T], needle: T): bool
+func contains(haystack: [T], needle: T): Bool
 where T: primitive
 ```
 
@@ -309,7 +309,7 @@ Returns `true` if the haystack array contains an item equal to `needle`.
 ## `func` lag
 
 ```lutra
-func lag(array: [T], offset: int64): [T]
+func lag(array: [T], offset: Int64): [T]
 where T
 ```
 
@@ -321,7 +321,7 @@ For example, `lag(["a", "b", "c"], 1)` is `["", "a", "b"]`.
 ## `func` lead
 
 ```lutra
-func lead(array: [T], offset: int64): [T]
+func lead(array: [T], offset: Int64): [T]
 where T
 ```
 
@@ -333,7 +333,7 @@ For example, `lead(["a", "b", "c"], 1)` is `["b", "c", ""]`.
 ## `func` rolling_mean
 
 ```lutra
-func rolling_mean(array: [T], preceding: uint32, following: uint32): [float64]
+func rolling_mean(array: [T], preceding: Uint32, following: Uint32): [Float64]
 where T: number
 ```
 
@@ -350,7 +350,7 @@ For example, `rolling_mean(..., 1, 2)` computes mean of each item, along with
 ## `func` rank
 
 ```lutra
-func rank(array: [T]): [int32]
+func rank(array: [T]): [Int32]
 where T: primitive
 ```
 
@@ -366,7 +366,7 @@ For example, `rank(["a", "b", "b", "c"])` is `[1, 2, 2, 4]`.
 ## `func` rank_dense
 
 ```lutra
-func rank_dense(array: [T]): [int32]
+func rank_dense(array: [T]): [Int32]
 where T: primitive
 ```
 
@@ -382,7 +382,7 @@ For example, `rank_dense(["a", "b", "b", "c"])` is `[1, 2, 2, 3]`.
 ## `func` rank_percentile
 
 ```lutra
-func rank_percentile(array: [T]): [float64]
+func rank_percentile(array: [T]): [Float64]
 where T: primitive
 ```
 
@@ -398,7 +398,7 @@ For example, `rank_percentile(["a", "b", "b", "c"])` is
 ## `func` cume_dist
 
 ```lutra
-func cume_dist(array: [T]): [float64]
+func cume_dist(array: [T]): [Float64]
 where T: primitive
 ```
 

@@ -31,34 +31,27 @@ type ExprKind: enum {
 @rust_derive(["Debug", "Clone", "enum_as_inner::EnumAsInner"])
 type Pointer: enum {
   External: ExternalPtr,
-  Binding: uint32,
+  Binding: Uint32,
   Parameter: ParameterPtr,
 }
 
 type ExternalPtr: {
-  id: text,
+  id: Text,
 }
 
 @rust_derive(["Debug", "Clone"])
 type ParameterPtr: {
-  function_id: uint32,
-  param_position: uint8
+  function_id: Uint32,
+  param_position: Uint8,
 }
 
 @rust_derive(["Debug", "Clone", "PartialEq", "enum_as_inner::EnumAsInner"])
 type Literal: enum {
-  bool: bool,
-  int8: int8,
-  int16: int16,
-  int32: int32,
-  int64: int64,
-  uint8: uint8,
-  uint16: uint16,
-  uint32: uint32,
-  uint64: uint64,
-  float32: float32,
-  float64: float64,
-  text: text,
+  Prim8: Uint8,
+  Prim16: Uint16,
+  Prim32: Uint32,
+  Prim64: Uint64,
+  text: Text,
 }
 
 type Call: {
@@ -67,7 +60,7 @@ type Call: {
 }
 
 type Function: {
-  id: uint32,
+  id: Uint32,
   body: Expr,
 }
 
@@ -77,27 +70,27 @@ type TupleField: {
 }
 
 type EnumVariant: {
-  tag: uint64,
+  tag: Uint64,
   inner: Expr,
 }
 
 type EnumEq: {
   subject: Expr,
-  tag: uint64,
+  tag: Uint64,
 }
 
 type EnumUnwrap: {
   subject: Expr,
-  tag: uint64,
+  tag: Uint64,
 }
 
 type TupleLookup: {
   base: Expr,
-  position: uint16,
+  position: Uint16,
 }
 
 type Binding: {
-  id: uint32,
+  id: Uint32,
   expr: Expr,
   main: Expr,
 }
@@ -117,8 +110,8 @@ type TyDef: {
 type Ty: {
   kind: TyKind,
   layout: enum { None, Some: TyLayout },
-  name: enum { None, Some: text },
-  variants_recursive: [uint16],
+  name: enum { None, Some: Text },
+  variants_recursive: [Uint16],
 }
 
 @rust_derive(["Debug", "Clone", "PartialEq", "enum_as_inner::EnumAsInner"])
@@ -138,36 +131,28 @@ type TyKind: enum {
 
 @rust_derive(["Debug", "Clone", "Copy", "PartialEq", "Eq", "Hash"])
 type TyPrimitive: enum {
-  bool,
-  int8,
-  int16,
-  int32,
-  int64,
-  uint8,
-  uint16,
-  uint32,
-  uint64,
-  float32,
-  float64,
-  text,
+  prim8,
+  prim16,
+  prim32,
+  prim64,
 }
 
 @rust_derive(["Debug", "Clone", "PartialEq"])
 type TyTupleField: {
-  name: enum { None, Some: text},
+  name: enum { None, Some: Text},
   ty: Ty,
 }
 
 @rust_derive(["Debug", "Clone", "PartialEq"])
 type TyEnumVariant: {
-  name: text,
+  name: Text,
   ty: Ty,
 }
 
 @rust_derive(["Debug", "Clone", "PartialEq", "Default"])
 type TyLayout: {
-  head_size: uint32,
-  body_ptrs: [uint32],
+  head_size: Uint32,
+  body_ptrs: [Uint32],
 }
 
 @rust_derive(["Debug", "Clone", "PartialEq"])
@@ -180,7 +165,7 @@ type TyFunction: {
 type Path: [text]
 
 type Module: {
-  decls: [{name: text, decl: Decl}],
+  decls: [{name: Text, decl: Decl}],
 }
 
 type Decl: enum {

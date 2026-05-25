@@ -78,12 +78,28 @@ impl<'d, 't: 'd> Table<'d, 't> {
         self.reader.ty()
     }
 
+    /// Resolve a type identifier by one hop.
+    pub(super) fn get_ty(&self, path: &'t ir::Path) -> &'t ir::Ty {
+        self.reader.get_ty(path)
+    }
+
     /// Resolve type identifiers to their definitions.
     pub(super) fn get_ty_mat<'a>(&self, ty: &'a ir::Ty) -> &'a ir::Ty
     where
         't: 'a,
     {
         self.reader.get_ty_mat(ty)
+    }
+
+    pub(super) fn get_ty_std(&self, ty: &ir::Ty) -> Option<ir::TyStd> {
+        let mut ty = ty;
+        while let ir::TyKind::Ident(ident) = &ty.kind {
+            if let Some(t) = ir::TyStd::try_new(ident) {
+                return Some(t);
+            }
+            ty = self.get_ty(ident);
+        }
+        None
     }
 
     /// Returns the row item type (unwraps array if root is array).
@@ -97,6 +113,10 @@ impl<'d, 't: 'd> Table<'d, 't> {
 
     /// Returns true if the type can be rendered in a single cell.
     pub(super) fn is_flat(&self, ty: &ir::Ty) -> bool {
+        if self.get_ty_std(ty).is_some() {
+            return true;
+        }
+
         match &self.get_ty_mat(ty).kind {
             ir::TyKind::Primitive(_) => true,
             ir::TyKind::Enum(variants) => variants.iter().all(|v| {
@@ -170,6 +190,11 @@ impl<'d, 't> Table<'d, 't> {
     }
 
     fn flatten_cell(&self, cell: TableCell<'d, 't>, out: &mut Vec<TableCell<'d, 't>>) {
+        if self.get_ty_std(cell.ty()).is_some() {
+            out.push(cell);
+            return;
+        }
+
         let ty = self.get_ty_mat(cell.ty());
         match &ty.kind {
             ir::TyKind::Tuple(fields) => {

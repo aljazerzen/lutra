@@ -1,47 +1,42 @@
-import std::filter
-import std::sort
-import std::map
-import std::to_int64
-
 module duckdb_catalog {
-  type SchemaRow: {schema_name: text, internal: bool}
-  func from_schemas(): [SchemaRow] -> std::sql::raw(
+  type SchemaRow: {schema_name: Text, internal: Bool}
+  func from_schemas(): [SchemaRow] -> sql::raw(
     "SELECT DISTINCT schema_name, internal FROM duckdb_schemas()"
   )
 
-  type TableRow: {schema_name: text, table_name: text, table_oid: int64}
-  func from_tables(): [TableRow] -> std::sql::raw(
+  type TableRow: {schema_name: Text, table_name: Text, table_oid: Int64}
+  func from_tables(): [TableRow] -> sql::raw(
     "SELECT schema_name, table_name, table_oid FROM duckdb_tables() WHERE internal = false"
   )
 
   type ColumnRow: {
-    table_oid: int64,
-    column_name: text,
-    column_index: int32,
-    data_type: text,
-    is_nullable: bool
+    table_oid: Int64,
+    column_name: Text,
+    column_index: Int32,
+    data_type: Text,
+    is_nullable: Bool
   }
-  func from_columns(): [ColumnRow] -> std::sql::raw(
+  func from_columns(): [ColumnRow] -> sql::raw(
     "SELECT table_oid, column_name, column_index, data_type, is_nullable FROM duckdb_columns()"
   )
 
   type IndexRow: {
-    table_oid: int64,
-    index_name: text,
-    is_unique: bool,
-    sql: text
+    table_oid: Int64,
+    index_name: Text,
+    is_unique: Bool,
+    sql: Text
   }
-  func from_indexes(): [IndexRow] -> std::sql::raw(
+  func from_indexes(): [IndexRow] -> sql::raw(
     "SELECT table_oid, index_name, is_unique, sql FROM duckdb_indexes()"
   )
 
   type ConstraintRow: {
-    table_oid: int64,
-    constraint_type: text,
-    constraint_column_names: [text],
-    constraint_name: text
+    table_oid: Int64,
+    constraint_type: Text,
+    constraint_column_names: [Text],
+    constraint_name: Text
   }
-  func from_constraints(): [ConstraintRow] -> std::sql::raw(
+  func from_constraints(): [ConstraintRow] -> sql::raw(
     "SELECT table_oid, constraint_type, constraint_column_names, constraint_name FROM duckdb_constraints()"
   )
 }

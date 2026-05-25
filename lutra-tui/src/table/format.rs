@@ -17,54 +17,28 @@ pub fn truncate(s: &str, max_width: usize) -> String {
 
 /// Format a value for display, returning (text, alignment).
 pub fn format_value(data: &[u8], ty: &ir::Ty, table: &Table) -> Result<String> {
-    // Try special types first (Date, Time, Timestamp, Decimal)
-    if let Some(result) = format_special(data, ty) {
-        return result;
-    }
-
     let ty_mat = table.get_ty_mat(ty);
     match &ty_mat.kind {
         ir::TyKind::Primitive(prim) => format_primitive(data, prim),
+        ir::TyKind::Ident(ident) => format_ty_std(data, ir::TyStd::try_new(ident).unwrap()),
         ir::TyKind::Enum(variants) => format_enum(data, ty_mat, variants, table),
         ir::TyKind::Array(_) => Ok("[…]".into()),
         ir::TyKind::Tuple(_) => Ok("{…}".into()),
-        ir::TyKind::Function(_) => Ok("fn".into()),
-        ir::TyKind::Ident(_) => unreachable!("should be resolved"),
+        ir::TyKind::Function(_) => Ok("func".into()),
     }
 }
 
 /// Format a primitive value, returning (text, alignment).
 pub fn format_primitive(data: &[u8], prim: &ir::TyPrimitive) -> Result<String> {
     match prim {
-        ir::TyPrimitive::bool => {
-            let v = bool::decode(data)?;
-            Ok(if v { "true" } else { "false" }.into())
-        }
-        ir::TyPrimitive::text => {
-            let (offset, len) = ArrayReader::<&[u8]>::read_head(data);
-            let text_data = &data[offset..offset + len];
-            let s = std::str::from_utf8(text_data).map_err(|_| Error::InvalidData)?;
-            Ok(s.to_string())
-        }
-        ir::TyPrimitive::int8 => Ok(i8::decode(data)?.to_string()),
-        ir::TyPrimitive::int16 => Ok(i16::decode(data)?.to_string()),
-        ir::TyPrimitive::int32 => Ok(i32::decode(data)?.to_string()),
-        ir::TyPrimitive::int64 => Ok(i64::decode(data)?.to_string()),
-        ir::TyPrimitive::uint8 => Ok(u8::decode(data)?.to_string()),
-        ir::TyPrimitive::uint16 => Ok(u16::decode(data)?.to_string()),
-        ir::TyPrimitive::uint32 => Ok(u32::decode(data)?.to_string()),
-        ir::TyPrimitive::uint64 => Ok(u64::decode(data)?.to_string()),
-        ir::TyPrimitive::float32 => {
-            let v = f32::decode(data)?;
-            Ok(format_float(v as f64))
-        }
-        ir::TyPrimitive::float64 => {
-            let v = f64::decode(data)?;
-            Ok(format_float(v))
-        }
+        ir::TyPrimitive::prim8 => Ok(i8::decode(data)?.to_string()),
+        ir::TyPrimitive::prim16 => Ok(i16::decode(data)?.to_string()),
+        ir::TyPrimitive::prim32 => Ok(i32::decode(data)?.to_string()),
+        ir::TyPrimitive::prim64 => Ok(i64::decode(data)?.to_string()),
     }
 }
 
+#[allow(dead_code)]
 fn format_float(v: f64) -> String {
     if v.is_nan() {
         "NaN".into()
@@ -83,53 +57,65 @@ fn format_float(v: f64) -> String {
 
 /// Try to format special types (Date, Time, Timestamp, Decimal).
 /// Returns None if not a special type.
-pub fn format_special(data: &[u8], ty: &ir::Ty) -> Option<Result<String>> {
-    let ir::TyKind::Ident(path) = &ty.kind else {
-        return None;
-    };
-
-    if path.0 == ["std", "Date"] {
-        let days = match i32::decode(data) {
-            Ok(d) => d,
-            Err(e) => return Some(Err(e)),
-        };
-        if let Some(date) = chrono::NaiveDate::from_num_days_from_ce_opt(days) {
-            Some(Ok(format!("{}", date)))
-        } else {
-            Some(Ok(days.to_string()))
+pub fn format_ty_std(data: &[u8], ty: ir::TyStd) -> Result<String> {
+    Ok(match ty {
+        ir::TyStd::Bool => {
+            let v = bool::decode(data)?;
+            if v { "true" } else { "false" }.into()
         }
-    } else if path.0 == ["std", "Time"] {
-        let micros_t = match i64::decode(data) {
-            Ok(m) => m,
-            Err(e) => return Some(Err(e)),
-        };
-        let micros = (micros_t % 1_000_000).unsigned_abs();
-        let sec_t = micros_t / 1_000_000;
-        let sec = (sec_t % 60).unsigned_abs();
-        let min_t = sec_t / 60;
-        let min = (min_t % 60).unsigned_abs();
-        let h = min_t / 60;
-        Some(Ok(format!("{:02}:{:02}:{:02}.{:06}", h, min, sec, micros)))
-    } else if path.0 == ["std", "Timestamp"] {
-        let micros = match i64::decode(data) {
-            Ok(m) => m,
-            Err(e) => return Some(Err(e)),
-        };
-        if let Some(dt) = chrono::DateTime::from_timestamp_micros(micros) {
-            let formatted = dt.format("%Y-%m-%d %H:%M:%S%.6f").to_string();
-            Some(Ok(formatted))
-        } else {
-            Some(Ok(micros.to_string()))
+        ir::TyStd::Int8 => i8::decode(data)?.to_string(),
+        ir::TyStd::Int16 => i16::decode(data)?.to_string(),
+        ir::TyStd::Int32 => i32::decode(data)?.to_string(),
+        ir::TyStd::Int64 => i64::decode(data)?.to_string(),
+        ir::TyStd::UInt8 => u8::decode(data)?.to_string(),
+        ir::TyStd::UInt16 => u16::decode(data)?.to_string(),
+        ir::TyStd::UInt32 => u32::decode(data)?.to_string(),
+        ir::TyStd::UInt64 => u64::decode(data)?.to_string(),
+        ir::TyStd::Float32 => {
+            let v = f32::decode(data)?;
+            format_float(v as f64)
         }
-    } else if path.0 == ["std", "Decimal"] {
-        let val = match i64::decode(data) {
-            Ok(v) => v,
-            Err(e) => return Some(Err(e)),
-        };
-        Some(Ok(format!("{}.{:02}", val / 100, (val % 100).abs())))
-    } else {
-        None
-    }
+        ir::TyStd::Float64 => {
+            let v = f64::decode(data)?;
+            format_float(v)
+        }
+        ir::TyStd::Text => {
+            let (offset, len) = ArrayReader::<&[u8]>::read_head(data);
+            let text_data = &data[offset..offset + len];
+            let s = std::str::from_utf8(text_data).map_err(|_| Error::InvalidData)?;
+            s.to_string()
+        }
+        ir::TyStd::Date => {
+            let days = i32::decode(data)?;
+            if let Some(date) = chrono::NaiveDate::from_num_days_from_ce_opt(days) {
+                format!("{}", date)
+            } else {
+                days.to_string()
+            }
+        }
+        ir::TyStd::Time => {
+            let micros_t = i64::decode(data)?;
+            let micros = (micros_t % 1_000_000).unsigned_abs();
+            let sec_t = micros_t / 1_000_000;
+            let sec = (sec_t % 60).unsigned_abs();
+            let min_t = sec_t / 60;
+            let min = (min_t % 60).unsigned_abs();
+            let h = min_t / 60;
+            format!("{:02}:{:02}:{:02}.{:06}", h, min, sec, micros)
+        }
+        ir::TyStd::Timestamp => {
+            let micros = i64::decode(data)?;
+            if let Some(dt) = chrono::DateTime::from_timestamp_micros(micros) {
+                dt.format("%Y-%m-%d %H:%M:%S%.6f").to_string()
+            } else {
+                micros.to_string()
+            }
+        }
+        ir::TyStd::Decimal => {
+            let val = i64::decode(data)?;
+            format!("{}.{:02}", val / 100, (val % 100).abs())
+        }
+    })
 }
 
 fn format_enum(
@@ -218,10 +204,7 @@ pub fn format_ty_name(ty: &ir::Ty, table: &Table) -> String {
                 format!("enum{{{},…}}", names[..2].join(","))
             }
         }
-        ir::TyKind::Ident(path) => {
-            // Show last segment for special types (Date, Timestamp, etc.)
-            path.0.last().cloned().unwrap_or_default()
-        }
+        ir::TyKind::Ident(path) => path.0.last().cloned().unwrap_or_default(),
         ir::TyKind::Tuple(_) => "{…}".into(),
         ir::TyKind::Function(_) => "fn".into(),
     }
@@ -229,18 +212,10 @@ pub fn format_ty_name(ty: &ir::Ty, table: &Table) -> String {
 
 fn format_primitive_ty_name(prim: &ir::TyPrimitive) -> String {
     match prim {
-        ir::TyPrimitive::bool => "bool",
-        ir::TyPrimitive::int8 => "int8",
-        ir::TyPrimitive::int16 => "int16",
-        ir::TyPrimitive::int32 => "int32",
-        ir::TyPrimitive::int64 => "int64",
-        ir::TyPrimitive::uint8 => "uint8",
-        ir::TyPrimitive::uint16 => "uint16",
-        ir::TyPrimitive::uint32 => "uint32",
-        ir::TyPrimitive::uint64 => "uint64",
-        ir::TyPrimitive::float32 => "float32",
-        ir::TyPrimitive::float64 => "float64",
-        ir::TyPrimitive::text => "text",
+        ir::TyPrimitive::prim8 => "Prim8",
+        ir::TyPrimitive::prim16 => "Prim16",
+        ir::TyPrimitive::prim32 => "Prim32",
+        ir::TyPrimitive::prim64 => "Prim64",
     }
     .into()
 }

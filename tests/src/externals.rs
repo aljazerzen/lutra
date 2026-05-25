@@ -25,7 +25,7 @@ fn _compile_with(
 #[test]
 fn sql_code_compiles_for_sql_pg() {
     let source = r#"
-        func main(): [{id: int32, title: text}] -> std::sql::from("movies")
+        func main(): [{id: Int32, title: Text}] -> std::sql::from("movies")
     "#;
     _compile(source, Repr::SqlPg).unwrap();
 }
@@ -33,7 +33,7 @@ fn sql_code_compiles_for_sql_pg() {
 #[test]
 fn sql_code_compiles_for_sql_duckdb() {
     let source = r#"
-        func main(): [{id: int32, title: text}] -> std::sql::from("movies")
+        func main(): [{id: Int32, title: Text}] -> std::sql::from("movies")
     "#;
     _compile(source, Repr::SqlDuckdb).unwrap();
 }
@@ -41,7 +41,7 @@ fn sql_code_compiles_for_sql_duckdb() {
 #[test]
 fn sql_code_rejected_for_bytecode() {
     let source = r#"
-        func main(): [{id: int32, title: text}] -> std::sql::from("movies")
+        func main(): [{id: Int32, title: Text}] -> std::sql::from("movies")
     "#;
     let err = _compile(source, Repr::BytecodeLt).unwrap_err();
     assert!(
@@ -53,7 +53,7 @@ fn sql_code_rejected_for_bytecode() {
 #[test]
 fn fs_code_compiles_for_bytecode() {
     let source = r#"
-        func main(): [{a: int32}] -> std::fs::read_parquet("test.parquet")
+        func main(): [{a: Int32}] -> std::fs::read_parquet("test.parquet")
     "#;
     _compile_with(source, Repr::BytecodeLt, vec!["std::fs"]).unwrap();
 }
@@ -61,7 +61,7 @@ fn fs_code_compiles_for_bytecode() {
 #[test]
 fn fs_code_rejected_for_sql_pg() {
     let source = r#"
-        func main(): [{a: int32}] -> std::fs::read_parquet("test.parquet")
+        func main(): [{a: Int32}] -> std::fs::read_parquet("test.parquet")
     "#;
     let err = _compile(source, Repr::SqlPg).unwrap_err();
     assert!(
@@ -73,7 +73,7 @@ fn fs_code_rejected_for_sql_pg() {
 #[test]
 fn fs_code_compiles_for_duckdb() {
     let source = r#"
-        func main(): [{a: int32}] -> std::fs::read_parquet("test.parquet")
+        func main(): [{a: Int32}] -> std::fs::read_parquet("test.parquet")
     "#;
     _compile(source, Repr::SqlDuckdb).unwrap();
 }
@@ -81,7 +81,7 @@ fn fs_code_compiles_for_duckdb() {
 #[test]
 fn no_externals_compiles_everywhere() {
     let source = r#"
-        func main(): int32 -> 42
+        func main(): Int32 -> 42
     "#;
     _compile(source, Repr::BytecodeLt).unwrap();
     _compile(source, Repr::SqlPg).unwrap();
@@ -91,7 +91,7 @@ fn no_externals_compiles_everywhere() {
 #[test]
 fn externals_compiles_no_where() {
     let source = r#"
-        func main(): int32
+        func main(): Int32
     "#;
     _compile(source, Repr::BytecodeLt).unwrap_err();
     _compile(source, Repr::SqlPg).unwrap_err();
@@ -101,8 +101,8 @@ fn externals_compiles_no_where() {
 #[test]
 fn transitive_requirement() {
     let source = r#"
-        func read_movies(): [{id: int32, title: text}] -> std::sql::from("movies")
-        func main(): [{id: int32, title: text}] -> read_movies()
+        func read_movies(): [{id: Int32, title: Text}] -> std::sql::from("movies")
+        func main(): [{id: Int32, title: Text}] -> read_movies()
     "#;
     // should succeed for SQL
     _compile(source, Repr::SqlPg).unwrap();

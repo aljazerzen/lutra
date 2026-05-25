@@ -33,6 +33,7 @@ impl Diagnostic {
     }
 
     /// Things that you *think* should never happen, but are not sure.
+    #[allow(dead_code)]
     pub(crate) fn new_assert<S: Into<String>>(message: S) -> Self {
         Diagnostic::new("Internal bug. Please file an issue.", DiagnosticCode::BUG)
             .push_hint(message)

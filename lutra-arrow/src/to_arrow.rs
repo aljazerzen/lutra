@@ -3,7 +3,7 @@ use std::borrow::Cow;
 use std::sync::Arc;
 
 use arrow::array as aa;
-use arrow::datatypes::{DataType, Field, Schema, SchemaRef};
+use arrow::datatypes::{DataType, Field, Schema, SchemaRef, TimeUnit};
 
 use lutra_bin::{ArrayReader, bytes, ir};
 
@@ -135,7 +135,7 @@ fn construct_row_converter(ty: &ir::Ty, ctx: &Context) -> Result<Box<dyn Convert
                 fields,
             }))
         }
-        ir::TyKind::Primitive(_) => Ok(construct_cell_converter(ty, ctx)?),
+        ir::TyKind::Primitive(_) | ir::TyKind::Ident(_) => Ok(construct_cell_converter(ty, ctx)?),
         ir::TyKind::Array(_) => Err(Error::UnsupportedType("nested arrays not supported".into())),
         ir::TyKind::Enum(_) => Err(Error::UnsupportedType(
             "enum types not yet supported".into(),
@@ -143,26 +143,23 @@ fn construct_row_converter(ty: &ir::Ty, ctx: &Context) -> Result<Box<dyn Convert
         ir::TyKind::Function(_) => Err(Error::UnsupportedType(
             "cannot serialize functions to Arrow".into(),
         )),
-        ir::TyKind::Ident(_) => unreachable!("should have been resolved by get_ty_mat"),
     }
 }
 
 /// Build a converter for a single column and a single row.
 fn construct_cell_converter(ty: &ir::Ty, ctx: &Context) -> Result<Box<dyn Convert>, Error> {
-    let ty = ctx.get_ty_mat(ty)?;
+    let mut ty = ty;
+    while let ir::TyKind::Ident(ident) = &ty.kind {
+        if let Some(c) = construct_cell_ident_converter(ident) {
+            return Ok(c);
+        }
+        ty = ctx.get_ty(ident)?;
+    }
     match &ty.kind {
-        ir::TyKind::Primitive(ir::TyPrimitive::bool) => Ok(Box::new(BoolConverter)),
-        ir::TyKind::Primitive(ir::TyPrimitive::int8) => Ok(Box::new(Int8Converter)),
-        ir::TyKind::Primitive(ir::TyPrimitive::int16) => Ok(Box::new(Int16Converter)),
-        ir::TyKind::Primitive(ir::TyPrimitive::int32) => Ok(Box::new(Int32Converter)),
-        ir::TyKind::Primitive(ir::TyPrimitive::int64) => Ok(Box::new(Int64Converter)),
-        ir::TyKind::Primitive(ir::TyPrimitive::uint8) => Ok(Box::new(UInt8Converter)),
-        ir::TyKind::Primitive(ir::TyPrimitive::uint16) => Ok(Box::new(UInt16Converter)),
-        ir::TyKind::Primitive(ir::TyPrimitive::uint32) => Ok(Box::new(UInt32Converter)),
-        ir::TyKind::Primitive(ir::TyPrimitive::uint64) => Ok(Box::new(UInt64Converter)),
-        ir::TyKind::Primitive(ir::TyPrimitive::float32) => Ok(Box::new(Float32Converter)),
-        ir::TyKind::Primitive(ir::TyPrimitive::float64) => Ok(Box::new(Float64Converter)),
-        ir::TyKind::Primitive(ir::TyPrimitive::text) => Ok(Box::new(TextConverter)),
+        ir::TyKind::Primitive(ir::TyPrimitive::prim8) => Ok(Box::new(UInt8Converter)),
+        ir::TyKind::Primitive(ir::TyPrimitive::prim16) => Ok(Box::new(UInt16Converter)),
+        ir::TyKind::Primitive(ir::TyPrimitive::prim32) => Ok(Box::new(UInt32Converter)),
+        ir::TyKind::Primitive(ir::TyPrimitive::prim64) => Ok(Box::new(UInt64Converter)),
         ir::TyKind::Tuple(_) => Err(Error::UnsupportedType(
             "nested tuple types not yet supported".into(),
         )),
@@ -179,6 +176,36 @@ fn construct_cell_converter(ty: &ir::Ty, ctx: &Context) -> Result<Box<dyn Conver
     }
 }
 
+fn construct_cell_ident_converter(ident: &ir::Path) -> Option<Box<dyn Convert>> {
+    if ident.is(&["std", "Bool"]) {
+        Some(Box::new(BoolConverter))
+    } else if ident.is(&["std", "Int8"]) {
+        Some(Box::new(Int8Converter))
+    } else if ident.is(&["std", "Int16"]) {
+        Some(Box::new(Int16Converter))
+    } else if ident.is(&["std", "Int32"]) {
+        Some(Box::new(Int32Converter))
+    } else if ident.is(&["std", "Int64"]) {
+        Some(Box::new(Int64Converter))
+    } else if ident.is(&["std", "Uint8"]) {
+        Some(Box::new(UInt8Converter))
+    } else if ident.is(&["std", "Uint16"]) {
+        Some(Box::new(UInt16Converter))
+    } else if ident.is(&["std", "Uint32"]) {
+        Some(Box::new(UInt32Converter))
+    } else if ident.is(&["std", "Uint64"]) {
+        Some(Box::new(UInt64Converter))
+    } else if ident.is(&["std", "Float32"]) {
+        Some(Box::new(Float32Converter))
+    } else if ident.is(&["std", "Float64"]) {
+        Some(Box::new(Float64Converter))
+    } else if ident.is(&["std", "Text"]) {
+        Some(Box::new(TextConverter))
+    } else {
+        None
+    }
+}
+
 // ---------------------------------------------------------------------------
 // Schema helpers
 // ---------------------------------------------------------------------------
@@ -189,7 +216,9 @@ fn get_schema(ty: &ir::Ty, ctx: &Context) -> Result<SchemaRef, Error> {
 
     let fields = match &ty.kind {
         ir::TyKind::Array(ty_item) => get_schema_row(ty_item, ctx)?,
-        ir::TyKind::Tuple(_) | ir::TyKind::Primitive(_) => get_schema_row(ty, ctx)?,
+        ir::TyKind::Tuple(_) | ir::TyKind::Primitive(_) | ir::TyKind::Ident(_) => {
+            get_schema_row(ty, ctx)?
+        }
 
         ir::TyKind::Enum(_) => {
             return Err(Error::UnsupportedType("enum types not supported".into()));
@@ -199,7 +228,6 @@ fn get_schema(ty: &ir::Ty, ctx: &Context) -> Result<SchemaRef, Error> {
                 "cannot serialize functions to Arrow".into(),
             ));
         }
-        ir::TyKind::Ident(_) => unreachable!(),
     };
     Ok(Arc::new(Schema::new(fields)))
 }
@@ -221,7 +249,7 @@ fn get_schema_row(ty: &ir::Ty, ctx: &Context) -> Result<Vec<Field>, Error> {
             }
             Ok(fields)
         }
-        ir::TyKind::Primitive(_) => {
+        ir::TyKind::Primitive(_) | ir::TyKind::Ident(_) => {
             let field = Field::new("value", get_schema_cell(ty, ctx)?, false);
             Ok(vec![field])
         }
@@ -229,26 +257,37 @@ fn get_schema_row(ty: &ir::Ty, ctx: &Context) -> Result<Vec<Field>, Error> {
         ir::TyKind::Function(_) => Err(Error::UnsupportedType(
             "cannot serialize functions to Arrow".into(),
         )),
-        ir::TyKind::Ident(_) => unreachable!(),
     }
 }
 
 fn get_schema_cell(ty: &ir::Ty, ctx: &Context) -> Result<DataType, Error> {
     let ty = ctx.get_ty_mat(ty)?;
-
     match &ty.kind {
-        ir::TyKind::Primitive(ir::TyPrimitive::bool) => Ok(DataType::Boolean),
-        ir::TyKind::Primitive(ir::TyPrimitive::int8) => Ok(DataType::Int8),
-        ir::TyKind::Primitive(ir::TyPrimitive::int16) => Ok(DataType::Int16),
-        ir::TyKind::Primitive(ir::TyPrimitive::int32) => Ok(DataType::Int32),
-        ir::TyKind::Primitive(ir::TyPrimitive::int64) => Ok(DataType::Int64),
-        ir::TyKind::Primitive(ir::TyPrimitive::uint8) => Ok(DataType::UInt8),
-        ir::TyKind::Primitive(ir::TyPrimitive::uint16) => Ok(DataType::UInt16),
-        ir::TyKind::Primitive(ir::TyPrimitive::uint32) => Ok(DataType::UInt32),
-        ir::TyKind::Primitive(ir::TyPrimitive::uint64) => Ok(DataType::UInt64),
-        ir::TyKind::Primitive(ir::TyPrimitive::float32) => Ok(DataType::Float32),
-        ir::TyKind::Primitive(ir::TyPrimitive::float64) => Ok(DataType::Float64),
-        ir::TyKind::Primitive(ir::TyPrimitive::text) => Ok(DataType::Utf8),
+        ir::TyKind::Primitive(ir::TyPrimitive::prim8) => Ok(DataType::UInt8),
+        ir::TyKind::Primitive(ir::TyPrimitive::prim16) => Ok(DataType::UInt16),
+        ir::TyKind::Primitive(ir::TyPrimitive::prim32) => Ok(DataType::UInt32),
+        ir::TyKind::Primitive(ir::TyPrimitive::prim64) => Ok(DataType::UInt64),
+        ir::TyKind::Ident(path) => {
+            let ty_std = ir::TyStd::try_new(path).unwrap();
+            Ok(match ty_std {
+                ir::TyStd::Bool => DataType::Boolean,
+                ir::TyStd::Int8 => DataType::Int8,
+                ir::TyStd::Int16 => DataType::Int16,
+                ir::TyStd::Int32 => DataType::Int32,
+                ir::TyStd::Int64 => DataType::Int64,
+                ir::TyStd::UInt8 => DataType::UInt8,
+                ir::TyStd::UInt16 => DataType::UInt16,
+                ir::TyStd::UInt32 => DataType::UInt32,
+                ir::TyStd::UInt64 => DataType::UInt64,
+                ir::TyStd::Float32 => DataType::Float32,
+                ir::TyStd::Float64 => DataType::Float64,
+                ir::TyStd::Text => DataType::Utf8,
+                ir::TyStd::Date => DataType::Date32,
+                ir::TyStd::Time => DataType::Time64(TimeUnit::Microsecond),
+                ir::TyStd::Timestamp => DataType::Timestamp(TimeUnit::Microsecond, None),
+                ir::TyStd::Decimal => DataType::Decimal64(20, 2),
+            })
+        }
         ir::TyKind::Array(_) => Err(Error::UnsupportedType(
             "nested arrays not supported".to_string(),
         )),
@@ -261,7 +300,6 @@ fn get_schema_cell(ty: &ir::Ty, ctx: &Context) -> Result<DataType, Error> {
         ir::TyKind::Function(_) => Err(Error::UnsupportedType(
             "cannot serialize functions to Arrow".into(),
         )),
-        ir::TyKind::Ident(_) => unreachable!("should have been resolved by get_ty_mat"),
     }
 }
 

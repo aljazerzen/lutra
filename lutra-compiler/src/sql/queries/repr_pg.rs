@@ -28,23 +28,24 @@ impl<'a> queries::Context<'a> {
         include_index: bool,
     ) -> Vec<(String, Cow<'t, ir::Ty>)> {
         match &self.get_ty_mat(ty).kind {
-            ir::TyKind::Primitive(_) | ir::TyKind::Tuple(_) | ir::TyKind::Enum(_) => {
-                self.pg_cols_nested(ty, "".into())
-            }
+            ir::TyKind::Primitive(_)
+            | ir::TyKind::Ident(_)
+            | ir::TyKind::Tuple(_)
+            | ir::TyKind::Enum(_) => self.pg_cols_nested(ty, "".into()),
 
             ir::TyKind::Array(item) => {
                 // just inner item cols
                 let mut r = self.pg_cols_nested(item, "".into());
 
                 if include_index {
-                    let ty_index = Cow::Owned(ir::Ty::new(ir::TyPrimitive::int64));
+                    let ty_index = Cow::Owned(ir::Ty::new(ir::TyPrimitive::prim64));
                     r.insert(0, (COL_ARRAY_INDEX.into(), ty_index));
                 }
 
                 r
             }
 
-            ir::TyKind::Function(_) | ir::TyKind::Ident(_) => unreachable!(),
+            ir::TyKind::Function(_) => unreachable!(),
         }
     }
 
@@ -69,7 +70,7 @@ impl<'a> queries::Context<'a> {
 
         let ty_mat = self.get_ty_mat(ty);
         match &ty_mat.kind {
-            ir::TyKind::Primitive(_) | ir::TyKind::Array(_) => {
+            ir::TyKind::Primitive(_) | ir::TyKind::Ident(_) | ir::TyKind::Array(_) => {
                 // primitives are a single column
                 // array is a encoded as json
 
@@ -108,7 +109,7 @@ impl<'a> queries::Context<'a> {
                 r
             }
 
-            ir::TyKind::Function(_) | ir::TyKind::Ident(_) => unreachable!(),
+            ir::TyKind::Function(_) => unreachable!(),
         }
     }
 
@@ -269,7 +270,7 @@ impl<'a> queries::Context<'a> {
     fn pg_serialize_nested(&self, input_rel: &str, input_cols: &[String], ty: &ir::Ty) -> String {
         let ty_mat = self.get_ty_mat(ty);
         match &ty_mat.kind {
-            ir::TyKind::Primitive(_) => {
+            ir::TyKind::Primitive(_) | ir::TyKind::Ident(_) => {
                 format!("{input_rel}.{}", input_cols[0])
                 // if strict { format!("to_json({r})") } else { r }
             }
@@ -340,7 +341,7 @@ impl<'a> queries::Context<'a> {
 
                 format!("CASE {input_rel}.{tag} {cases} END")
             }
-            ir::TyKind::Function(_) | ir::TyKind::Ident(_) => unreachable!(),
+            ir::TyKind::Function(_) => unreachable!(),
         }
     }
 
@@ -403,12 +404,11 @@ impl<'a> queries::Context<'a> {
     fn pg_deserialize_nested(&self, json_ref: String, ty: &ir::Ty) -> Vec<String> {
         let ty_mat = self.get_ty_mat(ty);
         match &ty_mat.kind {
-            ir::TyKind::Primitive(prim) => {
-                let r = match prim {
-                    ir::TyPrimitive::text => format!("jsonb_build_array({json_ref}) ->> 0"),
-                    _ => format!("{json_ref}::text::{}", self.ty_name(ty)),
-                };
-                vec![r]
+            ir::TyKind::Ident(i) if i.is(&["std", "Text"]) => {
+                vec![format!("jsonb_build_array({json_ref}) ->> 0")]
+            }
+            ir::TyKind::Primitive(_) | ir::TyKind::Ident(_) => {
+                vec![format!("{json_ref}::text::{}", self.ty_name(ty))]
             }
 
             ir::TyKind::Array(_) => {

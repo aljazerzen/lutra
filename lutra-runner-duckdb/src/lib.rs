@@ -151,11 +151,15 @@ impl<'a> Context<'a> {
         }
     }
 
-    pub fn get_ty_mat(&self, ty: &'a ir::Ty) -> &'a ir::Ty {
-        match &ty.kind {
-            ir::TyKind::Ident(path) => self.types.get(path).unwrap(),
-            _ => ty,
+    pub fn get_ty(&self, ident: &'a ir::Path) -> &'a ir::Ty {
+        self.types.get(ident).unwrap()
+    }
+
+    pub fn get_ty_mat(&self, mut ty: &'a ir::Ty) -> &'a ir::Ty {
+        while let ir::TyKind::Ident(path) = &ty.kind {
+            ty = self.get_ty(path);
         }
+        ty
     }
 
     /// Checks if an enum is an "option" enum. Must match [lutra_compiler::sql::utils::is_option].

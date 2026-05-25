@@ -116,25 +116,17 @@ impl Layout for () {
 // Does not recurse.
 pub fn compute(ty: &ir::Ty) -> Option<ir::TyLayout> {
     Some(match &ty.kind {
-        ir::TyKind::Array(_) | ir::TyKind::Primitive(ir::TyPrimitive::text) => ir::TyLayout {
+        ir::TyKind::Array(_) => ir::TyLayout {
             head_size: 64,
             body_ptrs: vec![0],
         },
 
         ir::TyKind::Primitive(prim) => {
             let head_size = match prim {
-                ir::TyPrimitive::int8 => 8,
-                ir::TyPrimitive::int16 => 16,
-                ir::TyPrimitive::int32 => 32,
-                ir::TyPrimitive::int64 => 64,
-                ir::TyPrimitive::uint8 => 8,
-                ir::TyPrimitive::uint16 => 16,
-                ir::TyPrimitive::uint32 => 32,
-                ir::TyPrimitive::uint64 => 64,
-                ir::TyPrimitive::float32 => 32,
-                ir::TyPrimitive::float64 => 64,
-                ir::TyPrimitive::bool => 8,
-                ir::TyPrimitive::text => unreachable!(),
+                ir::TyPrimitive::prim8 => 8,
+                ir::TyPrimitive::prim16 => 16,
+                ir::TyPrimitive::prim32 => 32,
+                ir::TyPrimitive::prim64 => 64,
             };
             ir::TyLayout {
                 head_size,

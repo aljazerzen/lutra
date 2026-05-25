@@ -71,25 +71,25 @@ DuckDB execution step as a CLI or Rust concern.
 
 ## Type mapping
 
-Lutra uses DuckDB native types for `sql::from`, `sql::insert`, and `sql::raw`.
-These rules apply no matter whether the program is launched from the CLI or
-through Rust.
+Lutra uses DuckDB native types for framed standard types in `sql::from`,
+`sql::insert`, and `sql::raw`. These rules apply no matter whether the
+program is launched from the CLI or through Rust.
 
 | Lutra type | DuckDB column type |
 |---|---|
-| `bool` | `BOOL` |
-| `int8`, `int16`, `int32`, `int64` | `INT1`, `INT2`, `INT4`, `INT8` |
-| `uint8`, `uint16`, `uint32`, `uint64` | `UINT8`, `UINT16`, `UINT32`, `UINT64` |
-| `float32`, `float64` | `FLOAT4`, `FLOAT8` |
-| `text` | `TEXT` |
-| `std::Date` | `DATE` |
-| `std::Time` | `TIME` |
-| `std::Timestamp` | `TIMESTAMP` |
-| top-level tuple `{id: int64, name: text}` | `id INT8, name TEXT` |
-| nested tuple `{x: {a: int32, b: int32}}` | `x STRUCT(a INT4, b INT4)` |
-| nested array `[text]` inside another value | `TEXT[]` |
+| `Bool` | `BOOL` |
+| `Int8`, `Int16`, `Int32`, `Int64` | `INT1`, `INT2`, `INT4`, `INT8` |
+| `Uint8`, `Uint16`, `Uint32`, `Uint64` | `UINT8`, `UINT16`, `UINT32`, `UINT64` |
+| `Float32`, `Float64` | `FLOAT4`, `FLOAT8` |
+| `Text` | `TEXT` |
+| `Date` | `DATE` |
+| `Time` | `TIME` |
+| `Timestamp` | `TIMESTAMP` |
+| top-level tuple `{id: Int64, name: Text}` | `id INT8, name TEXT` |
+| nested tuple `{x: {a: Int32, b: Int32}}` | `x STRUCT(a INT4, b INT4)` |
+| nested array `[Text]` inside another value | `TEXT[]` |
 | enum with payloads | `UNION(...)` |
-| `enum {none, some: int32}` | nullable `INT4` |
+| `enum {none, some: Int32}` | nullable `INT4` |
 
 A top-level array is stored as one row per item, using the columns of the item
 shape.
@@ -103,8 +103,8 @@ from Rust.
 import std::Date
 
 type Movie: {
-  id: int64,
-  title: text,
+  id: Int64,
+  title: Text,
   released_on: Date,
 }
 

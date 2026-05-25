@@ -39,10 +39,21 @@ struct ByteCoder<'t> {
 
 impl<'t> ByteCoder<'t> {
     fn get_ty_mat<'a: 't>(&self, ty: &'a ir::Ty) -> &'t ir::Ty {
-        match &ty.kind {
-            TyKind::Ident(path) => self.def_map.get(path).unwrap(),
-            _ => ty,
+        let mut ty = ty;
+        while let TyKind::Ident(path) = &ty.kind {
+            ty = self.def_map.get(path).unwrap();
         }
+        ty
+    }
+    fn get_ty_mat_or_std<'a: 't>(&self, ty: &'a ir::Ty) -> &'t ir::Ty {
+        let mut ty = ty;
+        while let TyKind::Ident(path) = &ty.kind {
+            if ir::TyStd::try_new(path).is_some() {
+                return ty;
+            }
+            ty = self.def_map.get(path).unwrap();
+        }
+        ty
     }
 
     fn compile_expr(&mut self, expr: ir::Expr) -> Expr {
@@ -86,17 +97,10 @@ impl<'t> ByteCoder<'t> {
 
     fn compile_literal(&mut self, value: ir::Literal) -> Vec<u8> {
         match value {
-            ir::Literal::bool(v) => v.encode(),
-            ir::Literal::int8(v) => v.encode(),
-            ir::Literal::int16(v) => v.encode(),
-            ir::Literal::int32(v) => v.encode(),
-            ir::Literal::int64(v) => v.encode(),
-            ir::Literal::uint8(v) => v.encode(),
-            ir::Literal::uint16(v) => v.encode(),
-            ir::Literal::uint32(v) => v.encode(),
-            ir::Literal::uint64(v) => v.encode(),
-            ir::Literal::float32(v) => v.encode(),
-            ir::Literal::float64(v) => v.encode(),
+            ir::Literal::Prim8(v) => v.encode(),
+            ir::Literal::Prim16(v) => v.encode(),
+            ir::Literal::Prim32(v) => v.encode(),
+            ir::Literal::Prim64(v) => v.encode(),
             ir::Literal::text(v) => v.encode(),
         }
     }
@@ -158,9 +162,10 @@ impl<'t> ByteCoder<'t> {
     }
 
     fn compile_array(&mut self, ty: ir::Ty, items: Vec<ir::Expr>) -> Array {
+        let ty_item = self.get_ty_mat(&ty).kind.as_array().unwrap();
         Array {
             items: items.into_iter().map(|x| self.compile_expr(x)).collect(),
-            item_layout: self.compile_ty_layout(ty.kind.into_array().unwrap().layout.unwrap()),
+            item_layout: self.compile_ty_layout(ty_item.layout.clone().unwrap()),
         }
     }
 
@@ -289,7 +294,7 @@ impl<'t> ByteCoder<'t> {
             | "std::math::pow"
             | "std::array::sequence" => {
                 let param_ty = as_ty_of_param(ty_mat);
-                let ty_name = self.as_primitive_name(param_ty);
+                let ty_name = self.as_std_ty_suffix(param_ty);
                 return self.make_external(format!("{id}_{ty_name}"), vec![]);
             }
 
@@ -313,7 +318,7 @@ impl<'t> ByteCoder<'t> {
                 let layout_args = vec![item_layout.head_size.div_ceil(8)];
 
                 let n_params = ty_mat.kind.as_function().unwrap().params.len();
-                let cmp_id = format!("std::ops::cmp_{}", self.as_primitive_name(item_ty));
+                let cmp_id = format!("std::ops::cmp_{}", self.as_std_ty_suffix(item_ty));
                 let cmp = self.make_external(cmp_id, vec![]);
                 return self.wrap_external_with_extra_args(id, layout_args, n_params, vec![cmp]);
             }
@@ -330,7 +335,7 @@ impl<'t> ByteCoder<'t> {
                 let key_ty = &key_extractor_ty.kind.as_function().unwrap().body;
 
                 let n_params = ty_func.params.len();
-                let cmp_id = format!("std::ops::cmp_{}", self.as_primitive_name(key_ty));
+                let cmp_id = format!("std::ops::cmp_{}", self.as_std_ty_suffix(key_ty));
                 let cmp = self.make_external(cmp_id, vec![]);
                 return self.wrap_external_with_extra_args(id, layout_args, n_params, vec![cmp]);
             }
@@ -341,7 +346,7 @@ impl<'t> ByteCoder<'t> {
                 let item_layout = item_ty.layout.as_ref().unwrap();
                 let layout_args = vec![item_layout.head_size.div_ceil(8)];
 
-                let ty_name = self.as_primitive_name(item_ty);
+                let ty_name = self.as_std_ty_suffix(item_ty);
                 return self.make_external(format!("{id}_{ty_name}"), layout_args);
             }
 
@@ -543,34 +548,13 @@ impl<'t> ByteCoder<'t> {
         ExprKind::Pointer(Sid(index as u32).with_tag(SidKind::External))
     }
 
-    /// Determines the snake_case suffix for a numeric type parameter.
-    /// Handles both nominal types (e.g. `std::Int64` → `"int64"`) and
-    /// bare primitives (e.g. `int64` → `"int64"`).
-    fn as_primitive_name(&self, ty: &ir::Ty) -> String {
-        // Check if it's a nominal type (e.g. std::Int64)
-        if let ir::TyKind::Ident(path) = &ty.kind
-            && NOMINAL_PRIMITIVES.iter().any(|x| x == path.0.as_slice())
-        {
-            return path.0.last().unwrap().to_ascii_lowercase();
-        }
-
-        // Fall back to bare primitive
-        let prim = self.get_ty_mat(ty).kind.as_primitive().unwrap();
-        match prim {
-            ir::TyPrimitive::int8 => "int8",
-            ir::TyPrimitive::int16 => "int16",
-            ir::TyPrimitive::int32 => "int32",
-            ir::TyPrimitive::int64 => "int64",
-            ir::TyPrimitive::uint8 => "uint8",
-            ir::TyPrimitive::uint16 => "uint16",
-            ir::TyPrimitive::uint32 => "uint32",
-            ir::TyPrimitive::uint64 => "uint64",
-            ir::TyPrimitive::float32 => "float32",
-            ir::TyPrimitive::float64 => "float64",
-            ir::TyPrimitive::bool => "bool",
-            ir::TyPrimitive::text => "text",
-        }
-        .into()
+    /// Determines the snake_case suffix for a framed std type
+    fn as_std_ty_suffix(&self, ty: &ir::Ty) -> String {
+        let ty = self.get_ty_mat_or_std(ty);
+        let ir::TyKind::Ident(path) = &ty.kind else {
+            panic!();
+        };
+        path.0.last().unwrap().to_ascii_lowercase()
     }
 
     /// Registers an external symbol and returns a `Pointer` ExprKind for it.
@@ -644,20 +628,10 @@ impl<'t> ByteCoder<'t> {
     fn construct_default_for_ty_re(&self, ty: &ir::Ty) -> lutra_bin::Value {
         match &self.get_ty_mat(ty).kind {
             ir::TyKind::Primitive(prim) => match prim {
-                ir::TyPrimitive::bool | ir::TyPrimitive::int8 | ir::TyPrimitive::uint8 => {
-                    lutra_bin::Value::Prim8(0)
-                }
-
-                ir::TyPrimitive::int16 | ir::TyPrimitive::uint16 => lutra_bin::Value::Prim16(0),
-
-                ir::TyPrimitive::int32 | ir::TyPrimitive::uint32 | ir::TyPrimitive::float32 => {
-                    lutra_bin::Value::Prim32(0)
-                }
-
-                ir::TyPrimitive::int64 | ir::TyPrimitive::uint64 | ir::TyPrimitive::float64 => {
-                    lutra_bin::Value::Prim64(0)
-                }
-                ir::TyPrimitive::text => lutra_bin::Value::Array(vec![]),
+                ir::TyPrimitive::prim8 => lutra_bin::Value::Prim8(0),
+                ir::TyPrimitive::prim16 => lutra_bin::Value::Prim16(0),
+                ir::TyPrimitive::prim32 => lutra_bin::Value::Prim32(0),
+                ir::TyPrimitive::prim64 => lutra_bin::Value::Prim64(0),
             },
             ir::TyKind::Array(_) => lutra_bin::Value::Array(vec![]),
             ir::TyKind::Tuple(ty_fields) => lutra_bin::Value::Tuple(
@@ -676,21 +650,6 @@ impl<'t> ByteCoder<'t> {
         }
     }
 }
-
-/// Maps a nominal numeric type or bare primitive to a snake_case suffix
-/// for per-type external function names (e.g. `add_int64`, `mul_float32`).
-const NOMINAL_PRIMITIVES: &[[&str; 2]] = &[
-    ["std", "Int8"],
-    ["std", "Int16"],
-    ["std", "Int32"],
-    ["std", "Int64"],
-    ["std", "Uint8"],
-    ["std", "Uint16"],
-    ["std", "Uint32"],
-    ["std", "Uint64"],
-    ["std", "Float32"],
-    ["std", "Float64"],
-];
 
 fn as_len_and_items(items: &[u32]) -> impl Iterator<Item = u32> + '_ {
     Some(items.len() as u32)

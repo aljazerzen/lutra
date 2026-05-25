@@ -130,7 +130,7 @@ impl<'a> queries::Context<'a> {
 
         let ty_mat = self.get_ty_mat(ty);
         match &ty_mat.kind {
-            ir::TyKind::Primitive(_) | ir::TyKind::Array(_) => {
+            ir::TyKind::Primitive(_) | ir::TyKind::Ident(_) | ir::TyKind::Array(_) => {
                 vec![sa::Expr::Source(ser_ref)]
             }
             ir::TyKind::Tuple(fields) => {
@@ -180,7 +180,7 @@ impl<'a> queries::Context<'a> {
 
         let ty_mat = self.get_ty_mat(ty);
         let expr = match &ty_mat.kind {
-            ir::TyKind::Primitive(_) => {
+            ir::TyKind::Primitive(_) | ir::TyKind::Ident(_) => {
                 // pass through
                 sa::Expr::Source(format!("{input}.value"))
             }
@@ -204,7 +204,7 @@ impl<'a> queries::Context<'a> {
                     format!("list({item_serialized} ORDER BY {input}.{COL_ARRAY_INDEX})");
 
                 // empty array needs explicit type cast for DuckDB
-                let empty_list = format!("CAST([] AS {}[])", self.duck_compile_ty_name(ty_item));
+                let empty_list = format!("CAST([] AS {}[])", self.duck_ty_name(ty_item));
 
                 sa::Expr::Source(format!("COALESCE({list_agg}, {empty_list})"))
             }
@@ -247,7 +247,7 @@ impl<'a> queries::Context<'a> {
         }
 
         match &ty_mat.kind {
-            ir::TyKind::Primitive(_) | ir::TyKind::Array(_) => {
+            ir::TyKind::Primitive(_) | ir::TyKind::Ident(_) | ir::TyKind::Array(_) => {
                 // single column value - pass through
                 // nested array - already serialized as LIST in a single column
                 cols.remove(0)
@@ -280,7 +280,7 @@ impl<'a> queries::Context<'a> {
                 let tag_expr = cols.remove(0);
                 let operand = Some(Box::new(sa::Expr::Source(format!("{tag_expr}::int2"))));
 
-                let union_ty = self.duck_compile_ty_name(ty);
+                let union_ty = self.duck_ty_name(ty);
 
                 let mut cases = Vec::with_capacity(variants.len());
                 for (position, v) in variants.iter().enumerate() {
@@ -319,7 +319,7 @@ impl<'a> queries::Context<'a> {
     /// Converts a relation from "query repr" to "arrow repr".
     pub fn duck_export(&mut self, node: Node, ty: &ir::Ty, include_index: bool) -> Node {
         match &self.get_ty_mat(ty).kind {
-            ir::TyKind::Primitive(_) => node,
+            ir::TyKind::Primitive(_) | ir::TyKind::Ident(_) => node,
             ir::TyKind::Tuple(f) if f.is_empty() => node,
             ir::TyKind::Enum(variants) if self.is_option(variants) => {
                 // option enum is a single nullable column in both reprs
@@ -360,7 +360,7 @@ impl<'a> queries::Context<'a> {
                 Node::Query(query)
             }
 
-            ir::TyKind::Function(_) | ir::TyKind::Ident(_) => unreachable!(),
+            ir::TyKind::Function(_) => unreachable!(),
         }
     }
 
@@ -388,7 +388,7 @@ impl<'a> queries::Context<'a> {
 
             res_projection
         } else {
-            // primitive -> no conversion
+            // primitive or ident -> no conversion
             // nested array -> query repr will already contain serialized items
             // enum -> convert columns to single UNION column
 

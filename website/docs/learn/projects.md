@@ -18,7 +18,7 @@ Use `import` to bring names into scope.
 ```lt
 import math::(pi64, pow)
 
-const radius = 5.0: float64
+const radius = 5.0: Float64
 
 func main() -> pi64 * pow(radius, 2.0)
 ```
@@ -30,7 +30,7 @@ Imports keep code shorter and make dependencies explicit.
 You can also use fully qualified names.
 
 ```lt
-func main() -> math::pow(2.0: float64, 3.0)
+func main() -> math::pow(2.0: Float64, 3.0)
 ```
 
 This is useful when you want to make the origin of a name obvious.

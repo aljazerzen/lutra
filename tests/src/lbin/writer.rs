@@ -2,7 +2,11 @@ use lutra_bin::ir;
 use lutra_interpreter::{ArrayWriter, Data, EnumWriter, TupleWriter};
 
 #[track_caller]
-pub(crate) fn _test_array_writer(items: Vec<Data>, output_ty: &ir::Ty) -> String {
+pub(crate) fn _test_array_writer(
+    items: Vec<Data>,
+    output_ty: &ir::Ty,
+    ty_defs: &[ir::TyDef],
+) -> String {
     let mut output = ArrayWriter::new_for_ty(output_ty);
     for item in items {
         output.write_item(item);
@@ -11,13 +15,17 @@ pub(crate) fn _test_array_writer(items: Vec<Data>, output_ty: &ir::Ty) -> String
     let output_buf = output.finish().flatten();
 
     String::new()
-        + &lutra_bin::print_source(&output_buf, output_ty, &[]).unwrap()
+        + &lutra_bin::print_source(&output_buf, output_ty, ty_defs).unwrap()
         + "\n"
         + &pretty_hex::pretty_hex(&output_buf)
 }
 
 #[track_caller]
-pub(crate) fn _test_tuple_writer(fields: Vec<Data>, output_ty: &ir::Ty) -> String {
+pub(crate) fn _test_tuple_writer(
+    fields: Vec<Data>,
+    output_ty: &ir::Ty,
+    ty_defs: &[ir::TyDef],
+) -> String {
     let mut output = TupleWriter::new_for_ty(output_ty);
     for field in fields {
         output.write_field(field);
@@ -26,20 +34,25 @@ pub(crate) fn _test_tuple_writer(fields: Vec<Data>, output_ty: &ir::Ty) -> Strin
     let output_buf = output.finish().flatten();
 
     String::new()
-        + &lutra_bin::print_source(&output_buf, output_ty, &[]).unwrap()
+        + &lutra_bin::print_source(&output_buf, output_ty, ty_defs).unwrap()
         + "\n"
         + &pretty_hex::pretty_hex(&output_buf)
 }
 
 #[track_caller]
-pub(crate) fn _test_enum_writer(tag: u64, inner: Data, output_ty: &ir::Ty) -> String {
+pub(crate) fn _test_enum_writer(
+    tag: u64,
+    inner: Data,
+    output_ty: &ir::Ty,
+    ty_defs: &[ir::TyDef],
+) -> String {
     let writer = EnumWriter::new_for_ty(output_ty);
     let output = writer.write(tag, inner);
 
     let output_buf = output.flatten();
 
     String::new()
-        + &lutra_bin::print_source(&output_buf, output_ty, &[]).unwrap()
+        + &lutra_bin::print_source(&output_buf, output_ty, ty_defs).unwrap()
         + "\n"
         + &pretty_hex::pretty_hex(&output_buf)
 }
@@ -54,9 +67,9 @@ fn array_01() {
         Data::new(vec![4, 0, 0, 0, 0, 0, 0, 0]),
     ];
 
-    let output_ty = lutra_compiler::_test_compile_ty("[int64]");
+    let (output_ty, ty_defs) = lutra_compiler::_test_compile_ty("[Int64]");
 
-    insta::assert_snapshot!(_test_array_writer(items, &output_ty), @r#"
+    insta::assert_snapshot!(_test_array_writer(items, &output_ty, &ty_defs), @r#"
     [
       0,
       1,
@@ -85,9 +98,9 @@ fn array_02() {
 
     let items = vec![data1, data2, data3, data4];
 
-    let output_ty = lutra_compiler::_test_compile_ty("[text]");
+    let (output_ty, ty_defs) = lutra_compiler::_test_compile_ty("[Text]");
 
-    insta::assert_snapshot!(_test_array_writer(items, &output_ty), @r#"
+    insta::assert_snapshot!(_test_array_writer(items, &output_ty, &ty_defs), @r#"
     [
       "0",
       "1",
@@ -111,9 +124,9 @@ fn tuple_01() {
         Data::new(vec![1, 1, 0, 0, 0, 0, 0, 0, 65, 66, 65, 66]), // int (followed by the body of text)
     ];
 
-    let output_ty = lutra_compiler::_test_compile_ty("{int64, text, int64}");
+    let (output_ty, ty_defs) = lutra_compiler::_test_compile_ty("{Int64, Text, Int64}");
 
-    insta::assert_snapshot!(_test_tuple_writer(fields, &output_ty), @r#"
+    insta::assert_snapshot!(_test_tuple_writer(fields, &output_ty, &ty_defs), @r#"
     {
       42,
       "ABAB",
@@ -127,10 +140,10 @@ fn tuple_01() {
 
 #[test]
 fn enum_01() {
-    let output_ty =
-        lutra_compiler::_test_compile_ty("enum {Done, Pending: int16, Cancelled: text}");
+    let (output_ty, ty_defs) =
+        lutra_compiler::_test_compile_ty("enum {Done, Pending: Int16, Cancelled: Text}");
 
-    insta::assert_snapshot!(_test_enum_writer(0, Data::new(vec![]), &output_ty), @r#"
+    insta::assert_snapshot!(_test_enum_writer(0, Data::new(vec![]), &output_ty, &ty_defs), @r#"
     Done
     Length: 5 (0x5) bytes
     0000:   00 04 00 00  00                                      .....
@@ -138,7 +151,7 @@ fn enum_01() {
 
     // int
     let inner = Data::new(vec![42, 0]);
-    insta::assert_snapshot!(_test_enum_writer(1, inner, &output_ty), @r"
+    insta::assert_snapshot!(_test_enum_writer(1, inner, &output_ty, &ty_defs), @r"
     Pending(42)
     Length: 7 (0x7) bytes
     0000:   01 04 00 00  00 2a 00                                .....*.
@@ -146,7 +159,7 @@ fn enum_01() {
 
     // int (followed by the body of text)
     let inner = Data::new(vec![1, 1, 65, 66, 65, 66]);
-    insta::assert_snapshot!(_test_enum_writer(1, inner, &output_ty), @r"
+    insta::assert_snapshot!(_test_enum_writer(1, inner, &output_ty, &ty_defs), @r"
     Pending(257)
     Length: 11 (0xb) bytes
     0000:   01 04 00 00  00 01 01 41  42 41 42                   .......ABAB
@@ -154,7 +167,7 @@ fn enum_01() {
 
     // text
     let inner = Data::new(vec![8, 0, 0, 0, 4, 0, 0, 0, 65, 66, 65, 66]);
-    insta::assert_snapshot!(_test_enum_writer(2, inner, &output_ty), @r#"
+    insta::assert_snapshot!(_test_enum_writer(2, inner, &output_ty, &ty_defs), @r#"
     Cancelled("ABAB")
     Length: 17 (0x11) bytes
     0000:   02 04 00 00  00 08 00 00  00 04 00 00  00 41 42 41   .............ABA
@@ -165,7 +178,7 @@ fn enum_01() {
     let inner = Data::new(vec![
         0x10, 0, 0, 0, 4, 0, 0, 0, 42, 0, 0, 0, 0, 0, 0, 0, 65, 66, 65, 66,
     ]);
-    insta::assert_snapshot!(_test_enum_writer(2, inner, &output_ty), @r#"
+    insta::assert_snapshot!(_test_enum_writer(2, inner, &output_ty, &ty_defs), @r#"
     Cancelled("ABAB")
     Length: 25 (0x19) bytes
     0000:   02 04 00 00  00 10 00 00  00 04 00 00  00 2a 00 00   .............*..
@@ -177,8 +190,8 @@ fn enum_01() {
 fn enum_02() {
     // put an enum into an array, to test that body_ptrs are correct
 
-    let output_ty =
-        lutra_compiler::_test_compile_ty("[enum {Done, Pending: int16, Cancelled: text}]");
+    let (output_ty, ty_defs) =
+        lutra_compiler::_test_compile_ty("[enum {Done, Pending: Int16, Cancelled: Text}]");
 
     // done
     let item_0 = Data::new(vec![0, 0, 0, 0, 0]);
@@ -199,7 +212,7 @@ fn enum_02() {
 
     let items = vec![item_0, item_1, item_2, item_3, item_4];
 
-    insta::assert_snapshot!(_test_array_writer(items, &output_ty), @r#"
+    insta::assert_snapshot!(_test_array_writer(items, &output_ty, &ty_defs), @r#"
     [
       Done,
       Pending(42),
@@ -220,26 +233,26 @@ fn enum_02() {
 fn enum_03() {
     // put an enum into an array, to test that body_ptrs are correct
 
-    let output_ty =
-        lutra_compiler::_test_compile_ty("enum {Done, Pending: int16, Cancelled: bool}");
+    let (output_ty, ty_defs) =
+        lutra_compiler::_test_compile_ty("enum {Done, Pending: Int16, Cancelled: Bool}");
 
     // done
     let inner = Data::new(vec![]);
-    insta::assert_snapshot!(_test_enum_writer(0, inner, &output_ty), @r#"
+    insta::assert_snapshot!(_test_enum_writer(0, inner, &output_ty, &ty_defs), @r#"
     Done
     Length: 3 (0x3) bytes
     0000:   00 00 00                                             ...
     "#);
 
     let inner = Data::new(vec![1, 2]);
-    insta::assert_snapshot!(_test_enum_writer(1, inner, &output_ty), @r"
+    insta::assert_snapshot!(_test_enum_writer(1, inner, &output_ty, &ty_defs), @r"
     Pending(513)
     Length: 3 (0x3) bytes
     0000:   01 01 02                                             ...
     ");
 
     let inner = Data::new(vec![1, 2, 3, 4, 5, 6, 7, 8, 9]);
-    insta::assert_snapshot!(_test_enum_writer(2, inner, &output_ty), @r"
+    insta::assert_snapshot!(_test_enum_writer(2, inner, &output_ty, &ty_defs), @r"
     Cancelled(true)
     Length: 3 (0x3) bytes
     0000:   02 01 02                                             ...

@@ -10,7 +10,7 @@ A constant definition uses `const`.
 You can provide a type annotation or let the compiler infer the type.
 
 ```lt
-const a: int32 = 4
+const a: Int32 = 4
 const lang = "sl"
 const main = @2025-11-14
 ```
@@ -20,8 +20,8 @@ const main = @2025-11-14
 A function definition uses `func`.
 
 ```lt
-func add_one(x: int64) -> x + 1
-func bool_to_text(x: bool) -> if x then "yes" else "no"
+func add_one(x: Int64) -> x + 1
+func bool_to_text(x: Bool) -> if x then "yes" else "no"
 ```
 
 ### Parameters
@@ -35,7 +35,7 @@ name: Type
 Example:
 
 ```lt
-func add_one(x: int64) -> x + 1
+func add_one(x: Int64) -> x + 1
 ```
 
 ### Return types
@@ -43,13 +43,13 @@ func add_one(x: int64) -> x + 1
 A function can declare its return type after the parameter list.
 
 ```lt
-func main(): int32 -> 4
+func main(): Int32 -> 4
 ```
 
 If the return type is omitted, the compiler infers it from the body.
 
 ```lt
-func add_one(x: int64) -> x + 1
+func add_one(x: Int64) -> x + 1
 ```
 
 ### Labeled parameters
@@ -58,7 +58,7 @@ A function parameter can have an external label and a local name.
 The syntax is `label local_name: Type`.
 
 ```lt
-func calculate(value: int32, add addend: int32, multiply multiplier: int32) -> (
+func calculate(value: Int32, add addend: Int32, multiply multiplier: Int32) -> (
   value * multiplier + addend
 )
 ```
@@ -89,7 +89,7 @@ will return that same type:
 
 ```lt
 func main() -> {
-  identity(1: int32),
+  identity(1: Int32),
   identity("hello"),
 }
 ```
@@ -101,9 +101,9 @@ A `where` clause can leave a type parameter unconstrained:
 It can also constrain the allowed shape or domain of that type parameter:
 
 - `where T: {..}` for any tuple,
-- `where T: {x2: text, ..}` for a tuple with a required named field,
-- `where T: {bool, text, ..}` for a tuple with required positional fields,
-- `where T: bool | text` for one of several primitive types.
+- `where T: {x2: Text, ..}` for a tuple with a required named field,
+- `where T: {Bool, Text, ..}` for a tuple with required positional fields,
+- `where T: Bool | Text` for one of several types.
 
 For the type forms used in these constraints, see [Types](types.md).
 
@@ -125,15 +125,15 @@ A type alias assigns a name to another type.
 
 ```lt
 type Item: {
-  id: int64,
-  color: enum {red, green: bool, blue: bool},
+  id: Int64,
+  color: enum {red, green: Bool, blue: Bool},
 }
 ```
 
 ```lt
 type Status: enum {
-  open: int16,
-  closed: bool,
+  open: Int16,
+  closed: Bool,
 }
 ```
 
@@ -146,7 +146,7 @@ is part of the value's identity.
 Use a framed type when you want a distinct named type around an inner value.
 
 ```lt
-type Date(days_epoch: int32)
+type Date(days_epoch: Int32)
 ```
 
 Construct a framed value by calling the type name:
@@ -158,23 +158,24 @@ const my_date = Date(12)
 Access the inner value through field lookup:
 
 ```lt
-const my_days: int32 = my_date.days_epoch
+const my_days: Int32 = my_date.days_epoch
 ```
 
 Framed types are not required to name the inner type:
 
 ```lt
-type ErrorCode(int32)
+type ErrorCode(Int32)
 ```
 
-Inner values of named and unnamed framed types can be access with
+Inner values of named and unnamed framed types can be accessed with
 positional field lookup:
 
-```
-const err_code: int32 = my_error_code.0
+```lt
+const err_code: Int32 = my_error_code.0
 ```
 
-The standard library uses framed types for value types such as `Date`.
+The standard library defines framed standard types such as `Bool`, `Int32`,
+`Text`, `Date`, and `Timestamp` using this form.
 
 ## Module definitions
 
@@ -194,7 +195,7 @@ Any program can be invoked as the entry point, although the CLI defaults to
 invoking `main`:
 
 ```lt
-func main() -> 1: int32
+func main() -> 1: Int32
 ```
 
 ## See also

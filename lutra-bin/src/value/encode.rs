@@ -201,11 +201,10 @@ impl<'t> Context<'t> {
         }
     }
 
-    pub(super) fn get_mat_ty(&self, ty: &'t ir::Ty) -> &'t ir::Ty {
-        if let ir::TyKind::Ident(ident) = &ty.kind {
-            self.ty_defs.get(ident).unwrap()
-        } else {
-            ty
+    pub(super) fn get_mat_ty(&self, mut ty: &'t ir::Ty) -> &'t ir::Ty {
+        while let ir::TyKind::Ident(ident) = &ty.kind {
+            ty = self.ty_defs.get(ident).unwrap();
         }
+        ty
     }
 }

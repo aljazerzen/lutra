@@ -15,6 +15,7 @@ use crate::pr;
 use crate::project::Dependency;
 
 pub const NS_STD: &str = "std";
+pub(crate) use desugar::{TY_DOMAIN_NUMBER, TY_DOMAIN_PRIMITIVE};
 
 /// Runs semantic analysis on a project.
 pub fn resolve(
@@ -41,7 +42,7 @@ pub fn resolve(
         names::run(&mut root_module, unresolved, is_std).map_err(|d| vec![d])?;
 
     // resolve types
-    types::run(&mut root_module, &resolution_order)?;
+    types::run(&mut root_module, &resolution_order, is_std)?;
 
     let target_map = crate::project::TargetMap::build(target_spans);
 
@@ -88,7 +89,7 @@ pub fn resolve_overlay_expr(
     assert_eq!(resolution_order[0].len(), 1);
 
     // resolve types
-    types::run(&mut root_module, &resolution_order)?;
+    types::run(&mut root_module, &resolution_order, false)?;
 
     let def = root_module.defs.swap_remove(var_name).unwrap();
     Ok(*def.kind.into_expr().unwrap().value)

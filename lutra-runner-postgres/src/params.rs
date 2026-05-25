@@ -22,12 +22,23 @@ impl<'a> Context<'a> {
         args: &mut Vec<Arg<'a>>,
         program: &rr::SqlProgram,
     ) {
-        let ty_mat = self.get_ty_mat(ty);
-        match &ty_mat.kind {
+        let mut ty = ty;
+        while let ir::TyKind::Ident(ident) = &ty.kind {
+            if let Some(param_ty) = get_param_ty_of_std_ty(ident) {
+                args.push(Arg {
+                    data: Cow::Borrowed(input),
+                    ty: param_ty,
+                });
+                return;
+            }
+            ty = self.get_ty(ident);
+        }
+
+        match &ty.kind {
             ir::TyKind::Primitive(_) => {
                 args.push(Arg {
                     data: Cow::Borrowed(input),
-                    ty: Cow::Borrowed(&ty_mat.kind),
+                    ty: get_param_ty_of(&ty.kind).unwrap(),
                 });
             }
 
@@ -35,7 +46,7 @@ impl<'a> Context<'a> {
             ir::TyKind::Array(_) => {
                 args.push(Arg {
                     data: Cow::Owned(serialize_input_to_json(input, ty, program)),
-                    ty: Cow::Borrowed(&ty_mat.kind),
+                    ty: ParamTy::Json,
                 });
             }
 
@@ -47,13 +58,13 @@ impl<'a> Context<'a> {
                 }
             }
             ir::TyKind::Enum(variants) => {
-                let format = lutra_bin::layout::enum_format(variants, &ty_mat.variants_recursive);
+                let format = lutra_bin::layout::enum_format(variants, &ty.variants_recursive);
 
                 let (tag, inner) =
                     lutra_bin::decode_enum_head(input, format.tag_bytes, format.has_ptr);
                 args.push(Arg {
                     data: Cow::Owned((tag as u16).to_le_bytes().to_vec()),
-                    ty: Cow::Owned(ir::TyKind::Primitive(ir::TyPrimitive::int16)),
+                    ty: ParamTy::Prim16,
                 }); // tag
                 for (position, variant) in variants.iter().enumerate() {
                     if position == tag as usize {
@@ -70,12 +81,29 @@ impl<'a> Context<'a> {
     }
 
     fn push_nulls(&'a self, ty: &'a ir::Ty, args: &mut Vec<Arg<'a>>) {
-        let ty_mat = self.get_ty_mat(ty);
-        match &ty_mat.kind {
-            ir::TyKind::Primitive(_) | ir::TyKind::Array(_) => {
+        let mut ty = ty;
+        while let ir::TyKind::Ident(ident) = &ty.kind {
+            if let Some(param_ty) = get_param_ty_of_std_ty(ident) {
                 args.push(Arg {
                     data: Cow::Owned(vec![]),
-                    ty: Cow::Borrowed(&ty_mat.kind),
+                    ty: param_ty,
+                });
+                return;
+            }
+            ty = self.get_ty(ident);
+        }
+
+        match &ty.kind {
+            ir::TyKind::Primitive(_) => {
+                args.push(Arg {
+                    data: Cow::Owned(vec![]),
+                    ty: get_param_ty_of(&ty.kind).unwrap(),
+                });
+            }
+            ir::TyKind::Array(_) => {
+                args.push(Arg {
+                    data: Cow::Owned(vec![]),
+                    ty: ParamTy::Json,
                 });
             }
 
@@ -87,7 +115,7 @@ impl<'a> Context<'a> {
             ir::TyKind::Enum(variants) => {
                 args.push(Arg {
                     data: Cow::Owned(vec![]),
-                    ty: Cow::Owned(ir::TyKind::Primitive(ir::TyPrimitive::int16)),
+                    ty: ParamTy::Prim16,
                 });
                 for variant in variants {
                     self.push_nulls(&variant.ty, args);
@@ -97,6 +125,52 @@ impl<'a> Context<'a> {
             ir::TyKind::Function(_) | ir::TyKind::Ident(_) => panic!(),
         }
     }
+}
+
+fn get_param_ty_of(ty: &ir::TyKind) -> Option<ParamTy> {
+    match ty {
+        ir::TyKind::Primitive(ir::TyPrimitive::prim8) => Some(ParamTy::Prim8),
+        ir::TyKind::Primitive(ir::TyPrimitive::prim16) => Some(ParamTy::Prim16),
+        ir::TyKind::Primitive(ir::TyPrimitive::prim32) => Some(ParamTy::Prim32),
+        ir::TyKind::Primitive(ir::TyPrimitive::prim64) => Some(ParamTy::Prim64),
+        _ => None,
+    }
+}
+
+fn get_param_ty_of_std_ty(ident: &ir::Path) -> Option<ParamTy> {
+    if ident.is(&["std", "Bool"]) || ident.is(&["std", "Int8"]) || ident.is(&["std", "Uint8"]) {
+        Some(ParamTy::Prim8)
+    } else if ident.is(&["std", "Int16"]) || ident.is(&["std", "Uint16"]) {
+        Some(ParamTy::Prim16)
+    } else if ident.is(&["std", "Int32"])
+        || ident.is(&["std", "Uint32"])
+        || ident.is(&["std", "Float32"])
+        || ident.is(&["std", "Date"])
+    {
+        Some(ParamTy::Prim32)
+    } else if ident.is(&["std", "Int64"])
+        || ident.is(&["std", "Uint64"])
+        || ident.is(&["std", "Float64"])
+        || ident.is(&["std", "Time"])
+        || ident.is(&["std", "Timestamp"])
+        || ident.is(&["std", "Decimal"])
+    {
+        Some(ParamTy::Prim64)
+    } else if ident.is(&["std", "Text"]) {
+        Some(ParamTy::Text)
+    } else {
+        None
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+enum ParamTy {
+    Prim8,
+    Prim16,
+    Prim32,
+    Prim64,
+    Text,
+    Json,
 }
 
 fn serialize_input_to_json(input: &[u8], ty: &ir::Ty, program: &rr::SqlProgram) -> Vec<u8> {
@@ -125,7 +199,7 @@ impl<'a> Args<'a> {
 #[derive(Debug)]
 struct Arg<'a> {
     data: Cow<'a, [u8]>,
-    ty: Cow<'a, ir::TyKind>,
+    ty: ParamTy,
 }
 
 impl<'a> pg_ty::ToSql for Arg<'a> {
@@ -141,34 +215,16 @@ impl<'a> pg_ty::ToSql for Arg<'a> {
             return Ok(pg_ty::IsNull::Yes);
         }
 
-        match self.ty.as_ref() {
-            ir::TyKind::Primitive(ir::TyPrimitive::bool) => out.put_slice(&self.data[0..1]),
-            ir::TyKind::Primitive(ir::TyPrimitive::int8)
-            | ir::TyKind::Primitive(ir::TyPrimitive::uint8) => out.put_slice(&self.data[0..1]),
-
-            ir::TyKind::Primitive(ir::TyPrimitive::int16)
-            | ir::TyKind::Primitive(ir::TyPrimitive::uint16) => {
-                out.extend(self.data[0..2].iter().rev())
-            }
-            ir::TyKind::Primitive(ir::TyPrimitive::int32)
-            | ir::TyKind::Primitive(ir::TyPrimitive::uint32) => {
-                out.extend(self.data[0..4].iter().rev())
-            }
-            ir::TyKind::Primitive(ir::TyPrimitive::int64)
-            | ir::TyKind::Primitive(ir::TyPrimitive::uint64) => {
-                out.extend(self.data[0..8].iter().rev())
-            }
-
-            ir::TyKind::Primitive(ir::TyPrimitive::float32) => out.put_slice(&self.data[0..4]),
-            ir::TyKind::Primitive(ir::TyPrimitive::float64) => out.put_slice(&self.data[0..8]),
-
-            ir::TyKind::Primitive(ir::TyPrimitive::text) => {
+        match self.ty {
+            ParamTy::Prim8 => out.put_slice(&self.data[0..1]),
+            ParamTy::Prim16 => out.extend(self.data[0..2].iter().rev()),
+            ParamTy::Prim32 => out.extend(self.data[0..4].iter().rev()),
+            ParamTy::Prim64 => out.extend(self.data[0..8].iter().rev()),
+            ParamTy::Text => {
                 let (offset, len) = lutra_bin::ArrayReader::<&[u8]>::read_head(&self.data);
                 out.put_slice(&self.data[offset..(offset + len)])
             }
-
-            ir::TyKind::Array(_) => {
-                // JSON serialization
+            ParamTy::Json => {
                 match ty.name() {
                     "json" => out.put_slice(&self.data),
                     "jsonb" => {
@@ -178,11 +234,6 @@ impl<'a> pg_ty::ToSql for Arg<'a> {
                     _ => panic!(),
                 }
             }
-
-            ir::TyKind::Tuple(_)
-            | ir::TyKind::Enum(_)
-            | ir::TyKind::Ident(_)
-            | ir::TyKind::Function(_) => unreachable!(),
         }
         Ok(pg_ty::IsNull::No)
     }

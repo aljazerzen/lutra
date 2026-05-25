@@ -30,7 +30,7 @@ Currently supported languages:
 ```lt
 type Movie: {
   id: Prim16,
-  title: text,
+  title: Text,
 }
 
 let value: Movie = {

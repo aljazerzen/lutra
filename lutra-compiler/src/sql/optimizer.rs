@@ -332,7 +332,7 @@ fn push_correlated_into_group(expr: cr::Expr) -> (cr::Expr, bool) {
     // 1) construct bound_rel that we'll use in place of the original bound
     // 2) replace refs to the bound rel
     let mut group_outputs = vec![
-        cr::Expr::null(ir::Ty::new(ir::TyPrimitive::int64)), // fake index
+        cr::Expr::null(ir::Ty::new(ir::TyPrimitive::prim64)), // fake index
     ];
     group_outputs.append(values); // values
     let bound_rel = cr::Expr {

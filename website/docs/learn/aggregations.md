@@ -17,8 +17,8 @@ In Lutra, aggregation happens in three stages:
 
 ```lt
 const movies = [
-  {id = 1: int32, title = "Arrival"},
-  {id = 2: int32, title = "Dune"},
+  {id = 1: Int32, title = "Arrival"},
+  {id = 2: Int32, title = "Dune"},
 ]
 
 func main() -> movies | count()
@@ -35,9 +35,9 @@ A common pattern is:
 
 ```lt
 const sales = [
-  {category = "books", amount = 10: int32},
-  {category = "games", amount = 25: int32},
-  {category = "books", amount = 15: int32},
+  {category = "books", amount = 10: Int32},
+  {category = "games", amount = 25: Int32},
+  {category = "books", amount = 15: Int32},
 ]
 
 func main() -> (
@@ -56,21 +56,21 @@ minimum or maximum.
 
 ```lt
 func main() -> {
-  min([5, 3, 8: int32]),
-  max([5, 3, 8: int32]),
+  min([5, 3, 8: Int32]),
+  max([5, 3, 8: Int32]),
 }
 ```
 
 ```lt
-func main() -> min([]: [int32])
+func main() -> min([]: [Int32])
 ```
 
 That returns `none`.
 
-`mean` always returns `float64`.
+`mean` always returns `Float64`.
 
 ```lt
-func main() -> mean([5, 3, 8: int32])
+func main() -> mean([5, 3, 8: Int32])
 ```
 
 On an empty array, `mean` returns `NaN`.
@@ -100,9 +100,9 @@ It is often the closest Lutra equivalent to SQL `GROUP BY`.
 
 ```lt
 const sales = [
-  {category = "books", amount = 10: int32},
-  {category = "games", amount = 25: int32},
-  {category = "books", amount = 15: int32},
+  {category = "books", amount = 10: Int32},
+  {category = "games", amount = 25: Int32},
+  {category = "books", amount = 15: Int32},
 ]
 
 func main() -> (
@@ -203,9 +203,9 @@ Use `group_map` when you already know you want one summary row per group.
 
 ```lt
 func main() -> fold(
-  [1, 2, 3, 4, 5]: [int64],
-  {sum = 0: int64, count = 0: int64},
-  func (s, n: int64) -> {sum = s.sum + n, count = s.count + 1}
+  [1, 2, 3, 4, 5]: [Int64],
+  {sum = 0: Int64, count = 0: Int64},
+  func (s, n: Int64) -> {sum = s.sum + n, count = s.count + 1}
 )
 ```
 
@@ -213,9 +213,9 @@ func main() -> fold(
 
 ```lt
 func main() -> scan(
-  [1, 2, 3, 4, 5]: [int64],
+  [1, 2, 3, 4, 5]: [Int64],
   0,
-  func (s: int64, n: int64): int64 -> n + s
+  func (s: Int64, n: Int64): Int64 -> n + s
 )
 ```
 
@@ -231,13 +231,13 @@ work column by column instead.
 closure.
 
 ```lt
-const rel: [{sales: int64, refunds: int64}] = [
+const rel: [{sales: Int64, refunds: Int64}] = [
   {sales = 5, refunds = 3},
   {sales = 65, refunds = 1},
   {sales = 3, refunds = 2},
 ]
 
-func main() -> aggregate(rel, func (x: {sales: [int64], refunds: [int64]}) -> {
+func main() -> aggregate(rel, func (x: {sales: [Int64], refunds: [Int64]}) -> {
   min_sales = min(x.sales),
   min_refunds = min(x.refunds),
 })
@@ -254,7 +254,7 @@ These helper functions expose the same idea more explicitly.
 
 ```lt
 func main() -> to_columnar([
-  {sales = 5: int16, refunds = 3: int16},
+  {sales = 5: Int16, refunds = 3: Int16},
   {sales = 65, refunds = 1},
   {sales = 3, refunds = 2},
 ])
@@ -264,8 +264,8 @@ func main() -> to_columnar([
 
 ```lt
 func main() -> from_columnar({
-  sales = [5: int16, 65, 3],
-  refunds = [3: int16, 1, 2],
+  sales = [5: Int16, 65, 3],
+  refunds = [3: Int16, 1, 2],
 })
 ```
 
@@ -275,11 +275,11 @@ convert back to rows.
 ```lt
 func main() -> map_columnar(
   [
-    {sales = 5: int16, refunds = 3: int16},
+    {sales = 5: Int16, refunds = 3: Int16},
     {sales = 65, refunds = 1},
     {sales = 3, refunds = 2},
   ],
-  func (x: {sales: [int16], refunds: [int16]}) -> {
+  func (x: {sales: [Int16], refunds: [Int16]}) -> {
     sales = lag(x.sales, 1),
     refunds = lead(x.refunds, 1),
   }

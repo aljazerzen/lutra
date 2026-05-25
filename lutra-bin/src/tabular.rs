@@ -58,7 +58,10 @@ impl<'d, 't> TabularReader<'d, 't> {
         };
 
         match &r.get_ty_mat(ty).kind {
-            ir::TyKind::Primitive(_) | ir::TyKind::Tuple(_) | ir::TyKind::Enum(_) => {
+            ir::TyKind::Primitive(_)
+            | ir::TyKind::Ident(_)
+            | ir::TyKind::Tuple(_)
+            | ir::TyKind::Enum(_) => {
                 r.rem_items = 1;
             }
             ir::TyKind::Array(item) => {
@@ -68,7 +71,7 @@ impl<'d, 't> TabularReader<'d, 't> {
                 r.rem_items = len;
                 r.array_item_size = item.layout.as_ref().unwrap().head_size.div_ceil(8) as usize;
             }
-            ir::TyKind::Function(_) | ir::TyKind::Ident(_) => unreachable!(),
+            ir::TyKind::Function(_) => unreachable!(),
         }
         r
     }
@@ -77,10 +80,17 @@ impl<'d, 't> TabularReader<'d, 't> {
         self.inner.ty()
     }
 
+    pub fn get_ty(&self, path: &'t ir::Path) -> &'t ir::Ty {
+        self.types.get(path).unwrap()
+    }
+
     pub fn get_ty_mat(&self, ty: &'t ir::Ty) -> &'t ir::Ty {
         let mut ty = ty;
         while let ir::TyKind::Ident(path) = &ty.kind {
-            ty = self.types.get(path).unwrap();
+            if ir::TyStd::try_new(path).is_some() {
+                return ty;
+            }
+            ty = self.get_ty(path);
         }
         ty
     }
@@ -112,14 +122,14 @@ impl<'d, 't> TabularReader<'d, 't> {
                 .collect(),
 
             // primitives and enums become a single column (we also infer name from ident)
-            ir::TyKind::Primitive(_) | ir::TyKind::Enum(_) => {
+            ir::TyKind::Primitive(_) | ir::TyKind::Ident(_) | ir::TyKind::Enum(_) => {
                 if let ir::TyKind::Ident(path) = &ty.kind {
                     vec![path.0.last().unwrap().clone()]
                 } else {
                     vec!["value".into()]
                 }
             }
-            ir::TyKind::Ident(_) | ir::TyKind::Function(_) => unreachable!(),
+            ir::TyKind::Function(_) => unreachable!(),
         }
     }
 
@@ -155,7 +165,10 @@ impl<'d, 't> Iterator for TabularReader<'d, 't> {
         // unpack row
         let row_ty_mat = self.get_ty_mat(row.ty);
         Some(match &row_ty_mat.kind {
-            ir::TyKind::Primitive(_) | ir::TyKind::Array(_) | ir::TyKind::Enum(_) => {
+            ir::TyKind::Primitive(_)
+            | ir::TyKind::Ident(_)
+            | ir::TyKind::Array(_)
+            | ir::TyKind::Enum(_) => {
                 vec![row]
             }
             ir::TyKind::Tuple(fields) => {
@@ -170,7 +183,7 @@ impl<'d, 't> Iterator for TabularReader<'d, 't> {
                 }
                 cells
             }
-            ir::TyKind::Function(_) | ir::TyKind::Ident(_) => unreachable!(),
+            ir::TyKind::Function(_) => unreachable!(),
         })
     }
 }
