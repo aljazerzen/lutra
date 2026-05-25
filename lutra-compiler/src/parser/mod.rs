@@ -7,7 +7,6 @@ mod test;
 mod types;
 
 pub use self::lexer::{Token, TokenKind, lex_source_recovery};
-pub(crate) use types::{TY_DOMAIN_NUMBERS, TY_DOMAIN_PRIMITIVES};
 
 use chumsky::input::Input as _;
 use chumsky::prelude::*;

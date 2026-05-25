@@ -15,6 +15,7 @@ use crate::pr;
 use crate::project::Dependency;
 
 pub const NS_STD: &str = "std";
+pub(crate) use desugar::{TY_DOMAIN_NUMBER_NOMINALS, TY_DOMAIN_NUMBERS, TY_DOMAIN_PRIMITIVES};
 
 /// Runs semantic analysis on a project.
 pub fn resolve(

@@ -111,7 +111,7 @@ module ops {
 
   ## Negates a number.
   external func neg(T): T
-  where T: int8 | int16 | int32 | int64 | float32 | float64
+  where T: int8 | int16 | int32 | int64 | float32 | float64 | project::Int8 | project::Int16 | project::Int32 | project::Int64 | project::Float32 | project::Float64
 
   ## Compare two values to determine if the first is less, equal, or greater than
   ## the second.
@@ -436,7 +436,7 @@ module array {
   ##
   ## For example: `sequence(0, 3) == [0, 1, 2]`
   external func sequence(start: N, end: N): [N]
-  where N: int8 | int16 | int32 | int64 | uint8 | uint16 | uint32 | uint64
+  where N: int8 | int16 | int32 | int64 | uint8 | uint16 | uint32 | uint64 | project::Int8 | project::Int16 | project::Int32 | project::Int64 | project::Uint8 | project::Uint16 | project::Uint32 | project::Uint64
 
   # --- Aggregation functions ---
 
@@ -567,7 +567,7 @@ module math {
   # TODO: exponent should probably always be uint32
   ## Raises `value` to the power of `exponent`.
   external func pow(value: T, exponent: T): T
-  where T: int64 | float64
+  where T: int64 | float64 | project::Int64 | project::Float64
 
   # func exp(val: int64): int64
   # func ln(val: int64): int64
@@ -701,6 +701,36 @@ module sql {
   external func raw(const sql_source: text): R
   where R
 }
+
+## A signed 8-bit integer.
+type Int8(int8)
+
+## A signed 16-bit integer.
+type Int16(int16)
+
+## A signed 32-bit integer.
+type Int32(int32)
+
+## A signed 64-bit integer.
+type Int64(int64)
+
+## An unsigned 8-bit integer.
+type Uint8(uint8)
+
+## An unsigned 16-bit integer.
+type Uint16(uint16)
+
+## An unsigned 32-bit integer.
+type Uint32(uint32)
+
+## An unsigned 64-bit integer.
+type Uint64(uint64)
+
+## A 32-bit floating-point number.
+type Float32(float32)
+
+## A 64-bit floating-point number.
+type Float64(float64)
 
 ## An instant in time. Timestamp without a timezone.
 ##

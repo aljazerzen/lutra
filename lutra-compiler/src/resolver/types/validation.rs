@@ -520,7 +520,10 @@ impl TypeResolver<'_> {
 
             TyDomain::OneOf(possible_tys) => {
                 // TODO: this match is too naive
-                let is_match = possible_tys.iter().any(|p| p.kind == ty.kind);
+                let is_match = possible_tys.iter().any(|p| match (&p.kind, &ty.kind) {
+                    (TyKind::Ident(_), TyKind::Ident(_)) => p.target == ty.target,
+                    _ => p.kind == ty.kind,
+                });
 
                 if !is_match {
                     let possible_tys = possible_tys.iter().map(printer::print_ty).join(", ");

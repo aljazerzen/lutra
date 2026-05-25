@@ -326,7 +326,7 @@ pub fn interactive(cmd: InteractiveCommand) -> anyhow::Result<()> {
     let repr = lutra_compiler::ProgramRepr::from_externals(&externals)
         .ok_or_else(|| anyhow::anyhow!("runner did not provide a repr: tag in get_externals()"))?;
 
-    // open interactive TUI
+    // run shell
     let project_path =
         (cmd.discover.project.is_some()).then_some(project.source.get_root().to_path_buf());
     lutra_tui::run_shell(project_path, repr, runner)

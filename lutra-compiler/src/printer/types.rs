@@ -171,15 +171,15 @@ impl PrintSource for pr::TyParam {
             pr::TyDomain::Open => {}
             pr::TyDomain::OneOf(tys) => {
                 p.push(": ")?;
-                if let Some(alias) = abbreviated_domain(tys) {
-                    p.push(alias)?;
-                } else {
-                    for (i, ty) in tys.iter().enumerate() {
-                        if i > 0 {
-                            p.push(" | ")?;
-                        }
-                        ty.print(p)?;
+                let (shorthand, remaining) = compact_domain_shorthand(tys);
+                if let Some(s) = shorthand {
+                    p.push(s)?;
+                }
+                for (i, ty) in remaining.iter().enumerate() {
+                    if i > 0 || shorthand.is_some() {
+                        p.push(" | ")?;
                     }
+                    ty.print(p)?;
                 }
             }
             pr::TyDomain::TupleHasFields(fields) => {
@@ -228,21 +228,47 @@ impl PrintSource for pr::TyParam {
     }
 }
 
-/// Returns the abbreviated keyword for a `TyDomain::OneOf` list when it
-/// exactly matches one of the two hardcoded parser sets, or `None` otherwise.
-fn abbreviated_domain(tys: &[pr::Ty]) -> Option<&'static str> {
-    use crate::parser::{TY_DOMAIN_NUMBERS, TY_DOMAIN_PRIMITIVES};
+fn compact_domain_shorthand(tys: &[pr::Ty]) -> (Option<&'static str>, Vec<&pr::Ty>) {
+    use crate::resolver;
 
-    let prims: Vec<pr::TyPrimitive> = tys
-        .iter()
-        .map(|ty| ty.kind.as_primitive().cloned())
-        .collect::<Option<Vec<_>>>()?;
+    if let Some(remaining) = remove_shorthand(
+        tys,
+        resolver::TY_DOMAIN_PRIMITIVES,
+        resolver::TY_DOMAIN_NUMBER_NOMINALS,
+    ) {
+        return (Some("primitive"), remaining);
+    }
+    if let Some(remaining) = remove_shorthand(
+        tys,
+        resolver::TY_DOMAIN_NUMBERS,
+        resolver::TY_DOMAIN_NUMBER_NOMINALS,
+    ) {
+        return (Some("number"), remaining);
+    }
+    (None, tys.iter().collect())
+}
 
-    if prims == TY_DOMAIN_PRIMITIVES {
-        return Some("primitive");
+fn remove_shorthand<'t>(
+    tys: &'t [pr::Ty],
+    prim_shorthand: &'static [pr::TyPrimitive],
+    nominal_shorthand: &'static [&'static str],
+) -> Option<Vec<&'t pr::Ty>> {
+    let mut remaining: Vec<&_> = tys.iter().collect();
+    for sh in prim_shorthand {
+        let removed = remaining
+            .extract_if(.., |t| t.kind.as_primitive().is_some_and(|x| x == sh))
+            .count();
+        if removed == 0 {
+            return None;
+        }
     }
-    if prims == TY_DOMAIN_NUMBERS {
-        return Some("number");
+    for name in nominal_shorthand {
+        // Match nominal types by their path ending (e.g. "std::Int64" matches "Int64").
+        remaining
+            .extract_if(.., |t| {
+                t.kind.as_ident().is_some_and(|path| path.last() == *name)
+            })
+            .count();
     }
-    None
+    Some(remaining)
 }

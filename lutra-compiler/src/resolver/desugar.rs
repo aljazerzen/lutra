@@ -84,6 +84,53 @@ impl PrFold for Desugarator {
             _ => fold::fold_type(self, ty),
         }
     }
+
+    fn fold_ty_param(&mut self, param: pr::TyParam) -> Result<pr::TyParam> {
+        match param.domain {
+            pr::TyDomain::OneOf(items) => {
+                // desugar where T: primitive | number
+                let mut r = Vec::with_capacity(items.len());
+                for item in items {
+                    if let pr::TyKind::Ident(name) = &item.kind
+                        && name.as_steps() == ["number"]
+                    {
+                        let span = item.span.unwrap();
+                        r.extend(
+                            TY_DOMAIN_NUMBERS
+                                .iter()
+                                .map(|p| pr::Ty::new_with_span(p.clone(), span)),
+                        );
+                        r.extend(
+                            TY_DOMAIN_NUMBER_NOMINALS
+                                .iter()
+                                .map(|name| ident_ty(name, span)),
+                        );
+                    } else if let pr::TyKind::Ident(name) = &item.kind
+                        && name.as_steps() == ["primitive"]
+                    {
+                        let span = item.span.unwrap();
+                        r.extend(
+                            TY_DOMAIN_PRIMITIVES
+                                .iter()
+                                .map(|p| pr::Ty::new_with_span(p.clone(), span)),
+                        );
+                        r.extend(
+                            TY_DOMAIN_NUMBER_NOMINALS
+                                .iter()
+                                .map(|name| ident_ty(name, span)),
+                        );
+                    } else {
+                        r.push(self.fold_type(item)?);
+                    }
+                }
+                Ok(pr::TyParam {
+                    domain: pr::TyDomain::OneOf(r),
+                    ..param
+                })
+            }
+            _ => fold::fold_ty_param(self, param),
+        }
+    }
 }
 
 impl Desugarator {
@@ -329,3 +376,48 @@ fn new_binop(left: pr::Expr, op_name: &[&str], right: pr::Expr, op_span: Option<
         args: vec![pr::CallArg::simple(left), pr::CallArg::simple(right)],
     }))
 }
+
+fn ident_ty(name: &str, span: crate::Span) -> pr::Ty {
+    pr::Ty::new_with_span(
+        pr::TyKind::Ident(pr::Path::new([super::NS_STD, name])),
+        span,
+    )
+}
+
+/// Nominal numeric types that are included in the `number` (and `primitive`)
+/// domain shorthands.
+pub(crate) const TY_DOMAIN_NUMBER_NOMINALS: &[&str] = &[
+    "Int8", "Int16", "Int32", "Int64", "Uint8", "Uint16", "Uint32", "Uint64", "Float32", "Float64",
+];
+
+/// The set of numeric primitive types, in canonical order.
+/// Corresponds to the `number` keyword in a `where` constraint.
+pub(crate) const TY_DOMAIN_NUMBERS: &[pr::TyPrimitive] = &[
+    pr::TyPrimitive::int8,
+    pr::TyPrimitive::int16,
+    pr::TyPrimitive::int32,
+    pr::TyPrimitive::int64,
+    pr::TyPrimitive::uint8,
+    pr::TyPrimitive::uint16,
+    pr::TyPrimitive::uint32,
+    pr::TyPrimitive::uint64,
+    pr::TyPrimitive::float32,
+    pr::TyPrimitive::float64,
+];
+
+/// The set of all primitive types, in canonical order.
+/// Corresponds to the `primitive` keyword in a `where` constraint.
+pub(crate) const TY_DOMAIN_PRIMITIVES: &[pr::TyPrimitive] = &[
+    pr::TyPrimitive::bool,
+    pr::TyPrimitive::int8,
+    pr::TyPrimitive::int16,
+    pr::TyPrimitive::int32,
+    pr::TyPrimitive::int64,
+    pr::TyPrimitive::uint8,
+    pr::TyPrimitive::uint16,
+    pr::TyPrimitive::uint32,
+    pr::TyPrimitive::uint64,
+    pr::TyPrimitive::float32,
+    pr::TyPrimitive::float64,
+    pr::TyPrimitive::text,
+];
