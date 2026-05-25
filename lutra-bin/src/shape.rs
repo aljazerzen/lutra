@@ -16,7 +16,7 @@ pub struct Shape {
 /// Item count is read from the array header in O(1).
 /// Field count is read from the type definition without touching `data`.
 pub fn get_shape(data: &[u8], ty: &ir::Ty, ty_defs: &[ir::TyDef]) -> Shape {
-    let ty_mat = resolve_ty(ty, ty_defs);
+    let ty_mat = get_ty_mat(ty, ty_defs);
     match &ty_mat.kind {
         TyKind::Array(item_ty) => {
             let (_, items) = ArrayReader::<&[u8]>::read_head(data);
@@ -37,7 +37,7 @@ pub fn get_shape(data: &[u8], ty: &ir::Ty, ty_defs: &[ir::TyDef]) -> Shape {
 }
 
 pub fn get_shape_tuple(ty: &ir::Ty, ty_defs: &[ir::TyDef]) -> Option<usize> {
-    let ty_mat = resolve_ty(ty, ty_defs);
+    let ty_mat = get_ty_mat(ty, ty_defs);
     match &ty_mat.kind {
         TyKind::Tuple(fields) => Some(
             fields
@@ -49,11 +49,11 @@ pub fn get_shape_tuple(ty: &ir::Ty, ty_defs: &[ir::TyDef]) -> Option<usize> {
     }
 }
 
-fn resolve_ty<'a>(ty: &'a ir::Ty, ty_defs: &'a [ir::TyDef]) -> &'a ir::Ty {
-    if let TyKind::Ident(path) = &ty.kind
+fn get_ty_mat<'a>(mut ty: &'a ir::Ty, ty_defs: &'a [ir::TyDef]) -> &'a ir::Ty {
+    while let TyKind::Ident(path) = &ty.kind
         && let Some(def) = ty_defs.iter().find(|d| &d.name == path)
     {
-        return resolve_ty(&def.ty, ty_defs);
+        ty = &def.ty;
     }
     ty
 }

@@ -1,11 +1,11 @@
 mod cell;
 mod commands;
 mod completions;
+mod describe;
 mod driver;
 mod editor;
 mod export;
 mod input;
-mod inspect;
 mod keybindings;
 mod panels;
 mod printer;

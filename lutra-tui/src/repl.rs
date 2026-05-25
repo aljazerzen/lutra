@@ -3,11 +3,11 @@ use std::time::Duration;
 
 use crossterm::event::KeyCode;
 
-use crate::cell::{Cell, CellOutput, CellStage};
+use crate::cell::{Cell, CellOutput, CellOutputRef, CellStage};
 use crate::completions::Completions;
 use crate::editor::{self, Edit};
 use crate::terminal::{Action, ActionResult, View};
-use crate::{export, input, table};
+use crate::{input, table};
 
 /// REPL pane for evaluating arbitrary expressions.
 pub struct ReplPane {
@@ -68,28 +68,30 @@ impl ReplPane {
         if self.cursor.history_cursor.is_some() {
             let mut new_cell = Cell::new();
             let history_cell = self.visible_cell();
-            new_cell.program = history_cell.program.clone();
+            new_cell.prompt = history_cell.prompt.clone();
             new_cell.program_ty = history_cell.program_ty.clone();
-            new_cell.input = history_cell.input.clone();
+            new_cell.argument = history_cell.argument.clone();
+            new_cell.bound_input = history_cell.bound_input.clone();
 
             self.draft = new_cell;
-            self.cursor.goto_draft(Some(self.draft.program.len()));
+            self.cursor.goto_draft(Some(self.draft.prompt.len()));
         }
 
         res
     }
 
     /// Commit the draft cell: moves it to history.
-    pub fn commit_cell(&mut self, keep_program: bool) -> ActionResult {
+    pub fn commit_cell(&mut self, keep_prompt: bool) -> ActionResult {
         if self.draft.is_empty() {
             return ActionResult::default();
         }
         // take draft
         let cell = std::mem::replace(&mut self.draft, Cell::new());
-        if keep_program {
-            self.draft.program = cell.program.clone();
+        if keep_prompt {
+            self.draft.prompt = cell.prompt.clone();
         }
-        self.cursor.goto_draft(Some(self.draft.program.len()));
+        self.cursor.goto_draft(Some(self.draft.prompt.len()));
+        self.completions.update_query(&self.draft.prompt);
 
         let rc = Rc::new(cell);
         self.history.push(Rc::clone(&rc));
@@ -119,28 +121,28 @@ impl ReplPane {
         let res = self.checkout_from_history();
 
         self.draft.program_ty = None;
-        self.draft.input = None;
+        self.draft.argument = None;
         self.draft.output = None;
 
-        let edit = make_edit(&self.draft.program, self.cursor.program_col);
-        edit.apply(&mut self.draft.program, &mut self.cursor.program_col);
+        let edit = make_edit(&self.draft.prompt, self.cursor.prompt_col);
+        edit.apply(&mut self.draft.prompt, &mut self.cursor.prompt_col);
 
-        self.completions.update_query(&self.draft.program);
+        self.completions.update_query(&self.draft.prompt);
         res.and(ActionResult::redraw())
     }
 
     pub fn move_cursor(&mut self, make_move: impl FnOnce(&str, usize) -> usize) -> ActionResult {
         let res = self.checkout_from_history();
 
-        self.cursor.program_col = make_move(&self.draft.program, self.cursor.program_col);
+        self.cursor.prompt_col = make_move(&self.draft.prompt, self.cursor.prompt_col);
         res.and(ActionResult::redraw())
     }
 
-    /// If the current draft program is a bare path to a module or type, render
+    /// If the current draft prompt is a bare path to a module or type, render
     /// its definition and commit the cell.
-    pub fn try_inspect(&mut self, project: &lutra_compiler::Project) -> bool {
+    pub fn try_describe(&mut self, project: &lutra_compiler::Project) -> bool {
         let message =
-            crate::inspect::inspect_definition(&self.draft.program, project).map(|v| v.to_owned());
+            crate::describe::describe_def(&self.draft.prompt, project).map(|v| v.to_owned());
         if let Some(message) = message {
             self.draft.output = Some(CellOutput::Message(message));
             true
@@ -153,7 +155,7 @@ impl ReplPane {
         self.history.clear();
         self.draft = Cell::new();
         self.cursor.reset();
-        self.completions.update_query(&self.draft.program);
+        self.completions.update_query(&self.draft.prompt);
     }
 
     /// Move history cursor up (toward older entries).
@@ -180,28 +182,10 @@ impl ReplPane {
         }
     }
 
-    pub fn set_program_ty(&mut self, ty: lutra_bin::rr::ProgramType) {
-        self.draft.program_ty = Some(ty);
-    }
-
-    #[allow(dead_code)]
-    pub fn set_input_pane(&mut self, input_pane: input::InputPane) {
-        self.draft.input = Some(input_pane);
-    }
-
-    pub fn last_successful_output(&self) -> Option<export::ProgramOutput<'_>> {
-        fn as_success(cell: &Cell) -> Option<export::ProgramOutput<'_>> {
-            let CellOutput::RunOutput { data, .. } = cell.output.as_ref()? else {
-                return None;
-            };
-            let program_ty = cell.program_ty.as_ref()?;
-            Some(export::ProgramOutput {
-                bytes: data,
-                program_ty,
-            })
-        }
-
-        as_success(&self.draft).or_else(|| self.history.iter().rev().find_map(|rc| as_success(rc)))
+    pub fn last_successful_output(&self) -> Option<CellOutputRef<'_>> {
+        self.history
+            .last()
+            .and_then(|cell| cell.as_ref().as_output())
     }
 
     pub fn set_execution_result(&mut self, output: Result<Vec<u8>, String>, duration: Duration) {
@@ -216,7 +200,7 @@ impl ReplPane {
                 let layout = table::Table::new(&data, &ty.output, &ty.defs)
                     .compute_layout(table::Config::default());
                 CellOutput::RunOutput {
-                    data,
+                    data: Rc::new(data),
                     layout: Some(layout),
                     duration,
                 }
@@ -250,13 +234,19 @@ impl ReplPane {
                     self.cursor.goto_draft(None);
                     return ActionResult::redraw();
                 }
-                let res = self.commit_cell(false);
-                if !self.draft.is_empty() {
-                    self.draft = Cell::new();
-                    self.cursor.reset();
+                if !self.draft.is_output_empty() {
+                    return self.commit_cell(false);
                 }
-                self.completions.update_query(&self.draft.program);
-                res
+                if !self.draft.prompt.is_empty() {
+                    self.draft.prompt.clear();
+                    self.cursor.reset();
+                    return ActionResult::redraw();
+                }
+                if !self.draft.is_bound_input_empty() {
+                    self.draft.bound_input = None;
+                    return ActionResult::redraw();
+                }
+                ActionResult::default()
             }
             Action::CycleFocusNext => {
                 self.cursor_and_cell(|cursor, cell| {
@@ -396,15 +386,15 @@ impl ReplPane {
 
             // Raw terminal events: only handle text input (Char/Paste).
             // All other keys have already been translated to semantic actions by keybindings.
-            // Input stage is always on the draft cell, never on a history entry.
-            Action::Terminal(event) if self.cursor.stage == CellStage::Input => {
-                let Some(input) = &mut self.draft.input else {
+            // Argument stage is always on the draft cell, never on a history entry.
+            Action::Terminal(event) if self.cursor.stage == CellStage::Argument => {
+                let Some(argument) = &mut self.draft.argument else {
                     return ActionResult::default();
                 };
-                match input.handle(event) {
+                match argument.handle(event) {
                     input::InputResult::None => ActionResult::default(),
                     input::InputResult::Redraw => ActionResult::redraw(),
-                    input::InputResult::Submit => ActionResult::action(Action::SubmitInput),
+                    input::InputResult::Submit => ActionResult::action(Action::SubmitArgument),
                 }
             }
             Action::Terminal(crossterm::event::Event::Key(key)) => match self.cursor.stage {
@@ -431,8 +421,8 @@ impl ReplPane {
 pub struct Cursor {
     pub stage: CellStage,
     pub output: OutputCursor,
-    /// Byte offset of the text cursor within the program string.
-    pub program_col: usize,
+    /// Byte offset of the text cursor within the prompt string.
+    pub prompt_col: usize,
     /// Index into the history list (`None` = the live draft).
     pub history_cursor: Option<usize>,
     /// Visible height (in lines) of the output area.
@@ -444,18 +434,18 @@ impl Cursor {
         Self {
             stage: CellStage::Program,
             output: OutputCursor::Plain { scroll: 0 },
-            program_col: 0,
+            prompt_col: 0,
             history_cursor: None,
             page_size: 20.into(),
         }
     }
 
     /// Navigate to the live draft: clear history selection, enter program stage.
-    pub fn goto_draft(&mut self, program_col: Option<usize>) {
+    pub fn goto_draft(&mut self, prompt_col: Option<usize>) {
         self.history_cursor = None;
         self.stage = CellStage::Program;
-        if let Some(c) = program_col {
-            self.program_col = c;
+        if let Some(c) = prompt_col {
+            self.prompt_col = c;
         }
     }
 
@@ -468,7 +458,7 @@ impl Cursor {
     pub fn reset(&mut self) {
         self.output = OutputCursor::Plain { scroll: 0 };
         self.stage = CellStage::Program;
-        self.program_col = 0;
+        self.prompt_col = 0;
         self.history_cursor = None;
     }
 
@@ -478,8 +468,8 @@ impl Cursor {
     pub fn on_program(&self) -> bool {
         matches!(self.stage, CellStage::Program)
     }
-    pub fn on_input(&self) -> bool {
-        matches!(self.stage, CellStage::Input)
+    pub fn on_argument(&self) -> bool {
+        matches!(self.stage, CellStage::Argument)
     }
     pub fn on_output(&self) -> bool {
         matches!(self.stage, CellStage::Output)
@@ -491,8 +481,8 @@ impl Cursor {
         for _ in 0..3 {
             self.stage = match self.stage {
                 Browse => Program,
-                Program => Input,
-                Input => Output,
+                Program => Argument,
+                Argument => Output,
                 Output => Program,
             };
             if self.stage_visible(cell) {
@@ -509,8 +499,8 @@ impl Cursor {
             self.stage = match self.stage {
                 Browse => Program,
                 Program => Output,
-                Input => Program,
-                Output => Input,
+                Argument => Program,
+                Output => Argument,
             };
             if self.stage_visible(cell) {
                 return;
@@ -522,7 +512,7 @@ impl Cursor {
     fn stage_visible(&self, cell: &Cell) -> bool {
         match self.stage {
             CellStage::Browse | CellStage::Program => true,
-            CellStage::Input => !cell.is_input_empty(),
+            CellStage::Argument => !cell.is_argument_empty(),
             CellStage::Output => !cell.is_output_empty(),
         }
     }
@@ -539,6 +529,34 @@ impl Cursor {
         if let OutputCursor::Table(cursor) = &mut self.output {
             f(cursor, layout, self.page_size.get())
         }
+    }
+
+    /// Convert a cursor into a lutra program that locates the cursor in the `x` value
+    pub fn as_program(&self, ty: &lutra_bin::ir::Ty, defs: &[lutra_bin::ir::TyDef]) -> String {
+        let mut ty_mat = get_ty_mat(ty, defs);
+        let mut program = "x".to_string();
+
+        let OutputCursor::Table(cursor) = &self.output else {
+            return program;
+        };
+        if let lutra_bin::ir::TyKind::Array(item) = &ty_mat.kind {
+            program += &format!(" | std::index({}) | std::or_default()", cursor.row);
+            ty_mat = get_ty_mat(item, defs);
+        }
+        if let lutra_bin::ir::TyKind::Tuple(fields) = &ty_mat.kind {
+            program += " | x -> x.";
+
+            // TODO: cursor.col indexes nested column space, not just this tuple
+            let position = cursor.col;
+
+            let field: String = fields
+                .get(position)
+                .and_then(|f| f.name.as_ref())
+                .cloned()
+                .unwrap_or_else(|| position.to_string());
+            program += &field;
+        }
+        program
     }
 }
 
@@ -565,4 +583,17 @@ impl OutputCursor {
             OutputCursor::Table(cursor) => Some(cursor),
         }
     }
+}
+
+/// Resolve a type alias one level deep through `defs`.
+fn get_ty_mat<'a>(
+    mut ty: &'a lutra_bin::ir::Ty,
+    defs: &'a [lutra_bin::ir::TyDef],
+) -> &'a lutra_bin::ir::Ty {
+    while let lutra_bin::ir::TyKind::Ident(path) = &ty.kind
+        && let Some(def) = defs.iter().find(|d| &d.name == path)
+    {
+        ty = &def.ty
+    }
+    ty
 }

@@ -56,7 +56,7 @@ impl InputPane {
         let name = if ty.is_unit() {
             "(no input needed)"
         } else {
-            "input"
+            "argument"
         }
         .to_string();
 

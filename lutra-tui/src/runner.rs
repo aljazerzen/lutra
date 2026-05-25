@@ -96,7 +96,7 @@ impl RunnerSession {
         self.repr
     }
 
-    pub fn run(&mut self, program: &rr::Program, input: Vec<u8>) -> Result<(), String> {
+    pub fn run(&mut self, program: &rr::Program, input: &[u8]) -> Result<(), String> {
         self.prepare(program)?;
         self.execute(input)
     }
@@ -119,7 +119,7 @@ impl RunnerSession {
         }
     }
 
-    pub fn execute(&mut self, input: Vec<u8>) -> Result<(), String> {
+    pub fn execute(&mut self, input: &[u8]) -> Result<(), String> {
         if self.pending.is_some() {
             return Err("runner busy".to_string());
         }
@@ -128,7 +128,7 @@ impl RunnerSession {
             return Err("internal error: missing prepared program".to_string());
         };
 
-        let request_id = match self.client.execute(prepared.program_id, &input) {
+        let request_id = match self.client.execute(prepared.program_id, input) {
             Ok(request_id) => request_id,
             Err(e) => {
                 self.release();

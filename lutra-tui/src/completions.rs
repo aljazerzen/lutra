@@ -99,7 +99,7 @@ impl Completions {
 
         let res: Vec<_> = haystack
             .iter()
-            .filter(|item| item.searchable.contains(&query.search))
+            .filter(|item| item.searchable.starts_with(&query.search))
             .take(MAX_ITEMS)
             .cloned()
             .collect();

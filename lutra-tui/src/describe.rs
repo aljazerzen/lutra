@@ -6,7 +6,7 @@ use crate::terminal::{Line, Span, Style, View};
 /// If `program` is a bare path that resolves to a module or type definition,
 /// return a formatted string showing that definition.  Returns `None` otherwise,
 /// causing the caller to fall through to normal compilation.
-pub fn inspect_definition<'p>(program: &str, project: &'p Project) -> Option<View<'p>> {
+pub fn describe_def<'p>(program: &str, project: &'p Project) -> Option<View<'p>> {
     let program = program.trim();
     let path = if program == "project" || program == "module" {
         pr::Path::empty()
