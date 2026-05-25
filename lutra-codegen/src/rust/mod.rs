@@ -4,7 +4,7 @@ mod functions;
 mod program;
 mod types;
 
-use std::collections::{HashMap, VecDeque};
+use std::collections::{HashMap, HashSet, VecDeque};
 use std::path;
 
 use lutra_bin::ir;
@@ -30,6 +30,9 @@ pub struct Context<'a> {
     /// Buffer for types that don't have their own Lutra decl, but need their own Rust decl.
     /// When such type ref is encountered, it is pushed into here and generated later.
     def_buffer: VecDeque<ir::Ty>,
+
+    /// Track already-emitted type names to avoid duplicate definitions.
+    emitted_types: HashSet<String>,
 
     // static env
     options: &'a GenerateOptions,
@@ -70,6 +73,7 @@ pub(crate) fn run(
     let mut ctx = Context {
         current_rust_mod: vec![],
         def_buffer: VecDeque::new(),
+        emitted_types: HashSet::new(),
 
         options,
         ty_defs: &ty_defs,

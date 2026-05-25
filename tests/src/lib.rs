@@ -8,6 +8,7 @@ mod lutra {
 const POSTGRES_URL_SHARED: &str = "postgresql://postgres:pass@localhost:5416";
 
 mod arrow;
+mod client;
 mod duckdb;
 mod externals;
 mod fuzz;

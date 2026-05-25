@@ -13,6 +13,9 @@ pub fn write_tys(
     let mut all_tys = Vec::new();
 
     for (ty, annotations) in tys {
+        if let Some(name) = ty.name.as_ref() {
+            ctx.emitted_types.insert(name.clone());
+        }
         write_ty_def(w, &ty, annotations, ctx)?;
         all_tys.push(ty);
 
@@ -27,6 +30,12 @@ pub fn write_tys_in_buffer(
 ) -> Result<Vec<ir::Ty>, std::fmt::Error> {
     let mut all_tys = Vec::new();
     while let Some(ty) = ctx.def_buffer.pop_front() {
+        // Skip types that have already been emitted.
+        if let Some(name) = ty.name.as_ref()
+            && !ctx.emitted_types.insert(name.clone())
+        {
+            continue;
+        }
         let annotations = vec![];
         write_ty_def(w, &ty, &annotations, ctx)?;
 
