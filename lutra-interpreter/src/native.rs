@@ -3,119 +3,25 @@ use lutra_bin::{Encode, Layout};
 use crate::interpreter::{Cell, Interpreter};
 use crate::{Data, NativeModule};
 
-macro_rules! number_cast {
-    ($func_name: ident, $res_ty: ty) => {
-        pub fn $func_name(
-            _: &mut Interpreter,
-            layout_args: &[u32],
-            args: Vec<Cell>,
-        ) -> Result<Cell, EvalError> {
-            let input_ty = decode::ty_primitive(layout_args[0]);
-
+/// Generates a typed cast function: source type → target type, no layout args.
+macro_rules! typed_cast {
+    ($name: ident, $src: ty, $dst: ty) => {
+        pub fn $name(_: &mut Interpreter, _: &[u32], args: Vec<Cell>) -> Result<Cell, EvalError> {
             let [x] = assume::exactly_n(args);
-            let x = match input_ty {
-                ir::TyPrimitive::int8 => assume::primitive::<i8>(&x)? as $res_ty,
-                ir::TyPrimitive::int16 => assume::primitive::<i16>(&x)? as $res_ty,
-                ir::TyPrimitive::int32 => assume::primitive::<i32>(&x)? as $res_ty,
-                ir::TyPrimitive::int64 => assume::primitive::<i64>(&x)? as $res_ty,
-                ir::TyPrimitive::uint8 => assume::primitive::<u8>(&x)? as $res_ty,
-                ir::TyPrimitive::uint16 => assume::primitive::<u16>(&x)? as $res_ty,
-                ir::TyPrimitive::uint32 => assume::primitive::<u32>(&x)? as $res_ty,
-                ir::TyPrimitive::uint64 => assume::primitive::<u64>(&x)? as $res_ty,
-                ir::TyPrimitive::float32 => assume::primitive::<f32>(&x)? as $res_ty,
-                ir::TyPrimitive::float64 => assume::primitive::<f64>(&x)? as $res_ty,
-                _ => panic!(),
-            };
-            Ok(Cell::Data(encode(&x)))
+            let v = assume::primitive::<$src>(&x)? as $dst;
+            Ok(Cell::Data(encode(&v)))
         }
     };
 }
 
-macro_rules! primitive_op {
-    ($args: ident, $prim: ty, $op: ident) => {
-        {
-            let left = assume::primitive::<$prim>(&$args[0])?;
-            let right = assume::primitive::<$prim>(&$args[1])?;
-            left.$op(&right)
-        }
-    };
-    ($args: ident, $prim: ty, $op: tt) => {
-        {
-            let left = assume::primitive::<$prim>(&$args[0])?;
-            let right = assume::primitive::<$prim>(&$args[1])?;
-            left $op right
-        }
-    };
-}
-
-macro_rules! bin_func {
-    ($name: ident, $args_ty: ident, $op: tt, $res_ty: ty) => {
-        pub fn $name(
-            _: &mut Interpreter,
-            _layout_args: &[u32],
-            args: Vec<Cell>,
-        ) -> Result<Cell, EvalError> {
-            let res = primitive_op!(args, $args_ty, $op);
-            Ok(Cell::Data(encode::<$res_ty>(&res)))
-        }
-    };
-}
-
-macro_rules! bin_num_func {
-    ($name: ident, $op: tt) => {
-        pub fn $name(
-            _: &mut Interpreter,
-            layout_args: &[u32],
-            args: Vec<Cell>,
-        ) -> Result<Cell, EvalError> {
-            let prim = decode::ty_primitive(layout_args[0]);
-
-            Ok(match prim {
-                ir::TyPrimitive::int8 => encode_cell(&primitive_op!(args, i8, $op)),
-                ir::TyPrimitive::int16 => encode_cell(&primitive_op!(args, i16, $op)),
-                ir::TyPrimitive::int32 => encode_cell(&primitive_op!(args, i32, $op)),
-                ir::TyPrimitive::int64 => encode_cell(&primitive_op!(args, i64, $op)),
-                ir::TyPrimitive::uint8 => encode_cell(&primitive_op!(args, u8, $op)),
-                ir::TyPrimitive::uint16 => encode_cell(&primitive_op!(args, u16, $op)),
-                ir::TyPrimitive::uint32 => encode_cell(&primitive_op!(args, u32, $op)),
-                ir::TyPrimitive::uint64 => encode_cell(&primitive_op!(args, u64, $op)),
-                ir::TyPrimitive::float32 => encode_cell(&primitive_op!(args, f32, $op)),
-                ir::TyPrimitive::float64 => encode_cell(&primitive_op!(args, f64, $op)),
-                _ => panic!(),
-            })
-        }
-    };
-}
-
-macro_rules! bin_prim_func {
-    ($name: ident, $op: ident, $res_ty: ident) => {
-        pub fn $name(
-            _: &mut Interpreter,
-            layout_args: &[u32],
-            args: Vec<Cell>,
-        ) -> Result<Cell, EvalError> {
-            let prim = decode::ty_primitive(layout_args[0]);
-
-            Ok(Cell::Data(match prim {
-                ir::TyPrimitive::bool => encode::<$res_ty>(&primitive_op!(args, bool, $op)),
-                ir::TyPrimitive::int8 => encode::<$res_ty>(&primitive_op!(args, i8, $op)),
-                ir::TyPrimitive::int16 => encode::<$res_ty>(&primitive_op!(args, i16, $op)),
-                ir::TyPrimitive::int32 => encode::<$res_ty>(&primitive_op!(args, i32, $op)),
-                ir::TyPrimitive::int64 => encode::<$res_ty>(&primitive_op!(args, i64, $op)),
-                ir::TyPrimitive::uint8 => encode::<$res_ty>(&primitive_op!(args, u8, $op)),
-                ir::TyPrimitive::uint16 => encode::<$res_ty>(&primitive_op!(args, u16, $op)),
-                ir::TyPrimitive::uint32 => encode::<$res_ty>(&primitive_op!(args, u32, $op)),
-                ir::TyPrimitive::uint64 => encode::<$res_ty>(&primitive_op!(args, u64, $op)),
-                ir::TyPrimitive::float32 => encode::<$res_ty>(&primitive_op!(args, f32, $op)),
-                ir::TyPrimitive::float64 => encode::<$res_ty>(&primitive_op!(args, f64, $op)),
-                ir::TyPrimitive::text => {
-                    let left = assume::text_ref(args[0].clone())?;
-                    let right = assume::text_ref(args[1].clone())?;
-
-                    let res = left.as_str().$op(right.as_str());
-                    encode::<$res_ty>(&res)
-                }
-            }))
+/// Generates a typed binary op function that needs no layout args.
+/// The Rust type is baked into the function.
+macro_rules! typed_bin_op {
+    ($name: ident, $prim: ty, $op: tt) => {
+        pub fn $name(_: &mut Interpreter, _: &[u32], args: Vec<Cell>) -> Result<Cell, EvalError> {
+            let left = assume::primitive::<$prim>(&args[0])?;
+            let right = assume::primitive::<$prim>(&args[1])?;
+            Ok(encode_cell(&(left $op right)))
         }
     };
 }
@@ -131,62 +37,283 @@ macro_rules! neg_arg {
 pub mod std_convert {
     use crate::EvalError;
     use crate::native::*;
-    use lutra_bin::ir;
 
     pub struct Module;
 
     impl NativeModule for Module {
         fn lookup_native_symbol(&self, id: &str) -> Option<crate::interpreter::NativeFunction> {
             Some(match id {
-                "to_int8" => &to_int8,
-                "to_int16" => &to_int16,
-                "to_int32" => &to_int32,
-                "to_int64" => &to_int64,
-                "to_uint8" => &to_uint8,
-                "to_uint16" => &to_uint16,
-                "to_uint32" => &to_uint32,
-                "to_uint64" => &to_uint64,
-                "to_float32" => &to_float32,
-                "to_float64" => &to_float64,
-                "to_text" => &to_text,
+                // to_int8 casts
+                "to_int8_int8" => &to_int8_int8,
+                "to_int8_int16" => &to_int8_int16,
+                "to_int8_int32" => &to_int8_int32,
+                "to_int8_int64" => &to_int8_int64,
+                "to_int8_uint8" => &to_int8_uint8,
+                "to_int8_uint16" => &to_int8_uint16,
+                "to_int8_uint32" => &to_int8_uint32,
+                "to_int8_uint64" => &to_int8_uint64,
+                "to_int8_float32" => &to_int8_float32,
+                "to_int8_float64" => &to_int8_float64,
+                // to_int16 casts
+                "to_int16_int8" => &to_int16_int8,
+                "to_int16_int16" => &to_int16_int16,
+                "to_int16_int32" => &to_int16_int32,
+                "to_int16_int64" => &to_int16_int64,
+                "to_int16_uint8" => &to_int16_uint8,
+                "to_int16_uint16" => &to_int16_uint16,
+                "to_int16_uint32" => &to_int16_uint32,
+                "to_int16_uint64" => &to_int16_uint64,
+                "to_int16_float32" => &to_int16_float32,
+                "to_int16_float64" => &to_int16_float64,
+                // to_int32 casts
+                "to_int32_int8" => &to_int32_int8,
+                "to_int32_int16" => &to_int32_int16,
+                "to_int32_int32" => &to_int32_int32,
+                "to_int32_int64" => &to_int32_int64,
+                "to_int32_uint8" => &to_int32_uint8,
+                "to_int32_uint16" => &to_int32_uint16,
+                "to_int32_uint32" => &to_int32_uint32,
+                "to_int32_uint64" => &to_int32_uint64,
+                "to_int32_float32" => &to_int32_float32,
+                "to_int32_float64" => &to_int32_float64,
+                // to_int64 casts
+                "to_int64_int8" => &to_int64_int8,
+                "to_int64_int16" => &to_int64_int16,
+                "to_int64_int32" => &to_int64_int32,
+                "to_int64_int64" => &to_int64_int64,
+                "to_int64_uint8" => &to_int64_uint8,
+                "to_int64_uint16" => &to_int64_uint16,
+                "to_int64_uint32" => &to_int64_uint32,
+                "to_int64_uint64" => &to_int64_uint64,
+                "to_int64_float32" => &to_int64_float32,
+                "to_int64_float64" => &to_int64_float64,
+                // to_uint8 casts
+                "to_uint8_int8" => &to_uint8_int8,
+                "to_uint8_int16" => &to_uint8_int16,
+                "to_uint8_int32" => &to_uint8_int32,
+                "to_uint8_int64" => &to_uint8_int64,
+                "to_uint8_uint8" => &to_uint8_uint8,
+                "to_uint8_uint16" => &to_uint8_uint16,
+                "to_uint8_uint32" => &to_uint8_uint32,
+                "to_uint8_uint64" => &to_uint8_uint64,
+                "to_uint8_float32" => &to_uint8_float32,
+                "to_uint8_float64" => &to_uint8_float64,
+                // to_uint16 casts
+                "to_uint16_int8" => &to_uint16_int8,
+                "to_uint16_int16" => &to_uint16_int16,
+                "to_uint16_int32" => &to_uint16_int32,
+                "to_uint16_int64" => &to_uint16_int64,
+                "to_uint16_uint8" => &to_uint16_uint8,
+                "to_uint16_uint16" => &to_uint16_uint16,
+                "to_uint16_uint32" => &to_uint16_uint32,
+                "to_uint16_uint64" => &to_uint16_uint64,
+                "to_uint16_float32" => &to_uint16_float32,
+                "to_uint16_float64" => &to_uint16_float64,
+                // to_uint32 casts
+                "to_uint32_int8" => &to_uint32_int8,
+                "to_uint32_int16" => &to_uint32_int16,
+                "to_uint32_int32" => &to_uint32_int32,
+                "to_uint32_int64" => &to_uint32_int64,
+                "to_uint32_uint8" => &to_uint32_uint8,
+                "to_uint32_uint16" => &to_uint32_uint16,
+                "to_uint32_uint32" => &to_uint32_uint32,
+                "to_uint32_uint64" => &to_uint32_uint64,
+                "to_uint32_float32" => &to_uint32_float32,
+                "to_uint32_float64" => &to_uint32_float64,
+                // to_uint64 casts
+                "to_uint64_int8" => &to_uint64_int8,
+                "to_uint64_int16" => &to_uint64_int16,
+                "to_uint64_int32" => &to_uint64_int32,
+                "to_uint64_int64" => &to_uint64_int64,
+                "to_uint64_uint8" => &to_uint64_uint8,
+                "to_uint64_uint16" => &to_uint64_uint16,
+                "to_uint64_uint32" => &to_uint64_uint32,
+                "to_uint64_uint64" => &to_uint64_uint64,
+                "to_uint64_float32" => &to_uint64_float32,
+                "to_uint64_float64" => &to_uint64_float64,
+                // to_float32 casts
+                "to_float32_int8" => &to_float32_int8,
+                "to_float32_int16" => &to_float32_int16,
+                "to_float32_int32" => &to_float32_int32,
+                "to_float32_int64" => &to_float32_int64,
+                "to_float32_uint8" => &to_float32_uint8,
+                "to_float32_uint16" => &to_float32_uint16,
+                "to_float32_uint32" => &to_float32_uint32,
+                "to_float32_uint64" => &to_float32_uint64,
+                "to_float32_float32" => &to_float32_float32,
+                "to_float32_float64" => &to_float32_float64,
+                // to_float64 casts
+                "to_float64_int8" => &to_float64_int8,
+                "to_float64_int16" => &to_float64_int16,
+                "to_float64_int32" => &to_float64_int32,
+                "to_float64_int64" => &to_float64_int64,
+                "to_float64_uint8" => &to_float64_uint8,
+                "to_float64_uint16" => &to_float64_uint16,
+                "to_float64_uint32" => &to_float64_uint32,
+                "to_float64_uint64" => &to_float64_uint64,
+                "to_float64_float32" => &to_float64_float32,
+                "to_float64_float64" => &to_float64_float64,
+                // to_text casts
+                "to_text_bool" => &to_text_bool,
+                "to_text_int8" => &to_text_int8,
+                "to_text_int16" => &to_text_int16,
+                "to_text_int32" => &to_text_int32,
+                "to_text_int64" => &to_text_int64,
+                "to_text_uint8" => &to_text_uint8,
+                "to_text_uint16" => &to_text_uint16,
+                "to_text_uint32" => &to_text_uint32,
+                "to_text_uint64" => &to_text_uint64,
+                "to_text_float32" => &to_text_float32,
+                "to_text_float64" => &to_text_float64,
+                "to_text_text" => &to_text_text,
                 _ => return None,
             })
         }
     }
 
-    number_cast!(to_int8, i8);
-    number_cast!(to_int16, i16);
-    number_cast!(to_int32, i32);
-    number_cast!(to_int64, i64);
-    number_cast!(to_uint8, u8);
-    number_cast!(to_uint16, u16);
-    number_cast!(to_uint32, u32);
-    number_cast!(to_uint64, u64);
-    number_cast!(to_float32, f32);
-    number_cast!(to_float64, f64);
+    // Numeric casts: 10 target types × 10 source types = 100 functions
+    typed_cast!(to_int8_int8, i8, i8);
+    typed_cast!(to_int8_int16, i16, i8);
+    typed_cast!(to_int8_int32, i32, i8);
+    typed_cast!(to_int8_int64, i64, i8);
+    typed_cast!(to_int8_uint8, u8, i8);
+    typed_cast!(to_int8_uint16, u16, i8);
+    typed_cast!(to_int8_uint32, u32, i8);
+    typed_cast!(to_int8_uint64, u64, i8);
+    typed_cast!(to_int8_float32, f32, i8);
+    typed_cast!(to_int8_float64, f64, i8);
 
-    pub fn to_text(
+    typed_cast!(to_int16_int8, i8, i16);
+    typed_cast!(to_int16_int16, i16, i16);
+    typed_cast!(to_int16_int32, i32, i16);
+    typed_cast!(to_int16_int64, i64, i16);
+    typed_cast!(to_int16_uint8, u8, i16);
+    typed_cast!(to_int16_uint16, u16, i16);
+    typed_cast!(to_int16_uint32, u32, i16);
+    typed_cast!(to_int16_uint64, u64, i16);
+    typed_cast!(to_int16_float32, f32, i16);
+    typed_cast!(to_int16_float64, f64, i16);
+
+    typed_cast!(to_int32_int8, i8, i32);
+    typed_cast!(to_int32_int16, i16, i32);
+    typed_cast!(to_int32_int32, i32, i32);
+    typed_cast!(to_int32_int64, i64, i32);
+    typed_cast!(to_int32_uint8, u8, i32);
+    typed_cast!(to_int32_uint16, u16, i32);
+    typed_cast!(to_int32_uint32, u32, i32);
+    typed_cast!(to_int32_uint64, u64, i32);
+    typed_cast!(to_int32_float32, f32, i32);
+    typed_cast!(to_int32_float64, f64, i32);
+
+    typed_cast!(to_int64_int8, i8, i64);
+    typed_cast!(to_int64_int16, i16, i64);
+    typed_cast!(to_int64_int32, i32, i64);
+    typed_cast!(to_int64_int64, i64, i64);
+    typed_cast!(to_int64_uint8, u8, i64);
+    typed_cast!(to_int64_uint16, u16, i64);
+    typed_cast!(to_int64_uint32, u32, i64);
+    typed_cast!(to_int64_uint64, u64, i64);
+    typed_cast!(to_int64_float32, f32, i64);
+    typed_cast!(to_int64_float64, f64, i64);
+
+    typed_cast!(to_uint8_int8, i8, u8);
+    typed_cast!(to_uint8_int16, i16, u8);
+    typed_cast!(to_uint8_int32, i32, u8);
+    typed_cast!(to_uint8_int64, i64, u8);
+    typed_cast!(to_uint8_uint8, u8, u8);
+    typed_cast!(to_uint8_uint16, u16, u8);
+    typed_cast!(to_uint8_uint32, u32, u8);
+    typed_cast!(to_uint8_uint64, u64, u8);
+    typed_cast!(to_uint8_float32, f32, u8);
+    typed_cast!(to_uint8_float64, f64, u8);
+
+    typed_cast!(to_uint16_int8, i8, u16);
+    typed_cast!(to_uint16_int16, i16, u16);
+    typed_cast!(to_uint16_int32, i32, u16);
+    typed_cast!(to_uint16_int64, i64, u16);
+    typed_cast!(to_uint16_uint8, u8, u16);
+    typed_cast!(to_uint16_uint16, u16, u16);
+    typed_cast!(to_uint16_uint32, u32, u16);
+    typed_cast!(to_uint16_uint64, u64, u16);
+    typed_cast!(to_uint16_float32, f32, u16);
+    typed_cast!(to_uint16_float64, f64, u16);
+
+    typed_cast!(to_uint32_int8, i8, u32);
+    typed_cast!(to_uint32_int16, i16, u32);
+    typed_cast!(to_uint32_int32, i32, u32);
+    typed_cast!(to_uint32_int64, i64, u32);
+    typed_cast!(to_uint32_uint8, u8, u32);
+    typed_cast!(to_uint32_uint16, u16, u32);
+    typed_cast!(to_uint32_uint32, u32, u32);
+    typed_cast!(to_uint32_uint64, u64, u32);
+    typed_cast!(to_uint32_float32, f32, u32);
+    typed_cast!(to_uint32_float64, f64, u32);
+
+    typed_cast!(to_uint64_int8, i8, u64);
+    typed_cast!(to_uint64_int16, i16, u64);
+    typed_cast!(to_uint64_int32, i32, u64);
+    typed_cast!(to_uint64_int64, i64, u64);
+    typed_cast!(to_uint64_uint8, u8, u64);
+    typed_cast!(to_uint64_uint16, u16, u64);
+    typed_cast!(to_uint64_uint32, u32, u64);
+    typed_cast!(to_uint64_uint64, u64, u64);
+    typed_cast!(to_uint64_float32, f32, u64);
+    typed_cast!(to_uint64_float64, f64, u64);
+
+    typed_cast!(to_float32_int8, i8, f32);
+    typed_cast!(to_float32_int16, i16, f32);
+    typed_cast!(to_float32_int32, i32, f32);
+    typed_cast!(to_float32_int64, i64, f32);
+    typed_cast!(to_float32_uint8, u8, f32);
+    typed_cast!(to_float32_uint16, u16, f32);
+    typed_cast!(to_float32_uint32, u32, f32);
+    typed_cast!(to_float32_uint64, u64, f32);
+    typed_cast!(to_float32_float32, f32, f32);
+    typed_cast!(to_float32_float64, f64, f32);
+
+    typed_cast!(to_float64_int8, i8, f64);
+    typed_cast!(to_float64_int16, i16, f64);
+    typed_cast!(to_float64_int32, i32, f64);
+    typed_cast!(to_float64_int64, i64, f64);
+    typed_cast!(to_float64_uint8, u8, f64);
+    typed_cast!(to_float64_uint16, u16, f64);
+    typed_cast!(to_float64_uint32, u32, f64);
+    typed_cast!(to_float64_uint64, u64, f64);
+    typed_cast!(to_float64_float32, f32, f64);
+    typed_cast!(to_float64_float64, f64, f64);
+
+    // to_text casts: per source type
+    macro_rules! typed_to_text {
+        ($name: ident, $src: ty) => {
+            pub fn $name(
+                _: &mut Interpreter,
+                _: &[u32],
+                args: Vec<Cell>,
+            ) -> Result<Cell, EvalError> {
+                let [x] = assume::exactly_n(args);
+                let s = assume::primitive::<$src>(&x)?.to_string();
+                Ok(Cell::Data(encode(&s)))
+            }
+        };
+    }
+    typed_to_text!(to_text_int8, i8);
+    typed_to_text!(to_text_int16, i16);
+    typed_to_text!(to_text_int32, i32);
+    typed_to_text!(to_text_int64, i64);
+    typed_to_text!(to_text_uint8, u8);
+    typed_to_text!(to_text_uint16, u16);
+    typed_to_text!(to_text_uint32, u32);
+    typed_to_text!(to_text_uint64, u64);
+    typed_to_text!(to_text_float32, f32);
+    typed_to_text!(to_text_float64, f64);
+    typed_to_text!(to_text_bool, bool);
+    pub fn to_text_text(
         _: &mut Interpreter,
-        layout_args: &[u32],
+        _: &[u32],
         args: Vec<Cell>,
     ) -> Result<Cell, EvalError> {
-        let input_ty = decode::ty_primitive(layout_args[0]);
         let [x] = assume::exactly_n(args);
-        let x = match input_ty {
-            ir::TyPrimitive::bool => assume::primitive::<bool>(&x)?.to_string(),
-            ir::TyPrimitive::int8 => assume::primitive::<i8>(&x)?.to_string(),
-            ir::TyPrimitive::int16 => assume::primitive::<i16>(&x)?.to_string(),
-            ir::TyPrimitive::int32 => assume::primitive::<i32>(&x)?.to_string(),
-            ir::TyPrimitive::int64 => assume::primitive::<i64>(&x)?.to_string(),
-            ir::TyPrimitive::uint8 => assume::primitive::<u8>(&x)?.to_string(),
-            ir::TyPrimitive::uint16 => assume::primitive::<u16>(&x)?.to_string(),
-            ir::TyPrimitive::uint32 => assume::primitive::<u32>(&x)?.to_string(),
-            ir::TyPrimitive::uint64 => assume::primitive::<u64>(&x)?.to_string(),
-            ir::TyPrimitive::float32 => assume::primitive::<f32>(&x)?.to_string(),
-            ir::TyPrimitive::float64 => assume::primitive::<f64>(&x)?.to_string(),
-            ir::TyPrimitive::text => return Ok(x),
-        };
-        Ok(Cell::Data(encode(&x)))
+        Ok(x)
     }
 }
 
@@ -196,24 +323,125 @@ pub mod std_ops {
     use crate::native::assume::exactly_n;
     use crate::native::*;
     use crate::{Data, EvalError};
-    use lutra_bin::ir;
 
     pub struct Module;
 
     impl NativeModule for Module {
         fn lookup_native_symbol(&self, id: &str) -> Option<crate::interpreter::NativeFunction> {
             Some(match id {
-                "mul" => &mul,
-                "div" => &div,
-                "mod" => &r#mod,
-                "add" => &add,
-                "sub" => &sub,
-                "neg" => &neg,
+                "div_int8" => &div_int8,
+                "div_int16" => &div_int16,
+                "div_int32" => &div_int32,
+                "div_int64" => &div_int64,
+                "div_uint8" => &div_uint8,
+                "div_uint16" => &div_uint16,
+                "div_uint32" => &div_uint32,
+                "div_uint64" => &div_uint64,
+                "div_float32" => &div_float32,
+                "div_float64" => &div_float64,
 
-                "cmp" => &cmp,
-                "eq" => &eq,
-                "lt" => &lt,
-                "lte" => &lte,
+                "mod_int8" => &mod_int8,
+                "mod_int16" => &mod_int16,
+                "mod_int32" => &mod_int32,
+                "mod_int64" => &mod_int64,
+                "mod_uint8" => &mod_uint8,
+                "mod_uint16" => &mod_uint16,
+                "mod_uint32" => &mod_uint32,
+                "mod_uint64" => &mod_uint64,
+                "mod_float32" => &mod_float32,
+                "mod_float64" => &mod_float64,
+
+                "neg_int8" => &neg_int8,
+                "neg_int16" => &neg_int16,
+                "neg_int32" => &neg_int32,
+                "neg_int64" => &neg_int64,
+                "neg_float32" => &neg_float32,
+                "neg_float64" => &neg_float64,
+
+                "add_int8" => &add_int8,
+                "add_int16" => &add_int16,
+                "add_int32" => &add_int32,
+                "add_int64" => &add_int64,
+                "add_uint8" => &add_uint8,
+                "add_uint16" => &add_uint16,
+                "add_uint32" => &add_uint32,
+                "add_uint64" => &add_uint64,
+                "add_float32" => &add_float32,
+                "add_float64" => &add_float64,
+
+                "sub_int8" => &sub_int8,
+                "sub_int16" => &sub_int16,
+                "sub_int32" => &sub_int32,
+                "sub_int64" => &sub_int64,
+                "sub_uint8" => &sub_uint8,
+                "sub_uint16" => &sub_uint16,
+                "sub_uint32" => &sub_uint32,
+                "sub_uint64" => &sub_uint64,
+                "sub_float32" => &sub_float32,
+                "sub_float64" => &sub_float64,
+
+                "mul_int8" => &mul_int8,
+                "mul_int16" => &mul_int16,
+                "mul_int32" => &mul_int32,
+                "mul_int64" => &mul_int64,
+                "mul_uint8" => &mul_uint8,
+                "mul_uint16" => &mul_uint16,
+                "mul_uint32" => &mul_uint32,
+                "mul_uint64" => &mul_uint64,
+                "mul_float32" => &mul_float32,
+                "mul_float64" => &mul_float64,
+
+                "cmp_bool" => &cmp_bool,
+                "cmp_int8" => &cmp_int8,
+                "cmp_int16" => &cmp_int16,
+                "cmp_int32" => &cmp_int32,
+                "cmp_int64" => &cmp_int64,
+                "cmp_uint8" => &cmp_uint8,
+                "cmp_uint16" => &cmp_uint16,
+                "cmp_uint32" => &cmp_uint32,
+                "cmp_uint64" => &cmp_uint64,
+                "cmp_float32" => &cmp_float32,
+                "cmp_float64" => &cmp_float64,
+                "cmp_text" => &cmp_text,
+
+                "eq_bool" => &eq_bool,
+                "eq_int8" => &eq_int8,
+                "eq_int16" => &eq_int16,
+                "eq_int32" => &eq_int32,
+                "eq_int64" => &eq_int64,
+                "eq_uint8" => &eq_uint8,
+                "eq_uint16" => &eq_uint16,
+                "eq_uint32" => &eq_uint32,
+                "eq_uint64" => &eq_uint64,
+                "eq_float32" => &eq_float32,
+                "eq_float64" => &eq_float64,
+                "eq_text" => &eq_text,
+
+                "lt_bool" => &lt_bool,
+                "lt_int8" => &lt_int8,
+                "lt_int16" => &lt_int16,
+                "lt_int32" => &lt_int32,
+                "lt_int64" => &lt_int64,
+                "lt_uint8" => &lt_uint8,
+                "lt_uint16" => &lt_uint16,
+                "lt_uint32" => &lt_uint32,
+                "lt_uint64" => &lt_uint64,
+                "lt_float32" => &lt_float32,
+                "lt_float64" => &lt_float64,
+                "lt_text" => &lt_text,
+
+                "lte_bool" => &lte_bool,
+                "lte_int8" => &lte_int8,
+                "lte_int16" => &lte_int16,
+                "lte_int32" => &lte_int32,
+                "lte_int64" => &lte_int64,
+                "lte_uint8" => &lte_uint8,
+                "lte_uint16" => &lte_uint16,
+                "lte_uint32" => &lte_uint32,
+                "lte_uint64" => &lte_uint64,
+                "lte_float32" => &lte_float32,
+                "lte_float64" => &lte_float64,
+                "lte_text" => &lte_text,
 
                 "and" => &and,
                 "or" => &or,
@@ -224,38 +452,122 @@ pub mod std_ops {
         }
     }
 
-    bin_num_func!(add, +);
-    bin_num_func!(sub, -);
-    bin_num_func!(mul, *);
-    bin_num_func!(div, /);
-    bin_num_func!(r#mod, %);
+    // Per-type add functions (no layout args needed)
+    typed_bin_op!(add_int8, i8, +);
+    typed_bin_op!(add_int16, i16, +);
+    typed_bin_op!(add_int32, i32, +);
+    typed_bin_op!(add_int64, i64, +);
+    typed_bin_op!(add_uint8, u8, +);
+    typed_bin_op!(add_uint16, u16, +);
+    typed_bin_op!(add_uint32, u32, +);
+    typed_bin_op!(add_uint64, u64, +);
+    typed_bin_op!(add_float32, f32, +);
+    typed_bin_op!(add_float64, f64, +);
 
-    pub fn neg(
-        _: &mut Interpreter,
-        layout_args: &[u32],
-        args: Vec<Cell>,
-    ) -> Result<Cell, EvalError> {
-        let ty_prim = decode::ty_primitive(layout_args[0]);
-        Ok(match ty_prim {
-            ir::TyPrimitive::int8 => neg_arg!(i8, args),
-            ir::TyPrimitive::int16 => neg_arg!(i16, args),
-            ir::TyPrimitive::int32 => neg_arg!(i32, args),
-            ir::TyPrimitive::int64 => neg_arg!(i64, args),
-            ir::TyPrimitive::float32 => neg_arg!(f32, args),
-            ir::TyPrimitive::float64 => neg_arg!(f64, args),
-            _ => panic!(),
-        })
+    // Per-type sub functions
+    typed_bin_op!(sub_int8, i8, -);
+    typed_bin_op!(sub_int16, i16, -);
+    typed_bin_op!(sub_int32, i32, -);
+    typed_bin_op!(sub_int64, i64, -);
+    typed_bin_op!(sub_uint8, u8, -);
+    typed_bin_op!(sub_uint16, u16, -);
+    typed_bin_op!(sub_uint32, u32, -);
+    typed_bin_op!(sub_uint64, u64, -);
+    typed_bin_op!(sub_float32, f32, -);
+    typed_bin_op!(sub_float64, f64, -);
+
+    // Per-type mul functions
+    typed_bin_op!(mul_int8, i8, *);
+    typed_bin_op!(mul_int16, i16, *);
+    typed_bin_op!(mul_int32, i32, *);
+    typed_bin_op!(mul_int64, i64, *);
+    typed_bin_op!(mul_uint8, u8, *);
+    typed_bin_op!(mul_uint16, u16, *);
+    typed_bin_op!(mul_uint32, u32, *);
+    typed_bin_op!(mul_uint64, u64, *);
+    typed_bin_op!(mul_float32, f32, *);
+    typed_bin_op!(mul_float64, f64, *);
+    // Per-type div functions
+    typed_bin_op!(div_int8, i8, /);
+    typed_bin_op!(div_int16, i16, /);
+    typed_bin_op!(div_int32, i32, /);
+    typed_bin_op!(div_int64, i64, /);
+    typed_bin_op!(div_uint8, u8, /);
+    typed_bin_op!(div_uint16, u16, /);
+    typed_bin_op!(div_uint32, u32, /);
+    typed_bin_op!(div_uint64, u64, /);
+    typed_bin_op!(div_float32, f32, /);
+    typed_bin_op!(div_float64, f64, /);
+
+    // Per-type mod functions
+    typed_bin_op!(mod_int8, i8, %);
+    typed_bin_op!(mod_int16, i16, %);
+    typed_bin_op!(mod_int32, i32, %);
+    typed_bin_op!(mod_int64, i64, %);
+    typed_bin_op!(mod_uint8, u8, %);
+    typed_bin_op!(mod_uint16, u16, %);
+    typed_bin_op!(mod_uint32, u32, %);
+    typed_bin_op!(mod_uint64, u64, %);
+    typed_bin_op!(mod_float32, f32, %);
+    typed_bin_op!(mod_float64, f64, %);
+
+    // Per-type neg functions
+    macro_rules! typed_neg {
+        ($name: ident, $prim: ty) => {
+            pub fn $name(
+                _: &mut Interpreter,
+                _: &[u32],
+                args: Vec<Cell>,
+            ) -> Result<Cell, EvalError> {
+                Ok(neg_arg!($prim, args))
+            }
+        };
     }
+    typed_neg!(neg_int8, i8);
+    typed_neg!(neg_int16, i16);
+    typed_neg!(neg_int32, i32);
+    typed_neg!(neg_int64, i64);
+    typed_neg!(neg_float32, f32);
+    typed_neg!(neg_float64, f64);
 
-    pub fn cmp(
-        _: &mut Interpreter,
-        layout_args: &[u32],
-        args: Vec<Cell>,
-    ) -> Result<Cell, EvalError> {
+    // Per-type cmp functions
+    macro_rules! typed_cmp {
+        ($name: ident, $prim: ty, $method: ident) => {
+            pub fn $name(
+                _: &mut Interpreter,
+                _: &[u32],
+                args: Vec<Cell>,
+            ) -> Result<Cell, EvalError> {
+                let [a, b] = exactly_n(args);
+                let a = assume::into_data(a)?;
+                let b = assume::into_data(b)?;
+                let left = decode::primitive::<$prim>(&a);
+                let right = decode::primitive::<$prim>(&b);
+                let tag: u8 = match left.$method(&right) {
+                    Ordering::Less => 0,
+                    Ordering::Equal => 1,
+                    Ordering::Greater => 2,
+                };
+                Ok(encode_cell(&tag))
+            }
+        };
+    }
+    typed_cmp!(cmp_bool, bool, cmp);
+    typed_cmp!(cmp_int8, i8, cmp);
+    typed_cmp!(cmp_int16, i16, cmp);
+    typed_cmp!(cmp_int32, i32, cmp);
+    typed_cmp!(cmp_int64, i64, cmp);
+    typed_cmp!(cmp_uint8, u8, cmp);
+    typed_cmp!(cmp_uint16, u16, cmp);
+    typed_cmp!(cmp_uint32, u32, cmp);
+    typed_cmp!(cmp_uint64, u64, cmp);
+    typed_cmp!(cmp_float32, f32, total_cmp);
+    typed_cmp!(cmp_float64, f64, total_cmp);
+    pub fn cmp_text(_: &mut Interpreter, _: &[u32], args: Vec<Cell>) -> Result<Cell, EvalError> {
         let [a, b] = exactly_n(args);
-        let a = assume::into_data(a)?;
-        let b = assume::into_data(b)?;
-        let tag: u8 = match cmp_raw(layout_args[0], &a, &b) {
+        let a = decode::text_ref(assume::into_data(a)?);
+        let b = decode::text_ref(assume::into_data(b)?);
+        let tag: u8 = match a.as_str().cmp(b.as_str()) {
             Ordering::Less => 0,
             Ordering::Equal => 1,
             Ordering::Greater => 2,
@@ -263,56 +575,133 @@ pub mod std_ops {
         Ok(encode_cell(&tag))
     }
 
-    macro_rules! cmp_op {
-        ($a: ident, $b: ident, $prim: ty, $op: ident) => {{
-            let left = decode::primitive::<$prim>($a);
-            let right = decode::primitive::<$prim>($b);
-            left.$op(&right)
-        }};
-    }
-
-    pub fn cmp_raw(ty_arg: u32, a: &Data, b: &Data) -> Ordering {
-        let ty_prim = decode::ty_primitive(ty_arg);
-        match ty_prim {
-            ir::TyPrimitive::bool => cmp_op!(a, b, bool, cmp),
-            ir::TyPrimitive::int8 => cmp_op!(a, b, i8, cmp),
-            ir::TyPrimitive::int16 => cmp_op!(a, b, i16, cmp),
-            ir::TyPrimitive::int32 => cmp_op!(a, b, i32, cmp),
-            ir::TyPrimitive::int64 => cmp_op!(a, b, i64, cmp),
-            ir::TyPrimitive::uint8 => cmp_op!(a, b, u8, cmp),
-            ir::TyPrimitive::uint16 => cmp_op!(a, b, u16, cmp),
-            ir::TyPrimitive::uint32 => cmp_op!(a, b, u32, cmp),
-            ir::TyPrimitive::uint64 => cmp_op!(a, b, u64, cmp),
-            ir::TyPrimitive::float32 => cmp_op!(a, b, f32, total_cmp),
-            ir::TyPrimitive::float64 => cmp_op!(a, b, f64, total_cmp),
-            ir::TyPrimitive::text => {
-                let a = decode::text_ref(a.clone());
-                let b = decode::text_ref(b.clone());
-
-                // TODO: this does byte comparison, not Unicode comparisons
-                a.as_str().cmp(b.as_str())
+    // Per-type eq functions
+    macro_rules! typed_eq {
+        ($name: ident, $prim: ty) => {
+            pub fn $name(
+                _: &mut Interpreter,
+                _: &[u32],
+                args: Vec<Cell>,
+            ) -> Result<Cell, EvalError> {
+                let left = assume::primitive::<$prim>(&args[0])?;
+                let right = assume::primitive::<$prim>(&args[1])?;
+                Ok(encode_cell(&left.eq(&right)))
             }
-        }
+        };
+    }
+    typed_eq!(eq_bool, bool);
+    typed_eq!(eq_int8, i8);
+    typed_eq!(eq_int16, i16);
+    typed_eq!(eq_int32, i32);
+    typed_eq!(eq_int64, i64);
+    typed_eq!(eq_uint8, u8);
+    typed_eq!(eq_uint16, u16);
+    typed_eq!(eq_uint32, u32);
+    typed_eq!(eq_uint64, u64);
+    typed_eq!(eq_float32, f32);
+    typed_eq!(eq_float64, f64);
+    pub fn eq_text(_: &mut Interpreter, _: &[u32], args: Vec<Cell>) -> Result<Cell, EvalError> {
+        let [a, b] = exactly_n(args);
+        let a = decode::text_ref(assume::into_data(a)?);
+        let b = decode::text_ref(assume::into_data(b)?);
+        Ok(encode_cell(&a.as_str().eq(b.as_str())))
     }
 
-    bin_prim_func!(eq, eq, bool);
+    // Per-type lt functions
+    macro_rules! typed_lt {
+        ($name: ident, $prim: ty) => {
+            pub fn $name(
+                _: &mut Interpreter,
+                _: &[u32],
+                args: Vec<Cell>,
+            ) -> Result<Cell, EvalError> {
+                let left = assume::primitive::<$prim>(&args[0])?;
+                let right = assume::primitive::<$prim>(&args[1])?;
+                Ok(encode_cell(&left.lt(&right)))
+            }
+        };
+    }
+    typed_lt!(lt_bool, bool);
+    typed_lt!(lt_int8, i8);
+    typed_lt!(lt_int16, i16);
+    typed_lt!(lt_int32, i32);
+    typed_lt!(lt_int64, i64);
+    typed_lt!(lt_uint8, u8);
+    typed_lt!(lt_uint16, u16);
+    typed_lt!(lt_uint32, u32);
+    typed_lt!(lt_uint64, u64);
+    typed_lt!(lt_float32, f32);
+    typed_lt!(lt_float64, f64);
+    pub fn lt_text(_: &mut Interpreter, _: &[u32], args: Vec<Cell>) -> Result<Cell, EvalError> {
+        let [a, b] = exactly_n(args);
+        let a = decode::text_ref(assume::into_data(a)?);
+        let b = decode::text_ref(assume::into_data(b)?);
+        Ok(encode_cell(&a.as_str().lt(b.as_str())))
+    }
 
-    bin_prim_func!(lt, lt, bool);
+    // Per-type lte functions
+    macro_rules! typed_lte {
+        ($name: ident, $prim: ty) => {
+            pub fn $name(
+                _: &mut Interpreter,
+                _: &[u32],
+                args: Vec<Cell>,
+            ) -> Result<Cell, EvalError> {
+                let left = assume::primitive::<$prim>(&args[0])?;
+                let right = assume::primitive::<$prim>(&args[1])?;
+                Ok(encode_cell(&left.le(&right)))
+            }
+        };
+    }
+    typed_lte!(lte_bool, bool);
+    typed_lte!(lte_int8, i8);
+    typed_lte!(lte_int16, i16);
+    typed_lte!(lte_int32, i32);
+    typed_lte!(lte_int64, i64);
+    typed_lte!(lte_uint8, u8);
+    typed_lte!(lte_uint16, u16);
+    typed_lte!(lte_uint32, u32);
+    typed_lte!(lte_uint64, u64);
+    typed_lte!(lte_float32, f32);
+    typed_lte!(lte_float64, f64);
+    pub fn lte_text(_: &mut Interpreter, _: &[u32], args: Vec<Cell>) -> Result<Cell, EvalError> {
+        let [a, b] = exactly_n(args);
+        let a = decode::text_ref(assume::into_data(a)?);
+        let b = decode::text_ref(assume::into_data(b)?);
+        Ok(encode_cell(&a.as_str().le(b.as_str())))
+    }
 
-    bin_prim_func!(lte, le, bool);
+    pub fn eval_cmp(
+        it: &mut Interpreter,
+        cmp: &Cell,
+        a: &Data,
+        b: &Data,
+    ) -> Result<Ordering, EvalError> {
+        let ord = it.evaluate_func_call(cmp, vec![Cell::Data(a.clone()), Cell::Data(b.clone())])?;
+        let tag = assume::primitive::<u8>(&ord)?;
+        Ok(match tag {
+            0 => Ordering::Less,
+            1 => Ordering::Equal,
+            2 => Ordering::Greater,
+            _ => return Err(EvalError::BadProgram),
+        })
+    }
 
-    bin_func!(and, bool, &&, bool);
+    pub fn and(_: &mut Interpreter, _: &[u32], args: Vec<Cell>) -> Result<Cell, EvalError> {
+        let a = assume::bool(&args[0])?;
+        let b = assume::bool(&args[1])?;
+        Ok(encode_cell(&(a && b)))
+    }
 
-    bin_func!(or, bool, ||, bool);
+    pub fn or(_: &mut Interpreter, _: &[u32], args: Vec<Cell>) -> Result<Cell, EvalError> {
+        let a = assume::bool(&args[0])?;
+        let b = assume::bool(&args[1])?;
+        Ok(encode_cell(&(a || b)))
+    }
 
-    pub fn not(
-        _it: &mut Interpreter,
-        _layout_args: &[u32],
-        args: Vec<Cell>,
-    ) -> Result<Cell, EvalError> {
+    pub fn not(_it: &mut Interpreter, _: &[u32], args: Vec<Cell>) -> Result<Cell, EvalError> {
         let operand = assume::bool(&args[0])?;
-        let res = !operand;
-        Ok(Cell::Data(encode(&res)))
+        Ok(encode_cell(&!operand))
     }
 }
 
@@ -323,9 +712,11 @@ pub mod std_array {
     use crate::native::assume::LayoutArgsReader;
     use crate::native::*;
     use crate::{ArrayWriter, Data, EnumWriter, EvalError, TupleWriter};
-    use lutra_bin::{ArrayReader, Decode, TupleReader, ir};
+    use lutra_bin::{ArrayReader, Decode, TupleReader};
 
-    use super::std_ops::cmp_raw;
+    use ::std::cmp::Ordering;
+
+    use super::std_ops::eval_cmp;
 
     pub struct Module;
 
@@ -346,19 +737,53 @@ pub mod std_array {
                 "fold" => &fold,
                 "scan" => &scan,
                 "loop_until_empty" => &loop_until_empty,
-                "sequence" => &sequence,
+                "sequence_int8" => &sequence_int8,
+                "sequence_int16" => &sequence_int16,
+                "sequence_int32" => &sequence_int32,
+                "sequence_int64" => &sequence_int64,
+                "sequence_uint8" => &sequence_uint8,
+                "sequence_uint16" => &sequence_uint16,
+                "sequence_uint32" => &sequence_uint32,
+                "sequence_uint64" => &sequence_uint64,
 
                 "min" => &min,
                 "max" => &max,
-                "sum" => &sum,
-                "mean" => &mean,
+                "sum_int8" => &sum_int8,
+                "sum_int16" => &sum_int16,
+                "sum_int32" => &sum_int32,
+                "sum_int64" => &sum_int64,
+                "sum_uint8" => &sum_uint8,
+                "sum_uint16" => &sum_uint16,
+                "sum_uint32" => &sum_uint32,
+                "sum_uint64" => &sum_uint64,
+                "sum_float32" => &sum_float32,
+                "sum_float64" => &sum_float64,
+                "mean_int8" => &mean_int8,
+                "mean_int16" => &mean_int16,
+                "mean_int32" => &mean_int32,
+                "mean_int64" => &mean_int64,
+                "mean_uint8" => &mean_uint8,
+                "mean_uint16" => &mean_uint16,
+                "mean_uint32" => &mean_uint32,
+                "mean_uint64" => &mean_uint64,
+                "mean_float32" => &mean_float32,
+                "mean_float64" => &mean_float64,
                 "all" => &all,
                 "any" => &any,
                 "count" => &count,
 
                 "lag" => &lag,
                 "lead" => &lead,
-                "rolling_mean" => &rolling_mean,
+                "rolling_mean_int8" => &rolling_mean_int8,
+                "rolling_mean_int16" => &rolling_mean_int16,
+                "rolling_mean_int32" => &rolling_mean_int32,
+                "rolling_mean_int64" => &rolling_mean_int64,
+                "rolling_mean_uint8" => &rolling_mean_uint8,
+                "rolling_mean_uint16" => &rolling_mean_uint16,
+                "rolling_mean_uint32" => &rolling_mean_uint32,
+                "rolling_mean_uint64" => &rolling_mean_uint64,
+                "rolling_mean_float32" => &rolling_mean_float32,
+                "rolling_mean_float64" => &rolling_mean_float64,
                 "rank" => &rank,
                 "rank_dense" => &rank_dense,
                 "rank_percentile" => &rank_percentile,
@@ -516,22 +941,35 @@ pub mod std_array {
         let item_head_bytes = layout_args.next_u32();
         let item_body_ptrs = layout_args.next_slice();
 
-        let key_ty = layout_args.next_u32();
-
-        let [array, func] = assume::exactly_n(args);
+        let [array, func, cmp_func] = assume::exactly_n(args);
 
         let input = assume::array(array, item_head_bytes);
 
         let mut keys = Vec::with_capacity(input.remaining());
         for (index, item) in input.clone().enumerate() {
             let cell = Cell::Data(item);
-
             let key = it.evaluate_func_call(&func, vec![cell])?;
-
             keys.push((assume::into_data(key)?, index));
         }
 
-        keys.sort_by(|(a, _), (b, _)| cmp_raw(key_ty, a, b));
+        // Sort using injected comparator. We need try_sort_by but it's not stable,
+        // so collect orderings eagerly via a fallible sort wrapper.
+        let mut sort_err: Option<EvalError> = None;
+        keys.sort_by(|(a, _), (b, _)| {
+            if sort_err.is_some() {
+                return Ordering::Equal;
+            }
+            match eval_cmp(it, &cmp_func, a, b) {
+                Ok(ord) => ord,
+                Err(e) => {
+                    sort_err = Some(e);
+                    Ordering::Equal
+                }
+            }
+        });
+        if let Some(e) = sort_err {
+            return Err(e);
+        }
 
         let mut output = ArrayWriter::new(item_head_bytes, item_body_ptrs);
         for (_key, index) in keys {
@@ -827,106 +1265,130 @@ pub mod std_array {
         }};
     }
 
-    pub fn sequence(
-        _it: &mut Interpreter,
-        layout_args: &[u32],
-        args: Vec<Cell>,
-    ) -> Result<Cell, EvalError> {
-        let [start, end] = assume::exactly_n(args);
-        let start = assume::into_data(start)?;
-        let end = assume::into_data(end)?;
-
-        let ty_prim = decode::ty_primitive(layout_args[0]);
-        Ok(Cell::Data(match ty_prim {
-            ir::TyPrimitive::int8 => sequence!(i8, start, end),
-            ir::TyPrimitive::int16 => sequence!(i16, start, end),
-            ir::TyPrimitive::int32 => sequence!(i32, start, end),
-            ir::TyPrimitive::int64 => sequence!(i64, start, end),
-            ir::TyPrimitive::uint8 => sequence!(u8, start, end),
-            ir::TyPrimitive::uint16 => sequence!(u16, start, end),
-            ir::TyPrimitive::uint32 => sequence!(u32, start, end),
-            ir::TyPrimitive::uint64 => sequence!(u64, start, end),
-            _ => panic!(),
-        }))
+    macro_rules! typed_sequence {
+        ($name: ident, $prim: ident) => {
+            pub fn $name(
+                _: &mut Interpreter,
+                _: &[u32],
+                args: Vec<Cell>,
+            ) -> Result<Cell, EvalError> {
+                let [start, end] = assume::exactly_n(args);
+                let start = assume::into_data(start)?;
+                let end = assume::into_data(end)?;
+                Ok(Cell::Data(sequence!($prim, start, end)))
+            }
+        };
     }
+    typed_sequence!(sequence_int8, i8);
+    typed_sequence!(sequence_int16, i16);
+    typed_sequence!(sequence_int32, i32);
+    typed_sequence!(sequence_int64, i64);
+    typed_sequence!(sequence_uint8, u8);
+    typed_sequence!(sequence_uint16, u16);
+    typed_sequence!(sequence_uint32, u32);
+    typed_sequence!(sequence_uint64, u64);
 
     pub fn min(
-        _: &mut Interpreter,
+        it: &mut Interpreter,
         layout_args: &[u32],
         args: Vec<Cell>,
     ) -> Result<Cell, EvalError> {
-        let [array] = assume::exactly_n(args);
+        let [array, cmp_func] = assume::exactly_n(args);
         let array = assume::array(array, layout_args[0]);
 
-        let res = array.reduce(|a, b| {
-            if cmp_raw(layout_args[1], &a, &b).is_lt() {
-                a
-            } else {
-                b
-            }
-        });
-
+        let mut res: Option<Data> = None;
+        for item in array {
+            res = Some(match res {
+                None => item,
+                Some(current) => {
+                    let ord = eval_cmp(it, &cmp_func, &item, &current)?;
+                    if ord.is_gt() { current } else { item }
+                }
+            });
+        }
         Ok(Cell::Data(encode_option(res, layout_args[0])))
     }
 
     pub fn max(
-        _: &mut Interpreter,
+        it: &mut Interpreter,
         layout_args: &[u32],
         args: Vec<Cell>,
     ) -> Result<Cell, EvalError> {
-        let [array] = assume::exactly_n(args);
+        let [array, cmp_func] = assume::exactly_n(args);
         let array = assume::array(array, layout_args[0]);
 
-        let res = array.reduce(|a, b| {
-            if cmp_raw(layout_args[1], &a, &b).is_gt() {
-                a
-            } else {
-                b
-            }
-        });
+        let mut res: Option<Data> = None;
+        for item in array {
+            res = Some(match res {
+                None => item,
+                Some(current) => {
+                    let ord = eval_cmp(it, &cmp_func, &item, &current)?;
+                    if ord.is_lt() { current } else { item }
+                }
+            });
+        }
 
         Ok(Cell::Data(encode_option(res, layout_args[0])))
     }
 
-    macro_rules! sum {
-        ($array: expr, $ty: ident) => {{
-            let s = $array
-                .map(|x| decode::primitive::<$ty>(&x))
-                .reduce(|a, b| a + b);
-            encode(&s.unwrap_or_default())
-        }};
-    }
-
-    pub fn sum(
-        _: &mut Interpreter,
-        layout_args: &[u32],
-        args: Vec<Cell>,
-    ) -> Result<Cell, EvalError> {
-        let [array] = assume::exactly_n(args);
-        let array = assume::array(array, layout_args[0]);
-        let ty_prim = decode::ty_primitive(layout_args[1]);
-
-        let res = match ty_prim {
-            ir::TyPrimitive::int8 => sum!(array, i8),
-            ir::TyPrimitive::int16 => sum!(array, i16),
-            ir::TyPrimitive::int32 => sum!(array, i32),
-            ir::TyPrimitive::int64 => sum!(array, i64),
-            ir::TyPrimitive::uint8 => sum!(array, u8),
-            ir::TyPrimitive::uint16 => sum!(array, u16),
-            ir::TyPrimitive::uint32 => sum!(array, u32),
-            ir::TyPrimitive::uint64 => sum!(array, u64),
-            ir::TyPrimitive::float32 => sum!(array, f32),
-            ir::TyPrimitive::float64 => sum!(array, f64),
-            _ => panic!(),
+    macro_rules! typed_sum {
+        ($name: ident, $prim: ty) => {
+            pub fn $name(
+                _: &mut Interpreter,
+                layout_args: &[u32],
+                args: Vec<Cell>,
+            ) -> Result<Cell, EvalError> {
+                let [array] = assume::exactly_n(args);
+                let array = assume::array(array, layout_args[0]);
+                let s = array
+                    .map(|x| decode::primitive::<$prim>(&x))
+                    .reduce(|a, b| a + b)
+                    .unwrap_or_default();
+                Ok(Cell::Data(encode(&s)))
+            }
         };
-        Ok(Cell::Data(res))
     }
+    typed_sum!(sum_int8, i8);
+    typed_sum!(sum_int16, i16);
+    typed_sum!(sum_int32, i32);
+    typed_sum!(sum_int64, i64);
+    typed_sum!(sum_uint8, u8);
+    typed_sum!(sum_uint16, u16);
+    typed_sum!(sum_uint32, u32);
+    typed_sum!(sum_uint64, u64);
+    typed_sum!(sum_float32, f32);
+    typed_sum!(sum_float64, f64);
 
-    pub fn count(
-        _it: &mut Interpreter,
-        _layout_args: &[u32],
-        args: Vec<Cell>,
-    ) -> Result<Cell, EvalError> {
+    macro_rules! typed_mean {
+        ($name: ident, $prim: ty) => {
+            pub fn $name(
+                _: &mut Interpreter,
+                layout_args: &[u32],
+                args: Vec<Cell>,
+            ) -> Result<Cell, EvalError> {
+                let [array] = assume::exactly_n(args);
+                let array = assume::array(array, layout_args[0]);
+                let (sum, count) = array
+                    .map(|x| decode::primitive::<$prim>(&x))
+                    .fold((<$prim>::default(), 0_u32), |(sum, count), item| {
+                        (sum + item, count + 1)
+                    });
+                Ok(Cell::Data(encode(&(sum as f64 / count as f64))))
+            }
+        };
+    }
+    typed_mean!(mean_int8, i8);
+    typed_mean!(mean_int16, i16);
+    typed_mean!(mean_int32, i32);
+    typed_mean!(mean_int64, i64);
+    typed_mean!(mean_uint8, u8);
+    typed_mean!(mean_uint16, u16);
+    typed_mean!(mean_uint32, u32);
+    typed_mean!(mean_uint64, u64);
+    typed_mean!(mean_float32, f32);
+    typed_mean!(mean_float64, f64);
+
+    pub fn count(_it: &mut Interpreter, _: &[u32], args: Vec<Cell>) -> Result<Cell, EvalError> {
         let [array] = assume::exactly_n(args);
         let array = assume::into_data(array)?;
 
@@ -936,47 +1398,7 @@ pub mod std_array {
         Ok(Cell::Data(encode(&res)))
     }
 
-    macro_rules! mean {
-        ($array: expr, $ty: ident) => {{
-            let (sum, count) = $array
-                .map(|x| decode::primitive::<$ty>(&x))
-                .fold(($ty::default(), 0_u32), |(sum, count), item| {
-                    (sum + item, count + 1)
-                });
-            (sum as f64, count)
-        }};
-    }
-
-    pub fn mean(
-        _it: &mut Interpreter,
-        layout_args: &[u32],
-        args: Vec<Cell>,
-    ) -> Result<Cell, EvalError> {
-        let [array] = assume::exactly_n(args);
-        let array = assume::array(array, layout_args[0]);
-        let ty_prim = decode::ty_primitive(layout_args[1]);
-
-        let (sum, count) = match ty_prim {
-            ir::TyPrimitive::int8 => mean!(array, i8),
-            ir::TyPrimitive::int16 => mean!(array, i16),
-            ir::TyPrimitive::int32 => mean!(array, i32),
-            ir::TyPrimitive::int64 => mean!(array, i64),
-            ir::TyPrimitive::uint8 => mean!(array, u8),
-            ir::TyPrimitive::uint16 => mean!(array, u16),
-            ir::TyPrimitive::uint32 => mean!(array, u32),
-            ir::TyPrimitive::uint64 => mean!(array, u64),
-            ir::TyPrimitive::float32 => mean!(array, f32),
-            ir::TyPrimitive::float64 => mean!(array, f64),
-            _ => panic!(),
-        };
-        Ok(Cell::Data(encode(&(sum / (count as f64)))))
-    }
-
-    pub fn all(
-        _it: &mut Interpreter,
-        _layout_args: &[u32],
-        args: Vec<Cell>,
-    ) -> Result<Cell, EvalError> {
+    pub fn all(_it: &mut Interpreter, _: &[u32], args: Vec<Cell>) -> Result<Cell, EvalError> {
         let [array] = assume::exactly_n(args);
         let mut array = assume::array(array, 1);
 
@@ -984,11 +1406,7 @@ pub mod std_array {
         Ok(Cell::Data(encode(&res)))
     }
 
-    pub fn any(
-        _it: &mut Interpreter,
-        _layout_args: &[u32],
-        args: Vec<Cell>,
-    ) -> Result<Cell, EvalError> {
+    pub fn any(_it: &mut Interpreter, _: &[u32], args: Vec<Cell>) -> Result<Cell, EvalError> {
         let [array] = assume::exactly_n(args);
         let mut array = assume::array(array, 1);
 
@@ -1064,33 +1482,31 @@ pub mod std_array {
         Ok(Cell::Data(out.finish()))
     }
 
-    pub fn rolling_mean(
-        _it: &mut Interpreter,
-        layout_args: &[u32],
-        args: Vec<Cell>,
-    ) -> Result<Cell, EvalError> {
-        let [array, trailing, leading] = assume::exactly_n(args);
-        let trailing: u32 = assume::primitive(&trailing)?;
-        let leading: u32 = assume::primitive(&leading)?;
-
-        let item_head_bytes = layout_args[0];
-        let array = assume::array(array, item_head_bytes);
-        let ty_prim = decode::ty_primitive(layout_args[1]);
-
-        match ty_prim {
-            ir::TyPrimitive::int8 => rolling_mean_impl::<i8>(array, trailing, leading),
-            ir::TyPrimitive::int16 => rolling_mean_impl::<i16>(array, trailing, leading),
-            ir::TyPrimitive::int32 => rolling_mean_impl::<i32>(array, trailing, leading),
-            ir::TyPrimitive::int64 => rolling_mean_impl::<i64>(array, trailing, leading),
-            ir::TyPrimitive::uint8 => rolling_mean_impl::<u8>(array, trailing, leading),
-            ir::TyPrimitive::uint16 => rolling_mean_impl::<u16>(array, trailing, leading),
-            ir::TyPrimitive::uint32 => rolling_mean_impl::<u32>(array, trailing, leading),
-            ir::TyPrimitive::uint64 => rolling_mean_impl::<u64>(array, trailing, leading),
-            ir::TyPrimitive::float32 => rolling_mean_impl::<f32>(array, trailing, leading),
-            ir::TyPrimitive::float64 => rolling_mean_impl::<f64>(array, trailing, leading),
-            _ => unreachable!(),
-        }
+    macro_rules! typed_rolling_mean {
+        ($name: ident, $prim: ty) => {
+            pub fn $name(
+                _it: &mut Interpreter,
+                layout_args: &[u32],
+                args: Vec<Cell>,
+            ) -> Result<Cell, EvalError> {
+                let [array, trailing, leading] = assume::exactly_n(args);
+                let trailing: u32 = assume::primitive(&trailing)?;
+                let leading: u32 = assume::primitive(&leading)?;
+                let array = assume::array(array, layout_args[0]);
+                rolling_mean_impl::<$prim>(array, trailing, leading)
+            }
+        };
     }
+    typed_rolling_mean!(rolling_mean_int8, i8);
+    typed_rolling_mean!(rolling_mean_int16, i16);
+    typed_rolling_mean!(rolling_mean_int32, i32);
+    typed_rolling_mean!(rolling_mean_int64, i64);
+    typed_rolling_mean!(rolling_mean_uint8, u8);
+    typed_rolling_mean!(rolling_mean_uint16, u16);
+    typed_rolling_mean!(rolling_mean_uint32, u32);
+    typed_rolling_mean!(rolling_mean_uint64, u64);
+    typed_rolling_mean!(rolling_mean_float32, f32);
+    typed_rolling_mean!(rolling_mean_float64, f64);
 
     fn rolling_mean_impl<T>(
         array: ArrayReader<Data>,
@@ -1142,21 +1558,17 @@ pub mod std_array {
     }
 
     pub fn rank(
-        _it: &mut Interpreter,
+        it: &mut Interpreter,
         layout_args: &[u32],
         args: Vec<Cell>,
     ) -> Result<Cell, EvalError> {
-        let [array] = assume::exactly_n(args);
-
-        let item_head_bytes = layout_args[0];
-        let array = assume::array(array, item_head_bytes);
-        let ty_arg = layout_args[1];
+        let [array, cmp_func] = assume::exactly_n(args);
+        let array = assume::array(array, layout_args[0]);
 
         fn get_rank(start: usize, _end: usize, _group: usize) -> usize {
             start + 1
         }
-
-        let ranks = rank_impl(array, ty_arg, get_rank)?;
+        let ranks = rank_impl(it, array, &cmp_func, get_rank)?;
 
         Ok(Cell::Data(encode_primitives(
             ranks.into_iter().map(|r| r as i32),
@@ -1164,21 +1576,17 @@ pub mod std_array {
     }
 
     pub fn rank_dense(
-        _it: &mut Interpreter,
+        it: &mut Interpreter,
         layout_args: &[u32],
         args: Vec<Cell>,
     ) -> Result<Cell, EvalError> {
-        let [array] = assume::exactly_n(args);
-
-        let item_head_bytes = layout_args[0];
-        let array = assume::array(array, item_head_bytes);
-        let ty_arg = layout_args[1];
+        let [array, cmp_func] = assume::exactly_n(args);
+        let array = assume::array(array, layout_args[0]);
 
         fn get_rank(_start: usize, _end: usize, group: usize) -> usize {
             group + 1
         }
-
-        let ranks = rank_impl(array, ty_arg, get_rank)?;
+        let ranks = rank_impl(it, array, &cmp_func, get_rank)?;
 
         Ok(Cell::Data(encode_primitives(
             ranks.into_iter().map(|r| r as i32),
@@ -1186,22 +1594,18 @@ pub mod std_array {
     }
 
     pub fn rank_percentile(
-        _it: &mut Interpreter,
+        it: &mut Interpreter,
         layout_args: &[u32],
         args: Vec<Cell>,
     ) -> Result<Cell, EvalError> {
-        let [array] = assume::exactly_n(args);
-
-        let item_head_bytes = layout_args[0];
-        let array = assume::array(array, item_head_bytes);
-        let ty_arg = layout_args[1];
+        let [array, cmp_func] = assume::exactly_n(args);
+        let array = assume::array(array, layout_args[0]);
 
         fn get_rank(start: usize, _end: usize, _group: usize) -> usize {
             start
         }
         let n = (array.remaining() - 1) as f64;
-
-        let ranks = rank_impl(array, ty_arg, get_rank)?;
+        let ranks = rank_impl(it, array, &cmp_func, get_rank)?;
 
         Ok(Cell::Data(encode_primitives(
             ranks.into_iter().map(|r| r as f64 / n),
@@ -1209,22 +1613,18 @@ pub mod std_array {
     }
 
     pub fn cume_dist(
-        _it: &mut Interpreter,
+        it: &mut Interpreter,
         layout_args: &[u32],
         args: Vec<Cell>,
     ) -> Result<Cell, EvalError> {
-        let [array] = assume::exactly_n(args);
-
-        let item_head_bytes = layout_args[0];
-        let array = assume::array(array, item_head_bytes);
-        let ty_arg = layout_args[1];
+        let [array, cmp_func] = assume::exactly_n(args);
+        let array = assume::array(array, layout_args[0]);
 
         fn get_rank(_start: usize, end: usize, _group: usize) -> usize {
             end
         }
         let n = array.remaining() as f64;
-
-        let ranks = rank_impl(array, ty_arg, get_rank)?;
+        let ranks = rank_impl(it, array, &cmp_func, get_rank)?;
 
         Ok(Cell::Data(encode_primitives(
             ranks.into_iter().map(|r| r as f64 / n),
@@ -1232,15 +1632,31 @@ pub mod std_array {
     }
 
     fn rank_impl(
+        it: &mut Interpreter,
         array: ArrayReader<Data>,
-        ty_arg: u32,
+        cmp: &Cell,
         get_rank: impl Fn(usize, usize, usize) -> usize,
     ) -> Result<Vec<usize>, EvalError> {
         let array_len = array.remaining();
 
-        // sort by using std::cmp
+        // sort using injected comparator
         let mut indexed: Vec<(usize, Data)> = array.enumerate().collect();
-        indexed.sort_by(|(_, a), (_, b)| cmp_raw(ty_arg, a, b));
+        let mut sort_err: Option<EvalError> = None;
+        indexed.sort_by(|(_, a), (_, b)| {
+            if sort_err.is_some() {
+                return Ordering::Equal;
+            }
+            match eval_cmp(it, cmp, a, b) {
+                Ok(ord) => ord,
+                Err(e) => {
+                    sort_err = Some(e);
+                    Ordering::Equal
+                }
+            }
+        });
+        if let Some(e) = sort_err {
+            return Err(e);
+        }
 
         // iterate over groups
         let mut ranks = vec![0; array_len];
@@ -1250,7 +1666,11 @@ pub mod std_array {
             // find group of equal values
             let start = i;
             let value = &indexed[i].1;
-            while i < array_len && cmp_raw(ty_arg, &indexed[i].1, value).is_eq() {
+            while i < array_len {
+                let ord = eval_cmp(it, cmp, &indexed[i].1, value)?;
+                if !ord.is_eq() {
+                    break;
+                }
                 i += 1;
             }
             let end = i; // exclusive
@@ -1321,11 +1741,7 @@ pub mod std_text {
         }
     }
 
-    pub fn concat(
-        _it: &mut Interpreter,
-        _layout_args: &[u32],
-        args: Vec<Cell>,
-    ) -> Result<Cell, EvalError> {
+    pub fn concat(_it: &mut Interpreter, _: &[u32], args: Vec<Cell>) -> Result<Cell, EvalError> {
         let [left, right] = assume::exactly_n(args);
 
         // TODO: string reader
@@ -1349,11 +1765,7 @@ pub mod std_text {
         Ok(Cell::Data(Data::new(buf)))
     }
 
-    pub fn length(
-        _it: &mut Interpreter,
-        _layout_args: &[u32],
-        args: Vec<Cell>,
-    ) -> Result<Cell, EvalError> {
+    pub fn length(_it: &mut Interpreter, _: &[u32], args: Vec<Cell>) -> Result<Cell, EvalError> {
         let [text] = assume::exactly_n(args);
 
         let data = assume::into_data(text)?;
@@ -1365,7 +1777,7 @@ pub mod std_text {
 
     pub fn from_ascii(
         _it: &mut Interpreter,
-        _layout_args: &[u32],
+        _: &[u32],
         args: Vec<Cell>,
     ) -> Result<Cell, EvalError> {
         let [ascii] = assume::exactly_n(args);
@@ -1375,11 +1787,7 @@ pub mod std_text {
         Ok(Cell::Data(encode(&text)))
     }
 
-    pub fn join(
-        _it: &mut Interpreter,
-        _layout_args: &[u32],
-        args: Vec<Cell>,
-    ) -> Result<Cell, EvalError> {
+    pub fn join(_it: &mut Interpreter, _: &[u32], args: Vec<Cell>) -> Result<Cell, EvalError> {
         let [parts, sep] = assume::exactly_n(args);
         let mut parts = assume::array(parts, str::head_size().div_ceil(8) as u32);
         let sep = assume::text(&sep)?;
@@ -1401,11 +1809,7 @@ pub mod std_text {
         Ok(Cell::Data(encode(&joined)))
     }
 
-    pub fn split(
-        _it: &mut Interpreter,
-        _layout_args: &[u32],
-        args: Vec<Cell>,
-    ) -> Result<Cell, EvalError> {
+    pub fn split(_it: &mut Interpreter, _: &[u32], args: Vec<Cell>) -> Result<Cell, EvalError> {
         let [text, sep] = assume::exactly_n(args);
         let text = assume::text_ref(text)?;
         let sep = assume::text_ref(sep)?;
@@ -1419,7 +1823,7 @@ pub mod std_text {
 
     pub fn starts_with(
         _it: &mut Interpreter,
-        _layout_args: &[u32],
+        _: &[u32],
         args: Vec<Cell>,
     ) -> Result<Cell, EvalError> {
         let [text, prefix] = assume::exactly_n(args);
@@ -1432,11 +1836,7 @@ pub mod std_text {
         Ok(Cell::Data(encode(&res)))
     }
 
-    pub fn contains(
-        _it: &mut Interpreter,
-        _layout_args: &[u32],
-        args: Vec<Cell>,
-    ) -> Result<Cell, EvalError> {
+    pub fn contains(_it: &mut Interpreter, _: &[u32], args: Vec<Cell>) -> Result<Cell, EvalError> {
         let [text, pattern] = assume::exactly_n(args);
 
         let text = assume::text_ref(text)?;
@@ -1447,11 +1847,7 @@ pub mod std_text {
         Ok(Cell::Data(encode(&res)))
     }
 
-    pub fn ends_with(
-        _it: &mut Interpreter,
-        _layout_args: &[u32],
-        args: Vec<Cell>,
-    ) -> Result<Cell, EvalError> {
+    pub fn ends_with(_it: &mut Interpreter, _: &[u32], args: Vec<Cell>) -> Result<Cell, EvalError> {
         let [text, suffix] = assume::exactly_n(args);
 
         let text = assume::text_ref(text)?;
@@ -1464,104 +1860,57 @@ pub mod std_text {
 }
 
 pub mod std_math {
-    use crate::native::{assume, decode, encode};
+    use crate::native::{assume, encode};
     use crate::{Cell, EvalError, Interpreter, NativeModule};
-    use lutra_bin::ir;
 
     pub struct Module;
 
     impl NativeModule for Module {
         fn lookup_native_symbol(&self, id: &str) -> Option<crate::interpreter::NativeFunction> {
             Some(match id {
-                "abs" => &abs,
-                "pow" => &pow,
+                "abs_int8" => &abs_int8,
+                "abs_int16" => &abs_int16,
+                "abs_int32" => &abs_int32,
+                "abs_int64" => &abs_int64,
+                "abs_float32" => &abs_float32,
+                "abs_float64" => &abs_float64,
+
+                "pow_int64" => &pow_int64,
+                "pow_float64" => &pow_float64,
 
                 _ => return None,
             })
         }
     }
 
-    fn abs(_it: &mut Interpreter, layout_args: &[u32], args: Vec<Cell>) -> Result<Cell, EvalError> {
-        let [arg] = assume::exactly_n(args);
-
-        let ty_prim = decode::ty_primitive(layout_args[0]);
-
-        Ok(Cell::Data(match ty_prim {
-            ir::TyPrimitive::int8 => encode(&assume::primitive::<i8>(&arg)?.abs()),
-            ir::TyPrimitive::int16 => encode(&assume::primitive::<i16>(&arg)?.abs()),
-            ir::TyPrimitive::int32 => encode(&assume::primitive::<i32>(&arg)?.abs()),
-            ir::TyPrimitive::int64 => encode(&assume::primitive::<i64>(&arg)?.abs()),
-            ir::TyPrimitive::float32 => encode(&assume::primitive::<f32>(&arg)?.abs()),
-            ir::TyPrimitive::float64 => encode(&assume::primitive::<f64>(&arg)?.abs()),
-
-            ir::TyPrimitive::uint8
-            | ir::TyPrimitive::uint16
-            | ir::TyPrimitive::uint32
-            | ir::TyPrimitive::uint64 => return Ok(arg),
-
-            _ => return Err(EvalError::BadProgram),
-        }))
+    // Per-type abs
+    macro_rules! typed_abs {
+        ($name: ident, $prim: ty) => {
+            pub fn $name(
+                _: &mut Interpreter,
+                _: &[u32],
+                args: Vec<Cell>,
+            ) -> Result<Cell, EvalError> {
+                let [arg] = assume::exactly_n(args);
+                Ok(Cell::Data(encode(&assume::primitive::<$prim>(&arg)?.abs())))
+            }
+        };
     }
+    typed_abs!(abs_int8, i8);
+    typed_abs!(abs_int16, i16);
+    typed_abs!(abs_int32, i32);
+    typed_abs!(abs_int64, i64);
+    typed_abs!(abs_float32, f32);
+    typed_abs!(abs_float64, f64);
 
-    pub fn pow(
-        _: &mut Interpreter,
-        layout_args: &[u32],
-        args: Vec<Cell>,
-    ) -> Result<Cell, EvalError> {
-        let prim = decode::ty_primitive(layout_args[0]);
-        Ok(Cell::Data(match prim {
-            ir::TyPrimitive::int8 => {
-                let (left, right) = assume::primitive2::<i8>(&args)?;
-                let res = left.pow(right as u32);
-                encode::<i8>(&res)
-            }
-            ir::TyPrimitive::int16 => {
-                let (left, right) = assume::primitive2::<i16>(&args)?;
-                let res = left.pow(right as u32);
-                encode::<i16>(&res)
-            }
-            ir::TyPrimitive::int32 => {
-                let (left, right) = assume::primitive2::<i32>(&args)?;
-                let res = left.pow(right as u32);
-                encode::<i32>(&res)
-            }
-            ir::TyPrimitive::int64 => {
-                let (left, right) = assume::primitive2::<i64>(&args)?;
-                let res = left.pow(right as u32);
-                encode::<i64>(&res)
-            }
-            ir::TyPrimitive::uint8 => {
-                let (left, right) = assume::primitive2::<u8>(&args)?;
-                let res = left.pow(right as u32);
-                encode::<u8>(&res)
-            }
-            ir::TyPrimitive::uint16 => {
-                let (left, right) = assume::primitive2::<u16>(&args)?;
-                let res = left.pow(right as u32);
-                encode::<u16>(&res)
-            }
-            ir::TyPrimitive::uint32 => {
-                let (left, right) = assume::primitive2::<u32>(&args)?;
-                let res = left.pow(right);
-                encode::<u32>(&res)
-            }
-            ir::TyPrimitive::uint64 => {
-                let (left, right) = assume::primitive2::<u64>(&args)?;
-                let res = left.pow(right as u32);
-                encode::<u64>(&res)
-            }
-            ir::TyPrimitive::float32 => {
-                let (left, right) = assume::primitive2::<f32>(&args)?;
-                let res = left.powf(right);
-                encode::<f32>(&res)
-            }
-            ir::TyPrimitive::float64 => {
-                let (left, right) = assume::primitive2::<f64>(&args)?;
-                let res = left.powf(right);
-                encode::<f64>(&res)
-            }
-            _ => panic!(),
-        }))
+    // Per-type pow (std.lt only defines pow for int64 | float64)
+    pub fn pow_int64(_: &mut Interpreter, _: &[u32], args: Vec<Cell>) -> Result<Cell, EvalError> {
+        let (left, right) = assume::primitive2::<i64>(&args)?;
+        Ok(Cell::Data(encode(&left.pow(right as u32))))
+    }
+    pub fn pow_float64(_: &mut Interpreter, _: &[u32], args: Vec<Cell>) -> Result<Cell, EvalError> {
+        let (left, right) = assume::primitive2::<f64>(&args)?;
+        Ok(Cell::Data(encode(&left.powf(right))))
     }
 }
 
@@ -1701,7 +2050,7 @@ pub mod std_date {
 
     pub fn to_timestamp(
         _it: &mut Interpreter,
-        _layout_args: &[u32],
+        _: &[u32],
         args: Vec<Cell>,
     ) -> Result<Cell, EvalError> {
         let [date, time_zone] = assume::exactly_n(args);
@@ -1733,7 +2082,7 @@ pub mod std_date {
 
     pub fn to_year_month_day(
         _it: &mut Interpreter,
-        _layout_args: &[u32],
+        _: &[u32],
         args: Vec<Cell>,
     ) -> Result<Cell, EvalError> {
         // unpack
@@ -1769,11 +2118,7 @@ pub mod std_timestamp {
         }
     }
 
-    pub fn to_date(
-        _it: &mut Interpreter,
-        _layout_args: &[u32],
-        args: Vec<Cell>,
-    ) -> Result<Cell, EvalError> {
+    pub fn to_date(_it: &mut Interpreter, _: &[u32], args: Vec<Cell>) -> Result<Cell, EvalError> {
         let [timestamp, time_zone] = assume::exactly_n(args);
 
         let timestamp: i64 = assume::primitive(&timestamp)?;
@@ -1804,11 +2149,7 @@ pub mod interpreter {
         }
     }
 
-    fn version(
-        _it: &mut Interpreter,
-        _layout_args: &[u32],
-        _args: Vec<Cell>,
-    ) -> Result<Cell, EvalError> {
+    fn version(_it: &mut Interpreter, _: &[u32], _args: Vec<Cell>) -> Result<Cell, EvalError> {
         Ok(Cell::Data(encode("lutra-interpreter 0.0.1")))
     }
 }
@@ -1908,7 +2249,7 @@ mod assume {
 }
 
 mod decode {
-    use lutra_bin::{ArrayReader, Decode, ir};
+    use lutra_bin::{ArrayReader, Decode};
 
     use crate::Data;
 
@@ -1940,25 +2281,6 @@ mod decode {
     impl TextData {
         pub fn as_str(&self) -> &str {
             str::from_utf8(&self.body.chunk()[..self.len]).unwrap()
-        }
-    }
-
-    pub fn ty_primitive(ty_arg: u32) -> ir::TyPrimitive {
-        // keep in sync with generated ir code!
-        match ty_arg.to_be() {
-            0 => ir::TyPrimitive::bool,
-            1 => ir::TyPrimitive::int8,
-            2 => ir::TyPrimitive::int16,
-            3 => ir::TyPrimitive::int32,
-            4 => ir::TyPrimitive::int64,
-            5 => ir::TyPrimitive::uint8,
-            6 => ir::TyPrimitive::uint16,
-            7 => ir::TyPrimitive::uint32,
-            8 => ir::TyPrimitive::uint64,
-            9 => ir::TyPrimitive::float32,
-            10 => ir::TyPrimitive::float64,
-            11 => ir::TyPrimitive::text,
-            _ => unreachable!(),
         }
     }
 }

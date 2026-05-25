@@ -80,6 +80,20 @@ impl Data {
             Data::Combined(c) => c.write_all(w),
         }
     }
+
+    pub fn flatten_n(&self, n: usize) -> Vec<u8> {
+        let mut out = Vec::with_capacity(n);
+        let m = self.write_n(&mut out, n);
+        assert_eq!(m, 0);
+        out
+    }
+
+    pub fn write_n(&self, w: &mut vec::Vec<u8>, n: usize) -> usize {
+        match self {
+            Data::Single(s) => s.write_n(w, n),
+            Data::Combined(c) => c.write_n(w, n),
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -119,6 +133,12 @@ impl Slice {
 
     fn write_all(&self, w: &mut vec::Vec<u8>) {
         w.extend(&self.buf[self.offset..])
+    }
+
+    pub fn write_n(&self, w: &mut vec::Vec<u8>, n: usize) -> usize {
+        let written = usize::min(n, self.remaining());
+        w.extend(&self.buf[self.offset..(self.offset + written)]);
+        n - written
     }
 }
 
@@ -183,6 +203,16 @@ impl CombinedSlices {
         for part in &self.parts {
             part.write_all(w);
         }
+    }
+
+    fn write_n(&self, w: &mut vec::Vec<u8>, mut n: usize) -> usize {
+        for part in &self.parts {
+            n = part.write_n(w, n);
+            if n == 0 {
+                return 0;
+            }
+        }
+        n
     }
 }
 
