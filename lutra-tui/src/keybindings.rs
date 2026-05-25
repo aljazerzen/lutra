@@ -87,7 +87,7 @@ impl KeyBindings {
                 KeyCode::Enter => Some(Action::SubmitPrompt),
                 _ => self.process_edit_key(key),
             },
-            CellStage::Input => None,
+            CellStage::Argument => None,
             CellStage::Output => match key.code {
                 KeyCode::Up => Some(Action::TableMoveUp),
                 KeyCode::Down => Some(Action::TableMoveDown),
@@ -97,7 +97,7 @@ impl KeyBindings {
                 KeyCode::End => Some(Action::TableMoveEnd),
                 KeyCode::PageUp => Some(Action::TableMovePageUp),
                 KeyCode::PageDown => Some(Action::TableMovePageDown),
-                KeyCode::Enter => Some(Action::ClearCell),
+                KeyCode::Enter => Some(Action::InspectOutput),
                 _ => None,
             },
         }

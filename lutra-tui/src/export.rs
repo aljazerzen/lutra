@@ -1,7 +1,9 @@
 use std::path::{Path, PathBuf};
+use std::rc::Rc;
 
 use lutra_bin::{Value, ir, rr};
 
+use crate::cell::CellOutputRef;
 use crate::shell::Shell;
 use crate::terminal::{ActionResult, View};
 
@@ -9,7 +11,7 @@ pub fn run(shell: &mut Shell, input: Vec<u8>) -> ActionResult {
     let request = match decode_request(&input) {
         Ok(request) => request,
         Err(RequestError::Validation(err)) => {
-            if let Some(input) = &mut shell.repl.draft.input {
+            if let Some(input) = &mut shell.repl.draft.argument {
                 input.set_error(err);
             }
             return ActionResult::redraw();
@@ -70,11 +72,6 @@ pub fn default_input() -> Value {
         Value::Enum(0, Box::new(Value::unit())),
         Value::Text(Format::LutraSource.default_path().into()),
     ])
-}
-
-pub struct ProgramOutput<'a> {
-    pub bytes: &'a [u8],
-    pub program_ty: &'a rr::ProgramType,
 }
 
 pub struct Input {
@@ -154,7 +151,7 @@ pub fn resolve_export_path(path: &Path, project_dir: Option<&Path>) -> PathBuf {
     }
 }
 
-fn write_fs(request: &Input, output: ProgramOutput<'_>) -> Result<(), anyhow::Error> {
+fn write_fs(request: &Input, output: CellOutputRef<'_>) -> Result<(), anyhow::Error> {
     if let Some(parent) = request.path.parent()
         && !parent.as_os_str().is_empty()
     {
@@ -163,16 +160,13 @@ fn write_fs(request: &Input, output: ProgramOutput<'_>) -> Result<(), anyhow::Er
 
     match request.format {
         Format::LutraSource => {
-            let text = lutra_bin::print_source(
-                output.bytes,
-                &output.program_ty.output,
-                &output.program_ty.defs,
-            )
-            .map_err(|e| anyhow::anyhow!(e.to_string()))?;
+            let ty = output.cell.program_ty.as_ref().unwrap();
+            let text = lutra_bin::print_source(output.data, &ty.output, &ty.defs)
+                .map_err(|e| anyhow::anyhow!(e.to_string()))?;
             std::fs::write(&request.path, text)?;
         }
         Format::RawBinary => {
-            std::fs::write(&request.path, output.bytes)?;
+            std::fs::write(&request.path, Rc::as_ref(output.data))?;
         }
     }
 

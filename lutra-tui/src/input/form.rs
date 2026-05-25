@@ -50,16 +50,13 @@ pub enum FormResult {
     Submit,
 }
 
-fn resolve_ty<'a>(ty: &'a ir::Ty, ty_defs: &'a TyDefs) -> &'a ir::Ty {
-    match &ty.kind {
-        ir::TyKind::Ident(path) => {
-            let resolved = ty_defs
-                .get(path)
-                .unwrap_or_else(|| panic!("Type identifier {:?} not found in definitions", path));
-            resolve_ty(resolved, ty_defs)
-        }
-        _ => ty,
+fn get_ty_mat<'a>(mut ty: &'a ir::Ty, ty_defs: &'a TyDefs) -> &'a ir::Ty {
+    while let ir::TyKind::Ident(path) = &ty.kind {
+        ty = ty_defs
+            .get(path)
+            .unwrap_or_else(|| panic!("Type identifier {:?} not found in definitions", path))
     }
+    ty
 }
 
 impl Form {
@@ -81,9 +78,9 @@ impl Form {
     }
 
     pub fn new(ty: &ir::Ty, name: FormName, ty_defs: TyDefs) -> Self {
-        let resolved_ty = resolve_ty(ty, &ty_defs);
+        let ty_mat = get_ty_mat(ty, &ty_defs);
 
-        let kind: FormKind = match &resolved_ty.kind {
+        let kind: FormKind = match &ty_mat.kind {
             ir::TyKind::Primitive(ir::TyPrimitive::text) => {
                 FormKind::Text(TextForm::new(String::new()))
             }
@@ -104,7 +101,7 @@ impl Form {
             ir::TyKind::Tuple(fields) if fields.is_empty() => FormKind::TupleUnit,
             ir::TyKind::Tuple(fields) => FormKind::Tuple(TupleForm::new(fields, ty_defs.clone())),
             ir::TyKind::Array(_) => FormKind::Array(ArrayForm::new()),
-            ir::TyKind::Ident(_) => panic!("Type identifier should have been resolved"),
+            ir::TyKind::Ident(_) => unreachable!(),
             ir::TyKind::Function(_) => panic!("Function types cannot be input in forms"),
         };
 

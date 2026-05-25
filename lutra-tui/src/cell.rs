@@ -1,3 +1,4 @@
+use std::rc::Rc;
 use std::time::Duration;
 
 use crate::input;
@@ -6,14 +7,22 @@ use crate::table;
 use crate::terminal::{Line, Rect, Span, Style, View};
 use lutra_bin::rr::{self, ProgramType};
 
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct BoundInput {
+    pub data: Rc<Vec<u8>>,
+    pub ty_source: String,
+}
+
 /// A single committed REPL history entry.
 pub struct Cell {
-    pub program: String,
+    pub prompt: String,
 
     // Type of the program. Set after compilation.
     pub program_ty: Option<rr::ProgramType>,
 
-    pub input: Option<input::InputPane>,
+    pub argument: Option<input::InputPane>,
+
+    pub bound_input: Option<BoundInput>,
 
     pub output: Option<CellOutput>,
 }
@@ -23,7 +32,7 @@ pub struct Cell {
 pub enum CellStage {
     Browse,
     Program,
-    Input,
+    Argument,
     Output,
 }
 
@@ -32,29 +41,44 @@ pub enum CellOutput {
     CompileError(String),
     RunError(String),
     RunOutput {
-        data: Vec<u8>,
+        data: Rc<Vec<u8>>,
         layout: Option<table::Layout>,
         duration: Duration,
     },
     Message(View<'static>),
 }
 
+pub struct CellOutputRef<'a> {
+    pub cell: &'a Cell,
+    pub data: &'a Rc<Vec<u8>>,
+    #[allow(dead_code)]
+    pub duration: &'a Duration,
+}
+
 impl Cell {
     pub fn new() -> Self {
         Cell {
-            program: String::new(),
+            prompt: String::new(),
             program_ty: None,
-            input: None,
+            argument: None,
+            bound_input: None,
             output: None,
         }
     }
 
     pub fn is_empty(&self) -> bool {
-        self.program.is_empty() && self.is_input_empty() && self.is_output_empty()
+        self.prompt.is_empty()
+            && self.is_argument_empty()
+            && self.is_bound_input_empty()
+            && self.is_output_empty()
     }
 
-    pub fn is_input_empty(&self) -> bool {
-        self.input.is_none()
+    pub fn is_argument_empty(&self) -> bool {
+        self.argument.is_none()
+    }
+
+    pub fn is_bound_input_empty(&self) -> bool {
+        self.bound_input.is_none()
     }
 
     pub fn is_output_empty(&self) -> bool {
@@ -68,11 +92,35 @@ impl Cell {
         }
     }
 
-    pub fn get_input_bin(&self) -> Option<Vec<u8>> {
-        let (Some(input), Some(program_ty)) = (&self.input, &self.program_ty) else {
+    pub fn as_output(&self) -> Option<CellOutputRef<'_>> {
+        let Some(CellOutput::RunOutput { data, duration, .. }) = &self.output else {
             return None;
         };
-        Some(input.get_value_bin(&program_ty.input, &program_ty.defs))
+        Some(CellOutputRef {
+            cell: self,
+            data,
+            duration,
+        })
+    }
+
+    pub fn get_argument_bin(&self) -> Option<Vec<u8>> {
+        let (Some(argument), Some(program_ty)) = (&self.argument, &self.program_ty) else {
+            return None;
+        };
+        Some(argument.get_value_bin(&program_ty.input, &program_ty.defs))
+    }
+
+    fn get_prompt_header(&self) -> Option<String> {
+        self.bound_input
+            .as_ref()
+            .map(|i| format!("func (x: {}) ->", i.ty_source))
+    }
+
+    pub fn get_program_source(&self) -> String {
+        self.get_prompt_header()
+            .map(|h| h + "\n")
+            .unwrap_or_default()
+            + &self.prompt
     }
 
     pub fn render<'a>(
@@ -97,14 +145,18 @@ impl Cell {
             },
         );
 
-        // program
-        view.push_line(Line::new(&self.program));
+        if let Some(header) = self.get_prompt_header() {
+            view.push_line(Line::new(header));
+        }
+
+        // prompt
+        view.push_line(Line::new(&self.prompt));
         if let Some(c) = cursor
             && c.on_program()
         {
             let line = view.lines.last_mut().unwrap();
             let span = line.spans.last_mut().unwrap();
-            let after = span.split_at(c.program_col);
+            let after = span.split_at(c.prompt_col);
             view.set_cursor_inline();
             view.lines.last_mut().unwrap().push_span(after);
         }
@@ -113,10 +165,12 @@ impl Cell {
         }
         view.extend_lines(completions);
 
-        if let Some(input) = &self.input {
+        if self.bound_input.is_none()
+            && let Some(argument) = &self.argument
+        {
             view.push_line(Line::empty());
-            let focused = cursor.is_some_and(Cursor::on_input);
-            view.extend_lines(input.render(focused).to_owned());
+            let focused = cursor.is_some_and(Cursor::on_argument);
+            view.extend_lines(argument.render(focused).to_owned());
         }
 
         if let Some(output) = &self.output {
@@ -224,5 +278,14 @@ impl CellOutput {
                 (view, 0)
             }
         }
+    }
+}
+
+impl<'a> CellOutputRef<'a> {
+    pub fn as_bound_input(&self) -> BoundInput {
+        let data = Rc::clone(self.data); // TODO: make this Rc::clone
+        let ty = self.cell.program_ty.as_ref().unwrap();
+        let ty_source = lutra_bin::ir::print_ty(&ty.output);
+        BoundInput { data, ty_source }
     }
 }

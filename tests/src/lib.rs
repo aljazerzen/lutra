@@ -1,5 +1,6 @@
 #![cfg(test)]
 
+#[allow(warnings, unused)]
 mod lutra {
     include!(concat!(env!("OUT_DIR"), "/lutra.rs"));
 }

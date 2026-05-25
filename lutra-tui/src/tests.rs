@@ -336,6 +336,7 @@ fn help_command() {
     ▌
     ▌ /pull    Fetch schema and rewrite @schema module
     ▌ /export  Export the last successful result
+    ▌ /pipe    Bind the last history output as input
     ▌ /help    Show help
     ▌ /clear   Clear history and release memory
     ▌ /quit    Quit (aliases: /q, /exit)
@@ -362,6 +363,171 @@ fn typing_in_prompt() {
     ────────────────────
      ⸱ ok ⸱ bytecode-lt ⸱ Cell(Program)
     [cursor 0,13]
+    ");
+}
+
+#[test]
+fn function_prompt_shows_argument_form() {
+    let mut events = type_str("func (x: bool) -> (x | std::convert::to_text)");
+    events.push(enter());
+    insta::assert_snapshot!(record(events), @"
+    ▌ Lutra v0.5.1
+    ▌ Tip:  Enter to run  ·  ↑↓ for history  ·  Esc to clear  ·  Ctrl+Q to exit
+
+    ▌ project
+    ▌
+    ▌ module
+    ▌ m std
+
+    ▌ func (x: bool) -> (x | std::convert::to_text)
+    ▌
+    ▌ argument: [ ]
+    ▌ [Run]
+    ────────────────────
+     ⸱ ok ⸱ bytecode-lt ⸱ Cell(Argument)
+    [cursor 2,15]
+    ");
+}
+
+#[test]
+fn pipe_binds_last_history_output_into_draft() {
+    let mut events = type_str("\"hello\"");
+    events.push(enter());
+    events.push(esc());
+    events.extend(type_str("/pipe"));
+    events.push(enter());
+    insta::assert_snapshot!(record(events), @r#"
+    ▌ Lutra v0.5.1
+    ▌ Tip:  Enter to run  ·  ↑↓ for history  ·  Esc to clear  ·  Ctrl+Q to exit
+
+    ▌ project
+    ▌
+    ▌ module
+    ▌ m std
+
+    ▌ "hello"
+    ▌
+    ▌ output
+    ▌ value
+    ▌ text
+    ▌ ─────
+    ▌ hello
+
+    ▌ /pipe
+
+    ▌ func (x: text) ->
+    ▌ x
+    ────────────────────
+     ⸱ ok ⸱ bytecode-lt ⸱ Cell(Program)
+    [cursor 1,3]
+    "#);
+}
+
+#[test]
+fn bound_input_executes() {
+    let mut events = type_str("\"hello\"");
+    events.push(enter());
+    events.push(esc());
+    events.extend(type_str("/pipe"));
+    events.push(enter());
+    events.push(enter());
+    events.push(esc());
+    insta::assert_snapshot!(record(events), @r#"
+    ▌ Lutra v0.5.1
+    ▌ Tip:  Enter to run  ·  ↑↓ for history  ·  Esc to clear  ·  Ctrl+Q to exit
+
+    ▌ project
+    ▌
+    ▌ module
+    ▌ m std
+
+    ▌ "hello"
+    ▌
+    ▌ output
+    ▌ value
+    ▌ text
+    ▌ ─────
+    ▌ hello
+
+    ▌ /pipe
+
+    ▌ func (x: text) ->
+    ▌ x
+    ▌
+    ▌ output
+    ▌ value
+    ▌ text
+    ▌ ─────
+    ▌ hello
+
+    ▌
+    ────────────────────
+     ⸱ ok ⸱ bytecode-lt ⸱ Cell(Program)
+    [cursor 0,2]
+    "#);
+}
+
+#[test]
+fn inspect_output_seeds_input_for_scalar() {
+    // "hello" produces a `text` scalar — seeded prompt should be just `input`.
+    let mut events = type_str("\"hello\"");
+    events.push(enter());
+    events.push(enter());
+    insta::assert_snapshot!(record(events), @r#"
+    ▌ Lutra v0.5.1
+    ▌ Tip:  Enter to run  ·  ↑↓ for history  ·  Esc to clear  ·  Ctrl+Q to exit
+
+    ▌ project
+    ▌
+    ▌ module
+    ▌ m std
+
+    ▌ "hello"
+    ▌
+    ▌ output
+    ▌ value
+    ▌ text
+    ▌ ─────
+    ▌ hello
+
+    ▌ func (x: text) ->
+    ▌ x
+    ────────────────────
+     ⸱ ok ⸱ bytecode-lt ⸱ Cell(Program)
+    [cursor 1,3]
+    "#);
+}
+
+#[test]
+fn inspect_output_seeds_map_for_array() {
+    // `[1, 2, 3]: [int32]` produces an array — seeded prompt should include a map step.
+    let mut events = type_str("[1, 2, 3]: [int32]");
+    events.push(enter());
+    events.push(enter());
+    insta::assert_snapshot!(record(events), @"
+    ▌ Lutra v0.5.1
+    ▌ Tip:  Enter to run  ·  ↑↓ for history  ·  Esc to clear  ·  Ctrl+Q to exit
+
+    ▌ project
+    ▌
+    ▌ module
+    ▌ m std
+
+    ▌ [1, 2, 3]: [int32]
+    ▌
+    ▌ output · 3 items
+    ▌   value
+    ▌   int32
+    ▌ ───────
+    ▌ 0     1
+    ▌ 1     2
+    ▌ 2     3
+
+    ▌ func (x: [int32]) ->
+    ▌ x | std::index(0) | std::or_default()
+    ────────────────────
+     ⸱ ok ⸱ bytecode-lt ⸱ Cell(Program)
+    [cursor 1,39]
     ");
 }
 

@@ -21,7 +21,7 @@ pub enum Action {
     Exit,
     ExitIfEmpty,
     SubmitPrompt,
-    SubmitInput,
+    SubmitArgument,
 
     // REPL navigation
     HistoryUp,
@@ -62,6 +62,7 @@ pub enum Action {
     TableMoveEnd,
     TableMovePageUp,
     TableMovePageDown,
+    InspectOutput,
 }
 
 impl Action {

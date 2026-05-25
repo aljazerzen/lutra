@@ -2,6 +2,7 @@ use std::path;
 
 use crossterm::event;
 
+use crate::cell::BoundInput;
 use crate::commands::CommandRegistry;
 use crate::input;
 use crate::keybindings::{KeyBindings, KeyContext};
@@ -77,9 +78,9 @@ impl Shell {
         self.diagnostics_scroll = 0;
 
         self.repl.draft.program_ty = None;
-        self.repl.draft.input = None;
+        self.repl.draft.argument = None;
         self.runner.release();
-        if self.repl.cursor.on_input() {
+        if self.repl.cursor.on_argument() {
             self.repl.cursor.stage = crate::cell::CellStage::Program;
         }
     }
@@ -157,7 +158,7 @@ impl Shell {
         self.diagnostics_scroll = self.diagnostics_scroll.saturating_add(amount);
     }
 
-    pub(crate) fn pull(&mut self) -> ActionResult {
+    pub(crate) fn cmd_pull(&mut self) -> ActionResult {
         let CompileResult::Success { .. } = &self.project.compilation else {
             return self
                 .repl
@@ -170,11 +171,46 @@ impl Shell {
         }
     }
 
+    pub(crate) fn cmd_pipe(&mut self) -> ActionResult {
+        let Some(output) = self.repl.last_successful_output() else {
+            return self
+                .repl
+                .commit_error("no successful history output to bind");
+        };
+        let bound = output.as_bound_input();
+        self.bind_input(bound, "x".into())
+    }
+
+    fn inspect_output(&mut self) -> ActionResult {
+        let Some(output) = self.repl.visible_cell().as_output() else {
+            return ActionResult::default();
+        };
+        let input = output.as_bound_input();
+
+        let ty = output.cell.program_ty.as_ref().unwrap();
+        let prompt = self.repl.cursor.as_program(&ty.output, &ty.defs);
+        self.bind_input(input, prompt)
+    }
+
+    fn bind_input(&mut self, input: BoundInput, prompt: String) -> ActionResult {
+        let res = if self.repl.cursor.history_cursor.is_none() {
+            self.repl.commit_cell(false)
+        } else {
+            ActionResult::default()
+        };
+        self.repl.draft.bound_input = Some(input);
+        let prompt_len = prompt.len();
+        self.repl.draft.prompt = prompt;
+        self.repl.cursor.goto_draft(Some(prompt_len));
+        self.repl.completions.update_query("");
+        res.and(ActionResult::redraw())
+    }
+
     fn submit_prompt(&mut self) -> ActionResult {
         let r = self.repl.checkout_from_history();
         self.runner.release();
 
-        let prompt = self.repl.draft.program.trim().to_string();
+        let prompt = self.repl.draft.prompt.trim().to_string();
         if prompt.is_empty() {
             return r;
         }
@@ -190,14 +226,14 @@ impl Shell {
                 // run immediately
                 cmd.run(self, vec![])
             } else {
-                // prompt input
-                let mut input = input::InputPane::new(&cmd.ty().input, &cmd.ty().defs, "Ok");
+                // prompt argument
+                let mut argument = input::InputPane::new(&cmd.ty().input, &cmd.ty().defs, "Ok");
                 if let Some(value) = cmd.default_input() {
-                    input.set_value(value.clone())
+                    argument.set_value(value.clone())
                 }
-                self.repl.set_program_ty(cmd.ty().clone());
-                self.repl.set_input_pane(input);
-                self.repl.cursor.stage = crate::cell::CellStage::Input;
+                self.repl.draft.program_ty = Some(cmd.ty().clone());
+                self.repl.draft.argument = Some(argument);
+                self.repl.cursor.stage = crate::cell::CellStage::Argument;
                 ActionResult::redraw()
             });
         }
@@ -207,57 +243,61 @@ impl Shell {
         };
 
         // try: inspect
-        if self.repl.try_inspect(project) {
+        if self.repl.try_describe(project) {
             return r.and(self.repl.commit_cell(false));
         }
 
+        let bound_input = self.repl.draft.bound_input.clone();
+
         // base case: lutra program
-        let params = lutra_compiler::CompileParams::new(&prompt, self.runner.repr());
+        let program_source = self.repl.draft.get_program_source();
+        let params = lutra_compiler::CompileParams::new(program_source, self.runner.repr());
         let res = lutra_compiler::compile(project, &params);
         if let Err(err) = res {
             return r.and(self.repl.commit_compile_error(err.to_string()));
         }
         let (program, ty) = res.unwrap();
 
-        if ty.input.is_unit() {
+        if ty.input.is_unit() || bound_input.is_some() {
             // execute immediately
-            self.repl.draft.input = None;
-            self.repl.set_program_ty(ty);
-            if let Err(err) = self.runner.run(&program, vec![]) {
+            self.repl.draft.argument = None;
+            self.repl.draft.program_ty = Some(ty);
+            let argument = bound_input.map(|x| x.data).unwrap_or_default();
+            if let Err(err) = self.runner.run(&program, &argument) {
                 return r.and(self.repl.commit_error(err));
             }
         } else {
-            // prompt input
+            // prompt argument
             if let Err(err) = self.runner.prepare(&program) {
                 return r.and(self.repl.commit_error(err));
             }
-            let input_pane = input::InputPane::new(&ty.input, &ty.defs, "Run");
-            self.repl.set_input_pane(input_pane);
-            self.repl.cursor.stage = crate::cell::CellStage::Input;
-            self.repl.set_program_ty(ty);
+            let argument_pane = input::InputPane::new(&ty.input, &ty.defs, "Run");
+            self.repl.draft.argument = Some(argument_pane);
+            self.repl.cursor.stage = crate::cell::CellStage::Argument;
+            self.repl.draft.program_ty = Some(ty);
         }
         r.and(ActionResult::redraw())
     }
 
-    fn submit_input(&mut self) -> ActionResult {
-        // get input
-        let res = self.repl.draft.get_input_bin();
-        let Some(input) = res else {
+    fn submit_argument(&mut self) -> ActionResult {
+        // get argument
+        let res = self.repl.draft.get_argument_bin();
+        let Some(argument) = res else {
             return ActionResult::default();
         };
 
         // try: command
-        let prompt = self.repl.draft.program.trim().to_string();
+        let prompt = self.repl.draft.prompt.trim().to_string();
         if let Some(res) = self.commands.parse_and_find(&prompt) {
             let cmd = match res {
                 Err(message) => return self.repl.commit_error(message),
                 Ok(c) => c,
             };
-            return cmd.run(self, input);
+            return cmd.run(self, argument);
         }
 
         // base case: lutra program
-        match self.runner.execute(input) {
+        match self.runner.execute(&argument) {
             Ok(()) => ActionResult::redraw(),
             Err(e) => self.repl.commit_error(e),
         }
@@ -307,7 +347,8 @@ impl Shell {
                 }
             }
             Action::SubmitPrompt => self.submit_prompt(),
-            Action::SubmitInput => self.submit_input(),
+            Action::SubmitArgument => self.submit_argument(),
+            Action::InspectOutput => self.inspect_output(),
             Action::ClearCell => {
                 self.runner.release();
                 self.repl.handle(Action::ClearCell)
@@ -330,8 +371,8 @@ impl Shell {
                 self.startup_done = true;
 
                 if startup && let CompileResult::Success { project } = &self.project.compilation {
-                    self.repl.draft.program = "project".to_string();
-                    self.repl.try_inspect(project);
+                    self.repl.draft.prompt = "project".to_string();
+                    self.repl.try_describe(project);
                     return self.repl.commit_cell(false).and(ActionResult::redraw());
                 }
 

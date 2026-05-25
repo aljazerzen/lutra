@@ -80,7 +80,7 @@ impl CommandRegistry {
             "pull",
             &[],
             "Fetch schema and rewrite @schema module",
-            |s, _| s.pull(),
+            |s, _| s.cmd_pull(),
         ));
         self.commands.push(Rc::new(Command {
             name: "export".to_string(),
@@ -90,6 +90,12 @@ impl CommandRegistry {
             default_input: Some(export::default_input()),
             run: export::run,
         }));
+        self.commands.push(Command::new_simple(
+            "pipe",
+            &[],
+            "Bind the last history output as input",
+            |s, _| s.cmd_pipe(),
+        ));
         self.commands
             .push(Command::new_simple("help", &[], "Show help", |s, _| {
                 s.repl.commit_message(s.commands.view_help())
