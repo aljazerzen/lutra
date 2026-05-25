@@ -50,66 +50,6 @@ where
         self.ty_defs.get(name).unwrap()
     }
 
-    fn visit(&mut self, buf: B, ty: &'t ir::Ty) -> Result<Self::Res, crate::Error> {
-        // special case
-        #[cfg(feature = "chrono")]
-        if let ir::TyKind::Ident(ty_ident) = &ty.kind
-            && ty_ident.0 == ["std", "Date"]
-        {
-            use crate::Decode;
-            let days = i32::decode(buf.chunk())?;
-
-            if let Some(date) = chrono::NaiveDate::from_epoch_days(days) {
-                return Ok(format!("@{date}"));
-            } else {
-                // fallback to printing integers
-                // (this might happen when date is out range)
-            }
-        }
-        if let ir::TyKind::Ident(ty_ident) = &ty.kind
-            && ty_ident.0 == ["std", "Time"]
-        {
-            use crate::Decode;
-            let micros_t = i64::decode(buf.chunk())?;
-
-            let micros = (micros_t % 1000000).abs();
-            let sec_t = micros_t / 1000000;
-
-            let sec = (sec_t % 60).abs();
-            let min_t = sec_t / 60;
-
-            let min = (min_t % 60).abs();
-            let h_t = min_t / 60;
-
-            return Ok(format!("@{h_t:02}:{min:02}:{sec:02}.{micros:06}"));
-        }
-        if let ir::TyKind::Ident(ty_ident) = &ty.kind
-            && ty_ident.0 == ["std", "Timestamp"]
-        {
-            use crate::Decode;
-            let micros = i64::decode(buf.chunk())?;
-
-            if let Some(dt) = chrono::DateTime::from_timestamp_micros(micros) {
-                let dt = dt.to_rfc3339_opts(chrono::SecondsFormat::Micros, true);
-                return Ok(format!("@{}", dt.trim_end_matches('Z')));
-            } else {
-                // fallback
-            }
-        }
-        if let ir::TyKind::Ident(ty_ident) = &ty.kind
-            && ty_ident.0 == ["std", "Decimal"]
-        {
-            use crate::Decode;
-            let val = i64::decode(buf.chunk())?;
-            return Ok(format!("{}.{:02}", val / 100, (val % 100).abs()));
-        }
-
-        // general case
-        let ty = Visitor::<B>::get_mat_ty(self, ty);
-
-        self.visit_concrete(buf, ty)
-    }
-
     fn visit_bool(&mut self, v: bool) -> Result<Self::Res, Error> {
         Ok(if v {
             "true".to_string()
@@ -155,6 +95,46 @@ where
 
         let s = string::String::from_utf8(buf).map_err(|_| Error::InvalidData)?;
         Ok(quote_text(&s))
+    }
+
+    fn visit_date(&mut self, days: i32) -> std::result::Result<Self::Res, crate::Error> {
+        #[cfg(feature = "chrono")]
+        {
+            if let Some(date) = chrono::NaiveDate::from_epoch_days(days) {
+                return Ok(format!("@{date}"));
+            }
+            // fallback to printing integers
+            // (this might happen when date is out range)
+        }
+        Visitor::<'t, B>::visit_int32(self, days)
+    }
+
+    fn visit_time(&mut self, micros_t: i64) -> std::result::Result<Self::Res, crate::Error> {
+        let micros = (micros_t % 1000000).abs();
+        let sec_t = micros_t / 1000000;
+
+        let sec = (sec_t % 60).abs();
+        let min_t = sec_t / 60;
+
+        let min = (min_t % 60).abs();
+        let h_t = min_t / 60;
+
+        Ok(format!("@{h_t:02}:{min:02}:{sec:02}.{micros:06}"))
+    }
+
+    fn visit_timestamp(&mut self, micros: i64) -> std::result::Result<Self::Res, crate::Error> {
+        #[cfg(feature = "chrono")]
+        {
+            if let Some(dt) = chrono::DateTime::from_timestamp_micros(micros) {
+                let dt = dt.to_rfc3339_opts(chrono::SecondsFormat::Micros, true);
+                return Ok(format!("@{}", dt.trim_end_matches('Z')));
+            };
+        }
+        Visitor::<'t, B>::visit_int64(self, micros)
+    }
+
+    fn visit_decimal(&mut self, cent: i64) -> std::result::Result<Self::Res, crate::Error> {
+        Ok(format!("{}.{:02}", cent / 100, (cent % 100).abs()))
     }
 
     fn visit_tuple(
@@ -248,4 +228,52 @@ fn quote_text(text: &str) -> String {
     }
     result.push('"');
     result
+}
+
+#[cfg(test)]
+mod tests {
+    use super::print_source;
+    use crate::Encode;
+    use crate::ir;
+
+    fn path(segments: &[&str]) -> ir::Path {
+        ir::Path(segments.iter().map(|segment| (*segment).into()).collect())
+    }
+
+    fn ty_ident(segments: &[&str]) -> ir::Ty {
+        ir::Ty::new(path(segments))
+    }
+
+    fn ty_def(segments: &[&str], ty: ir::Ty) -> ir::TyDef {
+        ir::TyDef {
+            name: path(segments),
+            ty,
+        }
+    }
+
+    #[test]
+    fn nominal_numeric_dispatch_uses_type_ident() {
+        let ty = ty_ident(&["alias", "Signed"]);
+        let ty_defs = vec![
+            ty_def(&["alias", "Signed"], ty_ident(&["std", "Int32"])),
+            ty_def(&["std", "Int32"], ir::Ty::new(ir::TyPrimitive::uint32)),
+        ];
+
+        let buf = (-1_i32).encode();
+
+        assert_eq!(print_source(&buf, &ty, &ty_defs).unwrap(), "-1");
+    }
+
+    #[test]
+    fn decimal_alias_keeps_special_printing() {
+        let ty = ty_ident(&["alias", "Money"]);
+        let ty_defs = vec![
+            ty_def(&["alias", "Money"], ty_ident(&["std", "Decimal"])),
+            ty_def(&["std", "Decimal"], ir::Ty::new(ir::TyPrimitive::int64)),
+        ];
+
+        let buf = (-123_i64).encode();
+
+        assert_eq!(print_source(&buf, &ty, &ty_defs).unwrap(), "-1.23");
+    }
 }

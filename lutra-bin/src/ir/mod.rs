@@ -192,3 +192,9 @@ impl Module {
         })
     }
 }
+
+impl Path {
+    pub fn is(&self, name: &[&str]) -> bool {
+        self.0.len() == name.len() && core::iter::zip(&self.0, name).all(|(a, b)| a == b)
+    }
+}
