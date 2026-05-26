@@ -29,7 +29,7 @@ The mathematical constant π as a 64-bit float.
 
 ```lutra
 func pow(value: T, exponent: T): T
-where T: int64 | float64
+where T: int64 | float64 | project::Int64 | project::Float64
 ```
 
 Raises `value` to the power of `exponent`.

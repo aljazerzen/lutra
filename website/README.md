@@ -14,6 +14,11 @@ Use them for different purposes:
 - Put homepage and marketing-style content into `content/_index.md`.
 - Put user-facing documentation into `docs/`.
 
+## Generated reference pages
+
+Pages under `docs/reference/language/std/` are generated from
+`lutra-compiler/src/std.lt`.
+
 ## Documentation structure
 
 The docs are organized by **user intent**:

@@ -161,6 +161,19 @@ Access the inner value through field lookup:
 const my_days: int32 = my_date.days_epoch
 ```
 
+Framed types are not required to name the inner type:
+
+```lt
+type ErrorCode(int32)
+```
+
+Inner values of named and unnamed framed types can be access with
+positional field lookup:
+
+```
+const err_code: int32 = my_error_code.0
+```
+
 The standard library uses framed types for value types such as `Date`.
 
 ## Module definitions

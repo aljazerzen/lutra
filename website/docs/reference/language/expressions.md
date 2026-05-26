@@ -48,10 +48,8 @@ Use `.` with a field name or zero-based position.
 Field lookup also works after tuple spread and on framed values such as
 `std::Date`.
 
-```lt
-{a = @2025-11-15}.a.days_epoch
-@2025-11-14.0
-```
+Tuple field access (named and positional) is also used to access [inner
+values of framed types](./definitions#framed-types).
 
 ### Tuple spread
 

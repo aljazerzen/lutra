@@ -49,7 +49,7 @@ Subtracts two numbers.
 
 ```lutra
 func neg(T): T
-where T: int8 | int16 | int32 | int64 | float32 | float64
+where T: int8 | int16 | int32 | int64 | float32 | float64 | project::Int8 | project::Int16 | project::Int32 | project::Int64 | project::Float32 | project::Float64
 ```
 
 Negates a number.

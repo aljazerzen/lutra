@@ -3,9 +3,9 @@ title: Lutra
 ---
 
 
-Lutra is a language for preserving type information between different software components.
-It is a high-level, statically typed language, designed for querying data
-and expressing data structures.
+Lutra is a language for preserving type information between different software
+components. It is a high-level, statically typed language, designed for querying
+data and expressing data structures.
 
 ```lutra
 type Album: {id: int16, title: text}
@@ -18,8 +18,8 @@ func get_album_by_id(album_id: int16): Album -> (
 )
 ```
 
-It is minimal and designed to be extended to new execution targets.
-Currently, it can run on a reference-implementation interpreter and PostgreSQL.
+It is minimal and designed to be extended to new execution targets. Currently,
+it can run on DuckDB, PostgreSQL and a reference-implementation interpreter.
 
 ```lutra
 import std::(filter, sort, slice)

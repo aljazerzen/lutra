@@ -234,7 +234,7 @@ In SQL, this is known as "RECURSIVE CTE" or "recursive join".
 
 ```lutra
 func sequence(start: N, end: N): [N]
-where N: int8 | int16 | int32 | int64 | uint8 | uint16 | uint32 | uint64
+where N: int8 | int16 | int32 | int64 | uint8 | uint16 | uint32 | uint64 | project::Int8 | project::Int16 | project::Int32 | project::Int64 | project::Uint8 | project::Uint16 | project::Uint32 | project::Uint64
 ```
 
 Returns an array of sequential integers

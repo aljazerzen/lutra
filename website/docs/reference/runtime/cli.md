@@ -222,7 +222,7 @@ Common options:
 Examples:
 
 ```console
-$ lutra gen-code --project ./project.lt ./generated.rs
+$ lutra gen-code --project ./project.lt ./lutra.rs
 $ lutra gen-code --project ./project.lt --programs-sql-pg main ./generated.py
 ```
 

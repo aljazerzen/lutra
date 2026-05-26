@@ -639,7 +639,9 @@ module fs {
 ## SQL interface
 ##
 ## Module available only when targeting SQL databases.
-## Currently this includes only `sql-pg` format.
+## Supported SQL targets are DuckDB (`repr:sql-duckdb`) and PostgreSQL
+## (`repr:sql-pg`). Storage details differ between runners; see the
+## DuckDB reference and the type representations reference.
 module sql {
   ## Reads rows from a table.
   ##
@@ -690,14 +692,8 @@ module sql {
   ## It should be used as a last resort, because it circumvents type checking
   ## and can cause program panic on malformed SQL or incorrect resulting type.
   ##
-  ## Resulting type of the expression must match the "SQL representation"
-  ## of the Lutra type:
-  ## - primitives -> a single column,
-  ## - tuples -> one column for each tuple field,
-  ## - nested tuples -> unpacked into parent relation,
-  ## - arrays -> columns of the inner object,
-  ## - enums -> one tag column, followed by columns of each of the variants,
-  ## - enums that are the option -> one nullable column.
+  ## Resulting type of the expression must match the SQL representation of the
+  ## Lutra type for the selected runner.
   external func raw(const sql_source: text): R
   where R
 }

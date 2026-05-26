@@ -272,6 +272,7 @@ Reference = [
     { Runtime = [
         "reference/runtime/runner-model.md",
         "reference/runtime/cli.md",
+        "reference/runtime/duckdb.md",
     ] },
     { Internals = [
         "reference/internals/binary-format.md",

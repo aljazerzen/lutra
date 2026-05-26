@@ -53,6 +53,86 @@ anno rust_derive(const macros: [text])
 
 Annotates a type with traits to `#[Derive]` when translating to Rust.
 
+## `type` Int8
+
+```lutra
+type Int8(int8)
+```
+
+A signed 8-bit integer.
+
+## `type` Int16
+
+```lutra
+type Int16(int16)
+```
+
+A signed 16-bit integer.
+
+## `type` Int32
+
+```lutra
+type Int32(int32)
+```
+
+A signed 32-bit integer.
+
+## `type` Int64
+
+```lutra
+type Int64(int64)
+```
+
+A signed 64-bit integer.
+
+## `type` Uint8
+
+```lutra
+type Uint8(uint8)
+```
+
+An unsigned 8-bit integer.
+
+## `type` Uint16
+
+```lutra
+type Uint16(uint16)
+```
+
+An unsigned 16-bit integer.
+
+## `type` Uint32
+
+```lutra
+type Uint32(uint32)
+```
+
+An unsigned 32-bit integer.
+
+## `type` Uint64
+
+```lutra
+type Uint64(uint64)
+```
+
+An unsigned 64-bit integer.
+
+## `type` Float32
+
+```lutra
+type Float32(float32)
+```
+
+A 32-bit floating-point number.
+
+## `type` Float64
+
+```lutra
+type Float64(float64)
+```
+
+A 64-bit floating-point number.
+
 ## `type` Timestamp
 
 ```lutra
