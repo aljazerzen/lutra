@@ -141,6 +141,10 @@ impl ReplPane {
     /// If the current draft prompt is a bare path to a module or type, render
     /// its definition and commit the cell.
     pub fn try_describe(&mut self, project: &lutra_compiler::Project) -> bool {
+        if self.draft.bound_input.is_some() {
+            return false;
+        }
+
         let message =
             crate::describe::describe_def(&self.draft.prompt, project).map(|v| v.to_owned());
         if let Some(message) = message {
@@ -532,29 +536,32 @@ impl Cursor {
     }
 
     /// Convert a cursor into a lutra program that locates the cursor in the `x` value
-    pub fn as_program(&self, ty: &lutra_bin::ir::Ty, defs: &[lutra_bin::ir::TyDef]) -> String {
-        let mut ty_mat = get_ty_mat(ty, defs);
+    pub fn as_program(
+        &self,
+        ty: &lutra_bin::ir::Ty,
+        defs: &[lutra_bin::ir::TyDef],
+        layout: Option<&table::Layout>,
+    ) -> String {
         let mut program = "x".to_string();
 
         let OutputCursor::Table(cursor) = &self.output else {
             return program;
         };
-        if let lutra_bin::ir::TyKind::Array(item) = &ty_mat.kind {
+
+        // row lookup
+        let ty_mat = get_ty_mat(ty, defs);
+        if let lutra_bin::ir::TyKind::Array(_) = &ty_mat.kind {
             program += &format!(" | std::index({}) | std::or_default()", cursor.row);
-            ty_mat = get_ty_mat(item, defs);
         }
-        if let lutra_bin::ir::TyKind::Tuple(fields) = &ty_mat.kind {
-            program += " | x -> x.";
 
-            // TODO: cursor.col indexes nested column space, not just this tuple
-            let position = cursor.col;
-
-            let field: String = fields
-                .get(position)
-                .and_then(|f| f.name.as_ref())
-                .cloned()
-                .unwrap_or_else(|| position.to_string());
-            program += &field;
+        // column lookup
+        let accessor = layout
+            .and_then(|layout| layout.columns.get(cursor.col))
+            .map(|column| column.accessor.as_str())
+            .unwrap_or("");
+        if !accessor.is_empty() {
+            program += " | x -> x";
+            program += accessor;
         }
         program
     }

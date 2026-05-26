@@ -188,7 +188,8 @@ impl Shell {
         let input = output.as_bound_input();
 
         let ty = output.cell.program_ty.as_ref().unwrap();
-        let prompt = self.repl.cursor.as_program(&ty.output, &ty.defs);
+        let layout = output.cell.output_layout();
+        let prompt = self.repl.cursor.as_program(&ty.output, &ty.defs, layout);
         self.bind_input(input, prompt)
     }
 
@@ -206,6 +207,14 @@ impl Shell {
         res.and(ActionResult::redraw())
     }
 
+    fn enter_shell_command_mode(&mut self) {
+        self.repl.draft.bound_input = None;
+        self.repl.draft.program_ty = None;
+        self.repl.draft.argument = None;
+        self.repl.draft.output = None;
+        self.repl.cursor.stage = crate::cell::CellStage::Program;
+    }
+
     fn submit_prompt(&mut self) -> ActionResult {
         let r = self.repl.checkout_from_history();
         self.runner.release();
@@ -217,6 +226,8 @@ impl Shell {
 
         // try: command
         if let Some(res) = self.commands.parse_and_find(&prompt) {
+            self.enter_shell_command_mode();
+
             let cmd = match res {
                 Err(message) => return r.and(self.repl.commit_error(message)),
                 Ok(c) => c,

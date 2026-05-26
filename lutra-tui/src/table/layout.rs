@@ -47,6 +47,8 @@ impl Layout {
 pub struct Column {
     /// Column name.
     pub name: String,
+    /// Source suffix used to access this leaf, e.g. `.album.title` or `.1`.
+    pub accessor: String,
     /// Type display string for header.
     pub ty_name: String,
     /// Alignment for data in this column.
@@ -108,7 +110,7 @@ impl<'d, 't> Table<'d, 't> {
 
         // Flatten columns and initialize widths from headers
         let mut columns: Vec<Column> = self
-            .flatten_columns(&column_groups, self.row_ty())
+            .flatten_columns(&column_groups, self.row_ty(), "")
             .into_iter()
             .map(Column::width_from_header)
             .collect();
@@ -180,21 +182,30 @@ impl<'d, 't> Table<'d, 't> {
         }
     }
 
-    fn flatten_columns(&self, groups: &[ColumnGroup], ty: &'t ir::Ty) -> Vec<Column> {
+    fn flatten_columns(&self, groups: &[ColumnGroup], ty: &'t ir::Ty, access: &str) -> Vec<Column> {
         let ty = self.get_ty_mat(ty);
         match &ty.kind {
             ir::TyKind::Tuple(fields) => {
                 let mut leaves = Vec::new();
-                for (group, field) in groups.iter().zip(fields.iter()) {
+                for (i, (group, field)) in groups.iter().zip(fields.iter()).enumerate() {
+                    // construct accessor
+                    let mut accessor = access.to_string() + ".";
+                    if let Some(f_name) = &field.name {
+                        accessor += &lutra_bin::ident::display(f_name);
+                    } else {
+                        accessor += &i.to_string();
+                    }
+
                     if group.children.is_empty() {
                         leaves.push(Column {
                             name: group.name.clone(),
+                            accessor,
                             ty_name: format_ty_name(&field.ty, self),
                             align: self.infer_align(&field.ty),
                             width: 0,
                         });
                     } else {
-                        leaves.extend(self.flatten_columns(&group.children, &field.ty));
+                        leaves.extend(self.flatten_columns(&group.children, &field.ty, &accessor));
                     }
                 }
                 leaves
@@ -203,6 +214,7 @@ impl<'d, 't> Table<'d, 't> {
                 // Single column for non-tuple root (primitive, array, enum)
                 vec![Column {
                     name: "value".into(),
+                    accessor: access.to_string(),
                     ty_name: format_ty_name(ty, self),
                     align: self.infer_align(ty),
                     width: 0,

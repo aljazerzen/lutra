@@ -526,6 +526,85 @@ fn inspect_output_seeds_map_for_array() {
     ");
 }
 
+#[test]
+fn inspect_output_seeds_nested_column() {
+    let mut events = type_str(
+        "[{album = {title = \"Hello\", id = 1}, artist = \"A\"}]: [{album: {title: text, id: int32}, artist: text}]",
+    );
+    events.push(enter());
+    events.push(enter());
+    insta::assert_snapshot!(record(events), @r#"
+    ▌ Lutra v0.5.1
+    ▌ Tip:  Enter to run  ·  ↑↓ for history  ·  Esc to clear  ·  Ctrl+Q to exit
+
+    ▌ project
+    ▌
+    ▌ module
+    ▌ m std
+
+    ▌ [{album = {title = "Hello", id = 1}, artist = "A"}]: [{album: {title: text, id: int32}, artist: text}]
+    ▌
+    ▌ output · 1 items · 3 fields
+    ▌      album    artist
+    ▌   title    id
+    ▌   text  int32 text
+    ▌ ────────────────────
+    ▌ 0 Hello     1 A
+
+    ▌ func (x: [{album: {title: text, id: int32}, artist: text}]) ->
+    ▌ x | std::index(0) | std::or_default() | x -> x.album.title
+    ────────────────────
+     ⸱ ok ⸱ bytecode-lt ⸱ Cell(Program)
+    [cursor 1,60]
+    "#);
+}
+
+#[test]
+fn slash_help_from_bound_input_is_plain() {
+    let mut events = type_str("\"hello\"");
+    events.push(enter());
+    events.push(esc());
+    events.extend(type_str("/pipe"));
+    events.push(enter());
+    events.push(esc());
+    events.extend(type_str("/help"));
+    events.push(enter());
+    insta::assert_snapshot!(record(events), @r#"
+    ▌ Lutra v0.5.1
+    ▌ Tip:  Enter to run  ·  ↑↓ for history  ·  Esc to clear  ·  Ctrl+Q to exit
+
+    ▌ project
+    ▌
+    ▌ module
+    ▌ m std
+
+    ▌ "hello"
+    ▌
+    ▌ output
+    ▌ text
+    ▌ ─────
+    ▌ hello
+
+    ▌ /pipe
+
+    ▌ /help
+    ▌
+    ▌ Available commands
+    ▌
+    ▌ /pull    Fetch schema and rewrite @schema module
+    ▌ /export  Export the last successful result
+    ▌ /pipe    Bind the last history output as input
+    ▌ /help    Show help
+    ▌ /clear   Clear history and release memory
+    ▌ /quit    Quit (aliases: /q, /exit)
+
+    ▌
+    ────────────────────
+     ⸱ ok ⸱ bytecode-lt ⸱ Cell(Program)
+    [cursor 0,2]
+    "#);
+}
+
 /// Press Esc after execution to commit the result cell.
 #[test]
 fn run_success() {
