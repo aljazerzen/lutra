@@ -228,10 +228,7 @@ impl<'a> queries::Context<'a> {
             return sa::Expr::Source(format!("('1970-01-01'::date + {expr})"));
         }
         if is_ident(ty, &["std", "Time"]) {
-            let expr = cols.remove(0);
-            return sa::Expr::Source(format!(
-                "('00:00'::time + INTERVAL '1 microsecond' * {expr})"
-            ));
+            return cols.remove(0);
         }
         if is_ident(ty, &["std", "Timestamp"]) {
             let expr = cols.remove(0);

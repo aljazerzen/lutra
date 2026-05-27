@@ -2882,6 +2882,14 @@ func main() -> std::add_time(@116:07:44.12, @-4:00:00)
 # >
 @112:07:44.120000
 
+# === time_06_large_list
+func main() -> [@08:00:00, @40:00:00]
+# >
+[
+  @08:00:00.000000,
+  @40:00:00.000000,
+]
+
 # === std_date_to_timestamp_00
 func main() -> std::date::to_timestamp(@2025-12-16, "UTC")
 # >
