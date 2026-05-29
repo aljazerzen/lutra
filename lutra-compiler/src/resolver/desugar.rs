@@ -305,14 +305,14 @@ fn desugar_import(import: pr::ImportDef) -> (Vec<(String, pr::Def)>, Vec<pr::Def
         pr::ImportKind::Single(path, alias) => {
             let name = alias.unwrap_or_else(|| path.last().to_string());
             let def = pr::Def {
-                span: Some(import.span),
+                span: import.span,
                 ..pr::Def::new(pr::ImportDef::new_simple(path, import.span))
             };
             (vec![(name, def)], vec![])
         }
         pr::ImportKind::Star(_) => {
             let def = pr::Def {
-                span: Some(import.span),
+                span: import.span,
                 ..pr::Def::new(import)
             };
             (vec![], vec![def])

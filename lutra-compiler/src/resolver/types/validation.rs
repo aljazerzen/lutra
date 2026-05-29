@@ -519,8 +519,15 @@ impl TypeResolver<'_> {
             TyDomain::Open => Ok(()),
 
             TyDomain::OneOf(possible_tys) => {
-                // TODO: this match is too naive
-                let is_match = possible_tys.iter().any(|p| p.kind == ty.kind);
+                let is_match = possible_tys.iter().any(|p| {
+                    if p.kind.is_ident() && ty.kind.is_ident() {
+                        // special case: compare ref target
+                        p.target == ty.target
+                    } else {
+                        // TODO: this match is too naive
+                        p.kind == ty.kind
+                    }
+                });
 
                 if !is_match {
                     let possible_tys = possible_tys.iter().map(printer::print_ty).join(", ");

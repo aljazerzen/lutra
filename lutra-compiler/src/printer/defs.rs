@@ -327,7 +327,7 @@ impl PrintSource for pr::ImportDef {
     }
 
     fn span(&self) -> Option<crate::Span> {
-        Some(self.span)
+        self.span
     }
 }
 

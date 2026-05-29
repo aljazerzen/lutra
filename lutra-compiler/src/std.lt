@@ -1,14 +1,6 @@
 @!metadata(name = "std")
 #! Standard library
 
-# Self-reference module so that `std` references within std resolves.
-# This is needed, because some syntax (operators, doc comments) is de-sugared
-# into std::xxx references.
-@hidden
-module std {
-  import super::*
-}
-
 ## Annotates a definition with documentation.
 anno doc(content: text)
 

@@ -425,15 +425,12 @@ pub struct GenDocsCommand {
 }
 
 pub fn gen_docs(cmd: GenDocsCommand) -> anyhow::Result<()> {
-    let project = if cmd.discover.project.as_ref().is_some_and(|p| p == ":std:") {
-        let source = lutra_compiler::std_source();
-        let mut params = cmd.check;
-        params.no_std = true;
-        lutra_compiler::check(source, params)?
+    let source = if cmd.discover.project.as_ref().is_some_and(|p| p == ":std:") {
+        lutra_compiler::std_source()
     } else {
-        let source_tree = lutra_compiler::discover(cmd.discover.clone())?;
-        lutra_compiler::check(source_tree, cmd.check)?
+        lutra_compiler::discover(cmd.discover.clone())?
     };
+    let project = lutra_compiler::check(source, cmd.check)?;
 
     use lutra_project_tools::docs;
     let pages = docs::generate_md_pages(&project)?;

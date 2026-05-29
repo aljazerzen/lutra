@@ -18,28 +18,29 @@ use crate::{Span, error};
 pub struct CheckParams {
     #[cfg_attr(feature = "clap", arg(skip))]
     pub dependencies: Vec<Dependency>,
-
-    #[cfg_attr(feature = "clap", arg(skip))]
-    pub no_std: bool,
 }
 
 pub fn check(
     mut source: project::SourceTree,
-    mut params: CheckParams,
+    params: CheckParams,
 ) -> Result<project::Project, error::Error> {
+    // parse
     if source.is_empty() {
         source.insert(PathBuf::from(""), "".into());
     }
+    let root_mod = parse(&source)?.map_err(|e| Error::from_diagnostics(e, &source))?;
 
-    if !params.no_std {
-        params.dependencies.push(Dependency {
+    // resolve
+    let metadata = root_mod.get_anno_at(&pr::Path::empty(), pr::Anno::as_std_metadata);
+    let is_std = metadata.is_some_and(|m| m == NS_STD);
+    let mut dependencies = params.dependencies;
+    if !is_std {
+        dependencies.push(Dependency {
             name: NS_STD.into(),
             inner: std_project()?,
         });
     }
-
-    let mut project = parse(&source)?
-        .and_then(|ast| crate::resolver::resolve(ast, params.dependencies))
+    let mut project = crate::resolver::resolve(root_mod, dependencies, is_std)
         .map_err(|e| Error::from_diagnostics(e, &source))?;
     project.source = source;
     Ok(project)
@@ -180,7 +181,7 @@ fn std_project() -> Result<Arc<crate::Project>, error::Error> {
         return Ok(Arc::clone(cached));
     }
 
-    let project = Arc::new(check(std_source(), CheckParams::new().no_std())?);
+    let project = Arc::new(check(std_source(), CheckParams::new())?);
     let _ = STD_PROJECT.set(project);
     Ok(Arc::clone(STD_PROJECT.get().unwrap()))
 }
@@ -195,11 +196,6 @@ impl CheckParams {
             name: name.into(),
             inner: project,
         });
-        self
-    }
-
-    pub fn no_std(mut self) -> Self {
-        self.no_std = true;
         self
     }
 }

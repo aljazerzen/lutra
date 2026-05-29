@@ -20,6 +20,7 @@ pub const NS_STD: &str = "std";
 pub fn resolve(
     module_tree: pr::ModuleDef,
     dependencies: Vec<Dependency>,
+    is_std: bool,
 ) -> Result<Project, Vec<Diagnostic>> {
     // desugar
     let mut root_module = desugar::run(module_tree).map_err(|d| vec![d])?;
@@ -37,7 +38,7 @@ pub fn resolve(
 
     // resolve names
     let (resolution_order, target_spans) =
-        names::run(&mut root_module, unresolved).map_err(|d| vec![d])?;
+        names::run(&mut root_module, unresolved, is_std).map_err(|d| vec![d])?;
 
     // resolve types
     types::run(&mut root_module, &resolution_order)?;
@@ -81,7 +82,8 @@ pub fn resolve_overlay_expr(
 
     // resolve names
     let unresolved = std::collections::HashSet::from([pr::Path::from_name(var_name)]);
-    let (resolution_order, _) = names::run(&mut root_module, unresolved).map_err(|d| vec![d])?;
+    let (resolution_order, _) =
+        names::run(&mut root_module, unresolved, false).map_err(|d| vec![d])?;
     assert_eq!(resolution_order.len(), 1);
     assert_eq!(resolution_order[0].len(), 1);
 

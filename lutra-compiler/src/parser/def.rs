@@ -359,7 +359,7 @@ where
                     .map(|alias| ImportKind::Single(Path::empty(), alias)),
             )))
             .map_with(|(path, mut kind), e| {
-                let span = e.span();
+                let span = Some(e.span());
                 *kind.path_mut() = path;
                 ImportDef { kind, span }
             })

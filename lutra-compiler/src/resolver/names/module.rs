@@ -1,8 +1,10 @@
 use std::collections::HashSet;
+use std::iter;
 
 use crate::Result;
 use crate::diagnostic::{Diagnostic, DiagnosticCode, WithErrorInfo};
 use crate::pr;
+use crate::resolver::NS_STD;
 use crate::utils::IdGenerator;
 use crate::utils::fold::PrFold;
 
@@ -10,6 +12,7 @@ use crate::utils::fold::PrFold;
 /// Collects references of each definition.
 pub struct DefNameResolver<'a> {
     pub root: &'a mut pr::ModuleDef,
+    pub is_std: bool,
     /// Path of the current def being resolved
     pub current: pr::Path,
     /// Paths of definitions that still need name resolution
@@ -47,6 +50,7 @@ impl<'a> DefNameResolver<'a> {
         super::expr::NameResolver {
             // -- inherited --
             root: self.root,
+            is_std: self.is_std,
             unresolved: &self.unresolved,
             scope_id_gen: &mut self.scope_id_gen,
             target_spans: &mut self.target_spans,
@@ -140,8 +144,13 @@ impl<'a> DefNameResolver<'a> {
         );
         let _trace_enter = trace_span.enter();
 
+        let prelude = pr::Def::new(pr::ImportDef {
+            kind: pr::ImportKind::Star(pr::Path::from_name(NS_STD)),
+            span: None,
+        });
+
         let imports = std::mem::take(&mut module.imports);
-        for def in imports {
+        for def in iter::once(prelude).chain(imports) {
             let pr::DefKind::Import(import) = def.kind else {
                 unreachable!()
             };
@@ -152,9 +161,7 @@ impl<'a> DefNameResolver<'a> {
 
             // resolve the def
             let r = self.init_expr_resolver(false);
-            let target_fq = r
-                .resolve_path(&target)
-                .with_span_fallback(Some(import.span))?;
+            let target_fq = r.resolve_path(&target).with_span_fallback(import.span)?;
 
             // find target module and named of contents
             let target_mod = (self.root.get_module(target_fq.as_steps()))

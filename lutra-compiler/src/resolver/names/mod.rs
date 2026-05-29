@@ -19,11 +19,13 @@ type TargetSpanMap = Vec<(crate::Span, crate::project::TargetSpan)>;
 pub fn run(
     root: &mut pr::ModuleDef,
     unresolved: HashSet<pr::Path>,
+    is_std: bool,
 ) -> Result<(Vec<Vec<pr::Path>>, TargetSpanMap)> {
     // resolve inter-definition references
     let (refs_tys, refs_vars, target_spans) = {
         let mut r = module::DefNameResolver {
             root,
+            is_std,
             unresolved,
             refs_tys: Default::default(),
             refs_vars: Default::default(),

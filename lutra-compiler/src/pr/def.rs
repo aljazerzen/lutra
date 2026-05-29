@@ -174,7 +174,7 @@ pub struct TyDef {
 #[derive(Debug, PartialEq, Clone)]
 pub struct ImportDef {
     pub kind: ImportKind,
-    pub span: Span,
+    pub span: Option<Span>,
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -190,7 +190,7 @@ pub enum ImportKind {
 }
 
 impl ImportDef {
-    pub fn new_simple(path: Path, span: Span) -> Self {
+    pub fn new_simple(path: Path, span: Option<Span>) -> Self {
         Self {
             kind: ImportKind::Single(path, None),
             span,

@@ -15,10 +15,6 @@
 
 # === chinook_00
 module chinook {
-  import std::filter
-  import std::index
-  import std::option::or_default
-
   type Album: {id: int64, title: text}
 
   func get_albums(): [Album] -> [
@@ -33,10 +29,6 @@ module chinook {
   )
 }
 module box_office {
-  import std::filter
-  import std::index
-  import std::option::or_default
-
   type Invoice: {id: int64, total: float64}
 
   func get_album_sales(): [Invoice] -> [
@@ -115,9 +107,9 @@ module chinook {
 
   func get_album_by_id(album_id: int64): Album -> (
     get_albums()
-    | std::filter(func (this: Album) -> this.id == album_id)
-    | std::index(0)
-    | std::option::or_default()
+    | filter(func (this: Album) -> this.id == album_id)
+    | index(0)
+    | option::or_default()
   )
 }
 
@@ -150,7 +142,7 @@ module chinook {
 
   func get_albums_by_genre(genre_id: int64): [Album] -> (
     get_albums()
-    | std::filter(func (this: Album) -> this.genre_id == genre_id)
+    | filter(func (this: Album) -> this.genre_id == genre_id)
   )
 }
 
@@ -158,11 +150,11 @@ import chinook as c
 
 func main() -> (
   c::get_genres()
-  | std::map(func (this: c::Genre) -> {
+  | map(func (this: c::Genre) -> {
     name = this.name,
     albums = (
       c::get_albums_by_genre(this.id)
-      | std::map(func (this: c::Album) -> this.title)
+      | map(func (this: c::Album) -> this.title)
     ),
   })
 )
@@ -197,7 +189,7 @@ const payments: [{time: int32, amount: float64}] = [
 
 func main() -> (
   payments
-  | std::fold(
+  | fold(
     {time = 0, repayment = 0.0, debt = 50000.0},
     func (acc: Accumulator, payment: {time: int32, amount: float64}) -> (
       {
@@ -205,7 +197,7 @@ func main() -> (
         repayment = payment.amount,
         debt = (
           acc.debt
-          * std::math::pow(1.0 + 0.05 / 12.0, payment.time - acc.time | std::to_float64)
+          * math::pow(1.0 + 0.05 / 12.0, payment.time - acc.time | to_float64)
           - payment.amount
         ),
       }
@@ -241,7 +233,7 @@ func apply_time(state: State, time: int32): State -> {
   time = time,
   debt = (
     state.debt
-    * std::math::pow(1.0 + 0.05 / 12.0, time - state.time | std::to_float64)
+    * math::pow(1.0 + 0.05 / 12.0, time - state.time | to_float64)
   ),
   last_payment = state.last_payment,
 }
@@ -252,9 +244,9 @@ func apply_payment(state: State, payment: Payment): State -> {
 
 func simulate_debt(at_time: int32) -> (
   payments
-  | std::filter(func (p: Payment) -> p.time <= at_time)
-  | std::fold(
-    {time = 0, debt = 50000.0, last_payment = std::default()}: State,
+  | filter(func (p: Payment) -> p.time <= at_time)
+  | fold(
+    {time = 0, debt = 50000.0, last_payment = default()}: State,
     func (state: State, payment: Payment) -> (
       state | apply_time(payment.time) | apply_payment(payment)
     ),
@@ -262,7 +254,7 @@ func simulate_debt(at_time: int32) -> (
   | apply_time(at_time)
 )
 
-func main() -> [10, 15] | std::map(x -> simulate_debt(x))
+func main() -> [10, 15] | map(x -> simulate_debt(x))
 
 # >
 [
@@ -285,9 +277,6 @@ func main() -> [10, 15] | std::map(x -> simulate_debt(x))
 ]
 
 # === compounding_interest_02
-
-import std::(Date, math::pow)
-
 type Payment: {date: Date, amount: float64}
 
 const payments: [Payment] = [
@@ -302,21 +291,21 @@ type State: {date: Date, debt: float64}
 
 const initial_state: State = {date = @2025-01-01, debt = 50000.0}
 
-func main() -> std::fold(
+func main() -> fold(
   payments,
   initial_state,
   func (acc: State, payment: {date: Date, amount: float64}) -> {
     date = payment.date,
     debt = (
       acc.debt
-      * pow(
+      * math::pow(
         # 1 + monthly rate
         1.0 + 0.05 / 12.0,
 
         # duration in months
         payment.date.0 - acc.date.0
-        | std::to_float64
-        | std::div(30.0)
+        | to_float64
+        | div(30.0)
       )
       - payment.amount
     ),
@@ -330,8 +319,6 @@ func main() -> std::fold(
 }
 
 # === advent_of_sql_2024_08
-import std::(flat_map, filter, loop_until_empty)
-
 func main() -> (from_staff() | loop_until_empty(get_managers))
 
 type Iter: {id: int32, depth: int16}

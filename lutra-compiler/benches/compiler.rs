@@ -26,7 +26,7 @@ fn bench_check(c: &mut Criterion) {
     let mut group = c.benchmark_group("check");
 
     group.bench_function("std_lib", |b| {
-        b.iter(|| lutra_compiler::check(lutra_compiler::std_source(), CheckParams::new().no_std()));
+        b.iter(|| lutra_compiler::check(lutra_compiler::std_source(), CheckParams::new()));
     });
 
     let source = SourceTree::single("".into(), PROG.to_string());

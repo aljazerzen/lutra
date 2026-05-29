@@ -15,6 +15,7 @@ use super::Scope;
 pub struct NameResolver<'a> {
     // -- inherited --
     pub root: &'a pr::ModuleDef,
+    pub is_std: bool,
     pub unresolved: &'a HashSet<pr::Path>,
     pub scope_id_gen: &'a mut IdGenerator<usize>,
     pub target_spans: &'a mut Vec<(Span, crate::project::TargetSpan)>,
@@ -281,7 +282,13 @@ impl NameResolver<'_> {
                 path.pop();
                 (path, pr::Path::new(&steps[1..]))
             }
-            NS_STD => (pr::Path::from_name(NS_STD), pr::Path::new(&steps[1..])),
+            NS_STD => {
+                if self.is_std {
+                    (pr::Path::empty(), pr::Path::new(&steps[1..]))
+                } else {
+                    (pr::Path::from_name(NS_STD), pr::Path::new(&steps[1..]))
+                }
+            }
             _ => (pr::Path::new(def_mod_fq), pr::Path::new(steps)),
         };
 
