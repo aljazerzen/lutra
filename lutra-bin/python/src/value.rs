@@ -93,10 +93,9 @@ impl Value {
             _ => Err(pyo3::exceptions::PyValueError::new_err("expected float64")),
         }
     }
-    fn as_text(&self) -> PyResult<&str> {
-        match &self.0 {
-            lutra_bin::Value::Text(text) => Ok(text),
-            _ => Err(pyo3::exceptions::PyValueError::new_err("expected text")),
-        }
+    fn as_text(&self) -> PyResult<String> {
+        self.0
+            .expect_text_cloned()
+            .map_err(|e| pyo3::exceptions::PyValueError::new_err(format!("{e}")))
     }
 }

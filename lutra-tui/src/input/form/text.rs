@@ -106,13 +106,11 @@ impl TextForm {
     }
 
     pub(crate) fn get_value(&self) -> lutra_bin::Value {
-        lutra_bin::Value::Text(self.value.clone())
+        lutra_bin::Value::new_text(&self.value)
     }
 
     pub(crate) fn set_value(&mut self, value: lutra_bin::Value) {
-        let lutra_bin::Value::Text(value) = value else {
-            panic!()
-        };
+        let value = value.expect_text_cloned().expect("expected text value");
         self.cursor = value.len();
         self.value = value;
     }

@@ -57,11 +57,6 @@ fn encode_head<'t>(
             Ok(ValueHeadPtr::None)
         }
 
-        TyClass::PrimText => {
-            let v = value.expect_text()?;
-            Ok(ValueHeadPtr::Offset(v.encode_head(buf)))
-        }
-
         TyClass::Tuple(ty_fields) => {
             let fields = value.expect_tuple()?;
 
@@ -126,15 +121,6 @@ fn encode_body<'t>(
 
     match TyClass::of_ty(ty)? {
         TyClass::Prim8 | TyClass::Prim16 | TyClass::Prim32 | TyClass::Prim64 => {}
-        TyClass::PrimText => {
-            let v = value.expect_text()?;
-
-            let ValueHeadPtr::Offset(offset_ptr) = head_ptr else {
-                return Err(Error::Bug);
-            };
-
-            v.encode_body(offset_ptr, w);
-        }
         TyClass::Tuple(ty_fields) => {
             let fields = value.expect_tuple()?;
 

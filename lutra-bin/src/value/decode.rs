@@ -1,5 +1,5 @@
 use crate::value::TyClass;
-use crate::{boxed, string, vec};
+use crate::{boxed, vec};
 
 use bytes::Buf;
 
@@ -7,7 +7,7 @@ use super::Value;
 use super::encode::Context;
 
 use crate::ir;
-use crate::layout::{self, Layout};
+use crate::layout;
 use crate::{ArrayReader, Decode, Result};
 
 impl Value {
@@ -32,11 +32,6 @@ fn decode_inner<'t>(
         TyClass::Prim16 => Value::Prim16(decode::<u16>(r)?),
         TyClass::Prim32 => Value::Prim32(decode::<u32>(r)?),
         TyClass::Prim64 => Value::Prim64(decode::<u64>(r)?),
-        TyClass::PrimText => {
-            let res = string::String::decode(r.chunk())?;
-            r.advance(string::String::head_size().div_ceil(8));
-            Value::Text(res)
-        }
 
         TyClass::Tuple(fields) => {
             let mut res = vec::Vec::with_capacity(fields.len());

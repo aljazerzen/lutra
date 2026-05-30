@@ -23,7 +23,7 @@ fn test_typed_data_01() {
     insta::assert_snapshot!(_test_typed_data_roundtrip(
         Value::Tuple(vec![
             Value::Prim64(42),
-            Value::Text("Hello world!".to_string()),
+            Value::new_text("Hello world!"),
             Value::Array(vec![Value::Prim8(1), Value::Prim8(0)]),
         ]),
         "{int64, text, [bool]}",

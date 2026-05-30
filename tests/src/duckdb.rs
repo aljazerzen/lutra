@@ -1033,7 +1033,7 @@ fn input_tuple() {
 fn input_text() {
     insta::assert_snapshot!(_sql_and_output(_run(
         r#"func main(name: text): text -> f"Hello, {name}""#,
-        lutra_bin::Value::Text("World".to_string())
+        lutra_bin::Value::new_text("World")
     )), @r#"
     SELECT
       ('Hello, '::text || $1::TEXT) AS value
@@ -1078,8 +1078,8 @@ fn input_array_text() {
     insta::assert_snapshot!(_sql_and_output(_run(
         r#"func main(words: [text]): [text] -> words"#,
         lutra_bin::Value::Array(vec![
-            lutra_bin::Value::Text("hello".to_string()),
-            lutra_bin::Value::Text("world".to_string()),
+            lutra_bin::Value::new_text("hello"),
+            lutra_bin::Value::new_text("world"),
         ])
     )), @r#"
     SELECT

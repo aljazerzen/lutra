@@ -53,7 +53,10 @@ pub trait ValueVisitor<'t> {
             ir::TyKind::Primitive(ir::TyPrimitive::float64) => {
                 self.visit_float64(f64::from_ne_bytes(value.expect_prim64()?.to_ne_bytes()))
             }
-            ir::TyKind::Primitive(ir::TyPrimitive::text) => self.visit_text(value.expect_text()?),
+            ir::TyKind::Primitive(ir::TyPrimitive::text) => {
+                let text = value.expect_text_cloned()?;
+                self.visit_text(&text)
+            }
             ir::TyKind::Tuple(ty_fields) => {
                 let fields = value.expect_tuple()?;
                 self.visit_tuple(fields, ty_fields)

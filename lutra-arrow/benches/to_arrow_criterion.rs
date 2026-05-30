@@ -20,7 +20,7 @@ fn generate_complex_tuple_array(num_rows: usize) -> (Vec<u8>, ir::Ty) {
 
         values.push(Value::Tuple(vec![
             Value::Prim32(id),
-            Value::Text(name.into()),
+            Value::new_text(name),
             Value::Prim64(score.to_bits()),
             Value::Prim8(if active { 1 } else { 0 }),
         ]));

@@ -24,26 +24,26 @@ fn test_print_01() {
         Value::Prim64(100),
         Value::Array(vec![
             Value::Tuple(vec![
-                Value::Prim64(2),                 // id = int,
-                Value::Text("aljaz".to_string()), // name = text,
+                Value::Prim64(2),         // id = int,
+                Value::new_text("aljaz"), // name = text,
                 Value::Tuple(vec![
                     // address = {
-                    Value::Text("Ljubljana".into()), //     city = text,
-                    Value::Text("Trubarjeva ulica".into()), //     street = text
+                    Value::new_text("Ljubljana"), //     city = text,
+                    Value::new_text("Trubarjeva ulica"), //     street = text
                 ]), // },
-                Value::Prim64(27),                // int,
-                Value::Prim8(1),                  // is_admin = bool
+                Value::Prim64(27),        // int,
+                Value::Prim8(1),          // is_admin = bool
             ]),
             Value::Tuple(vec![
-                Value::Prim64(12),              // id = int,
-                Value::Text("tom".to_string()), // name = text,
+                Value::Prim64(12),      // id = int,
+                Value::new_text("tom"), // name = text,
                 Value::Tuple(vec![
                     // address = {
-                    Value::Text("London".into()),    //     city = text,
-                    Value::Text("Trafalgar".into()), //     street = text
+                    Value::new_text("London"),    //     city = text,
+                    Value::new_text("Trafalgar"), //     street = text
                 ]), // },
-                Value::Prim64(18),              // int,
-                Value::Prim8(0),                // is_admin = bool
+                Value::Prim64(18),      // int,
+                Value::Prim8(0),        // is_admin = bool
             ]),
         ]),
     ]);

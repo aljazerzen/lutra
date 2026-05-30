@@ -70,7 +70,7 @@ pub fn program_ty() -> rr::ProgramType {
 pub fn default_input() -> Value {
     Value::Tuple(vec![
         Value::Enum(0, Box::new(Value::unit())),
-        Value::Text(Format::LutraSource.default_path().into()),
+        Value::new_text(Format::LutraSource.default_path()),
     ])
 }
 
@@ -123,7 +123,7 @@ fn decode_request(input: &[u8]) -> Result<Input, RequestError> {
             ));
         }
     };
-    let Value::Text(path) = path else {
+    let Ok(path) = path.expect_text_cloned() else {
         return Err(RequestError::Internal(
             "internal error: invalid /export path".to_string(),
         ));

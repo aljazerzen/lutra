@@ -33,19 +33,19 @@ fn get_value() -> lutra_bin::Value {
     use lutra_bin::Value;
 
     Value::Tuple(vec![
-        Value::Text("hello".into()),
+        Value::new_text("hello"),
         Value::Enum(
             1,
-            Box::new(Value::Tuple(vec![Value::Text("fell of a cliff".into())])),
+            Box::new(Value::Tuple(vec![Value::new_text("fell of a cliff")])),
         ),
         Value::Array(vec![
-            Value::Text("first".into()),
-            Value::Text("second".into()),
-            Value::Text("third".into()),
+            Value::new_text("first"),
+            Value::new_text("second"),
+            Value::new_text("third"),
         ]),
         Value::Tuple(vec![
-            Value::Text("top-side".into()),
-            Value::Text("file.txt".into()),
+            Value::new_text("top-side"),
+            Value::new_text("file.txt"),
         ]),
         Value::Prim8(1),
     ])

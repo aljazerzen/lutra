@@ -66,7 +66,7 @@ fn test_x() {
 
     let value = Value::Tuple(vec![
         Value::Prim64(42),
-        Value::Text("Hello world!".to_string()),
+        Value::new_text("Hello world!"),
         Value::Array(vec![Value::Prim8(1), Value::Prim8(0)]),
     ]);
 
@@ -258,7 +258,7 @@ fn test_opt_02() {
     let ty = _test_get_type("opt");
     let value = Value::Enum(
         1, // Some
-        Box::new(Value::Text("text".into())),
+        Box::new(Value::new_text("text")),
     );
     assert_snapshot!(_test_encode_decode::<types::opt>(value, ty), @r#"
     Length: 17 (0x11) bytes
@@ -343,7 +343,7 @@ fn test_res3_01() {
     let ty = _test_get_type("res3");
     let value = Value::Enum(
         0, // ok
-        Box::new(Value::Text("hello".into())),
+        Box::new(Value::new_text("hello")),
     );
     assert_snapshot!(_test_encode_decode::<types::res3>(value, ty), @r#"
     Length: 18 (0x12) bytes
@@ -358,7 +358,7 @@ fn test_res3_02() {
     let ty = _test_get_type("res3");
     let value = Value::Enum(
         1, // err
-        Box::new(Value::Text("world".into())),
+        Box::new(Value::new_text("world")),
     );
     assert_snapshot!(_test_encode_decode::<types::res3>(value, ty), @r#"
     Length: 18 (0x12) bytes

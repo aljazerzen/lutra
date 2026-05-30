@@ -27,9 +27,6 @@ pub enum Value {
     Prim32(u32),
     Prim64(u64),
 
-    // TODO: replace with Array<Prim8>
-    Text(string::String),
-
     Tuple(vec::Vec<Value>),
     Array(vec::Vec<Value>),
     Enum(usize, boxed::Box<Value>),
@@ -80,9 +77,19 @@ impl Value {
         }
     }
 
-    pub fn expect_text(&self) -> Result<&str> {
+    pub fn new_text(s: &str) -> Value {
+        Value::Array(s.bytes().map(Value::Prim8).collect())
+    }
+
+    pub fn expect_text_cloned(&self) -> Result<string::String> {
         match self {
-            Value::Text(value) => Ok(value),
+            Value::Array(bytes) => {
+                let bytes: vec::Vec<u8> = bytes
+                    .iter()
+                    .map(|v| v.expect_prim8())
+                    .collect::<Result<_>>()?;
+                string::String::from_utf8(bytes).map_err(|_| Error::InvalidData)
+            }
             _ => Err(Error::BadValueType {
                 expected: "Text",
                 found: self.name(),
@@ -126,7 +133,6 @@ impl Value {
             Value::Prim16(..) => "Prim16",
             Value::Prim32(..) => "Prim32",
             Value::Prim64(..) => "Prim64",
-            Value::Text(..) => "Text",
             Value::Tuple(..) => "Tuple",
             Value::Array(..) => "Array",
             Value::Enum(..) => "Enum",
@@ -140,7 +146,6 @@ enum TyClass<'t> {
     Prim16,
     Prim32,
     Prim64,
-    PrimText,
     Tuple(&'t [ir::TyTupleField]),
     Array(&'t ir::Ty),
     Enum(&'t [ir::TyEnumVariant]),
@@ -148,6 +153,13 @@ enum TyClass<'t> {
 
 impl<'t> TyClass<'t> {
     fn of_ty(ty_mat: &'t ir::Ty) -> Result<Self> {
+        const TY_BYTE: &ir::Ty = &ir::Ty {
+            kind: ir::TyKind::Primitive(ir::TyPrimitive::uint8),
+            layout: None,
+            name: None,
+            variants_recursive: vec![],
+        };
+
         Ok(match &ty_mat.kind {
             ir::TyKind::Primitive(ir::TyPrimitive::bool)
             | ir::TyKind::Primitive(ir::TyPrimitive::int8)
@@ -161,7 +173,7 @@ impl<'t> TyClass<'t> {
             | ir::TyKind::Primitive(ir::TyPrimitive::uint64)
             | ir::TyKind::Primitive(ir::TyPrimitive::float64) => TyClass::Prim64,
 
-            ir::TyKind::Primitive(ir::TyPrimitive::text) => TyClass::PrimText,
+            ir::TyKind::Primitive(ir::TyPrimitive::text) => TyClass::Array(TY_BYTE),
 
             ir::TyKind::Tuple(t) => TyClass::Tuple(t),
             ir::TyKind::Array(t) => TyClass::Array(t),

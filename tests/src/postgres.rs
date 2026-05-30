@@ -949,7 +949,7 @@ fn param_01() {
     "#,
     lutra_bin::Value::Tuple(vec![
         lutra_bin::Value::Prim64(3),
-        lutra_bin::Value::Text("hello".into())
+        lutra_bin::Value::new_text("hello")
     ])
     ).1, @r#"
     {
@@ -967,7 +967,7 @@ fn param_02() {
     lutra_bin::Value::Tuple(vec![
         lutra_bin::Value::Prim64(3),
         lutra_bin::Value::Tuple(vec![
-            lutra_bin::Value::Text("hello".into()),
+            lutra_bin::Value::new_text("hello"),
             lutra_bin::Value::Prim8(1),
         ]),
         lutra_bin::Value::Prim32(5),
@@ -992,8 +992,8 @@ fn param_03() {
     lutra_bin::Value::Tuple(vec![
         lutra_bin::Value::Prim64(3),
         lutra_bin::Value::Array(vec![
-            lutra_bin::Value::Text("hello".into()),
-            lutra_bin::Value::Text("world".into()),
+            lutra_bin::Value::new_text("hello"),
+            lutra_bin::Value::new_text("world"),
         ]),
         lutra_bin::Value::Prim32(5),
     ])
@@ -1017,11 +1017,11 @@ fn param_04() {
     lutra_bin::Value::Array(vec![
         lutra_bin::Value::Tuple(vec![
             lutra_bin::Value::Prim64(5),
-            lutra_bin::Value::Text("hello".into()),
+            lutra_bin::Value::new_text("hello"),
         ]),
         lutra_bin::Value::Tuple(vec![
             lutra_bin::Value::Prim64(7),
-            lutra_bin::Value::Text("world".into()),
+            lutra_bin::Value::new_text("world"),
         ]),
     ])
     ).1, @r#"
@@ -1104,8 +1104,8 @@ fn param_07() {
     lutra_bin::Value::Enum(
         1,
         Box::new(lutra_bin::Value::Tuple(vec![
-            lutra_bin::Value::Text("today".into()),
-            lutra_bin::Value::Text("me".into())
+            lutra_bin::Value::new_text("today"),
+            lutra_bin::Value::new_text("me")
         ]))
     )
     )), @r#"
@@ -1138,8 +1138,8 @@ fn param_08() {
         lutra_bin::Value::Enum(
             1,
             Box::new(lutra_bin::Value::Tuple(vec![
-                lutra_bin::Value::Text("today".into()),
-                lutra_bin::Value::Text("me".into())
+                lutra_bin::Value::new_text("today"),
+                lutra_bin::Value::new_text("me")
             ]))
         ),
         lutra_bin::Value::Enum(
@@ -1148,7 +1148,7 @@ fn param_08() {
         ),
         lutra_bin::Value::Enum(
             2,
-            Box::new(lutra_bin::Value::Text("ok".into()))
+            Box::new(lutra_bin::Value::new_text("ok"))
         ),
     ])
     )), @r#"
@@ -1179,10 +1179,10 @@ fn param_09() {
     func main(x: {text, Status}) -> x
     "#,
     lutra_bin::Value::Tuple(vec![
-        lutra_bin::Value::Text("hello".into()),
+        lutra_bin::Value::new_text("hello"),
         lutra_bin::Value::Enum(
             2,
-            Box::new(lutra_bin::Value::Text("ok".into()))
+            Box::new(lutra_bin::Value::new_text("ok"))
         ),
     ])
     ).1, @r#"
@@ -2821,7 +2821,7 @@ async fn type_round_trip_01() {
         lutra_bin::Value::Tuple(vec![
             lutra_bin::Value::Prim32(10),
             lutra_bin::Value::Tuple(vec![
-                lutra_bin::Value::Text("Grand Ave".into()),
+                lutra_bin::Value::new_text("Grand Ave"),
                 lutra_bin::Value::Prim16(22),
             ]),
         ]),

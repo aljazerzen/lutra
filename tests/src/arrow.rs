@@ -301,7 +301,7 @@ fn to_arrow_int() {
 #[test]
 fn to_arrow_text() {
     let ty = lutra_compiler::_test_compile_ty("text");
-    let value = lutra_bin::Value::Text("hello".into());
+    let value = lutra_bin::Value::new_text("hello");
     let data = value.encode(&ty, &[]).unwrap();
 
     let batch = lutra_arrow::lutra_to_arrow(data.as_slice(), &ty, &[]).unwrap();
@@ -323,7 +323,7 @@ fn to_arrow_tuple() {
     let ty = lutra_compiler::_test_compile_ty("{x: int32, y: text}");
     let value = lutra_bin::Value::Tuple(vec![
         lutra_bin::Value::Prim32(42),
-        lutra_bin::Value::Text("world".into()),
+        lutra_bin::Value::new_text("world"),
     ]);
     let data = value.encode(&ty, &[]).unwrap();
 

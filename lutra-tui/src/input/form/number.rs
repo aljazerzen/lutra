@@ -52,7 +52,7 @@ impl NumberForm {
     }
 
     pub(crate) fn get_value(&self) -> lutra_bin::Value {
-        let lutra_bin::Value::Text(text) = self.inner.get_value() else {
+        let Ok(text) = self.inner.get_value().expect_text_cloned() else {
             panic!("NumberForm inner value should be Text")
         };
 
@@ -126,7 +126,7 @@ impl NumberForm {
             ),
         };
 
-        self.inner.set_value(lutra_bin::Value::Text(text));
+        self.inner.set_value(lutra_bin::Value::new_text(&text));
     }
 
     fn is_allowed_char(&self, c: char) -> bool {

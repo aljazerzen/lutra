@@ -27,8 +27,8 @@ fn test_simple_flat_columns() {
     let result = _table(
         "[{a: int32, b: text}]",
         Value::Array(vec![
-            Value::Tuple(vec![Value::Prim32(42), Value::Text("hello".into())]),
-            Value::Tuple(vec![Value::Prim32(100), Value::Text("world".into())]),
+            Value::Tuple(vec![Value::Prim32(42), Value::new_text("hello")]),
+            Value::Tuple(vec![Value::Prim32(100), Value::new_text("world")]),
         ]),
     );
 
@@ -48,11 +48,11 @@ fn test_nested_tuple() {
         Value::Array(vec![
             Value::Tuple(vec![
                 Value::Prim32(1),
-                Value::Tuple(vec![Value::Text("NYC".into()), Value::Prim32(10001)]),
+                Value::Tuple(vec![Value::new_text("NYC"), Value::Prim32(10001)]),
             ]),
             Value::Tuple(vec![
                 Value::Prim32(2),
-                Value::Tuple(vec![Value::Text("LA".into()), Value::Prim32(90001)]),
+                Value::Tuple(vec![Value::new_text("LA"), Value::Prim32(90001)]),
             ]),
         ]),
     );
@@ -73,12 +73,12 @@ fn test_array_expansion() {
         "[{name: text, tags: [text]}]",
         Value::Array(vec![
             Value::Tuple(vec![
-                Value::Text("Alice".into()),
-                Value::Array(vec![Value::Text("dev".into()), Value::Text("rust".into())]),
+                Value::new_text("Alice"),
+                Value::Array(vec![Value::new_text("dev"), Value::new_text("rust")]),
             ]),
             Value::Tuple(vec![
-                Value::Text("Bob".into()),
-                Value::Array(vec![Value::Text("pm".into())]),
+                Value::new_text("Bob"),
+                Value::Array(vec![Value::new_text("pm")]),
             ]),
         ]),
     );
@@ -98,13 +98,13 @@ fn test_array_truncation() {
     let result = _table(
         "[{name: text, tags: [text]}]",
         Value::Array(vec![Value::Tuple(vec![
-            Value::Text("Alice".into()),
+            Value::new_text("Alice"),
             Value::Array(vec![
-                Value::Text("a".into()),
-                Value::Text("b".into()),
-                Value::Text("c".into()),
-                Value::Text("d".into()),
-                Value::Text("e".into()),
+                Value::new_text("a"),
+                Value::new_text("b"),
+                Value::new_text("c"),
+                Value::new_text("d"),
+                Value::new_text("e"),
             ]),
         ])]),
     );
@@ -192,8 +192,8 @@ fn test_text_truncation() {
 
     let result = _table_with_config(
         "[{msg: text}]",
-        Value::Array(vec![Value::Tuple(vec![Value::Text(
-            "This is a very long message that should be truncated".into(),
+        Value::Array(vec![Value::Tuple(vec![Value::new_text(
+            "This is a very long message that should be truncated",
         )])]),
         config,
     );
@@ -222,7 +222,7 @@ fn test_empty_array() {
 fn test_single_tuple() {
     let result = _table(
         "{x: int32, y: text}",
-        Value::Tuple(vec![Value::Prim32(42), Value::Text("hello".into())]),
+        Value::Tuple(vec![Value::Prim32(42), Value::new_text("hello")]),
     );
 
     assert_snapshot!(result, @"
@@ -239,12 +239,12 @@ fn test_alignment() {
         "[{name: text, score: int32, active: bool}]",
         Value::Array(vec![
             Value::Tuple(vec![
-                Value::Text("Alice".into()),
+                Value::new_text("Alice"),
                 Value::Prim32(95),
                 Value::Prim8(1),
             ]),
             Value::Tuple(vec![
-                Value::Text("Bob".into()),
+                Value::new_text("Bob"),
                 Value::Prim32(82),
                 Value::Prim8(0),
             ]),
@@ -292,7 +292,7 @@ fn test_mixed_depth_columns() {
         "[{id: int32, address: {street: text, number: int32}}]",
         Value::Array(vec![Value::Tuple(vec![
             Value::Prim32(1),
-            Value::Tuple(vec![Value::Text("Main St".into()), Value::Prim32(123)]),
+            Value::Tuple(vec![Value::new_text("Main St"), Value::Prim32(123)]),
         ])]),
     );
 

@@ -657,7 +657,7 @@ impl<'t> ByteCoder<'t> {
                 ir::TyPrimitive::int64 | ir::TyPrimitive::uint64 | ir::TyPrimitive::float64 => {
                     lutra_bin::Value::Prim64(0)
                 }
-                ir::TyPrimitive::text => lutra_bin::Value::Text("".into()),
+                ir::TyPrimitive::text => lutra_bin::Value::Array(vec![]),
             },
             ir::TyKind::Array(_) => lutra_bin::Value::Array(vec![]),
             ir::TyKind::Tuple(ty_fields) => lutra_bin::Value::Tuple(
