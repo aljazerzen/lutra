@@ -110,7 +110,7 @@ Converts a number to `float64`
 
 ```lutra
 func to_text(T): Text
-where T: primitive
+where T: primitive | Timestamp | Date | Time | Decimal
 ```
 
 Converts a value to `text`

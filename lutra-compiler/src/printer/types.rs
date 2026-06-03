@@ -241,12 +241,8 @@ impl PrintSource for pr::TyParam {
 
 fn compact_domain_shorthand(tys: &[pr::Ty]) -> (Option<&'static str>, Vec<&pr::Ty>) {
     use crate::resolver;
-
-    if let Some(remaining) = remove_shorthand(tys, resolver::TY_DOMAIN_PRIMITIVE) {
-        return (Some("primitive"), remaining);
-    }
-    if let Some(remaining) = remove_shorthand(tys, resolver::TY_DOMAIN_NUMBER) {
-        return (Some("number"), remaining);
+    if let Some(remaining) = remove_shorthand(tys, resolver::DOMAIN_ANY_NUMBER) {
+        return (Some("AnyNumber"), remaining);
     }
     (None, tys.iter().collect())
 }

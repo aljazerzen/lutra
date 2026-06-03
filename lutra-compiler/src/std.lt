@@ -34,47 +34,47 @@ module convert {
 
   ## Converts a number to `int8`
   external func to_int8(T): Int8
-  where T: number
+  where T: AnyNumber
 
   ## Converts a number to `int16`
   external func to_int16(T): Int16
-  where T: number
+  where T: AnyNumber
 
   ## Converts a number to `int32`
   external func to_int32(T): Int32
-  where T: number
+  where T: AnyNumber
 
   ## Converts a number to `int64`
   external func to_int64(T): Int64
-  where T: number
+  where T: AnyNumber
 
   ## Converts a number to `uint8`
   external func to_uint8(T): Uint8
-  where T: number
+  where T: AnyNumber
 
   ## Converts a number to `uint16`
   external func to_uint16(T): Uint16
-  where T: number
+  where T: AnyNumber
 
   ## Converts a number to `uint32`
   external func to_uint32(T): Uint32
-  where T: number
+  where T: AnyNumber
 
   ## Converts a number to `uint64`
   external func to_uint64(T): Uint64
-  where T: number
+  where T: AnyNumber
 
   ## Converts a number to `float32`
   external func to_float32(T): Float32
-  where T: number
+  where T: AnyNumber
 
   ## Converts a number to `float64`
   external func to_float64(T): Float64
-  where T: number
+  where T: AnyNumber
 
   ## Converts a value to `text`
   external func to_text(T): Text
-  where T: primitive
+  where T: AnyNumber | Bool | Text | Timestamp | Date | Time | Decimal
 }
 
 import ops::*
@@ -83,39 +83,39 @@ import ops::*
 module ops {
   ## Multiplies two numbers.
   external func mul(T, T): T
-  where T: number
+  where T: AnyNumber
 
   ## Divides two numbers.
   external func div(T, T): T
-  where T: number
+  where T: AnyNumber
 
   ## Division remainder.
   external func mod(T, T): T
-  where T: number
+  where T: AnyNumber
 
   ## Adds two numbers.
   external func add(T, T): T
-  where T: number
+  where T: AnyNumber | Time | Decimal
 
   ## Subtracts two numbers.
   external func sub(T, T): T
-  where T: number
+  where T: AnyNumber | Time | Decimal
 
   ## Negates a number.
   external func neg(T): T
-  where T: Int8 | Int16 | Int32 | Int64 | Float32 | Float64
+  where T: Int8 | Int16 | Int32 | Int64 | Float32 | Float64 | Time
 
   ## Compare two values to determine if the first is less, equal, or greater than
   ## the second.
   external func cmp(T, T): Ordering
-  where T: primitive
+  where T: AnyNumber | Bool | Text | Timestamp | Date | Time | Decimal
 
   ## Result of a three-way comparison. Returned by [cmp].
   type Ordering: enum {less, equal, greater}
 
   ## Tests if values are equal. Used by `==` operator.
   func eq(left: T, right: T): Bool
-  where T: primitive
+  where T: AnyNumber | Bool | Text | Timestamp | Date | Time | Decimal
   -> (
     match cmp(left, right) {
       .equal => true,
@@ -125,7 +125,7 @@ module ops {
 
   ## Tests if values are not equal. Used by `!=` operator.
   func ne(left: T, right: T): Bool
-  where T: primitive
+  where T: AnyNumber | Bool | Text | Timestamp | Date | Time | Decimal
   -> (
     match cmp(left, right) {
       .equal => false,
@@ -135,7 +135,7 @@ module ops {
 
   ## Tests if left value is greater than the right. Used by `>` operator.
   func gt(left: T, right: T): Bool
-  where T: primitive
+  where T: AnyNumber | Bool | Text | Timestamp | Date | Time | Decimal
   -> (
     match cmp(left, right) {
       .greater => true,
@@ -145,7 +145,7 @@ module ops {
 
   ## Tests if left value is less than the right. Used by `<` operator.
   func lt(left: T, right: T): Bool
-  where T: primitive
+  where T: AnyNumber | Bool | Text | Timestamp | Date | Time | Decimal
   -> (
     match cmp(left, right) {
       .less => true,
@@ -155,7 +155,7 @@ module ops {
 
   ## Tests if left value is greater or equal to the right. Used by `>=` operator.
   func gte(left: T, right: T): Bool
-  where T: primitive
+  where T: AnyNumber | Bool | Text | Timestamp | Date | Time | Decimal
   -> (
     match cmp(left, right) {
       .less => false,
@@ -165,7 +165,7 @@ module ops {
 
   ## Tests if left value is less or equal to the right. Used by `<=` operator.
   func lte(left: T, right: T): Bool
-  where T: primitive
+  where T: AnyNumber | Bool | Text | Timestamp | Date | Time | Decimal
   -> (
     match cmp(left, right) {
       .greater => false,
@@ -323,7 +323,7 @@ module array {
 
   ## Sorts the array in ascending order by the value returned by `key`.
   external func sort(array: [I], key: func (I): K): [I]
-  where I, K: primitive
+  where I, K: AnyNumber | Bool | Text | Timestamp | Date | Time | Decimal
 
   ## Transposes an array of rows into a tuple of columns.
   ## Each field of the row type becomes a column — an array of that field's values.
@@ -435,21 +435,21 @@ module array {
   ## Find the minimum value in the array.
   ## Returns `none` when array is empty.
   external func min([T]): T?
-  where T: primitive
+  where T: AnyNumber | Bool | Text | Timestamp | Date | Time | Decimal
 
   ## Find the maximum value in the array.
   ## Returns `none` when array is empty.
   external func max([T]): T?
-  where T: primitive
+  where T: AnyNumber | Bool | Text | Timestamp | Date | Time | Decimal
 
   ## Compute sum of all number in an array.
   ## Returns zero when array is empty.
   external func sum([T]): T
-  where T: number
+  where T: AnyNumber | Time
 
   ## Compute arithmetic mean of an array of numbers.
   external func mean([T]): Float64
-  where T: number
+  where T: AnyNumber
 
   ## Returns `true` if all items in the array are `true`.
   external func all([Bool]): Bool
@@ -459,7 +459,7 @@ module array {
 
   ## Returns `true` if the haystack array contains an item equal to `needle`.
   func contains(haystack haystack: [T], needle needle: T): Bool
-  where T: primitive
+  where T: AnyNumber | Bool | Text | Timestamp | Date | Time | Decimal
   -> (haystack | filter(x -> eq(x, needle)) | is_empty | not)
 
   # --- Window functions ---
@@ -488,7 +488,7 @@ module array {
   ## For example, `rolling_mean(..., 1, 2)` computes mean of each item, along with
   ## 1 preceding and 2 following items, which is 4 items total.
   external func rolling_mean(array: [T], preceding: Uint32, following: Uint32): [Float64]
-  where T: number
+  where T: AnyNumber
 
   ## Computes rank of each array item.
   ##
@@ -499,7 +499,7 @@ module array {
   ##
   ## For example, `rank(["a", "b", "b", "c"])` is `[1, 2, 2, 4]`.
   external func rank(array: [T]): [Int32]
-  where T: primitive
+  where T: AnyNumber | Bool | Text | Timestamp | Date | Time | Decimal
 
   ## Computes dense rank of each array item.
   ##
@@ -510,7 +510,7 @@ module array {
   ##
   ## For example, `rank_dense(["a", "b", "b", "c"])` is `[1, 2, 2, 3]`.
   external func rank_dense(array: [T]): [Int32]
-  where T: primitive
+  where T: AnyNumber | Bool | Text | Timestamp | Date | Time | Decimal
 
   ## Computes percentile rank of each array item.
   ##
@@ -521,7 +521,7 @@ module array {
   ## For example, `rank_percentile(["a", "b", "b", "c"])` is
   ## `[0.0, 0.33333, 0.25, 1.0]`.
   external func rank_percentile(array: [T]): [Float64]
-  where T: primitive
+  where T: AnyNumber | Bool | Text | Timestamp | Date | Time | Decimal
 
   ## Computes ECDF (Empirical Cumulative Density Function) of array items.
   ##
@@ -533,14 +533,14 @@ module array {
   ## For example, `cume_dist(["a", "b", "b", "c"])` is
   ## `[0.25, 0.75, 0.75, 1.0]`.
   external func cume_dist(array: [T]): [Float64]
-  where T: primitive
+  where T: AnyNumber | Bool | Text | Timestamp | Date | Time | Decimal
 }
 
 ## Mathematical ops
 module math {
   ## Absolute value
   external func abs(T): T
-  where T: number
+  where T: AnyNumber
 
   # func sqrt(val: int64): int64
 
@@ -793,16 +793,12 @@ type Time(microseconds: Int64)
 # where D: Time64Millisecond -> x.0 | div(1000) | Time64Microsecond
 # where D: Time64Microsecond -> x
 
-## Adds two `Time` durations together.
-func add_time(a: Time, b: Time): Time -> (add(a.0, b.0) | Time)
-
-## Computes the elapsed `Time` between two `Timestamp`s.
-## Result is `a - b`: positive when `a` is later than `b`.
-func sub_timestamp(a: Timestamp, b: Timestamp): Time -> (sub(a.0, b.0) | Time)
-
 ## Returns offset of a time zone from UTC on a given date.
 func timezone_offset(time_zone tz: Text, date d: Date): Time -> (
-  sub_timestamp(date::to_timestamp(d, tz), date::to_timestamp(d, "UTC"))
+  timestamp::sub(
+    d | date::to_timestamp(tz),
+    d | date::to_timestamp("UTC"),
+  )
 )
 
 module date {
@@ -825,6 +821,10 @@ module date {
 module timestamp {
   ## Computes the local date of a timestamp at a timezone.
   external func to_date(timestamp: Timestamp, time_zone: Text): Date
+
+  ## Computes the elapsed `Time` between two `Timestamp`s.
+  ## Result is `a - b`: positive when `a` is later than `b`.
+  func sub(a: Timestamp, b: Timestamp): Time -> project::sub(a.0, b.0) | Time
 }
 
 ## Exact decimal value with a fixed `SCALE`, which is the number of digits past

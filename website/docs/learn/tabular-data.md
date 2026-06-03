@@ -199,5 +199,6 @@ well-typed table shape and produces the next one.
 
 - [Pipelines](pipelines.md)
 - [Aggregations](aggregations.md)
+- [Reporting](reporting.md)
 - [Projects](projects.md)
 - [Reference: Expressions](../reference/language/expressions.md)

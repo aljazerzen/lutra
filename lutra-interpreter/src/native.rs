@@ -357,6 +357,7 @@ pub mod std_ops {
                 "neg_int64" => &neg_int64,
                 "neg_float32" => &neg_float32,
                 "neg_float64" => &neg_float64,
+                "neg_time" => &neg_int64,
 
                 "add_int8" => &add_int8,
                 "add_int16" => &add_int16,
@@ -368,6 +369,8 @@ pub mod std_ops {
                 "add_uint64" => &add_uint64,
                 "add_float32" => &add_float32,
                 "add_float64" => &add_float64,
+                "add_time" => &add_int64,
+                "add_decimal" => &add_int64,
 
                 "sub_int8" => &sub_int8,
                 "sub_int16" => &sub_int16,
@@ -379,6 +382,8 @@ pub mod std_ops {
                 "sub_uint64" => &sub_uint64,
                 "sub_float32" => &sub_float32,
                 "sub_float64" => &sub_float64,
+                "sub_time" => &sub_int64,
+                "sub_decimal" => &sub_int64,
 
                 "mul_int8" => &mul_int8,
                 "mul_int16" => &mul_int16,
@@ -403,6 +408,10 @@ pub mod std_ops {
                 "cmp_float32" => &cmp_float32,
                 "cmp_float64" => &cmp_float64,
                 "cmp_text" => &cmp_text,
+                "cmp_date" => &cmp_int32,
+                "cmp_time" => &cmp_int64,
+                "cmp_timestamp" => &cmp_int64,
+                "cmp_decimal" => &cmp_int64,
 
                 "eq_bool" => &eq_bool,
                 "eq_int8" => &eq_int8,
@@ -416,6 +425,10 @@ pub mod std_ops {
                 "eq_float32" => &eq_float32,
                 "eq_float64" => &eq_float64,
                 "eq_text" => &eq_text,
+                "eq_date" => &eq_int32,
+                "eq_time" => &eq_int64,
+                "eq_timestamp" => &eq_int64,
+                "eq_decimal" => &eq_int64,
 
                 "lt_bool" => &lt_bool,
                 "lt_int8" => &lt_int8,
@@ -429,6 +442,10 @@ pub mod std_ops {
                 "lt_float32" => &lt_float32,
                 "lt_float64" => &lt_float64,
                 "lt_text" => &lt_text,
+                "lt_date" => &lt_int32,
+                "lt_time" => &lt_int64,
+                "lt_timestamp" => &lt_int64,
+                "lt_decimal" => &lt_int64,
 
                 "lte_bool" => &lte_bool,
                 "lte_int8" => &lte_int8,
@@ -442,6 +459,10 @@ pub mod std_ops {
                 "lte_float32" => &lte_float32,
                 "lte_float64" => &lte_float64,
                 "lte_text" => &lte_text,
+                "lte_date" => &lte_int32,
+                "lte_time" => &lte_int64,
+                "lte_timestamp" => &lte_int64,
+                "lte_decimal" => &lte_int64,
 
                 "and" => &and,
                 "or" => &or,

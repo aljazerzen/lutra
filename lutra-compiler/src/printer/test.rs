@@ -845,21 +845,10 @@ fn signature_generic_function() {
 fn signature_number_domain() {
     // `where T: number` must round-trip as `number`, not the full list of types.
     assert_snapshot!(_signature(
-        "func double(x: T): T where T: number -> x",
+        "func double(x: T): T where T: AnyNumber -> x",
     ), @"
     func double(T): T
-    where T: number
-    ");
-}
-
-#[test]
-fn signature_primitive_domain() {
-    // `where T: primitive` must round-trip as `primitive`, not the full list.
-    assert_snapshot!(_signature(
-        "func identity(x: T): T where T: primitive -> x",
-    ), @"
-    func identity(T): T
-    where T: primitive
+    where T: AnyNumber
     ");
 }
 

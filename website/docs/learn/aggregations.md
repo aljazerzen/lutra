@@ -295,5 +295,7 @@ A useful rule of thumb is:
 
 - [Tabular data basics](tabular-data.md) for row-oriented transformations.
 - [Pipelines](pipelines.md) for the general left-to-right programming style.
+- [Date and time](date-time.md) for local calendar conversions.
+- [Reporting](reporting.md) for end-to-end summary patterns.
 - [Reference: Expressions](../reference/language/expressions.md) for exact call and pipe rules.
 - [Reference: Types](../reference/language/types.md) for tuples, arrays, and grouped result shapes.

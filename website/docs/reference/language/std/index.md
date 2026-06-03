@@ -181,23 +181,6 @@ Can be interpreted as duration or offset from the midnight.
 
 Backed by a signed 64-bit integer, representing number of microseconds.
 
-## `func` add_time
-
-```lutra
-func add_time(Time, Time): Time
-```
-
-Adds two `Time` durations together.
-
-## `func` sub_timestamp
-
-```lutra
-func sub_timestamp(Timestamp, Timestamp): Time
-```
-
-Computes the elapsed `Time` between two `Timestamp`s.
-Result is `a - b`: positive when `a` is later than `b`.
-
 ## `func` timezone_offset
 
 ```lutra

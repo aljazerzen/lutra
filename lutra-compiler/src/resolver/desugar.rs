@@ -88,23 +88,18 @@ impl PrFold for Desugarator {
     fn fold_ty_param(&mut self, param: pr::TyParam) -> Result<pr::TyParam> {
         match param.domain {
             pr::TyDomain::OneOf(items) => {
-                // desugar where T: primitive | number
+                // desugar where T: number
                 let mut r = Vec::with_capacity(items.len());
                 for item in items {
-                    let span = item.span.unwrap();
                     if let pr::TyKind::Ident(name) = &item.kind
-                        && name.as_steps() == ["number"]
+                        && name.as_steps() == ["AnyNumber"]
                     {
-                        let tys = TY_DOMAIN_NUMBER.iter().cloned().map(pr::Ty::new_std);
-                        r.extend(tys.map(|t| t.with_span(span)));
-                    } else if let pr::TyKind::Ident(name) = &item.kind
-                        && name.as_steps() == ["primitive"]
-                    {
-                        let tys = TY_DOMAIN_PRIMITIVE.iter().cloned().map(pr::Ty::new_std);
-                        r.extend(tys.map(|t| t.with_span(span)));
-                    } else {
-                        r.push(self.fold_type(item)?);
+                        let tys = DOMAIN_ANY_NUMBER.iter().cloned().map(pr::Ty::new_std);
+                        r.extend(tys.map(|t| t.with_span(item.span.unwrap())));
+                        continue;
                     }
+
+                    r.push(self.fold_type(item)?);
                 }
                 Ok(pr::TyParam {
                     domain: pr::TyDomain::OneOf(r),
@@ -361,12 +356,6 @@ fn new_binop(left: pr::Expr, op_name: &[&str], right: pr::Expr, op_span: Option<
 }
 
 /// Std types that are included in the `number` domain shorthands.
-pub(crate) const TY_DOMAIN_NUMBER: &[&str] = &[
+pub(crate) const DOMAIN_ANY_NUMBER: &[&str] = &[
     "Int8", "Int16", "Int32", "Int64", "Uint8", "Uint16", "Uint32", "Uint64", "Float32", "Float64",
-];
-
-/// Std types that are included in the `primitive` domain shorthands.
-pub(crate) const TY_DOMAIN_PRIMITIVE: &[&str] = &[
-    "Int8", "Int16", "Int32", "Int64", "Uint8", "Uint16", "Uint32", "Uint64", "Float32", "Float64",
-    "Bool", "Text",
 ];

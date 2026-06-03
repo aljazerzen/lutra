@@ -63,7 +63,7 @@ Start the interactive REPL shell for a project.
 Use `interactive` when you want quick feedback while exploring expressions,
 recompiling against a project, or trying a real backend live.
 
-See [Runner selection](#runner-selection).
+See [Runner selection](#runner).
 
 Common options:
 
@@ -137,7 +137,7 @@ Compile a program and run it.
 
 This is the main command for executing Lutra programs from the CLI.
 
-See [Runner selection](#runner-selection).
+See [Runner selection](#runner).
 
 Common options:
 
@@ -169,7 +169,7 @@ Pull runner interface into a project.
 This command asks the selected runner for its exposed interface and updates the
 project schema module when possible.
 
-See [Runner selection](#runner-selection).
+See [Runner selection](#runner).
 
 Common options:
 
@@ -268,7 +268,7 @@ Serve a runner proxy over the TCP binary protocol.
 
 This starts a TCP server that exposes a selected runner to remote clients.
 
-See [Runner selection](#runner-selection).
+See [Runner selection](#runner).
 
 Common options:
 

@@ -242,6 +242,8 @@ Learn = [
     "learn/pipelines.md",
     "learn/tabular-data.md",
     "learn/aggregations.md",
+    "learn/date-time.md",
+    "learn/reporting.md",
     "learn/projects.md",
 ]
 

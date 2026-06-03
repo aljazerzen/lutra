@@ -31,7 +31,7 @@ Division remainder.
 
 ```lutra
 func add(T, T): T
-where T: number
+where T: number | Time | Decimal
 ```
 
 Adds two numbers.
@@ -40,7 +40,7 @@ Adds two numbers.
 
 ```lutra
 func sub(T, T): T
-where T: number
+where T: number | Time | Decimal
 ```
 
 Subtracts two numbers.
@@ -49,7 +49,7 @@ Subtracts two numbers.
 
 ```lutra
 func neg(T): T
-where T: Int8 | Int16 | Int32 | Int64 | Float32 | Float64
+where T: Int8 | Int16 | Int32 | Int64 | Float32 | Float64 | Time
 ```
 
 Negates a number.
@@ -58,7 +58,7 @@ Negates a number.
 
 ```lutra
 func cmp(T, T): Ordering
-where T: primitive
+where T: primitive | Timestamp | Date | Time | Decimal
 ```
 
 Compare two values to determine if the first is less, equal, or greater than
@@ -76,7 +76,7 @@ Result of a three-way comparison. Returned by [`cmp`](#func-cmp).
 
 ```lutra
 func eq(T, T): Bool
-where T: primitive
+where T: primitive | Timestamp | Date | Time | Decimal
 ```
 
 Tests if values are equal. Used by `==` operator.
@@ -85,7 +85,7 @@ Tests if values are equal. Used by `==` operator.
 
 ```lutra
 func ne(T, T): Bool
-where T: primitive
+where T: primitive | Timestamp | Date | Time | Decimal
 ```
 
 Tests if values are not equal. Used by `!=` operator.
@@ -94,7 +94,7 @@ Tests if values are not equal. Used by `!=` operator.
 
 ```lutra
 func gt(T, T): Bool
-where T: primitive
+where T: primitive | Timestamp | Date | Time | Decimal
 ```
 
 Tests if left value is greater than the right. Used by `>` operator.
@@ -103,7 +103,7 @@ Tests if left value is greater than the right. Used by `>` operator.
 
 ```lutra
 func lt(T, T): Bool
-where T: primitive
+where T: primitive | Timestamp | Date | Time | Decimal
 ```
 
 Tests if left value is less than the right. Used by `<` operator.
@@ -112,7 +112,7 @@ Tests if left value is less than the right. Used by `<` operator.
 
 ```lutra
 func gte(T, T): Bool
-where T: primitive
+where T: primitive | Timestamp | Date | Time | Decimal
 ```
 
 Tests if left value is greater or equal to the right. Used by `>=` operator.
@@ -121,7 +121,7 @@ Tests if left value is greater or equal to the right. Used by `>=` operator.
 
 ```lutra
 func lte(T, T): Bool
-where T: primitive
+where T: primitive | Timestamp | Date | Time | Decimal
 ```
 
 Tests if left value is less or equal to the right. Used by `<=` operator.

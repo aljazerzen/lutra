@@ -15,10 +15,9 @@ It is designed around a few ideas:
 A small Lutra program looks like this:
 
 ```lt
-func main() -> (
-  [1, 2, 3]: [Int32]
-  | map(x -> x * 2)
-)
+const my_ints: [Int32] = [1, 2, 3]
+
+func main() -> my_ints | map(x -> x * 2)
 ```
 
 When you run it, Lutra evaluates the `main` function and prints the result:
@@ -43,11 +42,9 @@ A typical Lutra program combines:
 
 Use the docs by intent:
 
-- Go to [Basics](basics.md) if you want your first runnable examples.
-- Stay in `learn/` if you want to become fluent in writing Lutra.
+- Start with [Learn / Basics](basics.md) if you want your first runnable examples.
 - Go to [Usage](../usage/cli.md) if you want task-oriented guides for the CLI, Python, or Rust.
-- Go to the language [Reference](../reference/language/syntax.md) if you want exact syntax and semantics.
-- Go to the [Reference overview](../reference/index.md) if you want to understand runners, the binary format, and the rest of the project reference.
+- Go to the [Reference](../reference/index.md) if you want exact information about the language, runners, or internals.
 
 ## Learning path
 
@@ -57,4 +54,6 @@ The recommended order is:
 2. [Pipelines](pipelines.md)
 3. [Tabular data basics](tabular-data.md)
 4. [Aggregations](aggregations.md)
-5. [Projects](projects.md)
+5. [Date and time](date-time.md)
+6. [Reporting](reporting.md)
+7. [Projects](projects.md)

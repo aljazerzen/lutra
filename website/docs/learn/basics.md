@@ -163,6 +163,8 @@ Next steps:
 - [Pipelines](pipelines.md)
 - [Tabular data basics](tabular-data.md)
 - [Aggregations](aggregations.md)
+- [Date and time](date-time.md)
+- [Reporting](reporting.md)
 - [Projects](projects.md)
 
 For exact syntax, use the language reference:
