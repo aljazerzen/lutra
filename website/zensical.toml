@@ -245,6 +245,7 @@ Learn = [
     "learn/date-time.md",
     "learn/reporting.md",
     "learn/projects.md",
+    "learn/runners.md",
 ]
 
 [[project.nav]]

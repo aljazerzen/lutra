@@ -99,6 +99,8 @@ data.
 
 ## See also
 
+- [Runners guide](../../learn/runners.md) for a learning-oriented overview
+  of backends and when to use each one.
 - [Binary format](./binary-format)
 - [Format specification](./format-spec)
 - [Representations](./representations)
