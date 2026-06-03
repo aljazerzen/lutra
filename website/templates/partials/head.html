@@ -1,15 +1,17 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <meta charset="utf-8">
+<meta name="description" content="{{ config.description }}">
 {% if page.title %}
 <title>{{ page.title }} | {{config.title }}</title>
 {% endif %}
 {% if section.title %}
 {% if section.title == config.title %}
-<title>{{ section.title }}</title>
+<title>{{ section.title }} — {{ config.description }}</title>
 {% else %}
 <title>{{ section.title }} | {{config.title }}</title>
 {% endif %}
 {% endif %}
+<link rel="canonical" href="{{ current_url | safe }}" />
 <link rel="shortcut icon" href="/favicon.ico" />
 <link rel="stylesheet" href="/water.min.css">
 <link rel="stylesheet" type="text/css" href="/giallo-dark.css" media="(prefers-color-scheme: dark)" />

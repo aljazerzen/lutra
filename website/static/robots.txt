@@ -1,0 +1,5 @@
+User-agent: *
+Disallow:
+Allow: /
+Sitemap: https://lutra-lang.org/sitemap.xml
+Content-Signal: ai-train=yes, search=yes, ai-input=yes

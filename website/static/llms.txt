@@ -1,0 +1,68 @@
+# Lutra
+
+> Lutra is a general-purpose, statically typed query language for querying data and expressing data structures. It compiles to SQL and can run on DuckDB, PostgreSQL, and a reference interpreter.
+
+Lutra preserves type information between different software components. Programs are built from expressions, pipelines make data flow easy to read, and the same program can target different execution backends.
+
+The project is in early development, created by Aljaž M. Eržen and available under the Apache 2.0 license.
+
+- Source code: https://codeberg.org/lutra/lutra
+
+## Usage
+
+- [Usage overview](https://lutra-lang.org/docs/usage/): Getting started with Lutra.
+- [Command line guide](https://lutra-lang.org/docs/usage/cli/): Install the CLI and run, check, and compile Lutra programs.
+- [Rust guide](https://lutra-lang.org/docs/usage/rust/): Use Lutra from Rust.
+- [Python guide](https://lutra-lang.org/docs/usage/python/): Use Lutra from Python.
+
+## Learn
+
+- [Introduction](https://lutra-lang.org/docs/learn/introduction/): Core ideas behind Lutra — types, expressions, pipelines, and backends.
+- [Basics](https://lutra-lang.org/docs/learn/basics/): Constants, functions, types, and basic expressions.
+- [Pipelines](https://lutra-lang.org/docs/learn/pipelines/): How pipelines chain operations on data.
+- [Tabular data](https://lutra-lang.org/docs/learn/tabular-data/): Working with tables and rows.
+- [Aggregations](https://lutra-lang.org/docs/learn/aggregations/): Grouping and aggregating data.
+- [Date and time](https://lutra-lang.org/docs/learn/date-time/): Date and time types and operations.
+- [Reporting](https://lutra-lang.org/docs/learn/reporting/): Building reports from query results.
+- [Projects](https://lutra-lang.org/docs/learn/projects/): Organizing Lutra code into projects.
+
+## Language Reference
+
+- [Syntax](https://lutra-lang.org/docs/reference/language/syntax/): Lutra syntax overview.
+- [Literals](https://lutra-lang.org/docs/reference/language/literals/): Literal values for numbers, text, dates, and more.
+- [Types](https://lutra-lang.org/docs/reference/language/types/): The type system — primitives, tuples, arrays, and custom types.
+- [Expressions](https://lutra-lang.org/docs/reference/language/expressions/): Expression forms and evaluation.
+- [Patterns](https://lutra-lang.org/docs/reference/language/patterns/): Pattern matching.
+- [Definitions](https://lutra-lang.org/docs/reference/language/definitions/): Defining constants, functions, and types.
+- [Modules](https://lutra-lang.org/docs/reference/language/modules/): Module system and imports.
+- [Operators](https://lutra-lang.org/docs/reference/language/operators/): Built-in operators.
+
+## Standard Library
+
+- [`std`](https://lutra-lang.org/docs/reference/language/std/): Standard library overview.
+- [`std::option`](https://lutra-lang.org/docs/reference/language/std/option/): Nullable values.
+- [`std::math`](https://lutra-lang.org/docs/reference/language/std/math/): Mathematical operations.
+- [`std::text`](https://lutra-lang.org/docs/reference/language/std/text/): Text functions.
+- [`std::fs`](https://lutra-lang.org/docs/reference/language/std/fs/): File system operations.
+- [`std::sql`](https://lutra-lang.org/docs/reference/language/std/sql/): SQL interface.
+- [`std::date`](https://lutra-lang.org/docs/reference/language/std/date/): Date operations.
+- [`std::timestamp`](https://lutra-lang.org/docs/reference/language/std/timestamp/): Timestamp operations.
+
+## Runtime
+
+- [Runner model](https://lutra-lang.org/docs/reference/runtime/runner-model/): How Lutra executes programs across backends.
+- [CLI reference](https://lutra-lang.org/docs/reference/runtime/cli/): All commands and options.
+- [DuckDB](https://lutra-lang.org/docs/reference/runtime/duckdb/): Running Lutra on DuckDB.
+
+## Internals
+
+- [Binary format](https://lutra-lang.org/docs/reference/internals/binary-format/): Lutra's compiled binary format.
+- [Format spec](https://lutra-lang.org/docs/reference/internals/format-spec/): Detailed format specification.
+- [Type representations](https://lutra-lang.org/docs/reference/internals/representations/): How types are represented internally.
+
+## About
+
+- [Status](https://lutra-lang.org/docs/about/status/): Project status and roadmap.
+- [Motivation](https://lutra-lang.org/docs/about/motivation/): Why Lutra was created.
+- [Design decisions](https://lutra-lang.org/docs/about/design/): Key design choices.
+- [Relation to PRQL](https://lutra-lang.org/docs/about/prql/): How Lutra relates to PRQL.

@@ -17,6 +17,28 @@ build:
     zola build
     zensical build
 
+    # include source .md files (this is a hack)
+    cp content/_index.md output/index.md
+    cp -R docs/ output/ --update=none
+
+    # .well-known
+    mkdir output/.well-known
+    cp output/llms.txt output/.well-known/llms.txt
+
+    just merge-sitemaps
+    rm output/docs/sitemap.xml
+
+# merge docs/sitemap.xml into sitemap.xml
+merge-sitemaps:
+    #!/usr/bin/env python3
+    import re
+    with open('output/docs/sitemap.xml') as f:
+        urls = re.findall(r'<url>.*?</url>', f.read(), re.DOTALL)
+    with open('output/sitemap.xml') as f:
+        main = f.read()
+    with open('output/sitemap.xml', 'w') as f:
+        f.write(main.replace('</urlset>', '\n'.join(urls) + '\n</urlset>'))
+
 publish:
     just build
     rsync --human-readable --progress --recursive --delete \

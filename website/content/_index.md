@@ -104,7 +104,7 @@ Again, this all compiles to SQL and can be executed on PostgreSQL.
 
 <ul class="card-list">
 
-{% card(title="Project overview", href="/docs/reference/project/overview/", label="Docs") %}
+{% card(title="Project overview", href="/docs/reference/", label="Docs") %}
     How do projects, programs, runners, and the binary format fit together?
 {% end %}
 
