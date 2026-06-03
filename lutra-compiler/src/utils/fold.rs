@@ -249,6 +249,7 @@ pub fn fold_match_branch<F: ?Sized + PrFold>(
     case: MatchBranch,
 ) -> Result<MatchBranch> {
     Ok(MatchBranch {
+        scope_id: case.scope_id,
         pattern: fold.fold_pattern(case.pattern)?,
         value: Box::new(fold.fold_expr(*case.value)?),
     })

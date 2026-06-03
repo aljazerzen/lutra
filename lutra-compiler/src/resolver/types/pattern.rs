@@ -22,10 +22,8 @@ impl<'a> super::TypeResolver<'a> {
         // type that will be inferred from the first branch and then validated against the following
         let mut ty = None;
         for branch in match_.branches {
-            self.scopes.push(Scope::new(
-                branch.value.scope_id.unwrap(),
-                ScopeKind::Nested,
-            ));
+            self.scopes
+                .push(Scope::new(branch.scope_id.unwrap(), ScopeKind::Nested));
 
             // resolve pattern
             let (pattern, bound_tys) = self.resolve_pattern(subject_ty, branch.pattern)?;
@@ -42,7 +40,6 @@ impl<'a> super::TypeResolver<'a> {
             let mapping = self.finalize_type_vars()?;
             let mut value = utils::TypeReplacer::on_expr(value, mapping);
             let scope = self.scopes.pop().unwrap();
-            value.scope_id = Some(scope.id);
 
             match &ty {
                 // first branch: infer its type
@@ -56,7 +53,11 @@ impl<'a> super::TypeResolver<'a> {
             }
 
             let value = Box::new(value);
-            branches.push(pr::MatchBranch { pattern, value })
+            branches.push(pr::MatchBranch {
+                scope_id: Some(scope.id),
+                pattern,
+                value,
+            })
         }
 
         // Safety: there will always be at least one branch, so this will be set

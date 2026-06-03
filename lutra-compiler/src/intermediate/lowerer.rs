@@ -350,7 +350,7 @@ impl<'a> Lowerer<'a> {
                     let mut values = Vec::new();
                     self.collect_pattern_binds(&branch.pattern, subject_ref.clone(), &mut values);
                     self.scopes.push(Scope {
-                        id: branch.value.scope_id.unwrap(),
+                        id: branch.scope_id.unwrap(),
                         kind: ScopeKind::Local { values },
                     });
 

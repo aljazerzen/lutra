@@ -297,6 +297,7 @@ fn parse_05() {
             },
             branches: [
                 MatchBranch {
+                    scope_id: None,
                     pattern: Pattern {
                         kind: Enum(
                             "open",
@@ -321,6 +322,7 @@ fn parse_05() {
                     },
                 },
                 MatchBranch {
+                    scope_id: None,
                     pattern: Pattern {
                         kind: Enum(
                             "closed",
@@ -381,6 +383,7 @@ fn parse_05() {
                     },
                 },
                 MatchBranch {
+                    scope_id: None,
                     pattern: Pattern {
                         kind: Bind(
                             "anything_else",
@@ -435,6 +438,7 @@ fn parse_06() {
             },
             branches: [
                 MatchBranch {
+                    scope_id: None,
                     pattern: Pattern {
                         kind: Enum(
                             "open",
@@ -467,6 +471,7 @@ fn parse_06() {
                     },
                 },
                 MatchBranch {
+                    scope_id: None,
                     pattern: Pattern {
                         kind: Enum(
                             "closed",

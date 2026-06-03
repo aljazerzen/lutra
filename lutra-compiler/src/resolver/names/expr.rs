@@ -105,12 +105,15 @@ impl fold::PrFold for NameResolver<'_> {
                     self.scopes.push(scope);
 
                     let pattern = self.fold_pattern(branch.pattern)?;
-                    let mut value = Box::new(self.fold_expr(*branch.value)?);
+                    let value = Box::new(self.fold_expr(*branch.value)?);
 
                     self.scopes.pop();
-                    value.scope_id = Some(scope_id);
 
-                    branches.push(pr::MatchBranch { pattern, value })
+                    branches.push(pr::MatchBranch {
+                        scope_id: Some(scope_id),
+                        pattern,
+                        value,
+                    })
                 }
 
                 pr::Expr {

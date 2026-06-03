@@ -628,6 +628,17 @@ func main(): [Text] -> (
   "Jessie",
 ]
 
+# === match_09
+func main() -> match "a" {
+  "a" => (
+    let x = "b";
+    x
+  ),
+  _ => "c",
+}
+# >
+"b"
+
 # === std_to_text_00
 func main() -> to_text(20: Uint8)
 # >

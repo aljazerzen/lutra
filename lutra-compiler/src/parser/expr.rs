@@ -219,7 +219,11 @@ where
     let branch = pattern
         .then_ignore(just(TokenKind::ArrowFat))
         .then(expr.clone().map(Box::new))
-        .map(|(pattern, value)| MatchBranch { pattern, value });
+        .map(|(pattern, value)| MatchBranch {
+            scope_id: None,
+            pattern,
+            value,
+        });
 
     keyword("match")
         .ignore_then(expr.map(Box::new))

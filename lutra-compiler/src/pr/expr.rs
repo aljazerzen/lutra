@@ -253,6 +253,8 @@ pub struct Match {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct MatchBranch {
+    /// Scope for pattern bindings visible in `value`.
+    pub scope_id: Option<usize>,
     pub pattern: Pattern,
     pub value: Box<Expr>,
 }
