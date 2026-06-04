@@ -122,10 +122,10 @@ enum ParamTy {
 
 fn get_param_ty_of(ty: &ir::TyPrimitive) -> Option<ParamTy> {
     match ty {
-        ir::TyPrimitive::prim8 => Some(ParamTy::I8),
-        ir::TyPrimitive::prim16 => Some(ParamTy::I16),
-        ir::TyPrimitive::prim32 => Some(ParamTy::I32),
-        ir::TyPrimitive::prim64 => Some(ParamTy::I64),
+        ir::TyPrimitive::Prim8 => Some(ParamTy::I8),
+        ir::TyPrimitive::Prim16 => Some(ParamTy::I16),
+        ir::TyPrimitive::Prim32 => Some(ParamTy::I32),
+        ir::TyPrimitive::Prim64 => Some(ParamTy::I64),
     }
 }
 

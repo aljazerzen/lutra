@@ -3,9 +3,9 @@ module rr {
   ## Compiled program, executable with lutra-runner
   @std::rust_derive(["Debug", "Clone", "enum_as_inner::EnumAsInner"])
   type Program: enum {
-    SqlPostgres: SqlProgram,
-    SqlDuckDB: SqlProgram,
-    BytecodeLt: project::br::Program,
+    sql_postgres: SqlProgram,
+    sql_duck_db: SqlProgram,
+    bytecode_lt: project::br::Program,
   }
 
   ## Types of a program's input and output
@@ -22,7 +22,7 @@ module rr {
 
   ## SQL program, executable with lutra-runner-postgres
   type SqlProgram: {
-    sql: text,
+    sql: Text,
     input_ty: project::ir::Ty,
     output_ty: project::ir::Ty,
     defs: [project::ir::TyDef],
@@ -31,14 +31,14 @@ module rr {
 
 module layout {
   type EnumFormat: {
-    tag_bytes: uint8,
-    inner_bytes: uint8,
-    has_ptr: bool,
+    tag_bytes: Uint8,
+    inner_bytes: Uint8,
+    has_ptr: Bool,
     variants: [EnumVariantFormat],
   }
 
   type EnumVariantFormat: {
-    is_unit: bool,
-    padding_bytes: uint8,
+    is_unit: Bool,
+    padding_bytes: Uint8,
   }
 }

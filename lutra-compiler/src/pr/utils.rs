@@ -5,10 +5,10 @@ impl From<ir::Ty> for super::Ty {
         let kind = match ty.kind {
             ir::TyKind::Primitive(primitive) => {
                 let primitive = match primitive {
-                    ir::TyPrimitive::prim8 => super::TyPrimitive::prim8,
-                    ir::TyPrimitive::prim16 => super::TyPrimitive::prim16,
-                    ir::TyPrimitive::prim32 => super::TyPrimitive::prim32,
-                    ir::TyPrimitive::prim64 => super::TyPrimitive::prim64,
+                    ir::TyPrimitive::Prim8 => super::TyPrimitive::prim8,
+                    ir::TyPrimitive::Prim16 => super::TyPrimitive::prim16,
+                    ir::TyPrimitive::Prim32 => super::TyPrimitive::prim32,
+                    ir::TyPrimitive::Prim64 => super::TyPrimitive::prim64,
                 };
                 super::TyKind::Primitive(primitive)
             }

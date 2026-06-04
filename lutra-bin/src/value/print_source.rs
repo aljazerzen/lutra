@@ -224,7 +224,7 @@ mod tests {
         let ty = ty_ident(&["alias", "Signed"]);
         let ty_defs = vec![
             ty_def(&["alias", "Signed"], ty_ident(&["std", "Int32"])),
-            ty_def(&["std", "Int32"], ir::Ty::new(ir::TyPrimitive::prim32)),
+            ty_def(&["std", "Int32"], ir::Ty::new(ir::TyPrimitive::Prim32)),
         ];
 
         let value = Value::Prim32((-1_i32) as u32);
@@ -237,7 +237,7 @@ mod tests {
         let ty = ty_ident(&["alias", "Money"]);
         let ty_defs = vec![
             ty_def(&["alias", "Money"], ty_ident(&["std", "Decimal"])),
-            ty_def(&["std", "Decimal"], ir::Ty::new(ir::TyPrimitive::prim64)),
+            ty_def(&["std", "Decimal"], ir::Ty::new(ir::TyPrimitive::Prim64)),
         ];
 
         let value = Value::Prim64((-123_i64) as u64);

@@ -138,10 +138,10 @@ fn validate_type_match(
     let ok = match (arrow_ty, &ty_mat.kind) {
         // Primitives
         (_, ir::TyKind::Primitive(prim)) => match (arrow_ty.primitive_width(), prim) {
-            (Some(1), ir::TyPrimitive::prim8) => true,
-            (Some(2), ir::TyPrimitive::prim16) => true,
-            (Some(4), ir::TyPrimitive::prim32) => true,
-            (Some(8), ir::TyPrimitive::prim64) => true,
+            (Some(1), ir::TyPrimitive::Prim8) => true,
+            (Some(2), ir::TyPrimitive::Prim16) => true,
+            (Some(4), ir::TyPrimitive::Prim32) => true,
+            (Some(8), ir::TyPrimitive::Prim64) => true,
             _ => false,
         },
         (_, ir::TyKind::Ident(ident)) => {

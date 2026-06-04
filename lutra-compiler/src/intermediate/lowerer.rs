@@ -482,7 +482,7 @@ impl<'a> Lowerer<'a> {
                 }
             }
             pr::Literal::Boolean(v) => ir::Literal::Prim8(*v as u8),
-            pr::Literal::Text(v) => ir::Literal::text(v.clone()),
+            pr::Literal::Text(v) => ir::Literal::Text(v.clone()),
 
             pr::Literal::Date(date) => {
                 let Some(epoch_days) = date.to_epoch_days() else {
@@ -700,10 +700,10 @@ impl<'a> Lowerer<'a> {
         let kind = match ty.kind {
             pr::TyKind::Primitive(primitive) => {
                 let primitive = match primitive {
-                    pr::TyPrimitive::prim8 => ir::TyPrimitive::prim8,
-                    pr::TyPrimitive::prim16 => ir::TyPrimitive::prim16,
-                    pr::TyPrimitive::prim32 => ir::TyPrimitive::prim32,
-                    pr::TyPrimitive::prim64 => ir::TyPrimitive::prim64,
+                    pr::TyPrimitive::prim8 => ir::TyPrimitive::Prim8,
+                    pr::TyPrimitive::prim16 => ir::TyPrimitive::Prim16,
+                    pr::TyPrimitive::prim32 => ir::TyPrimitive::Prim32,
+                    pr::TyPrimitive::prim64 => ir::TyPrimitive::Prim64,
                 };
                 ir::TyKind::Primitive(primitive)
             }
@@ -1016,10 +1016,10 @@ impl<'a> Lowerer<'a> {
     fn construct_default_for_ty(&mut self, ty: ir::Ty) -> ir::Expr {
         let kind = match self.get_ty_mat(ty.clone()).kind {
             ir::TyKind::Primitive(prim) => ir::ExprKind::Literal(match prim {
-                ir::TyPrimitive::prim8 => ir::Literal::Prim8(0),
-                ir::TyPrimitive::prim16 => ir::Literal::Prim16(0),
-                ir::TyPrimitive::prim32 => ir::Literal::Prim32(0),
-                ir::TyPrimitive::prim64 => ir::Literal::Prim64(0),
+                ir::TyPrimitive::Prim8 => ir::Literal::Prim8(0),
+                ir::TyPrimitive::Prim16 => ir::Literal::Prim16(0),
+                ir::TyPrimitive::Prim32 => ir::Literal::Prim32(0),
+                ir::TyPrimitive::Prim64 => ir::Literal::Prim64(0),
             }),
             ir::TyKind::Array(_) => ir::ExprKind::Array(vec![]),
             ir::TyKind::Tuple(ty_fields) => ir::ExprKind::Tuple(
@@ -1128,7 +1128,7 @@ pub(crate) fn lower_type_defs(project: &Project) -> ir::Module {
     lowerer.lower_ty_defs_queue();
     let types = order_ty_defs(lowerer.type_defs, project);
     for ty in types {
-        module.insert(&ty.name.0, ir::Decl::Type(ty.ty));
+        module.insert(&ty.name.0, ir::Decl::Ty(ty.ty));
     }
 
     crate::intermediate::layouter::on_root_module(module)

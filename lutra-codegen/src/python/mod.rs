@@ -149,10 +149,10 @@ fn codegen_module(
         };
 
         match &decl.decl {
-            ir::Decl::Module(module) => {
+            ir::Decl::Mod(module) => {
                 sub_modules.push((name, module));
             }
-            ir::Decl::Type(ty) => {
+            ir::Decl::Ty(ty) => {
                 let mut ty = ty.clone();
                 super::infer_names(name, &mut ty);
 
@@ -539,10 +539,10 @@ fn ty_codec(ty: &ir::Ty, ctx: &mut Context) -> Cow<'static, str> {
     }
 
     match &ty.kind {
-        ir::TyKind::Primitive(ir::TyPrimitive::prim8) => "lutra_bin.Int8Codec()".into(),
-        ir::TyKind::Primitive(ir::TyPrimitive::prim16) => "lutra_bin.Int16Codec()".into(),
-        ir::TyKind::Primitive(ir::TyPrimitive::prim32) => "lutra_bin.Int32Codec()".into(),
-        ir::TyKind::Primitive(ir::TyPrimitive::prim64) => "lutra_bin.Int64Codec()".into(),
+        ir::TyKind::Primitive(ir::TyPrimitive::Prim8) => "lutra_bin.Int8Codec()".into(),
+        ir::TyKind::Primitive(ir::TyPrimitive::Prim16) => "lutra_bin.Int16Codec()".into(),
+        ir::TyKind::Primitive(ir::TyPrimitive::Prim32) => "lutra_bin.Int32Codec()".into(),
+        ir::TyKind::Primitive(ir::TyPrimitive::Prim64) => "lutra_bin.Int64Codec()".into(),
 
         ir::TyKind::Array(item_ty) => {
             format!("lutra_bin.ArrayCodec({})", ty_codec(item_ty, ctx)).into()

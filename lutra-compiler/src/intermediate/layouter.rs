@@ -39,8 +39,8 @@ pub fn on_root_module(root_module: ir::Module) -> ir::Module {
     let mut types = Vec::new();
     for (path, def) in root_module.iter_defs_re() {
         match def {
-            ir::Decl::Module(_) => unreachable!(),
-            ir::Decl::Type(ty) => {
+            ir::Decl::Mod(_) => unreachable!(),
+            ir::Decl::Ty(ty) => {
                 let def = ir::TyDef {
                     name: path,
                     ty: ty.clone(),
@@ -67,7 +67,7 @@ pub fn on_root_module(root_module: ir::Module) -> ir::Module {
 
     // put ty_defs back
     for def in types {
-        result.insert(&def.name.0, ir::Decl::Type(def.ty));
+        result.insert(&def.name.0, ir::Decl::Ty(def.ty));
     }
 
     result

@@ -100,10 +100,10 @@ impl<'a> super::Context<'a> {
         tracing::debug!("cell for: {}", lutra_bin::ir::print_ty(ty));
 
         match &self.get_ty_mat(ty).kind {
-            ir::TyKind::Primitive(ir::TyPrimitive::prim8) => Box::new(Int8Encoder),
-            ir::TyKind::Primitive(ir::TyPrimitive::prim16) => Box::new(Int16Encoder),
-            ir::TyKind::Primitive(ir::TyPrimitive::prim32) => Box::new(Int32Encoder),
-            ir::TyKind::Primitive(ir::TyPrimitive::prim64) => Box::new(Int64Encoder),
+            ir::TyKind::Primitive(ir::TyPrimitive::Prim8) => Box::new(Int8Encoder),
+            ir::TyKind::Primitive(ir::TyPrimitive::Prim16) => Box::new(Int16Encoder),
+            ir::TyKind::Primitive(ir::TyPrimitive::Prim32) => Box::new(Int32Encoder),
+            ir::TyKind::Primitive(ir::TyPrimitive::Prim64) => Box::new(Int64Encoder),
 
             ir::TyKind::Ident(i) if i.is(&["std", "Bool"]) => Box::new(BoolEncoder),
             ir::TyKind::Ident(i) if i.is(&["std", "Int8"]) || i.is(&["std", "Uint8"]) => {
@@ -163,10 +163,10 @@ impl<'a> super::Context<'a> {
             }
             ir::TyKind::Primitive(prim) => Box::new(JsonTyStdEncoder {
                 ty: match prim {
-                    ir::TyPrimitive::prim8 => ir::TyStd::Int16,
-                    ir::TyPrimitive::prim16 => ir::TyStd::Int16,
-                    ir::TyPrimitive::prim32 => ir::TyStd::Int32,
-                    ir::TyPrimitive::prim64 => ir::TyStd::Int64,
+                    ir::TyPrimitive::Prim8 => ir::TyStd::Int16,
+                    ir::TyPrimitive::Prim16 => ir::TyStd::Int16,
+                    ir::TyPrimitive::Prim32 => ir::TyStd::Int32,
+                    ir::TyPrimitive::Prim64 => ir::TyStd::Int64,
                 },
             }),
 

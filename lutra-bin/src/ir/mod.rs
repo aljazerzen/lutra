@@ -163,14 +163,14 @@ impl Module {
             if !exists {
                 self.decls.push(ModuledeclsItems {
                     name: path[0].clone(),
-                    decl: Decl::Module(boxed::Box::new(Module {
+                    decl: Decl::Mod(boxed::Box::new(Module {
                         decls: vec::Vec::new(),
                     })),
                 });
             }
 
             let sub_module = self.decls.iter_mut().find(|d| d.name == path[0]);
-            let Decl::Module(sub_module) = &mut sub_module.unwrap().decl else {
+            let Decl::Mod(sub_module) = &mut sub_module.unwrap().decl else {
                 panic!()
             };
             sub_module.insert(&path[1..], decl)
@@ -179,7 +179,7 @@ impl Module {
 
     pub fn iter_defs_re(&self) -> impl Iterator<Item = (Path, &Decl)> {
         self.decls.iter().flat_map(|item| match &item.decl {
-            Decl::Module(sub_module) => sub_module
+            Decl::Mod(sub_module) => sub_module
                 .iter_defs_re()
                 .map(|(mut p, d)| {
                     p.0.insert(0, item.name.clone());
@@ -194,7 +194,7 @@ impl Module {
 
     pub fn iter_types_re(&self) -> impl Iterator<Item = (Path, &Ty)> {
         self.iter_defs_re().filter_map(|(p, d)| {
-            if let Decl::Type(ty) = d {
+            if let Decl::Ty(ty) = d {
                 Some((p, ty))
             } else {
                 None
@@ -218,6 +218,17 @@ impl Literal {
     }
     pub fn new_int64(value: i64) -> Self {
         Self::Prim64(value.to_le() as u64)
+    }
+}
+
+impl TyPrimitive {
+    pub fn name(self) -> &'static str {
+        match self {
+            Self::Prim8 => "Prim8",
+            Self::Prim16 => "Prim16",
+            Self::Prim32 => "Prim32",
+            Self::Prim64 => "Prim64",
+        }
     }
 }
 

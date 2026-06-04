@@ -226,7 +226,7 @@ struct BindingUsageCounter {
 impl BindingUsageCounter {
     fn is_simple_expr(expr: &ir::Expr) -> bool {
         match &expr.kind {
-            ir::ExprKind::Literal(ir::Literal::text(_)) => false,
+            ir::ExprKind::Literal(ir::Literal::Text(_)) => false,
             ir::ExprKind::Literal(_) => true,
             ir::ExprKind::Pointer(_) => true,
             ir::ExprKind::TupleLookup(lookup) => Self::is_simple_expr(&lookup.base),

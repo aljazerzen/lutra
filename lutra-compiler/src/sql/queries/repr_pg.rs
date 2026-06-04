@@ -38,7 +38,7 @@ impl<'a> queries::Context<'a> {
                 let mut r = self.pg_cols_nested(item, "".into());
 
                 if include_index {
-                    let ty_index = Cow::Owned(ir::Ty::new(ir::TyPrimitive::prim64));
+                    let ty_index = Cow::Owned(ir::Ty::new(ir::TyPrimitive::Prim64));
                     r.insert(0, (COL_ARRAY_INDEX.into(), ty_index));
                 }
 

@@ -127,7 +127,7 @@ impl<'a> Context<'a> {
                         .is_some_and(|x| x.is(&["std", "Text"])) =>
             {
                 // special case: this is produced by `std::default(): Text`
-                let lit = ir::Literal::text(String::new());
+                let lit = ir::Literal::Text(String::new());
                 cr::ExprKind::From(cr::From::Row(vec![cr::Expr {
                     kind: cr::ExprKind::From(cr::From::Literal(lit)),
                     ty: expr.ty.clone(),
@@ -1139,7 +1139,7 @@ impl<'a> Context<'a> {
 
             "std::sql::from" => {
                 let table_ident = &call.args[0];
-                let ir::ExprKind::Literal(ir::Literal::text(name)) = &table_ident.kind else {
+                let ir::ExprKind::Literal(ir::Literal::Text(name)) = &table_ident.kind else {
                     panic!("table identifier must be const")
                 };
 
@@ -1153,7 +1153,7 @@ impl<'a> Context<'a> {
                 let rows = self.new_binding(rows);
 
                 let table_ident = &call.args[1];
-                let ir::ExprKind::Literal(ir::Literal::text(table_ident)) = &table_ident.kind
+                let ir::ExprKind::Literal(ir::Literal::Text(table_ident)) = &table_ident.kind
                 else {
                     panic!("table identifier must be const")
                 };
@@ -1178,7 +1178,7 @@ impl<'a> Context<'a> {
 
                 // subject (the table being updated)
                 let table = &call.args[0];
-                let ir::ExprKind::Literal(ir::Literal::text(table)) = &table.kind else {
+                let ir::ExprKind::Literal(ir::Literal::Text(table)) = &table.kind else {
                     panic!("table identifier must be const")
                 };
                 let updater_ty = call.args[1].ty.kind.as_function().unwrap();
@@ -1246,7 +1246,7 @@ impl<'a> Context<'a> {
             }
             "std::sql::raw" => {
                 let source = &call.args[0];
-                let ir::ExprKind::Literal(ir::Literal::text(source)) = &source.kind else {
+                let ir::ExprKind::Literal(ir::Literal::Text(source)) = &source.kind else {
                     panic!("sql_source must be const")
                 };
                 cr::ExprKind::From(cr::From::SQLSource(source.clone()))
@@ -1589,7 +1589,7 @@ fn new_index(index: i64) -> cr::Expr {
 }
 
 fn ty_index() -> ir::Ty {
-    ir::Ty::new(ir::TyPrimitive::prim64)
+    ir::Ty::new(ir::TyPrimitive::Prim64)
 }
 
 /// Creates an int16 literal expression, used for enum tags.
@@ -1601,7 +1601,7 @@ fn new_tag(tag: i16) -> cr::Expr {
 }
 
 fn ty_tag() -> ir::Ty {
-    ir::Ty::new(ir::TyPrimitive::prim16)
+    ir::Ty::new(ir::TyPrimitive::Prim16)
 }
 
 fn ty_concat_as_tuples(a: ir::Ty, b: ir::Ty) -> ir::Ty {

@@ -97,16 +97,16 @@ where
 
     fn visit_concrete(&mut self, buf: B, ty: &'t ir::Ty) -> Result<Self::Res, crate::Error> {
         match &ty.kind {
-            ir::TyKind::Primitive(ir::TyPrimitive::prim8) => {
+            ir::TyKind::Primitive(ir::TyPrimitive::Prim8) => {
                 self.visit_uint8(u8::decode(buf.chunk())?)
             }
-            ir::TyKind::Primitive(ir::TyPrimitive::prim16) => {
+            ir::TyKind::Primitive(ir::TyPrimitive::Prim16) => {
                 self.visit_uint16(u16::decode(buf.chunk())?)
             }
-            ir::TyKind::Primitive(ir::TyPrimitive::prim32) => {
+            ir::TyKind::Primitive(ir::TyPrimitive::Prim32) => {
                 self.visit_uint32(u32::decode(buf.chunk())?)
             }
-            ir::TyKind::Primitive(ir::TyPrimitive::prim64) => {
+            ir::TyKind::Primitive(ir::TyPrimitive::Prim64) => {
                 self.visit_uint64(u64::decode(buf.chunk())?)
             }
             ir::TyKind::Tuple(ty_fields) => {

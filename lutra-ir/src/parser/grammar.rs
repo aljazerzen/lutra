@@ -42,7 +42,7 @@ fn expr<'src>() -> impl Parser<'src, I<'src>, Expr, extra::Err<PError>> + Clone 
                 }
             },
             TokenKind::Literal(pr::Literal::Boolean(i)) => ExprKind::Literal(Literal::Prim8(i as u8)),
-            TokenKind::Literal(pr::Literal::Text(i)) => ExprKind::Literal(Literal::text(i)),
+            TokenKind::Literal(pr::Literal::Text(i)) => ExprKind::Literal(Literal::Text(i)),
         };
 
         let pointer_external = keyword("external")
@@ -103,10 +103,10 @@ fn external_ptr<'src>() -> impl Parser<'src, I<'src>, ExternalPtr, extra::Err<PE
 fn ty<'src>() -> impl Parser<'src, I<'src>, Ty, extra::Err<PError>> {
     recursive(|ty_inner| {
         let primitive = select! {
-            TokenKind::Ident(i) if i == "Prim8" => TyPrimitive::prim8,
-            TokenKind::Ident(i) if i == "Prim16" => TyPrimitive::prim16,
-            TokenKind::Ident(i) if i == "Prim32" => TyPrimitive::prim32,
-            TokenKind::Ident(i) if i == "Prim64" => TyPrimitive::prim64,
+            TokenKind::Ident(i) if i == "Prim8" => TyPrimitive::Prim8,
+            TokenKind::Ident(i) if i == "Prim16" => TyPrimitive::Prim16,
+                TokenKind::Ident(i) if i == "Prim32" => TyPrimitive::Prim32,
+                    TokenKind::Ident(i) if i == "Prim64" => TyPrimitive::Prim64,
         }
         .map(TyKind::Primitive);
 

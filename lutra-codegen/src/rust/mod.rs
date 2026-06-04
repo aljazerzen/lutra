@@ -106,7 +106,7 @@ fn codegen_module(
         };
 
         match &decl.decl {
-            ir::Decl::Module(module) => {
+            ir::Decl::Mod(module) => {
                 let is_dep = module_path.is_empty()
                     && ctx.project.dependencies.iter().any(|d| &d.name == name);
                 if is_dep {
@@ -115,7 +115,7 @@ fn codegen_module(
 
                 sub_modules.push((name, module));
             }
-            ir::Decl::Type(ty) => {
+            ir::Decl::Ty(ty) => {
                 let mut ty = ty.clone();
                 infer_names(name, &mut ty);
 

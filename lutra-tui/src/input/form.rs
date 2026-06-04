@@ -87,7 +87,7 @@ impl Form {
                 assert!(i.is(&["std", "Text"]));
                 FormKind::Text(TextForm::new(String::new()))
             }
-            ir::TyKind::Primitive(ir::TyPrimitive::prim8) => FormKind::Bool(BoolForm::new(false)),
+            ir::TyKind::Primitive(ir::TyPrimitive::Prim8) => FormKind::Bool(BoolForm::new(false)),
             ir::TyKind::Primitive(prim) => FormKind::Number(NumberForm::new(*prim, "0".into())),
             ir::TyKind::Enum(variants) => FormKind::Enum(EnumForm::new(variants, ty_defs.clone())),
             ir::TyKind::Tuple(fields) if fields.is_empty() => FormKind::TupleUnit,

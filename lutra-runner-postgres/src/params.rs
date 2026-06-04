@@ -129,10 +129,10 @@ impl<'a> Context<'a> {
 
 fn get_param_ty_of(ty: &ir::TyKind) -> Option<ParamTy> {
     match ty {
-        ir::TyKind::Primitive(ir::TyPrimitive::prim8) => Some(ParamTy::Prim8),
-        ir::TyKind::Primitive(ir::TyPrimitive::prim16) => Some(ParamTy::Prim16),
-        ir::TyKind::Primitive(ir::TyPrimitive::prim32) => Some(ParamTy::Prim32),
-        ir::TyKind::Primitive(ir::TyPrimitive::prim64) => Some(ParamTy::Prim64),
+        ir::TyKind::Primitive(ir::TyPrimitive::Prim8) => Some(ParamTy::Prim8),
+        ir::TyKind::Primitive(ir::TyPrimitive::Prim16) => Some(ParamTy::Prim16),
+        ir::TyKind::Primitive(ir::TyPrimitive::Prim32) => Some(ParamTy::Prim32),
+        ir::TyKind::Primitive(ir::TyPrimitive::Prim64) => Some(ParamTy::Prim64),
         _ => None,
     }
 }

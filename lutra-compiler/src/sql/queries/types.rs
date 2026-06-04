@@ -25,10 +25,10 @@ impl<'p> Context<'p> {
                 .to_string(),
             ir::TyKind::Primitive(prim) => {
                 let ty = match prim {
-                    ir::TyPrimitive::prim8 => ir::TyStd::Int8,
-                    ir::TyPrimitive::prim16 => ir::TyStd::Int16,
-                    ir::TyPrimitive::prim32 => ir::TyStd::Int32,
-                    ir::TyPrimitive::prim64 => ir::TyStd::Int64,
+                    ir::TyPrimitive::Prim8 => ir::TyStd::Int8,
+                    ir::TyPrimitive::Prim16 => ir::TyStd::Int16,
+                    ir::TyPrimitive::Prim32 => ir::TyStd::Int32,
+                    ir::TyPrimitive::Prim64 => ir::TyStd::Int64,
                 };
                 self.ty_std_name(ty).to_string()
             }
@@ -112,10 +112,10 @@ impl<'p> Context<'p> {
         match &ty_mat.kind {
             ir::TyKind::Primitive(prim) => {
                 let ty = match prim {
-                    ir::TyPrimitive::prim8 => ir::TyStd::Int8,
-                    ir::TyPrimitive::prim16 => ir::TyStd::Int16,
-                    ir::TyPrimitive::prim32 => ir::TyStd::Int32,
-                    ir::TyPrimitive::prim64 => ir::TyStd::Int64,
+                    ir::TyPrimitive::Prim8 => ir::TyStd::Int8,
+                    ir::TyPrimitive::Prim16 => ir::TyStd::Int16,
+                    ir::TyPrimitive::Prim32 => ir::TyStd::Int32,
+                    ir::TyPrimitive::Prim64 => ir::TyStd::Int64,
                 };
                 self.duck_ty_std_name(ty).to_string()
             }
@@ -194,10 +194,10 @@ impl<'p> Context<'p> {
         let ty = self.get_ty_mat(ty);
         let ty_std = match &ty.kind {
             ir::TyKind::Ident(ident) => ir::TyStd::try_new(ident).unwrap(),
-            ir::TyKind::Primitive(ir::TyPrimitive::prim8) => Int8,
-            ir::TyKind::Primitive(ir::TyPrimitive::prim16) => Int16,
-            ir::TyKind::Primitive(ir::TyPrimitive::prim32) => Int32,
-            ir::TyKind::Primitive(ir::TyPrimitive::prim64) => Int64,
+            ir::TyKind::Primitive(ir::TyPrimitive::Prim8) => Int8,
+            ir::TyKind::Primitive(ir::TyPrimitive::Prim16) => Int16,
+            ir::TyKind::Primitive(ir::TyPrimitive::Prim32) => Int32,
+            ir::TyKind::Primitive(ir::TyPrimitive::Prim64) => Int64,
             _ => todo!(),
         };
 

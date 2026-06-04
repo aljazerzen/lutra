@@ -10,7 +10,7 @@ impl std::fmt::Display for ir::Literal {
             ir::Literal::Prim32(v) => write!(f, "{v}"),
             ir::Literal::Prim64(v) => write!(f, "{v}"),
 
-            ir::Literal::text(s) => {
+            ir::Literal::Text(s) => {
                 write!(f, "{}", quote_string(escape_all_except_quotes(s).as_str()))
             }
         }

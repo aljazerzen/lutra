@@ -26,16 +26,16 @@ pub trait ValueVisitor<'t> {
         }
 
         match &ty.kind {
-            ir::TyKind::Primitive(ir::TyPrimitive::prim8) => {
+            ir::TyKind::Primitive(ir::TyPrimitive::Prim8) => {
                 self.visit_int8(value.expect_prim8()? as i8)
             }
-            ir::TyKind::Primitive(ir::TyPrimitive::prim16) => {
+            ir::TyKind::Primitive(ir::TyPrimitive::Prim16) => {
                 self.visit_int16(value.expect_prim16()? as i16)
             }
-            ir::TyKind::Primitive(ir::TyPrimitive::prim32) => {
+            ir::TyKind::Primitive(ir::TyPrimitive::Prim32) => {
                 self.visit_int32(value.expect_prim32()? as i32)
             }
-            ir::TyKind::Primitive(ir::TyPrimitive::prim64) => {
+            ir::TyKind::Primitive(ir::TyPrimitive::Prim64) => {
                 self.visit_int64(value.expect_prim64()? as i64)
             }
             ir::TyKind::Tuple(ty_fields) => {

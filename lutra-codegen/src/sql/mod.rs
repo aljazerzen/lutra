@@ -92,10 +92,10 @@ impl TyStd {
 
     fn from_primitive(prim: ir::TyPrimitive) -> Self {
         match prim {
-            ir::TyPrimitive::prim8 => Self::Int8,
-            ir::TyPrimitive::prim16 => Self::Int16,
-            ir::TyPrimitive::prim32 => Self::Int32,
-            ir::TyPrimitive::prim64 => Self::Int64,
+            ir::TyPrimitive::Prim8 => Self::Int8,
+            ir::TyPrimitive::Prim16 => Self::Int16,
+            ir::TyPrimitive::Prim32 => Self::Int32,
+            ir::TyPrimitive::Prim64 => Self::Int64,
         }
     }
 
@@ -136,10 +136,10 @@ fn codegen_module(
         };
 
         match &decl.decl {
-            ir::Decl::Module(module) => {
+            ir::Decl::Mod(module) => {
                 sub_modules.push((name, module));
             }
-            ir::Decl::Type(ty) => {
+            ir::Decl::Ty(ty) => {
                 let mut ty = ty.clone();
                 infer_names(name, &mut ty);
 

@@ -31,10 +31,10 @@ pub fn format_value(data: &[u8], ty: &ir::Ty, table: &Table) -> Result<String> {
 /// Format a primitive value, returning (text, alignment).
 pub fn format_primitive(data: &[u8], prim: &ir::TyPrimitive) -> Result<String> {
     match prim {
-        ir::TyPrimitive::prim8 => Ok(i8::decode(data)?.to_string()),
-        ir::TyPrimitive::prim16 => Ok(i16::decode(data)?.to_string()),
-        ir::TyPrimitive::prim32 => Ok(i32::decode(data)?.to_string()),
-        ir::TyPrimitive::prim64 => Ok(i64::decode(data)?.to_string()),
+        ir::TyPrimitive::Prim8 => Ok(i8::decode(data)?.to_string()),
+        ir::TyPrimitive::Prim16 => Ok(i16::decode(data)?.to_string()),
+        ir::TyPrimitive::Prim32 => Ok(i32::decode(data)?.to_string()),
+        ir::TyPrimitive::Prim64 => Ok(i64::decode(data)?.to_string()),
     }
 }
 
@@ -188,7 +188,7 @@ pub fn format_ty_name(ty: &ir::Ty, table: &Table) -> String {
     }
 
     match &ty.kind {
-        ir::TyKind::Primitive(p) => format_primitive_ty_name(p),
+        ir::TyKind::Primitive(p) => p.name().to_string(),
         ir::TyKind::Array(item) => {
             if table.is_flat(item) {
                 format!("[{}]", format_ty_name(item, table))
@@ -208,14 +208,4 @@ pub fn format_ty_name(ty: &ir::Ty, table: &Table) -> String {
         ir::TyKind::Tuple(_) => "{…}".into(),
         ir::TyKind::Function(_) => "fn".into(),
     }
-}
-
-fn format_primitive_ty_name(prim: &ir::TyPrimitive) -> String {
-    match prim {
-        ir::TyPrimitive::prim8 => "Prim8",
-        ir::TyPrimitive::prim16 => "Prim16",
-        ir::TyPrimitive::prim32 => "Prim32",
-        ir::TyPrimitive::prim64 => "Prim64",
-    }
-    .into()
 }

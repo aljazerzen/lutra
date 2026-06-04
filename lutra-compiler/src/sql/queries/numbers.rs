@@ -74,10 +74,10 @@ impl super::Context<'_> {
     pub(super) fn compile_literal(&self, lit: &ir::Literal, ty: &ir::Ty) -> sa::Expr {
         let ty = self.get_ty_mat(ty);
         let ty_std = match &ty.kind {
-            ir::TyKind::Primitive(ir::TyPrimitive::prim8) => ir::TyStd::Int8,
-            ir::TyKind::Primitive(ir::TyPrimitive::prim16) => ir::TyStd::Int16,
-            ir::TyKind::Primitive(ir::TyPrimitive::prim32) => ir::TyStd::Int32,
-            ir::TyKind::Primitive(ir::TyPrimitive::prim64) => ir::TyStd::Int64,
+            ir::TyKind::Primitive(ir::TyPrimitive::Prim8) => ir::TyStd::Int8,
+            ir::TyKind::Primitive(ir::TyPrimitive::Prim16) => ir::TyStd::Int16,
+            ir::TyKind::Primitive(ir::TyPrimitive::Prim32) => ir::TyStd::Int32,
+            ir::TyKind::Primitive(ir::TyPrimitive::Prim64) => ir::TyStd::Int64,
             ir::TyKind::Ident(path) => ir::TyStd::try_new(path).unwrap(),
             _ => panic!("bad literal type"),
         };

@@ -136,7 +136,7 @@ pub trait RelCols<'a> {
 
             ir::TyKind::Enum(variants) => Box::new(itertools::chain(
                 // tag
-                Some(Cow::Owned(ir::Ty::new(ir::TyPrimitive::prim16))),
+                Some(Cow::Owned(ir::Ty::new(ir::TyPrimitive::Prim16))),
                 // variants
                 variants.iter().enumerate().flat_map(|(i, v)| {
                     let is_recursive =
@@ -305,7 +305,7 @@ mod rel_repr {
     // helpers
 
     fn prim() -> ir::Ty {
-        ir::Ty::new(ir::TyPrimitive::prim32)
+        ir::Ty::new(ir::TyPrimitive::Prim32)
     }
 
     fn tuple_0() -> ir::Ty {

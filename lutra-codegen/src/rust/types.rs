@@ -162,10 +162,10 @@ pub fn write_ty_ref(
     let lutra_bin = &ctx.options.lutra_bin_path;
 
     match &ty.kind {
-        ir::TyKind::Primitive(ir::TyPrimitive::prim8) => write!(w, "u8")?,
-        ir::TyKind::Primitive(ir::TyPrimitive::prim16) => write!(w, "u16")?,
-        ir::TyKind::Primitive(ir::TyPrimitive::prim32) => write!(w, "u32")?,
-        ir::TyKind::Primitive(ir::TyPrimitive::prim64) => write!(w, "u64")?,
+        ir::TyKind::Primitive(ir::TyPrimitive::Prim8) => write!(w, "u8")?,
+        ir::TyKind::Primitive(ir::TyPrimitive::Prim16) => write!(w, "u16")?,
+        ir::TyKind::Primitive(ir::TyPrimitive::Prim32) => write!(w, "u32")?,
+        ir::TyKind::Primitive(ir::TyPrimitive::Prim64) => write!(w, "u64")?,
         ir::TyKind::Ident(ident) => {
             if let Some(ty) = ty_ref_std(ident, ctx) {
                 write!(w, "{ty}")?;

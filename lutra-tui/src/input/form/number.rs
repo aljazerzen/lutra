@@ -57,19 +57,19 @@ impl NumberForm {
         };
 
         match self.primitive {
-            ir::TyPrimitive::prim8 => {
+            ir::TyPrimitive::Prim8 => {
                 let val = text.parse::<i8>().unwrap_or_default();
                 lutra_bin::Value::Prim8(val as u8)
             }
-            ir::TyPrimitive::prim16 => {
+            ir::TyPrimitive::Prim16 => {
                 let val = text.parse::<i16>().unwrap_or_default();
                 lutra_bin::Value::Prim16(val as u16)
             }
-            ir::TyPrimitive::prim32 => {
+            ir::TyPrimitive::Prim32 => {
                 let val = text.parse::<i32>().unwrap_or_default();
                 lutra_bin::Value::Prim32(val as u32)
             }
-            ir::TyPrimitive::prim64 => {
+            ir::TyPrimitive::Prim64 => {
                 let val = text.parse::<i64>().unwrap_or_default();
                 lutra_bin::Value::Prim64(val as u64)
             }
@@ -78,10 +78,10 @@ impl NumberForm {
 
     pub(crate) fn set_value(&mut self, value: lutra_bin::Value) {
         let text = match (&value, self.primitive) {
-            (lutra_bin::Value::Prim8(v), ir::TyPrimitive::prim8) => (*v as i8).to_string(),
-            (lutra_bin::Value::Prim16(v), ir::TyPrimitive::prim16) => (*v as i16).to_string(),
-            (lutra_bin::Value::Prim32(v), ir::TyPrimitive::prim32) => (*v as i32).to_string(),
-            (lutra_bin::Value::Prim64(v), ir::TyPrimitive::prim64) => (*v as i64).to_string(),
+            (lutra_bin::Value::Prim8(v), ir::TyPrimitive::Prim8) => (*v as i8).to_string(),
+            (lutra_bin::Value::Prim16(v), ir::TyPrimitive::Prim16) => (*v as i16).to_string(),
+            (lutra_bin::Value::Prim32(v), ir::TyPrimitive::Prim32) => (*v as i32).to_string(),
+            (lutra_bin::Value::Prim64(v), ir::TyPrimitive::Prim64) => (*v as i64).to_string(),
             _ => panic!(
                 "Value type mismatch: expected {:?}, got {:?}",
                 self.primitive, value
@@ -93,10 +93,10 @@ impl NumberForm {
 
     fn is_allowed_char(&self, c: char) -> bool {
         match self.primitive {
-            ir::TyPrimitive::prim8
-            | ir::TyPrimitive::prim16
-            | ir::TyPrimitive::prim32
-            | ir::TyPrimitive::prim64 => c.is_ascii_digit() || c == '-',
+            ir::TyPrimitive::Prim8
+            | ir::TyPrimitive::Prim16
+            | ir::TyPrimitive::Prim32
+            | ir::TyPrimitive::Prim64 => c.is_ascii_digit() || c == '-',
         }
     }
 }

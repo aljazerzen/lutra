@@ -861,7 +861,7 @@ let main =
                 ),
                 ty: Ty {
                     kind: Primitive(
-                        prim64,
+                        Prim64,
                     ),
                     layout: None,
                     name: None,
@@ -877,7 +877,7 @@ let main =
                 ),
                 ty: Ty {
                     kind: Primitive(
-                        prim64,
+                        Prim64,
                     ),
                     layout: None,
                     name: None,
@@ -895,7 +895,7 @@ let main =
                     kind: Array(
                         Ty {
                             kind: Primitive(
-                                prim8,
+                                Prim8,
                             ),
                             layout: None,
                             name: None,

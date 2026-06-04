@@ -101,7 +101,7 @@ impl<'t> ByteCoder<'t> {
             ir::Literal::Prim16(v) => v.encode(),
             ir::Literal::Prim32(v) => v.encode(),
             ir::Literal::Prim64(v) => v.encode(),
-            ir::Literal::text(v) => v.encode(),
+            ir::Literal::Text(v) => v.encode(),
         }
     }
 
@@ -628,10 +628,10 @@ impl<'t> ByteCoder<'t> {
     fn construct_default_for_ty_re(&self, ty: &ir::Ty) -> lutra_bin::Value {
         match &self.get_ty_mat(ty).kind {
             ir::TyKind::Primitive(prim) => match prim {
-                ir::TyPrimitive::prim8 => lutra_bin::Value::Prim8(0),
-                ir::TyPrimitive::prim16 => lutra_bin::Value::Prim16(0),
-                ir::TyPrimitive::prim32 => lutra_bin::Value::Prim32(0),
-                ir::TyPrimitive::prim64 => lutra_bin::Value::Prim64(0),
+                ir::TyPrimitive::Prim8 => lutra_bin::Value::Prim8(0),
+                ir::TyPrimitive::Prim16 => lutra_bin::Value::Prim16(0),
+                ir::TyPrimitive::Prim32 => lutra_bin::Value::Prim32(0),
+                ir::TyPrimitive::Prim64 => lutra_bin::Value::Prim64(0),
             },
             ir::TyKind::Array(_) => lutra_bin::Value::Array(vec![]),
             ir::TyKind::Tuple(ty_fields) => lutra_bin::Value::Tuple(

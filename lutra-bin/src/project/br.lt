@@ -10,8 +10,8 @@ type Program: {
 
 @rust_derive(["Debug", "Clone", "PartialEq", "Eq", "Hash"])
 type ExternalSymbol: {
-  id: text,
-  layout_args: [uint32],
+  id: Text,
+  layout_args: [Uint32],
 }
 
 type Expr: {
@@ -20,18 +20,18 @@ type Expr: {
 
 @rust_derive(["Debug", "Clone", "enum_as_inner::EnumAsInner"])
 type ExprKind: enum {
-  Pointer: Sid,
-  Literal: [uint8],
-  Call: Call,
-  Function: Function,
-  `Tuple`: `Tuple`,
-  Array: Array,
-  EnumVariant: EnumVariant,
-  EnumEq: EnumEq,
-  Offset: Offset,
-  Deref: Deref,
-  Binding: Binding,
-  Switch: [SwitchBranch],
+  pointer: Sid,
+  literal: [Uint8],
+  call: Call,
+  function: Function,
+  tuple: `Tuple`,
+  array: Array,
+  enum_variant: EnumVariant,
+  enum_eq: EnumEq,
+  offset: Offset,
+  deref: Deref,
+  binding: Binding,
+  switch: [SwitchBranch],
 }
 
 ## Symbol id.
@@ -40,7 +40,7 @@ type ExprKind: enum {
 ## - 0b10xxxxxx - function scopes
 ## - 0b11xxxxxx - unused
 @rust_derive(["Debug", "Clone", "Copy", "PartialEq", "Eq", "Hash"])
-type Sid: uint32
+type Sid: Uint32
 
 type Call: {
   function: Expr,
@@ -61,7 +61,7 @@ type Tuple: {
 
 type TupleField: {
   expr: Expr,
-  unpack: uint8,
+  unpack: Uint8,
 }
 
 type Array: {
@@ -70,21 +70,21 @@ type Array: {
 }
 
 type EnumVariant: {
-  tag: [uint8],
-  inner_bytes: uint8,
-  has_ptr: bool,
-  padding_bytes: uint8,
+  tag: [Uint8],
+  inner_bytes: Uint8,
+  has_ptr: Bool,
+  padding_bytes: Uint8,
   inner: Expr,
 }
 
 type EnumEq: {
-  tag: [uint8],
+  tag: [Uint8],
   expr: Expr,
 }
 
 type Offset: {
   base: Expr,
-  offset: uint32,
+  offset: Uint32,
 }
 
 type Deref: {
@@ -104,6 +104,6 @@ type SwitchBranch: {
 
 @rust_derive(["Debug", "Clone", "PartialEq", "Default"])
 type TyLayout: {
-  head_size: uint32,
-  body_ptrs: [uint32],
+  head_size: Uint32,
+  body_ptrs: [Uint32],
 }

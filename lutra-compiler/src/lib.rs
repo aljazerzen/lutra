@@ -96,7 +96,7 @@ pub fn compile(
             sql::Dialect::Postgres,
         ))),
         ProgramRepr::SqlDuckdb => {
-            rr::Program::SqlDuckDB(Box::new(sql::compile_ir(&program_ir, sql::Dialect::DuckDB)))
+            rr::Program::SqlDuckDb(Box::new(sql::compile_ir(&program_ir, sql::Dialect::DuckDB)))
         }
         ProgramRepr::BytecodeLt => {
             rr::Program::BytecodeLt(bytecoding::compile_program(program_ir.clone()))

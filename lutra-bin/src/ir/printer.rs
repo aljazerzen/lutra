@@ -282,10 +282,7 @@ impl Printer {
     #[allow(clippy::only_used_in_recursion)]
     fn print_ty(&self, ty: &ir::Ty) -> String {
         match &ty.kind {
-            ir::TyKind::Primitive(ir::TyPrimitive::prim8) => "Prim8".to_string(),
-            ir::TyKind::Primitive(ir::TyPrimitive::prim16) => "Prim16".to_string(),
-            ir::TyKind::Primitive(ir::TyPrimitive::prim32) => "Prim32".to_string(),
-            ir::TyKind::Primitive(ir::TyPrimitive::prim64) => "Prim64".to_string(),
+            ir::TyKind::Primitive(prim) => prim.name().to_string(),
             ir::TyKind::Tuple(fields) => {
                 let mut r = "{".to_string();
                 for (index, field) in fields.iter().enumerate() {

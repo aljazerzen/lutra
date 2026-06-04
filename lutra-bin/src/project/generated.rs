@@ -5,7 +5,7 @@ pub mod rr {
     #[allow(non_camel_case_types)]
     pub enum Program {
         SqlPostgres(crate::boxed::Box<SqlProgram>),
-        SqlDuckDB(crate::boxed::Box<SqlProgram>),
+        SqlDuckDb(crate::boxed::Box<SqlProgram>),
         BytecodeLt(super::br::Program),
     }
 
@@ -44,10 +44,10 @@ pub mod rr {
                         let r = ProgramHeadPtr::SqlPostgres(head_ptr);
                         r
                     }
-                    Self::SqlDuckDB(inner) => {
+                    Self::SqlDuckDb(inner) => {
                         w.put_slice(&[1]);
                         let head_ptr = crate::ReversePointer::new(w);
-                        let r = ProgramHeadPtr::SqlDuckDB(head_ptr);
+                        let r = ProgramHeadPtr::SqlDuckDb(head_ptr);
                         r
                     }
                     Self::BytecodeLt(inner) => {
@@ -68,8 +68,8 @@ pub mod rr {
                         let inner_head_ptr = inner.encode_head(w);
                         inner.encode_body(inner_head_ptr, w);
                     }
-                    Self::SqlDuckDB(inner) => {
-                        let ProgramHeadPtr::SqlDuckDB(offset_ptr) = head else {
+                    Self::SqlDuckDb(inner) => {
+                        let ProgramHeadPtr::SqlDuckDb(offset_ptr) = head else {
                             unreachable!()
                         };
                         offset_ptr.write_cur_len(w);
@@ -91,7 +91,7 @@ pub mod rr {
         pub enum ProgramHeadPtr {
             None,
             SqlPostgres(crate::ReversePointer),
-            SqlDuckDB(crate::ReversePointer),
+            SqlDuckDb(crate::ReversePointer),
             BytecodeLt(crate::ReversePointer),
         }
         impl crate::Layout for Program {
@@ -115,7 +115,7 @@ pub mod rr {
                     1 => {
                         let offset = u32::from_le_bytes(buf.read_const::<4>());
                         let inner = super::SqlProgram::decode(buf.skip(offset as usize))?;
-                        Program::SqlDuckDB(crate::boxed::Box::new(inner))
+                        Program::SqlDuckDb(crate::boxed::Box::new(inner))
                     }
                     2 => {
                         let offset = u32::from_le_bytes(buf.read_const::<4>());
@@ -396,7 +396,7 @@ pub mod ir {
         Prim16(u16),
         Prim32(u32),
         Prim64(u64),
-        text(crate::string::String),
+        Text(crate::string::String),
     }
 
     #[derive(Debug, Clone)]
@@ -493,10 +493,10 @@ pub mod ir {
     #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
     #[allow(non_camel_case_types)]
     pub enum TyPrimitive {
-        prim8,
-        prim16,
-        prim32,
-        prim64,
+        Prim8,
+        Prim16,
+        Prim32,
+        Prim64,
     }
 
     #[derive(Debug, Clone, PartialEq)]
@@ -547,8 +547,8 @@ pub mod ir {
     #[derive(Debug, Clone)]
     #[allow(non_camel_case_types)]
     pub enum Decl {
-        Module(crate::boxed::Box<Module>),
-        Type(Ty),
+        Mod(crate::boxed::Box<Module>),
+        Ty(Ty),
         Var(Ty),
     }
 
@@ -1070,33 +1070,33 @@ pub mod ir {
             fn encode_head(&self, w: &mut crate::bytes::BytesMut) -> LiteralHeadPtr {
                 match self {
                     Self::Prim8(inner) => {
-                        w.put_slice(&[1]);
+                        w.put_slice(&[0]);
                         let head_ptr = crate::ReversePointer::new(w);
-                        let r = LiteralHeadPtr::int8(head_ptr);
+                        let r = LiteralHeadPtr::Prim8(head_ptr);
                         r
                     }
                     Self::Prim16(inner) => {
-                        w.put_slice(&[2]);
+                        w.put_slice(&[1]);
                         let head_ptr = crate::ReversePointer::new(w);
-                        let r = LiteralHeadPtr::int16(head_ptr);
+                        let r = LiteralHeadPtr::Prim16(head_ptr);
                         r
                     }
                     Self::Prim32(inner) => {
-                        w.put_slice(&[3]);
+                        w.put_slice(&[2]);
                         let head_ptr = crate::ReversePointer::new(w);
-                        let r = LiteralHeadPtr::int32(head_ptr);
+                        let r = LiteralHeadPtr::Prim32(head_ptr);
                         r
                     }
                     Self::Prim64(inner) => {
-                        w.put_slice(&[4]);
+                        w.put_slice(&[3]);
                         let head_ptr = crate::ReversePointer::new(w);
-                        let r = LiteralHeadPtr::int64(head_ptr);
+                        let r = LiteralHeadPtr::Prim64(head_ptr);
                         r
                     }
-                    Self::text(inner) => {
-                        w.put_slice(&[11]);
+                    Self::Text(inner) => {
+                        w.put_slice(&[4]);
                         let head_ptr = crate::ReversePointer::new(w);
-                        let r = LiteralHeadPtr::text(head_ptr);
+                        let r = LiteralHeadPtr::Text(head_ptr);
                         r
                     }
                 }
@@ -1104,7 +1104,7 @@ pub mod ir {
             fn encode_body(&self, head: LiteralHeadPtr, w: &mut crate::bytes::BytesMut) {
                 match self {
                     Self::Prim8(inner) => {
-                        let LiteralHeadPtr::int8(offset_ptr) = head else {
+                        let LiteralHeadPtr::Prim8(offset_ptr) = head else {
                             unreachable!()
                         };
                         offset_ptr.write_cur_len(w);
@@ -1112,7 +1112,7 @@ pub mod ir {
                         inner.encode_body(inner_head_ptr, w);
                     }
                     Self::Prim16(inner) => {
-                        let LiteralHeadPtr::int16(offset_ptr) = head else {
+                        let LiteralHeadPtr::Prim16(offset_ptr) = head else {
                             unreachable!()
                         };
                         offset_ptr.write_cur_len(w);
@@ -1120,7 +1120,7 @@ pub mod ir {
                         inner.encode_body(inner_head_ptr, w);
                     }
                     Self::Prim32(inner) => {
-                        let LiteralHeadPtr::int32(offset_ptr) = head else {
+                        let LiteralHeadPtr::Prim32(offset_ptr) = head else {
                             unreachable!()
                         };
                         offset_ptr.write_cur_len(w);
@@ -1128,15 +1128,15 @@ pub mod ir {
                         inner.encode_body(inner_head_ptr, w);
                     }
                     Self::Prim64(inner) => {
-                        let LiteralHeadPtr::int64(offset_ptr) = head else {
+                        let LiteralHeadPtr::Prim64(offset_ptr) = head else {
                             unreachable!()
                         };
                         offset_ptr.write_cur_len(w);
                         let inner_head_ptr = inner.encode_head(w);
                         inner.encode_body(inner_head_ptr, w);
                     }
-                    Self::text(inner) => {
-                        let LiteralHeadPtr::text(offset_ptr) = head else {
+                    Self::Text(inner) => {
+                        let LiteralHeadPtr::Text(offset_ptr) = head else {
                             unreachable!()
                         };
                         offset_ptr.write_cur_len(w);
@@ -1149,18 +1149,11 @@ pub mod ir {
         #[allow(non_camel_case_types, dead_code)]
         pub enum LiteralHeadPtr {
             None,
-            bool(crate::ReversePointer),
-            int8(crate::ReversePointer),
-            int16(crate::ReversePointer),
-            int32(crate::ReversePointer),
-            int64(crate::ReversePointer),
-            uint8(crate::ReversePointer),
-            uint16(crate::ReversePointer),
-            uint32(crate::ReversePointer),
-            uint64(crate::ReversePointer),
-            float32(crate::ReversePointer),
-            float64(crate::ReversePointer),
-            text(crate::ReversePointer),
+            Prim8(crate::ReversePointer),
+            Prim16(crate::ReversePointer),
+            Prim32(crate::ReversePointer),
+            Prim64(crate::ReversePointer),
+            Text(crate::ReversePointer),
         }
         impl crate::Layout for Literal {
             fn head_size() -> usize {
@@ -1175,30 +1168,30 @@ pub mod ir {
                 let tag = u64::from_le_bytes(tag_bytes.try_into().unwrap()) as usize;
                 let buf = buf.skip(1);
                 Ok(match tag {
-                    1 => {
+                    0 => {
                         let offset = u32::from_le_bytes(buf.read_const::<4>());
                         let inner = u8::decode(buf.skip(offset as usize))?;
                         Literal::Prim8(inner)
                     }
-                    2 => {
+                    1 => {
                         let offset = u32::from_le_bytes(buf.read_const::<4>());
                         let inner = u16::decode(buf.skip(offset as usize))?;
                         Literal::Prim16(inner)
                     }
-                    3 => {
+                    2 => {
                         let offset = u32::from_le_bytes(buf.read_const::<4>());
                         let inner = u32::decode(buf.skip(offset as usize))?;
                         Literal::Prim32(inner)
                     }
-                    4 => {
+                    3 => {
                         let offset = u32::from_le_bytes(buf.read_const::<4>());
                         let inner = u64::decode(buf.skip(offset as usize))?;
                         Literal::Prim64(inner)
                     }
-                    11 => {
+                    4 => {
                         let offset = u32::from_le_bytes(buf.read_const::<4>());
                         let inner = crate::string::String::decode(buf.skip(offset as usize))?;
-                        Literal::text(inner)
+                        Literal::Text(inner)
                     }
                     _ => return Err(crate::Error::InvalidData),
                 })
@@ -1745,17 +1738,17 @@ pub mod ir {
             type HeadPtr = ();
             fn encode_head(&self, w: &mut crate::bytes::BytesMut) -> () {
                 match self {
-                    Self::prim8 => {
+                    Self::Prim8 => {
+                        w.put_slice(&[0]);
+                    }
+                    Self::Prim16 => {
                         w.put_slice(&[1]);
                     }
-                    Self::prim16 => {
+                    Self::Prim32 => {
                         w.put_slice(&[2]);
                     }
-                    Self::prim32 => {
+                    Self::Prim64 => {
                         w.put_slice(&[3]);
-                    }
-                    Self::prim64 => {
-                        w.put_slice(&[4]);
                     }
                 }
             }
@@ -1773,10 +1766,10 @@ pub mod ir {
                 tag_bytes.resize(8, 0);
                 let tag = u64::from_le_bytes(tag_bytes.try_into().unwrap()) as usize;
                 Ok(match tag {
-                    1 => TyPrimitive::prim8,
-                    2 => TyPrimitive::prim16,
-                    3 => TyPrimitive::prim32,
-                    4 => TyPrimitive::prim64,
+                    0 => TyPrimitive::Prim8,
+                    1 => TyPrimitive::Prim16,
+                    2 => TyPrimitive::Prim32,
+                    3 => TyPrimitive::Prim64,
                     _ => return Err(crate::Error::InvalidData),
                 })
             }
@@ -2003,16 +1996,16 @@ pub mod ir {
             type HeadPtr = DeclHeadPtr;
             fn encode_head(&self, w: &mut crate::bytes::BytesMut) -> DeclHeadPtr {
                 match self {
-                    Self::Module(inner) => {
+                    Self::Mod(inner) => {
                         w.put_slice(&[0]);
                         let head_ptr = crate::ReversePointer::new(w);
-                        let r = DeclHeadPtr::Module(head_ptr);
+                        let r = DeclHeadPtr::Mod(head_ptr);
                         r
                     }
-                    Self::Type(inner) => {
+                    Self::Ty(inner) => {
                         w.put_slice(&[1]);
                         let head_ptr = crate::ReversePointer::new(w);
-                        let r = DeclHeadPtr::Type(head_ptr);
+                        let r = DeclHeadPtr::Ty(head_ptr);
                         r
                     }
                     Self::Var(inner) => {
@@ -2025,16 +2018,16 @@ pub mod ir {
             }
             fn encode_body(&self, head: DeclHeadPtr, w: &mut crate::bytes::BytesMut) {
                 match self {
-                    Self::Module(inner) => {
-                        let DeclHeadPtr::Module(offset_ptr) = head else {
+                    Self::Mod(inner) => {
+                        let DeclHeadPtr::Mod(offset_ptr) = head else {
                             unreachable!()
                         };
                         offset_ptr.write_cur_len(w);
                         let inner_head_ptr = inner.encode_head(w);
                         inner.encode_body(inner_head_ptr, w);
                     }
-                    Self::Type(inner) => {
-                        let DeclHeadPtr::Type(offset_ptr) = head else {
+                    Self::Ty(inner) => {
+                        let DeclHeadPtr::Ty(offset_ptr) = head else {
                             unreachable!()
                         };
                         offset_ptr.write_cur_len(w);
@@ -2055,8 +2048,8 @@ pub mod ir {
         #[allow(non_camel_case_types, dead_code)]
         pub enum DeclHeadPtr {
             None,
-            Module(crate::ReversePointer),
-            Type(crate::ReversePointer),
+            Mod(crate::ReversePointer),
+            Ty(crate::ReversePointer),
             Var(crate::ReversePointer),
         }
         impl crate::Layout for Decl {
@@ -2075,12 +2068,12 @@ pub mod ir {
                     0 => {
                         let offset = u32::from_le_bytes(buf.read_const::<4>());
                         let inner = super::Module::decode(buf.skip(offset as usize))?;
-                        Decl::Module(crate::boxed::Box::new(inner))
+                        Decl::Mod(crate::boxed::Box::new(inner))
                     }
                     1 => {
                         let offset = u32::from_le_bytes(buf.read_const::<4>());
                         let inner = super::Ty::decode(buf.skip(offset as usize))?;
-                        Decl::Type(inner)
+                        Decl::Ty(inner)
                     }
                     2 => {
                         let offset = u32::from_le_bytes(buf.read_const::<4>());

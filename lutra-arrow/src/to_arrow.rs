@@ -156,10 +156,10 @@ fn construct_cell_converter(ty: &ir::Ty, ctx: &Context) -> Result<Box<dyn Conver
         ty = ctx.get_ty(ident)?;
     }
     match &ty.kind {
-        ir::TyKind::Primitive(ir::TyPrimitive::prim8) => Ok(Box::new(UInt8Converter)),
-        ir::TyKind::Primitive(ir::TyPrimitive::prim16) => Ok(Box::new(UInt16Converter)),
-        ir::TyKind::Primitive(ir::TyPrimitive::prim32) => Ok(Box::new(UInt32Converter)),
-        ir::TyKind::Primitive(ir::TyPrimitive::prim64) => Ok(Box::new(UInt64Converter)),
+        ir::TyKind::Primitive(ir::TyPrimitive::Prim8) => Ok(Box::new(UInt8Converter)),
+        ir::TyKind::Primitive(ir::TyPrimitive::Prim16) => Ok(Box::new(UInt16Converter)),
+        ir::TyKind::Primitive(ir::TyPrimitive::Prim32) => Ok(Box::new(UInt32Converter)),
+        ir::TyKind::Primitive(ir::TyPrimitive::Prim64) => Ok(Box::new(UInt64Converter)),
         ir::TyKind::Tuple(_) => Err(Error::UnsupportedType(
             "nested tuple types not yet supported".into(),
         )),
@@ -263,10 +263,10 @@ fn get_schema_row(ty: &ir::Ty, ctx: &Context) -> Result<Vec<Field>, Error> {
 fn get_schema_cell(ty: &ir::Ty, ctx: &Context) -> Result<DataType, Error> {
     let ty = ctx.get_ty_mat(ty)?;
     match &ty.kind {
-        ir::TyKind::Primitive(ir::TyPrimitive::prim8) => Ok(DataType::UInt8),
-        ir::TyKind::Primitive(ir::TyPrimitive::prim16) => Ok(DataType::UInt16),
-        ir::TyKind::Primitive(ir::TyPrimitive::prim32) => Ok(DataType::UInt32),
-        ir::TyKind::Primitive(ir::TyPrimitive::prim64) => Ok(DataType::UInt64),
+        ir::TyKind::Primitive(ir::TyPrimitive::Prim8) => Ok(DataType::UInt8),
+        ir::TyKind::Primitive(ir::TyPrimitive::Prim16) => Ok(DataType::UInt16),
+        ir::TyKind::Primitive(ir::TyPrimitive::Prim32) => Ok(DataType::UInt32),
+        ir::TyKind::Primitive(ir::TyPrimitive::Prim64) => Ok(DataType::UInt64),
         ir::TyKind::Ident(path) => {
             let ty_std = ir::TyStd::try_new(path).unwrap();
             Ok(match ty_std {

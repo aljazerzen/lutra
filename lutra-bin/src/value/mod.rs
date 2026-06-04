@@ -154,10 +154,10 @@ enum TyClass<'t> {
 impl<'t> TyClass<'t> {
     fn of_ty(ty_mat: &'t ir::Ty) -> Result<Self> {
         Ok(match &ty_mat.kind {
-            ir::TyKind::Primitive(ir::TyPrimitive::prim8) => TyClass::Prim8,
-            ir::TyKind::Primitive(ir::TyPrimitive::prim16) => TyClass::Prim16,
-            ir::TyKind::Primitive(ir::TyPrimitive::prim32) => TyClass::Prim32,
-            ir::TyKind::Primitive(ir::TyPrimitive::prim64) => TyClass::Prim64,
+            ir::TyKind::Primitive(ir::TyPrimitive::Prim8) => TyClass::Prim8,
+            ir::TyKind::Primitive(ir::TyPrimitive::Prim16) => TyClass::Prim16,
+            ir::TyKind::Primitive(ir::TyPrimitive::Prim32) => TyClass::Prim32,
+            ir::TyKind::Primitive(ir::TyPrimitive::Prim64) => TyClass::Prim64,
 
             ir::TyKind::Tuple(t) => TyClass::Tuple(t),
             ir::TyKind::Array(t) => TyClass::Array(t),

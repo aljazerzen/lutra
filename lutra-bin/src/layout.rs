@@ -123,10 +123,10 @@ pub fn compute(ty: &ir::Ty) -> Option<ir::TyLayout> {
 
         ir::TyKind::Primitive(prim) => {
             let head_size = match prim {
-                ir::TyPrimitive::prim8 => 8,
-                ir::TyPrimitive::prim16 => 16,
-                ir::TyPrimitive::prim32 => 32,
-                ir::TyPrimitive::prim64 => 64,
+                ir::TyPrimitive::Prim8 => 8,
+                ir::TyPrimitive::Prim16 => 16,
+                ir::TyPrimitive::Prim32 => 32,
+                ir::TyPrimitive::Prim64 => 64,
             };
             ir::TyLayout {
                 head_size,
