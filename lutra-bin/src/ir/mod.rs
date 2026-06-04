@@ -69,6 +69,11 @@ impl From<EnumTag> for ExprKind {
         ExprKind::EnumTag(boxed::Box::new(v))
     }
 }
+impl From<EnumUnwrap> for ExprKind {
+    fn from(value: EnumUnwrap) -> Self {
+        ExprKind::EnumUnwrap(boxed::Box::new(value))
+    }
+}
 
 impl PartialEq for Ty {
     fn eq(&self, other: &Self) -> bool {
@@ -222,6 +227,12 @@ impl Literal {
     }
     pub fn new_int64(value: i64) -> Self {
         Self::Prim64(value.to_le() as u64)
+    }
+}
+
+impl TupleLookup {
+    pub fn new(base: Expr, position: u16) -> Self {
+        Self { base, position }
     }
 }
 

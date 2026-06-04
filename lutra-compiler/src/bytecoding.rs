@@ -535,11 +535,16 @@ impl<'t> ByteCoder<'t> {
 
     /// Determines the snake_case suffix for a framed std type
     fn as_std_ty_suffix(&self, ty: &ir::Ty) -> String {
-        let ty = self.get_ty_mat_or_std(ty);
-        let ir::TyKind::Ident(path) = &ty.kind else {
-            panic!();
-        };
-        path.0.last().unwrap().to_ascii_lowercase()
+        match &self.get_ty_mat_or_std(ty).kind {
+            ir::TyKind::Ident(path) => path.0.last().unwrap().to_ascii_lowercase(),
+            ir::TyKind::Primitive(ir::TyPrimitive::Prim8) => "uint8".into(),
+            ir::TyKind::Primitive(ir::TyPrimitive::Prim16) => "uint16".into(),
+            ir::TyKind::Primitive(ir::TyPrimitive::Prim32) => "uint32".into(),
+            ir::TyKind::Primitive(ir::TyPrimitive::Prim64) => "uint64".into(),
+            _ => {
+                panic!("std specialization not supported for {}", ir::print_ty(ty));
+            }
+        }
     }
 
     /// Registers an external symbol and returns a `Pointer` ExprKind for it.

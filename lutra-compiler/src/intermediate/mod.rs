@@ -1,6 +1,7 @@
 pub mod externals;
 mod fold;
 mod inliner;
+mod ir_utils;
 pub mod layouter;
 pub mod lowerer;
 

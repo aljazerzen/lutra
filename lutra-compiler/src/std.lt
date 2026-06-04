@@ -108,14 +108,14 @@ module ops {
   ## Compare two values to determine if the first is less, equal, or greater than
   ## the second.
   external func cmp(T, T): Ordering
-  where T: AnyNumber | Bool | Text | Timestamp | Date | Time | Decimal
+  where T
 
   ## Result of a three-way comparison. Returned by [cmp].
   type Ordering: enum {less, equal, greater}
 
   ## Tests if values are equal. Used by `==` operator.
   func eq(left: T, right: T): Bool
-  where T: AnyNumber | Bool | Text | Timestamp | Date | Time | Decimal
+  where T
   -> (
     match cmp(left, right) {
       .equal => true,
@@ -125,7 +125,7 @@ module ops {
 
   ## Tests if values are not equal. Used by `!=` operator.
   func ne(left: T, right: T): Bool
-  where T: AnyNumber | Bool | Text | Timestamp | Date | Time | Decimal
+  where T
   -> (
     match cmp(left, right) {
       .equal => false,
@@ -135,7 +135,7 @@ module ops {
 
   ## Tests if left value is greater than the right. Used by `>` operator.
   func gt(left: T, right: T): Bool
-  where T: AnyNumber | Bool | Text | Timestamp | Date | Time | Decimal
+  where T
   -> (
     match cmp(left, right) {
       .greater => true,
@@ -145,7 +145,7 @@ module ops {
 
   ## Tests if left value is less than the right. Used by `<` operator.
   func lt(left: T, right: T): Bool
-  where T: AnyNumber | Bool | Text | Timestamp | Date | Time | Decimal
+  where T
   -> (
     match cmp(left, right) {
       .less => true,
@@ -155,7 +155,7 @@ module ops {
 
   ## Tests if left value is greater or equal to the right. Used by `>=` operator.
   func gte(left: T, right: T): Bool
-  where T: AnyNumber | Bool | Text | Timestamp | Date | Time | Decimal
+  where T
   -> (
     match cmp(left, right) {
       .less => false,
@@ -165,7 +165,7 @@ module ops {
 
   ## Tests if left value is less or equal to the right. Used by `<=` operator.
   func lte(left: T, right: T): Bool
-  where T: AnyNumber | Bool | Text | Timestamp | Date | Time | Decimal
+  where T
   -> (
     match cmp(left, right) {
       .greater => false,

@@ -84,11 +84,11 @@ fn lower_01() {
           switch,
           (
             (call
-              external.std::ops::eq: func (Int8, Int8) -> Bool,
+              external.std::ops::eq: func (Prim8, Prim8) -> Bool,
               (enum_tag
                 var.3: ops::Ordering
-              ): Int8,
-              1: Int8,
+              ): Prim8,
+              1: Prim8,
             ): Bool,
             1: Bool,
           ),
@@ -187,21 +187,21 @@ fn lower_02() {
         switch,
         (
           (call
-            external.std::ops::eq: func (Int8, Int8) -> Bool,
+            external.std::ops::eq: func (Prim8, Prim8) -> Bool,
             (enum_tag
               var.0: Status
-            ): Int8,
-            0: Int8,
+            ): Prim8,
+            0: Prim8,
           ): Bool,
           "open": Text,
         ),
         (
           (call
-            external.std::ops::eq: func (Int8, Int8) -> Bool,
+            external.std::ops::eq: func (Prim8, Prim8) -> Bool,
             (enum_tag
               var.0: Status
-            ): Int8,
-            1: Int8,
+            ): Prim8,
+            1: Prim8,
           ): Bool,
           "closed": Text,
         ),
@@ -296,21 +296,21 @@ fn lower_05() {
           switch,
           (
             (call
-              external.std::ops::eq: func (Int8, Int8) -> Bool,
+              external.std::ops::eq: func (Prim8, Prim8) -> Bool,
               (enum_tag
                 var.1: enum {none, some: Int32}
-              ): Int8,
-              1: Int8,
+              ): Prim8,
+              1: Prim8,
             ): Bool,
             1: dep::std::Bool,
           ),
           (
             (call
-              external.std::ops::eq: func (Int8, Int8) -> Bool,
+              external.std::ops::eq: func (Prim8, Prim8) -> Bool,
               (enum_tag
                 var.1: enum {none, some: Int32}
-              ): Int8,
-              0: Int8,
+              ): Prim8,
+              0: Prim8,
             ): Bool,
             0: dep::std::Bool,
           ),
@@ -327,4 +327,264 @@ fn lower_05() {
       ): dep::std::Bool
     ): func ({}) -> dep::std::Bool
     ");
+}
+
+#[test]
+fn lower_06_std_eq_tuple() {
+    assert_snapshot!(_test_compile_and_print(r#"
+    func main() -> {true, "aa"} == {true, "ab"}
+    "#), @r#"
+    type std::Bool = Prim8;
+    type std::Text = [Prim8];
+    type std::ops::Ordering = enum {less, equal, greater};
+    let main = (func 1 ->
+      let 1 = (func 3 ->
+        let 4 = (call
+          external.std::ops::cmp: func (Bool, Bool) -> ops::Ordering,
+          (tuple_lookup
+            fn.3+0: {Bool, Text}
+            0
+          ): Bool,
+          (tuple_lookup
+            fn.3+1: {Bool, Text}
+            0
+          ): Bool,
+        ): ops::Ordering;
+        (
+          switch,
+          (
+            (call
+              external.std::ops::eq: func (Prim8, Prim8) -> Bool,
+              (enum_tag
+                var.4: ops::Ordering
+              ): Prim8,
+              1: Prim8,
+            ): Bool,
+            let 3 = (call
+              external.std::ops::cmp: func (Text, Text) -> ops::Ordering,
+              (tuple_lookup
+                fn.3+0: {Bool, Text}
+                1
+              ): Text,
+              (tuple_lookup
+                fn.3+1: {Bool, Text}
+                1
+              ): Text,
+            ): ops::Ordering;
+            (
+              switch,
+              (
+                (call
+                  external.std::ops::eq: func (Prim8, Prim8) -> Bool,
+                  (enum_tag
+                    var.3: ops::Ordering
+                  ): Prim8,
+                  1: Prim8,
+                ): Bool,
+                (enum_variant 1): ops::Ordering,
+              ),
+              (
+                1: Bool,
+                var.3: ops::Ordering,
+              ),
+            ): ops::Ordering,
+          ),
+          (
+            1: Bool,
+            var.4: ops::Ordering,
+          ),
+        ): ops::Ordering
+      ): func ({Bool, Text}, {Bool, Text}) -> ops::Ordering;
+      let 0 = (func 2 ->
+        let 2 = (call
+          var.1: func ({Bool, Text}, {Bool, Text}) -> ops::Ordering,
+          fn.2+0: {Bool, Text},
+          fn.2+1: {Bool, Text},
+        ): ops::Ordering;
+        (
+          switch,
+          (
+            (call
+              external.std::ops::eq: func (Prim8, Prim8) -> Bool,
+              (enum_tag
+                var.2: ops::Ordering
+              ): Prim8,
+              1: Prim8,
+            ): Bool,
+            1: Bool,
+          ),
+          (
+            1: Bool,
+            0: Bool,
+          ),
+        ): Bool
+      ): func ({Bool, Text}, {Bool, Text}) -> Bool;
+      (call
+        (func 0 ->
+          (call
+            var.0: func ({Bool, Text}, {Bool, Text}) -> Bool,
+            (tuple
+              1: Bool,
+              "aa": Text,
+            ): {Bool, Text},
+            (tuple
+              1: Bool,
+              "ab": Text,
+            ): {Bool, Text},
+          ): Bool
+        ): func ({}) -> Bool,
+        fn.1+0: {},
+      ): Bool
+    ): func ({}) -> Bool
+    "#)
+}
+
+#[test]
+fn lower_07_std_eq_enum() {
+    assert_snapshot!(_test_compile_and_print(r#"
+    type Color: enum {red, green, blue}
+
+    func main() -> (.red: Color) == (.blue: Color)
+    "#), @"
+    type std::Bool = Prim8;
+    type std::ops::Ordering = enum {less, equal, greater};
+    type Color = enum {red, green, blue};
+    let main = (func 1 ->
+      let 1 = (func 3 ->
+        let 3 = (call
+          external.std::ops::cmp: func (Prim8, Prim8) -> ops::Ordering,
+          (enum_tag
+            fn.3+0: Color
+          ): Prim8,
+          (enum_tag
+            fn.3+1: Color
+          ): Prim8,
+        ): ops::Ordering;
+        (
+          switch,
+          (
+            (call
+              external.std::ops::eq: func (Prim8, Prim8) -> Bool,
+              (enum_tag
+                var.3: ops::Ordering
+              ): Prim8,
+              1: Prim8,
+            ): Bool,
+            (
+              switch,
+              (
+                1: Bool,
+                (enum_variant 1): ops::Ordering,
+              ),
+            ): ops::Ordering,
+          ),
+          (
+            1: Bool,
+            var.3: ops::Ordering,
+          ),
+        ): ops::Ordering
+      ): func (Color, Color) -> ops::Ordering;
+      let 0 = (func 2 ->
+        let 2 = (call
+          var.1: func (Color, Color) -> ops::Ordering,
+          fn.2+0: Color,
+          fn.2+1: Color,
+        ): ops::Ordering;
+        (
+          switch,
+          (
+            (call
+              external.std::ops::eq: func (Prim8, Prim8) -> Bool,
+              (enum_tag
+                var.2: ops::Ordering
+              ): Prim8,
+              1: Prim8,
+            ): Bool,
+            1: Bool,
+          ),
+          (
+            1: Bool,
+            0: Bool,
+          ),
+        ): Bool
+      ): func (Color, Color) -> Bool;
+      (call
+        (func 0 ->
+          (call
+            var.0: func (Color, Color) -> Bool,
+            (enum_variant 0): Color,
+            (enum_variant 2): Color,
+          ): Bool
+        ): func ({}) -> Bool,
+        fn.1+0: {},
+      ): Bool
+    ): func ({}) -> Bool
+    ")
+}
+
+#[test]
+fn lower_08_std_eq_single_variant_enum_payload() {
+    assert_snapshot!(_test_compile_and_print(r#"
+    type E: enum {only: Int64}
+
+    func main() -> (.only(1): E) == (.only(2): E)
+    "#), @"
+    type std::Bool = Prim8;
+    type std::Int64 = Prim64;
+    type std::ops::Ordering = enum {less, equal, greater};
+    type E = enum {only: Int64};
+    let main = (func 1 ->
+      let 1 = (func 3 ->
+        (call
+          external.std::ops::cmp: func (Int64, Int64) -> ops::Ordering,
+          (enum_unwrap
+            fn.3+0: E
+            0
+          ): Int64,
+          (enum_unwrap
+            fn.3+1: E
+            0
+          ): Int64,
+        ): ops::Ordering
+      ): func (E, E) -> ops::Ordering;
+      let 0 = (func 2 ->
+        let 2 = (call
+          var.1: func (E, E) -> ops::Ordering,
+          fn.2+0: E,
+          fn.2+1: E,
+        ): ops::Ordering;
+        (
+          switch,
+          (
+            (call
+              external.std::ops::eq: func (Prim8, Prim8) -> Bool,
+              (enum_tag
+                var.2: ops::Ordering
+              ): Prim8,
+              1: Prim8,
+            ): Bool,
+            1: Bool,
+          ),
+          (
+            1: Bool,
+            0: Bool,
+          ),
+        ): Bool
+      ): func (E, E) -> Bool;
+      (call
+        (func 0 ->
+          (call
+            var.0: func (E, E) -> Bool,
+            (enum_variant 0
+              1: Int64
+            ): E,
+            (enum_variant 0
+              2: Int64
+            ): E,
+          ): Bool
+        ): func ({}) -> Bool,
+        fn.1+0: {},
+      ): Bool
+    ): func ({}) -> Bool
+    ")
 }

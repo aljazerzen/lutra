@@ -1746,6 +1746,94 @@ fn cmp_00() {
     ");
 }
 
+#[test]
+fn cmp_tuple_sql() {
+    insta::assert_snapshot!(_run(
+        r#"func main() -> cmp({1: Int32, "a"}, {1: Int32, "b"})"#,
+        lutra_bin::Value::unit(),
+    ).0, @"
+    SELECT
+      r8._t
+    FROM
+      (
+        SELECT
+          1::int4 AS _0, 'b'::text AS _1) AS r0,
+      LATERAL (
+        SELECT
+          1::int4 AS _0, 'a'::text AS _1) AS r1,
+      LATERAL (
+        WITH
+        r2 AS (
+          SELECT
+            (
+              SELECT
+                CASE
+                  WHEN a < b THEN 0
+                  WHEN a > b THEN 2
+                  ELSE 1
+                END::int2
+              FROM
+                (
+                  VALUES
+                    (r1._0, r0._0)) t(a, b)
+            ) AS _t
+        )
+        SELECT
+          CASE
+            WHEN (
+              (
+                SELECT
+                  r3._t AS value
+                FROM
+                  r2 AS r3
+              ) = 1::int2
+            ) THEN (
+              WITH
+              r4 AS (
+                SELECT
+                  (
+                    SELECT
+                      CASE
+                        WHEN a < b THEN 0
+                        WHEN a > b THEN 2
+                        ELSE 1
+                      END::int2
+                    FROM
+                      (
+                        VALUES
+                          (r1._1, r0._1)) t(a, b)
+                  ) AS _t
+              )
+              SELECT
+                CASE
+                  WHEN (
+                    (
+                      SELECT
+                        r5._t AS value
+                      FROM
+                        r4 AS r5
+                    ) = 1::int2
+                  ) THEN 1::int2
+                  ELSE (
+                    SELECT
+                      r6._t
+                    FROM
+                      r4 AS r6
+                  )
+                END AS _t
+            )
+            ELSE (
+              SELECT
+                r7._t
+              FROM
+                r2 AS r7
+            )
+          END AS _t
+      ) AS r8
+    "
+    );
+}
+
 #[tokio::test(flavor = "current_thread")]
 async fn sql_from_00() {
     let mut client = _get_test_db_client().await.unwrap();

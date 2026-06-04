@@ -181,6 +181,15 @@ impl fold::IrFold for FuncInliner {
             }
         }
 
+        // detect cases:
+        // (switch
+        //    (.anything., x)
+        // )
+        if branches.len() == 1 {
+            let value = branches.into_iter().next().unwrap().value;
+            return self.fold_expr(value);
+        }
+
         fold::fold_switch(self, branches, ty)
     }
 }

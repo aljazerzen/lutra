@@ -108,6 +108,63 @@ func main() -> {
   false,
 }
 
+# === cmp_tuple_00
+func main() -> {
+  cmp({1: Int32, "a"}, {1: Int32, "b"}),
+  cmp({1: Int32, "a"}, {1: Int32, "a"}),
+  cmp({2: Int32, "a"}, {1: Int32, "z"}),
+}
+# >
+{
+  less,
+  equal,
+  greater,
+}
+
+# === cmp_array_00
+func main() -> {
+  cmp([1, 2]: [Int32], [1, 3]: [Int32]),
+  cmp([1, 2]: [Int32], [1, 2]: [Int32]),
+  cmp([1, 2, 0]: [Int32], [1, 2]: [Int32]),
+}
+# >
+{
+  less,
+  equal,
+  greater,
+}
+
+# === cmp_enum_00
+type Status: enum {
+  open,
+  closed: Int32,
+}
+
+func main() -> {
+  cmp(.open: Status, .closed(0): Status),
+  cmp(.closed(2): Status, .closed(2): Status),
+  cmp(.closed(3): Status, .closed(2): Status),
+}
+# >
+{
+  less,
+  equal,
+  greater,
+}
+
+# === cmp_nested_00
+func main() -> {
+  cmp([{1: Int32, "a"}], [{1: Int32, "b"}]),
+  cmp([{1: Int32, "a"}], [{1: Int32, "a"}]),
+  cmp([{2: Int32, "a"}], [{1: Int32, "z"}]),
+}
+# >
+{
+  less,
+  equal,
+  greater,
+}
+
 # === complex_00
 
 const x: [Int16] = [
@@ -1618,6 +1675,69 @@ func main() -> {"aa" == "b", "aa" == "aa"}
   true,
 }
 
+
+# === std_eq_04
+func main() -> {true, "aa"} == {true, "ab"}
+# >
+false
+
+# === std_eq_05
+func main() -> {true, "aa"} == {true, "aa"}
+# >
+true
+
+# === std_eq_06
+func main() -> [1: Int32, 2, 3] == [1, 2, 6]
+# >
+false
+
+# === std_eq_07
+func main() -> [1: Int32, 2, 6] == [1, 2, 6]
+# >
+true
+
+# === std_eq_08
+func main() -> (
+  {a = [1: Int32, 2, 6], b = [{true, "t"}, {false, "f"}]}
+  == {a = [1: Int32, 2, 6], b = [{true, "t"}, {false, "f"}]}
+)
+# >
+true
+
+# === std_eq_09
+type Color: enum {red, green, blue}
+func main() -> (.red: Color) == (.red: Color)
+# >
+true
+
+# === std_eq_10
+type Color: enum {red, green, blue}
+func main() -> (.red: Color) == (.blue: Color)
+# >
+false
+
+# === std_eq_11
+type Shape: enum {circle: Float64, rect: {Float64, Float64}}
+func main() -> (.circle(3.0): Shape) == (.circle(3.0): Shape)
+# >
+true
+
+# === std_eq_12
+type Shape: enum {circle: Float64, rect: {Float64, Float64}}
+func main() -> (.circle(3.0): Shape) == (.rect({1.0, 2.0}): Shape)
+# >
+false
+
+# === std_eq_13
+type Color: enum {red, green, blue}
+func main() -> (.red: Color) != (.blue: Color)
+# >
+true
+
+# === std_eq_14
+func main() -> [1: Int32, 2, 3] == [1, 2]
+# >
+false
 
 # === std_ne_00
 func main() -> {

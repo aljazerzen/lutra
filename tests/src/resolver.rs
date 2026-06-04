@@ -2450,3 +2450,16 @@ fn anno_05_non_const_arg() {
     ───╯
     ");
 }
+
+#[test]
+fn types_56_std_eq_composites() {
+    insta::assert_snapshot!(_test_ty(r#"
+        type Color: enum {red, green, blue}
+
+        func main() -> {
+          {true, "aa"} == {true, "aa"},
+          [1: Int32, 2, 3] == [1, 2, 3],
+          (.red: Color) == (.green: Color),
+        }
+    "#), @"{Bool, Bool, Bool}");
+}

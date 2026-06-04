@@ -121,24 +121,24 @@ fn inline_03() {
         ): OptText,
         (enum_variant 0): OptText,
         (call
-          external.std::ops::eq: func (Int8, Int8) -> Bool,
+          external.std::ops::eq: func (Prim8, Prim8) -> Bool,
           (enum_tag
             (enum_variant 1
               "hello": Text
             ): enum {none, some: Text}
-          ): Int8,
-          1: Int8,
+          ): Prim8,
+          1: Prim8,
         ): Bool,
         (call
           external.std::ops::not: func (Bool) -> Bool,
           (call
-            external.std::ops::eq: func (Int8, Int8) -> Bool,
+            external.std::ops::eq: func (Prim8, Prim8) -> Bool,
             (enum_tag
               (enum_variant 1
                 "hello": Text
               ): enum {none, some: Text}
-            ): Int8,
-            1: Int8,
+            ): Prim8,
+            1: Prim8,
           ): Bool,
         ): Bool,
       ): {OptText, OptText, Bool, Bool}

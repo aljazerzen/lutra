@@ -1,3 +1,5 @@
+mod std_cmp;
+
 use std::borrow::Cow;
 use std::collections::{HashMap, VecDeque};
 
@@ -6,6 +8,7 @@ use itertools::Itertools;
 use lutra_bin::ir;
 
 use crate::diagnostic::{Diagnostic, WithErrorInfo};
+use crate::intermediate::ir_utils::new_call_bin_bool;
 use crate::pr;
 use crate::resolver::NS_STD;
 use crate::utils::{self, IdGenerator};
@@ -15,7 +18,7 @@ pub fn lower_expr(project: &Project, main_pr: &pr::Expr) -> ir::Program {
     let mut lowerer = Lowerer::new(&project.root_module);
 
     let (input_ty, packed) = get_entry_point_input(main_pr);
-    lowerer.program_input_ty = Some((lowerer.lower_ty(input_ty), packed));
+    lowerer.program_input_ty = Some((lowerer.lower_ty(&input_ty), packed));
     tracing::debug!(
         "program_input_ty = {}",
         ir::print_ty(&lowerer.program_input_ty.as_ref().unwrap().0)
@@ -100,39 +103,20 @@ impl<'a> Lowerer<'a> {
         }
     }
 
-    /// Lowers a reference to external functions. If target is not external, returns None.
-    #[tracing::instrument(name = "leed", skip_all)]
-    fn lower_ref_to_external(&mut self, path: &pr::Path) -> Result<Option<ir::ExprKind>> {
-        if path.as_steps() == [NS_STD, "convert", "default"] {
-            // special case: evaluate std::convert::default in lowerer
-            return Ok(None);
-        }
-
-        // validate that it is an external definition
-        let def = self.root_module.get(path);
-        let def = def.unwrap_or_else(|| panic!("{path} does not exist"));
-        if !def.kind.is_external() {
-            return Ok(None);
-        }
-
-        let external_symbol_id = path.iter().join("::");
-        Ok(Some(ir::ExprKind::Pointer(ir::Pointer::External(
-            ir::ExternalPtr {
-                id: external_symbol_id,
-            },
-        ))))
-    }
-
     #[tracing::instrument(name = "led", skip_all, fields(p = path.to_string()))]
     fn lower_expr_def(&mut self, path: &pr::Path, ty_args: Vec<pr::Ty>) -> Result<ir::Expr> {
-        let def = self.root_module.get(path);
-        let def = def.unwrap_or_else(|| panic!("{path} does not exist"));
-
+        // special cases
         if path.as_steps() == [NS_STD, "convert", "default"] {
-            // special case: evaluate std::convert::default in lowerer
-            let ty_arg = ty_args.into_iter().next().unwrap();
+            let [ty_arg] = ty_args.try_into().unwrap();
             return Ok(self.impl_std_default(ty_arg));
         }
+        if path.as_steps() == [NS_STD, "ops", "cmp"] && self.std_cmp_expands(&ty_args[0]) {
+            let [ty_arg] = ty_args.try_into().unwrap();
+            return self.impl_std_cmp(ty_arg);
+        }
+
+        let def = self.root_module.get(path);
+        let def = def.unwrap_or_else(|| panic!("{path} does not exist"));
 
         if let pr::DefKind::External(ext_ty) = &def.kind {
             // External function: return a pointer to the external symbol
@@ -140,7 +124,7 @@ impl<'a> Lowerer<'a> {
             let kind = ir::ExprKind::Pointer(ir::Pointer::External(ir::ExternalPtr {
                 id: external_symbol_id,
             }));
-            let ty = self.lower_ty(ext_ty.clone());
+            let ty = self.lower_ty(ext_ty);
             return Ok(ir::Expr { kind, ty });
         }
 
@@ -223,7 +207,7 @@ impl<'a> Lowerer<'a> {
                     // this is un-framing (i.e. noop)
                     return Ok(ir::Expr {
                         kind: self.lower_expr(base)?.kind,
-                        ty: self.lower_ty(expr.ty.as_deref().cloned().unwrap()),
+                        ty: self.lower_ty(expr.ty.as_deref().unwrap()),
                     });
                 }
 
@@ -306,13 +290,13 @@ impl<'a> Lowerer<'a> {
                                 if input_ty.is_some_and(|(_, packed)| *packed) {
                                     // if original function params have been packed into a tuple,
                                     // we also need to also inject tuple lookup.
-                                    ir::ExprKind::TupleLookup(Box::new(ir::TupleLookup {
-                                        base: ir::Expr {
+                                    ir::ExprKind::TupleLookup(Box::new(ir::TupleLookup::new(
+                                        ir::Expr {
                                             kind: param_ref,
                                             ty: self.program_input_ty.clone().unwrap().0,
                                         },
-                                        position: param_position as u16,
-                                    }))
+                                        param_position as u16,
+                                    )))
                                 } else {
                                     param_ref
                                 }
@@ -362,7 +346,7 @@ impl<'a> Lowerer<'a> {
                     switch_branches.push(ir::SwitchBranch { condition, value })
                 }
 
-                let ty = self.lower_ty(ty.clone());
+                let ty = self.lower_ty(ty);
                 let switch = ir::Expr {
                     kind: ir::ExprKind::Switch(switch_branches),
                     ty: ty.clone(),
@@ -429,13 +413,14 @@ impl<'a> Lowerer<'a> {
         };
         Ok(ir::Expr {
             kind,
-            ty: self.lower_ty(expr.ty.as_deref().cloned().unwrap()),
+            ty: self.lower_ty(expr.ty.as_deref().unwrap()),
         })
     }
 
+    #[tracing::instrument(name = "lr", skip_all)]
     fn lower_ref_global(&mut self, ref_: &pr::Path, ty_args: &[pr::Ty]) -> Result<ir::ExprKind> {
-        // if native ref, return ir::Ptr::Native
-        if let Some(ptr) = self.lower_ref_to_external(ref_)? {
+        // if external ref, return ir::Ptr::External
+        if let Some(ptr) = self.try_lower_ref_external(ref_, ty_args) {
             return Ok(ptr);
         }
 
@@ -451,6 +436,35 @@ impl<'a> Lowerer<'a> {
             }
         };
         Ok(ir::ExprKind::Pointer(ir::Pointer::Binding(binding_id)))
+    }
+
+    /// Lowers a reference to external functions. If target is not external, returns None.
+    fn try_lower_ref_external(
+        &mut self,
+        path: &pr::Path,
+        ty_args: &[pr::Ty],
+    ) -> Option<ir::ExprKind> {
+        // special cases: don't emit ExternalPtr for things that get expanded into actual functions
+        if path.as_steps() == [NS_STD, "convert", "default"] {
+            return None;
+        }
+        if path.as_steps() == [NS_STD, "ops", "cmp"] && self.std_cmp_expands(&ty_args[0]) {
+            return None;
+        }
+
+        // validate that it is an external definition
+        let def = self.root_module.get(path);
+        let def = def.unwrap_or_else(|| panic!("{path} does not exist"));
+        if !def.kind.is_external() {
+            return None;
+        }
+
+        let external_symbol_id = path.iter().join("::");
+        Some(ir::ExprKind::Pointer(ir::Pointer::External(
+            ir::ExternalPtr {
+                id: external_symbol_id,
+            },
+        )))
     }
 
     fn lower_literal(&mut self, lit: &pr::Literal, ty: &pr::Ty) -> Result<ir::Literal> {
@@ -517,7 +531,12 @@ impl<'a> Lowerer<'a> {
             pr::PatternKind::Enum(variant_name, inner) => {
                 let tag = self.get_pattern_enum_eq_tag(subject, pattern, variant_name);
 
-                let mut expr = self.new_enum_tag_eq(subject.clone(), tag);
+                let mut expr = if let Some(enum_tag) = self.new_enum_tag(subject.clone()) {
+                    let tag_lit = self.new_prim(tag, enum_tag.ty.clone());
+                    new_call_bin_bool("std::ops::eq", enum_tag, tag_lit)
+                } else {
+                    ir::Expr::new_lit_bool(true)
+                };
 
                 if let Some(inner) = inner {
                     let subject_ty = self.get_ty_mat(subject.ty.clone());
@@ -535,7 +554,7 @@ impl<'a> Lowerer<'a> {
                     let inner_cond = self.lower_pattern_to_condition(&inner_ref, inner)?;
 
                     if let Some(inner_cond) = inner_cond {
-                        expr = new_bool_bin_func("std::ops::and", expr, inner_cond);
+                        expr = new_call_bin_bool("std::ops::and", expr, inner_cond);
                     }
                 }
                 Ok(Some(expr))
@@ -556,7 +575,7 @@ impl<'a> Lowerer<'a> {
                     ty: subject_ty,
                 };
 
-                Ok(Some(new_bool_bin_func(
+                Ok(Some(new_call_bin_bool(
                     "std::ops::eq",
                     subject.clone(),
                     lit,
@@ -575,7 +594,7 @@ impl<'a> Lowerer<'a> {
                     return Ok(None);
                 };
                 for c in conditions {
-                    res = new_bool_bin_func("std::ops::or", c, res);
+                    res = new_call_bin_bool("std::ops::or", c, res);
                 }
                 Ok(Some(res))
             }
@@ -638,7 +657,11 @@ impl<'a> Lowerer<'a> {
             }
         }
         // same for remaining bindings that come from project dependencies
-        for (id, expr) in bindings.into_values().flatten() {
+        // sort by id to make iteration deterministic (the source HashMap has
+        // non-deterministic ordering)
+        let mut remaining: Vec<(u32, ir::Expr)> = bindings.into_values().flatten().collect();
+        remaining.sort_by_key(|(id, _)| *id);
+        for (id, expr) in remaining {
             let ty = main.ty.clone();
             main = ir::Expr::new(ir::Binding { id, expr, main }, ty);
         }
@@ -654,15 +677,15 @@ impl<'a> Lowerer<'a> {
     }
 
     #[tracing::instrument(name = "lt", skip_all)]
-    fn lower_ty(&mut self, ty: pr::Ty) -> ir::Ty {
-        tracing::trace!("lower ty: {}", crate::printer::print_ty(&ty));
+    fn lower_ty(&mut self, ty: &pr::Ty) -> ir::Ty {
+        tracing::trace!("lower ty: {}", crate::printer::print_ty(ty));
 
-        if let Some(target) = ty.target {
+        if let Some(target) = &ty.target {
             match target {
                 pr::Ref::Global(fq) => {
                     self.type_defs_queue.push_back(fq.clone());
 
-                    let def = self.root_module.get(&fq).unwrap();
+                    let def = self.root_module.get(fq).unwrap();
                     let ty_def = def
                         .kind
                         .as_ty()
@@ -670,18 +693,18 @@ impl<'a> Lowerer<'a> {
 
                     tracing::debug!("lower ty ident: {}", fq);
                     return ir::Ty {
-                        kind: ir::TyKind::Ident(ir::Path(fq.into_iter().collect_vec())),
+                        kind: ir::TyKind::Ident(ir::Path(fq.iter().cloned().collect_vec())),
                         layout: None,
-                        name: ty.name,
+                        name: ty.name.clone(),
                         variants_recursive: ty_def.ty.variants_force_ptr.clone(),
                     };
                 }
                 pr::Ref::Local { scope, offset } => {
-                    let scope = self.scopes.iter().find(|s| s.id == scope).unwrap();
+                    let scope = self.scopes.iter().find(|s| s.id == *scope).unwrap();
 
                     match &scope.kind {
                         ScopeKind::TyLocal { types } => {
-                            return types[offset].clone();
+                            return types[*offset].clone();
                         }
 
                         ScopeKind::Function { .. } | ScopeKind::Local { .. } => unreachable!(),
@@ -691,7 +714,7 @@ impl<'a> Lowerer<'a> {
         }
 
         // this part is direct no-op mapping
-        let kind = match ty.kind {
+        let kind = match &ty.kind {
             pr::TyKind::Primitive(primitive) => {
                 let primitive = match primitive {
                     pr::TyPrimitive::prim8 => ir::TyPrimitive::Prim8,
@@ -706,7 +729,7 @@ impl<'a> Lowerer<'a> {
 
                 for f in fields {
                     let name = f.name.clone();
-                    let ty = self.lower_ty(f.ty);
+                    let ty = self.lower_ty(&f.ty);
                     if f.unpack {
                         let ir::TyKind::Tuple(fields) = self.get_ty_mat(ty).kind else {
                             panic!("expected a tuple type in unpack");
@@ -719,13 +742,13 @@ impl<'a> Lowerer<'a> {
 
                 ir::TyKind::Tuple(r)
             }
-            pr::TyKind::Array(items_ty) => ir::TyKind::Array(Box::new(self.lower_ty(*items_ty))),
+            pr::TyKind::Array(items_ty) => ir::TyKind::Array(Box::new(self.lower_ty(items_ty))),
             pr::TyKind::Enum(variants) => ir::TyKind::Enum(
                 variants
-                    .into_iter()
+                    .iter()
                     .map(|v| ir::TyEnumVariant {
-                        name: v.name,
-                        ty: self.lower_ty(v.ty),
+                        name: v.name.clone(),
+                        ty: self.lower_ty(&v.ty),
                     })
                     .collect(),
             ),
@@ -733,13 +756,13 @@ impl<'a> Lowerer<'a> {
             pr::TyKind::Func(func) => ir::TyKind::Function(Box::new(ir::TyFunction {
                 params: func
                     .params
-                    .into_iter()
-                    .map(|p| self.lower_ty(p.ty.unwrap()))
+                    .iter()
+                    .map(|p| self.lower_ty(p.ty.as_ref().unwrap()))
                     .collect(),
-                body: self.lower_ty(*func.body.clone().unwrap()),
+                body: self.lower_ty(func.body.as_ref().unwrap()),
             })),
             pr::TyKind::TupleComprehension(comp) => {
-                let tuple = self.lower_ty(*comp.tuple);
+                let tuple = self.lower_ty(&comp.tuple);
                 let ir::TyKind::Tuple(fields) = self.get_ty_mat(tuple).kind else {
                     panic!("expected a tuple type in unpack");
                 };
@@ -761,7 +784,7 @@ impl<'a> Lowerer<'a> {
                     *types = vec![field.ty];
 
                     // fold (and replace references)
-                    let f_ty = self.lower_ty(*comp.body_ty.clone());
+                    let f_ty = self.lower_ty(&comp.body_ty);
 
                     r.push(ir::TyTupleField {
                         name: if comp.body_name.is_some() {
@@ -781,9 +804,9 @@ impl<'a> Lowerer<'a> {
 
         ir::Ty {
             kind,
-            name: ty.name,
+            name: ty.name.clone(),
             layout: None,
-            variants_recursive: ty.variants_force_ptr,
+            variants_recursive: ty.variants_force_ptr.clone(),
         }
     }
 
@@ -800,22 +823,27 @@ impl<'a> Lowerer<'a> {
         ty
     }
 
-    /// Returns material type and the named of it's inner-most frame.
-    fn get_ty_mat_pr(&self, ty: &'a pr::Ty) -> (&'a pr::Ty, Option<&'a pr::Path>) {
-        let pr::TyKind::Ident(_) = &ty.kind else {
-            return (ty, None);
-        };
-        let Some(pr::Ref::Global(target_fq)) = &ty.target else {
-            panic!();
-        };
-        let def = self.root_module.get(target_fq).unwrap();
-        let def = def.kind.as_ty().unwrap();
+    /// Returns material type and the name of its inner-most frame.
+    fn get_ty_mat_pr(&self, mut ty: &'a pr::Ty) -> (&'a pr::Ty, Option<&'a pr::Path>) {
+        let mut frame_name = None;
+        while let pr::TyKind::Ident(_) = &ty.kind {
+            let Some(pr::Ref::Global(target_fq)) = &ty.target else {
+                panic!();
+            };
+            let def = self.root_module.get(target_fq).unwrap();
+            let def = def.kind.as_ty().unwrap();
 
-        let (ty, frame_name) = self.get_ty_mat_pr(&def.ty);
-
-        let frame_name = frame_name.or(if def.is_framed { Some(target_fq) } else { None });
-
+            ty = &def.ty;
+            if def.is_framed {
+                frame_name = Some(target_fq);
+            }
+        }
         (ty, frame_name)
+    }
+
+    fn is_ty_unit_pr(&self, ty: &pr::Ty) -> bool {
+        let (ty, _) = self.get_ty_mat_pr(ty);
+        matches!(&ty.kind, pr::TyKind::Tuple(fields) if fields.is_empty())
     }
 
     fn tuple_iter_fields(
@@ -867,9 +895,9 @@ impl<'a> Lowerer<'a> {
         }
 
         let def = self.root_module.get(&path).unwrap();
-        let def = def.kind.as_ty().unwrap().clone();
+        let def = def.kind.as_ty().unwrap();
 
-        let ty = self.lower_ty(def.ty);
+        let ty = self.lower_ty(&def.ty);
 
         self.type_defs.insert(path, ty);
     }
@@ -992,7 +1020,7 @@ impl<'a> Lowerer<'a> {
     }
 
     fn impl_std_default(&mut self, ty: pr::Ty) -> ir::Expr {
-        let ty = self.lower_ty(ty);
+        let ty = self.lower_ty(&ty);
         let body = self.construct_default_for_ty(ty.clone());
 
         ir::Expr {
@@ -1065,50 +1093,35 @@ impl<'a> Lowerer<'a> {
         }
     }
 
-    /// Builds `std::ops::eq(enum_tag(subject), tag)`, which tests whether
-    /// `subject` (an enum) is the variant with index `tag`.
-    fn new_enum_tag_eq(&mut self, subject: ir::Expr, tag: usize) -> ir::Expr {
+    /// Constructs `enum_tag(subject)` and converts a tag to an appropriate ir::Literal.
+    fn new_enum_tag(&mut self, subject: ir::Expr) -> Option<ir::Expr> {
         let subject_ty = self.get_ty_mat(subject.ty.clone());
         let variants = subject_ty.kind.as_enum().unwrap();
         let tag_bytes = lutra_bin::layout::enum_tag_size(variants.len()).div_ceil(8);
 
-        let (tag_ty_name, tag_lit) = match tag_bytes {
-            0 => return ir::Expr::new_lit_bool(true),
-            1 => ("Int8", ir::Literal::Prim8(tag as u8)),
-            2 => ("Int16", ir::Literal::Prim16(tag as u16)),
-            3 | 4 => ("Int32", ir::Literal::Prim32(tag as u32)),
-            _ => ("Int64", ir::Literal::Prim64(tag as u64)),
+        let tag_ty = match tag_bytes {
+            0 => return None,
+            1 => ir::TyPrimitive::Prim8,
+            2 => ir::TyPrimitive::Prim16,
+            3 | 4 => ir::TyPrimitive::Prim32,
+            _ => ir::TyPrimitive::Prim64,
         };
-        let tag_ty = ir::Ty::new_ident(&["std", tag_ty_name]);
-
-        let enum_tag = ir::Expr {
-            kind: ir::ExprKind::EnumTag(Box::new(ir::EnumTag { subject })),
-            ty: tag_ty.clone(),
-        };
-        let tag_lit = ir::Expr {
-            kind: ir::ExprKind::Literal(tag_lit),
-            ty: tag_ty,
-        };
-
-        new_bool_bin_func("std::ops::eq", enum_tag, tag_lit)
+        Some(ir::Expr::new(
+            ir::ExprKind::EnumTag(Box::new(ir::EnumTag { subject })),
+            ir::Ty::new(tag_ty),
+        ))
     }
-}
 
-fn new_bool_bin_func(func_id: &str, left: ir::Expr, right: ir::Expr) -> ir::Expr {
-    ir::Expr {
-        kind: ir::ExprKind::Call(Box::new(ir::Call {
-            function: ir::Expr {
-                kind: ir::ExprKind::Pointer(ir::Pointer::External(ir::ExternalPtr {
-                    id: func_id.to_string(),
-                })),
-                ty: ir::Ty::new(ir::TyFunction {
-                    params: vec![left.ty.clone(), right.ty.clone()],
-                    body: ir::Ty::bool(),
-                }),
-            },
-            args: vec![left, right],
-        })),
-        ty: ir::Ty::bool(),
+    /// Converts a usize to a ir::Literal
+    fn new_prim(&mut self, value: usize, ty: ir::Ty) -> ir::Expr {
+        let lit = match &ty.kind {
+            ir::TyKind::Primitive(ir::TyPrimitive::Prim8) => ir::Literal::Prim8(value as u8),
+            ir::TyKind::Primitive(ir::TyPrimitive::Prim16) => ir::Literal::Prim16(value as u16),
+            ir::TyKind::Primitive(ir::TyPrimitive::Prim32) => ir::Literal::Prim32(value as u32),
+            ir::TyKind::Primitive(ir::TyPrimitive::Prim64) => ir::Literal::Prim64(value as u64),
+            _ => panic!(),
+        };
+        ir::Expr::new(ir::ExprKind::Literal(lit), ty)
     }
 }
 
@@ -1129,13 +1142,13 @@ pub(crate) fn lower_type_defs(project: &Project) -> ir::Module {
 
             pr::DefKind::Expr(expr) => {
                 let expr = &expr.value;
-                let ty = lowerer.lower_ty(expr.ty.as_deref().cloned().unwrap());
+                let ty = lowerer.lower_ty(expr.ty.as_deref().unwrap());
 
                 module.insert(name.as_steps(), ir::Decl::Var(ty));
             }
 
             pr::DefKind::External(ext_ty) => {
-                let ty = lowerer.lower_ty(ext_ty.clone());
+                let ty = lowerer.lower_ty(ext_ty);
                 module.insert(name.as_steps(), ir::Decl::Var(ty));
             }
 

@@ -1187,6 +1187,105 @@ fn equality() {
     ");
 }
 
+#[test]
+fn cmp_tuple_sql() {
+    insta::assert_snapshot!(_compile(
+        r#"func main() -> cmp({1: Int32, "a"}, {1: Int32, "b"})"#,
+    ).unwrap().2, @"
+    SELECT
+      CASE
+        r9._t::int2
+        WHEN 0 THEN union_value(less := NULL)::
+        UNION
+    (less BOOL, equal BOOL, greater BOOL)
+        WHEN 1 THEN union_value(equal := NULL)
+        WHEN 2 THEN union_value(greater := NULL)
+      END AS value
+    FROM
+      (
+        SELECT
+          r8._t
+        FROM
+          (
+            SELECT
+              1::INT4 AS _0, 'b'::text AS _1) AS r0,
+          LATERAL (
+            SELECT
+              1::INT4 AS _0, 'a'::text AS _1) AS r1,
+          LATERAL (
+            WITH
+            r2 AS (
+              SELECT
+                (
+                  SELECT
+                    CASE
+                      WHEN a < b THEN 0
+                      WHEN a > b THEN 2
+                      ELSE 1
+                    END::int2
+                  FROM
+                    (
+                      VALUES
+                        (r1._0, r0._0)) t(a, b)
+                ) AS _t
+            )
+            SELECT
+              CASE
+                WHEN (
+                  (
+                    SELECT
+                      r3._t AS value
+                    FROM
+                      r2 AS r3
+                  ) = 1::INT1
+                ) THEN (
+                  WITH
+                  r4 AS (
+                    SELECT
+                      (
+                        SELECT
+                          CASE
+                            WHEN a < b THEN 0
+                            WHEN a > b THEN 2
+                            ELSE 1
+                          END::int2
+                        FROM
+                          (
+                            VALUES
+                              (r1._1, r0._1)) t(a, b)
+                      ) AS _t
+                  )
+                  SELECT
+                    CASE
+                      WHEN (
+                        (
+                          SELECT
+                            r5._t AS value
+                          FROM
+                            r4 AS r5
+                        ) = 1::INT1
+                      ) THEN 1::INT2
+                      ELSE (
+                        SELECT
+                          r6._t
+                        FROM
+                          r4 AS r6
+                      )
+                    END AS _t
+                )
+                ELSE (
+                  SELECT
+                    r7._t
+                  FROM
+                    r2 AS r7
+                )
+              END AS _t
+          ) AS r8
+      ) AS r9
+    "
+    );
+}
+
 // ============================================================================
 // Table Representation Tests (sql::from and sql::insert with external tables)
 // ============================================================================
