@@ -517,13 +517,7 @@ impl<'a> Lowerer<'a> {
             pr::PatternKind::Enum(variant_name, inner) => {
                 let tag = self.get_pattern_enum_eq_tag(subject, pattern, variant_name);
 
-                let mut expr = ir::Expr {
-                    kind: ir::ExprKind::EnumEq(Box::new(ir::EnumEq {
-                        subject: subject.clone(),
-                        tag: tag as u64,
-                    })),
-                    ty: ir::Ty::bool(),
-                };
+                let mut expr = self.new_enum_tag_eq(subject.clone(), tag);
 
                 if let Some(inner) = inner {
                     let subject_ty = self.get_ty_mat(subject.ty.clone());
@@ -1070,7 +1064,36 @@ impl<'a> Lowerer<'a> {
             tag
         }
     }
+
+    /// Builds `std::ops::eq(enum_tag(subject), tag)`, which tests whether
+    /// `subject` (an enum) is the variant with index `tag`.
+    fn new_enum_tag_eq(&mut self, subject: ir::Expr, tag: usize) -> ir::Expr {
+        let subject_ty = self.get_ty_mat(subject.ty.clone());
+        let variants = subject_ty.kind.as_enum().unwrap();
+        let tag_bytes = lutra_bin::layout::enum_tag_size(variants.len()).div_ceil(8);
+
+        let (tag_ty_name, tag_lit) = match tag_bytes {
+            0 => return ir::Expr::new_lit_bool(true),
+            1 => ("Int8", ir::Literal::Prim8(tag as u8)),
+            2 => ("Int16", ir::Literal::Prim16(tag as u16)),
+            3 | 4 => ("Int32", ir::Literal::Prim32(tag as u32)),
+            _ => ("Int64", ir::Literal::Prim64(tag as u64)),
+        };
+        let tag_ty = ir::Ty::new_ident(&["std", tag_ty_name]);
+
+        let enum_tag = ir::Expr {
+            kind: ir::ExprKind::EnumTag(Box::new(ir::EnumTag { subject })),
+            ty: tag_ty.clone(),
+        };
+        let tag_lit = ir::Expr {
+            kind: ir::ExprKind::Literal(tag_lit),
+            ty: tag_ty,
+        };
+
+        new_bool_bin_func("std::ops::eq", enum_tag, tag_lit)
+    }
 }
+
 fn new_bool_bin_func(func_id: &str, left: ir::Expr, right: ir::Expr) -> ir::Expr {
     ir::Expr {
         kind: ir::ExprKind::Call(Box::new(ir::Call {

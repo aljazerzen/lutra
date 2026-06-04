@@ -2302,8 +2302,8 @@ fn opt_00() {
     func main() -> {
       .some("hello"): enum {none, some: Text},
       .none: enum {none, some: Text},
-      std::option::is_some(.some("hello")),
-      std::option::is_none(.some("hello")),
+      is_some(.some("hello")),
+      is_none(.some("hello")),
     }
     "#, lutra_bin::Value::unit())), @r#"
     SELECT
@@ -2327,7 +2327,7 @@ fn opt_01() {
     type OptText: enum {none, some: Text}
     func main() -> (
       [.some("hello"), .none, .some("world")]: [OptText]
-      | std::map(x -> match x {
+      | map(x -> match x {
         .some(x) => x,
         .none => "none",
       })

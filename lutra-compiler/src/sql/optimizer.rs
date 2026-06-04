@@ -14,6 +14,7 @@ struct Optimizer {}
 impl cr::CrFold for Optimizer {
     fn fold_expr(&mut self, expr: cr::Expr) -> Result<cr::Expr, ()> {
         let mut expr = cr::fold_expr(self, expr)?;
+        expr = simplify_eq_of_bool(expr);
         expr = simplify_pick_row(expr);
         expr = simplify_discard_row(expr);
         expr = simplify_pick_discard(expr);
@@ -97,6 +98,54 @@ fn pack_unpack(expr: cr::Expr) -> cr::Expr {
     };
 
     *inner
+}
+
+/// Matches `(eq (cast (cast x: bool), literal)` and returns `x` or `(not x)`
+fn simplify_eq_of_bool(expr: cr::Expr) -> cr::Expr {
+    // match
+    let cr::ExprKind::From(cr::From::FuncCall(name, args)) = &expr.kind else {
+        return expr;
+    };
+    if name != "std::ops::eq" {
+        return expr;
+    }
+    let cr::ExprKind::From(cr::From::Literal(_)) = &args[1].kind else {
+        return expr;
+    };
+    let cr::ExprKind::From(cr::From::Cast(inner)) = &args[0].kind else {
+        return expr;
+    };
+    let cr::ExprKind::From(cr::From::Cast(inner)) = &inner.kind else {
+        return expr;
+    };
+    if inner.ty.kind.as_std() != Some(ir::TyStd::Bool) {
+        return expr;
+    }
+    tracing::debug!("simplify_eq_of_bool");
+
+    // unpack
+    let cr::ExprKind::From(cr::From::FuncCall(_, args)) = expr.kind else {
+        unreachable!()
+    };
+    let mut args = args.into_iter();
+    let cr::ExprKind::From(cr::From::Cast(inner)) = args.next().unwrap().kind else {
+        unreachable!()
+    };
+    let cr::ExprKind::From(cr::From::Cast(inner)) = inner.kind else {
+        unreachable!()
+    };
+    let cr::ExprKind::From(cr::From::Literal(lit)) = args.next().unwrap().kind else {
+        unreachable!()
+    };
+
+    if *lit.as_prim8().unwrap() == 1 {
+        *inner
+    } else {
+        cr::Expr {
+            kind: cr::ExprKind::From(cr::From::FuncCall("std::ops::not".into(), vec![*inner])),
+            ty: ir::Ty::bool(),
+        }
+    }
 }
 
 fn simplify_pick_row(expr: cr::Expr) -> cr::Expr {

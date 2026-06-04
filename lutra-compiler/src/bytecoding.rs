@@ -67,7 +67,7 @@ impl<'t> ByteCoder<'t> {
             ir::ExprKind::EnumVariant(v) => {
                 ExprKind::EnumVariant(Box::new(self.compile_enum_variant(expr.ty, *v)))
             }
-            ir::ExprKind::EnumEq(v) => ExprKind::EnumEq(Box::new(self.compile_enum_eq(*v))),
+            ir::ExprKind::EnumTag(v) => self.compile_expr(v.subject).kind,
             ir::ExprKind::EnumUnwrap(v) => return self.compile_enum_unwrap(*v),
             ir::ExprKind::TupleLookup(v) => return self.compile_tuple_lookup(*v),
             ir::ExprKind::Binding(v) => ExprKind::Binding(Box::new(self.compile_binding(*v))),
@@ -184,21 +184,6 @@ impl<'t> ByteCoder<'t> {
             has_ptr: head_format.has_ptr,
             padding_bytes: variant_format.padding_bytes,
             inner: self.compile_expr(v.inner),
-        }
-    }
-
-    fn compile_enum_eq(&mut self, v: ir::EnumEq) -> EnumEq {
-        let ty_mat = self.get_ty_mat(&v.subject.ty);
-        let ir::TyKind::Enum(ty_variants) = &ty_mat.kind else {
-            panic!()
-        };
-        let head_format =
-            lutra_bin::layout::enum_head_format(ty_variants, &ty_mat.variants_recursive);
-
-        let tag = v.tag.to_le_bytes()[0..head_format.tag_bytes as usize].to_vec();
-        EnumEq {
-            tag,
-            expr: self.compile_expr(v.subject),
         }
     }
 

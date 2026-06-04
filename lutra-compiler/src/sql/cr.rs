@@ -76,6 +76,9 @@ pub enum From {
     // A literal value
     Literal(ir::Literal),
 
+    /// Injects an explict type cast
+    Cast(Box<Expr>),
+
     /// SQL query parameter. Contains 0-based index.
     Param(u16),
 

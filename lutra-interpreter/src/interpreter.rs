@@ -262,15 +262,6 @@ impl Interpreter {
                     inner,
                 ))
             }
-            br::ExprKind::EnumEq(enum_eq) => {
-                let expr = self.evaluate_expr(&enum_eq.expr)?;
-                let expr = expr.into_data().map_err(|_| EvalError::BadProgram)?;
-
-                let expr_tag = &expr.chunk()[0..enum_eq.tag.len()];
-                let eq = expr_tag == enum_eq.tag;
-
-                Cell::Data(Data::new(vec![if eq { 1_u8 } else { 0_u8 }]))
-            }
             br::ExprKind::Offset(lookup) => {
                 let base = self.evaluate_expr(&lookup.base)?;
 

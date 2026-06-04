@@ -21,7 +21,7 @@ type ExprKind: enum {
   tuple: [TupleField],
   array: [Expr],
   enum_variant: EnumVariant,
-  enum_eq: EnumEq,
+  enum_tag: EnumTag,
   enum_unwrap: EnumUnwrap,
   tuple_lookup: TupleLookup,
   binding: Binding,
@@ -74,9 +74,8 @@ type EnumVariant: {
   inner: Expr,
 }
 
-type EnumEq: {
+type EnumTag: {
   subject: Expr,
-  tag: Uint64,
 }
 
 type EnumUnwrap: {

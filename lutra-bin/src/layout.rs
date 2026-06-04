@@ -290,7 +290,7 @@ fn enum_max_variant_head_size(variants: &[ir::TyEnumVariant]) -> u32 {
     i
 }
 
-fn enum_tag_size(variants_len: usize) -> u32 {
+pub fn enum_tag_size(variants_len: usize) -> u32 {
     // TODO: when bool-sub-byte packing is implemented, remove function in favor of enum_tag_size_used
     enum_tag_size_used(variants_len).div_ceil(8) * 8
 }

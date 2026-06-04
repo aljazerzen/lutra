@@ -304,124 +304,132 @@ impl IrFold for BindingInliner {
         fold::fold_ptr(ptr, ty)
     }
 
-    // optimization: simplify std::cmp
-    fn fold_enum_eq(&mut self, enum_eq: ir::EnumEq, ty: ir::Ty) -> Result<ir::Expr, ()> {
-        // normal fold
-        let enum_eq = ir::EnumEq {
-            tag: enum_eq.tag,
-            subject: self.fold_expr(enum_eq.subject)?,
-        };
-
-        // detect cases:
-        // (enum_eq
-        //   (call
-        //      external.std::cmp,
-        //      a,
-        //      b,
-        //   ),
-        //   tag
-        // )
-        if let ir::ExprKind::Call(call) = &enum_eq.subject.kind
-            && let ir::ExprKind::Pointer(ir::Pointer::External(func)) = &call.function.kind
-            && func.id == "std::ops::cmp"
-        {
-            let (cmp_func, swap) = match enum_eq.tag {
-                0 => ("std::ops::lt", false),
-                1 => ("std::ops::eq", false),
-                2 => ("std::ops::lt", true),
-                _ => unreachable!(),
-            };
-
-            let mut func_ty = call.function.ty.clone();
-            func_ty.kind.as_function_mut().unwrap().body = ir::Ty::bool();
-
-            let function = ir::Expr::new(
-                ir::ExternalPtr {
-                    id: cmp_func.to_string(),
-                },
-                func_ty,
-            );
-
-            let mut args = call.args.clone();
-            if swap {
-                args.reverse();
-            }
-
-            return Ok(ir::Expr::new(ir::Call { function, args }, ty));
-        }
-
-        Ok(ir::Expr {
-            kind: ir::ExprKind::EnumEq(Box::new(enum_eq)),
-            ty,
-        })
-    }
-
     // optimization: simplify call chains
     fn fold_call(&mut self, call: ir::Call, ty: ir::Ty) -> Result<ir::Expr, ()> {
+        // normal fold
         let expr = fold::fold_call(self, call, ty)?;
 
-        fn as_external(expr: &ir::Expr) -> Option<&str> {
-            expr.kind
-                .as_pointer()
-                .and_then(|p| p.as_external())
-                .map(|e| e.id.as_str())
-        }
-        fn as_external_mut(expr: &mut ir::Expr) -> Option<&mut String> {
-            expr.kind
-                .as_pointer_mut()
-                .and_then(|p| p.as_external_mut())
-                .map(|e| &mut e.id)
-        }
-
-        // detect:
-        // (call
-        //   external.outer_id,
-        //   (call
-        //     external.inner_id,
-        //     ..inner_args..
-        //   ),
-        //   ..outer_args..
-        // )
-        if let ir::ExprKind::Call(outer) = &expr.kind
-            && let Some(outer_id) = as_external(&outer.function)
-            && !outer.args.is_empty()
-            && let ir::ExprKind::Call(inner) = &outer.args[0].kind
-            && let Some(inner_id) = as_external(&inner.function)
-        {
-            match (outer_id, inner_id) {
-                ("std::ops::not", "std::ops::not") => {
-                    // not(not(x)) --> x
-                    return Ok(inner.args[0].clone());
-                }
-
-                ("std::ops::not", "std::ops::lt") => {
-                    // not(lt(a, b)) --> lte(b, a)
-                    let mut call = *inner.clone();
-
-                    let func_id = as_external_mut(&mut call.function).unwrap();
-                    *func_id = "std::ops::lte".to_string();
-
-                    call.args.reverse();
-
-                    return Ok(ir::Expr::new(call, expr.ty));
-                }
-                ("std::ops::not", "std::ops::lte") => {
-                    // not(lte(a, b)) --> lt(b, a)
-                    let mut call = *inner.clone();
-
-                    let func_id = as_external_mut(&mut call.function).unwrap();
-                    *func_id = "std::ops::lt".to_string();
-
-                    call.args.reverse();
-
-                    return Ok(ir::Expr::new(call, expr.ty));
-                }
-                _ => {}
-            }
-        }
-
+        // optimizations
+        let expr = rewrite_cmp_swap_greater(expr);
+        let expr = rewrite_cmp_tag_to_op(expr);
+        let expr = rewrite_not_chain(expr);
         Ok(expr)
     }
+}
+
+/// Matches `eq(enum_tag(cmp(a, b)), 2)` and returns `eq(enum_tag(cmp(b, a)), 0)`
+fn rewrite_cmp_swap_greater(expr: ir::Expr) -> ir::Expr {
+    let Some((_, 2)) = as_cmp_tag_test(&expr) else {
+        return expr;
+    };
+
+    let mut expr = expr;
+    let eq = expr.kind.as_call_mut().unwrap();
+
+    let enum_tag = eq.args[0].kind.as_enum_tag_mut().unwrap();
+    let cmp = enum_tag.subject.kind.as_call_mut().unwrap();
+    cmp.args.reverse();
+
+    let tag = eq.args[1].kind.as_literal_mut().unwrap();
+    *tag = ir::Literal::Prim8(0);
+
+    expr
+}
+
+/// Matches `eq(enum_tag(cmp(a, b)), tag)` and returns `lt(a, b)` or `eq(a, b)`.
+fn rewrite_cmp_tag_to_op(expr: ir::Expr) -> ir::Expr {
+    let Some((_, tag)) = as_cmp_tag_test(&expr) else {
+        return expr;
+    };
+    let op = match tag {
+        0 => "std::ops::lt",
+        1 => "std::ops::eq",
+        _ => return expr,
+    };
+
+    // unwrap the outer two ops
+    let [enum_tag, _] = unpack(expr.kind.into_call().unwrap().args);
+    let mut expr = enum_tag.kind.into_enum_tag().unwrap().subject;
+
+    // overwrite op
+    let call = expr.kind.as_call_mut().unwrap();
+    call.function.kind = ir::ExternalPtr { id: op.to_string() }.into();
+
+    // overwrite types
+    let func_ty = call.function.ty.kind.as_function_mut().unwrap();
+    func_ty.body = ir::Ty::bool();
+    expr.ty = ir::Ty::bool();
+
+    expr
+}
+
+/// Simplifies `not` applied to another negatable call:
+///   not(not(x))    ->  x
+///   not(lt(a, b))  ->  lte(b, a)
+///   not(lte(a, b)) ->  lt(b, a)
+fn rewrite_not_chain(expr: ir::Expr) -> ir::Expr {
+    let Some([inner]) = as_call_to(&expr, "std::ops::not") else {
+        return expr;
+    };
+
+    // not(not(x)) --> x
+    if as_call_to(inner, "std::ops::not").is_some() {
+        let [inner] = unpack(expr.kind.into_call().unwrap().args);
+        let [x] = unpack(inner.kind.into_call().unwrap().args);
+        return x;
+    }
+
+    // not(lt(a, b)) --> lte(b, a) ; not(lte(a, b)) --> lt(b, a)
+    let swapped_op = if as_call_to(inner, "std::ops::lt").is_some() {
+        "std::ops::lte"
+    } else if as_call_to(inner, "std::ops::lte").is_some() {
+        "std::ops::lt"
+    } else {
+        return expr;
+    };
+
+    let [mut inner] = unpack(expr.kind.into_call().unwrap().args);
+
+    let inner_call = inner.kind.as_call_mut().unwrap();
+    inner_call.args.reverse();
+    let inner_id = as_external_mut(&mut inner_call.function).unwrap();
+    *inner_id = swapped_op.to_string();
+
+    inner
+}
+
+/// Matches `eq(enum_tag(cmp(a, b)), tag)` and returns `([a, b], tag)`.
+///
+/// The `Ordering` enum has three variants, so its tag occupies a single byte
+/// and the compared literal is a `Prim8`.
+fn as_cmp_tag_test(expr: &ir::Expr) -> Option<(&[ir::Expr], u8)> {
+    let Some([enum_expr, tag]) = as_call_to(expr, "std::ops::eq") else {
+        return None;
+    };
+
+    let enum_tag = enum_expr.kind.as_enum_tag()?;
+    let args = as_call_to(&enum_tag.subject, "std::ops::cmp")?;
+    let tag = tag.kind.as_literal()?.as_prim8()?;
+    Some((args, *tag))
+}
+
+/// Matches `(call (pointer (external id)), args)` and returns `args`.
+fn as_call_to<'e>(expr: &'e ir::Expr, id: &str) -> Option<&'e [ir::Expr]> {
+    let call = expr.kind.as_call()?;
+    let ptr = call.function.kind.as_pointer()?.as_external()?;
+    if ptr.id != id {
+        return None;
+    }
+    Some(&call.args)
+}
+
+/// Returns `true` if `expr` is a pointer to the external function `id`.
+fn as_external_mut(expr: &mut ir::Expr) -> Option<&mut String> {
+    Some(&mut expr.kind.as_pointer_mut()?.as_external_mut()?.id)
+}
+
+fn unpack<const N: usize, T: std::fmt::Debug>(x: Vec<T>) -> [T; N] {
+    x.try_into().unwrap()
 }
 
 struct Substituter {

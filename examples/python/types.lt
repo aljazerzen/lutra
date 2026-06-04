@@ -1,14 +1,14 @@
 type Movie: {
-  id: int64,
-  title: text,
-  is_released: bool,
+  id: Int64,
+  title: Text,
+  is_released: Bool,
   genre: Genre,
 }
 
 type Genre: enum {
   fiction,
   drama,
-  other: text
+  other: Text
 }
 
 func get_movie(): Movie -> {

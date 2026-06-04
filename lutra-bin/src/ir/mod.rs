@@ -64,9 +64,9 @@ impl From<Function> for ExprKind {
         ExprKind::Function(boxed::Box::new(v))
     }
 }
-impl From<EnumEq> for ExprKind {
-    fn from(eq: EnumEq) -> Self {
-        ExprKind::EnumEq(boxed::Box::new(eq))
+impl From<EnumTag> for ExprKind {
+    fn from(v: EnumTag) -> Self {
+        ExprKind::EnumTag(boxed::Box::new(v))
     }
 }
 
@@ -122,6 +122,10 @@ impl TyKind {
         self.as_enum()
             .filter(|v| v.len() == 2 && v[0].ty.is_unit() && !v[1].ty.is_unit())
             .map(|v| &v[1].ty)
+    }
+
+    pub fn as_std(&self) -> Option<TyStd> {
+        self.as_ident().and_then(TyStd::try_new)
     }
 }
 

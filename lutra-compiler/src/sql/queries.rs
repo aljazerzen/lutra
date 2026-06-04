@@ -401,6 +401,11 @@ impl<'a> Context<'a> {
             cr::From::FuncCall(func_name, args_in) => {
                 self.compile_func_call(func_name, args_in, ty)
             }
+            cr::From::Cast(x_in) => {
+                let x = self.compile_rel(x_in);
+                let x = self.node_into_column(x, &x_in.ty);
+                Node::Source(format!("({x})::{}", self.ty_name(ty)))
+            }
             cr::From::Param(param_index) => {
                 Node::Source(format!("${}::{}", param_index + 1, self.ty_name(ty)))
             }

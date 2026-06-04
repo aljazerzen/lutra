@@ -27,7 +27,6 @@ type ExprKind: enum {
   tuple: `Tuple`,
   array: Array,
   enum_variant: EnumVariant,
-  enum_eq: EnumEq,
   offset: Offset,
   deref: Deref,
   binding: Binding,
@@ -75,11 +74,6 @@ type EnumVariant: {
   has_ptr: Bool,
   padding_bytes: Uint8,
   inner: Expr,
-}
-
-type EnumEq: {
-  tag: [Uint8],
-  expr: Expr,
 }
 
 type Offset: {

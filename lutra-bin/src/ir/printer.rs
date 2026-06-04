@@ -159,15 +159,13 @@ impl Printer {
                 r += ")";
                 r
             }
-            ir::ExprKind::EnumEq(eq) => {
-                let mut r = "(enum_eq".to_string();
+            ir::ExprKind::EnumTag(enum_tag) => {
+                let mut r = "(enum_tag".to_string();
                 self.indent();
                 r += &self.new_line();
 
-                r += &self.print_expr(&eq.subject);
+                r += &self.print_expr(&enum_tag.subject);
 
-                r += &self.new_line();
-                r += &format!("{}", eq.tag);
                 self.dedent();
                 r += &self.new_line();
                 r += ")";

@@ -83,9 +83,12 @@ fn lower_01() {
         (
           switch,
           (
-            (enum_eq
-              var.3: ops::Ordering
-              1
+            (call
+              external.std::ops::eq: func (Int8, Int8) -> Bool,
+              (enum_tag
+                var.3: ops::Ordering
+              ): Int8,
+              1: Int8,
             ): Bool,
             1: Bool,
           ),
@@ -183,16 +186,22 @@ fn lower_02() {
       (
         switch,
         (
-          (enum_eq
-            var.0: Status
-            0
+          (call
+            external.std::ops::eq: func (Int8, Int8) -> Bool,
+            (enum_tag
+              var.0: Status
+            ): Int8,
+            0: Int8,
           ): Bool,
           "open": Text,
         ),
         (
-          (enum_eq
-            var.0: Status
-            1
+          (call
+            external.std::ops::eq: func (Int8, Int8) -> Bool,
+            (enum_tag
+              var.0: Status
+            ): Int8,
+            1: Int8,
           ): Bool,
           "closed": Text,
         ),
@@ -286,16 +295,22 @@ fn lower_05() {
         (
           switch,
           (
-            (enum_eq
-              var.1: enum {none, some: Int32}
-              1
+            (call
+              external.std::ops::eq: func (Int8, Int8) -> Bool,
+              (enum_tag
+                var.1: enum {none, some: Int32}
+              ): Int8,
+              1: Int8,
             ): Bool,
             1: dep::std::Bool,
           ),
           (
-            (enum_eq
-              var.1: enum {none, some: Int32}
-              0
+            (call
+              external.std::ops::eq: func (Int8, Int8) -> Bool,
+              (enum_tag
+                var.1: enum {none, some: Int32}
+              ): Int8,
+              0: Int8,
             ): Bool,
             0: dep::std::Bool,
           ),

@@ -86,6 +86,7 @@ pub fn fold_from<T: ?Sized + CrFold>(fold: &mut T, from: From, ty: ir::Ty) -> Re
         From::RelRef(id) => From::RelRef(id),
         From::Null => From::Null,
         From::Literal(lit) => From::Literal(lit),
+        From::Cast(i) => From::Cast(Box::new(fold.fold_expr(*i)?)),
         From::Param(i) => From::Param(i),
         From::FuncCall(name, args) => From::FuncCall(name, fold_exprs(fold, args)?),
         From::Deserialize(expr) => From::Deserialize(Box::new(fold.fold_expr(*expr)?)),

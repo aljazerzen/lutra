@@ -252,7 +252,7 @@ impl<'a> Context<'a> {
                 | ir::ExprKind::Tuple(_)
                 | ir::ExprKind::Array(_)
                 | ir::ExprKind::EnumVariant(_)
-                | ir::ExprKind::EnumEq(_)
+                | ir::ExprKind::EnumTag(_)
                 | ir::ExprKind::EnumUnwrap(_)
                 | ir::ExprKind::Switch(_) => {
                     unreachable!()
@@ -373,32 +373,32 @@ impl<'a> Context<'a> {
                     cr::ExprKind::From(cr::From::Row(row))
                 }
             }
-            ir::ExprKind::EnumEq(enum_eq) => {
-                let base = self.compile_rel(&enum_eq.subject);
+            ir::ExprKind::EnumTag(e) => {
+                let base = self.compile_rel(&e.subject);
 
-                let ir::TyKind::Enum(variants) = &self.get_ty_mat(&enum_eq.subject.ty).kind else {
+                let ir::TyKind::Enum(variants) = &self.get_ty_mat(&e.subject.ty).kind else {
                     panic!("invalid program");
                 };
                 if self.is_option(variants) {
-                    // a nullable column
-                    let op = if enum_eq.tag == 0 {
-                        "is_null"
-                    } else {
-                        "is_not_null"
+                    // a nullable column: NULL is tag 0 (none), otherwise tag 1 (some)
+                    let is_null = cr::Expr {
+                        kind: cr::ExprKind::From(cr::From::FuncCall(
+                            "is_not_null".into(),
+                            vec![base],
+                        )),
+                        ty: ir::Ty::bool(),
                     };
-                    cr::ExprKind::From(cr::From::FuncCall(op.into(), vec![base]))
+                    // wrap into `_::int::int2`
+                    let as_int = cr::Expr {
+                        kind: cr::ExprKind::From(cr::From::Cast(Box::new(is_null))),
+                        ty: ir::Ty::new_ident(&["std", "Int32"]),
+                    };
+                    cr::ExprKind::From(cr::From::Cast(Box::new(as_int)))
                 } else {
-                    // tag + one column for variant
-
+                    // tag + one column for variant: pick the tag column
                     let base = self.new_binding(base);
 
-                    let tag = cr::Expr {
-                        kind: cr::ExprKind::Transform(base, cr::Transform::ProjectPick(vec![0])),
-                        ty: ty_tag(),
-                    };
-
-                    let args = vec![tag, new_tag(enum_eq.tag as i16)];
-                    cr::ExprKind::From(cr::From::FuncCall("std::ops::eq".to_string(), args))
+                    cr::ExprKind::Transform(base, cr::Transform::ProjectPick(vec![0]))
                 }
             }
             ir::ExprKind::EnumUnwrap(enum_unwrap) => {
