@@ -25,7 +25,7 @@ edition = "2024"
 license = "Apache-2.0"
 repository = "https://codeberg.org/lutra/lutra/"
 rust-version = "1.91"
-version = "0.5.1"
+version = "0.6.0"
 
 [workspace.dependencies]
 itertools = "0.13.0"
@@ -51,22 +51,22 @@ chrono-tz = { version = "0.10.4", default-features = false }
 arrow = "58.2.0"
 parquet = "58.2.0"
 
-lutra-arrow = { version = "0.5", path = "lutra-arrow" }
-lutra-bin = { version = "0.5", path = "lutra-bin", default-features = false }
-lutra-bin-python = { version = "0.5", path = "lutra-bin/python" }
-lutra-cli = { version = "0.5", path = "lutra-cli" }
-lutra-codegen = { version = "0.5", path = "lutra-codegen" }
-lutra-compiler = { version = "0.5", path = "lutra-compiler" }
-lutra-interpreter = { version = "0.5", path = "lutra-interpreter" }
-lutra-ir = { version = "0.5", path = "lutra-ir" }
-lutra-project-tools = { version = "0.5", path = "lutra-project-tools" }
-lutra-runner = { version = "0.5", path = "lutra-runner" }
-lutra-runner-duckdb = { version = "0.5", path = "lutra-runner-duckdb" }
-lutra-runner-postgres = { version = "0.5", path = "lutra-runner-postgres", default-features = false }
-lutra-runner-postgres-python = { version = "0.5", path = "lutra-runner-postgres/python", default-features = false }
-lutra-sql = { version = "0.5", path = "lutra-sql" }
-lutra-tui = { version = "0.5", path = "lutra-tui" }
-tests = { version = "0.5", path = "tests" }
+lutra-arrow = { version = "0.6", path = "lutra-arrow" }
+lutra-bin = { version = "0.6", path = "lutra-bin", default-features = false }
+lutra-bin-python = { version = "0.6", path = "lutra-bin/python" }
+lutra-cli = { version = "0.6", path = "lutra-cli" }
+lutra-codegen = { version = "0.6", path = "lutra-codegen" }
+lutra-compiler = { version = "0.6", path = "lutra-compiler" }
+lutra-interpreter = { version = "0.6", path = "lutra-interpreter" }
+lutra-ir = { version = "0.6", path = "lutra-ir" }
+lutra-project-tools = { version = "0.6", path = "lutra-project-tools" }
+lutra-runner = { version = "0.6", path = "lutra-runner" }
+lutra-runner-duckdb = { version = "0.6", path = "lutra-runner-duckdb" }
+lutra-runner-postgres = { version = "0.6", path = "lutra-runner-postgres", default-features = false }
+lutra-runner-postgres-python = { version = "0.6", path = "lutra-runner-postgres/python", default-features = false }
+lutra-sql = { version = "0.6", path = "lutra-sql" }
+lutra-tui = { version = "0.6", path = "lutra-tui" }
+tests = { version = "0.6", path = "tests" }
 
 [profile.samply]
 inherits = "release"
