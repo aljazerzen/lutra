@@ -249,7 +249,10 @@ fn write_ty_def(
     writeln!(w)?;
 
     match &ty.kind {
-        ir::TyKind::Primitive(_) | ir::TyKind::Array(_) | ir::TyKind::Tuple(_) => {
+        ir::TyKind::Primitive(_)
+        | ir::TyKind::Ident(_)
+        | ir::TyKind::Array(_)
+        | ir::TyKind::Tuple(_) => {
             writeln!(w, "@dataclasses.dataclass")?;
         }
 
@@ -262,7 +265,7 @@ fn write_ty_def(
 
     writeln!(w, "class {name}(lutra_bin.Encodable):")?;
     match &ty.kind {
-        ir::TyKind::Primitive(_) | ir::TyKind::Array(_) => {
+        ir::TyKind::Primitive(_) | ir::TyKind::Ident(_) | ir::TyKind::Array(_) => {
             writeln!(w, "    value: {}", ty_ref(ty, true, ctx))?;
         }
 
@@ -352,7 +355,7 @@ fn write_ty_def_codec(
     writeln!(w, "        return {head_bytes}")?;
 
     match &ty.kind {
-        ir::TyKind::Primitive(_) | ir::TyKind::Array(_) => {
+        ir::TyKind::Primitive(_) | ir::TyKind::Ident(_) | ir::TyKind::Array(_) => {
             writeln!(w, "    def decode(self, buf: bytes) -> {name}:")?;
             writeln!(w, "        return {name}({}.decode(buf))", ty_codec(ty, ctx))?;
             writeln!(w, "    def encode_head(self, obj: {name}, buf: lutra_bin.BytesMut) -> typing.Any:")?;

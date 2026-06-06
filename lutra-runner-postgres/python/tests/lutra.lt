@@ -1,6 +1,6 @@
 import std::sql
 
-type Movie: {id: int32, title: text, is_released: bool}
+type Movie: {id: Int32, title: Text, is_released: Bool}
 
 func from_movies(): [Movie] -> sql::from("movies")
 
