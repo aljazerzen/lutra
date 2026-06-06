@@ -1,12 +1,12 @@
 [package]
 name = "lutra-codegen"
 description = "Code generation for Lutra"
+version = "0.6.1"
 
 edition.workspace = true
 license.workspace = true
 repository.workspace = true
 rust-version.workspace = true
-version.workspace = true
 
 
 [features]

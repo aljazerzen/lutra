@@ -167,7 +167,7 @@ pub fn write_ty_ref(
         ir::TyKind::Primitive(ir::TyPrimitive::Prim32) => write!(w, "u32")?,
         ir::TyKind::Primitive(ir::TyPrimitive::Prim64) => write!(w, "u64")?,
         ir::TyKind::Ident(ident) => {
-            if let Some(ty) = ty_ref_std(ident, ctx) {
+            if let Some(ty) = get_ty_std_ref(ident, ctx) {
                 write!(w, "{ty}")?;
             } else {
                 let matching = zip(ident.0.iter(), ctx.current_rust_mod.iter())
@@ -239,38 +239,28 @@ pub fn write_ty_ref(
     Ok(())
 }
 
-fn ty_ref_std(ident: &ir::Path, ctx: &Context) -> Option<Cow<'static, str>> {
-    let rust_ty = if ident.is(&["std", "Bool"]) {
-        "bool"
-    } else if ident.is(&["std", "Int8"]) {
-        "i8"
-    } else if ident.is(&["std", "Int16"]) {
-        "i16"
-    } else if ident.is(&["std", "Int32"]) {
-        "i32"
-    } else if ident.is(&["std", "Int64"]) {
-        "i64"
-    } else if ident.is(&["std", "Uint8"]) {
-        "u8"
-    } else if ident.is(&["std", "Uint16"]) {
-        "u16"
-    } else if ident.is(&["std", "Uint32"]) {
-        "u32"
-    } else if ident.is(&["std", "Uint64"]) {
-        "u64"
-    } else if ident.is(&["std", "Float32"]) {
-        "f32"
-    } else if ident.is(&["std", "Float64"]) {
-        "f64"
-    } else if ident.is(&["std", "Text"]) {
-        return Some(Cow::Owned(format!(
-            "{}::string::String",
-            ctx.options.lutra_bin_path
-        )));
-    } else {
-        return None;
-    };
-    Some(Cow::Borrowed(rust_ty))
+fn get_ty_std_ref(ident: &ir::Path, ctx: &Context) -> Option<Cow<'static, str>> {
+    let ty_std = ir::TyStd::try_new(ident)?;
+    let lb = &ctx.options.lutra_bin_path;
+
+    Some(match ty_std {
+        ir::TyStd::Bool => Cow::Borrowed("bool"),
+        ir::TyStd::Int8 => Cow::Borrowed("i8"),
+        ir::TyStd::Int16 => Cow::Borrowed("i16"),
+        ir::TyStd::Int32 => Cow::Borrowed("i32"),
+        ir::TyStd::Int64 => Cow::Borrowed("i64"),
+        ir::TyStd::UInt8 => Cow::Borrowed("u8"),
+        ir::TyStd::UInt16 => Cow::Borrowed("u16"),
+        ir::TyStd::UInt32 => Cow::Borrowed("u32"),
+        ir::TyStd::UInt64 => Cow::Borrowed("u64"),
+        ir::TyStd::Float32 => Cow::Borrowed("f32"),
+        ir::TyStd::Float64 => Cow::Borrowed("f64"),
+        ir::TyStd::Text => Cow::Owned(format!("{lb}::string::String")),
+        ir::TyStd::Date => Cow::Owned(format!("{lb}::std::Date")),
+        ir::TyStd::Time => Cow::Owned(format!("{lb}::std::Time")),
+        ir::TyStd::Timestamp => Cow::Owned(format!("{lb}::std::Timestamp")),
+        ir::TyStd::Decimal => Cow::Owned(format!("{lb}::std::Decimal")),
+    })
 }
 
 pub fn is_unit_variant(variant_ty: &ir::Ty) -> bool {

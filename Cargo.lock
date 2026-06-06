@@ -2048,7 +2048,7 @@ dependencies = [
 
 [[package]]
 name = "lutra-codegen"
-version = "0.6.0"
+version = "0.6.1"
 dependencies = [
  "base85",
  "bytes",
