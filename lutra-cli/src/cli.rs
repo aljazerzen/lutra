@@ -52,6 +52,7 @@ fn main() {
 }
 
 #[derive(Parser)]
+#[clap(name = "lutra", version = env!("CARGO_PKG_VERSION"))]
 pub struct Command {
     #[clap(short, long)]
     pub verbose: bool,
