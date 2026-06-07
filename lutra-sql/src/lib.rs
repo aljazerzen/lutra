@@ -23,7 +23,7 @@ use core::hash;
 
 use display_utils::{NewLine, SpaceOrNewline};
 
-pub use self::dml::{Assignment, AssignmentTarget, Delete, Insert, Update};
+pub use self::dml::{Assignment, AssignmentTarget, Delete, FromTable, Insert, Update};
 pub use self::query::{
     Copy, Cte, CteAsMaterialized, Distinct, ExprWithAlias, Join, JoinConstraint, JoinOperator,
     LateralView, OrderBy, OrderByExpr, OrderByKind, OrderByOptions, Query, RelExpr, RelNamed,

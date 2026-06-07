@@ -1167,7 +1167,7 @@ impl<'a> Context<'a> {
                 //     Join(
                 //       subject.rowid,
                 //       ProjectDiscard(
-                //         Filter(
+                //         Where(
                 //           updater,
                 //           _t == 1
                 //         ),
@@ -1242,6 +1242,53 @@ impl<'a> Context<'a> {
                 cr::ExprKind::Update {
                     table: table.clone(),
                     updates,
+                }
+            }
+            "std::sql::delete" => {
+                // Compiles to:
+                //   Delete(
+                //     table,
+                //     Transform(
+                //       From(subject_table, use_row_id=true),
+                //       Where(predicate)
+                //     )
+                //   )
+
+                let table = &call.args[0];
+                let ir::ExprKind::Literal(ir::Literal::Text(table)) = &table.kind else {
+                    panic!("table identifier must be const")
+                };
+                let predicate_ty = call.args[1].ty.kind.as_function().unwrap();
+                let row_ty = predicate_ty.params[0].clone();
+
+                let subject = cr::Expr {
+                    kind: cr::ExprKind::From(cr::From::Table {
+                        name: table.clone(),
+                        use_row_id: true,
+                    }),
+                    ty: ir::Ty::new(ir::TyKind::Array(Box::new(row_ty.clone()))),
+                };
+                let subject = self.new_binding(subject);
+
+                // predicate function (with subject in scope)
+                let predicate_fn = &call.args[1];
+                let predicate_fn = predicate_fn.kind.as_function().unwrap();
+
+                let row_ref = self.new_array_item_ref(&subject);
+                self.functions
+                    .insert(predicate_fn.id, FuncProvider::Expr(vec![row_ref.kind]));
+                let predicate = self.compile_rel(&predicate_fn.body);
+                self.functions.remove(&predicate_fn.id);
+
+                // filter subject by predicate
+                let deletes = Box::new(cr::Expr::new_iso_transform(
+                    subject,
+                    cr::Transform::Where(Box::new(predicate)),
+                ));
+
+                cr::ExprKind::Delete {
+                    table: table.clone(),
+                    deletes,
                 }
             }
             "std::sql::raw" => {

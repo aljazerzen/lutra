@@ -6,7 +6,7 @@ use lutra_bin::ir;
 
 use crate::Runner;
 
-#[allow(dead_code)]
+#[allow(warnings)]
 mod lutra {
     include!(concat!(env!("OUT_DIR"), "/lutra.rs"));
 }

@@ -2859,6 +2859,144 @@ fn update_verify_changes() {
 }
 
 #[test]
+fn delete_basic() {
+    insta::assert_snapshot!(_sql_and_output(_run_with_setup(
+        "
+        CREATE TABLE users (id int4, name text, age int4);
+        INSERT INTO users VALUES (1, 'Alice', 30), (2, 'Bob', 25), (3, 'Charlie', 35);
+        ",
+        r#"
+        type User: {
+          id: Int32,
+          name: Text,
+          age: Int32,
+        }
+
+        func main(): {} -> std::sql::delete(
+          "users",
+          func (u: User) -> u.id == 2
+        )
+        "#,
+        lutra_bin::Value::unit()
+    )), @"
+    DELETE FROM
+      users
+    USING
+      (
+        SELECT
+          r1.index,
+          r1._0,
+          r1._1,
+          r1._2
+        FROM
+          (
+            SELECT
+              rowid AS index,
+              r0.id AS _0,
+              r0.name AS _1,
+              r0.age AS _2
+            FROM
+              users AS r0
+          ) AS r1
+        WHERE
+          (r1._0 = 2::INT4)
+      ) AS r2
+    WHERE
+      (r2.index = users.rowid)
+    ---
+    {}
+    ");
+}
+
+#[test]
+fn delete_with_bind() {
+    let conn = duckdb::Connection::open_in_memory().unwrap();
+    conn.execute_batch(
+        "
+        CREATE TABLE users (id int4, name text, age int4);
+        INSERT INTO users VALUES (1, 'Alice', 30), (2, 'Bob', 25), (3, 'Charlie', 35);
+        ",
+    )
+    .unwrap();
+
+    let mut runner = Runner::new(conn, None).unwrap();
+
+    let (_sql, output) = _run_on(
+        &mut runner,
+        r#"
+    type User: {id: Int32, name: Text, age: Int32}
+    const threshold: Int32 = 30
+    func main(): {} -> std::sql::delete(
+      "users", func (u: User) -> u.age > threshold
+    )
+    "#,
+        lutra_bin::Value::unit(),
+    );
+
+    assert_eq!(output, "{}");
+}
+
+#[test]
+fn delete_verify_changes() {
+    let conn = duckdb::Connection::open_in_memory().unwrap();
+    conn.execute_batch(
+        "
+        CREATE TABLE users (id int4, name text, age int4);
+        INSERT INTO users VALUES (1, 'Alice', 30), (2, 'Bob', 25), (3, 'Charlie', 35);
+        ",
+    )
+    .unwrap();
+
+    let mut runner = Runner::new(conn, None).unwrap();
+
+    // Execute delete
+    let (_sql, output) = _run_on(
+        &mut runner,
+        r#"
+    type User: {
+      id: Int32,
+      name: Text,
+      age: Int32,
+    }
+
+    func main(): {} -> std::sql::delete(
+      "users",
+      func (u: User) -> u.age < 30
+    )
+    "#,
+        lutra_bin::Value::unit(),
+    );
+
+    assert_eq!(output, "{}");
+
+    // Verify the delete worked
+    insta::assert_snapshot!(_run_on(&mut runner, r#"
+    type User: {
+      id: Int32,
+      name: Text,
+      age: Int32,
+    }
+    func main() -> (
+      (std::sql::from("users"): [User])
+      | std::sort(u -> u.id | std::to_int64)
+    )
+    "#, lutra_bin::Value::unit()).1, @r#"
+    [
+      {
+        id = 1,
+        name = "Alice",
+        age = 30,
+      },
+      {
+        id = 3,
+        name = "Charlie",
+        age = 35,
+      },
+    ]
+    "#);
+}
+
+#[test]
 fn pull_interface_with_parquet_files() {
     use arrow::array::{ArrayRef, Int32Array, RecordBatch, StringArray};
     use arrow::datatypes::{DataType, Field, Schema};

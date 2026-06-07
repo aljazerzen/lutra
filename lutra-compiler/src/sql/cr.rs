@@ -45,6 +45,13 @@ pub enum ExprKind {
         /// Index is row id.
         updates: Box<Expr>,
     },
+
+    /// Deletes rows from a table matching a predicate
+    Delete {
+        table: String,
+        /// Relation that contains row ids of rows to delete.
+        deletes: Box<Expr>,
+    },
 }
 
 /// An expression, bound to an identifier.

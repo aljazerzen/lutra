@@ -355,6 +355,40 @@ impl<'a> Context<'a> {
 
                 Node::Query(utils::query_new(update))
             }
+
+            cr::ExprKind::Delete { table, deletes } => {
+                tracing::debug!("Delete");
+
+                let deletes_ty = &deletes.ty;
+
+                let deletes = self.compile_rel(deletes);
+                let deletes = self.node_into_rel(deletes, deletes_ty);
+                let deletes_var = utils::get_rel_alias(&deletes).unwrap();
+
+                // WHERE deletes.index = table.rowid
+                let selection = Some(utils::new_bin_op(
+                    "=",
+                    [
+                        utils::identifier(Some(deletes_var), "index"),
+                        utils::identifier(Some(table), self.row_id()),
+                    ],
+                ));
+
+                let table_name = utils::new_object_name([table]);
+                let delete = sa::SetExpr::Delete(sa::Delete {
+                    tables: vec![],
+                    from: sa::FromTable::WithFromKeyword(vec![
+                        sa::RelExpr::Table(table_name).unnamed(),
+                    ]),
+                    using: Some(vec![deletes]),
+                    selection,
+                    returning: None,
+                    order_by: vec![],
+                    limit: None,
+                });
+
+                Node::Query(utils::query_new(delete))
+            }
         }
     }
 

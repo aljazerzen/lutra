@@ -68,6 +68,10 @@ pub fn fold_expr_kind<T: ?Sized + CrFold>(
             table,
             updates: Box::new(fold.fold_expr(*updates)?),
         },
+        ExprKind::Delete { table, deletes } => ExprKind::Delete {
+            table,
+            deletes: Box::new(fold.fold_expr(*deletes)?),
+        },
     };
     Ok(Expr { kind, ty })
 }

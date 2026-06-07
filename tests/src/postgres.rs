@@ -2269,6 +2269,90 @@ async fn update_with_bind() {
     runner.into_inner().rollback().await.unwrap();
 }
 
+#[tokio::test(flavor = "current_thread")]
+async fn delete_basic() {
+    let mut client = _get_test_db_client().await.unwrap();
+    let tran = client.transaction().await.unwrap();
+
+    tran.batch_execute(
+        "
+            CREATE TABLE users (id int4, name text, age int4);
+            INSERT INTO users VALUES (1, 'Alice', 30), (2, 'Bob', 25), (3, 'Charlie', 35);
+            ",
+    )
+    .await
+    .unwrap();
+
+    let mut runner = RunnerAsync::new(tran);
+
+    // Test basic DELETE
+    insta::assert_snapshot!(_sql_and_output(
+        _run_on(
+            &mut runner,
+            r#"
+    type User: {id: Int32, name: Text, age: Int32}
+
+    func main(): {} -> std::sql::delete(
+      "users", func (u: User) -> u.id == 2
+    )
+    "#,
+            lutra_bin::Value::unit()
+        )
+        .await
+    ), @"
+    DELETE FROM
+      users
+    USING
+      (
+        SELECT
+          r1.index,
+          r1._0,
+          r1._1,
+          r1._2
+        FROM
+          (
+            SELECT
+              ctid AS index,
+              r0.id::int4 AS _0,
+              r0.name::text AS _1,
+              r0.age::int4 AS _2
+            FROM
+              users AS r0
+          ) AS r1
+        WHERE
+          (r1._0 = 2::int4)
+      ) AS r2
+    WHERE
+      (r2.index = users.ctid)
+    ---
+    {}
+    ");
+
+    // Verify the delete worked
+    insta::assert_snapshot!(_run_on(&mut runner, r#"
+    type User: {id: Int32, name: Text, age: Int32}
+    func main() -> (
+      (std::sql::from("users"): [User])
+      | std::sort(u -> u.id | std::to_int64)
+    )
+    "#, lutra_bin::Value::unit()).await.1, @r#"
+    [
+      {
+        id = 1,
+        name = "Alice",
+        age = 30,
+      },
+      {
+        id = 3,
+        name = "Charlie",
+        age = 35,
+      },
+    ]
+    "#);
+
+    runner.into_inner().rollback().await.unwrap();
+}
+
 #[test]
 fn group_00() {
     insta::assert_snapshot!(_sql_and_output(_run(r#"

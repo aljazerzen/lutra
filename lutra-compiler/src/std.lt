@@ -678,6 +678,20 @@ module sql {
   external func update(const table_name: Text, updater: func (R): R?): {}
   where R: {..}
 
+  ## Deletes rows from a table.
+  ##
+  ## The `predicate` is applied to each row. Rows for which it returns `true`
+  ## are deleted.
+  ##
+  ## Example:
+  ## ```lt
+  ## sql::delete("sessions", func (s: Session) -> s.expires_at.0 < now.0)
+  ## ```
+  ##
+  ## For table identifier format, see documentation of [from].
+  external func delete(const table_name: Text, predicate: func (R): Bool): {}
+  where R: {..}
+
   ## Evaluates raw SQL.
   ##
   ## This function is an escape hatch for accessing SQL directly.

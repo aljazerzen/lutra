@@ -9,7 +9,7 @@ use tokio_postgres::Error;
 #[cfg(feature = "tokio-postgres")]
 use crate::RunnerAsync;
 
-#[allow(dead_code)]
+#[allow(warnings)]
 mod lutra {
     include!(concat!(env!("OUT_DIR"), "/lutra.rs"));
 }
