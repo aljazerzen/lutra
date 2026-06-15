@@ -146,29 +146,29 @@ fn validate_type_match(
         },
         (_, ir::TyKind::Ident(ident)) => {
             let ty_std = ir::TyStd::try_new(ident).unwrap();
+            use ad::DataType as AT;
             match (arrow_ty, ty_std) {
-                (ad::DataType::Boolean, ir::TyStd::Bool) => true,
-                (ad::DataType::Int8, ir::TyStd::Int8) => true,
-                (ad::DataType::Int16, ir::TyStd::Int16) => true,
-                (ad::DataType::Int32, ir::TyStd::Int32 | ir::TyStd::Date) => true,
-                (
-                    ad::DataType::Int64,
-                    ir::TyStd::Int64 | ir::TyStd::Time | ir::TyStd::Timestamp | ir::TyStd::Decimal,
-                ) => true,
-                (ad::DataType::UInt8, ir::TyStd::UInt8) => true,
-                (ad::DataType::UInt16, ir::TyStd::UInt16) => true,
-                (ad::DataType::UInt32, ir::TyStd::UInt32) => true,
-                (ad::DataType::UInt64, ir::TyStd::UInt64) => true,
-                (ad::DataType::Float32, ir::TyStd::Float32) => true,
-                (ad::DataType::Float64, ir::TyStd::Float64) => true,
-                (ad::DataType::Utf8, ir::TyStd::Text) => true,
-                (ad::DataType::Date32, ir::TyStd::Date) => true,
-                (ad::DataType::Time64(ad::TimeUnit::Microsecond), ir::TyStd::Time) => true,
-                (
-                    ad::DataType::Timestamp(ad::TimeUnit::Microsecond, None),
-                    ir::TyStd::Timestamp,
-                ) => true,
-                (ad::DataType::Decimal64(20, 2), ir::TyStd::Decimal) => true,
+                (AT::Boolean, ir::TyStd::Bool) => true,
+
+                (AT::Int8, ir::TyStd::Int8) => true,
+                (AT::Int16, ir::TyStd::Int16) => true,
+                (AT::Int32, ir::TyStd::Int32 | ir::TyStd::Date) => true,
+                (AT::Int64, ir::TyStd::Int64 | ir::TyStd::Decimal) => true,
+                (AT::Int64, ir::TyStd::Duration | ir::TyStd::Timestamp) => true,
+
+                (AT::UInt8, ir::TyStd::UInt8) => true,
+                (AT::UInt16, ir::TyStd::UInt16) => true,
+                (AT::UInt32, ir::TyStd::UInt32) => true,
+                (AT::UInt64, ir::TyStd::UInt64 | ir::TyStd::Time) => true,
+
+                (AT::Float32, ir::TyStd::Float32) => true,
+                (AT::Float64, ir::TyStd::Float64) => true,
+                (AT::Utf8, ir::TyStd::Text) => true,
+                (AT::Date32, ir::TyStd::Date) => true,
+                (AT::Time64(ad::TimeUnit::Microsecond), ir::TyStd::Time) => true,
+                (AT::Timestamp(ad::TimeUnit::Microsecond, None), ir::TyStd::Timestamp) => true,
+                (AT::Duration(ad::TimeUnit::Microsecond), ir::TyStd::Duration) => true,
+                (AT::Decimal64(20, 2), ir::TyStd::Decimal) => true,
                 _ => false,
             }
         }
@@ -410,6 +410,17 @@ impl<'a> Encoder<'a> {
             }
             ad::DataType::Timestamp(ad::TimeUnit::Microsecond, _) => {
                 downcast::<aa::TimestampMicrosecondArray>(array.as_any())
+                    .value(idx)
+                    .encode_head(&mut self.arr_buf);
+                HeadResidual::None
+            }
+            ad::DataType::Time64(ad::TimeUnit::Microsecond) => {
+                let v = downcast::<aa::Time64MicrosecondArray>(array.as_any()).value(idx);
+                (v as u64).encode_head(&mut self.arr_buf);
+                HeadResidual::None
+            }
+            ad::DataType::Duration(ad::TimeUnit::Microsecond) => {
+                downcast::<aa::DurationMicrosecondArray>(array.as_any())
                     .value(idx)
                     .encode_head(&mut self.arr_buf);
                 HeadResidual::None

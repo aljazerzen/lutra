@@ -101,8 +101,11 @@ pub trait ValueVisitor<'t> {
             let v = value.expect_prim32()? as i32;
             self.visit_date(v).map(Some)
         } else if ident.is(&["std", "Time"]) {
-            let v = value.expect_prim64()? as i64;
+            let v = value.expect_prim64()?;
             self.visit_time(v).map(Some)
+        } else if ident.is(&["std", "Duration"]) {
+            let v = value.expect_prim64()? as i64;
+            self.visit_duration(v).map(Some)
         } else if ident.is(&["std", "Timestamp"]) {
             let v = value.expect_prim64()? as i64;
             self.visit_timestamp(v).map(Some)
@@ -129,7 +132,10 @@ pub trait ValueVisitor<'t> {
     fn visit_date(&mut self, days: i32) -> Result<Self::Res, crate::Error> {
         self.visit_int32(days)
     }
-    fn visit_time(&mut self, micros: i64) -> Result<Self::Res, crate::Error> {
+    fn visit_time(&mut self, micros: u64) -> Result<Self::Res, crate::Error> {
+        self.visit_uint64(micros)
+    }
+    fn visit_duration(&mut self, micros: i64) -> Result<Self::Res, crate::Error> {
         self.visit_int64(micros)
     }
     fn visit_timestamp(&mut self, micros: i64) -> Result<Self::Res, crate::Error> {

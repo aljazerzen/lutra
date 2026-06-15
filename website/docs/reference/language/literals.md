@@ -99,10 +99,11 @@ Date literals start with `@` and use `year-month-day`.
 
 These literals have type `std::Date`.
 
-## Time literals
+## Duration literals
 
-Time literals also start with `@` and use `hour:minute:second`, with an
-optional fractional part.
+Duration literals start with `@` and use `hour:minute:second`, with an
+optional fractional part. They represent a signed, unbounded span of time, so
+the hour component can be negative or exceed 24 hours.
 
 ```lt
 @16:07:44.123456
@@ -111,7 +112,15 @@ optional fractional part.
 @-5:12:31.12
 ```
 
-These literals have type `std::Time`.
+These literals have type `std::Duration`.
+
+Lutra has no dedicated literal for `std::Time` (a time of day in the range
+`[0, 24h)`). Construct a `Time` value with the `std::Time` constructor and a
+microseconds-since-midnight value:
+
+```lt
+std::Time(58064000000)
+```
 
 ## Timestamp literals
 

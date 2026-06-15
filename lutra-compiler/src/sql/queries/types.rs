@@ -67,7 +67,7 @@ impl<'p> Context<'p> {
                 Float64 => "float8",
                 Text => "text",
                 Date => "int4",
-                Time | Timestamp | Decimal => "int8",
+                Time | Duration | Timestamp | Decimal => "int8",
             },
             Dialect::DuckDB => match ty {
                 Bool => "BOOL",
@@ -83,7 +83,8 @@ impl<'p> Context<'p> {
                 Float64 => "FLOAT8",
                 Text => "TEXT",
                 Date => "INT4",
-                Time | Timestamp | Decimal => "INT8",
+                Time => "UINT64",
+                Duration | Timestamp | Decimal => "INT8",
             },
         }
     }
@@ -181,7 +182,8 @@ impl<'p> Context<'p> {
             Float64 => "FLOAT8",
             Text => "TEXT",
             Date => "DATE",
-            Time => "TIMESTAMP",
+            Duration => "INT8",
+            Time => "TIME",
             Timestamp => "TIMESTAMP",
             Decimal => "DECIMAL",
         }
@@ -211,7 +213,7 @@ impl<'p> Context<'p> {
                 Float32 => "0.0::float4",
                 Float64 => "0.0::float8",
                 Text => "''",
-                Date | Time | Timestamp | Decimal => {
+                Date | Time | Duration | Timestamp | Decimal => {
                     todo!()
                 }
             },
@@ -229,7 +231,7 @@ impl<'p> Context<'p> {
                 Float32 => "0.0::FLOAT4",
                 Float64 => "0.0::FLOAT8",
                 Text => "''",
-                Date | Time | Timestamp | Decimal => {
+                Date | Time | Duration | Timestamp | Decimal => {
                     todo!()
                 }
             },

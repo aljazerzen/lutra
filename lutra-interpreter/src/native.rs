@@ -357,7 +357,7 @@ pub mod std_ops {
                 "neg_int64" => &neg_int64,
                 "neg_float32" => &neg_float32,
                 "neg_float64" => &neg_float64,
-                "neg_time" => &neg_int64,
+                "neg_duration" => &neg_int64,
 
                 "add_int8" => &add_int8,
                 "add_int16" => &add_int16,
@@ -369,7 +369,7 @@ pub mod std_ops {
                 "add_uint64" => &add_uint64,
                 "add_float32" => &add_float32,
                 "add_float64" => &add_float64,
-                "add_time" => &add_int64,
+                "add_duration" => &add_int64,
                 "add_decimal" => &add_int64,
 
                 "sub_int8" => &sub_int8,
@@ -382,7 +382,7 @@ pub mod std_ops {
                 "sub_uint64" => &sub_uint64,
                 "sub_float32" => &sub_float32,
                 "sub_float64" => &sub_float64,
-                "sub_time" => &sub_int64,
+                "sub_duration" => &sub_int64,
                 "sub_decimal" => &sub_int64,
 
                 "mul_int8" => &mul_int8,
@@ -410,6 +410,7 @@ pub mod std_ops {
                 "cmp_text" => &cmp_text,
                 "cmp_date" => &cmp_int32,
                 "cmp_time" => &cmp_int64,
+                "cmp_duration" => &cmp_int64,
                 "cmp_timestamp" => &cmp_int64,
                 "cmp_decimal" => &cmp_int64,
 
@@ -427,6 +428,7 @@ pub mod std_ops {
                 "eq_text" => &eq_text,
                 "eq_date" => &eq_int32,
                 "eq_time" => &eq_int64,
+                "eq_duration" => &eq_int64,
                 "eq_timestamp" => &eq_int64,
                 "eq_decimal" => &eq_int64,
 

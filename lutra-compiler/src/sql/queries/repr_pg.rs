@@ -146,6 +146,7 @@ impl<'a> queries::Context<'a> {
         if is_ident(ty, &["std", "Time"]) || is_ident(ty, &["std", "Timestamp"]) {
             return sa::Expr::Source(format!("(EXTRACT(EPOCH FROM {expr_pg})*1000000)::int8"));
         }
+        // Duration is flat int8 in Postgres repr — no conversion needed (handled by generic cast)
         if is_ident(ty, &["std", "Decimal"]) {
             return sa::Expr::Source(format!("({expr_pg}*100)::int8"));
         }

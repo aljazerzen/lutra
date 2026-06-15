@@ -116,7 +116,7 @@ impl TypeResolver<'_> {
             }
 
             Literal::Date(_) => self.new_ty_std("Date", span),
-            Literal::Time(_) => self.new_ty_std("Time", span),
+            Literal::Duration(_) => self.new_ty_std("Duration", span),
             Literal::DateTime(..) => self.new_ty_std("Timestamp", span),
         }
     }

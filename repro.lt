@@ -1,0 +1,34 @@
+# Minimal reproduction of the DuckDB binder error produced by the lutra
+# compiler.
+#
+# Compiling this to DuckDB SQL and running it yields:
+#
+#   Binder Error: Cannot mix values of type STRUCT(duration BIGINT)[] and
+#   STRUCT(duration TIMESTAMP)[] in COALESCE operator - an explicit cast is
+#   required
+#
+# Root cause: a struct field of type `Time` that is produced by `sum`
+# (i.e. summing `timestamp::sub` durations) is emitted as INT8 microseconds
+# in the `list(struct_pack(...))` elements, but the empty-array fallback in
+# `COALESCE(list(...), CAST([] AS STRUCT(duration TIMESTAMP)[]))` casts the
+# same `Time` field as TIMESTAMP. The two struct array types don't match.
+#
+# The bug only surfaces when the resulting list of structs is nested inside
+# another value (here the `{items: ...}` tuple), which is what forces the
+# COALESCE(list(...), empty-cast) wrapping.
+#
+# Schema for testing the generated SQL:
+#   CREATE TABLE time_entries(start TIMESTAMP, "end" TIMESTAMP);
+
+func repro(): {items: [{duration: Duration}]} -> (
+  let items = (
+    sql::from("time_entries"): [{start: Timestamp, end: Timestamp}]
+    | group_map(
+        e -> e.start,
+        func (k, entries) -> {
+          duration = entries | map(e -> timestamp::sub(e.end, e.start)) | sum,
+        },
+      )
+  );
+  {items}
+)

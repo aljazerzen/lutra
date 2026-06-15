@@ -4,7 +4,7 @@
 
 ```lutra
 func abs(T): T
-where T: number
+where T: AnyNumber
 ```
 
 Absolute value

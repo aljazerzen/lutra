@@ -111,17 +111,12 @@ where
         Visitor::<'t, B>::visit_int32(self, days)
     }
 
-    fn visit_time(&mut self, micros_t: i64) -> std::result::Result<Self::Res, crate::Error> {
-        let micros = (micros_t % 1000000).abs();
-        let sec_t = micros_t / 1000000;
+    fn visit_time(&mut self, micros_midnight: u64) -> std::result::Result<Self::Res, crate::Error> {
+        Ok(print_time(micros_midnight))
+    }
 
-        let sec = (sec_t % 60).abs();
-        let min_t = sec_t / 60;
-
-        let min = (min_t % 60).abs();
-        let h_t = min_t / 60;
-
-        Ok(format!("@{h_t:02}:{min:02}:{sec:02}.{micros:06}"))
+    fn visit_duration(&mut self, micros_t: i64) -> std::result::Result<Self::Res, crate::Error> {
+        Ok(print_duration(micros_t))
     }
 
     fn visit_timestamp(&mut self, micros: i64) -> std::result::Result<Self::Res, crate::Error> {
@@ -208,6 +203,28 @@ where
 
         Ok(r)
     }
+}
+
+pub fn print_time(micros_midnight: u64) -> String {
+    let micros = micros_midnight % 1_000_000;
+    let sec_t = micros_midnight / 1_000_000;
+    let sec = sec_t % 60;
+    let min_t = sec_t / 60;
+    let min = min_t % 60;
+    let h = min_t / 60;
+    format!("@{h:02}:{min:02}:{sec:02}.{micros:06}")
+}
+
+pub fn print_duration(micros_t: i64) -> String {
+    let sign = if micros_t < 0 { "-" } else { "" };
+    let abs = micros_t.unsigned_abs();
+    let micros = abs % 1_000_000;
+    let sec_t = abs / 1_000_000;
+    let sec = sec_t % 60;
+    let min_t = sec_t / 60;
+    let min = min_t % 60;
+    let h = min_t / 60;
+    format!("@{sign}{h:02}:{min:02}:{sec:02}.{micros:06}")
 }
 
 fn quote_text(text: &str) -> String {

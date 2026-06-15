@@ -10,7 +10,7 @@ use chumsky::prelude::*;
 
 use crate::Span;
 use crate::diagnostic::{Diagnostic, DiagnosticCode};
-use crate::pr::{Date, Literal, Time};
+use crate::pr::{Date, Hmsm, Literal};
 
 /// Split source into tokens.
 pub fn lex_source_recovery(source: &str, source_id: u16) -> (Option<Tokens>, Vec<Diagnostic>) {
@@ -277,10 +277,10 @@ fn literal<'src>() -> impl LtLexer<'src, Literal> {
         .then_ignore(non_ident())
         .map(Literal::Boolean);
 
-    let sign_opt = just('+').or(just('-')).or_not();
+    let sign_is_neg = just('+').or(just('-')).or_not().map(|s| s == Some('-'));
 
     // Date / DateTime
-    let year = sign_opt
+    let year = sign_is_neg
         .then(
             any()
                 .filter(|c: &char| c.is_ascii_digit())
@@ -288,10 +288,10 @@ fn literal<'src>() -> impl LtLexer<'src, Literal> {
                 .at_least(1)
                 .collect::<String>(),
         )
-        .map(|(s, d)| {
+        .map(|(n, d)| {
             let mut full = String::new();
-            if let Some(c) = s {
-                full.push(c);
+            if n {
+                full.push('-');
             }
             full.push_str(&d);
             str_parse::<i32>(full)
@@ -310,22 +310,14 @@ fn literal<'src>() -> impl LtLexer<'src, Literal> {
         .then(d2.map(str_parse::<u8>))
         .map(|((year, month), day)| Date { year, month, day });
 
-    let hour = sign_opt
-        .then(
-            any()
-                .filter(|c: &char| c.is_ascii_digit())
-                .repeated()
-                .at_least(1)
-                .collect::<String>(),
-        )
-        .map(|(s, d)| {
-            let mut full = String::new();
-            if let Some(c) = s {
-                full.push(c);
-            }
-            full.push_str(&d);
-            str_parse::<i32>(full)
-        });
+    let hour = sign_is_neg.then(
+        any()
+            .filter(|c: &char| c.is_ascii_digit())
+            .repeated()
+            .at_least(1)
+            .collect::<String>()
+            .map(str_parse::<u32>),
+    );
 
     let time_part = hour
         .then_ignore(just(':'))
@@ -345,7 +337,8 @@ fn literal<'src>() -> impl LtLexer<'src, Literal> {
                 )
                 .or_not(),
         )
-        .map(|(((hours, min), sec), micros)| Time {
+        .map(|((((negative, hours), min), sec), micros)| Hmsm {
+            negative,
             hours,
             min,
             sec,
@@ -367,7 +360,7 @@ fn literal<'src>() -> impl LtLexer<'src, Literal> {
     let time = just('@')
         .ignore_then(time_part)
         .then_ignore(non_ident())
-        .map(Literal::Time);
+        .map(Literal::Duration);
 
     choice((string, raw_string, number, boolean, date_or_datetime, time))
 }

@@ -2696,12 +2696,17 @@ async fn date_time_01() {
     .unwrap();
     let mut runner = RunnerAsync::new(tran);
 
+    // @HH:MM:SS literals are now Duration; use Time(micros_midnight) for time-of-day.
+    // Values chosen to match the expected SELECT output:
+    //   Time(58064120000)  = 16:07:44.120000
+    //   Time(28335880000)  = 07:52:15.880000  (was: postgres-wrapped -16:07:44.12)
+    //   Time(4064120000)   = 01:07:44.120000  (was: postgres-wrapped 25:07:44.12)
     insta::assert_snapshot!(_run_on(&mut runner, r#"
     func main() -> (
       [
-        {@2025-12-29, @16:07:44.12, @2025-12-22T16:07:44.12},
-        {@-100-12-29, @-16:07:44.12, @-100-12-29T-16:07:44.12},
-        {@10000-12-29, @25:07:44.12, @10000-12-29T25:07:44.12},
+        {@2025-12-29, Time(58064120000), @2025-12-22T16:07:44.12},
+        {@-100-12-29, Time(28335880000), @-100-12-29T-16:07:44.12},
+        {@10000-12-29, Time(4064120000), @10000-12-29T25:07:44.12},
       ]: [{d: std::Date, t: std::Time, ts: std::Timestamp}]
       | std::sql::insert("test")
     )

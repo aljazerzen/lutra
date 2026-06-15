@@ -19,6 +19,7 @@ mod value;
 mod visitor;
 
 #[path = "project/generated.rs"]
+#[allow(unused_imports)]
 mod generated;
 
 pub use decode::{Decode, decode_enum_head};
@@ -30,7 +31,7 @@ pub use value::{Value, ValueVisitor};
 pub use visitor::Visitor;
 
 #[cfg(feature = "std")]
-pub use printer::print_source;
+pub use printer::{print_duration, print_source, print_time};
 pub use shape::{Shape, get_shape};
 #[cfg(feature = "std")]
 pub use tabular::{TableCell, TabularReader};

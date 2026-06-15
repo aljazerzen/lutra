@@ -2,17 +2,19 @@
 title: Date and time
 ---
 
-Lutra has separate types for calendar dates, clock times, and instants in time.
+Lutra has separate types for calendar dates, times of day, durations, and
+instants in time.
 That separation helps you write reporting code without mixing up local calendar
-logic and UTC instants.
+logic, elapsed spans, and UTC instants.
 
 Use these types for different jobs:
 
 - `Date` for a calendar day such as `@2025-11-14`
-- `Time` for a duration or clock-like time value such as `@16:07:44`
+- `Time` for a time of day in the range `[0, 24h)`
+- `Duration` for a signed, unbounded span such as `@213:06:00` or `@-5:12:31`
 - `Timestamp` for an instant in time such as `@2025-12-29T16:07:44`
 
-## Understand the three core types
+## Understand the four core types
 
 `Date` stores a calendar day.
 Internally, it is backed by `days_epoch`.
@@ -25,13 +27,26 @@ func main() -> {
 }
 ```
 
-`Time` stores a signed number of microseconds.
-You will often use it as a duration.
+`Duration` stores a signed number of microseconds.
+It is the result of subtracting two instants or two dates, and it can be
+negative or larger than 24 hours.
 
 ```lt
 func main() -> {
-  short = @00:15:00,
+  span = @213:06:00,
+  negative = @-5:12:31,
   micros = @00:15:00.microseconds,
+}
+```
+
+`Time` stores a time of day, always in the range `[0, 24h)`.
+It is backed by `micros_midnight`, the number of microseconds since midnight.
+There is no `Time` literal, so you construct one with the `Time` constructor.
+
+```lt
+func main() -> {
+  time = Time(58064000000),
+  micros_midnight = Time(58064000000).micros_midnight,
 }
 ```
 
@@ -47,12 +62,13 @@ func main() -> {
 
 ## Use literals when you need fixed values
 
-Lutra has built-in literal syntax for all three types:
+Lutra has built-in literal syntax for dates, durations, and timestamps.
+The `@hour:minute:second` form is a `Duration`, not a time of day:
 
 ```lt
 func main() -> {
   date = @2025-11-14,
-  time = @16:07:44,
+  duration = @16:07:44,
   timestamp = @2025-12-29T16:07:44,
 }
 ```
@@ -119,7 +135,25 @@ Use `date::sub` when you want the duration between two dates.
 func main() -> date::sub(@2025-12-29, @2025-12-01)
 ```
 
-Both results are `Time` values.
+Both results are `Duration` values.
+
+## Work with times of day
+
+Use the `time` module to combine a `Time` with a `Duration`.
+The `add` and `sub` functions wrap their result within `[0, 24h)`, so adding a
+span that crosses midnight rolls over to the start of the day.
+
+```lt
+func main() -> {
+  later = time::add(Time(82800000000), @4:00:00),
+  earlier = time::sub(Time(3600000000), @4:00:00),
+  elapsed = time::diff(Time(7200000000), Time(3600000000)),
+  as_span = time::to_duration(Time(3600000000)),
+}
+```
+
+Use `time::diff` to get the signed `Duration` between two times of day, and
+`time::to_duration` to measure a time of day as a span from midnight.
 
 ## Check timezone offsets when you need them
 
@@ -183,4 +217,5 @@ The key idea is the order of operations:
 - [Reference: Literals](../reference/language/literals.md)
 - [Reference: Types](../reference/language/types.md)
 - [Reference: `std::date`](../reference/language/std/date/index.md)
+- [Reference: `std::time`](../reference/language/std/time/index.md)
 - [Reference: `std::timestamp`](../reference/language/std/timestamp/index.md)

@@ -264,6 +264,7 @@ pub enum TyStd {
     Text,
     Date,
     Time,
+    Duration,
     Timestamp,
     Decimal,
 }
@@ -292,6 +293,7 @@ impl TyStd {
             "Text" => Self::Text,
             "Date" => Self::Date,
             "Time" => Self::Time,
+            "Duration" => Self::Duration,
             "Timestamp" => Self::Timestamp,
             "Decimal" => Self::Decimal,
             _ => return None,
@@ -309,7 +311,12 @@ impl TyStd {
     pub fn is_signed_int(self) -> bool {
         matches!(
             self,
-            TyStd::Int8 | TyStd::Int16 | TyStd::Int32 | TyStd::Int64
+            TyStd::Int8
+                | TyStd::Int16
+                | TyStd::Int32
+                | TyStd::Int64
+                | TyStd::Duration
+                | TyStd::Timestamp
         )
     }
 
@@ -326,7 +333,12 @@ impl TyStd {
             TyStd::Int8 | TyStd::UInt8 => 8,
             TyStd::Int16 | TyStd::UInt16 => 16,
             TyStd::Int32 | TyStd::UInt32 | TyStd::Float32 => 32,
-            TyStd::Int64 | TyStd::UInt64 | TyStd::Float64 => 64,
+            TyStd::Int64
+            | TyStd::UInt64
+            | TyStd::Float64
+            | TyStd::Duration
+            | TyStd::Time
+            | TyStd::Timestamp => 64,
             _ => 0,
         }
     }

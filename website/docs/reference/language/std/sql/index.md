@@ -63,6 +63,25 @@ sql::update(
 
 For table identifier format, see documentation of [`from`](#func-from).
 
+## `func` delete
+
+```lutra
+func delete(const table_name: Text, predicate: func (R): Bool): {}
+where R: {..}
+```
+
+Deletes rows from a table.
+
+The `predicate` is applied to each row. Rows for which it returns `true`
+are deleted.
+
+Example:
+```lt
+sql::delete("sessions", func (s: Session) -> s.expires_at.0 < now.0)
+```
+
+For table identifier format, see documentation of [`from`](#func-from).
+
 ## `func` raw
 
 ```lutra

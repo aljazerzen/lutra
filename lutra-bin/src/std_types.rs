@@ -24,9 +24,15 @@ pub struct Date {
     pub days_epoch: i32,
 }
 
-/// A time-of-day offset — microseconds since midnight.
+/// A time-of-day offset — microseconds since midnight (always in `[0, 86_400_000_000)`).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Time {
+    pub micros_midnight: u64,
+}
+
+/// A signed, unbounded duration — microseconds.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct Duration {
     pub microseconds: i64,
 }
 
@@ -82,17 +88,38 @@ impl Encode for Time {
     type HeadPtr = ();
 
     fn encode_head(&self, buf: &mut crate::bytes::BytesMut) {
-        self.microseconds.encode_head(buf)
+        self.micros_midnight.encode_head(buf)
     }
 
     fn encode_body(&self, _: (), _: &mut crate::bytes::BytesMut) {}
 }
 impl Layout for Time {
     fn head_size() -> usize {
-        i64::head_size()
+        u64::head_size()
     }
 }
 impl Decode for Time {
+    fn decode(buf: &[u8]) -> Result<Self> {
+        Ok(Self {
+            micros_midnight: u64::decode(buf)?,
+        })
+    }
+}
+impl Encode for Duration {
+    type HeadPtr = ();
+
+    fn encode_head(&self, buf: &mut crate::bytes::BytesMut) {
+        self.microseconds.encode_head(buf)
+    }
+
+    fn encode_body(&self, _: (), _: &mut crate::bytes::BytesMut) {}
+}
+impl Layout for Duration {
+    fn head_size() -> usize {
+        i64::head_size()
+    }
+}
+impl Decode for Duration {
     fn decode(buf: &[u8]) -> Result<Self> {
         Ok(Self {
             microseconds: i64::decode(buf)?,
@@ -197,13 +224,13 @@ mod chrono_impls {
         type Error = crate::Error;
 
         fn try_from(value: Time) -> core::result::Result<Self, Self::Error> {
-            if !(0..MICROS_PER_DAY).contains(&value.microseconds) {
+            if value.micros_midnight >= MICROS_PER_DAY as u64 {
                 return Err(crate::Error::InvalidData);
             }
 
-            let secs = u32::try_from(value.microseconds / i64::from(MICROS_PER_SECOND))
+            let secs = u32::try_from(value.micros_midnight / u64::from(MICROS_PER_SECOND))
                 .map_err(|_| crate::Error::InvalidData)?;
-            let micros = u32::try_from(value.microseconds % i64::from(MICROS_PER_SECOND))
+            let micros = u32::try_from(value.micros_midnight % u64::from(MICROS_PER_SECOND))
                 .map_err(|_| crate::Error::InvalidData)?;
 
             chrono::NaiveTime::from_num_seconds_from_midnight_opt(secs, micros * 1_000)
@@ -213,10 +240,10 @@ mod chrono_impls {
 
     impl From<chrono::NaiveTime> for Time {
         fn from(value: chrono::NaiveTime) -> Self {
-            let secs = i64::from(value.num_seconds_from_midnight());
-            let micros = i64::from(value.nanosecond() / 1_000);
+            let secs = u64::from(value.num_seconds_from_midnight());
+            let micros = u64::from(value.nanosecond() / 1_000);
             Self {
-                microseconds: secs * i64::from(MICROS_PER_SECOND) + micros,
+                micros_midnight: secs * u64::from(MICROS_PER_SECOND) + micros,
             }
         }
     }

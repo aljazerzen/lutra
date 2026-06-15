@@ -8,8 +8,8 @@ pub enum Literal {
     Boolean(bool),
     Text(String),
     Date(Date),
-    Time(Time),
-    DateTime(Date, Time),
+    Duration(Hmsm),
+    DateTime(Date, Hmsm),
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -20,8 +20,12 @@ pub struct Date {
 }
 
 #[derive(Debug, PartialEq, Clone)]
-pub struct Time {
-    pub hours: i32,
+pub struct Hmsm {
+    /// Whether the literal carried a leading `-`. Tracked separately from
+    /// `hours` so that sub-hour negatives like `@-0:30:00` keep their sign.
+    pub negative: bool,
+    /// Hour magnitude (non-negative); the sign lives in `negative`.
+    pub hours: u32,
     pub min: u8,
     pub sec: u8,
     pub micros: Option<u32>,
@@ -112,7 +116,7 @@ impl std::fmt::Display for Literal {
                 f.write_char('@')?;
                 date.fmt(f)
             }
-            Literal::Time(time) => {
+            Literal::Duration(time) => {
                 f.write_char('@')?;
                 time.fmt(f)
             }
@@ -140,30 +144,32 @@ impl std::fmt::Display for Date {
     }
 }
 
-impl Time {
+impl Hmsm {
     pub fn to_microseconds(&self) -> i64 {
-        let h = self.hours.abs() as i64;
-        let min = h * 60 + self.min as i64;
-        let sec = min * 60 + self.sec as i64;
-        let mut micros = sec * 1000000 + self.micros.unwrap_or_default() as i64;
-        if self.hours < 0 {
+        let h = self.hours as u64;
+        let min = h * 60 + self.min as u64;
+        let sec = min * 60 + self.sec as u64;
+        let mut micros = (sec * 1000000 + self.micros.unwrap_or_default() as u64) as i128;
+        if self.negative {
             micros *= -1;
         }
-        micros
+        micros as i64
     }
 }
 
-impl std::fmt::Display for Time {
+impl std::fmt::Display for Hmsm {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let Time {
-            hours: hour,
+        let Hmsm {
+            negative,
+            hours,
             min,
             sec,
-            micros: millis,
+            micros,
         } = self;
-        write!(f, "{hour:02}:{min:02}:{sec:02}")?;
-        if let Some(millis) = millis {
-            write!(f, ".{millis:06}")?;
+        let sign = if *negative { "-" } else { "" };
+        write!(f, "{sign}{hours:02}:{min:02}:{sec:02}")?;
+        if let Some(micros) = micros {
+            write!(f, ".{micros:06}")?;
         }
         Ok(())
     }

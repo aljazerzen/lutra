@@ -122,6 +122,7 @@ impl<'a> super::Context<'a> {
             ir::TyKind::Ident(i)
                 if i.is(&["std", "Int64"])
                     || i.is(&["std", "Uint64"])
+                    || i.is(&["std", "Duration"])
                     || i.is(&["std", "Time"])
                     || i.is(&["std", "Timestamp"])
                     || i.is(&["std", "Decimal"]) =>
@@ -650,7 +651,8 @@ impl EncodeJson for JsonTyStdEncoder {
             (ir::TyStd::Float32, tinyjson::JsonValue::Number(v)) => (*v as f32).encode_head(buf),
             (ir::TyStd::Float64, tinyjson::JsonValue::Number(v)) => (*v).encode_head(buf),
             (ir::TyStd::Date, tinyjson::JsonValue::Number(v)) => (*v as i32).encode_head(buf),
-            (ir::TyStd::Time, tinyjson::JsonValue::Number(v)) => (*v as i64).encode_head(buf),
+            (ir::TyStd::Duration, tinyjson::JsonValue::Number(v)) => (*v as i64).encode_head(buf),
+            (ir::TyStd::Time, tinyjson::JsonValue::Number(v)) => (*v as u64).encode_head(buf),
             (ir::TyStd::Timestamp, tinyjson::JsonValue::Number(v)) => (*v as i64).encode_head(buf),
             (ir::TyStd::Decimal, tinyjson::JsonValue::Number(v)) => (*v as i64).encode_head(buf),
             (ir::TyStd::Text, _) => unreachable!(),

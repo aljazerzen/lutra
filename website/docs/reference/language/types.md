@@ -71,7 +71,8 @@ enum {
 
 A type definition can also introduce a framed type with a single wrapped field.
 The standard library uses this form for framed standard types such as
-`Bool`, `Int32`, `Text`, `Date`, `Time`, `Timestamp`, and `Decimal`.
+`Bool`, `Int32`, `Text`, `Date`, `Time`, `Duration`, `Timestamp`, and
+`Decimal`.
 
 Conceptually, a framed type definition looks like this:
 

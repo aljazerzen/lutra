@@ -104,17 +104,26 @@ impl<'t> ValueVisitor<'t> for Printer<'t> {
         ValueVisitor::<'t>::visit_int32(self, days)
     }
 
-    fn visit_time(&mut self, micros_t: i64) -> Result<Self::Res, crate::Error> {
-        let micros = (micros_t % 1000000).abs();
-        let sec_t = micros_t / 1000000;
-
-        let sec = (sec_t % 60).abs();
+    fn visit_time(&mut self, micros_midnight: u64) -> Result<Self::Res, crate::Error> {
+        let micros = micros_midnight % 1_000_000;
+        let sec_t = micros_midnight / 1_000_000;
+        let sec = sec_t % 60;
         let min_t = sec_t / 60;
+        let min = min_t % 60;
+        let h = min_t / 60;
+        Ok(format!("@{h:02}:{min:02}:{sec:02}.{micros:06}"))
+    }
 
-        let min = (min_t % 60).abs();
-        let h_t = min_t / 60;
-
-        Ok(format!("@{h_t:02}:{min:02}:{sec:02}.{micros:06}"))
+    fn visit_duration(&mut self, micros_t: i64) -> Result<Self::Res, crate::Error> {
+        let sign = if micros_t < 0 { "-" } else { "" };
+        let abs = micros_t.unsigned_abs();
+        let micros = abs % 1_000_000;
+        let sec_t = abs / 1_000_000;
+        let sec = sec_t % 60;
+        let min_t = sec_t / 60;
+        let min = min_t % 60;
+        let h = min_t / 60;
+        Ok(format!("@{sign}{h:02}:{min:02}:{sec:02}.{micros:06}"))
     }
 
     fn visit_timestamp(&mut self, micros: i64) -> Result<Self::Res, crate::Error> {

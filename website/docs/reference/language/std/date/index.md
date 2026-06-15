@@ -3,10 +3,10 @@
 ## `func` sub
 
 ```lutra
-func sub(Date, Date): Time
+func sub(Date, Date): Duration
 ```
 
-Computes time duration between two dates.
+Computes duration between two dates.
 
 Dates are assumed to be in the same timezone.
 Duration is measured from one midnight to another.

@@ -84,6 +84,7 @@ program is launched from the CLI or through Rust.
 | `Text` | `TEXT` |
 | `Date` | `DATE` |
 | `Time` | `TIME` |
+| `Duration` | `INT8` |
 | `Timestamp` | `TIMESTAMP` |
 | top-level tuple `{id: Int64, name: Text}` | `id INT8, name TEXT` |
 | nested tuple `{x: {a: Int32, b: Int32}}` | `x STRUCT(a INT4, b INT4)` |

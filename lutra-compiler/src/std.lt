@@ -74,7 +74,7 @@ module convert {
 
   ## Converts a value to `text`
   external func to_text(T): Text
-  where T: AnyNumber | Bool | Text | Timestamp | Date | Time | Decimal
+  where T: AnyNumber | Bool | Text | Timestamp | Date | Time | Duration | Decimal
 }
 
 import ops::*
@@ -95,15 +95,15 @@ module ops {
 
   ## Adds two numbers.
   external func add(T, T): T
-  where T: AnyNumber | Time | Decimal
+  where T: AnyNumber | Duration | Decimal
 
   ## Subtracts two numbers.
   external func sub(T, T): T
-  where T: AnyNumber | Time | Decimal
+  where T: AnyNumber | Duration | Decimal
 
   ## Negates a number.
   external func neg(T): T
-  where T: Int8 | Int16 | Int32 | Int64 | Float32 | Float64 | Time
+  where T: Int8 | Int16 | Int32 | Int64 | Float32 | Float64 | Duration
 
   ## Compare two values to determine if the first is less, equal, or greater than
   ## the second.
@@ -323,7 +323,8 @@ module array {
 
   ## Sorts the array in ascending order by the value returned by `key`.
   external func sort(array: [I], key: func (I): K): [I]
-  where I, K: AnyNumber | Bool | Text | Timestamp | Date | Time | Decimal
+  where I,
+    K: AnyNumber | Bool | Text | Timestamp | Date | Time | Duration | Decimal,
 
   ## Transposes an array of rows into a tuple of columns.
   ## Each field of the row type becomes a column — an array of that field's values.
@@ -430,22 +431,20 @@ module array {
   external func sequence(start: N, end: N): [N]
   where N: Int8 | Int16 | Int32 | Int64 | Uint8 | Uint16 | Uint32 | Uint64
 
-  # --- Aggregation functions ---
-
   ## Find the minimum value in the array.
   ## Returns `none` when array is empty.
   external func min([T]): T?
-  where T: AnyNumber | Bool | Text | Timestamp | Date | Time | Decimal
+  where T: AnyNumber | Bool | Text | Timestamp | Date | Time | Duration | Decimal
 
   ## Find the maximum value in the array.
   ## Returns `none` when array is empty.
   external func max([T]): T?
-  where T: AnyNumber | Bool | Text | Timestamp | Date | Time | Decimal
+  where T: AnyNumber | Bool | Text | Timestamp | Date | Time | Duration | Decimal
 
   ## Compute sum of all number in an array.
   ## Returns zero when array is empty.
   external func sum([T]): T
-  where T: AnyNumber | Time
+  where T: AnyNumber | Duration
 
   ## Compute arithmetic mean of an array of numbers.
   external func mean([T]): Float64
@@ -459,7 +458,7 @@ module array {
 
   ## Returns `true` if the haystack array contains an item equal to `needle`.
   func contains(haystack haystack: [T], needle needle: T): Bool
-  where T: AnyNumber | Bool | Text | Timestamp | Date | Time | Decimal
+  where T: AnyNumber | Bool | Text | Timestamp | Date | Time | Duration | Decimal
   -> (haystack | filter(x -> eq(x, needle)) | is_empty | not)
 
   # --- Window functions ---
@@ -499,7 +498,7 @@ module array {
   ##
   ## For example, `rank(["a", "b", "b", "c"])` is `[1, 2, 2, 4]`.
   external func rank(array: [T]): [Int32]
-  where T: AnyNumber | Bool | Text | Timestamp | Date | Time | Decimal
+  where T: AnyNumber | Bool | Text | Timestamp | Date | Time | Duration | Decimal
 
   ## Computes dense rank of each array item.
   ##
@@ -510,7 +509,7 @@ module array {
   ##
   ## For example, `rank_dense(["a", "b", "b", "c"])` is `[1, 2, 2, 3]`.
   external func rank_dense(array: [T]): [Int32]
-  where T: AnyNumber | Bool | Text | Timestamp | Date | Time | Decimal
+  where T: AnyNumber | Bool | Text | Timestamp | Date | Time | Duration | Decimal
 
   ## Computes percentile rank of each array item.
   ##
@@ -521,7 +520,7 @@ module array {
   ## For example, `rank_percentile(["a", "b", "b", "c"])` is
   ## `[0.0, 0.33333, 0.25, 1.0]`.
   external func rank_percentile(array: [T]): [Float64]
-  where T: AnyNumber | Bool | Text | Timestamp | Date | Time | Decimal
+  where T: AnyNumber | Bool | Text | Timestamp | Date | Time | Duration | Decimal
 
   ## Computes ECDF (Empirical Cumulative Density Function) of array items.
   ##
@@ -533,7 +532,7 @@ module array {
   ## For example, `cume_dist(["a", "b", "b", "c"])` is
   ## `[0.25, 0.75, 0.75, 1.0]`.
   external func cume_dist(array: [T]): [Float64]
-  where T: AnyNumber | Bool | Text | Timestamp | Date | Time | Decimal
+  where T: AnyNumber | Bool | Text | Timestamp | Date | Time | Duration | Decimal
 }
 
 ## Mathematical ops
@@ -752,76 +751,31 @@ type Timestamp(microseconds: Int64)
 ## Backed by a signed 32-bit integer, representing number of days.
 type Date(days_epoch: Int32)
 
-# ## Length of time, unrelated to calendar events.
-# ##
-# ## Backed by a signed 32-bit integer, representing number of seconds.
-# type Time32Second(int32)
-
-# ## Length of time, unrelated to calendar events.
-# ##
-# ## Backed by a signed 32-bit integer, representing number of milliseconds.
-# type Time32Millisecond(int32)
-
-# ## Length of time, unrelated to calendar events.
-# ##
-# ## Backed by a signed 32-bit integer, representing number of microseconds.
-# type Time32Microsecond(int32)
-
-# ## Length of time, unrelated to calendar events.
-# ##
-# ## Backed by a signed 64-bit integer, representing number of seconds.
-# type Time64Second(int64)
-
-# ## Length of time, unrelated to calendar events.
-# ##
-# ## Backed by a signed 64-bit integer, representing number of milliseconds.
-# type Time64Millisecond(int64)
-
-## Length of time, unrelated to calendar events.
-## Can be interpreted as duration or offset from the midnight.
+## A duration of time, unrelated to calendar events. Can be negative.
 ##
 ## Backed by a signed 64-bit integer, representing number of microseconds.
-type Time(microseconds: Int64)
+type Duration(microseconds: Int64)
 
-# func to_time64_second(x: D): Time64Second
-# where D: Time32Second -> x.0 | to_int64 | Time64Second
-# where D: Time32Millisecond -> x.0 | to_int64 | mul(1000) | Time64Second
-# where D: Time32Microsecond -> x.0 | to_int64 | mul(1000000) | Time64Second
-# where D: Time64Second -> x
-# where D: Time64Millisecond -> x.0 | mul(1000) | Time64Second
-# where D: Time64Microsecond -> x.0 | mul(1000000) | Time64Second
-
-# func to_time64_millisecond(x: D): Time64Millisecond
-# where D: Time32Second -> x.0 | to_int64 | div(1000) | Time64Millisecond
-# where D: Time32Millisecond -> x.0 | to_int64 | Time64Millisecond
-# where D: Time32Microsecond -> x.0 | to_int64 | mul(1000) | Time64Millisecond
-# where D: Time64Second -> x.0 | div(1000) | Time64Millisecond
-# where D: Time64Millisecond -> x
-# where D: Time64Microsecond -> x.0 | mul(1000) | Time64Millisecond
-
-# func to_time64_microsecond(x: D): Time64Microsecond
-# where D: Time32Second -> x.0 | to_int64 | div(1000000) | Time64Microsecond
-# where D: Time32Millisecond -> x.0 | to_int64 | div(1000) | Time64Microsecond
-# where D: Time32Microsecond -> x.0 | to_int64 | Time64Microsecond
-# where D: Time64Second -> x.0 | div(1000000) | Time64Microsecond
-# where D: Time64Millisecond -> x.0 | div(1000) | Time64Microsecond
-# where D: Time64Microsecond -> x
+## Time of day, in the range [0, 24h).
+##
+## Backed by an unsigned 64-bit integer, representing microseconds since midnight.
+type Time(micros_midnight: Uint64)
 
 ## Returns offset of a time zone from UTC on a given date.
-func timezone_offset(time_zone tz: Text, date d: Date): Time -> (
-  timestamp::sub(
-    d | date::to_timestamp(tz),
-    d | date::to_timestamp("UTC"),
-  )
+func timezone_offset(time_zone tz: Text, date d: Date): Duration -> (
+  timestamp::sub(d | date::to_timestamp(tz), d | date::to_timestamp("UTC"))
 )
 
 module date {
-  ## Computes time duration between two dates.
+  ## Computes duration between two dates.
   ##
   ## Dates are assumed to be in the same timezone.
   ## Duration is measured from one midnight to another.
-  func sub(a: Date, b: Date): Time -> (
-    project::sub(a.days_epoch, b.days_epoch) | to_int64 | mul(86400000000) | Time
+  func sub(a: Date, b: Date): Duration -> (
+    project::sub(a.days_epoch, b.days_epoch)
+    | to_int64
+    | mul(86400000000)
+    | Duration
   )
 
   ## Computes the timestamp of a local date at a timezone.
@@ -836,9 +790,39 @@ module timestamp {
   ## Computes the local date of a timestamp at a timezone.
   external func to_date(timestamp: Timestamp, time_zone: Text): Date
 
-  ## Computes the elapsed `Time` between two `Timestamp`s.
+  ## Computes the elapsed `Duration` between two `Timestamp`s.
   ## Result is `a - b`: positive when `a` is later than `b`.
-  func sub(a: Timestamp, b: Timestamp): Time -> project::sub(a.0, b.0) | Time
+  func sub(a: Timestamp, b: Timestamp): Duration -> (
+    project::sub(a.0, b.0) | Duration
+  )
+}
+
+## Time-of-day helper functions.
+module time {
+  ## Converts a `Time` (time-of-day) into a `Duration` from midnight.
+  func to_duration(t: Time): Duration -> t.micros_midnight | to_int64 | Duration
+
+  ## Computes the signed duration from `b` to `a` (`a - b`).
+  ## The result may be negative.
+  func diff(a: Time, b: Time): Duration -> (
+    Duration(project::sub(
+      a.micros_midnight | to_int64, b.micros_midnight | to_int64,
+    ))
+  )
+
+  ## Adds a `Duration` to a `Time`, wrapping within `[0, 24h)`.
+  func add(t: Time, d: Duration): Time -> (
+    let raw = t.micros_midnight | to_int64 | project::add(d.microseconds);
+    let day = 86400000000;
+    raw | mod(day) | project::add(day) | mod(day) | to_uint64 | Time
+  )
+
+  ## Subtracts a `Duration` from a `Time`, wrapping within `[0, 24h)`.
+  func sub(t: Time, d: Duration): Time -> (
+    let raw = t.micros_midnight | to_int64 | project::sub(d.microseconds);
+    let day = 86400000000;
+    raw | mod(day) | project::add(day) | mod(day) | to_uint64 | Time
+  )
 }
 
 ## Exact decimal value with a fixed `SCALE`, which is the number of digits past

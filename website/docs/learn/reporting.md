@@ -61,7 +61,7 @@ You could repeat that calculation in every report. It is usually better to
 factor it into a helper function:
 
 ```lt
-func entry_duration(entry: Entry): Time -> (
+func entry_duration(entry: Entry): Duration -> (
   let ended_at = entry.ended_at | option::or_else(entry.started_at);
   timestamp::sub(ended_at, entry.started_at)
 )
@@ -74,7 +74,7 @@ func main() -> entry_duration(entries | index(0) | option::or_default())
 Now, we can summarize all entries into a single row.
 
 ```lt
-func totals(entries: [Entry]): {count: Int64, duration: Time} -> {
+func totals(entries: [Entry]): {count: Int64, duration: Duration} -> {
   count = entries | count(),
   duration = entries | map(entry_duration) | sum(),
 }
@@ -93,7 +93,7 @@ It takes two functions:
 - a mapper that turns each partition into one output row
 
 ```lt
-func totals_by_project(entries: [Entry]): [{project: Text, duration: Time}] -> (
+func totals_by_project(entries: [Entry]): [{project: Text, duration: Duration}] -> (
   entries
   | group_map(
       e -> e.project,
@@ -114,7 +114,7 @@ partition the rows by a key, then map each partition to its summary.
 A grouped summary can return more than one metric.
 
 ```lt
-type ProjectMetric: {project: Text, count: Int64, duration: Time}
+type ProjectMetric: {project: Text, count: Int64, duration: Duration}
 
 func project_metrics(entries: [Entry]): [ProjectMetric] -> (
   entries

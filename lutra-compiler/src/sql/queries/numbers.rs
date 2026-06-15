@@ -111,7 +111,7 @@ impl super::Context<'_> {
                     format!("({v})::{}", self.ty_name(ty))
                 }
             }
-            ir::TyStd::Int64 | ir::TyStd::Time | ir::TyStd::Timestamp | ir::TyStd::Decimal => {
+            ir::TyStd::Int64 | ir::TyStd::Duration | ir::TyStd::Timestamp | ir::TyStd::Decimal => {
                 let v = *lit.as_prim64().unwrap() as i64;
                 if v >= 0 {
                     format!("{v}::{}", self.ty_name(ty))
@@ -143,7 +143,7 @@ impl super::Context<'_> {
                     format!("{}::{}", *v as i32, self.ty_name(ty))
                 }
             }
-            ir::TyStd::UInt64 => {
+            ir::TyStd::UInt64 | ir::TyStd::Time => {
                 let v = lit.as_prim64().unwrap();
                 if self.dialect == Dialect::DuckDB || *v < 0x8000000000000000 {
                     format!("{v}::{}", self.ty_name(ty))

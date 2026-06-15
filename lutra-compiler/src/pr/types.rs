@@ -89,9 +89,13 @@ pub struct TyEnumVariant {
 #[derive(Debug, Clone, PartialEq, Eq, Hash, strum::Display)]
 #[allow(non_camel_case_types)]
 pub enum TyPrimitive {
+    #[strum(to_string = "Prim8")]
     prim8,
+    #[strum(to_string = "Prim16")]
     prim16,
+    #[strum(to_string = "Prim32")]
     prim32,
+    #[strum(to_string = "Prim64")]
     prim64,
 }
 

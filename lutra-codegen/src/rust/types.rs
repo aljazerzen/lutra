@@ -257,6 +257,7 @@ fn get_ty_std_ref(ident: &ir::Path, ctx: &Context) -> Option<Cow<'static, str>> 
         ir::TyStd::Float64 => Cow::Borrowed("f64"),
         ir::TyStd::Text => Cow::Owned(format!("{lb}::string::String")),
         ir::TyStd::Date => Cow::Owned(format!("{lb}::std::Date")),
+        ir::TyStd::Duration => Cow::Owned(format!("{lb}::std::Duration")),
         ir::TyStd::Time => Cow::Owned(format!("{lb}::std::Time")),
         ir::TyStd::Timestamp => Cow::Owned(format!("{lb}::std::Timestamp")),
         ir::TyStd::Decimal => Cow::Owned(format!("{lb}::std::Decimal")),

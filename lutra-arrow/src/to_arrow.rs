@@ -107,6 +107,26 @@ prim_converter!(UInt64Converter, u64, aa::UInt64Builder);
 prim_converter!(Float32Converter, f32, aa::Float32Builder);
 prim_converter!(Float64Converter, f64, aa::Float64Builder);
 
+struct Time64MicrosecondConverter;
+impl Convert for Time64MicrosecondConverter {
+    fn convert(&self, writer: &mut ArrowRowWriter, data: &[u8]) {
+        let v = decode_prim::<u64>(data);
+        writer
+            .next_as::<aa::Time64MicrosecondBuilder>()
+            .append_value(v as i64);
+    }
+}
+
+struct DurationMicrosecondConverter;
+impl Convert for DurationMicrosecondConverter {
+    fn convert(&self, writer: &mut ArrowRowWriter, data: &[u8]) {
+        let v = decode_prim::<i64>(data);
+        writer
+            .next_as::<aa::DurationMicrosecondBuilder>()
+            .append_value(v);
+    }
+}
+
 struct TextConverter;
 impl Convert for TextConverter {
     fn convert(&self, writer: &mut ArrowRowWriter, data: &[u8]) {
@@ -201,6 +221,10 @@ fn construct_cell_ident_converter(ident: &ir::Path) -> Option<Box<dyn Convert>> 
         Some(Box::new(Float64Converter))
     } else if ident.is(&["std", "Text"]) {
         Some(Box::new(TextConverter))
+    } else if ident.is(&["std", "Time"]) {
+        Some(Box::new(Time64MicrosecondConverter))
+    } else if ident.is(&["std", "Duration"]) {
+        Some(Box::new(DurationMicrosecondConverter))
     } else {
         None
     }
@@ -284,6 +308,7 @@ fn get_schema_cell(ty: &ir::Ty, ctx: &Context) -> Result<DataType, Error> {
                 ir::TyStd::Text => DataType::Utf8,
                 ir::TyStd::Date => DataType::Date32,
                 ir::TyStd::Time => DataType::Time64(TimeUnit::Microsecond),
+                ir::TyStd::Duration => DataType::Duration(TimeUnit::Microsecond),
                 ir::TyStd::Timestamp => DataType::Timestamp(TimeUnit::Microsecond, None),
                 ir::TyStd::Decimal => DataType::Decimal64(20, 2),
             })

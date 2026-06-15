@@ -506,7 +506,9 @@ impl<'a> Lowerer<'a> {
 
                 ir::Literal::Prim32(epoch_days.to_le() as u32)
             }
-            pr::Literal::Time(time) => ir::Literal::Prim64(time.to_microseconds().to_le() as u64),
+            pr::Literal::Duration(time) => {
+                ir::Literal::Prim64(time.to_microseconds().to_le() as u64)
+            }
 
             pr::Literal::DateTime(date, time) => {
                 let Some(epoch_days) = date.to_epoch_days() else {

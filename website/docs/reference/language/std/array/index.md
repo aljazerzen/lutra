@@ -80,7 +80,7 @@ Returns items from index `start` (inclusive) to `end` (exclusive).
 
 ```lutra
 func sort(array: [I], key: func (I): K): [I]
-where I, K: primitive | Timestamp | Date | Time | Decimal
+where I, K: AnyNumber | Bool | Text | Timestamp | Date | Time | Duration | Decimal
 ```
 
 Sorts the array in ascending order by the value returned by `key`.
@@ -246,7 +246,7 @@ For example: `sequence(0, 3) == [0, 1, 2]`
 
 ```lutra
 func min([T]): enum {none, some: T}
-where T: primitive | Timestamp | Date | Time | Decimal
+where T: AnyNumber | Bool | Text | Timestamp | Date | Time | Duration | Decimal
 ```
 
 Find the minimum value in the array.
@@ -256,7 +256,7 @@ Returns `none` when array is empty.
 
 ```lutra
 func max([T]): enum {none, some: T}
-where T: primitive | Timestamp | Date | Time | Decimal
+where T: AnyNumber | Bool | Text | Timestamp | Date | Time | Duration | Decimal
 ```
 
 Find the maximum value in the array.
@@ -266,7 +266,7 @@ Returns `none` when array is empty.
 
 ```lutra
 func sum([T]): T
-where T: number | Time
+where T: AnyNumber | Duration
 ```
 
 Compute sum of all number in an array.
@@ -276,7 +276,7 @@ Returns zero when array is empty.
 
 ```lutra
 func mean([T]): Float64
-where T: number
+where T: AnyNumber
 ```
 
 Compute arithmetic mean of an array of numbers.
@@ -301,7 +301,7 @@ Returns `true` if any value in the array is `true`.
 
 ```lutra
 func contains(haystack: [T], needle: T): Bool
-where T: primitive | Timestamp | Date | Time | Decimal
+where T: AnyNumber | Bool | Text | Timestamp | Date | Time | Duration | Decimal
 ```
 
 Returns `true` if the haystack array contains an item equal to `needle`.
@@ -334,7 +334,7 @@ For example, `lead(["a", "b", "c"], 1)` is `["b", "c", ""]`.
 
 ```lutra
 func rolling_mean(array: [T], preceding: Uint32, following: Uint32): [Float64]
-where T: number
+where T: AnyNumber
 ```
 
 Computes rolling arithmetic mean over an array of numbers.
@@ -351,7 +351,7 @@ For example, `rolling_mean(..., 1, 2)` computes mean of each item, along with
 
 ```lutra
 func rank(array: [T]): [Int32]
-where T: primitive | Timestamp | Date | Time | Decimal
+where T: AnyNumber | Bool | Text | Timestamp | Date | Time | Duration | Decimal
 ```
 
 Computes rank of each array item.
@@ -367,7 +367,7 @@ For example, `rank(["a", "b", "b", "c"])` is `[1, 2, 2, 4]`.
 
 ```lutra
 func rank_dense(array: [T]): [Int32]
-where T: primitive | Timestamp | Date | Time | Decimal
+where T: AnyNumber | Bool | Text | Timestamp | Date | Time | Duration | Decimal
 ```
 
 Computes dense rank of each array item.
@@ -383,7 +383,7 @@ For example, `rank_dense(["a", "b", "b", "c"])` is `[1, 2, 2, 3]`.
 
 ```lutra
 func rank_percentile(array: [T]): [Float64]
-where T: primitive | Timestamp | Date | Time | Decimal
+where T: AnyNumber | Bool | Text | Timestamp | Date | Time | Duration | Decimal
 ```
 
 Computes percentile rank of each array item.
@@ -399,7 +399,7 @@ For example, `rank_percentile(["a", "b", "b", "c"])` is
 
 ```lutra
 func cume_dist(array: [T]): [Float64]
-where T: primitive | Timestamp | Date | Time | Decimal
+where T: AnyNumber | Bool | Text | Timestamp | Date | Time | Duration | Decimal
 ```
 
 Computes ECDF (Empirical Cumulative Density Function) of array items.

@@ -82,8 +82,11 @@ where
             let v = i32::decode(buf.chunk())?;
             self.visit_date(v).map(Some)
         } else if ident.is(&["std", "Time"]) {
-            let v = i64::decode(buf.chunk())?;
+            let v = u64::decode(buf.chunk())?;
             self.visit_time(v).map(Some)
+        } else if ident.is(&["std", "Duration"]) {
+            let v = i64::decode(buf.chunk())?;
+            self.visit_duration(v).map(Some)
         } else if ident.is(&["std", "Timestamp"]) {
             let v = i64::decode(buf.chunk())?;
             self.visit_timestamp(v).map(Some)
@@ -173,7 +176,10 @@ where
     fn visit_date(&mut self, days: i32) -> Result<Self::Res, crate::Error> {
         self.visit_int32(days)
     }
-    fn visit_time(&mut self, micros: i64) -> Result<Self::Res, crate::Error> {
+    fn visit_time(&mut self, micros: u64) -> Result<Self::Res, crate::Error> {
+        self.visit_uint64(micros)
+    }
+    fn visit_duration(&mut self, micros: i64) -> Result<Self::Res, crate::Error> {
         self.visit_int64(micros)
     }
     fn visit_timestamp(&mut self, micros: i64) -> Result<Self::Res, crate::Error> {

@@ -145,6 +145,7 @@ fn get_param_ty_of_std_ty(ident: &ir::Path) -> Option<ParamTy> {
     } else if ident.is(&["std", "Uint32"]) {
         Some(ParamTy::U32)
     } else if ident.is(&["std", "Int64"])
+        || ident.is(&["std", "Duration"])
         || ident.is(&["std", "Time"])
         || ident.is(&["std", "Timestamp"])
         || ident.is(&["std", "Decimal"])

@@ -120,7 +120,12 @@ impl<'a> queries::Context<'a> {
             let r = format!("({ser_ref}::date - '1970-01-01'::date)::int4");
             return vec![sa::Expr::Source(r)];
         }
-        if is_ident(ty, &["std", "Time"]) || is_ident(ty, &["std", "Timestamp"]) {
+        if is_ident(ty, &["std", "Time"]) {
+            // DuckDB TIME -> query repr (u64 micros since midnight)
+            let r = format!("epoch_us({ser_ref})");
+            return vec![sa::Expr::Source(r)];
+        }
+        if is_ident(ty, &["std", "Timestamp"]) {
             let r = format!("epoch_us({ser_ref})");
             return vec![sa::Expr::Source(r)];
         }
@@ -227,8 +232,14 @@ impl<'a> queries::Context<'a> {
             let expr = cols.remove(0);
             return sa::Expr::Source(format!("('1970-01-01'::date + {expr})"));
         }
-        if is_ident(ty, &["std", "Time"]) {
+        if is_ident(ty, &["std", "Duration"]) {
+            // Duration is INT8 pass-through
             return cols.remove(0);
+        }
+        if is_ident(ty, &["std", "Time"]) {
+            // query repr (u64 micros since midnight) -> DuckDB TIME
+            let expr = cols.remove(0);
+            return sa::Expr::Source(format!("(TIME '00:00:00' + to_microseconds({expr}))"));
         }
         if is_ident(ty, &["std", "Timestamp"]) {
             let expr = cols.remove(0);

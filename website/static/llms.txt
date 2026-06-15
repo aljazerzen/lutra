@@ -46,6 +46,7 @@ The project is in early development, created by Aljaž M. Eržen and available u
 - [`std::fs`](https://lutra-lang.org/docs/reference/language/std/fs/): File system operations.
 - [`std::sql`](https://lutra-lang.org/docs/reference/language/std/sql/): SQL interface.
 - [`std::date`](https://lutra-lang.org/docs/reference/language/std/date/): Date operations.
+- [`std::time`](https://lutra-lang.org/docs/reference/language/std/time/): Time-of-day operations.
 - [`std::timestamp`](https://lutra-lang.org/docs/reference/language/std/timestamp/): Timestamp operations.
 
 ## Runtime

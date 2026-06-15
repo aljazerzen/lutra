@@ -93,16 +93,8 @@ pub fn format_ty_std(data: &[u8], ty: ir::TyStd) -> Result<String> {
                 days.to_string()
             }
         }
-        ir::TyStd::Time => {
-            let micros_t = i64::decode(data)?;
-            let micros = (micros_t % 1_000_000).unsigned_abs();
-            let sec_t = micros_t / 1_000_000;
-            let sec = (sec_t % 60).unsigned_abs();
-            let min_t = sec_t / 60;
-            let min = (min_t % 60).unsigned_abs();
-            let h = min_t / 60;
-            format!("{:02}:{:02}:{:02}.{:06}", h, min, sec, micros)
-        }
+        ir::TyStd::Duration => lutra_bin::print_duration(i64::decode(data)?),
+        ir::TyStd::Time => lutra_bin::print_time(u64::decode(data)?),
         ir::TyStd::Timestamp => {
             let micros = i64::decode(data)?;
             if let Some(dt) = chrono::DateTime::from_timestamp_micros(micros) {

@@ -12,6 +12,7 @@
 - [`sql`](sql/index.md) - SQL interface
 - [`date`](date/index.md)
 - [`timestamp`](timestamp/index.md)
+- [`time`](time/index.md) - Time-of-day helper functions.
 
 ## `anno` doc
 
@@ -170,21 +171,30 @@ Elapsed days since Unix Epoch (1970-01-01).
 
 Backed by a signed 32-bit integer, representing number of days.
 
+## `type` Duration
+
+```lutra
+type Duration(microseconds: Int64)
+```
+
+A signed duration of time, unrelated to calendar events.
+
+Backed by a signed 64-bit integer, representing number of microseconds.
+
 ## `type` Time
 
 ```lutra
-type Time(microseconds: Int64)
+type Time(micros_midnight: Uint64)
 ```
 
-Length of time, unrelated to calendar events.
-Can be interpreted as duration or offset from the midnight.
+Time of day, in the range [0, 24h).
 
-Backed by a signed 64-bit integer, representing number of microseconds.
+Backed by an unsigned 64-bit integer, representing microseconds since midnight.
 
 ## `func` timezone_offset
 
 ```lutra
-func timezone_offset(time_zone: Text, date: Date): Time
+func timezone_offset(time_zone: Text, date: Date): Duration
 ```
 
 Returns offset of a time zone from UTC on a given date.
