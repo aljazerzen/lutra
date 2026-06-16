@@ -36,6 +36,36 @@ pub struct Duration {
     pub microseconds: i64,
 }
 
+impl core::ops::Add for Duration {
+    type Output = Duration;
+
+    fn add(self, rhs: Duration) -> Duration {
+        Duration {
+            microseconds: self.microseconds + rhs.microseconds,
+        }
+    }
+}
+
+impl core::ops::Sub for Duration {
+    type Output = Duration;
+
+    fn sub(self, rhs: Duration) -> Duration {
+        Duration {
+            microseconds: self.microseconds - rhs.microseconds,
+        }
+    }
+}
+
+impl core::ops::Neg for Duration {
+    type Output = Duration;
+
+    fn neg(self) -> Duration {
+        Duration {
+            microseconds: -self.microseconds,
+        }
+    }
+}
+
 /// A fixed-point decimal (scale = 2).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Decimal(pub i64);
@@ -179,6 +209,8 @@ impl Decode for ops::Ordering {
 mod chrono_impls {
     use chrono::{Datelike, Timelike};
 
+    use crate::std::Duration;
+
     use super::{Date, Time, Timestamp};
 
     const EPOCH_DAYS_FROM_CE: i32 = 719_163;
@@ -245,6 +277,21 @@ mod chrono_impls {
             Self {
                 micros_midnight: secs * u64::from(MICROS_PER_SECOND) + micros,
             }
+        }
+    }
+    impl From<Duration> for chrono::Duration {
+        fn from(value: Duration) -> Self {
+            chrono::Duration::microseconds(value.microseconds)
+        }
+    }
+    impl TryFrom<chrono::Duration> for Duration {
+        type Error = crate::Error;
+
+        fn try_from(value: chrono::Duration) -> core::result::Result<Self, Self::Error> {
+            value
+                .num_microseconds()
+                .map(|microseconds| Duration { microseconds })
+                .ok_or(crate::Error::InvalidData)
         }
     }
 }

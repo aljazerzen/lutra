@@ -129,6 +129,7 @@ impl RecordingPrinter {
 /// Strip dynamic content that would make snapshots fragile:
 /// - The status bar appends `⸱ {key:?}` for the last key pressed.
 /// - Output-signature lines contain a wall-clock duration (`output · 1.23ms`).
+/// - The banner contains the crate version (`Lutra v0.6.2`).
 fn normalize(s: String) -> String {
     // U+2E31: status-bar segment separator; U+00B7: output-signature separator.
     const KEY_MARKER: &str = " \u{2e31} KeyEvent { ";
@@ -146,7 +147,7 @@ fn normalize(s: String) -> String {
                     return line[..pos].to_string();
                 }
             }
-            line.to_string()
+            strip_version(line)
         })
         .collect();
     let mut joined = lines.join("\n");
@@ -154,6 +155,22 @@ fn normalize(s: String) -> String {
         joined.push('\n');
     }
     joined
+}
+
+/// Replace the version in the banner (`Lutra v0.6.2`) with `Lutra version`
+/// so snapshots survive version bumps.
+fn strip_version(line: &str) -> String {
+    const MARKER: &str = "Lutra v";
+    if let Some(pos) = line.find(MARKER) {
+        let after = &line[pos + MARKER.len()..];
+        let ver_len = after
+            .find(|c: char| !(c.is_ascii_digit() || c == '.'))
+            .unwrap_or(after.len());
+        if ver_len > 0 {
+            return format!("{}Lutra [version]{}", &line[..pos], &after[ver_len..]);
+        }
+    }
+    line.to_string()
 }
 
 fn is_duration(s: &str) -> bool {
@@ -302,7 +319,7 @@ fn record(events: Vec<Event>) -> String {
 #[test]
 fn startup_empty_project() {
     insta::assert_snapshot!(record(vec![]), @"
-    ▌ Lutra v0.6.0
+    ▌ Lutra [version]
     ▌ Tip:  Enter to run  ·  ↑↓ for history  ·  Esc to clear  ·  Ctrl+Q to exit
 
     ▌ project
@@ -322,7 +339,7 @@ fn help_command() {
     let mut events = type_str("/help");
     events.push(enter());
     insta::assert_snapshot!(record(events), @"
-    ▌ Lutra v0.6.0
+    ▌ Lutra [version]
     ▌ Tip:  Enter to run  ·  ↑↓ for history  ·  Esc to clear  ·  Ctrl+Q to exit
 
     ▌ project
@@ -351,7 +368,7 @@ fn help_command() {
 #[test]
 fn typing_in_prompt() {
     insta::assert_snapshot!(record(type_str("hello world")), @"
-    ▌ Lutra v0.6.0
+    ▌ Lutra [version]
     ▌ Tip:  Enter to run  ·  ↑↓ for history  ·  Esc to clear  ·  Ctrl+Q to exit
 
     ▌ project
@@ -371,7 +388,7 @@ fn function_prompt_shows_argument_form() {
     let mut events = type_str("func (x: Bool) -> (x | to_text)");
     events.push(enter());
     insta::assert_snapshot!(record(events), @"
-    ▌ Lutra v0.6.0
+    ▌ Lutra [version]
     ▌ Tip:  Enter to run  ·  ↑↓ for history  ·  Esc to clear  ·  Ctrl+Q to exit
 
     ▌ project
@@ -397,7 +414,7 @@ fn pipe_binds_last_history_output_into_draft() {
     events.extend(type_str("/pipe"));
     events.push(enter());
     insta::assert_snapshot!(record(events), @r#"
-    ▌ Lutra v0.6.0
+    ▌ Lutra [version]
     ▌ Tip:  Enter to run  ·  ↑↓ for history  ·  Esc to clear  ·  Ctrl+Q to exit
 
     ▌ project
@@ -432,7 +449,7 @@ fn bound_input_executes() {
     events.push(enter());
     events.push(esc());
     insta::assert_snapshot!(record(events), @r#"
-    ▌ Lutra v0.6.0
+    ▌ Lutra [version]
     ▌ Tip:  Enter to run  ·  ↑↓ for history  ·  Esc to clear  ·  Ctrl+Q to exit
 
     ▌ project
@@ -471,7 +488,7 @@ fn inspect_output_seeds_input_for_scalar() {
     events.push(enter());
     events.push(enter());
     insta::assert_snapshot!(record(events), @r#"
-    ▌ Lutra v0.6.0
+    ▌ Lutra [version]
     ▌ Tip:  Enter to run  ·  ↑↓ for history  ·  Esc to clear  ·  Ctrl+Q to exit
 
     ▌ project
@@ -501,7 +518,7 @@ fn inspect_output_seeds_map_for_array() {
     events.push(enter());
     events.push(enter());
     insta::assert_snapshot!(record(events), @"
-    ▌ Lutra v0.6.0
+    ▌ Lutra [version]
     ▌ Tip:  Enter to run  ·  ↑↓ for history  ·  Esc to clear  ·  Ctrl+Q to exit
 
     ▌ project
@@ -534,7 +551,7 @@ fn inspect_output_seeds_nested_column() {
     events.push(enter());
     events.push(enter());
     insta::assert_snapshot!(record(events), @r#"
-    ▌ Lutra v0.6.0
+    ▌ Lutra [version]
     ▌ Tip:  Enter to run  ·  ↑↓ for history  ·  Esc to clear  ·  Ctrl+Q to exit
 
     ▌ project
@@ -570,7 +587,7 @@ fn slash_help_from_bound_input_is_plain() {
     events.extend(type_str("/help"));
     events.push(enter());
     insta::assert_snapshot!(record(events), @r#"
-    ▌ Lutra v0.6.0
+    ▌ Lutra [version]
     ▌ Tip:  Enter to run  ·  ↑↓ for history  ·  Esc to clear  ·  Ctrl+Q to exit
 
     ▌ project
@@ -612,7 +629,7 @@ fn run_success() {
     events.push(enter());
     events.push(esc());
     insta::assert_snapshot!(record(events), @r#"
-    ▌ Lutra v0.6.0
+    ▌ Lutra [version]
     ▌ Tip:  Enter to run  ·  ↑↓ for history  ·  Esc to clear  ·  Ctrl+Q to exit
 
     ▌ project
@@ -641,7 +658,7 @@ fn run_error() {
     events.push(esc());
     let (runner, _) = error_runner();
     insta::assert_snapshot!(record_with(runner, events), @r#"
-    ▌ Lutra v0.6.0
+    ▌ Lutra [version]
     ▌ Tip:  Enter to run  ·  ↑↓ for history  ·  Esc to clear  ·  Ctrl+Q to exit
 
     ▌ project
@@ -668,7 +685,7 @@ fn pull_schema() {
     events.push(enter());
     let (runner, _) = schema_runner(schema);
     insta::assert_snapshot!(record_with(runner, events), @"
-    ▌ Lutra v0.6.0
+    ▌ Lutra [version]
     ▌ Tip:  Enter to run  ·  ↑↓ for history  ·  Esc to clear  ·  Ctrl+Q to exit
 
     ▌ project
@@ -692,7 +709,7 @@ fn resize() {
     let mut events = type_str("hello world");
     events.push(Event::Resize(40, 12));
     insta::assert_snapshot!(record(events), @"
-    ▌ Lutra v0.6.0
+    ▌ Lutra [version]
     ▌ Tip:  Enter to run  ·  ↑↓ for history  ·  Esc to clear  ·  Ctrl+Q to exit
 
     ▌ project

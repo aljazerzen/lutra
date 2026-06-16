@@ -190,7 +190,7 @@ fn validate_type_match(
     } else {
         Err(Error::TypeMismatch {
             arrow_ty: format!("{:?}", arrow_ty),
-            lutra_ty: format!("{:?}", lutra_ty.kind),
+            lutra_ty: lutra_bin::ir::print_ty(lutra_ty),
         })
     }
 }
