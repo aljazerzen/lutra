@@ -1666,9 +1666,13 @@ fn match_05() {
     "#, lutra_bin::Value::unit())), @r#"
     SELECT
       CASE
-        WHEN ('Tom'::text = 'world'::text) THEN 'Hello world!'::text
-        ELSE ('Hello '::text || 'Tom'::text)
+        WHEN (r0.value = 'world'::text) THEN 'Hello world!'::text
+        ELSE ('Hello '::text || r0.value)
       END AS value
+    FROM
+      (
+        SELECT
+          'Tom'::text AS value) AS r0
     ---
     "Hello Tom"
     "#);
@@ -1753,7 +1757,32 @@ fn cmp_tuple_sql() {
         lutra_bin::Value::unit(),
     ).0, @"
     SELECT
-      r8._t
+      CASE
+        WHEN (r2._t = 1::int2) THEN (
+          SELECT
+            CASE
+              WHEN (r3._t = 1::int2) THEN 1::int2
+              ELSE r3._t
+            END AS _t
+          FROM
+            (
+              SELECT
+                (
+                  SELECT
+                    CASE
+                      WHEN a < b THEN 0
+                      WHEN a > b THEN 2
+                      ELSE 1
+                    END::int2
+                  FROM
+                    (
+                      VALUES
+                        (r1._1, r0._1)) t(a, b)
+                ) AS _t
+            ) AS r3
+        )
+        ELSE r2._t
+      END AS _t
     FROM
       (
         SELECT
@@ -1762,74 +1791,20 @@ fn cmp_tuple_sql() {
         SELECT
           1::int4 AS _0, 'a'::text AS _1) AS r1,
       LATERAL (
-        WITH
-        r2 AS (
-          SELECT
-            (
-              SELECT
-                CASE
-                  WHEN a < b THEN 0
-                  WHEN a > b THEN 2
-                  ELSE 1
-                END::int2
-              FROM
-                (
-                  VALUES
-                    (r1._0, r0._0)) t(a, b)
-            ) AS _t
-        )
         SELECT
-          CASE
-            WHEN (
+          (
+            SELECT
+              CASE
+                WHEN a < b THEN 0
+                WHEN a > b THEN 2
+                ELSE 1
+              END::int2
+            FROM
               (
-                SELECT
-                  r3._t AS value
-                FROM
-                  r2 AS r3
-              ) = 1::int2
-            ) THEN (
-              WITH
-              r4 AS (
-                SELECT
-                  (
-                    SELECT
-                      CASE
-                        WHEN a < b THEN 0
-                        WHEN a > b THEN 2
-                        ELSE 1
-                      END::int2
-                    FROM
-                      (
-                        VALUES
-                          (r1._1, r0._1)) t(a, b)
-                  ) AS _t
-              )
-              SELECT
-                CASE
-                  WHEN (
-                    (
-                      SELECT
-                        r5._t AS value
-                      FROM
-                        r4 AS r5
-                    ) = 1::int2
-                  ) THEN 1::int2
-                  ELSE (
-                    SELECT
-                      r6._t
-                    FROM
-                      r4 AS r6
-                  )
-                END AS _t
-            )
-            ELSE (
-              SELECT
-                r7._t
-              FROM
-                r2 AS r7
-            )
-          END AS _t
-      ) AS r8
+                VALUES
+                  (r1._0, r0._0)) t(a, b)
+          ) AS _t
+      ) AS r2
     "
     );
 }

@@ -233,13 +233,17 @@ struct BindingUsageCounter {
 }
 
 impl BindingUsageCounter {
-    fn is_simple_expr(expr: &ir::Expr) -> bool {
+    fn is_simple_expr(&self, expr: &ir::Expr) -> bool {
         match &expr.kind {
             ir::ExprKind::Literal(ir::Literal::Text(_)) => false,
             ir::ExprKind::Literal(_) => true,
+            // A binding alias is only simple if the binding it points to is
+            // simple. Otherwise inlining the alias into multiple sites would
+            // duplicate a non-simple binding (see .plans/fix-inlining.md).
+            ir::ExprKind::Pointer(ir::Pointer::Binding(id)) => self.simple.contains(id),
             ir::ExprKind::Pointer(_) => true,
-            ir::ExprKind::TupleLookup(lookup) => Self::is_simple_expr(&lookup.base),
-            ir::ExprKind::Tuple(fields) => fields.iter().all(|f| Self::is_simple_expr(&f.expr)),
+            ir::ExprKind::TupleLookup(lookup) => self.is_simple_expr(&lookup.base),
+            ir::ExprKind::Tuple(fields) => fields.iter().all(|f| self.is_simple_expr(&f.expr)),
             _ => false,
         }
     }
@@ -250,7 +254,7 @@ impl fold::IrFold for BindingUsageCounter {
         self.usage.insert(binding.id, 0);
 
         // Check if this binding is simple
-        if Self::is_simple_expr(&binding.expr) {
+        if self.is_simple_expr(&binding.expr) {
             self.simple.insert(binding.id);
         }
 

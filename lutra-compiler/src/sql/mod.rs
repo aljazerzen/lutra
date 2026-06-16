@@ -13,7 +13,7 @@ pub fn compile_ir(program: &ir::Program, dialect: Dialect) -> rr::SqlProgram {
     // compile to clauses (dialect-agnostic)
     let (clauses, types) = clauses::compile(program);
 
-    let clauses = optimizer::optimize(clauses);
+    let clauses = optimizer::optimize(clauses, &types);
     tracing::debug!("cr: {clauses:#?}");
 
     // compile to queries

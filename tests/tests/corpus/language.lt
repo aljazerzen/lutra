@@ -1697,6 +1697,10 @@ func main() -> [1: Int32, 2, 6] == [1, 2, 6]
 true
 
 # === std_eq_08
+# skip: duckdb
+# Comparing values with array columns emits a recursive CTE (array fold) over
+# correlated LIST columns, which DuckDB cannot decorrelate.
+# See https://github.com/duckdb/duckdb/issues/23315
 func main() -> (
   {a = [1: Int32, 2, 6], b = [{true, "t"}, {false, "f"}]}
   == {a = [1: Int32, 2, 6], b = [{true, "t"}, {false, "f"}]}

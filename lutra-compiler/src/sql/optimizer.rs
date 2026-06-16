@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use lutra_bin::ir;
 
 use crate::sql::{
@@ -5,13 +7,33 @@ use crate::sql::{
     utils,
 };
 
-pub fn optimize(expr: cr::Expr) -> cr::Expr {
-    Optimizer {}.fold_expr(expr).unwrap()
+pub fn optimize(expr: cr::Expr, defs: &HashMap<&ir::Path, &ir::Ty>) -> cr::Expr {
+    Optimizer { defs }.fold_expr(expr).unwrap()
 }
 
-struct Optimizer {}
+struct Optimizer<'a> {
+    defs: &'a HashMap<&'a ir::Path, &'a ir::Ty>,
+}
 
-impl cr::CrFold for Optimizer {
+impl<'a> Optimizer<'a> {
+    /// Materializes `ty` by resolving non-std identifier aliases through the
+    /// program's type definitions. Std identifiers (e.g. `std::Text`) are
+    /// returned as-is. Mirrors `clauses::Context::get_ty_mat`.
+    fn get_ty_mat<'t>(&self, mut ty: &'t ir::Ty) -> &'t ir::Ty
+    where
+        'a: 't,
+    {
+        while let ir::TyKind::Ident(path) = &ty.kind {
+            if ir::TyStd::try_new(path).is_some() {
+                return ty;
+            }
+            ty = self.defs.get(path).copied().unwrap();
+        }
+        ty
+    }
+}
+
+impl cr::CrFold for Optimizer<'_> {
     fn fold_expr(&mut self, expr: cr::Expr) -> Result<cr::Expr, ()> {
         let mut expr = cr::fold_expr(self, expr)?;
         expr = simplify_eq_of_bool(expr);
@@ -28,7 +50,7 @@ impl cr::CrFold for Optimizer {
         expr = e;
 
         expr = push_bind_into_update(expr);
-        expr = bind_to_correlated(expr);
+        expr = self.bind_to_correlated(expr);
 
         if re_fold {
             expr = cr::fold_expr(self, expr)?;
@@ -446,32 +468,38 @@ fn push_bind_into_update(expr: cr::Expr) -> cr::Expr {
     }
 }
 
-fn bind_to_correlated(expr: cr::Expr) -> cr::Expr {
-    // match: Bind(val, main)
-    let cr::ExprKind::Bind(bound, _main) = &expr.kind else {
-        return expr;
-    };
+impl Optimizer<'_> {
+    fn bind_to_correlated(&self, expr: cr::Expr) -> cr::Expr {
+        // match: Bind(val, main)
+        let cr::ExprKind::Bind(bound, _main) = &expr.kind else {
+            return expr;
+        };
 
-    // Check if bound expression is exactly one row
-    let is_exactly_one_row = bound.rel.ty.kind.is_primitive()
-        || bound.rel.ty.kind.is_tuple()
-        || bound.rel.ty.kind.is_enum();
+        // Check if the bound expression is exactly one row. This holds for
+        // primitives, tuples, enums, and scalar std types (e.g. `std::Text`),
+        // which all map to a single SQL row.
+        let ty = self.get_ty_mat(&bound.rel.ty);
+        let is_exactly_one_row = ty.kind.is_primitive()
+            || ty.kind.is_tuple()
+            || ty.kind.is_enum()
+            || ty.kind.as_std().is_some();
 
-    if !is_exactly_one_row {
-        return expr;
-    }
+        if !is_exactly_one_row {
+            return expr;
+        }
 
-    tracing::debug!("bind_to_correlated");
+        tracing::debug!("bind_to_correlated");
 
-    // unpack
-    let cr::ExprKind::Bind(bound, main) = expr.kind else {
-        unreachable!()
-    };
+        // unpack
+        let cr::ExprKind::Bind(bound, main) = expr.kind else {
+            unreachable!()
+        };
 
-    // Convert Bind to BindCorrelated
-    cr::Expr {
-        ty: expr.ty,
-        kind: cr::ExprKind::BindCorrelated(bound, main),
+        // Convert Bind to BindCorrelated
+        cr::Expr {
+            ty: expr.ty,
+            kind: cr::ExprKind::BindCorrelated(bound, main),
+        }
     }
 }
 
