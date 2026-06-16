@@ -67,8 +67,8 @@ publish:
     cargo publish -p lutra-sql
     cargo publish -p lutra-compiler
     cargo publish -p lutra-codegen
-    cargo publish -p lutra-project-tools
-    cargo publish -p lutra-runner
+    # cargo publish -p lutra-project-tools
+    # cargo publish -p lutra-runner
     cargo publish -p lutra-runner-postgres
     cargo publish -p lutra-arrow
     cargo publish -p lutra-runner-duckdb

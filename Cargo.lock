@@ -1990,7 +1990,7 @@ dependencies = [
 
 [[package]]
 name = "lutra-arrow"
-version = "0.6.0"
+version = "0.6.2"
 dependencies = [
  "arrow",
  "criterion",
@@ -2003,7 +2003,7 @@ dependencies = [
 
 [[package]]
 name = "lutra-bin"
-version = "0.6.0"
+version = "0.6.2"
 dependencies = [
  "bytes",
  "chrono",
@@ -2022,7 +2022,7 @@ dependencies = [
 
 [[package]]
 name = "lutra-cli"
-version = "0.6.0"
+version = "0.6.2"
 dependencies = [
  "anyhow",
  "clap",
@@ -2048,7 +2048,7 @@ dependencies = [
 
 [[package]]
 name = "lutra-codegen"
-version = "0.6.1"
+version = "0.6.2"
 dependencies = [
  "base85",
  "bytes",
@@ -2061,7 +2061,7 @@ dependencies = [
 
 [[package]]
 name = "lutra-compiler"
-version = "0.6.0"
+version = "0.6.2"
 dependencies = [
  "append-only-vec",
  "ariadne",
@@ -2083,7 +2083,7 @@ dependencies = [
 
 [[package]]
 name = "lutra-interpreter"
-version = "0.6.0"
+version = "0.6.2"
 dependencies = [
  "arrow",
  "chrono",
@@ -2130,7 +2130,7 @@ dependencies = [
 
 [[package]]
 name = "lutra-runner-duckdb"
-version = "0.6.0"
+version = "0.6.2"
 dependencies = [
  "arrow",
  "bytes",
@@ -2146,7 +2146,7 @@ dependencies = [
 
 [[package]]
 name = "lutra-runner-postgres"
-version = "0.6.0"
+version = "0.6.2"
 dependencies = [
  "bytes",
  "futures",
@@ -2180,7 +2180,7 @@ dependencies = [
 
 [[package]]
 name = "lutra-sql"
-version = "0.6.0"
+version = "0.6.2"
 dependencies = [
  "log",
  "once_cell",
@@ -2189,7 +2189,7 @@ dependencies = [
 
 [[package]]
 name = "lutra-tui"
-version = "0.6.0"
+version = "0.6.2"
 dependencies = [
  "anyhow",
  "chrono",
@@ -3624,7 +3624,7 @@ dependencies = [
 
 [[package]]
 name = "tests"
-version = "0.6.0"
+version = "0.6.2"
 dependencies = [
  "arrow",
  "console",

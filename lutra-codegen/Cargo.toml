@@ -1,7 +1,7 @@
 [package]
 name = "lutra-codegen"
 description = "Code generation for Lutra"
-version = "0.6.1"
+version = "0.6.2"
 
 edition.workspace = true
 license.workspace = true
