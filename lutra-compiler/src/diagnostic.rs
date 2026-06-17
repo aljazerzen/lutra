@@ -43,6 +43,14 @@ impl Diagnostic {
         self.span = span.or(self.span);
         self
     }
+
+    pub(crate) fn push_additional<S: Into<String>>(mut self, msg: S, span: Option<Span>) -> Self {
+        self.additional.push(Additional {
+            message: msg.into(),
+            span,
+        });
+        self
+    }
 }
 
 #[derive(Debug, Clone)]

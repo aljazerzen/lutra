@@ -171,30 +171,15 @@ impl super::TypeResolver<'_> {
                 })
             }
             pr::DefKind::External(ty) => {
-                let ty_func = ty.kind.as_func().unwrap();
-                let scope_id = ty.scope_id.unwrap_or(usize::MAX);
-                let scope = scope::Scope::new(scope_id, scope::ScopeKind::Isolated);
-                self.scopes.push(scope);
-
-                // prepare generic arguments
-                self.scopes
-                    .last_mut()
-                    .unwrap()
-                    .insert_type_params(&ty_func.ty_params);
-
-                // resolve the function type
-                let ty = self.fold_type(ty)?;
-
-                // finalize scope
-                let mapping = self.finalize_type_vars()?;
-                let ty = utils::TypeReplacer::on_ty(ty, mapping);
-                self.scopes.pop().unwrap();
-
+                let ty = self.resolve_ty_def(ty)?;
                 pr::DefKind::External(ty)
             }
             pr::DefKind::Ty(ty_def) => {
-                let mut ty = self.fold_type(ty_def.ty)?;
-                ty.name = Some(fq_ident.last().to_string());
+                let mut ty = self.resolve_ty_def(ty_def.ty)?;
+                if !ty_def.is_framed {
+                    ty.name = Some(fq_ident.last().to_string());
+                }
+
                 pr::DefKind::Ty(pr::TyDef {
                     ty,
                     is_framed: ty_def.is_framed,
@@ -210,5 +195,25 @@ impl super::TypeResolver<'_> {
                 pr::DefKind::Anno(ann_def)
             }
         })
+    }
+
+    fn resolve_ty_def(&mut self, ty: pr::Ty) -> Result<pr::Ty, Diagnostic> {
+        // push scope
+        let scope_id = ty.scope_id.unwrap_or(usize::MAX);
+        let mut scope = scope::Scope::new(scope_id, scope::ScopeKind::Isolated);
+        if let pr::TyKind::Func(f) = &ty.kind {
+            scope.insert_type_params(&f.ty_params);
+        }
+        self.scopes.push(scope);
+
+        // fold
+        let ty = self.fold_type(ty)?;
+
+        // pop scope
+        let mapping = self.finalize_type_vars()?;
+        let ty = utils::TypeReplacer::on_ty(ty, mapping);
+        self.scopes.pop().unwrap();
+
+        Ok(ty)
     }
 }

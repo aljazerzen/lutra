@@ -64,6 +64,9 @@ pub trait PrFold {
     fn fold_func(&mut self, func: Func) -> Result<Func> {
         fold_func(self, func)
     }
+    fn fold_func_param(&mut self, param: FuncParam) -> Result<FuncParam> {
+        fold_func_param(self, param)
+    }
     fn fold_interpolate_item(&mut self, inter: InterpolateItem) -> Result<InterpolateItem> {
         fold_interpolate_item(self, inter)
     }
@@ -295,7 +298,7 @@ pub fn fold_func_params<T: ?Sized + PrFold>(
 ) -> Result<Vec<FuncParam>> {
     params
         .into_iter()
-        .map(|p| fold_func_param(fold, p))
+        .map(|p| fold.fold_func_param(p))
         .collect()
 }
 
@@ -305,6 +308,7 @@ pub fn fold_func_param<T: ?Sized + PrFold>(fold: &mut T, param: FuncParam) -> Re
         label: param.label,
         name: param.name,
         ty: fold_type_opt(fold, param.ty)?,
+        default: fold_optional_box(fold, param.default)?,
         span: param.span,
     })
 }
@@ -404,6 +408,8 @@ pub fn fold_ty_func_param<F: ?Sized + PrFold>(
         constant: p.constant,
         label: p.label,
         ty: fold_type_opt(fold, p.ty)?,
+        default: fold_optional_box(fold, p.default)?,
+        span: p.span,
     })
 }
 

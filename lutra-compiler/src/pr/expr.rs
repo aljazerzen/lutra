@@ -186,6 +186,9 @@ pub struct FuncParam {
     /// Type requirement for this param.
     pub ty: Option<Ty>,
 
+    /// Default value of this param. Must be const.
+    pub default: Option<Box<Expr>>,
+
     pub span: Span,
 }
 

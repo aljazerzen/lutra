@@ -3198,6 +3198,49 @@ func calculate(value: Int32, add addend: Int32, multiply multiplier: Int32) -> (
   5,
 }
 
+# === default_args_00
+func main() -> {
+  add(4),
+  add(4, 3),
+}
+
+func add(x: Int32, y: Int32 = 1) -> x + y
+# >
+{
+  5,
+  7,
+}
+
+# === default_args_01
+func main() -> {
+  wrap("x"),
+  wrap("x", right = "!"),
+  wrap("x", right = "!", left = "<"),
+}
+
+func wrap(value: Text, left prefix: Text = "[", right suffix: Text = "]") -> (
+  f"{prefix}{value}{suffix}"
+)
+# >
+{
+  "[x]",
+  "[x!",
+  "<x!",
+}
+
+# === default_args_02
+func main() -> {
+  score(player = "alice"),
+  score(5, player = "bob"),
+}
+
+func score(bonus: Int32 = 1, player name: Text) -> (let b = bonus | to_text; f"{name}:{b}")
+# >
+{
+  "alice:1",
+  "bob:5",
+}
+
 # === std_decimal_00
 func main(): [Decimal] -> [
   4.2,

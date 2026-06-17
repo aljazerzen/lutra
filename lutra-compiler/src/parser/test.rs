@@ -5,7 +5,7 @@ use insta::assert_debug_snapshot;
 
 use crate::diagnostic::Diagnostic;
 use crate::parser::{PExtra, PInput, prepare_tokens};
-use crate::parser::{def, expr, types};
+use crate::parser::{def, expr_and_type};
 
 use crate::pr;
 
@@ -35,7 +35,11 @@ where
 
 #[track_caller]
 fn parse_expr(source: &str) -> pr::Expr {
-    parse_with(source, |_| Box::new(expr::expr(types::type_expr()))).unwrap()
+    parse_with(source, |_| {
+        let (expr, _) = expr_and_type();
+        Box::new(expr)
+    })
+    .unwrap()
 }
 
 #[track_caller]
@@ -798,6 +802,7 @@ fn parse_10() {
                             label: None,
                             name: "x",
                             ty: None,
+                            default: None,
                             span: 0:4-5,
                         },
                         body: Expr {

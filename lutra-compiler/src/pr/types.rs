@@ -1,6 +1,7 @@
 use enum_as_inner::EnumAsInner;
 
 use crate::Span;
+use crate::pr::Expr;
 use crate::pr::path::Path;
 use crate::resolver::NS_STD;
 
@@ -112,11 +113,13 @@ pub struct TyFunc {
 }
 
 /// Parameter of type of a function
-#[derive(Debug, Clone, PartialEq, Hash)]
+#[derive(Debug, Clone)]
 pub struct TyFuncParam {
     pub constant: bool,
     pub label: Option<String>,
     pub ty: Option<Ty>,
+    pub default: Option<Box<Expr>>,
+    pub span: Option<Span>,
 }
 
 impl TyFuncParam {
@@ -125,7 +128,25 @@ impl TyFuncParam {
             constant: false,
             label: None,
             ty,
+            default: None,
+            span: None,
         }
+    }
+}
+
+impl std::hash::Hash for TyFuncParam {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.constant.hash(state);
+        self.label.hash(state);
+        self.ty.hash(state);
+    }
+}
+
+impl PartialEq for TyFuncParam {
+    fn eq(&self, other: &Self) -> bool {
+        // `default` and `span` are not part of structural type identity
+        // (kept consistent with `Hash`).
+        self.constant == other.constant && self.label == other.label && self.ty == other.ty
     }
 }
 

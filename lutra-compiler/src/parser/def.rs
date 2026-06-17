@@ -16,8 +16,7 @@ where
 {
     let is_submodule = keyword("submodule").or_not().map(|x| x.is_some());
 
-    let ty = types::type_expr();
-    let expr = expr::expr(ty.clone());
+    let (expr, ty) = super::expr_and_type();
 
     let mod_content = recursive(|mod_content| {
         let module_def = keyword("module")
@@ -41,10 +40,10 @@ where
             module_def.boxed(),
             type_def(ty.clone()).boxed(),
             import_def().boxed(),
-            external_func_def(ty.clone()).boxed(),
+            external_func_def(expr.clone(), ty.clone()).boxed(),
             func_def(expr.clone(), ty.clone()).boxed(),
             const_def(expr.clone(), ty.clone()).boxed(),
-            anno_def(ty).boxed(),
+            anno_def(expr.clone(), ty).boxed(),
         ))
         .labelled("definition");
 
@@ -215,7 +214,7 @@ where
     let head = keyword("func").ignore_then(def_name());
 
     let params = delimited_by_parenthesis(
-        super::expr::func_param(ty.clone())
+        super::expr::func_param(expr.clone(), ty.clone())
             .separated_by(ctrl(','))
             .allow_trailing()
             .collect(),
@@ -255,6 +254,7 @@ where
 }
 
 fn external_func_def<'src, I>(
+    expr: impl Parser<'src, I, Expr, PExtra<'src>> + Clone + 'src,
     ty: impl Parser<'src, I, Ty, PExtra<'src>> + Clone + 'src,
 ) -> impl Parser<'src, I, (NameAndSpan, DefKind), PExtra<'src>> + Clone
 where
@@ -264,7 +264,7 @@ where
         .ignore_then(keyword("func"))
         .ignore_then(def_name());
 
-    let params = super::types::func_params(ty.clone());
+    let params = super::types::func_params(ty.clone(), expr);
 
     let return_ty = ctrl(':').ignore_then(ty.clone());
 
@@ -320,12 +320,13 @@ where
 }
 
 fn anno_def<'src, I>(
+    expr: impl Parser<'src, I, Expr, PExtra<'src>> + Clone + 'src,
     ty: impl Parser<'src, I, Ty, PExtra<'src>> + Clone + 'src,
 ) -> impl Parser<'src, I, (NameAndSpan, DefKind), PExtra<'src>> + Clone
 where
     I: ValueInput<'src, Token = TokenKind, Span = Span>,
 {
-    let params = super::types::func_params(ty);
+    let params = super::types::func_params(ty, expr);
 
     keyword("anno")
         .ignore_then(def_name())

@@ -10,48 +10,47 @@ use super::interpolation;
 use super::{PExtra, TokenKind};
 
 pub(crate) fn expr<'src, I>(
+    expr: impl Parser<'src, I, Expr, PExtra<'src>> + Clone + 'src,
     ty: impl Parser<'src, I, Ty, PExtra<'src>> + Clone + 'src,
 ) -> impl Parser<'src, I, Expr, PExtra<'src>> + Clone + 'src
 where
     I: ValueInput<'src, Token = TokenKind, Span = Span>,
 {
-    recursive(|expr| {
-        // Box each complex alternative so the 10-way choice sees a uniform
-        // Boxed<ExprKind> element type, collapsing Choice<10-tuple>::go into
-        // one small monomorphization instead of a 10K-line function.
-        let literal = literal().map(ExprKind::Literal).boxed();
-        let identified = identified(expr.clone()).boxed();
-        let variant = variant(expr.clone()).map(ExprKind::Variant).boxed();
-        let func = func(expr.clone(), ty.clone()).boxed();
-        let tuple = tuple(expr.clone()).boxed();
-        let array = array(expr.clone()).boxed();
-        let nested = nested(expr.clone()).boxed();
-        let interpolation = interpolation().boxed();
-        let match_ = match_(expr.clone()).boxed();
-        let if_else = if_else(expr.clone()).boxed();
+    // Box each complex alternative so the 10-way choice sees a uniform
+    // Boxed<ExprKind> element type, collapsing Choice<10-tuple>::go into
+    // one small monomorphization instead of a 10K-line function.
+    let literal = literal().map(ExprKind::Literal).boxed();
+    let identified = identified(expr.clone()).boxed();
+    let variant = variant(expr.clone()).map(ExprKind::Variant).boxed();
+    let func = func(expr.clone(), ty.clone()).boxed();
+    let tuple = tuple(expr.clone()).boxed();
+    let array = array(expr.clone()).boxed();
+    let nested = nested(expr.clone()).boxed();
+    let interpolation = interpolation().boxed();
+    let match_ = match_(expr.clone()).boxed();
+    let if_else = if_else(expr.clone()).boxed();
 
-        let term = choice((
-            identified,
-            literal,
-            tuple,
-            nested,
-            func,
-            match_,
-            if_else,
-            array,
-            interpolation,
-            variant,
-        ))
-        .map_with(|kind, e| Expr::new_with_span(kind, e.span()))
-        .boxed(); // prevent MapWith<Choice<10-tuple>> from propagating downstream
+    let term = choice((
+        identified,
+        literal,
+        tuple,
+        nested,
+        func,
+        match_,
+        if_else,
+        array,
+        interpolation,
+        variant,
+    ))
+    .map_with(|kind, e| Expr::new_with_span(kind, e.span()))
+    .boxed(); // prevent MapWith<Choice<10-tuple>> from propagating downstream
 
-        let atom = field_lookup(term).boxed();
-        let atom = type_annotation(atom, ty).boxed();
+    let atom = field_lookup(term).boxed();
+    let atom = type_annotation(atom, ty).boxed();
 
-        let expr_ops = unary_and_binary_expr(atom).boxed();
-        let expr_with_range = range(expr_ops).boxed();
-        binary_op_parser(expr_with_range, ctrl('|').to(BinOp::Pipe).boxed())
-    })
+    let expr_ops = unary_and_binary_expr(atom).boxed();
+    let expr_with_range = range(expr_ops).boxed();
+    binary_op_parser(expr_with_range, ctrl('|').to(BinOp::Pipe).boxed())
 }
 
 fn unary_and_binary_expr<'src, I>(
@@ -458,6 +457,7 @@ where
                     label: None,
                     name: first_name,
                     ty: None,
+                    default: None,
                     span: first_span,
                 };
                 ExprKind::FuncShort(Box::new(FuncShort { param, body }))
@@ -475,13 +475,13 @@ where
 {
     keyword("func")
         .ignore_then(delimited_by_parenthesis(
-            func_param(ty.clone())
+            func_param(expr.clone(), ty.clone())
                 .separated_by(ctrl(','))
                 .allow_trailing()
                 .collect(),
             |_| vec![],
         ))
-        .then(ctrl(':').ignore_then(ty.clone()).or_not())
+        .then(ctrl(':').ignore_then(ty).or_not())
         .then_ignore(just(TokenKind::ArrowThin))
         .then(expr.map(Box::new))
         .map(|((params, return_ty), body)| {
@@ -497,6 +497,7 @@ where
 }
 
 pub fn func_param<'src, I>(
+    expr: impl Parser<'src, I, Expr, PExtra<'src>> + Clone + 'src,
     ty: impl Parser<'src, I, Ty, PExtra<'src>> + Clone + 'src,
 ) -> impl Parser<'src, I, FuncParam, PExtra<'src>> + Clone + 'src
 where
@@ -511,12 +512,14 @@ where
                     None => (None, a),
                 }),
         )
-        .then(ctrl(':').ignore_then(ty.clone()).or_not())
-        .map_with(|((constant, (label, name)), ty), e| FuncParam {
+        .then(ctrl(':').ignore_then(ty).or_not())
+        .then(ctrl('=').ignore_then(expr).map(Box::new).or_not())
+        .map_with(|(((constant, (label, name)), ty), default), e| FuncParam {
             constant,
             label,
             name,
             ty,
+            default,
             span: e.span(),
         })
 }

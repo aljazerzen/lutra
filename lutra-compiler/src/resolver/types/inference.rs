@@ -50,6 +50,8 @@ impl TypeResolver<'_> {
                         constant: p.constant,
                         label: p.label.clone(),
                         ty: p.ty.clone(),
+                        default: p.default.clone(),
+                        span: Some(p.span),
                     })
                     .collect_vec(),
                 body: func

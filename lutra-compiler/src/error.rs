@@ -171,7 +171,7 @@ where
     for additional in &diagnostic.additional {
         if let Some(span) = additional.span {
             let span = std::ops::Range::from(span);
-            report.add_label(Label::new((source_path, span)).with_message(&diagnostic.message))
+            report.add_label(Label::new((source_path, span)).with_message(&additional.message))
         } else {
             notes += &additional.message;
             notes += "\n";

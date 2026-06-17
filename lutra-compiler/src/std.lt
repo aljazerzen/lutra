@@ -431,6 +431,8 @@ module array {
   external func sequence(start: N, end: N): [N]
   where N: Int8 | Int16 | Int32 | Int64 | Uint8 | Uint16 | Uint32 | Uint64
 
+  # --- Aggregations ---
+
   ## Find the minimum value in the array.
   ## Returns `none` when array is empty.
   external func min([T]): T?

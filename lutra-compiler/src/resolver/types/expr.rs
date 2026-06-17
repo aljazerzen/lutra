@@ -64,6 +64,8 @@ impl fold::PrFold for super::TypeResolver<'_> {
                                     constant: false,
                                     ty: Some(ty_inner),
                                     label: framed_label.map(str::to_string),
+                                    default: None,
+                                    span: ty_framed.span,
                                 }],
                                 body: Some(Box::new(ty_framed)),
                                 ty_params: vec![],
@@ -239,25 +241,10 @@ impl fold::PrFold for super::TypeResolver<'_> {
 
     fn fold_type(&mut self, ty: pr::Ty) -> Result<pr::Ty> {
         let ty = match ty.kind {
-            // introduce new ty vars for missing type annotations
-            // (this is needed to find non-inferable params)
-            pr::TyKind::Func(mut ty_func) => {
-                for p in &mut ty_func.params {
-                    if p.ty.is_none() {
-                        p.ty = Some(self.introduce_ty_var(pr::TyDomain::Open, ty.span.unwrap()));
-                    }
-                }
-                if ty_func.body.is_none() {
-                    ty_func.body = Some(Box::new(
-                        self.introduce_ty_var(pr::TyDomain::Open, ty.span.unwrap()),
-                    ));
-                }
-
-                pr::Ty {
-                    kind: pr::TyKind::Func(ty_func),
-                    ..ty
-                }
-            }
+            pr::TyKind::Func(ty_func) => pr::Ty {
+                kind: pr::TyKind::Func(self.resolve_ty_func(ty_func, ty.span)?),
+                ..ty
+            },
 
             pr::TyKind::Ident(_) => {
                 let span = ty.span;

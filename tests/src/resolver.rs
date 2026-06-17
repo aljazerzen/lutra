@@ -2060,7 +2060,7 @@ fn framed_03() {
        │
      3 │     const main = MyInt()
        │                  ───┬───
-       │                     ╰───── func MyInt expected 1 arguments, but got 0
+       │                     ╰───── missing an argument
     ───╯
     ");
 }
@@ -2076,9 +2076,7 @@ fn framed_04() {
        │
      3 │     const main = MyInt(false)
        │                        ──┬──
-       │                          ╰──── func MyInt expected type `MyInt`, but found type `Bool`
-       │
-       │ Note: type `MyInt` expands to `Int32`
+       │                          ╰──── func MyInt expected type `Int32`, but found type `Bool`
     ───╯
     ");
 }
@@ -2193,14 +2191,19 @@ fn framed_11() {
        │            ─────┬────
        │                 ╰────── unknown parameter `wrong`
     ───╯
+    Error:
+       ╭─[ <unknown>:5:7 ]
+       │
+     5 │       Date(wrong = 12),
+       │       ────────┬───────
+       │               ╰───────── missing days_since_epoch argument
+    ───╯
     [E0006] Error:
        ╭─[ <unknown>:6:31 ]
        │
      6 │       Date(days_since_epoch = false),
        │                               ──┬──
-       │                                 ╰──── func Date expected type `Date`, but found type `Bool`
-       │
-       │ Note: type `Date` expands to `Int32`
+       │                                 ╰──── func Date expected type `Int32`, but found type `Bool`
     ───╯
     [E0006] Error:
        ╭─[ <unknown>:7:15 ]
@@ -2289,6 +2292,13 @@ fn call_02() {
        │                               ────┬────
        │                                   ╰────── unknown parameter `z`
     ───╯
+    Error:
+       ╭─[ <unknown>:4:20 ]
+       │
+     4 │     func main() -> noop(true, z = false)
+       │                    ──────────┬──────────
+       │                              ╰──────────── missing an argument
+    ───╯
     [E0006] Error:
        ╭─[ <unknown>:4:25 ]
        │
@@ -2313,7 +2323,7 @@ fn call_03() {
        │
      4 │     func main() -> noop(true)
        │                    ─────┬────
-       │                         ╰────── func noop expected 2 arguments, but got 1
+       │                         ╰────── missing an argument
     ───╯
     [E0006] Error:
        ╭─[ <unknown>:4:25 ]
@@ -2349,6 +2359,195 @@ fn call_04() {
        │                               ╰───── func noop expected type `Bool`, but found type `Text`
     ───╯
     "#);
+}
+
+#[test]
+fn call_05() {
+    // call, omitted arg uses param default
+
+    insta::assert_snapshot!(_test_ty(r#"
+    func noop(x: Int32 = 1) -> x
+
+    func main() -> noop()
+    "#), @"Int32");
+}
+
+#[test]
+fn call_06() {
+    // call, optional positional param may be followed by a required labelled param
+
+    insta::assert_snapshot!(_test_ty(r#"
+    func noop(x: Int32 = 1, y y: Int32) -> x + y
+
+    func main() -> noop(y = 4)
+    "#), @"Int32");
+}
+
+#[test]
+fn call_07() {
+    // external func signatures may have defaulted params
+
+    insta::assert_snapshot!(_test_ty(r#"
+    external func noop(x: Int32 = 1): Int32
+
+    func main() -> noop()
+    "#), @"Int32");
+}
+
+#[test]
+fn call_08() {
+    // type-only func signatures may have defaulted params
+
+    insta::assert_snapshot!(_test_ty(r#"
+    type F: func (x: Int32 = 1): Int32
+
+    external func apply(f: F): F
+
+    func main(): Int32 -> 1
+    "#), @"Int32");
+}
+
+#[test]
+fn call_09() {
+    // param defaults must be const
+
+    insta::assert_snapshot!(_test_err(r#"
+    func helper(): Int32 -> 1
+    func noop(x: Int32 = helper()) -> x
+
+    func main() -> noop()
+    "#), @"
+    Error:
+       ╭─[ <unknown>:3:26 ]
+       │
+     3 │     func noop(x: Int32 = helper()) -> x
+       │                          ────┬───
+       │                              ╰───── param defaults must be const
+    ───╯
+    ");
+}
+
+#[test]
+fn call_10() {
+    // param defaults cannot reference names from outer scope
+
+    insta::assert_snapshot!(_test_err(r#"
+    func main() -> (
+      let a = 1;
+      func (x: Int32 = a) -> x
+    )
+    "#), @"
+    Error:
+       ╭─[ <unknown>:4:24 ]
+       │
+     4 │       func (x: Int32 = a) -> x
+       │                        ┬
+       │                        ╰── param defaults must be const
+    ───╯
+    ");
+}
+
+#[test]
+fn call_11() {
+    // param defaults cannot reference other params
+
+    insta::assert_snapshot!(_test_err(r#"
+    func noop(x: Int32 = y, y y: Int32) -> x
+
+    func main() -> noop(y = 2)
+    "#), @"
+    Error:
+       ╭─[ <unknown>:2:26 ]
+       │
+     2 │     func noop(x: Int32 = y, y y: Int32) -> x
+       │                          ┬
+       │                          ╰── param defaults must be const
+    ───╯
+    ");
+}
+
+#[test]
+fn call_12() {
+    // call, missing required labelled arg even when earlier params have defaults
+
+    insta::assert_snapshot!(_test_err(r#"
+    func noop(x: Int32 = 1, y y: Bool) -> x
+
+    func main() -> noop()
+    "#), @"
+    Error:
+       ╭─[ <unknown>:4:20 ]
+       │
+     4 │     func main() -> noop()
+       │                    ───┬──
+       │                       ╰──── missing y argument
+    ───╯
+    ");
+}
+
+#[test]
+fn call_13() {
+    // call, external func with a default followed by a positional
+
+    insta::assert_snapshot!(_test_err(r#"
+    external func noop(x: Int32 = 1, y: Bool): Int32
+
+    func main() -> noop()
+    "#), @"
+    Error:
+       ╭─[ <unknown>:4:20 ]
+       │
+     4 │     func main() -> noop()
+       │                    ───┬──
+       │                       ╰──── missing y argument
+    ───╯
+    ");
+}
+
+#[test]
+fn call_14() {
+    // def, unlabelled positional param after a defaulted param
+
+    insta::assert_snapshot!(_test_err(r#"
+    func noop(x: Int32 = 1, y: Int32) -> x + y
+
+    func main() -> noop(2, 3)
+    "#), @"
+    Error:
+       ╭─[ <unknown>:2:26 ]
+       │
+     2 │     func noop(x: Int32 = 1, y: Int32) -> x + y
+       │                          ┬  ────┬───
+       │                          ╰──────────── this default value can never be used
+       │                                 │
+       │                                 ╰───── because this param is not labelled
+       │
+       │ Note: Either swap param order or add param label
+    ───╯
+    ");
+}
+
+#[test]
+fn call_15() {
+    // external def, unlabelled positional param after a defaulted param
+
+    insta::assert_snapshot!(_test_err(r#"
+    external func noop(x: Int32 = 1, Int32): Int32
+
+    func main() -> noop(2, 3)
+    "#), @"
+    Error:
+       ╭─[ <unknown>:2:35 ]
+       │
+     2 │     external func noop(x: Int32 = 1, Int32): Int32
+       │                                   ┬  ──┬──
+       │                                   ╰───────── this default value can never be used
+       │                                        │
+       │                                        ╰──── because this param is not labelled
+       │
+       │ Note: Either swap param order or add param label
+    ───╯
+    ");
 }
 
 #[test]
@@ -2426,7 +2625,7 @@ fn anno_04_missing_args() {
        │
      4 │     @deprecated()
        │      ──────┬─────
-       │            ╰─────── expected 1 arguments, but got 0
+       │            ╰─────── missing reason argument
     ───╯
     ");
 }

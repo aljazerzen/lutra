@@ -8,8 +8,9 @@ mod types;
 
 pub use self::lexer::{Token, TokenKind, lex_source_recovery};
 
-use chumsky::input::Input as _;
+use chumsky::input::{Input as _, ValueInput};
 use chumsky::prelude::*;
+use chumsky::recursive::Recursive;
 
 use crate::Span;
 use crate::diagnostic::Diagnostic;
@@ -58,9 +59,8 @@ pub fn parse_expr(source: &str, source_id: u16) -> (Option<pr::Expr>, Vec<Diagno
     let ast = if let Some(tokens) = tokens {
         let tokens = prepare_tokens(tokens.semantic, source_id);
 
-        let (ast, errs) = expr::expr(types::type_expr())
-            .parse(tokens.as_input())
-            .into_output_errors();
+        let (expr, _) = expr_and_type();
+        let (ast, errs) = expr.parse(tokens.as_input()).into_output_errors();
         errors.extend(errs.into_iter().map(Diagnostic::from));
         ast
     } else {
@@ -76,6 +76,22 @@ pub fn parse_path(source: &str) -> Option<pr::Path> {
 
     let (path, _) = expr::path().parse(tokens.as_input()).into_output_errors();
     path
+}
+
+pub(crate) fn expr_and_type<'src, I>() -> (
+    impl Parser<'src, I, pr::Expr, PExtra<'src>> + Clone + 'src,
+    impl Parser<'src, I, pr::Ty, PExtra<'src>> + Clone + 'src,
+)
+where
+    I: ValueInput<'src, Token = TokenKind, Span = Span>,
+{
+    let mut expr = Recursive::declare();
+    let mut ty = Recursive::declare();
+
+    expr.define(self::expr::expr(expr.clone(), ty.clone()));
+    ty.define(self::types::type_expr(ty.clone(), expr.clone()));
+
+    (expr, ty)
 }
 
 /// Convert the output of the lexer into token pairs and end-of-input span.

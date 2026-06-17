@@ -1,6 +1,6 @@
 use itertools::Itertools;
 
-use crate::diagnostic::Diagnostic;
+use crate::diagnostic::{Diagnostic, WithErrorInfo};
 use crate::pr::{self, *};
 use crate::utils::fold::{self, PrFold};
 use crate::{Result, Span, utils};
@@ -9,7 +9,6 @@ use super::TypeResolver;
 use super::scope::{Scope, ScopeKind};
 
 impl TypeResolver<'_> {
-    /// Folds function types, so they are resolved to material types, ready for type checking.
     #[tracing::instrument(name = "func", skip_all, fields(f = func.params.iter().map(|p| &p.name).join(",")))]
     pub fn resolve_func(&mut self, scope_id: usize, mut func: Box<Func>) -> Result<Box<Func>> {
         tracing::debug!(
@@ -30,7 +29,7 @@ impl TypeResolver<'_> {
         self.scopes.push(scope);
 
         // fold types
-        func.params = fold::fold_func_params(self, func.params)?;
+        func.params = self.resolve_func_params(func.params)?;
         func.return_ty = fold::fold_type_opt(self, func.return_ty)?;
         if func.ty_params.is_empty() {
             // only allow ty param inference for functions without type params
@@ -61,6 +60,100 @@ impl TypeResolver<'_> {
         self.scopes.pop().unwrap();
 
         Ok(Box::new(func))
+    }
+
+    fn resolve_func_params(
+        &mut self,
+        params: Vec<pr::FuncParam>,
+    ) -> Result<Vec<pr::FuncParam>, Diagnostic> {
+        let mut resolved = Vec::with_capacity(params.len());
+        let mut err_slot = None;
+        let mut last_default = None;
+        for mut p in params {
+            // fold ty
+            p.ty = p.ty.map(|t| self.fold_type(t)).transpose()?;
+
+            // validate no positionals after defaults
+            if p.label.is_none() && last_default.is_some() {
+                let d = err_unsuable_default(last_default, Some(p.span));
+                self.collect_diag(&mut err_slot, d);
+            }
+
+            // default
+            if let Some(default) = p.default.take() {
+                last_default = Some(default.span.unwrap_or(p.span));
+
+                match self.resolve_func_param_default(*default, &p.ty) {
+                    Ok(default) => p.default = Some(Box::new(default)),
+                    Err(e) => self.collect_diag(&mut err_slot, e),
+                }
+            }
+            resolved.push(p);
+        }
+        err_slot.map_or(Ok(resolved), Err)
+    }
+
+    pub fn resolve_ty_func(
+        &mut self,
+        mut ty_func: pr::TyFunc,
+        span: Option<Span>,
+    ) -> Result<pr::TyFunc, Diagnostic> {
+        let mut err_slot = None;
+        let mut last_default = None;
+        for p in &mut ty_func.params {
+            // introduce new ty vars for missing type annotations
+            // (this is needed to find non-inferable params)
+            if p.ty.is_none() {
+                p.ty = Some(self.introduce_ty_var(pr::TyDomain::Open, span.unwrap()));
+            }
+            // fold ty
+            p.ty = p.ty.take().map(|t| self.fold_type(t)).transpose()?;
+
+            // validate no positionals after defaults
+            if p.label.is_none() && last_default.is_some() {
+                self.collect_diag(&mut err_slot, err_unsuable_default(last_default, p.span));
+            }
+
+            // fold defaults
+            if let Some(default) = p.default.take() {
+                last_default = Some(default.span.or(p.span).unwrap());
+
+                match self.resolve_func_param_default(*default, &p.ty) {
+                    Ok(default) => p.default = Some(Box::new(default)),
+                    Err(e) => self.collect_diag(&mut err_slot, e),
+                }
+            }
+        }
+        if ty_func.body.is_none() {
+            // introduce new ty vars for missing type annotations
+            // (this is needed to find non-inferable params)
+            ty_func.body = Some(Box::new(
+                self.introduce_ty_var(pr::TyDomain::Open, span.unwrap()),
+            ));
+        }
+        err_slot.map_or(Ok(ty_func), Err)
+    }
+
+    fn resolve_func_param_default(
+        &mut self,
+        default: pr::Expr,
+        ty: &Option<pr::Ty>,
+    ) -> Result<pr::Expr, Diagnostic> {
+        // validate const
+        let r = self.const_validator.validate_is_const(&default);
+        if let Err(span) = r {
+            return Err(Diagnostic::new_custom("param defaults must be const").with_span(span));
+        }
+
+        // fold
+        let mut default = self.fold_expr(default)?;
+
+        // validate type
+        if let Some(expected_ty) = ty {
+            self.validate_expr_type(&mut default, expected_ty, &|| None)
+                .unwrap_or_else(self.push_diagnostic());
+        }
+        Ok(default)
     }
 
     pub fn resolve_func_call(
@@ -98,6 +191,13 @@ impl TypeResolver<'_> {
         let mut args_resolved = Vec::with_capacity(params.len());
         for (param, arg) in std::iter::zip(params, args) {
             let Some(mut arg) = arg else {
+                if let Some(default) = &param.default {
+                    args_resolved.push(pr::CallArg {
+                        expr: *default.clone(),
+                        label: None,
+                        span: None,
+                    });
+                }
                 continue;
             };
 
@@ -135,8 +235,9 @@ impl TypeResolver<'_> {
 
     /// For each given arg, finds the func param that it should pass the value to.
     /// Takes care of labelled args. Returns args in the same order as func params.
-    /// An arg might be None, which means that it was not supplied and we have pushed
-    /// an error onto [Self::diagnostics].
+    /// An arg might be None, which means that it was not provided and is either:
+    /// - missing (and we pushed to self.diagnostics), or
+    /// - has a default.
     fn match_args_to_params(
         &self,
         mut args: Vec<pr::CallArg>,
@@ -144,7 +245,10 @@ impl TypeResolver<'_> {
         metadata: &FuncMetadata,
         span: Option<Span>,
     ) -> Vec<Option<pr::CallArg>> {
-        if args.len() != params.len() {
+        let mut args_reordered = vec![None; params.len()];
+
+        // validate too many args
+        if args.len() > params.len() {
             let who = metadata
                 .as_who()
                 .map(|n| format!("{n} "))
@@ -157,8 +261,6 @@ impl TypeResolver<'_> {
             self.diagnostics
                 .push(Diagnostic::new_custom(message).with_span(span));
         }
-
-        let mut args_reordered = vec![None; args.len()];
 
         // find first labelled arg
         let first_labelled = args
@@ -203,6 +305,17 @@ impl TypeResolver<'_> {
             };
             args_reordered[pos] = Some(arg);
         }
+
+        // report missing args
+        for (a, p) in args_reordered.iter().zip(params) {
+            if a.is_some() || p.default.is_some() {
+                continue;
+            }
+            let label = p.label.as_deref().unwrap_or("an");
+            self.diagnostics
+                .push(Diagnostic::new_custom(format!("missing {label} argument")).with_span(span));
+        }
+
         args_reordered
     }
 
@@ -220,6 +333,13 @@ impl TypeResolver<'_> {
 
         res
     }
+}
+
+fn err_unsuable_default(default: Option<Span>, positional: Option<Span>) -> Diagnostic {
+    Diagnostic::new_custom("this default value can never be used")
+        .with_span(default)
+        .push_additional("because this param is not labelled", positional)
+        .push_hint("Either swap param order or add param label")
 }
 
 #[derive(Debug, PartialEq, Clone, Default)]

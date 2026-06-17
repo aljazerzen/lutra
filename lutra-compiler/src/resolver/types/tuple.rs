@@ -37,25 +37,21 @@ impl super::TypeResolver<'_> {
                 match ty_ref {
                     scope::TyRef::Ty(t) => {
                         if !t.kind.is_tuple() {
-                            self.collect_diag(
-                                &mut diag,
-                                Diagnostic::new(
-                                    "only tuples can be unpacked",
-                                    DiagnosticCode::TYPE,
-                                )
-                                .with_span(expr.span)
-                                .push_hint(format!("got type {}", printer::print_ty(t))),
-                            );
+                            let d = Diagnostic::new(
+                                "only tuples can be unpacked",
+                                DiagnosticCode::TYPE,
+                            )
+                            .with_span(expr.span)
+                            .push_hint(format!("got type {}", printer::print_ty(t)));
+                            self.collect_diag(&mut diag, d);
                             continue;
                         }
                     }
                     scope::TyRef::Param(id) => {
                         let (param_name, domain) = self.get_ty_param(id);
                         let pr::TyDomain::TupleHasFields(_) = domain else {
-                            self.collect_diag(
-                                &mut diag,
-                                error_lookup_into_unpack_of_ty_param(param_name),
-                            );
+                            let d = error_lookup_into_unpack_of_ty_param(param_name);
+                            self.collect_diag(&mut diag, d);
                             continue;
                         };
 
