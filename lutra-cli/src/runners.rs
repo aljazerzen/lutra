@@ -108,9 +108,16 @@ impl AnyRunner {
                     runner,
                 )))
             }
-            Spec::Postgres { url } => Ok(AnyRunner::Postgres(
-                lutra_runner_postgres::RunnerAsync::connect_no_tls(url).await?,
-            )),
+            Spec::Postgres { url } => {
+                let (runner, conn) =
+                    lutra_runner_postgres::RunnerAsync::connect_no_tls(url).await?;
+                tokio::task::spawn(async {
+                    if let Err(e) = conn.await {
+                        eprintln!("{e}");
+                    }
+                });
+                Ok(AnyRunner::Postgres(runner))
+            }
             Spec::Duckdb { db, file_system } => {
                 Ok(AnyRunner::Duckdb(lutra_runner::AsyncRunner::new(
                     lutra_runner_duckdb::Runner::open(db, file_system.clone())?,
@@ -203,8 +210,13 @@ impl AnyRunnerSync {
                 let rt = tokio::runtime::Builder::new_current_thread()
                     .enable_all()
                     .build()?;
-                let runner =
+                let (runner, conn) =
                     rt.block_on(lutra_runner_postgres::RunnerAsync::connect_no_tls(url))?;
+                rt.spawn(async {
+                    if let Err(e) = conn.await {
+                        eprintln!("{e}");
+                    }
+                });
                 Ok(AnyRunnerSync::Postgres(
                     lutra_runner::SyncRunner::with_runtime(runner, rt),
                 ))

@@ -1,5 +1,6 @@
 /// Converts a string to snake_case
 /// Handles CamelCase, PascalCase, kebab-case, and space separated formats
+#[allow(dead_code)]
 pub fn to_snake_case(input: &str) -> String {
     if input.is_empty() {
         return String::new();
@@ -38,6 +39,7 @@ pub fn to_snake_case(input: &str) -> String {
 
 /// Converts a string to PascalCase
 /// Handles snake_case, kebab-case, space separated, and mixed formats
+#[allow(dead_code)]
 pub fn to_pascal_case(input: &str) -> String {
     input
         .split(['_', '-'])

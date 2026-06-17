@@ -21,27 +21,23 @@ dev FILTER_SET='all()' *NEXTEST_ARGS='':
     # RUST_LOG=lutra_compiler::sql=debug
     RUST_LOG=debug \
     INSTA_FORCE_PASS=1 \
-    cargo nextest run -E '{{FILTER_SET}}' {{NEXTEST_ARGS}}
+    cargo nextest run -E '{{ FILTER_SET }}' {{ NEXTEST_ARGS }}
     cargo insta review
 
     cargo fmt
-    cargo check --all-targets --profile=test
     cargo clippy --all-targets
-    cargo check -p lutra-bin --no-default-features
-    cargo check -p lutra-runner --no-default-features
-    cargo check -p lutra-sql --no-default-features
 
 # Run ignored tests and print only tests that pass
 test-ignored:
     cargo nextest --profile=final-all run --run-ignored=only 2>&1 | rg PASS
 
 # Re-generate committed generated files
-[working-directory: 'lutra-bin/src/project']
+[working-directory('lutra-bin/src/project')]
 generate:
     cargo run -p lutra-cli -- gen-code --lutra-bin-path="crate" --project=. ./generated.rs
     cargo fmt -p lutra-bin
 
-[working-directory: 'lutra-bin/src/project']
+[working-directory('lutra-bin/src/project')]
 generate-precompiled:
     # For when current code does not compile, but we still have an old cli binary
     ../../../target/debug/lutra gen-code --lutra-bin-path="crate" --project=. ./generated.rs
@@ -55,7 +51,14 @@ profile:
 
 # Test (this should pass for every commit)
 test:
-    cargo build -p lutra-cli --quiet
+    cargo build --quiet -p lutra-cli
+    cargo check --quiet -p lutra-bin --no-default-features
+    cargo check --quiet -p lutra-runner --no-default-features
+    cargo check --quiet -p lutra-sql --no-default-features
+    cargo check --quiet -p lutra-compiler --no-default-features
+    cargo check --quiet -p lutra-codegen --no-default-features
+    cargo check --quiet -p lutra-runner-postgres --no-default-features --features postgres
+    cargo check --quiet -p lutra-runner-postgres --no-default-features --features tokio-postgres
 
     cargo nextest run --cargo-quiet
     just py test
@@ -78,6 +81,5 @@ publish:
 
 # Run a command for each Python package
 py *ARGS='':
-    just lutra-bin/python/{{ARGS}}
-    just lutra-runner-postgres/python/{{ARGS}}
-
+    just lutra-bin/python/{{ ARGS }}
+    just lutra-runner-postgres/python/{{ ARGS }}

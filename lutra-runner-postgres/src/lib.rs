@@ -16,20 +16,21 @@ use lutra_bin::{ir, rr};
 use lutra_runner::proto;
 use thiserror::Error;
 
+use std::collections::HashMap;
 #[cfg(feature = "tokio-postgres")]
-use std::{collections::HashMap, sync::Mutex};
+use std::sync::Mutex;
 
 #[cfg(feature = "postgres")]
-use postgres::Error as PgError;
+use postgres as pg;
 #[cfg(not(feature = "postgres"))]
-use tokio_postgres::Error as PgError;
+use tokio_postgres as pg;
 
 #[derive(Error, Debug)]
 pub enum Error {
     #[error("bad result: {}", .0)]
     BadDatabaseResponse(&'static str),
     #[error("postgres: {:?}", .0)]
-    Postgres(#[from] PgError),
+    Postgres(#[from] pg::Error),
 }
 
 impl From<Error> for proto::Error {
@@ -69,6 +70,7 @@ pub struct RunnerAsync<C: tokio_postgres::GenericClient = tokio_postgres::Client
     programs: Mutex<HashMap<u32, PreparedProgram>>,
 }
 
+#[cfg(feature = "tokio-postgres")]
 impl<C> RunnerAsync<C>
 where
     C: tokio_postgres::GenericClient,
@@ -86,20 +88,19 @@ where
     }
 }
 
+#[cfg(feature = "tokio-postgres")]
+type ConnNoTls = tokio_postgres::Connection<pg::Socket, pg::tls::NoTlsStream>;
+
+#[cfg(feature = "tokio-postgres")]
 impl RunnerAsync<tokio_postgres::Client> {
     /// Helper for [tokio_postgres::connect] and [RunnerAsync::new].
-    pub async fn connect_no_tls(config: &str) -> Result<Self, Error> {
+    pub async fn connect_no_tls(config: &str) -> Result<(Self, ConnNoTls), Error> {
         let (client, conn) = tokio_postgres::connect(config, tokio_postgres::NoTls).await?;
-        tokio::task::spawn(async {
-            if let Err(e) = conn.await {
-                eprintln!("{e}");
-            }
-        });
-
-        Ok(Self::new(client))
+        Ok((Self::new(client), conn))
     }
 }
 
+#[cfg(feature = "tokio-postgres")]
 #[derive(Clone)]
 struct PreparedProgram {
     program: rr::SqlProgram,

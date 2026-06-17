@@ -15,7 +15,9 @@ pub struct Interpreter {
     bindings: HashMap<br::Sid, Addr>,
     scopes: HashMap<br::Sid, Vec<Addr>>,
 
+    #[allow(dead_code)]
     pub(crate) file_system: Option<std::path::PathBuf>,
+    #[allow(dead_code)]
     pub(crate) defs: Vec<lutra_bin::ir::TyDef>,
 }
 

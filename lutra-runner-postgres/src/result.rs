@@ -158,10 +158,6 @@ impl<'a> super::Context<'a> {
         tracing::debug!("json for: {}", lutra_bin::ir::print_ty(ty));
 
         match &ty.kind {
-            ir::TyKind::Ident(i) if i.is(&["std", "Text"]) => Box::new(JsonTextEncoder),
-            ir::TyKind::Ident(i) if let Some(ty) = TyStd::try_new(i) => {
-                Box::new(JsonTyStdEncoder { ty })
-            }
             ir::TyKind::Primitive(prim) => Box::new(JsonTyStdEncoder {
                 ty: match prim {
                     ir::TyPrimitive::Prim8 => ir::TyStd::Int16,
@@ -189,11 +185,18 @@ impl<'a> super::Context<'a> {
                     .collect(),
             }),
 
-            ir::TyKind::Ident(path) => {
-                if !json_ctx.encoders.contains_key(path) {
+            ir::TyKind::Ident(ident) => {
+                if ident.is(&["std", "Text"]) {
+                    return Box::new(JsonTextEncoder);
+                }
+                if let Some(ty) = TyStd::try_new(ident) {
+                    return Box::new(JsonTyStdEncoder { ty });
+                }
+
+                if !json_ctx.encoders.contains_key(ident) {
                     // insert a dummy
                     json_ctx.encoders.insert(
-                        path.clone(),
+                        ident.clone(),
                         Box::new(JsonTyStdEncoder {
                             ty: ir::TyStd::Bool,
                         }),
@@ -203,11 +206,11 @@ impl<'a> super::Context<'a> {
                     let encoder = self.construct_json_encoder(self.get_ty_mat(ty), json_ctx);
 
                     // insert correct encoder
-                    *json_ctx.encoders.get_mut(path).unwrap() = encoder;
+                    *json_ctx.encoders.get_mut(ident).unwrap() = encoder;
                 }
 
                 Box::new(JsonRefEncoder {
-                    ident: path.clone(),
+                    ident: ident.clone(),
                 })
             }
 

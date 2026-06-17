@@ -133,9 +133,14 @@ fn fuzz() {
         let seeds = seeds.clone();
         handles.push(thread::spawn(move || {
             let f = async {
-                let client = RunnerAsync::connect_no_tls(POSTGRES_URL_SHARED)
+                let (client, conn) = RunnerAsync::connect_no_tls(POSTGRES_URL_SHARED)
                     .await
                     .unwrap();
+                tokio::task::spawn(async {
+                    if let Err(e) = conn.await {
+                        eprintln!("{e}");
+                    }
+                });
 
                 loop {
                     let i = {
