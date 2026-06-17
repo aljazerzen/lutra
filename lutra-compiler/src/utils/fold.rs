@@ -94,9 +94,13 @@ pub fn fold_expr_kind<T: ?Sized + PrFold>(fold: &mut T, expr_kind: ExprKind) -> 
     use ExprKind::*;
     Ok(match expr_kind {
         Ident(ident) => Ident(ident),
-        Lookup { base, lookup } => Lookup {
+        TupleLookup { base, lookup } => TupleLookup {
             base: Box::new(fold.fold_expr(*base)?),
             lookup,
+        },
+        ArrayLookup { base, index } => ArrayLookup {
+            base: Box::new(fold.fold_expr(*base)?),
+            index: Box::new(fold.fold_expr(*index)?),
         },
         Tuple(items) => Tuple(
             items

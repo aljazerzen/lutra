@@ -1,7 +1,7 @@
 use indexmap::IndexMap;
 
 use crate::diagnostic::Diagnostic;
-use crate::pr::{self, Expr};
+use crate::pr;
 use crate::resolver::NS_STD;
 use crate::utils::fold;
 use crate::utils::fold::PrFold;
@@ -59,6 +59,9 @@ impl PrFold for Desugarator {
                 return self.fold_expr(*p);
             }
             pr::ExprKind::Range(r) => self.desugar_range(r, expr.span.unwrap())?,
+            pr::ExprKind::ArrayLookup { base, index } => {
+                self.desugar_array_lookup(*base, *index, expr.span.unwrap())?
+            }
             pr::ExprKind::Unary(unary) => self.desugar_unary(unary, expr.span.unwrap())?,
 
             pr::ExprKind::Binary(pr::BinaryExpr {
@@ -177,6 +180,25 @@ impl Desugarator {
         }
     }
 
+    /// Desugar array lookup into std::array::index(base, index) | std::option::or_default
+    fn desugar_array_lookup(
+        &mut self,
+        base: pr::Expr,
+        index: pr::Expr,
+        span: Span,
+    ) -> Result<pr::ExprKind> {
+        let base = self.fold_expr(base)?;
+        let index = self.fold_expr(index)?;
+        let item_opt = new_binop(base, &[NS_STD, "array", "index"], index, Some(span));
+
+        let mut or_default = pr::Expr::new(pr::Path::new([NS_STD, "option", "or_default"]));
+        or_default.span = Some(span);
+        Ok(pr::ExprKind::Call(pr::Call {
+            subject: Box::new(or_default),
+            args: vec![pr::CallArg::simple(item_opt)],
+        }))
+    }
+
     /// Desugar unary operators into function calls.
     fn desugar_unary(
         &mut self,
@@ -256,7 +278,7 @@ impl Desugarator {
     ) -> Result<pr::ExprKind> {
         let mut items = items.into_iter().map(|item| match item {
             pr::InterpolateItem::String(string) => {
-                Expr::new_with_span(pr::Literal::Text(string), string_span)
+                pr::Expr::new_with_span(pr::Literal::Text(string), string_span)
             }
             pr::InterpolateItem::Expr {
                 expr,

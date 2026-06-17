@@ -49,7 +49,7 @@ fn interpolated_parser<'src>(
             for (part, span) in parts {
                 let span = absolute_span(span, span_base);
                 let lookup = Lookup::Name(part);
-                let kind = ExprKind::Lookup { base, lookup };
+                let kind = ExprKind::TupleLookup { base, lookup };
                 base = Box::new(Expr::new_with_span(kind, span));
             }
             base

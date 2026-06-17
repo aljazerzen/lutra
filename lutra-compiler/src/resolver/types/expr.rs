@@ -85,7 +85,7 @@ impl fold::PrFold for super::TypeResolver<'_> {
                 }
             }
 
-            pr::ExprKind::Lookup { base, lookup } => {
+            pr::ExprKind::TupleLookup { base, lookup } => {
                 let base = Box::new(self.fold_expr(*base)?);
                 let base_ty = base.ty.as_deref().unwrap();
 
@@ -93,7 +93,7 @@ impl fold::PrFold for super::TypeResolver<'_> {
                     .resolve_tuple_lookup(base_ty, &lookup, span.unwrap())
                     .with_span(span)?;
 
-                let kind = pr::ExprKind::Lookup { base, lookup };
+                let kind = pr::ExprKind::TupleLookup { base, lookup };
                 pr::Expr {
                     ty: Some(Box::new(target_ty)),
                     kind,

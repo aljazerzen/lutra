@@ -45,12 +45,12 @@ where
     .map_with(|kind, e| Expr::new_with_span(kind, e.span()))
     .boxed(); // prevent MapWith<Choice<10-tuple>> from propagating downstream
 
-    let atom = field_lookup(term).boxed();
-    let atom = type_annotation(atom, ty).boxed();
+    let term = postfix_lookup(term, expr).boxed();
+    let term = type_annotation(term, ty).boxed();
 
-    let expr_ops = unary_and_binary_expr(atom).boxed();
-    let expr_with_range = range(expr_ops).boxed();
-    binary_op_parser(expr_with_range, ctrl('|').to(BinOp::Pipe).boxed())
+    let term = unary_and_binary_expr(term).boxed();
+    let term = range(term).boxed();
+    binary_op_parser(term, ctrl('|').to(BinOp::Pipe).boxed())
 }
 
 fn unary_and_binary_expr<'src, I>(
@@ -237,13 +237,20 @@ where
         .map(|(subject, branches)| ExprKind::Match(Match { subject, branches }))
 }
 
-fn field_lookup<'src, I>(
+/// tuple field lookups (`.name` / `.0`) and array index lookups (`[expr]`).
+fn postfix_lookup<'src, I>(
+    term: impl Parser<'src, I, Expr, PExtra<'src>> + Clone + 'src,
     expr: impl Parser<'src, I, Expr, PExtra<'src>> + Clone + 'src,
 ) -> impl Parser<'src, I, Expr, PExtra<'src>> + Clone + 'src
 where
     I: ValueInput<'src, Token = TokenKind, Span = Span>,
 {
-    let lookup_step = ctrl('.')
+    enum Step {
+        Tuple(Lookup),
+        Array(Box<Expr>),
+    }
+
+    let tuple_step = ctrl('.')
         .ignore_then(choice((
             ident_part().map(Lookup::Name),
             select! {
@@ -251,12 +258,29 @@ where
                     => Lookup::Position(i.parse::<i64>().unwrap())
             },
         )))
-        .map_with(|f, e| (f, e.span()));
+        .map_with(|lookup, e| (Step::Tuple(lookup), e.span()));
 
-    expr.foldl(lookup_step.repeated(), |base, (lookup, span)| {
-        let base = Box::new(base);
-        let kind = ExprKind::Lookup { base, lookup };
-        Expr::new_with_span(kind, span)
+    let array_step = ctrl('[')
+        .ignore_then(expr)
+        .then_ignore(ctrl(']'))
+        .map_with(|index, e| (Step::Array(Box::new(index)), e.span()));
+
+    let step = choice((tuple_step, array_step));
+
+    term.foldl(step.repeated(), |base, (step, step_span)| match step {
+        Step::Tuple(lookup) => {
+            let base = Box::new(base);
+            let kind = ExprKind::TupleLookup { base, lookup };
+            Expr::new_with_span(kind, step_span)
+        }
+        Step::Array(index) => {
+            let mut span = base.span.unwrap();
+            span.set_end_of(&step_span);
+
+            let base = Box::new(base);
+            let kind = ExprKind::ArrayLookup { base, index };
+            Expr::new_with_span(kind, span)
+        }
     })
 }
 

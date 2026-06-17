@@ -34,7 +34,7 @@ impl ConstantValidator {
                 pr::Ref::Local { .. } => Err(expr.span),
             },
 
-            pr::ExprKind::Lookup { base, .. } => self.validate_is_const(base),
+            pr::ExprKind::TupleLookup { base, .. } => self.validate_is_const(base),
 
             pr::ExprKind::Tuple(fields) => fields
                 .iter()
@@ -59,7 +59,8 @@ impl ConstantValidator {
             | pr::ExprKind::VarBinding(_) => Err(expr.span),
 
             // resolved away
-            pr::ExprKind::TypeAnnotation(_)
+            pr::ExprKind::ArrayLookup { .. }
+            | pr::ExprKind::TypeAnnotation(_)
             | pr::ExprKind::Range(_)
             | pr::ExprKind::Binary(_)
             | pr::ExprKind::Unary(_)

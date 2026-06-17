@@ -11,13 +11,17 @@ impl PrintSource for pr::Expr {
 
         match &self.kind {
             pr::ExprKind::Ident(path) => p.push(path.to_string())?,
-            pr::ExprKind::Lookup { base, lookup } => {
+            pr::ExprKind::TupleLookup { base, lookup } => {
                 base.print(p)?;
                 p.push(".")?;
                 match lookup {
                     pr::Lookup::Name(n) => p.push(ident::display(n))?,
                     pr::Lookup::Position(i) => p.push(i.to_string())?,
                 }
+            }
+            pr::ExprKind::ArrayLookup { base, index } => {
+                base.print(p)?;
+                index.between("[", "]", self.span).print(p)?;
             }
             pr::ExprKind::Literal(literal) => p.push(literal.to_string())?,
 

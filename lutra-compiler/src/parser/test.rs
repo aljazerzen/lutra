@@ -274,7 +274,7 @@ fn parse_05() {
     Match(
         Match {
             subject: Expr {
-                kind: Lookup {
+                kind: TupleLookup {
                     base: Expr {
                         kind: Ident(
                             item,

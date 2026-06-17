@@ -74,7 +74,7 @@ impl fold::PrFold for NameResolver<'_> {
                     ..expr
                 }
             }
-            pr::ExprKind::Lookup { .. } => pr::Expr {
+            pr::ExprKind::TupleLookup { .. } => pr::Expr {
                 kind: fold::fold_expr_kind(self, expr.kind)?,
                 ..expr
             },

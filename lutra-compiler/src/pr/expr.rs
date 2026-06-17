@@ -74,11 +74,14 @@ pub enum Ref {
 pub enum ExprKind {
     Ident(Path),
 
-    /// A lookup into an object by name or position.
-    /// Currently, this includes only tuple field lookups, primarily by name.
-    Lookup {
+    /// A lookup into a tuple by name or position.
+    TupleLookup {
         base: Box<Expr>,
         lookup: Lookup,
+    },
+    ArrayLookup {
+        base: Box<Expr>,
+        index: Box<Expr>,
     },
     Literal(Literal),
     Nested(Box<Expr>),

@@ -1959,6 +1959,55 @@ func main() -> index(["hello", "world", "!"], 2)
 # >
 some("!")
 
+# === array_lookup_00
+# Basic indexing returns the item at the given position.
+func main() -> ([10, 20, 30]: [Int64])[1]
+# >
+20
+
+# === array_lookup_01
+# Indexing is zero-based, so `[0]` returns the first item.
+func main() -> ["a", "b", "c"][0]
+# >
+"a"
+
+# === array_lookup_02
+# Out-of-bounds indexing returns the type's default value (0 for numbers).
+func main() -> ([10, 20, 30]: [Int64])[10]
+# >
+0
+
+# === array_lookup_04
+# The index may be an arbitrary expression, not just a literal.
+func main() -> ([10, 20, 30]: [Int64])[1 + 1]
+# >
+30
+
+# === array_lookup_05
+# Indexing can be chained for nested arrays: `[0][1]` is `([0])[1]`.
+# skip: duckdb
+# skip: postgres
+const a: [[Int64]] = [[1, 2], [3, 4], [5, 6]]
+func main() -> a[2][1]
+# >
+6
+
+# === array_lookup_06
+# A field lookup may be followed by an array lookup.
+const a = {xs = ([7, 8, 9]: [Int64])}
+func main() -> a.xs[2]
+# >
+9
+
+# === array_lookup_08
+# skip: duckdb
+# skip: postgres
+# An array lookup may be followed by a field lookup: `arr[0].b`.
+const a: [{b: Int64}] = [{b = 1}, {b = 2}, {b = 3}]
+func main() -> a[1].b
+# >
+2
+
 # === std_lag_00
 func main() -> lag([5,3,65,3,2,56,67]: [Int8], 2)
 # >

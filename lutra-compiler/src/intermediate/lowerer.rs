@@ -200,7 +200,7 @@ impl<'a> Lowerer<'a> {
                     inner,
                 }))
             }
-            pr::ExprKind::Lookup { base, lookup } => {
+            pr::ExprKind::TupleLookup { base, lookup } => {
                 let (base_ty, frame_name) = self.get_ty_mat_pr(base.ty.as_ref().unwrap());
 
                 if frame_name.is_some() {
@@ -404,7 +404,8 @@ impl<'a> Lowerer<'a> {
             pr::ExprKind::TypeAnnotation(_) => unreachable!(),
 
             // desugared away
-            pr::ExprKind::Nested(_)
+            pr::ExprKind::ArrayLookup { .. }
+            | pr::ExprKind::Nested(_)
             | pr::ExprKind::Binary(_)
             | pr::ExprKind::Unary(_)
             | pr::ExprKind::Range(_)

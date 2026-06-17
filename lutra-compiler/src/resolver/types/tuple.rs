@@ -94,7 +94,7 @@ impl super::TypeResolver<'_> {
 
     fn infer_tuple_field_name(&self, field: &pr::Expr) -> Option<String> {
         match &field.kind {
-            pr::ExprKind::Lookup { base: _, lookup } => match lookup {
+            pr::ExprKind::TupleLookup { base: _, lookup } => match lookup {
                 pr::Lookup::Name(name) => Some(name.clone()),
                 pr::Lookup::Position(_) => None,
             },

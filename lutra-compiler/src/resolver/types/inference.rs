@@ -68,12 +68,13 @@ impl TypeResolver<'_> {
             | ExprKind::Call(_)
             | ExprKind::Variant(_)
             | ExprKind::Match(_)
-            | ExprKind::Lookup { .. }
+            | ExprKind::TupleLookup { .. }
             | ExprKind::If(_)
             | ExprKind::VarBinding(_) => unreachable!(),
 
             // desugar-ed
-            ExprKind::Nested(_)
+            ExprKind::ArrayLookup { .. }
+            | ExprKind::Nested(_)
             | ExprKind::Range(_)
             | ExprKind::Binary(_)
             | ExprKind::Unary(_)
