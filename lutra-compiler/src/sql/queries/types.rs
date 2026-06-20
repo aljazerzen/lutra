@@ -189,11 +189,22 @@ impl<'p> Context<'p> {
         }
     }
 
-    /// Get default value for a type
-    pub(super) fn default_value(&self, ty: &ir::Ty) -> &'static str {
+    /// Get default value for a type, as a single SQL column expression.
+    pub(super) fn default_value(&self, ty: &ir::Ty) -> String {
         use ir::TyStd::*;
 
         let ty = self.get_ty_mat(ty);
+
+        // Compound types whose serialized form is a single column.
+        if let ir::TyKind::Array(item_ty) = &ty.kind {
+            // An array is serialized into a single column: jsonb on Postgres,
+            // a native LIST on DuckDB.
+            return match self.dialect() {
+                Dialect::Postgres => "'[]'::jsonb".to_string(),
+                Dialect::DuckDB => format!("CAST([] AS {}[])", self.duck_ty_name(item_ty)),
+            };
+        }
+
         let ty_std = match &ty.kind {
             ir::TyKind::Ident(ident) => ir::TyStd::try_new(ident).unwrap(),
             ir::TyKind::Primitive(ir::TyPrimitive::Prim8) => Int8,
@@ -236,5 +247,6 @@ impl<'p> Context<'p> {
                 }
             },
         }
+        .to_string()
     }
 }

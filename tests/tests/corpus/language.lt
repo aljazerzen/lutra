@@ -280,8 +280,6 @@ func main(): [Text] -> lag([default(), default()], 1)
 ]
 
 # === default_14
-# skip: postgres
-# skip: duckdb
 func main(): [[Int64]] -> lag([default(), default()], 1)
 # >
 [

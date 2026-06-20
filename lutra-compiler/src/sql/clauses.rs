@@ -91,18 +91,25 @@ impl<'a> Context<'a> {
     /// Constructs a reference to an array item.
     /// If needed, the reference is also deserialized.
     pub fn new_array_item_ref(&mut self, rel: &cr::BoundExpr) -> cr::Expr {
+        let item_ref = self.new_array_item_ref_ser(rel);
+        self.maybe_deser(item_ref)
+    }
+
+    /// Constructs a reference to an array item, leaving it in its serialized
+    /// (single-column) representation. Window functions like `lag`/`lead` shift
+    /// whole items between rows and must operate on the serialized column rather
+    /// than a deserialized nested relation.
+    pub fn new_array_item_ref_ser(&mut self, rel: &cr::BoundExpr) -> cr::Expr {
         let array_ty = self.get_ty_mat(&rel.rel.ty);
         let item_ty = array_ty.kind.as_array().unwrap();
 
-        let item_ref = cr::Expr {
+        cr::Expr {
             kind: cr::ExprKind::Transform(
                 self.new_binding(cr::Expr::new_rel_ref(rel)),
                 cr::Transform::ProjectDiscard(vec![0]),
             ),
             ty: *item_ty.clone(),
-        };
-
-        self.maybe_deser(item_ref)
+        }
     }
 
     /// Injects deserialize, if needed.
@@ -848,7 +855,7 @@ impl<'a> Context<'a> {
                 let array = self.compile_rel(&call.args[0]);
                 let array = self.new_binding(array);
 
-                let item = self.new_array_item_ref(&array);
+                let item = self.new_array_item_ref_ser(&array);
 
                 let mut args = vec![item];
                 args.extend(call.args[1..].iter().map(|a| self.compile_column(a)));
