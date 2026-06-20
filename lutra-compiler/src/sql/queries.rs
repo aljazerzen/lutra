@@ -446,7 +446,7 @@ impl<'a> Context<'a> {
 
             cr::From::Deserialize(input_in) => {
                 let input = self.compile_rel(input_in);
-                self.deserialize(input, &input_in.ty, ty)
+                self.deserialize(input, ty)
             }
 
             cr::From::Serialize(expr_in) => {

@@ -347,8 +347,8 @@ impl<'a> queries::Context<'a> {
     }
 
     /// Convert a column in "postgres JSON repr" into a relation in "query repr"
-    pub fn pg_deserialize(&mut self, input: Node, input_ty: &ir::Ty, ty: &ir::Ty) -> Node {
-        let (input_expr, input_rels) = self.node_into_column_and_rels(input, input_ty);
+    pub fn pg_deserialize(&mut self, input: Node, ty: &ir::Ty) -> Node {
+        let (input_expr, input_rels) = self.node_into_column_and_rels(input, &ir::Ty::text());
 
         let mut result = utils::select_empty();
         result.from.extend(input_rels);

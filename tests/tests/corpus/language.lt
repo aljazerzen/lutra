@@ -1985,8 +1985,6 @@ func main() -> ([10, 20, 30]: [Int64])[1 + 1]
 
 # === array_lookup_05
 # Indexing can be chained for nested arrays: `[0][1]` is `([0])[1]`.
-# skip: duckdb
-# skip: postgres
 const a: [[Int64]] = [[1, 2], [3, 4], [5, 6]]
 func main() -> a[2][1]
 # >
@@ -2000,8 +1998,6 @@ func main() -> a.xs[2]
 9
 
 # === array_lookup_08
-# skip: duckdb
-# skip: postgres
 # An array lookup may be followed by a field lookup: `arr[0].b`.
 const a: [{b: Int64}] = [{b = 1}, {b = 2}, {b = 3}]
 func main() -> a[1].b

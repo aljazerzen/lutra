@@ -172,15 +172,21 @@ impl<'a> crate::sql::queries::Context<'a> {
         ty: &ir::Ty,
     ) -> (sa::Expr, Vec<sa::RelNamed>) {
         match scoped {
-            Node::Column {
-                expr,
-                rels: rel_vars,
-            } => (*expr, rel_vars),
-            Node::Columns {
-                exprs,
-                rels: rel_vars,
-            } if exprs.len() == 1 => (exprs.into_iter().next().unwrap(), rel_vars),
+            Node::Column { expr, rels } => (*expr, rels),
+            Node::Columns { exprs, rels } if exprs.len() == 1 => {
+                (exprs.into_iter().next().unwrap(), rels)
+            }
             Node::Source(source) => (sa::Expr::Source(source), vec![]),
+            Node::RelVar(ref rel_name) => {
+                // A rel var is already in scope -> reference its columns
+                let cols = self.rel_var_into_columns(Some(rel_name), ty);
+                if cols.len() == 1 {
+                    (cols.into_iter().next().unwrap(), vec![])
+                } else {
+                    let subquery = sa::Expr::Subquery(Box::new(self.node_into_query(scoped, ty)));
+                    (subquery, vec![])
+                }
+            }
             _ => {
                 let rel = self.node_into_rel(scoped, ty);
 

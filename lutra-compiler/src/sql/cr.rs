@@ -179,7 +179,6 @@ impl Expr {
         }
     }
 
-    #[allow(dead_code)]
     pub fn new_deserialize(rel: Expr) -> Self {
         Expr {
             ty: rel.ty.clone(),

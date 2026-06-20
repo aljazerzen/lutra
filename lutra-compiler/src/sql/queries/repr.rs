@@ -57,9 +57,9 @@ impl<'a> Context<'a> {
     /// What this means depends on the dialect:
     /// - on postgres, this will unpack json
     /// - on duckdb, this will deconstruct STRUCT/LIST/UNION types
-    pub fn deserialize(&mut self, input: Node, input_ty: &ir::Ty, ty: &ir::Ty) -> Node {
+    pub fn deserialize(&mut self, input: Node, ty: &ir::Ty) -> Node {
         match self.dialect() {
-            Dialect::Postgres => self.pg_deserialize(input, input_ty, ty),
+            Dialect::Postgres => self.pg_deserialize(input, ty),
             Dialect::DuckDB => self.duck_deserialize(input, ty),
         }
     }

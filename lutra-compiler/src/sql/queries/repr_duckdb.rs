@@ -69,7 +69,8 @@ impl<'a> queries::Context<'a> {
     pub fn duck_deserialize(&mut self, input: Node, ty: &ir::Ty) -> Node {
         match &self.get_ty_mat(ty).kind {
             ir::TyKind::Array(ty_item) => {
-                let (input_expr, input_rels) = self.node_into_column_and_rels(input, ty);
+                let (input_expr, input_rels) =
+                    self.node_into_column_and_rels(input, &ir::Ty::text());
 
                 let mut result = utils::select_empty();
                 result.from.extend(input_rels);

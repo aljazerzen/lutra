@@ -92,25 +92,30 @@ impl<'a> Context<'a> {
     /// If needed, the reference is also deserialized.
     pub fn new_array_item_ref(&mut self, rel: &cr::BoundExpr) -> cr::Expr {
         let array_ty = self.get_ty_mat(&rel.rel.ty);
-        let item_ty = self.get_ty_mat(array_ty.kind.as_array().unwrap());
-        let item_ty = item_ty.clone();
+        let item_ty = array_ty.kind.as_array().unwrap();
 
-        let mut item_ref = cr::ExprKind::Transform(
-            self.new_binding(cr::Expr::new_rel_ref(rel)),
-            cr::Transform::ProjectDiscard(vec![0]),
-        );
+        let item_ref = cr::Expr {
+            kind: cr::ExprKind::Transform(
+                self.new_binding(cr::Expr::new_rel_ref(rel)),
+                cr::Transform::ProjectDiscard(vec![0]),
+            ),
+            ty: *item_ty.clone(),
+        };
 
-        // deserialize from JSON if needed
-        if item_ty.kind.is_array() {
-            item_ref = cr::ExprKind::From(cr::From::Deserialize(Box::new(cr::Expr {
-                kind: item_ref,
-                ty: ir::Ty::text(),
-            })));
-        }
+        self.maybe_deser(item_ref)
+    }
 
-        cr::Expr {
-            kind: item_ref,
-            ty: item_ty,
+    /// Injects deserialize, if needed.
+    /// Should be called whenever an expression is "unwrapped" from a "nested" expression.
+    /// For example, if we lookup `a` in nested `{a: [1, 2, 3]}`, we get `[1, 2, 3]`.
+    /// In nested expression the array was represented as JSON, but afterwards it is represneted
+    /// as a relation. Thus, a deserialize is needed.
+    fn maybe_deser(&self, rel: cr::Expr) -> cr::Expr {
+        let ty_mat = self.get_ty_mat(&rel.ty);
+        if ty_mat.kind.is_array() {
+            cr::Expr::new_deserialize(rel)
+        } else {
+            rel
         }
     }
 
@@ -292,11 +297,10 @@ impl<'a> Context<'a> {
                             }
 
                             ir::TyKind::Array(_) => {
-                                // param will be encoded as JSON
-                                cr::ExprKind::From(cr::From::Deserialize(Box::new(cr::Expr {
+                                return cr::Expr::new_deserialize(cr::Expr {
                                     kind: cr::ExprKind::From(cr::From::Param(0)),
                                     ty: expr.ty.clone(),
-                                })))
+                                });
                             }
 
                             ir::TyKind::Function(_) => unreachable!(),
@@ -410,8 +414,11 @@ impl<'a> Context<'a> {
                 };
 
                 if self.is_option(variants) {
-                    // a nullable column
-                    return base;
+                    // a single nullable column
+                    return self.maybe_deser(cr::Expr {
+                        kind: base.kind,
+                        ty: expr.ty.clone(),
+                    });
                 } else {
                     // tag + one column for variant
 
@@ -449,7 +456,7 @@ impl<'a> Context<'a> {
                 // change the repr into normal SQL repr.
                 // Currently this only happens for arrays, which change from JSON to SQL repr.
                 let ty_mat = self.get_ty_mat(&expr.ty);
-                let unpack = ty_mat.kind.is_array();
+                let deser = ty_mat.kind.is_array();
 
                 // In simple case start == lookup.position. But this tuple might contains fields
                 // before lookup.position which are represented with multiple columns.
@@ -464,25 +471,25 @@ impl<'a> Context<'a> {
                 // Also, target of lookup might not contain a single column
                 // (e.g. it might be a nested tuple with two fields).
                 let end = start
-                    + if unpack {
+                    + if deser {
                         1
                     } else {
                         self.rel_cols_ty_nested(&fields[position].ty).count()
                     };
 
-                let mut rel = cr::ExprKind::Transform(
-                    self.new_binding(base),
-                    cr::Transform::ProjectPick((start..end).collect()),
-                );
+                let mut rel = cr::Expr {
+                    kind: cr::ExprKind::Transform(
+                        self.new_binding(base),
+                        cr::Transform::ProjectPick((start..end).collect()),
+                    ),
+                    ty: expr.ty.clone(),
+                };
 
-                if unpack {
-                    rel = cr::ExprKind::From(cr::From::Deserialize(Box::new(cr::Expr {
-                        kind: rel,
-                        ty: ir::Ty::text(),
-                    })));
+                if deser {
+                    rel = cr::Expr::new_deserialize(rel);
                 }
 
-                rel
+                return rel;
             }
             ir::ExprKind::Binding(binding) => {
                 if let ir::TyKind::Function(_) = &binding.expr.ty.kind {
@@ -1438,12 +1445,7 @@ impl<'a> Context<'a> {
                             kind: cr::ExprKind::From(cr::From::Serialize(Box::new(rel))),
                         }])
                     }
-                    ir::TyKind::Tuple(_) => {
-                        // non-constructed tuples need to be declared as a rel var and unpacked
-
-                        ColumnsOrUnpack::Unpack(rel)
-                    }
-                    ir::TyKind::Enum(_) => {
+                    ir::TyKind::Tuple(_) | ir::TyKind::Enum(_) => {
                         let is_single_col = self.rel_cols_ty_nested(ty_mat).nth(1).is_none();
                         if is_single_col {
                             ColumnsOrUnpack::Columns(vec![rel])
