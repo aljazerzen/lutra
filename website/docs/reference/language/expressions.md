@@ -110,6 +110,13 @@ labeled parameter syntax.
 calculate(1, add = 2, multiply = 3)
 ```
 
+You can omit an argument when the parameter declares a default value. See
+[Default values](definitions.md#default-values).
+
+```lt
+add(4) # y uses its default value
+```
+
 ## Anonymous functions
 
 Lutra supports two anonymous function forms.

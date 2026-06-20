@@ -57,7 +57,7 @@ Annotates a type with traits to `#[Derive]` when translating to Rust.
 ## `type` Bool
 
 ```lutra
-type Bool(prim8)
+type Bool(Prim8)
 ```
 
 A boolean value.
@@ -65,7 +65,7 @@ A boolean value.
 ## `type` Int8
 
 ```lutra
-type Int8(prim8)
+type Int8(Prim8)
 ```
 
 A signed 8-bit integer.
@@ -73,7 +73,7 @@ A signed 8-bit integer.
 ## `type` Int16
 
 ```lutra
-type Int16(prim16)
+type Int16(Prim16)
 ```
 
 A signed 16-bit integer.
@@ -81,7 +81,7 @@ A signed 16-bit integer.
 ## `type` Int32
 
 ```lutra
-type Int32(prim32)
+type Int32(Prim32)
 ```
 
 A signed 32-bit integer.
@@ -89,7 +89,7 @@ A signed 32-bit integer.
 ## `type` Int64
 
 ```lutra
-type Int64(prim64)
+type Int64(Prim64)
 ```
 
 A signed 64-bit integer.
@@ -97,7 +97,7 @@ A signed 64-bit integer.
 ## `type` Uint8
 
 ```lutra
-type Uint8(prim8)
+type Uint8(Prim8)
 ```
 
 An unsigned 8-bit integer.
@@ -105,7 +105,7 @@ An unsigned 8-bit integer.
 ## `type` Uint16
 
 ```lutra
-type Uint16(prim16)
+type Uint16(Prim16)
 ```
 
 An unsigned 16-bit integer.
@@ -113,7 +113,7 @@ An unsigned 16-bit integer.
 ## `type` Uint32
 
 ```lutra
-type Uint32(prim32)
+type Uint32(Prim32)
 ```
 
 An unsigned 32-bit integer.
@@ -121,7 +121,7 @@ An unsigned 32-bit integer.
 ## `type` Uint64
 
 ```lutra
-type Uint64(prim64)
+type Uint64(Prim64)
 ```
 
 An unsigned 64-bit integer.
@@ -129,7 +129,7 @@ An unsigned 64-bit integer.
 ## `type` Float32
 
 ```lutra
-type Float32(prim32)
+type Float32(Prim32)
 ```
 
 A 32-bit floating-point number.
@@ -137,7 +137,7 @@ A 32-bit floating-point number.
 ## `type` Float64
 
 ```lutra
-type Float64(prim64)
+type Float64(Prim64)
 ```
 
 A 64-bit floating-point number.
@@ -145,7 +145,7 @@ A 64-bit floating-point number.
 ## `type` Text
 
 ```lutra
-type Text([prim8])
+type Text([Prim8])
 ```
 
 Unicode text of arbitrary length. Encoded as UTF-8.
@@ -177,7 +177,7 @@ Backed by a signed 32-bit integer, representing number of days.
 type Duration(microseconds: Int64)
 ```
 
-A signed duration of time, unrelated to calendar events.
+A duration of time, unrelated to calendar events. Can be negative.
 
 Backed by a signed 64-bit integer, representing number of microseconds.
 
@@ -202,7 +202,7 @@ Returns offset of a time zone from UTC on a given date.
 ## `type` Decimal
 
 ```lutra
-type Decimal(prim64)
+type Decimal(Prim64)
 ```
 
 Exact decimal value with a fixed `SCALE`, which is the number of digits past

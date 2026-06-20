@@ -71,6 +71,66 @@ calculate(1, add = 2, multiply = 3)
 calculate(1, multiply = 3, add = 2)
 ```
 
+### Default values
+
+A parameter can declare a default value with `= value`.
+The syntax is `name: Type = value`, or `label local_name: Type = value` for a
+labeled parameter.
+
+When the caller omits an argument, the function uses the default value.
+
+```lt
+func add(x: Int32, y: Int32 = 1) -> x + y
+
+func main() -> {
+  add(4),     # 5
+  add(4, 3),  # 7
+}
+```
+
+Default values also work with labeled parameters:
+
+```lt
+func wrap(value: Text, left prefix: Text = "[", right suffix: Text = "]") -> (
+  f"{prefix}{value}{suffix}"
+)
+
+func main() -> {
+  wrap("x"),                          # "[x]"
+  wrap("x", right = "!"),             # "[x!"
+  wrap("x", right = "!", left = "<"), # "<x!"
+}
+```
+
+A default value must be a constant expression.
+It cannot reference other parameters, names from an outer scope, or function
+calls.
+
+```lt
+# Not allowed: defaults must be constant.
+func bad(x: Int32 = helper()) -> x
+func bad(x: Int32 = y, y y: Int32) -> x
+```
+
+A parameter with a default value can be omitted only when every parameter after
+it is labeled.
+A required labeled parameter may follow a parameter that has a default:
+
+```lt
+func score(bonus: Int32 = 1, player name: Text) -> name
+
+func main() -> {
+  score(player = "alice"),    # bonus uses the default
+  score(5, player = "bob"),   # bonus passed positionally
+}
+```
+
+If an unlabeled positional parameter follows a defaulted parameter, the default
+can never be used, because the caller must always pass the earlier parameter
+positionally to reach the later one.
+The compiler reports this as an error.
+To fix it, either reorder the parameters or add a label to the later parameter.
+
 ### Type parameters with `where`
 
 Functions can have type parameters specified with `where` clause.
