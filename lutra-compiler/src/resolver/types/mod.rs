@@ -63,11 +63,18 @@ impl TypeResolver<'_> {
     }
 
     /// Store diagnostic in a slot. Existing diagnostic is pushed into [Self::diagnostics].
-    fn collect_diag(&mut self, slot: &mut Option<Diagnostic>, d: Diagnostic) {
+    fn collect_err(&mut self, slot: &mut Option<Diagnostic>, d: Diagnostic) {
         if let Some(existing) = slot.take() {
             self.diagnostics.push(existing);
         }
         *slot = Some(d);
+    }
+
+    /// Given a Vec of errors, push all but the last into [Self::diagnostics] and return the last.
+    fn push_errors(&mut self, mut errors: Vec<Diagnostic>) -> Diagnostic {
+        let r = errors.pop().unwrap();
+        self.diagnostics.extend(errors);
+        r
     }
 
     /// If diagnostic has span, push it to buffer.

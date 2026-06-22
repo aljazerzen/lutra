@@ -25,7 +25,7 @@ impl super::TypeResolver<'_> {
             let expr = match self.fold_expr(f.expr) {
                 Ok(e) => e,
                 Err(d) => {
-                    self.collect_diag(&mut diag, d);
+                    self.collect_err(&mut diag, d);
                     continue;
                 }
             };
@@ -43,7 +43,7 @@ impl super::TypeResolver<'_> {
                             )
                             .with_span(expr.span)
                             .push_hint(format!("got type {}", printer::print_ty(t)));
-                            self.collect_diag(&mut diag, d);
+                            self.collect_err(&mut diag, d);
                             continue;
                         }
                     }
@@ -51,7 +51,7 @@ impl super::TypeResolver<'_> {
                         let (param_name, domain) = self.get_ty_param(id);
                         let pr::TyDomain::TupleHasFields(_) = domain else {
                             let d = error_lookup_into_unpack_of_ty_param(param_name);
-                            self.collect_diag(&mut diag, d);
+                            self.collect_err(&mut diag, d);
                             continue;
                         };
 

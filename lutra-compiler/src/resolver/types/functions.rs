@@ -29,21 +29,14 @@ impl TypeResolver<'_> {
         self.scopes.push(scope);
 
         // fold types
-        func.params = self.resolve_func_params(func.params)?;
-        func.return_ty = fold::fold_type_opt(self, func.return_ty)?;
-        if func.ty_params.is_empty() {
-            // only allow ty param inference for functions without type params
-
-            for param in func.params.iter_mut() {
-                if param.ty.is_none() {
-                    param.ty = Some(self.introduce_ty_var(pr::TyDomain::Open, param.span));
-                }
-            }
-        }
+        self.resolve_func_tys(&mut func)?;
 
         // put params into scope
-        let res = self.scopes.last_mut().unwrap().insert_params(&func);
-        res.map_err(|mut d| d.remove(0))?;
+        let s = self.scopes.last_mut().unwrap();
+        s.insert_params(&func).map_err(|e| self.push_errors(e))?;
+
+        // resolve param defaults (requires scope to be complete)
+        func.params = self.resolve_func_param_defaults(func.params)?;
 
         // fold body
         let mut body = Box::new(self.fold_expr(*func.body)?);
@@ -62,7 +55,35 @@ impl TypeResolver<'_> {
         Ok(Box::new(func))
     }
 
-    fn resolve_func_params(
+    fn resolve_func_tys(&mut self, func: &mut pr::Func) -> Result<()> {
+        let mut err_slot = None;
+
+        // params
+        for p in &mut func.params {
+            let Some(ty) = p.ty.take() else { continue };
+            match self.fold_type(ty) {
+                Ok(ty) => p.ty = Some(ty),
+                Err(d) => self.collect_err(&mut err_slot, d),
+            }
+        }
+        // return ty
+        func.return_ty = fold::fold_type_opt(self, func.return_ty.take())?;
+
+        // param ty inference
+        if func.ty_params.is_empty() {
+            // only allow ty param inference for functions without type params
+
+            for param in func.params.iter_mut() {
+                if param.ty.is_none() {
+                    param.ty = Some(self.introduce_ty_var(pr::TyDomain::Open, param.span));
+                }
+            }
+        }
+
+        err_slot.map_or(Ok(()), Err)
+    }
+
+    fn resolve_func_param_defaults(
         &mut self,
         params: Vec<pr::FuncParam>,
     ) -> Result<Vec<pr::FuncParam>, Diagnostic> {
@@ -70,23 +91,21 @@ impl TypeResolver<'_> {
         let mut err_slot = None;
         let mut last_default = None;
         for mut p in params {
-            // fold ty
-            p.ty = p.ty.map(|t| self.fold_type(t)).transpose()?;
-
             // validate no positionals after defaults
             if p.label.is_none() && last_default.is_some() {
                 let d = err_unsuable_default(last_default, Some(p.span));
-                self.collect_diag(&mut err_slot, d);
+                self.collect_err(&mut err_slot, d);
             }
+            let Some(default) = p.default.take() else {
+                resolved.push(p);
+                continue;
+            };
+            last_default = Some(default.span.unwrap_or(p.span));
 
-            // default
-            if let Some(default) = p.default.take() {
-                last_default = Some(default.span.unwrap_or(p.span));
-
-                match self.resolve_func_param_default(*default, &p.ty) {
-                    Ok(default) => p.default = Some(Box::new(default)),
-                    Err(e) => self.collect_diag(&mut err_slot, e),
-                }
+            // resolve default
+            match self.resolve_func_param_default(*default, &p.ty) {
+                Ok(default) => p.default = Some(Box::new(default)),
+                Err(e) => self.collect_err(&mut err_slot, e),
             }
             resolved.push(p);
         }
@@ -111,7 +130,7 @@ impl TypeResolver<'_> {
 
             // validate no positionals after defaults
             if p.label.is_none() && last_default.is_some() {
-                self.collect_diag(&mut err_slot, err_unsuable_default(last_default, p.span));
+                self.collect_err(&mut err_slot, err_unsuable_default(last_default, p.span));
             }
 
             // fold defaults
@@ -120,7 +139,7 @@ impl TypeResolver<'_> {
 
                 match self.resolve_func_param_default(*default, &p.ty) {
                     Ok(default) => p.default = Some(Box::new(default)),
-                    Err(e) => self.collect_diag(&mut err_slot, e),
+                    Err(e) => self.collect_err(&mut err_slot, e),
                 }
             }
         }

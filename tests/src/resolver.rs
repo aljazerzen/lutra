@@ -2551,6 +2551,19 @@ fn call_15() {
 }
 
 #[test]
+fn call_16() {
+    // def, a defaulted param combined with a `where`-constrained generic param
+    // must not shift the param offsets (the body `n` must resolve to `Int32`,
+    // not to `data`'s type `[P]`)
+
+    insta::assert_snapshot!(_test_ty(r#"
+    func f(data: [P], n n: Int32 = 0): Int32 where P: {..} -> n
+
+    func main(): Int32 -> 1
+    "#), @"Int32");
+}
+
+#[test]
 fn anno_00_happy_path() {
     insta::assert_snapshot!(_test_ty(r#"
     anno deprecated(reason: Text)
