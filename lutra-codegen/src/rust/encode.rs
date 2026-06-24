@@ -45,13 +45,31 @@ fn write_ty_def_impl(
     let name = ty.name.as_ref().unwrap();
 
     match &ty.kind {
-        ir::TyKind::Primitive(_) | ir::TyKind::Ident(_) => {
+        ir::TyKind::Primitive(_) => {
+            // Primitive newtypes wrap a fixed-size integer; HeadPtr is always ().
             writeln!(w, "impl {lutra_bin}::Encode for {name} {{")?;
             writeln!(w, "    type HeadPtr = ();")?;
             writeln!(w, "    fn encode_head(&self, buf: &mut {lutra_bin}::bytes::BytesMut) {{")?;
             writeln!(w, "        self.0.encode_head(buf)")?;
             writeln!(w, "    }}")?;
             writeln!(w, "    fn encode_body(&self, _: (), _: &mut {lutra_bin}::bytes::BytesMut) {{}}")?;
+            writeln!(w, "}}")?;
+        }
+
+        ir::TyKind::Ident(_) => {
+            // Ident newtypes (e.g. `Color(Text)`) delegate encoding to the
+            // inner named type. The inner type's HeadPtr may be non-unit
+            // (e.g. `String` has `HeadPtr = ReversePointer`).
+            let mut inner = String::new();
+            write_ty_ref(&mut inner, ty, false, ctx)?;
+            writeln!(w, "impl {lutra_bin}::Encode for {name} {{")?;
+            writeln!(w, "    type HeadPtr = <{inner} as {lutra_bin}::Encode>::HeadPtr;")?;
+            writeln!(w, "    fn encode_head(&self, buf: &mut {lutra_bin}::bytes::BytesMut) -> Self::HeadPtr {{")?;
+            writeln!(w, "        self.0.encode_head(buf)")?;
+            writeln!(w, "    }}")?;
+            writeln!(w, "    fn encode_body(&self, head: Self::HeadPtr, buf: &mut {lutra_bin}::bytes::BytesMut) {{")?;
+            writeln!(w, "        self.0.encode_body(head, buf)")?;
+            writeln!(w, "    }}")?;
             writeln!(w, "}}")?;
         }
 
