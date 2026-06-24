@@ -90,7 +90,7 @@ Some files are generated. Regenerate them only when needed, usually after change
 
 ```bash
 just generate
-just generate-precompiled # use when the project does not compile
+just generate-no-compile # use when the project does not compile
 ```
 
 Do not hand-edit generated files unless you are debugging the generator itself.

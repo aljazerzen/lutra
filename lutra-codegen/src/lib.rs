@@ -124,10 +124,13 @@ pub struct GenerateOptions {
             default_missing_value = "true"
         )
     )]
-    pub no_function_traits: bool,
+    pub function_traits: bool,
 
     #[cfg_attr(feature = "clap", arg(long))]
     pub client: bool,
+
+    #[cfg_attr(feature = "clap", arg(long = "no-std", default_value_t = false))]
+    pub no_std: bool,
 
     #[cfg_attr(feature = "clap", arg(long))]
     pub programs_bytecode_lt: Vec<String>,
@@ -150,8 +153,9 @@ impl Default for GenerateOptions {
         Self {
             no_types: false,
             no_encode_decode: false,
-            no_function_traits: true,
+            function_traits: false,
             client: false,
+            no_std: false,
             programs_bytecode_lt: Vec::new(),
             programs_sql_pg: Vec::new(),
             programs_sql_duckdb: Vec::new(),
@@ -163,26 +167,33 @@ impl Default for GenerateOptions {
 
 impl GenerateOptions {
     /// Do not generate type definitions
-    pub fn no_generate_types(mut self) -> Self {
+    pub fn no_types(mut self) -> Self {
         self.no_types = true;
         self
     }
 
     /// Do not generate [lutra_bin::Encode] and [lutra_bin::Decode] implementations
-    pub fn no_generate_encode_decode(mut self) -> Self {
+    pub fn no_encode_decode(mut self) -> Self {
         self.no_encode_decode = true;
         self
     }
 
     /// Do not generate traits for functions
-    pub fn generate_function_traits(mut self) -> Self {
-        self.no_function_traits = false;
+    pub fn function_traits(mut self) -> Self {
+        self.function_traits = true;
         self
     }
 
     /// Generate module client wrappers for generated programs
     pub fn generate_client(mut self) -> Self {
         self.client = true;
+        self
+    }
+
+    /// Emit `no_std`-safe, fully-qualified references for `Vec`, `String`, and
+    /// `Box` (via the `lutra_bin` re-exports) instead of the prelude names.
+    pub fn no_std(mut self) -> Self {
+        self.no_std = true;
         self
     }
 
@@ -218,7 +229,7 @@ impl GenerateOptions {
     }
 
     pub(crate) fn generates_function_traits(&self) -> bool {
-        !self.no_function_traits
+        self.function_traits
     }
 
     pub(crate) fn generates_client(&self) -> bool {
@@ -249,6 +260,33 @@ impl GenerateOptions {
                         && p[module_path.len()..].starts_with("::"))
                     || (module_path.is_empty() && !p.is_empty())
             })
+    }
+
+    /// Path to use for `Vec` in generated code.
+    pub(crate) fn vec_path(&self) -> Cow<'static, str> {
+        if self.no_std {
+            Cow::Owned(format!("{}::vec::Vec", self.lutra_bin_path))
+        } else {
+            Cow::Borrowed("Vec")
+        }
+    }
+
+    /// Path to use for `String` in generated code.
+    pub(crate) fn string_path(&self) -> Cow<'static, str> {
+        if self.no_std {
+            Cow::Owned(format!("{}::string::String", self.lutra_bin_path))
+        } else {
+            Cow::Borrowed("String")
+        }
+    }
+
+    /// Path to use for `Box` in generated code.
+    pub(crate) fn box_path(&self) -> Cow<'static, str> {
+        if self.no_std {
+            Cow::Owned(format!("{}::boxed::Box", self.lutra_bin_path))
+        } else {
+            Cow::Borrowed("Box")
+        }
     }
 }
 

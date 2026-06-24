@@ -2574,11 +2574,13 @@ pub mod br {
         }
 
         impl crate::Encode for Sid {
-            type HeadPtr = ();
-            fn encode_head(&self, buf: &mut crate::bytes::BytesMut) {
+            type HeadPtr = <u32 as crate::Encode>::HeadPtr;
+            fn encode_head(&self, buf: &mut crate::bytes::BytesMut) -> Self::HeadPtr {
                 self.0.encode_head(buf)
             }
-            fn encode_body(&self, _: (), _: &mut crate::bytes::BytesMut) {}
+            fn encode_body(&self, head: Self::HeadPtr, buf: &mut crate::bytes::BytesMut) {
+                self.0.encode_body(head, buf)
+            }
         }
         impl crate::Layout for Sid {
             fn head_size() -> usize {

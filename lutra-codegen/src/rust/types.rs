@@ -51,8 +51,6 @@ pub fn write_ty_def(
     annotations: &[pr::Anno],
     ctx: &mut Context,
 ) -> Result<(), std::fmt::Error> {
-    let lutra_bin = &ctx.options.lutra_bin_path;
-
     let name = ty.name.as_ref().unwrap();
 
     // derive traits
@@ -111,7 +109,7 @@ pub fn write_ty_def(
 
                     write!(w, "(")?;
                     if needs_box {
-                        write!(w, "{lutra_bin}::boxed::Box<")?;
+                        write!(w, "{}<", ctx.options.box_path())?;
                     }
                     write_ty_ref(w, &variant.ty, false, ctx)?;
                     if needs_box {
@@ -159,8 +157,6 @@ pub fn write_ty_ref(
         return write!(w, "()");
     }
 
-    let lutra_bin = &ctx.options.lutra_bin_path;
-
     match &ty.kind {
         ir::TyKind::Primitive(ir::TyPrimitive::Prim8) => write!(w, "u8")?,
         ir::TyKind::Primitive(ir::TyPrimitive::Prim16) => write!(w, "u16")?,
@@ -186,7 +182,7 @@ pub fn write_ty_ref(
             }
         }
         ir::TyKind::Array(items_ty) => {
-            write!(w, "{lutra_bin}::vec::Vec")?;
+            write!(w, "{}", ctx.options.vec_path())?;
             if as_expr {
                 write!(w, "::<")?;
             } else {
@@ -255,7 +251,7 @@ fn get_ty_std_ref(ident: &ir::Path, ctx: &Context) -> Option<Cow<'static, str>> 
         ir::TyStd::UInt64 => Cow::Borrowed("u64"),
         ir::TyStd::Float32 => Cow::Borrowed("f32"),
         ir::TyStd::Float64 => Cow::Borrowed("f64"),
-        ir::TyStd::Text => Cow::Owned(format!("{lb}::string::String")),
+        ir::TyStd::Text => ctx.options.string_path(),
         ir::TyStd::Date => Cow::Owned(format!("{lb}::std::Date")),
         ir::TyStd::Duration => Cow::Owned(format!("{lb}::std::Duration")),
         ir::TyStd::Time => Cow::Owned(format!("{lb}::std::Time")),

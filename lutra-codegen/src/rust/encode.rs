@@ -42,6 +42,7 @@ fn write_ty_def_impl(
     ctx: &mut Context,
 ) -> Result<(), std::fmt::Error> {
     let lutra_bin = &ctx.options.lutra_bin_path;
+    let box_path = ctx.options.box_path();
     let name = ty.name.as_ref().unwrap();
 
     match &ty.kind {
@@ -223,7 +224,7 @@ fn write_ty_def_impl(
                         writeln!(w, "                let r = {head_ptr_name}::{va_name}(head_ptr);")?;
                     } else {
                         writeln!(w, "                let inner_head_ptr = inner.encode_head(w);")?;
-                        writeln!(w, "                let r = {head_ptr_name}::{va_name}({lutra_bin}::boxed::Box::new(inner_head_ptr));")?;
+                        writeln!(w, "                let r = {head_ptr_name}::{va_name}({box_path}::new(inner_head_ptr));")?;
                     }
                 } else if head.inner_bytes > 0 {
                     writeln!(w, "                inner.encode_head(w);")?;
@@ -288,7 +289,7 @@ fn write_ty_def_impl(
                     if head.has_ptr {
                         write!(w, "({lutra_bin}::ReversePointer)")?;
                     } else {
-                        write!(w, "({lutra_bin}::boxed::Box<<")?;
+                        write!(w, "({box_path}<<")?;
                         write_ty_ref(w, &variant.ty, false, ctx)?;
                         write!(w, " as {lutra_bin}::Encode>::HeadPtr>)")?;
                     }
@@ -432,7 +433,7 @@ fn write_ty_def_impl(
                 if is_unit_variant(&variant.ty) {
                     writeln!(w, "                {name}::{va_name}", )?;
                 } else if needs_box {
-                    writeln!(w, "                {name}::{va_name}({lutra_bin}::boxed::Box::new(inner))")?;
+                    writeln!(w, "                {name}::{va_name}({box_path}::new(inner))")?;
                 } else {
                     writeln!(w, "                {name}::{va_name}(inner)")?;
                 }
