@@ -384,6 +384,13 @@ fn format_21() {
 }
 
 #[test]
+fn format_22_default_params() {
+    assert_snapshot!(_format(r#"
+    func f(x: Int = 1, y = 2) -> x
+    "#), @"func f(x: Int = 1, y = 2) -> x")
+}
+
+#[test]
 fn trivia_00() {
     assert_snapshot!(_format(r#"
     # TODO

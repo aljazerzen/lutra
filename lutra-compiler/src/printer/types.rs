@@ -133,6 +133,11 @@ impl PrintSource for pr::TyFuncParam {
             ty.print(p)?;
         }
 
+        if let Some(default) = &self.default {
+            p.push(" = ")?;
+            default.print(p)?;
+        }
+
         Some(())
     }
 
