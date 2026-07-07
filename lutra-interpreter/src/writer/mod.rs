@@ -33,12 +33,16 @@ struct SeveredBodies {
     // Buffer that contains the bodies of the type
     buf: Data,
 
-    // Locations of pointers to bodies within the buffer of the head, in bytes.
+    // Locations of pointers to *live* bodies within the buffer of the head, in
+    // bytes. Slots for unit enum variants (whose raw pointer value is zero and
+    // which carry no body) are filtered out during extraction.
     body_ptr_offsets: Vec<u32>,
 
-    // Locations of starts of bodies (except the first one) within the buf, in bytes.
-    // The first body is skipped, because it is guaranteed to be 0.
-    // This is because we skip the buf so the first body is always at the beginning of the buf.
+    // Locations of starts of subsequent live bodies within `buf`, in bytes,
+    // relative to the first live body. The first live body's offset is
+    // implicit (0) because `buf` is advanced to point at it during extraction.
+    // Invariant: `body_ptr_offsets.len() == body_offsets.len() + 1`, and both
+    // index only live pointer slots.
     body_offsets: Vec<u32>,
 }
 
@@ -67,25 +71,38 @@ fn extract_head_and_body(
 ) -> (Vec<u8>, Option<SeveredBodies>) {
     let head = buf.flatten_n(head_bytes as usize);
 
-    let body = if !body_ptrs.is_empty() {
-        let mut ptrs = body_ptrs.iter();
+    // Collect only the *live* pointer slots — those whose raw stored offset is
+    // non-zero. Enum-typed fields whose layout says `has_ptr` still contribute a
+    // `body_ptrs` entry at compile time, but at runtime a unit variant leaves
+    // that slot zeroed and has no body. Treating such slots as real body pointers
+    // would misread padding as a body offset and underflow the subtraction below.
+    let mut live: vec::Vec<(u32, u32)> = vec::Vec::with_capacity(body_ptrs.len());
+    for ptr in body_ptrs {
+        let raw = read_raw_ptr(&head, *ptr);
+        if raw == 0 {
+            // Unit-variant / no-body slot. Skip; leave the zero in place so
+            // downstream pointer rewriting does not clobber it.
+            continue;
+        }
+        // Absolute offset of this body from the start of `buf`.
+        live.push((*ptr, raw + *ptr));
+    }
 
-        let first_body_ptr = ptrs.next().unwrap();
+    let body = if let Some((_, first_body_offset)) = live.first().copied() {
         let mut buf = buf.clone();
 
-        let first_body_offset = read_ptr(&head, *first_body_ptr);
-
-        // read body offsets
-        let mut body_offsets = vec::Vec::new();
-        for ptr in ptrs {
-            let body_offset = read_ptr(&head, *ptr);
+        // Offsets of subsequent bodies, relative to the first body's start.
+        let mut body_offsets = vec::Vec::with_capacity(live.len() - 1);
+        for &(_, body_offset) in &live[1..] {
             body_offsets.push(body_offset - first_body_offset);
         }
+
+        let body_ptr_offsets: vec::Vec<u32> = live.iter().map(|(p, _)| *p).collect();
 
         buf.advance(first_body_offset as usize);
         Some(SeveredBodies {
             buf,
-            body_ptr_offsets: body_ptrs.to_vec(),
+            body_ptr_offsets,
             body_offsets,
         })
     } else {
@@ -94,11 +111,11 @@ fn extract_head_and_body(
     (head, body)
 }
 
-/// Reads a pointers from buf, at given offset.
-/// Returns the pointers, *relative to the start of the buf*.
-fn read_ptr(buf: &[u8], offset: u32) -> u32 {
+/// Reads the raw 4-byte pointer value stored at `offset` in `buf`, without
+/// adding `offset`.
+fn read_raw_ptr(buf: &[u8], offset: u32) -> u32 {
     let buf = buf.skip(offset as usize);
-    u32::from_le_bytes(buf.read_const()) + offset
+    u32::from_le_bytes(buf.read_const())
 }
 
 fn write_head(
