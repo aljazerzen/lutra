@@ -287,7 +287,7 @@ fn lower_05() {
         func main() -> dep::is_some(.none: Int32?)
         "#,
     ), @"
-    type dep::std::Bool = Prim8;
+    type std::Bool = Prim8;
     type std::Int32 = Prim32;
     let main = (func 1 ->
       let 0 = (func 2 ->
@@ -302,7 +302,7 @@ fn lower_05() {
               ): Prim8,
               1: Prim8,
             ): Bool,
-            1: dep::std::Bool,
+            1: Bool,
           ),
           (
             (call
@@ -312,20 +312,20 @@ fn lower_05() {
               ): Prim8,
               0: Prim8,
             ): Bool,
-            0: dep::std::Bool,
+            0: Bool,
           ),
-        ): dep::std::Bool
-      ): func (enum {none, some: Int32}) -> dep::std::Bool;
+        ): Bool
+      ): func (enum {none, some: Int32}) -> Bool;
       (call
         (func 0 ->
           (call
-            var.0: func (enum {none, some: Int32}) -> dep::std::Bool,
+            var.0: func (enum {none, some: Int32}) -> Bool,
             (enum_variant 0): enum {none, some: Int32},
-          ): dep::std::Bool
-        ): func ({}) -> dep::std::Bool,
+          ): Bool
+        ): func ({}) -> Bool,
         fn.1+0: {},
-      ): dep::std::Bool
-    ): func ({}) -> dep::std::Bool
+      ): Bool
+    ): func ({}) -> Bool
     ");
 }
 

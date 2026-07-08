@@ -20,6 +20,10 @@ impl Prefixer {
             return Some(ref_);
         };
 
+        if !should_prefix(&absolute_ref) {
+            return Some(pr::Ref::Global(absolute_ref));
+        }
+
         let mut prefixed = pr::Path::from_name(self.prefix.clone());
         prefixed.extend(absolute_ref);
         absolute_ref = prefixed;
@@ -28,8 +32,17 @@ impl Prefixer {
     }
 
     fn prefix_path(&self, path: pr::Path) -> pr::Path {
+        if !should_prefix(&path) {
+            return path;
+        }
         pr::Path::from_name(self.prefix.clone()).append(path)
     }
+}
+
+fn should_prefix(path: &pr::Path) -> bool {
+    // Do not prefix `std` paths, so all `std` references
+    // get unified into the top-level `std` dependency.
+    path.first() != "std"
 }
 
 impl fold::PrFold for Prefixer {
