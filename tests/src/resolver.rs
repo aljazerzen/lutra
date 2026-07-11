@@ -82,7 +82,7 @@ fn optional_field_domain() {
        │                                                                    ──┬──
        │                                                                      ╰──── cannot access optional field .note
        │
-       │ Note: optional fields may be absent; their presence is only observable at the FFI boundary
+       │ Note: optional fields may be absent
     ───╯
     ");
 }

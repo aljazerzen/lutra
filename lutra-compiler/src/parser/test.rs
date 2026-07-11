@@ -223,27 +223,30 @@ fn parse_04() {
                 ty_params: [
                     TyParam {
                         name: "T",
-                        domain: TupleHasFields(
-                            [
-                                TyDomainTupleField {
-                                    location: Name(
-                                        "b",
-                                    ),
-                                    optional: false,
-                                    ty: Ty {
-                                        kind: Ident(
-                                            int64,
+                        domain: TupleOf(
+                            TyDomainTupleOf {
+                                fields: [
+                                    TyDomainTupleField {
+                                        location: Name(
+                                            "b",
                                         ),
-                                        span: Some(
-                                            0:22-27,
-                                        ),
-                                        name: None,
-                                        scope_id: None,
-                                        target: None,
-                                        variants_force_ptr: [],
+                                        optional: false,
+                                        ty: Ty {
+                                            kind: Ident(
+                                                int64,
+                                            ),
+                                            span: Some(
+                                                0:22-27,
+                                            ),
+                                            name: None,
+                                            scope_id: None,
+                                            target: None,
+                                            variants_force_ptr: [],
+                                        },
                                     },
-                                },
-                            ],
+                                ],
+                                open: true,
+                            },
                         ),
                         span: Some(
                             0:15-32,

@@ -3,7 +3,7 @@ use itertools::Itertools;
 use std::collections::HashMap;
 
 use crate::diagnostic::{Diagnostic, DiagnosticCode, WithErrorInfo};
-use crate::pr::{self, *};
+use crate::pr::{self, TyDomainTupleOf, *};
 use crate::printer;
 use crate::resolver::types::scope;
 use crate::utils::fold::PrFold;
@@ -348,7 +348,7 @@ impl TypeResolver<'_> {
                     let fields = domains
                         .iter()
                         .filter_map(|d| match d {
-                            TyDomain::TupleHasFields(fields) => Some(fields),
+                            TyDomain::TupleOf(TyDomainTupleOf { fields, .. }) => Some(fields),
                             _ => None,
                         })
                         .flatten();
@@ -542,7 +542,10 @@ impl TypeResolver<'_> {
                 Ok(())
             }
 
-            TyDomain::TupleHasFields(domain_fields) => {
+            TyDomain::TupleOf(TyDomainTupleOf {
+                fields: domain_fields,
+                open,
+            }) => {
                 let ty = ty.clone();
 
                 for domain_field in domain_fields {
@@ -556,6 +559,24 @@ impl TypeResolver<'_> {
                     self.validate_type(&target_ty, &domain_field.ty, &|| None)
                         .with_span_fallback(target_ty.span)?;
                     // ok
+                }
+
+                // a closed record must not have any fields beyond those listed
+                if !open && let TyKind::Tuple(ty_fields) = &ty.kind {
+                    for (i, ty_field) in ty_fields.iter().enumerate() {
+                        let allowed = domain_fields.iter().any(|df| match &df.location {
+                            Lookup::Name(n) => ty_field.name.as_deref() == Some(n.as_str()),
+                            Lookup::Position(p) => *p as usize == i,
+                        });
+                        if !allowed {
+                            let field = ty_field.name.clone().unwrap_or_else(|| format!(".{i}"));
+                            return Err(Diagnostic::new(
+                                format!("unexpected field {field} in {}", printer::print_ty(&ty)),
+                                DiagnosticCode::TYPE_DOMAIN,
+                            )
+                            .push_hint("this tuple is closed; add `..` to allow extra fields"));
+                        }
+                    }
                 }
 
                 // all ok
@@ -643,9 +664,9 @@ impl TypeResolver<'_> {
                 Ok(())
             }
 
-            (TyDomain::TupleHasFields(found_fields), TyDomain::TupleHasFields(expected_fields)) => {
-                for expected_field in expected_fields {
-                    let res = Self::lookup_in_tuple_domain(found_fields, &expected_field.location);
+            (TyDomain::TupleOf(found), TyDomain::TupleOf(expected)) => {
+                for expected_field in &expected.fields {
+                    let res = Self::lookup_in_tuple_domain(&found.fields, &expected_field.location);
                     let target_ty = match res {
                         Ok(t) => t,
                         Err(_) if expected_field.optional => continue,
@@ -654,6 +675,29 @@ impl TypeResolver<'_> {
 
                     self.validate_type(&target_ty, &expected_field.ty, &|| None)
                         .with_span_fallback(target_ty.span)?;
+                }
+
+                // a closed expected domain forbids any fields the found domain
+                // could add on top of the listed ones
+                if !expected.open {
+                    if found.open {
+                        return Err(Diagnostic::new(
+                            "found an open tuple, but a closed tuple is required",
+                            DiagnosticCode::TYPE_DOMAIN,
+                        ));
+                    }
+                    for found_field in &found.fields {
+                        let allowed = expected
+                            .fields
+                            .iter()
+                            .any(|ef| ef.location == found_field.location);
+                        if !allowed {
+                            return Err(Diagnostic::new(
+                                "found a tuple with more fields than the closed tuple allows",
+                                DiagnosticCode::TYPE_DOMAIN,
+                            ));
+                        }
+                    }
                 }
 
                 // all ok

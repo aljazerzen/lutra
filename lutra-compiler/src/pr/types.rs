@@ -172,14 +172,22 @@ pub enum TyDomain {
     /// Must be one of the following
     OneOf(Vec<Ty>),
 
-    /// Must be a tuple with following fields
-    TupleHasFields(Vec<TyDomainTupleField>),
+    TupleOf(TyDomainTupleOf),
 
     /// Must be a tuple with exactly N fields
-    TupleLen { n: usize },
+    TupleLen {
+        n: usize,
+    },
 
     /// Must be an enum with following variants
     EnumVariants(Vec<TyDomainEnumVariant>),
+}
+
+#[derive(Debug, Clone)]
+/// Must be a tuple with following fields
+pub struct TyDomainTupleOf {
+    pub fields: Vec<TyDomainTupleField>,
+    pub open: bool,
 }
 
 #[derive(Clone)]
@@ -187,7 +195,7 @@ pub struct TyDomainTupleField {
     pub location: super::Lookup,
     pub ty: Ty,
 
-    /// When true, the field may be absent from the concrete record.
+    /// When true, the field may be absent from the concrete tuple.
     /// Optional fields cannot be accessed directly; their presence is only
     /// observable at the FFI boundary (via `@inject_type`).
     pub optional: bool,

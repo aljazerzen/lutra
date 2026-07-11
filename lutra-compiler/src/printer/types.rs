@@ -1,6 +1,6 @@
 use lutra_bin::ident;
 
-use crate::pr;
+use crate::pr::{self, TyDomainTupleOf};
 use crate::printer::common::{PrintSourceExt, Separated};
 use crate::printer::{PrintSource, Printer};
 
@@ -198,9 +198,12 @@ impl PrintSource for pr::TyParam {
                     ty.print(p)?;
                 }
             }
-            pr::TyDomain::TupleHasFields(fields) => {
+            pr::TyDomain::TupleOf(TyDomainTupleOf { fields, open }) => {
                 p.push(": {")?;
                 for (i, field) in fields.iter().enumerate() {
+                    if i > 0 {
+                        p.push(", ")?;
+                    }
                     match &field.location {
                         pr::Lookup::Name(name) => {
                             p.push(ident::display(name))?;
@@ -214,9 +217,14 @@ impl PrintSource for pr::TyParam {
                         }
                     }
                     field.ty.print(p)?;
-                    p.push(", ")?;
                 }
-                p.push("..}")?;
+                if *open {
+                    if !fields.is_empty() {
+                        p.push(", ")?;
+                    }
+                    p.push("..")?;
+                }
+                p.push("}")?;
             }
             pr::TyDomain::TupleLen { n } => {
                 // not an actual Lutra syntax (there is no syntax for this)

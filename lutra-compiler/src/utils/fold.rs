@@ -7,6 +7,7 @@ use itertools::Itertools;
 
 use crate::Result;
 use crate::pr;
+use crate::pr::TyDomainTupleOf;
 use crate::pr::*;
 
 // Fold pattern:
@@ -439,8 +440,8 @@ pub fn fold_ty_domain<F: ?Sized + PrFold>(fold: &mut F, domain: TyDomain) -> Res
         TyDomain::OneOf(tys) => {
             TyDomain::OneOf(tys.into_iter().map(|t| fold.fold_type(t)).try_collect()?)
         }
-        TyDomain::TupleHasFields(fields) => TyDomain::TupleHasFields(
-            fields
+        TyDomain::TupleOf(TyDomainTupleOf { fields, open }) => TyDomain::TupleOf(TyDomainTupleOf {
+            fields: fields
                 .into_iter()
                 .map(|f| -> Result<_> {
                     Ok(TyDomainTupleField {
@@ -451,7 +452,8 @@ pub fn fold_ty_domain<F: ?Sized + PrFold>(fold: &mut F, domain: TyDomain) -> Res
                     })
                 })
                 .try_collect()?,
-        ),
+            open,
+        }),
         TyDomain::EnumVariants(variants) => TyDomain::EnumVariants(
             variants
                 .into_iter()

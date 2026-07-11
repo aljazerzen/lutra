@@ -2,7 +2,7 @@ use std::cell::RefCell;
 use std::collections::HashMap;
 
 use crate::diagnostic::{Diagnostic, DiagnosticCode, WithErrorInfo};
-use crate::pr;
+use crate::pr::{self, TyDomainTupleOf};
 use crate::{Result, Span};
 use crate::{printer, utils};
 
@@ -180,7 +180,7 @@ impl Scope {
         let var_id = self.names.push(ScopedKind::TyVar(type_arg));
 
         // overwrite span to point to this var instead of the original domain
-        if let pr::TyDomain::TupleHasFields(fields) = &mut domain {
+        if let pr::TyDomain::TupleOf(TyDomainTupleOf { fields, .. }) = &mut domain {
             for f in fields {
                 f.span = span;
             }

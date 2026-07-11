@@ -6,6 +6,7 @@ use super::helpers::*;
 use super::{PExtra, TokenKind};
 
 use crate::Span;
+use crate::pr::TyDomainTupleOf;
 use crate::pr::*;
 
 pub(crate) fn type_expr<'src, I>(
@@ -181,11 +182,17 @@ where
             .separated_by(ctrl(','))
             .at_least(1)
             .collect::<Vec<_>>()
-            .then_ignore(ctrl(',').then(just(TokenKind::Range)).or_not()),
-        just(TokenKind::Range).to(vec![]),
+            .then(
+                ctrl(',')
+                    .then(just(TokenKind::Range))
+                    .or_not()
+                    .map(|tail| tail.is_some()),
+            ),
+        // `{..}`: open, no named fields
+        just(TokenKind::Range).to((vec![], true)),
     ))
     .delimited_by(ctrl('{'), ctrl('}'))
-    .try_map(|mut positional, _span| {
+    .try_map(|(mut positional, open), _span| {
         let first_named = positional
             .iter()
             .position(|((n, _), _)| n.is_some())
@@ -223,7 +230,7 @@ where
                 ty,
             });
         }
-        Ok(TyDomain::TupleHasFields(fields))
+        Ok(TyDomain::TupleOf(TyDomainTupleOf { fields, open }))
     })
     .labelled("tuple domain");
 

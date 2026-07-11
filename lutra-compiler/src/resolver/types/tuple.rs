@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use lutra_bin::ident;
 
 use crate::diagnostic::{Diagnostic, DiagnosticCode, WithErrorInfo};
-use crate::pr::{self, Ty};
+use crate::pr::{self, Ty, TyDomainTupleOf};
 use crate::utils::fold::PrFold;
 use crate::{Result, Span, printer, utils};
 
@@ -49,7 +49,7 @@ impl super::TypeResolver<'_> {
                     }
                     scope::TyRef::Param(id) => {
                         let (param_name, domain) = self.get_ty_param(id);
-                        let pr::TyDomain::TupleHasFields(_) = domain else {
+                        let pr::TyDomain::TupleOf(TyDomainTupleOf { .. }) = domain else {
                             let d = error_lookup_into_unpack_of_ty_param(param_name);
                             self.collect_err(&mut diag, d);
                             continue;
@@ -60,7 +60,10 @@ impl super::TypeResolver<'_> {
                     scope::TyRef::Var(_, o) => {
                         // restrict var to be a tuple
 
-                        let domain = pr::TyDomain::TupleHasFields(vec![]);
+                        let domain = pr::TyDomain::TupleOf(TyDomainTupleOf {
+                            fields: vec![],
+                            open: true,
+                        });
                         let scope = self.get_ty_var_scope();
                         scope.infer_type_var_in_domain(o, domain);
                     }
@@ -126,12 +129,15 @@ impl super::TypeResolver<'_> {
                 let field_ty = self.introduce_ty_var(pr::TyDomain::Open, span);
 
                 // restrict existing ty var to tuples with this field
-                let domain = pr::TyDomain::TupleHasFields(vec![pr::TyDomainTupleField {
-                    location: lookup.clone(),
-                    optional: false,
-                    ty: field_ty.clone(),
-                    span,
-                }]);
+                let domain = pr::TyDomain::TupleOf(TyDomainTupleOf {
+                    fields: vec![pr::TyDomainTupleField {
+                        location: lookup.clone(),
+                        optional: false,
+                        ty: field_ty.clone(),
+                        span,
+                    }],
+                    open: true,
+                });
                 let scope = self.get_ty_var_scope();
                 scope.infer_type_var_in_domain(o, domain);
 
@@ -307,7 +313,7 @@ impl super::TypeResolver<'_> {
 
     fn lookup_position_in_ty_param(&self, param_id: usize, position: usize) -> Result<Ty> {
         let (param_name, param_domain) = self.get_ty_param(param_id);
-        let pr::TyDomain::TupleHasFields(fields) = param_domain else {
+        let pr::TyDomain::TupleOf(TyDomainTupleOf { fields, .. }) = param_domain else {
             return Err(error_lookup_into_unpack_of_ty_param(param_name));
         };
         let lookup = pr::Lookup::Position(position as i64);
@@ -320,7 +326,7 @@ impl super::TypeResolver<'_> {
 
     fn lookup_name_in_ty_param(&self, lookup: &pr::Lookup, id: usize) -> Result<pr::Ty> {
         let (param_name, param) = self.get_ty_param(id);
-        let pr::TyDomain::TupleHasFields(fields) = param else {
+        let pr::TyDomain::TupleOf(TyDomainTupleOf { fields, .. }) = param else {
             return Err(error_lookup_into_unpack_of_ty_param(param_name));
         };
 
