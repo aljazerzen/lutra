@@ -10,8 +10,13 @@ type Program: {
 
 @rust_derive(["Debug", "Clone", "PartialEq", "Eq", "Hash"])
 type ExternalSymbol: {
+  # Id of the symbol, typically composed of package name, followed by fully
+  # qualified path of the source definition, delimited by `::`.
   id: Text,
-  layout_args: [Uint32],
+  # Opaque byte buffer holding compiler-derived args for the native impl.
+  # Encode either a std-func-specfic data from the `statics` module, or
+  # an encoded `Ty` for external functions with `@inject_type`.
+  static_args: [Prim8],
 }
 
 type Expr: {
@@ -98,6 +103,71 @@ type SwitchBranch: {
 
 @rust_derive(["Debug", "Clone", "PartialEq", "Default"])
 type TyLayout: {
-  head_size: Uint32,
+  head_bytes: Uint32,
   body_ptrs: [Uint32],
+}
+
+# Definitions of data in `ExternalSymbol.static_args`.
+module statics {
+  # `fold`, `min`, `max`, `sum`, `mean`, `rolling_mean`, `rank*`, `cume_dist`.
+  type ItemHeadArgs: {
+    item_head: Uint32,
+  }
+
+  # `filter`, `slice`, `sort`, `append`, `loop_until_empty`.
+  type ItemLayoutArgs: {
+    item: super::TyLayout,
+  }
+
+  # `lag`, `lead`.
+  type ShiftArgs: {
+    item: super::TyLayout,
+    default: [Prim8],
+  }
+
+  # `index`.
+  type IndexArgs: {
+    item_head: Uint32,
+    # An encoded `lutra_bin::layout::EnumFormat` for the `T?` output.
+    output_enum_format: [Prim8],
+  }
+
+  # `map`, `flat_map`, `scan`.
+  type MapArgs: {
+    input_item_head: Uint32,
+    output_item: super::TyLayout,
+  }
+
+  # `zip`.
+  type ZipArgs: {
+    a: super::TyLayout,
+    b: super::TyLayout,
+  }
+
+  # `to_columnar`.
+  type ToColumnarArgs: {
+    item_head: Uint32,
+    field_offsets: [Uint32],
+    fields: [super::TyLayout],
+  }
+
+  # `from_columnar`.
+  type FromColumnarArgs: {
+    output: super::TyLayout,
+    fields: [super::TyLayout],
+  }
+
+  # `group`.
+  type GroupArgs: {
+    input: super::TyLayout,
+    output: super::TyLayout,
+    output_fields: [super::TyLayout],
+    key_head: Uint32,
+  }
+
+  # `@inject_type` externals (e.g. `read_parquet` / `write_parquet`): the full
+  # monomorphized type descriptor, carrying field and enum-variant names.
+  type InjectTypeArgs: {
+    ty: project::ir::Ty,
+  }
 }

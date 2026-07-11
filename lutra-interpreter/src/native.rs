@@ -6,7 +6,7 @@ use crate::{Data, NativeModule};
 /// Generates a typed cast function: source type → target type, no layout args.
 macro_rules! typed_cast {
     ($name: ident, $src: ty, $dst: ty) => {
-        pub fn $name(_: &mut Interpreter, _: &[u32], args: Vec<Cell>) -> Result<Cell, EvalError> {
+        pub fn $name(_: &mut Interpreter, _: &[u8], args: Vec<Cell>) -> Result<Cell, EvalError> {
             let [x] = assume::exactly_n(args);
             let v = assume::primitive::<$src>(&x)? as $dst;
             Ok(Cell::Data(encode(&v)))
@@ -18,7 +18,7 @@ macro_rules! typed_cast {
 /// The Rust type is baked into the function.
 macro_rules! typed_bin_op {
     ($name: ident, $prim: ty, $op: tt) => {
-        pub fn $name(_: &mut Interpreter, _: &[u32], args: Vec<Cell>) -> Result<Cell, EvalError> {
+        pub fn $name(_: &mut Interpreter, _: &[u8], args: Vec<Cell>) -> Result<Cell, EvalError> {
             let left = assume::primitive::<$prim>(&args[0])?;
             let right = assume::primitive::<$prim>(&args[1])?;
             Ok(encode_cell(&(left $op right)))
@@ -287,7 +287,7 @@ pub mod std_convert {
         ($name: ident, $src: ty) => {
             pub fn $name(
                 _: &mut Interpreter,
-                _: &[u32],
+                _: &[u8],
                 args: Vec<Cell>,
             ) -> Result<Cell, EvalError> {
                 let [x] = assume::exactly_n(args);
@@ -307,11 +307,7 @@ pub mod std_convert {
     typed_to_text!(to_text_float32, f32);
     typed_to_text!(to_text_float64, f64);
     typed_to_text!(to_text_bool, bool);
-    pub fn to_text_text(
-        _: &mut Interpreter,
-        _: &[u32],
-        args: Vec<Cell>,
-    ) -> Result<Cell, EvalError> {
+    pub fn to_text_text(_: &mut Interpreter, _: &[u8], args: Vec<Cell>) -> Result<Cell, EvalError> {
         let [x] = assume::exactly_n(args);
         Ok(x)
     }
@@ -539,7 +535,7 @@ pub mod std_ops {
         ($name: ident, $prim: ty) => {
             pub fn $name(
                 _: &mut Interpreter,
-                _: &[u32],
+                _: &[u8],
                 args: Vec<Cell>,
             ) -> Result<Cell, EvalError> {
                 Ok(neg_arg!($prim, args))
@@ -558,7 +554,7 @@ pub mod std_ops {
         ($name: ident, $prim: ty, $method: ident) => {
             pub fn $name(
                 _: &mut Interpreter,
-                _: &[u32],
+                _: &[u8],
                 args: Vec<Cell>,
             ) -> Result<Cell, EvalError> {
                 let [a, b] = exactly_n(args);
@@ -586,7 +582,7 @@ pub mod std_ops {
     typed_cmp!(cmp_uint64, u64, cmp);
     typed_cmp!(cmp_float32, f32, total_cmp);
     typed_cmp!(cmp_float64, f64, total_cmp);
-    pub fn cmp_text(_: &mut Interpreter, _: &[u32], args: Vec<Cell>) -> Result<Cell, EvalError> {
+    pub fn cmp_text(_: &mut Interpreter, _: &[u8], args: Vec<Cell>) -> Result<Cell, EvalError> {
         let [a, b] = exactly_n(args);
         let a = decode::text_ref(assume::into_data(a)?);
         let b = decode::text_ref(assume::into_data(b)?);
@@ -603,7 +599,7 @@ pub mod std_ops {
         ($name: ident, $prim: ty) => {
             pub fn $name(
                 _: &mut Interpreter,
-                _: &[u32],
+                _: &[u8],
                 args: Vec<Cell>,
             ) -> Result<Cell, EvalError> {
                 let left = assume::primitive::<$prim>(&args[0])?;
@@ -623,7 +619,7 @@ pub mod std_ops {
     typed_eq!(eq_uint64, u64);
     typed_eq!(eq_float32, f32);
     typed_eq!(eq_float64, f64);
-    pub fn eq_text(_: &mut Interpreter, _: &[u32], args: Vec<Cell>) -> Result<Cell, EvalError> {
+    pub fn eq_text(_: &mut Interpreter, _: &[u8], args: Vec<Cell>) -> Result<Cell, EvalError> {
         let [a, b] = exactly_n(args);
         let a = decode::text_ref(assume::into_data(a)?);
         let b = decode::text_ref(assume::into_data(b)?);
@@ -635,7 +631,7 @@ pub mod std_ops {
         ($name: ident, $prim: ty) => {
             pub fn $name(
                 _: &mut Interpreter,
-                _: &[u32],
+                _: &[u8],
                 args: Vec<Cell>,
             ) -> Result<Cell, EvalError> {
                 let left = assume::primitive::<$prim>(&args[0])?;
@@ -655,7 +651,7 @@ pub mod std_ops {
     typed_lt!(lt_uint64, u64);
     typed_lt!(lt_float32, f32);
     typed_lt!(lt_float64, f64);
-    pub fn lt_text(_: &mut Interpreter, _: &[u32], args: Vec<Cell>) -> Result<Cell, EvalError> {
+    pub fn lt_text(_: &mut Interpreter, _: &[u8], args: Vec<Cell>) -> Result<Cell, EvalError> {
         let [a, b] = exactly_n(args);
         let a = decode::text_ref(assume::into_data(a)?);
         let b = decode::text_ref(assume::into_data(b)?);
@@ -667,7 +663,7 @@ pub mod std_ops {
         ($name: ident, $prim: ty) => {
             pub fn $name(
                 _: &mut Interpreter,
-                _: &[u32],
+                _: &[u8],
                 args: Vec<Cell>,
             ) -> Result<Cell, EvalError> {
                 let left = assume::primitive::<$prim>(&args[0])?;
@@ -687,7 +683,7 @@ pub mod std_ops {
     typed_lte!(lte_uint64, u64);
     typed_lte!(lte_float32, f32);
     typed_lte!(lte_float64, f64);
-    pub fn lte_text(_: &mut Interpreter, _: &[u32], args: Vec<Cell>) -> Result<Cell, EvalError> {
+    pub fn lte_text(_: &mut Interpreter, _: &[u8], args: Vec<Cell>) -> Result<Cell, EvalError> {
         let [a, b] = exactly_n(args);
         let a = decode::text_ref(assume::into_data(a)?);
         let b = decode::text_ref(assume::into_data(b)?);
@@ -710,19 +706,19 @@ pub mod std_ops {
         })
     }
 
-    pub fn and(_: &mut Interpreter, _: &[u32], args: Vec<Cell>) -> Result<Cell, EvalError> {
+    pub fn and(_: &mut Interpreter, _: &[u8], args: Vec<Cell>) -> Result<Cell, EvalError> {
         let a = assume::bool(&args[0])?;
         let b = assume::bool(&args[1])?;
         Ok(encode_cell(&(a && b)))
     }
 
-    pub fn or(_: &mut Interpreter, _: &[u32], args: Vec<Cell>) -> Result<Cell, EvalError> {
+    pub fn or(_: &mut Interpreter, _: &[u8], args: Vec<Cell>) -> Result<Cell, EvalError> {
         let a = assume::bool(&args[0])?;
         let b = assume::bool(&args[1])?;
         Ok(encode_cell(&(a || b)))
     }
 
-    pub fn not(_it: &mut Interpreter, _: &[u32], args: Vec<Cell>) -> Result<Cell, EvalError> {
+    pub fn not(_it: &mut Interpreter, _: &[u8], args: Vec<Cell>) -> Result<Cell, EvalError> {
         let operand = assume::bool(&args[0])?;
         Ok(encode_cell(&!operand))
     }
@@ -732,14 +728,22 @@ pub mod std_array {
     use ::std::borrow::Cow;
     use ::std::collections::HashMap;
 
-    use crate::native::assume::LayoutArgsReader;
     use crate::native::*;
     use crate::{ArrayWriter, Data, EnumWriter, EvalError, TupleWriter};
+    use lutra_bin::br::statics::{
+        FromColumnarArgs, GroupArgs, IndexArgs, ItemHeadArgs, ItemLayoutArgs, MapArgs, ShiftArgs,
+        ToColumnarArgs, ZipArgs,
+    };
     use lutra_bin::{ArrayReader, Decode, TupleReader};
 
     use ::std::cmp::Ordering;
 
     use super::std_ops::eval_cmp;
+
+    /// Decodes a per-intrinsic static-args schema from the byte buffer.
+    fn decode_args<T: Decode>(static_args: &[u8]) -> Result<T, EvalError> {
+        T::decode(static_args).map_err(|_| EvalError::BadProgram)
+    }
 
     pub struct Module;
 
@@ -819,14 +823,13 @@ pub mod std_array {
 
     pub fn index(
         _it: &mut Interpreter,
-        layout_args: &[u32],
+        static_args: &[u8],
         args: Vec<Cell>,
     ) -> Result<Cell, EvalError> {
-        let mut layout_args = LayoutArgsReader::new(layout_args);
-        let input_item_head_bytes = layout_args.next_u32();
+        let sa: IndexArgs = decode_args(static_args)?;
+        let input_item_head_bytes = sa.item_head;
 
-        let output_format = assume::bytes(layout_args.next_slice());
-        let output_format = lutra_bin::layout::EnumFormat::decode(&output_format).unwrap();
+        let output_format = lutra_bin::layout::EnumFormat::decode(&sa.output_enum_format).unwrap();
 
         let [array, position] = assume::exactly_n(args);
 
@@ -848,18 +851,15 @@ pub mod std_array {
 
     pub fn map(
         it: &mut Interpreter,
-        layout_args: &[u32],
+        static_args: &[u8],
         args: Vec<Cell>,
     ) -> Result<Cell, EvalError> {
-        let mut layout_args = LayoutArgsReader::new(layout_args);
-        let input_item_head_bytes = layout_args.next_u32();
-        let output_item_head_bytes = layout_args.next_u32();
-        let output_item_body_ptrs = layout_args.next_slice();
+        let sa: MapArgs = decode_args(static_args)?;
 
         let [array, func] = assume::exactly_n(args);
 
-        let mut output = ArrayWriter::new(output_item_head_bytes, output_item_body_ptrs);
-        for item in assume::array(array, input_item_head_bytes) {
+        let mut output = ArrayWriter::new(sa.output_item.head_bytes, &sa.output_item.body_ptrs);
+        for item in assume::array(array, sa.input_item_head) {
             let cell = Cell::Data(item);
 
             let value = it.evaluate_func_call(&func, vec![cell])?;
@@ -872,23 +872,20 @@ pub mod std_array {
 
     pub fn flat_map(
         it: &mut Interpreter,
-        layout_args: &[u32],
+        static_args: &[u8],
         args: Vec<Cell>,
     ) -> Result<Cell, EvalError> {
-        let mut layout_args = LayoutArgsReader::new(layout_args);
-        let input_item_head_bytes = layout_args.next_u32();
-        let output_item_head_bytes = layout_args.next_u32();
-        let output_item_body_ptrs = layout_args.next_slice();
+        let sa: MapArgs = decode_args(static_args)?;
 
         let [array, func] = assume::exactly_n(args);
 
-        let mut output = ArrayWriter::new(output_item_head_bytes, output_item_body_ptrs);
-        for item in assume::array(array, input_item_head_bytes) {
+        let mut output = ArrayWriter::new(sa.output_item.head_bytes, &sa.output_item.body_ptrs);
+        for item in assume::array(array, sa.input_item_head) {
             let cell = Cell::Data(item);
 
             let value = it.evaluate_func_call(&func, vec![cell])?;
 
-            for i in assume::array(value, output_item_head_bytes) {
+            for i in assume::array(value, sa.output_item.head_bytes) {
                 output.write_item(i);
             }
         }
@@ -898,12 +895,12 @@ pub mod std_array {
 
     pub fn filter(
         it: &mut Interpreter,
-        layout_args: &[u32],
+        static_args: &[u8],
         args: Vec<Cell>,
     ) -> Result<Cell, EvalError> {
-        let mut layout_args = LayoutArgsReader::new(layout_args);
-        let item_head_bytes = layout_args.next_u32();
-        let item_body_ptrs = layout_args.next_slice();
+        let sa: ItemLayoutArgs = decode_args(static_args)?;
+        let item_head_bytes = sa.item.head_bytes;
+        let item_body_ptrs = &sa.item.body_ptrs;
 
         let [array, func] = assume::exactly_n(args);
         let input = assume::array(array, item_head_bytes);
@@ -925,12 +922,12 @@ pub mod std_array {
 
     pub fn slice(
         _it: &mut Interpreter,
-        layout_args: &[u32],
+        static_args: &[u8],
         args: Vec<Cell>,
     ) -> Result<Cell, EvalError> {
-        let mut layout_args = LayoutArgsReader::new(layout_args);
-        let item_head_bytes = layout_args.next_u32();
-        let item_body_ptrs = layout_args.next_slice();
+        let sa: ItemLayoutArgs = decode_args(static_args)?;
+        let item_head_bytes = sa.item.head_bytes;
+        let item_body_ptrs = &sa.item.body_ptrs;
 
         let [array, start, end] = assume::exactly_n(args);
 
@@ -957,12 +954,12 @@ pub mod std_array {
 
     pub fn sort(
         it: &mut Interpreter,
-        layout_args: &[u32],
+        static_args: &[u8],
         args: Vec<Cell>,
     ) -> Result<Cell, EvalError> {
-        let mut layout_args = LayoutArgsReader::new(layout_args);
-        let item_head_bytes = layout_args.next_u32();
-        let item_body_ptrs = layout_args.next_slice();
+        let sa: ItemLayoutArgs = decode_args(static_args)?;
+        let item_head_bytes = sa.item.head_bytes;
+        let item_body_ptrs = &sa.item.body_ptrs;
 
         let [array, func, cmp_func] = assume::exactly_n(args);
 
@@ -1004,24 +1001,20 @@ pub mod std_array {
 
     pub fn to_columnar(
         _it: &mut Interpreter,
-        layout_args: &[u32],
+        static_args: &[u8],
         args: Vec<Cell>,
     ) -> Result<Cell, EvalError> {
-        let mut layout_args = LayoutArgsReader::new(layout_args);
-        let input_item_head_bytes = layout_args.next_u32();
-        let fields_offsets = layout_args.next_slice();
-        let fields_head_bytes = layout_args.next_slice();
+        let sa: ToColumnarArgs = decode_args(static_args)?;
+        let fields_offsets = sa.field_offsets.as_slice();
 
         let [array] = assume::exactly_n(args);
-        let input = assume::array(array, input_item_head_bytes);
+        let input = assume::array(array, sa.item_head);
 
         // init output arrays
-        let mut output_arrays: Vec<ArrayWriter> = fields_head_bytes
+        let mut output_arrays: Vec<ArrayWriter> = sa
+            .fields
             .iter()
-            .map(|head_bytes| {
-                let body_ptrs = layout_args.next_slice();
-                ArrayWriter::new(*head_bytes, body_ptrs)
-            })
+            .map(|f| ArrayWriter::new(f.head_bytes, &f.body_ptrs))
             .collect();
 
         // partition input into output arrays
@@ -1053,34 +1046,35 @@ pub mod std_array {
 
     pub fn from_columnar(
         _it: &mut Interpreter,
-        layout_args: &[u32],
+        static_args: &[u8],
         args: Vec<Cell>,
     ) -> Result<Cell, EvalError> {
-        let mut layout_args = LayoutArgsReader::new(layout_args);
-        let output_head_bytes = layout_args.next_u32();
-        let output_body_ptrs = layout_args.next_slice();
-        let fields_item_head_bytes = layout_args.next_slice();
+        let sa: FromColumnarArgs = decode_args(static_args)?;
+        let output_head_bytes = sa.output.head_bytes;
+        let output_body_ptrs = &sa.output.body_ptrs;
 
-        let mut output_fields_layouts = Vec::new();
-        for field_head_bytes in fields_item_head_bytes {
-            output_fields_layouts.push((*field_head_bytes, layout_args.next_slice()));
-        }
+        let output_fields_layouts: Vec<(u32, &[u32])> = sa
+            .fields
+            .iter()
+            .map(|f| (f.head_bytes, f.body_ptrs.as_slice()))
+            .collect();
 
         let [columnar] = assume::exactly_n(args);
 
         // hard-coded tuple of arrays layout
-        let mut field_offsets = Vec::with_capacity(fields_item_head_bytes.len());
-        for i in 0..fields_item_head_bytes.len() {
+        let mut field_offsets = Vec::with_capacity(sa.fields.len());
+        for i in 0..sa.fields.len() {
             field_offsets.push(8_u32 * i as u32); // array head has 8 bytes
         }
 
         let input = TupleReader::new(assume::into_data(columnar)?, field_offsets.into());
 
         // init input array readers
-        let mut input_arrays: Vec<ArrayReader<_>> = fields_item_head_bytes
+        let mut input_arrays: Vec<ArrayReader<_>> = sa
+            .fields
             .iter()
             .enumerate()
-            .map(|(i, head_bytes)| ArrayReader::new(input.get_field(i), *head_bytes as usize))
+            .map(|(i, f)| ArrayReader::new(input.get_field(i), f.head_bytes as usize))
             .collect();
 
         // init output array
@@ -1106,24 +1100,25 @@ pub mod std_array {
 
     pub fn zip(
         _it: &mut Interpreter,
-        layout_args: &[u32],
+        static_args: &[u8],
         args: Vec<Cell>,
     ) -> Result<Cell, EvalError> {
-        let mut layout_args = LayoutArgsReader::new(layout_args);
-        let l_head_bytes = layout_args.next_u32();
-        let l_body_ptrs = layout_args.next_slice();
-        let r_head_bytes = layout_args.next_u32();
-        let r_body_ptrs = layout_args.next_slice();
+        let sa: ZipArgs = decode_args(static_args)?;
+        let l = &sa.a;
+        let r = &sa.b;
 
-        let output_head_bytes = l_head_bytes + r_head_bytes;
-        let mut output_body_ptrs = l_body_ptrs.to_vec();
-        output_body_ptrs.extend(r_body_ptrs.iter().map(|p| p + l_head_bytes));
+        let output_head_bytes = l.head_bytes + r.head_bytes;
+        let mut output_body_ptrs = l.body_ptrs.to_vec();
+        output_body_ptrs.extend(r.body_ptrs.iter().map(|p| p + l.head_bytes));
 
-        let output_fields_layouts = [(l_head_bytes, l_body_ptrs), (r_head_bytes, r_body_ptrs)];
+        let output_fields_layouts = [
+            (l.head_bytes, l.body_ptrs.as_slice()),
+            (r.head_bytes, r.body_ptrs.as_slice()),
+        ];
 
         let [left, right] = assume::exactly_n(args);
-        let left = ArrayReader::new(assume::into_data(left)?, l_head_bytes as usize);
-        let right = ArrayReader::new(assume::into_data(right)?, r_head_bytes as usize);
+        let left = ArrayReader::new(assume::into_data(left)?, l.head_bytes as usize);
+        let right = ArrayReader::new(assume::into_data(right)?, r.head_bytes as usize);
 
         let mut output = ArrayWriter::new(output_head_bytes, &output_body_ptrs);
         for (l, r) in left.zip(right) {
@@ -1138,24 +1133,20 @@ pub mod std_array {
 
     pub fn group(
         it: &mut Interpreter,
-        layout_args: &[u32],
+        static_args: &[u8],
         args: Vec<Cell>,
     ) -> Result<Cell, EvalError> {
-        let mut layout_args = LayoutArgsReader::new(layout_args);
-        let input_head_bytes = layout_args.next_u32();
-        let input_body_ptrs = layout_args.next_slice();
-        let output_head_bytes = layout_args.next_u32();
-        let output_body_ptrs = layout_args.next_slice();
+        let sa: GroupArgs = decode_args(static_args)?;
 
-        let output_field_head_bytes = layout_args.next_slice();
-        let mut output_fields_layouts = Vec::new();
-        for field_head_bytes in output_field_head_bytes {
-            output_fields_layouts.push((*field_head_bytes, layout_args.next_slice()));
-        }
-        let key_head_bytes = layout_args.next_u32() as usize;
+        let output_fields_layouts: Vec<(u32, &[u32])> = sa
+            .output_fields
+            .iter()
+            .map(|f| (f.head_bytes, f.body_ptrs.as_slice()))
+            .collect();
+        let key_head_bytes = sa.key_head as usize;
 
         let [input, key_getter] = assume::exactly_n(args);
-        let input = ArrayReader::new(assume::into_data(input)?, input_head_bytes as usize);
+        let input = ArrayReader::new(assume::into_data(input)?, sa.input.head_bytes as usize);
 
         let mut groups: HashMap<Vec<u8>, Vec<Data>> = HashMap::new();
         for item in input {
@@ -1169,12 +1160,12 @@ pub mod std_array {
         }
 
         // init output array
-        let mut output = ArrayWriter::new(output_head_bytes, output_body_ptrs);
+        let mut output = ArrayWriter::new(sa.output.head_bytes, &sa.output.body_ptrs);
         for (key, values) in groups {
             let mut tuple = TupleWriter::new(Cow::from(&output_fields_layouts));
             tuple.write_field(Data::new(key));
 
-            let mut partition = ArrayWriter::new(input_head_bytes, input_body_ptrs);
+            let mut partition = ArrayWriter::new(sa.input.head_bytes, &sa.input.body_ptrs);
             for value in values {
                 partition.write_item(value);
             }
@@ -1187,23 +1178,21 @@ pub mod std_array {
 
     pub fn append(
         _it: &mut Interpreter,
-        layout_args: &[u32],
+        static_args: &[u8],
         args: Vec<Cell>,
     ) -> Result<Cell, EvalError> {
-        let mut layout_args = LayoutArgsReader::new(layout_args);
-        let input_head_bytes = layout_args.next_u32();
-        let input_body_ptrs = layout_args.next_slice();
+        let sa: ItemLayoutArgs = decode_args(static_args)?;
 
         let [first, second] = assume::exactly_n(args);
 
-        let mut output = ArrayWriter::new(input_head_bytes, input_body_ptrs);
+        let mut output = ArrayWriter::new(sa.item.head_bytes, &sa.item.body_ptrs);
 
-        let first = ArrayReader::new(assume::into_data(first)?, input_head_bytes as usize);
+        let first = ArrayReader::new(assume::into_data(first)?, sa.item.head_bytes as usize);
         for item in first {
             output.write_item(item);
         }
 
-        let second = ArrayReader::new(assume::into_data(second)?, input_head_bytes as usize);
+        let second = ArrayReader::new(assume::into_data(second)?, sa.item.head_bytes as usize);
         for item in second {
             output.write_item(item);
         }
@@ -1212,11 +1201,11 @@ pub mod std_array {
 
     pub fn fold(
         it: &mut Interpreter,
-        layout_args: &[u32],
+        static_args: &[u8],
         args: Vec<Cell>,
     ) -> Result<Cell, EvalError> {
-        let mut layout_args = LayoutArgsReader::new(layout_args);
-        let input_head_bytes = layout_args.next_u32();
+        let sa: ItemHeadArgs = decode_args(static_args)?;
+        let input_head_bytes = sa.item_head;
 
         let [inputs, initial, operation] = assume::exactly_n(args);
 
@@ -1231,19 +1220,16 @@ pub mod std_array {
 
     pub fn scan(
         it: &mut Interpreter,
-        layout_args: &[u32],
+        static_args: &[u8],
         args: Vec<Cell>,
     ) -> Result<Cell, EvalError> {
-        let mut layout_args = LayoutArgsReader::new(layout_args);
-        let input_head_bytes = layout_args.next_u32();
-        let output_head_bytes = layout_args.next_u32();
-        let output_body_ptrs = layout_args.next_slice();
+        let sa: MapArgs = decode_args(static_args)?;
 
         let [inputs, initial, operation] = assume::exactly_n(args);
 
-        let inputs = ArrayReader::new(assume::into_data(inputs)?, input_head_bytes as usize);
+        let inputs = ArrayReader::new(assume::into_data(inputs)?, sa.input_item_head as usize);
         let mut acc = assume::into_data(initial)?;
-        let mut outputs = ArrayWriter::new(output_head_bytes, output_body_ptrs);
+        let mut outputs = ArrayWriter::new(sa.output_item.head_bytes, &sa.output_item.body_ptrs);
         for input in inputs {
             let args = vec![Cell::Data(acc), Cell::Data(input)];
             acc = assume::into_data(it.evaluate_func_call(&operation, args)?)?;
@@ -1254,20 +1240,20 @@ pub mod std_array {
 
     pub fn loop_until_empty(
         it: &mut Interpreter,
-        layout_args: &[u32],
+        static_args: &[u8],
         args: Vec<Cell>,
     ) -> Result<Cell, EvalError> {
-        let mut layout_args = LayoutArgsReader::new(layout_args);
-        let ty_head_bytes = layout_args.next_u32();
-        let ty_body_ptrs = layout_args.next_slice();
+        let sa: ItemLayoutArgs = decode_args(static_args)?;
 
         let [initial, function] = assume::exactly_n(args);
 
         let mut value = initial;
-        let mut outputs = ArrayWriter::new(ty_head_bytes, ty_body_ptrs);
+        let mut outputs = ArrayWriter::new(sa.item.head_bytes, &sa.item.body_ptrs);
         loop {
-            let values =
-                ArrayReader::new(assume::into_data(value.clone())?, ty_head_bytes as usize);
+            let values = ArrayReader::new(
+                assume::into_data(value.clone())?,
+                sa.item.head_bytes as usize,
+            );
             if values.remaining() == 0 {
                 break;
             }
@@ -1292,7 +1278,7 @@ pub mod std_array {
         ($name: ident, $prim: ident) => {
             pub fn $name(
                 _: &mut Interpreter,
-                _: &[u32],
+                _: &[u8],
                 args: Vec<Cell>,
             ) -> Result<Cell, EvalError> {
                 let [start, end] = assume::exactly_n(args);
@@ -1313,11 +1299,11 @@ pub mod std_array {
 
     pub fn min(
         it: &mut Interpreter,
-        layout_args: &[u32],
+        static_args: &[u8],
         args: Vec<Cell>,
     ) -> Result<Cell, EvalError> {
         let [array, cmp_func] = assume::exactly_n(args);
-        let array = assume::array(array, layout_args[0]);
+        let array = assume::array(array, decode_args::<ItemHeadArgs>(static_args)?.item_head);
 
         let mut res: Option<Data> = None;
         for item in array {
@@ -1329,16 +1315,19 @@ pub mod std_array {
                 }
             });
         }
-        Ok(Cell::Data(encode_option(res, layout_args[0])))
+        Ok(Cell::Data(encode_option(
+            res,
+            decode_args::<ItemHeadArgs>(static_args)?.item_head,
+        )))
     }
 
     pub fn max(
         it: &mut Interpreter,
-        layout_args: &[u32],
+        static_args: &[u8],
         args: Vec<Cell>,
     ) -> Result<Cell, EvalError> {
         let [array, cmp_func] = assume::exactly_n(args);
-        let array = assume::array(array, layout_args[0]);
+        let array = assume::array(array, decode_args::<ItemHeadArgs>(static_args)?.item_head);
 
         let mut res: Option<Data> = None;
         for item in array {
@@ -1351,18 +1340,22 @@ pub mod std_array {
             });
         }
 
-        Ok(Cell::Data(encode_option(res, layout_args[0])))
+        Ok(Cell::Data(encode_option(
+            res,
+            decode_args::<ItemHeadArgs>(static_args)?.item_head,
+        )))
     }
 
     macro_rules! typed_sum {
         ($name: ident, $prim: ty) => {
             pub fn $name(
                 _: &mut Interpreter,
-                layout_args: &[u32],
+                static_args: &[u8],
                 args: Vec<Cell>,
             ) -> Result<Cell, EvalError> {
                 let [array] = assume::exactly_n(args);
-                let array = assume::array(array, layout_args[0]);
+                let array =
+                    assume::array(array, decode_args::<ItemHeadArgs>(static_args)?.item_head);
                 let s = array
                     .map(|x| decode::primitive::<$prim>(&x))
                     .reduce(|a, b| a + b)
@@ -1386,11 +1379,12 @@ pub mod std_array {
         ($name: ident, $prim: ty) => {
             pub fn $name(
                 _: &mut Interpreter,
-                layout_args: &[u32],
+                static_args: &[u8],
                 args: Vec<Cell>,
             ) -> Result<Cell, EvalError> {
                 let [array] = assume::exactly_n(args);
-                let array = assume::array(array, layout_args[0]);
+                let array =
+                    assume::array(array, decode_args::<ItemHeadArgs>(static_args)?.item_head);
                 let (sum, count) = array
                     .map(|x| decode::primitive::<$prim>(&x))
                     .fold((<$prim>::default(), 0_u32), |(sum, count), item| {
@@ -1411,7 +1405,7 @@ pub mod std_array {
     typed_mean!(mean_float32, f32);
     typed_mean!(mean_float64, f64);
 
-    pub fn count(_it: &mut Interpreter, _: &[u32], args: Vec<Cell>) -> Result<Cell, EvalError> {
+    pub fn count(_it: &mut Interpreter, _: &[u8], args: Vec<Cell>) -> Result<Cell, EvalError> {
         let [array] = assume::exactly_n(args);
         let array = assume::into_data(array)?;
 
@@ -1421,7 +1415,7 @@ pub mod std_array {
         Ok(Cell::Data(encode(&res)))
     }
 
-    pub fn all(_it: &mut Interpreter, _: &[u32], args: Vec<Cell>) -> Result<Cell, EvalError> {
+    pub fn all(_it: &mut Interpreter, _: &[u8], args: Vec<Cell>) -> Result<Cell, EvalError> {
         let [array] = assume::exactly_n(args);
         let mut array = assume::array(array, 1);
 
@@ -1429,7 +1423,7 @@ pub mod std_array {
         Ok(Cell::Data(encode(&res)))
     }
 
-    pub fn any(_it: &mut Interpreter, _: &[u32], args: Vec<Cell>) -> Result<Cell, EvalError> {
+    pub fn any(_it: &mut Interpreter, _: &[u8], args: Vec<Cell>) -> Result<Cell, EvalError> {
         let [array] = assume::exactly_n(args);
         let mut array = assume::array(array, 1);
 
@@ -1439,38 +1433,36 @@ pub mod std_array {
 
     pub fn lag(
         _it: &mut Interpreter,
-        layout_args: &[u32],
+        static_args: &[u8],
         args: Vec<Cell>,
     ) -> Result<Cell, EvalError> {
-        let mut layout_args = LayoutArgsReader::new(layout_args);
-        let head_bytes = layout_args.next_u32();
-        let body_ptrs = layout_args.next_slice();
-        let default_val = assume::bytes(layout_args.next_slice());
+        let sa: ShiftArgs = decode_args(static_args)?;
+        let l = &sa.item;
+        let default = sa.default.clone();
 
         let [array, offset] = assume::exactly_n(args);
 
-        let array = assume::array(array, head_bytes);
+        let array = assume::array(array, l.head_bytes);
         let offset = assume::int64(&offset)? as isize;
 
-        shift(array, offset, head_bytes, body_ptrs, default_val)
+        shift(array, offset, l.head_bytes, &l.body_ptrs, default)
     }
 
     pub fn lead(
         _it: &mut Interpreter,
-        layout_args: &[u32],
+        static_args: &[u8],
         args: Vec<Cell>,
     ) -> Result<Cell, EvalError> {
-        let mut layout_args = LayoutArgsReader::new(layout_args);
-        let head_bytes = layout_args.next_u32();
-        let body_ptrs = layout_args.next_slice();
-        let default_val = assume::bytes(layout_args.next_slice());
+        let sa: ShiftArgs = decode_args(static_args)?;
+        let l = &sa.item;
+        let default_val = sa.default.clone();
 
         let [array, offset] = assume::exactly_n(args);
 
-        let array = assume::array(array, head_bytes);
+        let array = assume::array(array, l.head_bytes);
         let offset = (assume::int64(&offset)? as isize).saturating_neg();
 
-        shift(array, offset, head_bytes, body_ptrs, default_val)
+        shift(array, offset, l.head_bytes, &l.body_ptrs, default_val)
     }
 
     fn shift(
@@ -1509,13 +1501,14 @@ pub mod std_array {
         ($name: ident, $prim: ty) => {
             pub fn $name(
                 _it: &mut Interpreter,
-                layout_args: &[u32],
+                static_args: &[u8],
                 args: Vec<Cell>,
             ) -> Result<Cell, EvalError> {
                 let [array, trailing, leading] = assume::exactly_n(args);
                 let trailing: u32 = assume::primitive(&trailing)?;
                 let leading: u32 = assume::primitive(&leading)?;
-                let array = assume::array(array, layout_args[0]);
+                let array =
+                    assume::array(array, decode_args::<ItemHeadArgs>(static_args)?.item_head);
                 rolling_mean_impl::<$prim>(array, trailing, leading)
             }
         };
@@ -1582,11 +1575,11 @@ pub mod std_array {
 
     pub fn rank(
         it: &mut Interpreter,
-        layout_args: &[u32],
+        static_args: &[u8],
         args: Vec<Cell>,
     ) -> Result<Cell, EvalError> {
         let [array, cmp_func] = assume::exactly_n(args);
-        let array = assume::array(array, layout_args[0]);
+        let array = assume::array(array, decode_args::<ItemHeadArgs>(static_args)?.item_head);
 
         fn get_rank(start: usize, _end: usize, _group: usize) -> usize {
             start + 1
@@ -1600,11 +1593,11 @@ pub mod std_array {
 
     pub fn rank_dense(
         it: &mut Interpreter,
-        layout_args: &[u32],
+        static_args: &[u8],
         args: Vec<Cell>,
     ) -> Result<Cell, EvalError> {
         let [array, cmp_func] = assume::exactly_n(args);
-        let array = assume::array(array, layout_args[0]);
+        let array = assume::array(array, decode_args::<ItemHeadArgs>(static_args)?.item_head);
 
         fn get_rank(_start: usize, _end: usize, group: usize) -> usize {
             group + 1
@@ -1618,11 +1611,11 @@ pub mod std_array {
 
     pub fn rank_percentile(
         it: &mut Interpreter,
-        layout_args: &[u32],
+        static_args: &[u8],
         args: Vec<Cell>,
     ) -> Result<Cell, EvalError> {
         let [array, cmp_func] = assume::exactly_n(args);
-        let array = assume::array(array, layout_args[0]);
+        let array = assume::array(array, decode_args::<ItemHeadArgs>(static_args)?.item_head);
 
         fn get_rank(start: usize, _end: usize, _group: usize) -> usize {
             start
@@ -1637,11 +1630,11 @@ pub mod std_array {
 
     pub fn cume_dist(
         it: &mut Interpreter,
-        layout_args: &[u32],
+        static_args: &[u8],
         args: Vec<Cell>,
     ) -> Result<Cell, EvalError> {
         let [array, cmp_func] = assume::exactly_n(args);
-        let array = assume::array(array, layout_args[0]);
+        let array = assume::array(array, decode_args::<ItemHeadArgs>(static_args)?.item_head);
 
         fn get_rank(_start: usize, end: usize, _group: usize) -> usize {
             end
@@ -1764,7 +1757,7 @@ pub mod std_text {
         }
     }
 
-    pub fn concat(_it: &mut Interpreter, _: &[u32], args: Vec<Cell>) -> Result<Cell, EvalError> {
+    pub fn concat(_it: &mut Interpreter, _: &[u8], args: Vec<Cell>) -> Result<Cell, EvalError> {
         let [left, right] = assume::exactly_n(args);
 
         // TODO: string reader
@@ -1788,7 +1781,7 @@ pub mod std_text {
         Ok(Cell::Data(Data::new(buf)))
     }
 
-    pub fn length(_it: &mut Interpreter, _: &[u32], args: Vec<Cell>) -> Result<Cell, EvalError> {
+    pub fn length(_it: &mut Interpreter, _: &[u8], args: Vec<Cell>) -> Result<Cell, EvalError> {
         let [text] = assume::exactly_n(args);
 
         let data = assume::into_data(text)?;
@@ -1798,11 +1791,7 @@ pub mod std_text {
         Ok(Cell::Data(encode(&length)))
     }
 
-    pub fn from_ascii(
-        _it: &mut Interpreter,
-        _: &[u32],
-        args: Vec<Cell>,
-    ) -> Result<Cell, EvalError> {
+    pub fn from_ascii(_it: &mut Interpreter, _: &[u8], args: Vec<Cell>) -> Result<Cell, EvalError> {
         let [ascii] = assume::exactly_n(args);
         let ascii = assume::primitive::<u8>(&ascii)?;
 
@@ -1810,7 +1799,7 @@ pub mod std_text {
         Ok(Cell::Data(encode(&text)))
     }
 
-    pub fn join(_it: &mut Interpreter, _: &[u32], args: Vec<Cell>) -> Result<Cell, EvalError> {
+    pub fn join(_it: &mut Interpreter, _: &[u8], args: Vec<Cell>) -> Result<Cell, EvalError> {
         let [parts, sep] = assume::exactly_n(args);
         let mut parts = assume::array(parts, str::head_size().div_ceil(8) as u32);
         let sep = assume::text(&sep)?;
@@ -1832,7 +1821,7 @@ pub mod std_text {
         Ok(Cell::Data(encode(&joined)))
     }
 
-    pub fn split(_it: &mut Interpreter, _: &[u32], args: Vec<Cell>) -> Result<Cell, EvalError> {
+    pub fn split(_it: &mut Interpreter, _: &[u8], args: Vec<Cell>) -> Result<Cell, EvalError> {
         let [text, sep] = assume::exactly_n(args);
         let text = assume::text_ref(text)?;
         let sep = assume::text_ref(sep)?;
@@ -1846,7 +1835,7 @@ pub mod std_text {
 
     pub fn starts_with(
         _it: &mut Interpreter,
-        _: &[u32],
+        _: &[u8],
         args: Vec<Cell>,
     ) -> Result<Cell, EvalError> {
         let [text, prefix] = assume::exactly_n(args);
@@ -1859,7 +1848,7 @@ pub mod std_text {
         Ok(Cell::Data(encode(&res)))
     }
 
-    pub fn contains(_it: &mut Interpreter, _: &[u32], args: Vec<Cell>) -> Result<Cell, EvalError> {
+    pub fn contains(_it: &mut Interpreter, _: &[u8], args: Vec<Cell>) -> Result<Cell, EvalError> {
         let [text, pattern] = assume::exactly_n(args);
 
         let text = assume::text_ref(text)?;
@@ -1870,7 +1859,7 @@ pub mod std_text {
         Ok(Cell::Data(encode(&res)))
     }
 
-    pub fn ends_with(_it: &mut Interpreter, _: &[u32], args: Vec<Cell>) -> Result<Cell, EvalError> {
+    pub fn ends_with(_it: &mut Interpreter, _: &[u8], args: Vec<Cell>) -> Result<Cell, EvalError> {
         let [text, suffix] = assume::exactly_n(args);
 
         let text = assume::text_ref(text)?;
@@ -1911,7 +1900,7 @@ pub mod std_math {
         ($name: ident, $prim: ty) => {
             pub fn $name(
                 _: &mut Interpreter,
-                _: &[u32],
+                _: &[u8],
                 args: Vec<Cell>,
             ) -> Result<Cell, EvalError> {
                 let [arg] = assume::exactly_n(args);
@@ -1927,11 +1916,11 @@ pub mod std_math {
     typed_abs!(abs_float64, f64);
 
     // Per-type pow (std.lt only defines pow for int64 | float64)
-    pub fn pow_int64(_: &mut Interpreter, _: &[u32], args: Vec<Cell>) -> Result<Cell, EvalError> {
+    pub fn pow_int64(_: &mut Interpreter, _: &[u8], args: Vec<Cell>) -> Result<Cell, EvalError> {
         let (left, right) = assume::primitive2::<i64>(&args)?;
         Ok(Cell::Data(encode(&left.pow(right as u32))))
     }
-    pub fn pow_float64(_: &mut Interpreter, _: &[u32], args: Vec<Cell>) -> Result<Cell, EvalError> {
+    pub fn pow_float64(_: &mut Interpreter, _: &[u8], args: Vec<Cell>) -> Result<Cell, EvalError> {
         let (left, right) = assume::primitive2::<f64>(&args)?;
         Ok(Cell::Data(encode(&left.powf(right))))
     }
@@ -1940,7 +1929,8 @@ pub mod std_math {
 pub mod std_fs {
     use ::std::{fs, io, path};
 
-    use lutra_bin::{Decode, ir};
+    use lutra_bin::Decode;
+    use lutra_bin::br::statics::InjectTypeArgs;
     use parquet::arrow::arrow_reader::ParquetRecordBatchReaderBuilder;
     use parquet::arrow::arrow_writer::ArrowWriter;
 
@@ -1977,7 +1967,7 @@ pub mod std_fs {
 
     pub fn read_parquet(
         it: &mut Interpreter,
-        layout_args: &[u32],
+        static_args: &[u8],
         args: Vec<Cell>,
     ) -> Result<Cell, EvalError> {
         // unpack args
@@ -1986,10 +1976,10 @@ pub mod std_fs {
         let file_path = assume::text(&file_path)?;
         let file_path = it.resolve_path(&file_path)?;
 
-        // decode item ty from layout args
-        let mut layout_args = assume::LayoutArgsReader::new(layout_args);
-        let ty = assume::bytes(layout_args.next_slice());
-        let ty = ir::Ty::decode(&ty).map_err(|_| EvalError::BadProgram)?;
+        // decode injected type descriptor from static args
+        let ty = InjectTypeArgs::decode(static_args)
+            .map_err(|_| EvalError::BadProgram)?
+            .ty;
 
         // init parquet reader
         let file = match fs::File::open(&file_path) {
@@ -2018,7 +2008,7 @@ pub mod std_fs {
 
     pub fn write_parquet(
         it: &mut Interpreter,
-        layout_args: &[u32],
+        static_args: &[u8],
         args: Vec<Cell>,
     ) -> Result<Cell, EvalError> {
         // unpack args
@@ -2029,10 +2019,10 @@ pub mod std_fs {
 
         let data = assume::into_data(data)?;
 
-        // decode item ty from layout args
-        let mut layout_args = assume::LayoutArgsReader::new(layout_args);
-        let ty = assume::bytes(layout_args.next_slice());
-        let ty = ir::Ty::decode(&ty).map_err(|_| EvalError::BadProgram)?;
+        // decode injected type descriptor from static args
+        let ty = InjectTypeArgs::decode(static_args)
+            .map_err(|_| EvalError::BadProgram)?
+            .ty;
 
         // convert lutra to arrow
         let batch = lutra_arrow::lutra_to_arrow(data, &ty, &it.defs)
@@ -2073,7 +2063,7 @@ pub mod std_date {
 
     pub fn to_timestamp(
         _it: &mut Interpreter,
-        _: &[u32],
+        _: &[u8],
         args: Vec<Cell>,
     ) -> Result<Cell, EvalError> {
         let [date, time_zone] = assume::exactly_n(args);
@@ -2105,7 +2095,7 @@ pub mod std_date {
 
     pub fn to_year_month_day(
         _it: &mut Interpreter,
-        _: &[u32],
+        _: &[u8],
         args: Vec<Cell>,
     ) -> Result<Cell, EvalError> {
         // unpack
@@ -2141,7 +2131,7 @@ pub mod std_timestamp {
         }
     }
 
-    pub fn to_date(_it: &mut Interpreter, _: &[u32], args: Vec<Cell>) -> Result<Cell, EvalError> {
+    pub fn to_date(_it: &mut Interpreter, _: &[u8], args: Vec<Cell>) -> Result<Cell, EvalError> {
         let [timestamp, time_zone] = assume::exactly_n(args);
 
         let timestamp: i64 = assume::primitive(&timestamp)?;
@@ -2172,7 +2162,7 @@ pub mod interpreter {
         }
     }
 
-    fn version(_it: &mut Interpreter, _: &[u32], _args: Vec<Cell>) -> Result<Cell, EvalError> {
+    fn version(_it: &mut Interpreter, _: &[u8], _args: Vec<Cell>) -> Result<Cell, EvalError> {
         Ok(Cell::Data(encode("lutra-interpreter 0.0.1")))
     }
 }
@@ -2235,39 +2225,6 @@ mod assume {
 
     pub fn array(cell: Cell, item_head_bytes: u32) -> ArrayReader<Data> {
         ArrayReader::new(into_data(cell).unwrap(), item_head_bytes as usize)
-    }
-
-    pub struct LayoutArgsReader<'t> {
-        layout_args: &'t [u32],
-    }
-
-    impl<'t> LayoutArgsReader<'t> {
-        pub fn new(layout_args: &'t [u32]) -> Self {
-            Self { layout_args }
-        }
-
-        pub fn next_u32(&mut self) -> u32 {
-            let r = self.layout_args[0];
-            self.layout_args = &self.layout_args[1..];
-            r
-        }
-
-        pub fn next_slice(&mut self) -> &'t [u32] {
-            let len = self.layout_args[0] as usize;
-            let r = &self.layout_args[1..len + 1];
-            self.layout_args = &self.layout_args[len + 1..];
-            r
-        }
-    }
-
-    pub fn bytes(args: &[u32]) -> Vec<u8> {
-        let len = args[0] as usize;
-        let mut r = Vec::with_capacity(args.len() * (u32::BITS / u8::BITS) as usize);
-        for arg in &args[1..] {
-            r.extend(arg.to_le_bytes());
-        }
-        r.truncate(len);
-        r
     }
 }
 

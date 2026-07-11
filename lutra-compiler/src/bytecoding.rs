@@ -2,8 +2,8 @@ use std::collections::HashMap;
 
 use indexmap::IndexSet;
 use lutra_bin::Encode;
+use lutra_bin::br::statics::*;
 use lutra_bin::br::*;
-use lutra_bin::bytes::BufMut;
 use lutra_bin::ir;
 
 pub fn compile_program(value: ir::Program) -> Program {
@@ -136,7 +136,7 @@ impl<'t> ByteCoder<'t> {
                     vec![&f.expr.ty]
                 }
             })
-            .map(|ty| self.compile_ty_layout(ty.layout.clone().unwrap()))
+            .map(|ty| ty_layout(ty.layout.as_ref().unwrap()))
             .collect();
 
         let fields = fields
@@ -165,7 +165,7 @@ impl<'t> ByteCoder<'t> {
         let ty_item = self.get_ty_mat(&ty).kind.as_array().unwrap();
         Array {
             items: items.into_iter().map(|x| self.compile_expr(x)).collect(),
-            item_layout: self.compile_ty_layout(ty_item.layout.clone().unwrap()),
+            item_layout: ty_layout(ty_item.layout.as_ref().unwrap()),
         }
     }
 
@@ -245,15 +245,8 @@ impl<'t> ByteCoder<'t> {
             .collect()
     }
 
-    fn compile_ty_layout(&self, value: ir::TyLayout) -> TyLayout {
-        TyLayout {
-            head_size: value.head_size,
-            body_ptrs: value.body_ptrs,
-        }
-    }
-
     fn compile_external_symbol(&mut self, id: String, ty_mat: &ir::Ty) -> ExprKind {
-        let layout_args: Vec<u32> = match id.as_str() {
+        let static_args: Vec<u8> = match id.as_str() {
             "std::ops::add"
             | "std::ops::sub"
             | "std::ops::mul"
@@ -285,9 +278,7 @@ impl<'t> ByteCoder<'t> {
 
             "std::array::fold" => {
                 let item_layout = as_layout_of_param_array(ty_mat);
-                vec![
-                    item_layout.head_size.div_ceil(8), // item_head_size
-                ]
+                item_head_arg(item_layout).encode()
             }
 
             "std::array::min"
@@ -300,20 +291,20 @@ impl<'t> ByteCoder<'t> {
                 let param_ty = as_ty_of_param(ty_mat);
                 let item_ty = self.get_ty_mat(param_ty).kind.as_array().unwrap();
                 let item_layout = item_ty.layout.as_ref().unwrap();
-                let layout_args = vec![item_layout.head_size.div_ceil(8)];
+                let static_args = item_head_arg(item_layout).encode();
 
                 let n_params = ty_mat.kind.as_function().unwrap().params.len();
                 let cmp_id = format!("std::ops::cmp_{}", self.as_std_ty_suffix(item_ty));
                 let cmp = self.make_external(cmp_id, vec![]);
-                return self.wrap_external_with_extra_args(id, layout_args, n_params, vec![cmp]);
+                return self.wrap_external_with_extra_args(id, static_args, n_params, vec![cmp]);
             }
 
             "std::array::sort" => {
                 let item_layout = as_layout_of_param_array(ty_mat);
-
-                let mut layout_args = Vec::with_capacity(1 + 1 + item_layout.body_ptrs.len());
-                layout_args.push(item_layout.head_size.div_ceil(8));
-                layout_args.extend(as_len_and_items(&item_layout.body_ptrs));
+                let static_args = ItemLayoutArgs {
+                    item: ty_layout(item_layout),
+                }
+                .encode();
 
                 let ty_func = ty_mat.kind.as_function().unwrap();
                 let key_extractor_ty = self.get_ty_mat(&ty_func.params[1]);
@@ -322,17 +313,17 @@ impl<'t> ByteCoder<'t> {
                 let n_params = ty_func.params.len();
                 let cmp_id = format!("std::ops::cmp_{}", self.as_std_ty_suffix(key_ty));
                 let cmp = self.make_external(cmp_id, vec![]);
-                return self.wrap_external_with_extra_args(id, layout_args, n_params, vec![cmp]);
+                return self.wrap_external_with_extra_args(id, static_args, n_params, vec![cmp]);
             }
 
             "std::array::sum" | "std::array::mean" | "std::array::rolling_mean" => {
                 let param_ty = as_ty_of_param(ty_mat);
                 let item_ty = self.get_ty_mat(param_ty).kind.as_array().unwrap();
                 let item_layout = item_ty.layout.as_ref().unwrap();
-                let layout_args = vec![item_layout.head_size.div_ceil(8)];
+                let static_args = item_head_arg(item_layout).encode();
 
                 let ty_name = self.as_std_ty_suffix(item_ty);
-                return self.make_external(format!("{id}_{ty_name}"), layout_args);
+                return self.make_external(format!("{id}_{ty_name}"), static_args);
             }
 
             "std::array::index" => {
@@ -344,14 +335,12 @@ impl<'t> ByteCoder<'t> {
                     ty_out_variants,
                     &ty_func.body.variants_recursive,
                 );
-                let ty_out_format = ty_out_format.encode();
 
-                let mut r = vec![
-                    item_layout.head_size.div_ceil(8), // item_head_size
-                ];
-
-                pack_bytes_to_u32(ty_out_format, &mut r);
-                r
+                IndexArgs {
+                    item_head: head_bytes(item_layout),
+                    output_enum_format: ty_out_format.encode(),
+                }
+                .encode()
             }
 
             "std::array::filter"
@@ -359,38 +348,35 @@ impl<'t> ByteCoder<'t> {
             | "std::array::append"
             | "std::array::loop_until_empty" => {
                 let item_layout = as_layout_of_param_array(ty_mat);
-
-                let mut r = Vec::with_capacity(1 + 1 + item_layout.body_ptrs.len());
-                r.push(item_layout.head_size.div_ceil(8)); // item_head_size
-                r.extend(as_len_and_items(&item_layout.body_ptrs)); // item_body_ptrs
-                r
+                ItemLayoutArgs {
+                    item: ty_layout(item_layout),
+                }
+                .encode()
             }
 
             "std::array::lag" | "std::array::lead" => {
                 let item_layout = as_layout_of_param_array(ty_mat);
 
-                let mut r = Vec::with_capacity(1 + 1 + item_layout.body_ptrs.len());
-                r.push(item_layout.head_size.div_ceil(8)); // item_head_size
-                r.extend(as_len_and_items(&item_layout.body_ptrs)); // item_body_ptrs
-
-                // also encode default value
                 let ty_func = ty_mat.kind.as_function().unwrap();
                 let ty_item = ty_func.body.kind.as_array().unwrap();
-                let default_val = self.construct_default_for_ty(ty_item);
-                pack_bytes_to_u32(default_val, &mut r);
+                let default = self.construct_default_for_ty(ty_item);
 
-                r
+                ShiftArgs {
+                    item: ty_layout(item_layout),
+                    default,
+                }
+                .encode()
             }
 
             "std::array::map" | "std::array::flat_map" | "std::array::scan" => {
                 let input_layout = as_layout_of_param_array(ty_mat);
                 let output_layout = as_layout_of_return_array(ty_mat);
 
-                let mut r = Vec::with_capacity(2 + 1 + output_layout.body_ptrs.len());
-                r.push(input_layout.head_size.div_ceil(8)); // input_item_head
-                r.push(output_layout.head_size.div_ceil(8)); // output_item_head
-                r.extend(as_len_and_items(&output_layout.body_ptrs)); // output_item_body_ptrs
-                r
+                MapArgs {
+                    input_item_head: head_bytes(input_layout),
+                    output_item: ty_layout(output_layout),
+                }
+                .encode()
             }
 
             "std::array::to_columnar" => {
@@ -398,72 +384,46 @@ impl<'t> ByteCoder<'t> {
 
                 let input_item = ty_func.params[0].kind.as_array().unwrap();
                 let input_layout = input_item.layout.as_ref().unwrap();
-
-                let mut r = Vec::new();
-                r.push(input_layout.head_size.div_ceil(8)); // item_head_size
-
-                let input_field_offsets = lutra_bin::layout::tuple_field_offsets(input_item);
-                r.extend(as_len_and_items(&input_field_offsets)); // field_offsets
-
-                // fields_head_bytes
                 let fields = input_item.kind.as_tuple().unwrap();
-                r.push(fields.len() as u32);
-                for field in fields {
-                    let field_layout = field.ty.layout.as_ref().unwrap();
-                    r.push(field_layout.head_size.div_ceil(8));
-                }
 
-                // fields_body_ptrs
-                for field in fields {
-                    let field_layout = field.ty.layout.as_ref().unwrap();
-                    r.extend(as_len_and_items(&field_layout.body_ptrs));
+                ToColumnarArgs {
+                    item_head: head_bytes(input_layout),
+                    field_offsets: lutra_bin::layout::tuple_field_offsets(input_item),
+                    fields: fields
+                        .iter()
+                        .map(|f| ty_layout(f.ty.layout.as_ref().unwrap()))
+                        .collect(),
                 }
-
-                r
+                .encode()
             }
             "std::array::from_columnar" => {
                 let ty_func = ty_mat.kind.as_function().unwrap();
 
                 let output_item = ty_func.body.kind.as_array().unwrap();
                 let output_layout = output_item.layout.as_ref().unwrap();
-
-                let mut r = Vec::new();
-                r.push(output_layout.head_size.div_ceil(8)); // output_head_bytes
-
-                r.extend(as_len_and_items(&output_layout.body_ptrs)); // output_body_ptrs
-
-                // fields_item_head_bytes
                 let fields = output_item.kind.as_tuple().unwrap();
-                r.push(fields.len() as u32);
-                for field in fields {
-                    let field_layout = field.ty.layout.as_ref().unwrap();
-                    r.push(field_layout.head_size.div_ceil(8));
-                }
 
-                // fields_body_ptrs
-                for field in fields {
-                    let field_layout = field.ty.layout.as_ref().unwrap();
-                    r.extend(as_len_and_items(&field_layout.body_ptrs));
+                FromColumnarArgs {
+                    output: ty_layout(output_layout),
+                    fields: fields
+                        .iter()
+                        .map(|f| ty_layout(f.ty.layout.as_ref().unwrap()))
+                        .collect(),
                 }
-
-                r
+                .encode()
             }
 
             "std::array::zip" => {
                 let ty_func = ty_mat.kind.as_function().unwrap();
 
                 let a_item = self.get_ty_mat(&ty_func.params[0]).kind.as_array().unwrap();
-                let a_layout = a_item.layout.as_ref().unwrap();
-
                 let b_item = self.get_ty_mat(&ty_func.params[1]).kind.as_array().unwrap();
-                let b_layout = b_item.layout.as_ref().unwrap();
 
-                let mut r = Vec::new();
-                r.push(a_layout.head_size.div_ceil(8));
-                r.extend(as_len_and_items(&a_layout.body_ptrs));
-                r.push(b_layout.head_size.div_ceil(8));
-                r.extend(as_len_and_items(&b_layout.body_ptrs));
-                r
+                ZipArgs {
+                    a: ty_layout(a_item.layout.as_ref().unwrap()),
+                    b: ty_layout(b_item.layout.as_ref().unwrap()),
+                }
+                .encode()
             }
 
             "std::array::group" => {
@@ -474,63 +434,41 @@ impl<'t> ByteCoder<'t> {
 
                 let output_item = self.get_ty_mat(&ty_func.body).kind.as_array().unwrap();
                 let output_layout = output_item.layout.as_ref().unwrap();
+                let fields = output_item.kind.as_tuple().unwrap();
 
                 let key = &self.get_ty_mat(output_item).kind.as_tuple().unwrap()[0].ty;
                 let key_layout = key.layout.as_ref().unwrap();
 
-                let mut r = Vec::new();
-                r.push(input_layout.head_size.div_ceil(8)); // input_head_bytes
-                r.extend(as_len_and_items(&input_layout.body_ptrs)); // input_body_ptrs
-
-                r.push(output_layout.head_size.div_ceil(8)); // output_head_bytes
-                r.extend(as_len_and_items(&output_layout.body_ptrs)); // output_body_ptrs
-
-                // output_field_head_bytes
-                let fields = output_item.kind.as_tuple().unwrap();
-                r.push(fields.len() as u32);
-                for field in fields {
-                    let field_layout = field.ty.layout.as_ref().unwrap();
-                    r.push(field_layout.head_size.div_ceil(8));
+                GroupArgs {
+                    input: ty_layout(input_layout),
+                    output: ty_layout(output_layout),
+                    output_fields: fields
+                        .iter()
+                        .map(|f| ty_layout(f.ty.layout.as_ref().unwrap()))
+                        .collect(),
+                    key_head: head_bytes(key_layout),
                 }
-
-                // output_fields_body_ptrs
-                for field in fields {
-                    let field_layout = field.ty.layout.as_ref().unwrap();
-                    r.extend(as_len_and_items(&field_layout.body_ptrs));
-                }
-
-                r.push(key_layout.head_size.div_ceil(8)); // key_head_bytes
-
-                r
+                .encode()
             }
 
             "std::fs::read_parquet" => {
                 let ty_func = ty_mat.kind.as_function().unwrap();
-                let ty_data = &ty_func.body;
+                let ty_data = ty_func.body.clone();
 
                 self.include_defs = true;
-
-                let mut r = Vec::new();
-                pack_bytes_to_u32(ty_data.encode(), &mut r);
-                r
+                InjectTypeArgs { ty: ty_data }.encode()
             }
             "std::fs::write_parquet" => {
-                let ty_data = as_ty_of_param(ty_mat);
+                let ty_data = as_ty_of_param(ty_mat).clone();
 
                 self.include_defs = true;
-
-                let mut r = Vec::new();
-                pack_bytes_to_u32(ty_data.encode(), &mut r);
-                r
+                InjectTypeArgs { ty: ty_data }.encode()
             }
 
             _ => vec![],
         };
 
-        let (index, _) = self
-            .externals
-            .insert_full(ExternalSymbol { id, layout_args });
-        ExprKind::Pointer(Sid(index as u32).with_tag(SidKind::External))
+        self.make_external(id, static_args)
     }
 
     /// Determines the snake_case suffix for a framed std type
@@ -547,11 +485,12 @@ impl<'t> ByteCoder<'t> {
         }
     }
 
-    /// Registers an external symbol and returns a `Pointer` ExprKind for it.
-    fn make_external(&mut self, id: String, layout_args: Vec<u32>) -> ExprKind {
+    /// Registers an external symbol with encoded static args (a per-intrinsic
+    /// schema, or empty) and returns a `Pointer` ExprKind for it.
+    fn make_external(&mut self, id: String, static_args: Vec<u8>) -> ExprKind {
         let (index, _) = self
             .externals
-            .insert_full(ExternalSymbol { id, layout_args });
+            .insert_full(ExternalSymbol { id, static_args });
         ExprKind::Pointer(Sid(index as u32).with_tag(SidKind::External))
     }
 
@@ -570,14 +509,14 @@ impl<'t> ByteCoder<'t> {
     fn wrap_external_with_extra_args(
         &mut self,
         id: String,
-        layout_args: Vec<u32>,
+        static_args: Vec<u8>,
         n_params: usize,
         extra_args: Vec<ExprKind>,
     ) -> ExprKind {
         // Register the real external symbol
         let (ext_index, _) = self
             .externals
-            .insert_full(ExternalSymbol { id, layout_args });
+            .insert_full(ExternalSymbol { id, static_args });
         let ext_sid = Sid(ext_index as u32).with_tag(SidKind::External);
 
         // Generate a unique wrapper function ID
@@ -641,10 +580,23 @@ impl<'t> ByteCoder<'t> {
     }
 }
 
-fn as_len_and_items(items: &[u32]) -> impl Iterator<Item = u32> + '_ {
-    Some(items.len() as u32)
-        .into_iter()
-        .chain(items.iter().cloned())
+fn item_head_arg(layout: &ir::TyLayout) -> statics::ItemHeadArgs {
+    statics::ItemHeadArgs {
+        item_head: head_bytes(layout),
+    }
+}
+
+/// Byte size of a type's head (the codec stores head sizes in bytes, while
+/// `ir::TyLayout::head_size` is in bits).
+fn head_bytes(layout: &ir::TyLayout) -> u32 {
+    layout.head_size.div_ceil(8)
+}
+
+fn ty_layout(l: &ir::TyLayout) -> TyLayout {
+    TyLayout {
+        head_bytes: head_bytes(l),
+        body_ptrs: l.body_ptrs.clone(),
+    }
 }
 
 fn as_layout_of_param_array(ty: &Ty) -> &ir::TyLayout {
@@ -664,21 +616,4 @@ fn as_layout_of_return_array(ty: &Ty) -> &ir::TyLayout {
 fn as_ty_of_param(ty: &Ty) -> &ir::Ty {
     let ty_func = ty.kind.as_function().unwrap();
     &ty_func.params[0]
-}
-
-fn pack_bytes_to_u32(mut input: Vec<u8>, output: &mut Vec<u32>) {
-    let input_len = input.len();
-
-    // pad
-    if !input.len().is_multiple_of(4) {
-        input.put_bytes(0, 4 - input.len() % 4);
-    }
-
-    // cast to Vec<u32> as le bytes
-    output.reserve(2 + input.len() / 4);
-    output.push((input.len() / 4) as u32 + 1);
-    output.push(input_len as u32);
-    for chunk in input.chunks_exact(4) {
-        output.push(u32::from_le_bytes(chunk.try_into().unwrap()));
-    }
 }

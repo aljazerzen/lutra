@@ -2097,7 +2097,7 @@ pub mod br {
     #[allow(non_camel_case_types)]
     pub struct ExternalSymbol {
         pub id: crate::string::String,
-        pub layout_args: crate::vec::Vec<u32>,
+        pub static_args: crate::vec::Vec<u8>,
     }
 
     #[derive(Debug, Clone)]
@@ -2202,8 +2202,439 @@ pub mod br {
     #[derive(Debug, Clone, PartialEq, Default)]
     #[allow(non_camel_case_types)]
     pub struct TyLayout {
-        pub head_size: u32,
+        pub head_bytes: u32,
         pub body_ptrs: crate::vec::Vec<u32>,
+    }
+
+    pub mod statics {
+        #[derive(Debug, Clone)]
+        #[allow(non_camel_case_types)]
+        pub struct ItemHeadArgs {
+            pub item_head: u32,
+        }
+
+        #[derive(Debug, Clone)]
+        #[allow(non_camel_case_types)]
+        pub struct ItemLayoutArgs {
+            pub item: super::TyLayout,
+        }
+
+        #[derive(Debug, Clone)]
+        #[allow(non_camel_case_types)]
+        pub struct ShiftArgs {
+            pub item: super::TyLayout,
+            pub default: crate::vec::Vec<u8>,
+        }
+
+        #[derive(Debug, Clone)]
+        #[allow(non_camel_case_types)]
+        pub struct IndexArgs {
+            pub item_head: u32,
+            pub output_enum_format: crate::vec::Vec<u8>,
+        }
+
+        #[derive(Debug, Clone)]
+        #[allow(non_camel_case_types)]
+        pub struct MapArgs {
+            pub input_item_head: u32,
+            pub output_item: super::TyLayout,
+        }
+
+        #[derive(Debug, Clone)]
+        #[allow(non_camel_case_types)]
+        pub struct ZipArgs {
+            pub a: super::TyLayout,
+            pub b: super::TyLayout,
+        }
+
+        #[derive(Debug, Clone)]
+        #[allow(non_camel_case_types)]
+        pub struct ToColumnarArgs {
+            pub item_head: u32,
+            pub field_offsets: crate::vec::Vec<u32>,
+            pub fields: crate::vec::Vec<super::TyLayout>,
+        }
+
+        #[derive(Debug, Clone)]
+        #[allow(non_camel_case_types)]
+        pub struct FromColumnarArgs {
+            pub output: super::TyLayout,
+            pub fields: crate::vec::Vec<super::TyLayout>,
+        }
+
+        #[derive(Debug, Clone)]
+        #[allow(non_camel_case_types)]
+        pub struct GroupArgs {
+            pub input: super::TyLayout,
+            pub output: super::TyLayout,
+            pub output_fields: crate::vec::Vec<super::TyLayout>,
+            pub key_head: u32,
+        }
+
+        #[derive(Debug, Clone)]
+        #[allow(non_camel_case_types)]
+        pub struct InjectTypeArgs {
+            pub ty: super::super::ir::Ty,
+        }
+
+        mod impls {
+            #![allow(unused_imports)]
+            use super::*;
+            use crate::ReaderExt;
+            use crate::bytes::BufMut;
+
+            #[allow(clippy::all, unused_variables)]
+            impl crate::Encode for ItemHeadArgs {
+                type HeadPtr = ItemHeadArgsHeadPtr;
+                fn encode_head(&self, buf: &mut crate::bytes::BytesMut) -> Self::HeadPtr {
+                    let item_head = self.item_head.encode_head(buf);
+                    ItemHeadArgsHeadPtr { item_head }
+                }
+                fn encode_body(&self, head: Self::HeadPtr, buf: &mut crate::bytes::BytesMut) {
+                    self.item_head.encode_body(head.item_head, buf);
+                }
+            }
+            #[allow(non_camel_case_types)]
+            pub struct ItemHeadArgsHeadPtr {
+                item_head: <u32 as crate::Encode>::HeadPtr,
+            }
+            impl crate::Layout for ItemHeadArgs {
+                fn head_size() -> usize {
+                    32
+                }
+            }
+
+            impl crate::Decode for ItemHeadArgs {
+                fn decode(buf: &[u8]) -> crate::Result<Self> {
+                    let item_head = u32::decode(buf.skip(0))?;
+                    Ok(ItemHeadArgs { item_head })
+                }
+            }
+
+            #[allow(clippy::all, unused_variables)]
+            impl crate::Encode for ItemLayoutArgs {
+                type HeadPtr = ItemLayoutArgsHeadPtr;
+                fn encode_head(&self, buf: &mut crate::bytes::BytesMut) -> Self::HeadPtr {
+                    let item = self.item.encode_head(buf);
+                    ItemLayoutArgsHeadPtr { item }
+                }
+                fn encode_body(&self, head: Self::HeadPtr, buf: &mut crate::bytes::BytesMut) {
+                    self.item.encode_body(head.item, buf);
+                }
+            }
+            #[allow(non_camel_case_types)]
+            pub struct ItemLayoutArgsHeadPtr {
+                item: <super::super::TyLayout as crate::Encode>::HeadPtr,
+            }
+            impl crate::Layout for ItemLayoutArgs {
+                fn head_size() -> usize {
+                    96
+                }
+            }
+
+            impl crate::Decode for ItemLayoutArgs {
+                fn decode(buf: &[u8]) -> crate::Result<Self> {
+                    let item = super::super::TyLayout::decode(buf.skip(0))?;
+                    Ok(ItemLayoutArgs { item })
+                }
+            }
+
+            #[allow(clippy::all, unused_variables)]
+            impl crate::Encode for ShiftArgs {
+                type HeadPtr = ShiftArgsHeadPtr;
+                fn encode_head(&self, buf: &mut crate::bytes::BytesMut) -> Self::HeadPtr {
+                    let item = self.item.encode_head(buf);
+                    let default = self.default.encode_head(buf);
+                    ShiftArgsHeadPtr { item, default }
+                }
+                fn encode_body(&self, head: Self::HeadPtr, buf: &mut crate::bytes::BytesMut) {
+                    self.item.encode_body(head.item, buf);
+                    self.default.encode_body(head.default, buf);
+                }
+            }
+            #[allow(non_camel_case_types)]
+            pub struct ShiftArgsHeadPtr {
+                item: <super::super::TyLayout as crate::Encode>::HeadPtr,
+                default: <crate::vec::Vec<u8> as crate::Encode>::HeadPtr,
+            }
+            impl crate::Layout for ShiftArgs {
+                fn head_size() -> usize {
+                    160
+                }
+            }
+
+            impl crate::Decode for ShiftArgs {
+                fn decode(buf: &[u8]) -> crate::Result<Self> {
+                    let item = super::super::TyLayout::decode(buf.skip(0))?;
+                    let default = crate::vec::Vec::<u8>::decode(buf.skip(12))?;
+                    Ok(ShiftArgs { item, default })
+                }
+            }
+
+            #[allow(clippy::all, unused_variables)]
+            impl crate::Encode for IndexArgs {
+                type HeadPtr = IndexArgsHeadPtr;
+                fn encode_head(&self, buf: &mut crate::bytes::BytesMut) -> Self::HeadPtr {
+                    let item_head = self.item_head.encode_head(buf);
+                    let output_enum_format = self.output_enum_format.encode_head(buf);
+                    IndexArgsHeadPtr {
+                        item_head,
+                        output_enum_format,
+                    }
+                }
+                fn encode_body(&self, head: Self::HeadPtr, buf: &mut crate::bytes::BytesMut) {
+                    self.item_head.encode_body(head.item_head, buf);
+                    self.output_enum_format
+                        .encode_body(head.output_enum_format, buf);
+                }
+            }
+            #[allow(non_camel_case_types)]
+            pub struct IndexArgsHeadPtr {
+                item_head: <u32 as crate::Encode>::HeadPtr,
+                output_enum_format: <crate::vec::Vec<u8> as crate::Encode>::HeadPtr,
+            }
+            impl crate::Layout for IndexArgs {
+                fn head_size() -> usize {
+                    96
+                }
+            }
+
+            impl crate::Decode for IndexArgs {
+                fn decode(buf: &[u8]) -> crate::Result<Self> {
+                    let item_head = u32::decode(buf.skip(0))?;
+                    let output_enum_format = crate::vec::Vec::<u8>::decode(buf.skip(4))?;
+                    Ok(IndexArgs {
+                        item_head,
+                        output_enum_format,
+                    })
+                }
+            }
+
+            #[allow(clippy::all, unused_variables)]
+            impl crate::Encode for MapArgs {
+                type HeadPtr = MapArgsHeadPtr;
+                fn encode_head(&self, buf: &mut crate::bytes::BytesMut) -> Self::HeadPtr {
+                    let input_item_head = self.input_item_head.encode_head(buf);
+                    let output_item = self.output_item.encode_head(buf);
+                    MapArgsHeadPtr {
+                        input_item_head,
+                        output_item,
+                    }
+                }
+                fn encode_body(&self, head: Self::HeadPtr, buf: &mut crate::bytes::BytesMut) {
+                    self.input_item_head.encode_body(head.input_item_head, buf);
+                    self.output_item.encode_body(head.output_item, buf);
+                }
+            }
+            #[allow(non_camel_case_types)]
+            pub struct MapArgsHeadPtr {
+                input_item_head: <u32 as crate::Encode>::HeadPtr,
+                output_item: <super::super::TyLayout as crate::Encode>::HeadPtr,
+            }
+            impl crate::Layout for MapArgs {
+                fn head_size() -> usize {
+                    128
+                }
+            }
+
+            impl crate::Decode for MapArgs {
+                fn decode(buf: &[u8]) -> crate::Result<Self> {
+                    let input_item_head = u32::decode(buf.skip(0))?;
+                    let output_item = super::super::TyLayout::decode(buf.skip(4))?;
+                    Ok(MapArgs {
+                        input_item_head,
+                        output_item,
+                    })
+                }
+            }
+
+            #[allow(clippy::all, unused_variables)]
+            impl crate::Encode for ZipArgs {
+                type HeadPtr = ZipArgsHeadPtr;
+                fn encode_head(&self, buf: &mut crate::bytes::BytesMut) -> Self::HeadPtr {
+                    let a = self.a.encode_head(buf);
+                    let b = self.b.encode_head(buf);
+                    ZipArgsHeadPtr { a, b }
+                }
+                fn encode_body(&self, head: Self::HeadPtr, buf: &mut crate::bytes::BytesMut) {
+                    self.a.encode_body(head.a, buf);
+                    self.b.encode_body(head.b, buf);
+                }
+            }
+            #[allow(non_camel_case_types)]
+            pub struct ZipArgsHeadPtr {
+                a: <super::super::TyLayout as crate::Encode>::HeadPtr,
+                b: <super::super::TyLayout as crate::Encode>::HeadPtr,
+            }
+            impl crate::Layout for ZipArgs {
+                fn head_size() -> usize {
+                    192
+                }
+            }
+
+            impl crate::Decode for ZipArgs {
+                fn decode(buf: &[u8]) -> crate::Result<Self> {
+                    let a = super::super::TyLayout::decode(buf.skip(0))?;
+                    let b = super::super::TyLayout::decode(buf.skip(12))?;
+                    Ok(ZipArgs { a, b })
+                }
+            }
+
+            #[allow(clippy::all, unused_variables)]
+            impl crate::Encode for ToColumnarArgs {
+                type HeadPtr = ToColumnarArgsHeadPtr;
+                fn encode_head(&self, buf: &mut crate::bytes::BytesMut) -> Self::HeadPtr {
+                    let item_head = self.item_head.encode_head(buf);
+                    let field_offsets = self.field_offsets.encode_head(buf);
+                    let fields = self.fields.encode_head(buf);
+                    ToColumnarArgsHeadPtr {
+                        item_head,
+                        field_offsets,
+                        fields,
+                    }
+                }
+                fn encode_body(&self, head: Self::HeadPtr, buf: &mut crate::bytes::BytesMut) {
+                    self.item_head.encode_body(head.item_head, buf);
+                    self.field_offsets.encode_body(head.field_offsets, buf);
+                    self.fields.encode_body(head.fields, buf);
+                }
+            }
+            #[allow(non_camel_case_types)]
+            pub struct ToColumnarArgsHeadPtr {
+                item_head: <u32 as crate::Encode>::HeadPtr,
+                field_offsets: <crate::vec::Vec<u32> as crate::Encode>::HeadPtr,
+                fields: <crate::vec::Vec<super::super::TyLayout> as crate::Encode>::HeadPtr,
+            }
+            impl crate::Layout for ToColumnarArgs {
+                fn head_size() -> usize {
+                    160
+                }
+            }
+
+            impl crate::Decode for ToColumnarArgs {
+                fn decode(buf: &[u8]) -> crate::Result<Self> {
+                    let item_head = u32::decode(buf.skip(0))?;
+                    let field_offsets = crate::vec::Vec::<u32>::decode(buf.skip(4))?;
+                    let fields = crate::vec::Vec::<super::super::TyLayout>::decode(buf.skip(12))?;
+                    Ok(ToColumnarArgs {
+                        item_head,
+                        field_offsets,
+                        fields,
+                    })
+                }
+            }
+
+            #[allow(clippy::all, unused_variables)]
+            impl crate::Encode for FromColumnarArgs {
+                type HeadPtr = FromColumnarArgsHeadPtr;
+                fn encode_head(&self, buf: &mut crate::bytes::BytesMut) -> Self::HeadPtr {
+                    let output = self.output.encode_head(buf);
+                    let fields = self.fields.encode_head(buf);
+                    FromColumnarArgsHeadPtr { output, fields }
+                }
+                fn encode_body(&self, head: Self::HeadPtr, buf: &mut crate::bytes::BytesMut) {
+                    self.output.encode_body(head.output, buf);
+                    self.fields.encode_body(head.fields, buf);
+                }
+            }
+            #[allow(non_camel_case_types)]
+            pub struct FromColumnarArgsHeadPtr {
+                output: <super::super::TyLayout as crate::Encode>::HeadPtr,
+                fields: <crate::vec::Vec<super::super::TyLayout> as crate::Encode>::HeadPtr,
+            }
+            impl crate::Layout for FromColumnarArgs {
+                fn head_size() -> usize {
+                    160
+                }
+            }
+
+            impl crate::Decode for FromColumnarArgs {
+                fn decode(buf: &[u8]) -> crate::Result<Self> {
+                    let output = super::super::TyLayout::decode(buf.skip(0))?;
+                    let fields = crate::vec::Vec::<super::super::TyLayout>::decode(buf.skip(12))?;
+                    Ok(FromColumnarArgs { output, fields })
+                }
+            }
+
+            #[allow(clippy::all, unused_variables)]
+            impl crate::Encode for GroupArgs {
+                type HeadPtr = GroupArgsHeadPtr;
+                fn encode_head(&self, buf: &mut crate::bytes::BytesMut) -> Self::HeadPtr {
+                    let input = self.input.encode_head(buf);
+                    let output = self.output.encode_head(buf);
+                    let output_fields = self.output_fields.encode_head(buf);
+                    let key_head = self.key_head.encode_head(buf);
+                    GroupArgsHeadPtr {
+                        input,
+                        output,
+                        output_fields,
+                        key_head,
+                    }
+                }
+                fn encode_body(&self, head: Self::HeadPtr, buf: &mut crate::bytes::BytesMut) {
+                    self.input.encode_body(head.input, buf);
+                    self.output.encode_body(head.output, buf);
+                    self.output_fields.encode_body(head.output_fields, buf);
+                    self.key_head.encode_body(head.key_head, buf);
+                }
+            }
+            #[allow(non_camel_case_types)]
+            pub struct GroupArgsHeadPtr {
+                input: <super::super::TyLayout as crate::Encode>::HeadPtr,
+                output: <super::super::TyLayout as crate::Encode>::HeadPtr,
+                output_fields: <crate::vec::Vec<super::super::TyLayout> as crate::Encode>::HeadPtr,
+                key_head: <u32 as crate::Encode>::HeadPtr,
+            }
+            impl crate::Layout for GroupArgs {
+                fn head_size() -> usize {
+                    288
+                }
+            }
+
+            impl crate::Decode for GroupArgs {
+                fn decode(buf: &[u8]) -> crate::Result<Self> {
+                    let input = super::super::TyLayout::decode(buf.skip(0))?;
+                    let output = super::super::TyLayout::decode(buf.skip(12))?;
+                    let output_fields =
+                        crate::vec::Vec::<super::super::TyLayout>::decode(buf.skip(24))?;
+                    let key_head = u32::decode(buf.skip(32))?;
+                    Ok(GroupArgs {
+                        input,
+                        output,
+                        output_fields,
+                        key_head,
+                    })
+                }
+            }
+
+            #[allow(clippy::all, unused_variables)]
+            impl crate::Encode for InjectTypeArgs {
+                type HeadPtr = InjectTypeArgsHeadPtr;
+                fn encode_head(&self, buf: &mut crate::bytes::BytesMut) -> Self::HeadPtr {
+                    let ty = self.ty.encode_head(buf);
+                    InjectTypeArgsHeadPtr { ty }
+                }
+                fn encode_body(&self, head: Self::HeadPtr, buf: &mut crate::bytes::BytesMut) {
+                    self.ty.encode_body(head.ty, buf);
+                }
+            }
+            #[allow(non_camel_case_types)]
+            pub struct InjectTypeArgsHeadPtr {
+                ty: <super::super::super::ir::Ty as crate::Encode>::HeadPtr,
+            }
+            impl crate::Layout for InjectTypeArgs {
+                fn head_size() -> usize {
+                    184
+                }
+            }
+
+            impl crate::Decode for InjectTypeArgs {
+                fn decode(buf: &[u8]) -> crate::Result<Self> {
+                    let ty = super::super::super::ir::Ty::decode(buf.skip(0))?;
+                    Ok(InjectTypeArgs { ty })
+                }
+            }
+        }
     }
 
     mod impls {
@@ -2261,18 +2692,18 @@ pub mod br {
             type HeadPtr = ExternalSymbolHeadPtr;
             fn encode_head(&self, buf: &mut crate::bytes::BytesMut) -> Self::HeadPtr {
                 let id = self.id.encode_head(buf);
-                let layout_args = self.layout_args.encode_head(buf);
-                ExternalSymbolHeadPtr { id, layout_args }
+                let static_args = self.static_args.encode_head(buf);
+                ExternalSymbolHeadPtr { id, static_args }
             }
             fn encode_body(&self, head: Self::HeadPtr, buf: &mut crate::bytes::BytesMut) {
                 self.id.encode_body(head.id, buf);
-                self.layout_args.encode_body(head.layout_args, buf);
+                self.static_args.encode_body(head.static_args, buf);
             }
         }
         #[allow(non_camel_case_types)]
         pub struct ExternalSymbolHeadPtr {
             id: <crate::string::String as crate::Encode>::HeadPtr,
-            layout_args: <crate::vec::Vec<u32> as crate::Encode>::HeadPtr,
+            static_args: <crate::vec::Vec<u8> as crate::Encode>::HeadPtr,
         }
         impl crate::Layout for ExternalSymbol {
             fn head_size() -> usize {
@@ -2283,8 +2714,8 @@ pub mod br {
         impl crate::Decode for ExternalSymbol {
             fn decode(buf: &[u8]) -> crate::Result<Self> {
                 let id = crate::string::String::decode(buf.skip(0))?;
-                let layout_args = crate::vec::Vec::<u32>::decode(buf.skip(8))?;
-                Ok(ExternalSymbol { id, layout_args })
+                let static_args = crate::vec::Vec::<u8>::decode(buf.skip(8))?;
+                Ok(ExternalSymbol { id, static_args })
             }
         }
 
@@ -2948,21 +3379,21 @@ pub mod br {
         impl crate::Encode for TyLayout {
             type HeadPtr = TyLayoutHeadPtr;
             fn encode_head(&self, buf: &mut crate::bytes::BytesMut) -> Self::HeadPtr {
-                let head_size = self.head_size.encode_head(buf);
+                let head_bytes = self.head_bytes.encode_head(buf);
                 let body_ptrs = self.body_ptrs.encode_head(buf);
                 TyLayoutHeadPtr {
-                    head_size,
+                    head_bytes,
                     body_ptrs,
                 }
             }
             fn encode_body(&self, head: Self::HeadPtr, buf: &mut crate::bytes::BytesMut) {
-                self.head_size.encode_body(head.head_size, buf);
+                self.head_bytes.encode_body(head.head_bytes, buf);
                 self.body_ptrs.encode_body(head.body_ptrs, buf);
             }
         }
         #[allow(non_camel_case_types)]
         pub struct TyLayoutHeadPtr {
-            head_size: <u32 as crate::Encode>::HeadPtr,
+            head_bytes: <u32 as crate::Encode>::HeadPtr,
             body_ptrs: <crate::vec::Vec<u32> as crate::Encode>::HeadPtr,
         }
         impl crate::Layout for TyLayout {
@@ -2973,10 +3404,10 @@ pub mod br {
 
         impl crate::Decode for TyLayout {
             fn decode(buf: &[u8]) -> crate::Result<Self> {
-                let head_size = u32::decode(buf.skip(0))?;
+                let head_bytes = u32::decode(buf.skip(0))?;
                 let body_ptrs = crate::vec::Vec::<u32>::decode(buf.skip(4))?;
                 Ok(TyLayout {
-                    head_size,
+                    head_bytes,
                     body_ptrs,
                 })
             }

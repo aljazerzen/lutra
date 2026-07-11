@@ -25,12 +25,12 @@ pub struct Interpreter {
 pub enum Cell {
     Data(Data),
     Function(Box<br::Function>),
-    FunctionNative(Box<(NativeFunction, Rc<[u32]>)>),
+    FunctionNative(Box<(NativeFunction, Rc<[u8]>)>),
     Vacant,
 }
 
 pub type NativeFunction =
-    &'static dyn Fn(&mut Interpreter, &[u32], Vec<Cell>) -> Result<Cell, EvalError>;
+    &'static dyn Fn(&mut Interpreter, &[u8], Vec<Cell>) -> Result<Cell, EvalError>;
 
 #[derive(Debug, Clone, thiserror::Error)]
 pub enum EvalError {
@@ -73,7 +73,7 @@ pub fn evaluate(
         };
         interpreter.allocate(Cell::FunctionNative(Box::new((
             function,
-            Rc::from(external.layout_args.clone()),
+            Rc::from(external.static_args.clone()),
         ))));
     }
 
@@ -204,7 +204,7 @@ impl Interpreter {
                 let field_layouts: Vec<_> = tuple
                     .field_layouts
                     .iter()
-                    .map(|x| (x.head_size.div_ceil(8), x.body_ptrs.as_slice()))
+                    .map(|x| (x.head_bytes, x.body_ptrs.as_slice()))
                     .collect();
 
                 let mut field_index = 0;
@@ -240,10 +240,8 @@ impl Interpreter {
                 Cell::Data(writer.finish())
             }
             br::ExprKind::Array(array) => {
-                let mut writer = ArrayWriter::new(
-                    array.item_layout.head_size.div_ceil(8),
-                    &array.item_layout.body_ptrs,
-                );
+                let mut writer =
+                    ArrayWriter::new(array.item_layout.head_bytes, &array.item_layout.body_ptrs);
                 for item in &array.items {
                     let cell = self.evaluate_expr(item)?;
 

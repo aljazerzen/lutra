@@ -37,7 +37,7 @@ pub fn write_functions(
     for (name, _func) in functions {
         writeln!(w, "    fn {name}(")?;
         writeln!(w, "        interpreter: &mut ::lutra_interpreter::Interpreter,")?;
-        writeln!(w, "        layout_args: &[u32],")?;
+        writeln!(w, "        static_args: &[u8],")?;
         writeln!(w, "        args: Vec<::lutra_interpreter::Cell>,")?;
         writeln!(w, "    ) -> Result<::lutra_interpreter::Cell, ::lutra_interpreter::EvalError>;")?;
     }
@@ -53,7 +53,7 @@ pub fn write_functions(
 
         writeln!(w, "    fn {name}(")?;
         writeln!(w, "        _interpreter: &mut ::lutra_interpreter::Interpreter,")?;
-        writeln!(w, "        _layout_args: &[u32],")?;
+        writeln!(w, "        _static_args: &[u8],")?;
         writeln!(w, "        {args}: Vec<::lutra_interpreter::Cell>,")?;
         writeln!(w, "    ) -> Result<::lutra_interpreter::Cell, ::lutra_interpreter::EvalError> {{")?;
 
