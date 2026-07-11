@@ -1976,10 +1976,11 @@ pub mod std_fs {
         let file_path = assume::text(&file_path)?;
         let file_path = it.resolve_path(&file_path)?;
 
-        // decode injected type descriptor from static args
-        let ty = InjectTypeArgs::decode(static_args)
-            .map_err(|_| EvalError::BadProgram)?
-            .ty;
+        // decode injected function type from static args; the result type is
+        // the function body (`func(Text): [R]`).
+        let static_args = InjectTypeArgs::decode(static_args).map_err(|_| EvalError::BadProgram)?;
+        let ty_func = (static_args.ty.kind.into_function()).map_err(|_| EvalError::BadProgram)?;
+        let ty = ty_func.body;
 
         // init parquet reader
         let file = match fs::File::open(&file_path) {
@@ -2019,10 +2020,12 @@ pub mod std_fs {
 
         let data = assume::into_data(data)?;
 
-        // decode injected type descriptor from static args
-        let ty = InjectTypeArgs::decode(static_args)
-            .map_err(|_| EvalError::BadProgram)?
-            .ty;
+        // decode injected function type from static args; the data type is the
+        // first parameter (`func([R], Text): {}`).
+        let static_arg = InjectTypeArgs::decode(static_args).map_err(|_| EvalError::BadProgram)?;
+        let mut ty_func =
+            (static_arg.ty.kind.into_function()).map_err(|_| EvalError::BadProgram)?;
+        let ty = ty_func.params.swap_remove(0);
 
         // convert lutra to arrow
         let batch = lutra_arrow::lutra_to_arrow(data, &ty, &it.defs)

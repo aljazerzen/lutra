@@ -81,7 +81,7 @@ impl<'t> ByteCoder<'t> {
         match ptr {
             ir::Pointer::External(e_ptr) => {
                 let ty = self.get_ty_mat(ty);
-                self.compile_external_symbol(e_ptr.id, ty)
+                self.compile_external_symbol(e_ptr.id, e_ptr.inject_type, ty)
             }
             #[rustfmt::skip]
             ir::Pointer::Binding(binding_id) => {
@@ -245,7 +245,21 @@ impl<'t> ByteCoder<'t> {
             .collect()
     }
 
-    fn compile_external_symbol(&mut self, id: String, ty_mat: &ir::Ty) -> ExprKind {
+    fn compile_external_symbol(
+        &mut self,
+        id: String,
+        inject_type: bool,
+        ty_mat: &ir::Ty,
+    ) -> ExprKind {
+        // `@inject_type` externals receive their monomorphized function type,
+        // encoded into `static_args`; type defs are included so the native side
+        // can resolve named types.
+        if inject_type {
+            self.include_defs = true;
+            let static_args = InjectTypeArgs { ty: ty_mat.clone() }.encode();
+            return self.make_external(id, static_args);
+        }
+
         let static_args: Vec<u8> = match id.as_str() {
             "std::ops::add"
             | "std::ops::sub"
@@ -449,20 +463,6 @@ impl<'t> ByteCoder<'t> {
                     key_head: head_bytes(key_layout),
                 }
                 .encode()
-            }
-
-            "std::fs::read_parquet" => {
-                let ty_func = ty_mat.kind.as_function().unwrap();
-                let ty_data = ty_func.body.clone();
-
-                self.include_defs = true;
-                InjectTypeArgs { ty: ty_data }.encode()
-            }
-            "std::fs::write_parquet" => {
-                let ty_data = as_ty_of_param(ty_mat).clone();
-
-                self.include_defs = true;
-                InjectTypeArgs { ty: ty_data }.encode()
             }
 
             _ => vec![],

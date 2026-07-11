@@ -382,6 +382,7 @@ pub mod ir {
     #[allow(non_camel_case_types)]
     pub struct ExternalPtr {
         pub id: crate::string::String,
+        pub inject_type: bool,
     }
 
     #[derive(Debug, Clone)]
@@ -1003,26 +1004,30 @@ pub mod ir {
             type HeadPtr = ExternalPtrHeadPtr;
             fn encode_head(&self, buf: &mut crate::bytes::BytesMut) -> Self::HeadPtr {
                 let id = self.id.encode_head(buf);
-                ExternalPtrHeadPtr { id }
+                let inject_type = self.inject_type.encode_head(buf);
+                ExternalPtrHeadPtr { id, inject_type }
             }
             fn encode_body(&self, head: Self::HeadPtr, buf: &mut crate::bytes::BytesMut) {
                 self.id.encode_body(head.id, buf);
+                self.inject_type.encode_body(head.inject_type, buf);
             }
         }
         #[allow(non_camel_case_types)]
         pub struct ExternalPtrHeadPtr {
             id: <crate::string::String as crate::Encode>::HeadPtr,
+            inject_type: <bool as crate::Encode>::HeadPtr,
         }
         impl crate::Layout for ExternalPtr {
             fn head_size() -> usize {
-                64
+                72
             }
         }
 
         impl crate::Decode for ExternalPtr {
             fn decode(buf: &[u8]) -> crate::Result<Self> {
                 let id = crate::string::String::decode(buf.skip(0))?;
-                Ok(ExternalPtr { id })
+                let inject_type = bool::decode(buf.skip(8))?;
+                Ok(ExternalPtr { id, inject_type })
             }
         }
 

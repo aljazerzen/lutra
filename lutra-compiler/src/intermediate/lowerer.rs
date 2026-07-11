@@ -121,8 +121,10 @@ impl<'a> Lowerer<'a> {
         if let pr::DefKind::External(ext_ty) = &def.kind {
             // External function: return a pointer to the external symbol
             let external_symbol_id = path.iter().join("::");
+            let inject_type = def.get_anno(pr::Anno::as_std_inject_type).is_some();
             let kind = ir::ExprKind::Pointer(ir::Pointer::External(ir::ExternalPtr {
                 id: external_symbol_id,
+                inject_type,
             }));
             let ty = self.lower_ty(ext_ty);
             return Ok(ir::Expr { kind, ty });
@@ -461,9 +463,11 @@ impl<'a> Lowerer<'a> {
         }
 
         let external_symbol_id = path.iter().join("::");
+        let inject_type = def.get_anno(pr::Anno::as_std_inject_type).is_some();
         Some(ir::ExprKind::Pointer(ir::Pointer::External(
             ir::ExternalPtr {
                 id: external_symbol_id,
+                inject_type,
             },
         )))
     }

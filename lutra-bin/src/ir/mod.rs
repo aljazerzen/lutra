@@ -44,6 +44,15 @@ impl From<ExternalPtr> for ExprKind {
         ExprKind::Pointer(Pointer::External(ptr))
     }
 }
+impl ExternalPtr {
+    /// Creates an external pointer that does not request type injection.
+    pub fn new(id: impl Into<string::String>) -> Self {
+        ExternalPtr {
+            id: id.into(),
+            inject_type: false,
+        }
+    }
+}
 impl From<TupleLookup> for ExprKind {
     fn from(v: TupleLookup) -> Self {
         ExprKind::TupleLookup(boxed::Box::new(v))

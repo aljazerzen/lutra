@@ -97,7 +97,7 @@ fn external_ptr<'src>() -> impl Parser<'src, I<'src>, ExternalPtr, extra::Err<PE
         .at_least(1)
         .collect::<Vec<_>>()
         .map(|id| id.join("::"))
-        .map(|id| ExternalPtr { id })
+        .map(ExternalPtr::new)
 }
 
 fn ty<'src>() -> impl Parser<'src, I<'src>, Ty, extra::Err<PError>> {

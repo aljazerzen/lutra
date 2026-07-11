@@ -161,9 +161,7 @@ impl fold::IrFold for FuncInliner {
                     let cond = self.fold_expr(cond)?;
 
                     let std_not = ir::Expr::new(
-                        ir::ExternalPtr {
-                            id: "std::ops::not".into(),
-                        },
+                        ir::ExternalPtr::new("std::ops::not"),
                         ir::Ty::new(ir::TyFunction {
                             params: vec![ir::Ty::bool()],
                             body: ir::Ty::bool(),
@@ -366,7 +364,7 @@ fn rewrite_cmp_tag_to_op(expr: ir::Expr) -> ir::Expr {
 
     // overwrite op
     let call = expr.kind.as_call_mut().unwrap();
-    call.function.kind = ir::ExternalPtr { id: op.to_string() }.into();
+    call.function.kind = ir::ExternalPtr::new(op).into();
 
     // overwrite types
     let func_ty = call.function.ty.kind.as_function_mut().unwrap();

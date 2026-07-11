@@ -574,6 +574,7 @@ let main =
                                                                                 External(
                                                                                     ExternalPtr {
                                                                                         id: "std::int::add",
+                                                                                        inject_type: false,
                                                                                     },
                                                                                 ),
                                                                             ),

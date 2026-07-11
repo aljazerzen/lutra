@@ -17,6 +17,11 @@ anno runner(url: Text)
 ## Annotates a type with traits to `#[Derive]` when translating to Rust.
 anno rust_derive(macros: [Text])
 
+## Annotates an external function to receive its monomorphized function type,
+## injected into the runtime call so the native implementation can inspect
+## field names, enum variant labels, and optional-field presence.
+anno inject_type()
+
 import convert::*
 
 ## Type conversions
@@ -621,10 +626,12 @@ module text {
 ## File system operations
 module fs {
   ## Reads rows from a Parquet file at `file_name`.
+  @inject_type
   external func read_parquet(file_name: Text): [R]
   where R: {..}
 
   ## Writes `data` to a Parquet file at `file_name`.
+  @inject_type
   external func write_parquet(data: [R], file_name: Text): {}
   where R: {..}
 }

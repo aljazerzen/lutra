@@ -37,6 +37,9 @@ type Pointer: enum {
 
 type ExternalPtr: {
   id: Text,
+  # When set, the bytecoder injects the monomorphized function type of this
+  # call into the symbol's `static_args` (see `@inject_type`).
+  inject_type: Bool,
 }
 
 @rust_derive(["Debug", "Clone"])

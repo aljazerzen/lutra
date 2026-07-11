@@ -2,7 +2,7 @@ use lutra_bin::ir::*;
 
 pub fn new_call_bin(id: &str, left: Expr, right: Expr, ty: Ty) -> Expr {
     let function = Expr::new(
-        ExprKind::Pointer(Pointer::External(ExternalPtr { id: id.to_string() })),
+        ExprKind::Pointer(Pointer::External(ExternalPtr::new(id))),
         Ty::new(TyFunction {
             params: vec![left.ty.clone(), right.ty.clone()],
             body: ty.clone(),
@@ -18,7 +18,7 @@ pub fn new_call_bin_bool(func_id: &str, left: Expr, right: Expr) -> Expr {
 
 pub fn new_call_un(id: &str, arg: Expr, ty: Ty) -> Expr {
     let function = Expr::new(
-        ExprKind::Pointer(Pointer::External(ExternalPtr { id: id.into() })),
+        ExprKind::Pointer(Pointer::External(ExternalPtr::new(id))),
         Ty::new(TyFunction {
             params: vec![arg.ty.clone()],
             body: ty.clone(),
@@ -30,7 +30,7 @@ pub fn new_call_un(id: &str, arg: Expr, ty: Ty) -> Expr {
 
 pub fn new_call_tri(id: &str, a: Expr, b: Expr, c: Expr, ty: Ty) -> Expr {
     let function = Expr::new(
-        ExprKind::Pointer(Pointer::External(ExternalPtr { id: id.to_string() })),
+        ExprKind::Pointer(Pointer::External(ExternalPtr::new(id))),
         Ty::new(TyFunction {
             params: vec![a.ty.clone(), b.ty.clone(), c.ty.clone()],
             body: ty.clone(),

@@ -300,6 +300,14 @@ impl Anno {
         Some(())
     }
 
+    /// Matches as `@std::inject_type` annotation.
+    pub fn as_std_inject_type(&self) -> Option<()> {
+        let _ = self
+            .as_named(&["std", "inject_type"])
+            .or_else(|| self.as_named(&["inject_type"]))?;
+        Some(())
+    }
+
     /// Matches as `@std::rust_derive([...])` annotation.
     pub fn as_std_rust_derive(&self) -> Option<Vec<&str>> {
         let args = self.as_named(&["std", "rust_derive"])?;
