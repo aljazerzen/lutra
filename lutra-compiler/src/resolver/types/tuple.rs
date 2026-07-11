@@ -128,6 +128,7 @@ impl super::TypeResolver<'_> {
                 // restrict existing ty var to tuples with this field
                 let domain = pr::TyDomain::TupleHasFields(vec![pr::TyDomainTupleField {
                     location: lookup.clone(),
+                    optional: false,
                     ty: field_ty.clone(),
                     span,
                 }]);
@@ -323,6 +324,11 @@ impl super::TypeResolver<'_> {
             return Err(error_lookup_into_unpack_of_ty_param(param_name));
         };
 
+        if let Some(field) = fields.iter().find(|f| &f.location == lookup)
+            && field.optional
+        {
+            return Err(error_access_optional_field(lookup));
+        }
         Self::lookup_in_tuple_domain(fields, lookup)
     }
 
@@ -338,6 +344,14 @@ impl super::TypeResolver<'_> {
         };
         Ok(field.ty.clone())
     }
+}
+
+fn error_access_optional_field(lookup: &pr::Lookup) -> Diagnostic {
+    Diagnostic::new(
+        format!("cannot access optional field {}", print_lookup(lookup)),
+        DiagnosticCode::TYPE,
+    )
+    .push_hint("optional fields may be absent")
 }
 
 pub fn error_no_field(base: &Ty, lookup: &pr::Lookup) -> Diagnostic {

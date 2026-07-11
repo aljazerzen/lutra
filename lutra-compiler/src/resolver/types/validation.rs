@@ -547,7 +547,11 @@ impl TypeResolver<'_> {
 
                 for domain_field in domain_fields {
                     let span = domain_field.span;
-                    let target_ty = self.lookup_in_tuple(&ty, &domain_field.location, span)?;
+                    let target_ty = match self.lookup_in_tuple(&ty, &domain_field.location, span) {
+                        Ok(t) => t,
+                        Err(_) if domain_field.optional => continue,
+                        Err(e) => return Err(e),
+                    };
 
                     self.validate_type(&target_ty, &domain_field.ty, &|| None)
                         .with_span_fallback(target_ty.span)?;
@@ -641,8 +645,12 @@ impl TypeResolver<'_> {
 
             (TyDomain::TupleHasFields(found_fields), TyDomain::TupleHasFields(expected_fields)) => {
                 for expected_field in expected_fields {
-                    let target_ty =
-                        Self::lookup_in_tuple_domain(found_fields, &expected_field.location)?;
+                    let res = Self::lookup_in_tuple_domain(found_fields, &expected_field.location);
+                    let target_ty = match res {
+                        Ok(t) => t,
+                        Err(_) if expected_field.optional => continue,
+                        Err(e) => return Err(e),
+                    };
 
                     self.validate_type(&target_ty, &expected_field.ty, &|| None)
                         .with_span_fallback(target_ty.span)?;

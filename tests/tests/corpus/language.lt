@@ -2901,6 +2901,26 @@ func main() -> false_x_false({true, "hello"})
 # >
 "hello"
 
+# === optional_field_01
+# same function accepts records with and without an optional field
+func first_name(x: R) where R: {name: Text, note?: Text} -> x.name
+func main() -> [
+  first_name({name = "a"}),
+  first_name({name = "b", note = "hi"}),
+]
+# >
+[
+  "a",
+  "b",
+]
+
+# === optional_field_02
+# composes with the open tail
+func first_name(x: R) where R: {name: Text, note?: Text, ..} -> x.name
+func main() -> first_name({name = "a", age = 3: Int32})
+# >
+"a"
+
 
 # === recursive_type_00
 # skip: duckdb

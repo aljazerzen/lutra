@@ -204,6 +204,9 @@ impl PrintSource for pr::TyParam {
                     match &field.location {
                         pr::Lookup::Name(name) => {
                             p.push(ident::display(name))?;
+                            if field.optional {
+                                p.push("?")?;
+                            }
                             p.push(": ")?;
                         }
                         pr::Lookup::Position(p) => {

@@ -173,6 +173,7 @@ where
 {
     let tuple = choice((
         ident_part()
+            .then(ctrl('?').or_not().map(|o| o.is_some()))
             .then_ignore(ctrl(':'))
             .or_not()
             .then(ty.clone())
@@ -180,7 +181,7 @@ where
             .separated_by(ctrl(','))
             .at_least(1)
             .collect::<Vec<_>>()
-            .then_ignore(ctrl(',').then(just(TokenKind::Range))),
+            .then_ignore(ctrl(',').then(just(TokenKind::Range)).or_not()),
         just(TokenKind::Range).to(vec![]),
     ))
     .delimited_by(ctrl('{'), ctrl('}'))
@@ -195,17 +196,21 @@ where
         let mut fields = Vec::new();
 
         // positional
-        for (i, ((_, ty), span)) in positional.into_iter().enumerate() {
+        for (i, ((prefix, ty), span)) in positional.into_iter().enumerate() {
+            if prefix.is_some_and(|(_, optional)| optional) {
+                return Err(Rich::custom(span, "positional field cannot be optional"));
+            }
             fields.push(TyDomainTupleField {
                 location: Lookup::Position(i as i64),
+                optional: false,
                 span,
                 ty,
             });
         }
 
         // named
-        for ((name, ty), span) in named {
-            let Some(name) = name else {
+        for ((prefix, ty), span) in named {
+            let Some((name, optional)) = prefix else {
                 return Err(Rich::custom(
                     span,
                     "named field cannot be followed by a positional field",
@@ -213,6 +218,7 @@ where
             };
             fields.push(TyDomainTupleField {
                 location: Lookup::Name(name),
+                optional,
                 span,
                 ty,
             });

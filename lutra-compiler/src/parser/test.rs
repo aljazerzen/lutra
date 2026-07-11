@@ -229,6 +229,7 @@ fn parse_04() {
                                     location: Name(
                                         "b",
                                     ),
+                                    optional: false,
                                     ty: Ty {
                                         kind: Ident(
                                             int64,

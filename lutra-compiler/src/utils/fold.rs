@@ -445,6 +445,7 @@ pub fn fold_ty_domain<F: ?Sized + PrFold>(fold: &mut F, domain: TyDomain) -> Res
                 .map(|f| -> Result<_> {
                     Ok(TyDomainTupleField {
                         location: f.location,
+                        optional: f.optional,
                         span: f.span,
                         ty: fold.fold_type(f.ty)?,
                     })

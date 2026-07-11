@@ -187,6 +187,11 @@ pub struct TyDomainTupleField {
     pub location: super::Lookup,
     pub ty: Ty,
 
+    /// When true, the field may be absent from the concrete record.
+    /// Optional fields cannot be accessed directly; their presence is only
+    /// observable at the FFI boundary (via `@inject_type`).
+    pub optional: bool,
+
     pub span: Span,
 }
 
@@ -298,6 +303,7 @@ impl std::fmt::Debug for TyDomainTupleField {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("TyDomainTupleField")
             .field("location", &self.location)
+            .field("optional", &self.optional)
             .field("ty", &self.ty)
             .finish()
     }

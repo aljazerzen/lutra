@@ -63,6 +63,30 @@ fn types_02() {
     "#), @"Bool");
 }
 #[test]
+fn optional_field_domain() {
+    // present and absent optional fields both type-check
+    insta::assert_snapshot!(_test_ty(r#"
+        func first_name(x: R) where R: {name: Text, note?: Text} -> x.name
+        func main() -> [first_name({name = "a"}), first_name({name = "b", note = "hi"})]
+    "#), @"[Text]");
+
+    // accessing an optional field is not allowed
+    insta::assert_snapshot!(_test_err(r#"
+        func get_note(x: R) where R: {name: Text, note?: Text} -> x.note
+        func main() -> get_note({name = "a"})
+    "#), @"
+    [E0006] Error:
+       ╭─[ <unknown>:2:68 ]
+       │
+     2 │         func get_note(x: R) where R: {name: Text, note?: Text} -> x.note
+       │                                                                    ──┬──
+       │                                                                      ╰──── cannot access optional field .note
+       │
+       │ Note: optional fields may be absent; their presence is only observable at the FFI boundary
+    ───╯
+    ");
+}
+#[test]
 fn types_03() {
     // validation of type params
 
