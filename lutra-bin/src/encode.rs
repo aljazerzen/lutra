@@ -198,52 +198,37 @@ impl<E: Encode> Encode for [E] {
 impl<E: Encode + Layout> Encode for Option<E> {
     type HeadPtr = Option<Result<E::HeadPtr, ReversePointer>>;
 
-    #[allow(clippy::collapsible_else_if)]
     fn encode_head(&self, buf: &mut BytesMut) -> Self::HeadPtr {
-        let tag: u8 = if self.is_none() { 0 } else { 1 };
-        buf.put_u8(tag);
+        let format = layout::option_head_format::<E>();
 
-        let inner_head_size = E::head_size();
-        let has_ptr = inner_head_size > 32;
+        let Some(inner) = self else {
+            // the `none` variant is a unit variant: tag, then padding
+            let variant = format.variant(0, 0);
+            variant.encode_tag(buf);
+            variant.encode_padding(buf);
+            return None;
+        };
 
-        if has_ptr {
-            if self.is_some() {
-                let offset = ReversePointer::new(buf);
-                Some(Err(offset))
-            } else {
-                buf.put_bytes(0, 4);
-                None
-            }
-        } else {
-            if let Some(inner) = self {
-                let inner_head_ptr = inner.encode_head(buf);
-                Some(Ok(inner_head_ptr))
-            } else {
-                buf.put_bytes(0, inner_head_size.div_ceil(8));
-                None
-            }
-        }
+        let variant = format.variant(1, E::head_size() as u32);
+        let head_ptr = match variant.encode_tag(buf) {
+            Some(ptr) => Err(ptr),
+            None => Ok(inner.encode_head(buf)),
+        };
+        variant.encode_padding(buf);
+        Some(head_ptr)
     }
 
     fn encode_body(&self, head: Self::HeadPtr, buf: &mut BytesMut) {
         let Some(inner) = self else { return };
 
-        let inner_head_size = E::head_size();
-        let has_ptr = inner_head_size > 32;
+        match head.unwrap() {
+            Err(offset_ptr) => {
+                offset_ptr.write_cur_len(buf);
 
-        let head = head.unwrap();
-
-        if has_ptr {
-            let Err(offset_ptr) = head else {
-                unreachable!()
-            };
-            offset_ptr.write_cur_len(buf);
-
-            let head_ptr = inner.encode_head(buf);
-            inner.encode_body(head_ptr, buf)
-        } else {
-            let Ok(head) = head else { unreachable!() };
-            inner.encode_body(head, buf)
+                let head_ptr = inner.encode_head(buf);
+                inner.encode_body(head_ptr, buf)
+            }
+            Ok(head) => inner.encode_body(head, buf),
         }
     }
 }
@@ -252,38 +237,23 @@ impl<T: Encode + Layout, E: Encode + Layout> Encode for core::result::Result<T, 
     type HeadPtr =
         core::result::Result<core::result::Result<T::HeadPtr, E::HeadPtr>, ReversePointer>;
 
-    #[allow(clippy::collapsible_else_if)]
     fn encode_head(&self, buf: &mut BytesMut) -> Self::HeadPtr {
-        let t_head_bits = T::head_size();
-        let e_head_bits = E::head_size();
-        let max_head_bits = t_head_bits.max(e_head_bits);
-        let has_ptr = max_head_bits > 32;
-        let inner_bytes = if has_ptr {
-            4
-        } else {
-            max_head_bits.div_ceil(8)
+        let format = layout::result_head_format::<T, E>();
+
+        let variant = match self {
+            Ok(_) => format.variant(0, T::head_size() as u32),
+            Err(_) => format.variant(1, E::head_size() as u32),
         };
 
-        let tag: u8 = if self.is_ok() { 0 } else { 1 };
-        buf.put_u8(tag);
-
-        if has_ptr {
-            let ptr = ReversePointer::new(buf);
-            Err(ptr)
-        } else {
-            match self {
-                Ok(inner) => {
-                    let head_ptr = inner.encode_head(buf);
-                    buf.put_bytes(0, inner_bytes - t_head_bits.div_ceil(8));
-                    Ok(Ok(head_ptr))
-                }
-                Err(inner) => {
-                    let head_ptr = inner.encode_head(buf);
-                    buf.put_bytes(0, inner_bytes - e_head_bits.div_ceil(8));
-                    Ok(Err(head_ptr))
-                }
-            }
-        }
+        let head_ptr = match variant.encode_tag(buf) {
+            Some(ptr) => Err(ptr),
+            None => Ok(match self {
+                Ok(inner) => Ok(inner.encode_head(buf)),
+                Err(inner) => Err(inner.encode_head(buf)),
+            }),
+        };
+        variant.encode_padding(buf);
+        head_ptr
     }
 
     fn encode_body(&self, head: Self::HeadPtr, buf: &mut BytesMut) {
@@ -333,7 +303,7 @@ impl ReversePointer {
         let r = ReversePointer {
             location: buf.len(),
         };
-        buf.put_bytes(0, 4);
+        buf.put_bytes(0, layout::PTR_BYTES as usize);
         r
     }
 
@@ -351,37 +321,7 @@ impl ReversePointer {
 
     pub fn write(self, w: &mut [u8], absolute_ptr: usize) {
         let relative = absolute_ptr - self.location;
-        w[self.location..(self.location + 4)].copy_from_slice(&(relative as u32).to_le_bytes());
-    }
-}
-
-pub fn encode_enum_head_tag(
-    format: &layout::EnumFormat,
-    tag: u64,
-    buf: &mut BytesMut,
-) -> Option<ReversePointer> {
-    // tag
-    let tag_slice = &tag.to_le_bytes()[0..format.tag_bytes as usize];
-    buf.put_slice(tag_slice);
-
-    if format.has_ptr {
-        // inner pointer
-        let variant = &format.variants[tag as usize];
-        if !variant.is_unit {
-            Some(ReversePointer::new(buf))
-        } else {
-            // this is unit variant, no need for a pointer
-            None
-        }
-    } else {
-        // no pointer, head of inner should follow directly
-        None
-    }
-}
-
-pub fn encode_enum_head_padding(format: &layout::EnumFormat, tag: u64, buf: &mut BytesMut) {
-    let variant = &format.variants[tag as usize];
-    if variant.padding_bytes > 0 {
-        buf.put_bytes(0, variant.padding_bytes as usize);
+        let end = self.location + layout::PTR_BYTES as usize;
+        w[self.location..end].copy_from_slice(&(relative as u32).to_le_bytes());
     }
 }

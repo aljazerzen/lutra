@@ -22,10 +22,12 @@ mod visitor;
 #[allow(unused_imports)]
 mod generated;
 
-pub use decode::{Decode, decode_enum_head};
-pub use encode::{Encode, ReversePointer, encode_enum_head_padding, encode_enum_head_tag};
+pub use decode::Decode;
+pub use encode::{Encode, ReversePointer};
 pub use error::{Error, Result};
-pub use layout::Layout;
+pub use layout::{
+    ARRAY_HEAD_BYTES, ENUM_INLINE_MAX_BITS, EnumHeadFormat, EnumVariantHead, Layout, PTR_BYTES,
+};
 pub use reader::{ArrayReader, ReaderExt, TupleReader};
 pub use value::{Value, ValueVisitor};
 pub use visitor::Visitor;

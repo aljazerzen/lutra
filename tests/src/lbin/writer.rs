@@ -146,7 +146,7 @@ fn enum_01() {
     insta::assert_snapshot!(_test_enum_writer(0, Data::new(vec![]), &output_ty, &ty_defs), @r#"
     Done
     Length: 5 (0x5) bytes
-    0000:   00 04 00 00  00                                      .....
+    0000:   00 00 00 00  00                                      .....
     "#);
 
     // int

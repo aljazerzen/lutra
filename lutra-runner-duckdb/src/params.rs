@@ -41,8 +41,7 @@ impl<'a> Context<'a> {
 
             ir::TyKind::Enum(variants) if self.is_option(variants) => {
                 let format = lutra_bin::layout::enum_format(variants, &ty.variants_recursive);
-                let (tag, inner) =
-                    lutra_bin::decode_enum_head(input, format.tag_bytes, format.has_ptr);
+                let (tag, inner) = format.decode_head(input);
 
                 if tag == 0 {
                     self.push_nulls(&variants[1].ty, args);
@@ -53,8 +52,7 @@ impl<'a> Context<'a> {
 
             ir::TyKind::Enum(variants) => {
                 let format = lutra_bin::layout::enum_format(variants, &ty.variants_recursive);
-                let (tag, inner) =
-                    lutra_bin::decode_enum_head(input, format.tag_bytes, format.has_ptr);
+                let (tag, inner) = format.decode_head(input);
 
                 args.push(Box::new(tag as i16));
 

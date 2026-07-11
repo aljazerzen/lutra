@@ -293,8 +293,7 @@ impl EnumCodecHelper {
         let py_buf = PyBuffer::<u8>::get(&buf)?;
         let buf_slice = buffer_as_slice(&py_buf)?;
 
-        let (tag, inner) =
-            lutra_bin::decode_enum_head(buf_slice, self.format.tag_bytes, self.format.has_ptr);
+        let (tag, inner) = self.format.decode_head(buf_slice);
         let inner_offset = buf_slice.len() - inner.len();
         Ok((tag, inner_offset))
     }
@@ -302,14 +301,14 @@ impl EnumCodecHelper {
         let mut bytes_mut = buf.try_borrow_mut()?;
         let buf = &mut bytes_mut.inner;
 
-        let residual = lutra_bin::encode_enum_head_tag(&self.format, tag, buf);
+        let residual = self.format.variant(tag).encode_tag(buf);
         Ok(residual.map(|r| r.unwrap()))
     }
     fn encode_head_padding(&self, tag: u64, buf: Bound<BytesMut>) -> PyResult<()> {
         let mut bytes_mut = buf.try_borrow_mut()?;
         let buf = &mut bytes_mut.inner;
 
-        lutra_bin::encode_enum_head_padding(&self.format, tag, buf);
+        self.format.variant(tag).encode_padding(buf);
         Ok(())
     }
     fn encode_body_ptr(&self, residual: Option<usize>, buf: Bound<BytesMut>) -> PyResult<()> {

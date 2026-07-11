@@ -520,49 +520,35 @@ impl<'a> Encoder<'a> {
                 // Get enum format for layout info
                 let head_format =
                     lutra_bin::layout::enum_head_format(variants, &ty.variants_recursive);
+                let variant_head =
+                    head_format.variant(tag as u64, variant.ty.layout.as_ref().unwrap().head_size);
 
                 // Write tag byte
                 self.arr_buf.put_u8(tag as u8);
 
-                if head_format.has_ptr {
-                    // Pointer-style enum: write pointer, defer inner to body
-                    if variant.ty.is_unit() {
-                        // Unit variant: just padding (no pointer needed)
-                        self.arr_buf.put_bytes(0, head_format.inner_bytes as usize);
-                        HeadResidual::Enum {
-                            tag,
-                            variant_residual: Box::new(HeadResidual::None),
-                            has_ptr: true,
-                            ptr: None,
-                        }
-                    } else {
-                        // Non-unit variant: write pointer
-                        let ptr = lutra_bin::ReversePointer::new(&mut self.arr_buf);
-                        HeadResidual::Enum {
-                            tag,
-                            variant_residual: Box::new(HeadResidual::None),
-                            has_ptr: true,
-                            ptr: Some(ptr),
-                        }
+                if variant_head.has_ptr {
+                    // Inner is stored in the body: write pointer, defer inner
+                    let ptr = lutra_bin::ReversePointer::new(&mut self.arr_buf);
+                    HeadResidual::Enum {
+                        tag,
+                        variant_residual: Box::new(HeadResidual::None),
+                        has_ptr: true,
+                        ptr: Some(ptr),
                     }
                 } else {
-                    // Inline-style enum: write variant head inline
-                    let variant_arr = union_arr.child(tag as i8);
-                    // For sparse unions, use the same index; for dense, we'd need offset
-                    let variant_idx = idx;
-
+                    // Inner head is written inline, which is nothing for unit variants
                     let variant_residual = if variant.ty.is_unit() {
                         HeadResidual::None
                     } else {
-                        self.write_head(variant_arr.as_ref(), variant_idx, &variant.ty)?
+                        let variant_arr = union_arr.child(tag as i8);
+                        // For sparse unions, use the same index; for dense, we'd need offset
+                        self.write_head(variant_arr.as_ref(), idx, &variant.ty)?
                     };
 
                     // Add padding to match largest variant
-                    let variant_format =
-                        lutra_bin::layout::enum_variant_format(&head_format, &variant.ty);
-                    if variant_format.padding_bytes > 0 {
+                    if variant_head.padding_bytes > 0 {
                         self.arr_buf
-                            .put_bytes(0, variant_format.padding_bytes as usize);
+                            .put_bytes(0, variant_head.padding_bytes as usize);
                     }
 
                     HeadResidual::Enum {

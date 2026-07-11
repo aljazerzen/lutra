@@ -60,8 +60,7 @@ impl<'a> Context<'a> {
             ir::TyKind::Enum(variants) => {
                 let format = lutra_bin::layout::enum_format(variants, &ty.variants_recursive);
 
-                let (tag, inner) =
-                    lutra_bin::decode_enum_head(input, format.tag_bytes, format.has_ptr);
+                let (tag, inner) = format.decode_head(input);
                 args.push(Arg {
                     data: Cow::Owned((tag as u16).to_le_bytes().to_vec()),
                     ty: ParamTy::Prim16,

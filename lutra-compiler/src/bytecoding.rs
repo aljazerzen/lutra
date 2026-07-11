@@ -176,13 +176,14 @@ impl<'t> ByteCoder<'t> {
         };
         let ty_variant = ty_variants.get(v.tag as usize).unwrap();
         let head_format = lutra_bin::layout::enum_head_format(ty_variants, &ty.variants_recursive);
-        let variant_format = lutra_bin::layout::enum_variant_format(&head_format, &ty_variant.ty);
+        let variant_head =
+            head_format.variant(v.tag, ty_variant.ty.layout.as_ref().unwrap().head_size);
 
         EnumVariant {
             tag: v.tag.to_le_bytes()[0..head_format.tag_bytes as usize].to_vec(),
             inner_bytes: head_format.inner_bytes as u8,
-            has_ptr: head_format.has_ptr,
-            padding_bytes: variant_format.padding_bytes,
+            has_ptr: variant_head.has_ptr,
+            padding_bytes: variant_head.padding_bytes as u8,
             inner: self.compile_expr(v.inner),
         }
     }

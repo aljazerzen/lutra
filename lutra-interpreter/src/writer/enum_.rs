@@ -25,47 +25,44 @@ impl EnumWriter {
         if tag as usize >= self.format.variants.len() {
             panic!()
         }
-        let variant = &self.format.variants[tag as usize];
+        let variant = self.format.variant(tag);
 
-        let tag = &tag.to_le_bytes()[0..self.format.tag_bytes as usize];
         Self::write_variant(
-            tag,
+            &tag.to_le_bytes()[0..variant.tag_bytes as usize],
             self.format.inner_bytes,
-            self.format.has_ptr,
-            variant.padding_bytes,
+            variant.has_ptr,
+            variant.padding_bytes as u8,
             inner,
         )
     }
 
+    /// Writes the head of an enum variant, as described by
+    /// [layout::EnumVariantHead].
     pub fn write_variant(
         tag: &[u8],
         inner_bytes: u8,
         has_ptr: bool,
-        variant_padding_bytes: u8,
+        padding_bytes: u8,
         inner: Data,
     ) -> Data {
         // tag
         let mut buf = tag.to_vec();
 
         if has_ptr {
-            // pointer
-            buf.extend(4_u32.to_le_bytes());
+            // pointer to the body, which follows the head directly
+            buf.extend(layout::PTR_BYTES.to_le_bytes());
 
             // inner
             Data::new(buf).combine(inner)
-
-            // If variant is unit, instead of padding we write ptr [4 0 0 0].
-            // We also combine with inner Data, as it should be empty anyway.
-            // This allows us to drop `variant.is_unit` param.
         } else {
-            // inner
+            // inner, which is empty for unit variants
             buf.extend(inner.chunk());
 
             let expected_len = tag.len() + inner_bytes as usize;
 
             if buf.len() < expected_len {
                 // padding
-                buf.put_bytes(0, variant_padding_bytes as usize);
+                buf.put_bytes(0, padding_bytes as usize);
             } else {
                 // clip, if inner had trailing data
                 buf.truncate(expected_len);
