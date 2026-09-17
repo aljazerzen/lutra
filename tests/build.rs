@@ -3,7 +3,7 @@ fn main() {
         "lutra",
         lutra_codegen::GenerateOptions::default()
             .function_traits()
-            .generate_programs("runtime", lutra_codegen::ProgramRepr::BytecodeLt)
+            .generate_programs("runtime", lutra_codegen::ProgramRepr::BytecodeLt, [])
             .generate_client(),
     );
 }

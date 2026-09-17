@@ -1,7 +1,10 @@
 fn main() {
     lutra_codegen::check_and_generate(
         "lutra",
-        lutra_codegen::GenerateOptions::default()
-            .generate_programs("", lutra_codegen::ProgramRepr::SqlPg),
+        lutra_codegen::GenerateOptions::default().generate_programs(
+            "",
+            lutra_codegen::ProgramRepr::SqlPg,
+            [],
+        ),
     );
 }

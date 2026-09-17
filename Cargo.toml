@@ -42,7 +42,7 @@ insta = "1.40.0"
 pretty-hex = "0.4.1"
 enum-as-inner = "0.6.1"
 indexmap = "2.6.0"
-tracing = "0.1"
+tracing = { version = "0.1", default-features = false, features = ["attributes"] }
 tracing-subscriber = "0.3.19"
 tokio = "1.42.0"
 strum = { version = "0.26.3", features = ["std", "derive"] }

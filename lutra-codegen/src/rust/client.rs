@@ -11,7 +11,6 @@ pub fn write_client(
     w: &mut impl Write,
     functions: &[(&String, ir::TyFunction)],
     sub_modules: &[&String],
-    repr: Option<lutra_compiler::ProgramRepr>,
     ctx: &mut Context,
 ) -> Result<(), std::fmt::Error> {
     let lutra_runner = &ctx.options.lutra_runner_path;
@@ -34,7 +33,7 @@ pub fn write_client(
     }
 
     for (name, _func) in functions {
-        let ty = compiled_program_ty(ctx, name, repr.unwrap());
+        let ty = compiled_program_ty(ctx, name);
 
         write!(w, "    pub async fn {name}(\n        &self,\n")?;
         write_client_method_params(w, &ty.input, ctx)?;
@@ -67,7 +66,7 @@ pub fn write_client(
     }
 
     for (name, _func) in functions {
-        let ty = compiled_program_ty(ctx, name, repr.unwrap());
+        let ty = compiled_program_ty(ctx, name);
 
         write!(w, "    pub fn {name}(\n        &mut self,\n")?;
         write_client_method_params(w, &ty.input, ctx)?;
@@ -159,20 +158,13 @@ fn write_encode_input(
     Ok(())
 }
 
-fn compiled_program_ty(
-    ctx: &Context,
-    name: &str,
-    repr: lutra_compiler::ProgramRepr,
-) -> lutra_bin::rr::ProgramType {
+fn compiled_program_ty(ctx: &Context, name: &str) -> lutra_bin::rr::ProgramType {
     let mut fq_path = pr::Path::new(&ctx.current_rust_mod);
     fq_path.push(name.to_string());
     let fq_path = fq_path.to_string();
 
-    let (_, mut ty) = lutra_compiler::compile(
-        ctx.project,
-        &lutra_compiler::CompileParams::new(&fq_path, repr),
-    )
-    .unwrap();
+    let p = ctx.options.get_program_params(&fq_path).unwrap();
+    let (_, mut ty) = lutra_compiler::compile(ctx.project, &p).unwrap();
     crate::infer_names_of_program_ty(&mut ty, name);
     ty
 }

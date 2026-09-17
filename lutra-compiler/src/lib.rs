@@ -21,6 +21,7 @@ pub use bytecoding::compile_program as bytecode_program;
 pub use check::{CheckParams, check, check_overlay, std_source};
 pub use codespan::Span;
 pub use discover::{DiscoverParams, discover};
+pub use error::{Additional, DiagnosticMessage, Error};
 pub use format::format;
 pub use parser::parse_path;
 pub use project::{Project, SourceTree, SymbolInfo};

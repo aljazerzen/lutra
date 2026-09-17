@@ -5,6 +5,7 @@ mod sql;
 pub use lutra_compiler::ProgramRepr;
 
 use std::borrow::Cow;
+use std::collections::HashMap;
 use std::{fs, path};
 
 use lutra_bin::{Encode, ir};
@@ -44,7 +45,11 @@ pub fn check_and_generate(project_dir: impl AsRef<path::Path>, options: Generate
     };
 
     // generate
-    let code = rust::run(&project, &options, out_dir).unwrap();
+    let code = rust::run(&project, &options, out_dir);
+    let code = match code {
+        Ok(s) => s,
+        Err(e) => panic!("{e}"),
+    };
     fs::write(out_path, code).unwrap();
 
     // print directives with absolute paths for reliability
@@ -103,6 +108,16 @@ pub fn generate_program_bytecode(project_dir: &path::Path, program: &str, out_fi
     std::fs::write(out_file, buf).unwrap();
 }
 
+#[derive(Debug, thiserror::Error)]
+pub enum Error {
+    #[error("{0}")]
+    Fmt(std::fmt::Error),
+    #[error("{0}")]
+    Io(std::io::Error),
+    #[error("{0}")]
+    Compile(lutra_compiler::Error),
+}
+
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "clap", derive(clap::Args))]
 pub struct GenerateOptions {
@@ -132,14 +147,10 @@ pub struct GenerateOptions {
     #[cfg_attr(feature = "clap", arg(long = "no-std", default_value_t = false))]
     pub no_std: bool,
 
-    #[cfg_attr(feature = "clap", arg(long))]
-    pub programs_bytecode_lt: Vec<String>,
-
-    #[cfg_attr(feature = "clap", arg(long))]
-    pub programs_sql_pg: Vec<String>,
-
-    #[cfg_attr(feature = "clap", arg(long))]
-    pub programs_sql_duckdb: Vec<String>,
+    /// Modules for which programs should be generated, together with their
+    /// representation and additional externals.
+    #[cfg_attr(feature = "clap", arg(skip))]
+    pub programs: HashMap<String, (ProgramRepr, Vec<String>)>,
 
     #[cfg_attr(feature = "clap", arg(long, default_value = "::lutra_bin"))]
     pub lutra_bin_path: String,
@@ -156,9 +167,7 @@ impl Default for GenerateOptions {
             function_traits: false,
             client: false,
             no_std: false,
-            programs_bytecode_lt: Vec::new(),
-            programs_sql_pg: Vec::new(),
-            programs_sql_duckdb: Vec::new(),
+            programs: HashMap::new(),
             lutra_bin_path: "::lutra_bin".into(),
             lutra_runner_path: "::lutra_runner".into(),
         }
@@ -209,15 +218,40 @@ impl GenerateOptions {
         self
     }
 
-    /// Generates programs for all functions in a module
-    pub fn generate_programs(mut self, module_path: impl ToString, fmt: ProgramRepr) -> Self {
-        let module_path = module_path.to_string();
-        match fmt {
-            ProgramRepr::BytecodeLt => self.programs_bytecode_lt.push(module_path),
-            ProgramRepr::SqlPg => self.programs_sql_pg.push(module_path),
-            ProgramRepr::SqlDuckdb => self.programs_sql_duckdb.push(module_path),
-        }
+    /// Generates programs for all functions in a module.
+    ///
+    /// This will compile each function from the module into the target program repr.
+    /// It will check that the program uses only externals provided by the repr or
+    /// explicitly allowed by `suppoerted_externals`.
+    pub fn generate_programs(
+        mut self,
+        module_path: impl ToString,
+        repr: ProgramRepr,
+        supported_externals: impl IntoIterator<Item = String>,
+    ) -> Self {
+        let m = module_path.to_string();
+        let e = self.programs.entry(m).or_insert_with(|| (repr, Vec::new()));
+        e.0 = repr;
+        e.1.extend(supported_externals);
         self
+    }
+
+    /// Return compile parameters for a generated function definition.
+    ///
+    /// `programs` is keyed by module path, while `path` is the fully-qualified
+    /// definition path. Resolve the module first so nested modules do not get
+    /// confused with their definitions.
+    pub(crate) fn get_program_params(&self, path: &str) -> Option<lutra_compiler::CompileParams> {
+        let module_path = path.rsplit_once("::").map_or("", |(module, _)| module);
+        let (repr, externals) = self.programs.get(module_path)?;
+        Some(
+            lutra_compiler::CompileParams::new(path, *repr)
+                .with_externals(externals.iter().cloned()),
+        )
+    }
+
+    pub(crate) fn generates_programs_for_module(&self, module_path: &str) -> bool {
+        self.programs.contains_key(module_path)
     }
 
     pub(crate) fn generates_types(&self) -> bool {
@@ -236,30 +270,14 @@ impl GenerateOptions {
         self.client
     }
 
-    pub(crate) fn included_program_repr(&self, module_path: &str) -> Option<ProgramRepr> {
-        if self.programs_bytecode_lt.iter().any(|p| p == module_path) {
-            Some(ProgramRepr::BytecodeLt)
-        } else if self.programs_sql_pg.iter().any(|p| p == module_path) {
-            Some(ProgramRepr::SqlPg)
-        } else if self.programs_sql_duckdb.iter().any(|p| p == module_path) {
-            Some(ProgramRepr::SqlDuckdb)
-        } else {
-            None
-        }
-    }
-
     pub(crate) fn has_programs_in_subtree(&self, module_path: &str) -> bool {
-        self.programs_bytecode_lt
-            .iter()
-            .chain(self.programs_sql_pg.iter())
-            .chain(self.programs_sql_duckdb.iter())
-            .any(|p| {
-                p == module_path
-                    || (!module_path.is_empty()
-                        && p.starts_with(module_path)
-                        && p[module_path.len()..].starts_with("::"))
-                    || (module_path.is_empty() && !p.is_empty())
-            })
+        self.programs.keys().any(|p| {
+            p == module_path
+                || (!module_path.is_empty()
+                    && p.starts_with(module_path)
+                    && p[module_path.len()..].starts_with("::"))
+                || (module_path.is_empty() && !p.is_empty())
+        })
     }
 
     /// Path to use for `Vec` in generated code.

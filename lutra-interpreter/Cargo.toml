@@ -19,7 +19,7 @@ parquet = { workspace = true }
 arrow = { workspace = true }
 
 thiserror = { workspace = true }
-tracing = { workspace = true }
+tracing = { workspace = true, features = ["std"] }
 chrono = { workspace = true }
 chrono-tz = { workspace = true }
 

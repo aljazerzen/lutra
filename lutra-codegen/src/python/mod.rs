@@ -3,7 +3,7 @@ use std::path::PathBuf;
 use std::{borrow::Cow, fmt::Write};
 
 use lutra_bin::{Encode, ir, layout};
-use lutra_compiler::{ProgramRepr, Project, pr};
+use lutra_compiler::{Project, pr};
 
 use crate::camel_to_snake;
 
@@ -176,8 +176,8 @@ fn codegen_module(
 
     // write traits for functions
     let module_path_str = module_path.as_slice().join("::");
-    if let Some(format) = ctx.options.included_program_repr(&module_path_str) {
-        write_programs(w, &functions, format, ctx)?;
+    if ctx.options.generates_programs_for_module(&module_path_str) {
+        write_programs(w, &functions, ctx)?;
 
         tys.extend(write_tys_in_buffer(w, ctx)?);
     }
@@ -590,7 +590,6 @@ fn ty_encode_body(ty: &ir::Ty, val_ref: &str, residual_ref: &str, ctx: &mut Cont
 fn write_programs(
     w: &mut impl Write,
     functions: &[(&String, ir::TyFunction)],
-    repr: ProgramRepr,
     ctx: &mut Context,
 ) -> Result<(), std::fmt::Error> {
     if functions.is_empty() {
@@ -603,11 +602,8 @@ fn write_programs(
         let fq_path = fq_path.to_string();
 
         // compile
-        let (program, mut ty) = lutra_compiler::compile(
-            ctx.project,
-            &lutra_compiler::CompileParams::new(&fq_path, repr),
-        )
-        .unwrap();
+        let params = ctx.options.get_program_params(&fq_path).unwrap();
+        let (program, mut ty) = lutra_compiler::compile(ctx.project, &params).unwrap();
 
         // encode to base85
         let buf = program.encode();
