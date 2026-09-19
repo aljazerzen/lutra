@@ -398,6 +398,8 @@ pub fn gen_code(cmd: GenCodeCommand) -> anyhow::Result<()> {
     let out_ext = cmd.output_file.extension();
     let target = if out_ext.is_some_and(|x| x == "py") {
         lutra_codegen::Target::Python
+    } else if out_ext.is_some_and(|e| e == "hpp" || e == "hxx") {
+        lutra_codegen::Target::Cpp
     } else if out_ext.is_some_and(|e| e == "sql") {
         lutra_codegen::Target::Sql
     } else {

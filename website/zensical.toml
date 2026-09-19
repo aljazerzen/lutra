@@ -233,7 +233,7 @@ accent = "blue"
 Home = "https://lutra-lang.org"
 
 [[project.nav]]
-Usage = ["usage/index.md", "usage/cli.md", "usage/rust.md", "usage/python.md"]
+Usage = ["usage/index.md", "usage/cli.md", "usage/rust.md", "usage/python.md", "usage/cpp.md"]
 
 [[project.nav]]
 Learn = [

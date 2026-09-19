@@ -1,0 +1,11 @@
+type Movie: {
+  id: Int64,
+  title: Text,
+  genre: Genre,
+}
+
+type Genre: enum {
+  fiction,
+  drama,
+  other: Text,
+}

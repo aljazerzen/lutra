@@ -1,3 +1,4 @@
+mod cpp;
 mod python;
 mod rust;
 mod sql;
@@ -65,15 +66,19 @@ pub fn generate(
     target: Target,
     out_path: impl AsRef<path::Path>,
     options: GenerateOptions,
-) -> Result<(), lutra_compiler::error::Error> {
+) -> Result<(), Error> {
     let out_path = out_path.as_ref();
-    let out_dir = out_path.parent().unwrap().to_path_buf();
+    let out_dir = out_path
+        .parent()
+        .unwrap_or_else(|| path::Path::new("."))
+        .to_path_buf();
 
     // generate
     let code = match target {
-        Target::Rust => rust::run(project, &options, out_dir).unwrap(),
-        Target::Python => python::run(project, &options, out_dir).unwrap(),
-        Target::Sql => sql::run(project, &options, out_dir).unwrap(),
+        Target::Cpp => cpp::run(project, &options, out_dir)?,
+        Target::Rust => rust::run(project, &options, out_dir)?,
+        Target::Python => python::run(project, &options, out_dir)?,
+        Target::Sql => sql::run(project, &options, out_dir)?,
     };
 
     fs::write(out_path, code)?;
@@ -82,6 +87,7 @@ pub fn generate(
 }
 
 pub enum Target {
+    Cpp,
     Rust,
     Python,
     Sql,
@@ -111,11 +117,13 @@ pub fn generate_program_bytecode(project_dir: &path::Path, program: &str, out_fi
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
     #[error("{0}")]
-    Fmt(std::fmt::Error),
+    Fmt(#[from] std::fmt::Error),
     #[error("{0}")]
-    Io(std::io::Error),
+    Io(#[from] std::io::Error),
     #[error("{0}")]
-    Compile(lutra_compiler::Error),
+    Compile(#[from] lutra_compiler::Error),
+    #[error("{0}")]
+    Unsupported(String),
 }
 
 #[derive(Debug, Clone)]
@@ -133,8 +141,9 @@ pub struct GenerateOptions {
     #[cfg_attr(
         feature = "clap",
         arg(
-            long = "no-function-traits",
-            default_value_t = true,
+            long = "function-traits",
+            visible_alias = "no-function-traits",
+            default_value_t = false,
             num_args = 0..=1,
             default_missing_value = "true"
         )
@@ -187,7 +196,7 @@ impl GenerateOptions {
         self
     }
 
-    /// Do not generate traits for functions
+    /// Generate traits for functions (Rust only).
     pub fn function_traits(mut self) -> Self {
         self.function_traits = true;
         self

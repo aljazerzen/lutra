@@ -202,19 +202,20 @@ $ lutra format --project ./project.lt
 
 Generate bindings code from a project.
 
-This command compiles a project and emits Rust or Python bindings depending on
-output file extension.
+This command compiles a project and emits bindings depending on the output file
+extension: `.hpp`/`.hxx` for C++, `.py` for Python, `.sql` for SQL, and Rust otherwise.
+See [C++ usage](../../usage/cpp.md) for the C++20 requirements and supported options.
 
 Arguments:
 
-- `<OUTPUT_FILE>` — output path, typically ending in `.rs` or `.py`
+- `<OUTPUT_FILE>` — output path, typically ending in `.rs`, `.py`, or `.hpp`
 
 Common options:
 
 - `--project <file.lt>`
 - `--no-types`
 - `--no-encode-decode`
-- `--no-function-traits`
+- `--function-traits` (Rust only; legacy alias: `--no-function-traits`)
 - `--programs-bytecode-lt <PROGRAM>`
 - `--programs-sql-pg <PROGRAM>`
 - `--lutra-bin-path <PATH>`
@@ -223,6 +224,7 @@ Examples:
 
 ```console
 $ lutra gen-code --project ./project.lt ./lutra.rs
+$ lutra gen-code --project ./project.lt ./generated.hpp
 $ lutra gen-code --project ./project.lt --programs-sql-pg main ./generated.py
 ```
 

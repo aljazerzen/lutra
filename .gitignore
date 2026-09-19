@@ -15,6 +15,7 @@ perf.data.old
 profile.json.gz
 
 /examples/*
+!/examples/cpp
 !/examples/python
 !/examples/rust-interpreter
 !/examples/rust-postgres

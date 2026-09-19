@@ -24,6 +24,11 @@ title: Usage
 
     Generate Python models and run typed Lutra programs from Python applications.
 
+-   :material-language-cpp:{.lg} [__C++ guide__](./cpp)
+
+    ---
+
+    Generate C++20 types and compatible binary codecs in a self-contained header.
 
 -   :material-school:{.lg} [__Learn the language__](../learn/introduction)
 
