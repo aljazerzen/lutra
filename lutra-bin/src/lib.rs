@@ -26,7 +26,7 @@ pub use decode::Decode;
 pub use encode::{Encode, ReversePointer};
 pub use error::{Error, Result};
 pub use layout::{
-    ARRAY_HEAD_BYTES, ENUM_INLINE_MAX_BITS, EnumHeadFormat, EnumVariantHead, Layout, PTR_BYTES,
+    ARRAY_HEAD_BYTES, ENUM_INLINE_MAX_BITS, EnumHeadFormat, EnumVariantHead, PTR_BYTES,
 };
 pub use reader::{ArrayReader, ReaderExt, TupleReader};
 pub use value::{Value, ValueVisitor};

@@ -1,4 +1,4 @@
-use crate::{Decode, Encode, Layout, Result};
+use crate::{Decode, Encode, Result};
 
 /// Standard-library types used by generated Lutra code.
 pub mod ops {
@@ -72,18 +72,13 @@ pub struct Decimal(pub i64);
 
 impl Encode for Timestamp {
     type HeadPtr = ();
+    const HEAD_BITS: u32 = <i64 as Encode>::HEAD_BITS;
 
     fn encode_head(&self, buf: &mut crate::bytes::BytesMut) {
         self.microseconds.encode_head(buf)
     }
 
     fn encode_body(&self, _: (), _: &mut crate::bytes::BytesMut) {}
-}
-
-impl Layout for Timestamp {
-    fn head_size() -> usize {
-        i64::head_size()
-    }
 }
 
 impl Decode for Timestamp {
@@ -95,17 +90,13 @@ impl Decode for Timestamp {
 }
 impl Encode for Date {
     type HeadPtr = ();
+    const HEAD_BITS: u32 = <i32 as Encode>::HEAD_BITS;
 
     fn encode_head(&self, buf: &mut crate::bytes::BytesMut) {
         self.days_epoch.encode_head(buf)
     }
 
     fn encode_body(&self, _: (), _: &mut crate::bytes::BytesMut) {}
-}
-impl Layout for Date {
-    fn head_size() -> usize {
-        i32::head_size()
-    }
 }
 impl Decode for Date {
     fn decode(buf: &[u8]) -> Result<Self> {
@@ -116,17 +107,13 @@ impl Decode for Date {
 }
 impl Encode for Time {
     type HeadPtr = ();
+    const HEAD_BITS: u32 = <u64 as Encode>::HEAD_BITS;
 
     fn encode_head(&self, buf: &mut crate::bytes::BytesMut) {
         self.micros_midnight.encode_head(buf)
     }
 
     fn encode_body(&self, _: (), _: &mut crate::bytes::BytesMut) {}
-}
-impl Layout for Time {
-    fn head_size() -> usize {
-        u64::head_size()
-    }
 }
 impl Decode for Time {
     fn decode(buf: &[u8]) -> Result<Self> {
@@ -137,17 +124,13 @@ impl Decode for Time {
 }
 impl Encode for Duration {
     type HeadPtr = ();
+    const HEAD_BITS: u32 = <i64 as Encode>::HEAD_BITS;
 
     fn encode_head(&self, buf: &mut crate::bytes::BytesMut) {
         self.microseconds.encode_head(buf)
     }
 
     fn encode_body(&self, _: (), _: &mut crate::bytes::BytesMut) {}
-}
-impl Layout for Duration {
-    fn head_size() -> usize {
-        i64::head_size()
-    }
 }
 impl Decode for Duration {
     fn decode(buf: &[u8]) -> Result<Self> {
@@ -158,17 +141,13 @@ impl Decode for Duration {
 }
 impl Encode for Decimal {
     type HeadPtr = ();
+    const HEAD_BITS: u32 = <i64 as Encode>::HEAD_BITS;
 
     fn encode_head(&self, buf: &mut crate::bytes::BytesMut) {
         self.0.encode_head(buf)
     }
 
     fn encode_body(&self, _: (), _: &mut crate::bytes::BytesMut) {}
-}
-impl Layout for Decimal {
-    fn head_size() -> usize {
-        i64::head_size()
-    }
 }
 impl Decode for Decimal {
     fn decode(buf: &[u8]) -> Result<Self> {
@@ -177,6 +156,7 @@ impl Decode for Decimal {
 }
 impl Encode for ops::Ordering {
     type HeadPtr = ();
+    const HEAD_BITS: u32 = 8;
 
     fn encode_head(&self, buf: &mut crate::bytes::BytesMut) {
         let tag = match self {
@@ -188,11 +168,6 @@ impl Encode for ops::Ordering {
     }
 
     fn encode_body(&self, _: (), _: &mut crate::bytes::BytesMut) {}
-}
-impl Layout for ops::Ordering {
-    fn head_size() -> usize {
-        8
-    }
 }
 impl Decode for ops::Ordering {
     fn decode(buf: &[u8]) -> Result<Self> {

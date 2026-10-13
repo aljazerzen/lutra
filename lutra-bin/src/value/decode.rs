@@ -89,6 +89,6 @@ fn decode_inner<'t>(
 
 fn decode<D: Decode + Sized>(reader: &mut impl bytes::Buf) -> Result<D> {
     let res = D::decode(reader.chunk());
-    reader.advance(D::head_size().div_ceil(8));
+    reader.advance(D::HEAD_BITS.div_ceil(8) as usize);
     res
 }

@@ -1,4 +1,3 @@
-use crate::string;
 use crate::vec;
 
 use crate::ReaderExt;
@@ -13,125 +12,6 @@ pub const ARRAY_HEAD_BYTES: u32 = 2 * PTR_BYTES;
 /// Largest inner head, in bits, that is still stored inline in a enum type head.
 /// Anything larger is moved to the body and replaced by a pointer.
 pub const ENUM_INLINE_MAX_BITS: u32 = 8 * PTR_BYTES;
-
-// TODO: conceptually, this shouldn't exist
-pub trait Layout {
-    /// Returns the size of the head in bits for a given type.
-    fn head_size() -> usize;
-}
-
-impl<T> Layout for &T
-where
-    T: Layout,
-{
-    fn head_size() -> usize {
-        T::head_size()
-    }
-}
-
-impl Layout for bool {
-    fn head_size() -> usize {
-        8
-    }
-}
-
-impl Layout for i8 {
-    fn head_size() -> usize {
-        8
-    }
-}
-impl Layout for i16 {
-    fn head_size() -> usize {
-        16
-    }
-}
-impl Layout for i32 {
-    fn head_size() -> usize {
-        32
-    }
-}
-impl Layout for i64 {
-    fn head_size() -> usize {
-        64
-    }
-}
-impl Layout for u8 {
-    fn head_size() -> usize {
-        8
-    }
-}
-impl Layout for u16 {
-    fn head_size() -> usize {
-        16
-    }
-}
-impl Layout for u32 {
-    fn head_size() -> usize {
-        32
-    }
-}
-impl Layout for u64 {
-    fn head_size() -> usize {
-        64
-    }
-}
-impl Layout for f32 {
-    fn head_size() -> usize {
-        32
-    }
-}
-impl Layout for f64 {
-    fn head_size() -> usize {
-        64
-    }
-}
-
-impl Layout for str {
-    fn head_size() -> usize {
-        64
-    }
-}
-impl Layout for string::String {
-    fn head_size() -> usize {
-        64
-    }
-}
-
-impl<I> Layout for vec::Vec<I> {
-    fn head_size() -> usize {
-        64
-    }
-}
-
-impl<I: Layout> Layout for Option<I> {
-    fn head_size() -> usize {
-        option_head_format::<I>().head_size() as usize
-    }
-}
-
-impl<T: Layout, E: Layout> Layout for core::result::Result<T, E> {
-    fn head_size() -> usize {
-        result_head_format::<T, E>().head_size() as usize
-    }
-}
-
-/// Head format of the built-in `Option<I>`, which is a two-variant enum
-/// with a unit variant and `I`.
-pub fn option_head_format<I: Layout>() -> EnumHeadFormat {
-    EnumHeadFormat::new(enum_tag_size(2), I::head_size() as u32, false)
-}
-
-/// Head format of the built-in `Result<T, E>`, which is a two-variant enum.
-pub fn result_head_format<T: Layout, E: Layout>() -> EnumHeadFormat {
-    let max_head = (T::head_size() as u32).max(E::head_size() as u32);
-    EnumHeadFormat::new(enum_tag_size(2), max_head, false)
-}
-
-impl Layout for () {
-    fn head_size() -> usize {
-        0
-    }
-}
 
 /// Computes layout of a type, iff all inner types have their layout computed.
 // Does not recurse.
@@ -432,17 +312,34 @@ fn enum_max_variant_head_size(variants: &[ir::TyEnumVariant]) -> u32 {
     i
 }
 
-pub fn enum_tag_size(variants_len: usize) -> u32 {
+pub const fn enum_tag_size(variants_len: usize) -> u32 {
     // TODO: when bool-sub-byte packing is implemented, remove function in favor of enum_tag_size_used
     enum_tag_size_used(variants_len).div_ceil(8) * 8
 }
 
-fn enum_tag_size_used(variants_len: usize) -> u32 {
-    variants_len
-        .saturating_sub(1)
-        .checked_ilog2()
-        .map(|x| x + 1)
-        .unwrap_or_default()
+const fn enum_tag_size_used(variants_len: usize) -> u32 {
+    match variants_len.saturating_sub(1).checked_ilog2() {
+        Some(x) => x + 1,
+        None => 0,
+    }
+}
+
+/// Head format of the built-in `Option<I>`, which is a two-variant enum
+/// with a unit variant and `I`.
+// TODO: remove together with the built-in `Encode for Option<I>`
+pub const fn option_head_format<I: crate::Encode>() -> EnumHeadFormat {
+    EnumHeadFormat::new(enum_tag_size(2), I::HEAD_BITS, false)
+}
+
+/// Head format of the built-in `Result<T, E>`, which is a two-variant enum.
+// TODO: remove together with the built-in `Encode for Result<T, E>`
+pub const fn result_head_format<T: crate::Encode, E: crate::Encode>() -> EnumHeadFormat {
+    let max_head = if T::HEAD_BITS > E::HEAD_BITS {
+        T::HEAD_BITS
+    } else {
+        E::HEAD_BITS
+    };
+    EnumHeadFormat::new(enum_tag_size(2), max_head, false)
 }
 
 #[test]

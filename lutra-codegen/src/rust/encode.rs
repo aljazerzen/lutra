@@ -45,11 +45,20 @@ fn write_ty_def_impl(
     let box_path = ctx.options.box_path();
     let name = ty.name.as_ref().unwrap();
 
+    // the head size is computed by the compiler, see `lutra_bin::layout::compute`
+    let head_bits = ty
+        .layout
+        .as_ref()
+        .unwrap_or_else(|| panic!("ty is missing layout: {}", lutra_bin::ir::print_ty(ty)))
+        .head_size;
+    let head_bits = format!("    const HEAD_BITS: u32 = {head_bits};");
+
     match &ty.kind {
         ir::TyKind::Primitive(_) => {
             // Primitive newtypes wrap a fixed-size integer; HeadPtr is always ().
             writeln!(w, "impl {lutra_bin}::Encode for {name} {{")?;
             writeln!(w, "    type HeadPtr = ();")?;
+            writeln!(w, "{head_bits}")?;
             writeln!(w, "    fn encode_head(&self, buf: &mut {lutra_bin}::bytes::BytesMut) {{")?;
             writeln!(w, "        self.0.encode_head(buf)")?;
             writeln!(w, "    }}")?;
@@ -65,6 +74,7 @@ fn write_ty_def_impl(
             write_ty_ref(&mut inner, ty, false, ctx)?;
             writeln!(w, "impl {lutra_bin}::Encode for {name} {{")?;
             writeln!(w, "    type HeadPtr = <{inner} as {lutra_bin}::Encode>::HeadPtr;")?;
+            writeln!(w, "{head_bits}")?;
             writeln!(w, "    fn encode_head(&self, buf: &mut {lutra_bin}::bytes::BytesMut) -> Self::HeadPtr {{")?;
             writeln!(w, "        self.0.encode_head(buf)")?;
             writeln!(w, "    }}")?;
@@ -77,6 +87,7 @@ fn write_ty_def_impl(
         ir::TyKind::Array(_) => {
             writeln!(w, "impl {lutra_bin}::Encode for {name} {{")?;
             writeln!(w, "    type HeadPtr = {lutra_bin}::ReversePointer;")?;
+            writeln!(w, "{head_bits}")?;
             writeln!(w, "    fn encode_head(&self, buf: &mut {lutra_bin}::bytes::BytesMut) -> Self::HeadPtr {{")?;
             writeln!(w, "        self.0.encode_head(buf)")?;
             writeln!(w, "    }}")?;
@@ -97,6 +108,7 @@ fn write_ty_def_impl(
             writeln!(w, "         <{inner_head_ptr} as {lutra_bin}::Encode>::HeadPtr,")?;
             writeln!(w, "         {lutra_bin}::ReversePointer,")?;
             writeln!(w, "    >>;")?;
+            writeln!(w, "{head_bits}")?;
             writeln!(w, "    fn encode_head(&self, buf: &mut {lutra_bin}::bytes::BytesMut) -> Self::HeadPtr {{")?;
             writeln!(w, "        self.0.encode_head(buf)")?;
             writeln!(w, "    }}")?;
@@ -124,6 +136,7 @@ fn write_ty_def_impl(
             writeln!(w, "        >,")?;
             writeln!(w, "        {lutra_bin}::ReversePointer,")?;
             writeln!(w, "    >;")?;
+            writeln!(w, "{head_bits}")?;
             writeln!(w, "    fn encode_head(&self, buf: &mut {lutra_bin}::bytes::BytesMut) -> Self::HeadPtr {{")?;
             writeln!(w, "        self.0.encode_head(buf)")?;
             writeln!(w, "    }}")?;
@@ -137,6 +150,7 @@ fn write_ty_def_impl(
             writeln!(w, "#[allow(clippy::all, unused_variables)]")?;
             writeln!(w, "impl {lutra_bin}::Encode for {name} {{")?;
             writeln!(w, "    type HeadPtr = {name}HeadPtr;")?;
+            writeln!(w, "{head_bits}")?;
 
             // encode head
             writeln!(w, "    fn encode_head(&self, buf: &mut {lutra_bin}::bytes::BytesMut) -> Self::HeadPtr {{")?;
@@ -196,6 +210,7 @@ fn write_ty_def_impl(
             writeln!(w, "#[allow(clippy::all)]")?;
             writeln!(w, "impl {lutra_bin}::Encode for {name} {{")?;
             writeln!(w, "    type HeadPtr = {head_ptr_name};")?;
+            writeln!(w, "{head_bits}")?;
             writeln!(w, "    fn encode_head(&self, w: &mut {lutra_bin}::bytes::BytesMut) -> {head_ptr_name} {{")?;
             writeln!(w, "        match self {{")?;
 
@@ -303,16 +318,7 @@ fn write_ty_def_impl(
         _ => unimplemented!(),
     }
 
-    let head_size = &ty
-        .layout
-        .as_ref()
-        .unwrap_or_else(|| panic!("ty is missing layout: {}", lutra_bin::ir::print_ty(ty)))
-        .head_size;
-    writeln!(w, "impl {lutra_bin}::Layout for {name} {{")?;
-    writeln!(w, "    fn head_size() -> usize {{")?;
-    writeln!(w, "        {head_size}")?;
-    writeln!(w, "    }}")?;
-    writeln!(w, "}}\n")?;
+    writeln!(w)?;
 
     match &ty.kind {
         ir::TyKind::Primitive(_) | ir::TyKind::Array(_) | ir::TyKind::Ident(_) => {

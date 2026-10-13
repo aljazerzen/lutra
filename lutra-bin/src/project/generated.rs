@@ -38,6 +38,7 @@ pub mod rr {
         #[allow(clippy::all)]
         impl crate::Encode for Program {
             type HeadPtr = ProgramHeadPtr;
+            const HEAD_BITS: u32 = 40;
             fn encode_head(&self, w: &mut crate::bytes::BytesMut) -> ProgramHeadPtr {
                 match self {
                     Self::SqlPostgres(inner) => {
@@ -96,11 +97,6 @@ pub mod rr {
             SqlDuckDb(crate::ReversePointer),
             BytecodeLt(crate::ReversePointer),
         }
-        impl crate::Layout for Program {
-            fn head_size() -> usize {
-                40
-            }
-        }
 
         impl crate::Decode for Program {
             fn decode(buf: &[u8]) -> crate::Result<Self> {
@@ -132,6 +128,7 @@ pub mod rr {
         #[allow(clippy::all, unused_variables)]
         impl crate::Encode for ProgramType {
             type HeadPtr = ProgramTypeHeadPtr;
+            const HEAD_BITS: u32 = 432;
             fn encode_head(&self, buf: &mut crate::bytes::BytesMut) -> Self::HeadPtr {
                 let input = self.input.encode_head(buf);
                 let output = self.output.encode_head(buf);
@@ -154,11 +151,6 @@ pub mod rr {
             output: <super::super::ir::Ty as crate::Encode>::HeadPtr,
             defs: <crate::vec::Vec<super::super::ir::TyDef> as crate::Encode>::HeadPtr,
         }
-        impl crate::Layout for ProgramType {
-            fn head_size() -> usize {
-                432
-            }
-        }
 
         impl crate::Decode for ProgramType {
             fn decode(buf: &[u8]) -> crate::Result<Self> {
@@ -176,6 +168,7 @@ pub mod rr {
         #[allow(clippy::all, unused_variables)]
         impl crate::Encode for SqlProgram {
             type HeadPtr = SqlProgramHeadPtr;
+            const HEAD_BITS: u32 = 496;
             fn encode_head(&self, buf: &mut crate::bytes::BytesMut) -> Self::HeadPtr {
                 let sql = self.sql.encode_head(buf);
                 let input_ty = self.input_ty.encode_head(buf);
@@ -201,11 +194,6 @@ pub mod rr {
             input_ty: <super::super::ir::Ty as crate::Encode>::HeadPtr,
             output_ty: <super::super::ir::Ty as crate::Encode>::HeadPtr,
             defs: <crate::vec::Vec<super::super::ir::TyDef> as crate::Encode>::HeadPtr,
-        }
-        impl crate::Layout for SqlProgram {
-            fn head_size() -> usize {
-                496
-            }
         }
 
         impl crate::Decode for SqlProgram {
@@ -251,6 +239,7 @@ pub mod layout {
         #[allow(clippy::all, unused_variables)]
         impl crate::Encode for EnumFormat {
             type HeadPtr = EnumFormatHeadPtr;
+            const HEAD_BITS: u32 = 88;
             fn encode_head(&self, buf: &mut crate::bytes::BytesMut) -> Self::HeadPtr {
                 let tag_bytes = self.tag_bytes.encode_head(buf);
                 let inner_bytes = self.inner_bytes.encode_head(buf);
@@ -277,11 +266,6 @@ pub mod layout {
             has_ptr: <bool as crate::Encode>::HeadPtr,
             variants: <crate::vec::Vec<super::EnumVariantFormat> as crate::Encode>::HeadPtr,
         }
-        impl crate::Layout for EnumFormat {
-            fn head_size() -> usize {
-                88
-            }
-        }
 
         impl crate::Decode for EnumFormat {
             fn decode(buf: &[u8]) -> crate::Result<Self> {
@@ -301,6 +285,7 @@ pub mod layout {
         #[allow(clippy::all, unused_variables)]
         impl crate::Encode for EnumVariantFormat {
             type HeadPtr = EnumVariantFormatHeadPtr;
+            const HEAD_BITS: u32 = 16;
             fn encode_head(&self, buf: &mut crate::bytes::BytesMut) -> Self::HeadPtr {
                 let is_unit = self.is_unit.encode_head(buf);
                 let padding_bytes = self.padding_bytes.encode_head(buf);
@@ -318,11 +303,6 @@ pub mod layout {
         pub struct EnumVariantFormatHeadPtr {
             is_unit: <bool as crate::Encode>::HeadPtr,
             padding_bytes: <u8 as crate::Encode>::HeadPtr,
-        }
-        impl crate::Layout for EnumVariantFormat {
-            fn head_size() -> usize {
-                16
-            }
         }
 
         impl crate::Decode for EnumVariantFormat {
@@ -563,6 +543,7 @@ pub mod ir {
         #[allow(clippy::all, unused_variables)]
         impl crate::Encode for Program {
             type HeadPtr = ProgramHeadPtr;
+            const HEAD_BITS: u32 = 288;
             fn encode_head(&self, buf: &mut crate::bytes::BytesMut) -> Self::HeadPtr {
                 let main = self.main.encode_head(buf);
                 let defs = self.defs.encode_head(buf);
@@ -578,11 +559,6 @@ pub mod ir {
             main: <super::Expr as crate::Encode>::HeadPtr,
             defs: <crate::vec::Vec<super::TyDef> as crate::Encode>::HeadPtr,
         }
-        impl crate::Layout for Program {
-            fn head_size() -> usize {
-                288
-            }
-        }
 
         impl crate::Decode for Program {
             fn decode(buf: &[u8]) -> crate::Result<Self> {
@@ -595,6 +571,7 @@ pub mod ir {
         #[allow(clippy::all, unused_variables)]
         impl crate::Encode for Expr {
             type HeadPtr = ExprHeadPtr;
+            const HEAD_BITS: u32 = 224;
             fn encode_head(&self, buf: &mut crate::bytes::BytesMut) -> Self::HeadPtr {
                 let kind = self.kind.encode_head(buf);
                 let ty = self.ty.encode_head(buf);
@@ -610,11 +587,6 @@ pub mod ir {
             kind: <super::ExprKind as crate::Encode>::HeadPtr,
             ty: <super::Ty as crate::Encode>::HeadPtr,
         }
-        impl crate::Layout for Expr {
-            fn head_size() -> usize {
-                224
-            }
-        }
 
         impl crate::Decode for Expr {
             fn decode(buf: &[u8]) -> crate::Result<Self> {
@@ -628,6 +600,7 @@ pub mod ir {
         #[allow(clippy::all)]
         impl crate::Encode for ExprKind {
             type HeadPtr = ExprKindHeadPtr;
+            const HEAD_BITS: u32 = 40;
             fn encode_head(&self, w: &mut crate::bytes::BytesMut) -> ExprKindHeadPtr {
                 match self {
                     Self::Pointer(inner) => {
@@ -821,11 +794,6 @@ pub mod ir {
             Binding(crate::ReversePointer),
             Switch(crate::ReversePointer),
         }
-        impl crate::Layout for ExprKind {
-            fn head_size() -> usize {
-                40
-            }
-        }
 
         impl crate::Decode for ExprKind {
             fn decode(buf: &[u8]) -> crate::Result<Self> {
@@ -908,6 +876,7 @@ pub mod ir {
         #[allow(clippy::all)]
         impl crate::Encode for Pointer {
             type HeadPtr = PointerHeadPtr;
+            const HEAD_BITS: u32 = 40;
             fn encode_head(&self, w: &mut crate::bytes::BytesMut) -> PointerHeadPtr {
                 match self {
                     Self::External(inner) => {
@@ -966,11 +935,6 @@ pub mod ir {
             Binding(crate::ReversePointer),
             Parameter(crate::ReversePointer),
         }
-        impl crate::Layout for Pointer {
-            fn head_size() -> usize {
-                40
-            }
-        }
 
         impl crate::Decode for Pointer {
             fn decode(buf: &[u8]) -> crate::Result<Self> {
@@ -1002,6 +966,7 @@ pub mod ir {
         #[allow(clippy::all, unused_variables)]
         impl crate::Encode for ExternalPtr {
             type HeadPtr = ExternalPtrHeadPtr;
+            const HEAD_BITS: u32 = 72;
             fn encode_head(&self, buf: &mut crate::bytes::BytesMut) -> Self::HeadPtr {
                 let id = self.id.encode_head(buf);
                 let inject_type = self.inject_type.encode_head(buf);
@@ -1017,11 +982,6 @@ pub mod ir {
             id: <crate::string::String as crate::Encode>::HeadPtr,
             inject_type: <bool as crate::Encode>::HeadPtr,
         }
-        impl crate::Layout for ExternalPtr {
-            fn head_size() -> usize {
-                72
-            }
-        }
 
         impl crate::Decode for ExternalPtr {
             fn decode(buf: &[u8]) -> crate::Result<Self> {
@@ -1034,6 +994,7 @@ pub mod ir {
         #[allow(clippy::all, unused_variables)]
         impl crate::Encode for ParameterPtr {
             type HeadPtr = ParameterPtrHeadPtr;
+            const HEAD_BITS: u32 = 40;
             fn encode_head(&self, buf: &mut crate::bytes::BytesMut) -> Self::HeadPtr {
                 let function_id = self.function_id.encode_head(buf);
                 let param_position = self.param_position.encode_head(buf);
@@ -1052,11 +1013,6 @@ pub mod ir {
             function_id: <u32 as crate::Encode>::HeadPtr,
             param_position: <u8 as crate::Encode>::HeadPtr,
         }
-        impl crate::Layout for ParameterPtr {
-            fn head_size() -> usize {
-                40
-            }
-        }
 
         impl crate::Decode for ParameterPtr {
             fn decode(buf: &[u8]) -> crate::Result<Self> {
@@ -1073,6 +1029,7 @@ pub mod ir {
         #[allow(clippy::all)]
         impl crate::Encode for Literal {
             type HeadPtr = LiteralHeadPtr;
+            const HEAD_BITS: u32 = 40;
             fn encode_head(&self, w: &mut crate::bytes::BytesMut) -> LiteralHeadPtr {
                 match self {
                     Self::Prim8(inner) => {
@@ -1161,11 +1118,6 @@ pub mod ir {
             Prim64(crate::ReversePointer),
             Text(crate::ReversePointer),
         }
-        impl crate::Layout for Literal {
-            fn head_size() -> usize {
-                40
-            }
-        }
 
         impl crate::Decode for Literal {
             fn decode(buf: &[u8]) -> crate::Result<Self> {
@@ -1207,6 +1159,7 @@ pub mod ir {
         #[allow(clippy::all, unused_variables)]
         impl crate::Encode for Call {
             type HeadPtr = CallHeadPtr;
+            const HEAD_BITS: u32 = 288;
             fn encode_head(&self, buf: &mut crate::bytes::BytesMut) -> Self::HeadPtr {
                 let function = self.function.encode_head(buf);
                 let args = self.args.encode_head(buf);
@@ -1222,11 +1175,6 @@ pub mod ir {
             function: <super::Expr as crate::Encode>::HeadPtr,
             args: <crate::vec::Vec<super::Expr> as crate::Encode>::HeadPtr,
         }
-        impl crate::Layout for Call {
-            fn head_size() -> usize {
-                288
-            }
-        }
 
         impl crate::Decode for Call {
             fn decode(buf: &[u8]) -> crate::Result<Self> {
@@ -1239,6 +1187,7 @@ pub mod ir {
         #[allow(clippy::all, unused_variables)]
         impl crate::Encode for Function {
             type HeadPtr = FunctionHeadPtr;
+            const HEAD_BITS: u32 = 256;
             fn encode_head(&self, buf: &mut crate::bytes::BytesMut) -> Self::HeadPtr {
                 let id = self.id.encode_head(buf);
                 let body = self.body.encode_head(buf);
@@ -1254,11 +1203,6 @@ pub mod ir {
             id: <u32 as crate::Encode>::HeadPtr,
             body: <super::Expr as crate::Encode>::HeadPtr,
         }
-        impl crate::Layout for Function {
-            fn head_size() -> usize {
-                256
-            }
-        }
 
         impl crate::Decode for Function {
             fn decode(buf: &[u8]) -> crate::Result<Self> {
@@ -1271,6 +1215,7 @@ pub mod ir {
         #[allow(clippy::all, unused_variables)]
         impl crate::Encode for TupleField {
             type HeadPtr = TupleFieldHeadPtr;
+            const HEAD_BITS: u32 = 232;
             fn encode_head(&self, buf: &mut crate::bytes::BytesMut) -> Self::HeadPtr {
                 let expr = self.expr.encode_head(buf);
                 let unpack = self.unpack.encode_head(buf);
@@ -1286,11 +1231,6 @@ pub mod ir {
             expr: <super::Expr as crate::Encode>::HeadPtr,
             unpack: <bool as crate::Encode>::HeadPtr,
         }
-        impl crate::Layout for TupleField {
-            fn head_size() -> usize {
-                232
-            }
-        }
 
         impl crate::Decode for TupleField {
             fn decode(buf: &[u8]) -> crate::Result<Self> {
@@ -1303,6 +1243,7 @@ pub mod ir {
         #[allow(clippy::all, unused_variables)]
         impl crate::Encode for EnumVariant {
             type HeadPtr = EnumVariantHeadPtr;
+            const HEAD_BITS: u32 = 288;
             fn encode_head(&self, buf: &mut crate::bytes::BytesMut) -> Self::HeadPtr {
                 let tag = self.tag.encode_head(buf);
                 let inner = self.inner.encode_head(buf);
@@ -1318,11 +1259,6 @@ pub mod ir {
             tag: <u64 as crate::Encode>::HeadPtr,
             inner: <super::Expr as crate::Encode>::HeadPtr,
         }
-        impl crate::Layout for EnumVariant {
-            fn head_size() -> usize {
-                288
-            }
-        }
 
         impl crate::Decode for EnumVariant {
             fn decode(buf: &[u8]) -> crate::Result<Self> {
@@ -1335,6 +1271,7 @@ pub mod ir {
         #[allow(clippy::all, unused_variables)]
         impl crate::Encode for EnumTag {
             type HeadPtr = EnumTagHeadPtr;
+            const HEAD_BITS: u32 = 224;
             fn encode_head(&self, buf: &mut crate::bytes::BytesMut) -> Self::HeadPtr {
                 let subject = self.subject.encode_head(buf);
                 EnumTagHeadPtr { subject }
@@ -1347,11 +1284,6 @@ pub mod ir {
         pub struct EnumTagHeadPtr {
             subject: <super::Expr as crate::Encode>::HeadPtr,
         }
-        impl crate::Layout for EnumTag {
-            fn head_size() -> usize {
-                224
-            }
-        }
 
         impl crate::Decode for EnumTag {
             fn decode(buf: &[u8]) -> crate::Result<Self> {
@@ -1363,6 +1295,7 @@ pub mod ir {
         #[allow(clippy::all, unused_variables)]
         impl crate::Encode for EnumUnwrap {
             type HeadPtr = EnumUnwrapHeadPtr;
+            const HEAD_BITS: u32 = 288;
             fn encode_head(&self, buf: &mut crate::bytes::BytesMut) -> Self::HeadPtr {
                 let subject = self.subject.encode_head(buf);
                 let tag = self.tag.encode_head(buf);
@@ -1378,11 +1311,6 @@ pub mod ir {
             subject: <super::Expr as crate::Encode>::HeadPtr,
             tag: <u64 as crate::Encode>::HeadPtr,
         }
-        impl crate::Layout for EnumUnwrap {
-            fn head_size() -> usize {
-                288
-            }
-        }
 
         impl crate::Decode for EnumUnwrap {
             fn decode(buf: &[u8]) -> crate::Result<Self> {
@@ -1395,6 +1323,7 @@ pub mod ir {
         #[allow(clippy::all, unused_variables)]
         impl crate::Encode for TupleLookup {
             type HeadPtr = TupleLookupHeadPtr;
+            const HEAD_BITS: u32 = 240;
             fn encode_head(&self, buf: &mut crate::bytes::BytesMut) -> Self::HeadPtr {
                 let base = self.base.encode_head(buf);
                 let position = self.position.encode_head(buf);
@@ -1410,11 +1339,6 @@ pub mod ir {
             base: <super::Expr as crate::Encode>::HeadPtr,
             position: <u16 as crate::Encode>::HeadPtr,
         }
-        impl crate::Layout for TupleLookup {
-            fn head_size() -> usize {
-                240
-            }
-        }
 
         impl crate::Decode for TupleLookup {
             fn decode(buf: &[u8]) -> crate::Result<Self> {
@@ -1427,6 +1351,7 @@ pub mod ir {
         #[allow(clippy::all, unused_variables)]
         impl crate::Encode for Binding {
             type HeadPtr = BindingHeadPtr;
+            const HEAD_BITS: u32 = 480;
             fn encode_head(&self, buf: &mut crate::bytes::BytesMut) -> Self::HeadPtr {
                 let id = self.id.encode_head(buf);
                 let expr = self.expr.encode_head(buf);
@@ -1445,11 +1370,6 @@ pub mod ir {
             expr: <super::Expr as crate::Encode>::HeadPtr,
             main: <super::Expr as crate::Encode>::HeadPtr,
         }
-        impl crate::Layout for Binding {
-            fn head_size() -> usize {
-                480
-            }
-        }
 
         impl crate::Decode for Binding {
             fn decode(buf: &[u8]) -> crate::Result<Self> {
@@ -1463,6 +1383,7 @@ pub mod ir {
         #[allow(clippy::all, unused_variables)]
         impl crate::Encode for SwitchBranch {
             type HeadPtr = SwitchBranchHeadPtr;
+            const HEAD_BITS: u32 = 448;
             fn encode_head(&self, buf: &mut crate::bytes::BytesMut) -> Self::HeadPtr {
                 let condition = self.condition.encode_head(buf);
                 let value = self.value.encode_head(buf);
@@ -1478,11 +1399,6 @@ pub mod ir {
             condition: <super::Expr as crate::Encode>::HeadPtr,
             value: <super::Expr as crate::Encode>::HeadPtr,
         }
-        impl crate::Layout for SwitchBranch {
-            fn head_size() -> usize {
-                448
-            }
-        }
 
         impl crate::Decode for SwitchBranch {
             fn decode(buf: &[u8]) -> crate::Result<Self> {
@@ -1495,6 +1411,7 @@ pub mod ir {
         #[allow(clippy::all, unused_variables)]
         impl crate::Encode for TyDef {
             type HeadPtr = TyDefHeadPtr;
+            const HEAD_BITS: u32 = 248;
             fn encode_head(&self, buf: &mut crate::bytes::BytesMut) -> Self::HeadPtr {
                 let name = self.name.encode_head(buf);
                 let ty = self.ty.encode_head(buf);
@@ -1510,11 +1427,6 @@ pub mod ir {
             name: <super::Path as crate::Encode>::HeadPtr,
             ty: <super::Ty as crate::Encode>::HeadPtr,
         }
-        impl crate::Layout for TyDef {
-            fn head_size() -> usize {
-                248
-            }
-        }
 
         impl crate::Decode for TyDef {
             fn decode(buf: &[u8]) -> crate::Result<Self> {
@@ -1527,6 +1439,7 @@ pub mod ir {
         #[allow(clippy::all, unused_variables)]
         impl crate::Encode for Ty {
             type HeadPtr = TyHeadPtr;
+            const HEAD_BITS: u32 = 184;
             fn encode_head(&self, buf: &mut crate::bytes::BytesMut) -> Self::HeadPtr {
                 let kind = self.kind.encode_head(buf);
                 let layout = self.layout.encode_head(buf);
@@ -1554,11 +1467,6 @@ pub mod ir {
             name: <core::option::Option<crate::string::String> as crate::Encode>::HeadPtr,
             variants_recursive: <crate::vec::Vec<u16> as crate::Encode>::HeadPtr,
         }
-        impl crate::Layout for Ty {
-            fn head_size() -> usize {
-                184
-            }
-        }
 
         impl crate::Decode for Ty {
             fn decode(buf: &[u8]) -> crate::Result<Self> {
@@ -1579,6 +1487,7 @@ pub mod ir {
         #[allow(clippy::all)]
         impl crate::Encode for TyKind {
             type HeadPtr = TyKindHeadPtr;
+            const HEAD_BITS: u32 = 40;
             fn encode_head(&self, w: &mut crate::bytes::BytesMut) -> TyKindHeadPtr {
                 match self {
                     Self::Primitive(inner) => {
@@ -1682,11 +1591,6 @@ pub mod ir {
             Function(crate::ReversePointer),
             Ident(crate::ReversePointer),
         }
-        impl crate::Layout for TyKind {
-            fn head_size() -> usize {
-                40
-            }
-        }
 
         impl crate::Decode for TyKind {
             fn decode(buf: &[u8]) -> crate::Result<Self> {
@@ -1738,6 +1642,7 @@ pub mod ir {
         #[allow(clippy::all)]
         impl crate::Encode for TyPrimitive {
             type HeadPtr = ();
+            const HEAD_BITS: u32 = 8;
             fn encode_head(&self, w: &mut crate::bytes::BytesMut) -> () {
                 match self {
                     Self::Prim8 => {
@@ -1755,11 +1660,6 @@ pub mod ir {
                 }
             }
             fn encode_body(&self, head: (), w: &mut crate::bytes::BytesMut) {}
-        }
-        impl crate::Layout for TyPrimitive {
-            fn head_size() -> usize {
-                8
-            }
         }
 
         impl crate::Decode for TyPrimitive {
@@ -1780,6 +1680,7 @@ pub mod ir {
         #[allow(clippy::all, unused_variables)]
         impl crate::Encode for TyTupleField {
             type HeadPtr = TyTupleFieldHeadPtr;
+            const HEAD_BITS: u32 = 224;
             fn encode_head(&self, buf: &mut crate::bytes::BytesMut) -> Self::HeadPtr {
                 let name = self.name.encode_head(buf);
                 let ty = self.ty.encode_head(buf);
@@ -1795,11 +1696,6 @@ pub mod ir {
             name: <core::option::Option<crate::string::String> as crate::Encode>::HeadPtr,
             ty: <super::Ty as crate::Encode>::HeadPtr,
         }
-        impl crate::Layout for TyTupleField {
-            fn head_size() -> usize {
-                224
-            }
-        }
 
         impl crate::Decode for TyTupleField {
             fn decode(buf: &[u8]) -> crate::Result<Self> {
@@ -1812,6 +1708,7 @@ pub mod ir {
         #[allow(clippy::all, unused_variables)]
         impl crate::Encode for TyEnumVariant {
             type HeadPtr = TyEnumVariantHeadPtr;
+            const HEAD_BITS: u32 = 248;
             fn encode_head(&self, buf: &mut crate::bytes::BytesMut) -> Self::HeadPtr {
                 let name = self.name.encode_head(buf);
                 let ty = self.ty.encode_head(buf);
@@ -1827,11 +1724,6 @@ pub mod ir {
             name: <crate::string::String as crate::Encode>::HeadPtr,
             ty: <super::Ty as crate::Encode>::HeadPtr,
         }
-        impl crate::Layout for TyEnumVariant {
-            fn head_size() -> usize {
-                248
-            }
-        }
 
         impl crate::Decode for TyEnumVariant {
             fn decode(buf: &[u8]) -> crate::Result<Self> {
@@ -1844,6 +1736,7 @@ pub mod ir {
         #[allow(clippy::all, unused_variables)]
         impl crate::Encode for TyLayout {
             type HeadPtr = TyLayoutHeadPtr;
+            const HEAD_BITS: u32 = 96;
             fn encode_head(&self, buf: &mut crate::bytes::BytesMut) -> Self::HeadPtr {
                 let head_size = self.head_size.encode_head(buf);
                 let body_ptrs = self.body_ptrs.encode_head(buf);
@@ -1862,11 +1755,6 @@ pub mod ir {
             head_size: <u32 as crate::Encode>::HeadPtr,
             body_ptrs: <crate::vec::Vec<u32> as crate::Encode>::HeadPtr,
         }
-        impl crate::Layout for TyLayout {
-            fn head_size() -> usize {
-                96
-            }
-        }
 
         impl crate::Decode for TyLayout {
             fn decode(buf: &[u8]) -> crate::Result<Self> {
@@ -1882,6 +1770,7 @@ pub mod ir {
         #[allow(clippy::all, unused_variables)]
         impl crate::Encode for TyFunction {
             type HeadPtr = TyFunctionHeadPtr;
+            const HEAD_BITS: u32 = 248;
             fn encode_head(&self, buf: &mut crate::bytes::BytesMut) -> Self::HeadPtr {
                 let params = self.params.encode_head(buf);
                 let body = self.body.encode_head(buf);
@@ -1897,11 +1786,6 @@ pub mod ir {
             params: <crate::vec::Vec<super::Ty> as crate::Encode>::HeadPtr,
             body: <super::Ty as crate::Encode>::HeadPtr,
         }
-        impl crate::Layout for TyFunction {
-            fn head_size() -> usize {
-                248
-            }
-        }
 
         impl crate::Decode for TyFunction {
             fn decode(buf: &[u8]) -> crate::Result<Self> {
@@ -1913,16 +1797,12 @@ pub mod ir {
 
         impl crate::Encode for Path {
             type HeadPtr = crate::ReversePointer;
+            const HEAD_BITS: u32 = 64;
             fn encode_head(&self, buf: &mut crate::bytes::BytesMut) -> Self::HeadPtr {
                 self.0.encode_head(buf)
             }
             fn encode_body(&self, head: Self::HeadPtr, buf: &mut crate::bytes::BytesMut) {
                 self.0.encode_body(head, buf)
-            }
-        }
-        impl crate::Layout for Path {
-            fn head_size() -> usize {
-                64
             }
         }
 
@@ -1935,6 +1815,7 @@ pub mod ir {
         #[allow(clippy::all, unused_variables)]
         impl crate::Encode for Module {
             type HeadPtr = ModuleHeadPtr;
+            const HEAD_BITS: u32 = 64;
             fn encode_head(&self, buf: &mut crate::bytes::BytesMut) -> Self::HeadPtr {
                 let decls = self.decls.encode_head(buf);
                 ModuleHeadPtr { decls }
@@ -1947,11 +1828,6 @@ pub mod ir {
         pub struct ModuleHeadPtr {
             decls: <crate::vec::Vec<ModuledeclsItems> as crate::Encode>::HeadPtr,
         }
-        impl crate::Layout for Module {
-            fn head_size() -> usize {
-                64
-            }
-        }
 
         impl crate::Decode for Module {
             fn decode(buf: &[u8]) -> crate::Result<Self> {
@@ -1963,6 +1839,7 @@ pub mod ir {
         #[allow(clippy::all, unused_variables)]
         impl crate::Encode for ModuledeclsItems {
             type HeadPtr = ModuledeclsItemsHeadPtr;
+            const HEAD_BITS: u32 = 104;
             fn encode_head(&self, buf: &mut crate::bytes::BytesMut) -> Self::HeadPtr {
                 let name = self.name.encode_head(buf);
                 let decl = self.decl.encode_head(buf);
@@ -1978,11 +1855,6 @@ pub mod ir {
             name: <crate::string::String as crate::Encode>::HeadPtr,
             decl: <super::Decl as crate::Encode>::HeadPtr,
         }
-        impl crate::Layout for ModuledeclsItems {
-            fn head_size() -> usize {
-                104
-            }
-        }
 
         impl crate::Decode for ModuledeclsItems {
             fn decode(buf: &[u8]) -> crate::Result<Self> {
@@ -1996,6 +1868,7 @@ pub mod ir {
         #[allow(clippy::all)]
         impl crate::Encode for Decl {
             type HeadPtr = DeclHeadPtr;
+            const HEAD_BITS: u32 = 40;
             fn encode_head(&self, w: &mut crate::bytes::BytesMut) -> DeclHeadPtr {
                 match self {
                     Self::Mod(inner) => {
@@ -2053,11 +1926,6 @@ pub mod ir {
             Mod(crate::ReversePointer),
             Ty(crate::ReversePointer),
             Var(crate::ReversePointer),
-        }
-        impl crate::Layout for Decl {
-            fn head_size() -> usize {
-                40
-            }
         }
 
         impl crate::Decode for Decl {
@@ -2291,6 +2159,7 @@ pub mod br {
             #[allow(clippy::all, unused_variables)]
             impl crate::Encode for ItemHeadArgs {
                 type HeadPtr = ItemHeadArgsHeadPtr;
+                const HEAD_BITS: u32 = 32;
                 fn encode_head(&self, buf: &mut crate::bytes::BytesMut) -> Self::HeadPtr {
                     let item_head = self.item_head.encode_head(buf);
                     ItemHeadArgsHeadPtr { item_head }
@@ -2303,11 +2172,6 @@ pub mod br {
             pub struct ItemHeadArgsHeadPtr {
                 item_head: <u32 as crate::Encode>::HeadPtr,
             }
-            impl crate::Layout for ItemHeadArgs {
-                fn head_size() -> usize {
-                    32
-                }
-            }
 
             impl crate::Decode for ItemHeadArgs {
                 fn decode(buf: &[u8]) -> crate::Result<Self> {
@@ -2319,6 +2183,7 @@ pub mod br {
             #[allow(clippy::all, unused_variables)]
             impl crate::Encode for ItemLayoutArgs {
                 type HeadPtr = ItemLayoutArgsHeadPtr;
+                const HEAD_BITS: u32 = 96;
                 fn encode_head(&self, buf: &mut crate::bytes::BytesMut) -> Self::HeadPtr {
                     let item = self.item.encode_head(buf);
                     ItemLayoutArgsHeadPtr { item }
@@ -2331,11 +2196,6 @@ pub mod br {
             pub struct ItemLayoutArgsHeadPtr {
                 item: <super::super::TyLayout as crate::Encode>::HeadPtr,
             }
-            impl crate::Layout for ItemLayoutArgs {
-                fn head_size() -> usize {
-                    96
-                }
-            }
 
             impl crate::Decode for ItemLayoutArgs {
                 fn decode(buf: &[u8]) -> crate::Result<Self> {
@@ -2347,6 +2207,7 @@ pub mod br {
             #[allow(clippy::all, unused_variables)]
             impl crate::Encode for ShiftArgs {
                 type HeadPtr = ShiftArgsHeadPtr;
+                const HEAD_BITS: u32 = 160;
                 fn encode_head(&self, buf: &mut crate::bytes::BytesMut) -> Self::HeadPtr {
                     let item = self.item.encode_head(buf);
                     let default = self.default.encode_head(buf);
@@ -2362,11 +2223,6 @@ pub mod br {
                 item: <super::super::TyLayout as crate::Encode>::HeadPtr,
                 default: <crate::vec::Vec<u8> as crate::Encode>::HeadPtr,
             }
-            impl crate::Layout for ShiftArgs {
-                fn head_size() -> usize {
-                    160
-                }
-            }
 
             impl crate::Decode for ShiftArgs {
                 fn decode(buf: &[u8]) -> crate::Result<Self> {
@@ -2379,6 +2235,7 @@ pub mod br {
             #[allow(clippy::all, unused_variables)]
             impl crate::Encode for IndexArgs {
                 type HeadPtr = IndexArgsHeadPtr;
+                const HEAD_BITS: u32 = 96;
                 fn encode_head(&self, buf: &mut crate::bytes::BytesMut) -> Self::HeadPtr {
                     let item_head = self.item_head.encode_head(buf);
                     let output_enum_format = self.output_enum_format.encode_head(buf);
@@ -2398,11 +2255,6 @@ pub mod br {
                 item_head: <u32 as crate::Encode>::HeadPtr,
                 output_enum_format: <crate::vec::Vec<u8> as crate::Encode>::HeadPtr,
             }
-            impl crate::Layout for IndexArgs {
-                fn head_size() -> usize {
-                    96
-                }
-            }
 
             impl crate::Decode for IndexArgs {
                 fn decode(buf: &[u8]) -> crate::Result<Self> {
@@ -2418,6 +2270,7 @@ pub mod br {
             #[allow(clippy::all, unused_variables)]
             impl crate::Encode for MapArgs {
                 type HeadPtr = MapArgsHeadPtr;
+                const HEAD_BITS: u32 = 128;
                 fn encode_head(&self, buf: &mut crate::bytes::BytesMut) -> Self::HeadPtr {
                     let input_item_head = self.input_item_head.encode_head(buf);
                     let output_item = self.output_item.encode_head(buf);
@@ -2436,11 +2289,6 @@ pub mod br {
                 input_item_head: <u32 as crate::Encode>::HeadPtr,
                 output_item: <super::super::TyLayout as crate::Encode>::HeadPtr,
             }
-            impl crate::Layout for MapArgs {
-                fn head_size() -> usize {
-                    128
-                }
-            }
 
             impl crate::Decode for MapArgs {
                 fn decode(buf: &[u8]) -> crate::Result<Self> {
@@ -2456,6 +2304,7 @@ pub mod br {
             #[allow(clippy::all, unused_variables)]
             impl crate::Encode for ZipArgs {
                 type HeadPtr = ZipArgsHeadPtr;
+                const HEAD_BITS: u32 = 192;
                 fn encode_head(&self, buf: &mut crate::bytes::BytesMut) -> Self::HeadPtr {
                     let a = self.a.encode_head(buf);
                     let b = self.b.encode_head(buf);
@@ -2471,11 +2320,6 @@ pub mod br {
                 a: <super::super::TyLayout as crate::Encode>::HeadPtr,
                 b: <super::super::TyLayout as crate::Encode>::HeadPtr,
             }
-            impl crate::Layout for ZipArgs {
-                fn head_size() -> usize {
-                    192
-                }
-            }
 
             impl crate::Decode for ZipArgs {
                 fn decode(buf: &[u8]) -> crate::Result<Self> {
@@ -2488,6 +2332,7 @@ pub mod br {
             #[allow(clippy::all, unused_variables)]
             impl crate::Encode for ToColumnarArgs {
                 type HeadPtr = ToColumnarArgsHeadPtr;
+                const HEAD_BITS: u32 = 160;
                 fn encode_head(&self, buf: &mut crate::bytes::BytesMut) -> Self::HeadPtr {
                     let item_head = self.item_head.encode_head(buf);
                     let field_offsets = self.field_offsets.encode_head(buf);
@@ -2510,11 +2355,6 @@ pub mod br {
                 field_offsets: <crate::vec::Vec<u32> as crate::Encode>::HeadPtr,
                 fields: <crate::vec::Vec<super::super::TyLayout> as crate::Encode>::HeadPtr,
             }
-            impl crate::Layout for ToColumnarArgs {
-                fn head_size() -> usize {
-                    160
-                }
-            }
 
             impl crate::Decode for ToColumnarArgs {
                 fn decode(buf: &[u8]) -> crate::Result<Self> {
@@ -2532,6 +2372,7 @@ pub mod br {
             #[allow(clippy::all, unused_variables)]
             impl crate::Encode for FromColumnarArgs {
                 type HeadPtr = FromColumnarArgsHeadPtr;
+                const HEAD_BITS: u32 = 160;
                 fn encode_head(&self, buf: &mut crate::bytes::BytesMut) -> Self::HeadPtr {
                     let output = self.output.encode_head(buf);
                     let fields = self.fields.encode_head(buf);
@@ -2547,11 +2388,6 @@ pub mod br {
                 output: <super::super::TyLayout as crate::Encode>::HeadPtr,
                 fields: <crate::vec::Vec<super::super::TyLayout> as crate::Encode>::HeadPtr,
             }
-            impl crate::Layout for FromColumnarArgs {
-                fn head_size() -> usize {
-                    160
-                }
-            }
 
             impl crate::Decode for FromColumnarArgs {
                 fn decode(buf: &[u8]) -> crate::Result<Self> {
@@ -2564,6 +2400,7 @@ pub mod br {
             #[allow(clippy::all, unused_variables)]
             impl crate::Encode for GroupArgs {
                 type HeadPtr = GroupArgsHeadPtr;
+                const HEAD_BITS: u32 = 288;
                 fn encode_head(&self, buf: &mut crate::bytes::BytesMut) -> Self::HeadPtr {
                     let input = self.input.encode_head(buf);
                     let output = self.output.encode_head(buf);
@@ -2590,11 +2427,6 @@ pub mod br {
                 output_fields: <crate::vec::Vec<super::super::TyLayout> as crate::Encode>::HeadPtr,
                 key_head: <u32 as crate::Encode>::HeadPtr,
             }
-            impl crate::Layout for GroupArgs {
-                fn head_size() -> usize {
-                    288
-                }
-            }
 
             impl crate::Decode for GroupArgs {
                 fn decode(buf: &[u8]) -> crate::Result<Self> {
@@ -2615,6 +2447,7 @@ pub mod br {
             #[allow(clippy::all, unused_variables)]
             impl crate::Encode for InjectTypeArgs {
                 type HeadPtr = InjectTypeArgsHeadPtr;
+                const HEAD_BITS: u32 = 184;
                 fn encode_head(&self, buf: &mut crate::bytes::BytesMut) -> Self::HeadPtr {
                     let ty = self.ty.encode_head(buf);
                     InjectTypeArgsHeadPtr { ty }
@@ -2626,11 +2459,6 @@ pub mod br {
             #[allow(non_camel_case_types)]
             pub struct InjectTypeArgsHeadPtr {
                 ty: <super::super::super::ir::Ty as crate::Encode>::HeadPtr,
-            }
-            impl crate::Layout for InjectTypeArgs {
-                fn head_size() -> usize {
-                    184
-                }
             }
 
             impl crate::Decode for InjectTypeArgs {
@@ -2651,6 +2479,7 @@ pub mod br {
         #[allow(clippy::all, unused_variables)]
         impl crate::Encode for Program {
             type HeadPtr = ProgramHeadPtr;
+            const HEAD_BITS: u32 = 168;
             fn encode_head(&self, buf: &mut crate::bytes::BytesMut) -> Self::HeadPtr {
                 let externals = self.externals.encode_head(buf);
                 let main = self.main.encode_head(buf);
@@ -2673,11 +2502,6 @@ pub mod br {
             main: <super::Expr as crate::Encode>::HeadPtr,
             defs: <crate::vec::Vec<super::super::ir::TyDef> as crate::Encode>::HeadPtr,
         }
-        impl crate::Layout for Program {
-            fn head_size() -> usize {
-                168
-            }
-        }
 
         impl crate::Decode for Program {
             fn decode(buf: &[u8]) -> crate::Result<Self> {
@@ -2695,6 +2519,7 @@ pub mod br {
         #[allow(clippy::all, unused_variables)]
         impl crate::Encode for ExternalSymbol {
             type HeadPtr = ExternalSymbolHeadPtr;
+            const HEAD_BITS: u32 = 128;
             fn encode_head(&self, buf: &mut crate::bytes::BytesMut) -> Self::HeadPtr {
                 let id = self.id.encode_head(buf);
                 let static_args = self.static_args.encode_head(buf);
@@ -2710,11 +2535,6 @@ pub mod br {
             id: <crate::string::String as crate::Encode>::HeadPtr,
             static_args: <crate::vec::Vec<u8> as crate::Encode>::HeadPtr,
         }
-        impl crate::Layout for ExternalSymbol {
-            fn head_size() -> usize {
-                128
-            }
-        }
 
         impl crate::Decode for ExternalSymbol {
             fn decode(buf: &[u8]) -> crate::Result<Self> {
@@ -2727,6 +2547,7 @@ pub mod br {
         #[allow(clippy::all, unused_variables)]
         impl crate::Encode for Expr {
             type HeadPtr = ExprHeadPtr;
+            const HEAD_BITS: u32 = 40;
             fn encode_head(&self, buf: &mut crate::bytes::BytesMut) -> Self::HeadPtr {
                 let kind = self.kind.encode_head(buf);
                 ExprHeadPtr { kind }
@@ -2738,11 +2559,6 @@ pub mod br {
         #[allow(non_camel_case_types)]
         pub struct ExprHeadPtr {
             kind: <super::ExprKind as crate::Encode>::HeadPtr,
-        }
-        impl crate::Layout for Expr {
-            fn head_size() -> usize {
-                40
-            }
         }
 
         impl crate::Decode for Expr {
@@ -2756,6 +2572,7 @@ pub mod br {
         #[allow(clippy::all)]
         impl crate::Encode for ExprKind {
             type HeadPtr = ExprKindHeadPtr;
+            const HEAD_BITS: u32 = 40;
             fn encode_head(&self, w: &mut crate::bytes::BytesMut) -> ExprKindHeadPtr {
                 match self {
                     Self::Pointer(inner) => {
@@ -2934,11 +2751,6 @@ pub mod br {
             Binding(crate::ReversePointer),
             Switch(crate::ReversePointer),
         }
-        impl crate::Layout for ExprKind {
-            fn head_size() -> usize {
-                40
-            }
-        }
 
         impl crate::Decode for ExprKind {
             fn decode(buf: &[u8]) -> crate::Result<Self> {
@@ -3011,16 +2823,12 @@ pub mod br {
 
         impl crate::Encode for Sid {
             type HeadPtr = <u32 as crate::Encode>::HeadPtr;
+            const HEAD_BITS: u32 = 32;
             fn encode_head(&self, buf: &mut crate::bytes::BytesMut) -> Self::HeadPtr {
                 self.0.encode_head(buf)
             }
             fn encode_body(&self, head: Self::HeadPtr, buf: &mut crate::bytes::BytesMut) {
                 self.0.encode_body(head, buf)
-            }
-        }
-        impl crate::Layout for Sid {
-            fn head_size() -> usize {
-                32
             }
         }
 
@@ -3033,6 +2841,7 @@ pub mod br {
         #[allow(clippy::all, unused_variables)]
         impl crate::Encode for Call {
             type HeadPtr = CallHeadPtr;
+            const HEAD_BITS: u32 = 104;
             fn encode_head(&self, buf: &mut crate::bytes::BytesMut) -> Self::HeadPtr {
                 let function = self.function.encode_head(buf);
                 let args = self.args.encode_head(buf);
@@ -3048,11 +2857,6 @@ pub mod br {
             function: <super::Expr as crate::Encode>::HeadPtr,
             args: <crate::vec::Vec<super::Expr> as crate::Encode>::HeadPtr,
         }
-        impl crate::Layout for Call {
-            fn head_size() -> usize {
-                104
-            }
-        }
 
         impl crate::Decode for Call {
             fn decode(buf: &[u8]) -> crate::Result<Self> {
@@ -3065,6 +2869,7 @@ pub mod br {
         #[allow(clippy::all, unused_variables)]
         impl crate::Encode for Function {
             type HeadPtr = FunctionHeadPtr;
+            const HEAD_BITS: u32 = 72;
             fn encode_head(&self, buf: &mut crate::bytes::BytesMut) -> Self::HeadPtr {
                 let symbol_ns = self.symbol_ns.encode_head(buf);
                 let body = self.body.encode_head(buf);
@@ -3080,11 +2885,6 @@ pub mod br {
             symbol_ns: <super::Sid as crate::Encode>::HeadPtr,
             body: <super::Expr as crate::Encode>::HeadPtr,
         }
-        impl crate::Layout for Function {
-            fn head_size() -> usize {
-                72
-            }
-        }
 
         impl crate::Decode for Function {
             fn decode(buf: &[u8]) -> crate::Result<Self> {
@@ -3097,6 +2897,7 @@ pub mod br {
         #[allow(clippy::all, unused_variables)]
         impl crate::Encode for Tuple {
             type HeadPtr = TupleHeadPtr;
+            const HEAD_BITS: u32 = 128;
             fn encode_head(&self, buf: &mut crate::bytes::BytesMut) -> Self::HeadPtr {
                 let fields = self.fields.encode_head(buf);
                 let field_layouts = self.field_layouts.encode_head(buf);
@@ -3115,11 +2916,6 @@ pub mod br {
             fields: <crate::vec::Vec<super::TupleField> as crate::Encode>::HeadPtr,
             field_layouts: <crate::vec::Vec<super::TyLayout> as crate::Encode>::HeadPtr,
         }
-        impl crate::Layout for Tuple {
-            fn head_size() -> usize {
-                128
-            }
-        }
 
         impl crate::Decode for Tuple {
             fn decode(buf: &[u8]) -> crate::Result<Self> {
@@ -3135,6 +2931,7 @@ pub mod br {
         #[allow(clippy::all, unused_variables)]
         impl crate::Encode for TupleField {
             type HeadPtr = TupleFieldHeadPtr;
+            const HEAD_BITS: u32 = 48;
             fn encode_head(&self, buf: &mut crate::bytes::BytesMut) -> Self::HeadPtr {
                 let expr = self.expr.encode_head(buf);
                 let unpack = self.unpack.encode_head(buf);
@@ -3150,11 +2947,6 @@ pub mod br {
             expr: <super::Expr as crate::Encode>::HeadPtr,
             unpack: <u8 as crate::Encode>::HeadPtr,
         }
-        impl crate::Layout for TupleField {
-            fn head_size() -> usize {
-                48
-            }
-        }
 
         impl crate::Decode for TupleField {
             fn decode(buf: &[u8]) -> crate::Result<Self> {
@@ -3167,6 +2959,7 @@ pub mod br {
         #[allow(clippy::all, unused_variables)]
         impl crate::Encode for Array {
             type HeadPtr = ArrayHeadPtr;
+            const HEAD_BITS: u32 = 160;
             fn encode_head(&self, buf: &mut crate::bytes::BytesMut) -> Self::HeadPtr {
                 let item_layout = self.item_layout.encode_head(buf);
                 let items = self.items.encode_head(buf);
@@ -3182,11 +2975,6 @@ pub mod br {
             item_layout: <super::TyLayout as crate::Encode>::HeadPtr,
             items: <crate::vec::Vec<super::Expr> as crate::Encode>::HeadPtr,
         }
-        impl crate::Layout for Array {
-            fn head_size() -> usize {
-                160
-            }
-        }
 
         impl crate::Decode for Array {
             fn decode(buf: &[u8]) -> crate::Result<Self> {
@@ -3199,6 +2987,7 @@ pub mod br {
         #[allow(clippy::all, unused_variables)]
         impl crate::Encode for EnumVariant {
             type HeadPtr = EnumVariantHeadPtr;
+            const HEAD_BITS: u32 = 128;
             fn encode_head(&self, buf: &mut crate::bytes::BytesMut) -> Self::HeadPtr {
                 let tag = self.tag.encode_head(buf);
                 let inner_bytes = self.inner_bytes.encode_head(buf);
@@ -3229,11 +3018,6 @@ pub mod br {
             padding_bytes: <u8 as crate::Encode>::HeadPtr,
             inner: <super::Expr as crate::Encode>::HeadPtr,
         }
-        impl crate::Layout for EnumVariant {
-            fn head_size() -> usize {
-                128
-            }
-        }
 
         impl crate::Decode for EnumVariant {
             fn decode(buf: &[u8]) -> crate::Result<Self> {
@@ -3255,6 +3039,7 @@ pub mod br {
         #[allow(clippy::all, unused_variables)]
         impl crate::Encode for Offset {
             type HeadPtr = OffsetHeadPtr;
+            const HEAD_BITS: u32 = 72;
             fn encode_head(&self, buf: &mut crate::bytes::BytesMut) -> Self::HeadPtr {
                 let base = self.base.encode_head(buf);
                 let offset = self.offset.encode_head(buf);
@@ -3270,11 +3055,6 @@ pub mod br {
             base: <super::Expr as crate::Encode>::HeadPtr,
             offset: <u32 as crate::Encode>::HeadPtr,
         }
-        impl crate::Layout for Offset {
-            fn head_size() -> usize {
-                72
-            }
-        }
 
         impl crate::Decode for Offset {
             fn decode(buf: &[u8]) -> crate::Result<Self> {
@@ -3287,6 +3067,7 @@ pub mod br {
         #[allow(clippy::all, unused_variables)]
         impl crate::Encode for Deref {
             type HeadPtr = DerefHeadPtr;
+            const HEAD_BITS: u32 = 40;
             fn encode_head(&self, buf: &mut crate::bytes::BytesMut) -> Self::HeadPtr {
                 let ptr = self.ptr.encode_head(buf);
                 DerefHeadPtr { ptr }
@@ -3299,11 +3080,6 @@ pub mod br {
         pub struct DerefHeadPtr {
             ptr: <super::Expr as crate::Encode>::HeadPtr,
         }
-        impl crate::Layout for Deref {
-            fn head_size() -> usize {
-                40
-            }
-        }
 
         impl crate::Decode for Deref {
             fn decode(buf: &[u8]) -> crate::Result<Self> {
@@ -3315,6 +3091,7 @@ pub mod br {
         #[allow(clippy::all, unused_variables)]
         impl crate::Encode for Binding {
             type HeadPtr = BindingHeadPtr;
+            const HEAD_BITS: u32 = 112;
             fn encode_head(&self, buf: &mut crate::bytes::BytesMut) -> Self::HeadPtr {
                 let symbol = self.symbol.encode_head(buf);
                 let expr = self.expr.encode_head(buf);
@@ -3333,11 +3110,6 @@ pub mod br {
             expr: <super::Expr as crate::Encode>::HeadPtr,
             main: <super::Expr as crate::Encode>::HeadPtr,
         }
-        impl crate::Layout for Binding {
-            fn head_size() -> usize {
-                112
-            }
-        }
 
         impl crate::Decode for Binding {
             fn decode(buf: &[u8]) -> crate::Result<Self> {
@@ -3351,6 +3123,7 @@ pub mod br {
         #[allow(clippy::all, unused_variables)]
         impl crate::Encode for SwitchBranch {
             type HeadPtr = SwitchBranchHeadPtr;
+            const HEAD_BITS: u32 = 80;
             fn encode_head(&self, buf: &mut crate::bytes::BytesMut) -> Self::HeadPtr {
                 let condition = self.condition.encode_head(buf);
                 let value = self.value.encode_head(buf);
@@ -3366,11 +3139,6 @@ pub mod br {
             condition: <super::Expr as crate::Encode>::HeadPtr,
             value: <super::Expr as crate::Encode>::HeadPtr,
         }
-        impl crate::Layout for SwitchBranch {
-            fn head_size() -> usize {
-                80
-            }
-        }
 
         impl crate::Decode for SwitchBranch {
             fn decode(buf: &[u8]) -> crate::Result<Self> {
@@ -3383,6 +3151,7 @@ pub mod br {
         #[allow(clippy::all, unused_variables)]
         impl crate::Encode for TyLayout {
             type HeadPtr = TyLayoutHeadPtr;
+            const HEAD_BITS: u32 = 96;
             fn encode_head(&self, buf: &mut crate::bytes::BytesMut) -> Self::HeadPtr {
                 let head_bytes = self.head_bytes.encode_head(buf);
                 let body_ptrs = self.body_ptrs.encode_head(buf);
@@ -3400,11 +3169,6 @@ pub mod br {
         pub struct TyLayoutHeadPtr {
             head_bytes: <u32 as crate::Encode>::HeadPtr,
             body_ptrs: <crate::vec::Vec<u32> as crate::Encode>::HeadPtr,
-        }
-        impl crate::Layout for TyLayout {
-            fn head_size() -> usize {
-                96
-            }
         }
 
         impl crate::Decode for TyLayout {

@@ -10,17 +10,17 @@
 use crate::ir;
 use crate::layout::ARRAY_HEAD_BYTES;
 use crate::vec;
-use crate::{ArrayReader, Decode, Encode, Layout, Result};
+use crate::{ArrayReader, Decode, Encode, Result};
 
 pub fn data_offset() -> usize {
-    let ty_size = ir::Ty::head_size().div_ceil(8);
+    let ty_size = ir::Ty::HEAD_BITS.div_ceil(8) as usize;
 
     ty_size + ARRAY_HEAD_BYTES as usize
 }
 
 pub fn decode(buffer: &[u8]) -> Result<(&[u8], ir::Ty, vec::Vec<ir::TyDef>)> {
     let ty = ir::Ty::decode(buffer)?;
-    let field_size = ir::Ty::head_size().div_ceil(8);
+    let field_size = ir::Ty::HEAD_BITS.div_ceil(8) as usize;
     let buffer = &buffer[field_size..];
 
     let ty_defs: vec::Vec<ir::TyDef> = Decode::decode(buffer)?;

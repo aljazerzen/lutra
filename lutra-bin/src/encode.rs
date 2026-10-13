@@ -4,10 +4,13 @@ use crate::vec;
 
 use bytes::{BufMut, BytesMut};
 
-use crate::{Layout, Result};
+use crate::Result;
 
 pub trait Encode {
     type HeadPtr;
+
+    /// Size of the head of this type, in bits.
+    const HEAD_BITS: u32;
 
     fn encode(&self) -> vec::Vec<u8> {
         let mut buf = BytesMut::new();
@@ -26,6 +29,7 @@ where
     T: Encode,
 {
     type HeadPtr = T::HeadPtr;
+    const HEAD_BITS: u32 = T::HEAD_BITS;
 
     fn encode_head(&self, buf: &mut BytesMut) -> Self::HeadPtr {
         T::encode_head(self, buf)
@@ -38,6 +42,7 @@ where
 
 impl Encode for bool {
     type HeadPtr = ();
+    const HEAD_BITS: u32 = 8;
 
     fn encode_head(&self, buf: &mut BytesMut) -> Self::HeadPtr {
         buf.put_u8(*self as u8);
@@ -48,6 +53,7 @@ impl Encode for bool {
 
 impl Encode for i8 {
     type HeadPtr = ();
+    const HEAD_BITS: u32 = 8;
 
     fn encode_head(&self, buf: &mut BytesMut) -> Self::HeadPtr {
         buf.put_i8(*self)
@@ -57,6 +63,7 @@ impl Encode for i8 {
 }
 impl Encode for i16 {
     type HeadPtr = ();
+    const HEAD_BITS: u32 = 16;
 
     fn encode_head(&self, buf: &mut BytesMut) -> Self::HeadPtr {
         buf.put_i16_le(*self)
@@ -66,6 +73,7 @@ impl Encode for i16 {
 }
 impl Encode for i32 {
     type HeadPtr = ();
+    const HEAD_BITS: u32 = 32;
 
     fn encode_head(&self, buf: &mut BytesMut) -> Self::HeadPtr {
         buf.put_i32_le(*self);
@@ -75,6 +83,7 @@ impl Encode for i32 {
 }
 impl Encode for i64 {
     type HeadPtr = ();
+    const HEAD_BITS: u32 = 64;
 
     fn encode_head(&self, buf: &mut BytesMut) -> Self::HeadPtr {
         buf.put_i64_le(*self);
@@ -84,6 +93,7 @@ impl Encode for i64 {
 }
 impl Encode for u8 {
     type HeadPtr = ();
+    const HEAD_BITS: u32 = 8;
 
     fn encode_head(&self, buf: &mut BytesMut) -> Self::HeadPtr {
         buf.put_u8(*self);
@@ -93,6 +103,7 @@ impl Encode for u8 {
 }
 impl Encode for u16 {
     type HeadPtr = ();
+    const HEAD_BITS: u32 = 16;
 
     fn encode_head(&self, buf: &mut BytesMut) -> Self::HeadPtr {
         buf.put_u16_le(*self);
@@ -102,6 +113,7 @@ impl Encode for u16 {
 }
 impl Encode for u32 {
     type HeadPtr = ();
+    const HEAD_BITS: u32 = 32;
 
     fn encode_head(&self, buf: &mut BytesMut) -> Self::HeadPtr {
         buf.put_u32_le(*self);
@@ -111,6 +123,7 @@ impl Encode for u32 {
 }
 impl Encode for u64 {
     type HeadPtr = ();
+    const HEAD_BITS: u32 = 64;
 
     fn encode_head(&self, buf: &mut BytesMut) -> Self::HeadPtr {
         buf.put_u64_le(*self);
@@ -120,6 +133,7 @@ impl Encode for u64 {
 }
 impl Encode for f32 {
     type HeadPtr = ();
+    const HEAD_BITS: u32 = 32;
 
     fn encode_head(&self, buf: &mut BytesMut) -> Self::HeadPtr {
         buf.put_f32_le(*self);
@@ -129,6 +143,7 @@ impl Encode for f32 {
 }
 impl Encode for f64 {
     type HeadPtr = ();
+    const HEAD_BITS: u32 = 64;
 
     fn encode_head(&self, buf: &mut BytesMut) -> Self::HeadPtr {
         buf.put_f64_le(*self);
@@ -139,6 +154,7 @@ impl Encode for f64 {
 
 impl Encode for str {
     type HeadPtr = ReversePointer;
+    const HEAD_BITS: u32 = layout::ARRAY_HEAD_BYTES * 8;
 
     fn encode_head(&self, buf: &mut BytesMut) -> ReversePointer {
         let offset = ReversePointer::new(buf);
@@ -153,6 +169,7 @@ impl Encode for str {
 }
 impl Encode for string::String {
     type HeadPtr = ReversePointer;
+    const HEAD_BITS: u32 = <str as Encode>::HEAD_BITS;
 
     fn encode_head(&self, buf: &mut BytesMut) -> ReversePointer {
         (self as &str).encode_head(buf)
@@ -164,6 +181,7 @@ impl Encode for string::String {
 }
 impl<E: Encode> Encode for vec::Vec<E> {
     type HeadPtr = ReversePointer;
+    const HEAD_BITS: u32 = <[E] as Encode>::HEAD_BITS;
 
     fn encode_head(&self, buf: &mut BytesMut) -> Self::HeadPtr {
         self.as_slice().encode_head(buf)
@@ -175,6 +193,7 @@ impl<E: Encode> Encode for vec::Vec<E> {
 }
 impl<E: Encode> Encode for [E] {
     type HeadPtr = ReversePointer;
+    const HEAD_BITS: u32 = layout::ARRAY_HEAD_BYTES * 8;
 
     fn encode_head(&self, buf: &mut BytesMut) -> ReversePointer {
         let offset = ReversePointer::new(buf);
@@ -195,8 +214,9 @@ impl<E: Encode> Encode for [E] {
         }
     }
 }
-impl<E: Encode + Layout> Encode for Option<E> {
+impl<E: Encode> Encode for Option<E> {
     type HeadPtr = Option<Result<E::HeadPtr, ReversePointer>>;
+    const HEAD_BITS: u32 = layout::option_head_format::<E>().head_size();
 
     fn encode_head(&self, buf: &mut BytesMut) -> Self::HeadPtr {
         let format = layout::option_head_format::<E>();
@@ -209,7 +229,7 @@ impl<E: Encode + Layout> Encode for Option<E> {
             return None;
         };
 
-        let variant = format.variant(1, E::head_size() as u32);
+        let variant = format.variant(1, E::HEAD_BITS);
         let head_ptr = match variant.encode_tag(buf) {
             Some(ptr) => Err(ptr),
             None => Ok(inner.encode_head(buf)),
@@ -233,16 +253,17 @@ impl<E: Encode + Layout> Encode for Option<E> {
     }
 }
 
-impl<T: Encode + Layout, E: Encode + Layout> Encode for core::result::Result<T, E> {
+impl<T: Encode, E: Encode> Encode for core::result::Result<T, E> {
     type HeadPtr =
         core::result::Result<core::result::Result<T::HeadPtr, E::HeadPtr>, ReversePointer>;
+    const HEAD_BITS: u32 = layout::result_head_format::<T, E>().head_size();
 
     fn encode_head(&self, buf: &mut BytesMut) -> Self::HeadPtr {
         let format = layout::result_head_format::<T, E>();
 
         let variant = match self {
-            Ok(_) => format.variant(0, T::head_size() as u32),
-            Err(_) => format.variant(1, E::head_size() as u32),
+            Ok(_) => format.variant(0, T::HEAD_BITS),
+            Err(_) => format.variant(1, E::HEAD_BITS),
         };
 
         let head_ptr = match variant.encode_tag(buf) {
@@ -285,6 +306,7 @@ impl<T: Encode + Layout, E: Encode + Layout> Encode for core::result::Result<T, 
 
 impl Encode for () {
     type HeadPtr = ();
+    const HEAD_BITS: u32 = 0;
 
     fn encode_head(&self, _buf: &mut BytesMut) {}
 

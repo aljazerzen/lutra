@@ -1,8 +1,8 @@
 use crate::{string, vec};
 
-use crate::{Layout, ReaderExt, Result, layout, reader};
+use crate::{Encode, ReaderExt, Result, layout, reader};
 
-pub trait Decode: Sized + Layout {
+pub trait Decode: Sized + Encode {
     fn decode(buffer: &[u8]) -> Result<Self>;
 }
 impl Decode for bool {
@@ -73,7 +73,7 @@ impl Decode for string::String {
 }
 impl<E: Decode> Decode for vec::Vec<E> {
     fn decode(r: &[u8]) -> Result<Self> {
-        decode_array(r, E::head_size().div_ceil(8), E::decode)
+        decode_array(r, E::HEAD_BITS.div_ceil(8) as usize, E::decode)
     }
 }
 impl<E: Decode> Decode for Option<E> {
@@ -83,7 +83,7 @@ impl<E: Decode> Decode for Option<E> {
         Ok(match format.decode_tag(buf) {
             0 => None,
             1 => Some(E::decode(
-                format.variant(1, E::head_size() as u32).decode_inner(buf),
+                format.variant(1, E::HEAD_BITS).decode_inner(buf),
             )?),
             _ => return Err(crate::Error::InvalidData),
         })
@@ -95,10 +95,10 @@ impl<T: Decode, E: Decode> Decode for core::result::Result<T, E> {
 
         Ok(match format.decode_tag(buf) {
             0 => Ok(T::decode(
-                format.variant(0, T::head_size() as u32).decode_inner(buf),
+                format.variant(0, T::HEAD_BITS).decode_inner(buf),
             )?),
             1 => Err(E::decode(
-                format.variant(1, E::head_size() as u32).decode_inner(buf),
+                format.variant(1, E::HEAD_BITS).decode_inner(buf),
             )?),
             _ => return Err(crate::Error::InvalidData),
         })
@@ -133,14 +133,14 @@ mod tests {
     use crate::Encode;
     use crate::string::String;
 
-    /// Encoded head size must match the layout declared by [Layout],
+    /// Encoded head size must match [Encode::HEAD_BITS],
     /// otherwise containers compute wrong strides and offsets.
     fn assert_head_size<T: Encode + Decode + core::fmt::Debug + PartialEq>(value: T) {
         let mut buf = crate::bytes::BytesMut::new();
         let head = value.encode_head(&mut buf);
         assert_eq!(
-            buf.len() * 8,
-            T::head_size(),
+            buf.len() as u32 * 8,
+            T::HEAD_BITS,
             "head size mismatch for {value:?}"
         );
         value.encode_body(head, &mut buf);

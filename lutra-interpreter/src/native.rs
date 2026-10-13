@@ -1,4 +1,4 @@
-use lutra_bin::{Encode, Layout};
+use lutra_bin::Encode;
 
 use crate::interpreter::{Cell, Interpreter};
 use crate::{Data, NativeModule};
@@ -1539,7 +1539,7 @@ pub mod std_array {
 
         let mut sum = T::default();
         let mut count: usize = 0;
-        let mut out = ArrayWriter::new(f64::head_size().div_ceil(8) as u32, &[]);
+        let mut out = ArrayWriter::new(<f64 as Encode>::HEAD_BITS.div_ceil(8), &[]);
 
         // accumulate leading
         for _ in 0..leading {
@@ -1801,7 +1801,7 @@ pub mod std_text {
 
     pub fn join(_it: &mut Interpreter, _: &[u8], args: Vec<Cell>) -> Result<Cell, EvalError> {
         let [parts, sep] = assume::exactly_n(args);
-        let mut parts = assume::array(parts, str::head_size().div_ceil(8) as u32);
+        let mut parts = assume::array(parts, <str as Encode>::HEAD_BITS.div_ceil(8));
         let sep = assume::text(&sep)?;
 
         let joined = match parts.next() {
@@ -1826,7 +1826,7 @@ pub mod std_text {
         let text = assume::text_ref(text)?;
         let sep = assume::text_ref(sep)?;
 
-        let mut output = crate::ArrayWriter::new(String::head_size().div_ceil(8) as u32, &[0]);
+        let mut output = crate::ArrayWriter::new(<String as Encode>::HEAD_BITS.div_ceil(8), &[0]);
         for part in text.as_str().split(sep.as_str()) {
             output.write_item(Data::new(part.encode()));
         }
@@ -2268,7 +2268,7 @@ mod decode {
     }
 }
 
-pub fn encode<T: Encode + Layout + ?Sized>(value: &T) -> Data {
+pub fn encode<T: Encode + ?Sized>(value: &T) -> Data {
     Data::new(value.encode())
 }
 
@@ -2288,14 +2288,14 @@ pub fn encode_option(value: Option<Data>, inner_head_bytes: u32) -> Data {
     }
 }
 
-pub fn encode_primitives<T: Encode + Layout + Sized>(values: impl Iterator<Item = T>) -> Data {
-    let mut out = crate::ArrayWriter::new(T::head_size().div_ceil(8) as u32, &[]);
+pub fn encode_primitives<T: Encode + Sized>(values: impl Iterator<Item = T>) -> Data {
+    let mut out = crate::ArrayWriter::new(T::HEAD_BITS.div_ceil(8), &[]);
     for v in values {
         out.write_item(Data::new(v.encode()));
     }
     out.finish()
 }
 
-pub fn encode_cell<T: Encode + Layout + ?Sized>(value: &T) -> Cell {
+pub fn encode_cell<T: Encode + ?Sized>(value: &T) -> Cell {
     Cell::Data(encode(value))
 }
