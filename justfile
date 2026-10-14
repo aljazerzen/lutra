@@ -53,7 +53,10 @@ profile:
 test:
     cargo build --quiet -p lutra-cli
     cargo check --quiet -p lutra-bin --no-default-features
+    cargo check --quiet -p lutra-bin-stream --no-default-features
+    cargo check --quiet -p lutra-bin-stream --no-default-features --features async
     cargo check --quiet -p lutra-runner --no-default-features
+    cargo check --quiet -p lutra-runner --no-default-features --features binary-embedded
     cargo check --quiet -p lutra-sql --no-default-features
     cargo check --quiet -p lutra-compiler --no-default-features
     cargo check --quiet -p lutra-codegen --no-default-features

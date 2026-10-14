@@ -1,6 +1,7 @@
 [workspace]
 members = [
     "lutra-bin",
+    "lutra-bin-stream",
     "lutra-bin/python",
     "lutra-sql",
     "lutra-compiler",
@@ -50,9 +51,11 @@ chrono = { version = "0.4.42", default-features = false }
 chrono-tz = { version = "0.10.4", default-features = false }
 arrow = "58.2.0"
 parquet = "58.2.0"
+zstd = "0.13"
 
 lutra-arrow = { version = "0.6", path = "lutra-arrow" }
 lutra-bin = { version = "0.6", path = "lutra-bin", default-features = false }
+lutra-bin-stream = { version = "0.6", path = "lutra-bin-stream", default-features = false }
 lutra-bin-python = { version = "0.6", path = "lutra-bin/python" }
 lutra-cli = { version = "0.6", path = "lutra-cli" }
 lutra-codegen = { version = "0.6", path = "lutra-codegen" }

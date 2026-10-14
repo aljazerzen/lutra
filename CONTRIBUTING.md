@@ -112,6 +112,13 @@ cargo run -- --verbose run --program 'hello_world()' --runner duckdb
 ```
 
 
+## Definition order
+
+Order definitions in each file by importance, not dependency order. After `mod`
+and `use` declarations, put the entrypoint function or main type first. Follow
+with supporting types and functions, then low-level helpers. Keep public methods
+before private implementation helpers, and put test helpers after the tests.
+
 ## Change guidelines
 
 When you implement a feature:

@@ -2021,6 +2021,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "lutra-bin-stream"
+version = "0.6.2"
+dependencies = [
+ "bytes",
+ "embedded-io-async",
+ "lutra-bin",
+ "thiserror 2.0.18",
+ "tokio",
+ "zstd",
+]
+
+[[package]]
 name = "lutra-cli"
 version = "0.6.2"
 dependencies = [
@@ -2124,6 +2136,7 @@ version = "0.6.0"
 dependencies = [
  "embedded-io-async",
  "lutra-bin",
+ "lutra-bin-stream",
  "lutra-codegen",
  "tokio",
  "tracing",

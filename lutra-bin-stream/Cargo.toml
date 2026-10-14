@@ -1,0 +1,26 @@
+[package]
+name = "lutra-bin-stream"
+description = "Framed streams of Lutra binary values"
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+version.workspace = true
+
+[features]
+default = ["std", "compression-zstd"]
+std = ["thiserror/std", "bytes/std", "embedded-io-async?/std"]
+compression-zstd = ["std", "dep:zstd"]
+async = ["dep:embedded-io-async"]
+tokio = ["async", "std", "dep:tokio"]
+
+[dependencies]
+lutra-bin = { workspace = true }
+bytes = { workspace = true }
+thiserror = { workspace = true }
+zstd = { workspace = true, optional = true }
+embedded-io-async = { version = "0.7", optional = true }
+tokio = { workspace = true, optional = true, features = ["io-util"] }
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["macros", "rt", "time"] }

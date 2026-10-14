@@ -1,8 +1,13 @@
 use std::collections::HashMap;
 use std::marker::Unpin;
 
-use lutra_bin::Decode;
-use tokio::io::{AsyncRead, AsyncWrite, AsyncWriteExt};
+use lutra_bin::{Decode, Encode};
+use lutra_bin_stream::{
+    Compression,
+    r#async::{Reader, Writer},
+    tokio::TokioIo,
+};
+use tokio::io::{AsyncRead, AsyncWrite};
 
 use crate::Run;
 use crate::proto;
@@ -16,6 +21,7 @@ where
     runner: &'r R,
     /// Maps client program_id → runner-allocated program_id.
     program_ids: HashMap<u32, u32>,
+    started: bool,
 }
 
 impl<'r, C, R> Server<'r, C, R>
@@ -28,19 +34,58 @@ where
             stream,
             runner,
             program_ids: HashMap::new(),
+            started: false,
         }
     }
 
+    /// Serve one connection. A cancelled or completed session cannot be restarted.
     pub async fn run(&mut self) -> Result<(), std::io::Error> {
-        while let Ok(request) = super::read_message(&mut self.stream).await {
-            self.handle_request(request).await?;
-
-            self.stream.flush().await?;
+        if self.started {
+            return Err(super::stream_error("server session has already started"));
         }
-        Ok(())
+        self.started = true;
+        let result = self.run_session().await;
+        let mut cleanup_error = None;
+        for (_, handle) in self.program_ids.drain() {
+            if let Err(err) = self.runner.release(handle).await {
+                cleanup_error.get_or_insert_with(|| super::stream_error(err.display));
+            }
+        }
+        result.and(match cleanup_error {
+            Some(err) => Err(err),
+            None => Ok(()),
+        })
     }
 
-    async fn handle_request(&mut self, req: proto::Request) -> Result<(), std::io::Error> {
+    async fn run_session(&mut self) -> Result<(), std::io::Error> {
+        let mut reader = Reader::new();
+        let mut writer = Writer::new(Compression::None).map_err(super::stream_error)?;
+        // Send the response header with the first response (or EOS). Writing
+        // it before reading requests can deadlock a tiny bounded duplex pipe
+        // when the client is still writing its request.
+        while let Some(frame) = reader
+            .read_frame(&mut TokioIo(&mut self.stream))
+            .await
+            .map_err(super::stream_error)?
+        {
+            let request = proto::Request::decode(&frame).map_err(super::stream_error)?;
+            let response = self.handle_request(request).await;
+            writer
+                .write_frame(&mut TokioIo(&mut self.stream), &response.encode())
+                .await
+                .map_err(super::stream_error)?;
+            writer
+                .flush(&mut TokioIo(&mut self.stream))
+                .await
+                .map_err(super::stream_error)?;
+        }
+        writer
+            .finish(&mut TokioIo(&mut self.stream))
+            .await
+            .map_err(super::stream_error)
+    }
+
+    async fn handle_request(&mut self, req: proto::Request) -> proto::Response {
         let res = match req.kind {
             proto::RequestKind::Prepare(prepare) => {
                 tracing::trace!("prepare");
@@ -68,12 +113,10 @@ where
                 proto::ResponseKind::Externals(self.runner.get_externals().await.into())
             }
         };
-        let res = proto::Response {
+        proto::Response {
             kind: res,
             request_id: req.id,
-        };
-
-        super::write_message(&mut self.stream, res).await
+        }
     }
 
     async fn handle_prepare(&mut self, prepare: proto::PrepareRequest) -> Result<(), proto::Error> {
@@ -81,7 +124,9 @@ where
             lutra_bin::rr::Program::decode(&prepare.program).map_err(proto::Error::from)?;
 
         let handle = self.runner.prepare(program).await?;
-        self.program_ids.insert(prepare.program_id, handle);
+        if let Some(previous) = self.program_ids.insert(prepare.program_id, handle) {
+            self.runner.release(previous).await?;
+        }
         Ok(())
     }
 
