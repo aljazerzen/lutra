@@ -36,6 +36,15 @@ pub struct InterpreterRunner<'a> {
 }
 
 impl<'a> InterpreterRunner<'a> {
+    /// Build a runner with a custom set of native modules. Use [BUILTIN_MODULES]
+    /// as a starting point when adding application-specific modules.
+    pub fn with_modules(modules: &'a [(&'a str, &'a dyn NativeModule)]) -> Self {
+        Self {
+            modules,
+            ..Self::default()
+        }
+    }
+
     pub fn with_file_system(mut self, file_system: Option<std::path::PathBuf>) -> Self {
         self.file_system = file_system;
         self

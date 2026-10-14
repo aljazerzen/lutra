@@ -44,9 +44,12 @@ where
     ) -> Result<proto::ExecuteResult, C::Error> {
         let program_id = self.prepare(program).await?;
         let request_id = self.execute(program_id, input).await?;
+        // recv_execute must happen before release: the server sends responses in
+        // request order, so the execute response sits in the stream ahead of the
+        // release response and would be silently consumed by `release()`.
+        let result = self.recv_execute(request_id).await?;
         self.release(program_id).await?;
-
-        self.recv_execute(request_id).await
+        Ok(result)
     }
 
     pub async fn prepare(&mut self, program: &[u8]) -> Result<u32, C::Error> {
