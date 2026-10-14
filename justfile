@@ -65,7 +65,18 @@ test:
 
     cargo nextest run --cargo-quiet
     just py test
+    just examples
     just website/test
+
+# Build and run the committed examples, which are separate workspaces
+examples:
+    cargo run --quiet --manifest-path=examples/rust-interpreter/Cargo.toml
+
+    # only built, because running it needs the `movies` table from init.sql
+    cargo build --quiet --manifest-path=examples/rust-postgres/Cargo.toml
+
+    # needs the lutra_bin wheel, which `just py test` installs
+    just examples/python/
 
 # Publish crates
 publish:

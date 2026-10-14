@@ -1,7 +1,7 @@
 type Movie: {
-    id: int64,
-    title: text,
-    is_released: bool
+    id: Int64,
+    title: Text,
+    is_released: Bool
 }
 
 func insert_movies(movies: [Movie]) -> std::sql::insert(movies, "movies")

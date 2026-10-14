@@ -7,11 +7,19 @@ mod generated {
 #[tokio::main(flavor = "current_thread")]
 async fn main() {
     // init PostgreSQL runner
-    let runner = lutra_runner_postgres::RunnerAsync::connect_no_tls(
+    let (runner, conn) = lutra_runner_postgres::RunnerAsync::connect_no_tls(
         "postgres://postgres:pass@localhost:5416",
     )
     .await
     .unwrap();
+
+    // the connection drives the protocol, so it has to be polled
+    tokio::task::spawn(async {
+        if let Err(e) = conn.await {
+            eprintln!("connection error: {e}");
+        }
+    });
+
     let client = generated::Client::new(&runner);
 
     // insert a few movies

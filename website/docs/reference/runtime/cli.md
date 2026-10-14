@@ -216,8 +216,11 @@ Common options:
 - `--no-types`
 - `--no-encode-decode`
 - `--function-traits` (Rust only; legacy alias: `--no-function-traits`)
-- `--programs-bytecode-lt <PROGRAM>`
-- `--programs-sql-pg <PROGRAM>`
+- `--programs-bytecode-lt <MODULE>` — generate bytecode programs for every function in a module
+- `--programs-sql-pg <MODULE>` — generate PostgreSQL SQL programs for every function in a module
+
+Use an empty module path (`''`) for the project's root module. Repeat either
+option to generate programs for multiple modules.
 - `--lutra-bin-path <PATH>`
 
 Examples:
@@ -225,7 +228,7 @@ Examples:
 ```console
 $ lutra gen-code --project ./project.lt ./lutra.rs
 $ lutra gen-code --project ./project.lt ./generated.hpp
-$ lutra gen-code --project ./project.lt --programs-sql-pg main ./generated.py
+$ lutra gen-code --project ./project.lt --programs-sql-pg '' ./generated.py
 ```
 
 ## `gen-docs`
